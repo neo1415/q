@@ -7,6 +7,124 @@ export type Json =
   | Json[]
 
 export type Database = {
+  audit: {
+    Tables: {
+      material_actions: {
+        Row: {
+          action_type: string
+          actor_id: string | null
+          actor_type: string
+          authority_user_id: string | null
+          correlation_id: string | null
+          event_id: string
+          id: number
+          metadata: Json
+          occurred_at: string
+          organisation_id: string | null
+          outcome: string
+          relationship_id: string | null
+          resource_id: string
+          resource_type: string
+          tenant_id: string
+        }
+        Insert: {
+          action_type: string
+          actor_id?: string | null
+          actor_type: string
+          authority_user_id?: string | null
+          correlation_id?: string | null
+          event_id: string
+          id?: number
+          metadata?: Json
+          occurred_at: string
+          organisation_id?: string | null
+          outcome: string
+          relationship_id?: string | null
+          resource_id: string
+          resource_type: string
+          tenant_id: string
+        }
+        Update: {
+          action_type?: string
+          actor_id?: string | null
+          actor_type?: string
+          authority_user_id?: string | null
+          correlation_id?: string | null
+          event_id?: string
+          id?: number
+          metadata?: Json
+          occurred_at?: string
+          organisation_id?: string | null
+          outcome?: string
+          relationship_id?: string | null
+          resource_id?: string
+          resource_type?: string
+          tenant_id?: string
+        }
+        Relationships: []
+      }
+      security_events: {
+        Row: {
+          correlation_id: string | null
+          event_id: string
+          event_type: string
+          id: number
+          ip_hash: string | null
+          metadata: Json
+          occurred_at: string
+          resource_id: string | null
+          resource_type: string | null
+          severity: string
+          tenant_id: string | null
+          user_agent_hash: string | null
+          user_id: string | null
+        }
+        Insert: {
+          correlation_id?: string | null
+          event_id: string
+          event_type: string
+          id?: number
+          ip_hash?: string | null
+          metadata?: Json
+          occurred_at: string
+          resource_id?: string | null
+          resource_type?: string | null
+          severity: string
+          tenant_id?: string | null
+          user_agent_hash?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          correlation_id?: string | null
+          event_id?: string
+          event_type?: string
+          id?: number
+          ip_hash?: string | null
+          metadata?: Json
+          occurred_at?: string
+          resource_id?: string | null
+          resource_type?: string | null
+          severity?: string
+          tenant_id?: string | null
+          user_agent_hash?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      [_ in never]: never
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   events: {
     Tables: {
       outbox: {
@@ -687,6 +805,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  audit: {
+    Enums: {},
+  },
   events: {
     Enums: {},
   },

@@ -25,7 +25,7 @@ describe("supabase/config.toml exposed schemas", () => {
     expect(exposed).toContain("public");
   });
 
-  it.each(["identity", "permissions", "private"])(
+  it.each(["identity", "permissions", "private", "events", "audit", "pgmq"])(
     "does not expose the %s schema through the Data API",
     (schema) => {
       expect(exposed).not.toContain(schema);

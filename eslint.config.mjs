@@ -59,6 +59,8 @@ const boundaryMessage = {
     "@capital-q/eventing is server-side event infrastructure over the database. Browser-reachable code and the API client never import it.",
   publisherOnlyInWorkers:
     "@capital-q/eventing/publisher (OutboxPublisher, PgmqEventDispatcher) is worker infrastructure. Domain and application code emit events through OutboxWriter inside their own transaction and never publish to the queue directly (ERA-041, AEC-036).",
+  serverOnlyAudit:
+    "@capital-q/audit writes accountability records through the database. Browser-reachable code and the API client never import it.",
   serverOnlyObservability:
     "@capital-q/observability is server-only: it depends on Pino and Node built-ins and must not reach a browser bundle. Browser telemetry arrives as its own surface.",
   relativeEscape:
@@ -93,6 +95,10 @@ const noSecurityAdapters = {
 const noEventing = {
   group: ["@capital-q/eventing", "@capital-q/eventing/*"],
   message: boundaryMessage.serverOnlyEventing,
+};
+const noAudit = {
+  group: ["@capital-q/audit", "@capital-q/audit/*"],
+  message: boundaryMessage.serverOnlyAudit,
 };
 const noObservability = {
   group: ["@capital-q/observability", "@capital-q/observability/*"],
@@ -237,6 +243,7 @@ export default tseslint.config(
       noDatabase,
       noSecurityAdapters,
       noEventing,
+      noAudit,
       noObservability,
       {
         group: APP_IMPORT_PATTERNS.filter(
@@ -257,6 +264,7 @@ export default tseslint.config(
       noDatabase,
       noSecurityAdapters,
       noEventing,
+      noAudit,
       noApps,
       noAppPaths,
       deepInternal,

@@ -188,6 +188,34 @@ importers:
         specifier: 5.9.3
         version: 5.9.3
 
+  packages/audit:
+    dependencies:
+      '@capital-q/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      '@capital-q/database':
+        specifier: workspace:*
+        version: link:../database
+      '@capital-q/security':
+        specifier: workspace:*
+        version: link:../security
+      zod:
+        specifier: 4.5.4
+        version: 4.5.4
+    devDependencies:
+      '@capital-q/config':
+        specifier: workspace:*
+        version: link:../config
+      '@capital-q/eventing':
+        specifier: workspace:*
+        version: link:../eventing
+      '@types/node':
+        specifier: ^24.13.3
+        version: 24.13.3
+      typescript:
+        specifier: 5.9.3
+        version: 5.9.3
+
   packages/config:
     dependencies:
       zod:
