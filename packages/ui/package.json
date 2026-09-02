@@ -85,6 +85,50 @@
     "./q-composer": {
       "types": "./dist/patterns/q-composer.d.ts",
       "default": "./dist/patterns/q-composer.js"
+    },
+    "./select": {
+      "types": "./dist/components/select.d.ts",
+      "default": "./dist/components/select.js"
+    },
+    "./choice-list": {
+      "types": "./dist/components/choice-list.d.ts",
+      "default": "./dist/components/choice-list.js"
+    },
+    "./money-input": {
+      "types": "./dist/components/money-input.d.ts",
+      "default": "./dist/components/money-input.js"
+    },
+    "./narrative-input": {
+      "types": "./dist/patterns/narrative-input.d.ts",
+      "default": "./dist/patterns/narrative-input.js"
+    },
+    "./evidence-status": {
+      "types": "./dist/patterns/evidence-status.d.ts",
+      "default": "./dist/patterns/evidence-status.js"
+    },
+    "./q-suggestion": {
+      "types": "./dist/patterns/q-suggestion.d.ts",
+      "default": "./dist/patterns/q-suggestion.js"
+    },
+    "./editable-fact": {
+      "types": "./dist/patterns/editable-fact.d.ts",
+      "default": "./dist/patterns/editable-fact.js"
+    },
+    "./taxonomy-chip-editor": {
+      "types": "./dist/patterns/taxonomy-chip-editor.d.ts",
+      "default": "./dist/patterns/taxonomy-chip-editor.js"
+    },
+    "./file-selection-list": {
+      "types": "./dist/patterns/file-selection-list.d.ts",
+      "default": "./dist/patterns/file-selection-list.js"
+    },
+    "./q-clarification": {
+      "types": "./dist/patterns/q-clarification.d.ts",
+      "default": "./dist/patterns/q-clarification.js"
+    },
+    "./intelligence-snapshot": {
+      "types": "./dist/patterns/intelligence-snapshot.d.ts",
+      "default": "./dist/patterns/intelligence-snapshot.js"
     }
   },
   "main": "./dist/index.js",

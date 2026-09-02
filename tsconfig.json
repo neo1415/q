@@ -25,6 +25,7 @@
     "dist",
     "**/dist",
     ".next",
-    "**/.next"
+    "**/.next",
+    "apps/web"
   ]
 }

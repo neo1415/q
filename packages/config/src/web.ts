@@ -6,6 +6,7 @@ import {
   type EnvironmentInput,
   type RuntimeConfig,
 } from "./common.js";
+import { ConfigurationError } from "./errors.js";
 
 /**
  * Web configuration has two fundamentally different classes and they must never
@@ -40,8 +41,25 @@ export type WebPublicConfig = Readonly<Record<string, never>>;
 
 export type WebServerSecrets = Readonly<Record<string, never>>;
 
+/**
+ * Which founder-onboarding client the web app composes.
+ *
+ *   fixture  deterministic synthetic development adapter; the default outside
+ *            production NODE_ENV so `next dev` and Playwright can exercise the
+ *            journey before the onboarding API (CQ-ONB-002) exists
+ *   none     the honest "not available yet" surface; the default for
+ *            production builds
+ *
+ * The fixture is refused outright in the production deployment environment:
+ * a misconfiguration can turn the feature off, never turn fake data on.
+ */
+export const FOUNDER_ONBOARDING_ADAPTERS = ["fixture", "none"] as const;
+export type FounderOnboardingAdapter =
+  (typeof FOUNDER_ONBOARDING_ADAPTERS)[number];
+
 export type WebServerConfig = {
   readonly runtime: RuntimeConfig;
+  readonly founderOnboardingAdapter: FounderOnboardingAdapter;
   readonly public: WebPublicConfig;
   readonly secrets: WebServerSecrets;
 };
@@ -58,14 +76,34 @@ export function parseWebPublicConfig(input: EnvironmentInput): WebPublicConfig {
   return {};
 }
 
-const webServerEnvSchema = z.object({ ...runtimeEnvShape });
+const webServerEnvSchema = z.object({
+  ...runtimeEnvShape,
+  CQ_FOUNDER_ONBOARDING_ADAPTER: z.enum(FOUNDER_ONBOARDING_ADAPTERS).optional(),
+});
 
 /** Server-only. Never pass the result to a Client Component. */
 export function parseWebServerConfig(env: EnvironmentInput): WebServerConfig {
   const parsed = parseConfig("web", webServerEnvSchema, env);
+  const runtime = toRuntimeConfig(parsed);
+  const founderOnboardingAdapter: FounderOnboardingAdapter =
+    parsed.CQ_FOUNDER_ONBOARDING_ADAPTER ??
+    (runtime.nodeEnv === "production" ? "none" : "fixture");
+  if (
+    founderOnboardingAdapter === "fixture" &&
+    runtime.deploymentEnvironment === "production"
+  ) {
+    throw new ConfigurationError("web", [
+      {
+        variable: "CQ_FOUNDER_ONBOARDING_ADAPTER",
+        reason:
+          "the fixture adapter is never permitted in the production environment",
+      },
+    ]);
+  }
 
   return {
-    runtime: toRuntimeConfig(parsed),
+    runtime,
+    founderOnboardingAdapter,
     public: {},
     secrets: {},
   };

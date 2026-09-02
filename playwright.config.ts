@@ -65,6 +65,9 @@ export default defineConfig({
   webServer: {
     command: `node ./node_modules/next/dist/bin/next start --port ${String(PORT)}`,
     cwd: "apps/web",
+    // The founder onboarding journey runs on the deterministic fixture
+    // adapter under test; production builds default to "none".
+    env: { CQ_FOUNDER_ONBOARDING_ADAPTER: "fixture" },
     url: `${BASE_URL}/home`,
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
