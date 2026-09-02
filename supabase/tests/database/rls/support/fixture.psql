@@ -1,0 +1,195 @@
+-- Capital Q reusable RLS fixture and principal simulation (CQ-SEC-004).
+--
+-- Include from a pgTAP suite, inside its transaction, after loading pgtap:
+--
+--   begin;
+--   create extension if not exists pgtap with schema extensions;
+--   \ir support/fixture.psql
+--   select pg_temp.rls_setup();
+--   select plan(N);
+--   ...
+--   select * from finish();
+--   rollback;
+--
+-- Everything here is transaction-local: the fixture table is a temp table
+-- dropped on commit, the helpers live in pg_temp, and the suite rolls back.
+-- Nothing is left behind and nothing here exists in production.
+--
+-- Deliberately not a psql-level `.sql` file: the Supabase runner executes
+-- every *.sql under tests/database as a suite, and this is not one.
+--
+-- Identities (fixed, obviously synthetic):
+--   ...00a1 auth user A   ...00a3 tenant A   ...00a4 organisation A   ...00a5 membership A (active)
+--   ...00b1 auth user B   ...00b3 tenant B   ...00b4 organisation B   ...00b5 membership B (active)
+--   ...00c1 auth user R   ...00c3 tenant R   ...00c4 organisation R   ...00c5 membership R (revoked)
+-- Application UserIds (user_a / user_b / user_r) are created by the real
+-- auth-profile trigger and read back, because AuthUserId ≠ UserId.
+
+create temporary table rls_fixture (
+  label text primary key,
+  id uuid not null
+) on commit drop;
+
+-- Client roles must be able to read the fixture ids while acting.
+grant select on rls_fixture to anon, authenticated, service_role;
+
+insert into rls_fixture (label, id) values
+  ('auth_a', '00000000-0000-4000-8000-0000000000a1'),
+  ('tenant_a', '00000000-0000-4000-8000-0000000000a3'),
+  ('org_a', '00000000-0000-4000-8000-0000000000a4'),
+  ('membership_a', '00000000-0000-4000-8000-0000000000a5'),
+  ('auth_b', '00000000-0000-4000-8000-0000000000b1'),
+  ('tenant_b', '00000000-0000-4000-8000-0000000000b3'),
+  ('org_b', '00000000-0000-4000-8000-0000000000b4'),
+  ('membership_b', '00000000-0000-4000-8000-0000000000b5'),
+  ('auth_r', '00000000-0000-4000-8000-0000000000c1'),
+  ('tenant_r', '00000000-0000-4000-8000-0000000000c3'),
+  ('org_r', '00000000-0000-4000-8000-0000000000c4'),
+  ('membership_r', '00000000-0000-4000-8000-0000000000c5');
+
+-- Look up a fixture id by label. Works for every role (the temp table is
+-- readable by the client roles above).
+create function pg_temp.rls_id(p_label text) returns uuid
+language sql stable
+as $$ select id from pg_temp.rls_fixture where label = p_label $$;
+
+-- Create the baseline matrix using the real schema and the real triggers:
+-- two isolated tenants with one active member each, and a third tenant whose
+-- member has been revoked (history kept, access gone). No cross-membership.
+create function pg_temp.rls_setup() returns void
+language plpgsql
+as $$
+begin
+  insert into auth.users (id, email) values
+    (pg_temp.rls_id('auth_a'), 'rls-user-a@example.invalid'),
+    (pg_temp.rls_id('auth_b'), 'rls-user-b@example.invalid'),
+    (pg_temp.rls_id('auth_r'), 'rls-user-r@example.invalid');
+
+  -- The application profile is created by private.handle_new_auth_user.
+  insert into pg_temp.rls_fixture (label, id)
+  select 'user_a', p.id from identity.user_profiles p where p.auth_user_id = pg_temp.rls_id('auth_a');
+  insert into pg_temp.rls_fixture (label, id)
+  select 'user_b', p.id from identity.user_profiles p where p.auth_user_id = pg_temp.rls_id('auth_b');
+  insert into pg_temp.rls_fixture (label, id)
+  select 'user_r', p.id from identity.user_profiles p where p.auth_user_id = pg_temp.rls_id('auth_r');
+
+  insert into identity.tenants (id, name) values
+    (pg_temp.rls_id('tenant_a'), 'RLS Fixture Tenant A'),
+    (pg_temp.rls_id('tenant_b'), 'RLS Fixture Tenant B'),
+    (pg_temp.rls_id('tenant_r'), 'RLS Fixture Tenant R');
+
+  insert into identity.organisations (id, tenant_id, organisation_type, display_name, slug) values
+    (pg_temp.rls_id('org_a'), pg_temp.rls_id('tenant_a'), 'company', 'RLS Fixture Org A', 'rls-org-a'),
+    (pg_temp.rls_id('org_b'), pg_temp.rls_id('tenant_b'), 'investment_firm', 'RLS Fixture Org B', 'rls-org-b'),
+    (pg_temp.rls_id('org_r'), pg_temp.rls_id('tenant_r'), 'company', 'RLS Fixture Org R', 'rls-org-r');
+
+  insert into identity.tenant_organisations (tenant_id, organisation_id) values
+    (pg_temp.rls_id('tenant_a'), pg_temp.rls_id('org_a')),
+    (pg_temp.rls_id('tenant_b'), pg_temp.rls_id('org_b')),
+    (pg_temp.rls_id('tenant_r'), pg_temp.rls_id('org_r'));
+
+  insert into identity.organisation_memberships
+    (id, tenant_id, organisation_id, user_id, membership_status, joined_at, left_at) values
+    (pg_temp.rls_id('membership_a'), pg_temp.rls_id('tenant_a'), pg_temp.rls_id('org_a'), pg_temp.rls_id('user_a'), 'active', now() - interval '30 days', null),
+    (pg_temp.rls_id('membership_b'), pg_temp.rls_id('tenant_b'), pg_temp.rls_id('org_b'), pg_temp.rls_id('user_b'), 'active', now() - interval '30 days', null),
+    (pg_temp.rls_id('membership_r'), pg_temp.rls_id('tenant_r'), pg_temp.rls_id('org_r'), pg_temp.rls_id('user_r'), 'revoked', now() - interval '30 days', now() - interval '1 day');
+
+  -- Persisted active contexts, including a stale one pointing at the revoked
+  -- membership: it must never recreate access.
+  insert into identity.user_active_contexts (user_id, membership_id) values
+    (pg_temp.rls_id('user_a'), pg_temp.rls_id('membership_a')),
+    (pg_temp.rls_id('user_b'), pg_temp.rls_id('membership_b')),
+    (pg_temp.rls_id('user_r'), pg_temp.rls_id('membership_r'));
+
+  -- One role assignment so role-visibility policies have something to test.
+  insert into identity.membership_roles (membership_id, role_id)
+  select pg_temp.rls_id('membership_a'), r.id from permissions.roles r where r.code = 'organisation_admin';
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- Principal simulation. Each helper first returns to the session role, then
+-- installs exactly the state that principal would have, so no claim or role
+-- from a previous principal survives.
+-- ---------------------------------------------------------------------------
+
+-- Anonymous: role anon, no JWT claims, auth.uid() is null.
+create function pg_temp.act_as_anonymous() returns void
+language plpgsql
+as $$
+begin
+  execute 'reset role';
+  perform set_config('request.jwt.claims', '', true);
+  perform set_config('request.jwt.claim.sub', '', true);
+  perform set_config('request.jwt.claim.role', '', true);
+  execute 'set local role anon';
+end;
+$$;
+
+-- Authenticated as the fixture auth user behind a label ('auth_a', 'auth_b',
+-- 'auth_r'). The JWT carries only sub and role: it proves who is asking, and
+-- nothing about tenants or organisations. That still comes from membership
+-- rows through the production helpers.
+create function pg_temp.act_as(p_auth_label text) returns void
+language plpgsql
+as $$
+declare
+  v_auth uuid;
+begin
+  execute 'reset role';
+  v_auth := pg_temp.rls_id(p_auth_label);
+  if v_auth is null then
+    raise exception 'unknown fixture principal %', p_auth_label;
+  end if;
+  perform set_config(
+    'request.jwt.claims',
+    json_build_object('sub', v_auth::text, 'role', 'authenticated')::text,
+    true
+  );
+  perform set_config('request.jwt.claim.sub', v_auth::text, true);
+  perform set_config('request.jwt.claim.role', 'authenticated', true);
+  execute 'set local role authenticated';
+end;
+$$;
+
+create function pg_temp.act_as_user_a() returns void language sql as $$ select pg_temp.act_as('auth_a') $$;
+create function pg_temp.act_as_user_b() returns void language sql as $$ select pg_temp.act_as('auth_b') $$;
+create function pg_temp.act_as_revoked_user() returns void language sql as $$ select pg_temp.act_as('auth_r') $$;
+
+-- Supabase's service_role database role: rolbypassrls, but in Capital Q it
+-- holds NO grants on the application schemas. Provided so suites can prove
+-- that posture rather than assume it.
+create function pg_temp.act_as_service_role() returns void
+language plpgsql
+as $$
+begin
+  execute 'reset role';
+  perform set_config('request.jwt.claims', '', true);
+  perform set_config('request.jwt.claim.sub', '', true);
+  perform set_config('request.jwt.claim.role', '', true);
+  execute 'set local role service_role';
+end;
+$$;
+
+-- The privileged server principal: the migration-owner role the server
+-- connection uses (postgres locally), which bypasses RLS.
+--
+--   RLS BYPASS ≠ BUSINESS AUTHORIZATION.
+--
+-- Rows being visible to this role says nothing about whether any action is
+-- permitted; that is decided by ActorContext + AuthorizationService.
+create function pg_temp.act_as_privileged() returns void
+language plpgsql
+as $$
+begin
+  execute 'reset role';
+  perform set_config('request.jwt.claims', '', true);
+  perform set_config('request.jwt.claim.sub', '', true);
+  perform set_config('request.jwt.claim.role', '', true);
+end;
+$$;
+
+-- Alias with the intent spelled out: back to the test's own identity.
+create function pg_temp.reset_test_identity() returns void
+language sql
+as $$ select pg_temp.act_as_privileged() $$;
