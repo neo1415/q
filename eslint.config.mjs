@@ -65,6 +65,59 @@ const boundaryMessage = {
     "Cross-package imports use the @capital-q/* workspace name, not a relative path out of the package.",
 };
 
+/** Import restrictions as reusable pattern entries. */
+const deepInternal = {
+  group: [DEEP_INTERNAL_PATTERN],
+  message: boundaryMessage.deepInternal,
+};
+const relativeEscape = {
+  group: ["**/apps/*/src/*", "**/packages/*/src/*"],
+  message: boundaryMessage.relativeEscape,
+};
+const noApps = {
+  group: APP_IMPORT_PATTERNS,
+  message: boundaryMessage.appFromPackage,
+};
+const noAppPaths = {
+  group: ["**/apps/**"],
+  message: boundaryMessage.appFromPackage,
+};
+const noDatabase = {
+  group: ["@capital-q/database", "@capital-q/database/*"],
+  message: boundaryMessage.privilegedDatabase,
+};
+const noSecurityAdapters = {
+  group: ["@capital-q/security/postgres"],
+  message: boundaryMessage.serverOnlySecurityAdapters,
+};
+const noEventing = {
+  group: ["@capital-q/eventing", "@capital-q/eventing/*"],
+  message: boundaryMessage.serverOnlyEventing,
+};
+const noObservability = {
+  group: ["@capital-q/observability", "@capital-q/observability/*"],
+  message: boundaryMessage.serverOnlyObservability,
+};
+const noMigration = {
+  group: ["@capital-q/database/migration"],
+  message: boundaryMessage.migrationEntrypoint,
+};
+const noPublisher = {
+  group: ["@capital-q/eventing/publisher"],
+  message: boundaryMessage.publisherOnlyInWorkers,
+};
+
+/** One complete, non-merging import-boundary scope. */
+function restrictImports(files, ignores, patterns) {
+  return {
+    files,
+    ignores,
+    rules: {
+      "@typescript-eslint/no-restricted-imports": ["error", { patterns }],
+    },
+  };
+}
+
 export default tseslint.config(
   // 1. Global ignores. Build output and generated files only -- never real source.
   {
@@ -149,212 +202,91 @@ export default tseslint.config(
   // 4. Capital Q architecture boundaries.
   //
   // Enforced with no-restricted-imports rather than a dependency-graph
-  // framework: the rules below are the ones knowable today, and adding a
-  // second architecture tool is not justified at this size (36).
-  {
-    files: ["**/*.{ts,tsx,mts,cts}"],
-    rules: {
-      "@typescript-eslint/no-restricted-imports": [
-        "error",
-        {
-          patterns: [
-            {
-              group: [DEEP_INTERNAL_PATTERN],
-              message: boundaryMessage.deepInternal,
-            },
-            {
-              group: ["**/apps/*/src/*", "**/packages/*/src/*"],
-              message: boundaryMessage.relativeEscape,
-            },
-          ],
-        },
-      ],
-    },
-  },
+  // framework (36). One rule of flat config shapes everything below: when two
+  // config objects match the same file, the later one REPLACES the rule's
+  // options -- patterns are never merged. So each scope here is complete on
+  // its own, scopes are disjoint, and a probe file in each scope is part of
+  // every packet's verification.
 
   // Rule A -- no reusable package may import a deployable app.
-  {
-    files: ["packages/**/*.{ts,tsx}"],
-    rules: {
-      "@typescript-eslint/no-restricted-imports": [
-        "error",
-        {
-          patterns: [
-            {
-              group: APP_IMPORT_PATTERNS,
-              message: boundaryMessage.appFromPackage,
-            },
-            {
-              group: [DEEP_INTERNAL_PATTERN],
-              message: boundaryMessage.deepInternal,
-            },
-            {
-              group: ["**/apps/**"],
-              message: boundaryMessage.appFromPackage,
-            },
-          ],
-        },
-      ],
-    },
-  },
+  restrictImports(
+    ["packages/**/*.{ts,tsx}"],
+    ["packages/ui/**", "packages/api-client/**", "packages/eventing/**"],
+    [
+      noApps,
+      noAppPaths,
+      noPublisher,
+      noMigration,
+      deepInternal,
+      relativeEscape,
+    ],
+  ),
+  restrictImports(
+    ["packages/eventing/**/*.{ts,tsx}"],
+    [],
+    [noApps, noAppPaths, noMigration, deepInternal, relativeEscape],
+  ),
 
-  // Rule C -- browser-reachable code must not reach database infrastructure.
-  //
-  // This is the one import boundary the security architecture explicitly
-  // requires be checked statically (doc 15, 113/116; TM-TEN-03, TM-SEC-02).
-  // Lint is one of the two controls those threats name; production build
-  // scanning is the other and arrives with CI in CQ-FOUND-005.
-  {
-    files: ["apps/web/**/*.{ts,tsx}", "packages/ui/**/*.{ts,tsx}"],
-    rules: {
-      "@typescript-eslint/no-restricted-imports": [
-        "error",
-        {
-          patterns: [
-            {
-              group: ["@capital-q/database", "@capital-q/database/*"],
-              message: boundaryMessage.privilegedDatabase,
-            },
-            {
-              group: ["@capital-q/security/postgres"],
-              message: boundaryMessage.serverOnlySecurityAdapters,
-            },
-            {
-              group: ["@capital-q/eventing", "@capital-q/eventing/*"],
-              message: boundaryMessage.serverOnlyEventing,
-            },
-            {
-              group: ["@capital-q/observability", "@capital-q/observability/*"],
-              message: boundaryMessage.serverOnlyObservability,
-            },
-            {
-              group: APP_IMPORT_PATTERNS.filter(
-                (pattern) => !pattern.startsWith("@capital-q/web"),
-              ),
-              message: boundaryMessage.appFromPackage,
-            },
-            {
-              group: [DEEP_INTERNAL_PATTERN],
-              message: boundaryMessage.deepInternal,
-            },
-          ],
-        },
-      ],
-    },
-  },
+  // Rule C -- browser-reachable code must not reach server infrastructure
+  // (doc 15, 113/116; TM-TEN-03, TM-SEC-02). Lint is one of the two controls
+  // those threats name; the other is production build scanning in CI.
+  restrictImports(
+    ["apps/web/**/*.{ts,tsx}", "packages/ui/**/*.{ts,tsx}"],
+    [],
+    [
+      noDatabase,
+      noSecurityAdapters,
+      noEventing,
+      noObservability,
+      {
+        group: APP_IMPORT_PATTERNS.filter(
+          (pattern) => !pattern.startsWith("@capital-q/web"),
+        ),
+        message: boundaryMessage.appFromPackage,
+      },
+      deepInternal,
+      relativeEscape,
+    ],
+  ),
 
   // Rule D -- the API client consumes contracts, never server implementation.
-  {
-    files: ["packages/api-client/**/*.ts"],
-    rules: {
-      "@typescript-eslint/no-restricted-imports": [
-        "error",
-        {
-          patterns: [
-            {
-              group: ["@capital-q/database", "@capital-q/database/*"],
-              message: boundaryMessage.serverOnlyDatabase,
-            },
-            {
-              group: ["@capital-q/security/postgres"],
-              message: boundaryMessage.serverOnlySecurityAdapters,
-            },
-            {
-              group: ["@capital-q/eventing", "@capital-q/eventing/*"],
-              message: boundaryMessage.serverOnlyEventing,
-            },
-            {
-              group: APP_IMPORT_PATTERNS,
-              message: boundaryMessage.apiImplementation,
-            },
-            {
-              group: ["**/apps/**"],
-              message: boundaryMessage.apiImplementation,
-            },
-            {
-              group: [DEEP_INTERNAL_PATTERN],
-              message: boundaryMessage.deepInternal,
-            },
-          ],
-        },
-      ],
-    },
-  },
-
-  // Configuration is read once, through @capital-q/config (ERA-048, ERA-049).
-  //
-  // Scoped to the Node deployables and reusable packages. apps/web is excluded
-  // because Next.js statically replaces `process.env.NODE_ENV` and
-  // `NEXT_PUBLIC_*` at build time, which is a framework mechanism rather than
-  // ad hoc configuration access. The config package itself is the one place
-  // allowed to read the environment.
-  {
-    files: [
-      "apps/api/src/**/*.ts",
-      "apps/q-api/src/**/*.ts",
-      "apps/workers/src/**/*.ts",
-      "packages/**/*.{ts,tsx}",
+  restrictImports(
+    ["packages/api-client/**/*.ts"],
+    [],
+    [
+      noDatabase,
+      noSecurityAdapters,
+      noEventing,
+      noApps,
+      noAppPaths,
+      deepInternal,
+      relativeEscape,
     ],
-    ignores: ["packages/config/src/**"],
-    rules: {
-      "no-restricted-properties": [
-        "error",
-        {
-          object: "process",
-          property: "env",
-          message:
-            "Read configuration through @capital-q/config rather than process.env. Environment access belongs in the config package and the composition root (ERA-049).",
-        },
-      ],
-    },
-  },
+  ),
 
-  // Rule F -- queue publication is the worker's job alone. Everything else
-  // reaches the event pipeline through OutboxWriter.
-  {
-    files: ["apps/**/*.{ts,tsx}", "packages/**/*.{ts,tsx}"],
-    ignores: ["apps/workers/**", "packages/eventing/**"],
-    rules: {
-      "@typescript-eslint/no-restricted-imports": [
-        "error",
-        {
-          patterns: [
-            {
-              group: ["@capital-q/eventing/publisher"],
-              message: boundaryMessage.publisherOnlyInWorkers,
-            },
-            {
-              group: [DEEP_INTERNAL_PATTERN],
-              message: boundaryMessage.deepInternal,
-            },
-          ],
-        },
-      ],
-    },
-  },
+  // Rule E -- HTTP deployables: no schema administration, no queue
+  // publication. Events leave through OutboxWriter in a transaction.
+  restrictImports(
+    ["apps/api/**/*.{ts,tsx}", "apps/q-api/**/*.{ts,tsx}"],
+    [],
+    [noMigration, noPublisher, deepInternal, relativeEscape],
+  ),
 
-  // Rule E -- schema-administration access never enters a deployable, and
-  // parameterisation is never bypassed outside the driver adapter itself.
-  {
-    files: ["apps/**/*.{ts,tsx}"],
-    rules: {
-      "@typescript-eslint/no-restricted-imports": [
-        "error",
-        {
-          patterns: [
-            {
-              group: ["@capital-q/database/migration"],
-              message: boundaryMessage.migrationEntrypoint,
-            },
-            {
-              group: [DEEP_INTERNAL_PATTERN],
-              message: boundaryMessage.deepInternal,
-            },
-          ],
-        },
-      ],
-    },
-  },
+  // Rule F -- the worker may publish; it still never administers schema.
+  restrictImports(
+    ["apps/workers/**/*.{ts,tsx}"],
+    [],
+    [noMigration, deepInternal, relativeEscape],
+  ),
+
+  // Everything else (root configs, e2e tests): package boundaries only.
+  restrictImports(
+    ["**/*.{ts,tsx,mts,cts}"],
+    ["apps/**", "packages/**"],
+    [deepInternal, relativeEscape],
+  ),
+
+  // Parameterisation is never bypassed outside the driver adapter itself.
   {
     files: ["apps/**/*.{ts,tsx}", "packages/**/*.{ts,tsx}"],
     ignores: ["packages/database/src/internal/**"],
