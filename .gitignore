@@ -42,3 +42,6 @@ apps/web/CLAUDE.md
 # OS / editor
 .DS_Store
 Thumbs.db
+
+# Per-developer in-app browser preview configuration.
+.claude/launch.json

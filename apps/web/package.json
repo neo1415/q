@@ -3,24 +3,32 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "Capital Q web application — Next.js App Router composition root.",
+  "description": "Capital Q web application \u2014 Next.js App Router composition root.",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
     "typecheck": "tsc --noEmit",
-    "clean": "node -e \"require('node:fs').rmSync('.next',{recursive:true,force:true})\""
+    "clean": "node -e \"require('node:fs').rmSync('.next',{recursive:true,force:true})\"",
+    "icons": "node scripts/generate-pwa-icons.mjs"
   },
   "dependencies": {
     "@capital-q/contracts": "workspace:*",
+    "@capital-q/ui": "workspace:*",
+    "geist": "1.7.2",
     "next": "~16.3.4",
     "react": "^19.2.8",
     "react-dom": "^19.2.8"
   },
   "devDependencies": {
+    "@tailwindcss/postcss": "4.3.3",
+    "@testing-library/react": "16.3.3",
+    "@testing-library/user-event": "14.6.7",
     "@types/node": "^24.13.3",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.4",
+    "jsdom": "30.0.1",
+    "tailwindcss": "4.3.3",
     "typescript": "5.9.3"
   }
 }

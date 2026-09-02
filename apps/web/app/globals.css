@@ -1,0 +1,131 @@
+@import "tailwindcss";
+@import "@capital-q/ui/styles.css";
+
+/* Component classes live in the design-system package's source. */
+@source "../../../packages/ui/src";
+
+/*
+ * Tailwind theme: fonts and radii only. Colours are never registered here --
+ * utilities read the canonical `--cq-*` tokens directly (ADR-001 Decision 3).
+ */
+@theme {
+  --font-sans:
+    var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system, "Segoe UI",
+    sans-serif;
+  --font-mono:
+    var(--font-geist-mono), ui-monospace, "SFMono-Regular", Menlo, monospace;
+
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 18px;
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+    /* Keep focused content clear of the fixed header and bottom navigation. */
+    scroll-padding-top: calc(
+      var(--cq-header-height) + var(--cq-safe-top) + 8px
+    );
+    scroll-padding-bottom: calc(
+      var(--cq-bottom-nav-height) + var(--cq-safe-bottom) + 8px
+    );
+  }
+
+  body {
+    min-height: 100dvh;
+    background-color: var(--cq-canvas);
+    color: var(--cq-text-primary);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  @media (min-width: 1024px) {
+    html {
+      scroll-padding-top: 8px;
+      scroll-padding-bottom: 8px;
+    }
+  }
+}
+
+/*
+ * Application shell. Mobile is the base: header, main, fixed bottom
+ * navigation that reserves real space and respects the safe areas. Desktop
+ * is the enhancement: a sidebar replaces both header and bottom navigation.
+ */
+@layer components {
+  .cq-shell {
+    display: flex;
+    min-height: 100dvh;
+  }
+
+  .cq-shell-sidebar {
+    display: none;
+  }
+
+  .cq-shell-body {
+    display: flex;
+    min-width: 0;
+    flex: 1 1 auto;
+    flex-direction: column;
+  }
+
+  .cq-shell-header {
+    position: sticky;
+    top: 0;
+    z-index: var(--cq-z-sticky);
+    padding-top: var(--cq-safe-top);
+    padding-left: var(--cq-safe-left);
+    padding-right: var(--cq-safe-right);
+    border-bottom: 1px solid var(--cq-border-subtle);
+    background-color: var(--cq-canvas);
+  }
+
+  .cq-shell-main {
+    flex: 1 1 auto;
+    padding-bottom: calc(var(--cq-bottom-nav-height) + var(--cq-safe-bottom));
+  }
+
+  .cq-bottom-nav {
+    position: fixed;
+    inset-inline: 0;
+    bottom: 0;
+    z-index: var(--cq-z-navigation);
+    box-sizing: border-box;
+    /* Outer height is exactly what main reserves, border included. */
+    height: calc(var(--cq-bottom-nav-height) + var(--cq-safe-bottom));
+    padding-bottom: var(--cq-safe-bottom);
+    padding-left: var(--cq-safe-left);
+    padding-right: var(--cq-safe-right);
+    border-top: 1px solid var(--cq-border-subtle);
+    background-color: var(--cq-surface);
+  }
+
+  @media (min-width: 1024px) {
+    .cq-shell-sidebar {
+      position: sticky;
+      top: 0;
+      display: flex;
+      height: 100dvh;
+      width: var(--cq-sidebar-width);
+      flex: none;
+      flex-direction: column;
+      border-right: 1px solid var(--cq-border-subtle);
+      background-color: var(--cq-surface);
+      padding-top: var(--cq-safe-top);
+      padding-left: var(--cq-safe-left);
+    }
+
+    .cq-shell-header,
+    .cq-bottom-nav {
+      display: none;
+    }
+
+    .cq-shell-main {
+      padding-bottom: 0;
+    }
+  }
+}

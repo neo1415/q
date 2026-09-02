@@ -298,6 +298,33 @@ export default tseslint.config(
     },
   },
 
+  // The service worker is plain browser JavaScript with worker globals, and
+  // the icon generator is a Node script. Neither is TypeScript source.
+  {
+    files: ["apps/web/public/sw.js"],
+    languageOptions: {
+      sourceType: "script",
+      globals: {
+        self: "readonly",
+        caches: "readonly",
+        fetch: "readonly",
+        URL: "readonly",
+        Promise: "readonly",
+      },
+    },
+  },
+  {
+    files: ["apps/web/scripts/**/*.mjs"],
+    languageOptions: {
+      globals: {
+        Buffer: "readonly",
+        console: "readonly",
+        process: "readonly",
+      },
+    },
+    rules: { "no-console": "off" },
+  },
+
   // Backend runtime logging goes through @capital-q/observability, so records
   // are structured, carry service metadata and pass baseline redaction
   // (ERA-050, ERA-141). Scripts, tooling and tests are unaffected.

@@ -8,3 +8,5 @@ packages:
 # dependencies, so its build script is not required for lint to resolve imports.
 allowBuilds:
   unrs-resolver: false
+minimumReleaseAgeExclude:
+  - "@testing-library/user-event@14.6.7"

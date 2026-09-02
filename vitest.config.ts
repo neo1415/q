@@ -17,7 +17,11 @@ import { defineConfig } from "vitest/config";
  * (TEO-001).
  */
 export default defineConfig({
+  // Component tests are TSX; opt into the automatic React runtime.
+  oxc: { jsx: { runtime: "automatic" } },
   test: {
+    // Testing Library auto-cleans between tests when the globals exist.
+    globals: true,
     // Node is the default environment. A fake browser is not imposed on
     // backend and domain tests just because a web app exists in the repo;
     // component tests will opt into a browser environment explicitly.

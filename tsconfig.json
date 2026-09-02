@@ -4,7 +4,9 @@
     "noEmit": true,
     "declaration": false,
     "declarationMap": false,
-    "types": ["node"]
+    "types": ["node"],
+    "jsx": "react-jsx",
+    "lib": ["DOM", "DOM.Iterable", "ES2023"]
   },
   "include": [
     "vitest.config.ts",
@@ -14,7 +16,8 @@
     "apps/**/*.test.ts",
     "apps/**/*.spec.ts",
     "packages/**/*.test.ts",
-    "packages/**/*.spec.ts"
+    "packages/**/*.spec.ts",
+    "packages/**/*.test.tsx"
   ],
   "exclude": [
     "node_modules",
