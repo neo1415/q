@@ -1,0 +1,10 @@
+packages:
+  - "apps/*"
+  - "packages/*"
+# Install/lifecycle scripts are denied by default and approved case by case
+# (doc 15, 109: review install scripts for high-risk dependencies; TM-SC-01).
+# unrs-resolver is a native resolver pulled in transitively by
+# eslint-config-next; it ships prebuilt platform binaries as optional
+# dependencies, so its build script is not required for lint to resolve imports.
+allowBuilds:
+  unrs-resolver: false

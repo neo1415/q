@@ -1,0 +1,25 @@
+{
+  "name": "@capital-q/q-api",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Q runtime service — independently deployable Capital Q intelligence boundary.",
+  "scripts": {
+    "dev": "node --watch src/main.ts",
+    "build": "tsc",
+    "start": "node dist/main.js",
+    "typecheck": "tsc --noEmit",
+    "clean": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\""
+  },
+  "dependencies": {
+    "@capital-q/config": "workspace:*",
+    "@capital-q/contracts": "workspace:*",
+    "@capital-q/observability": "workspace:*",
+    "fastify": "^5.12.1",
+    "@capital-q/security": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.3",
+    "typescript": "5.9.3"
+  }
+}

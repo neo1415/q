@@ -1,0 +1,80 @@
+name: CI
+
+# Baseline quality gate: a clean runner must reproduce the repository's static
+# checks, deterministic tests and build from the committed dependency graph.
+# Deployment, database, E2E and security scanning are deliberately not here --
+# they arrive with the packets that introduce those capabilities.
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+# Read-only. This job checks out code and runs local tooling; it never writes to
+# the repository, publishes, or deploys. Unspecified permissions default to none.
+permissions:
+  contents: read
+
+# A newer commit on the same ref supersedes an in-flight run.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    name: quality
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # .nvmrc is the single runtime version source, shared with local dev.
+      - name: Set up Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+
+      # Corepack activates the exact pnpm pinned in package.json#packageManager,
+      # so CI and local development run the same package manager version.
+      - name: Activate pinned pnpm
+        run: |
+          corepack enable
+          corepack prepare --activate
+          node --version
+          pnpm --version
+
+      - name: Resolve pnpm store path
+        id: pnpm-store
+        run: echo "path=$(pnpm store path)" >> "$GITHUB_OUTPUT"
+
+      - name: Restore pnpm store
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ steps.pnpm-store.outputs.path }}
+          key: pnpm-store-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            pnpm-store-${{ runner.os }}-
+
+      # Fails if package.json and pnpm-lock.yaml have drifted apart.
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Cheapest gates first so obvious failures do not pay for a build.
+      - name: Format check
+        run: pnpm format:check
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Test
+        run: pnpm test
+
+      - name: Build
+        run: pnpm build

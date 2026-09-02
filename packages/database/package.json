@@ -1,0 +1,40 @@
+{
+  "name": "@capital-q/database",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Server-only PostgreSQL client, access classes and transaction boundary.",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./privileged": {
+      "types": "./dist/privileged.d.ts",
+      "default": "./dist/privileged.js"
+    },
+    "./migration": {
+      "types": "./dist/migration.d.ts",
+      "default": "./dist/migration.js"
+    }
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "clean": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\""
+  },
+  "devDependencies": {
+    "typescript": "5.9.3",
+    "@types/node": "^24.13.3"
+  },
+  "dependencies": {
+    "postgres": "3.4.9",
+    "@capital-q/config": "workspace:*"
+  }
+}

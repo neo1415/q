@@ -1,0 +1,32 @@
+{
+  "name": "@capital-q/observability",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Structured logging, tracing and telemetry abstractions.",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "clean": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\""
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.3",
+    "typescript": "5.9.3"
+  },
+  "dependencies": {
+    "@opentelemetry/api": "1.9.1",
+    "pino": "10.3.1"
+  }
+}

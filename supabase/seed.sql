@@ -1,0 +1,17 @@
+-- Capital Q local seed.
+--
+-- Runs after migrations on `supabase start` and `supabase db reset`.
+--
+-- Rules:
+--   * Data insertions only. Schema belongs in supabase/migrations/, never here.
+--   * Synthetic data only. Never seed from a production dump, a customer
+--     database, a founder deck, or any real investor material (DDA seed rule).
+--   * Demo data and test fixtures are separate concerns and neither belongs to
+--     the other.
+--
+-- Intentionally empty. Capital Q has no domain tables yet -- identity,
+-- organisations, companies, investors and relationships arrive with their own
+-- packets, and inventing rows before the owning schema exists would create
+-- fictional truth this file would then have to unlearn.
+--
+-- Seed content is added by the packet that creates the tables it populates.
