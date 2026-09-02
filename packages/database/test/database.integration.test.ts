@@ -125,8 +125,8 @@ describe("@capital-q/database against local Supabase Postgres", () => {
         caught = error;
       }
 
-      expect(caught).toBeInstanceOf(DatabaseError);
-      expect((caught as DatabaseError).cause).toBeInstanceOf(UseCaseFailure);
+      // The application's own error comes back as itself, not wrapped.
+      expect(caught).toBeInstanceOf(UseCaseFailure);
 
       const rows = await db.sql`select id from ${db.sql(table)}`;
       expect(rows).toHaveLength(0);

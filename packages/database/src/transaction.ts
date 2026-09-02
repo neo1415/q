@@ -1,6 +1,18 @@
 import type { Sql } from "postgres";
 
-import { toDatabaseError } from "./errors.js";
+import { DatabaseError, toDatabaseError } from "./errors.js";
+
+/** Postgres.js and socket errors carry a `code`; application errors do not. */
+function isDriverFailure(error: unknown): boolean {
+  if (error instanceof DatabaseError) {
+    return true;
+  }
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    ("code" in error || "errno" in error)
+  );
+}
 import type { TransactionContext, TransactionManager } from "./types.js";
 
 /**
@@ -28,7 +40,12 @@ export function createTransactionManager(sql: Sql): TransactionManager {
         });
         return value;
       } catch (error) {
-        throw toDatabaseError(error);
+        // Only driver failures are translated. An application error thrown
+        // inside the boundary -- a validation failure, a business rule, a
+        // deliberate abort -- is the caller's own: the rollback has already
+        // happened and the error propagates unchanged, so callers can match
+        // on their own types instead of unwrapping `cause`.
+        throw isDriverFailure(error) ? toDatabaseError(error) : error;
       }
     },
   };

@@ -10,10 +10,33 @@ import {
   type RuntimeConfig,
 } from "./common.js";
 
+function boundedInt(defaultValue: number, min: number, max: number) {
+  const expectation = `expected an integer between ${String(min)} and ${String(max)}`;
+  return z.preprocess(
+    (value) => (value === undefined || value === "" ? defaultValue : value),
+    z.coerce
+      .number(expectation)
+      .int(expectation)
+      .min(min, expectation)
+      .max(max, expectation),
+  );
+}
+
 const workerEnvSchema = z.object({
   ...runtimeEnvShape,
   ...observabilityEnvShape,
+  // Outbox publisher runner. Bounded so a typo cannot produce an unbounded
+  // batch or a busy loop. Queue identity is a code constant, not config.
+  OUTBOX_PUBLISH_BATCH_SIZE: boundedInt(25, 1, 100),
+  OUTBOX_POLL_INTERVAL_MS: boundedInt(750, 250, 10_000),
+  OUTBOX_MAX_ATTEMPTS: boundedInt(10, 1, 50),
 });
+
+export type OutboxRunnerConfig = {
+  readonly batchSize: number;
+  readonly pollIntervalMs: number;
+  readonly maxAttempts: number;
+};
 
 /**
  * Queue connection and provider credentials arrive with the packet that
@@ -31,6 +54,7 @@ export type WorkerPublicConfig = Readonly<Record<string, never>>;
 export type WorkerConfig = {
   readonly runtime: RuntimeConfig;
   readonly observability: ObservabilityConfig;
+  readonly outbox: OutboxRunnerConfig;
   readonly public: WorkerPublicConfig;
   readonly secrets: WorkerSecrets;
 };
@@ -42,6 +66,11 @@ export function parseWorkerConfig(env: EnvironmentInput): WorkerConfig {
   return {
     runtime,
     observability: toObservabilityConfig(parsed, runtime),
+    outbox: {
+      batchSize: parsed.OUTBOX_PUBLISH_BATCH_SIZE,
+      pollIntervalMs: parsed.OUTBOX_POLL_INTERVAL_MS,
+      maxAttempts: parsed.OUTBOX_MAX_ATTEMPTS,
+    },
     public: {},
     secrets: {},
   };

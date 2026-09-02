@@ -14,6 +14,16 @@ import { EventSourceSchema, EventTypeSchema } from "./envelope.js";
  * inventing synonymous events for the same fact -- the failure this registry
  * exists to prevent.
  */
+/**
+ * Whether an event belongs to a tenant. Absent means TENANT_OWNED: an event
+ * must opt out explicitly to be published without a tenantId, so forgetting
+ * the field fails closed at the outbox rather than leaking a tenantless
+ * business event.
+ */
+export const EVENT_TENANCIES = ["TENANT_OWNED", "PLATFORM"] as const;
+export type EventTenancy = (typeof EVENT_TENANCIES)[number];
+export const EventTenancySchema = z.enum(EVENT_TENANCIES);
+
 export type EventDefinition<TData extends z.ZodType = z.ZodType> = {
   readonly name: string;
   readonly version: number;
@@ -29,6 +39,7 @@ export type EventDefinition<TData extends z.ZodType = z.ZodType> = {
   readonly consumers: readonly string[];
   readonly sensitivity: MessageSensitivity;
   readonly replaySafety: ReplaySafety;
+  readonly tenancy?: EventTenancy | undefined;
   readonly dataSchema: TData;
   readonly description: string;
 };
@@ -41,6 +52,7 @@ const definitionMetaSchema = z.object({
   consumers: z.array(z.string().min(1).max(128)),
   sensitivity: MessageSensitivitySchema,
   replaySafety: ReplaySafetySchema,
+  tenancy: EventTenancySchema.optional(),
   description: z.string().min(1).max(500),
 });
 
@@ -61,6 +73,7 @@ export function defineEvent<TData extends z.ZodType>(
     consumers: definition.consumers,
     sensitivity: definition.sensitivity,
     replaySafety: definition.replaySafety,
+    tenancy: definition.tenancy,
     description: definition.description,
   });
 
@@ -68,6 +81,11 @@ export function defineEvent<TData extends z.ZodType>(
 }
 
 /** Registry lookup identity: a type alone does not determine a payload forever. */
+/** Tenant-owned unless the definition explicitly declares PLATFORM. */
+export function isTenantOwnedEvent(definition: EventDefinition): boolean {
+  return (definition.tenancy ?? "TENANT_OWNED") === "TENANT_OWNED";
+}
+
 export function eventKey(name: string, version: number): string {
   return `${name}@${String(version)}`;
 }

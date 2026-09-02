@@ -55,6 +55,10 @@ const boundaryMessage = {
     "sql.unsafe() bypasses parameterisation and is forbidden in application code. Interpolate values in the sql`` tagged template so they are bound as parameters (doc 23, 96).",
   serverOnlySecurityAdapters:
     "@capital-q/security/postgres holds the database-backed security adapters and pulls in the Postgres driver. Browser-reachable code and the API client use the pure primitives from @capital-q/security only.",
+  serverOnlyEventing:
+    "@capital-q/eventing is server-side event infrastructure over the database. Browser-reachable code and the API client never import it.",
+  publisherOnlyInWorkers:
+    "@capital-q/eventing/publisher (OutboxPublisher, PgmqEventDispatcher) is worker infrastructure. Domain and application code emit events through OutboxWriter inside their own transaction and never publish to the queue directly (ERA-041, AEC-036).",
   serverOnlyObservability:
     "@capital-q/observability is server-only: it depends on Pino and Node built-ins and must not reach a browser bundle. Browser telemetry arrives as its own surface.",
   relativeEscape:
@@ -216,6 +220,10 @@ export default tseslint.config(
               message: boundaryMessage.serverOnlySecurityAdapters,
             },
             {
+              group: ["@capital-q/eventing", "@capital-q/eventing/*"],
+              message: boundaryMessage.serverOnlyEventing,
+            },
+            {
               group: ["@capital-q/observability", "@capital-q/observability/*"],
               message: boundaryMessage.serverOnlyObservability,
             },
@@ -250,6 +258,10 @@ export default tseslint.config(
             {
               group: ["@capital-q/security/postgres"],
               message: boundaryMessage.serverOnlySecurityAdapters,
+            },
+            {
+              group: ["@capital-q/eventing", "@capital-q/eventing/*"],
+              message: boundaryMessage.serverOnlyEventing,
             },
             {
               group: APP_IMPORT_PATTERNS,
@@ -292,6 +304,30 @@ export default tseslint.config(
           property: "env",
           message:
             "Read configuration through @capital-q/config rather than process.env. Environment access belongs in the config package and the composition root (ERA-049).",
+        },
+      ],
+    },
+  },
+
+  // Rule F -- queue publication is the worker's job alone. Everything else
+  // reaches the event pipeline through OutboxWriter.
+  {
+    files: ["apps/**/*.{ts,tsx}", "packages/**/*.{ts,tsx}"],
+    ignores: ["apps/workers/**", "packages/eventing/**"],
+    rules: {
+      "@typescript-eslint/no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: ["@capital-q/eventing/publisher"],
+              message: boundaryMessage.publisherOnlyInWorkers,
+            },
+            {
+              group: [DEEP_INTERNAL_PATTERN],
+              message: boundaryMessage.deepInternal,
+            },
+          ],
         },
       ],
     },

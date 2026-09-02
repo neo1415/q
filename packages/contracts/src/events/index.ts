@@ -38,6 +38,14 @@ export {
   type EventType,
 } from "./envelope.js";
 
-export { defineEvent, eventKey, type EventDefinition } from "./definition.js";
+export {
+  defineEvent,
+  EVENT_TENANCIES,
+  eventKey,
+  EventTenancySchema,
+  isTenantOwnedEvent,
+  type EventDefinition,
+  type EventTenancy,
+} from "./definition.js";
 
 export { createEventRegistry, type EventRegistry } from "./registry.js";

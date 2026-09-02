@@ -7,6 +7,64 @@ export type Json =
   | Json[]
 
 export type Database = {
+  events: {
+    Tables: {
+      outbox: {
+        Row: {
+          attempt_count: number
+          available_at: string
+          created_at: string
+          event_id: string
+          event_type: string
+          event_version: number
+          id: number
+          last_error: string | null
+          payload: Json
+          published_at: string | null
+          tenant_id: string | null
+        }
+        Insert: {
+          attempt_count?: number
+          available_at?: string
+          created_at?: string
+          event_id: string
+          event_type: string
+          event_version: number
+          id?: never
+          last_error?: string | null
+          payload: Json
+          published_at?: string | null
+          tenant_id?: string | null
+        }
+        Update: {
+          attempt_count?: number
+          available_at?: string
+          created_at?: string
+          event_id?: string
+          event_type?: string
+          event_version?: number
+          id?: never
+          last_error?: string | null
+          payload?: Json
+          published_at?: string | null
+          tenant_id?: string | null
+        }
+        Relationships: []
+      }
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      [_ in never]: never
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   identity: {
     Tables: {
       membership_roles: {
@@ -629,6 +687,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  events: {
+    Enums: {},
+  },
   identity: {
     Enums: {},
   },

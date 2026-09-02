@@ -5,7 +5,6 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { parseDatabaseConfig } from "@capital-q/config/database";
 import {
   createRequestDatabaseClient,
-  DatabaseError,
   type RequestDatabase,
   type TransactionContext,
   type TransactionManager,
@@ -104,9 +103,7 @@ describe("@capital-q/security Postgres adapters", () => {
         throw new Rollback();
       });
     } catch (error) {
-      if (!(
-        error instanceof DatabaseError && error.cause instanceof Rollback
-      )) {
+      if (!(error instanceof Rollback)) {
         throw error;
       }
     }
