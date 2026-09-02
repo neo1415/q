@@ -8,6 +8,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
+    },
+    "./postgres": {
+      "types": "./dist/postgres/index.d.ts",
+      "default": "./dist/postgres/index.js"
     }
   },
   "main": "./dist/index.js",
@@ -22,10 +26,12 @@
     "clean": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\""
   },
   "devDependencies": {
-    "typescript": "5.9.3"
+    "typescript": "5.9.3",
+    "@capital-q/config": "workspace:*"
   },
   "dependencies": {
     "@capital-q/contracts": "workspace:*",
-    "zod": "4.5.4"
+    "zod": "4.5.4",
+    "@capital-q/database": "workspace:*"
   }
 }

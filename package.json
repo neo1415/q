@@ -2,7 +2,7 @@
   "name": "capital-q",
   "private": true,
   "type": "module",
-  "description": "Capital Q — AI-native Investment Intelligence Operating System for private capital.",
+  "description": "Capital Q \u2014 AI-native Investment Intelligence Operating System for private capital.",
   "packageManager": "pnpm@11.25.0",
   "engines": {
     "node": ">=24.0.0 <25.0.0"
@@ -27,7 +27,9 @@
     "db:lint": "supabase db lint",
     "test:db": "supabase test db",
     "clean": "turbo run clean",
-    "test:integration": "vitest run --config vitest.integration.config.ts"
+    "test:integration": "vitest run --config vitest.integration.config.ts",
+    "db:types": "supabase gen types typescript --local --schema identity,permissions > packages/database/src/generated/database.types.ts",
+    "db:types:check": "pnpm db:types && git diff --exit-code -- packages/database/src/generated"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

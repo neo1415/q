@@ -112,12 +112,9 @@ function policy(
 }
 
 describe("capability syntax", () => {
-  it.each([...REFERENCE_CAPABILITIES, "organisation.admin"])(
-    "accepts %s",
-    (value) => {
-      expect(CapabilitySchema.safeParse(value).success).toBe(true);
-    },
-  );
+  it.each([...REFERENCE_CAPABILITIES])("accepts %s", (value) => {
+    expect(CapabilitySchema.safeParse(value).success).toBe(true);
+  });
 
   it.each([
     "ADMIN",

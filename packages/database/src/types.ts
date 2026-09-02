@@ -1,4 +1,4 @@
-import type { Sql, TransactionSql } from "postgres";
+import type { ISql, TransactionSql } from "postgres";
 
 import type { DatabaseAccessClass } from "@capital-q/config/database";
 
@@ -11,7 +11,13 @@ import type { DatabaseAccessClass } from "@capital-q/config/database";
  * assembly. `.unsafe()` exists on the driver but is forbidden by lint outside
  * this package's own adapter.
  */
-export type DatabaseExecutor = Sql;
+/*
+ * Deliberately the driver's shared query surface (ISql) rather than the full
+ * client: both a pooled client and a transaction satisfy it, so a repository
+ * written against DatabaseExecutor runs unchanged inside or outside a
+ * transaction, and it cannot reach `begin`, `end` or pool lifecycle.
+ */
+export type DatabaseExecutor = ISql;
 
 /**
  * A transaction in progress.

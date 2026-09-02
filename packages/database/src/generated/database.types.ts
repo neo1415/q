@@ -1,0 +1,639 @@
+export type Json =
+  | string
+  | number
+  | boolean
+  | null
+  | { [key: string]: Json | undefined }
+  | Json[]
+
+export type Database = {
+  identity: {
+    Tables: {
+      membership_roles: {
+        Row: {
+          created_at: string
+          id: string
+          membership_id: string
+          role_id: string
+          valid_from: string
+          valid_until: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          membership_id: string
+          role_id: string
+          valid_from?: string
+          valid_until?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          membership_id?: string
+          role_id?: string
+          valid_from?: string
+          valid_until?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "membership_roles_membership_id_fkey"
+            columns: ["membership_id"]
+            isOneToOne: false
+            referencedRelation: "organisation_memberships"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      organisation_memberships: {
+        Row: {
+          created_at: string
+          id: string
+          invited_by_user_id: string | null
+          joined_at: string
+          left_at: string | null
+          membership_status: string
+          metadata: Json
+          organisation_id: string
+          primary_business_title: string | null
+          tenant_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          invited_by_user_id?: string | null
+          joined_at?: string
+          left_at?: string | null
+          membership_status?: string
+          metadata?: Json
+          organisation_id: string
+          primary_business_title?: string | null
+          tenant_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          invited_by_user_id?: string | null
+          joined_at?: string
+          left_at?: string | null
+          membership_status?: string
+          metadata?: Json
+          organisation_id?: string
+          primary_business_title?: string | null
+          tenant_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organisation_memberships_invited_by_user_id_fkey"
+            columns: ["invited_by_user_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "organisation_memberships_organisation_id_tenant_id_fkey"
+            columns: ["organisation_id", "tenant_id"]
+            isOneToOne: false
+            referencedRelation: "organisations"
+            referencedColumns: ["id", "tenant_id"]
+          },
+          {
+            foreignKeyName: "organisation_memberships_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "organisation_memberships_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      organisations: {
+        Row: {
+          country_code: string | null
+          created_at: string
+          display_name: string
+          id: string
+          jurisdiction_code: string | null
+          legal_name: string | null
+          organisation_type: string
+          slug: string
+          status: string
+          tenant_id: string
+          updated_at: string
+          website_url: string | null
+        }
+        Insert: {
+          country_code?: string | null
+          created_at?: string
+          display_name: string
+          id?: string
+          jurisdiction_code?: string | null
+          legal_name?: string | null
+          organisation_type: string
+          slug: string
+          status?: string
+          tenant_id: string
+          updated_at?: string
+          website_url?: string | null
+        }
+        Update: {
+          country_code?: string | null
+          created_at?: string
+          display_name?: string
+          id?: string
+          jurisdiction_code?: string | null
+          legal_name?: string | null
+          organisation_type?: string
+          slug?: string
+          status?: string
+          tenant_id?: string
+          updated_at?: string
+          website_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organisations_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tenant_organisations: {
+        Row: {
+          created_at: string
+          organisation_id: string
+          relationship_type: string
+          tenant_id: string
+        }
+        Insert: {
+          created_at?: string
+          organisation_id: string
+          relationship_type?: string
+          tenant_id: string
+        }
+        Update: {
+          created_at?: string
+          organisation_id?: string
+          relationship_type?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tenant_organisations_organisation_id_tenant_id_fkey"
+            columns: ["organisation_id", "tenant_id"]
+            isOneToOne: false
+            referencedRelation: "organisations"
+            referencedColumns: ["id", "tenant_id"]
+          },
+          {
+            foreignKeyName: "tenant_organisations_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tenants: {
+        Row: {
+          created_at: string
+          data_policy_id: string | null
+          default_region: string | null
+          id: string
+          name: string
+          plan_code: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          data_policy_id?: string | null
+          default_region?: string | null
+          id?: string
+          name: string
+          plan_code?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          data_policy_id?: string | null
+          default_region?: string | null
+          id?: string
+          name?: string
+          plan_code?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      user_active_contexts: {
+        Row: {
+          membership_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          membership_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          membership_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_active_contexts_membership_id_user_id_fkey"
+            columns: ["membership_id", "user_id"]
+            isOneToOne: false
+            referencedRelation: "organisation_memberships"
+            referencedColumns: ["id", "user_id"]
+          },
+          {
+            foreignKeyName: "user_active_contexts_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_profiles: {
+        Row: {
+          auth_user_id: string
+          avatar_storage_key: string | null
+          country_code: string | null
+          created_at: string
+          display_name: string | null
+          family_name: string | null
+          given_name: string | null
+          headline: string | null
+          id: string
+          primary_locale: string | null
+          status: string
+          timezone: string | null
+          updated_at: string
+        }
+        Insert: {
+          auth_user_id: string
+          avatar_storage_key?: string | null
+          country_code?: string | null
+          created_at?: string
+          display_name?: string | null
+          family_name?: string | null
+          given_name?: string | null
+          headline?: string | null
+          id?: string
+          primary_locale?: string | null
+          status?: string
+          timezone?: string | null
+          updated_at?: string
+        }
+        Update: {
+          auth_user_id?: string
+          avatar_storage_key?: string | null
+          country_code?: string | null
+          created_at?: string
+          display_name?: string | null
+          family_name?: string | null
+          given_name?: string | null
+          headline?: string | null
+          id?: string
+          primary_locale?: string | null
+          status?: string
+          timezone?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      [_ in never]: never
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
+  permissions: {
+    Tables: {
+      capabilities: {
+        Row: {
+          code: string
+          created_at: string
+          description: string | null
+          id: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      grants: {
+        Row: {
+          capability_id: string
+          created_at: string
+          effect: string
+          granted_by_user_id: string | null
+          id: string
+          principal_id: string
+          principal_type: string
+          resource_id: string | null
+          resource_type: string | null
+          revoked_at: string | null
+          scope: Json
+          tenant_id: string
+          valid_from: string
+          valid_until: string | null
+        }
+        Insert: {
+          capability_id: string
+          created_at?: string
+          effect: string
+          granted_by_user_id?: string | null
+          id?: string
+          principal_id: string
+          principal_type: string
+          resource_id?: string | null
+          resource_type?: string | null
+          revoked_at?: string | null
+          scope: Json
+          tenant_id: string
+          valid_from?: string
+          valid_until?: string | null
+        }
+        Update: {
+          capability_id?: string
+          created_at?: string
+          effect?: string
+          granted_by_user_id?: string | null
+          id?: string
+          principal_id?: string
+          principal_type?: string
+          resource_id?: string | null
+          resource_type?: string | null
+          revoked_at?: string | null
+          scope?: Json
+          tenant_id?: string
+          valid_from?: string
+          valid_until?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "grants_capability_id_fkey"
+            columns: ["capability_id"]
+            isOneToOne: false
+            referencedRelation: "capabilities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      role_capabilities: {
+        Row: {
+          capability_id: string
+          created_at: string
+          default_scope: Json | null
+          effect: string
+          role_id: string
+        }
+        Insert: {
+          capability_id: string
+          created_at?: string
+          default_scope?: Json | null
+          effect: string
+          role_id: string
+        }
+        Update: {
+          capability_id?: string
+          created_at?: string
+          default_scope?: Json | null
+          effect?: string
+          role_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "role_capabilities_capability_id_fkey"
+            columns: ["capability_id"]
+            isOneToOne: false
+            referencedRelation: "capabilities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "role_capabilities_role_id_fkey"
+            columns: ["role_id"]
+            isOneToOne: false
+            referencedRelation: "roles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      roles: {
+        Row: {
+          code: string
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          scope_type: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          scope_type: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          scope_type?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      [_ in never]: never
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
+}
+
+type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">
+
+type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">]
+
+export type Tables<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+        DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
+    : never = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+      DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
+      Row: infer R
+    }
+    ? R
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])
+    ? (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
+        Row: infer R
+      }
+      ? R
+      : never
+    : never
+
+export type TablesInsert<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+      Insert: infer I
+    }
+    ? I
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+        Insert: infer I
+      }
+      ? I
+      : never
+    : never
+
+export type TablesUpdate<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+      Update: infer U
+    }
+    ? U
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+        Update: infer U
+      }
+      ? U
+      : never
+    : never
+
+export type Enums<
+  DefaultSchemaEnumNameOrOptions extends
+    | keyof DefaultSchema["Enums"]
+    | { schema: keyof DatabaseWithoutInternals },
+  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
+    : never = never,
+> = DefaultSchemaEnumNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
+  : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
+    ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
+    : never
+
+export type CompositeTypes<
+  PublicCompositeTypeNameOrOptions extends
+    | keyof DefaultSchema["CompositeTypes"]
+    | { schema: keyof DatabaseWithoutInternals },
+  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
+    : never = never,
+> = PublicCompositeTypeNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
+  : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
+    ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
+    : never
+
+export const Constants = {
+  identity: {
+    Enums: {},
+  },
+  permissions: {
+    Enums: {},
+  },
+} as const
+

@@ -41,4 +41,10 @@ export type {
   TransactionManager,
 } from "./types.js";
 
+/**
+ * Schema types generated from the local database by `pnpm db:types`. An
+ * authoritative artifact of the migrations, not a hand-maintained interface.
+ */
+export type { Database, Json } from "./generated/database.types.js";
+
 export const PACKAGE_NAME = "@capital-q/database" as const;
