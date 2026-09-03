@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { CountryCodeSchema } from "../common/geography.js";
 import { UuidSchema } from "../common/ids.js";
 import {
   createCursorPageSchema,
@@ -59,9 +60,6 @@ const WebsiteUrlSchema = z
   .refine((value) => /^https?:\/\//i.test(value), {
     message: "expected an http(s) URL",
   });
-const CountryCodeSchema = z
-  .string()
-  .regex(/^[A-Z]{2}$/, "expected an ISO 3166-1 alpha-2 country code");
 const JurisdictionCodeSchema = z
   .string()
   .trim()

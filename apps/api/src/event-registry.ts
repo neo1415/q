@@ -1,4 +1,5 @@
 import { createEventRegistry, type EventRegistry } from "@capital-q/contracts";
+import { COMPANY_EVENTS } from "@capital-q/companies/events";
 import { ORGANISATION_EVENTS } from "@capital-q/organisations/events";
 
 /**
@@ -7,5 +8,5 @@ import { ORGANISATION_EVENTS } from "@capital-q/organisations/events";
  * domain packet adds its events to both when they land.
  */
 export function createProductionEventRegistry(): EventRegistry {
-  return createEventRegistry([...ORGANISATION_EVENTS]);
+  return createEventRegistry([...ORGANISATION_EVENTS, ...COMPANY_EVENTS]);
 }

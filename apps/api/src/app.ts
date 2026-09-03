@@ -9,6 +9,10 @@ import {
   type ServiceIdentity,
 } from "@capital-q/observability";
 
+import {
+  registerCompanyRoutes,
+  type CompanyRoutesDependencies,
+} from "./http/companies.js";
 import { registerMeRoute, type MeRouteDependencies } from "./http/me.js";
 import {
   registerOrganisationRoutes,
@@ -35,6 +39,7 @@ export type ApiSecurityDependencies = MeRouteDependencies;
 export type ApiModules = {
   readonly organisations?:
     OrganisationRoutesDependencies["organisations"] | undefined;
+  readonly companies?: CompanyRoutesDependencies["companies"] | undefined;
 };
 
 /**
@@ -106,6 +111,14 @@ export function createApp(
       authenticator: security.authenticator,
       resolver: security.resolver,
       organisations: modules.organisations,
+    });
+  }
+
+  if (modules.companies !== undefined) {
+    registerCompanyRoutes(app, {
+      authenticator: security.authenticator,
+      resolver: security.resolver,
+      companies: modules.companies,
     });
   }
 

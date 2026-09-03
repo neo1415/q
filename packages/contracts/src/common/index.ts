@@ -57,3 +57,5 @@ export {
   ValidationIssueSchema,
   type ValidationIssue,
 } from "./validation.js";
+
+export { CountryCodeSchema, type CountryCode } from "./geography.js";

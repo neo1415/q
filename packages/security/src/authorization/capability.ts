@@ -35,6 +35,9 @@ export type Capability = z.infer<typeof CapabilitySchema>;
 export const REFERENCE_CAPABILITIES = [
   "organisation.view",
   "organisation.admin",
+  "company.create",
+  "company.view",
+  "company.edit",
   "company.financials.view",
   "company.financials.edit",
   "data_room.share",

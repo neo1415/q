@@ -1,4 +1,5 @@
 import { createEventRegistry, type EventRegistry } from "@capital-q/contracts";
+import { COMPANY_EVENTS } from "@capital-q/companies/events";
 import { ORGANISATION_EVENTS } from "@capital-q/organisations/events";
 
 /**
@@ -9,5 +10,5 @@ import { ORGANISATION_EVENTS } from "@capital-q/organisations/events";
  * Test-only definitions (test.fixture.*) never appear in this list.
  */
 export function createProductionEventRegistry(): EventRegistry {
-  return createEventRegistry([...ORGANISATION_EVENTS]);
+  return createEventRegistry([...ORGANISATION_EVENTS, ...COMPANY_EVENTS]);
 }

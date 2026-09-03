@@ -31,3 +31,5 @@ export {
   updateOrganisation,
   type ApiSession,
 } from "./organisations.js";
+
+export { createCompany, getCompany, updateCompany } from "./companies.js";

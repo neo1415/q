@@ -1,0 +1,46 @@
+{
+  "name": "@capital-q/companies",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Company bounded context: the one canonical Company per represented business -- identity, profile core, stage, geography and baseline lifecycle.",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./contracts": {
+      "types": "./dist/contracts/index.d.ts",
+      "default": "./dist/contracts/index.js"
+    },
+    "./events": {
+      "types": "./dist/events/index.d.ts",
+      "default": "./dist/events/index.js"
+    }
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "clean": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\""
+  },
+  "dependencies": {
+    "@capital-q/audit": "workspace:*",
+    "@capital-q/contracts": "workspace:*",
+    "@capital-q/database": "workspace:*",
+    "@capital-q/eventing": "workspace:*",
+    "@capital-q/organisations": "workspace:*",
+    "@capital-q/security": "workspace:*",
+    "zod": "4.5.4"
+  },
+  "devDependencies": {
+    "@capital-q/config": "workspace:*",
+    "@types/node": "^24.13.3",
+    "typescript": "5.9.3"
+  }
+}

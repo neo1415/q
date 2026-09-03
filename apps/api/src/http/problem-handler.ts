@@ -5,6 +5,11 @@ import {
   problemFromUnknownError,
   type ProblemDetails,
 } from "@capital-q/contracts";
+import {
+  CompanyCreationConflictError,
+  CompanyNotFoundError,
+  CompanyVersionConflictError,
+} from "@capital-q/companies";
 import type { Logger } from "@capital-q/observability";
 import {
   OrganisationCreationConflictError,
@@ -122,11 +127,17 @@ function toProblem(error: unknown, requestId: string): ProblemDetails {
   // Organisation domain failures. Each is enumeration-safe by construction
   // (the domain raises the same error for absent, foreign and inaccessible
   // resources), so mapping them is purely a status decision.
-  if (error instanceof OrganisationNotFoundError) {
+  if (
+    error instanceof OrganisationNotFoundError ||
+    error instanceof CompanyNotFoundError
+  ) {
     return createProblemDetails({ code: "RESOURCE_NOT_FOUND", requestId });
   }
 
-  if (error instanceof OrganisationVersionConflictError) {
+  if (
+    error instanceof OrganisationVersionConflictError ||
+    error instanceof CompanyVersionConflictError
+  ) {
     return createProblemDetails({
       code: "VERSION_CONFLICT",
       requestId,
@@ -134,7 +145,10 @@ function toProblem(error: unknown, requestId: string): ProblemDetails {
     });
   }
 
-  if (error instanceof OrganisationCreationConflictError) {
+  if (
+    error instanceof OrganisationCreationConflictError ||
+    error instanceof CompanyCreationConflictError
+  ) {
     return createProblemDetails({
       code: "IDEMPOTENCY_CONFLICT",
       requestId,

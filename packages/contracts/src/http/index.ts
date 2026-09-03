@@ -65,3 +65,28 @@ export {
   type OrganisationType,
   type UpdateOrganisationRequest,
 } from "./organisations.js";
+
+export {
+  COMPANIES_PATH,
+  COMPANY_CITY_MAX_LENGTH,
+  COMPANY_EDITABLE_FIELDS,
+  COMPANY_NAME_MAX_LENGTH,
+  COMPANY_PRIMARY_DESCRIPTION_MAX_LENGTH,
+  COMPANY_SHORT_DESCRIPTION_MAX_LENGTH,
+  COMPANY_STATUSES,
+  CompanyDtoSchema,
+  CompanyStatusSchema,
+  CreateCompanyRequestSchema,
+  MARKETPLACE_READINESS_NOT_ASSESSED,
+  MARKETPLACE_VISIBILITIES,
+  MarketplaceReadinessStateSchema,
+  MarketplaceVisibilitySchema,
+  StageCodeSchema,
+  UpdateCompanyRequestSchema,
+  type CompanyDto,
+  type CompanyEditableField,
+  type CompanyStatus,
+  type CreateCompanyRequest,
+  type MarketplaceVisibility,
+  type UpdateCompanyRequest,
+} from "./companies.js";

@@ -17,7 +17,11 @@ import {
 import { createRequestDatabaseClient } from "@capital-q/database";
 import { createOutboxWriter } from "@capital-q/eventing";
 import { createTelemetryRuntime } from "@capital-q/observability";
-import { createOrganisationService } from "@capital-q/organisations";
+import { createCompanyService } from "@capital-q/companies";
+import {
+  createOrganisationService,
+  createPostgresOrganisationQueryPort,
+} from "@capital-q/organisations";
 import { createAuthorizationService } from "@capital-q/security";
 import {
   createPostgresActiveOrganisationContextStore,
@@ -55,22 +59,41 @@ const security = {
 
 // Domain modules. Authorization, audit and events are the shared ports;
 // each bounded context receives them and never reaches around them.
+const authorization = createAuthorizationService(
+  createPostgresAuthorizationPolicySource({ sql: database.sql }),
+);
+const outbox = createOutboxWriter({
+  registry: createProductionEventRegistry(),
+});
+const audit = createPostgresMaterialActionAuditWriter();
+
 const organisations = createOrganisationService({
   sql: database.sql,
   transactions: database.transactions,
-  authorization: createAuthorizationService(
-    createPostgresAuthorizationPolicySource({ sql: database.sql }),
-  ),
+  authorization,
   resolver: security.resolver,
   activeContexts: createPostgresActiveOrganisationContextStore({
     transactions: database.transactions,
   }),
-  outbox: createOutboxWriter({ registry: createProductionEventRegistry() }),
-  audit: createPostgresMaterialActionAuditWriter(),
+  outbox,
+  audit,
   securityEvents: createPostgresSecurityEventWriter({ sql: database.sql }),
 });
 
-const { app, logger } = createApp(config, security, { organisations });
+// Companies reach organisations only through the public query port.
+const companies = createCompanyService({
+  sql: database.sql,
+  transactions: database.transactions,
+  authorization,
+  organisations: createPostgresOrganisationQueryPort({ sql: database.sql }),
+  outbox,
+  audit,
+});
+
+const { app, logger } = createApp(config, security, {
+  organisations,
+  companies,
+});
 
 app.addHook("onClose", async () => {
   await database.close();

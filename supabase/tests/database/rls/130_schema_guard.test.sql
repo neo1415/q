@@ -32,7 +32,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 
 create temporary table guarded_schemas (schema_name text primary key) on commit drop;
-insert into guarded_schemas values ('identity'), ('permissions'), ('events'), ('audit');
+insert into guarded_schemas values ('identity'), ('permissions'), ('events'), ('audit'), ('core');
 
 create temporary table rls_inventory (
   schema_name text not null,
@@ -52,6 +52,8 @@ insert into rls_inventory (schema_name, table_name, classification, authenticate
   ('identity', 'user_active_contexts',     'RLS_REQUIRED',         '{SELECT}'),
   ('identity', 'membership_roles',         'RLS_REQUIRED',         '{SELECT}'),
   ('identity', 'organisation_creation_requests', 'INTERNAL_SERVER_ONLY', '{}'),
+  ('core', 'companies',                    'RLS_REQUIRED',         '{SELECT}'),
+  ('core', 'company_creation_requests',    'INTERNAL_SERVER_ONLY', '{}'),
   ('permissions', 'capabilities',          'PUBLIC_REFERENCE',     '{SELECT}'),
   ('permissions', 'roles',                 'PUBLIC_REFERENCE',     '{SELECT}'),
   ('permissions', 'role_capabilities',     'PUBLIC_REFERENCE',     '{SELECT}'),
