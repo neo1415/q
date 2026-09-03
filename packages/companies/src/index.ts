@@ -50,6 +50,8 @@ export type {
   CompanyProfileChanges,
   CompanyQueryPort,
   CompanyRepository,
+  CompanyVisibilityFacts,
+  FounderProfileOwnershipFacts,
   NewCompany,
 } from "./application/ports.js";
 export type { CompanyServiceDependencies } from "./application/dependencies.js";

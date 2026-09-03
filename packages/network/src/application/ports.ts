@@ -11,6 +11,7 @@ import type { ActorType, TenantId } from "@capital-q/security";
 import type {
   Relationship,
   RelationshipEvent,
+  RelationshipEventId,
   RelationshipId,
 } from "../contracts/index.js";
 
@@ -89,6 +90,10 @@ export type RelationshipEventRepository = {
     tx: TransactionContext,
     input: NewRelationshipEvent,
   ) => Promise<RelationshipEvent>;
+  readonly findById: (
+    executor: DatabaseExecutor,
+    relationshipEventId: RelationshipEventId,
+  ) => Promise<RelationshipEvent | null>;
   readonly listByRelationship: (
     executor: DatabaseExecutor,
     relationshipId: RelationshipId,
@@ -120,4 +125,8 @@ export type RelationshipQueryPort = {
       readonly limit?: number | undefined;
     },
   ) => Promise<readonly RelationshipEvent[]>;
+  /** One history row by id, for disclosure resolution (CQ-PERM-001). Permission-neutral. */
+  readonly getEventById: (
+    relationshipEventId: RelationshipEventId,
+  ) => Promise<RelationshipEvent | null>;
 };

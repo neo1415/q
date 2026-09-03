@@ -1426,6 +1426,57 @@ export type Database = {
         }
         Relationships: []
       }
+      disclosure_policies: {
+        Row: {
+          access_level: string
+          created_at: string
+          created_by_user_id: string
+          expires_at: string | null
+          id: string
+          owner_organisation_id: string | null
+          owner_user_id: string | null
+          recipient_id: string | null
+          recipient_type: string | null
+          resource_id: string
+          resource_type: string
+          revoked_at: string | null
+          scope_type: string
+          tenant_id: string
+        }
+        Insert: {
+          access_level: string
+          created_at?: string
+          created_by_user_id: string
+          expires_at?: string | null
+          id?: string
+          owner_organisation_id?: string | null
+          owner_user_id?: string | null
+          recipient_id?: string | null
+          recipient_type?: string | null
+          resource_id: string
+          resource_type: string
+          revoked_at?: string | null
+          scope_type: string
+          tenant_id: string
+        }
+        Update: {
+          access_level?: string
+          created_at?: string
+          created_by_user_id?: string
+          expires_at?: string | null
+          id?: string
+          owner_organisation_id?: string | null
+          owner_user_id?: string | null
+          recipient_id?: string | null
+          recipient_type?: string | null
+          resource_id?: string
+          resource_type?: string
+          revoked_at?: string | null
+          scope_type?: string
+          tenant_id?: string
+        }
+        Relationships: []
+      }
       grants: {
         Row: {
           capability_id: string

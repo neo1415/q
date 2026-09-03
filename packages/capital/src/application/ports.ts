@@ -1,6 +1,7 @@
 import type { CompanyId } from "@capital-q/companies";
 import type {
   CapitalObjectiveClosureReason,
+  CapitalObjectiveStatus,
   CapitalObjectiveType,
   CapitalTarget,
   LocalDate,
@@ -163,7 +164,23 @@ export type CapitalObjectiveCreationRequestStore = {
  * raising" resolves here before any document retrieval. Permission-neutral;
  * callers authorize first.
  */
+/** Trusted ownership facts of a capital objective for disclosure resolution. No amounts. */
+export type CapitalObjectiveOwnershipFacts = {
+  readonly id: CapitalObjectiveId;
+  readonly tenantId: TenantId;
+  readonly companyId: CompanyId;
+  readonly status: CapitalObjectiveStatus;
+};
+
 export type CapitalObjectiveQueryPort = {
+  /**
+   * Tenant-agnostic ownership lookup for the Permissions bounded context
+   * (CQ-PERM-001): identifiers and status only, never the target or the
+   * use-of-funds narrative. Permission-neutral.
+   */
+  readonly findCanonicalCapitalObjective: (
+    capitalObjectiveId: CapitalObjectiveId,
+  ) => Promise<CapitalObjectiveOwnershipFacts | null>;
   readonly getCurrentForCompany: (
     tenantId: TenantId,
     companyId: CompanyId,

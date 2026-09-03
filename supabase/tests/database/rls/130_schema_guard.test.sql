@@ -72,6 +72,7 @@ insert into rls_inventory (schema_name, table_name, classification, authenticate
   ('permissions', 'roles',                 'PUBLIC_REFERENCE',     '{SELECT}'),
   ('permissions', 'role_capabilities',     'PUBLIC_REFERENCE',     '{SELECT}'),
   ('permissions', 'grants',                'INTERNAL_SERVER_ONLY', '{}'),
+  ('permissions', 'disclosure_policies',   'INTERNAL_SERVER_ONLY', '{}'),
   ('events', 'outbox',                     'INTERNAL_SERVER_ONLY', '{}'),
   ('audit', 'material_actions',            'INTERNAL_SERVER_ONLY', '{}'),
   ('audit', 'security_events',             'INTERNAL_SERVER_ONLY', '{}');

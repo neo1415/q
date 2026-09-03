@@ -109,6 +109,7 @@ select results_eq(
             ('capital_objective.view'), ('company.create'), ('company.edit'), ('company.financials.edit'),
             ('company.financials.view'), ('company.team.manage'), ('company.team.self_edit'),
             ('company.team.view'), ('company.view'), ('data_room.share'),
+            ('disclosure.inspect'), ('disclosure.manage'),
             ('investor.create'), ('investor.edit'), ('investor.mandate.create'),
             ('investor.mandate.edit'), ('investor.mandate.view'), ('investor.representative.self_edit'),
             ('investor.view'), ('organisation.admin'), ('organisation.view'),
@@ -127,10 +128,11 @@ select results_eq(
   $$ values ('capital_objective.close'), ('capital_objective.create'), ('capital_objective.edit'),
             ('capital_objective.view'), ('company.create'), ('company.edit'), ('company.team.manage'),
             ('company.team.self_edit'), ('company.team.view'), ('company.view'),
+            ('disclosure.inspect'), ('disclosure.manage'),
             ('investor.create'), ('investor.edit'), ('investor.mandate.create'),
             ('investor.mandate.edit'), ('investor.mandate.view'), ('investor.representative.self_edit'),
             ('investor.view'), ('organisation.admin'), ('organisation.view') $$,
-  'organisation_admin maps to organisation, company, team, investor, mandate and capital capabilities only');
+  'organisation_admin maps to organisation, company, team, investor, mandate, capital and disclosure capabilities only');
 select results_eq(
   $$ select c.code from permissions.role_capabilities rc
        join permissions.roles r on r.id = rc.role_id

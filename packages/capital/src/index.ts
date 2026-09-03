@@ -59,6 +59,7 @@ export type {
   CapitalObjectiveCreationRecord,
   CapitalObjectiveCreationRequestStore,
   CapitalObjectiveHistoryWriter,
+  CapitalObjectiveOwnershipFacts,
   CapitalObjectiveQueryPort,
   CapitalObjectiveRepository,
   NewCapitalObjective,

@@ -134,6 +134,7 @@ export {
 export type {
   InvestorMandateCreationRecord,
   InvestorMandateCreationRequestStore,
+  InvestorMandateOwnershipFacts,
   InvestorMandateQueryPort,
   InvestorMandateRepository,
   InvestorMandateScalarChanges,

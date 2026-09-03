@@ -1,10 +1,13 @@
 import type { DatabaseExecutor, TransactionContext } from "@capital-q/database";
 import type { OrganisationId, TenantId, UserId } from "@capital-q/security";
 
+import type { MarketplaceVisibility } from "@capital-q/contracts";
+
 import type {
   Company,
   CompanyId,
   CompanyIdentity,
+  FounderProfileId,
 } from "../contracts/index.js";
 
 /**
@@ -138,4 +141,37 @@ export type CompanyQueryPort = {
   readonly findCanonicalCompany: (
     companyId: CompanyId,
   ) => Promise<CompanyIdentity | null>;
+  /**
+   * The company's ownership and intrinsic disclosure classification for the
+   * Permissions bounded context (CQ-PERM-001). marketplace_visibility stays
+   * owned here; disclosure reads it through this port and never copies it.
+   */
+  readonly findCanonicalCompanyVisibility: (
+    companyId: CompanyId,
+  ) => Promise<CompanyVisibilityFacts | null>;
+  /**
+   * A founder profile's ownership (the Person) and its intrinsic
+   * visibility_scope, tenant-agnostic, for disclosure resolution. No
+   * summaries or narrative are returned through this port.
+   */
+  readonly findCanonicalFounderProfile: (
+    founderProfileId: FounderProfileId,
+  ) => Promise<FounderProfileOwnershipFacts | null>;
+};
+
+/** Trusted ownership + classification of a company. Permission-neutral. */
+export type CompanyVisibilityFacts = {
+  readonly id: CompanyId;
+  readonly tenantId: TenantId;
+  readonly organisationId: OrganisationId;
+  readonly marketplaceVisibility: MarketplaceVisibility;
+};
+
+/** Trusted ownership + classification of a founder profile. No content. */
+export type FounderProfileOwnershipFacts = {
+  readonly id: FounderProfileId;
+  readonly tenantId: TenantId;
+  readonly userId: UserId;
+  readonly primaryCompanyId: CompanyId | null;
+  readonly visibilityScope: MarketplaceVisibility;
 };

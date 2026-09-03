@@ -444,6 +444,27 @@ export function createPostgresInvestorMandateQueryPort(options: {
   const { sql } = options;
   const repository = createPostgresInvestorMandateRepository();
   return {
+    findCanonicalInvestorMandate: async (mandateId) => {
+      const rows = await sql`
+        select m.id, m.tenant_id, m.investor_organisation_id, m.status
+          from core.investor_mandates m
+         where m.id = ${mandateId}`;
+      if (rows.length === 0) {
+        return null;
+      }
+      const parsed = MandateRow.pick({
+        id: true,
+        tenant_id: true,
+        investor_organisation_id: true,
+        status: true,
+      }).parse(rows[0]);
+      return {
+        id: parsed.id,
+        tenantId: parsed.tenant_id,
+        investorOrganisationId: parsed.investor_organisation_id,
+        status: parsed.status,
+      };
+    },
     getMandate: async (tenantId, investorOrganisationId, mandateId) => {
       const mandate = await repository.findById(
         sql,

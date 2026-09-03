@@ -55,6 +55,8 @@ export const REFERENCE_CAPABILITIES = [
   "company.financials.view",
   "company.financials.edit",
   "data_room.share",
+  "disclosure.manage",
+  "disclosure.inspect",
   "q.action.approve",
 ] as const;
 

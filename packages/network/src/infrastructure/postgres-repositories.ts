@@ -206,6 +206,11 @@ export function createPostgresRelationshipEventRepository(): RelationshipEventRe
         ${eventSelect(tx.sql)} where e.id = ${inserted.id}`;
       return toEvent(created[0]);
     },
+    findById: async (executor, relationshipEventId) => {
+      const rows = await executor`
+        ${eventSelect(executor)} where e.id = ${relationshipEventId}`;
+      return rows.length === 0 ? null : toEvent(rows[0]);
+    },
     listByRelationship: async (executor, relationshipId, page) => {
       const rows = await executor`
         ${eventSelect(executor)}

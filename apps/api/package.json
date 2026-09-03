@@ -23,6 +23,7 @@
     "@capital-q/network": "workspace:*",
     "@capital-q/observability": "workspace:*",
     "@capital-q/organisations": "workspace:*",
+    "@capital-q/permissions": "workspace:*",
     "@capital-q/security": "workspace:*",
     "fastify": "^5.12.1"
   },

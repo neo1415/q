@@ -21,7 +21,8 @@
     "@capital-q/investors": "workspace:*",
     "@capital-q/network": "workspace:*",
     "@capital-q/observability": "workspace:*",
-    "@capital-q/organisations": "workspace:*"
+    "@capital-q/organisations": "workspace:*",
+    "@capital-q/permissions": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^24.13.3",

@@ -80,6 +80,9 @@ importers:
       '@capital-q/organisations':
         specifier: workspace:*
         version: link:../../packages/organisations
+      '@capital-q/permissions':
+        specifier: workspace:*
+        version: link:../../packages/permissions
       '@capital-q/security':
         specifier: workspace:*
         version: link:../../packages/security
@@ -218,6 +221,9 @@ importers:
       '@capital-q/organisations':
         specifier: workspace:*
         version: link:../../packages/organisations
+      '@capital-q/permissions':
+        specifier: workspace:*
+        version: link:../../packages/permissions
     devDependencies:
       '@types/node':
         specifier: ^24.13.3
@@ -503,6 +509,49 @@ importers:
       '@capital-q/eventing':
         specifier: workspace:*
         version: link:../eventing
+      '@capital-q/security':
+        specifier: workspace:*
+        version: link:../security
+      zod:
+        specifier: 4.5.4
+        version: 4.5.4
+    devDependencies:
+      '@capital-q/config':
+        specifier: workspace:*
+        version: link:../config
+      '@types/node':
+        specifier: ^24.13.3
+        version: 24.13.3
+      typescript:
+        specifier: 5.9.3
+        version: 5.9.3
+
+  packages/permissions:
+    dependencies:
+      '@capital-q/audit':
+        specifier: workspace:*
+        version: link:../audit
+      '@capital-q/capital':
+        specifier: workspace:*
+        version: link:../capital
+      '@capital-q/companies':
+        specifier: workspace:*
+        version: link:../companies
+      '@capital-q/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      '@capital-q/database':
+        specifier: workspace:*
+        version: link:../database
+      '@capital-q/eventing':
+        specifier: workspace:*
+        version: link:../eventing
+      '@capital-q/investors':
+        specifier: workspace:*
+        version: link:../investors
+      '@capital-q/network':
+        specifier: workspace:*
+        version: link:../network
       '@capital-q/security':
         specifier: workspace:*
         version: link:../security

@@ -7,10 +7,15 @@ import {
   UtcTimestampSchema,
 } from "@capital-q/contracts";
 import type { DatabaseExecutor } from "@capital-q/database";
-import { OrganisationIdSchema, TenantIdSchema } from "@capital-q/security";
+import {
+  OrganisationIdSchema,
+  TenantIdSchema,
+  UserIdSchema,
+} from "@capital-q/security";
 
 import {
   CompanyIdSchema,
+  FounderProfileIdSchema,
   type Company,
   type CompanyIdentity,
 } from "../contracts/index.js";
@@ -307,5 +312,52 @@ export function createPostgresCompanyQueryPort(options: {
          where c.id = ${companyId}`;
       return rows.length === 0 ? null : toIdentity(rows[0]);
     },
+    findCanonicalCompanyVisibility: async (companyId) => {
+      const rows = await sql`
+        select c.id, c.tenant_id, c.organisation_id, c.marketplace_visibility
+          from core.companies c
+         where c.id = ${companyId}`;
+      if (rows.length === 0) {
+        return null;
+      }
+      const parsed = CompanyRowSchema.pick({
+        id: true,
+        tenant_id: true,
+        organisation_id: true,
+        marketplace_visibility: true,
+      }).parse(rows[0]);
+      return {
+        id: parsed.id,
+        tenantId: parsed.tenant_id,
+        organisationId: parsed.organisation_id,
+        marketplaceVisibility: parsed.marketplace_visibility,
+      };
+    },
+    findCanonicalFounderProfile: async (founderProfileId) => {
+      // Ownership and classification only: no summary column is selected.
+      const rows = await sql`
+        select p.id, p.tenant_id, p.user_id, p.primary_company_id, p.visibility_scope
+          from core.founder_profiles p
+         where p.id = ${founderProfileId}`;
+      if (rows.length === 0) {
+        return null;
+      }
+      const parsed = FounderProfileFactsRow.parse(rows[0]);
+      return {
+        id: parsed.id,
+        tenantId: parsed.tenant_id,
+        userId: parsed.user_id,
+        primaryCompanyId: parsed.primary_company_id,
+        visibilityScope: parsed.visibility_scope,
+      };
+    },
   };
 }
+
+const FounderProfileFactsRow = z.object({
+  id: FounderProfileIdSchema,
+  tenant_id: TenantIdSchema,
+  user_id: UserIdSchema,
+  primary_company_id: CompanyIdSchema.nullable(),
+  visibility_scope: MarketplaceVisibilitySchema,
+});

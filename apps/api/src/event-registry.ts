@@ -4,6 +4,7 @@ import { COMPANY_EVENTS } from "@capital-q/companies/events";
 import { INVESTOR_EVENTS } from "@capital-q/investors/events";
 import { NETWORK_EVENTS } from "@capital-q/network/events";
 import { ORGANISATION_EVENTS } from "@capital-q/organisations/events";
+import { PERMISSIONS_EVENTS } from "@capital-q/permissions/events";
 
 /**
  * The production event registry the API's OutboxWriter validates against.
@@ -17,5 +18,6 @@ export function createProductionEventRegistry(): EventRegistry {
     ...INVESTOR_EVENTS,
     ...CAPITAL_EVENTS,
     ...NETWORK_EVENTS,
+    ...PERMISSIONS_EVENTS,
   ]);
 }

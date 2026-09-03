@@ -168,7 +168,23 @@ export type InvestorMandateCreationRequestStore = {
  * on. Permission-neutral (callers authorize first); returns typed policy
  * without the raw narrative; deterministic for (mandateId, version).
  */
+/** Trusted ownership facts of a mandate for disclosure resolution. No content. */
+export type InvestorMandateOwnershipFacts = {
+  readonly id: InvestorMandateId;
+  readonly tenantId: TenantId;
+  readonly investorOrganisationId: InvestorOrganisationId;
+  readonly status: InvestorMandateStatus;
+};
+
 export type InvestorMandateQueryPort = {
+  /**
+   * Tenant-agnostic ownership lookup for the Permissions bounded context
+   * (CQ-PERM-001). Returns identifiers and status only -- never cheque
+   * sizes, constraints or the raw mandate text. Permission-neutral.
+   */
+  readonly findCanonicalInvestorMandate: (
+    mandateId: InvestorMandateId,
+  ) => Promise<InvestorMandateOwnershipFacts | null>;
   readonly getMandate: (
     tenantId: TenantId,
     investorOrganisationId: InvestorOrganisationId,

@@ -71,6 +71,8 @@ export function createNetworkService(
           afterSequence: page.afterSequence,
           limit: page.limit ?? 100,
         }),
+      getEventById: (relationshipEventId) =>
+        repositories.events.findById(sql, relationshipEventId),
     },
   };
 }

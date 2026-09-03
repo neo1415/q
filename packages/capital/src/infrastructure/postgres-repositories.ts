@@ -278,6 +278,27 @@ export function createPostgresCapitalObjectiveQueryPort(options: {
   const { sql } = options;
   const repository = createPostgresCapitalObjectiveRepository();
   return {
+    findCanonicalCapitalObjective: async (capitalObjectiveId) => {
+      const rows = await sql`
+        select o.id, o.tenant_id, o.company_id, o.status
+          from core.capital_objectives o
+         where o.id = ${capitalObjectiveId}`;
+      if (rows.length === 0) {
+        return null;
+      }
+      const parsed = Row.pick({
+        id: true,
+        tenant_id: true,
+        company_id: true,
+        status: true,
+      }).parse(rows[0]);
+      return {
+        id: parsed.id,
+        tenantId: parsed.tenant_id,
+        companyId: parsed.company_id,
+        status: parsed.status,
+      };
+    },
     getCurrentForCompany: async (tenantId, companyId) => {
       const objective = await repository.findActive(sql, tenantId, companyId);
       return objective === null ? null : toCapitalObjectiveSnapshot(objective);

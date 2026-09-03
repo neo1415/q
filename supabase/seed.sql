@@ -40,6 +40,8 @@ insert into permissions.capabilities (code, description) values
   ('company.financials.view',  'View company financial data.'),
   ('company.financials.edit',  'Edit company financial data.'),
   ('data_room.share',          'Share data room content with another party.'),
+  ('disclosure.manage',        'Create and revoke deliberate disclosure policies for resources the organisation owns.'),
+  ('disclosure.inspect',       'Inspect who currently holds disclosure access to resources the organisation owns.'),
   ('q.action.approve',         'Approve a consequential action proposed by Q.')
 on conflict (code) do update
   set description = excluded.description;
@@ -93,6 +95,8 @@ select r.id, c.id, 'ALLOW'
       ('organisation_admin',  'capital_objective.view'),
       ('organisation_admin',  'capital_objective.edit'),
       ('organisation_admin',  'capital_objective.close'),
-      ('organisation_member', 'capital_objective.view')
+      ('organisation_member', 'capital_objective.view'),
+      ('organisation_admin',  'disclosure.manage'),
+      ('organisation_admin',  'disclosure.inspect')
     )
 on conflict (role_id, capability_id) do nothing;
