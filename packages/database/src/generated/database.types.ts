@@ -125,6 +125,129 @@ export type Database = {
       [_ in never]: never
     }
   }
+  core: {
+    Tables: {
+      companies: {
+        Row: {
+          canonical_name: string
+          company_status: string
+          created_at: string
+          current_stage_code: string | null
+          founded_date: string | null
+          headquarters_city: string | null
+          headquarters_country: string | null
+          id: string
+          legal_name: string | null
+          logo_storage_key: string | null
+          marketplace_readiness_state: string
+          marketplace_visibility: string
+          organisation_id: string
+          primary_description: string | null
+          short_description: string | null
+          slug: string
+          tenant_id: string
+          updated_at: string
+          version: number
+          website_url: string | null
+        }
+        Insert: {
+          canonical_name: string
+          company_status?: string
+          created_at?: string
+          current_stage_code?: string | null
+          founded_date?: string | null
+          headquarters_city?: string | null
+          headquarters_country?: string | null
+          id?: string
+          legal_name?: string | null
+          logo_storage_key?: string | null
+          marketplace_readiness_state?: string
+          marketplace_visibility?: string
+          organisation_id: string
+          primary_description?: string | null
+          short_description?: string | null
+          slug: string
+          tenant_id: string
+          updated_at?: string
+          version?: number
+          website_url?: string | null
+        }
+        Update: {
+          canonical_name?: string
+          company_status?: string
+          created_at?: string
+          current_stage_code?: string | null
+          founded_date?: string | null
+          headquarters_city?: string | null
+          headquarters_country?: string | null
+          id?: string
+          legal_name?: string | null
+          logo_storage_key?: string | null
+          marketplace_readiness_state?: string
+          marketplace_visibility?: string
+          organisation_id?: string
+          primary_description?: string | null
+          short_description?: string | null
+          slug?: string
+          tenant_id?: string
+          updated_at?: string
+          version?: number
+          website_url?: string | null
+        }
+        Relationships: []
+      }
+      company_creation_requests: {
+        Row: {
+          company_id: string
+          created_at: string
+          idempotency_key_hash: string
+          organisation_id: string
+          request_hash: string
+          tenant_id: string
+          user_id: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          idempotency_key_hash: string
+          organisation_id: string
+          request_hash: string
+          tenant_id: string
+          user_id: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          idempotency_key_hash?: string
+          organisation_id?: string
+          request_hash?: string
+          tenant_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "company_creation_requests_company_id_tenant_id_fkey"
+            columns: ["company_id", "tenant_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id", "tenant_id"]
+          },
+        ]
+      }
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      [_ in never]: never
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   events: {
     Tables: {
       outbox: {
@@ -851,6 +974,9 @@ export type CompositeTypes<
 
 export const Constants = {
   audit: {
+    Enums: {},
+  },
+  core: {
     Enums: {},
   },
   events: {
