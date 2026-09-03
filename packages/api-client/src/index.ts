@@ -20,3 +20,5 @@ export {
 } from "./problem.js";
 
 export const PACKAGE_NAME = "@capital-q/api-client" as const;
+
+export { fetchMe, type FetchMeInput } from "./me.js";

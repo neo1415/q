@@ -24,6 +24,13 @@ const nextConfig: NextConfig = {
     return Promise.resolve([
       { source: "/(.*)", headers: securityHeaders },
       {
+        // Authentication responses are never shared-cacheable: a callback that
+        // sets session cookies, or a sign-in page rendered with a notice,
+        // must not be served to anyone else by a CDN or proxy.
+        source: "/auth/:path*",
+        headers: [{ key: "Cache-Control", value: "no-store" }],
+      },
+      {
         // The service worker must never be cached indefinitely, or an old
         // caching policy could outlive the code that replaced it.
         source: "/sw.js",

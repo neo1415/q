@@ -18,6 +18,7 @@ type LoadedWorker = {
   readonly isCacheable: CacheDecision;
   readonly allowedPrefixes: readonly string[];
   readonly allowedExact: readonly string[];
+  readonly deniedPrefixes: readonly string[];
   readonly listeners: readonly string[];
   readonly source: string;
 };
@@ -34,6 +35,7 @@ function loadServiceWorker(): LoadedWorker {
           isCacheable: CacheDecision;
           ALLOWED_PREFIXES: string[];
           ALLOWED_EXACT: string[];
+          DENIED_PREFIXES: string[];
         }
       | undefined,
     location: { origin: "https://app.capitalq.test" },
@@ -51,6 +53,7 @@ function loadServiceWorker(): LoadedWorker {
     isCacheable: self.__cq.isCacheable,
     allowedPrefixes: self.__cq.ALLOWED_PREFIXES,
     allowedExact: self.__cq.ALLOWED_EXACT,
+    deniedPrefixes: self.__cq.DENIED_PREFIXES,
     listeners,
     source,
   };
@@ -100,6 +103,32 @@ describe("service worker cache policy", () => {
     "/media/signed/pitch.m3u8?token=abc",
   ])("never intercepts %s", (path) => {
     expect(worker.isCacheable(get(path), ORIGIN)).toBe(false);
+  });
+
+  it.each([
+    "/auth/sign-in",
+    "/auth/sign-in?next=%2Fhome",
+    "/auth/sign-up",
+    "/auth/callback?code=abc",
+    "/auth/callback?token_hash=abc&type=recovery",
+    "/auth/update-password",
+    "/auth/forgot-password",
+    "/auth/check-email?purpose=recovery",
+    "/v1/me",
+    "/api/session",
+  ])("never caches the authentication or session path %s", (path) => {
+    expect(worker.isCacheable(get(path), ORIGIN)).toBe(false);
+  });
+
+  it("denies authentication paths by name, before the allow-list", () => {
+    expect(worker.deniedPrefixes).toEqual(
+      expect.arrayContaining(["/auth/", "/api/", "/v1/"]),
+    );
+    // Even if an allow-listed prefix were ever nested under /auth, the deny
+    // wins: the check runs first.
+    expect(worker.source.indexOf("DENIED_PREFIXES.some")).toBeLessThan(
+      worker.source.indexOf("ALLOWED_EXACT.includes"),
+    );
   });
 
   it("never caches cross-origin requests, even for static-looking paths", () => {

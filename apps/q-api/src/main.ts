@@ -11,18 +11,28 @@
  */
 
 import { loadQApiConfig } from "@capital-q/config/q-api";
+import { requireSupabaseAuthConfig } from "@capital-q/config/supabase-auth";
 import { createTelemetryRuntime } from "@capital-q/observability";
+import { createSupabaseAccessTokenAuthenticator } from "@capital-q/security/supabase";
 
 import { createApp } from "./app.js";
+import { createSupabaseRequestAuthenticator } from "./security/supabase-authenticator.js";
 
 // Q configuration is loaded from its own schema, separate from the application
 // API even where the current fields coincide.
 const config = loadQApiConfig();
+// Q operations are human-initiated and authenticated; without an Auth server
+// to verify against, the service does not start.
+const supabaseAuth = requireSupabaseAuthConfig("q-api", config.supabaseAuth);
 
 const telemetry = createTelemetryRuntime();
 await telemetry.start();
 
-const { app, logger } = createApp(config);
+const { app, logger } = createApp(config, {
+  authenticator: createSupabaseRequestAuthenticator(
+    createSupabaseAccessTokenAuthenticator(supabaseAuth),
+  ),
+});
 
 await app.listen({
   port: config.network.port,

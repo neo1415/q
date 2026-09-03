@@ -28,6 +28,10 @@
     "./database": {
       "types": "./dist/database.d.ts",
       "default": "./dist/database.js"
+    },
+    "./supabase-auth": {
+      "types": "./dist/supabase-auth.d.ts",
+      "default": "./dist/supabase-auth.js"
     }
   },
   "main": "./dist/index.js",

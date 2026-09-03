@@ -13,7 +13,9 @@ import { createApp } from "../src/app.js";
  * No Q routes are created here; a fixture exercises the shared error boundary.
  */
 function buildTestApp() {
-  const { app } = createApp(parseQApiConfig({ NODE_ENV: "test" }));
+  const { app } = createApp(parseQApiConfig({ NODE_ENV: "test" }), {
+    authenticator: { authenticate: () => Promise.resolve(null) },
+  });
 
   app.get("/__fixture/boom", () => {
     // Synthetic only.

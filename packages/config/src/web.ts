@@ -7,6 +7,10 @@ import {
   type RuntimeConfig,
 } from "./common.js";
 import { ConfigurationError } from "./errors.js";
+import {
+  parseSupabaseAuthConfig,
+  type SupabaseAuthConfig,
+} from "./supabase-auth.js";
 
 /**
  * Web configuration has two fundamentally different classes and they must never
@@ -21,23 +25,27 @@ import { ConfigurationError } from "./errors.js";
  *   belong here either.
  *
  * SERVER
- *   Read only in Server Components, route handlers and server actions. A server
- *   config object must never be serialised into React props or otherwise handed
- *   to a Client Component.
+ *   Read only in Server Components, route handlers, server actions and the
+ *   request proxy. A server config object must never be serialised into React
+ *   props or otherwise handed to a Client Component.
  */
 
 /**
- * Capital Q has no public browser variables yet. The schema and boundary exist
- * so the first one is validated rather than read ad hoc.
+ * The Supabase project URL and publishable key are the only public values.
+ * They carry the NEXT_PUBLIC_ prefix because they are, by definition, safe for
+ * a browser to hold; today every auth call still runs on the server, so no
+ * browser bundle actually reads them. The key is validated to be publishable:
+ * a secret or service-role key is refused at parse time, so it cannot be
+ * configured under a public name by mistake.
  *
- * When adding one, reference it explicitly -- `process.env.NEXT_PUBLIC_FOO` --
- * so Next's static replacement applies. Never build a dynamic accessor such as
- * `process.env[name]`: it defeats static replacement and risks exposing
- * arbitrary environment variables to the browser.
+ * When adding another, reference it explicitly -- `process.env.NEXT_PUBLIC_FOO`
+ * -- so Next's static replacement applies. Never build a dynamic accessor such
+ * as `process.env[name]`.
  */
-const webPublicEnvSchema = z.object({});
-
-export type WebPublicConfig = Readonly<Record<string, never>>;
+export type WebPublicConfig = {
+  readonly supabaseUrl: string;
+  readonly supabasePublishableKey: string;
+};
 
 export type WebServerSecrets = Readonly<Record<string, never>>;
 
@@ -57,28 +65,56 @@ export const FOUNDER_ONBOARDING_ADAPTERS = ["fixture", "none"] as const;
 export type FounderOnboardingAdapter =
   (typeof FOUNDER_ONBOARDING_ADAPTERS)[number];
 
+export type WebAuthConfig = {
+  readonly supabase: SupabaseAuthConfig;
+  /**
+   * The origin Capital Q is served from, used to build the email callback
+   * URLs handed to Supabase. Configured, not read from the Host header: a
+   * request header is attacker-controlled and would let a poisoned host land
+   * in a password-recovery email.
+   */
+  readonly appOrigin: string;
+  /**
+   * `Secure` on the session cookies. Off only for the local deployment class,
+   * which is served over plain http on a loopback address.
+   */
+  readonly secureCookies: boolean;
+};
+
 export type WebServerConfig = {
   readonly runtime: RuntimeConfig;
   readonly founderOnboardingAdapter: FounderOnboardingAdapter;
+  readonly auth: WebAuthConfig;
+  /** Base URL of the Capital Q API for server-side calls. Absent locally by default. */
+  readonly apiBaseUrl: string | undefined;
   readonly public: WebPublicConfig;
   readonly secrets: WebServerSecrets;
 };
 
-/**
- * Validate browser-visible configuration.
- *
- * Takes an explicitly constructed object rather than reading the environment,
- * because the caller must name each NEXT_PUBLIC_ variable literally for Next's
- * build-time replacement to work.
- */
-export function parseWebPublicConfig(input: EnvironmentInput): WebPublicConfig {
-  parseConfig("web (public)", webPublicEnvSchema, input);
-  return {};
-}
+const LOCAL_APP_ORIGIN = "http://127.0.0.1:3000";
+
+const originSchema = z
+  .string()
+  .url("expected an absolute http(s) origin")
+  .refine((value) => {
+    try {
+      const url = new URL(value);
+      return (
+        (url.protocol === "http:" || url.protocol === "https:") &&
+        url.pathname === "/" &&
+        url.search === "" &&
+        url.hash === ""
+      );
+    } catch {
+      return false;
+    }
+  }, "expected an origin with no path, query or fragment");
 
 const webServerEnvSchema = z.object({
   ...runtimeEnvShape,
   CQ_FOUNDER_ONBOARDING_ADAPTER: z.enum(FOUNDER_ONBOARDING_ADAPTERS).optional(),
+  CQ_WEB_ORIGIN: originSchema.optional(),
+  CQ_API_URL: z.string().url("expected an absolute http(s) URL").optional(),
 });
 
 /** Server-only. Never pass the result to a Client Component. */
@@ -101,15 +137,43 @@ export function parseWebServerConfig(env: EnvironmentInput): WebServerConfig {
     ]);
   }
 
+  const supabase = parseSupabaseAuthConfig("web", {
+    url: env["NEXT_PUBLIC_SUPABASE_URL"],
+    publishableKey: env["NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY"],
+  });
+
+  const isLocal = runtime.deploymentEnvironment === "local";
+  const appOrigin =
+    parsed.CQ_WEB_ORIGIN ?? (isLocal ? LOCAL_APP_ORIGIN : undefined);
+  if (appOrigin === undefined) {
+    // A deployed environment must say where it lives; guessing from a request
+    // header is exactly the host-poisoning path this value exists to close.
+    throw new ConfigurationError("web", [
+      {
+        variable: "CQ_WEB_ORIGIN",
+        reason: "required outside the local deployment environment",
+      },
+    ]);
+  }
+
   return {
     runtime,
     founderOnboardingAdapter,
-    public: {},
+    auth: {
+      supabase,
+      appOrigin: appOrigin.replace(/\/$/, ""),
+      secureCookies: !isLocal,
+    },
+    apiBaseUrl: parsed.CQ_API_URL?.replace(/\/$/, ""),
+    public: {
+      supabaseUrl: supabase.url,
+      supabasePublishableKey: supabase.publishableKey,
+    },
     secrets: {},
   };
 }
 
-/** Server-only. Call from a Server Component, route handler or server action. */
+/** Server-only. Call from a Server Component, route handler, server action or the proxy. */
 export function loadWebServerConfig(): WebServerConfig {
   return parseWebServerConfig(process.env);
 }

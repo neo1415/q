@@ -104,7 +104,45 @@
     background-color: var(--cq-surface);
   }
 
+  /*
+   * Authentication frame: wordmark, one column. Top-anchored on phones so the
+   * form stays put when the keyboard resizes the viewport; centred on wide
+   * screens with a controlled column width. No sidebar, no navigation.
+   */
+  .cq-auth {
+    display: flex;
+    min-height: 100dvh;
+    flex-direction: column;
+    padding-top: calc(var(--cq-safe-top) + 20px);
+    padding-right: calc(var(--cq-safe-right) + 20px);
+    padding-bottom: calc(var(--cq-safe-bottom) + 24px);
+    padding-left: calc(var(--cq-safe-left) + 20px);
+  }
+
+  .cq-auth-header {
+    display: flex;
+    width: 100%;
+    max-width: 24rem;
+    margin: 0 auto;
+  }
+
+  .cq-auth-main {
+    display: flex;
+    width: 100%;
+    max-width: 24rem;
+    flex: 1 1 auto;
+    flex-direction: column;
+    margin: 0 auto;
+    padding-top: 40px;
+  }
+
   @media (min-width: 1024px) {
+    .cq-auth-main {
+      justify-content: center;
+      padding-top: 0;
+      padding-bottom: 12vh;
+    }
+
     .cq-shell-sidebar {
       position: sticky;
       top: 0;

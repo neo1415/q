@@ -12,6 +12,10 @@
     "./postgres": {
       "types": "./dist/postgres/index.d.ts",
       "default": "./dist/postgres/index.js"
+    },
+    "./supabase": {
+      "types": "./dist/supabase/index.d.ts",
+      "default": "./dist/supabase/index.js"
     }
   },
   "main": "./dist/index.js",
@@ -26,12 +30,13 @@
     "clean": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\""
   },
   "devDependencies": {
-    "typescript": "5.9.3",
-    "@capital-q/config": "workspace:*"
+    "@capital-q/config": "workspace:*",
+    "typescript": "5.9.3"
   },
   "dependencies": {
     "@capital-q/contracts": "workspace:*",
-    "zod": "4.5.4",
-    "@capital-q/database": "workspace:*"
+    "@capital-q/database": "workspace:*",
+    "@supabase/supabase-js": "2.114.0",
+    "zod": "4.5.4"
   }
 }

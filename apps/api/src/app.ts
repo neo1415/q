@@ -9,9 +9,18 @@ import {
   type ServiceIdentity,
 } from "@capital-q/observability";
 
+import { registerMeRoute, type MeRouteDependencies } from "./http/me.js";
 import { registerProblemHandling } from "./http/problem-handler.js";
 
 export const SERVICE_NAME = "api";
+
+/**
+ * The security boundary the composition root hands the application: how a
+ * request is authenticated, how a person's organisation context is resolved,
+ * and how an auth subject maps to a Person. Production wires Supabase and
+ * PostgreSQL; tests hand in doubles. Routes never construct these themselves.
+ */
+export type ApiSecurityDependencies = MeRouteDependencies;
 
 /**
  * Build the API without binding a port.
@@ -20,7 +29,10 @@ export const SERVICE_NAME = "api";
  * behaviour through fastify.inject() instead of opening sockets, which is what
  * makes the error contract testable at all.
  */
-export function createApp(config: ApiConfig): {
+export function createApp(
+  config: ApiConfig,
+  security: ApiSecurityDependencies,
+): {
   readonly app: FastifyInstance;
   readonly logger: Logger;
 } {
@@ -70,6 +82,8 @@ export function createApp(config: ApiConfig): {
     environment: config.runtime.deploymentEnvironment,
     contracts: CONTRACTS_VERSION,
   }));
+
+  registerMeRoute(app, security);
 
   return { app, logger };
 }

@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "Capital Q web application \u2014 Next.js App Router composition root.",
+  "description": "Capital Q web application \u00e2\u20ac\u201d Next.js App Router composition root.",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -13,13 +13,17 @@
     "icons": "node scripts/generate-pwa-icons.mjs"
   },
   "dependencies": {
+    "@capital-q/api-client": "workspace:*",
     "@capital-q/config": "workspace:*",
     "@capital-q/contracts": "workspace:*",
     "@capital-q/ui": "workspace:*",
+    "@supabase/ssr": "0.12.5",
+    "@supabase/supabase-js": "2.114.0",
     "geist": "1.7.2",
     "next": "~16.3.4",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
+    "server-only": "0.0.1",
     "zod": "4.5.4"
   },
   "devDependencies": {

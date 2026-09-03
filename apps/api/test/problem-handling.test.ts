@@ -4,7 +4,16 @@ import type { FastifyInstance } from "fastify";
 import { parseApiConfig } from "@capital-q/config/api";
 import { ContractValidationError } from "@capital-q/contracts";
 
-import { createApp } from "../src/app.js";
+import { createApp, type ApiSecurityDependencies } from "../src/app.js";
+
+/** A closed security boundary: nothing authenticates, nothing resolves. */
+const NO_SECURITY: ApiSecurityDependencies = {
+  authenticator: { authenticate: () => Promise.resolve(null) },
+  resolver: {
+    resolveHumanContext: () => Promise.resolve({ status: "CONTEXT_REQUIRED" }),
+  },
+  identities: { lookup: () => Promise.resolve(null) },
+};
 
 /**
  * HTTP behaviour is exercised through fastify.inject(), so these are real
@@ -14,7 +23,7 @@ import { createApp } from "../src/app.js";
  * is registered in production composition.
  */
 function buildTestApp(): FastifyInstance {
-  const { app } = createApp(parseApiConfig({ NODE_ENV: "test" }));
+  const { app } = createApp(parseApiConfig({ NODE_ENV: "test" }), NO_SECURITY);
 
   app.post("/__fixture/validated", {
     schema: {

@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "Capital Q application API — Fastify composition root.",
+  "description": "Capital Q application API \u00e2\u20ac\u201d Fastify composition root.",
   "scripts": {
     "dev": "node --watch src/main.ts",
     "build": "tsc",
@@ -14,9 +14,10 @@
   "dependencies": {
     "@capital-q/config": "workspace:*",
     "@capital-q/contracts": "workspace:*",
+    "@capital-q/database": "workspace:*",
     "@capital-q/observability": "workspace:*",
-    "fastify": "^5.12.1",
-    "@capital-q/security": "workspace:*"
+    "@capital-q/security": "workspace:*",
+    "fastify": "^5.12.1"
   },
   "devDependencies": {
     "@types/node": "^24.13.3",

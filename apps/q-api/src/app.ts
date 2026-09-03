@@ -10,8 +10,26 @@ import {
 } from "@capital-q/observability";
 
 import { registerProblemHandling } from "./http/problem-handler.js";
+import type { RequestAuthenticator } from "./security/actor-context.js";
 
 export const SERVICE_NAME = "q-api";
+
+/**
+ * The verified human authentication boundary future Q routes protect
+ * themselves with. Composed once in main.ts (Supabase-backed) and available
+ * to route registration through the instance, so no Q route ever verifies a
+ * token on its own. Organisation context resolution is added alongside the
+ * first Q route that needs a database.
+ */
+export type QApiSecurityDependencies = {
+  readonly authenticator: RequestAuthenticator;
+};
+
+declare module "fastify" {
+  interface FastifyInstance {
+    security: QApiSecurityDependencies;
+  }
+}
 
 /**
  * Build the Q API without binding a port.
@@ -20,7 +38,10 @@ export const SERVICE_NAME = "q-api";
  * behaviour through fastify.inject() instead of opening sockets, which is what
  * makes the error contract testable at all.
  */
-export function createApp(config: QApiConfig): {
+export function createApp(
+  config: QApiConfig,
+  security: QApiSecurityDependencies,
+): {
   readonly app: FastifyInstance;
   readonly logger: Logger;
 } {
@@ -58,6 +79,8 @@ export function createApp(config: QApiConfig): {
   });
 
   registerProblemHandling(app, logger);
+
+  app.decorate("security", security);
 
   // Liveness and readiness are split per doc 21 (74-77): liveness proves the
   // process is alive and performs no dependency checks; readiness will grow to

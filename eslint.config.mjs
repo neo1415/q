@@ -54,7 +54,7 @@ const boundaryMessage = {
   unsafeSql:
     "sql.unsafe() bypasses parameterisation and is forbidden in application code. Interpolate values in the sql`` tagged template so they are bound as parameters (doc 23, 96).",
   serverOnlySecurityAdapters:
-    "@capital-q/security/postgres holds the database-backed security adapters and pulls in the Postgres driver. Browser-reachable code and the API client use the pure primitives from @capital-q/security only.",
+    "@capital-q/security/postgres and @capital-q/security/supabase are server-side security adapters (database driver, Auth server client). Browser-reachable code and the API client use the pure primitives from @capital-q/security only.",
   serverOnlyEventing:
     "@capital-q/eventing is server-side event infrastructure over the database. Browser-reachable code and the API client never import it.",
   publisherOnlyInWorkers:
@@ -89,7 +89,7 @@ const noDatabase = {
   message: boundaryMessage.privilegedDatabase,
 };
 const noSecurityAdapters = {
-  group: ["@capital-q/security/postgres"],
+  group: ["@capital-q/security/postgres", "@capital-q/security/supabase"],
   message: boundaryMessage.serverOnlySecurityAdapters,
 };
 const noEventing = {

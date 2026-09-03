@@ -92,7 +92,7 @@ test.describe("progressive web application", () => {
       }
       return { keys, urls };
     });
-    expect(cached.keys).toEqual(["cq-shell-v1"]);
+    expect(cached.keys).toEqual(["cq-shell-v2"]);
     for (const url of cached.urls) {
       expect(
         ALLOWED.some((pattern) => pattern.test(url)),

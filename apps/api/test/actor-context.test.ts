@@ -15,7 +15,16 @@ import {
   type AuthenticatedPrincipal,
 } from "@capital-q/security";
 
-import { createApp } from "../src/app.js";
+import { createApp, type ApiSecurityDependencies } from "../src/app.js";
+
+/** A closed security boundary: nothing authenticates, nothing resolves. */
+const NO_SECURITY: ApiSecurityDependencies = {
+  authenticator: { authenticate: () => Promise.resolve(null) },
+  resolver: {
+    resolveHumanContext: () => Promise.resolve({ status: "CONTEXT_REQUIRED" }),
+  },
+  identities: { lookup: () => Promise.resolve(null) },
+};
 import {
   getActorContext,
   requireActorContextHook,
@@ -79,7 +88,7 @@ function buildApp(dependencies: {
   authenticator: RequestAuthenticator;
   resolver: ActorContextResolver;
 }): FastifyInstance {
-  const { app } = createApp(parseApiConfig({ NODE_ENV: "test" }));
+  const { app } = createApp(parseApiConfig({ NODE_ENV: "test" }), NO_SECURITY);
 
   app.get(
     "/__fixture/protected",

@@ -1,4 +1,4 @@
-﻿import { z } from "zod";
+import { z } from "zod";
 import {
   networkEnvShape,
   observabilityEnvShape,
@@ -11,6 +11,11 @@ import {
   type NetworkConfig,
   type RuntimeConfig,
 } from "./common.js";
+import {
+  supabaseAuthEnvShape,
+  toSupabaseAuthConfig,
+  type SupabaseAuthConfig,
+} from "./supabase-auth.js";
 
 /** Local default. Hosting platforms inject PORT. */
 export const API_DEFAULT_PORT = 3001;
@@ -19,6 +24,12 @@ const apiEnvSchema = z.object({
   ...runtimeEnvShape,
   ...observabilityEnvShape,
   ...networkEnvShape(API_DEFAULT_PORT),
+  // Optional at parse time so tooling and tests can build a config without an
+  // Auth server. The composition root refuses to start without it: a service
+  // that cannot verify sessions must not serve protected routes.
+  SUPABASE_URL: supabaseAuthEnvShape.SUPABASE_URL.optional(),
+  SUPABASE_PUBLISHABLE_KEY:
+    supabaseAuthEnvShape.SUPABASE_PUBLISHABLE_KEY.optional(),
 });
 
 /**
@@ -35,6 +46,8 @@ export type ApiConfig = {
   readonly runtime: RuntimeConfig;
   readonly observability: ObservabilityConfig;
   readonly network: NetworkConfig;
+  /** Supabase Auth verification settings; absent means "not configured". */
+  readonly supabaseAuth: SupabaseAuthConfig | undefined;
   readonly public: ApiPublicConfig;
   readonly secrets: ApiSecrets;
 };
@@ -47,6 +60,14 @@ export function parseApiConfig(env: EnvironmentInput): ApiConfig {
     runtime,
     observability: toObservabilityConfig(parsed, runtime),
     network: { host: parsed.HOST, port: parsed.PORT },
+    supabaseAuth:
+      parsed.SUPABASE_URL !== undefined &&
+      parsed.SUPABASE_PUBLISHABLE_KEY !== undefined
+        ? toSupabaseAuthConfig({
+            SUPABASE_URL: parsed.SUPABASE_URL,
+            SUPABASE_PUBLISHABLE_KEY: parsed.SUPABASE_PUBLISHABLE_KEY,
+          })
+        : undefined,
     public: {},
     secrets: {},
   };

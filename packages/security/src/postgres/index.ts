@@ -28,3 +28,9 @@ export {
   type PolicyIntegrityFailure,
   type PostgresAuthorizationPolicySourceOptions,
 } from "./authorization-policy-source.js";
+
+export {
+  createPostgresApplicationIdentityLookup,
+  type ApplicationIdentity,
+  type ApplicationIdentityLookup,
+} from "./application-identity.js";

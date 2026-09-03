@@ -104,7 +104,12 @@ test.describe("mobile application shell", () => {
     await expect(
       page.getByRole("heading", { name: "Profile", level: 1 }),
     ).toBeVisible();
-    await expect(page.getByText("Not signed in")).toBeVisible();
+    // The verified account, and no fabricated organisation.
+    await expect(page.getByText(/@example\.invalid/)).toBeVisible();
+    // The sidebar's chip is first in DOM order but hidden on a phone.
+    await expect(
+      page.getByText("No context set").filter({ visible: true }).first(),
+    ).toBeVisible();
     await expectNoHorizontalOverflow(page);
 
     await nav.getByRole("link", { name: "Home" }).tap();

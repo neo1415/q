@@ -51,4 +51,12 @@ export {
   type DatabaseConnectionMode,
 } from "./database.js";
 
+export {
+  classifySupabaseKey,
+  parseSupabaseAuthConfig,
+  requireSupabaseAuthConfig,
+  type SupabaseAuthConfig,
+  type SupabaseKeyClass,
+} from "./supabase-auth.js";
+
 export const CONFIG_SCHEMA_VERSION = 1;

@@ -12,11 +12,17 @@
  * There is no precache of pages and no offline data. Capital Q is an online
  * intelligence system; the worker exists so the installed app shell loads
  * fast and updates cleanly.
+ *
+ * Authentication and session-bearing paths are additionally denied by name.
+ * The allow-list already excludes them; the deny-list makes the intent
+ * explicit so a future widening of the allow-list cannot quietly start
+ * storing a sign-in page, a callback or an API response in Cache Storage.
  */
 
-const VERSION = "cq-shell-v1";
+const VERSION = "cq-shell-v2";
 const ALLOWED_PREFIXES = ["/_next/static/", "/icons/", "/fonts/"];
 const ALLOWED_EXACT = ["/manifest.webmanifest", "/icon.svg"];
+const DENIED_PREFIXES = ["/auth/", "/api/", "/v1/"];
 
 function isCacheable(request, origin) {
   if (request.method !== "GET") {
@@ -31,6 +37,9 @@ function isCacheable(request, origin) {
   if (url.origin !== origin) {
     return false;
   }
+  if (DENIED_PREFIXES.some((prefix) => url.pathname.startsWith(prefix))) {
+    return false;
+  }
   if (ALLOWED_EXACT.includes(url.pathname)) {
     return true;
   }
@@ -38,7 +47,13 @@ function isCacheable(request, origin) {
 }
 
 // Exposed for tests, which load this file and exercise the real policy.
-self.__cq = { VERSION, ALLOWED_PREFIXES, ALLOWED_EXACT, isCacheable };
+self.__cq = {
+  VERSION,
+  ALLOWED_PREFIXES,
+  ALLOWED_EXACT,
+  DENIED_PREFIXES,
+  isCacheable,
+};
 
 self.addEventListener("install", () => {
   self.skipWaiting();

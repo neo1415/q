@@ -12,6 +12,12 @@ import { ConfigurationError } from "../src/errors.js";
  */
 const EMPTY_ENV = {} as const;
 
+/** The web app cannot be configured without its Auth server; api/q-api can. */
+const WEB_ENV = {
+  NEXT_PUBLIC_SUPABASE_URL: "http://127.0.0.1:54321",
+  NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: "sb_publishable_test",
+} as const;
+
 describe("runtime defaults", () => {
   it("defaults to local development when nothing is set", () => {
     const config = parseApiConfig(EMPTY_ENV);
@@ -95,11 +101,18 @@ describe("per-service isolation", () => {
       parseApiConfig(EMPTY_ENV),
       parseQApiConfig(EMPTY_ENV),
       parseWorkerConfig(EMPTY_ENV),
-      parseWebServerConfig(EMPTY_ENV),
     ]) {
       expect(config.public).toEqual({});
       expect(config.secrets).toEqual({});
     }
+    // The web app's public area holds exactly the two browser-safe Supabase
+    // values and nothing secret.
+    const web = parseWebServerConfig(WEB_ENV);
+    expect(Object.keys(web.public).sort()).toEqual([
+      "supabasePublishableKey",
+      "supabaseUrl",
+    ]);
+    expect(web.secrets).toEqual({});
   });
 });
 

@@ -51,6 +51,12 @@ pnpm dev
 
 `api` and `q-api` expose `/health/live` and `/health/ready`. `workers` is a private workload with no public endpoint.
 
+### Authentication (local)
+
+Sign-in, sign-up and sessions run against Supabase Auth. Locally that is the CLI stack (`pnpm db:start`). The web app reads `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (put them in `apps/web/.env.local` for `next dev`; values come from `supabase status`); `api` and `q-api` read `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY` and refuse to start without them. Only the publishable key is ever configured -- a secret or service-role key is rejected by validation. See `.env.example`.
+
+`pnpm test:e2e` and `pnpm test:integration` need the local stack running: the browser suite creates synthetic accounts through the real sign-up screen and reads provider emails from the local mail catcher.
+
 ## Architecture
 
 Coding agents and contributors: read [`CLAUDE.md`](CLAUDE.md) first. It carries the cross-cutting architectural rules, source precedence and verification requirements that apply to every change.

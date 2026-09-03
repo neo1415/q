@@ -16,7 +16,16 @@ import {
   type ResourceScope,
 } from "@capital-q/security";
 
-import { createApp } from "../src/app.js";
+import { createApp, type ApiSecurityDependencies } from "../src/app.js";
+
+/** A closed security boundary: nothing authenticates, nothing resolves. */
+const NO_SECURITY: ApiSecurityDependencies = {
+  authenticator: { authenticate: () => Promise.resolve(null) },
+  resolver: {
+    resolveHumanContext: () => Promise.resolve({ status: "CONTEXT_REQUIRED" }),
+  },
+  identities: { lookup: () => Promise.resolve(null) },
+};
 import {
   getActorContext,
   requireActorContextHook,
@@ -79,7 +88,7 @@ const companyAOnly: AuthorizationPolicySource = {
 };
 
 function buildApp() {
-  const { app } = createApp(parseApiConfig({ NODE_ENV: "test" }));
+  const { app } = createApp(parseApiConfig({ NODE_ENV: "test" }), NO_SECURITY);
   const authorization = createAuthorizationService(companyAOnly);
 
   // Proves the handler body is not reached on a denial, not merely that a 403

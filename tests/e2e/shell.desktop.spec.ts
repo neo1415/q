@@ -49,10 +49,16 @@ test.describe("desktop application shell", () => {
     expect(overflow.scrollWidth).toBeLessThanOrEqual(overflow.clientWidth);
   });
 
-  test("does not fabricate an organisation or a user", async ({ page }) => {
+  test("shows the signed-in account and does not fabricate an organisation", async ({
+    page,
+  }) => {
     await page.goto("/profile");
-    await expect(page.getByText("Not signed in")).toBeVisible();
+    // The account row carries the verified provider email, nothing invented.
+    await expect(page.getByText(/@example\.invalid/)).toBeVisible();
     await expect(page.getByText("No context set").first()).toBeVisible();
+    await expect(page.getByText("Active organisation membership")).toHaveCount(
+      0,
+    );
   });
 
   test("the development UI preview is not available in production builds", async ({

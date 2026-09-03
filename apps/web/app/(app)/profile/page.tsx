@@ -2,6 +2,9 @@ import type { Metadata } from "next";
 
 import { ContextIndicator } from "@capital-q/ui/context-indicator";
 
+import { getCurrentIdentity } from "@/auth/current-identity";
+import { getSessionUser } from "@/auth/session";
+import { SignOutButton } from "@/features/auth";
 import {
   PageContainer,
   PageHeader,
@@ -10,11 +13,17 @@ import {
 export const metadata: Metadata = { title: "Profile" };
 
 /**
- * Profile shell. Shows the structure of account and context without
- * fabricating any of it: there is no session on this build, so nothing here
- * claims a role, a membership, a verification or an organisation.
+ * Profile: the signed-in account, the person Capital Q knows, and the
+ * organisation context the server resolved. Every value on this page is
+ * server-derived -- the email from the verified provider identity, the
+ * Person and context from `GET /v1/me` -- and absence is shown as absence.
  */
-export default function ProfilePage() {
+export default async function ProfilePage() {
+  const [user, identity] = await Promise.all([
+    getSessionUser(),
+    getCurrentIdentity(),
+  ]);
+
   return (
     <PageContainer width="reading">
       <PageHeader
@@ -23,10 +32,21 @@ export default function ProfilePage() {
       />
       <dl className="divide-y divide-(--cq-border-subtle) border-y border-(--cq-border-subtle)">
         <ProfileRow term="Account">
-          <span className="text-(--cq-text-secondary)">Not signed in</span>
+          <span className="break-all text-(--cq-text-primary)">
+            {user?.email ?? "Signed in"}
+          </span>
+        </ProfileRow>
+        <ProfileRow term="Name">
+          {identity.status === "AVAILABLE" ? (
+            <span className="text-(--cq-text-primary)">
+              {identity.me.user.displayName ?? "Not set yet"}
+            </span>
+          ) : (
+            <span className="text-(--cq-text-secondary)">Not available</span>
+          )}
         </ProfileRow>
         <ProfileRow term="Organisation context">
-          <ContextIndicator scope="unset" />
+          <OrganisationContext identity={identity} />
         </ProfileRow>
         <ProfileRow term="Appearance">
           <span className="text-(--cq-text-secondary)">
@@ -34,11 +54,48 @@ export default function ProfilePage() {
           </span>
         </ProfileRow>
       </dl>
-      <p className="cq-body-sm pt-5 text-(--cq-text-secondary)">
-        Sign-in, verification and organisation membership are managed by Capital
-        Q and appear here once your account is connected.
-      </p>
+      <div className="flex flex-col gap-4 pt-5">
+        <p className="cq-body-sm text-(--cq-text-secondary)">
+          Verification and organisation membership are managed by Capital Q and
+          appear here once they exist.
+        </p>
+        <SignOutButton />
+      </div>
     </PageContainer>
+  );
+}
+
+function OrganisationContext({
+  identity,
+}: {
+  readonly identity: Awaited<ReturnType<typeof getCurrentIdentity>>;
+}) {
+  if (identity.status === "AVAILABLE") {
+    if (identity.me.context.status === "RESOLVED") {
+      return (
+        <span className="text-(--cq-text-primary)">
+          Active organisation membership
+        </span>
+      );
+    }
+    return (
+      <span className="flex flex-col gap-1">
+        <ContextIndicator scope="unset" />
+        <span className="cq-caption text-(--cq-text-secondary)">
+          You don&apos;t belong to an organisation yet. Onboarding sets one up.
+        </span>
+      </span>
+    );
+  }
+  return (
+    <span className="flex flex-col gap-1">
+      <ContextIndicator scope="unset" />
+      <span className="cq-caption text-(--cq-text-secondary)">
+        {identity.status === "NOT_CONFIGURED"
+          ? "Not available on this build."
+          : "Couldn't be loaded right now."}
+      </span>
+    </span>
   );
 }
 
