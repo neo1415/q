@@ -1286,6 +1286,117 @@ export type Database = {
       [_ in never]: never
     }
   }
+  network: {
+    Tables: {
+      relationship_events: {
+        Row: {
+          actor_id: string
+          actor_type: string
+          correlation_id: string
+          created_at: string
+          event_type: string
+          id: string
+          occurred_at: string
+          payload: Json
+          relationship_id: string
+          sequence: number
+          source_id: string | null
+          source_type: string
+          tenant_id: string
+          visibility_scope: string
+        }
+        Insert: {
+          actor_id: string
+          actor_type: string
+          correlation_id: string
+          created_at?: string
+          event_type: string
+          id?: string
+          occurred_at?: string
+          payload?: Json
+          relationship_id: string
+          sequence: number
+          source_id?: string | null
+          source_type: string
+          tenant_id: string
+          visibility_scope: string
+        }
+        Update: {
+          actor_id?: string
+          actor_type?: string
+          correlation_id?: string
+          created_at?: string
+          event_type?: string
+          id?: string
+          occurred_at?: string
+          payload?: Json
+          relationship_id?: string
+          sequence?: number
+          source_id?: string | null
+          source_type?: string
+          tenant_id?: string
+          visibility_scope?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "relationship_events_relationship_id_tenant_id_fkey"
+            columns: ["relationship_id", "tenant_id"]
+            isOneToOne: false
+            referencedRelation: "relationships"
+            referencedColumns: ["id", "tenant_id"]
+          },
+        ]
+      }
+      relationships: {
+        Row: {
+          company_id: string
+          created_at: string
+          current_state: string
+          first_discovered_at: string
+          id: string
+          investor_organisation_id: string
+          last_event_sequence: number
+          state_updated_at: string
+          tenant_id: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          current_state?: string
+          first_discovered_at?: string
+          id?: string
+          investor_organisation_id: string
+          last_event_sequence?: number
+          state_updated_at?: string
+          tenant_id: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          current_state?: string
+          first_discovered_at?: string
+          id?: string
+          investor_organisation_id?: string
+          last_event_sequence?: number
+          state_updated_at?: string
+          tenant_id?: string
+        }
+        Relationships: []
+      }
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      [_ in never]: never
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   permissions: {
     Tables: {
       capabilities: {
@@ -1590,6 +1701,9 @@ export const Constants = {
     Enums: {},
   },
   identity: {
+    Enums: {},
+  },
+  network: {
     Enums: {},
   },
   permissions: {

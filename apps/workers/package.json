@@ -19,6 +19,7 @@
     "@capital-q/database": "workspace:*",
     "@capital-q/eventing": "workspace:*",
     "@capital-q/investors": "workspace:*",
+    "@capital-q/network": "workspace:*",
     "@capital-q/observability": "workspace:*",
     "@capital-q/organisations": "workspace:*"
   },

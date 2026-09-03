@@ -130,4 +130,12 @@ export type CompanyQueryPort = {
     tenantId: TenantId,
     companyId: CompanyId,
   ) => Promise<CompanyIdentity | null>;
+  /**
+   * Tenant-agnostic canonical lookup for cross-organisation domains (the
+   * relationship graph): returns the company's trusted ownership metadata,
+   * including its tenant. Permission-neutral; callers authorise separately.
+   */
+  readonly findCanonicalCompany: (
+    companyId: CompanyId,
+  ) => Promise<CompanyIdentity | null>;
 };

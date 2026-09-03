@@ -239,3 +239,21 @@ export {
   type ReplaceCapitalObjectiveRequest,
   type UpdateCapitalObjectiveRequest,
 } from "./capital-objectives.js";
+
+export {
+  DisclosureScopeSchema,
+  RELATIONSHIP_CURRENT_STATES,
+  RELATIONSHIP_EVENT_PAYLOAD_MAX_BYTES,
+  RELATIONSHIP_SOURCE_TYPES,
+  RELATIONSHIP_STATE_DISCOVERED,
+  RelationshipCurrentStateSchema,
+  RelationshipDtoSchema,
+  RelationshipEventSummaryDtoSchema,
+  RelationshipEventTypeSchema,
+  RelationshipSourceIdSchema,
+  RelationshipSourceTypeSchema,
+  type DisclosureScope,
+  type RelationshipDto,
+  type RelationshipEventSummaryDto,
+  type RelationshipSourceType,
+} from "./relationships.js";

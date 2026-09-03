@@ -178,4 +178,12 @@ export type InvestorOrganisationQueryPort = {
     tenantId: TenantId,
     investorOrganisationId: InvestorOrganisationId,
   ) => Promise<InvestorOrganisationIdentity | null>;
+  /**
+   * Tenant-agnostic canonical lookup for cross-organisation domains (the
+   * relationship graph): trusted ownership metadata including the tenant.
+   * Permission-neutral; callers authorise separately.
+   */
+  readonly findCanonicalInvestorOrganisation: (
+    investorOrganisationId: InvestorOrganisationId,
+  ) => Promise<InvestorOrganisationIdentity | null>;
 };

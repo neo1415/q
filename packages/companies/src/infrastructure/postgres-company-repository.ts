@@ -275,6 +275,22 @@ export function createPostgresCompanyQueryPort(options: {
   readonly sql: DatabaseExecutor;
 }): CompanyQueryPort {
   const { sql } = options;
+  const toIdentity = (row: unknown): CompanyIdentity => {
+    const parsed = CompanyRowSchema.pick({
+      id: true,
+      tenant_id: true,
+      organisation_id: true,
+      canonical_name: true,
+      company_status: true,
+    }).parse(row);
+    return {
+      id: parsed.id,
+      tenantId: parsed.tenant_id,
+      organisationId: parsed.organisation_id,
+      canonicalName: parsed.canonical_name,
+      companyStatus: parsed.company_status,
+    };
+  };
   return {
     getCanonicalCompany: async (tenantId, companyId) => {
       const rows = await sql`
@@ -282,24 +298,14 @@ export function createPostgresCompanyQueryPort(options: {
           from core.companies c
          where c.id = ${companyId}
            and c.tenant_id = ${tenantId}`;
-      if (rows.length === 0) {
-        return null;
-      }
-      const parsed = CompanyRowSchema.pick({
-        id: true,
-        tenant_id: true,
-        organisation_id: true,
-        canonical_name: true,
-        company_status: true,
-      }).parse(rows[0]);
-      const identity: CompanyIdentity = {
-        id: parsed.id,
-        tenantId: parsed.tenant_id,
-        organisationId: parsed.organisation_id,
-        canonicalName: parsed.canonical_name,
-        companyStatus: parsed.company_status,
-      };
-      return identity;
+      return rows.length === 0 ? null : toIdentity(rows[0]);
+    },
+    findCanonicalCompany: async (companyId) => {
+      const rows = await sql`
+        select c.id, c.tenant_id, c.organisation_id, c.canonical_name, c.company_status
+          from core.companies c
+         where c.id = ${companyId}`;
+      return rows.length === 0 ? null : toIdentity(rows[0]);
     },
   };
 }

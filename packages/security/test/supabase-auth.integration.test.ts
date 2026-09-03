@@ -134,9 +134,15 @@ describe("Supabase authentication -> canonical identity -> ActorContext", () => 
       principal,
     );
 
-    // Tamper with the signature: same header and claims, different last char.
-    const last = accessToken.slice(-1);
-    const tampered = accessToken.slice(0, -1) + (last === "a" ? "b" : "a");
+    // Tamper with the signature: same header and claims, one signature
+    // character changed. Not the last character: its low bits are base64url
+    // padding that a lenient decoder ignores, which made the old check flaky.
+    const index = accessToken.length - 2;
+    const original = accessToken.charAt(index);
+    const tampered =
+      accessToken.slice(0, index) +
+      (original === "a" ? "b" : "a") +
+      accessToken.slice(index + 1);
     await expect(authenticator.authenticate(tampered)).resolves.toBeNull();
 
     // A structurally valid but unrelated token.

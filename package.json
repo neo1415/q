@@ -28,7 +28,7 @@
     "test:db": "supabase test db",
     "clean": "turbo run clean",
     "test:integration": "vitest run --config vitest.integration.config.ts",
-    "db:types": "supabase gen types typescript --local --schema identity,permissions,events,audit,core > packages/database/src/generated/database.types.ts",
+    "db:types": "supabase gen types typescript --local --schema identity,permissions,events,audit,core,network > packages/database/src/generated/database.types.ts",
     "db:types:check": "pnpm db:types && git diff --exit-code -- packages/database/src/generated",
     "test:rls": "supabase test db supabase/tests/database/rls"
   },

@@ -32,7 +32,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 
 create temporary table guarded_schemas (schema_name text primary key) on commit drop;
-insert into guarded_schemas values ('identity'), ('permissions'), ('events'), ('audit'), ('core');
+insert into guarded_schemas values ('identity'), ('permissions'), ('events'), ('audit'), ('core'), ('network');
 
 create temporary table rls_inventory (
   schema_name text not null,
@@ -66,6 +66,8 @@ insert into rls_inventory (schema_name, table_name, classification, authenticate
   ('core', 'capital_objectives',            'RLS_REQUIRED',         '{SELECT}'),
   ('core', 'capital_objective_events',      'RLS_REQUIRED',         '{SELECT}'),
   ('core', 'capital_objective_creation_requests', 'INTERNAL_SERVER_ONLY', '{}'),
+  ('network', 'relationships',            'INTERNAL_SERVER_ONLY', '{}'),
+  ('network', 'relationship_events',      'INTERNAL_SERVER_ONLY', '{}'),
   ('permissions', 'capabilities',          'PUBLIC_REFERENCE',     '{SELECT}'),
   ('permissions', 'roles',                 'PUBLIC_REFERENCE',     '{SELECT}'),
   ('permissions', 'role_capabilities',     'PUBLIC_REFERENCE',     '{SELECT}'),
@@ -146,8 +148,9 @@ select ok(not has_schema_privilege('anon', 'private', 'usage') and not has_schem
   'anon has no usage on private or pgmq');
 select ok(not has_schema_privilege('authenticated', 'events', 'usage')
       and not has_schema_privilege('authenticated', 'audit', 'usage')
+      and not has_schema_privilege('authenticated', 'network', 'usage')
       and not has_schema_privilege('authenticated', 'pgmq', 'usage'),
-  'authenticated has no usage on events, audit or pgmq');
+  'authenticated has no usage on events, audit, network or pgmq');
 
 -- SECURITY DEFINER helpers -----------------------------------------------------
 

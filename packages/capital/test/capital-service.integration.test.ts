@@ -371,8 +371,14 @@ describe("@capital-q/capital against local PostgreSQL", () => {
         // No relationship, readiness, recommendation or Q table was touched (none exists).
         const tables = await tx.sql<{ n: string }[]>`
         select table_name as n from information_schema.tables
-         where table_name in ('relationships', 'readiness_assessments', 'recommendation_slates', 'q_knowledge_objects', 'onboarding_raise')`;
+         where table_name in ('readiness_assessments', 'recommendation_slates', 'q_knowledge_objects', 'onboarding_raise')`;
         expect(tables).toEqual([]);
+        // The relationship spine exists (CQ-NET-001) but a raise never creates one.
+        expect(
+          await count(
+            tx.sql`select count(*)::int as count from network.relationships where company_id = ${companyA}`,
+          ),
+        ).toBe(0);
 
         const port = createPostgresCapitalObjectiveQueryPort({ sql: tx.sql });
         const snapshot = await port.getCurrentForCompany(

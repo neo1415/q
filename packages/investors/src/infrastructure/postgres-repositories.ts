@@ -345,6 +345,24 @@ export function createPostgresInvestorOrganisationQueryPort(options: {
   readonly sql: DatabaseExecutor;
 }): InvestorOrganisationQueryPort {
   const { sql } = options;
+  const toIdentity = (row: unknown): InvestorOrganisationIdentity => {
+    const parsed = InvestorRow.pick({
+      id: true,
+      tenant_id: true,
+      organisation_id: true,
+      investor_type: true,
+      display_name: true,
+      deployment_state: true,
+    }).parse(row);
+    return {
+      id: parsed.id,
+      tenantId: parsed.tenant_id,
+      organisationId: parsed.organisation_id,
+      investorType: parsed.investor_type,
+      displayName: parsed.display_name,
+      deploymentState: parsed.deployment_state,
+    };
+  };
   return {
     getCanonicalInvestorOrganisation: async (tenantId, id) => {
       const rows = await sql`
@@ -352,26 +370,14 @@ export function createPostgresInvestorOrganisationQueryPort(options: {
           from core.investor_organisations i
          where i.id = ${id}
            and i.tenant_id = ${tenantId}`;
-      if (rows.length === 0) {
-        return null;
-      }
-      const parsed = InvestorRow.pick({
-        id: true,
-        tenant_id: true,
-        organisation_id: true,
-        investor_type: true,
-        display_name: true,
-        deployment_state: true,
-      }).parse(rows[0]);
-      const identity: InvestorOrganisationIdentity = {
-        id: parsed.id,
-        tenantId: parsed.tenant_id,
-        organisationId: parsed.organisation_id,
-        investorType: parsed.investor_type,
-        displayName: parsed.display_name,
-        deploymentState: parsed.deployment_state,
-      };
-      return identity;
+      return rows.length === 0 ? null : toIdentity(rows[0]);
+    },
+    findCanonicalInvestorOrganisation: async (id) => {
+      const rows = await sql`
+        select i.id, i.tenant_id, i.organisation_id, i.investor_type, i.display_name, i.deployment_state
+          from core.investor_organisations i
+         where i.id = ${id}`;
+      return rows.length === 0 ? null : toIdentity(rows[0]);
     },
   };
 }
