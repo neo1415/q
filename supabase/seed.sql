@@ -26,6 +26,10 @@ insert into permissions.capabilities (code, description) values
   ('company.team.view',        'Read company team relationships and team facts.'),
   ('company.team.self_edit',   'Maintain one''s own company relationship and founder profile.'),
   ('company.team.manage',      'Administer company-wide team facts.'),
+  ('investor.create',          'Establish the canonical investor organisation for the active organisation.'),
+  ('investor.view',            'Read the organisation-internal investor organisation profile.'),
+  ('investor.edit',            'Edit the investor organisation profile and deployment state.'),
+  ('investor.representative.self_edit', 'Maintain one''s own representation of the investor organisation.'),
   ('company.financials.view',  'View company financial data.'),
   ('company.financials.edit',  'Edit company financial data.'),
   ('data_room.share',          'Share data room content with another party.'),
@@ -67,6 +71,12 @@ select r.id, c.id, 'ALLOW'
       ('organisation_admin',  'company.team.self_edit'),
       ('organisation_admin',  'company.team.manage'),
       ('organisation_member', 'company.team.view'),
-      ('organisation_member', 'company.team.self_edit')
+      ('organisation_member', 'company.team.self_edit'),
+      ('organisation_admin',  'investor.create'),
+      ('organisation_admin',  'investor.view'),
+      ('organisation_admin',  'investor.edit'),
+      ('organisation_admin',  'investor.representative.self_edit'),
+      ('organisation_member', 'investor.view'),
+      ('organisation_member', 'investor.representative.self_edit')
     )
 on conflict (role_id, capability_id) do nothing;

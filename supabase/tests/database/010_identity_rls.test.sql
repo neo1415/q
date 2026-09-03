@@ -108,7 +108,9 @@ select results_eq(
   $$ values ('company.create'), ('company.edit'), ('company.financials.edit'),
             ('company.financials.view'), ('company.team.manage'), ('company.team.self_edit'),
             ('company.team.view'), ('company.view'), ('data_room.share'),
-            ('organisation.admin'), ('organisation.view'), ('q.action.approve') $$,
+            ('investor.create'), ('investor.edit'), ('investor.representative.self_edit'),
+            ('investor.view'), ('organisation.admin'), ('organisation.view'),
+            ('q.action.approve') $$,
   'seeded capability codes match the known reference set');
 select results_eq(
   $$ select code from permissions.roles order by code $$,
@@ -122,8 +124,9 @@ select results_eq(
       order by c.code $$,
   $$ values ('company.create'), ('company.edit'), ('company.team.manage'),
             ('company.team.self_edit'), ('company.team.view'), ('company.view'),
-            ('organisation.admin'), ('organisation.view') $$,
-  'organisation_admin maps to organisation, company profile and team capabilities only');
+            ('investor.create'), ('investor.edit'), ('investor.representative.self_edit'),
+            ('investor.view'), ('organisation.admin'), ('organisation.view') $$,
+  'organisation_admin maps to organisation, company, team and investor capabilities only');
 select results_eq(
   $$ select c.code from permissions.role_capabilities rc
        join permissions.roles r on r.id = rc.role_id
@@ -131,8 +134,8 @@ select results_eq(
       where r.code = 'organisation_member' and rc.effect = 'ALLOW'
       order by c.code $$,
   $$ values ('company.team.self_edit'), ('company.team.view'), ('company.view'),
-            ('organisation.view') $$,
-  'organisation_member carries view and self-edit capabilities only (CQ-ORG-001, CQ-COMP-001, CQ-COMP-002)');
+            ('investor.representative.self_edit'), ('investor.view'), ('organisation.view') $$,
+  'organisation_member carries view and self-edit capabilities only (CQ-ORG-001, CQ-COMP-001, CQ-COMP-002, CQ-INV-001)');
 
 -- ===========================================================================
 -- Fixtures (as the migration owner; RLS bypassed)

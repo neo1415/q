@@ -309,7 +309,8 @@ export function createPostgresOrganisationQueryPort(options: {
   return {
     getActiveOrganisationIdentity: async (tenantId, organisationId) => {
       const rows = await sql`
-        select o.id, o.tenant_id, o.organisation_type, o.display_name, o.status
+        select o.id, o.tenant_id, o.organisation_type, o.display_name,
+               o.website_url, o.country_code, o.status
           from identity.organisations o
          where o.id = ${organisationId}
            and o.tenant_id = ${tenantId}
@@ -322,6 +323,8 @@ export function createPostgresOrganisationQueryPort(options: {
         tenant_id: true,
         organisation_type: true,
         display_name: true,
+        website_url: true,
+        country_code: true,
         status: true,
       }).parse(rows[0]);
       const identity: OrganisationIdentity = {
@@ -329,6 +332,8 @@ export function createPostgresOrganisationQueryPort(options: {
         tenantId: parsed.tenant_id,
         organisationType: parsed.organisation_type,
         displayName: parsed.display_name,
+        websiteUrl: parsed.website_url,
+        countryCode: parsed.country_code,
         status: parsed.status,
       };
       return identity;

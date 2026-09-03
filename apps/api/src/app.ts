@@ -14,6 +14,10 @@ import {
   type CompanyRoutesDependencies,
 } from "./http/companies.js";
 import { registerCompanyTeamRoutes } from "./http/company-team.js";
+import {
+  registerInvestorRoutes,
+  type InvestorRoutesDependencies,
+} from "./http/investors.js";
 import { registerMeRoute, type MeRouteDependencies } from "./http/me.js";
 import {
   registerOrganisationRoutes,
@@ -41,6 +45,7 @@ export type ApiModules = {
   readonly organisations?:
     OrganisationRoutesDependencies["organisations"] | undefined;
   readonly companies?: CompanyRoutesDependencies["companies"] | undefined;
+  readonly investors?: InvestorRoutesDependencies["investors"] | undefined;
 };
 
 /**
@@ -125,6 +130,14 @@ export function createApp(
       authenticator: security.authenticator,
       resolver: security.resolver,
       companies: modules.companies,
+    });
+  }
+
+  if (modules.investors !== undefined) {
+    registerInvestorRoutes(app, {
+      authenticator: security.authenticator,
+      resolver: security.resolver,
+      investors: modules.investors,
     });
   }
 

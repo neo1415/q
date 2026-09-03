@@ -68,6 +68,9 @@ export type OrganisationIdentity = {
   readonly tenantId: TenantId;
   readonly organisationType: OrganisationType;
   readonly displayName: string;
+  /** Ordinary profile context a dependant may default from; not domain-control proof. */
+  readonly websiteUrl: string | null;
+  readonly countryCode: string | null;
   readonly status: OrganisationStatus;
 };
 
@@ -96,6 +99,8 @@ export function toOrganisationIdentity(
     tenantId: organisation.tenantId,
     organisationType: organisation.organisationType,
     displayName: organisation.displayName,
+    websiteUrl: organisation.websiteUrl,
+    countryCode: organisation.countryCode,
     status: organisation.status,
   };
 }

@@ -381,6 +381,152 @@ export type Database = {
           },
         ]
       }
+      investor_creation_requests: {
+        Row: {
+          created_at: string
+          idempotency_key_hash: string
+          investor_organisation_id: string
+          organisation_id: string
+          request_hash: string
+          tenant_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          idempotency_key_hash: string
+          investor_organisation_id: string
+          organisation_id: string
+          request_hash: string
+          tenant_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          idempotency_key_hash?: string
+          investor_organisation_id?: string
+          organisation_id?: string
+          request_hash?: string
+          tenant_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "investor_creation_requests_investor_organisation_id_tenant_fkey"
+            columns: ["investor_organisation_id", "tenant_id"]
+            isOneToOne: false
+            referencedRelation: "investor_organisations"
+            referencedColumns: ["id", "tenant_id"]
+          },
+        ]
+      }
+      investor_organisations: {
+        Row: {
+          created_at: string
+          deployment_state: string | null
+          display_name: string
+          hq_country: string | null
+          id: string
+          investor_type: string
+          organisation_id: string
+          public_description: string | null
+          tenant_id: string
+          updated_at: string
+          verification_state: string
+          version: number
+          website_url: string | null
+        }
+        Insert: {
+          created_at?: string
+          deployment_state?: string | null
+          display_name: string
+          hq_country?: string | null
+          id?: string
+          investor_type: string
+          organisation_id: string
+          public_description?: string | null
+          tenant_id: string
+          updated_at?: string
+          verification_state?: string
+          version?: number
+          website_url?: string | null
+        }
+        Update: {
+          created_at?: string
+          deployment_state?: string | null
+          display_name?: string
+          hq_country?: string | null
+          id?: string
+          investor_type?: string
+          organisation_id?: string
+          public_description?: string | null
+          tenant_id?: string
+          updated_at?: string
+          verification_state?: string
+          version?: number
+          website_url?: string | null
+        }
+        Relationships: []
+      }
+      investor_representatives: {
+        Row: {
+          business_title: string | null
+          created_at: string
+          ended_at: string | null
+          id: string
+          investor_organisation_id: string
+          is_current: boolean
+          membership_id: string
+          organisation_id: string
+          started_at: string
+          tenant_id: string
+          updated_at: string
+          user_id: string
+          version: number
+        }
+        Insert: {
+          business_title?: string | null
+          created_at?: string
+          ended_at?: string | null
+          id?: string
+          investor_organisation_id: string
+          is_current?: boolean
+          membership_id: string
+          organisation_id: string
+          started_at?: string
+          tenant_id: string
+          updated_at?: string
+          user_id: string
+          version?: number
+        }
+        Update: {
+          business_title?: string | null
+          created_at?: string
+          ended_at?: string | null
+          id?: string
+          investor_organisation_id?: string
+          is_current?: boolean
+          membership_id?: string
+          organisation_id?: string
+          started_at?: string
+          tenant_id?: string
+          updated_at?: string
+          user_id?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "investor_representatives_investor_organisation_id_organisa_fkey"
+            columns: [
+              "investor_organisation_id",
+              "organisation_id",
+              "tenant_id",
+            ]
+            isOneToOne: false
+            referencedRelation: "investor_organisations"
+            referencedColumns: ["id", "organisation_id", "tenant_id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never

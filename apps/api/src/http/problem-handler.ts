@@ -15,6 +15,13 @@ import {
   FounderProfileNotFoundError,
   TeamVersionConflictError,
 } from "@capital-q/companies";
+import {
+  InvestorCreationConflictError,
+  InvestorOrganisationExistsError,
+  InvestorOrganisationNotFoundError,
+  InvestorRepresentativeNotFoundError,
+  InvestorVersionConflictError,
+} from "@capital-q/investors";
 import type { Logger } from "@capital-q/observability";
 import {
   OrganisationCreationConflictError,
@@ -147,7 +154,9 @@ function toProblem(error: unknown, requestId: string): ProblemDetails {
     error instanceof CompanyNotFoundError ||
     error instanceof CompanyMemberNotFoundError ||
     error instanceof FounderProfileNotFoundError ||
-    error instanceof CompanyTeamFactsNotFoundError
+    error instanceof CompanyTeamFactsNotFoundError ||
+    error instanceof InvestorOrganisationNotFoundError ||
+    error instanceof InvestorRepresentativeNotFoundError
   ) {
     return createProblemDetails({ code: "RESOURCE_NOT_FOUND", requestId });
   }
@@ -155,7 +164,8 @@ function toProblem(error: unknown, requestId: string): ProblemDetails {
   if (
     error instanceof OrganisationVersionConflictError ||
     error instanceof CompanyVersionConflictError ||
-    error instanceof TeamVersionConflictError
+    error instanceof TeamVersionConflictError ||
+    error instanceof InvestorVersionConflictError
   ) {
     return createProblemDetails({
       code: "VERSION_CONFLICT",
@@ -166,10 +176,22 @@ function toProblem(error: unknown, requestId: string): ProblemDetails {
 
   if (
     error instanceof OrganisationCreationConflictError ||
-    error instanceof CompanyCreationConflictError
+    error instanceof CompanyCreationConflictError ||
+    error instanceof InvestorCreationConflictError
   ) {
     return createProblemDetails({
       code: "IDEMPOTENCY_CONFLICT",
+      requestId,
+      detail: error.message,
+    });
+  }
+
+  // One canonical investor organisation per organisation. Only a member of
+  // that organisation can reach this branch, so confirming existence to
+  // them discloses nothing they cannot already read.
+  if (error instanceof InvestorOrganisationExistsError) {
+    return createProblemDetails({
+      code: "RESOURCE_CONFLICT",
       requestId,
       detail: error.message,
     });

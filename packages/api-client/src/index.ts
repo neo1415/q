@@ -42,3 +42,12 @@ export {
   updateMyFounderProfile,
   upsertMyCompanyMembership,
 } from "./company-team.js";
+
+export {
+  createInvestorOrganisation,
+  getCurrentInvestorOrganisation,
+  getInvestorOrganisation,
+  getMyInvestorRepresentative,
+  updateInvestorOrganisation,
+  upsertMyInvestorRepresentative,
+} from "./investors.js";

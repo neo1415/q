@@ -18,6 +18,7 @@
     "@capital-q/contracts": "workspace:*",
     "@capital-q/database": "workspace:*",
     "@capital-q/eventing": "workspace:*",
+    "@capital-q/investors": "workspace:*",
     "@capital-q/observability": "workspace:*",
     "@capital-q/organisations": "workspace:*",
     "@capital-q/security": "workspace:*",

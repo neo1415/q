@@ -65,6 +65,9 @@ importers:
       '@capital-q/eventing':
         specifier: workspace:*
         version: link:../../packages/eventing
+      '@capital-q/investors':
+        specifier: workspace:*
+        version: link:../../packages/investors
       '@capital-q/observability':
         specifier: workspace:*
         version: link:../../packages/observability
@@ -194,6 +197,9 @@ importers:
       '@capital-q/eventing':
         specifier: workspace:*
         version: link:../../packages/eventing
+      '@capital-q/investors':
+        specifier: workspace:*
+        version: link:../../packages/investors
       '@capital-q/observability':
         specifier: workspace:*
         version: link:../../packages/observability
@@ -333,6 +339,40 @@ importers:
       '@capital-q/database':
         specifier: workspace:*
         version: link:../database
+      zod:
+        specifier: 4.5.4
+        version: 4.5.4
+    devDependencies:
+      '@capital-q/config':
+        specifier: workspace:*
+        version: link:../config
+      '@types/node':
+        specifier: ^24.13.3
+        version: 24.13.3
+      typescript:
+        specifier: 5.9.3
+        version: 5.9.3
+
+  packages/investors:
+    dependencies:
+      '@capital-q/audit':
+        specifier: workspace:*
+        version: link:../audit
+      '@capital-q/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      '@capital-q/database':
+        specifier: workspace:*
+        version: link:../database
+      '@capital-q/eventing':
+        specifier: workspace:*
+        version: link:../eventing
+      '@capital-q/organisations':
+        specifier: workspace:*
+        version: link:../organisations
+      '@capital-q/security':
+        specifier: workspace:*
+        version: link:../security
       zod:
         specifier: 4.5.4
         version: 4.5.4
