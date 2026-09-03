@@ -22,8 +22,24 @@ import {
  * only -- never profile text.
  */
 
-export const INVESTOR_EVENT_OWNER = "@capital-q/investors" as const;
-export const INVESTOR_EVENT_PRODUCER = "capitalq://api/core/investor" as const;
+import { INVESTOR_EVENT_OWNER, INVESTOR_EVENT_PRODUCER } from "./shared.js";
+import { INVESTOR_MANDATE_EVENTS as MANDATE_EVENTS } from "./mandate.js";
+
+export { INVESTOR_EVENT_OWNER, INVESTOR_EVENT_PRODUCER } from "./shared.js";
+export {
+  INVESTOR_MANDATE_EVENTS,
+  investorMandateActivatedEvent,
+  investorMandateClosedEvent,
+  investorMandateCreatedEvent,
+  investorMandateUpdatedEvent,
+  InvestorMandateActivatedEvent,
+  InvestorMandateClosedEvent,
+  InvestorMandateCreatedEvent,
+  InvestorMandateUpdatedEvent,
+  MANDATE_CHANGE_KINDS,
+  MandateChangeKindSchema,
+  type MandateChangeKind,
+} from "./mandate.js";
 
 const changedFields = z.array(z.string().min(1).max(64)).min(1).max(16);
 
@@ -112,6 +128,7 @@ export const INVESTOR_EVENTS: readonly EventDefinition[] = [
   InvestorOrganisationUpdatedEvent,
   InvestorRepresentativeCreatedEvent,
   InvestorRepresentativeUpdatedEvent,
+  ...MANDATE_EVENTS,
 ];
 
 type Context = {

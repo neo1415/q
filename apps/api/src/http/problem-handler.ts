@@ -17,6 +17,9 @@ import {
 } from "@capital-q/companies";
 import {
   InvestorCreationConflictError,
+  InvestorMandateCreationConflictError,
+  InvestorMandateLifecycleError,
+  InvestorMandateNotFoundError,
   InvestorOrganisationExistsError,
   InvestorOrganisationNotFoundError,
   InvestorRepresentativeNotFoundError,
@@ -156,7 +159,8 @@ function toProblem(error: unknown, requestId: string): ProblemDetails {
     error instanceof FounderProfileNotFoundError ||
     error instanceof CompanyTeamFactsNotFoundError ||
     error instanceof InvestorOrganisationNotFoundError ||
-    error instanceof InvestorRepresentativeNotFoundError
+    error instanceof InvestorRepresentativeNotFoundError ||
+    error instanceof InvestorMandateNotFoundError
   ) {
     return createProblemDetails({ code: "RESOURCE_NOT_FOUND", requestId });
   }
@@ -177,7 +181,8 @@ function toProblem(error: unknown, requestId: string): ProblemDetails {
   if (
     error instanceof OrganisationCreationConflictError ||
     error instanceof CompanyCreationConflictError ||
-    error instanceof InvestorCreationConflictError
+    error instanceof InvestorCreationConflictError ||
+    error instanceof InvestorMandateCreationConflictError
   ) {
     return createProblemDetails({
       code: "IDEMPOTENCY_CONFLICT",
@@ -186,10 +191,14 @@ function toProblem(error: unknown, requestId: string): ProblemDetails {
     });
   }
 
-  // One canonical investor organisation per organisation. Only a member of
-  // that organisation can reach this branch, so confirming existence to
-  // them discloses nothing they cannot already read.
-  if (error instanceof InvestorOrganisationExistsError) {
+  // One canonical investor organisation per organisation, and a mandate
+  // lifecycle that refuses edits to history. Only a member of that
+  // organisation can reach these branches, so confirming the state to them
+  // discloses nothing they cannot already read.
+  if (
+    error instanceof InvestorOrganisationExistsError ||
+    error instanceof InvestorMandateLifecycleError
+  ) {
     return createProblemDetails({
       code: "RESOURCE_CONFLICT",
       requestId,

@@ -419,6 +419,166 @@ export type Database = {
           },
         ]
       }
+      investor_mandate_constraints: {
+        Row: {
+          created_at: string
+          dimension: string
+          id: string
+          importance: string
+          is_hard_exclusion: boolean
+          mandate_id: string
+          operator: string
+          tenant_id: string
+          value_jsonb: Json
+        }
+        Insert: {
+          created_at?: string
+          dimension: string
+          id?: string
+          importance: string
+          is_hard_exclusion?: boolean
+          mandate_id: string
+          operator: string
+          tenant_id: string
+          value_jsonb: Json
+        }
+        Update: {
+          created_at?: string
+          dimension?: string
+          id?: string
+          importance?: string
+          is_hard_exclusion?: boolean
+          mandate_id?: string
+          operator?: string
+          tenant_id?: string
+          value_jsonb?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "investor_mandate_constraints_mandate_id_tenant_id_fkey"
+            columns: ["mandate_id", "tenant_id"]
+            isOneToOne: false
+            referencedRelation: "investor_mandates"
+            referencedColumns: ["id", "tenant_id"]
+          },
+        ]
+      }
+      investor_mandate_creation_requests: {
+        Row: {
+          created_at: string
+          idempotency_key_hash: string
+          investor_organisation_id: string
+          mandate_id: string
+          request_hash: string
+          tenant_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          idempotency_key_hash: string
+          investor_organisation_id: string
+          mandate_id: string
+          request_hash: string
+          tenant_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          idempotency_key_hash?: string
+          investor_organisation_id?: string
+          mandate_id?: string
+          request_hash?: string
+          tenant_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "investor_mandate_creation_req_investor_organisation_id_ten_fkey"
+            columns: ["investor_organisation_id", "tenant_id"]
+            isOneToOne: false
+            referencedRelation: "investor_organisations"
+            referencedColumns: ["id", "tenant_id"]
+          },
+          {
+            foreignKeyName: "investor_mandate_creation_requests_mandate_id_tenant_id_fkey"
+            columns: ["mandate_id", "tenant_id"]
+            isOneToOne: false
+            referencedRelation: "investor_mandates"
+            referencedColumns: ["id", "tenant_id"]
+          },
+        ]
+      }
+      investor_mandates: {
+        Row: {
+          created_at: string
+          created_by_user_id: string
+          currency_code: string | null
+          discovery_mode: string | null
+          effective_from: string | null
+          effective_to: string | null
+          id: string
+          investor_organisation_id: string
+          max_cheque: number | null
+          max_stage_code: string | null
+          min_cheque: number | null
+          min_stage_code: string | null
+          name: string
+          raw_mandate_text: string | null
+          status: string
+          tenant_id: string
+          updated_at: string
+          version: number
+        }
+        Insert: {
+          created_at?: string
+          created_by_user_id: string
+          currency_code?: string | null
+          discovery_mode?: string | null
+          effective_from?: string | null
+          effective_to?: string | null
+          id?: string
+          investor_organisation_id: string
+          max_cheque?: number | null
+          max_stage_code?: string | null
+          min_cheque?: number | null
+          min_stage_code?: string | null
+          name: string
+          raw_mandate_text?: string | null
+          status?: string
+          tenant_id: string
+          updated_at?: string
+          version?: number
+        }
+        Update: {
+          created_at?: string
+          created_by_user_id?: string
+          currency_code?: string | null
+          discovery_mode?: string | null
+          effective_from?: string | null
+          effective_to?: string | null
+          id?: string
+          investor_organisation_id?: string
+          max_cheque?: number | null
+          max_stage_code?: string | null
+          min_cheque?: number | null
+          min_stage_code?: string | null
+          name?: string
+          raw_mandate_text?: string | null
+          status?: string
+          tenant_id?: string
+          updated_at?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "investor_mandates_investor_organisation_id_tenant_id_fkey"
+            columns: ["investor_organisation_id", "tenant_id"]
+            isOneToOne: false
+            referencedRelation: "investor_organisations"
+            referencedColumns: ["id", "tenant_id"]
+          },
+        ]
+      }
       investor_organisations: {
         Row: {
           created_at: string

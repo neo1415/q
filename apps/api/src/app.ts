@@ -14,6 +14,7 @@ import {
   type CompanyRoutesDependencies,
 } from "./http/companies.js";
 import { registerCompanyTeamRoutes } from "./http/company-team.js";
+import { registerInvestorMandateRoutes } from "./http/investor-mandates.js";
 import {
   registerInvestorRoutes,
   type InvestorRoutesDependencies,
@@ -135,6 +136,11 @@ export function createApp(
 
   if (modules.investors !== undefined) {
     registerInvestorRoutes(app, {
+      authenticator: security.authenticator,
+      resolver: security.resolver,
+      investors: modules.investors,
+    });
+    registerInvestorMandateRoutes(app, {
       authenticator: security.authenticator,
       resolver: security.resolver,
       investors: modules.investors,

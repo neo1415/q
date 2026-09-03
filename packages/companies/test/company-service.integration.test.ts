@@ -330,6 +330,9 @@ describe("@capital-q/companies against local PostgreSQL", () => {
         "company_team_facts",
         "founder_profiles",
         "investor_creation_requests",
+        "investor_mandate_constraints",
+        "investor_mandate_creation_requests",
+        "investor_mandates",
         "investor_organisations",
         "investor_representatives",
       ]);

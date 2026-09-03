@@ -92,6 +92,8 @@ const REPRESENTATIVE: InvestorRepresentative = {
   updatedAt: NOW,
 };
 
+const notUnderTest = () => Promise.reject(new Error("not under test"));
+
 function fakeService(overrides: Partial<InvestorService> = {}) {
   const calls: Record<string, unknown[]> = {
     create: [],
@@ -118,6 +120,13 @@ function fakeService(overrides: Partial<InvestorService> = {}) {
       calls["upsert"]?.push(command);
       return Promise.resolve(REPRESENTATIVE);
     },
+    // Mandate operations are covered by investor-mandates.test.ts.
+    createInvestorMandate: notUnderTest,
+    getInvestorMandate: notUnderTest,
+    listInvestorMandates: notUnderTest,
+    updateInvestorMandate: notUnderTest,
+    activateInvestorMandate: notUnderTest,
+    closeInvestorMandate: notUnderTest,
     ...overrides,
   };
   return { service, calls };

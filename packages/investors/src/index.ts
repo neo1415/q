@@ -93,4 +93,75 @@ export {
   createPostgresInvestorRepresentativeRepository,
 } from "./infrastructure/postgres-repositories.js";
 
+// Declared mandate (CQ-INV-002).
+export {
+  chequeRangeOf,
+  InvestorMandateConstraintIdSchema,
+  InvestorMandateIdSchema,
+  toInvestorMandateConstraintDto,
+  toInvestorMandateDto,
+  toInvestorMandateSummaryDto,
+  typicalCheque,
+  type InvestorMandate,
+  type InvestorMandateConstraint,
+  type InvestorMandateConstraintId,
+  type InvestorMandateId,
+  type InvestorMandateSnapshot,
+  type InvestorMandateSummary,
+  type MandateAutomatedUse,
+} from "./contracts/mandate.js";
+export {
+  InvestorMandateCreationConflictError,
+  InvestorMandateLifecycleError,
+  InvestorMandateNotFoundError,
+} from "./domain/mandate-errors.js";
+export { compareDecimalStrings } from "./domain/decimal.js";
+export {
+  automatedUseOf,
+  BUSINESS_ATTRIBUTE_CODES,
+  FOUNDER_BUSINESS_ATTRIBUTE_CODES,
+  GREEN_FLAG_CODES,
+  INVESTMENT_ROLE_CODES,
+  MANDATE_CONSTRAINT_REGISTRY,
+  validateChequeRange,
+  validateMandateConstraints,
+  type MandateConstraintDefinition,
+} from "./domain/mandate-registry.js";
+export {
+  hashCreateInvestorMandateRequest,
+  hashInvestorMandateIdempotencyKey,
+} from "./domain/mandate-idempotency.js";
+export type {
+  InvestorMandateCreationRecord,
+  InvestorMandateCreationRequestStore,
+  InvestorMandateQueryPort,
+  InvestorMandateRepository,
+  InvestorMandateScalarChanges,
+  MandateListPage,
+  NewInvestorMandate,
+  NewMandateConstraint,
+} from "./application/mandate-ports.js";
+export {
+  createActivateInvestorMandate,
+  createCloseInvestorMandate,
+  createCreateInvestorMandate,
+  createGetInvestorMandate,
+  createListInvestorMandates,
+  createUpdateInvestorMandate,
+  INVESTOR_MANDATE_CREATE,
+  INVESTOR_MANDATE_EDIT,
+  INVESTOR_MANDATE_VIEW,
+  type CreateInvestorMandateCommand,
+  type GetInvestorMandateQuery,
+  type InvestorMandatePage,
+  type ListInvestorMandatesQuery,
+  type TransitionInvestorMandateCommand,
+  type UpdateInvestorMandateCommand,
+} from "./application/mandate-use-cases.js";
+export {
+  createPostgresInvestorMandateCreationRequestStore,
+  createPostgresInvestorMandateQueryPort,
+  createPostgresInvestorMandateRepository,
+} from "./infrastructure/postgres-mandate-repository.js";
+
 export const PACKAGE_NAME = "@capital-q/investors" as const;

@@ -331,7 +331,8 @@ describe("investor events", () => {
       expect(definition?.replaySafety).toBe("REPLAY_SAFE");
       expect(registry.has(name, 2)).toBe(false);
     }
-    expect(registry.has("core.investor_mandate.created", 1)).toBe(false);
+    // Mandate events are registered by CQ-INV-002; fund events do not exist.
+    expect(registry.has("core.investor_mandate.created", 1)).toBe(true);
     expect(registry.has("core.investment_fund.created", 1)).toBe(false);
   });
 

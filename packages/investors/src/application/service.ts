@@ -2,6 +2,11 @@ import type {
   InvestorOrganisation,
   InvestorRepresentative,
 } from "../contracts/index.js";
+import type { InvestorMandate } from "../contracts/mandate.js";
+import {
+  createPostgresInvestorMandateCreationRequestStore,
+  createPostgresInvestorMandateRepository,
+} from "../infrastructure/postgres-mandate-repository.js";
 import {
   createPostgresInvestorCreationRequestStore,
   createPostgresInvestorOrganisationRepository,
@@ -12,6 +17,20 @@ import {
   type CreateInvestorOrganisationCommand,
 } from "./create-investor-organisation.js";
 import type { InvestorServiceDependencies } from "./dependencies.js";
+import {
+  createActivateInvestorMandate,
+  createCloseInvestorMandate,
+  createCreateInvestorMandate,
+  createGetInvestorMandate,
+  createListInvestorMandates,
+  createUpdateInvestorMandate,
+  type CreateInvestorMandateCommand,
+  type GetInvestorMandateQuery,
+  type InvestorMandatePage,
+  type ListInvestorMandatesQuery,
+  type TransitionInvestorMandateCommand,
+  type UpdateInvestorMandateCommand,
+} from "./mandate-use-cases.js";
 import {
   createGetCurrentInvestorOrganisation,
   createGetInvestorOrganisation,
@@ -52,6 +71,24 @@ export type InvestorService = {
   readonly upsertMyInvestorRepresentative: (
     command: UpsertMyInvestorRepresentativeCommand,
   ) => Promise<InvestorRepresentative>;
+  readonly createInvestorMandate: (
+    command: CreateInvestorMandateCommand,
+  ) => Promise<InvestorMandate>;
+  readonly getInvestorMandate: (
+    query: GetInvestorMandateQuery,
+  ) => Promise<InvestorMandate>;
+  readonly listInvestorMandates: (
+    query: ListInvestorMandatesQuery,
+  ) => Promise<InvestorMandatePage>;
+  readonly updateInvestorMandate: (
+    command: UpdateInvestorMandateCommand,
+  ) => Promise<InvestorMandate>;
+  readonly activateInvestorMandate: (
+    command: TransitionInvestorMandateCommand,
+  ) => Promise<InvestorMandate>;
+  readonly closeInvestorMandate: (
+    command: TransitionInvestorMandateCommand,
+  ) => Promise<InvestorMandate>;
 };
 
 export type InvestorServiceOptions = Omit<
@@ -71,6 +108,9 @@ export function createInvestorService(
       investors: createPostgresInvestorOrganisationRepository(),
       representatives: createPostgresInvestorRepresentativeRepository(),
       creationRequests: createPostgresInvestorCreationRequestStore(),
+      mandates: createPostgresInvestorMandateRepository(),
+      mandateCreationRequests:
+        createPostgresInvestorMandateCreationRequestStore(),
     },
   };
 
@@ -84,5 +124,11 @@ export function createInvestorService(
       createGetMyInvestorRepresentative(dependencies),
     upsertMyInvestorRepresentative:
       createUpsertMyInvestorRepresentative(dependencies),
+    createInvestorMandate: createCreateInvestorMandate(dependencies),
+    getInvestorMandate: createGetInvestorMandate(dependencies),
+    listInvestorMandates: createListInvestorMandates(dependencies),
+    updateInvestorMandate: createUpdateInvestorMandate(dependencies),
+    activateInvestorMandate: createActivateInvestorMandate(dependencies),
+    closeInvestorMandate: createCloseInvestorMandate(dependencies),
   };
 }

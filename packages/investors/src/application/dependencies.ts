@@ -5,6 +5,10 @@ import type { OrganisationQueryPort } from "@capital-q/organisations";
 import type { AuthorizationService } from "@capital-q/security";
 
 import type {
+  InvestorMandateCreationRequestStore,
+  InvestorMandateRepository,
+} from "./mandate-ports.js";
+import type {
   InvestorCreationRequestStore,
   InvestorOrganisationRepository,
   InvestorRepresentativeRepository,
@@ -27,5 +31,7 @@ export type InvestorServiceDependencies = {
     readonly investors: InvestorOrganisationRepository;
     readonly representatives: InvestorRepresentativeRepository;
     readonly creationRequests: InvestorCreationRequestStore;
+    readonly mandates: InvestorMandateRepository;
+    readonly mandateCreationRequests: InvestorMandateCreationRequestStore;
   };
 };

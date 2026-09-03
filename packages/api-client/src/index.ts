@@ -51,3 +51,12 @@ export {
   updateInvestorOrganisation,
   upsertMyInvestorRepresentative,
 } from "./investors.js";
+
+export {
+  activateInvestorMandate,
+  closeInvestorMandate,
+  createInvestorMandate,
+  getInvestorMandate,
+  listInvestorMandates,
+  updateInvestorMandate,
+} from "./investor-mandates.js";

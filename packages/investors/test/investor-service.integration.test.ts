@@ -423,12 +423,15 @@ describe("@capital-q/investors against local PostgreSQL", () => {
         membershipId: adminA.membershipId,
       });
 
-      // Nothing beyond the investor and its representative: no fund, no
-      // mandate, no GateQ rule set exists to be written.
+      // Nothing beyond the investor and its representative: no fund or
+      // GateQ rule set table exists to be written, and no mandate is invented.
       const tables = await tx.sql<{ table_name: string }[]>`
         select table_schema || '.' || table_name as table_name from information_schema.tables
-         where table_name in ('investment_funds', 'investor_mandates', 'gateq_rule_sets')`;
+         where table_name in ('investment_funds', 'gateq_rule_sets')`;
       expect(tables).toEqual([]);
+      const [mandates] = await tx.sql<{ count: number }[]>`
+        select count(*)::int as count from core.investor_mandates where investor_organisation_id = ${investor.id}`;
+      expect(mandates?.count).toBe(0);
 
       // The permission-neutral query port answers the identity for the right tenant only.
       const port = createPostgresInvestorOrganisationQueryPort({ sql: tx.sql });

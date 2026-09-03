@@ -137,6 +137,8 @@ export function toInvestorOrganisationIdentity(
   };
 }
 
+export * from "./mandate.js";
+
 /** No tenant, organisation, membership, roles, capabilities or person PII. */
 export function toInvestorRepresentativeDto(
   representative: InvestorRepresentative,
