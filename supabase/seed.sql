@@ -33,6 +33,10 @@ insert into permissions.capabilities (code, description) values
   ('investor.mandate.create',  'Create a declared mandate for the investor organisation.'),
   ('investor.mandate.view',    'Read the investor organisation''s declared mandates.'),
   ('investor.mandate.edit',    'Edit, activate and close the investor organisation''s declared mandates.'),
+  ('capital_objective.create', 'Create the company''s capital objective.'),
+  ('capital_objective.view',   'Read the company''s capital objectives and their history.'),
+  ('capital_objective.edit',   'Recalibrate the company''s active capital objective.'),
+  ('capital_objective.close',  'Close or replace the company''s active capital objective.'),
   ('company.financials.view',  'View company financial data.'),
   ('company.financials.edit',  'Edit company financial data.'),
   ('data_room.share',          'Share data room content with another party.'),
@@ -84,6 +88,11 @@ select r.id, c.id, 'ALLOW'
       ('organisation_admin',  'investor.mandate.create'),
       ('organisation_admin',  'investor.mandate.view'),
       ('organisation_admin',  'investor.mandate.edit'),
-      ('organisation_member', 'investor.mandate.view')
+      ('organisation_member', 'investor.mandate.view'),
+      ('organisation_admin',  'capital_objective.create'),
+      ('organisation_admin',  'capital_objective.view'),
+      ('organisation_admin',  'capital_objective.edit'),
+      ('organisation_admin',  'capital_objective.close'),
+      ('organisation_member', 'capital_objective.view')
     )
 on conflict (role_id, capability_id) do nothing;

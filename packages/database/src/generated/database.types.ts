@@ -127,6 +127,160 @@ export type Database = {
   }
   core: {
     Tables: {
+      capital_objective_creation_requests: {
+        Row: {
+          capital_objective_id: string
+          company_id: string
+          created_at: string
+          idempotency_key_hash: string
+          request_hash: string
+          tenant_id: string
+          user_id: string
+        }
+        Insert: {
+          capital_objective_id: string
+          company_id: string
+          created_at?: string
+          idempotency_key_hash: string
+          request_hash: string
+          tenant_id: string
+          user_id: string
+        }
+        Update: {
+          capital_objective_id?: string
+          company_id?: string
+          created_at?: string
+          idempotency_key_hash?: string
+          request_hash?: string
+          tenant_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "capital_objective_creation_re_capital_objective_id_tenant__fkey"
+            columns: ["capital_objective_id", "tenant_id"]
+            isOneToOne: false
+            referencedRelation: "capital_objectives"
+            referencedColumns: ["id", "tenant_id"]
+          },
+          {
+            foreignKeyName: "capital_objective_creation_requests_company_id_tenant_id_fkey"
+            columns: ["company_id", "tenant_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id", "tenant_id"]
+          },
+        ]
+      }
+      capital_objective_events: {
+        Row: {
+          actor_id: string
+          actor_type: string
+          capital_objective_id: string
+          event_type: string
+          id: string
+          occurred_at: string
+          payload: Json
+          tenant_id: string
+        }
+        Insert: {
+          actor_id: string
+          actor_type: string
+          capital_objective_id: string
+          event_type: string
+          id?: string
+          occurred_at?: string
+          payload: Json
+          tenant_id: string
+        }
+        Update: {
+          actor_id?: string
+          actor_type?: string
+          capital_objective_id?: string
+          event_type?: string
+          id?: string
+          occurred_at?: string
+          payload?: Json
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "capital_objective_events_capital_objective_id_tenant_id_fkey"
+            columns: ["capital_objective_id", "tenant_id"]
+            isOneToOne: false
+            referencedRelation: "capital_objectives"
+            referencedColumns: ["id", "tenant_id"]
+          },
+        ]
+      }
+      capital_objectives: {
+        Row: {
+          closed_at: string | null
+          company_id: string
+          created_at: string
+          created_by_user_id: string
+          currency_code: string
+          id: string
+          instrument_code: string | null
+          objective_type: string
+          started_at: string
+          status: string
+          target_amount: number
+          target_close_date: string | null
+          target_stage: string | null
+          tenant_id: string
+          updated_at: string
+          use_of_funds_summary: string | null
+          version: number
+        }
+        Insert: {
+          closed_at?: string | null
+          company_id: string
+          created_at?: string
+          created_by_user_id: string
+          currency_code: string
+          id?: string
+          instrument_code?: string | null
+          objective_type?: string
+          started_at?: string
+          status?: string
+          target_amount: number
+          target_close_date?: string | null
+          target_stage?: string | null
+          tenant_id: string
+          updated_at?: string
+          use_of_funds_summary?: string | null
+          version?: number
+        }
+        Update: {
+          closed_at?: string | null
+          company_id?: string
+          created_at?: string
+          created_by_user_id?: string
+          currency_code?: string
+          id?: string
+          instrument_code?: string | null
+          objective_type?: string
+          started_at?: string
+          status?: string
+          target_amount?: number
+          target_close_date?: string | null
+          target_stage?: string | null
+          tenant_id?: string
+          updated_at?: string
+          use_of_funds_summary?: string | null
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "capital_objectives_company_id_tenant_id_fkey"
+            columns: ["company_id", "tenant_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id", "tenant_id"]
+          },
+        ]
+      }
       companies: {
         Row: {
           canonical_name: string

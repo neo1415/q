@@ -25,8 +25,10 @@ export {
 export { PercentageSchema, type Percentage } from "./percentage.js";
 
 export {
+  LocalDateSchema,
   Rfc3339TimestampSchema,
   UtcTimestampSchema,
+  type LocalDate,
   type Rfc3339Timestamp,
   type UtcTimestamp,
 } from "./time.js";

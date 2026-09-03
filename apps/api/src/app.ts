@@ -10,6 +10,10 @@ import {
 } from "@capital-q/observability";
 
 import {
+  registerCapitalObjectiveRoutes,
+  type CapitalRoutesDependencies,
+} from "./http/capital-objectives.js";
+import {
   registerCompanyRoutes,
   type CompanyRoutesDependencies,
 } from "./http/companies.js";
@@ -47,6 +51,7 @@ export type ApiModules = {
     OrganisationRoutesDependencies["organisations"] | undefined;
   readonly companies?: CompanyRoutesDependencies["companies"] | undefined;
   readonly investors?: InvestorRoutesDependencies["investors"] | undefined;
+  readonly capital?: CapitalRoutesDependencies["capital"] | undefined;
 };
 
 /**
@@ -144,6 +149,14 @@ export function createApp(
       authenticator: security.authenticator,
       resolver: security.resolver,
       investors: modules.investors,
+    });
+  }
+
+  if (modules.capital !== undefined) {
+    registerCapitalObjectiveRoutes(app, {
+      authenticator: security.authenticator,
+      resolver: security.resolver,
+      capital: modules.capital,
     });
   }
 

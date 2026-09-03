@@ -60,3 +60,13 @@ export {
   listInvestorMandates,
   updateInvestorMandate,
 } from "./investor-mandates.js";
+
+export {
+  closeCapitalObjective,
+  createCapitalObjective,
+  getCapitalObjective,
+  getCurrentCapitalObjective,
+  listCapitalObjectives,
+  replaceCapitalObjective,
+  updateCapitalObjective,
+} from "./capital-objectives.js";

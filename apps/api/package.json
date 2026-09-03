@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@capital-q/audit": "workspace:*",
+    "@capital-q/capital": "workspace:*",
     "@capital-q/companies": "workspace:*",
     "@capital-q/config": "workspace:*",
     "@capital-q/contracts": "workspace:*",

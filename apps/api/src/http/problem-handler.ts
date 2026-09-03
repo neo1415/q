@@ -6,6 +6,13 @@ import {
   type ProblemDetails,
 } from "@capital-q/contracts";
 import {
+  ActiveCapitalObjectiveExistsError,
+  CapitalObjectiveCreationConflictError,
+  CapitalObjectiveLifecycleError,
+  CapitalObjectiveNotFoundError,
+  CapitalObjectiveVersionConflictError,
+} from "@capital-q/capital";
+import {
   CompanyCreationConflictError,
   CompanyMemberNotFoundError,
   CompanyNotFoundError,
@@ -160,7 +167,8 @@ function toProblem(error: unknown, requestId: string): ProblemDetails {
     error instanceof CompanyTeamFactsNotFoundError ||
     error instanceof InvestorOrganisationNotFoundError ||
     error instanceof InvestorRepresentativeNotFoundError ||
-    error instanceof InvestorMandateNotFoundError
+    error instanceof InvestorMandateNotFoundError ||
+    error instanceof CapitalObjectiveNotFoundError
   ) {
     return createProblemDetails({ code: "RESOURCE_NOT_FOUND", requestId });
   }
@@ -169,7 +177,8 @@ function toProblem(error: unknown, requestId: string): ProblemDetails {
     error instanceof OrganisationVersionConflictError ||
     error instanceof CompanyVersionConflictError ||
     error instanceof TeamVersionConflictError ||
-    error instanceof InvestorVersionConflictError
+    error instanceof InvestorVersionConflictError ||
+    error instanceof CapitalObjectiveVersionConflictError
   ) {
     return createProblemDetails({
       code: "VERSION_CONFLICT",
@@ -182,7 +191,8 @@ function toProblem(error: unknown, requestId: string): ProblemDetails {
     error instanceof OrganisationCreationConflictError ||
     error instanceof CompanyCreationConflictError ||
     error instanceof InvestorCreationConflictError ||
-    error instanceof InvestorMandateCreationConflictError
+    error instanceof InvestorMandateCreationConflictError ||
+    error instanceof CapitalObjectiveCreationConflictError
   ) {
     return createProblemDetails({
       code: "IDEMPOTENCY_CONFLICT",
@@ -197,7 +207,9 @@ function toProblem(error: unknown, requestId: string): ProblemDetails {
   // discloses nothing they cannot already read.
   if (
     error instanceof InvestorOrganisationExistsError ||
-    error instanceof InvestorMandateLifecycleError
+    error instanceof InvestorMandateLifecycleError ||
+    error instanceof ActiveCapitalObjectiveExistsError ||
+    error instanceof CapitalObjectiveLifecycleError
   ) {
     return createProblemDetails({
       code: "RESOURCE_CONFLICT",

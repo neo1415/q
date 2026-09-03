@@ -324,6 +324,9 @@ describe("@capital-q/companies against local PostgreSQL", () => {
       const tables = await sql<{ table_name: string }[]>`
         select table_name from information_schema.tables where table_schema = 'core' order by 1`;
       expect(tables.map((t) => t.table_name)).toEqual([
+        "capital_objective_creation_requests",
+        "capital_objective_events",
+        "capital_objectives",
         "companies",
         "company_creation_requests",
         "company_members",

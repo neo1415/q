@@ -105,7 +105,8 @@ select is(
 
 select results_eq(
   $$ select code from permissions.capabilities order by code $$,
-  $$ values ('company.create'), ('company.edit'), ('company.financials.edit'),
+  $$ values ('capital_objective.close'), ('capital_objective.create'), ('capital_objective.edit'),
+            ('capital_objective.view'), ('company.create'), ('company.edit'), ('company.financials.edit'),
             ('company.financials.view'), ('company.team.manage'), ('company.team.self_edit'),
             ('company.team.view'), ('company.view'), ('data_room.share'),
             ('investor.create'), ('investor.edit'), ('investor.mandate.create'),
@@ -123,22 +124,23 @@ select results_eq(
        join permissions.capabilities c on c.id = rc.capability_id
       where r.code = 'organisation_admin' and rc.effect = 'ALLOW'
       order by c.code $$,
-  $$ values ('company.create'), ('company.edit'), ('company.team.manage'),
+  $$ values ('capital_objective.close'), ('capital_objective.create'), ('capital_objective.edit'),
+            ('capital_objective.view'), ('company.create'), ('company.edit'), ('company.team.manage'),
             ('company.team.self_edit'), ('company.team.view'), ('company.view'),
             ('investor.create'), ('investor.edit'), ('investor.mandate.create'),
             ('investor.mandate.edit'), ('investor.mandate.view'), ('investor.representative.self_edit'),
             ('investor.view'), ('organisation.admin'), ('organisation.view') $$,
-  'organisation_admin maps to organisation, company, team, investor and mandate capabilities only');
+  'organisation_admin maps to organisation, company, team, investor, mandate and capital capabilities only');
 select results_eq(
   $$ select c.code from permissions.role_capabilities rc
        join permissions.roles r on r.id = rc.role_id
        join permissions.capabilities c on c.id = rc.capability_id
       where r.code = 'organisation_member' and rc.effect = 'ALLOW'
       order by c.code $$,
-  $$ values ('company.team.self_edit'), ('company.team.view'), ('company.view'),
+  $$ values ('capital_objective.view'), ('company.team.self_edit'), ('company.team.view'), ('company.view'),
             ('investor.mandate.view'), ('investor.representative.self_edit'), ('investor.view'),
             ('organisation.view') $$,
-  'organisation_member carries view and self-edit capabilities only (CQ-ORG-001, CQ-COMP-001, CQ-COMP-002, CQ-INV-001, CQ-INV-002)');
+  'organisation_member carries view and self-edit capabilities only (CQ-ORG-001, CQ-COMP-001, CQ-COMP-002, CQ-INV-001, CQ-INV-002, CQ-CAP-001)');
 
 -- ===========================================================================
 -- Fixtures (as the migration owner; RLS bypassed)

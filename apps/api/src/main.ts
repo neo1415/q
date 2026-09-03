@@ -17,7 +17,11 @@ import {
 import { createRequestDatabaseClient } from "@capital-q/database";
 import { createOutboxWriter } from "@capital-q/eventing";
 import { createTelemetryRuntime } from "@capital-q/observability";
-import { createCompanyService } from "@capital-q/companies";
+import { createCapitalService } from "@capital-q/capital";
+import {
+  createCompanyService,
+  createPostgresCompanyQueryPort,
+} from "@capital-q/companies";
 import { createInvestorService } from "@capital-q/investors";
 import {
   createOrganisationService,
@@ -102,10 +106,22 @@ const investors = createInvestorService({
   audit,
 });
 
+// Capital reaches the company only through its public query port; the
+// capital repositories are never handed to Q.
+const capital = createCapitalService({
+  sql: database.sql,
+  transactions: database.transactions,
+  authorization,
+  companies: createPostgresCompanyQueryPort({ sql: database.sql }),
+  outbox,
+  audit,
+});
+
 const { app, logger } = createApp(config, security, {
   organisations,
   companies,
   investors,
+  capital,
 });
 
 app.addHook("onClose", async () => {

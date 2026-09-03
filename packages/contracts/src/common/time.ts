@@ -28,5 +28,14 @@ export const Rfc3339TimestampSchema = z.iso.datetime({ offset: true });
  */
 export const UtcTimestampSchema = z.iso.datetime();
 
+/**
+ * A calendar date (YYYY-MM-DD) with no time and no zone: a planning date such
+ * as a target close, never an instant. A datetime supplied here is rejected
+ * rather than truncated.
+ */
+export const LocalDateSchema = z.iso.date();
+
+export type LocalDate = z.infer<typeof LocalDateSchema>;
+
 export type Rfc3339Timestamp = z.infer<typeof Rfc3339TimestampSchema>;
 export type UtcTimestamp = z.infer<typeof UtcTimestampSchema>;
