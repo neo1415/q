@@ -98,3 +98,5 @@ export function toCompanyIdentity(company: Company): CompanyIdentity {
     companyStatus: company.companyStatus,
   };
 }
+
+export * from "./team.js";

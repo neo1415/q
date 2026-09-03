@@ -65,9 +65,47 @@ owning organisation (`private.is_organisation_member`), no client writes.
 Anonymous, other tenants and revoked members see nothing. A new company is not
 investor-discoverable through this packet.
 
+## Founder / team (CQ-COMP-002)
+
+Three further tables, still inside this context:
+
+- `core.company_members` -- Person ↔ Company relationship: `relationship_type`
+  (team_member | advisor | board_member | contractor | other), `business_title`
+  (presentation only), `is_founder` (self-asserted representation, never a
+  role), `is_current` / `started_at` / `ended_at` (history kept; one current
+  row per company + person), `version`. Readable by members of the owning
+  organisation; never authorisation: a revoked organisation membership removes
+  access while the row remains history.
+- `core.founder_profiles` -- one per tenant + person; `primary_company_id`
+  is set on first creation and never moved by profile edits;
+  `professional_summary` / `background_summary` (≤ 4000, deliberately
+  supplied, never Q text); `visibility_scope` defaults to `founder_private` and
+  has no write path here. RLS: a person reads only their own profile.
+- `core.company_team_facts` -- self-reported `founder_count`,
+  `full_time_founder_count`, `team_size` (null = unknown, never zero; cross
+  checks when both present), one row per company, versioned. No fake persons
+  are created for unregistered cofounders.
+
+Capabilities: `company.team.view`, `company.team.self_edit`,
+`company.team.manage`; admin → all three, member → view + self_edit.
+Self-edit never changes roles, capabilities or organisation membership.
+
+Routes: `GET/PUT …/team/me` (caller only; PUT is idempotent desired state; a
+new period is opened after an ended one), `GET/PATCH …/founder-profile/me`
+(current founder relationship required; first PATCH creates without
+`expectedVersion`), `GET/PATCH …/team-facts` (view / manage).
+
+Events: `core.company_member.created@1`, `core.company_member.updated@1`,
+`core.company_team.updated@1` (INTERNAL); `core.founder_profile.created@1`,
+`core.founder_profile.updated@1` (CONFIDENTIAL). Payloads carry identifiers,
+versions and changed field names only -- profile text is never on the bus or
+in audit metadata. Audit: `company_member.created/updated`,
+`founder_profile.created/updated`, `company_team.updated`.
+
 ## Deferred
 
-Founder/team and `core.company_members` (CQ-COMP-002), business models,
+Invitations and member administration, founder claims/credential evidence,
+public founder presentation, business models,
 metrics, milestones, taxonomy assignments (CQ-TAX-001), capital objective
 (CQ-CAP-001), evidence and verification, marketplace activation
 (CQ-PERM-001 / readiness), discovery projection, recommendations, Q. Future

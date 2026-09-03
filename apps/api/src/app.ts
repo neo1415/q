@@ -13,6 +13,7 @@ import {
   registerCompanyRoutes,
   type CompanyRoutesDependencies,
 } from "./http/companies.js";
+import { registerCompanyTeamRoutes } from "./http/company-team.js";
 import { registerMeRoute, type MeRouteDependencies } from "./http/me.js";
 import {
   registerOrganisationRoutes,
@@ -116,6 +117,11 @@ export function createApp(
 
   if (modules.companies !== undefined) {
     registerCompanyRoutes(app, {
+      authenticator: security.authenticator,
+      resolver: security.resolver,
+      companies: modules.companies,
+    });
+    registerCompanyTeamRoutes(app, {
       authenticator: security.authenticator,
       resolver: security.resolver,
       companies: modules.companies,

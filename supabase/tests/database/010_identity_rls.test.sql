@@ -106,7 +106,8 @@ select is(
 select results_eq(
   $$ select code from permissions.capabilities order by code $$,
   $$ values ('company.create'), ('company.edit'), ('company.financials.edit'),
-            ('company.financials.view'), ('company.view'), ('data_room.share'),
+            ('company.financials.view'), ('company.team.manage'), ('company.team.self_edit'),
+            ('company.team.view'), ('company.view'), ('data_room.share'),
             ('organisation.admin'), ('organisation.view'), ('q.action.approve') $$,
   'seeded capability codes match the known reference set');
 select results_eq(
@@ -119,17 +120,19 @@ select results_eq(
        join permissions.capabilities c on c.id = rc.capability_id
       where r.code = 'organisation_admin' and rc.effect = 'ALLOW'
       order by c.code $$,
-  $$ values ('company.create'), ('company.edit'), ('company.view'),
+  $$ values ('company.create'), ('company.edit'), ('company.team.manage'),
+            ('company.team.self_edit'), ('company.team.view'), ('company.view'),
             ('organisation.admin'), ('organisation.view') $$,
-  'organisation_admin maps to organisation and company profile capabilities only');
+  'organisation_admin maps to organisation, company profile and team capabilities only');
 select results_eq(
   $$ select c.code from permissions.role_capabilities rc
        join permissions.roles r on r.id = rc.role_id
        join permissions.capabilities c on c.id = rc.capability_id
       where r.code = 'organisation_member' and rc.effect = 'ALLOW'
       order by c.code $$,
-  $$ values ('company.view'), ('organisation.view') $$,
-  'organisation_member carries view capabilities only (CQ-ORG-001, CQ-COMP-001)');
+  $$ values ('company.team.self_edit'), ('company.team.view'), ('company.view'),
+            ('organisation.view') $$,
+  'organisation_member carries view and self-edit capabilities only (CQ-ORG-001, CQ-COMP-001, CQ-COMP-002)');
 
 -- ===========================================================================
 -- Fixtures (as the migration owner; RLS bypassed)

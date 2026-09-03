@@ -72,6 +72,8 @@ const COMPANY_A: Company = {
   updatedAt: "2026-09-03T09:00:00.000Z",
 };
 
+const notUnderTest = () => Promise.reject(new Error("not under test"));
+
 function fakeService(overrides: Partial<CompanyService> = {}) {
   const calls: { create: unknown[]; update: unknown[] } = {
     create: [],
@@ -87,6 +89,13 @@ function fakeService(overrides: Partial<CompanyService> = {}) {
       calls.update.push(command);
       return Promise.resolve({ ...COMPANY_A, version: 2 });
     },
+    // Founder / team operations are covered by company-team.test.ts.
+    getMyCompanyMembership: notUnderTest,
+    upsertMyCompanyMembership: notUnderTest,
+    getMyFounderProfile: notUnderTest,
+    updateMyFounderProfile: notUnderTest,
+    getCompanyTeamFacts: notUnderTest,
+    updateCompanyTeamFacts: notUnderTest,
     ...overrides,
   };
   return { service, calls };

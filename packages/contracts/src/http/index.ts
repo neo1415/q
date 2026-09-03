@@ -90,3 +90,28 @@ export {
   type MarketplaceVisibility,
   type UpdateCompanyRequest,
 } from "./companies.js";
+
+export {
+  BUSINESS_TITLE_MAX_LENGTH,
+  COMPANY_FOUNDER_PROFILE_ME_SUFFIX,
+  COMPANY_RELATIONSHIP_TYPES,
+  COMPANY_TEAM_FACTS_SUFFIX,
+  COMPANY_TEAM_ME_SUFFIX,
+  CompanyMemberDtoSchema,
+  CompanyRelationshipTypeSchema,
+  CompanyTeamFactsDtoSchema,
+  FOUNDER_PROFILE_EDITABLE_FIELDS,
+  FOUNDER_SUMMARY_MAX_LENGTH,
+  FounderProfileDtoSchema,
+  TEAM_FACT_FIELDS,
+  UpdateCompanyTeamFactsRequestSchema,
+  UpdateMyFounderProfileRequestSchema,
+  UpsertMyCompanyMembershipRequestSchema,
+  type CompanyMemberDto,
+  type CompanyRelationshipType,
+  type CompanyTeamFactsDto,
+  type FounderProfileDto,
+  type UpdateCompanyTeamFactsRequest,
+  type UpdateMyFounderProfileRequest,
+  type UpsertMyCompanyMembershipRequest,
+} from "./company-team.js";

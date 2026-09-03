@@ -26,7 +26,7 @@ export type ApiSession = {
  */
 export async function call<TSchema extends z.ZodType>(
   session: ApiSession,
-  method: "GET" | "POST" | "PATCH",
+  method: "GET" | "POST" | "PUT" | "PATCH",
   path: string,
   schema: TSchema,
   options: {

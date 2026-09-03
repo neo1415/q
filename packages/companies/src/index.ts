@@ -80,4 +80,48 @@ export {
   createPostgresCompanyRepository,
 } from "./infrastructure/postgres-company-repository.js";
 
+export {
+  CompanyMemberIdSchema,
+  FounderProfileIdSchema,
+  toCompanyMemberDto,
+  toCompanyTeamFactsDto,
+  toFounderProfileDto,
+  type CompanyMember,
+  type CompanyMemberId,
+  type CompanyTeamFacts,
+  type FounderProfile,
+  type FounderProfileId,
+} from "./contracts/team.js";
+export {
+  CompanyMemberNotFoundError,
+  CompanyTeamFactsNotFoundError,
+  FounderProfileNotAllowedError,
+  FounderProfileNotFoundError,
+  TeamVersionConflictError,
+} from "./domain/team-errors.js";
+export type {
+  CompanyMemberChanges,
+  CompanyMemberRepository,
+  CompanyTeamFactsRepository,
+  CompanyTeamFactsValues,
+  FounderProfileChanges,
+  FounderProfileRepository,
+} from "./application/team-ports.js";
+export {
+  COMPANY_TEAM_MANAGE,
+  COMPANY_TEAM_SELF_EDIT,
+  COMPANY_TEAM_VIEW,
+  type GetCompanyTeamFactsQuery,
+  type GetMyCompanyMembershipQuery,
+  type GetMyFounderProfileQuery,
+  type UpdateCompanyTeamFactsCommand,
+  type UpdateMyFounderProfileCommand,
+  type UpsertMyCompanyMembershipCommand,
+} from "./application/team-use-cases.js";
+export {
+  createPostgresCompanyMemberRepository,
+  createPostgresCompanyTeamFactsRepository,
+  createPostgresFounderProfileRepository,
+} from "./infrastructure/postgres-team-repositories.js";
+
 export const PACKAGE_NAME = "@capital-q/companies" as const;

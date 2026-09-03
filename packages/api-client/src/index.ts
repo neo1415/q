@@ -33,3 +33,12 @@ export {
 } from "./organisations.js";
 
 export { createCompany, getCompany, updateCompany } from "./companies.js";
+
+export {
+  getCompanyTeamFacts,
+  getMyCompanyMembership,
+  getMyFounderProfile,
+  updateCompanyTeamFacts,
+  updateMyFounderProfile,
+  upsertMyCompanyMembership,
+} from "./company-team.js";

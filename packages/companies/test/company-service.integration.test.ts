@@ -326,7 +326,17 @@ describe("@capital-q/companies against local PostgreSQL", () => {
       expect(tables.map((t) => t.table_name)).toEqual([
         "companies",
         "company_creation_requests",
+        "company_members",
+        "company_team_facts",
+        "founder_profiles",
       ]);
+      const [related] = await sql<
+        { members: number; profiles: number; facts: number }[]
+      >`
+        select (select count(*)::int from core.company_members where company_id = ${company.id}) as members,
+               (select count(*)::int from core.founder_profiles where primary_company_id = ${company.id}) as profiles,
+               (select count(*)::int from core.company_team_facts where company_id = ${company.id}) as facts`;
+      expect(related).toEqual({ members: 0, profiles: 0, facts: 0 });
 
       // The query port answers the identity for the right tenant only.
       const port = createPostgresCompanyQueryPort({ sql });

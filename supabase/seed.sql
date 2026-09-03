@@ -23,6 +23,9 @@ insert into permissions.capabilities (code, description) values
   ('company.create',           'Create the canonical company for the active organisation.'),
   ('company.view',             'Read the organisation-private canonical company profile.'),
   ('company.edit',             'Edit the canonical company profile.'),
+  ('company.team.view',        'Read company team relationships and team facts.'),
+  ('company.team.self_edit',   'Maintain one''s own company relationship and founder profile.'),
+  ('company.team.manage',      'Administer company-wide team facts.'),
   ('company.financials.view',  'View company financial data.'),
   ('company.financials.edit',  'Edit company financial data.'),
   ('data_room.share',          'Share data room content with another party.'),
@@ -59,6 +62,11 @@ select r.id, c.id, 'ALLOW'
       ('organisation_admin',  'company.create'),
       ('organisation_admin',  'company.view'),
       ('organisation_admin',  'company.edit'),
-      ('organisation_member', 'company.view')
+      ('organisation_member', 'company.view'),
+      ('organisation_admin',  'company.team.view'),
+      ('organisation_admin',  'company.team.self_edit'),
+      ('organisation_admin',  'company.team.manage'),
+      ('organisation_member', 'company.team.view'),
+      ('organisation_member', 'company.team.self_edit')
     )
 on conflict (role_id, capability_id) do nothing;

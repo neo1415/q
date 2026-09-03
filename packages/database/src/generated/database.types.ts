@@ -234,6 +234,153 @@ export type Database = {
           },
         ]
       }
+      company_members: {
+        Row: {
+          business_title: string | null
+          company_id: string
+          created_at: string
+          ended_at: string | null
+          id: string
+          is_current: boolean
+          is_founder: boolean
+          relationship_type: string
+          started_at: string
+          tenant_id: string
+          updated_at: string
+          user_id: string
+          version: number
+        }
+        Insert: {
+          business_title?: string | null
+          company_id: string
+          created_at?: string
+          ended_at?: string | null
+          id?: string
+          is_current?: boolean
+          is_founder?: boolean
+          relationship_type?: string
+          started_at?: string
+          tenant_id: string
+          updated_at?: string
+          user_id: string
+          version?: number
+        }
+        Update: {
+          business_title?: string | null
+          company_id?: string
+          created_at?: string
+          ended_at?: string | null
+          id?: string
+          is_current?: boolean
+          is_founder?: boolean
+          relationship_type?: string
+          started_at?: string
+          tenant_id?: string
+          updated_at?: string
+          user_id?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "company_members_company_id_tenant_id_fkey"
+            columns: ["company_id", "tenant_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id", "tenant_id"]
+          },
+        ]
+      }
+      company_team_facts: {
+        Row: {
+          company_id: string
+          created_at: string
+          founder_count: number | null
+          full_time_founder_count: number | null
+          id: string
+          team_size: number | null
+          tenant_id: string
+          updated_at: string
+          version: number
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          founder_count?: number | null
+          full_time_founder_count?: number | null
+          id?: string
+          team_size?: number | null
+          tenant_id: string
+          updated_at?: string
+          version?: number
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          founder_count?: number | null
+          full_time_founder_count?: number | null
+          id?: string
+          team_size?: number | null
+          tenant_id?: string
+          updated_at?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "company_team_facts_company_id_tenant_id_fkey"
+            columns: ["company_id", "tenant_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id", "tenant_id"]
+          },
+        ]
+      }
+      founder_profiles: {
+        Row: {
+          background_summary: string | null
+          created_at: string
+          id: string
+          primary_company_id: string | null
+          professional_summary: string | null
+          tenant_id: string
+          updated_at: string
+          user_id: string
+          version: number
+          visibility_scope: string
+        }
+        Insert: {
+          background_summary?: string | null
+          created_at?: string
+          id?: string
+          primary_company_id?: string | null
+          professional_summary?: string | null
+          tenant_id: string
+          updated_at?: string
+          user_id: string
+          version?: number
+          visibility_scope?: string
+        }
+        Update: {
+          background_summary?: string | null
+          created_at?: string
+          id?: string
+          primary_company_id?: string | null
+          professional_summary?: string | null
+          tenant_id?: string
+          updated_at?: string
+          user_id?: string
+          version?: number
+          visibility_scope?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "founder_profiles_primary_company_id_tenant_id_fkey"
+            columns: ["primary_company_id", "tenant_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id", "tenant_id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never

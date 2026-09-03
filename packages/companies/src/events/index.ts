@@ -21,8 +21,9 @@ import {
  * names only.
  */
 
-export const COMPANY_EVENT_OWNER = "@capital-q/companies" as const;
-export const COMPANY_EVENT_PRODUCER = "capitalq://api/core/company" as const;
+import { COMPANY_EVENT_OWNER, COMPANY_EVENT_PRODUCER } from "./shared.js";
+
+export { COMPANY_EVENT_OWNER, COMPANY_EVENT_PRODUCER } from "./shared.js";
 
 export const CompanyCreatedEvent = defineEvent({
   name: "core.company.created",
@@ -62,7 +63,7 @@ export const CompanyUpdatedEvent = defineEvent({
     "The canonical company profile changed; consumers re-read the fields they need.",
 });
 
-export const COMPANY_EVENTS: readonly EventDefinition[] = [
+export const COMPANY_PROFILE_EVENTS: readonly EventDefinition[] = [
   CompanyCreatedEvent,
   CompanyUpdatedEvent,
 ];
@@ -118,3 +119,25 @@ export function companyUpdatedEvent(
     changedFields: [...input.changedFields],
   });
 }
+
+export {
+  COMPANY_TEAM_EVENTS,
+  CompanyMemberCreatedEvent,
+  CompanyMemberUpdatedEvent,
+  CompanyTeamUpdatedEvent,
+  companyMemberCreatedEvent,
+  companyMemberUpdatedEvent,
+  companyTeamUpdatedEvent,
+  FounderProfileCreatedEvent,
+  FounderProfileUpdatedEvent,
+  founderProfileCreatedEvent,
+  founderProfileUpdatedEvent,
+} from "./team.js";
+
+import { COMPANY_TEAM_EVENTS as TEAM_EVENTS } from "./team.js";
+
+/** Everything the Company bounded context publishes. */
+export const COMPANY_EVENTS: readonly EventDefinition[] = [
+  ...COMPANY_PROFILE_EVENTS,
+  ...TEAM_EVENTS,
+];

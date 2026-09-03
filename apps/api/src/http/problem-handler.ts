@@ -7,8 +7,13 @@ import {
 } from "@capital-q/contracts";
 import {
   CompanyCreationConflictError,
+  CompanyMemberNotFoundError,
   CompanyNotFoundError,
+  CompanyTeamFactsNotFoundError,
   CompanyVersionConflictError,
+  FounderProfileNotAllowedError,
+  FounderProfileNotFoundError,
+  TeamVersionConflictError,
 } from "@capital-q/companies";
 import type { Logger } from "@capital-q/observability";
 import {
@@ -101,6 +106,16 @@ function toProblem(error: unknown, requestId: string): ProblemDetails {
     });
   }
 
+  // Not currently a founder of this company: the same refusal whether the
+  // relationship is absent or non-founder.
+  if (error instanceof FounderProfileNotAllowedError) {
+    return createProblemDetails({
+      code: "PERMISSION_DENIED",
+      requestId,
+      detail: error.message,
+    });
+  }
+
   // Capability denial. The internal reason code is deliberately not sent: it
   // can disclose that an organisation or resource exists. Whether a given
   // resource should instead answer an enumeration-safe 404 is the owning
@@ -129,14 +144,18 @@ function toProblem(error: unknown, requestId: string): ProblemDetails {
   // resources), so mapping them is purely a status decision.
   if (
     error instanceof OrganisationNotFoundError ||
-    error instanceof CompanyNotFoundError
+    error instanceof CompanyNotFoundError ||
+    error instanceof CompanyMemberNotFoundError ||
+    error instanceof FounderProfileNotFoundError ||
+    error instanceof CompanyTeamFactsNotFoundError
   ) {
     return createProblemDetails({ code: "RESOURCE_NOT_FOUND", requestId });
   }
 
   if (
     error instanceof OrganisationVersionConflictError ||
-    error instanceof CompanyVersionConflictError
+    error instanceof CompanyVersionConflictError ||
+    error instanceof TeamVersionConflictError
   ) {
     return createProblemDetails({
       code: "VERSION_CONFLICT",

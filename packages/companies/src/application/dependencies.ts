@@ -8,6 +8,11 @@ import type {
   CompanyCreationRequestStore,
   CompanyRepository,
 } from "./ports.js";
+import type {
+  CompanyMemberRepository,
+  CompanyTeamFactsRepository,
+  FounderProfileRepository,
+} from "./team-ports.js";
 
 /**
  * Everything the company use cases consume. The organisation is reached
@@ -24,5 +29,8 @@ export type CompanyServiceDependencies = {
   readonly repositories: {
     readonly companies: CompanyRepository;
     readonly creationRequests: CompanyCreationRequestStore;
+    readonly members: CompanyMemberRepository;
+    readonly founderProfiles: FounderProfileRepository;
+    readonly teamFacts: CompanyTeamFactsRepository;
   };
 };
