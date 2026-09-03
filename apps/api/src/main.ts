@@ -10,15 +10,25 @@
 import { loadApiConfig } from "@capital-q/config/api";
 import { loadDatabaseConfig } from "@capital-q/config/database";
 import { requireSupabaseAuthConfig } from "@capital-q/config/supabase-auth";
-import { createRequestDatabaseClient } from "@capital-q/database";
-import { createTelemetryRuntime } from "@capital-q/observability";
 import {
+  createPostgresMaterialActionAuditWriter,
+  createPostgresSecurityEventWriter,
+} from "@capital-q/audit";
+import { createRequestDatabaseClient } from "@capital-q/database";
+import { createOutboxWriter } from "@capital-q/eventing";
+import { createTelemetryRuntime } from "@capital-q/observability";
+import { createOrganisationService } from "@capital-q/organisations";
+import { createAuthorizationService } from "@capital-q/security";
+import {
+  createPostgresActiveOrganisationContextStore,
   createPostgresActorContextResolver,
   createPostgresApplicationIdentityLookup,
+  createPostgresAuthorizationPolicySource,
 } from "@capital-q/security/postgres";
 import { createSupabaseAccessTokenAuthenticator } from "@capital-q/security/supabase";
 
 import { createApp } from "./app.js";
+import { createProductionEventRegistry } from "./event-registry.js";
 import { createSupabaseRequestAuthenticator } from "./security/supabase-authenticator.js";
 
 // Configuration is validated once here at the composition root. Invalid
@@ -35,13 +45,32 @@ await telemetry.start();
 // through ActorContext and AuthorizationService.
 const database = createRequestDatabaseClient(loadDatabaseConfig());
 
-const { app, logger } = createApp(config, {
+const security = {
   authenticator: createSupabaseRequestAuthenticator(
     createSupabaseAccessTokenAuthenticator(supabaseAuth),
   ),
   resolver: createPostgresActorContextResolver({ sql: database.sql }),
   identities: createPostgresApplicationIdentityLookup({ sql: database.sql }),
+};
+
+// Domain modules. Authorization, audit and events are the shared ports;
+// each bounded context receives them and never reaches around them.
+const organisations = createOrganisationService({
+  sql: database.sql,
+  transactions: database.transactions,
+  authorization: createAuthorizationService(
+    createPostgresAuthorizationPolicySource({ sql: database.sql }),
+  ),
+  resolver: security.resolver,
+  activeContexts: createPostgresActiveOrganisationContextStore({
+    transactions: database.transactions,
+  }),
+  outbox: createOutboxWriter({ registry: createProductionEventRegistry() }),
+  audit: createPostgresMaterialActionAuditWriter(),
+  securityEvents: createPostgresSecurityEventWriter({ sql: database.sql }),
 });
+
+const { app, logger } = createApp(config, security, { organisations });
 
 app.addHook("onClose", async () => {
   await database.close();

@@ -22,3 +22,12 @@ export {
 export const PACKAGE_NAME = "@capital-q/api-client" as const;
 
 export { fetchMe, type FetchMeInput } from "./me.js";
+
+export {
+  activateOrganisation,
+  createOrganisation,
+  getOrganisation,
+  listMyOrganisations,
+  updateOrganisation,
+  type ApiSession,
+} from "./organisations.js";

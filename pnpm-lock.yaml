@@ -47,6 +47,9 @@ importers:
 
   apps/api:
     dependencies:
+      '@capital-q/audit':
+        specifier: workspace:*
+        version: link:../../packages/audit
       '@capital-q/config':
         specifier: workspace:*
         version: link:../../packages/config
@@ -56,9 +59,15 @@ importers:
       '@capital-q/database':
         specifier: workspace:*
         version: link:../../packages/database
+      '@capital-q/eventing':
+        specifier: workspace:*
+        version: link:../../packages/eventing
       '@capital-q/observability':
         specifier: workspace:*
         version: link:../../packages/observability
+      '@capital-q/organisations':
+        specifier: workspace:*
+        version: link:../../packages/organisations
       '@capital-q/security':
         specifier: workspace:*
         version: link:../../packages/security
@@ -182,6 +191,9 @@ importers:
       '@capital-q/observability':
         specifier: workspace:*
         version: link:../../packages/observability
+      '@capital-q/organisations':
+        specifier: workspace:*
+        version: link:../../packages/organisations
     devDependencies:
       '@types/node':
         specifier: ^24.13.3
@@ -195,6 +207,9 @@ importers:
       '@capital-q/contracts':
         specifier: workspace:*
         version: link:../contracts
+      zod:
+        specifier: 4.5.4
+        version: 4.5.4
     devDependencies:
       '@types/node':
         specifier: ^24.13.3
@@ -301,6 +316,37 @@ importers:
         specifier: 10.3.1
         version: 10.3.1
     devDependencies:
+      '@types/node':
+        specifier: ^24.13.3
+        version: 24.13.3
+      typescript:
+        specifier: 5.9.3
+        version: 5.9.3
+
+  packages/organisations:
+    dependencies:
+      '@capital-q/audit':
+        specifier: workspace:*
+        version: link:../audit
+      '@capital-q/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      '@capital-q/database':
+        specifier: workspace:*
+        version: link:../database
+      '@capital-q/eventing':
+        specifier: workspace:*
+        version: link:../eventing
+      '@capital-q/security':
+        specifier: workspace:*
+        version: link:../security
+      zod:
+        specifier: 4.5.4
+        version: 4.5.4
+    devDependencies:
+      '@capital-q/config':
+        specifier: workspace:*
+        version: link:../config
       '@types/node':
         specifier: ^24.13.3
         version: 24.13.3

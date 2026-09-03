@@ -26,6 +26,7 @@
     "@types/node": "^24.13.3"
   },
   "dependencies": {
-    "@capital-q/contracts": "workspace:*"
+    "@capital-q/contracts": "workspace:*",
+    "zod": "4.5.4"
   }
 }

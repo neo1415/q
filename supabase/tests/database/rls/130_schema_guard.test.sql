@@ -51,6 +51,7 @@ insert into rls_inventory (schema_name, table_name, classification, authenticate
   ('identity', 'organisation_memberships', 'RLS_REQUIRED',         '{SELECT}'),
   ('identity', 'user_active_contexts',     'RLS_REQUIRED',         '{SELECT}'),
   ('identity', 'membership_roles',         'RLS_REQUIRED',         '{SELECT}'),
+  ('identity', 'organisation_creation_requests', 'INTERNAL_SERVER_ONLY', '{}'),
   ('permissions', 'capabilities',          'PUBLIC_REFERENCE',     '{SELECT}'),
   ('permissions', 'roles',                 'PUBLIC_REFERENCE',     '{SELECT}'),
   ('permissions', 'role_capabilities',     'PUBLIC_REFERENCE',     '{SELECT}'),

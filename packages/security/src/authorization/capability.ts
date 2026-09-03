@@ -33,6 +33,7 @@ export type Capability = z.infer<typeof CapabilitySchema>;
  * actor holds it.
  */
 export const REFERENCE_CAPABILITIES = [
+  "organisation.view",
   "organisation.admin",
   "company.financials.view",
   "company.financials.edit",

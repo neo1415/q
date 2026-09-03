@@ -8,7 +8,7 @@ create extension if not exists pgtap with schema extensions;
 \ir support/fixture.psql
 select pg_temp.rls_setup();
 
-select plan(22);
+select plan(25);
 
 -- Seed one row of each internal kind as the privileged role.
 insert into events.outbox (event_id, event_type, event_version, payload)
@@ -38,6 +38,7 @@ select throws_ok(
 select throws_ok($$ update audit.material_actions set outcome = 'DENIED' $$, '42501', null, 'audit: authenticated cannot rewrite');
 select throws_ok($$ delete from audit.security_events $$, '42501', null, 'audit: authenticated cannot delete');
 select throws_ok($$ select * from identity.tenant_organisations $$, '42501', null, 'tenant mapping: authenticated cannot read');
+select throws_ok($$ select * from identity.organisation_creation_requests $$, '42501', null, 'creation idempotency: authenticated cannot read');
 select throws_ok($$ select * from pgmq.meta $$, '42501', null, 'queue: authenticated cannot read pgmq metadata');
 select throws_ok($$ select pgmq.send('domain-events', '{}'::jsonb) $$, '42501', null, 'queue: authenticated cannot send');
 select throws_ok($$ select * from pgmq.read('domain-events', 1, 1) $$, '42501', null, 'queue: authenticated cannot read');
@@ -52,12 +53,14 @@ select throws_ok(
 select throws_ok($$ select * from audit.material_actions $$, '42501', null, 'audit: anon cannot read');
 select throws_ok($$ select * from audit.security_events $$, '42501', null, 'audit: anon cannot read security events');
 select throws_ok($$ select pgmq.send('domain-events', '{}'::jsonb) $$, '42501', null, 'queue: anon cannot send');
+select throws_ok($$ select * from identity.organisation_creation_requests $$, '42501', null, 'creation idempotency: anon cannot read');
 
 -- service_role: BYPASSRLS, but no grants on Capital Q schemas -----------------
 
 select pg_temp.act_as_service_role();
 select throws_ok($$ select * from events.outbox $$, '42501', null, 'service_role: no grant on the outbox');
 select throws_ok($$ select * from audit.material_actions $$, '42501', null, 'service_role: no grant on audit');
+select throws_ok($$ select * from identity.organisation_creation_requests $$, '42501', null, 'service_role: no grant on creation idempotency');
 
 -- Privileged server role: sees the rows (EXPECTED DB BEHAVIOR; APPLICATION
 -- AUTHORIZATION IS STILL REQUIRED).

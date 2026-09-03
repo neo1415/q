@@ -220,6 +220,48 @@ export type Database = {
           },
         ]
       }
+      organisation_creation_requests: {
+        Row: {
+          created_at: string
+          idempotency_key_hash: string
+          organisation_id: string
+          request_hash: string
+          tenant_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          idempotency_key_hash: string
+          organisation_id: string
+          request_hash: string
+          tenant_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          idempotency_key_hash?: string
+          organisation_id?: string
+          request_hash?: string
+          tenant_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organisation_creation_requests_organisation_id_tenant_id_fkey"
+            columns: ["organisation_id", "tenant_id"]
+            isOneToOne: false
+            referencedRelation: "organisations"
+            referencedColumns: ["id", "tenant_id"]
+          },
+          {
+            foreignKeyName: "organisation_creation_requests_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       organisation_memberships: {
         Row: {
           created_at: string
@@ -307,6 +349,7 @@ export type Database = {
           status: string
           tenant_id: string
           updated_at: string
+          version: number
           website_url: string | null
         }
         Insert: {
@@ -321,6 +364,7 @@ export type Database = {
           status?: string
           tenant_id: string
           updated_at?: string
+          version?: number
           website_url?: string | null
         }
         Update: {
@@ -335,6 +379,7 @@ export type Database = {
           status?: string
           tenant_id?: string
           updated_at?: string
+          version?: number
           website_url?: string | null
         }
         Relationships: [

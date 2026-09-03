@@ -7,6 +7,11 @@ import {
 } from "@capital-q/contracts";
 import type { Logger } from "@capital-q/observability";
 import {
+  OrganisationCreationConflictError,
+  OrganisationNotFoundError,
+  OrganisationVersionConflictError,
+} from "@capital-q/organisations";
+import {
   ActorContextDeniedError,
   ActorContextRequiredError,
   AuthenticationRequiredError,
@@ -109,6 +114,29 @@ function toProblem(error: unknown, requestId: string): ProblemDetails {
   if (error instanceof AuthorizationRequirementError) {
     return createProblemDetails({
       code: "PERMISSION_DENIED",
+      requestId,
+      detail: error.message,
+    });
+  }
+
+  // Organisation domain failures. Each is enumeration-safe by construction
+  // (the domain raises the same error for absent, foreign and inaccessible
+  // resources), so mapping them is purely a status decision.
+  if (error instanceof OrganisationNotFoundError) {
+    return createProblemDetails({ code: "RESOURCE_NOT_FOUND", requestId });
+  }
+
+  if (error instanceof OrganisationVersionConflictError) {
+    return createProblemDetails({
+      code: "VERSION_CONFLICT",
+      requestId,
+      detail: error.message,
+    });
+  }
+
+  if (error instanceof OrganisationCreationConflictError) {
+    return createProblemDetails({
+      code: "IDEMPOTENCY_CONFLICT",
       requestId,
       detail: error.message,
     });

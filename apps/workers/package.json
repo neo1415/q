@@ -16,7 +16,8 @@
     "@capital-q/contracts": "workspace:*",
     "@capital-q/database": "workspace:*",
     "@capital-q/eventing": "workspace:*",
-    "@capital-q/observability": "workspace:*"
+    "@capital-q/observability": "workspace:*",
+    "@capital-q/organisations": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^24.13.3",

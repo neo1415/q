@@ -106,7 +106,8 @@ select is(
 select results_eq(
   $$ select code from permissions.capabilities order by code $$,
   $$ values ('company.financials.edit'), ('company.financials.view'),
-            ('data_room.share'), ('organisation.admin'), ('q.action.approve') $$,
+            ('data_room.share'), ('organisation.admin'), ('organisation.view'),
+            ('q.action.approve') $$,
   'seeded capability codes match the known reference set');
 select results_eq(
   $$ select code from permissions.roles order by code $$,
@@ -116,13 +117,17 @@ select results_eq(
   $$ select c.code from permissions.role_capabilities rc
        join permissions.roles r on r.id = rc.role_id
        join permissions.capabilities c on c.id = rc.capability_id
-      where r.code = 'organisation_admin' and rc.effect = 'ALLOW' $$,
-  $$ values ('organisation.admin') $$,
-  'organisation_admin maps to organisation.admin only');
-select is(
-  (select count(*)::int from permissions.role_capabilities rc
-     join permissions.roles r on r.id = rc.role_id where r.code = 'organisation_member'),
-  0, 'organisation_member carries no capabilities by default');
+      where r.code = 'organisation_admin' and rc.effect = 'ALLOW'
+      order by c.code $$,
+  $$ values ('organisation.admin'), ('organisation.view') $$,
+  'organisation_admin maps to organisation.admin and organisation.view only');
+select results_eq(
+  $$ select c.code from permissions.role_capabilities rc
+       join permissions.roles r on r.id = rc.role_id
+       join permissions.capabilities c on c.id = rc.capability_id
+      where r.code = 'organisation_member' and rc.effect = 'ALLOW' $$,
+  $$ values ('organisation.view') $$,
+  'organisation_member carries organisation.view only (CQ-ORG-001)');
 
 -- ===========================================================================
 -- Fixtures (as the migration owner; RLS bypassed)

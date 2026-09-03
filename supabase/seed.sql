@@ -18,6 +18,7 @@
 -- ---------------------------------------------------------------------------
 
 insert into permissions.capabilities (code, description) values
+  ('organisation.view',        'View the organisation profile and membership context.'),
   ('organisation.admin',       'Administer the organisation: members, roles and settings.'),
   ('company.financials.view',  'View company financial data.'),
   ('company.financials.edit',  'Edit company financial data.'),
@@ -29,14 +30,16 @@ on conflict (code) do update
 -- ---------------------------------------------------------------------------
 -- Minimal V1 role templates. The detailed product role matrix is deliberately
 -- unresolved: these two exist so a membership can be administered at all, and
--- organisation_member starts with no capabilities (least privilege).
+-- organisation_member may only view (least privilege). The production
+-- copy of this reference data lives in the CQ-ORG-001 migration; keep both
+-- aligned.
 -- ---------------------------------------------------------------------------
 
 insert into permissions.roles (code, name, description, scope_type) values
   ('organisation_admin',  'Organisation administrator',
      'Administers the organisation it is assigned within.', 'organisation'),
   ('organisation_member', 'Organisation member',
-     'Baseline membership template. Carries no capabilities by default.', 'organisation')
+     'Baseline membership template: may view the organisation it belongs to.', 'organisation')
 on conflict (code) do update
   set name = excluded.name,
       description = excluded.description,
@@ -44,7 +47,11 @@ on conflict (code) do update
 
 insert into permissions.role_capabilities (role_id, capability_id, effect)
 select r.id, c.id, 'ALLOW'
-from permissions.roles r
-join permissions.capabilities c on c.code = 'organisation.admin'
-where r.code = 'organisation_admin'
+  from permissions.roles r
+  join permissions.capabilities c
+    on (r.code, c.code) in (
+      ('organisation_admin',  'organisation.view'),
+      ('organisation_admin',  'organisation.admin'),
+      ('organisation_member', 'organisation.view')
+    )
 on conflict (role_id, capability_id) do nothing;

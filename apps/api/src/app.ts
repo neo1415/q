@@ -10,6 +10,10 @@ import {
 } from "@capital-q/observability";
 
 import { registerMeRoute, type MeRouteDependencies } from "./http/me.js";
+import {
+  registerOrganisationRoutes,
+  type OrganisationRoutesDependencies,
+} from "./http/organisations.js";
 import { registerProblemHandling } from "./http/problem-handler.js";
 
 export const SERVICE_NAME = "api";
@@ -23,6 +27,17 @@ export const SERVICE_NAME = "api";
 export type ApiSecurityDependencies = MeRouteDependencies;
 
 /**
+ * Domain modules the API exposes. Each is an application service from its
+ * bounded context; the routes here only adapt HTTP to it. Absent modules
+ * register no routes, which is how tests that exercise only the security
+ * boundary build an app without a database.
+ */
+export type ApiModules = {
+  readonly organisations?:
+    OrganisationRoutesDependencies["organisations"] | undefined;
+};
+
+/**
  * Build the API without binding a port.
  *
  * Separating composition from process startup lets tests drive real HTTP
@@ -32,6 +47,7 @@ export type ApiSecurityDependencies = MeRouteDependencies;
 export function createApp(
   config: ApiConfig,
   security: ApiSecurityDependencies,
+  modules: ApiModules = {},
 ): {
   readonly app: FastifyInstance;
   readonly logger: Logger;
@@ -84,6 +100,14 @@ export function createApp(
   }));
 
   registerMeRoute(app, security);
+
+  if (modules.organisations !== undefined) {
+    registerOrganisationRoutes(app, {
+      authenticator: security.authenticator,
+      resolver: security.resolver,
+      organisations: modules.organisations,
+    });
+  }
 
   return { app, logger };
 }
