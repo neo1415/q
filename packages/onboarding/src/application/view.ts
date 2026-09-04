@@ -188,6 +188,9 @@ function presentationOf(
         vocabularyCodes: configuration.vocabularyCodes,
         minItems: configuration.minItems,
         maxItems: configuration.maxItems,
+        ...(configuration.contextKey === undefined
+          ? {}
+          : { contextKey: configuration.contextKey }),
       };
   }
 }

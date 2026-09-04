@@ -505,7 +505,8 @@ export function createOnboardingUseCases(
     let context: Readonly<Record<string, unknown>> | undefined;
     if (
       current !== undefined &&
-      current.configuration.stepType === "confirmation" &&
+      (current.configuration.stepType === "confirmation" ||
+        current.configuration.stepType === "reference_select") &&
       current.configuration.contextKey !== undefined &&
       aggregate.path.eligibleKeys.has(current.stepKey)
     ) {

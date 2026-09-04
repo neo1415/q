@@ -17,10 +17,14 @@ select pg_temp.rls_setup();
 select plan(40);
 
 -- Definitions ----------------------------------------------------------------------
+-- The synthetic journey uses the one journey type without a production
+-- definition. An integration run may already have published one on it; the
+-- row is reused and the synthetic version number stays clear of any publisher.
 insert into onboarding.definitions (id, journey_type, name)
-values ('00000000-0000-4000-8000-0000000000d0', 'investor', 'Founder (test)');
+values ('00000000-0000-4000-8000-0000000000d0', 'external_investor_conversion', 'Founder (test)')
+on conflict (journey_type) do nothing;
 insert into onboarding.definition_versions (id, definition_id, version, schema, manifest_hash)
-values ('00000000-0000-4000-8000-0000000000d1', '00000000-0000-4000-8000-0000000000d0', 1,
+values ('00000000-0000-4000-8000-0000000000d1', (select id from onboarding.definitions where journey_type = 'external_investor_conversion'), 7,
         '{"schemaVersion": 1, "phases": [], "runtime": {"subjectType": "COMPANY", "allowUnboundStart": true}}',
         repeat('a', 64));
 insert into onboarding.steps (definition_version_id, step_key, sequence_order, step_type, required, configuration)
@@ -28,15 +32,15 @@ values ('00000000-0000-4000-8000-0000000000d1', 'intent', 0, 'single_select', tr
         '{"prompt": "Are you raising?", "options": [{"optionKey": "yes", "label": "Yes"}, {"optionKey": "no", "label": "No"}]}');
 
 select throws_ok(
-  $$ insert into onboarding.definitions (journey_type, name) values ('investor', 'Duplicate') $$,
+  $$ insert into onboarding.definitions (journey_type, name) values ('external_investor_conversion', 'Duplicate') $$,
   '23505', null, 'one canonical definition per journey type');
 select throws_ok(
   $$ insert into onboarding.definition_versions (definition_id, version, schema, manifest_hash)
-     values ('00000000-0000-4000-8000-0000000000d0', 1, '{"schemaVersion": 1}', repeat('b', 64)) $$,
+     values ((select id from onboarding.definitions where journey_type = 'external_investor_conversion'), 7, '{"schemaVersion": 1}', repeat('b', 64)) $$,
   '23505', null, 'definition versions are unique per definition');
 select throws_ok(
   $$ insert into onboarding.definition_versions (definition_id, version, schema, manifest_hash)
-     values ('00000000-0000-4000-8000-0000000000d0', 0, '{"schemaVersion": 1}', repeat('b', 64)) $$,
+     values ((select id from onboarding.definitions where journey_type = 'external_investor_conversion'), 0, '{"schemaVersion": 1}', repeat('b', 64)) $$,
   '23514', null, 'version must be >= 1');
 select throws_ok(
   $$ insert into onboarding.steps (definition_version_id, step_key, sequence_order, step_type, configuration)
@@ -57,7 +61,7 @@ select throws_ok(
 
 -- Publish, then everything about the version is frozen.
 update onboarding.definition_versions set published_at = clock_timestamp() where id = '00000000-0000-4000-8000-0000000000d1';
-update onboarding.definitions set current_version = 1 where id = '00000000-0000-4000-8000-0000000000d0';
+update onboarding.definitions set current_version = 7 where id = (select id from onboarding.definitions where journey_type = 'external_investor_conversion');
 select throws_ok(
   $$ update onboarding.definition_versions set schema = '{"schemaVersion": 1, "phases": [{"phaseKey": "x", "label": "X"}]}'
       where id = '00000000-0000-4000-8000-0000000000d1' $$,
@@ -78,32 +82,32 @@ select throws_ok(
 
 -- Sessions -------------------------------------------------------------------------
 insert into onboarding.sessions (id, user_id, journey_type, definition_version_id, current_step_key)
-values ('00000000-0000-4000-8000-0000000000e1', pg_temp.rls_id('user_a'), 'investor', '00000000-0000-4000-8000-0000000000d1', 'intent');
+values ('00000000-0000-4000-8000-0000000000e1', pg_temp.rls_id('user_a'), 'external_investor_conversion', '00000000-0000-4000-8000-0000000000d1', 'intent');
 select is((select tenant_id from onboarding.sessions where id = '00000000-0000-4000-8000-0000000000e1'), null,
   'a bootstrap session has no tenant');
 select throws_ok(
   $$ insert into onboarding.sessions (user_id, journey_type, definition_version_id, current_step_key)
-     values (pg_temp.rls_id('user_a'), 'investor', '00000000-0000-4000-8000-0000000000d1', 'intent') $$,
+     values (pg_temp.rls_id('user_a'), 'external_investor_conversion', '00000000-0000-4000-8000-0000000000d1', 'intent') $$,
   '23505', null, 'at most one ACTIVE unbound session per user + journey');
 select throws_ok(
   $$ insert into onboarding.sessions (user_id, journey_type, definition_version_id, current_step_key, subject_type)
-     values (pg_temp.rls_id('user_b'), 'investor', '00000000-0000-4000-8000-0000000000d1', 'intent', 'COMPANY') $$,
+     values (pg_temp.rls_id('user_b'), 'external_investor_conversion', '00000000-0000-4000-8000-0000000000d1', 'intent', 'COMPANY') $$,
   '23514', null, 'subject_type without subject_id is rejected');
 select throws_ok(
   $$ insert into onboarding.sessions (user_id, journey_type, definition_version_id, current_step_key, subject_id)
-     values (pg_temp.rls_id('user_b'), 'investor', '00000000-0000-4000-8000-0000000000d1', 'intent', '00000000-0000-4000-8000-0000000000c1') $$,
+     values (pg_temp.rls_id('user_b'), 'external_investor_conversion', '00000000-0000-4000-8000-0000000000d1', 'intent', '00000000-0000-4000-8000-0000000000c1') $$,
   '23514', null, 'subject_id without subject_type is rejected');
 select throws_ok(
   $$ insert into onboarding.sessions (user_id, journey_type, definition_version_id, current_step_key, organisation_id)
-     values (pg_temp.rls_id('user_b'), 'investor', '00000000-0000-4000-8000-0000000000d1', 'intent', pg_temp.rls_id('org_b')) $$,
+     values (pg_temp.rls_id('user_b'), 'external_investor_conversion', '00000000-0000-4000-8000-0000000000d1', 'intent', pg_temp.rls_id('org_b')) $$,
   '23514', null, 'an organisation without a tenant is rejected');
 select throws_ok(
   $$ insert into onboarding.sessions (user_id, journey_type, definition_version_id)
-     values (pg_temp.rls_id('user_b'), 'investor', '00000000-0000-4000-8000-0000000000d1') $$,
+     values (pg_temp.rls_id('user_b'), 'external_investor_conversion', '00000000-0000-4000-8000-0000000000d1') $$,
   '23514', null, 'an ACTIVE session must have a current step');
 select throws_ok(
   $$ insert into onboarding.sessions (user_id, journey_type, definition_version_id, current_step_key, status)
-     values (pg_temp.rls_id('user_b'), 'investor', '00000000-0000-4000-8000-0000000000d1', 'intent', 'COMPLETED') $$,
+     values (pg_temp.rls_id('user_b'), 'external_investor_conversion', '00000000-0000-4000-8000-0000000000d1', 'intent', 'COMPLETED') $$,
   '23514', null, 'COMPLETED requires completed_at');
 
 -- One-way binding.
@@ -131,7 +135,7 @@ select throws_ok(
   '23514', null, 'a session cannot change owner');
 select throws_ok(
   $$ insert into onboarding.sessions (user_id, journey_type, definition_version_id, current_step_key, tenant_id, organisation_id, subject_type, subject_id)
-     values (pg_temp.rls_id('user_a'), 'investor', '00000000-0000-4000-8000-0000000000d1', 'intent',
+     values (pg_temp.rls_id('user_a'), 'external_investor_conversion', '00000000-0000-4000-8000-0000000000d1', 'intent',
              pg_temp.rls_id('tenant_a'), pg_temp.rls_id('org_a'), 'COMPANY', '00000000-0000-4000-8000-0000000000c3') $$,
   '23505', null, 'at most one ACTIVE bound session per user + journey + subject');
 

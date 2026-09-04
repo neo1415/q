@@ -162,6 +162,8 @@ export type OnboardingSuggestionStatus = z.infer<
 export const ONBOARDING_RESOURCE_TYPES = [
   "EVIDENCE_DOCUMENT",
   "TAXONOMY_NODE",
+  /** A declared investor mandate the journey operates on (CQ-ONB-003). */
+  "INVESTOR_MANDATE",
 ] as const;
 export const OnboardingResourceTypeSchema = z.enum(ONBOARDING_RESOURCE_TYPES);
 export type OnboardingResourceType = z.infer<
@@ -408,6 +410,8 @@ export const OnboardingStepPresentationSchema = z.discriminatedUnion(
       vocabularyCodes: z.array(z.string()),
       minItems: z.number().int().min(0),
       maxItems: z.number().int().min(1),
+      /** Names the server-side context listing selectable references (see `context`). */
+      contextKey: z.string().optional(),
     }),
   ],
 );

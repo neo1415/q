@@ -50,3 +50,11 @@ export class InvestorRepresentativeNotFoundError extends Error {
     this.name = "InvestorRepresentativeNotFoundError";
   }
 }
+
+/** Enumeration-safe: absent, removed, or not visible in this context. */
+export class InvestorPortfolioReferenceNotFoundError extends Error {
+  constructor(message = "The portfolio reference was not found.") {
+    super(message);
+    this.name = "InvestorPortfolioReferenceNotFoundError";
+  }
+}

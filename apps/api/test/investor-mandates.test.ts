@@ -146,6 +146,9 @@ function fakeService(overrides: Partial<InvestorService> = {}) {
         version: 3,
       });
     },
+    listInvestorPortfolioReferences: notUnderTest,
+    addInvestorPortfolioReference: notUnderTest,
+    removeInvestorPortfolioReference: notUnderTest,
     ...overrides,
   };
   return { service, calls };

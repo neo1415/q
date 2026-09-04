@@ -1,9 +1,9 @@
 import { cx } from "@capital-q/ui";
 
-import type { FounderOnboardingSessionView } from "../models/presentation";
+import type { ProgressView } from "../session";
 
 /**
- * Semantic progress: the four founder sections, the current section
+ * Semantic progress: the journey's few sections, the current section
  * highlighted, and a programmatic description ("Business, step 2 of 3") so
  * the position is understandable without the visual bar. The bar itself is
  * a progressbar over all steps.
@@ -11,7 +11,7 @@ import type { FounderOnboardingSessionView } from "../models/presentation";
 export function OnboardingProgress({
   session,
 }: {
-  readonly session: FounderOnboardingSessionView;
+  readonly session: ProgressView;
 }) {
   const currentSection =
     session.steps.find((step) => step.id === session.currentStepId)?.section ??
@@ -78,7 +78,7 @@ export function OnboardingProgress({
       </ol>
       <div
         role="progressbar"
-        aria-label="Founder setup progress"
+        aria-label="Setup progress"
         aria-valuemin={0}
         aria-valuemax={session.steps.length}
         aria-valuenow={overallIndex}

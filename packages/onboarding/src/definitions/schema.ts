@@ -214,6 +214,12 @@ export const OnboardingStepConfigurationSchema = z.discriminatedUnion(
           .default([]),
         minItems: z.number().int().min(0).default(1),
         maxItems: z.number().int().min(1).max(20).default(10),
+        /** A registered step-context provider lists the selectable references. */
+        contextKey: z
+          .string()
+          .regex(/^[a-z][a-z0-9_]*(?:\.[a-z][a-z0-9_]*)*$/)
+          .max(64)
+          .optional(),
       })
       .strict(),
   ],

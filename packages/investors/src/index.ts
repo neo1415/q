@@ -165,4 +165,27 @@ export {
   createPostgresInvestorMandateRepository,
 } from "./infrastructure/postgres-mandate-repository.js";
 
+// Portfolio references (CQ-ONB-003, ADR 0007).
+export {
+  InvestorPortfolioReferenceIdSchema,
+  toInvestorPortfolioReferenceDto,
+  type InvestorPortfolioReference,
+  type InvestorPortfolioReferenceId,
+} from "./contracts/portfolio.js";
+export { InvestorPortfolioReferenceNotFoundError } from "./domain/errors.js";
+export type {
+  InvestorPortfolioReferenceRepository,
+  NewInvestorPortfolioReference,
+} from "./application/portfolio-ports.js";
+export {
+  createAddInvestorPortfolioReference,
+  createListInvestorPortfolioReferences,
+  createRemoveInvestorPortfolioReference,
+  INVESTOR_PORTFOLIO_REFERENCES_MAX,
+  type AddInvestorPortfolioReferenceCommand,
+  type ListInvestorPortfolioReferencesQuery,
+  type RemoveInvestorPortfolioReferenceCommand,
+} from "./application/portfolio-use-cases.js";
+export { createPostgresInvestorPortfolioReferenceRepository } from "./infrastructure/postgres-portfolio-repository.js";
+
 export const PACKAGE_NAME = "@capital-q/investors" as const;

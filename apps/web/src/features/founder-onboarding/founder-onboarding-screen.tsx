@@ -9,8 +9,8 @@ import { Button, buttonClassName } from "@capital-q/ui/button";
 import { EmptyState, InlineNotice, Skeleton } from "@capital-q/ui/states";
 
 import { createFounderOnboardingClient } from "./adapters/compose";
-import { OnboardingProgress } from "./components/onboarding-progress";
-import { OnboardingShell } from "./components/onboarding-shell";
+import { OnboardingProgress } from "../onboarding-kit/components/onboarding-progress";
+import { OnboardingShell } from "../onboarding-kit/components/onboarding-shell";
 import { useFounderOnboarding } from "./controller/use-founder-onboarding";
 import { renderStep } from "./steps/registry";
 

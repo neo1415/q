@@ -84,10 +84,13 @@ select throws_ok(
   '23514', null, 'the published founder version cannot be deleted');
 
 -- The extended step-type check accepts reference_select and nothing new ----
+-- Reuses a definition an integration run may already have published on the
+-- spare journey type; the synthetic version number stays clear of publishers.
 insert into onboarding.definitions (id, journey_type, name)
-values ('00000000-0000-4000-8000-0000000000e0', 'investor', 'Investor (test)');
+values ('00000000-0000-4000-8000-0000000000e0', 'external_investor_conversion', 'Investor (test)')
+on conflict (journey_type) do nothing;
 insert into onboarding.definition_versions (id, definition_id, version, schema, manifest_hash)
-values ('00000000-0000-4000-8000-0000000000e1', '00000000-0000-4000-8000-0000000000e0', 1,
+values ('00000000-0000-4000-8000-0000000000e1', (select id from onboarding.definitions where journey_type = 'external_investor_conversion'), 7,
         '{"schemaVersion": 1, "phases": [], "runtime": {"subjectType": "INVESTOR_ORGANISATION", "allowUnboundStart": true}}',
         repeat('c', 64));
 select lives_ok(

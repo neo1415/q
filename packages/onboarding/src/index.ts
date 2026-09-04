@@ -43,6 +43,23 @@ export {
 } from "./definitions/schema.js";
 export { validateOnboardingManifest } from "./definitions/validate.js";
 export {
+  onboardingDefinitionIds,
+  renderOnboardingDefinitionMigration,
+} from "./definitions/render-sql.js";
+export {
+  confirmed,
+  decimal,
+  integer,
+  labelOf,
+  labelsOf,
+  multiSelect,
+  resourceIds,
+  responseValues,
+  singleSelect,
+  text,
+  type ResponseValues,
+} from "./application/response-values.js";
+export {
   ONBOARDING_RUNTIME_FAULTS,
   ONBOARDING_STATE_REASONS,
   OnboardingContextRequiredError,
@@ -109,6 +126,7 @@ export type {
 } from "./application/ports.js";
 export {
   createCompanyOnboardingSubjectResolver,
+  createInvestorOrganisationOnboardingSubjectResolver,
   createOnboardingStepContextRegistry,
   createOnboardingSubjectResolverRegistry,
   createOnboardingWriteTargetRegistry,

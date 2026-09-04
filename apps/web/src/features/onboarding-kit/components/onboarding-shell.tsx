@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import { Button, IconButton } from "@capital-q/ui/button";
 import { ArrowLeft, ICON_SIZE, ICON_STROKE } from "@capital-q/ui/icons";
 
-import type { SaveStatus } from "../controller/use-founder-onboarding";
+import type { SaveStatus } from "../controller";
 import { SaveStatusIndicator } from "./save-status";
 
 /**

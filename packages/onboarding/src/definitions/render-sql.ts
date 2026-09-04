@@ -1,10 +1,8 @@
 import { createHash } from "node:crypto";
 
-import {
-  hashOnboardingRequest,
-  validateOnboardingManifest,
-  type OnboardingDefinitionManifest,
-} from "@capital-q/onboarding";
+import { hashOnboardingRequest } from "../domain/idempotency.js";
+import type { OnboardingDefinitionManifest } from "./schema.js";
+import { validateOnboardingManifest } from "./validate.js";
 
 /**
  * Renders a validated manifest as the SQL a production reference-data
@@ -66,7 +64,11 @@ function literal(value: string): string {
 
 export function renderOnboardingDefinitionMigration(
   raw: OnboardingDefinitionManifest,
-  options: { readonly packet: string },
+  options: {
+    readonly packet: string;
+    /** Where the manifest lives, for the generated-file banner. */
+    readonly source?: string | undefined;
+  },
 ): string {
   const manifest = validateOnboardingManifest(raw);
   const manifestHash = hashOnboardingRequest(manifest);
@@ -74,7 +76,7 @@ export function renderOnboardingDefinitionMigration(
   const lines: string[] = [];
   lines.push(
     `-- ${options.packet} · ${manifest.name} v${String(manifest.version)} (journey "${manifest.journeyType}")`,
-    `-- GENERATED from packages/founder-onboarding/src/definition by renderOnboardingDefinitionMigration.`,
+    `-- GENERATED from ${options.source ?? "packages/founder-onboarding/src/definition"} by renderOnboardingDefinitionMigration.`,
     `-- Do not edit by hand: a change to the journey is a new definition version.`,
     `-- Reference data published through the same rows the runtime publisher writes;`,
     `-- publishing the same manifest again is an idempotent no-op (manifest hash below).`,

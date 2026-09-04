@@ -16,6 +16,12 @@ import {
   type FounderSnapshotContext,
 } from "@capital-q/founder-onboarding/definition";
 import type { ChoiceOption } from "@capital-q/ui/choice-list";
+
+import {
+  SubmissionPlanError,
+  type JourneyGroup,
+  type Submission,
+} from "../../onboarding-kit/runtime-port";
 import type { SnapshotSection } from "@capital-q/ui/intelligence-snapshot";
 
 import type {
@@ -66,6 +72,8 @@ export type Group = {
   /** Runtime step keys in definition order; never empty. */
   readonly stepKeys: readonly [string, ...string[]];
 };
+
+export { SubmissionPlanError, type Submission };
 
 const S = FOUNDER_STEPS;
 
@@ -799,23 +807,6 @@ function snapshotSections(snapshot: FounderSnapshotContext): SnapshotSection[] {
 // Composite responses → runtime submissions
 // ---------------------------------------------------------------------------
 
-export type Submission =
-  | {
-      readonly stepKey: string;
-      readonly action: "submit";
-      readonly value: OnboardingResponseValue;
-    }
-  | { readonly stepKey: string; readonly action: "skip" }
-  /** Not asked on this screen yet (becomes eligible later); leave untouched. */
-  | { readonly stepKey: string; readonly action: "leave" };
-
-export class SubmissionPlanError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "SubmissionPlanError";
-  }
-}
-
 const submit = (
   stepKey: string,
   value: OnboardingResponseValue,
@@ -840,7 +831,7 @@ const textOrSkip = (stepKey: string, value: string | undefined) =>
  * makes the amount eligible), so the plan lists every step of the group.
  */
 export function planSubmissions(
-  group: Group,
+  group: JourneyGroup,
   response: StepResponse,
 ): readonly Submission[] {
   if (response.kind !== group.kind) {
@@ -945,13 +936,6 @@ export function planSubmissions(
     case "snapshot":
       return [submit(S.snapshot, { type: "CONFIRMATION", confirmed: true })];
   }
-}
-
-export function sameValue(
-  a: OnboardingResponseValue | undefined,
-  b: OnboardingResponseValue,
-): boolean {
-  return a !== undefined && JSON.stringify(a) === JSON.stringify(b);
 }
 
 /** Country keys are lowercase option keys in the definition; the UI shows ISO codes. */

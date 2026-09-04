@@ -10,6 +10,7 @@ import {
   getOnboardingSession,
   getTaxonomyNode,
   goBackInOnboarding,
+  listTaxonomyNodes,
   skipOnboardingStep,
   startOnboardingSession,
   submitOnboardingResponse,
@@ -17,27 +18,28 @@ import {
 } from "@capital-q/api-client";
 import { loadWebServerConfig } from "@capital-q/config/web";
 import {
+  OnboardingJourneyTypeSchema,
   OnboardingResponseValueSchema,
   OnboardingStepKeySchema,
   TAXONOMY_CLASSIFICATION_TEXT_MAX_LENGTH,
+  TaxonomyVocabularyCodeSchema,
+  type OnboardingJourneyType,
   type OnboardingSessionView,
 } from "@capital-q/contracts";
-import { CATEGORY_VOCABULARIES } from "@capital-q/founder-onboarding/definition";
 
 import { getSessionAccessToken } from "@/auth/session";
 
-import type { TaxonomyCandidateView } from "../models/presentation";
-import type { ClientFailureKind } from "./client";
+import type { ClientFailureKind, TaxonomyCandidateView } from "./client";
 
 /**
- * Founder onboarding server actions: the only place the browser's journey
+ * Onboarding server actions: the only place a journey in the browser
  * reaches the Capital Q API. Each action forwards the HttpOnly session's
  * access token server-to-server, validates its own arguments (a client is
- * input, never authority), and returns a plain result the browser can
- * reason about -- never a raw problem document, never the token.
+ * input, never authority), and returns a plain result the browser can reason
+ * about -- never a raw problem document, never the token.
  *
- * Nothing here decides journey logic: it is transport for the runtime
- * contract, one call per action.
+ * Journey-agnostic transport for the runtime contract, one call per action;
+ * the journey type is validated input, not trust.
  */
 
 export type ActionResult<T> =
@@ -59,10 +61,7 @@ const failure = (
 async function apiSession(): Promise<ApiSession | ActionResult<never>> {
   const { apiBaseUrl } = loadWebServerConfig();
   if (apiBaseUrl === undefined) {
-    return failure(
-      "UNAVAILABLE",
-      "Founder setup isn't available on this build yet.",
-    );
+    return failure("UNAVAILABLE", "Setup isn't available on this build yet.");
   }
   const accessToken = await getSessionAccessToken();
   if (accessToken === null) {
@@ -115,12 +114,13 @@ async function run<T>(
   }
 }
 
-export async function founderCurrentAction(): Promise<
-  ActionResult<OnboardingSessionView | null>
-> {
+export async function onboardingCurrentAction(
+  rawJourney: string,
+): Promise<ActionResult<OnboardingSessionView | null>> {
+  const journeyType = OnboardingJourneyTypeSchema.parse(rawJourney);
   return run(async (session) => {
     try {
-      return await getCurrentOnboardingSession(session, "founder");
+      return await getCurrentOnboardingSession(session, journeyType);
     } catch (error) {
       if (error instanceof ApiProblemError && error.status === 404) {
         return null;
@@ -130,16 +130,19 @@ export async function founderCurrentAction(): Promise<
   });
 }
 
-export async function founderStartAction(
+export async function onboardingStartAction(
+  rawJourney: string,
   rawIdempotencyKey: string,
 ): Promise<ActionResult<OnboardingSessionView>> {
+  const journeyType: OnboardingJourneyType =
+    OnboardingJourneyTypeSchema.parse(rawJourney);
   const idempotencyKey = Uuid.parse(rawIdempotencyKey);
   return run((session) =>
-    startOnboardingSession(session, { journeyType: "founder" }, idempotencyKey),
+    startOnboardingSession(session, { journeyType }, idempotencyKey),
   );
 }
 
-export async function founderGetAction(
+export async function onboardingGetAction(
   rawSessionId: string,
 ): Promise<ActionResult<OnboardingSessionView>> {
   const sessionId = Uuid.parse(rawSessionId);
@@ -154,7 +157,7 @@ const SubmitInput = z.object({
   idempotencyKey: Uuid,
 });
 
-export async function founderSubmitAction(
+export async function onboardingSubmitAction(
   raw: unknown,
 ): Promise<ActionResult<OnboardingSessionView>> {
   const input = SubmitInput.parse(raw);
@@ -179,7 +182,7 @@ const SkipInput = z.object({
   idempotencyKey: Uuid,
 });
 
-export async function founderSkipAction(
+export async function onboardingSkipAction(
   raw: unknown,
 ): Promise<ActionResult<OnboardingSessionView>> {
   const input = SkipInput.parse(raw);
@@ -200,7 +203,7 @@ const NavigateInput = z.object({
   targetStepKey: OnboardingStepKeySchema.optional(),
 });
 
-export async function founderNavigateAction(
+export async function onboardingNavigateAction(
   raw: unknown,
 ): Promise<ActionResult<OnboardingSessionView>> {
   const input = NavigateInput.parse(raw);
@@ -219,7 +222,7 @@ const CompleteInput = z.object({
   expectedSessionVersion: Version,
 });
 
-export async function founderCompleteAction(
+export async function onboardingCompleteAction(
   raw: unknown,
 ): Promise<ActionResult<OnboardingSessionView>> {
   const input = CompleteInput.parse(raw);
@@ -237,25 +240,26 @@ const VOCABULARY_LABELS: Readonly<Record<string, string>> = {
   customer_type: "Customer type",
   technology: "Technology",
   geography: "Geography",
+  regulatory_profile: "Regulatory profile",
+  impact_theme: "Impact theme",
 };
 
 const vocabularyLabel = (code: string) => VOCABULARY_LABELS[code] ?? code;
 
-const CandidatesInput = z
-  .string()
-  .trim()
-  .min(1)
-  .max(TAXONOMY_CLASSIFICATION_TEXT_MAX_LENGTH);
+const CandidatesInput = z.object({
+  text: z.string().trim().min(1).max(TAXONOMY_CLASSIFICATION_TEXT_MAX_LENGTH),
+  vocabularyCodes: z.array(TaxonomyVocabularyCodeSchema).min(1).max(8),
+});
 
-/** Suggested categories for the founder's own words. Nothing is assigned. */
-export async function founderCandidatesAction(
-  rawText: string,
+/** Suggested categories for the user's own words. Nothing is assigned. */
+export async function onboardingCandidatesAction(
+  raw: unknown,
 ): Promise<ActionResult<readonly TaxonomyCandidateView[]>> {
-  const text = CandidatesInput.parse(rawText);
+  const input = CandidatesInput.parse(raw);
   return run(async (session) => {
     const result = await findTaxonomyCandidates(session, {
-      text,
-      vocabularyCodes: [...CATEGORY_VOCABULARIES],
+      text: input.text,
+      vocabularyCodes: input.vocabularyCodes,
     });
     return result.candidates.map((candidate) => ({
       nodeId: candidate.nodeId,
@@ -266,9 +270,9 @@ export async function founderCandidatesAction(
   });
 }
 
-const DescribeInput = z.array(Uuid).max(8);
+const DescribeInput = z.array(Uuid).max(40);
 
-export async function founderDescribeNodesAction(
+export async function onboardingDescribeNodesAction(
   rawIds: readonly string[],
 ): Promise<ActionResult<readonly TaxonomyCandidateView[]>> {
   const ids = DescribeInput.parse(rawIds);
@@ -277,6 +281,24 @@ export async function founderDescribeNodesAction(
       ids.map((id) => getTaxonomyNode(session, id)),
     );
     return nodes.map((node) => ({
+      nodeId: node.id,
+      label: node.displayName,
+      vocabularyLabel: vocabularyLabel(node.vocabularyCode),
+    }));
+  });
+}
+
+/** Root nodes of one vocabulary, for small pick-lists. Active nodes only. */
+export async function onboardingListNodesAction(
+  rawVocabulary: string,
+): Promise<ActionResult<readonly TaxonomyCandidateView[]>> {
+  const vocabularyCode = TaxonomyVocabularyCodeSchema.parse(rawVocabulary);
+  return run(async (session) => {
+    const page = await listTaxonomyNodes(session, vocabularyCode, {
+      roots: true,
+      limit: 50,
+    });
+    return page.items.map((node) => ({
       nodeId: node.id,
       label: node.displayName,
       vocabularyLabel: vocabularyLabel(node.vocabularyCode),

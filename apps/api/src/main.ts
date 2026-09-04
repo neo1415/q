@@ -18,12 +18,16 @@ import { createRequestDatabaseClient } from "@capital-q/database";
 import { createOutboxWriter } from "@capital-q/eventing";
 import { createLogger, createTelemetryRuntime } from "@capital-q/observability";
 import { createFounderOnboardingIntegration } from "@capital-q/founder-onboarding";
+import { createInvestorOnboardingIntegration } from "@capital-q/investor-onboarding";
 import { createCapitalService } from "@capital-q/capital";
 import {
   createCompanyService,
   createPostgresCompanyQueryPort,
 } from "@capital-q/companies";
-import { createInvestorService } from "@capital-q/investors";
+import {
+  createInvestorService,
+  createPostgresInvestorOrganisationQueryPort,
+} from "@capital-q/investors";
 import {
   createOrganisationService,
   createPostgresOrganisationQueryPort,
@@ -31,6 +35,7 @@ import {
 import { createAuthorizationService } from "@capital-q/security";
 import {
   createCompanyOnboardingSubjectResolver,
+  createInvestorOrganisationOnboardingSubjectResolver,
   createOnboardingService,
 } from "@capital-q/onboarding";
 import { createTaxonomyService } from "@capital-q/taxonomy";
@@ -148,13 +153,30 @@ const founder = createFounderOnboardingIntegration({
   audit,
   securityEvents: createPostgresSecurityEventWriter({ sql: database.sql }),
 });
+// The Investor integration (CQ-ONB-003) does the same for Investor
+// Definition v1: canonical Investor Organisation, Representative, Mandate,
+// taxonomy preferences and portfolio references through their services.
+const investorOnboarding = createInvestorOnboardingIntegration({
+  outbox,
+  audit,
+  securityEvents: createPostgresSecurityEventWriter({ sql: database.sql }),
+});
 const onboarding = createOnboardingService({
   sql: database.sql,
   transactions: database.transactions,
   outbox,
-  writeTargets: founder.writeTargets,
-  stepContextProviders: founder.stepContextProviders,
+  writeTargets: [
+    ...(founder.writeTargets ?? []),
+    ...(investorOnboarding.writeTargets ?? []),
+  ],
+  stepContextProviders: [
+    ...(founder.stepContextProviders ?? []),
+    ...(investorOnboarding.stepContextProviders ?? []),
+  ],
   subjectResolvers: [
+    createInvestorOrganisationOnboardingSubjectResolver(
+      createPostgresInvestorOrganisationQueryPort({ sql: database.sql }),
+    ),
     createCompanyOnboardingSubjectResolver(
       createPostgresCompanyQueryPort({ sql: database.sql }),
     ),

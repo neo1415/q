@@ -1,0 +1,45 @@
+/**
+ * Browser-safe subpath: the Investor Definition v1 manifest and its
+ * vocabularies as plain data. No database, no services, no Node built-ins.
+ */
+export {
+  BUSINESS_MODEL_VOCABULARIES,
+  CAPITAL_INTENSITY_OPTIONS,
+  CURRENCY_OPTIONS,
+  CUSTOMER_TYPE_VOCABULARIES,
+  DEPLOYMENT_STATUS_OPTIONS,
+  DISCOVERY_MODE_OPTIONS,
+  FOUNDER_PREFERENCE_OPTIONS,
+  GEOGRAPHY_VOCABULARIES,
+  GREEN_FLAG_OPTIONS,
+  INBOUND_PREFERENCE_OPTIONS,
+  INVESTMENT_ROLE_OPTIONS,
+  INVESTOR_DEFINITION_NAME,
+  INVESTOR_DEFINITION_V1,
+  INVESTOR_DEFINITION_VERSION,
+  INVESTOR_JOURNEY_TYPE,
+  INVESTOR_PHASES,
+  INVESTOR_STEP_CONTEXTS,
+  INVESTOR_STEPS,
+  INVESTOR_TYPE_OPTIONS,
+  INVESTOR_WRITE_TARGETS,
+  PERSONAL_INVESTING_WORKSPACE,
+  PORTFOLIO_MAX_ENTRIES,
+  POSITIVE_STRENGTH_OPTIONS,
+  RED_FLAG_OPTIONS,
+  REGULATORY_APPETITE_OPTIONS,
+  REVENUE_STATE_OPTIONS,
+  SECTOR_VOCABULARIES,
+  STAGE_OPTIONS,
+  STAGE_ORDER,
+  type InvestorStepKey,
+} from "./investor-v1.js";
+export {
+  InvestorHandoffContextSchema,
+  InvestorMandateCandidateSchema,
+  InvestorMandatesContextSchema,
+  InvestorReviewContextSchema,
+  type InvestorHandoffContext,
+  type InvestorMandatesContext,
+  type InvestorReviewContext,
+} from "./contexts.js";

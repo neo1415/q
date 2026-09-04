@@ -1,3 +1,7 @@
+import {
+  InvestorOrganisationIdSchema,
+  type InvestorOrganisationQueryPort,
+} from "@capital-q/investors";
 import { CompanyIdSchema, type CompanyQueryPort } from "@capital-q/companies";
 
 import type { OnboardingWriteTargetKey } from "../definitions/schema.js";
@@ -73,6 +77,39 @@ export function createOnboardingSubjectResolverRegistry(
  * must exist in the actor's tenant and be owned by the actor's active
  * organisation. Identity resolution only; no Founder journey logic.
  */
+/**
+ * INVESTOR_ORGANISATION subject identity through the Investor query port:
+ * the investor organisation must exist in the actor's tenant and belong to
+ * the actor's active organisation. Identity resolution only.
+ */
+export function createInvestorOrganisationOnboardingSubjectResolver(
+  investors: InvestorOrganisationQueryPort,
+): OnboardingSubjectResolver {
+  return {
+    subjectType: "INVESTOR_ORGANISATION",
+    resolve: async (context, subjectId) => {
+      const id = InvestorOrganisationIdSchema.safeParse(subjectId);
+      if (!id.success || context.organisationId === undefined) {
+        return null;
+      }
+      const investor = await investors.getCanonicalInvestorOrganisation(
+        context.tenantId,
+        id.data,
+      );
+      if (
+        investor === null ||
+        investor.organisationId !== context.organisationId
+      ) {
+        return null;
+      }
+      return {
+        tenantId: investor.tenantId,
+        organisationId: investor.organisationId,
+      };
+    },
+  };
+}
+
 export function createCompanyOnboardingSubjectResolver(
   companies: CompanyQueryPort,
 ): OnboardingSubjectResolver {

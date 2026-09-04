@@ -781,6 +781,50 @@ export type Database = {
         }
         Relationships: []
       }
+      investor_portfolio_references: {
+        Row: {
+          company_name: string
+          created_at: string
+          created_by_user_id: string
+          id: string
+          investor_organisation_id: string
+          removed_at: string | null
+          source: string
+          tenant_id: string
+          website_url: string | null
+        }
+        Insert: {
+          company_name: string
+          created_at?: string
+          created_by_user_id: string
+          id?: string
+          investor_organisation_id: string
+          removed_at?: string | null
+          source?: string
+          tenant_id: string
+          website_url?: string | null
+        }
+        Update: {
+          company_name?: string
+          created_at?: string
+          created_by_user_id?: string
+          id?: string
+          investor_organisation_id?: string
+          removed_at?: string | null
+          source?: string
+          tenant_id?: string
+          website_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "investor_portfolio_references_investor_organisation_id_ten_fkey"
+            columns: ["investor_organisation_id", "tenant_id"]
+            isOneToOne: false
+            referencedRelation: "investor_organisations"
+            referencedColumns: ["id", "tenant_id"]
+          },
+        ]
+      }
       investor_representatives: {
         Row: {
           business_title: string | null

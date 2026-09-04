@@ -45,7 +45,7 @@ import {
   singleSelect,
   text,
   type ResponseValues,
-} from "./responses.js";
+} from "@capital-q/onboarding";
 import {
   createFounderReadServices,
   type FounderDomainDependencies,

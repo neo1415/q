@@ -196,6 +196,74 @@ export type InvestorRepresentativeDto = z.infer<
   typeof InvestorRepresentativeDtoSchema
 >;
 
+// ---------------------------------------------------------------------------
+// Portfolio references (CQ-ONB-003, ADR 0007)
+// ---------------------------------------------------------------------------
+
+/**
+ * A representative portfolio company the investor names. A reference, not
+ * a Capital Q Company: naming "Stripe" creates no company entity, no
+ * relationship and no match. V1 provenance is the investor typing it in.
+ */
+export const INVESTOR_PORTFOLIO_SOURCES = ["USER_ENTERED"] as const;
+export const InvestorPortfolioSourceSchema = z.enum(INVESTOR_PORTFOLIO_SOURCES);
+export type InvestorPortfolioSource = z.infer<
+  typeof InvestorPortfolioSourceSchema
+>;
+
+export const INVESTOR_PORTFOLIO_COMPANY_NAME_MAX_LENGTH = 200;
+
+export const AddInvestorPortfolioReferenceRequestSchema = z
+  .object({
+    companyName: z
+      .string()
+      .trim()
+      .min(1)
+      .max(INVESTOR_PORTFOLIO_COMPANY_NAME_MAX_LENGTH),
+    websiteUrl: WebsiteUrlSchema.optional(),
+  })
+  .strict();
+export type AddInvestorPortfolioReferenceRequest = z.infer<
+  typeof AddInvestorPortfolioReferenceRequestSchema
+>;
+
+export const InvestorPortfolioReferenceDtoSchema = z.object({
+  id: UuidSchema,
+  investorOrganisationId: UuidSchema,
+  companyName: z.string(),
+  websiteUrl: z.string().nullable(),
+  source: InvestorPortfolioSourceSchema,
+  createdAt: UtcTimestampSchema,
+});
+export type InvestorPortfolioReferenceDto = z.infer<
+  typeof InvestorPortfolioReferenceDtoSchema
+>;
+
+// ---------------------------------------------------------------------------
+// Inbound preference seam (CQ-ONB-003 I10; canonical policy arrives with CQ-GATE-001)
+// ---------------------------------------------------------------------------
+
+/**
+ * How an investor wants unsolicited founder contact handled.
+ *   CLOSED     no unsolicited inbound
+ *   QUALIFIED  founders may request contact once later GateQ criteria are met
+ *   OPEN       broader inbound accepted
+ * Captured during onboarding as the investor's confirmed preference; GateQ
+ * (CQ-GATE-001) promotes it into canonical inbound policy using this same
+ * vocabulary. It is not a discovery mode and not an active screen.
+ */
+export const INVESTOR_INBOUND_PREFERENCES = [
+  "CLOSED",
+  "QUALIFIED",
+  "OPEN",
+] as const;
+export const InvestorInboundPreferenceSchema = z.enum(
+  INVESTOR_INBOUND_PREFERENCES,
+);
+export type InvestorInboundPreference = z.infer<
+  typeof InvestorInboundPreferenceSchema
+>;
+
 export const INVESTORS_PATH = "/v1/investors" as const;
 /** The investor organisation attached to the caller's active organisation. */
 export const INVESTORS_CURRENT_PATH = "/v1/investors/current" as const;

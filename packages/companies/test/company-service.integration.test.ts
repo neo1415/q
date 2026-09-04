@@ -337,6 +337,7 @@ describe("@capital-q/companies against local PostgreSQL", () => {
         "investor_mandate_creation_requests",
         "investor_mandates",
         "investor_organisations",
+        "investor_portfolio_references",
         "investor_representatives",
       ]);
       const [related] = await sql<

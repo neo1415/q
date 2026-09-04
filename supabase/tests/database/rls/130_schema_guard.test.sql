@@ -63,6 +63,7 @@ insert into rls_inventory (schema_name, table_name, classification, authenticate
   ('core', 'investor_mandates',            'RLS_REQUIRED',         '{SELECT}'),
   ('core', 'investor_mandate_constraints', 'RLS_REQUIRED',         '{SELECT}'),
   ('core', 'investor_mandate_creation_requests', 'INTERNAL_SERVER_ONLY', '{}'),
+  ('core', 'investor_portfolio_references', 'RLS_REQUIRED',         '{SELECT}'),
   ('core', 'capital_objectives',            'RLS_REQUIRED',         '{SELECT}'),
   ('core', 'capital_objective_events',      'RLS_REQUIRED',         '{SELECT}'),
   ('core', 'capital_objective_creation_requests', 'INTERNAL_SERVER_ONLY', '{}'),

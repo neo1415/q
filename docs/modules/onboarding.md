@@ -195,14 +195,32 @@ never application authorisation.
 
 The Founder journey itself lives in `docs/modules/founder-onboarding.md`.
 
+## CQ-ONB-003 additions
+
+- `reference_select` steps may name a `contextKey` (as confirmations do),
+  so a server-assembled candidate list (the investor's open mandates) reaches
+  the browser on the step view.
+- Resource type `INVESTOR_MANDATE` for RESOURCE_REFERENCE responses: the
+  mandate an investor is defining is a typed reference on the session, never
+  free JSON.
+- `createInvestorOrganisationOnboardingSubjectResolver` binds sessions to
+  INVESTOR_ORGANISATION subjects through the Investor query port.
+- The migration renderer (`renderOnboardingDefinitionMigration`) and the
+  response-value helpers moved from the Founder package into this runtime
+  package and are shared by both journeys.
+
+The Investor journey itself lives in `docs/modules/investor-onboarding.md`.
+
 ## Frontend boundary
 
-The web keeps one `FounderOnboardingClient` over a `RuntimePort` speaking
-this runtime's session-view contract; the API adapter and the development
-fixture implement the port, and one pure mapper produces the screens.
+The web keeps one generic `OnboardingClient` (`apps/web/src/features/onboarding-kit`)
+over a `RuntimePort` speaking this runtime's session-view contract; each
+journey supplies a pure `JourneyModel` (screens, mapper, planner). The API
+adapter and the development fixture implement the port. One adapter setting
+(`CQ_FOUNDER_ONBOARDING_ADAPTER`) governs both journeys.
 
 ## Not here (later packets)
 
-Investor I0–I12 (CQ-ONB-003), Evidence sources and upload (CQ-EVD), voice
-capture and transcription, Q-generated suggestions, pitch media,
-recommendation, an onboarding builder UI, `onboarding.voice_captures`.
+Evidence sources and upload (CQ-EVD), voice capture and transcription,
+Q-generated suggestions, pitch media, recommendation, GateQ evaluation, an
+onboarding builder UI, `onboarding.voice_captures`.

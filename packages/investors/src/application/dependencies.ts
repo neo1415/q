@@ -9,6 +9,7 @@ import type {
   InvestorMandateCreationRequestStore,
   InvestorMandateRepository,
 } from "./mandate-ports.js";
+import type { InvestorPortfolioReferenceRepository } from "./portfolio-ports.js";
 import type {
   InvestorCreationRequestStore,
   InvestorOrganisationRepository,
@@ -40,5 +41,6 @@ export type InvestorServiceDependencies = {
     readonly creationRequests: InvestorCreationRequestStore;
     readonly mandates: InvestorMandateRepository;
     readonly mandateCreationRequests: InvestorMandateCreationRequestStore;
+    readonly portfolio: InvestorPortfolioReferenceRepository;
   };
 };

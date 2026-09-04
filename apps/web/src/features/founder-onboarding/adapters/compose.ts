@@ -1,6 +1,6 @@
 import type { FounderOnboardingAdapter } from "@capital-q/config/web";
 
-import { API_ADAPTER_NAME, createApiRuntimePort } from "./api-port";
+import { API_ADAPTER_NAME, createFounderApiRuntimePort } from "./api-port";
 import type { FounderOnboardingClient } from "./client";
 import {
   createFixtureRuntimePort,
@@ -23,7 +23,7 @@ export function createFounderOnboardingClient(input: {
 }): FounderOnboardingClient {
   switch (input.adapter) {
     case "api":
-      return createRuntimeFounderClient(createApiRuntimePort(), {
+      return createRuntimeFounderClient(createFounderApiRuntimePort(), {
         adapter: API_ADAPTER_NAME,
         synthetic: false,
       });

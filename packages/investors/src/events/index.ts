@@ -5,6 +5,7 @@ import { z } from "zod";
 import {
   defineEvent,
   EventIdSchema,
+  InvestorPortfolioSourceSchema,
   InvestorTypeSchema,
   UtcTimestampSchema,
   UuidSchema,
@@ -122,12 +123,50 @@ export const InvestorRepresentativeUpdatedEvent = defineEvent({
     "A person's current representation of an investor organisation changed (presentation fields only).",
 });
 
+export const InvestorPortfolioReferenceAddedEvent = defineEvent({
+  name: "core.investor_portfolio_reference.added",
+  version: 1,
+  owner: INVESTOR_EVENT_OWNER,
+  producer: INVESTOR_EVENT_PRODUCER,
+  consumers: ["@capital-q/onboarding", "@capital-q/q"],
+  sensitivity: "CONFIDENTIAL",
+  replaySafety: "REPLAY_SAFE",
+  dataSchema: z
+    .object({
+      portfolioReferenceId: UuidSchema,
+      investorOrganisationId: UuidSchema,
+      source: InvestorPortfolioSourceSchema,
+    })
+    .strict(),
+  description:
+    "The investor named a representative portfolio company (ADR 0007). Identifiers and provenance only; the name stays investor-private.",
+});
+
+export const InvestorPortfolioReferenceRemovedEvent = defineEvent({
+  name: "core.investor_portfolio_reference.removed",
+  version: 1,
+  owner: INVESTOR_EVENT_OWNER,
+  producer: INVESTOR_EVENT_PRODUCER,
+  consumers: ["@capital-q/onboarding", "@capital-q/q"],
+  sensitivity: "CONFIDENTIAL",
+  replaySafety: "REPLAY_SAFE",
+  dataSchema: z
+    .object({
+      portfolioReferenceId: UuidSchema,
+      investorOrganisationId: UuidSchema,
+    })
+    .strict(),
+  description: "A portfolio reference was removed; the row is kept as history.",
+});
+
 /** Everything the Investor bounded context publishes. */
 export const INVESTOR_EVENTS: readonly EventDefinition[] = [
   InvestorOrganisationCreatedEvent,
   InvestorOrganisationUpdatedEvent,
   InvestorRepresentativeCreatedEvent,
   InvestorRepresentativeUpdatedEvent,
+  InvestorPortfolioReferenceAddedEvent,
+  InvestorPortfolioReferenceRemovedEvent,
   ...MANDATE_EVENTS,
 ];
 
@@ -260,6 +299,50 @@ export function investorRepresentativeUpdatedEvent(
       investorOrganisationId: input.investorOrganisationId,
       version: input.version,
       changedFields: [...input.changedFields],
+    },
+  );
+}
+
+export function investorPortfolioReferenceAddedEvent(
+  input: Context & {
+    readonly investorOrganisationId: string;
+    readonly portfolioReferenceId: string;
+    readonly source: z.infer<typeof InvestorPortfolioSourceSchema>;
+  },
+) {
+  return envelope(
+    InvestorPortfolioReferenceAddedEvent,
+    input,
+    {
+      type: "investor_portfolio_reference",
+      id: input.portfolioReferenceId,
+      version: 1,
+    },
+    {
+      portfolioReferenceId: input.portfolioReferenceId,
+      investorOrganisationId: input.investorOrganisationId,
+      source: input.source,
+    },
+  );
+}
+
+export function investorPortfolioReferenceRemovedEvent(
+  input: Context & {
+    readonly investorOrganisationId: string;
+    readonly portfolioReferenceId: string;
+  },
+) {
+  return envelope(
+    InvestorPortfolioReferenceRemovedEvent,
+    input,
+    {
+      type: "investor_portfolio_reference",
+      id: input.portfolioReferenceId,
+      version: 2,
+    },
+    {
+      portfolioReferenceId: input.portfolioReferenceId,
+      investorOrganisationId: input.investorOrganisationId,
     },
   );
 }

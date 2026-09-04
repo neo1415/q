@@ -2,7 +2,7 @@ import type { OnboardingResponseValue } from "@capital-q/contracts";
 import type {
   OnboardingResponse,
   ValidatedOnboardingResponse,
-} from "@capital-q/onboarding";
+} from "../contracts/index.js";
 
 /**
  * Typed access to journey answers. A handler sees the responses already on

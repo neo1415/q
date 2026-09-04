@@ -4,6 +4,17 @@ import type {
 } from "../contracts/index.js";
 import { createPostgresMandateTaxonomyPreferencePort } from "@capital-q/taxonomy";
 
+import type { InvestorPortfolioReference } from "../contracts/portfolio.js";
+import { createPostgresInvestorPortfolioReferenceRepository } from "../infrastructure/postgres-portfolio-repository.js";
+import {
+  createAddInvestorPortfolioReference,
+  createListInvestorPortfolioReferences,
+  createRemoveInvestorPortfolioReference,
+  type AddInvestorPortfolioReferenceCommand,
+  type ListInvestorPortfolioReferencesQuery,
+  type RemoveInvestorPortfolioReferenceCommand,
+} from "./portfolio-use-cases.js";
+
 import type { InvestorMandate } from "../contracts/mandate.js";
 import {
   createPostgresInvestorMandateCreationRequestStore,
@@ -91,6 +102,15 @@ export type InvestorService = {
   readonly closeInvestorMandate: (
     command: TransitionInvestorMandateCommand,
   ) => Promise<InvestorMandate>;
+  readonly listInvestorPortfolioReferences: (
+    query: ListInvestorPortfolioReferencesQuery,
+  ) => Promise<readonly InvestorPortfolioReference[]>;
+  readonly addInvestorPortfolioReference: (
+    command: AddInvestorPortfolioReferenceCommand,
+  ) => Promise<InvestorPortfolioReference>;
+  readonly removeInvestorPortfolioReference: (
+    command: RemoveInvestorPortfolioReferenceCommand,
+  ) => Promise<InvestorPortfolioReference>;
 };
 
 export type InvestorServiceOptions = Omit<
@@ -119,6 +139,7 @@ export function createInvestorService(
       }),
       mandateCreationRequests:
         createPostgresInvestorMandateCreationRequestStore(),
+      portfolio: createPostgresInvestorPortfolioReferenceRepository(),
     },
   };
 
@@ -138,5 +159,11 @@ export function createInvestorService(
     updateInvestorMandate: createUpdateInvestorMandate(dependencies),
     activateInvestorMandate: createActivateInvestorMandate(dependencies),
     closeInvestorMandate: createCloseInvestorMandate(dependencies),
+    listInvestorPortfolioReferences:
+      createListInvestorPortfolioReferences(dependencies),
+    addInvestorPortfolioReference:
+      createAddInvestorPortfolioReference(dependencies),
+    removeInvestorPortfolioReference:
+      createRemoveInvestorPortfolioReference(dependencies),
   };
 }

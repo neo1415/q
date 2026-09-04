@@ -1,6 +1,6 @@
 import { cx } from "@capital-q/ui";
 
-import type { SaveStatus } from "../controller/use-founder-onboarding";
+import type { SaveStatus } from "../controller";
 
 /**
  * Quiet autosave feedback. A polite live region that only has content on

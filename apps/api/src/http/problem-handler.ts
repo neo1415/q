@@ -29,6 +29,7 @@ import {
   InvestorMandateNotFoundError,
   InvestorOrganisationExistsError,
   InvestorOrganisationNotFoundError,
+  InvestorPortfolioReferenceNotFoundError,
   InvestorRepresentativeNotFoundError,
   InvestorVersionConflictError,
 } from "@capital-q/investors";
@@ -194,6 +195,7 @@ function toProblem(
     error instanceof InvestorOrganisationNotFoundError ||
     error instanceof InvestorRepresentativeNotFoundError ||
     error instanceof InvestorMandateNotFoundError ||
+    error instanceof InvestorPortfolioReferenceNotFoundError ||
     error instanceof CapitalObjectiveNotFoundError ||
     error instanceof TaxonomyVocabularyNotFoundError ||
     error instanceof TaxonomyNodeNotFoundError ||

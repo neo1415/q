@@ -20,7 +20,7 @@ export * from "./definition/index.js";
 export {
   onboardingDefinitionIds,
   renderOnboardingDefinitionMigration,
-} from "./definition/render-sql.js";
+} from "@capital-q/onboarding";
 export {
   createFounderDomainServices,
   createFounderReadServices,
@@ -40,10 +40,7 @@ export {
   createFounderStepContextProviders,
   type FounderStepContextOptions,
 } from "./integration/step-contexts.js";
-export {
-  responseValues,
-  type ResponseValues,
-} from "./integration/responses.js";
+export { responseValues, type ResponseValues } from "@capital-q/onboarding";
 
 export type FounderOnboardingIntegrationOptions = FounderDomainDependencies;
 

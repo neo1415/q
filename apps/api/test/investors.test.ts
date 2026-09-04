@@ -127,6 +127,9 @@ function fakeService(overrides: Partial<InvestorService> = {}) {
     updateInvestorMandate: notUnderTest,
     activateInvestorMandate: notUnderTest,
     closeInvestorMandate: notUnderTest,
+    listInvestorPortfolioReferences: notUnderTest,
+    addInvestorPortfolioReference: notUnderTest,
+    removeInvestorPortfolioReference: notUnderTest,
     ...overrides,
   };
   return { service, calls };

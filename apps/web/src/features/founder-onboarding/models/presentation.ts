@@ -4,6 +4,8 @@ import type { ChoiceOption } from "@capital-q/ui/choice-list";
 import type { SnapshotSection } from "@capital-q/ui/intelligence-snapshot";
 import type { CurrencyOption } from "@capital-q/ui/money-input";
 
+import type { TaxonomyCandidateView } from "../../onboarding-kit/client";
+
 /**
  * Frontend presentation contract for founder onboarding.
  *
@@ -115,14 +117,7 @@ export type MetricQuestion = {
   readonly optional: boolean;
 };
 
-/** A canonical taxonomy node offered for confirmation. Never auto-assigned. */
-export type TaxonomyCandidateView = {
-  readonly nodeId: string;
-  readonly label: string;
-  readonly vocabularyLabel: string;
-  /** Short observable reason from the deterministic classifier. */
-  readonly reason?: string | undefined;
-};
+export type { TaxonomyCandidateView } from "../../onboarding-kit/client";
 
 export type ReviewItem = {
   readonly id: string;
