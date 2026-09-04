@@ -46,6 +46,17 @@ import {
   AuthorizationRequirementError,
 } from "@capital-q/security";
 import {
+  OnboardingContextRequiredError,
+  OnboardingDefinitionUnavailableError,
+  OnboardingMutationConflictError,
+  OnboardingRuntimeConfigurationError,
+  OnboardingSessionNotFoundError,
+  OnboardingSessionStateError,
+  OnboardingSessionVersionConflictError,
+  OnboardingSubjectNotFoundError,
+  OnboardingSuggestionNotFoundError,
+} from "@capital-q/onboarding";
+import {
   TaxonomyClassificationCandidateDecidedError,
   TaxonomyClassificationCandidateNotFoundError,
   TaxonomyClassificationInputError,
@@ -109,7 +120,11 @@ const MALFORMED_REQUEST_CODES: ReadonlySet<string> = new Set([
   "FST_ERR_CTP_BODY_TOO_LARGE",
 ]);
 
-function toProblem(error: unknown, requestId: string): ProblemDetails {
+function toProblem(
+  error: unknown,
+  requestId: string,
+  logger: Logger,
+): ProblemDetails {
   // Security failures map to existing public codes rather than new ones. The
   // wording is deliberately identical whether an organisation does not exist,
   // was never joined, or has been left: distinguishing them would let a caller
@@ -184,7 +199,11 @@ function toProblem(error: unknown, requestId: string): ProblemDetails {
     error instanceof TaxonomyNodeNotFoundError ||
     error instanceof TaxonomySubjectNotFoundError ||
     error instanceof TaxonomyClassificationRunNotFoundError ||
-    error instanceof TaxonomyClassificationCandidateNotFoundError
+    error instanceof TaxonomyClassificationCandidateNotFoundError ||
+    error instanceof OnboardingSessionNotFoundError ||
+    error instanceof OnboardingSuggestionNotFoundError ||
+    error instanceof OnboardingSubjectNotFoundError ||
+    error instanceof OnboardingDefinitionUnavailableError
   ) {
     return createProblemDetails({ code: "RESOURCE_NOT_FOUND", requestId });
   }
@@ -224,6 +243,46 @@ function toProblem(error: unknown, requestId: string): ProblemDetails {
       requestId,
       detail: error.message,
     });
+  }
+
+  // Onboarding runtime. State refusals name their reason code because the
+  // caller already owns the session; nothing about other people leaks.
+  if (error instanceof OnboardingSessionStateError) {
+    return createProblemDetails({
+      code: "RESOURCE_CONFLICT",
+      requestId,
+      detail: `${error.message} (${error.reason})`,
+    });
+  }
+  if (error instanceof OnboardingSessionVersionConflictError) {
+    return createProblemDetails({
+      code: "VERSION_CONFLICT",
+      requestId,
+      detail: error.message,
+    });
+  }
+  if (error instanceof OnboardingMutationConflictError) {
+    return createProblemDetails({
+      code: "IDEMPOTENCY_CONFLICT",
+      requestId,
+      detail: error.message,
+    });
+  }
+  if (error instanceof OnboardingContextRequiredError) {
+    return createProblemDetails({
+      code: "INVALID_REQUEST",
+      requestId,
+      detail: error.message,
+    });
+  }
+  // A published step names a target nobody registered (or similar wiring
+  // fault): the safe code goes to the log, the client gets a redacted 500.
+  if (error instanceof OnboardingRuntimeConfigurationError) {
+    logger.error(
+      { requestId, fault: error.fault, detail: error.detail },
+      "onboarding runtime configuration fault",
+    );
+    return createProblemDetails({ code: "INTERNAL_SERVER_ERROR", requestId });
   }
 
   if (
@@ -326,7 +385,7 @@ export function registerProblemHandling(
   });
 
   app.setErrorHandler((error, request: FastifyRequest, reply: FastifyReply) => {
-    const problem = toProblem(error, request.id);
+    const problem = toProblem(error, request.id, logger);
 
     if (problem.status >= 500) {
       // Diagnostics stay server-side. The client gets the request id and

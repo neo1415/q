@@ -1397,6 +1397,396 @@ export type Database = {
       [_ in never]: never
     }
   }
+  onboarding: {
+    Tables: {
+      definition_versions: {
+        Row: {
+          created_at: string
+          definition_id: string
+          id: string
+          manifest_hash: string
+          published_at: string | null
+          schema: Json
+          version: number
+        }
+        Insert: {
+          created_at?: string
+          definition_id: string
+          id?: string
+          manifest_hash: string
+          published_at?: string | null
+          schema: Json
+          version: number
+        }
+        Update: {
+          created_at?: string
+          definition_id?: string
+          id?: string
+          manifest_hash?: string
+          published_at?: string | null
+          schema?: Json
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "definition_versions_definition_id_fkey"
+            columns: ["definition_id"]
+            isOneToOne: false
+            referencedRelation: "definitions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      definitions: {
+        Row: {
+          created_at: string
+          current_version: number | null
+          id: string
+          journey_type: string
+          name: string
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          current_version?: number | null
+          id?: string
+          journey_type: string
+          name: string
+          status?: string
+        }
+        Update: {
+          created_at?: string
+          current_version?: number | null
+          id?: string
+          journey_type?: string
+          name?: string
+          status?: string
+        }
+        Relationships: []
+      }
+      responses: {
+        Row: {
+          created_at: string
+          id: string
+          raw_text: string | null
+          response_jsonb: Json
+          response_type: string
+          session_id: string
+          source_modality: string
+          step_key: string
+          superseded_by_response_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          raw_text?: string | null
+          response_jsonb: Json
+          response_type: string
+          session_id: string
+          source_modality: string
+          step_key: string
+          superseded_by_response_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          raw_text?: string | null
+          response_jsonb?: Json
+          response_type?: string
+          session_id?: string
+          source_modality?: string
+          step_key?: string
+          superseded_by_response_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "responses_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "responses_superseded_by_response_id_fkey"
+            columns: ["superseded_by_response_id"]
+            isOneToOne: false
+            referencedRelation: "responses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      session_creation_requests: {
+        Row: {
+          created_at: string
+          idempotency_key_hash: string
+          journey_type: string
+          request_hash: string
+          session_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          idempotency_key_hash: string
+          journey_type: string
+          request_hash: string
+          session_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          idempotency_key_hash?: string
+          journey_type?: string
+          request_hash?: string
+          session_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "session_creation_requests_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      session_mutation_requests: {
+        Row: {
+          created_at: string
+          idempotency_key_hash: string
+          operation: string
+          request_hash: string
+          result_version: number
+          session_id: string
+        }
+        Insert: {
+          created_at?: string
+          idempotency_key_hash: string
+          operation: string
+          request_hash: string
+          result_version: number
+          session_id: string
+        }
+        Update: {
+          created_at?: string
+          idempotency_key_hash?: string
+          operation?: string
+          request_hash?: string
+          result_version?: number
+          session_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "session_mutation_requests_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sessions: {
+        Row: {
+          completed_at: string | null
+          current_step_key: string | null
+          definition_version_id: string
+          id: string
+          journey_type: string
+          last_activity_at: string
+          organisation_id: string | null
+          started_at: string
+          status: string
+          subject_id: string | null
+          subject_type: string | null
+          tenant_id: string | null
+          user_id: string
+          version: number
+        }
+        Insert: {
+          completed_at?: string | null
+          current_step_key?: string | null
+          definition_version_id: string
+          id?: string
+          journey_type: string
+          last_activity_at?: string
+          organisation_id?: string | null
+          started_at?: string
+          status?: string
+          subject_id?: string | null
+          subject_type?: string | null
+          tenant_id?: string | null
+          user_id: string
+          version?: number
+        }
+        Update: {
+          completed_at?: string | null
+          current_step_key?: string | null
+          definition_version_id?: string
+          id?: string
+          journey_type?: string
+          last_activity_at?: string
+          organisation_id?: string | null
+          started_at?: string
+          status?: string
+          subject_id?: string | null
+          subject_type?: string | null
+          tenant_id?: string | null
+          user_id?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sessions_definition_version_id_fkey"
+            columns: ["definition_version_id"]
+            isOneToOne: false
+            referencedRelation: "definition_versions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      step_states: {
+        Row: {
+          completed_at: string | null
+          entered_at: string
+          session_id: string
+          skipped_at: string | null
+          status: string
+          step_key: string
+        }
+        Insert: {
+          completed_at?: string | null
+          entered_at?: string
+          session_id: string
+          skipped_at?: string | null
+          status: string
+          step_key: string
+        }
+        Update: {
+          completed_at?: string | null
+          entered_at?: string
+          session_id?: string
+          skipped_at?: string | null
+          status?: string
+          step_key?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "step_states_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      steps: {
+        Row: {
+          branching_expression: Json | null
+          configuration: Json
+          definition_version_id: string
+          id: string
+          required: boolean
+          sequence_order: number
+          step_key: string
+          step_type: string
+          writes_to: Json
+        }
+        Insert: {
+          branching_expression?: Json | null
+          configuration: Json
+          definition_version_id: string
+          id?: string
+          required?: boolean
+          sequence_order: number
+          step_key: string
+          step_type: string
+          writes_to?: Json
+        }
+        Update: {
+          branching_expression?: Json | null
+          configuration?: Json
+          definition_version_id?: string
+          id?: string
+          required?: boolean
+          sequence_order?: number
+          step_key?: string
+          step_type?: string
+          writes_to?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "steps_definition_version_id_fkey"
+            columns: ["definition_version_id"]
+            isOneToOne: false
+            referencedRelation: "definition_versions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      suggestions: {
+        Row: {
+          confidence: number | null
+          created_at: string
+          id: string
+          model_run_id: string | null
+          resolved_at: string | null
+          session_id: string
+          source_refs: Json
+          status: string
+          step_key: string
+          suggested_value: Json
+          target_field: string
+        }
+        Insert: {
+          confidence?: number | null
+          created_at?: string
+          id?: string
+          model_run_id?: string | null
+          resolved_at?: string | null
+          session_id: string
+          source_refs?: Json
+          status?: string
+          step_key: string
+          suggested_value: Json
+          target_field: string
+        }
+        Update: {
+          confidence?: number | null
+          created_at?: string
+          id?: string
+          model_run_id?: string | null
+          resolved_at?: string | null
+          session_id?: string
+          source_refs?: Json
+          status?: string
+          step_key?: string
+          suggested_value?: Json
+          target_field?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "suggestions_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      [_ in never]: never
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   permissions: {
     Tables: {
       capabilities: {
@@ -2150,6 +2540,9 @@ export const Constants = {
     Enums: {},
   },
   network: {
+    Enums: {},
+  },
+  onboarding: {
     Enums: {},
   },
   permissions: {

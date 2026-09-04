@@ -25,6 +25,10 @@ import {
 } from "./http/investors.js";
 import { registerMeRoute, type MeRouteDependencies } from "./http/me.js";
 import {
+  registerOnboardingRoutes,
+  type OnboardingRoutesDependencies,
+} from "./http/onboarding.js";
+import {
   registerOrganisationRoutes,
   type OrganisationRoutesDependencies,
 } from "./http/organisations.js";
@@ -67,6 +71,7 @@ export type ApiModules = {
   readonly investors?: InvestorRoutesDependencies["investors"] | undefined;
   readonly capital?: CapitalRoutesDependencies["capital"] | undefined;
   readonly taxonomy?: TaxonomyRoutesDependencies["taxonomy"] | undefined;
+  readonly onboarding?: OnboardingRoutesDependencies["onboarding"] | undefined;
 };
 
 /**
@@ -175,6 +180,17 @@ export function createApp(
       authenticator: security.authenticator,
       resolver: security.resolver,
       taxonomy: modules.taxonomy,
+    });
+  }
+
+  // Onboarding works before a person belongs to an organisation, so its
+  // routes resolve the Person identity as well as the optional context.
+  if (modules.onboarding !== undefined) {
+    registerOnboardingRoutes(app, {
+      authenticator: security.authenticator,
+      resolver: security.resolver,
+      identities: security.identities,
+      onboarding: modules.onboarding,
     });
   }
 

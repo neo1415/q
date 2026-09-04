@@ -77,3 +77,13 @@ export {
   listTaxonomyNodes,
   listTaxonomyVocabularies,
 } from "./taxonomy.js";
+
+export {
+  completeOnboardingSession,
+  getOnboardingSession,
+  goBackInOnboarding,
+  resolveOnboardingSuggestion,
+  skipOnboardingStep,
+  startOnboardingSession,
+  submitOnboardingResponse,
+} from "./onboarding.js";

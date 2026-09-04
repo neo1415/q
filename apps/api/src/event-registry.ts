@@ -3,6 +3,7 @@ import { CAPITAL_EVENTS } from "@capital-q/capital/events";
 import { COMPANY_EVENTS } from "@capital-q/companies/events";
 import { INVESTOR_EVENTS } from "@capital-q/investors/events";
 import { NETWORK_EVENTS } from "@capital-q/network/events";
+import { ONBOARDING_EVENTS } from "@capital-q/onboarding/events";
 import { ORGANISATION_EVENTS } from "@capital-q/organisations/events";
 import { PERMISSIONS_EVENTS } from "@capital-q/permissions/events";
 import { TAXONOMY_EVENTS } from "@capital-q/taxonomy/events";
@@ -21,5 +22,6 @@ export function createProductionEventRegistry(): EventRegistry {
     ...NETWORK_EVENTS,
     ...PERMISSIONS_EVENTS,
     ...TAXONOMY_EVENTS,
+    ...ONBOARDING_EVENTS,
   ]);
 }

@@ -32,7 +32,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 
 create temporary table guarded_schemas (schema_name text primary key) on commit drop;
-insert into guarded_schemas values ('identity'), ('permissions'), ('events'), ('audit'), ('core'), ('network'), ('taxonomy');
+insert into guarded_schemas values ('identity'), ('permissions'), ('events'), ('audit'), ('core'), ('network'), ('taxonomy'), ('onboarding');
 
 create temporary table rls_inventory (
   schema_name text not null,
@@ -81,6 +81,15 @@ insert into rls_inventory (schema_name, table_name, classification, authenticate
   ('taxonomy', 'mandate_preferences',      'INTERNAL_SERVER_ONLY', '{}'),
   ('taxonomy', 'classification_runs',      'INTERNAL_SERVER_ONLY', '{}'),
   ('taxonomy', 'classification_candidates', 'INTERNAL_SERVER_ONLY', '{}'),
+  ('onboarding', 'definitions',            'INTERNAL_SERVER_ONLY', '{}'),
+  ('onboarding', 'definition_versions',    'INTERNAL_SERVER_ONLY', '{}'),
+  ('onboarding', 'steps',                  'INTERNAL_SERVER_ONLY', '{}'),
+  ('onboarding', 'sessions',               'INTERNAL_SERVER_ONLY', '{}'),
+  ('onboarding', 'step_states',            'INTERNAL_SERVER_ONLY', '{}'),
+  ('onboarding', 'responses',              'INTERNAL_SERVER_ONLY', '{}'),
+  ('onboarding', 'suggestions',            'INTERNAL_SERVER_ONLY', '{}'),
+  ('onboarding', 'session_creation_requests', 'INTERNAL_SERVER_ONLY', '{}'),
+  ('onboarding', 'session_mutation_requests', 'INTERNAL_SERVER_ONLY', '{}'),
   ('events', 'outbox',                     'INTERNAL_SERVER_ONLY', '{}'),
   ('audit', 'material_actions',            'INTERNAL_SERVER_ONLY', '{}'),
   ('audit', 'security_events',             'INTERNAL_SERVER_ONLY', '{}');
@@ -159,8 +168,9 @@ select ok(not has_schema_privilege('authenticated', 'events', 'usage')
       and not has_schema_privilege('authenticated', 'audit', 'usage')
       and not has_schema_privilege('authenticated', 'network', 'usage')
       and not has_schema_privilege('authenticated', 'taxonomy', 'usage')
+      and not has_schema_privilege('authenticated', 'onboarding', 'usage')
       and not has_schema_privilege('authenticated', 'pgmq', 'usage'),
-  'authenticated has no usage on events, audit, network, taxonomy or pgmq');
+  'authenticated has no usage on events, audit, network, taxonomy, onboarding or pgmq');
 
 -- SECURITY DEFINER helpers -----------------------------------------------------
 

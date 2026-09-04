@@ -28,6 +28,10 @@ import {
   createPostgresOrganisationQueryPort,
 } from "@capital-q/organisations";
 import { createAuthorizationService } from "@capital-q/security";
+import {
+  createCompanyOnboardingSubjectResolver,
+  createOnboardingService,
+} from "@capital-q/onboarding";
 import { createTaxonomyService } from "@capital-q/taxonomy";
 import {
   createPostgresActiveOrganisationContextStore,
@@ -134,6 +138,23 @@ const taxonomy = createTaxonomyService({
   }),
 });
 
+// Onboarding owns journey state only. No Founder or Investor write-target
+// handler is registered here (CQ-ONB-002/003); the COMPANY subject resolver
+// is identity resolution through the company query port, not journey logic.
+const onboarding = createOnboardingService({
+  sql: database.sql,
+  transactions: database.transactions,
+  outbox,
+  subjectResolvers: [
+    createCompanyOnboardingSubjectResolver(
+      createPostgresCompanyQueryPort({ sql: database.sql }),
+    ),
+  ],
+  logger: createLogger(apiServiceIdentity(config), {
+    level: config.observability.logLevel,
+  }),
+});
+
 const { app, logger } = createApp(config, security, {
   organisations,
   companies,
@@ -143,6 +164,7 @@ const { app, logger } = createApp(config, security, {
     query: taxonomy.query,
     candidates: taxonomy.classification.candidates,
   },
+  onboarding: onboarding.runtime,
 });
 
 app.addHook("onClose", async () => {
