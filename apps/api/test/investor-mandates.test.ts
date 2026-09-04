@@ -78,6 +78,7 @@ const DRAFT: InvestorMandate = {
   createdAt: NOW,
   updatedAt: NOW,
   constraints: [],
+  taxonomyPreferences: [],
 };
 const SUMMARY: InvestorMandateSummary = {
   id: MANDATE,

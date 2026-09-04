@@ -28,6 +28,7 @@ import {
   createPostgresOrganisationQueryPort,
 } from "@capital-q/organisations";
 import { createAuthorizationService } from "@capital-q/security";
+import { createTaxonomyService } from "@capital-q/taxonomy";
 import {
   createPostgresActiveOrganisationContextStore,
   createPostgresActorContextResolver,
@@ -117,11 +118,24 @@ const capital = createCapitalService({
   audit,
 });
 
+// Taxonomy is a platform capability: reference reads for every authenticated
+// user, company classification through the company query port, and the
+// mandate preference port the investor service already uses.
+const taxonomy = createTaxonomyService({
+  sql: database.sql,
+  transactions: database.transactions,
+  authorization,
+  companies: createPostgresCompanyQueryPort({ sql: database.sql }),
+  outbox,
+  audit,
+});
+
 const { app, logger } = createApp(config, security, {
   organisations,
   companies,
   investors,
   capital,
+  taxonomy: taxonomy.query,
 });
 
 app.addHook("onClose", async () => {

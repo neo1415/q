@@ -1622,6 +1622,289 @@ export type Database = {
       [_ in never]: never
     }
   }
+  taxonomy: {
+    Tables: {
+      aliases: {
+        Row: {
+          alias: string
+          alias_type: string
+          id: string
+          locale: string
+          node_id: string
+          normalized_alias: string
+        }
+        Insert: {
+          alias: string
+          alias_type?: string
+          id: string
+          locale?: string
+          node_id: string
+          normalized_alias: string
+        }
+        Update: {
+          alias?: string
+          alias_type?: string
+          id?: string
+          locale?: string
+          node_id?: string
+          normalized_alias?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "aliases_node_id_fkey"
+            columns: ["node_id"]
+            isOneToOne: false
+            referencedRelation: "nodes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      entity_assignments: {
+        Row: {
+          assignment_source: string
+          classification_run_id: string | null
+          confidence: number | null
+          confirmed_at: string | null
+          confirmed_by_user_id: string | null
+          created_at: string
+          entity_id: string
+          entity_type: string
+          id: string
+          node_id: string
+          raw_source_text: string | null
+          source_id: string | null
+          status: string
+          tenant_id: string
+          valid_from: string
+          valid_to: string | null
+        }
+        Insert: {
+          assignment_source: string
+          classification_run_id?: string | null
+          confidence?: number | null
+          confirmed_at?: string | null
+          confirmed_by_user_id?: string | null
+          created_at?: string
+          entity_id: string
+          entity_type: string
+          id?: string
+          node_id: string
+          raw_source_text?: string | null
+          source_id?: string | null
+          status?: string
+          tenant_id: string
+          valid_from?: string
+          valid_to?: string | null
+        }
+        Update: {
+          assignment_source?: string
+          classification_run_id?: string | null
+          confidence?: number | null
+          confirmed_at?: string | null
+          confirmed_by_user_id?: string | null
+          created_at?: string
+          entity_id?: string
+          entity_type?: string
+          id?: string
+          node_id?: string
+          raw_source_text?: string | null
+          source_id?: string | null
+          status?: string
+          tenant_id?: string
+          valid_from?: string
+          valid_to?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "entity_assignments_node_id_fkey"
+            columns: ["node_id"]
+            isOneToOne: false
+            referencedRelation: "nodes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mandate_preferences: {
+        Row: {
+          confidence: number | null
+          created_at: string
+          id: string
+          is_exclusion: boolean
+          mandate_id: string
+          node_id: string
+          preference_strength: string
+          source: string
+          tenant_id: string
+        }
+        Insert: {
+          confidence?: number | null
+          created_at?: string
+          id?: string
+          is_exclusion?: boolean
+          mandate_id: string
+          node_id: string
+          preference_strength: string
+          source?: string
+          tenant_id: string
+        }
+        Update: {
+          confidence?: number | null
+          created_at?: string
+          id?: string
+          is_exclusion?: boolean
+          mandate_id?: string
+          node_id?: string
+          preference_strength?: string
+          source?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mandate_preferences_node_id_fkey"
+            columns: ["node_id"]
+            isOneToOne: false
+            referencedRelation: "nodes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      node_edges: {
+        Row: {
+          created_at: string
+          edge_type: string
+          from_node_id: string
+          to_node_id: string
+        }
+        Insert: {
+          created_at?: string
+          edge_type: string
+          from_node_id: string
+          to_node_id: string
+        }
+        Update: {
+          created_at?: string
+          edge_type?: string
+          from_node_id?: string
+          to_node_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "node_edges_from_node_id_fkey"
+            columns: ["from_node_id"]
+            isOneToOne: false
+            referencedRelation: "nodes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "node_edges_to_node_id_fkey"
+            columns: ["to_node_id"]
+            isOneToOne: false
+            referencedRelation: "nodes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      nodes: {
+        Row: {
+          canonical_code: string
+          depth: number
+          description: string | null
+          display_name: string
+          id: string
+          metadata: Json
+          parent_node_id: string | null
+          status: string
+          valid_from: string | null
+          valid_to: string | null
+          vocabulary_id: string
+        }
+        Insert: {
+          canonical_code: string
+          depth?: number
+          description?: string | null
+          display_name: string
+          id: string
+          metadata?: Json
+          parent_node_id?: string | null
+          status?: string
+          valid_from?: string | null
+          valid_to?: string | null
+          vocabulary_id: string
+        }
+        Update: {
+          canonical_code?: string
+          depth?: number
+          description?: string | null
+          display_name?: string
+          id?: string
+          metadata?: Json
+          parent_node_id?: string | null
+          status?: string
+          valid_from?: string | null
+          valid_to?: string | null
+          vocabulary_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nodes_parent_node_id_vocabulary_id_fkey"
+            columns: ["parent_node_id", "vocabulary_id"]
+            isOneToOne: false
+            referencedRelation: "nodes"
+            referencedColumns: ["id", "vocabulary_id"]
+          },
+          {
+            foreignKeyName: "nodes_vocabulary_id_fkey"
+            columns: ["vocabulary_id"]
+            isOneToOne: false
+            referencedRelation: "vocabularies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      vocabularies: {
+        Row: {
+          code: string
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          status: string
+          version: number
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          description?: string | null
+          id: string
+          name: string
+          status?: string
+          version?: number
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          status?: string
+          version?: number
+        }
+        Relationships: []
+      }
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      [_ in never]: never
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
 }
 
 type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">
@@ -1758,6 +2041,9 @@ export const Constants = {
     Enums: {},
   },
   permissions: {
+    Enums: {},
+  },
+  taxonomy: {
     Enums: {},
   },
 } as const

@@ -15,6 +15,7 @@ import {
   type UtcTimestamp,
 } from "@capital-q/contracts";
 import type { TenantId, UserId } from "@capital-q/security";
+import type { MandateTaxonomyPreference } from "@capital-q/taxonomy";
 
 import type { InvestorOrganisationId } from "./index.js";
 
@@ -81,6 +82,8 @@ export type InvestorMandate = {
   readonly updatedAt: UtcTimestamp;
   /** Every stored constraint, including the derived `cheque.typical`. */
   readonly constraints: readonly InvestorMandateConstraint[];
+  /** Declared canonical taxonomy preferences (CQ-TAX-001); same node ids companies are classified with. */
+  readonly taxonomyPreferences: readonly MandateTaxonomyPreference[];
 };
 
 export type InvestorMandateSummary = {
@@ -116,6 +119,7 @@ export type InvestorMandateSnapshot = {
   readonly constraints: readonly (InvestorMandateConstraint & {
     readonly automatedUse: MandateAutomatedUse;
   })[];
+  readonly taxonomyPreferences: readonly MandateTaxonomyPreference[];
 };
 
 /** The typical cheque lives in a derived constraint, not a column. */
@@ -191,6 +195,13 @@ export function toInvestorMandateDto(
         (constraint): constraint is InvestorMandateConstraintDto =>
           constraint !== null,
       ),
+    taxonomyPreferences: mandate.taxonomyPreferences.map((preference) => ({
+      nodeId: preference.nodeId,
+      vocabularyCode: preference.vocabularyCode,
+      canonicalCode: preference.canonicalCode,
+      preferenceStrength: preference.preferenceStrength,
+      isExclusion: preference.isExclusion,
+    })),
     version: mandate.version,
     createdAt: mandate.createdAt,
     updatedAt: mandate.updatedAt,

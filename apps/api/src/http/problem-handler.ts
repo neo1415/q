@@ -45,6 +45,12 @@ import {
   AuthorizationDeniedError,
   AuthorizationRequirementError,
 } from "@capital-q/security";
+import {
+  TaxonomyNodeNotFoundError,
+  TaxonomyNodeNotSelectableError,
+  TaxonomySubjectNotFoundError,
+  TaxonomyVocabularyNotFoundError,
+} from "@capital-q/taxonomy";
 
 /**
  * Fastify wiring for the Capital Q problem contract.
@@ -168,9 +174,23 @@ function toProblem(error: unknown, requestId: string): ProblemDetails {
     error instanceof InvestorOrganisationNotFoundError ||
     error instanceof InvestorRepresentativeNotFoundError ||
     error instanceof InvestorMandateNotFoundError ||
-    error instanceof CapitalObjectiveNotFoundError
+    error instanceof CapitalObjectiveNotFoundError ||
+    error instanceof TaxonomyVocabularyNotFoundError ||
+    error instanceof TaxonomyNodeNotFoundError ||
+    error instanceof TaxonomySubjectNotFoundError
   ) {
     return createProblemDetails({ code: "RESOURCE_NOT_FOUND", requestId });
+  }
+
+  // A named taxonomy node cannot be selected here (unknown, deprecated,
+  // wrong vocabulary, duplicate). The node id is the caller's own input,
+  // so naming it discloses nothing.
+  if (error instanceof TaxonomyNodeNotSelectableError) {
+    return createProblemDetails({
+      code: "INVALID_REQUEST",
+      requestId,
+      detail: `${error.message} (${error.reason}: ${error.nodeId})`,
+    });
   }
 
   if (

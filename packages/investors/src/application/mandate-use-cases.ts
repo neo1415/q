@@ -168,6 +168,29 @@ function constraintKey(constraint: NewMandateConstraint): string {
   ]);
 }
 
+/** Same declared taxonomy set, regardless of order. Values never leave this comparison. */
+function sameTaxonomyPreferences(
+  current: readonly {
+    readonly nodeId: string;
+    readonly preferenceStrength: string;
+    readonly isExclusion: boolean;
+  }[],
+  desired: readonly {
+    readonly nodeId: string;
+    readonly preferenceStrength: string;
+    readonly isExclusion: boolean;
+  }[],
+): boolean {
+  const key = (row: {
+    readonly nodeId: string;
+    readonly preferenceStrength: string;
+    readonly isExclusion: boolean;
+  }) => `${row.nodeId}|${row.preferenceStrength}|${String(row.isExclusion)}`;
+  const left = new Set(current.map(key));
+  const right = new Set(desired.map(key));
+  return left.size === right.size && [...left].every((item) => right.has(item));
+}
+
 function changeKindOf(constraint: NewMandateConstraint): MandateChangeKind {
   if (constraint.isHardExclusion) {
     return "HARD_EXCLUSION";
@@ -226,7 +249,7 @@ export type CreateInvestorMandateCommand = InvestorScoped & {
 export function createCreateInvestorMandate(
   dependencies: InvestorServiceDependencies,
 ) {
-  const { transactions, authorization, outbox, audit, repositories } =
+  const { transactions, authorization, outbox, audit, repositories, taxonomy } =
     dependencies;
 
   return async (
@@ -287,7 +310,7 @@ export function createCreateInvestorMandate(
         return existing;
       }
 
-      const mandate = await repositories.mandates.insert(tx, {
+      const inserted = await repositories.mandates.insert(tx, {
         tenantId: actor.tenantId,
         investorOrganisationId: investor.id,
         name: input.name,
@@ -304,6 +327,28 @@ export function createCreateInvestorMandate(
           ...(typical === null ? [] : [typical]),
         ],
       });
+      // Declared taxonomy preferences: same canonical nodes companies are
+      // classified with, validated and written by the Taxonomy port under
+      // this same transaction (CQ-TAX-001).
+      let mandate = inserted;
+      if (input.taxonomyPreferences !== undefined) {
+        await taxonomy.replace(tx, {
+          tenantId: actor.tenantId,
+          mandateId: inserted.id,
+          preferences: input.taxonomyPreferences,
+          source: "user_selected",
+        });
+        const reloaded = await repositories.mandates.findById(
+          tx.sql,
+          actor.tenantId,
+          investor.id,
+          inserted.id,
+        );
+        if (reloaded === null) {
+          throw new InvestorMandateNotFoundError();
+        }
+        mandate = reloaded;
+      }
 
       await audit.record(tx, {
         ...auditActorFromContext(actor),
@@ -316,6 +361,7 @@ export function createCreateInvestorMandate(
         metadata: {
           investorOrganisationId: investor.id,
           constraintCount: mandate.constraints.length,
+          taxonomyPreferenceCount: mandate.taxonomyPreferences.length,
         },
         correlationId: command.correlationId,
       });
@@ -446,7 +492,7 @@ function requireEditable(mandate: InvestorMandate): void {
 export function createUpdateInvestorMandate(
   dependencies: InvestorServiceDependencies,
 ) {
-  const { transactions, authorization, outbox, audit, repositories } =
+  const { transactions, authorization, outbox, audit, repositories, taxonomy } =
     dependencies;
 
   return async (
@@ -592,6 +638,19 @@ export function createUpdateInvestorMandate(
         changedFields.push("constraints");
       }
 
+      // Declared taxonomy preferences: a set replacement over the same
+      // canonical nodes, diffed so an unchanged set is not a change.
+      const taxonomyChanged =
+        input.taxonomyPreferences !== undefined &&
+        !sameTaxonomyPreferences(
+          current.taxonomyPreferences,
+          input.taxonomyPreferences,
+        );
+      if (taxonomyChanged) {
+        changedFields.push("taxonomyPreferences");
+        kinds.add("TAXONOMY");
+      }
+
       if (
         changedFields.length === 0 &&
         removeIds.length === 0 &&
@@ -616,6 +675,14 @@ export function createUpdateInvestorMandate(
         removeIds,
         add: nextConstraints,
       });
+      if (taxonomyChanged && input.taxonomyPreferences !== undefined) {
+        await taxonomy.replace(tx, {
+          tenantId: actor.tenantId,
+          mandateId: current.id,
+          preferences: input.taxonomyPreferences,
+          source: "user_selected",
+        });
+      }
       const updated = await repositories.mandates.findById(
         tx.sql,
         actor.tenantId,

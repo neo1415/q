@@ -407,6 +407,7 @@ describe("@capital-q/investors mandates against local PostgreSQL", () => {
         expect(audits[0]?.metadata).toEqual({
           investorOrganisationId: investorA,
           constraintCount: 6,
+          taxonomyPreferenceCount: 0,
         });
         const events = await eventsFor(tx, correlationId);
         expect(events).toHaveLength(1);

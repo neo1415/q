@@ -70,3 +70,9 @@ export {
   replaceCapitalObjective,
   updateCapitalObjective,
 } from "./capital-objectives.js";
+
+export {
+  getTaxonomyNode,
+  listTaxonomyNodes,
+  listTaxonomyVocabularies,
+} from "./taxonomy.js";

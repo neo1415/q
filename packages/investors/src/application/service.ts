@@ -2,6 +2,8 @@ import type {
   InvestorOrganisation,
   InvestorRepresentative,
 } from "../contracts/index.js";
+import { createPostgresMandateTaxonomyPreferencePort } from "@capital-q/taxonomy";
+
 import type { InvestorMandate } from "../contracts/mandate.js";
 import {
   createPostgresInvestorMandateCreationRequestStore,
@@ -93,22 +95,28 @@ export type InvestorService = {
 
 export type InvestorServiceOptions = Omit<
   InvestorServiceDependencies,
-  "repositories"
+  "repositories" | "taxonomy"
 > & {
   readonly repositories?:
     InvestorServiceDependencies["repositories"] | undefined;
+  readonly taxonomy?: InvestorServiceDependencies["taxonomy"] | undefined;
 };
 
 export function createInvestorService(
   options: InvestorServiceOptions,
 ): InvestorService {
+  const taxonomy =
+    options.taxonomy ?? createPostgresMandateTaxonomyPreferencePort();
   const dependencies: InvestorServiceDependencies = {
     ...options,
+    taxonomy,
     repositories: options.repositories ?? {
       investors: createPostgresInvestorOrganisationRepository(),
       representatives: createPostgresInvestorRepresentativeRepository(),
       creationRequests: createPostgresInvestorCreationRequestStore(),
-      mandates: createPostgresInvestorMandateRepository(),
+      mandates: createPostgresInvestorMandateRepository({
+        taxonomyPreferences: taxonomy,
+      }),
       mandateCreationRequests:
         createPostgresInvestorMandateCreationRequestStore(),
     },

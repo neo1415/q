@@ -29,6 +29,10 @@ import {
   type OrganisationRoutesDependencies,
 } from "./http/organisations.js";
 import { registerProblemHandling } from "./http/problem-handler.js";
+import {
+  registerTaxonomyRoutes,
+  type TaxonomyRoutesDependencies,
+} from "./http/taxonomy.js";
 
 export const SERVICE_NAME = "api";
 
@@ -52,6 +56,7 @@ export type ApiModules = {
   readonly companies?: CompanyRoutesDependencies["companies"] | undefined;
   readonly investors?: InvestorRoutesDependencies["investors"] | undefined;
   readonly capital?: CapitalRoutesDependencies["capital"] | undefined;
+  readonly taxonomy?: TaxonomyRoutesDependencies["taxonomy"] | undefined;
 };
 
 /**
@@ -157,6 +162,14 @@ export function createApp(
       authenticator: security.authenticator,
       resolver: security.resolver,
       capital: modules.capital,
+    });
+  }
+
+  if (modules.taxonomy !== undefined) {
+    registerTaxonomyRoutes(app, {
+      authenticator: security.authenticator,
+      resolver: security.resolver,
+      taxonomy: modules.taxonomy,
     });
   }
 

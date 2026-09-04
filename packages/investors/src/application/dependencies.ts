@@ -3,6 +3,7 @@ import type { DatabaseExecutor, TransactionManager } from "@capital-q/database";
 import type { OutboxWriter } from "@capital-q/eventing";
 import type { OrganisationQueryPort } from "@capital-q/organisations";
 import type { AuthorizationService } from "@capital-q/security";
+import type { MandateTaxonomyPreferencePort } from "@capital-q/taxonomy";
 
 import type {
   InvestorMandateCreationRequestStore,
@@ -27,6 +28,12 @@ export type InvestorServiceDependencies = {
   readonly organisations: OrganisationQueryPort;
   readonly outbox: OutboxWriter;
   readonly audit: MaterialActionAuditWriter;
+  /**
+   * Declared taxonomy preferences are persisted through the Taxonomy port
+   * inside the mandate command's own transaction, so a taxonomy change is a
+   * versioned, audited, published mandate change (CQ-TAX-001).
+   */
+  readonly taxonomy: MandateTaxonomyPreferencePort;
   readonly repositories: {
     readonly investors: InvestorOrganisationRepository;
     readonly representatives: InvestorRepresentativeRepository;

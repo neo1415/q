@@ -11,6 +11,11 @@ import {
 } from "@capital-q/contracts";
 import type { DatabaseExecutor, TransactionContext } from "@capital-q/database";
 import { TenantIdSchema, UserIdSchema } from "@capital-q/security";
+import {
+  createPostgresMandateTaxonomyPreferencePort,
+  type MandateTaxonomyPreference,
+  type MandateTaxonomyPreferencePort,
+} from "@capital-q/taxonomy";
 
 import { InvestorOrganisationIdSchema } from "../contracts/index.js";
 import {
@@ -115,6 +120,7 @@ function toConstraint(row: unknown): InvestorMandateConstraint {
 function toMandate(
   row: unknown,
   constraints: readonly InvestorMandateConstraint[],
+  taxonomyPreferences: readonly MandateTaxonomyPreference[],
 ): InvestorMandate {
   const r = MandateRow.parse(row);
   return {
@@ -137,6 +143,7 @@ function toMandate(
     createdAt: r.created_at,
     updatedAt: r.updated_at,
     constraints,
+    taxonomyPreferences,
   };
 }
 
@@ -209,7 +216,17 @@ const COLUMN_BY_FIELD: Readonly<
   rawMandateText: "raw_mandate_text",
 };
 
-export function createPostgresInvestorMandateRepository(): InvestorMandateRepository {
+export type PostgresInvestorMandateRepositoryOptions = {
+  /** Reads declared taxonomy preferences through the Taxonomy public port. */
+  readonly taxonomyPreferences?: MandateTaxonomyPreferencePort | undefined;
+};
+
+export function createPostgresInvestorMandateRepository(
+  options: PostgresInvestorMandateRepositoryOptions = {},
+): InvestorMandateRepository {
+  const taxonomy =
+    options.taxonomyPreferences ??
+    createPostgresMandateTaxonomyPreferencePort();
   return {
     insert: async (tx, input) => {
       // Money is bound as text and cast in SQL; the driver never sees a number.
@@ -235,6 +252,7 @@ export function createPostgresInvestorMandateRepository(): InvestorMandateReposi
       return toMandate(
         created[0],
         await loadConstraints(tx.sql, input.tenantId, inserted.id),
+        await taxonomy.list(tx.sql, input.tenantId, inserted.id),
       );
     },
 
@@ -250,6 +268,7 @@ export function createPostgresInvestorMandateRepository(): InvestorMandateReposi
       return toMandate(
         rows[0],
         await loadConstraints(executor, tenantId, mandateId),
+        await taxonomy.list(executor, tenantId, mandateId),
       );
     },
 
@@ -266,6 +285,7 @@ export function createPostgresInvestorMandateRepository(): InvestorMandateReposi
       return toMandate(
         rows[0],
         await loadConstraints(tx.sql, tenantId, mandateId),
+        await taxonomy.list(tx.sql, tenantId, mandateId),
       );
     },
 
@@ -491,6 +511,7 @@ export function createPostgresInvestorMandateQueryPort(options: {
           ...constraint,
           automatedUse: automatedUseOf(constraint.dimension),
         })),
+        taxonomyPreferences: mandate.taxonomyPreferences,
       };
       return snapshot;
     },

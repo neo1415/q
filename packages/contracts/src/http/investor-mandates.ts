@@ -191,6 +191,41 @@ const ConstraintListSchema = z
   .array(MandateConstraintInputSchema)
   .max(MANDATE_CONSTRAINTS_MAX);
 
+export const MANDATE_TAXONOMY_PREFERENCES_MAX = 100;
+
+/**
+ * A declared preference for one canonical taxonomy node (CQ-TAX-001). The
+ * node is a TaxonomyNodeId from the same vocabulary companies are
+ * classified with; the strength is the existing preference scale, and
+ * HARD_EXCLUSION ⇔ isExclusion. No new scale, no free text, no weight.
+ */
+export const MandateTaxonomyPreferenceInputSchema = z
+  .object({
+    nodeId: UuidSchema,
+    preferenceStrength: MandatePreferenceClassSchema,
+    isExclusion: z.boolean(),
+  })
+  .strict()
+  .refine(
+    (value) =>
+      (value.preferenceStrength === "HARD_EXCLUSION") === value.isExclusion,
+    {
+      message: "preferenceStrength HARD_EXCLUSION and isExclusion must agree",
+      path: ["isExclusion"],
+    },
+  );
+export type MandateTaxonomyPreferenceInput = z.infer<
+  typeof MandateTaxonomyPreferenceInputSchema
+>;
+
+const TaxonomyPreferenceListSchema = z
+  .array(MandateTaxonomyPreferenceInputSchema)
+  .max(MANDATE_TAXONOMY_PREFERENCES_MAX)
+  .refine(
+    (items) => new Set(items.map((item) => item.nodeId)).size === items.length,
+    { message: "each taxonomy node may appear once" },
+  );
+
 /**
  * The cheque envelope on the wire. Persisted as min / max / currency on the
  * mandate; `typical` becomes a `cheque.typical` constraint. Exact strings
@@ -219,6 +254,7 @@ export const CreateInvestorMandateRequestSchema = z
     maxStageCode: StageCodeSchema.optional(),
     rawMandateText: RawTextSchema.optional(),
     constraints: ConstraintListSchema.optional(),
+    taxonomyPreferences: TaxonomyPreferenceListSchema.optional(),
   })
   .strict();
 export type CreateInvestorMandateRequest = z.infer<
@@ -233,6 +269,7 @@ export const INVESTOR_MANDATE_EDITABLE_FIELDS = [
   "maxStageCode",
   "rawMandateText",
   "constraints",
+  "taxonomyPreferences",
 ] as const;
 export type InvestorMandateEditableField =
   (typeof INVESTOR_MANDATE_EDITABLE_FIELDS)[number];
@@ -254,6 +291,7 @@ export const UpdateInvestorMandateRequestSchema = z
     maxStageCode: StageCodeSchema.nullable().optional(),
     rawMandateText: RawTextSchema.nullable().optional(),
     constraints: ConstraintListSchema.optional(),
+    taxonomyPreferences: TaxonomyPreferenceListSchema.optional(),
   })
   .strict()
   .refine(
@@ -289,6 +327,18 @@ export type InvestorMandateConstraintDto = z.infer<
   typeof InvestorMandateConstraintDtoSchema
 >;
 
+/** A stored taxonomy preference: the node's identity plus the declared strength. */
+export const InvestorMandateTaxonomyPreferenceDtoSchema = z.object({
+  nodeId: UuidSchema,
+  vocabularyCode: z.string(),
+  canonicalCode: z.string(),
+  preferenceStrength: MandatePreferenceClassSchema,
+  isExclusion: z.boolean(),
+});
+export type InvestorMandateTaxonomyPreferenceDto = z.infer<
+  typeof InvestorMandateTaxonomyPreferenceDtoSchema
+>;
+
 /** Organisation-internal. Carries raw text and every declared constraint. */
 export const InvestorMandateDtoSchema = z.object({
   id: UuidSchema,
@@ -303,6 +353,7 @@ export const InvestorMandateDtoSchema = z.object({
   maxStageCode: z.string().nullable(),
   rawMandateText: z.string().nullable(),
   constraints: z.array(InvestorMandateConstraintDtoSchema),
+  taxonomyPreferences: z.array(InvestorMandateTaxonomyPreferenceDtoSchema),
   version: ResourceVersionSchema,
   createdAt: UtcTimestampSchema,
   updatedAt: UtcTimestampSchema,

@@ -36,6 +36,7 @@
     "@capital-q/eventing": "workspace:*",
     "@capital-q/organisations": "workspace:*",
     "@capital-q/security": "workspace:*",
+    "@capital-q/taxonomy": "workspace:*",
     "zod": "4.5.4"
   },
   "devDependencies": {

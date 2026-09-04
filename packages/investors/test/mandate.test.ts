@@ -521,6 +521,7 @@ describe("DTO", () => {
           isHardExclusion: true,
         },
       ],
+      taxonomyPreferences: [],
     };
     const dto = toInvestorMandateDto(mandate);
     expect(InvestorMandateDtoSchema.safeParse(dto).success).toBe(true);

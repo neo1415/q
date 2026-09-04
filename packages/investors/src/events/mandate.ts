@@ -33,12 +33,13 @@ export const MANDATE_CHANGE_KINDS = [
   "HARD_EXCLUSION",
   "DISCOVERY_MODE",
   "RAW_TEXT",
+  "TAXONOMY",
 ] as const;
 export const MandateChangeKindSchema = z.enum(MANDATE_CHANGE_KINDS);
 export type MandateChangeKind = z.infer<typeof MandateChangeKindSchema>;
 
 const changedFields = z.array(z.string().min(1).max(64)).min(1).max(16);
-const changeKinds = z.array(MandateChangeKindSchema).min(1).max(8);
+const changeKinds = z.array(MandateChangeKindSchema).min(1).max(9);
 const version = z.number().int().min(1);
 
 const CONSUMERS = [
