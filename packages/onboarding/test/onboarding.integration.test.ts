@@ -317,7 +317,7 @@ describe("@capital-q/onboarding against local PostgreSQL", () => {
   ) {
     const result = await world.service.runtime.startSession({
       actor,
-      journeyType: "founder",
+      journeyType: "external_investor_conversion",
       subject,
       idempotencyKey: randomUUID(),
       correlationId: CORRELATION(),
@@ -424,7 +424,7 @@ describe("@capital-q/onboarding against local PostgreSQL", () => {
       const key = randomUUID();
       const first = await service.runtime.startSession({
         actor: newcomer,
-        journeyType: "founder",
+        journeyType: "external_investor_conversion",
         idempotencyKey: key,
         correlationId: CORRELATION(),
       });
@@ -444,7 +444,7 @@ describe("@capital-q/onboarding against local PostgreSQL", () => {
 
       const replay = await service.runtime.startSession({
         actor: newcomer,
-        journeyType: "founder",
+        journeyType: "external_investor_conversion",
         idempotencyKey: key,
         correlationId: CORRELATION(),
       });
@@ -456,7 +456,7 @@ describe("@capital-q/onboarding against local PostgreSQL", () => {
       await expect(
         service.runtime.startSession({
           actor: newcomer,
-          journeyType: "founder",
+          journeyType: "external_investor_conversion",
           subject: { subjectType: "COMPANY", subjectId: randomUUID() },
           idempotencyKey: key,
           correlationId: CORRELATION(),
@@ -473,7 +473,7 @@ describe("@capital-q/onboarding against local PostgreSQL", () => {
         select payload from events.outbox where event_type = 'onboarding.session.started' and payload -> 'data' ->> 'sessionId' = ${first.view.session.id}`;
       expect(event?.payload.data).toEqual({
         sessionId: first.view.session.id,
-        journeyType: "founder",
+        journeyType: "external_investor_conversion",
         definitionVersionId: first.view.session.definitionVersionId,
       });
       expect(event?.payload.tenantId).toBeUndefined();
@@ -1381,18 +1381,16 @@ describe("concurrent session start over separate connections (§207)", () => {
   });
 
   it("two simultaneous starts for the same newcomer produce exactly one session", async () => {
-    // Committed on purpose (two real connections); uses a journey no other
-    // suite publishes so the leftover definition never collides.
+    // Committed on purpose (two real connections); uses the synthetic journey
+    // type, which no production migration publishes.
     const service = createOnboardingService({
       sql: db.sql,
       transactions: db.transactions,
       outbox: createOutboxWriter({ registry }),
     });
-    await service.publisher.publish({
-      ...SYNTHETIC_FOUNDER_MANIFEST,
-      journeyType: "external_investor_conversion",
-      name: "Synthetic concurrency journey",
-    });
+    // The same manifest the rolled-back suites publish, so the committed
+    // definition is always an idempotent republish and never a conflict.
+    await service.publisher.publish(SYNTHETIC_FOUNDER_MANIFEST);
     const authUserId = randomUUID();
     await db.sql`insert into auth.users (id) values (${authUserId})`;
     const [profile] = await db.sql<

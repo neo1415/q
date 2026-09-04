@@ -106,7 +106,7 @@ function response(
   value: OnboardingResponse["value"],
 ): OnboardingResponse {
   return {
-    id: `00000000-0000-4000-8000-00000000f${stepKey.length}${stepKey.charCodeAt(0) % 10}` as never,
+    id: `00000000-0000-4000-8000-00000000f${String(stepKey.length).padStart(2, "0")}${stepKey.charCodeAt(0) % 10}` as never,
     sessionId: "00000000-0000-4000-8000-0000000000e1" as never,
     stepKey,
     responseType: value.type,

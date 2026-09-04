@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useMemo } from "react";
 
 import type { FounderOnboardingAdapter } from "@capital-q/config/web";
@@ -17,7 +18,7 @@ const STEP_FORM_ID = "founder-onboarding-step";
 
 /**
  * The founder onboarding controller. Composes the configured client, drives
- * one session through the adapter, and renders whichever step the session
+ * one session through the adapter, and renders whichever screen the session
  * says is current. Nothing about the journey lives here.
  */
 export function FounderOnboardingScreen({
@@ -27,6 +28,7 @@ export function FounderOnboardingScreen({
   readonly adapter: FounderOnboardingAdapter;
   readonly seed?: string | undefined;
 }) {
+  const router = useRouter();
   const client = useMemo(
     () => createFounderOnboardingClient({ adapter, seed }),
     [adapter, seed],
@@ -37,8 +39,11 @@ export function FounderOnboardingScreen({
     return (
       <div className="mx-auto flex min-h-dvh w-full max-w-(--cq-layout-narrow) flex-col justify-center gap-6 px-4 py-10">
         <EmptyState
-          title="Founder setup isn't available on this build yet."
-          description="When it is, you'll start here. Nothing you've done so far is lost."
+          title="Founder setup isn't available right now."
+          description={
+            state.errorMessage ??
+            "When it is, you'll start here. Nothing you've done so far is lost."
+          }
           action={
             <Link href="/home" className={buttonClassName("secondary")}>
               Back to Home
@@ -71,9 +76,26 @@ export function FounderOnboardingScreen({
   }
 
   const { session } = state;
-  const { step } = session;
+
+  if (session.status === "complete" || session.step === undefined) {
+    return (
+      <div className="mx-auto flex min-h-dvh w-full max-w-(--cq-layout-narrow) flex-col justify-center gap-6 px-4 py-10">
+        <EmptyState
+          title="Founder setup is complete."
+          description="Your company profile is in place. You can keep improving it from Home; investors don't see any of it until you choose to become discoverable."
+          action={
+            <Link href="/home" className={buttonClassName("primary")}>
+              Go to Home
+            </Link>
+          }
+        />
+      </div>
+    );
+  }
+
+  const step = session.step;
   const isFirst = session.steps[0]?.id === step.id;
-  const isFinal = step.kind === "intelligence_snapshot";
+  const isFinal = step.kind === "snapshot";
 
   const notice =
     state.errorMessage !== undefined ? (
@@ -94,12 +116,25 @@ export function FounderOnboardingScreen({
       >
         {state.errorMessage} Your answers on this screen are kept.
       </InlineNotice>
+    ) : state.conflictNotice !== undefined ? (
+      <InlineNotice tone="info" title="Updated elsewhere">
+        {state.conflictNotice}
+      </InlineNotice>
     ) : session.source.synthetic ? (
       <p className="cq-caption text-(--cq-text-tertiary)">
         Development preview: synthetic data from {session.source.adapter}.
         Nothing is sent or stored outside this browser tab.
       </p>
     ) : undefined;
+
+  const finish = async () => {
+    // Confirm the snapshot, then mark the journey complete. Completion is
+    // journey completion only; Home decides what comes next.
+    await actions.submit({ kind: "snapshot", confirmed: true });
+    if (await actions.complete()) {
+      router.push("/home");
+    }
+  };
 
   return (
     <OnboardingShell
@@ -110,7 +145,7 @@ export function FounderOnboardingScreen({
       notice={notice}
       primaryAction={
         isFinal
-          ? { label: "Go to Home", href: "/home" }
+          ? { label: "Go to Home", onClick: () => void finish() }
           : {
               label: step.primaryActionLabel ?? "Continue",
               formId: STEP_FORM_ID,
@@ -120,7 +155,7 @@ export function FounderOnboardingScreen({
         isFinal
           ? {
               label: "Keep improving",
-              onClick: () => void actions.openStep("understanding"),
+              onClick: () => void actions.openStep("review"),
             }
           : step.optional
             ? { label: "Skip for now", onClick: () => void actions.skip() }

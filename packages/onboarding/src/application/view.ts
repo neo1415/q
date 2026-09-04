@@ -177,6 +177,17 @@ function presentationOf(
           ? {}
           : { declineLabel: configuration.declineLabel }),
         requireAffirmative: configuration.requireAffirmative,
+        ...(configuration.contextKey === undefined
+          ? {}
+          : { contextKey: configuration.contextKey }),
+      };
+    case "reference_select":
+      return {
+        stepType: "reference_select",
+        resourceType: configuration.resourceType,
+        vocabularyCodes: configuration.vocabularyCodes,
+        minItems: configuration.minItems,
+        maxItems: configuration.maxItems,
       };
   }
 }
@@ -197,6 +208,7 @@ export function toResponseView(
 export function toStepView(
   step: OnboardingStepDefinition,
   currentResponse: OnboardingResponse | undefined,
+  context?: Readonly<Record<string, unknown>>,
 ): OnboardingStepView {
   const { configuration } = step;
   return {
@@ -217,6 +229,7 @@ export function toStepView(
     ...(currentResponse === undefined
       ? {}
       : { currentResponse: toResponseView(currentResponse) }),
+    ...(context === undefined ? {} : { context }),
   };
 }
 
@@ -237,6 +250,7 @@ export function toSuggestionView(
 export function toSessionView(
   aggregate: OnboardingSessionAggregate,
   pathChanges?: OnboardingPathChanges,
+  stepContext?: Readonly<Record<string, unknown>>,
 ): OnboardingSessionView {
   const { session, definition, path, states, currentResponses } = aggregate;
   const current =
@@ -267,11 +281,19 @@ export function toSessionView(
     currentStep:
       current === undefined
         ? null
-        : toStepView(current, currentResponses.get(current.stepKey)),
+        : toStepView(
+            current,
+            currentResponses.get(current.stepKey),
+            stepContext,
+          ),
     progress: computeProgress(session, path, states),
     pendingSuggestions: aggregate.pendingSuggestions
       .filter((s) => path.eligibleKeys.has(s.stepKey))
       .map(toSuggestionView),
+    responses: path.eligible.flatMap((step) => {
+      const response = currentResponses.get(step.stepKey);
+      return response === undefined ? [] : [toResponseView(response)];
+    }),
     ...(pathChanges === undefined ? {} : { pathChanges }),
   };
 }

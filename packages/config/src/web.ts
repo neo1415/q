@@ -52,16 +52,18 @@ export type WebServerSecrets = Readonly<Record<string, never>>;
 /**
  * Which founder-onboarding client the web app composes.
  *
- *   fixture  deterministic synthetic development adapter; the default outside
- *            production NODE_ENV so `next dev` and Playwright can exercise the
- *            journey before the onboarding API (CQ-ONB-002) exists
- *   none     the honest "not available yet" surface; the default for
- *            production builds
+ *   api      the real onboarding API through server actions; the default
+ *            whenever CQ_API_URL is configured
+ *   fixture  deterministic synthetic development adapter; the default only
+ *            for a non-production NODE_ENV with no CQ_API_URL, and never
+ *            composed on a production build or deployment
+ *   none     the honest "not available yet" surface; the default for a
+ *            production build without CQ_API_URL
  *
  * The fixture is refused outright in the production deployment environment:
  * a misconfiguration can turn the feature off, never turn fake data on.
  */
-export const FOUNDER_ONBOARDING_ADAPTERS = ["fixture", "none"] as const;
+export const FOUNDER_ONBOARDING_ADAPTERS = ["api", "fixture", "none"] as const;
 export type FounderOnboardingAdapter =
   (typeof FOUNDER_ONBOARDING_ADAPTERS)[number];
 
@@ -123,16 +125,30 @@ export function parseWebServerConfig(env: EnvironmentInput): WebServerConfig {
   const runtime = toRuntimeConfig(parsed);
   const founderOnboardingAdapter: FounderOnboardingAdapter =
     parsed.CQ_FOUNDER_ONBOARDING_ADAPTER ??
-    (runtime.nodeEnv === "production" ? "none" : "fixture");
+    (parsed.CQ_API_URL !== undefined
+      ? "api"
+      : runtime.nodeEnv === "production"
+        ? "none"
+        : "fixture");
   if (
     founderOnboardingAdapter === "fixture" &&
-    runtime.deploymentEnvironment === "production"
+    (runtime.deploymentEnvironment === "production" ||
+      runtime.nodeEnv === "production")
   ) {
     throw new ConfigurationError("web", [
       {
         variable: "CQ_FOUNDER_ONBOARDING_ADAPTER",
         reason:
-          "the fixture adapter is never permitted in the production environment",
+          "the fixture adapter is never permitted on a production build or environment",
+      },
+    ]);
+  }
+
+  if (founderOnboardingAdapter === "api" && parsed.CQ_API_URL === undefined) {
+    throw new ConfigurationError("web", [
+      {
+        variable: "CQ_API_URL",
+        reason: 'required when the founder onboarding adapter is "api"',
       },
     ]);
   }

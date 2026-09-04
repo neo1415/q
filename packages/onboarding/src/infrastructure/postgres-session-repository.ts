@@ -136,6 +136,26 @@ export function createPostgresOnboardingSessionRepository(): OnboardingSessionRe
          limit 1`;
       return rows.length === 0 ? null : toSession(rows[0]);
     },
+    findLatestActive: async (executor, userId, journeyType) => {
+      const rows = await executor`
+        ${sessionSelect(executor)}
+         where s.user_id = ${userId}
+           and s.journey_type = ${journeyType}
+           and s.status = 'ACTIVE'
+         order by s.started_at desc
+         limit 1`;
+      return rows.length === 0 ? null : toSession(rows[0]);
+    },
+    findLatest: async (executor, userId, journeyType) => {
+      const rows = await executor`
+        ${sessionSelect(executor)}
+         where s.user_id = ${userId}
+           and s.journey_type = ${journeyType}
+           and s.status in ('ACTIVE', 'COMPLETED')
+         order by s.started_at desc
+         limit 1`;
+      return rows.length === 0 ? null : toSession(rows[0]);
+    },
     lockStart: async (tx, userId, journeyType, subject) => {
       await tx.sql`
         select pg_advisory_xact_lock(

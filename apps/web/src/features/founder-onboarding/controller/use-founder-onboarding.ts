@@ -9,6 +9,7 @@ import {
 import type {
   FounderOnboardingSessionView,
   StepResponse,
+  TaxonomyCandidateView,
 } from "../models/presentation";
 
 /**
@@ -18,7 +19,9 @@ import type {
  *
  * Save status announces transitions (saving → saved / failed), not
  * keystrokes. A failed operation keeps the draft on screen and can be
- * retried; nothing is wiped.
+ * retried; nothing is wiped. A version conflict (the session moved on in
+ * another tab) reloads the latest view and says so, without retrying the
+ * stale write.
  */
 
 export type OnboardingPhase = "loading" | "ready" | "unavailable" | "error";
@@ -31,6 +34,8 @@ export type FounderOnboardingState = {
   readonly busy: boolean;
   readonly errorMessage: string | undefined;
   readonly canRetry: boolean;
+  /** Set after a conflict reload, cleared on the next successful action. */
+  readonly conflictNotice: string | undefined;
 };
 
 export type FounderOnboardingActions = {
@@ -38,13 +43,11 @@ export type FounderOnboardingActions = {
   readonly skip: () => Promise<void>;
   readonly back: () => Promise<void>;
   readonly openStep: (stepId: string) => Promise<void>;
-  readonly attachFile: (file: {
-    name: string;
-    sizeBytes: number;
-    type: string;
-  }) => Promise<void>;
-  readonly removeFile: (fileId: string) => Promise<void>;
-  readonly retryFile: (fileId: string) => Promise<void>;
+  /** Marks the journey complete; navigation is the screen's decision. */
+  readonly complete: () => Promise<boolean>;
+  readonly findTaxonomyCandidates: (
+    text: string,
+  ) => Promise<readonly TaxonomyCandidateView[]>;
   readonly retry: () => Promise<void>;
 };
 
@@ -60,6 +63,9 @@ export function useFounderOnboarding(
   const [save, setSave] = useState<SaveStatus>("idle");
   const [busy, setBusy] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | undefined>(
+    undefined,
+  );
+  const [conflictNotice, setConflictNotice] = useState<string | undefined>(
     undefined,
   );
   const [canRetry, setCanRetry] = useState(false);
@@ -91,6 +97,7 @@ export function useFounderOnboarding(
           error instanceof FounderOnboardingClientError &&
           error.kind === "UNAVAILABLE"
         ) {
+          setErrorMessage(error.message);
           setPhase("unavailable");
         } else {
           setErrorMessage(
@@ -109,7 +116,7 @@ export function useFounderOnboarding(
     async (
       operation: () => Promise<FounderOnboardingSessionView>,
       isSave: boolean,
-    ) => {
+    ): Promise<boolean> => {
       lastOperation.current = operation;
       setCanRetry(false);
       setBusy(true);
@@ -121,6 +128,7 @@ export function useFounderOnboarding(
       try {
         const view = await operation();
         setSession(view);
+        setConflictNotice(undefined);
         if (isSave) {
           setSave("saved");
           savedTimer.current = setTimeout(
@@ -130,27 +138,43 @@ export function useFounderOnboarding(
         }
         lastOperation.current = null;
         setCanRetry(false);
+        return true;
       } catch (error) {
+        const conflict =
+          error instanceof FounderOnboardingClientError &&
+          error.kind === "CONFLICT";
         const retryable =
           error instanceof FounderOnboardingClientError && error.retryable;
         const message =
           error instanceof Error
             ? error.message
             : "Something went wrong. Please try again.";
-        setErrorMessage(message);
         if (isSave) {
-          setSave("failed");
+          setSave(conflict ? "idle" : "failed");
         }
-        // Only a transient failure keeps the operation available to retry.
+        if (conflict && client !== null) {
+          // The stale write is never retried; the latest session replaces it.
+          lastOperation.current = null;
+          setCanRetry(false);
+          try {
+            setSession(await client.getSession());
+            setConflictNotice(message);
+          } catch {
+            setErrorMessage(message);
+          }
+          return false;
+        }
+        setErrorMessage(message);
         if (!retryable) {
           lastOperation.current = null;
         }
         setCanRetry(retryable);
+        return false;
       } finally {
         setBusy(false);
       }
     },
-    [],
+    [client],
   );
 
   const requireClient = (): FounderOnboardingClient => {
@@ -163,21 +187,24 @@ export function useFounderOnboarding(
   const stepId = () => session?.currentStepId ?? "";
 
   const actions: FounderOnboardingActions = {
-    submit: (response) =>
-      run(
+    submit: async (response) => {
+      await run(
         () => requireClient().saveResponse({ stepId: stepId(), response }),
         true,
-      ),
-    skip: () => run(() => requireClient().skipStep({ stepId: stepId() }), true),
-    back: () => run(() => requireClient().goBack({ stepId: stepId() }), false),
-    openStep: (target) =>
-      run(() => requireClient().openStep({ stepId: target }), false),
-    attachFile: (file) =>
-      run(() => requireClient().attachFile({ stepId: stepId(), file }), true),
-    removeFile: (fileId) =>
-      run(() => requireClient().removeFile({ stepId: stepId(), fileId }), true),
-    retryFile: (fileId) =>
-      run(() => requireClient().retryFile({ stepId: stepId(), fileId }), true),
+      );
+    },
+    skip: async () => {
+      await run(() => requireClient().skipStep({ stepId: stepId() }), true);
+    },
+    back: async () => {
+      await run(() => requireClient().goBack({ stepId: stepId() }), false);
+    },
+    openStep: async (target) => {
+      await run(() => requireClient().openStep({ stepId: target }), false);
+    },
+    complete: () => run(() => requireClient().complete(), true),
+    findTaxonomyCandidates: (text) =>
+      requireClient().findTaxonomyCandidates({ text }),
     retry: async () => {
       const operation = lastOperation.current;
       if (operation !== null) {
@@ -194,6 +221,7 @@ export function useFounderOnboarding(
       busy,
       errorMessage,
       canRetry,
+      conflictNotice,
     },
     actions,
   ];

@@ -80,6 +80,7 @@ export {
 
 export {
   completeOnboardingSession,
+  getCurrentOnboardingSession,
   getOnboardingSession,
   goBackInOnboarding,
   resolveOnboardingSuggestion,

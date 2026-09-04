@@ -97,7 +97,8 @@ function validateConfiguration(
       }
       break;
     }
-    case "document_upload": {
+    case "document_upload":
+    case "reference_select": {
       if (configuration.minItems > configuration.maxItems) {
         reasons.push(`step ${step.stepKey}: minItems exceeds maxItems`);
       }

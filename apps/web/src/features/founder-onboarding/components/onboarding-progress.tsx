@@ -13,7 +13,10 @@ export function OnboardingProgress({
 }: {
   readonly session: FounderOnboardingSessionView;
 }) {
-  const currentSection = session.step.section;
+  const currentSection =
+    session.steps.find((step) => step.id === session.currentStepId)?.section ??
+    session.sections[0]?.id ??
+    "company";
   const sectionSteps = session.steps.filter(
     (step) => step.section === currentSection,
   );

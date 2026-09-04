@@ -2,6 +2,7 @@ import {
   IDEMPOTENCY_KEY_HEADER,
   ONBOARDING_BACK_SEGMENT,
   ONBOARDING_COMPLETE_SEGMENT,
+  ONBOARDING_CURRENT_SEGMENT,
   ONBOARDING_PATH,
   ONBOARDING_RESOLVE_SEGMENT,
   ONBOARDING_RESPONSES_SEGMENT,
@@ -11,6 +12,7 @@ import {
   ONBOARDING_SUGGESTIONS_SEGMENT,
   OnboardingSessionViewSchema,
   type CompleteOnboardingSessionRequest,
+  type OnboardingJourneyType,
   type OnboardingBackRequest,
   type ResolveOnboardingSuggestionRequest,
   type SkipOnboardingStepRequest,
@@ -44,6 +46,19 @@ export function startOnboardingSession(
     body: request,
     ...idempotent(idempotencyKey),
   });
+}
+
+/** `GET /v1/onboarding/sessions/current?journeyType=` -- 404 when there is none. */
+export function getCurrentOnboardingSession(
+  session: ApiSession,
+  journeyType: OnboardingJourneyType,
+) {
+  return call(
+    session,
+    "GET",
+    `${sessions}${ONBOARDING_CURRENT_SEGMENT}?journeyType=${encodeURIComponent(journeyType)}`,
+    OnboardingSessionViewSchema,
+  );
 }
 
 /** `GET /v1/onboarding/sessions/:sessionId` */

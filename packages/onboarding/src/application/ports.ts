@@ -131,6 +131,18 @@ export type OnboardingSessionRepository = {
     journeyType: OnboardingJourneyType,
     subject: OnboardingSubject | null,
   ) => Promise<OnboardingSession | null>;
+  /** The owner's most recent ACTIVE session of a journey, bound or not. */
+  readonly findLatestActive: (
+    executor: DatabaseExecutor,
+    userId: UserId,
+    journeyType: OnboardingJourneyType,
+  ) => Promise<OnboardingSession | null>;
+  /** The owner's most recent ACTIVE or COMPLETED session of a journey. */
+  readonly findLatest: (
+    executor: DatabaseExecutor,
+    userId: UserId,
+    journeyType: OnboardingJourneyType,
+  ) => Promise<OnboardingSession | null>;
   /** Serialises session creation for a user + journey (+ subject). */
   readonly lockStart: (
     tx: TransactionContext,
@@ -322,6 +334,41 @@ export type OnboardingWriteContext = {
   readonly correlationId: string;
   /** Responses on the current path before this one is applied. */
   readonly currentResponses: ReadonlyMap<string, OnboardingResponse>;
+  /**
+   * One-way context binding inside this transaction, for handlers that
+   * establish the canonical subject (the company a journey is about). Same
+   * rules as the internal bind operation: NULL -> value, same value
+   * idempotent, never a different subject or organisation.
+   */
+  readonly bindContext: (binding: {
+    readonly tenantId: TenantId;
+    readonly organisationId: OrganisationId;
+    readonly subject: OnboardingSubject;
+  }) => Promise<OnboardingSession>;
+};
+
+export type OnboardingStepContextInput = {
+  readonly executor: DatabaseExecutor;
+  readonly actor: OnboardingActor;
+  readonly session: OnboardingSession;
+  readonly step: OnboardingStepDefinition;
+  readonly currentResponses: ReadonlyMap<string, OnboardingResponse>;
+};
+
+/**
+ * Server-side data for a step that presents derived state (a review, a
+ * snapshot). Assembled under the actor and the session's bound subject
+ * through public domain query ports; the runtime never interprets it.
+ */
+export type OnboardingStepContextProvider = {
+  readonly key: string;
+  readonly load: (
+    input: OnboardingStepContextInput,
+  ) => Promise<Readonly<Record<string, unknown>>>;
+};
+
+export type OnboardingStepContextRegistry = {
+  readonly get: (key: string) => OnboardingStepContextProvider | undefined;
 };
 
 /**

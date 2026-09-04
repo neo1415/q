@@ -4,14 +4,17 @@ import { useState, type FormEvent } from "react";
 
 import { ChoiceList, MultiChoiceList } from "@capital-q/ui/choice-list";
 import { MoneyInput, type MoneyValue } from "@capital-q/ui/money-input";
-import { NarrativeInput } from "@capital-q/ui/narrative-input";
+import { InlineNotice } from "@capital-q/ui/states";
 
 import { StepHeading, type StepProps } from "./step-props";
+
+const RAISING = new Set(["active", "preparing"]);
 
 /**
  * F6. The raise as its own object, separate from the company profile. It
  * starts with one decision; the rest appears only when a raise is in play.
- * Amounts stay exact strings all the way down.
+ * Saving creates the company's capital objective or recalibrates the
+ * existing one -- never a second. Amounts stay exact strings all the way.
  */
 export function CapitalObjectiveStep({
   step,
@@ -38,10 +41,10 @@ export function CapitalObjectiveStep({
   const [useOfFunds, setUseOfFunds] = useState<readonly string[]>(
     saved?.useOfFunds ?? [],
   );
-  const [note, setNote] = useState(saved?.note ?? "");
   const [error, setError] = useState<string | undefined>(undefined);
+  const [amountError, setAmountError] = useState<string | undefined>(undefined);
 
-  const raising = raisingStatus !== undefined && raisingStatus !== "not_now";
+  const raising = raisingStatus !== undefined && RAISING.has(raisingStatus);
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -53,14 +56,17 @@ export function CapitalObjectiveStep({
       void actions.submit({ kind: "capital_objective", raisingStatus });
       return;
     }
+    if (amount.amount.length === 0 || !/[1-9]/.test(amount.amount)) {
+      setAmountError("Enter the target amount to save the raise.");
+      return;
+    }
     void actions.submit({
       kind: "capital_objective",
       raisingStatus,
-      ...(amount.amount.length > 0 ? { targetAmount: amount } : {}),
+      targetAmount: amount,
       ...(instrument !== undefined ? { instrument } : {}),
       ...(timeframe !== undefined ? { timeframe } : {}),
       ...(useOfFunds.length > 0 ? { useOfFunds: [...useOfFunds] } : {}),
-      ...(note.trim().length > 0 ? { note: note.trim() } : {}),
     });
   }
 
@@ -88,14 +94,25 @@ export function CapitalObjectiveStep({
 
       {raising ? (
         <>
+          {step.existingObjective !== undefined ? (
+            <InlineNotice tone="info" title="Recalibrating your raise">
+              Your current objective is {step.existingObjective.currency}{" "}
+              {step.existingObjective.amount}. Saving updates it; it never
+              creates a second one.
+            </InlineNotice>
+          ) : null}
           <MoneyInput
             id="raise-amount"
             label="Target amount"
-            description="Optional. A range is fine; enter the midpoint."
+            description="An exact figure. A range is fine; enter the midpoint."
             value={amount}
             currencies={step.currencies}
             disabled={busy}
-            onChange={setAmount}
+            error={amountError}
+            onChange={(next) => {
+              setAmount(next);
+              setAmountError(undefined);
+            }}
           />
           <ChoiceList
             id="raise-instrument"
@@ -126,15 +143,6 @@ export function CapitalObjectiveStep({
             values={useOfFunds}
             disabled={busy}
             onChange={setUseOfFunds}
-          />
-          <NarrativeInput
-            id="raise-note"
-            label="Anything to add about the raise?"
-            description="Optional."
-            value={note}
-            maxLength={600}
-            disabled={busy}
-            onChange={setNote}
           />
         </>
       ) : null}

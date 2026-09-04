@@ -5,9 +5,8 @@ import {
 
 /**
  * The client composed when no onboarding backend is configured. Every call
- * fails with UNAVAILABLE, and the screen shows an honest "not available yet"
- * state. This is what production gets until CQ-ONB-002 exists; it never
- * degrades into fixture data.
+ * fails with UNAVAILABLE, and the screen shows an honest "not available"
+ * state. It never degrades into fixture data.
  */
 export function createUnavailableFounderOnboardingClient(): FounderOnboardingClient {
   const unavailable = () =>
@@ -23,8 +22,7 @@ export function createUnavailableFounderOnboardingClient(): FounderOnboardingCli
     goBack: unavailable,
     skipStep: unavailable,
     openStep: unavailable,
-    attachFile: unavailable,
-    removeFile: unavailable,
-    retryFile: unavailable,
+    complete: unavailable,
+    findTaxonomyCandidates: unavailable,
   };
 }

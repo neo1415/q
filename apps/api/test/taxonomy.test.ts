@@ -87,6 +87,7 @@ function fakeQuery(overrides: Partial<TaxonomyQueryPort> = {}) {
     getVocabularyByCode: notUnderTest,
     getNodeById: notUnderTest,
     findNodeById: notUnderTest,
+    findNodesByIds: notUnderTest,
     findNodeByCanonicalCode: notUnderTest,
     getNodeDetail: (nodeId) =>
       nodeId === CHILD.id

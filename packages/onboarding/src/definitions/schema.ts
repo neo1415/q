@@ -190,6 +190,30 @@ export const OnboardingStepConfigurationSchema = z.discriminatedUnion(
         declineLabel: z.string().min(1).max(80).optional(),
         /** When true only `confirmed: true` completes the step. */
         requireAffirmative: z.boolean().default(true),
+        /** A registered step-context provider assembles server data for this step. */
+        contextKey: z
+          .string()
+          .regex(/^[a-z][a-z0-9_]*(?:\.[a-z][a-z0-9_]*)*$/)
+          .max(64)
+          .optional(),
+      })
+      .strict(),
+    z
+      .object({
+        stepType: z.literal("reference_select"),
+        ...common,
+        resourceType: OnboardingResourceTypeSchema,
+        vocabularyCodes: z
+          .array(
+            z
+              .string()
+              .regex(/^[a-z][a-z0-9_]*$/)
+              .max(64),
+          )
+          .max(16)
+          .default([]),
+        minItems: z.number().int().min(0).default(1),
+        maxItems: z.number().int().min(1).max(20).default(10),
       })
       .strict(),
   ],

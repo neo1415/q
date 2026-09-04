@@ -2,6 +2,8 @@ import { CompanyIdSchema, type CompanyQueryPort } from "@capital-q/companies";
 
 import type { OnboardingWriteTargetKey } from "../definitions/schema.js";
 import type {
+  OnboardingStepContextProvider,
+  OnboardingStepContextRegistry,
   OnboardingSubjectResolver,
   OnboardingSubjectResolverRegistry,
   OnboardingWriteTargetHandler,
@@ -33,6 +35,19 @@ export function createOnboardingWriteTargetRegistry(
     get: (targetKey) => byKey.get(targetKey),
     keys: () => [...byKey.keys()],
   };
+}
+
+export function createOnboardingStepContextRegistry(
+  providers: readonly OnboardingStepContextProvider[] = [],
+): OnboardingStepContextRegistry {
+  const byKey = new Map<string, OnboardingStepContextProvider>();
+  for (const provider of providers) {
+    if (byKey.has(provider.key)) {
+      throw new TypeError(`duplicate step context provider ${provider.key}`);
+    }
+    byKey.set(provider.key, provider);
+  }
+  return { get: (key) => byKey.get(key) };
 }
 
 export function createOnboardingSubjectResolverRegistry(

@@ -1,24 +1,22 @@
 import { z } from "zod";
 
 import type { ChoiceOption } from "@capital-q/ui/choice-list";
-import type { EvidenceKind } from "@capital-q/ui/evidence-status";
-import type { FactVerdict } from "@capital-q/ui/editable-fact";
-import type { FileSelection } from "@capital-q/ui/file-selection-list";
 import type { SnapshotSection } from "@capital-q/ui/intelligence-snapshot";
 import type { CurrencyOption } from "@capital-q/ui/money-input";
 
 /**
  * Frontend presentation contract for founder onboarding.
  *
- * This is what the screens render and what the client port returns. It is
- * deliberately a *presentation* model -- sections, steps, choices, saved
- * responses -- not a copy of the future onboarding domain. When CQ-ONB-001/002
- * land, their session/definition responses are mapped onto these views in
- * the API adapter and every screen keeps working.
+ * What the screens render and what the client port returns. It is a
+ * *presentation* model -- sections, composite screens, choices, saved
+ * answers -- produced by one mapper from the onboarding runtime's session
+ * view (`@capital-q/contracts`). The API client and the development fixture
+ * both speak the runtime contract underneath, so every screen sees exactly
+ * the same shapes whichever adapter is composed.
  *
  * Responses are Zod schemas because they cross a boundary (the fixture's
- * storage today, the API tomorrow). Step views are produced in-process by
- * the adapter and stay as TypeScript types.
+ * storage, the server actions). Step views are produced in-process and stay
+ * as TypeScript types.
  */
 
 export const SECTION_IDS = ["company", "business", "raise", "review"] as const;
@@ -43,6 +41,8 @@ const MoneySchema = z.object({
 });
 export type MoneyResponse = z.infer<typeof MoneySchema>;
 
+const Count = z.string().regex(/^\d{1,9}$/);
+
 export const StepResponseSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("choice"), value: z.string().min(1) }),
   z.object({ kind: z.literal("multi_choice"), values: z.array(z.string()) }),
@@ -51,31 +51,20 @@ export const StepResponseSchema = z.discriminatedUnion("kind", [
     kind: z.literal("company_basics"),
     name: z.string().min(1).max(120),
     website: z.string().max(200).optional(),
-    countryCode: z.string().length(2).optional(),
+    countryCode: z.string().min(2).max(8).optional(),
   }),
   z.object({
-    kind: z.literal("asset_selection"),
-    assetTypes: z.array(z.string()),
+    kind: z.literal("taxonomy_select"),
+    nodeIds: z.array(z.string().uuid()).max(8),
   }),
-  z.object({
-    kind: z.literal("understanding_review"),
-    facts: z.array(
-      z.object({
-        id: z.string(),
-        value: z.string(),
-        verdict: z.enum(["suggested", "confirmed", "edited", "missing"]),
-      }),
-    ),
-    taxonomy: z.array(z.string()),
-    missingNote: z.string().max(600).optional(),
-  }),
+  z.object({ kind: z.literal("review"), confirmed: z.literal(true) }),
   z.object({
     kind: z.literal("team"),
-    founders: z.string(),
-    fullTime: z.string(),
-    role: z.string(),
+    founders: Count,
+    fullTime: z.string().min(1),
+    role: z.string().min(1),
     functions: z.array(z.string()),
-    teamSize: z.string(),
+    teamSize: Count,
   }),
   z.object({
     kind: z.literal("traction"),
@@ -83,28 +72,22 @@ export const StepResponseSchema = z.discriminatedUnion("kind", [
       z.string(),
       z.union([
         z.object({ value: z.string() }),
-        z.object({ money: MoneySchema }),
         z.object({ unknown: z.literal(true) }),
       ]),
     ),
   }),
   z.object({
     kind: z.literal("capital_objective"),
-    raisingStatus: z.string(),
+    raisingStatus: z.string().min(1),
     targetAmount: MoneySchema.optional(),
     instrument: z.string().optional(),
     timeframe: z.string().optional(),
     useOfFunds: z.array(z.string()).optional(),
-    note: z.string().max(600).optional(),
   }),
-  z.object({
-    kind: z.literal("clarification"),
-    choice: z.string().optional(),
-    text: z.string().max(600).optional(),
-  }),
+  z.object({ kind: z.literal("snapshot"), confirmed: z.literal(true) }),
 ]);
 export type StepResponse = z.infer<typeof StepResponseSchema>;
-export type StepKind = StepResponse["kind"] | "intelligence_snapshot";
+export type StepKind = StepResponse["kind"];
 
 // ---------------------------------------------------------------------------
 // Step views (what a screen renders)
@@ -127,21 +110,29 @@ export type MetricQuestion = {
   readonly id: string;
   readonly label: string;
   readonly help?: string | undefined;
-  readonly kind: "choice" | "number" | "money";
+  readonly kind: "choice" | "number";
   readonly options?: readonly ChoiceOption[] | undefined;
   readonly optional: boolean;
 };
 
-export type FactView = {
-  readonly id: string;
+/** A canonical taxonomy node offered for confirmation. Never auto-assigned. */
+export type TaxonomyCandidateView = {
+  readonly nodeId: string;
   readonly label: string;
-  readonly value: string;
-  readonly evidence: EvidenceKind;
-  readonly evidenceDetail?: string | undefined;
-  readonly verdict: FactVerdict;
+  readonly vocabularyLabel: string;
+  /** Short observable reason from the deterministic classifier. */
+  readonly reason?: string | undefined;
 };
 
-export type AssetTypeOption = ChoiceOption & { readonly uploadable: boolean };
+export type ReviewItem = {
+  readonly id: string;
+  readonly label: string;
+  readonly value: string | undefined;
+  /** Where the value came from. Always the founder in V1. */
+  readonly source: "founder";
+  /** The group to reopen to change it. */
+  readonly editStepId: string;
+};
 
 export type StepView =
   | (StepBase<"choice"> & {
@@ -166,35 +157,32 @@ export type StepView =
       readonly response?:
         Extract<StepResponse, { kind: "company_basics" }> | undefined;
     })
-  | (StepBase<"asset_selection"> & {
-      readonly assetTypes: readonly AssetTypeOption[];
-      readonly exclusiveValues: readonly string[];
-      readonly acceptedExtensions: readonly string[];
-      readonly files: readonly FileSelection[];
+  | (StepBase<"taxonomy_select"> & {
+      /** Text the candidates are derived from (the founder's own description). */
+      readonly sourceText: string | undefined;
+      readonly maxItems: number;
       readonly response?:
-        Extract<StepResponse, { kind: "asset_selection" }> | undefined;
+        Extract<StepResponse, { kind: "taxonomy_select" }> | undefined;
+      /** Labels for already-selected ids, so a revisit can render them. */
+      readonly selected: readonly TaxonomyCandidateView[];
     })
-  | (StepBase<"understanding_review"> & {
+  | (StepBase<"review"> & {
       readonly intro: string;
-      readonly facts: readonly FactView[];
-      readonly taxonomyOptions: readonly string[];
-      readonly taxonomySelected: readonly string[];
-      readonly response?:
-        Extract<StepResponse, { kind: "understanding_review" }> | undefined;
+      readonly items: readonly ReviewItem[];
+      readonly categories: readonly string[];
+      readonly materials: readonly string[] | undefined;
+      readonly response?: Extract<StepResponse, { kind: "review" }> | undefined;
     })
   | (StepBase<"team"> & {
-      readonly founderOptions: readonly ChoiceOption[];
-      readonly fullTimeOptions: readonly ChoiceOption[];
       readonly roleOptions: readonly ChoiceOption[];
+      readonly fullTimeOptions: readonly ChoiceOption[];
       readonly functionOptions: readonly ChoiceOption[];
-      readonly teamSizeOptions: readonly ChoiceOption[];
       readonly response?: Extract<StepResponse, { kind: "team" }> | undefined;
     })
   | (StepBase<"traction"> & {
-      readonly variant: string;
+      readonly variant: "pre_revenue" | "revenue";
       readonly intro: string;
       readonly metrics: readonly MetricQuestion[];
-      readonly currencies: readonly CurrencyOption[];
       readonly response?:
         Extract<StepResponse, { kind: "traction" }> | undefined;
     })
@@ -204,19 +192,13 @@ export type StepView =
       readonly timeframeOptions: readonly ChoiceOption[];
       readonly useOfFundsOptions: readonly ChoiceOption[];
       readonly currencies: readonly CurrencyOption[];
+      /** Present when an objective already exists: saving recalibrates it. */
+      readonly existingObjective:
+        { readonly amount: string; readonly currency: string } | undefined;
       readonly response?:
         Extract<StepResponse, { kind: "capital_objective" }> | undefined;
     })
-  | (StepBase<"clarification"> & {
-      readonly observation: string;
-      readonly question: string;
-      readonly why?: string | undefined;
-      readonly options: readonly ChoiceOption[];
-      readonly allowText: boolean;
-      readonly response?:
-        Extract<StepResponse, { kind: "clarification" }> | undefined;
-    })
-  | (StepBase<"intelligence_snapshot"> & {
+  | (StepBase<"snapshot"> & {
       readonly headline: string;
       readonly summary: string;
       readonly sections: readonly SnapshotSection[];
@@ -224,8 +206,9 @@ export type StepView =
         readonly id: string;
         readonly text: string;
       }[];
-      readonly provenanceNote?: string | undefined;
-      readonly response?: undefined;
+      readonly provenanceNote: string;
+      readonly response?:
+        Extract<StepResponse, { kind: "snapshot" }> | undefined;
     });
 
 export type StepViewOfKind<TKind extends StepKind> = Extract<
@@ -256,7 +239,8 @@ export type FounderOnboardingSessionView = {
   readonly sections: readonly SectionSummary[];
   readonly steps: readonly StepSummary[];
   readonly currentStepId: string;
-  readonly step: StepView;
+  /** Absent only once the session is complete. */
+  readonly step: StepView | undefined;
   /** Which adapter produced this view. Synthetic views say so on screen. */
   readonly source: { readonly adapter: string; readonly synthetic: boolean };
 };

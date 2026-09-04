@@ -4,15 +4,11 @@ import { useState, type FormEvent } from "react";
 
 import { ChoiceList } from "@capital-q/ui/choice-list";
 import { Input } from "@capital-q/ui/input";
-import { MoneyInput, type MoneyValue } from "@capital-q/ui/money-input";
 
 import type { MetricQuestion, StepResponse } from "../models/presentation";
 import { StepHeading, type StepProps } from "./step-props";
 
-type MetricAnswer =
-  | { readonly value: string }
-  | { readonly money: MoneyValue }
-  | { readonly unknown: true };
+type MetricAnswer = { readonly value: string } | { readonly unknown: true };
 
 type TractionMetrics = Extract<StepResponse, { kind: "traction" }>["metrics"];
 
@@ -27,14 +23,10 @@ export function TractionStep({
   busy,
   actions,
 }: StepProps<"traction">) {
-  const [answers, setAnswers] = useState<Record<string, MetricAnswer>>(() => {
-    const saved = step.response?.metrics ?? {};
-    return Object.fromEntries(
-      Object.entries(saved).map(([id, value]) => [id, value]),
-    );
-  });
+  const [answers, setAnswers] = useState<Record<string, MetricAnswer>>(() => ({
+    ...(step.response?.metrics ?? {}),
+  }));
   const [error, setError] = useState<string | undefined>(undefined);
-  const defaultCurrency = step.currencies[0]?.code ?? "USD";
 
   function set(id: string, answer: MetricAnswer | undefined) {
     setAnswers((current) => {
@@ -60,11 +52,7 @@ export function TractionStep({
     }
     const metrics: TractionMetrics = {};
     for (const [id, answer] of Object.entries(answers)) {
-      if ("money" in answer) {
-        if (answer.money.amount.length > 0) {
-          metrics[id] = { money: answer.money };
-        }
-      } else if ("value" in answer) {
+      if ("value" in answer) {
         if (answer.value.length > 0) {
           metrics[id] = { value: answer.value };
         }
@@ -89,8 +77,6 @@ export function TractionStep({
           metric={metric}
           answer={answers[metric.id]}
           busy={busy}
-          defaultCurrency={defaultCurrency}
-          currencies={step.currencies}
           onChange={(answer) => set(metric.id, answer)}
         />
       ))}
@@ -107,15 +93,11 @@ function MetricField({
   metric,
   answer,
   busy,
-  defaultCurrency,
-  currencies,
   onChange,
 }: {
   readonly metric: MetricQuestion;
   readonly answer: MetricAnswer | undefined;
   readonly busy: boolean;
-  readonly defaultCurrency: string;
-  readonly currencies: StepProps<"traction">["step"]["currencies"];
   readonly onChange: (answer: MetricAnswer | undefined) => void;
 }) {
   const unknown = answer !== undefined && "unknown" in answer;
@@ -148,27 +130,6 @@ function MetricField({
           }
           disabled={busy || unknown}
           onChange={(value) => onChange({ value })}
-        />
-        {unknownToggle}
-      </div>
-    );
-  }
-
-  if (metric.kind === "money") {
-    return (
-      <div className="flex flex-col gap-2">
-        <MoneyInput
-          id={`metric-${metric.id}`}
-          label={metric.label}
-          description={metric.help}
-          value={
-            answer !== undefined && "money" in answer
-              ? answer.money
-              : { amount: "", currency: defaultCurrency }
-          }
-          currencies={currencies}
-          disabled={busy || unknown}
-          onChange={(money) => onChange({ money })}
         />
         {unknownToggle}
       </div>

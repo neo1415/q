@@ -6,6 +6,8 @@ import {
   IdempotencyKeyHeaderSchema,
   ONBOARDING_BACK_SEGMENT,
   ONBOARDING_COMPLETE_SEGMENT,
+  ONBOARDING_CURRENT_SEGMENT,
+  OnboardingJourneyTypeSchema,
   ONBOARDING_PATH,
   ONBOARDING_RESOLVE_SEGMENT,
   ONBOARDING_RESPONSES_SEGMENT,
@@ -25,6 +27,7 @@ import {
 } from "@capital-q/contracts";
 import {
   OnboardingSessionIdSchema,
+  OnboardingSessionNotFoundError,
   OnboardingSuggestionIdSchema,
   type OnboardingService,
   type OnboardingSessionId,
@@ -124,6 +127,30 @@ export function registerOnboardingRoutes(
       .header("Cache-Control", "no-store");
     return OnboardingSessionViewSchema.parse(result.view);
   });
+
+  // Static segment registered before the parameterised one; find-my-way
+  // prefers it, so "current" can never be read as a session id.
+  app.get(
+    `${sessions}${ONBOARDING_CURRENT_SEGMENT}`,
+    { onRequest: withActor },
+    async (request, reply) => {
+      const query = request.query as Record<string, unknown>;
+      const journeyType = parseContract(
+        OnboardingJourneyTypeSchema,
+        query["journeyType"],
+        "The journey type is not valid.",
+      );
+      const view = await runtime.getCurrentSession({
+        actor: getOnboardingActor(request),
+        journeyType,
+      });
+      if (view === null) {
+        throw new OnboardingSessionNotFoundError();
+      }
+      void reply.header("Cache-Control", "no-store");
+      return OnboardingSessionViewSchema.parse(view);
+    },
+  );
 
   app.get(byId, { onRequest: withActor }, async (request, reply) => {
     const view = await runtime.getSession({

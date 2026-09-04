@@ -33,6 +33,7 @@ const RESPONSE_TYPE_FOR_STEP: Record<
   voice_text: "TEXT",
   document_upload: "RESOURCE_REFERENCE",
   confirmation: "CONFIRMATION",
+  reference_select: "RESOURCE_REFERENCE",
 };
 
 const ALLOWED_MODALITIES: Record<
@@ -43,7 +44,7 @@ const ALLOWED_MODALITIES: Record<
   MULTI_SELECT: ["SELECTION"],
   RANGE: ["SELECTION", "TYPED_TEXT"],
   TEXT: ["TYPED_TEXT", "VOICE_TRANSCRIPT"],
-  RESOURCE_REFERENCE: ["DOCUMENT_REFERENCE"],
+  RESOURCE_REFERENCE: ["DOCUMENT_REFERENCE", "SELECTION"],
   CONFIRMATION: ["SELECTION"],
 };
 
@@ -236,6 +237,35 @@ export function validateOnboardingResponse(
       break;
     }
     case "RESOURCE_REFERENCE": {
+      if (configuration.stepType === "reference_select") {
+        if (configuration.resourceType !== value.resourceType) {
+          issues.push(
+            issue(
+              "value.resourceType",
+              "resource_type_not_allowed",
+              "Resource type not allowed.",
+            ),
+          );
+        }
+        if (value.resourceIds.length < configuration.minItems) {
+          issues.push(
+            issue(
+              "value.resourceIds",
+              "too_few_items",
+              `At least ${configuration.minItems} items.`,
+            ),
+          );
+        }
+        if (value.resourceIds.length > configuration.maxItems) {
+          issues.push(
+            issue(
+              "value.resourceIds",
+              "too_many_items",
+              `At most ${configuration.maxItems} items.`,
+            ),
+          );
+        }
+      }
       if (configuration.stepType === "document_upload") {
         if (!configuration.allowedResourceTypes.includes(value.resourceType)) {
           issues.push(
@@ -287,7 +317,11 @@ export function validateOnboardingResponse(
 
   const allowed = ALLOWED_MODALITIES[expected];
   const defaultModality =
-    step.stepType === "voice_text" ? "VOICE_TRANSCRIPT" : allowed[0];
+    step.stepType === "voice_text"
+      ? "VOICE_TRANSCRIPT"
+      : step.stepType === "reference_select"
+        ? "SELECTION"
+        : allowed[0];
   let sourceModality: OnboardingSourceModality;
   if (options.sourceModality !== undefined) {
     sourceModality = options.sourceModality;

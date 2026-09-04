@@ -24,7 +24,10 @@
  */
 
 export { createRequestDatabaseClient } from "./client.js";
-export { createTransactionManager } from "./transaction.js";
+export {
+  createSavepointTransactionManager,
+  createTransactionManager,
+} from "./transaction.js";
 export { checkDatabaseHealth, type DatabaseHealth } from "./health.js";
 export {
   DATABASE_FAILURE_KINDS,

@@ -90,10 +90,11 @@ export function requireOnboardingActorHook(
           actor = {
             userId: resolution.context.userId,
             context: resolution.context,
+            principal,
           };
           break;
         case "CONTEXT_REQUIRED":
-          actor = { userId: identity.userId, context: null };
+          actor = { userId: identity.userId, context: null, principal };
           break;
         case "NO_APPLICATION_IDENTITY":
         case "CONTEXT_NOT_ACCESSIBLE":

@@ -57,6 +57,10 @@ export type TaxonomyQueryPort = {
     code: TaxonomyVocabularyCode,
   ) => Promise<TaxonomyVocabulary>;
   readonly getNodeById: (nodeId: TaxonomyNodeId) => Promise<TaxonomyNode>;
+  /** Bounded batch lookup; unknown ids are simply absent. */
+  readonly findNodesByIds: (
+    nodeIds: readonly TaxonomyNodeId[],
+  ) => Promise<readonly TaxonomyNode[]>;
   readonly findNodeById: (
     nodeId: TaxonomyNodeId,
   ) => Promise<TaxonomyNode | null>;
@@ -120,6 +124,7 @@ export function createTaxonomyQueryPort(dependencies: {
     getVocabularyByCode,
     getNodeById,
     findNodeById: (nodeId) => reference.findNodeById(sql, nodeId),
+    findNodesByIds: (nodeIds) => reference.findNodesByIds(sql, nodeIds),
     findNodeByCanonicalCode: (vocabularyCode, canonicalCode) =>
       reference.findNodeByCanonicalCode(sql, vocabularyCode, canonicalCode),
     getNodeDetail: async (nodeId) => {

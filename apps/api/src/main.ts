@@ -17,6 +17,7 @@ import {
 import { createRequestDatabaseClient } from "@capital-q/database";
 import { createOutboxWriter } from "@capital-q/eventing";
 import { createLogger, createTelemetryRuntime } from "@capital-q/observability";
+import { createFounderOnboardingIntegration } from "@capital-q/founder-onboarding";
 import { createCapitalService } from "@capital-q/capital";
 import {
   createCompanyService,
@@ -138,13 +139,21 @@ const taxonomy = createTaxonomyService({
   }),
 });
 
-// Onboarding owns journey state only. No Founder or Investor write-target
-// handler is registered here (CQ-ONB-002/003); the COMPANY subject resolver
-// is identity resolution through the company query port, not journey logic.
+// Onboarding owns journey state only. The Founder integration registers the
+// write-target handlers and step-context providers for Founder Definition v1;
+// each handler reaches the canonical domains through their public services on
+// the onboarding transaction (CQ-ONB-002). Investor arrives with CQ-ONB-003.
+const founder = createFounderOnboardingIntegration({
+  outbox,
+  audit,
+  securityEvents: createPostgresSecurityEventWriter({ sql: database.sql }),
+});
 const onboarding = createOnboardingService({
   sql: database.sql,
   transactions: database.transactions,
   outbox,
+  writeTargets: founder.writeTargets,
+  stepContextProviders: founder.stepContextProviders,
   subjectResolvers: [
     createCompanyOnboardingSubjectResolver(
       createPostgresCompanyQueryPort({ sql: database.sql }),

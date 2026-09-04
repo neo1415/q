@@ -9,7 +9,7 @@ import type { OnboardingDefinitionManifest } from "../src/definitions/schema.js"
 export const TEST_WRITE_TARGET = "test.echo" as const;
 
 export const SYNTHETIC_FOUNDER_MANIFEST: OnboardingDefinitionManifest = {
-  journeyType: "founder",
+  journeyType: "external_investor_conversion",
   name: "Synthetic founder journey",
   version: 1,
   schema: {

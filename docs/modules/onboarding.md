@@ -160,7 +160,8 @@ bounded labels.
 
 Routes (all require an authenticated Person; an organisation context is
 optional so bootstrap works before any membership exists): `POST /sessions`,
-`GET /sessions/:id`, `POST /sessions/:id/responses`, `POST
+`GET /sessions/current?journeyType=` (the caller's latest active or
+completed session, 404 when none), `GET /sessions/:id`, `POST /sessions/:id/responses`, `POST
 /sessions/:id/steps/:stepKey/skip`, `POST /sessions/:id/back`, `POST
 /sessions/:id/complete`, `POST /sessions/:id/suggestions/:id/resolve`. The
 view exposes the session summary, phases, the current step's safe
@@ -173,16 +174,35 @@ no context. All nine tables are INTERNAL_SERVER_ONLY (RLS enabled, no
 policies, no grants); the privileged server role can read rows, and that is
 never application authorisation.
 
+## CQ-ONB-002 additions
+
+- Step type `reference_select` (canonical reference entities by stable id;
+  the taxonomy confirmation step). Response type RESOURCE_REFERENCE with the
+  SELECTION modality.
+- Handlers may bind the session's context inside their transaction
+  (`OnboardingWriteContext.bindContext`, same one-way rules).
+- Step-context providers: a confirmation step names a `contextKey`; the
+  registered provider assembles server-side data into `currentStep.context`.
+  A missing provider is a redacted 500 (fault `STEP_CONTEXT_PROVIDER_MISSING`).
+- `responses`: the current response of every eligible step, on the view.
+- An unbound start resumes the person's latest active session of the
+  journey, bound or not; `GET /sessions/current` reads it without starting.
+- Navigation with `targetStepKey` accepts any visited, currently eligible
+  step (earlier or later). Unvisited steps stay locked.
+- `OnboardingActor.principal` carries the verified principal from the API
+  hook so person-scoped bootstrap (creating a first workspace) can run inside
+  a handler. Never reconstructed from client input.
+
+The Founder journey itself lives in `docs/modules/founder-onboarding.md`.
+
 ## Frontend boundary
 
-WEB-011 keeps its fixture behind the `FounderOnboardingClient` port. Its
-presentation model uses composite Founder step kinds that have no V1 runtime
-step type; mapping them onto this runtime's contracts (and any step-type
-extension) is CQ-ONB-002's Founder-definition work. No visual change here.
+The web keeps one `FounderOnboardingClient` over a `RuntimePort` speaking
+this runtime's session-view contract; the API adapter and the development
+fixture implement the port, and one pure mapper produces the screens.
 
 ## Not here (later packets)
 
-Founder F0–F8 definition and write mappings (CQ-ONB-002), Investor I0–I12
-(CQ-ONB-003), Evidence sources and upload (CQ-EVD), voice capture and
-transcription, Q-generated suggestions, pitch media, recommendation, an
-onboarding builder UI, `onboarding.voice_captures`.
+Investor I0–I12 (CQ-ONB-003), Evidence sources and upload (CQ-EVD), voice
+capture and transcription, Q-generated suggestions, pitch media,
+recommendation, an onboarding builder UI, `onboarding.voice_captures`.

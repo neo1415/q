@@ -25,6 +25,7 @@ import type { OutboxWriter } from "@capital-q/eventing";
 import type { Logger } from "@capital-q/observability";
 import {
   ActorContextSchema,
+  AuthenticatedPrincipalSchema,
   UserIdSchema,
   type ActorContext,
 } from "@capital-q/security";
@@ -78,10 +79,12 @@ import {
 import { validateOnboardingResponse } from "../runtime/validate-response.js";
 import { getOnboardingMetrics } from "./metrics.js";
 import type {
+  OnboardingWriteContext,
   OnboardingDefinitionRepository,
   OnboardingIdempotencyRepository,
   OnboardingResponseRepository,
   OnboardingSessionRepository,
+  OnboardingStepContextRegistry,
   OnboardingStepStateRepository,
   OnboardingSubjectResolverRegistry,
   OnboardingSuggestionRepository,
@@ -118,11 +121,16 @@ export type OnboardingRuntimeDependencies = {
   readonly idempotency: OnboardingIdempotencyRepository;
   readonly subjects: OnboardingSubjectResolverRegistry;
   readonly writeTargets: OnboardingWriteTargetRegistry;
+  readonly stepContexts: OnboardingStepContextRegistry;
   readonly logger?: Logger | undefined;
 };
 
 const ActorSchema = z
-  .object({ userId: UserIdSchema, context: ActorContextSchema.nullable() })
+  .object({
+    userId: UserIdSchema,
+    context: ActorContextSchema.nullable(),
+    principal: AuthenticatedPrincipalSchema.optional(),
+  })
   .strict();
 const SubjectSchema = z
   .object({ subjectType: OnboardingSubjectTypeSchema, subjectId: UuidSchema })
@@ -151,6 +159,11 @@ export type StartOnboardingSessionResult = {
 export type SessionScopedQuery = {
   readonly actor: OnboardingActor;
   readonly sessionId: OnboardingSessionId;
+};
+
+export type CurrentSessionQuery = {
+  readonly actor: OnboardingActor;
+  readonly journeyType: OnboardingJourneyType;
 };
 
 export type BindSessionContextCommand = SessionScopedQuery & {
@@ -328,6 +341,36 @@ async function commitResponse(
   readonly response: OnboardingResponse;
   readonly changes: OnboardingPathChanges;
 }> {
+  // Handlers may bind the session's canonical context in this transaction
+  // (F1-style bootstrap); the commit below expects the version they left.
+  let currentSession = aggregate.session;
+  const bindContext: OnboardingWriteContext["bindContext"] = async (
+    binding,
+  ) => {
+    const s = currentSession;
+    if (s.subject !== null) {
+      if (
+        s.subject.subjectType === binding.subject.subjectType &&
+        s.subject.subjectId === binding.subject.subjectId
+      ) {
+        return s;
+      }
+      throw new OnboardingSessionStateError("SUBJECT_ALREADY_BOUND");
+    }
+    if (
+      (s.tenantId !== null && s.tenantId !== binding.tenantId) ||
+      (s.organisationId !== null && s.organisationId !== binding.organisationId)
+    ) {
+      throw new OnboardingSessionStateError("CONTEXT_ALREADY_BOUND");
+    }
+    currentSession = await runtime.sessions.bindContext(
+      tx,
+      s.id,
+      s.version,
+      binding,
+    );
+    return currentSession;
+  };
   // Every target must have a handler before anything is written: a step
   // that declares a target nobody registered fails safely and completely.
   const handlers = step.writesTo.map((target) => {
@@ -345,10 +388,11 @@ async function commitResponse(
       {
         tx,
         actor,
-        session: aggregate.session,
+        session: currentSession,
         step,
         correlationId,
         currentResponses: aggregate.currentResponses,
+        bindContext,
       },
       validated,
     );
@@ -399,7 +443,7 @@ async function commitResponse(
   const session = await runtime.sessions.commit(
     tx,
     aggregate.session.id,
-    aggregate.session.version,
+    currentSession.version,
     { currentStepKey: next?.stepKey ?? step.stepKey },
   );
   return { session, response, changes };
@@ -445,11 +489,45 @@ export function createOnboardingUseCases(
     idempotency,
   } = runtime;
 
+  // The session view, with the current step's server-side context when the
+  // pinned definition names a provider for it.
   const view = async (
     executor: DatabaseExecutor,
+    actor: OnboardingActor,
     session: OnboardingSession,
     changes?: OnboardingPathChanges,
-  ) => toSessionView(await aggregateOf(runtime, executor, session), changes);
+  ) => {
+    const aggregate = await aggregateOf(runtime, executor, session);
+    const current =
+      session.currentStepKey === null
+        ? undefined
+        : aggregate.stepsByKey.get(session.currentStepKey);
+    let context: Readonly<Record<string, unknown>> | undefined;
+    if (
+      current !== undefined &&
+      current.configuration.stepType === "confirmation" &&
+      current.configuration.contextKey !== undefined &&
+      aggregate.path.eligibleKeys.has(current.stepKey)
+    ) {
+      const provider = runtime.stepContexts.get(
+        current.configuration.contextKey,
+      );
+      if (provider === undefined) {
+        throw new OnboardingRuntimeConfigurationError(
+          "STEP_CONTEXT_PROVIDER_MISSING",
+          `step ${current.stepKey} needs ${current.configuration.contextKey}`,
+        );
+      }
+      context = await provider.load({
+        executor,
+        actor,
+        session,
+        step: current,
+        currentResponses: aggregate.currentResponses,
+      });
+    }
+    return toSessionView(aggregate, changes, context);
+  };
 
   const publishedForJourney = async (journeyType: OnboardingJourneyType) => {
     const definition = await runtime.definitions.findByJourney(
@@ -552,7 +630,7 @@ export function createOnboardingUseCases(
           actor,
           previous.sessionId,
         );
-        return { view: await view(tx.sql, replayed), created: false };
+        return { view: await view(tx.sql, actor, replayed), created: false };
       }
       const ownership =
         subject === null
@@ -562,15 +640,21 @@ export function createOnboardingUseCases(
         throw new OnboardingSessionStateError("UNBOUND_START_NOT_ALLOWED");
       }
       await sessions.lockStart(tx, actor.userId, journeyType, subject);
-      const existing = await sessions.findActive(
-        tx.sql,
-        actor.userId,
-        journeyType,
-        subject,
-      );
+      // An unbound start resumes the person's latest active session of the
+      // journey even after it bound its subject: a founder returning without
+      // a company id must land on the same session, never a second company.
+      const existing =
+        subject === null
+          ? await sessions.findLatestActive(tx.sql, actor.userId, journeyType)
+          : await sessions.findActive(
+              tx.sql,
+              actor.userId,
+              journeyType,
+              subject,
+            );
       if (existing !== null) {
         safeLog(runtime, "session.resumed", existing);
-        return { view: await view(tx.sql, existing), created: false };
+        return { view: await view(tx.sql, actor, existing), created: false };
       }
       const session = await sessions.insert(tx, {
         userId: actor.userId,
@@ -602,8 +686,24 @@ export function createOnboardingUseCases(
         bound: subject !== null,
       });
       safeLog(runtime, "session.started", session);
-      return { view: await view(tx.sql, session), created: true };
+      return { view: await view(tx.sql, actor, session), created: true };
     });
+  };
+
+  /** The caller's latest session of a journey (active or completed), or null. */
+  const getCurrentSession = async (
+    raw: CurrentSessionQuery,
+  ): Promise<OnboardingSessionView | null> => {
+    const query = z
+      .object({ actor: ActorSchema, journeyType: OnboardingJourneyTypeSchema })
+      .strict()
+      .parse(raw);
+    const session = await runtime.sessions.findLatest(
+      sql,
+      query.actor.userId,
+      query.journeyType,
+    );
+    return session === null ? null : view(sql, query.actor, session);
   };
 
   const getSession = async (
@@ -615,7 +715,7 @@ export function createOnboardingUseCases(
       query.actor,
       OnboardingSessionIdSchema.parse(query.sessionId),
     );
-    return view(sql, session);
+    return view(sql, query.actor, session);
   };
 
   const bindSessionContext = async (
@@ -723,7 +823,7 @@ export function createOnboardingUseCases(
         },
       );
       if (idem.replay) {
-        return view(tx.sql, locked);
+        return view(tx.sql, actor, locked);
       }
       const session = await lockedActiveSession(
         runtime,
@@ -767,7 +867,7 @@ export function createOnboardingUseCases(
       safeLog(runtime, "response.committed", committed.session, {
         stepKey: step.stepKey,
       });
-      return view(tx.sql, committed.session, committed.changes);
+      return view(tx.sql, actor, committed.session, committed.changes);
     });
   };
 
@@ -807,7 +907,7 @@ export function createOnboardingUseCases(
         },
       );
       if (idem.replay) {
-        return view(tx.sql, locked);
+        return view(tx.sql, actor, locked);
       }
       const session = await lockedActiveSession(
         runtime,
@@ -866,7 +966,7 @@ export function createOnboardingUseCases(
         journeyType: session.journeyType,
       });
       safeLog(runtime, "step.skipped", updated, { stepKey: step.stepKey });
-      return view(tx.sql, updated);
+      return view(tx.sql, actor, updated);
     });
   };
 
@@ -882,6 +982,7 @@ export function createOnboardingUseCases(
       })
       .strict()
       .parse(raw);
+    const { actor } = command;
     return transactions.run(async (tx) => {
       const session = await lockedActiveSession(
         runtime,
@@ -910,10 +1011,11 @@ export function createOnboardingUseCases(
         );
         const candidate =
           index >= 0 ? aggregate.path.eligible[index] : undefined;
-        // Only an earlier, visited, currently eligible step. Never a locked future step.
+        // Any visited, currently eligible step -- earlier to revise, or later
+        // to return after revising. Never an unvisited (locked) future step.
         if (
           candidate === undefined ||
-          index >= currentIndex ||
+          index === currentIndex ||
           !aggregate.states.has(candidate.stepKey)
         ) {
           throw new OnboardingSessionStateError("STEP_NOT_VISITED");
@@ -925,7 +1027,7 @@ export function createOnboardingUseCases(
         currentStepKey: target.stepKey,
       });
       safeLog(runtime, "session.back", updated, { stepKey: target.stepKey });
-      return view(tx.sql, updated);
+      return view(tx.sql, actor, updated);
     });
   };
 
@@ -941,6 +1043,7 @@ export function createOnboardingUseCases(
       })
       .strict()
       .parse(raw);
+    const { actor } = command;
     return transactions.run(async (tx) => {
       const session = await lockedActiveSession(
         runtime,
@@ -970,7 +1073,7 @@ export function createOnboardingUseCases(
         journeyType: session.journeyType,
       });
       safeLog(runtime, "session.completed", updated);
-      return view(tx.sql, updated);
+      return view(tx.sql, actor, updated);
     });
   };
 
@@ -1061,7 +1164,7 @@ export function createOnboardingUseCases(
         },
       );
       if (idem.replay) {
-        return view(tx.sql, locked);
+        return view(tx.sql, actor, locked);
       }
       const session = await lockedActiveSession(
         runtime,
@@ -1150,7 +1253,7 @@ export function createOnboardingUseCases(
         stepKey: step.stepKey,
         resolution: status,
       });
-      return view(tx.sql, updated, changes);
+      return view(tx.sql, actor, updated, changes);
     });
   };
 
@@ -1205,6 +1308,7 @@ export function createOnboardingUseCases(
 
   return {
     startSession,
+    getCurrentSession,
     getSession,
     bindSessionContext,
     submitResponse,

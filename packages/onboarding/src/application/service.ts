@@ -16,6 +16,7 @@ import type {
   OnboardingResponseRepository,
   OnboardingSessionRepository,
   OnboardingStepStateRepository,
+  OnboardingStepContextProvider,
   OnboardingSubjectResolver,
   OnboardingSuggestionRepository,
   OnboardingWriteTargetHandler,
@@ -26,6 +27,7 @@ import {
 } from "./publisher.js";
 import {
   createOnboardingSubjectResolverRegistry,
+  createOnboardingStepContextRegistry,
   createOnboardingWriteTargetRegistry,
 } from "./registry.js";
 import {
@@ -44,6 +46,7 @@ export type OnboardingService = {
   readonly runtime: Pick<
     OnboardingUseCases,
     | "startSession"
+    | "getCurrentSession"
     | "getSession"
     | "submitResponse"
     | "skipStep"
@@ -65,6 +68,9 @@ export type OnboardingServiceOptions = {
   /** Domain adapters for semantic write targets. Empty in CQ-ONB-001 production. */
   readonly writeTargets?: readonly OnboardingWriteTargetHandler[] | undefined;
   readonly subjectResolvers?: readonly OnboardingSubjectResolver[] | undefined;
+  /** Journey-specific server-side step data (reviews, snapshots). Empty in CQ-ONB-001. */
+  readonly stepContextProviders?:
+    readonly OnboardingStepContextProvider[] | undefined;
   readonly repositories?:
     | {
         readonly definitions?: OnboardingDefinitionRepository | undefined;
@@ -111,11 +117,15 @@ export function createOnboardingService(
     writeTargets: createOnboardingWriteTargetRegistry(
       options.writeTargets ?? [],
     ),
+    stepContexts: createOnboardingStepContextRegistry(
+      options.stepContextProviders ?? [],
+    ),
     logger: options.logger,
   });
   return {
     runtime: {
       startSession: useCases.startSession,
+      getCurrentSession: useCases.getCurrentSession,
       getSession: useCases.getSession,
       submitResponse: useCases.submitResponse,
       skipStep: useCases.skipStep,

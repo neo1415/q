@@ -97,6 +97,7 @@ const VIEW: OnboardingSessionView = {
     canComplete: false,
   },
   pendingSuggestions: [],
+  responses: [],
 };
 
 type Runtime = OnboardingService["runtime"];
@@ -113,6 +114,7 @@ function fakeRuntime(overrides: Partial<Runtime> = {}) {
     startSession: record("startSession", () =>
       Promise.resolve({ view: VIEW, created: true }),
     ),
+    getCurrentSession: record("getCurrentSession", () => Promise.resolve(VIEW)),
     getSession: record("getSession", () => Promise.resolve(VIEW)),
     submitResponse: record("submitResponse", () =>
       Promise.resolve({
@@ -228,7 +230,11 @@ describe("/v1/onboarding/sessions", () => {
       true,
     );
     const actor = (calls[0]?.input as { actor: OnboardingActor }).actor;
-    expect(actor).toEqual({ userId: USER_ID, context: null });
+    expect(actor).toEqual({
+      userId: USER_ID,
+      context: null,
+      principal: PRINCIPAL,
+    });
     expect(calls[0]?.input).toMatchObject({
       journeyType: "founder",
       idempotencyKey: KEY["idempotency-key"],
@@ -258,7 +264,7 @@ describe("/v1/onboarding/sessions", () => {
     });
     expect(response.statusCode).toBe(200);
     expect(calls[0]?.input).toMatchObject({
-      actor: { userId: USER_ID, context: CONTEXT },
+      actor: { userId: USER_ID, context: CONTEXT, principal: PRINCIPAL },
       subject: {
         subjectType: "COMPANY",
         subjectId: "a1111111-1111-4111-8111-111111111111",
@@ -484,6 +490,52 @@ describe("/v1/onboarding/sessions", () => {
     expect(JSON.stringify(misconfigured.json())).not.toMatch(
       /company\.stage|handler/,
     );
+  });
+
+  it('GET /sessions/current returns the caller\'s latest session, 404 when none, and never reads "current" as an id', async () => {
+    const { runtime, calls } = fakeRuntime();
+    const app = buildApp({
+      principal: PRINCIPAL,
+      context: "CONTEXT_REQUIRED",
+      runtime,
+    });
+    const found = await app.inject({
+      method: "GET",
+      url: "/v1/onboarding/sessions/current?journeyType=founder",
+    });
+    expect(found.statusCode).toBe(200);
+    expect(found.headers["cache-control"]).toBe("no-store");
+    expect(OnboardingSessionViewSchema.parse(found.json()).session.id).toBe(
+      SESSION_ID,
+    );
+    expect(calls).toEqual([
+      {
+        method: "getCurrentSession",
+        input: {
+          actor: { userId: USER_ID, context: null, principal: PRINCIPAL },
+          journeyType: "founder",
+        },
+      },
+    ]);
+    const badJourney = await app.inject({
+      method: "GET",
+      url: "/v1/onboarding/sessions/current?journeyType=marketplace",
+    });
+    expect(badJourney.statusCode).toBe(422);
+
+    const none = buildApp({
+      principal: PRINCIPAL,
+      context: "CONTEXT_REQUIRED",
+      runtime: fakeRuntime({
+        getCurrentSession: () => Promise.resolve(null),
+      }).runtime,
+    });
+    const missing = await none.inject({
+      method: "GET",
+      url: "/v1/onboarding/sessions/current?journeyType=founder",
+    });
+    expect(missing.statusCode).toBe(404);
+    expect(missing.json()).toMatchObject({ code: "RESOURCE_NOT_FOUND" });
   });
 
   it("exposes no definition, binding, suggestion-creation or listing route", async () => {

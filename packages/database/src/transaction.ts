@@ -16,6 +16,31 @@ function isDriverFailure(error: unknown): boolean {
 import type { TransactionContext, TransactionManager } from "./types.js";
 
 /**
+ * A TransactionManager whose units are savepoints inside an existing
+ * transaction. This is how one bounded context's use case runs inside
+ * another's transaction (an onboarding step committing a canonical company
+ * write): the nested unit commits or rolls back with the outer one, a
+ * failure inside it releases only its own savepoint, and no second
+ * top-level transaction is ever opened from inside the first.
+ */
+export function createSavepointTransactionManager(
+  outer: TransactionContext,
+): TransactionManager {
+  return {
+    run: async (work) => {
+      try {
+        const { value } = await outer.sql.savepoint(async (inner) => ({
+          value: await work({ sql: inner }),
+        }));
+        return value;
+      } catch (error) {
+        throw isDriverFailure(error) ? toDatabaseError(error) : error;
+      }
+    },
+  };
+}
+
+/**
  * Wrap a client in the transaction boundary.
  *
  * `sql.begin` reserves one connection from the pool for the callback's

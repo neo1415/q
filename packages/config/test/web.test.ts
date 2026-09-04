@@ -23,6 +23,55 @@ describe("parseWebServerConfig", () => {
     expect(config.secrets).toEqual({});
   });
 
+  it("defaults to the api adapter whenever CQ_API_URL is configured, and requires it for api", () => {
+    const local = parseWebServerConfig({
+      NODE_ENV: "test",
+      CQ_API_URL: "http://127.0.0.1:3001",
+      ...SUPABASE_ENV,
+    });
+    expect(local.founderOnboardingAdapter).toBe("api");
+    expect(local.apiBaseUrl).toBe("http://127.0.0.1:3001");
+
+    const production = parseWebServerConfig({
+      NODE_ENV: "production",
+      CAPITAL_Q_ENV: "production",
+      CQ_WEB_ORIGIN: "https://app.capitalq.test",
+      CQ_API_URL: "https://api.capitalq.test/",
+      ...SUPABASE_ENV,
+    });
+    expect(production.founderOnboardingAdapter).toBe("api");
+    expect(production.apiBaseUrl).toBe("https://api.capitalq.test");
+
+    expect(() =>
+      parseWebServerConfig({
+        NODE_ENV: "test",
+        CQ_FOUNDER_ONBOARDING_ADAPTER: "api",
+        ...SUPABASE_ENV,
+      }),
+    ).toThrow(ConfigurationError);
+  });
+
+  it("never composes the fixture on a production build or environment", () => {
+    expect(() =>
+      parseWebServerConfig({
+        NODE_ENV: "production",
+        CAPITAL_Q_ENV: "preview",
+        CQ_WEB_ORIGIN: "https://preview.capitalq.test",
+        CQ_FOUNDER_ONBOARDING_ADAPTER: "fixture",
+        ...SUPABASE_ENV,
+      }),
+    ).toThrow(ConfigurationError);
+    expect(() =>
+      parseWebServerConfig({
+        NODE_ENV: "test",
+        CAPITAL_Q_ENV: "production",
+        CQ_WEB_ORIGIN: "https://app.capitalq.test",
+        CQ_FOUNDER_ONBOARDING_ADAPTER: "fixture",
+        ...SUPABASE_ENV,
+      }),
+    ).toThrow(ConfigurationError);
+  });
+
   it("requires the Supabase URL and publishable key", () => {
     expect(() => parseWebServerConfig({ NODE_ENV: "test" })).toThrow(
       ConfigurationError,

@@ -100,12 +100,16 @@ export type {
   OnboardingSubjectResolver,
   OnboardingSubjectResolverRegistry,
   OnboardingSuggestionRepository,
+  OnboardingStepContextInput,
+  OnboardingStepContextProvider,
+  OnboardingStepContextRegistry,
   OnboardingWriteContext,
   OnboardingWriteTargetHandler,
   OnboardingWriteTargetRegistry,
 } from "./application/ports.js";
 export {
   createCompanyOnboardingSubjectResolver,
+  createOnboardingStepContextRegistry,
   createOnboardingSubjectResolverRegistry,
   createOnboardingWriteTargetRegistry,
 } from "./application/registry.js";
@@ -126,6 +130,7 @@ export {
   createOnboardingUseCases,
   type BindSessionContextCommand,
   type CompleteOnboardingSessionCommand,
+  type CurrentSessionQuery,
   type CreateOnboardingSuggestionCommand,
   type ExpireOnboardingSuggestionCommand,
   type OnboardingBackCommand,

@@ -25,6 +25,8 @@ export const ONBOARDING_BACK_SEGMENT = "/back";
 export const ONBOARDING_COMPLETE_SEGMENT = "/complete";
 export const ONBOARDING_SUGGESTIONS_SEGMENT = "/suggestions";
 export const ONBOARDING_RESOLVE_SEGMENT = "/resolve";
+/** `GET /v1/onboarding/sessions/current?journeyType=` -- the caller's latest active session. */
+export const ONBOARDING_CURRENT_SEGMENT = "/current";
 
 // ---------------------------------------------------------------------------
 // Closed vocabularies
@@ -69,6 +71,8 @@ export const ONBOARDING_STEP_TYPES = [
   "voice_text",
   "document_upload",
   "confirmation",
+  /** Select canonical reference entities (e.g. taxonomy nodes) by stable id. */
+  "reference_select",
 ] as const;
 export const OnboardingStepTypeSchema = z.enum(ONBOARDING_STEP_TYPES);
 export type OnboardingStepType = z.infer<typeof OnboardingStepTypeSchema>;
@@ -96,6 +100,9 @@ export const ONBOARDING_STEP_PROGRESS_STATUSES = [
 export const OnboardingStepProgressStatusSchema = z.enum(
   ONBOARDING_STEP_PROGRESS_STATUSES,
 );
+export type OnboardingStepProgressStatus = z.infer<
+  typeof OnboardingStepProgressStatusSchema
+>;
 
 export const ONBOARDING_RESPONSE_TYPES = [
   "SINGLE_SELECT",
@@ -174,7 +181,7 @@ export const OnboardingOptionKeySchema = z
 
 export const OnboardingPhaseKeySchema = z
   .string()
-  .regex(/^[a-z0-9][a-z0-9_-]{0,63}$/, "expected a phase key");
+  .regex(/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$/, "expected a phase key");
 
 export const ONBOARDING_TEXT_MAX_LENGTH = 4000;
 export const ONBOARDING_MULTI_SELECT_MAX = 50;
@@ -391,6 +398,16 @@ export const OnboardingStepPresentationSchema = z.discriminatedUnion(
       confirmLabel: z.string(),
       declineLabel: z.string().optional(),
       requireAffirmative: z.boolean(),
+      /** Names the server-side context this confirmation presents (see `context`). */
+      contextKey: z.string().optional(),
+    }),
+    z.object({
+      stepType: z.literal("reference_select"),
+      resourceType: OnboardingResourceTypeSchema,
+      /** For TAXONOMY_NODE: the vocabularies the selection may draw from. */
+      vocabularyCodes: z.array(z.string()),
+      minItems: z.number().int().min(0),
+      maxItems: z.number().int().min(1),
     }),
   ],
 );
@@ -420,6 +437,12 @@ export const OnboardingStepViewSchema = z.object({
   phaseKey: OnboardingPhaseKeySchema.optional(),
   presentation: OnboardingStepPresentationSchema,
   currentResponse: OnboardingResponseViewSchema.optional(),
+  /**
+   * Server-assembled, journey-specific data for this step (deterministic
+   * projections such as a review summary). Its shape is owned by the
+   * provider named in `presentation.contextKey`; never client input.
+   */
+  context: z.record(z.string(), z.unknown()).optional(),
 });
 export type OnboardingStepView = z.infer<typeof OnboardingStepViewSchema>;
 
@@ -494,6 +517,12 @@ export const OnboardingSessionViewSchema = z.object({
   currentStep: OnboardingStepViewSchema.nullable(),
   progress: OnboardingProgressSchema,
   pendingSuggestions: z.array(OnboardingSuggestionViewSchema),
+  /**
+   * The current response of every eligible step, so a client can present a
+   * group of related steps (or prefill a revisited one) without a round
+   * trip per step. Only the caller's own answers; never another user's.
+   */
+  responses: z.array(OnboardingResponseViewSchema),
   /** Present after a mutation that changed the eligible path. */
   pathChanges: OnboardingPathChangesSchema.optional(),
 });

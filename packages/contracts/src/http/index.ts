@@ -328,6 +328,7 @@ export {
 export {
   CompleteOnboardingSessionRequestSchema,
   ONBOARDING_BACK_SEGMENT,
+  ONBOARDING_CURRENT_SEGMENT,
   ONBOARDING_CLIENT_SOURCE_MODALITIES,
   ONBOARDING_COMPLETE_SEGMENT,
   ONBOARDING_JOURNEY_TYPES,
@@ -373,6 +374,7 @@ export {
   OnboardingStepPresentationSchema,
   OnboardingStepProgressSchema,
   OnboardingStepProgressStatusSchema,
+  type OnboardingStepProgressStatus,
   OnboardingStepStateStatusSchema,
   OnboardingStepTypeSchema,
   OnboardingStepViewSchema,

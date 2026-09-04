@@ -16,6 +16,7 @@
     "@capital-q/api-client": "workspace:*",
     "@capital-q/config": "workspace:*",
     "@capital-q/contracts": "workspace:*",
+    "@capital-q/founder-onboarding": "workspace:*",
     "@capital-q/ui": "workspace:*",
     "@supabase/ssr": "0.12.5",
     "@supabase/supabase-js": "2.114.0",

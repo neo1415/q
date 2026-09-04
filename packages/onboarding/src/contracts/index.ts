@@ -15,6 +15,7 @@ import {
 } from "@capital-q/contracts";
 import type {
   ActorContext,
+  AuthenticatedPrincipal,
   OrganisationId,
   TenantId,
   UserId,
@@ -130,6 +131,12 @@ export type PublishedOnboardingDefinition = {
 export type OnboardingActor = {
   readonly userId: UserId;
   readonly context: ActorContext | null;
+  /**
+   * The verified authentication principal when the caller is a live
+   * request. Person-scoped bootstrap commands (creating a first workspace)
+   * need it; it is never reconstructed from client input.
+   */
+  readonly principal?: AuthenticatedPrincipal | undefined;
 };
 
 export type OnboardingSubject = {

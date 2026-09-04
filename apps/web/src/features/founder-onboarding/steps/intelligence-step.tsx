@@ -7,10 +7,11 @@ import { InlineNotice } from "@capital-q/ui/states";
 import type { StepProps } from "./step-props";
 
 /**
- * F8. First-value intelligence: structured, sourced, no score, no investor
- * matches, and no "complete" banner. The shell supplies the momentum actions.
+ * F8. "Here's what we have so far": structured, sourced from the founder's
+ * own answers, no score, no investor matches, no "complete" banner and no
+ * claim that Q has analysed anything. The shell supplies the actions.
  */
-export function IntelligenceStep({ step }: StepProps<"intelligence_snapshot">) {
+export function IntelligenceStep({ step }: StepProps<"snapshot">) {
   return (
     <div className="flex flex-col gap-6">
       <h1 className="sr-only">{step.title}</h1>
@@ -19,6 +20,7 @@ export function IntelligenceStep({ step }: StepProps<"intelligence_snapshot">) {
         summary={step.summary}
         sections={step.sections}
         nextSteps={step.nextSteps}
+        nextStepsTitle="What would help next"
         provenanceNote={step.provenanceNote}
       />
       <div className="flex flex-col gap-3">

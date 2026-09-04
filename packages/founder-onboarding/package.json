@@ -1,0 +1,48 @@
+{
+  "name": "@capital-q/founder-onboarding",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Founder onboarding (F0-F8) over the onboarding runtime: the published Founder Definition v1 and the integration layer that maps journey responses onto the canonical Organisation, Company, Taxonomy and Capital domains through their public services. Owns no business truth and no journey state.",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./definition": {
+      "types": "./dist/definition/index.d.ts",
+      "default": "./dist/definition/index.js"
+    }
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "clean": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\""
+  },
+  "dependencies": {
+    "@capital-q/audit": "workspace:*",
+    "@capital-q/capital": "workspace:*",
+    "@capital-q/companies": "workspace:*",
+    "@capital-q/contracts": "workspace:*",
+    "@capital-q/database": "workspace:*",
+    "@capital-q/eventing": "workspace:*",
+    "@capital-q/onboarding": "workspace:*",
+    "@capital-q/organisations": "workspace:*",
+    "@capital-q/security": "workspace:*",
+    "@capital-q/taxonomy": "workspace:*",
+    "zod": "4.5.4"
+  },
+  "devDependencies": {
+    "@capital-q/config": "workspace:*",
+    "@capital-q/observability": "workspace:*",
+    "@capital-q/permissions": "workspace:*",
+    "@types/node": "^24.13.3",
+    "typescript": "5.9.3"
+  }
+}
