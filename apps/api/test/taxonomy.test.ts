@@ -136,7 +136,12 @@ function buildApp(options: {
     identities: { lookup: () => Promise.resolve(null) },
   };
   return createApp(parseApiConfig({ NODE_ENV: "test" }), security, {
-    taxonomy: options.query,
+    taxonomy: {
+      query: options.query,
+      candidates: {
+        findCandidates: () => Promise.reject(new Error("not under test")),
+      },
+    },
   }).app;
 }
 
@@ -265,12 +270,15 @@ describe("taxonomy routes", () => {
     expect(malformed.statusCode).toBe(422);
   });
 
-  it("registers no assignment, classification, search or edit route", async () => {
+  it("registers no assignment, alias, classification-run, search or edit route", async () => {
     const app = buildApp({ principal: PRINCIPAL, query: fakeQuery().query });
     for (const [method, url] of [
       ["POST", "/v1/taxonomy/nodes"],
       ["PATCH", `/v1/taxonomy/nodes/${ROOT.id}`],
       ["POST", "/v1/taxonomy/assignments"],
+      ["POST", "/v1/taxonomy/aliases"],
+      ["POST", "/v1/taxonomy/classification-runs"],
+      ["GET", "/v1/taxonomy/classification-runs"],
       ["GET", "/v1/taxonomy/search?q=payments"],
     ] as const) {
       const response = await app.inject({ method, url });

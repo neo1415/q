@@ -72,6 +72,7 @@ export {
 } from "./capital-objectives.js";
 
 export {
+  findTaxonomyCandidates,
   getTaxonomyNode,
   listTaxonomyNodes,
   listTaxonomyVocabularies,

@@ -122,11 +122,12 @@ export function createPostgresTaxonomyAssignmentRepository(): TaxonomyAssignment
       const rows = await tx.sql`
         insert into taxonomy.entity_assignments
           (tenant_id, entity_type, entity_id, node_id, assignment_source, confidence,
-           raw_source_text, source_id, confirmed_by_user_id, confirmed_at)
+           raw_source_text, source_id, classification_run_id, confirmed_by_user_id, confirmed_at)
         values
           (${input.tenantId}, ${input.subjectType}, ${input.subjectId}, ${input.nodeId},
            ${input.assignmentSource}, ${input.confidence}::text::numeric, ${input.rawSourceText},
-           ${input.sourceId}, ${input.confirmedByUserId}, ${input.confirmedAt}::text::timestamptz)
+           ${input.sourceId}, ${input.classificationRunId}, ${input.confirmedByUserId},
+           ${input.confirmedAt}::text::timestamptz)
         returning id`;
       const inserted = z
         .object({ id: TaxonomyAssignmentIdSchema })

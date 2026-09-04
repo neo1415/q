@@ -46,6 +46,11 @@ import {
   AuthorizationRequirementError,
 } from "@capital-q/security";
 import {
+  TaxonomyClassificationCandidateDecidedError,
+  TaxonomyClassificationCandidateNotFoundError,
+  TaxonomyClassificationInputError,
+  TaxonomyClassificationRunNotFoundError,
+  TaxonomyClassifierNotAvailableError,
   TaxonomyNodeNotFoundError,
   TaxonomyNodeNotSelectableError,
   TaxonomySubjectNotFoundError,
@@ -177,7 +182,9 @@ function toProblem(error: unknown, requestId: string): ProblemDetails {
     error instanceof CapitalObjectiveNotFoundError ||
     error instanceof TaxonomyVocabularyNotFoundError ||
     error instanceof TaxonomyNodeNotFoundError ||
-    error instanceof TaxonomySubjectNotFoundError
+    error instanceof TaxonomySubjectNotFoundError ||
+    error instanceof TaxonomyClassificationRunNotFoundError ||
+    error instanceof TaxonomyClassificationCandidateNotFoundError
   ) {
     return createProblemDetails({ code: "RESOURCE_NOT_FOUND", requestId });
   }
@@ -190,6 +197,32 @@ function toProblem(error: unknown, requestId: string): ProblemDetails {
       code: "INVALID_REQUEST",
       requestId,
       detail: `${error.message} (${error.reason}: ${error.nodeId})`,
+    });
+  }
+
+  if (error instanceof TaxonomyClassificationInputError) {
+    return createProblemDetails({
+      code: "INVALID_REQUEST",
+      requestId,
+      detail: `${error.message} (${error.reason})`,
+    });
+  }
+
+  // A strategy with a declared port but no adapter yet (SEMANTIC, MODEL).
+  // Lexical search is never silently substituted for it.
+  if (error instanceof TaxonomyClassifierNotAvailableError) {
+    return createProblemDetails({
+      code: "PROVIDER_UNAVAILABLE",
+      requestId,
+      detail: `${error.code}: ${error.message}`,
+    });
+  }
+
+  if (error instanceof TaxonomyClassificationCandidateDecidedError) {
+    return createProblemDetails({
+      code: "RESOURCE_CONFLICT",
+      requestId,
+      detail: error.message,
     });
   }
 

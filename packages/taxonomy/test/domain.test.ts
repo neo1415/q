@@ -253,15 +253,21 @@ describe("closed vocabularies and primitives", () => {
     expect(() => decodeTaxonomyNodeCursor("not-a-cursor")).toThrow();
   });
 
-  it("exposes no ranking, scoring, classification-run or model surface (§185-188)", () => {
+  it("exposes no recommendation-weight, embedding, model-provider or LLM surface", () => {
     const names = Object.keys(taxonomy);
     for (const forbidden of names.filter((name) =>
-      /rank|score|weight|recommend|embedding|classif(y|ier|ication)Run|llm|model/i.test(
+      /weight|recommend|embedding|vector|llm|gateway|openai|anthropic|gemini/i.test(
         name,
       ),
     )) {
       expect(forbidden, forbidden).toBe("");
     }
+    // The only "model" name is the declared-but-unimplemented classifier port.
+    expect(
+      names.filter(
+        (name) => /model/i.test(name) && name !== "TAXONOMY_CLASSIFIER_MODEL",
+      ),
+    ).toEqual([]);
     expect(names).toContain("createTaxonomyService");
     expect(names).toContain("normalizeTaxonomyAlias");
   });

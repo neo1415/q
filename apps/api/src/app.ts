@@ -36,6 +36,16 @@ import {
 
 export const SERVICE_NAME = "api";
 
+/** The resource identity every logger and meter of this deployable carries. */
+export function apiServiceIdentity(config: ApiConfig): ServiceIdentity {
+  return {
+    serviceName: SERVICE_NAME,
+    environment: config.runtime.deploymentEnvironment,
+    serviceVersion: config.observability.serviceVersion,
+    region: config.observability.region,
+  };
+}
+
 /**
  * The security boundary the composition root hands the application: how a
  * request is authenticated, how a person's organisation context is resolved,
@@ -74,12 +84,7 @@ export function createApp(
   readonly app: FastifyInstance;
   readonly logger: Logger;
 } {
-  const identity: ServiceIdentity = {
-    serviceName: SERVICE_NAME,
-    environment: config.runtime.deploymentEnvironment,
-    serviceVersion: config.observability.serviceVersion,
-    region: config.observability.region,
-  };
+  const identity = apiServiceIdentity(config);
 
   const logger = createLogger(identity, {
     level: config.observability.logLevel,

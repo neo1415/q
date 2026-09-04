@@ -1659,6 +1659,111 @@ export type Database = {
           },
         ]
       }
+      classification_candidates: {
+        Row: {
+          accepted: boolean | null
+          classification_run_id: string
+          confidence: number
+          decided_at: string | null
+          decided_by_user_id: string | null
+          match_types: string[]
+          node_id: string
+          rank: number
+          rationale_summary: string
+        }
+        Insert: {
+          accepted?: boolean | null
+          classification_run_id: string
+          confidence: number
+          decided_at?: string | null
+          decided_by_user_id?: string | null
+          match_types: string[]
+          node_id: string
+          rank: number
+          rationale_summary: string
+        }
+        Update: {
+          accepted?: boolean | null
+          classification_run_id?: string
+          confidence?: number
+          decided_at?: string | null
+          decided_by_user_id?: string | null
+          match_types?: string[]
+          node_id?: string
+          rank?: number
+          rationale_summary?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "classification_candidates_classification_run_id_fkey"
+            columns: ["classification_run_id"]
+            isOneToOne: false
+            referencedRelation: "classification_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "classification_candidates_node_id_fkey"
+            columns: ["node_id"]
+            isOneToOne: false
+            referencedRelation: "nodes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      classification_runs: {
+        Row: {
+          classifier_model: string
+          classifier_provider: string
+          classifier_version: string
+          completed_at: string | null
+          cost_usd: number
+          id: string
+          input_source_id: string | null
+          input_source_type: string | null
+          metadata: Json
+          started_at: string
+          status: string
+          subject_id: string
+          subject_type: string
+          taxonomy_version: Json
+          tenant_id: string
+        }
+        Insert: {
+          classifier_model: string
+          classifier_provider: string
+          classifier_version: string
+          completed_at?: string | null
+          cost_usd?: number
+          id?: string
+          input_source_id?: string | null
+          input_source_type?: string | null
+          metadata?: Json
+          started_at?: string
+          status?: string
+          subject_id: string
+          subject_type: string
+          taxonomy_version: Json
+          tenant_id: string
+        }
+        Update: {
+          classifier_model?: string
+          classifier_provider?: string
+          classifier_version?: string
+          completed_at?: string | null
+          cost_usd?: number
+          id?: string
+          input_source_id?: string | null
+          input_source_type?: string | null
+          metadata?: Json
+          started_at?: string
+          status?: string
+          subject_id?: string
+          subject_type?: string
+          taxonomy_version?: Json
+          tenant_id?: string
+        }
+        Relationships: []
+      }
       entity_assignments: {
         Row: {
           assignment_source: string
@@ -1715,6 +1820,13 @@ export type Database = {
           valid_to?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "entity_assignments_classification_run_fk"
+            columns: ["classification_run_id"]
+            isOneToOne: false
+            referencedRelation: "classification_runs"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "entity_assignments_node_id_fkey"
             columns: ["node_id"]

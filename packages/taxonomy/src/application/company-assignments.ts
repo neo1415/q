@@ -9,13 +9,18 @@ import {
   type MaterialActionAuditWriter,
 } from "@capital-q/audit";
 import { CorrelationIdSchema, type CorrelationId } from "@capital-q/contracts";
-import type { DatabaseExecutor, TransactionManager } from "@capital-q/database";
+import type {
+  DatabaseExecutor,
+  TransactionContext,
+  TransactionManager,
+} from "@capital-q/database";
 import type { OutboxWriter } from "@capital-q/eventing";
 import {
   ActorContextSchema,
   capability,
   type ActorContext,
   type AuthorizationService,
+  type OrganisationId,
 } from "@capital-q/security";
 
 import {
@@ -26,6 +31,7 @@ import {
   type TaxonomyEntityAssignment,
   type TaxonomyNode,
   type TaxonomyNodeId,
+  type TaxonomySubjectDescriptor,
   type TaxonomyVocabularyCode,
 } from "../contracts/index.js";
 import {
@@ -122,11 +128,19 @@ export type CompanyAssignmentDependencies = {
   readonly subjects: TaxonomySubjectResolverRegistry;
 };
 
-async function visibleCompany(
-  dependencies: CompanyAssignmentDependencies,
+/**
+ * The company must be visible in the actor's tenant AND owned by the
+ * actor's active organisation. Shared by every company-scoped taxonomy
+ * command (assignments, classification runs, candidate decisions).
+ */
+export async function requireVisibleCompany(
+  dependencies: Pick<CompanyAssignmentDependencies, "subjects">,
   actor: ActorContext,
   companyId: string,
-) {
+): Promise<{
+  readonly subject: TaxonomySubjectDescriptor;
+  readonly organisationId: OrganisationId;
+}> {
   const subject = await dependencies.subjects.resolve(
     "COMPANY",
     actor.tenantId,
@@ -181,6 +195,61 @@ export async function requireSelectableNodes(
   return byId;
 }
 
+export type CompanyAssignmentChange = {
+  readonly actor: ActorContext;
+  readonly subject: TaxonomySubjectDescriptor;
+  readonly organisationId: OrganisationId;
+  readonly vocabularyCode: TaxonomyVocabularyCode;
+  readonly addedCount: number;
+  readonly removedCount: number;
+  readonly occurredAt: string;
+  readonly correlationId: CorrelationId;
+  /** Safe identifiers only (e.g. a classification run id); never raw text. */
+  readonly provenance?: { readonly classificationRunId: string } | undefined;
+};
+
+/**
+ * The one audit + outbox path for a canonical company classification
+ * change. Candidate acceptance (CQ-TAX-002) reuses it rather than
+ * inventing a second audit fact or event for the same mutation.
+ */
+export async function recordCompanyAssignmentChange(
+  tx: TransactionContext,
+  dependencies: Pick<CompanyAssignmentDependencies, "audit" | "outbox">,
+  change: CompanyAssignmentChange,
+): Promise<void> {
+  await dependencies.audit.record(tx, {
+    ...auditActorFromContext(change.actor),
+    auditEventId: createAuditEventId(),
+    actionType: ACTION_UPDATED,
+    resourceType: RESOURCE_COMPANY,
+    resourceId: change.subject.subjectId,
+    occurredAt: change.occurredAt,
+    outcome: "SUCCEEDED",
+    metadata: {
+      vocabularyCode: change.vocabularyCode,
+      addedCount: change.addedCount,
+      removedCount: change.removedCount,
+      ...(change.provenance === undefined
+        ? {}
+        : { classificationRunId: change.provenance.classificationRunId }),
+    },
+    correlationId: change.correlationId,
+  });
+  await dependencies.outbox.enqueue(
+    tx,
+    entityAssignmentsChangedEvent({
+      tenantId: change.actor.tenantId,
+      organisationId: change.organisationId,
+      actorUserId: change.actor.userId,
+      correlationId: change.correlationId,
+      subjectType: change.subject.subjectType,
+      subjectId: change.subject.subjectId,
+      changedVocabularyCodes: [change.vocabularyCode],
+    }),
+  );
+}
+
 export function createReplaceCompanyAssignments(
   dependencies: CompanyAssignmentDependencies,
 ) {
@@ -199,7 +268,7 @@ export function createReplaceCompanyAssignments(
   ): Promise<ReplaceCompanyAssignmentsResult> => {
     const command = ReplaceCommandSchema.parse(raw);
     const { actor } = command;
-    const { subject, organisationId } = await visibleCompany(
+    const { subject, organisationId } = await requireVisibleCompany(
       dependencies,
       actor,
       command.companyId,
@@ -274,37 +343,25 @@ export function createReplaceCompanyAssignments(
           confidence: null,
           rawSourceText: node.rawSourceText ?? null,
           sourceId: null,
+          classificationRunId: null,
           confirmedByUserId: actor.userId,
           confirmedAt: now,
         });
       }
 
-      await audit.record(tx, {
-        ...auditActorFromContext(actor),
-        auditEventId: createAuditEventId(),
-        actionType: ACTION_UPDATED,
-        resourceType: RESOURCE_COMPANY,
-        resourceId: subject.subjectId,
-        occurredAt: now,
-        outcome: "SUCCEEDED",
-        metadata: {
+      await recordCompanyAssignmentChange(
+        tx,
+        { audit, outbox },
+        {
+          actor,
+          subject,
+          organisationId,
           vocabularyCode: command.vocabularyCode,
           addedCount: added.length,
           removedCount: removed.length,
-        },
-        correlationId: command.correlationId,
-      });
-      await outbox.enqueue(
-        tx,
-        entityAssignmentsChangedEvent({
-          tenantId: actor.tenantId,
-          organisationId,
-          actorUserId: actor.userId,
+          occurredAt: now,
           correlationId: command.correlationId,
-          subjectType: subject.subjectType,
-          subjectId: subject.subjectId,
-          changedVocabularyCodes: [command.vocabularyCode],
-        }),
+        },
       );
 
       const updated = await assignments.listCurrent(
@@ -326,7 +383,7 @@ export function createListCompanyAssignments(
   return async (
     query: ListCompanyAssignmentsQuery,
   ): Promise<readonly TaxonomyEntityAssignment[]> => {
-    const { subject, organisationId } = await visibleCompany(
+    const { subject, organisationId } = await requireVisibleCompany(
       dependencies,
       query.actor,
       query.companyId,

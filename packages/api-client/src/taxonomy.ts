@@ -1,10 +1,13 @@
 import {
   ListTaxonomyNodesResponseSchema,
   ListTaxonomyVocabulariesResponseSchema,
+  TAXONOMY_CANDIDATES_SEGMENT,
   TAXONOMY_NODES_SEGMENT,
   TAXONOMY_PATH,
   TAXONOMY_VOCABULARIES_SEGMENT,
+  TaxonomyCandidateResponseSchema,
   TaxonomyNodeDetailDtoSchema,
+  type TaxonomyCandidateRequest,
   type TaxonomyNodeStatus,
 } from "@capital-q/contracts";
 
@@ -67,5 +70,24 @@ export function getTaxonomyNode(session: ApiSession, nodeId: string) {
     "GET",
     `${TAXONOMY_PATH}${TAXONOMY_NODES_SEGMENT}/${encodeURIComponent(nodeId)}`,
     TaxonomyNodeDetailDtoSchema,
+  );
+}
+
+/**
+ * `POST /v1/taxonomy/candidates` -- deterministic canonical-node candidates
+ * for a phrase. Read/compute only: nothing is persisted, so it is safe for
+ * autocomplete and onboarding suggestions. A candidate is a suggestion,
+ * never an assignment; confidence is an indicator, never a probability.
+ */
+export function findTaxonomyCandidates(
+  session: ApiSession,
+  request: TaxonomyCandidateRequest,
+) {
+  return call(
+    session,
+    "POST",
+    `${TAXONOMY_PATH}${TAXONOMY_CANDIDATES_SEGMENT}`,
+    TaxonomyCandidateResponseSchema,
+    { body: request },
   );
 }

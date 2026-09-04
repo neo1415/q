@@ -79,6 +79,8 @@ insert into rls_inventory (schema_name, table_name, classification, authenticate
   ('taxonomy', 'aliases',                  'INTERNAL_SERVER_ONLY', '{}'),
   ('taxonomy', 'entity_assignments',       'INTERNAL_SERVER_ONLY', '{}'),
   ('taxonomy', 'mandate_preferences',      'INTERNAL_SERVER_ONLY', '{}'),
+  ('taxonomy', 'classification_runs',      'INTERNAL_SERVER_ONLY', '{}'),
+  ('taxonomy', 'classification_candidates', 'INTERNAL_SERVER_ONLY', '{}'),
   ('events', 'outbox',                     'INTERNAL_SERVER_ONLY', '{}'),
   ('audit', 'material_actions',            'INTERNAL_SERVER_ONLY', '{}'),
   ('audit', 'security_events',             'INTERNAL_SERVER_ONLY', '{}');

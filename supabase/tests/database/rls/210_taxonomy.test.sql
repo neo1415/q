@@ -190,8 +190,8 @@ select throws_ok($$ select * from taxonomy.vocabularies $$, '42501', null, 'anon
 select pg_temp.act_as_service_role();
 select throws_ok($$ select * from taxonomy.aliases $$, '42501', null, 'service_role holds no grant');
 select pg_temp.act_as_privileged();
-select is((select count(*)::int from information_schema.tables where table_schema = 'taxonomy' and table_name in ('classification_runs', 'classification_candidates')), 0,
-  'no classification tables exist yet (CQ-TAX-002)');
+select is((select count(*)::int from information_schema.tables where table_schema = 'taxonomy' and table_name in ('classification_runs', 'classification_candidates')), 2,
+  'the CQ-TAX-002 classification provenance tables exist (covered by 220_taxonomy_classification)');
 
 select * from finish();
 

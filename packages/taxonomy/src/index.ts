@@ -13,8 +13,9 @@
  * Does not own: companies, investor mandates, evidence, onboarding, Q,
  * recommendations or search. It reaches the company through its public
  * query port; the Investor domain calls the mandate preference port inside
- * its own versioned transaction. Zero model calls, no embeddings, no
- * classification runs or candidates (CQ-TAX-002), no ranking weights.
+ * its own versioned transaction. Classification (CQ-TAX-002) is
+ * deterministic: exact + bounded lexical candidates, provenance runs,
+ * human confirmation. Zero model calls, no embeddings, no ranking weights.
  *
  *   Company classification ≠ Investor preference (same TaxonomyNodeId)
  *   canonical_code / id = identity; display_name ≠ identity
@@ -83,7 +84,10 @@ export {
   COMPANY_VIEW,
   createListCompanyAssignments,
   createReplaceCompanyAssignments,
+  recordCompanyAssignmentChange,
   requireSelectableNodes,
+  requireVisibleCompany,
+  type CompanyAssignmentChange,
   type CompanyAssignmentDependencies,
   type ListCompanyAssignmentsQuery,
   type ReplaceCompanyAssignmentsCommand,
@@ -97,9 +101,12 @@ export {
 } from "./application/mandate-preferences.js";
 export {
   createTaxonomyService,
+  type TaxonomyClassificationService,
   type TaxonomyService,
   type TaxonomyServiceOptions,
 } from "./application/service.js";
+
+export * from "./classification/index.js";
 
 export { createPostgresTaxonomyReferenceRepository } from "./infrastructure/postgres-taxonomy-repository.js";
 export { createPostgresTaxonomyAssignmentRepository } from "./infrastructure/postgres-assignment-repository.js";

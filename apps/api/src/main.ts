@@ -16,7 +16,7 @@ import {
 } from "@capital-q/audit";
 import { createRequestDatabaseClient } from "@capital-q/database";
 import { createOutboxWriter } from "@capital-q/eventing";
-import { createTelemetryRuntime } from "@capital-q/observability";
+import { createLogger, createTelemetryRuntime } from "@capital-q/observability";
 import { createCapitalService } from "@capital-q/capital";
 import {
   createCompanyService,
@@ -37,7 +37,7 @@ import {
 } from "@capital-q/security/postgres";
 import { createSupabaseAccessTokenAuthenticator } from "@capital-q/security/supabase";
 
-import { createApp } from "./app.js";
+import { apiServiceIdentity, createApp } from "./app.js";
 import { createProductionEventRegistry } from "./event-registry.js";
 import { createSupabaseRequestAuthenticator } from "./security/supabase-authenticator.js";
 
@@ -128,6 +128,10 @@ const taxonomy = createTaxonomyService({
   companies: createPostgresCompanyQueryPort({ sql: database.sql }),
   outbox,
   audit,
+  // Safe classification telemetry only; the classifier never logs text.
+  logger: createLogger(apiServiceIdentity(config), {
+    level: config.observability.logLevel,
+  }),
 });
 
 const { app, logger } = createApp(config, security, {
@@ -135,7 +139,10 @@ const { app, logger } = createApp(config, security, {
   companies,
   investors,
   capital,
-  taxonomy: taxonomy.query,
+  taxonomy: {
+    query: taxonomy.query,
+    candidates: taxonomy.classification.candidates,
+  },
 });
 
 app.addHook("onClose", async () => {

@@ -2,7 +2,36 @@ import type { MaterialActionAuditWriter } from "@capital-q/audit";
 import type { CompanyQueryPort } from "@capital-q/companies";
 import type { DatabaseExecutor, TransactionManager } from "@capital-q/database";
 import type { OutboxWriter } from "@capital-q/eventing";
+import type { Logger } from "@capital-q/observability";
 import type { AuthorizationService } from "@capital-q/security";
+
+import {
+  createAcceptCompanyClassificationCandidate,
+  createClassifyWithProvenance,
+  createGetCompanyClassificationRun,
+  createRejectCompanyClassificationCandidate,
+  type AcceptCompanyCandidateResult,
+  type ClassifyWithProvenanceCommand,
+  type DecideCompanyCandidateCommand,
+  type GetClassificationRunQuery,
+  type TaxonomyClassificationRunResult,
+} from "../classification/application/classification-runs.js";
+import {
+  createTaxonomyCandidateFinder,
+  createTaxonomyClassifier,
+  type TaxonomyCandidateFinder,
+} from "../classification/application/candidate-service.js";
+import type {
+  TaxonomyClassificationRunRepository,
+  TaxonomyLexicalSearchRepository,
+} from "../classification/application/ports.js";
+import type {
+  TaxonomyClassificationCandidateRecord,
+  TaxonomyClassificationRun,
+} from "../classification/contracts/index.js";
+import type { TaxonomyClassificationPolicy } from "../classification/domain/policy.js";
+import { createPostgresTaxonomyClassificationRunRepository } from "../classification/infrastructure/postgres-classification-run-repository.js";
+import { createPostgresTaxonomyLexicalSearchRepository } from "../classification/infrastructure/postgres-lexical-search-repository.js";
 
 import type { TaxonomyEntityAssignment } from "../contracts/index.js";
 import { normalizeTaxonomyAlias } from "../domain/normalize-alias.js";
@@ -34,6 +63,28 @@ import {
  * assignments exists; onboarding and other owning workflows call these
  * after shaping their own commands.
  */
+/**
+ * Classification (CQ-TAX-002). `candidates` is stateless and safe for the
+ * HTTP candidate route; the provenance operations are internal to trusted
+ * workflows and never exposed as generic browser CRUD.
+ */
+export type TaxonomyClassificationService = {
+  readonly candidates: TaxonomyCandidateFinder;
+  readonly classifyWithProvenance: (
+    command: ClassifyWithProvenanceCommand,
+  ) => Promise<TaxonomyClassificationRunResult>;
+  readonly getCompanyRun: (query: GetClassificationRunQuery) => Promise<{
+    readonly run: TaxonomyClassificationRun;
+    readonly candidates: readonly TaxonomyClassificationCandidateRecord[];
+  }>;
+  readonly acceptCompanyCandidate: (
+    command: DecideCompanyCandidateCommand,
+  ) => Promise<AcceptCompanyCandidateResult>;
+  readonly rejectCompanyCandidate: (
+    command: DecideCompanyCandidateCommand,
+  ) => Promise<TaxonomyClassificationCandidateRecord>;
+};
+
 export type TaxonomyService = {
   readonly query: TaxonomyQueryPort;
   readonly replaceCompanyAssignments: (
@@ -43,6 +94,7 @@ export type TaxonomyService = {
     query: ListCompanyAssignmentsQuery,
   ) => Promise<readonly TaxonomyEntityAssignment[]>;
   readonly mandatePreferences: MandateTaxonomyPreferencePort;
+  readonly classification: TaxonomyClassificationService;
 };
 
 export type TaxonomyServiceOptions = {
@@ -56,9 +108,14 @@ export type TaxonomyServiceOptions = {
     | {
         readonly reference: TaxonomyReferenceRepository;
         readonly assignments: TaxonomyAssignmentRepository;
+        readonly lexical?: TaxonomyLexicalSearchRepository | undefined;
+        readonly runs?: TaxonomyClassificationRunRepository | undefined;
       }
     | undefined;
   readonly mandatePreferences?: MandateTaxonomyPreferencePort | undefined;
+  readonly classificationPolicy?: TaxonomyClassificationPolicy | undefined;
+  /** Safe structured logging only (lengths, hashes, counts). Never the text. */
+  readonly logger?: Logger | undefined;
 };
 
 export function createTaxonomyService(
@@ -68,6 +125,12 @@ export function createTaxonomyService(
     reference: createPostgresTaxonomyReferenceRepository(),
     assignments: createPostgresTaxonomyAssignmentRepository(),
   };
+  const lexical =
+    options.repositories?.lexical ??
+    createPostgresTaxonomyLexicalSearchRepository();
+  const runs =
+    options.repositories?.runs ??
+    createPostgresTaxonomyClassificationRunRepository();
   const subjects = createTaxonomySubjectResolverRegistry([
     createCompanyTaxonomySubjectResolver(options.companies),
   ]);
@@ -81,6 +144,17 @@ export function createTaxonomyService(
     assignments: repositories.assignments,
     subjects,
   };
+  const classifier = createTaxonomyClassifier({
+    reference: repositories.reference,
+    lexical,
+    policy: options.classificationPolicy,
+  });
+  const runDependencies = {
+    ...dependencies,
+    runs,
+    classifier,
+    logger: options.logger,
+  };
   return {
     query: createTaxonomyQueryPort({
       sql: options.sql,
@@ -92,5 +166,18 @@ export function createTaxonomyService(
     mandatePreferences:
       options.mandatePreferences ??
       createPostgresMandateTaxonomyPreferencePort(),
+    classification: {
+      candidates: createTaxonomyCandidateFinder({
+        sql: options.sql,
+        classifier,
+        logger: options.logger,
+      }),
+      classifyWithProvenance: createClassifyWithProvenance(runDependencies),
+      getCompanyRun: createGetCompanyClassificationRun(runDependencies),
+      acceptCompanyCandidate:
+        createAcceptCompanyClassificationCandidate(runDependencies),
+      rejectCompanyCandidate:
+        createRejectCompanyClassificationCandidate(runDependencies),
+    },
   };
 }

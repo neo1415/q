@@ -617,6 +617,9 @@ importers:
       '@capital-q/eventing':
         specifier: workspace:*
         version: link:../eventing
+      '@capital-q/observability':
+        specifier: workspace:*
+        version: link:../observability
       '@capital-q/security':
         specifier: workspace:*
         version: link:../security

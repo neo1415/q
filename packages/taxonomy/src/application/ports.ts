@@ -100,6 +100,8 @@ export type NewTaxonomyAssignment = {
   readonly confidence: string | null;
   readonly rawSourceText: string | null;
   readonly sourceId: string | null;
+  /** Provenance link to the classification run whose candidate was confirmed. */
+  readonly classificationRunId: string | null;
   readonly confirmedByUserId: UserId | null;
   readonly confirmedAt: string | null;
 };

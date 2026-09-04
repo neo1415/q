@@ -156,3 +156,146 @@ export const ListTaxonomyNodesResponseSchema = createCursorPageSchema(
 export type ListTaxonomyNodesResponse = z.infer<
   typeof ListTaxonomyNodesResponseSchema
 >;
+
+// ---------------------------------------------------------------------------
+// Candidate lookup (CQ-TAX-002) -- `POST /v1/taxonomy/candidates`
+// ---------------------------------------------------------------------------
+
+/**
+ * Language -> canonical taxonomy candidates. Read/compute only: the
+ * endpoint persists nothing, so autocomplete and onboarding suggestions do
+ * not create classification runs. A candidate says "this node may represent
+ * the supplied language"; it is never a canonical assignment, never a
+ * verified fact and never a calibrated probability.
+ */
+export const TAXONOMY_CANDIDATES_SEGMENT = "/candidates";
+
+/** Direct candidate lookup is bounded; long documents belong to Evidence processing. */
+export const TAXONOMY_CLASSIFICATION_TEXT_MAX_LENGTH = 2048;
+export const TAXONOMY_CANDIDATE_DEFAULT_LIMIT = 5;
+export const TAXONOMY_CANDIDATE_MAX_LIMIT = 20;
+export const TAXONOMY_CANDIDATE_MAX_VOCABULARIES = 16;
+
+/**
+ * Strategy vocabulary. Only EXACT, LEXICAL and AUTO are implemented in V1;
+ * SEMANTIC and MODEL are reserved for later adapters and are refused with a
+ * typed error today. Lexical search is never presented as semantic.
+ */
+export const TAXONOMY_CLASSIFICATION_STRATEGIES = [
+  "AUTO",
+  "EXACT",
+  "LEXICAL",
+  "SEMANTIC",
+  "MODEL",
+] as const;
+export const TaxonomyClassificationStrategySchema = z.enum(
+  TAXONOMY_CLASSIFICATION_STRATEGIES,
+);
+export type TaxonomyClassificationStrategy = z.infer<
+  typeof TaxonomyClassificationStrategySchema
+>;
+
+/** How a node was found. Provenance of the suggestion, not of the company. */
+export const TAXONOMY_MATCH_TYPES = [
+  "CANONICAL_CODE_EXACT",
+  "ALIAS_EXACT",
+  "DISPLAY_NAME_EXACT",
+  "LEXICAL",
+] as const;
+export const TaxonomyMatchTypeSchema = z.enum(TAXONOMY_MATCH_TYPES);
+export type TaxonomyMatchType = z.infer<typeof TaxonomyMatchTypeSchema>;
+
+export const TAXONOMY_CLASSIFICATION_RESOLUTIONS = [
+  "EXACT",
+  "CANDIDATES",
+  "AMBIGUOUS",
+  "ABSTAINED",
+] as const;
+export const TaxonomyClassificationResolutionSchema = z.enum(
+  TAXONOMY_CLASSIFICATION_RESOLUTIONS,
+);
+export type TaxonomyClassificationResolution = z.infer<
+  typeof TaxonomyClassificationResolutionSchema
+>;
+
+/** Bounded, deterministic reasons. Abstention is a correct outcome, not a failure. */
+export const TAXONOMY_ABSTENTION_REASONS = [
+  "NO_CANDIDATES",
+  "LOW_CONFIDENCE",
+  "AMBIGUOUS_CANDIDATES",
+  "NO_ACTIVE_VOCABULARY",
+  "UNSUPPORTED_STRATEGY",
+] as const;
+export const TaxonomyAbstentionReasonSchema = z.enum(
+  TAXONOMY_ABSTENTION_REASONS,
+);
+export type TaxonomyAbstentionReason = z.infer<
+  typeof TaxonomyAbstentionReasonSchema
+>;
+
+/** Exact decimal string in [0, 1] with four places, e.g. "0.9500". */
+export const TaxonomyCandidateConfidenceSchema = z
+  .string()
+  .regex(/^(?:0\.\d{4}|1\.0000)$/, "expected a confidence such as 0.8500");
+
+export const TaxonomyCandidateRequestSchema = z
+  .object({
+    text: z
+      .string()
+      .max(TAXONOMY_CLASSIFICATION_TEXT_MAX_LENGTH)
+      .refine((value) => value.trim().length > 0, {
+        message: "text must not be empty",
+      }),
+    vocabularyCodes: z
+      .array(TaxonomyVocabularyCodeSchema)
+      .min(1)
+      .max(TAXONOMY_CANDIDATE_MAX_VOCABULARIES)
+      .refine((codes) => new Set(codes).size === codes.length, {
+        message: "vocabularyCodes must be unique",
+      })
+      .optional(),
+    strategy: TaxonomyClassificationStrategySchema.optional(),
+    limit: z.number().int().min(1).max(TAXONOMY_CANDIDATE_MAX_LIMIT).optional(),
+  })
+  .strict();
+export type TaxonomyCandidateRequest = z.infer<
+  typeof TaxonomyCandidateRequestSchema
+>;
+
+export const TaxonomyClassificationCandidateDtoSchema = z.object({
+  nodeId: UuidSchema,
+  vocabularyCode: TaxonomyVocabularyCodeSchema,
+  canonicalCode: TaxonomyCanonicalCodeSchema,
+  displayName: z.string(),
+  /** 1-based, unique within the response. */
+  rank: z.number().int().min(1),
+  /** Deterministic classification indicator. NOT a calibrated probability. */
+  confidence: TaxonomyCandidateConfidenceSchema,
+  matchTypes: z.array(TaxonomyMatchTypeSchema).min(1),
+  /** Short observable reason. Never hidden reasoning. */
+  rationaleSummary: z.string().max(300),
+});
+export type TaxonomyClassificationCandidateDto = z.infer<
+  typeof TaxonomyClassificationCandidateDtoSchema
+>;
+
+export const TaxonomyClassifierIdentitySchema = z.object({
+  provider: z.literal("capital_q"),
+  model: z.literal("deterministic_lexical"),
+  version: z.string().max(64),
+});
+export type TaxonomyClassifierIdentity = z.infer<
+  typeof TaxonomyClassifierIdentitySchema
+>;
+
+export const TaxonomyCandidateResponseSchema = z.object({
+  resolution: TaxonomyClassificationResolutionSchema,
+  candidates: z.array(TaxonomyClassificationCandidateDtoSchema),
+  abstentionReason: TaxonomyAbstentionReasonSchema.optional(),
+  /** The exact vocabulary versions the candidates were computed against. */
+  taxonomyVersions: z.record(TaxonomyVocabularyCodeSchema, z.number().int()),
+  classifier: TaxonomyClassifierIdentitySchema,
+});
+export type TaxonomyCandidateResponse = z.infer<
+  typeof TaxonomyCandidateResponseSchema
+>;

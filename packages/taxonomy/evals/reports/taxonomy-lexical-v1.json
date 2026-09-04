@@ -1,0 +1,556 @@
+{
+  "classifierVersion": "taxonomy-lexical-v1",
+  "taxonomyVersionSet": {
+    "business_model": 1,
+    "company_stage": 1,
+    "customer_type": 1,
+    "geography": 1,
+    "impact_theme": 1,
+    "industry": 1,
+    "product_category": 1,
+    "regulatory_profile": 1,
+    "technology": 1
+  },
+  "fixtureVersion": "taxonomy-golden-v1",
+  "fixtureCount": 34,
+  "exact": {
+    "count": 15,
+    "top1Accuracy": 1
+  },
+  "lexical": {
+    "count": 7,
+    "top1Accuracy": 0.8571,
+    "topKAccuracy": 1
+  },
+  "multiLabel": {
+    "count": 5,
+    "meanPrecision": 0.27,
+    "meanRecall": 0.6867
+  },
+  "ambiguity": {
+    "count": 3,
+    "correctlyAmbiguous": 3
+  },
+  "abstention": {
+    "count": 4,
+    "correctAbstentions": 4,
+    "falseAbstentions": 0
+  },
+  "failures": [
+    "multi-b2b-saas-apis"
+  ],
+  "grades": [
+    {
+      "fixtureId": "exact-alias-payments-rails-product",
+      "kind": "EXACT",
+      "resolution": "EXACT",
+      "returned": [
+        "product_category/payment_infrastructure"
+      ],
+      "abstained": false,
+      "top1Hit": true,
+      "topKHit": true,
+      "precision": null,
+      "recall": null,
+      "passed": true
+    },
+    {
+      "fixtureId": "exact-alias-payments-rails-industry-case",
+      "kind": "EXACT",
+      "resolution": "EXACT",
+      "returned": [
+        "industry/payment_infrastructure"
+      ],
+      "abstained": false,
+      "top1Hit": true,
+      "topKHit": true,
+      "precision": null,
+      "recall": null,
+      "passed": true
+    },
+    {
+      "fixtureId": "exact-display-b2b-saas",
+      "kind": "EXACT",
+      "resolution": "EXACT",
+      "returned": [
+        "business_model/b2b_saas"
+      ],
+      "abstained": false,
+      "top1Hit": true,
+      "topKHit": true,
+      "precision": null,
+      "recall": null,
+      "passed": true
+    },
+    {
+      "fixtureId": "exact-display-artificial-intelligence",
+      "kind": "EXACT",
+      "resolution": "EXACT",
+      "returned": [
+        "technology/artificial_intelligence"
+      ],
+      "abstained": false,
+      "top1Hit": true,
+      "topKHit": true,
+      "precision": null,
+      "recall": null,
+      "passed": true
+    },
+    {
+      "fixtureId": "exact-canonical-code",
+      "kind": "EXACT",
+      "resolution": "EXACT",
+      "returned": [
+        "industry/payment_infrastructure"
+      ],
+      "abstained": false,
+      "top1Hit": true,
+      "topKHit": true,
+      "precision": null,
+      "recall": null,
+      "passed": true
+    },
+    {
+      "fixtureId": "exact-alias-ai-slash-ml-spacing",
+      "kind": "EXACT",
+      "resolution": "EXACT",
+      "returned": [
+        "technology/artificial_intelligence"
+      ],
+      "abstained": false,
+      "top1Hit": true,
+      "topKHit": true,
+      "precision": null,
+      "recall": null,
+      "passed": true
+    },
+    {
+      "fixtureId": "exact-alias-neobank",
+      "kind": "EXACT",
+      "resolution": "EXACT",
+      "returned": [
+        "industry/digital_banking"
+      ],
+      "abstained": false,
+      "top1Hit": true,
+      "topKHit": true,
+      "precision": null,
+      "recall": null,
+      "passed": true
+    },
+    {
+      "fixtureId": "exact-alias-kyc",
+      "kind": "EXACT",
+      "resolution": "EXACT",
+      "returned": [
+        "product_category/identity_verification"
+      ],
+      "abstained": false,
+      "top1Hit": true,
+      "topKHit": true,
+      "precision": null,
+      "recall": null,
+      "passed": true
+    },
+    {
+      "fixtureId": "exact-alias-whitespace",
+      "kind": "EXACT",
+      "resolution": "EXACT",
+      "returned": [
+        "industry/fintech"
+      ],
+      "abstained": false,
+      "top1Hit": true,
+      "topKHit": true,
+      "precision": null,
+      "recall": null,
+      "passed": true
+    },
+    {
+      "fixtureId": "exact-display-unicode-ligature",
+      "kind": "EXACT",
+      "resolution": "EXACT",
+      "returned": [
+        "industry/fintech"
+      ],
+      "abstained": false,
+      "top1Hit": true,
+      "topKHit": true,
+      "precision": null,
+      "recall": null,
+      "passed": true
+    },
+    {
+      "fixtureId": "exact-alias-series-a",
+      "kind": "EXACT",
+      "resolution": "EXACT",
+      "returned": [
+        "company_stage/series_a"
+      ],
+      "abstained": false,
+      "top1Hit": true,
+      "topKHit": true,
+      "precision": null,
+      "recall": null,
+      "passed": true
+    },
+    {
+      "fixtureId": "exact-alias-iso-country",
+      "kind": "EXACT",
+      "resolution": "EXACT",
+      "returned": [
+        "geography/nigeria"
+      ],
+      "abstained": false,
+      "top1Hit": true,
+      "topKHit": true,
+      "precision": null,
+      "recall": null,
+      "passed": true
+    },
+    {
+      "fixtureId": "exact-display-cross-border-industry",
+      "kind": "EXACT",
+      "resolution": "EXACT",
+      "returned": [
+        "industry/cross_border_payments"
+      ],
+      "abstained": false,
+      "top1Hit": true,
+      "topKHit": true,
+      "precision": null,
+      "recall": null,
+      "passed": true
+    },
+    {
+      "fixtureId": "exact-alias-telemedicine",
+      "kind": "EXACT",
+      "resolution": "EXACT",
+      "returned": [
+        "product_category/telehealth"
+      ],
+      "abstained": false,
+      "top1Hit": true,
+      "topKHit": true,
+      "precision": null,
+      "recall": null,
+      "passed": true
+    },
+    {
+      "fixtureId": "exact-display-media-entertainment",
+      "kind": "EXACT",
+      "resolution": "EXACT",
+      "returned": [
+        "industry/media_entertainment"
+      ],
+      "abstained": false,
+      "top1Hit": true,
+      "topKHit": true,
+      "precision": null,
+      "recall": null,
+      "passed": true
+    },
+    {
+      "fixtureId": "lexical-typo-payment-infrastructure",
+      "kind": "LEXICAL",
+      "resolution": "CANDIDATES",
+      "returned": [
+        "product_category/payment_infrastructure",
+        "product_category/developer_api"
+      ],
+      "abstained": false,
+      "top1Hit": true,
+      "topKHit": true,
+      "precision": null,
+      "recall": null,
+      "passed": true
+    },
+    {
+      "fixtureId": "lexical-claims-automation-phrase",
+      "kind": "LEXICAL",
+      "resolution": "CANDIDATES",
+      "returned": [
+        "product_category/claims_automation",
+        "product_category/workflow_automation",
+        "product_category/payment_infrastructure"
+      ],
+      "abstained": false,
+      "top1Hit": true,
+      "topKHit": true,
+      "precision": null,
+      "recall": null,
+      "passed": true
+    },
+    {
+      "fixtureId": "lexical-mobile-money-wallet",
+      "kind": "LEXICAL",
+      "resolution": "CANDIDATES",
+      "returned": [
+        "product_category/digital_wallet"
+      ],
+      "abstained": false,
+      "top1Hit": true,
+      "topKHit": true,
+      "precision": null,
+      "recall": null,
+      "passed": true
+    },
+    {
+      "fixtureId": "lexical-core-banking-phrase",
+      "kind": "LEXICAL",
+      "resolution": "CANDIDATES",
+      "returned": [
+        "product_category/core_banking_platform",
+        "product_category/embedded_finance"
+      ],
+      "abstained": false,
+      "top1Hit": true,
+      "topKHit": true,
+      "precision": null,
+      "recall": null,
+      "passed": true
+    },
+    {
+      "fixtureId": "lexical-fraud-prevention-phrase",
+      "kind": "LEXICAL",
+      "resolution": "CANDIDATES",
+      "returned": [
+        "product_category/fraud_detection"
+      ],
+      "abstained": false,
+      "top1Hit": true,
+      "topKHit": true,
+      "precision": null,
+      "recall": null,
+      "passed": true
+    },
+    {
+      "fixtureId": "lexical-renewables-phrase",
+      "kind": "LEXICAL",
+      "resolution": "CANDIDATES",
+      "returned": [
+        "industry/energy",
+        "industry/clean_energy",
+        "industry/energy_access"
+      ],
+      "abstained": false,
+      "top1Hit": false,
+      "topKHit": true,
+      "precision": null,
+      "recall": null,
+      "passed": true
+    },
+    {
+      "fixtureId": "lexical-learning-platform-typo",
+      "kind": "LEXICAL",
+      "resolution": "CANDIDATES",
+      "returned": [
+        "product_category/learning_platform",
+        "product_category/lending_platform"
+      ],
+      "abstained": false,
+      "top1Hit": true,
+      "topKHit": true,
+      "precision": null,
+      "recall": null,
+      "passed": true
+    },
+    {
+      "fixtureId": "ambiguous-payments-rails-unscoped",
+      "kind": "AMBIGUOUS",
+      "resolution": "AMBIGUOUS",
+      "returned": [
+        "industry/payment_infrastructure",
+        "product_category/payment_infrastructure"
+      ],
+      "abstained": false,
+      "top1Hit": null,
+      "topKHit": true,
+      "precision": null,
+      "recall": null,
+      "passed": true
+    },
+    {
+      "fixtureId": "ambiguous-api-infrastructure",
+      "kind": "AMBIGUOUS",
+      "resolution": "AMBIGUOUS",
+      "returned": [
+        "product_category/developer_api",
+        "technology/api_platform"
+      ],
+      "abstained": false,
+      "top1Hit": null,
+      "topKHit": true,
+      "precision": null,
+      "recall": null,
+      "passed": true
+    },
+    {
+      "fixtureId": "ambiguous-marketplace",
+      "kind": "AMBIGUOUS",
+      "resolution": "AMBIGUOUS",
+      "returned": [
+        "business_model/marketplace",
+        "product_category/marketplace"
+      ],
+      "abstained": false,
+      "top1Hit": null,
+      "topKHit": true,
+      "precision": null,
+      "recall": null,
+      "passed": true
+    },
+    {
+      "fixtureId": "abstain-nonsense",
+      "kind": "ABSTAIN",
+      "resolution": "ABSTAINED",
+      "returned": [],
+      "abstained": true,
+      "top1Hit": null,
+      "topKHit": null,
+      "precision": null,
+      "recall": null,
+      "passed": true
+    },
+    {
+      "fixtureId": "abstain-unrelated-sentence",
+      "kind": "ABSTAIN",
+      "resolution": "ABSTAINED",
+      "returned": [],
+      "abstained": true,
+      "top1Hit": null,
+      "topKHit": null,
+      "precision": null,
+      "recall": null,
+      "passed": true
+    },
+    {
+      "fixtureId": "abstain-protected-attribute",
+      "kind": "ABSTAIN",
+      "resolution": "ABSTAINED",
+      "returned": [],
+      "abstained": true,
+      "top1Hit": null,
+      "topKHit": null,
+      "precision": null,
+      "recall": null,
+      "passed": true
+    },
+    {
+      "fixtureId": "abstain-injection-shaped",
+      "kind": "ABSTAIN",
+      "resolution": "ABSTAINED",
+      "returned": [],
+      "abstained": true,
+      "top1Hit": null,
+      "topKHit": null,
+      "precision": null,
+      "recall": null,
+      "passed": true
+    },
+    {
+      "fixtureId": "multi-ai-claims-automation",
+      "kind": "MULTI_LABEL",
+      "resolution": "CANDIDATES",
+      "returned": [
+        "industry/insurance",
+        "product_category/claims_automation",
+        "industry/insurtech",
+        "customer_type/insurance_company",
+        "geography/france",
+        "technology/artificial_intelligence",
+        "product_category/insurance_distribution",
+        "product_category/payment_infrastructure",
+        "impact_theme/climate",
+        "product_category/workflow_automation"
+      ],
+      "abstained": false,
+      "top1Hit": null,
+      "topKHit": null,
+      "precision": 0.3,
+      "recall": 0.6,
+      "passed": true
+    },
+    {
+      "fixtureId": "multi-fintech-apis-africa",
+      "kind": "MULTI_LABEL",
+      "resolution": "CANDIDATES",
+      "returned": [
+        "geography/africa",
+        "industry/fintech",
+        "geography/east_africa",
+        "geography/west_africa",
+        "industry/agritech",
+        "industry/payment_infrastructure",
+        "geography/north_africa",
+        "geography/south_africa",
+        "geography/southern_africa",
+        "industry/edtech"
+      ],
+      "abstained": false,
+      "top1Hit": null,
+      "topKHit": null,
+      "precision": 0.2,
+      "recall": 0.5,
+      "passed": true
+    },
+    {
+      "fixtureId": "multi-b2b-saas-apis",
+      "kind": "MULTI_LABEL",
+      "resolution": "CANDIDATES",
+      "returned": [
+        "business_model/b2b_saas",
+        "product_category/payment_infrastructure",
+        "customer_type/business_customer",
+        "industry/enterprise_software"
+      ],
+      "abstained": false,
+      "top1Hit": null,
+      "topKHit": null,
+      "precision": 0.25,
+      "recall": 0.3333333333333333,
+      "passed": false
+    },
+    {
+      "fixtureId": "multi-african-insurance-infrastructure",
+      "kind": "MULTI_LABEL",
+      "resolution": "CANDIDATES",
+      "returned": [
+        "industry/insurance",
+        "geography/africa",
+        "industry/data_infrastructure",
+        "product_category/developer_api",
+        "technology/api_platform",
+        "technology/data_infrastructure",
+        "technology/cloud_infrastructure",
+        "industry/payment_infrastructure",
+        "product_category/payment_infrastructure",
+        "industry/insurtech"
+      ],
+      "abstained": false,
+      "top1Hit": null,
+      "topKHit": null,
+      "precision": 0.2,
+      "recall": 1,
+      "passed": true
+    },
+    {
+      "fixtureId": "multi-ai-claims-automation-short",
+      "kind": "MULTI_LABEL",
+      "resolution": "CANDIDATES",
+      "returned": [
+        "product_category/claims_automation",
+        "product_category/workflow_automation",
+        "technology/robotics",
+        "technology/artificial_intelligence",
+        "industry/education"
+      ],
+      "abstained": false,
+      "top1Hit": null,
+      "topKHit": null,
+      "precision": 0.4,
+      "recall": 1,
+      "passed": true
+    }
+  ]
+}
