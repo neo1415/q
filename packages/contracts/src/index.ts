@@ -25,6 +25,7 @@
 export * from "./common/index.js";
 export * from "./http/index.js";
 export * from "./messaging/index.js";
+export * from "./evidence/index.js";
 export * from "./events/index.js";
 export * from "./jobs/index.js";
 

@@ -58,6 +58,12 @@ export const REFERENCE_CAPABILITIES = [
   "disclosure.manage",
   "disclosure.inspect",
   "q.action.approve",
+  "document.create",
+  "document.view",
+  "document.download",
+  "document.manage",
+  "evidence.view",
+  "evidence.record",
 ] as const;
 
 const KNOWN: ReadonlySet<string> = new Set(REFERENCE_CAPABILITIES);

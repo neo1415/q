@@ -32,7 +32,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 
 create temporary table guarded_schemas (schema_name text primary key) on commit drop;
-insert into guarded_schemas values ('identity'), ('permissions'), ('events'), ('audit'), ('core'), ('network'), ('taxonomy'), ('onboarding');
+insert into guarded_schemas values ('identity'), ('permissions'), ('events'), ('audit'), ('core'), ('network'), ('taxonomy'), ('onboarding'), ('evidence');
 
 create temporary table rls_inventory (
   schema_name text not null,
@@ -91,6 +91,14 @@ insert into rls_inventory (schema_name, table_name, classification, authenticate
   ('onboarding', 'suggestions',            'INTERNAL_SERVER_ONLY', '{}'),
   ('onboarding', 'session_creation_requests', 'INTERNAL_SERVER_ONLY', '{}'),
   ('onboarding', 'session_mutation_requests', 'INTERNAL_SERVER_ONLY', '{}'),
+  ('evidence', 'sources',                  'INTERNAL_SERVER_ONLY', '{}'),
+  ('evidence', 'documents',                'INTERNAL_SERVER_ONLY', '{}'),
+  ('evidence', 'document_versions',        'INTERNAL_SERVER_ONLY', '{}'),
+  ('evidence', 'document_processing_runs', 'INTERNAL_SERVER_ONLY', '{}'),
+  ('evidence', 'claims',                   'INTERNAL_SERVER_ONLY', '{}'),
+  ('evidence', 'claim_revisions',          'INTERNAL_SERVER_ONLY', '{}'),
+  ('evidence', 'evidence_items',           'INTERNAL_SERVER_ONLY', '{}'),
+  ('evidence', 'claim_evidence',           'INTERNAL_SERVER_ONLY', '{}'),
   ('events', 'outbox',                     'INTERNAL_SERVER_ONLY', '{}'),
   ('audit', 'material_actions',            'INTERNAL_SERVER_ONLY', '{}'),
   ('audit', 'security_events',             'INTERNAL_SERVER_ONLY', '{}');
@@ -170,8 +178,9 @@ select ok(not has_schema_privilege('authenticated', 'events', 'usage')
       and not has_schema_privilege('authenticated', 'network', 'usage')
       and not has_schema_privilege('authenticated', 'taxonomy', 'usage')
       and not has_schema_privilege('authenticated', 'onboarding', 'usage')
+      and not has_schema_privilege('authenticated', 'evidence', 'usage')
       and not has_schema_privilege('authenticated', 'pgmq', 'usage'),
-  'authenticated has no usage on events, audit, network, taxonomy, onboarding or pgmq');
+  'authenticated has no usage on events, audit, network, taxonomy, onboarding, evidence or pgmq');
 
 -- SECURITY DEFINER helpers -----------------------------------------------------
 

@@ -110,6 +110,8 @@ select results_eq(
             ('company.financials.view'), ('company.team.manage'), ('company.team.self_edit'),
             ('company.team.view'), ('company.view'), ('data_room.share'),
             ('disclosure.inspect'), ('disclosure.manage'),
+            ('document.create'), ('document.download'), ('document.manage'), ('document.view'),
+            ('evidence.record'), ('evidence.view'),
             ('investor.create'), ('investor.edit'), ('investor.mandate.create'),
             ('investor.mandate.edit'), ('investor.mandate.view'), ('investor.representative.self_edit'),
             ('investor.view'), ('organisation.admin'), ('organisation.view'),
@@ -129,10 +131,12 @@ select results_eq(
             ('capital_objective.view'), ('company.create'), ('company.edit'), ('company.team.manage'),
             ('company.team.self_edit'), ('company.team.view'), ('company.view'),
             ('disclosure.inspect'), ('disclosure.manage'),
+            ('document.create'), ('document.download'), ('document.manage'), ('document.view'),
+            ('evidence.record'), ('evidence.view'),
             ('investor.create'), ('investor.edit'), ('investor.mandate.create'),
             ('investor.mandate.edit'), ('investor.mandate.view'), ('investor.representative.self_edit'),
             ('investor.view'), ('organisation.admin'), ('organisation.view') $$,
-  'organisation_admin maps to organisation, company, team, investor, mandate, capital and disclosure capabilities only');
+  'organisation_admin maps to organisation, company, team, investor, mandate, capital, disclosure, document and evidence capabilities only');
 select results_eq(
   $$ select c.code from permissions.role_capabilities rc
        join permissions.roles r on r.id = rc.role_id
@@ -140,9 +144,11 @@ select results_eq(
       where r.code = 'organisation_member' and rc.effect = 'ALLOW'
       order by c.code $$,
   $$ values ('capital_objective.view'), ('company.team.self_edit'), ('company.team.view'), ('company.view'),
+            ('document.create'), ('document.download'), ('document.view'),
+            ('evidence.record'), ('evidence.view'),
             ('investor.mandate.view'), ('investor.representative.self_edit'), ('investor.view'),
             ('organisation.view') $$,
-  'organisation_member carries view and self-edit capabilities only (CQ-ORG-001, CQ-COMP-001, CQ-COMP-002, CQ-INV-001, CQ-INV-002, CQ-CAP-001)');
+  'organisation_member carries view, self-edit, document and evidence-recording capabilities only (CQ-ORG-001, CQ-COMP-001, CQ-COMP-002, CQ-INV-001, CQ-INV-002, CQ-CAP-001, CQ-EVD-001)');
 
 -- ===========================================================================
 -- Fixtures (as the migration owner; RLS bypassed)

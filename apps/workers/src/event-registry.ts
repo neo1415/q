@@ -1,6 +1,7 @@
 import { createEventRegistry, type EventRegistry } from "@capital-q/contracts";
 import { CAPITAL_EVENTS } from "@capital-q/capital/events";
 import { COMPANY_EVENTS } from "@capital-q/companies/events";
+import { EVIDENCE_EVENTS } from "@capital-q/evidence/events";
 import { INVESTOR_EVENTS } from "@capital-q/investors/events";
 import { NETWORK_EVENTS } from "@capital-q/network/events";
 import { ONBOARDING_EVENTS } from "@capital-q/onboarding/events";
@@ -20,6 +21,7 @@ export function createProductionEventRegistry(): EventRegistry {
     ...ORGANISATION_EVENTS,
     ...COMPANY_EVENTS,
     ...INVESTOR_EVENTS,
+    ...EVIDENCE_EVENTS,
     ...CAPITAL_EVENTS,
     ...NETWORK_EVENTS,
     ...PERMISSIONS_EVENTS,

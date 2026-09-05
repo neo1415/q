@@ -42,7 +42,13 @@ insert into permissions.capabilities (code, description) values
   ('data_room.share',          'Share data room content with another party.'),
   ('disclosure.manage',        'Create and revoke deliberate disclosure policies for resources the organisation owns.'),
   ('disclosure.inspect',       'Inspect who currently holds disclosure access to resources the organisation owns.'),
-  ('q.action.approve',         'Approve a consequential action proposed by Q.')
+  ('q.action.approve',         'Approve a consequential action proposed by Q.'),
+  ('document.create',          'Create a logical document owned by the active organisation.'),
+  ('document.view',            'Read the organisation''s documents and their version metadata.'),
+  ('document.download',        'Obtain authorised, short-lived access to a document version''s bytes.'),
+  ('document.manage',          'Register versions, reclassify and archive the organisation''s documents.'),
+  ('evidence.view',            'Read sources, claims and evidence items about subjects the organisation owns.'),
+  ('evidence.record',          'Register sources, record claims and evidence items, and link evidence to claims.')
 on conflict (code) do update
   set description = excluded.description;
 
@@ -97,6 +103,17 @@ select r.id, c.id, 'ALLOW'
       ('organisation_admin',  'capital_objective.close'),
       ('organisation_member', 'capital_objective.view'),
       ('organisation_admin',  'disclosure.manage'),
-      ('organisation_admin',  'disclosure.inspect')
+      ('organisation_admin',  'disclosure.inspect'),
+      ('organisation_admin',  'document.create'),
+      ('organisation_admin',  'document.view'),
+      ('organisation_admin',  'document.download'),
+      ('organisation_admin',  'document.manage'),
+      ('organisation_admin',  'evidence.view'),
+      ('organisation_admin',  'evidence.record'),
+      ('organisation_member', 'document.create'),
+      ('organisation_member', 'document.view'),
+      ('organisation_member', 'document.download'),
+      ('organisation_member', 'evidence.view'),
+      ('organisation_member', 'evidence.record')
     )
 on conflict (role_id, capability_id) do nothing;

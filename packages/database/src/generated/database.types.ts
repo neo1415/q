@@ -957,6 +957,534 @@ export type Database = {
       [_ in never]: never
     }
   }
+  evidence: {
+    Tables: {
+      claim_evidence: {
+        Row: {
+          claim_id: string
+          created_at: string
+          created_by_user_id: string | null
+          evidence_item_id: string
+          relationship: string
+          tenant_id: string
+          weight: number | null
+        }
+        Insert: {
+          claim_id: string
+          created_at?: string
+          created_by_user_id?: string | null
+          evidence_item_id: string
+          relationship: string
+          tenant_id: string
+          weight?: number | null
+        }
+        Update: {
+          claim_id?: string
+          created_at?: string
+          created_by_user_id?: string | null
+          evidence_item_id?: string
+          relationship?: string
+          tenant_id?: string
+          weight?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "claim_evidence_claim_id_tenant_id_fkey"
+            columns: ["claim_id", "tenant_id"]
+            isOneToOne: false
+            referencedRelation: "claims"
+            referencedColumns: ["id", "tenant_id"]
+          },
+          {
+            foreignKeyName: "claim_evidence_evidence_item_id_tenant_id_fkey"
+            columns: ["evidence_item_id", "tenant_id"]
+            isOneToOne: false
+            referencedRelation: "evidence_items"
+            referencedColumns: ["id", "tenant_id"]
+          },
+        ]
+      }
+      claim_revisions: {
+        Row: {
+          change_reason: string | null
+          changed_by_id: string
+          changed_by_type: string
+          claim_id: string
+          created_at: string
+          evidence_status: string
+          id: string
+          lifecycle_status: string
+          revision_number: number
+          source_id: string | null
+          statement: string
+          structured_value: Json | null
+          tenant_id: string
+          truth_class: string
+          valid_from: string | null
+          valid_to: string | null
+        }
+        Insert: {
+          change_reason?: string | null
+          changed_by_id: string
+          changed_by_type: string
+          claim_id: string
+          created_at?: string
+          evidence_status: string
+          id?: string
+          lifecycle_status: string
+          revision_number: number
+          source_id?: string | null
+          statement: string
+          structured_value?: Json | null
+          tenant_id: string
+          truth_class: string
+          valid_from?: string | null
+          valid_to?: string | null
+        }
+        Update: {
+          change_reason?: string | null
+          changed_by_id?: string
+          changed_by_type?: string
+          claim_id?: string
+          created_at?: string
+          evidence_status?: string
+          id?: string
+          lifecycle_status?: string
+          revision_number?: number
+          source_id?: string | null
+          statement?: string
+          structured_value?: Json | null
+          tenant_id?: string
+          truth_class?: string
+          valid_from?: string | null
+          valid_to?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "claim_revisions_claim_id_tenant_id_fkey"
+            columns: ["claim_id", "tenant_id"]
+            isOneToOne: false
+            referencedRelation: "claims"
+            referencedColumns: ["id", "tenant_id"]
+          },
+          {
+            foreignKeyName: "claim_revisions_source_id_tenant_id_fkey"
+            columns: ["source_id", "tenant_id"]
+            isOneToOne: false
+            referencedRelation: "sources"
+            referencedColumns: ["id", "tenant_id"]
+          },
+        ]
+      }
+      claims: {
+        Row: {
+          asserted_at: string
+          asserted_by_id: string
+          asserted_by_type: string
+          claim_key: string
+          claim_type: string
+          created_at: string
+          current_revision_id: string
+          current_revision_number: number
+          evidence_status: string
+          id: string
+          lifecycle_status: string
+          sensitivity_class: string
+          statement: string
+          structured_value: Json | null
+          subject_id: string
+          subject_type: string
+          tenant_id: string
+          truth_class: string
+          valid_from: string | null
+          valid_to: string | null
+          visibility_scope: string
+        }
+        Insert: {
+          asserted_at: string
+          asserted_by_id: string
+          asserted_by_type: string
+          claim_key: string
+          claim_type: string
+          created_at?: string
+          current_revision_id: string
+          current_revision_number?: number
+          evidence_status: string
+          id?: string
+          lifecycle_status?: string
+          sensitivity_class?: string
+          statement: string
+          structured_value?: Json | null
+          subject_id: string
+          subject_type: string
+          tenant_id: string
+          truth_class: string
+          valid_from?: string | null
+          valid_to?: string | null
+          visibility_scope?: string
+        }
+        Update: {
+          asserted_at?: string
+          asserted_by_id?: string
+          asserted_by_type?: string
+          claim_key?: string
+          claim_type?: string
+          created_at?: string
+          current_revision_id?: string
+          current_revision_number?: number
+          evidence_status?: string
+          id?: string
+          lifecycle_status?: string
+          sensitivity_class?: string
+          statement?: string
+          structured_value?: Json | null
+          subject_id?: string
+          subject_type?: string
+          tenant_id?: string
+          truth_class?: string
+          valid_from?: string | null
+          valid_to?: string | null
+          visibility_scope?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "claims_current_revision_fkey"
+            columns: ["current_revision_id", "id"]
+            isOneToOne: false
+            referencedRelation: "claim_revisions"
+            referencedColumns: ["id", "claim_id"]
+          },
+        ]
+      }
+      document_processing_runs: {
+        Row: {
+          classifier_version: string | null
+          completed_at: string | null
+          cost_usd: number
+          created_at: string
+          document_version_id: string
+          embedding_model_id: string | null
+          error_code: string | null
+          extractor_version: string | null
+          id: string
+          metadata: Json
+          pipeline_version: string
+          started_at: string | null
+          status: string
+        }
+        Insert: {
+          classifier_version?: string | null
+          completed_at?: string | null
+          cost_usd?: number
+          created_at?: string
+          document_version_id: string
+          embedding_model_id?: string | null
+          error_code?: string | null
+          extractor_version?: string | null
+          id?: string
+          metadata?: Json
+          pipeline_version: string
+          started_at?: string | null
+          status?: string
+        }
+        Update: {
+          classifier_version?: string | null
+          completed_at?: string | null
+          cost_usd?: number
+          created_at?: string
+          document_version_id?: string
+          embedding_model_id?: string | null
+          error_code?: string | null
+          extractor_version?: string | null
+          id?: string
+          metadata?: Json
+          pipeline_version?: string
+          started_at?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "document_processing_runs_document_version_id_fkey"
+            columns: ["document_version_id"]
+            isOneToOne: false
+            referencedRelation: "document_versions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      document_versions: {
+        Row: {
+          document_id: string
+          id: string
+          malware_scan_status: string
+          mime_type: string
+          original_filename: string
+          processing_status: string
+          sha256: string
+          size_bytes: number
+          storage_bucket: string
+          storage_key: string
+          supersedes_version_id: string | null
+          tenant_id: string
+          text_extraction_status: string
+          uploaded_at: string
+          uploaded_by_user_id: string
+          version_number: number
+        }
+        Insert: {
+          document_id: string
+          id?: string
+          malware_scan_status?: string
+          mime_type: string
+          original_filename: string
+          processing_status?: string
+          sha256: string
+          size_bytes: number
+          storage_bucket: string
+          storage_key: string
+          supersedes_version_id?: string | null
+          tenant_id: string
+          text_extraction_status?: string
+          uploaded_at?: string
+          uploaded_by_user_id: string
+          version_number: number
+        }
+        Update: {
+          document_id?: string
+          id?: string
+          malware_scan_status?: string
+          mime_type?: string
+          original_filename?: string
+          processing_status?: string
+          sha256?: string
+          size_bytes?: number
+          storage_bucket?: string
+          storage_key?: string
+          supersedes_version_id?: string | null
+          tenant_id?: string
+          text_extraction_status?: string
+          uploaded_at?: string
+          uploaded_by_user_id?: string
+          version_number?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "document_versions_document_id_tenant_id_fkey"
+            columns: ["document_id", "tenant_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
+            referencedColumns: ["id", "tenant_id"]
+          },
+          {
+            foreignKeyName: "document_versions_supersedes_version_id_document_id_fkey"
+            columns: ["supersedes_version_id", "document_id"]
+            isOneToOne: false
+            referencedRelation: "document_versions"
+            referencedColumns: ["id", "document_id"]
+          },
+        ]
+      }
+      documents: {
+        Row: {
+          company_id: string | null
+          created_at: string
+          created_by_user_id: string
+          current_version_id: string | null
+          document_type: string
+          id: string
+          owner_organisation_id: string
+          sensitivity_class: string
+          status: string
+          tenant_id: string
+          title: string
+          updated_at: string
+          version: number
+          visibility_scope: string
+        }
+        Insert: {
+          company_id?: string | null
+          created_at?: string
+          created_by_user_id: string
+          current_version_id?: string | null
+          document_type?: string
+          id?: string
+          owner_organisation_id: string
+          sensitivity_class?: string
+          status?: string
+          tenant_id: string
+          title: string
+          updated_at?: string
+          version?: number
+          visibility_scope?: string
+        }
+        Update: {
+          company_id?: string | null
+          created_at?: string
+          created_by_user_id?: string
+          current_version_id?: string | null
+          document_type?: string
+          id?: string
+          owner_organisation_id?: string
+          sensitivity_class?: string
+          status?: string
+          tenant_id?: string
+          title?: string
+          updated_at?: string
+          version?: number
+          visibility_scope?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "documents_current_version_fkey"
+            columns: ["current_version_id", "id"]
+            isOneToOne: false
+            referencedRelation: "document_versions"
+            referencedColumns: ["id", "document_id"]
+          },
+        ]
+      }
+      evidence_items: {
+        Row: {
+          created_at: string
+          created_by_user_id: string | null
+          evidence_status: string
+          evidence_type: string
+          id: string
+          locator: Json
+          reliability_class: string | null
+          sensitivity_class: string
+          source_id: string
+          structured_value: Json | null
+          subject_id: string
+          subject_type: string
+          summary: string
+          tenant_id: string
+          valid_from: string | null
+          valid_to: string | null
+          visibility_scope: string
+        }
+        Insert: {
+          created_at?: string
+          created_by_user_id?: string | null
+          evidence_status: string
+          evidence_type: string
+          id?: string
+          locator: Json
+          reliability_class?: string | null
+          sensitivity_class: string
+          source_id: string
+          structured_value?: Json | null
+          subject_id: string
+          subject_type: string
+          summary: string
+          tenant_id: string
+          valid_from?: string | null
+          valid_to?: string | null
+          visibility_scope: string
+        }
+        Update: {
+          created_at?: string
+          created_by_user_id?: string | null
+          evidence_status?: string
+          evidence_type?: string
+          id?: string
+          locator?: Json
+          reliability_class?: string | null
+          sensitivity_class?: string
+          source_id?: string
+          structured_value?: Json | null
+          subject_id?: string
+          subject_type?: string
+          summary?: string
+          tenant_id?: string
+          valid_from?: string | null
+          valid_to?: string | null
+          visibility_scope?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "evidence_items_source_id_tenant_id_fkey"
+            columns: ["source_id", "tenant_id"]
+            isOneToOne: false
+            referencedRelation: "sources"
+            referencedColumns: ["id", "tenant_id"]
+          },
+        ]
+      }
+      sources: {
+        Row: {
+          created_at: string
+          created_by_user_id: string | null
+          external_reference: string | null
+          id: string
+          metadata: Json
+          provider: string | null
+          published_at: string | null
+          reliability_class: string | null
+          retrieved_at: string | null
+          sensitivity_class: string
+          source_type: string
+          source_url: string | null
+          subject_id: string
+          subject_type: string
+          tenant_id: string
+          title: string | null
+          visibility_scope: string
+        }
+        Insert: {
+          created_at?: string
+          created_by_user_id?: string | null
+          external_reference?: string | null
+          id?: string
+          metadata?: Json
+          provider?: string | null
+          published_at?: string | null
+          reliability_class?: string | null
+          retrieved_at?: string | null
+          sensitivity_class: string
+          source_type: string
+          source_url?: string | null
+          subject_id: string
+          subject_type: string
+          tenant_id: string
+          title?: string | null
+          visibility_scope: string
+        }
+        Update: {
+          created_at?: string
+          created_by_user_id?: string | null
+          external_reference?: string | null
+          id?: string
+          metadata?: Json
+          provider?: string | null
+          published_at?: string | null
+          reliability_class?: string | null
+          retrieved_at?: string | null
+          sensitivity_class?: string
+          source_type?: string
+          source_url?: string | null
+          subject_id?: string
+          subject_type?: string
+          tenant_id?: string
+          title?: string | null
+          visibility_scope?: string
+        }
+        Relationships: []
+      }
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      [_ in never]: never
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   identity: {
     Tables: {
       membership_roles: {
@@ -2578,6 +3106,9 @@ export const Constants = {
     Enums: {},
   },
   events: {
+    Enums: {},
+  },
+  evidence: {
     Enums: {},
   },
   identity: {
