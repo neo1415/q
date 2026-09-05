@@ -1212,6 +1212,128 @@ export type Database = {
           },
         ]
       }
+      document_upload_requests: {
+        Row: {
+          created_at: string
+          idempotency_key_hash: string
+          organisation_id: string
+          request_hash: string
+          tenant_id: string
+          upload_session_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          idempotency_key_hash: string
+          organisation_id: string
+          request_hash: string
+          tenant_id: string
+          upload_session_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          idempotency_key_hash?: string
+          organisation_id?: string
+          request_hash?: string
+          tenant_id?: string
+          upload_session_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "document_upload_requests_upload_session_id_tenant_id_fkey"
+            columns: ["upload_session_id", "tenant_id"]
+            isOneToOne: false
+            referencedRelation: "document_upload_sessions"
+            referencedColumns: ["id", "tenant_id"]
+          },
+        ]
+      }
+      document_upload_sessions: {
+        Row: {
+          authorising_capability: string
+          cleanup_pending: boolean
+          created_at: string
+          created_by_user_id: string
+          declared_mime_type: string
+          declared_size_bytes: number
+          document_id: string
+          document_version_id: string | null
+          expires_at: string
+          failure_code: string | null
+          finalized_at: string | null
+          id: string
+          original_filename: string
+          owner_organisation_id: string
+          status: string
+          storage_bucket: string
+          storage_key: string
+          tenant_id: string
+          updated_at: string
+          version: number
+        }
+        Insert: {
+          authorising_capability: string
+          cleanup_pending?: boolean
+          created_at?: string
+          created_by_user_id: string
+          declared_mime_type: string
+          declared_size_bytes: number
+          document_id: string
+          document_version_id?: string | null
+          expires_at: string
+          failure_code?: string | null
+          finalized_at?: string | null
+          id?: string
+          original_filename: string
+          owner_organisation_id: string
+          status?: string
+          storage_bucket: string
+          storage_key: string
+          tenant_id: string
+          updated_at?: string
+          version?: number
+        }
+        Update: {
+          authorising_capability?: string
+          cleanup_pending?: boolean
+          created_at?: string
+          created_by_user_id?: string
+          declared_mime_type?: string
+          declared_size_bytes?: number
+          document_id?: string
+          document_version_id?: string | null
+          expires_at?: string
+          failure_code?: string | null
+          finalized_at?: string | null
+          id?: string
+          original_filename?: string
+          owner_organisation_id?: string
+          status?: string
+          storage_bucket?: string
+          storage_key?: string
+          tenant_id?: string
+          updated_at?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "document_upload_sessions_document_id_tenant_id_fkey"
+            columns: ["document_id", "tenant_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
+            referencedColumns: ["id", "tenant_id"]
+          },
+          {
+            foreignKeyName: "document_upload_sessions_document_version_id_tenant_id_fkey"
+            columns: ["document_version_id", "tenant_id"]
+            isOneToOne: false
+            referencedRelation: "document_versions"
+            referencedColumns: ["id", "tenant_id"]
+          },
+        ]
+      }
       document_versions: {
         Row: {
           document_id: string

@@ -88,3 +88,12 @@ export {
   startOnboardingSession,
   submitOnboardingResponse,
 } from "./onboarding.js";
+
+export {
+  cancelDocumentUploadSession,
+  completeDocumentUploadSession,
+  createDocumentUploadSession,
+  getDocument,
+  getDocumentUploadSession,
+  listDocuments,
+} from "./documents.js";

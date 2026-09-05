@@ -22,6 +22,11 @@ export {
   ClaimNotFoundError,
   ClaimRevisionConflictError,
   DocumentNotFoundError,
+  DocumentStorageUnavailableError,
+  DocumentUploadCreationConflictError,
+  DocumentUploadRejectedError,
+  DocumentUploadSessionNotFoundError,
+  DocumentUploadStateError,
   DocumentVersionConflictError,
   DocumentVersionNotFoundError,
   EvidenceItemNotFoundError,
@@ -50,7 +55,53 @@ export {
   EVIDENCE_RECORD,
   EVIDENCE_VIEW,
 } from "./application/authority.js";
-export type { EvidenceServiceDependencies } from "./application/dependencies.js";
+export type {
+  DocumentUploadLimits,
+  EvidenceServiceDependencies,
+} from "./application/dependencies.js";
+export type {
+  DirectUploadAuthorization,
+  PrivateDocumentStorageProvider,
+  StoredObjectMetadata,
+  StoredObjectRef,
+  StoredObjectStream,
+} from "./application/storage-port.js";
+export {
+  ADMISSIBLE_DOCUMENT_TYPES,
+  ADMISSIBLE_EXTENSIONS,
+  ADMISSIBLE_MIME_TYPES,
+  DOCUMENT_STORAGE_BUCKET,
+  DOCUMENT_UPLOAD_DEFAULT_MAX_BYTES,
+  DOCUMENT_UPLOAD_MAX_OPEN_SESSIONS,
+  DOCUMENT_UPLOAD_SESSION_TTL_SECONDS,
+  REFUSED_EXTENSIONS,
+  checkClaimedType,
+  extensionOf,
+  sanitiseOriginalFilename,
+  type AdmissibleDocumentType,
+  type DetectedContentKind,
+} from "./domain/upload-policy.js";
+export {
+  detectDocumentContent,
+  type ByteRangeReader,
+  type ContentDetection,
+} from "./domain/content-validation.js";
+export { createDocumentStorageKey } from "./domain/storage-identity.js";
+export {
+  CompleteDocumentUploadSessionInputSchema,
+  CreateDocumentUploadSessionInputSchema,
+  type CancelDocumentUploadSessionCommand,
+  type CompleteDocumentUploadSessionCommand,
+  type CompletedUploadResult,
+  type CreateDocumentUploadSessionCommand,
+  type CreateDocumentUploadSessionInput,
+  type DocumentUploadSessionResult,
+} from "./application/upload-use-cases.js";
+export {
+  createPostgresDocumentUploadRequestStore,
+  createPostgresDocumentUploadSessionRepository,
+} from "./infrastructure/postgres-upload-repository.js";
+export { createSupabaseDocumentStorageProvider } from "./infrastructure/supabase-storage-provider.js";
 export type {
   ClaimEvidenceRepository,
   ClaimQueryPort,
@@ -106,6 +157,12 @@ export {
   type EvidenceService,
   type EvidenceServiceOptions,
 } from "./application/service.js";
+export type { DocumentWithVersion } from "./application/document-use-cases.js";
+export {
+  toDocumentDto,
+  toDocumentUploadSessionDto,
+  toDocumentVersionDto,
+} from "./contracts/dto.js";
 export { createPostgresEvidenceRepositories } from "./infrastructure/postgres-repositories.js";
 export {
   createPostgresClaimQueryPort,

@@ -38,6 +38,15 @@ import {
   createInvestorOrganisationOnboardingSubjectResolver,
   createOnboardingService,
 } from "@capital-q/onboarding";
+import {
+  createEvidenceSubjectResolverRegistry,
+  createCompanyEvidenceSubjectResolver,
+  createEvidenceService,
+  createSupabaseDocumentStorageProvider,
+  DOCUMENT_STORAGE_BUCKET,
+  DOCUMENT_UPLOAD_MAX_OPEN_SESSIONS,
+  DOCUMENT_UPLOAD_SESSION_TTL_SECONDS,
+} from "@capital-q/evidence";
 import { createTaxonomyService } from "@capital-q/taxonomy";
 import {
   createPostgresActiveOrganisationContextStore,
@@ -186,6 +195,43 @@ const onboarding = createOnboardingService({
   }),
 });
 
+// Evidence. The storage adapter is composed only when a privileged
+// storage credential is configured: without it the document upload
+// boundary refuses rather than opening, and the rest of the API still
+// serves. The credential never leaves this process.
+const storage =
+  config.secrets.supabaseSecretKey === undefined
+    ? undefined
+    : createSupabaseDocumentStorageProvider({
+        supabaseUrl: supabaseAuth.url,
+        secretKey: config.secrets.supabaseSecretKey,
+      });
+
+const evidence = createEvidenceService({
+  sql: database.sql,
+  transactions: database.transactions,
+  authorization,
+  subjects: createEvidenceSubjectResolverRegistry([
+    createCompanyEvidenceSubjectResolver(
+      createPostgresCompanyQueryPort({ sql: database.sql }),
+    ),
+  ]),
+  outbox,
+  audit,
+  securityEvents: createPostgresSecurityEventWriter({ sql: database.sql }),
+  ...(storage === undefined
+    ? {}
+    : {
+        storage,
+        uploads: {
+          bucket: DOCUMENT_STORAGE_BUCKET,
+          maxBytes: config.public.documentUploadMaxBytes,
+          sessionTtlSeconds: DOCUMENT_UPLOAD_SESSION_TTL_SECONDS,
+          maxOpenSessions: DOCUMENT_UPLOAD_MAX_OPEN_SESSIONS,
+        },
+      }),
+});
+
 const { app, logger } = createApp(config, security, {
   organisations,
   companies,
@@ -196,6 +242,7 @@ const { app, logger } = createApp(config, security, {
     candidates: taxonomy.classification.candidates,
   },
   onboarding: onboarding.runtime,
+  evidence,
 });
 
 app.addHook("onClose", async () => {

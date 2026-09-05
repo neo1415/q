@@ -94,17 +94,22 @@ describe("per-service isolation", () => {
     expect(config.runtime.deploymentEnvironment).toBe("local");
   });
 
-  it("exposes empty public and secret areas rather than omitting them", () => {
-    // The shape exists now so future provider credentials have a defined home
-    // and cannot be mixed into runtime config.
+  it("keeps public and secret areas defined, and never fills a secret by default", () => {
+    // The shape exists so provider credentials have a defined home and
+    // cannot be mixed into runtime config.
     for (const config of [
-      parseApiConfig(EMPTY_ENV),
       parseQApiConfig(EMPTY_ENV),
       parseWorkerConfig(EMPTY_ENV),
     ]) {
       expect(config.public).toEqual({});
       expect(config.secrets).toEqual({});
     }
+    // The API carries the document upload limit as public operational value
+    // and the storage credential as a secret that is absent unless configured.
+    const api = parseApiConfig(EMPTY_ENV);
+    expect(Object.keys(api.public)).toEqual(["documentUploadMaxBytes"]);
+    expect(api.public.documentUploadMaxBytes).toBe(26214400);
+    expect(api.secrets.supabaseSecretKey).toBeUndefined();
     // The web app's public area holds exactly the two browser-safe Supabase
     // values and nothing secret.
     const web = parseWebServerConfig(WEB_ENV);
@@ -113,6 +118,42 @@ describe("per-service isolation", () => {
       "supabaseUrl",
     ]);
     expect(web.secrets).toEqual({});
+  });
+
+  it("refuses a publishable key where storage authority is expected, and the reverse", () => {
+    // The two Supabase credentials are not interchangeable. Configuring the
+    // public one as storage authority would silently disable uploads;
+    // configuring the secret one as the public key would ship it to browsers.
+    expect(() =>
+      parseApiConfig({
+        SUPABASE_URL: "http://127.0.0.1:54321",
+        SUPABASE_PUBLISHABLE_KEY: "sb_publishable_test",
+        SUPABASE_SECRET_KEY: "sb_publishable_test",
+      }),
+    ).toThrow();
+    expect(() =>
+      parseApiConfig({
+        SUPABASE_URL: "http://127.0.0.1:54321",
+        SUPABASE_PUBLISHABLE_KEY: "sb_secret_test",
+      }),
+    ).toThrow();
+    const configured = parseApiConfig({
+      SUPABASE_URL: "http://127.0.0.1:54321",
+      SUPABASE_PUBLISHABLE_KEY: "sb_publishable_test",
+      SUPABASE_SECRET_KEY: "sb_secret_test",
+    });
+    expect(configured.secrets.supabaseSecretKey).toBe("sb_secret_test");
+  });
+
+  it("bounds the document upload limit by the ceiling a version may carry", () => {
+    expect(
+      parseApiConfig({ CQ_DOCUMENT_UPLOAD_MAX_BYTES: "1048576" }).public
+        .documentUploadMaxBytes,
+    ).toBe(1048576);
+    // 50 MiB is the largest a document version may ever be.
+    expect(() =>
+      parseApiConfig({ CQ_DOCUMENT_UPLOAD_MAX_BYTES: "52428801" }),
+    ).toThrow();
   });
 });
 

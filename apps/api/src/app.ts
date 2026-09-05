@@ -1,5 +1,6 @@
 import Fastify, { type FastifyBaseLogger, type FastifyInstance } from "fastify";
 import { CONTRACTS_VERSION } from "@capital-q/contracts";
+import { ADMISSIBLE_MIME_TYPES } from "@capital-q/evidence";
 import type { ApiConfig } from "@capital-q/config/api";
 import {
   createFrameworkLogger,
@@ -18,6 +19,10 @@ import {
   type CompanyRoutesDependencies,
 } from "./http/companies.js";
 import { registerCompanyTeamRoutes } from "./http/company-team.js";
+import {
+  registerDocumentRoutes,
+  type DocumentRoutesDependencies,
+} from "./http/documents.js";
 import { registerInvestorMandateRoutes } from "./http/investor-mandates.js";
 import {
   registerInvestorRoutes,
@@ -72,6 +77,7 @@ export type ApiModules = {
   readonly capital?: CapitalRoutesDependencies["capital"] | undefined;
   readonly taxonomy?: TaxonomyRoutesDependencies["taxonomy"] | undefined;
   readonly onboarding?: OnboardingRoutesDependencies["onboarding"] | undefined;
+  readonly evidence?: DocumentRoutesDependencies["evidence"] | undefined;
 };
 
 /**
@@ -191,6 +197,20 @@ export function createApp(
       resolver: security.resolver,
       identities: security.identities,
       onboarding: modules.onboarding,
+    });
+  }
+
+  // Documents register only when the Evidence module is composed. Without
+  // a storage credential the upload boundary is closed, not open.
+  if (modules.evidence !== undefined) {
+    registerDocumentRoutes(app, {
+      authenticator: security.authenticator,
+      resolver: security.resolver,
+      evidence: modules.evidence,
+      uploads: {
+        maxBytes: config.public.documentUploadMaxBytes,
+        allowedMimeTypes: ADMISSIBLE_MIME_TYPES,
+      },
     });
   }
 

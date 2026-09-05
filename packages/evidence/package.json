@@ -35,6 +35,7 @@
     "@capital-q/contracts": "workspace:*",
     "@capital-q/database": "workspace:*",
     "@capital-q/eventing": "workspace:*",
+    "@capital-q/observability": "workspace:*",
     "@capital-q/security": "workspace:*",
     "zod": "4.5.4"
   },

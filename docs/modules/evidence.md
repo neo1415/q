@@ -20,8 +20,9 @@ Documents support intelligence; uploading one never makes it the company's
 authoritative record. A deck saying "revenue $2M" may support a Claim
 (`USER_CLAIM` / `SELF_REPORTED`); nothing here writes `core.*`.
 
-This packet contains no upload endpoint, no signed URL, no parser, no
-malware scanner, no embedding, no model call and no URL fetch.
+Uploading arrived with CQ-EVD-002 (below). There is still no parser, no
+malware scanner, no text extraction, no embedding, no model call, no URL
+fetch and no document download route.
 
 ## Vocabulary (ADR-001 wins)
 
@@ -84,6 +85,112 @@ separate documents and permissions.
 
 Storage is deferred: rows carry a bucket name and a random server key; no
 bucket is created or exposed, no bytes are accepted.
+
+## Secure upload (CQ-EVD-002)
+
+```
+transferred ≠ validated ≠ scanned ≠ parsed ≠ safe
+storage key ≠ authorization      declared type ≠ actual content
+```
+
+**The flow.** `POST /v1/documents/upload-sessions` (Idempotency-Key)
+authorises one transfer: the server checks the capability, resolves the
+company, chooses the object identity and returns a scoped target. The
+browser PUTs the bytes straight into private storage.
+`POST …/:id/complete` (Idempotency-Key) is where the decision happens: the
+server stats the object, streams it to a capped temporary file computing
+SHA-256, identifies the container, requires extension, declared MIME and
+detected content to agree, and only then appends an immutable
+DocumentVersion and marks the session COMPLETED. `POST …/:id/cancel` closes
+a session and removes any bytes. `GET /v1/documents` and
+`GET /v1/documents/:id` return authorised metadata and processing state,
+never a bucket, a key or a URL. The API never proxies document bytes and
+there is no download route.
+
+**The bucket.** `cq-documents-private`, created by migration with
+`public = false`, a 25 MiB ceiling and the MIME allowlist. `storage.objects`
+keeps RLS with no policy for it, so anonymous and authenticated browser
+credentials can neither read, list, write nor delete. The only
+browser-reachable write is the server-issued signed target, scoped to one
+object with `upsert:false`, so a completed upload's bytes can never be
+replaced; replacement is a new session, a new random identity and a new
+version. A public bucket is a release blocker and is asserted in pgTAP.
+
+**Object identity.** `raw/<tenantId>/<32 random hex>`, chosen by the server.
+Never the filename, the title or any business id. The original filename is
+kept as display metadata only, with client directories stripped and control
+characters, path separators and CR/LF refused.
+
+**What is admitted.** PDF, DOCX, PPTX, XLSX, CSV, TXT, PNG, JPEG — the same
+list the version registry stores. Executables, scripts, HTML, SVG, general
+archives, legacy Office and macro-enabled Office are refused. PDF must carry
+its signature at byte zero, so a polyglot with leading junk is refused
+rather than admitted as the convenient interpretation. OOXML is identified
+by reading the ZIP **central directory only** — entry names, never an
+inflated entry — requiring `[Content_Types].xml` plus exactly one of
+`word/`, `ppt/` or `xl/`, and refusing `vbaProject.bin`. Text must contain
+no NUL or stray control bytes and must not open with markup, a shebang or a
+printable binary header.
+
+> Admitting an OOXML package means its container is what it claims to be. It
+> does **not** mean extracting it is safe: expansion ratios, entry counts,
+> parser timeouts and memory limits belong to the isolated processing worker
+> in CQ-EVD-003.
+
+**Sessions.** `evidence.document_upload_sessions`: PENDING_AUTHORIZATION →
+AUTHORIZED → FINALIZING → COMPLETED, or REJECTED, EXPIRED, CANCELLED.
+COMPLETED means bytes arrived, passed the boundary and became a version —
+never scanned, parsed or safe. The session records which capability admitted
+it (`document.create` for a new document's first version, `document.manage`
+for a further version of an existing one) and re-checks it at finalization.
+Its object identity is immutable by trigger, and
+`UNIQUE (storage_bucket, storage_key)` means a key is never reused. The
+signed target itself is never persisted.
+`evidence.document_upload_requests` carries durable idempotency: one key,
+one session, one document; the same key with different content is a
+conflict.
+
+**Limits.** 25 MiB by default (`CQ_DOCUMENT_UPLOAD_MAX_BYTES`), an adjustable
+implementation limit inside the 50 MiB ceiling a version may carry, enforced
+at the bucket, at the declaration and against the actual stored size. A
+30-minute application window; Supabase's own signed-upload token lives a
+fixed two hours, so finalization after the window fails closed and late bytes
+can never become a version. An organisation may hold 25 open authorizations
+at once — a bound on outstanding scoped writes, not a rate limiter.
+
+**Failure and cleanup.** A refusal marks the session REJECTED with a bounded
+code and deletes the object; if deletion fails the refusal still stands and
+`cleanup_pending` records the debt. Validity never depends on cleanup
+succeeding. Storage and Postgres cannot share a transaction: the object
+exists first, the database commits second, and a failed commit leaves the
+bytes private and unattached for a safe retry.
+`cleanupExpiredUploadSession` is a service primitive; scheduled cleanup
+arrives with the worker packet.
+
+**Refusal codes** (problem `VALIDATION_FAILED` with the category in
+`errors[0].code`): FILE_TOO_LARGE, FILE_EMPTY, FILENAME_NOT_ALLOWED,
+EXTENSION_NOT_ALLOWED, MIME_NOT_ALLOWED, SIGNATURE_MISMATCH,
+OOXML_TYPE_MISMATCH, ACTIVE_CONTENT_TYPE_NOT_ALLOWED, ARCHIVE_NOT_ALLOWED,
+CONTENT_UNRECOGNISED, SIZE_MISMATCH, OBJECT_MISSING, UPLOAD_EXPIRED,
+STORAGE_VALIDATION_FAILED. Only the content-disagrees-with-its-claim
+categories raise a security event; an unsupported type or an oversized file
+is an ordinary mistake and must not flood security monitoring.
+
+**Credentials.** The privileged storage key lives only in the API process,
+validated as privileged by its own config schema so a publishable key cannot
+be configured in its place and it cannot be configured where the public key
+belongs. It never reaches a browser, a log or a problem response. Without it
+the upload boundary is closed rather than open.
+
+**Threat coverage.** TM-FILE-02 (content-type bypass) is mitigated at this
+boundary. TM-FILE-04 (macros) is blocked by type and package inspection, with
+parser-level enforcement still to come. TM-FILE-06 (public storage) is
+mitigated and asserted. TM-FILE-07 has nothing to leak: no download URL is
+issued. TM-FILE-01 (parser exploits) and TM-FILE-03 (decompression bombs)
+have their foundation here and their controls in CQ-EVD-003. TM-FILE-05
+(document prompt injection) is untouched by design: a valid document whose
+words give instructions is admitted as a valid document, and its words carry
+no authority.
 
 ## Processing provenance
 

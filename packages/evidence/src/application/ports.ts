@@ -36,6 +36,10 @@ import type {
   TextExtractionStatus,
   TruthClass,
 } from "../contracts/index.js";
+import type {
+  DocumentUploadRequestStore,
+  DocumentUploadSessionRepository,
+} from "./upload-ports.js";
 
 /**
  * Repository ports. Writes take the transaction, reads take an executor,
@@ -182,6 +186,15 @@ export type DocumentVersionRepository = {
     executor: DatabaseExecutor,
     tenantId: TenantId,
     documentId: DocumentId,
+  ) => Promise<readonly DocumentVersion[]>;
+  /**
+   * The current version of each of an organisation's documents, in one
+   * round trip, so listing documents does not become a query per row.
+   */
+  readonly listCurrentByOwner: (
+    executor: DatabaseExecutor,
+    tenantId: TenantId,
+    ownerOrganisationId: OrganisationId,
   ) => Promise<readonly DocumentVersion[]>;
   /**
    * Byte-level duplicate detection inside one organisation only. A hash is
@@ -372,6 +385,13 @@ export type ClaimEvidenceRepository = {
   ) => Promise<readonly ClaimEvidenceLink[]>;
 };
 
+export type {
+  DocumentUploadRequestRecord,
+  DocumentUploadRequestStore,
+  DocumentUploadSessionChanges,
+  DocumentUploadSessionRepository,
+} from "./upload-ports.js";
+
 export type EvidenceRepositories = {
   readonly sources: EvidenceSourceRepository;
   readonly documents: DocumentRepository;
@@ -380,6 +400,8 @@ export type EvidenceRepositories = {
   readonly claims: ClaimRepository;
   readonly evidenceItems: EvidenceItemRepository;
   readonly claimEvidence: ClaimEvidenceRepository;
+  readonly uploadSessions: DocumentUploadSessionRepository;
+  readonly uploadRequests: DocumentUploadRequestStore;
 };
 
 // ---------------------------------------------------------------------------

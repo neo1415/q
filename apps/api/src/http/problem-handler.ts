@@ -39,6 +39,23 @@ import {
   OrganisationNotFoundError,
   OrganisationVersionConflictError,
 } from "@capital-q/organisations";
+import type { DocumentUploadFailureCode } from "@capital-q/contracts";
+import {
+  ClaimNotFoundError,
+  ClaimRevisionConflictError,
+  DocumentNotFoundError,
+  DocumentStorageUnavailableError,
+  DocumentUploadCreationConflictError,
+  DocumentUploadRejectedError,
+  DocumentUploadSessionNotFoundError,
+  DocumentUploadStateError,
+  DocumentVersionConflictError,
+  DocumentVersionNotFoundError,
+  EvidenceItemNotFoundError,
+  EvidenceRuleError,
+  EvidenceSourceNotFoundError,
+  EvidenceSubjectNotFoundError,
+} from "@capital-q/evidence";
 import {
   ActorContextDeniedError,
   ActorContextRequiredError,
@@ -120,6 +137,31 @@ const MALFORMED_REQUEST_CODES: ReadonlySet<string> = new Set([
   "FST_ERR_CTP_INVALID_CONTENT_LENGTH",
   "FST_ERR_CTP_BODY_TOO_LARGE",
 ]);
+
+/**
+ * What a refused upload is told. One short, bounded sentence per category:
+ * enough for an honest person to fix the file, and nothing that maps out
+ * the detector for a hostile one (doc 22 §22).
+ */
+const UPLOAD_REFUSAL_DETAIL: Readonly<
+  Record<DocumentUploadFailureCode, string>
+> = {
+  FILE_TOO_LARGE: "The file is larger than the upload limit.",
+  FILE_EMPTY: "The file is empty.",
+  FILENAME_NOT_ALLOWED: "That file name cannot be used.",
+  EXTENSION_NOT_ALLOWED: "That file type is not supported.",
+  MIME_NOT_ALLOWED: "That file type is not supported.",
+  SIGNATURE_MISMATCH: "The file does not match its extension.",
+  OOXML_TYPE_MISMATCH:
+    "The file is a different Office document type than its name suggests.",
+  ACTIVE_CONTENT_TYPE_NOT_ALLOWED: "Files that can run code are not accepted.",
+  ARCHIVE_NOT_ALLOWED: "Archives are not accepted.",
+  CONTENT_UNRECOGNISED: "The file could not be recognised.",
+  SIZE_MISMATCH: "The upload did not complete correctly. Try again.",
+  OBJECT_MISSING: "No file was received. Try uploading again.",
+  UPLOAD_EXPIRED: "The upload window expired. Start again.",
+  STORAGE_VALIDATION_FAILED: "The upload could not be verified. Try again.",
+};
 
 function toProblem(
   error: unknown,
@@ -205,9 +247,70 @@ function toProblem(
     error instanceof OnboardingSessionNotFoundError ||
     error instanceof OnboardingSuggestionNotFoundError ||
     error instanceof OnboardingSubjectNotFoundError ||
-    error instanceof OnboardingDefinitionUnavailableError
+    error instanceof OnboardingDefinitionUnavailableError ||
+    error instanceof EvidenceSourceNotFoundError ||
+    error instanceof EvidenceItemNotFoundError ||
+    error instanceof EvidenceSubjectNotFoundError ||
+    error instanceof ClaimNotFoundError ||
+    error instanceof DocumentNotFoundError ||
+    error instanceof DocumentVersionNotFoundError ||
+    error instanceof DocumentUploadSessionNotFoundError
   ) {
     return createProblemDetails({ code: "RESOURCE_NOT_FOUND", requestId });
+  }
+
+  // A refused upload. The category is machine-readable so a client can say
+  // something useful; nothing about the detector, the storage target or the
+  // file's content is disclosed.
+  if (error instanceof DocumentUploadRejectedError) {
+    return createProblemDetails({
+      code: "VALIDATION_FAILED",
+      requestId,
+      detail: UPLOAD_REFUSAL_DETAIL[error.failureCode],
+      errors: [
+        {
+          path: "file",
+          code: error.failureCode,
+          message: UPLOAD_REFUSAL_DETAIL[error.failureCode],
+        },
+      ],
+    });
+  }
+
+  // The upload exists but is not at a step where this can happen: already
+  // completed, already refused, cancelled, or never authorised.
+  if (error instanceof DocumentUploadStateError) {
+    return createProblemDetails({
+      code: "UPLOAD_NOT_READY",
+      requestId,
+      detail: error.message,
+    });
+  }
+
+  if (error instanceof DocumentUploadCreationConflictError) {
+    return createProblemDetails({ code: "IDEMPOTENCY_CONFLICT", requestId });
+  }
+
+  if (error instanceof DocumentVersionConflictError) {
+    return createProblemDetails({ code: "VERSION_CONFLICT", requestId });
+  }
+
+  if (error instanceof ClaimRevisionConflictError) {
+    return createProblemDetails({ code: "VERSION_CONFLICT", requestId });
+  }
+
+  // Private storage is unreachable or unconfigured. Uploads are closed
+  // rather than open, and no provider detail is echoed.
+  if (error instanceof DocumentStorageUnavailableError) {
+    return createProblemDetails({ code: "PROVIDER_UNAVAILABLE", requestId });
+  }
+
+  if (error instanceof EvidenceRuleError) {
+    return createProblemDetails({
+      code: "INVALID_REQUEST",
+      requestId,
+      detail: error.message,
+    });
   }
 
   // A named taxonomy node cannot be selected here (unknown, deprecated,

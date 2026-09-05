@@ -16,6 +16,10 @@ import {
   UserIdSchema,
 } from "@capital-q/security";
 
+import {
+  createPostgresDocumentUploadRequestStore,
+  createPostgresDocumentUploadSessionRepository,
+} from "./postgres-upload-repository.js";
 import type {
   ClaimEvidenceRepository,
   ClaimRepository,
@@ -404,6 +408,21 @@ export function createPostgresDocumentVersionRepository(): DocumentVersionReposi
         ${selectVersions(executor)}
          where v.tenant_id = ${tenantId} and v.document_id = ${documentId}
          order by v.version_number desc`;
+      return rows.map(toVersion);
+    },
+    listCurrentByOwner: async (executor, tenantId, ownerOrganisationId) => {
+      const rows = await executor`
+        select v.id, v.tenant_id, v.document_id, v.version_number, v.storage_bucket, v.storage_key,
+               v.original_filename, v.mime_type, v.size_bytes, v.sha256, v.uploaded_by_user_id,
+               v.uploaded_at, v.supersedes_version_id, v.processing_status, v.malware_scan_status,
+               v.text_extraction_status
+          from evidence.document_versions v
+          join evidence.documents d
+            on d.id = v.document_id
+           and d.tenant_id = v.tenant_id
+           and d.current_version_id = v.id
+         where v.tenant_id = ${tenantId}
+           and d.owner_organisation_id = ${ownerOrganisationId}`;
       return rows.map(toVersion);
     },
     findBySha256: async (executor, tenantId, ownerOrganisationId, sha256) => {
@@ -966,6 +985,8 @@ export function createPostgresClaimEvidenceRepository(): ClaimEvidenceRepository
 
 export function createPostgresEvidenceRepositories(): EvidenceRepositories {
   return {
+    uploadSessions: createPostgresDocumentUploadSessionRepository(),
+    uploadRequests: createPostgresDocumentUploadRequestStore(),
     sources: createPostgresEvidenceSourceRepository(),
     documents: createPostgresDocumentRepository(),
     documentVersions: createPostgresDocumentVersionRepository(),

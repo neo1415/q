@@ -85,6 +85,23 @@ export const supabasePublishableKeySchema = z
       "expected a publishable (anon) key; a secret or service-role key must never be configured here",
   });
 
+/**
+ * The privileged server credential (CQ-EVD-002). It is the mirror image of
+ * the publishable key: this one is refused unless it *is* privileged, so a
+ * publishable key cannot be configured where storage authority is expected
+ * and a secret key cannot be configured where the public one belongs. It
+ * exists only in server processes, never in a browser bundle, never in a
+ * log, never in a problem response.
+ */
+export const supabaseSecretKeySchema = z
+  .string()
+  .min(1)
+  .max(2048)
+  .refine((value) => classifySupabaseKey(value) === "privileged", {
+    message:
+      "expected a secret (service-role) key; a publishable key carries no storage authority",
+  });
+
 /** Server-process variables (api, q-api). Web uses its NEXT_PUBLIC_ names. */
 export const supabaseAuthEnvShape = {
   SUPABASE_URL: supabaseUrlSchema,

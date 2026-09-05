@@ -12,14 +12,17 @@ import {
   MessageSensitivitySchema,
   UuidSchema,
   type CorrelationId,
+  type MessageSensitivity,
 } from "@capital-q/contracts";
-import type { ActorContext } from "@capital-q/security";
+import type { TransactionContext } from "@capital-q/database";
+import type { ActorContext, OrganisationId } from "@capital-q/security";
 
 import {
   DocumentIdSchema,
   DocumentTitleSchema,
   DocumentTypeSchema,
   DocumentVersionIdSchema,
+  type DocumentType,
   MimeTypeSchema,
   OriginalFilenameSchema,
   Sha256Schema,
@@ -84,6 +87,234 @@ export const DOCUMENT_MIME_ALLOWLIST = [
 /** Upper bound on a registered version; the platform storage limit is 50 MiB. */
 export const DOCUMENT_MAX_SIZE_BYTES = 50 * 1024 * 1024;
 
+// ---------------------------------------------------------------------------
+// Transactional bodies shared with the upload boundary (CQ-EVD-002).
+//
+// The upload flow must create a document and append its version inside its
+// own transaction, alongside the upload session it is completing. Sharing
+// these bodies keeps one path for the insert, the audit entry and the
+// event, so a document created by upload is indistinguishable from any
+// other and neither path can drift.
+// ---------------------------------------------------------------------------
+
+export type InsertDocumentWithin = {
+  readonly actor: ActorContext;
+  readonly organisationId: OrganisationId;
+  readonly companyId: string | null;
+  readonly documentType: DocumentType;
+  readonly title: string;
+  readonly sensitivityClass: MessageSensitivity;
+  readonly correlationId: CorrelationId;
+};
+
+export async function insertDocumentWithin(
+  tx: TransactionContext,
+  dependencies: EvidenceServiceDependencies,
+  input: InsertDocumentWithin,
+): Promise<Document> {
+  const { audit, outbox, repositories } = dependencies;
+  const { actor } = input;
+  const document = await repositories.documents.insert(tx, {
+    tenantId: actor.tenantId,
+    companyId: input.companyId,
+    ownerOrganisationId: input.organisationId,
+    documentType: input.documentType,
+    title: input.title,
+    // Never broader than the organisation at creation; sharing is a
+    // separate, deliberate disclosure decision.
+    visibilityScope: "organisation_private",
+    sensitivityClass: input.sensitivityClass,
+    createdByUserId: actor.userId,
+  });
+  await audit.record(tx, {
+    ...auditActorFromContext(actor),
+    auditEventId: createAuditEventId(),
+    actionType: ACTION.created,
+    resourceType: RESOURCE_DOCUMENT,
+    resourceId: document.id,
+    occurredAt: occurredNow(),
+    outcome: "SUCCEEDED",
+    metadata: {
+      documentType: document.documentType,
+      companyId: document.companyId,
+      sensitivityClass: document.sensitivityClass,
+    },
+    correlationId: input.correlationId,
+  });
+  await outbox.enqueue(
+    tx,
+    documentCreatedEvent(
+      {
+        actor,
+        organisationId: input.organisationId,
+        correlationId: input.correlationId,
+      },
+      {
+        documentId: document.id,
+        ownerOrganisationId: document.ownerOrganisationId,
+        companyId: document.companyId,
+        documentType: document.documentType,
+      },
+    ),
+  );
+  return document;
+}
+
+/** Verified file identity. Whoever calls this has already proved it. */
+export type DocumentFileIdentity = {
+  readonly storageBucket: string;
+  readonly storageKey: string;
+  readonly originalFilename: string;
+  readonly mimeType: string;
+  readonly sizeBytes: number;
+  readonly sha256: string;
+};
+
+/**
+ * Appends the next version to a document the caller already holds a row
+ * lock on, and advances the current-version pointer in the same
+ * transaction. The lock is what makes version numbers sequential when two
+ * uploads finalize at once: whoever holds it is version N, the next is N+1.
+ */
+export async function appendDocumentVersionWithin(
+  tx: TransactionContext,
+  dependencies: EvidenceServiceDependencies,
+  input: {
+    readonly actor: ActorContext;
+    readonly organisationId: OrganisationId;
+    readonly document: Document;
+    readonly file: DocumentFileIdentity;
+    readonly correlationId: CorrelationId;
+  },
+): Promise<RegisterDocumentVersionResult> {
+  const { audit, outbox, repositories } = dependencies;
+  const { actor, document } = input;
+  if (document.status !== "ACTIVE") {
+    throw new EvidenceRuleError("an archived document takes no new versions");
+  }
+  const existing = await repositories.documentVersions.listByDocument(
+    tx.sql,
+    actor.tenantId,
+    document.id,
+  );
+  const versionNumber =
+    existing.reduce((max, v) => Math.max(max, v.versionNumber), 0) + 1;
+  const duplicates = await repositories.documentVersions.findBySha256(
+    tx.sql,
+    actor.tenantId,
+    input.organisationId,
+    input.file.sha256,
+  );
+  const version = await repositories.documentVersions.insert(tx, {
+    tenantId: actor.tenantId,
+    documentId: document.id,
+    versionNumber,
+    storageBucket: input.file.storageBucket,
+    storageKey: input.file.storageKey,
+    originalFilename: input.file.originalFilename,
+    mimeType: input.file.mimeType.toLowerCase(),
+    sizeBytes: input.file.sizeBytes,
+    sha256: input.file.sha256,
+    uploadedByUserId: actor.userId,
+    supersedesVersionId: document.currentVersionId,
+  });
+  const advanced = await repositories.documents.setCurrentVersion(tx, {
+    tenantId: actor.tenantId,
+    documentId: document.id,
+    expectedVersion: document.version,
+    currentVersionId: version.id,
+  });
+  if (!advanced) {
+    throw new DocumentVersionConflictError();
+  }
+  const updated = await repositories.documents.findById(
+    tx.sql,
+    actor.tenantId,
+    input.organisationId,
+    document.id,
+  );
+  if (updated === null) {
+    throw new DocumentNotFoundError();
+  }
+  await audit.record(tx, {
+    ...auditActorFromContext(actor),
+    auditEventId: createAuditEventId(),
+    actionType: ACTION.versionRegistered,
+    resourceType: RESOURCE_DOCUMENT,
+    resourceId: document.id,
+    occurredAt: occurredNow(),
+    outcome: "SUCCEEDED",
+    metadata: {
+      documentVersionId: version.id,
+      versionNumber,
+      sizeBytes: version.sizeBytes,
+      duplicateCount: duplicates.length,
+    },
+    correlationId: input.correlationId,
+  });
+  await outbox.enqueue(
+    tx,
+    documentVersionCreatedEvent(
+      {
+        actor,
+        organisationId: input.organisationId,
+        correlationId: input.correlationId,
+      },
+      updated.version,
+      {
+        documentId: document.id,
+        documentVersionId: version.id,
+        versionNumber,
+        supersedesVersionId: version.supersedesVersionId,
+      },
+    ),
+  );
+  return {
+    document: updated,
+    version,
+    duplicateOf: duplicates.map((d) => d.id),
+  };
+}
+
+/**
+ * The company and sensitivity checks a new document must pass, whether it
+ * is created directly or as the first step of an upload.
+ */
+export async function resolveNewDocument(
+  dependencies: EvidenceServiceDependencies,
+  actor: ActorContext,
+  input: {
+    readonly documentType: DocumentType;
+    readonly companyId?: string | undefined;
+    readonly sensitivityClass?: MessageSensitivity | undefined;
+  },
+): Promise<{
+  readonly companyId: string | null;
+  readonly sensitivityClass: MessageSensitivity;
+}> {
+  // A company named by the caller must be one this organisation owns; a
+  // guessed id from elsewhere is "not found", never "forbidden".
+  const companyId =
+    input.companyId === undefined
+      ? null
+      : (
+          await ownedSubject(dependencies, actor, {
+            subjectType: "COMPANY",
+            subjectId: input.companyId,
+          }).catch(() => {
+            throw new DocumentNotFoundError();
+          })
+        ).subjectId;
+  const floor = defaultDocumentSensitivity(input.documentType);
+  const sensitivityClass = input.sensitivityClass ?? floor;
+  if (!isAtLeastAsSensitive(sensitivityClass, floor)) {
+    throw new EvidenceRuleError(
+      `a ${input.documentType} document is at least ${floor}`,
+    );
+  }
+  return { companyId, sensitivityClass };
+}
+
 export const CreateDocumentInputSchema = z
   .object({
     title: DocumentTitleSchema,
@@ -104,31 +335,16 @@ export type CreateDocumentCommand = {
 export function createCreateDocument(
   dependencies: EvidenceServiceDependencies,
 ) {
-  const { transactions, audit, outbox, repositories } = dependencies;
+  const { transactions } = dependencies;
   return async (command: CreateDocumentCommand): Promise<Document> => {
     const input = CreateDocumentInputSchema.parse(command.input);
     const { actor } = command;
     const organisationId = activeOrganisation(actor);
-    // A company named by the caller must be one this organisation owns; a
-    // guessed id from elsewhere is "not found", never "forbidden".
-    const companyId =
-      input.companyId === undefined
-        ? null
-        : (
-            await ownedSubject(dependencies, actor, {
-              subjectType: "COMPANY",
-              subjectId: input.companyId,
-            }).catch(() => {
-              throw new DocumentNotFoundError();
-            })
-          ).subjectId;
-    const floor = defaultDocumentSensitivity(input.documentType);
-    const sensitivityClass = input.sensitivityClass ?? floor;
-    if (!isAtLeastAsSensitive(sensitivityClass, floor)) {
-      throw new EvidenceRuleError(
-        `a ${input.documentType} document is at least ${floor}`,
-      );
-    }
+    const { companyId, sensitivityClass } = await resolveNewDocument(
+      dependencies,
+      actor,
+      input,
+    );
     await dependencies.authorization.requireCapability({
       actor,
       capability: DOCUMENT_CREATE,
@@ -138,46 +354,17 @@ export function createCreateDocument(
         organisationId,
       },
     });
-    return transactions.run(async (tx) => {
-      const document = await repositories.documents.insert(tx, {
-        tenantId: actor.tenantId,
+    return transactions.run((tx) =>
+      insertDocumentWithin(tx, dependencies, {
+        actor,
+        organisationId,
         companyId,
-        ownerOrganisationId: organisationId,
         documentType: input.documentType,
         title: input.title,
-        visibilityScope: "organisation_private",
         sensitivityClass,
-        createdByUserId: actor.userId,
-      });
-      await audit.record(tx, {
-        ...auditActorFromContext(actor),
-        auditEventId: createAuditEventId(),
-        actionType: ACTION.created,
-        resourceType: RESOURCE_DOCUMENT,
-        resourceId: document.id,
-        occurredAt: occurredNow(),
-        outcome: "SUCCEEDED",
-        metadata: {
-          documentType: document.documentType,
-          companyId: document.companyId,
-          sensitivityClass: document.sensitivityClass,
-        },
         correlationId: command.correlationId,
-      });
-      await outbox.enqueue(
-        tx,
-        documentCreatedEvent(
-          { actor, organisationId, correlationId: command.correlationId },
-          {
-            documentId: document.id,
-            ownerOrganisationId: document.ownerOrganisationId,
-            companyId: document.companyId,
-            documentType: document.documentType,
-          },
-        ),
-      );
-      return document;
-    });
+      }),
+    );
   };
 }
 
@@ -221,7 +408,7 @@ export type RegisterDocumentVersionResult = {
 export function createRegisterDocumentVersion(
   dependencies: EvidenceServiceDependencies,
 ) {
-  const { transactions, audit, outbox, repositories } = dependencies;
+  const { transactions, repositories } = dependencies;
   return async (
     command: RegisterDocumentVersionCommand,
   ): Promise<RegisterDocumentVersionResult> => {
@@ -262,89 +449,20 @@ export function createRegisterDocumentVersion(
       if (document.version !== input.expectedDocumentVersion) {
         throw new DocumentVersionConflictError();
       }
-      if (document.status !== "ACTIVE") {
-        throw new EvidenceRuleError(
-          "an archived document takes no new versions",
-        );
-      }
-      const existing = await repositories.documentVersions.listByDocument(
-        tx.sql,
-        actor.tenantId,
-        document.id,
-      );
-      const versionNumber =
-        existing.reduce((max, v) => Math.max(max, v.versionNumber), 0) + 1;
-      const duplicates = await repositories.documentVersions.findBySha256(
-        tx.sql,
-        actor.tenantId,
+      return appendDocumentVersionWithin(tx, dependencies, {
+        actor,
         organisationId,
-        input.sha256,
-      );
-      const version = await repositories.documentVersions.insert(tx, {
-        tenantId: actor.tenantId,
-        documentId: document.id,
-        versionNumber,
-        storageBucket: input.storageBucket,
-        storageKey: input.storageKey,
-        originalFilename: input.originalFilename,
-        mimeType: input.mimeType.toLowerCase(),
-        sizeBytes: input.sizeBytes,
-        sha256: input.sha256,
-        uploadedByUserId: actor.userId,
-        supersedesVersionId: document.currentVersionId,
-      });
-      const advanced = await repositories.documents.setCurrentVersion(tx, {
-        tenantId: actor.tenantId,
-        documentId: document.id,
-        expectedVersion: document.version,
-        currentVersionId: version.id,
-      });
-      if (!advanced) {
-        throw new DocumentVersionConflictError();
-      }
-      const updated = await repositories.documents.findById(
-        tx.sql,
-        actor.tenantId,
-        organisationId,
-        document.id,
-      );
-      if (updated === null) {
-        throw new DocumentNotFoundError();
-      }
-      await audit.record(tx, {
-        ...auditActorFromContext(actor),
-        auditEventId: createAuditEventId(),
-        actionType: ACTION.versionRegistered,
-        resourceType: RESOURCE_DOCUMENT,
-        resourceId: document.id,
-        occurredAt: occurredNow(),
-        outcome: "SUCCEEDED",
-        metadata: {
-          documentVersionId: version.id,
-          versionNumber,
-          sizeBytes: version.sizeBytes,
-          duplicateCount: duplicates.length,
+        document,
+        file: {
+          storageBucket: input.storageBucket,
+          storageKey: input.storageKey,
+          originalFilename: input.originalFilename,
+          mimeType: input.mimeType,
+          sizeBytes: input.sizeBytes,
+          sha256: input.sha256,
         },
         correlationId: command.correlationId,
       });
-      await outbox.enqueue(
-        tx,
-        documentVersionCreatedEvent(
-          { actor, organisationId, correlationId: command.correlationId },
-          updated.version,
-          {
-            documentId: document.id,
-            documentVersionId: version.id,
-            versionNumber,
-            supersedesVersionId: version.supersedesVersionId,
-          },
-        ),
-      );
-      return {
-        document: updated,
-        version,
-        duplicateOf: duplicates.map((d) => d.id),
-      };
     });
   };
 }
@@ -452,5 +570,59 @@ export function createGetDocumentVersion(
       throw new DocumentVersionNotFoundError();
     });
     return version;
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Reads that include the current version, for surfaces that show a
+// document's state. Two queries for a page, never one per row.
+// ---------------------------------------------------------------------------
+
+export type DocumentWithVersion = {
+  readonly document: Document;
+  readonly currentVersion: DocumentVersion | null;
+};
+
+export function createGetDocumentWithVersion(
+  dependencies: EvidenceServiceDependencies,
+) {
+  const getDocument = createGetDocument(dependencies);
+  return async (query: GetDocumentQuery): Promise<DocumentWithVersion> => {
+    const document = await getDocument(query);
+    if (document.currentVersionId === null) {
+      return { document, currentVersion: null };
+    }
+    const version = await dependencies.repositories.documentVersions.findById(
+      dependencies.sql,
+      query.actor.tenantId,
+      document.currentVersionId,
+    );
+    return { document, currentVersion: version };
+  };
+}
+
+export function createListDocumentsWithVersions(
+  dependencies: EvidenceServiceDependencies,
+) {
+  const listDocuments = createListDocuments(dependencies);
+  return async (
+    query: ListDocumentsQuery,
+  ): Promise<readonly DocumentWithVersion[]> => {
+    const documents = await listDocuments(query);
+    if (documents.length === 0) return [];
+    const versions =
+      await dependencies.repositories.documentVersions.listCurrentByOwner(
+        dependencies.sql,
+        query.actor.tenantId,
+        activeOrganisation(query.actor),
+      );
+    const byId = new Map(versions.map((version) => [version.id, version]));
+    return documents.map((document) => ({
+      document,
+      currentVersion:
+        document.currentVersionId === null
+          ? null
+          : (byId.get(document.currentVersionId) ?? null),
+    }));
   };
 }

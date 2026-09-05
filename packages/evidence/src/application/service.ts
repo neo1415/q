@@ -11,7 +11,9 @@ import {
   createCreateDocument,
   createGetDocument,
   createGetDocumentVersion,
+  createGetDocumentWithVersion,
   createListDocuments,
+  createListDocumentsWithVersions,
   createListDocumentVersions,
   createRegisterDocumentVersion,
 } from "./document-use-cases.js";
@@ -30,6 +32,13 @@ import {
   createListEvidenceSources,
   createRegisterEvidenceSource,
 } from "./source-use-cases.js";
+import {
+  createCancelDocumentUploadSession,
+  createCleanupExpiredUploadSession,
+  createCompleteDocumentUploadSession,
+  createCreateDocumentUploadSession,
+  createGetDocumentUploadSession,
+} from "./upload-use-cases.js";
 
 /** The Evidence application surface: bound use cases, nothing else. */
 export type EvidenceService = {
@@ -46,6 +55,12 @@ export type EvidenceService = {
   readonly listDocuments: ReturnType<typeof createListDocuments>;
   readonly listDocumentVersions: ReturnType<typeof createListDocumentVersions>;
   readonly getDocumentVersion: ReturnType<typeof createGetDocumentVersion>;
+  readonly getDocumentWithVersion: ReturnType<
+    typeof createGetDocumentWithVersion
+  >;
+  readonly listDocumentsWithVersions: ReturnType<
+    typeof createListDocumentsWithVersions
+  >;
   readonly registerProcessingRun: ReturnType<
     typeof createRegisterProcessingRun
   >;
@@ -63,6 +78,21 @@ export type EvidenceService = {
   readonly createEvidenceItem: ReturnType<typeof createCreateEvidenceItem>;
   readonly getEvidenceItem: ReturnType<typeof createGetEvidenceItem>;
   readonly listEvidenceItems: ReturnType<typeof createListEvidenceItems>;
+  readonly createDocumentUploadSession: ReturnType<
+    typeof createCreateDocumentUploadSession
+  >;
+  readonly completeDocumentUploadSession: ReturnType<
+    typeof createCompleteDocumentUploadSession
+  >;
+  readonly cancelDocumentUploadSession: ReturnType<
+    typeof createCancelDocumentUploadSession
+  >;
+  readonly getDocumentUploadSession: ReturnType<
+    typeof createGetDocumentUploadSession
+  >;
+  readonly cleanupExpiredUploadSession: ReturnType<
+    typeof createCleanupExpiredUploadSession
+  >;
 };
 
 export type EvidenceServiceOptions = Omit<
@@ -90,6 +120,8 @@ export function createEvidenceService(
     listDocuments: createListDocuments(dependencies),
     listDocumentVersions: createListDocumentVersions(dependencies),
     getDocumentVersion: createGetDocumentVersion(dependencies),
+    getDocumentWithVersion: createGetDocumentWithVersion(dependencies),
+    listDocumentsWithVersions: createListDocumentsWithVersions(dependencies),
     registerProcessingRun: createRegisterProcessingRun(dependencies),
     transitionProcessingRun: createTransitionProcessingRun(dependencies),
     advanceVersionProcessingState:
@@ -102,5 +134,14 @@ export function createEvidenceService(
     createEvidenceItem: createCreateEvidenceItem(dependencies),
     getEvidenceItem: createGetEvidenceItem(dependencies),
     listEvidenceItems: createListEvidenceItems(dependencies),
+    createDocumentUploadSession:
+      createCreateDocumentUploadSession(dependencies),
+    completeDocumentUploadSession:
+      createCompleteDocumentUploadSession(dependencies),
+    cancelDocumentUploadSession:
+      createCancelDocumentUploadSession(dependencies),
+    getDocumentUploadSession: createGetDocumentUploadSession(dependencies),
+    cleanupExpiredUploadSession:
+      createCleanupExpiredUploadSession(dependencies),
   };
 }
