@@ -149,6 +149,8 @@ export const TEXT_EXTRACTION_STATUSES = [
   "PROCESSING",
   "COMPLETED",
   "FAILED",
+  /** No extractor exists for this format yet. Never "completed" (CQ-EVD-003). */
+  "UNSUPPORTED",
 ] as const;
 export const TextExtractionStatusSchema = z.enum(TEXT_EXTRACTION_STATUSES);
 export type TextExtractionStatus = z.infer<typeof TextExtractionStatusSchema>;
@@ -158,6 +160,13 @@ export const PROCESSING_RUN_STATUSES = [
   "RUNNING",
   "COMPLETED",
   "FAILED",
+  /**
+   * Policy refused the work: an infected object, an unavailable scanner
+   * under a fail-closed policy, or a format with no extractor. Terminal and
+   * never retried, and deliberately distinct from FAILED, which means the
+   * attempt broke and may be worth another (CQ-EVD-003).
+   */
+  "BLOCKED",
 ] as const;
 export const ProcessingRunStatusSchema = z.enum(PROCESSING_RUN_STATUSES);
 export type ProcessingRunStatus = z.infer<typeof ProcessingRunStatusSchema>;
@@ -527,3 +536,6 @@ export type {
 };
 
 export * from "./upload.js";
+
+// Structured extraction contracts (CQ-EVD-003).
+export * from "./extraction.js";

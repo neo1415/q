@@ -8,6 +8,7 @@ import {
   UtcTimestampSchema,
   UuidSchema,
   type CapitalQEvent,
+  type CausationId,
   type CorrelationId,
   type EventDefinition,
 } from "@capital-q/contracts";
@@ -145,10 +146,40 @@ export const EvidenceItemCreatedEvent = defineEvent({
     "An evidence item was identified inside a source. Never the summary, value or locator.",
 });
 
+/**
+ * The immutable version completed the processing pipeline this deployment
+ * currently supports, and structured extraction is available.
+ *
+ * It does not mean the document's contents are verified, that the company is
+ * ready, that the file is safe to share, or that Q has concluded anything.
+ * Consumers that want the extracted structure ask for it through an
+ * authorised read; it is never carried here.
+ */
+export const DocumentReadyEvent = defineEvent({
+  name: "evidence.document.ready",
+  version: 1,
+  owner: EVIDENCE_EVENT_OWNER,
+  producer: EVIDENCE_EVENT_PRODUCER,
+  consumers: CONSUMERS,
+  sensitivity: "CONFIDENTIAL",
+  replaySafety: "REPLAY_SAFE",
+  dataSchema: z
+    .object({
+      documentId: UuidSchema,
+      documentVersionId: UuidSchema,
+      processingRunId: UuidSchema,
+      pipelineVersion: z.string().min(1).max(64),
+    })
+    .strict(),
+  description:
+    "A document version finished the supported processing pipeline and structured extraction exists. Carries no extracted content.",
+});
+
 export const EVIDENCE_EVENTS: readonly EventDefinition[] = [
   EvidenceSourceRegisteredEvent,
   DocumentCreatedEvent,
   DocumentVersionCreatedEvent,
+  DocumentReadyEvent,
   ClaimChangedEvent,
   EvidenceItemCreatedEvent,
 ];
@@ -248,4 +279,42 @@ export function evidenceItemCreatedEvent(
     { type: "evidence_item", id: data.evidenceItemId, version: 1 },
     data,
   );
+}
+
+/**
+ * Processing is background work with no human actor, so the envelope carries
+ * no attribution rather than inventing one. Tenant and organisation still
+ * come from the resource the worker resolved, never from a queue message.
+ */
+export function documentReadyEvent(
+  context: {
+    readonly tenantId: string;
+    readonly organisationId: string;
+    readonly correlationId: CorrelationId;
+    readonly causationId?: CausationId | undefined;
+  },
+  data: z.infer<typeof DocumentReadyEvent.dataSchema>,
+): CapitalQEvent<z.infer<typeof DocumentReadyEvent.dataSchema>> {
+  return {
+    specVersion: "1.0",
+    id: EventIdSchema.parse(randomUUID()),
+    type: DocumentReadyEvent.name,
+    source: DocumentReadyEvent.producer,
+    time: UtcTimestampSchema.parse(new Date().toISOString()),
+    subject: `document_version/${data.documentVersionId}`,
+    dataContentType: "application/json",
+    eventVersion: DocumentReadyEvent.version,
+    tenantId: context.tenantId,
+    organisationId: context.organisationId,
+    correlationId: context.correlationId,
+    ...(context.causationId === undefined
+      ? {}
+      : { causationId: context.causationId }),
+    aggregate: {
+      type: "document_version",
+      id: data.documentVersionId,
+      version: 1,
+    },
+    data,
+  };
 }

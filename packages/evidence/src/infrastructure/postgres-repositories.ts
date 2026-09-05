@@ -16,6 +16,7 @@ import {
   UserIdSchema,
 } from "@capital-q/security";
 
+import { createPostgresDocumentExtractionRepository } from "./postgres-extraction-repository.js";
 import {
   createPostgresDocumentUploadRequestStore,
   createPostgresDocumentUploadSessionRepository,
@@ -403,6 +404,11 @@ export function createPostgresDocumentVersionRepository(): DocumentVersionReposi
       return created;
     },
     findById,
+    findByIdForProcessing: async (executor, versionId) => {
+      const rows = await executor`
+        ${selectVersions(executor)} where v.id = ${versionId}`;
+      return rows.length === 0 ? null : toVersion(rows[0]);
+    },
     listByDocument: async (executor, tenantId, documentId) => {
       const rows = await executor`
         ${selectVersions(executor)}
@@ -547,12 +553,16 @@ export function createPostgresDocumentProcessingRunRepository(): DocumentProcess
     },
     findById,
     transition: async (tx, input) => {
+      const provenance = input.provenance ?? {};
       const rows = await tx.sql`
         update evidence.document_processing_runs r
            set status = ${input.status},
                error_code = ${input.errorCode},
+               extractor_version = coalesce(${provenance.extractorVersion ?? null}, r.extractor_version),
+               cost_usd = coalesce(${provenance.costUsd ?? null}::numeric, r.cost_usd),
+               metadata = coalesce(${provenance.metadata === undefined ? null : JSON.stringify(provenance.metadata)}::jsonb, r.metadata),
                started_at = case when ${input.status} = 'RUNNING' then clock_timestamp() else r.started_at end,
-               completed_at = case when ${input.status} in ('COMPLETED', 'FAILED') then clock_timestamp() else null end
+               completed_at = case when ${input.status} in ('COMPLETED', 'FAILED', 'BLOCKED') then clock_timestamp() else null end
           from evidence.document_versions v
          where r.id = ${input.runId}
            and v.id = r.document_version_id
@@ -985,6 +995,7 @@ export function createPostgresClaimEvidenceRepository(): ClaimEvidenceRepository
 
 export function createPostgresEvidenceRepositories(): EvidenceRepositories {
   return {
+    documentExtractions: createPostgresDocumentExtractionRepository(),
     uploadSessions: createPostgresDocumentUploadSessionRepository(),
     uploadRequests: createPostgresDocumentUploadRequestStore(),
     sources: createPostgresEvidenceSourceRepository(),

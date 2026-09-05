@@ -20,9 +20,9 @@ Documents support intelligence; uploading one never makes it the company's
 authoritative record. A deck saying "revenue $2M" may support a Claim
 (`USER_CLAIM` / `SELF_REPORTED`); nothing here writes `core.*`.
 
-Uploading arrived with CQ-EVD-002 (below). There is still no parser, no
-malware scanner, no text extraction, no embedding, no model call, no URL
-fetch and no document download route.
+Uploading arrived with CQ-EVD-002 and processing with CQ-EVD-003 (below).
+There is still no malware scanner, no chunking, no embedding, no model
+call, no URL fetch and no document download route.
 
 ## Vocabulary (ADR-001 wins)
 
@@ -196,12 +196,66 @@ no authority.
 
 `evidence.document_processing_runs`: `UNIQUE (document_version_id,
 pipeline_version)`; `registerProcessingRun` is get-or-create, so a second
-registration of `evidence-v1` for the same version is the same run.
-Status QUEUED → RUNNING → COMPLETED | FAILED (FAILED may be re-queued).
-Version states: processing NOT_STARTED/QUEUED/PROCESSING/COMPLETED/FAILED;
-malware PENDING/CLEAN/BLOCKED/ERROR; extraction
-NOT_STARTED/PROCESSING/COMPLETED/FAILED. All checked strings. No processor
-runs here.
+registration of `evidence-processing-v1` for the same version is the same
+run. Status QUEUED → RUNNING → COMPLETED | FAILED | BLOCKED. FAILED means
+the attempt broke and may be re-queued; BLOCKED means policy refused the
+work (infected, unscannable) and is terminal. Version states: processing
+NOT_STARTED/QUEUED/PROCESSING/COMPLETED/FAILED; malware
+PENDING/CLEAN/BLOCKED/ERROR; extraction
+NOT_STARTED/PROCESSING/COMPLETED/FAILED/UNSUPPORTED. All checked strings.
+The package still runs no parser and no scanner; it records what a worker
+did.
+
+## Processing pipeline (CQ-EVD-003)
+
+```
+version created → evidence.document.process → documents queue → worker
+  → security gate → malware gate → isolated parse → extraction artifact
+  → instruction-risk signal → evidence.document.ready
+```
+
+**Where it runs.** `apps/workers` owns the loops: a `domain-events`
+consumer turns `evidence.document.version_created` into a job, and a
+`documents` consumer runs it (`documents-dead` holds exhausted attempts).
+The evidence package exposes `createDocumentProcessingService`, a surface
+with no AuthorizationService and no audit writer: processing is a trusted
+server operation on a queue message, not a user action.
+
+**Tenancy.** The job carries a version id, a pipeline version and a tenant
+_claim_. The worker resolves the version by id alone
+(`findByIdForProcessing`) and refuses on mismatch — a forged pairing is
+dead-lettered, not silently reported as missing.
+
+**Parser isolation.** `execFile` with an argument array, no shell, a
+private temp directory removed in `finally`, a timeout, a bounded stdout,
+a heap ceiling, and an environment holding no database URL, storage key,
+model key or connector token. Output is revalidated with
+`ParserOutputSchema` before anything is stored.
+
+**Extractors.** PDF (`pdfjs-dist`, evaluation and system fonts disabled),
+DOCX and PPTX (own bounded OOXML reader: entry, size, total and ratio
+limits checked before inflating; XML scanned, never entity-resolved), and
+plain text. XLSX and CSV are deferred: a valid upload gets
+`text_extraction_status = 'UNSUPPORTED'`, never COMPLETED.
+
+**Malware gate.** A port with one implementation that answers UNAVAILABLE.
+Under the default `REQUIRE_CLEAN` policy an unscanned document is BLOCKED
+and never parsed; `ALLOW_UNSCANNED` is refused outside a local
+environment. Only a scanner verdict may write CLEAN.
+
+**Extraction.** `evidence.document_extractions` records extractor,
+versions, run, artifact bucket/key, hash, counts and the number of
+instruction-risk signals; one row per (version, pipeline version),
+immutable. The blocks live in the private `cq-extractions-private` bucket
+and inherit the document's visibility scope and sensitivity class. Blocks
+keep page, slide, section and line locators, so a later citation can name
+a place. A deterministic scanner counts instruction-shaped passages and
+reports categories and locators — never the matched text, which stays in
+the private artifact.
+
+**Completion.** The run transition, the version state and
+`evidence.document.ready` are one transaction; a redelivered job finds the
+run settled and emits nothing. See `docs/adr/0008-document-processing-and-parser-isolation.md`.
 
 ## Claims and revisions
 
@@ -256,8 +310,9 @@ never the Postgres repositories.
 ## Boundaries and deferrals
 
 - Upload sessions, private storage, MIME/signature checks → CQ-EVD-002.
-- Malware orchestration, extraction, queues → CQ-EVD-002/003.
+- A real malware scanner, OCR, spreadsheet and CSV extraction → later.
 - Chunks, embeddings, RAG → CQ-RAG; Q Knowledge Objects → CQ-KNW; Q → CQ-Q.
+- Claims derived from an extraction → a later packet; extraction creates none.
 - InvestIQ evidence weighting → later methodology.
 - Data Room → CQ-DR. Verification claims → separate workflow (ADR-001).
 
@@ -269,5 +324,10 @@ identity, metadata, sensitivity, registry, events);
 same-hash-across-tenants, cross-organisation ownership, revisions,
 contradiction retention, immutability, processing idempotency,
 cross-tenant negatives, privacy markers);
-`supabase/tests/database/rls/260_evidence.test.sql` (shape, constraints,
-triggers, principals).
+`packages/evidence/test/extraction.test.ts` (extraction bounds, artifact
+provenance, instruction-risk categories and locators without text);
+`apps/workers/test/` (OOXML refusals, extractor structure, sandbox
+containment, pipeline decisions, queue acknowledgement, event handling);
+`supabase/tests/database/rls/260_evidence.test.sql` and
+`280_document_processing.test.sql` (shape, constraints, triggers,
+principals).

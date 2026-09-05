@@ -83,6 +83,8 @@ export const DOCUMENT_TEXT_EXTRACTION_STATUSES = [
   "PROCESSING",
   "COMPLETED",
   "FAILED",
+  /** The format has no extractor yet; the owner is told so, not told "done". */
+  "UNSUPPORTED",
 ] as const;
 export const DocumentTextExtractionStatusSchema = z.enum(
   DOCUMENT_TEXT_EXTRACTION_STATUSES,

@@ -1156,6 +1156,113 @@ export type Database = {
           },
         ]
       }
+      document_extractions: {
+        Row: {
+          artifact_bucket: string
+          artifact_bytes: number
+          artifact_key: string
+          artifact_sha256: string
+          block_count: number
+          created_at: string
+          document_id: string
+          document_version_id: string
+          extractor_id: string
+          extractor_version: string
+          id: string
+          instruction_risk_signals: number
+          language: string | null
+          owner_organisation_id: string
+          page_count: number | null
+          pipeline_version: string
+          processing_run_id: string
+          schema_version: number
+          sensitivity_class: string
+          slide_count: number | null
+          source_id: string | null
+          tenant_id: string
+          visibility_scope: string
+        }
+        Insert: {
+          artifact_bucket: string
+          artifact_bytes: number
+          artifact_key: string
+          artifact_sha256: string
+          block_count: number
+          created_at?: string
+          document_id: string
+          document_version_id: string
+          extractor_id: string
+          extractor_version: string
+          id?: string
+          instruction_risk_signals?: number
+          language?: string | null
+          owner_organisation_id: string
+          page_count?: number | null
+          pipeline_version: string
+          processing_run_id: string
+          schema_version: number
+          sensitivity_class: string
+          slide_count?: number | null
+          source_id?: string | null
+          tenant_id: string
+          visibility_scope: string
+        }
+        Update: {
+          artifact_bucket?: string
+          artifact_bytes?: number
+          artifact_key?: string
+          artifact_sha256?: string
+          block_count?: number
+          created_at?: string
+          document_id?: string
+          document_version_id?: string
+          extractor_id?: string
+          extractor_version?: string
+          id?: string
+          instruction_risk_signals?: number
+          language?: string | null
+          owner_organisation_id?: string
+          page_count?: number | null
+          pipeline_version?: string
+          processing_run_id?: string
+          schema_version?: number
+          sensitivity_class?: string
+          slide_count?: number | null
+          source_id?: string | null
+          tenant_id?: string
+          visibility_scope?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "document_extractions_document_id_tenant_id_fkey"
+            columns: ["document_id", "tenant_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
+            referencedColumns: ["id", "tenant_id"]
+          },
+          {
+            foreignKeyName: "document_extractions_document_version_id_tenant_id_fkey"
+            columns: ["document_version_id", "tenant_id"]
+            isOneToOne: false
+            referencedRelation: "document_versions"
+            referencedColumns: ["id", "tenant_id"]
+          },
+          {
+            foreignKeyName: "document_extractions_processing_run_id_fkey"
+            columns: ["processing_run_id"]
+            isOneToOne: false
+            referencedRelation: "document_processing_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "document_extractions_source_id_tenant_id_fkey"
+            columns: ["source_id", "tenant_id"]
+            isOneToOne: false
+            referencedRelation: "sources"
+            referencedColumns: ["id", "tenant_id"]
+          },
+        ]
+      }
       document_processing_runs: {
         Row: {
           classifier_version: string | null

@@ -230,11 +230,12 @@ describe("subject resolver registry", () => {
 });
 
 describe("events", () => {
-  it("declares five confidential, replay-safe events whose payloads carry no content", () => {
+  it("declares six confidential, replay-safe events whose payloads carry no content", () => {
     expect(EVIDENCE_EVENTS.map((e) => e.name)).toEqual([
       "evidence.source.registered",
       "evidence.document.created",
       "evidence.document.version_created",
+      "evidence.document.ready",
       "evidence.claim.changed",
       "evidence.evidence_item.created",
     ]);

@@ -122,6 +122,16 @@ class FakeStorage implements PrivateDocumentStorageProvider {
     });
   }
 
+  /** A server-produced artifact, which may be rewritten by a retry. */
+  putObject(input: {
+    readonly object: StoredObjectRef;
+    readonly body: Uint8Array;
+    readonly contentType: string;
+  }) {
+    this.objects.set(FakeStorage.path(input.object), input.body);
+    return Promise.resolve();
+  }
+
   deleteObject(object: StoredObjectRef) {
     if (this.deleteFails)
       return Promise.reject(new Error("storage unavailable"));

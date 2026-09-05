@@ -41,3 +41,17 @@ export type EvidenceServiceDependencies = {
   /** Rejected uploads whose content disagreed with its claim. */
   readonly securityEvents?: SecurityEventWriter | undefined;
 };
+
+/**
+ * What the document processing worker is given, and no more.
+ *
+ * There is no AuthorizationService and no audit writer here on purpose.
+ * Processing is a trusted server operation acting on a queue message, not a
+ * user action: nothing in it may look like an authorization decision, and a
+ * worker that cannot authorize cannot be tricked into believing it did.
+ * Tenant scope comes from the resolved row, never from the message.
+ */
+export type EvidenceProcessingDependencies = Pick<
+  EvidenceServiceDependencies,
+  "sql" | "transactions" | "outbox" | "repositories" | "storage"
+>;

@@ -6,7 +6,11 @@ import {
   createListClaims,
   createReviseClaim,
 } from "./claim-use-cases.js";
-import type { EvidenceServiceDependencies } from "./dependencies.js";
+import type {
+  EvidenceProcessingDependencies,
+  EvidenceServiceDependencies,
+} from "./dependencies.js";
+import type { EvidenceRepositories } from "./ports.js";
 import {
   createCreateDocument,
   createGetDocument,
@@ -18,13 +22,19 @@ import {
   createRegisterDocumentVersion,
 } from "./document-use-cases.js";
 import {
+  createFindDocumentExtraction,
+  createRecordDocumentExtraction,
+} from "./extraction-use-cases.js";
+import {
   createCreateEvidenceItem,
   createGetEvidenceItem,
   createListEvidenceItems,
 } from "./evidence-item-use-cases.js";
 import {
   createAdvanceVersionProcessingState,
+  createCompleteDocumentProcessing,
   createRegisterProcessingRun,
+  createResolveProcessingTarget,
   createTransitionProcessingRun,
 } from "./processing-use-cases.js";
 import {
@@ -70,6 +80,12 @@ export type EvidenceService = {
   readonly advanceVersionProcessingState: ReturnType<
     typeof createAdvanceVersionProcessingState
   >;
+  readonly resolveProcessingTarget: ReturnType<
+    typeof createResolveProcessingTarget
+  >;
+  readonly completeDocumentProcessing: ReturnType<
+    typeof createCompleteDocumentProcessing
+  >;
   readonly createClaim: ReturnType<typeof createCreateClaim>;
   readonly reviseClaim: ReturnType<typeof createReviseClaim>;
   readonly linkClaimEvidence: ReturnType<typeof createLinkClaimEvidence>;
@@ -92,6 +108,12 @@ export type EvidenceService = {
   >;
   readonly cleanupExpiredUploadSession: ReturnType<
     typeof createCleanupExpiredUploadSession
+  >;
+  readonly recordDocumentExtraction: ReturnType<
+    typeof createRecordDocumentExtraction
+  >;
+  readonly findDocumentExtraction: ReturnType<
+    typeof createFindDocumentExtraction
   >;
 };
 
@@ -126,6 +148,8 @@ export function createEvidenceService(
     transitionProcessingRun: createTransitionProcessingRun(dependencies),
     advanceVersionProcessingState:
       createAdvanceVersionProcessingState(dependencies),
+    resolveProcessingTarget: createResolveProcessingTarget(dependencies),
+    completeDocumentProcessing: createCompleteDocumentProcessing(dependencies),
     createClaim: createCreateClaim(dependencies),
     reviseClaim: createReviseClaim(dependencies),
     linkClaimEvidence: createLinkClaimEvidence(dependencies),
@@ -143,5 +167,66 @@ export function createEvidenceService(
     getDocumentUploadSession: createGetDocumentUploadSession(dependencies),
     cleanupExpiredUploadSession:
       createCleanupExpiredUploadSession(dependencies),
+    recordDocumentExtraction: createRecordDocumentExtraction(dependencies),
+    findDocumentExtraction: createFindDocumentExtraction(dependencies),
+  };
+}
+
+/**
+ * The worker's surface: the trusted server operations that move a document
+ * through processing, bound to a dependency set that contains no
+ * authorization service and no audit writer.
+ *
+ * Deliberately separate from `EvidenceService`. A queue consumer must not
+ * hold the use cases that answer "may this actor do this", because there is
+ * no actor in a queue message — only a claim.
+ */
+export type DocumentProcessingService = {
+  readonly resolveProcessingTarget: ReturnType<
+    typeof createResolveProcessingTarget
+  >;
+  readonly registerProcessingRun: ReturnType<
+    typeof createRegisterProcessingRun
+  >;
+  readonly transitionProcessingRun: ReturnType<
+    typeof createTransitionProcessingRun
+  >;
+  readonly advanceVersionProcessingState: ReturnType<
+    typeof createAdvanceVersionProcessingState
+  >;
+  readonly completeDocumentProcessing: ReturnType<
+    typeof createCompleteDocumentProcessing
+  >;
+  readonly recordDocumentExtraction: ReturnType<
+    typeof createRecordDocumentExtraction
+  >;
+  readonly findDocumentExtraction: ReturnType<
+    typeof createFindDocumentExtraction
+  >;
+};
+
+export type DocumentProcessingServiceOptions = Omit<
+  EvidenceProcessingDependencies,
+  "repositories"
+> & {
+  readonly repositories?: EvidenceRepositories | undefined;
+};
+
+export function createDocumentProcessingService(
+  options: DocumentProcessingServiceOptions,
+): DocumentProcessingService {
+  const dependencies: EvidenceProcessingDependencies = {
+    ...options,
+    repositories: options.repositories ?? createPostgresEvidenceRepositories(),
+  };
+  return {
+    resolveProcessingTarget: createResolveProcessingTarget(dependencies),
+    registerProcessingRun: createRegisterProcessingRun(dependencies),
+    transitionProcessingRun: createTransitionProcessingRun(dependencies),
+    advanceVersionProcessingState:
+      createAdvanceVersionProcessingState(dependencies),
+    completeDocumentProcessing: createCompleteDocumentProcessing(dependencies),
+    recordDocumentExtraction: createRecordDocumentExtraction(dependencies),
+    findDocumentExtraction: createFindDocumentExtraction(dependencies),
   };
 }

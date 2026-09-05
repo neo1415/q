@@ -321,6 +321,19 @@ export default tseslint.config(
       },
     },
   },
+  // Parser sandbox fixtures: tiny Node programs a test spawns as a child
+  // process to exercise the sandbox's containment (timeout, output bound,
+  // scrubbed environment). They are never imported by application code.
+  {
+    files: ["apps/workers/test/fixtures/**/*.mjs"],
+    languageOptions: {
+      globals: {
+        Buffer: "readonly",
+        process: "readonly",
+        setInterval: "readonly",
+      },
+    },
+  },
   {
     files: ["apps/web/scripts/**/*.mjs"],
     languageOptions: {

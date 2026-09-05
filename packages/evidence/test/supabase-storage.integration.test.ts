@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import {
   createSupabaseDocumentStorageProvider,
   DOCUMENT_STORAGE_BUCKET,
+  EXTRACTION_STORAGE_BUCKET,
 } from "../src/index.js";
 import { FIXTURES } from "./upload-fixtures.js";
 
@@ -148,6 +149,39 @@ describe.skipIf(!configured)(
         body: "intruder",
       });
       expect(write.ok).toBe(false);
+    });
+
+    it("writes a derived extraction artifact into its own private bucket", async () => {
+      // The server writes this one itself; no client ever holds a target for
+      // the extraction bucket.
+      const artifact = {
+        bucket: EXTRACTION_STORAGE_BUCKET,
+        key: `extractions/00000000-0000-4000-8000-0000000000aa/${randomBytes(16).toString("hex")}.json`,
+      };
+      const body = new TextEncoder().encode(
+        JSON.stringify({ schemaVersion: 1, blocks: [] }),
+      );
+
+      await provider.putObject({
+        object: artifact,
+        body,
+        contentType: "application/json",
+      });
+
+      expect((await provider.statObject(artifact))?.sizeBytes).toBe(
+        body.byteLength,
+      );
+      const stream = await provider.openObjectStream(artifact);
+      expect((await readBody(stream.body)).toString("utf8")).toBe(
+        Buffer.from(body).toString("utf8"),
+      );
+
+      const anonymousRead = await fetch(
+        `${SUPABASE_URL}/storage/v1/object/public/${artifact.bucket}/${artifact.key}`,
+      );
+      expect(anonymousRead.ok).toBe(false);
+
+      await provider.deleteObject(artifact);
     });
 
     it("deletes an object, and deleting one that is already gone is success", async () => {

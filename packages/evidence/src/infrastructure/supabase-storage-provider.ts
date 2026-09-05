@@ -194,6 +194,24 @@ export function createSupabaseDocumentStorageProvider(
       };
     },
 
+    putObject: async (input): Promise<void> => {
+      // Server-produced bytes only; a client's content never reaches this
+      // path. Upsert is allowed because a derived artifact's key is unique
+      // to the run that produced it, so a retry rewrites identical content.
+      const response = await request(`/object/${objectPath(input.object)}`, {
+        method: "POST",
+        headers: {
+          "content-type": input.contentType,
+          "x-upsert": "true",
+          "cache-control": "no-store",
+        },
+        // Copied into a Buffer so the request body is a concrete view over
+        // its own ArrayBuffer, which is what fetch's body type requires.
+        body: Buffer.from(input.body),
+      });
+      if (!response.ok) throw new DocumentStorageUnavailableError();
+    },
+
     deleteObject: async (object): Promise<void> => {
       const response = await request(`/object/${objectPath(object)}`, {
         method: "DELETE",

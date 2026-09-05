@@ -27,6 +27,7 @@ import type {
   EvidenceSubjectType,
   LifecycleStatus,
   MalwareScanStatus,
+  ProcessingRunMetadata,
   ProcessingRunStatus,
   ProcessingStatus,
   ReliabilityClass,
@@ -36,6 +37,7 @@ import type {
   TextExtractionStatus,
   TruthClass,
 } from "../contracts/index.js";
+import type { DocumentExtractionRepository } from "./extraction-ports.js";
 import type {
   DocumentUploadRequestStore,
   DocumentUploadSessionRepository,
@@ -182,6 +184,18 @@ export type DocumentVersionRepository = {
     tenantId: TenantId,
     versionId: DocumentVersionId,
   ) => Promise<DocumentVersion | null>;
+  /**
+   * Resolution by version id alone, for the processing worker only.
+   *
+   * A queue message *claims* a tenant. The worker compares that claim with
+   * the row this returns and refuses on mismatch; it never uses the claim to
+   * scope the lookup, because a scoped lookup would silently accept a forged
+   * pairing as "not found". No product read path calls this.
+   */
+  readonly findByIdForProcessing: (
+    executor: DatabaseExecutor,
+    versionId: DocumentVersionId,
+  ) => Promise<DocumentVersion | null>;
   readonly listByDocument: (
     executor: DatabaseExecutor,
     tenantId: TenantId,
@@ -247,6 +261,17 @@ export type DocumentProcessingRunRepository = {
       readonly runId: DocumentProcessingRun["id"];
       readonly status: ProcessingRunStatus;
       readonly errorCode: string | null;
+      /**
+       * What actually did the work. Absent fields keep their stored value,
+       * so a run's provenance accumulates rather than being overwritten.
+       */
+      readonly provenance?:
+        | {
+            readonly extractorVersion?: string | undefined;
+            readonly costUsd?: string | undefined;
+            readonly metadata?: ProcessingRunMetadata | undefined;
+          }
+        | undefined;
     },
   ) => Promise<DocumentProcessingRun | null>;
 };
@@ -385,6 +410,7 @@ export type ClaimEvidenceRepository = {
   ) => Promise<readonly ClaimEvidenceLink[]>;
 };
 
+export type { DocumentExtractionRepository } from "./extraction-ports.js";
 export type {
   DocumentUploadRequestRecord,
   DocumentUploadRequestStore,
@@ -400,6 +426,7 @@ export type EvidenceRepositories = {
   readonly claims: ClaimRepository;
   readonly evidenceItems: EvidenceItemRepository;
   readonly claimEvidence: ClaimEvidenceRepository;
+  readonly documentExtractions: DocumentExtractionRepository;
   readonly uploadSessions: DocumentUploadSessionRepository;
   readonly uploadRequests: DocumentUploadRequestStore;
 };

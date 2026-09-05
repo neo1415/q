@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "Capital Q background worker runtime — persistent Node workload boundary.",
+  "description": "Capital Q background worker runtime \u2014 persistent Node workload boundary.",
   "scripts": {
     "dev": "node --watch src/main.ts",
     "build": "tsc",
@@ -25,9 +25,12 @@
     "@capital-q/onboarding": "workspace:*",
     "@capital-q/organisations": "workspace:*",
     "@capital-q/permissions": "workspace:*",
-    "@capital-q/taxonomy": "workspace:*"
+    "@capital-q/taxonomy": "workspace:*",
+    "pdfjs-dist": "6.3.289",
+    "zod": "4.5.4"
   },
   "devDependencies": {
+    "@capital-q/security": "workspace:*",
     "@types/node": "^24.13.3",
     "typescript": "5.9.3"
   }

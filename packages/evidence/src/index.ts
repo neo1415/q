@@ -57,6 +57,7 @@ export {
 } from "./application/authority.js";
 export type {
   DocumentUploadLimits,
+  EvidenceProcessingDependencies,
   EvidenceServiceDependencies,
 } from "./application/dependencies.js";
 export type {
@@ -134,8 +135,10 @@ export {
 } from "./application/document-use-cases.js";
 export {
   AdvanceVersionProcessingStateInputSchema,
+  CompleteDocumentProcessingInputSchema,
   RegisterProcessingRunInputSchema,
   TransitionProcessingRunInputSchema,
+  type ProcessingTarget,
 } from "./application/processing-use-cases.js";
 export {
   CreateClaimInputSchema,
@@ -153,7 +156,10 @@ export {
   type CreateEvidenceItemInput,
 } from "./application/evidence-item-use-cases.js";
 export {
+  createDocumentProcessingService,
   createEvidenceService,
+  type DocumentProcessingService,
+  type DocumentProcessingServiceOptions,
   type EvidenceService,
   type EvidenceServiceOptions,
 } from "./application/service.js";
@@ -170,6 +176,22 @@ export {
   createPostgresEvidenceItemQueryPort,
   createPostgresEvidenceSourceQueryPort,
 } from "./infrastructure/postgres-query-ports.js";
-export { EVIDENCE_EVENTS } from "./events/index.js";
+export {
+  DocumentReadyEvent,
+  documentReadyEvent,
+  EVIDENCE_EVENTS,
+} from "./events/index.js";
+export type { DocumentExtractionRepository } from "./application/extraction-ports.js";
+export {
+  EXTRACTION_STORAGE_BUCKET,
+  RecordDocumentExtractionInputSchema,
+  type RecordDocumentExtractionInput,
+  type RecordDocumentExtractionResult,
+} from "./application/extraction-use-cases.js";
+export {
+  scanInstructionRisk,
+  type InstructionRiskReport,
+} from "./domain/instruction-risk.js";
+export { createPostgresDocumentExtractionRepository } from "./infrastructure/postgres-extraction-repository.js";
 
 export const PACKAGE_NAME = "@capital-q/evidence" as const;

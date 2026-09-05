@@ -56,6 +56,16 @@ export type PrivateDocumentStorageProvider = {
   readonly openObjectStream: (
     object: StoredObjectRef,
   ) => Promise<StoredObjectStream>;
+  /**
+   * Writes a server-produced object. Used for derived artifacts such as a
+   * structured extraction; never for content a client supplied, which only
+   * ever arrives through a scoped upload authorization.
+   */
+  readonly putObject: (input: {
+    readonly object: StoredObjectRef;
+    readonly body: Uint8Array;
+    readonly contentType: string;
+  }) => Promise<void>;
   /** Idempotent: deleting an object that is already gone is success. */
   readonly deleteObject: (object: StoredObjectRef) => Promise<void>;
 };
