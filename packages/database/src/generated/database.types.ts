@@ -2087,6 +2087,114 @@ export type Database = {
       [_ in never]: never
     }
   }
+  media: {
+    Tables: {
+      media_assets: {
+        Row: {
+          aspect_ratio: string | null
+          caption_state: string
+          created_at: string
+          created_by_user_id: string
+          deleted_at: string | null
+          duration_seconds: number | null
+          height: number | null
+          id: string
+          moderation_status: string
+          owner_id: string
+          owner_organisation_id: string
+          owner_type: string
+          playback_policy: string
+          provider: string
+          provider_asset_id: string | null
+          purpose: string
+          ready_at: string | null
+          replaces_media_asset_id: string | null
+          status: string
+          superseded_at: string | null
+          tenant_id: string
+          thumbnail_reference: string | null
+          transcript_state: string
+          version: number
+          width: number | null
+        }
+        Insert: {
+          aspect_ratio?: string | null
+          caption_state?: string
+          created_at?: string
+          created_by_user_id: string
+          deleted_at?: string | null
+          duration_seconds?: number | null
+          height?: number | null
+          id?: string
+          moderation_status?: string
+          owner_id: string
+          owner_organisation_id: string
+          owner_type: string
+          playback_policy?: string
+          provider?: string
+          provider_asset_id?: string | null
+          purpose: string
+          ready_at?: string | null
+          replaces_media_asset_id?: string | null
+          status?: string
+          superseded_at?: string | null
+          tenant_id: string
+          thumbnail_reference?: string | null
+          transcript_state?: string
+          version?: number
+          width?: number | null
+        }
+        Update: {
+          aspect_ratio?: string | null
+          caption_state?: string
+          created_at?: string
+          created_by_user_id?: string
+          deleted_at?: string | null
+          duration_seconds?: number | null
+          height?: number | null
+          id?: string
+          moderation_status?: string
+          owner_id?: string
+          owner_organisation_id?: string
+          owner_type?: string
+          playback_policy?: string
+          provider?: string
+          provider_asset_id?: string | null
+          purpose?: string
+          ready_at?: string | null
+          replaces_media_asset_id?: string | null
+          status?: string
+          superseded_at?: string | null
+          tenant_id?: string
+          thumbnail_reference?: string | null
+          transcript_state?: string
+          version?: number
+          width?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "media_assets_replaces_media_asset_id_fkey"
+            columns: ["replaces_media_asset_id"]
+            isOneToOne: false
+            referencedRelation: "media_assets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      [_ in never]: never
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   network: {
     Tables: {
       relationship_events: {
@@ -3341,6 +3449,9 @@ export const Constants = {
     Enums: {},
   },
   identity: {
+    Enums: {},
+  },
+  media: {
     Enums: {},
   },
   network: {

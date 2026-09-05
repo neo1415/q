@@ -25,6 +25,10 @@ import {
 } from "./http/documents.js";
 import { registerInvestorMandateRoutes } from "./http/investor-mandates.js";
 import {
+  registerMediaRoutes,
+  type MediaRoutesDependencies,
+} from "./http/media.js";
+import {
   registerInvestorRoutes,
   type InvestorRoutesDependencies,
 } from "./http/investors.js";
@@ -78,6 +82,7 @@ export type ApiModules = {
   readonly taxonomy?: TaxonomyRoutesDependencies["taxonomy"] | undefined;
   readonly onboarding?: OnboardingRoutesDependencies["onboarding"] | undefined;
   readonly evidence?: DocumentRoutesDependencies["evidence"] | undefined;
+  readonly media?: MediaRoutesDependencies["media"] | undefined;
 };
 
 /**
@@ -211,6 +216,16 @@ export function createApp(
         maxBytes: config.public.documentUploadMaxBytes,
         allowedMimeTypes: ADMISSIBLE_MIME_TYPES,
       },
+    });
+  }
+
+  // Pitch media registers only when the Media module is composed. It
+  // creates records, never uploads: no provider integration exists yet.
+  if (modules.media !== undefined) {
+    registerMediaRoutes(app, {
+      authenticator: security.authenticator,
+      resolver: security.resolver,
+      media: modules.media,
     });
   }
 

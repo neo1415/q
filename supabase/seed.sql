@@ -48,7 +48,10 @@ insert into permissions.capabilities (code, description) values
   ('document.download',        'Obtain authorised, short-lived access to a document version''s bytes.'),
   ('document.manage',          'Register versions, reclassify and archive the organisation''s documents.'),
   ('evidence.view',            'Read sources, claims and evidence items about subjects the organisation owns.'),
-  ('evidence.record',          'Register sources, record claims and evidence items, and link evidence to claims.')
+  ('evidence.record',          'Register sources, record claims and evidence items, and link evidence to claims.'),
+  ('media.create',             'Create or replace pitch media owned by the active organisation.'),
+  ('media.view',               'Read pitch media metadata for the active organisation''s resources.'),
+  ('media.manage',             'Delete pitch media and manage its lifecycle for the active organisation.')
 on conflict (code) do update
   set description = excluded.description;
 
@@ -114,6 +117,11 @@ select r.id, c.id, 'ALLOW'
       ('organisation_member', 'document.view'),
       ('organisation_member', 'document.download'),
       ('organisation_member', 'evidence.view'),
-      ('organisation_member', 'evidence.record')
+      ('organisation_member', 'evidence.record'),
+      ('organisation_admin',  'media.create'),
+      ('organisation_admin',  'media.view'),
+      ('organisation_admin',  'media.manage'),
+      ('organisation_member', 'media.create'),
+      ('organisation_member', 'media.view')
     )
 on conflict (role_id, capability_id) do nothing;

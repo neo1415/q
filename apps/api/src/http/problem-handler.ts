@@ -57,6 +57,14 @@ import {
   EvidenceSubjectNotFoundError,
 } from "@capital-q/evidence";
 import {
+  MediaAssetConflictError,
+  MediaAssetNotFoundError,
+  MediaOwnerNotFoundError,
+  MediaReplacementConflictError,
+  MediaRuleError,
+  MediaTransitionError,
+} from "@capital-q/media";
+import {
   ActorContextDeniedError,
   ActorContextRequiredError,
   AuthenticationRequiredError,
@@ -254,7 +262,9 @@ function toProblem(
     error instanceof ClaimNotFoundError ||
     error instanceof DocumentNotFoundError ||
     error instanceof DocumentVersionNotFoundError ||
-    error instanceof DocumentUploadSessionNotFoundError
+    error instanceof DocumentUploadSessionNotFoundError ||
+    error instanceof MediaAssetNotFoundError ||
+    error instanceof MediaOwnerNotFoundError
   ) {
     return createProblemDetails({ code: "RESOURCE_NOT_FOUND", requestId });
   }
@@ -297,6 +307,33 @@ function toProblem(
 
   if (error instanceof ClaimRevisionConflictError) {
     return createProblemDetails({ code: "VERSION_CONFLICT", requestId });
+  }
+
+  // Someone else changed the media asset first, or the pitch being replaced
+  // is no longer the current one. Refused rather than resolved: two callers
+  // must never both believe they set the company's pitch.
+  if (
+    error instanceof MediaAssetConflictError ||
+    error instanceof MediaReplacementConflictError
+  ) {
+    return createProblemDetails({
+      code: "VERSION_CONFLICT",
+      requestId,
+      detail: error.message,
+    });
+  }
+
+  // The lifecycle refused the move, or a media rule did. The message names
+  // states and rules, never a provider or a viewer.
+  if (
+    error instanceof MediaTransitionError ||
+    error instanceof MediaRuleError
+  ) {
+    return createProblemDetails({
+      code: "INVALID_REQUEST",
+      requestId,
+      detail: error.message,
+    });
   }
 
   // Private storage is unreachable or unconfigured. Uploads are closed

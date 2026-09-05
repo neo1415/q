@@ -64,6 +64,9 @@ export const REFERENCE_CAPABILITIES = [
   "document.manage",
   "evidence.view",
   "evidence.record",
+  "media.create",
+  "media.view",
+  "media.manage",
 ] as const;
 
 const KNOWN: ReadonlySet<string> = new Set(REFERENCE_CAPABILITIES);

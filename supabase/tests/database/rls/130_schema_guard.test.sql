@@ -32,7 +32,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 
 create temporary table guarded_schemas (schema_name text primary key) on commit drop;
-insert into guarded_schemas values ('identity'), ('permissions'), ('events'), ('audit'), ('core'), ('network'), ('taxonomy'), ('onboarding'), ('evidence');
+insert into guarded_schemas values ('identity'), ('permissions'), ('events'), ('audit'), ('core'), ('network'), ('taxonomy'), ('onboarding'), ('evidence'), ('media');
 
 create temporary table rls_inventory (
   schema_name text not null,
@@ -102,6 +102,7 @@ insert into rls_inventory (schema_name, table_name, classification, authenticate
   ('evidence', 'document_upload_sessions',  'INTERNAL_SERVER_ONLY', '{}'),
   ('evidence', 'document_upload_requests',  'INTERNAL_SERVER_ONLY', '{}'),
   ('evidence', 'document_extractions',      'INTERNAL_SERVER_ONLY', '{}'),
+  ('media',    'media_assets',              'INTERNAL_SERVER_ONLY', '{}'),
   ('events', 'outbox',                     'INTERNAL_SERVER_ONLY', '{}'),
   ('audit', 'material_actions',            'INTERNAL_SERVER_ONLY', '{}'),
   ('audit', 'security_events',             'INTERNAL_SERVER_ONLY', '{}');
@@ -182,8 +183,9 @@ select ok(not has_schema_privilege('authenticated', 'events', 'usage')
       and not has_schema_privilege('authenticated', 'taxonomy', 'usage')
       and not has_schema_privilege('authenticated', 'onboarding', 'usage')
       and not has_schema_privilege('authenticated', 'evidence', 'usage')
+      and not has_schema_privilege('authenticated', 'media', 'usage')
       and not has_schema_privilege('authenticated', 'pgmq', 'usage'),
-  'authenticated has no usage on events, audit, network, taxonomy, onboarding, evidence or pgmq');
+  'authenticated has no usage on events, audit, network, taxonomy, onboarding, evidence, media or pgmq');
 
 -- SECURITY DEFINER helpers -----------------------------------------------------
 

@@ -114,7 +114,8 @@ select results_eq(
             ('evidence.record'), ('evidence.view'),
             ('investor.create'), ('investor.edit'), ('investor.mandate.create'),
             ('investor.mandate.edit'), ('investor.mandate.view'), ('investor.representative.self_edit'),
-            ('investor.view'), ('organisation.admin'), ('organisation.view'),
+            ('investor.view'), ('media.create'), ('media.manage'), ('media.view'),
+            ('organisation.admin'), ('organisation.view'),
             ('q.action.approve') $$,
   'seeded capability codes match the known reference set');
 select results_eq(
@@ -135,8 +136,9 @@ select results_eq(
             ('evidence.record'), ('evidence.view'),
             ('investor.create'), ('investor.edit'), ('investor.mandate.create'),
             ('investor.mandate.edit'), ('investor.mandate.view'), ('investor.representative.self_edit'),
-            ('investor.view'), ('organisation.admin'), ('organisation.view') $$,
-  'organisation_admin maps to organisation, company, team, investor, mandate, capital, disclosure, document and evidence capabilities only');
+            ('investor.view'), ('media.create'), ('media.manage'), ('media.view'),
+            ('organisation.admin'), ('organisation.view') $$,
+  'organisation_admin maps to organisation, company, team, investor, mandate, capital, disclosure, document, evidence and media capabilities only');
 select results_eq(
   $$ select c.code from permissions.role_capabilities rc
        join permissions.roles r on r.id = rc.role_id
@@ -147,8 +149,8 @@ select results_eq(
             ('document.create'), ('document.download'), ('document.view'),
             ('evidence.record'), ('evidence.view'),
             ('investor.mandate.view'), ('investor.representative.self_edit'), ('investor.view'),
-            ('organisation.view') $$,
-  'organisation_member carries view, self-edit, document and evidence-recording capabilities only (CQ-ORG-001, CQ-COMP-001, CQ-COMP-002, CQ-INV-001, CQ-INV-002, CQ-CAP-001, CQ-EVD-001)');
+            ('media.create'), ('media.view'), ('organisation.view') $$,
+  'organisation_member may publish and replace a pitch but not delete one; everything else stays view, self-edit, document and evidence-recording (CQ-ORG-001, CQ-COMP-001, CQ-COMP-002, CQ-INV-001, CQ-INV-002, CQ-CAP-001, CQ-EVD-001, CQ-MEDIA-001)');
 
 -- ===========================================================================
 -- Fixtures (as the migration owner; RLS bypassed)

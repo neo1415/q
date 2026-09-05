@@ -47,6 +47,11 @@ import {
   DOCUMENT_UPLOAD_MAX_OPEN_SESSIONS,
   DOCUMENT_UPLOAD_SESSION_TTL_SECONDS,
 } from "@capital-q/evidence";
+import {
+  createCompanyMediaOwnerResolver,
+  createMediaOwnerResolverRegistry,
+  createMediaService,
+} from "@capital-q/media";
 import { createTaxonomyService } from "@capital-q/taxonomy";
 import {
   createPostgresActiveOrganisationContextStore,
@@ -232,6 +237,21 @@ const evidence = createEvidenceService({
       }),
 });
 
+// Pitch media. No provider is configured or needed: this composes the
+// record-keeping domain only, and holds no video credential of any kind.
+const media = createMediaService({
+  sql: database.sql,
+  transactions: database.transactions,
+  authorization,
+  owners: createMediaOwnerResolverRegistry([
+    createCompanyMediaOwnerResolver(
+      createPostgresCompanyQueryPort({ sql: database.sql }),
+    ),
+  ]),
+  outbox,
+  audit,
+});
+
 const { app, logger } = createApp(config, security, {
   organisations,
   companies,
@@ -243,6 +263,7 @@ const { app, logger } = createApp(config, security, {
   },
   onboarding: onboarding.runtime,
   evidence,
+  media,
 });
 
 app.addHook("onClose", async () => {

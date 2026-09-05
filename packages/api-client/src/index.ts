@@ -97,3 +97,10 @@ export {
   getDocumentUploadSession,
   listDocuments,
 } from "./documents.js";
+
+export {
+  createPitchMediaAsset,
+  deletePitchMediaAsset,
+  getCompanyPitch,
+  listCompanyMedia,
+} from "./media.js";
