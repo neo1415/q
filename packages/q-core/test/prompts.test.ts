@@ -88,9 +88,20 @@ describe("registry", () => {
     );
     for (const id of PROMPT_IDS) {
       const active = registry.getActive(id);
-      expect(active.versionId).toBe(`${active.versionId.split("/")[0]}/v1`);
-      expect(registry.get(id, 1)?.versionId).toBe(active.versionId);
-      expect(registry.get(id, 2)).toBeUndefined();
+      // Exactly one ACTIVE version per family, and every published version
+      // still resolvable by exact number — a superseded prompt is retired,
+      // never removed, so a run recorded against it stays explainable.
+      const activeVersion = active.definition.version;
+      expect(registry.list().filter((r) => r.definition.id === id)).toSatisfy(
+        (records: readonly { definition: { status: string } }[]) =>
+          records.filter((r) => r.definition.status === "ACTIVE").length === 1,
+      );
+      for (let version = 1; version <= activeVersion; version += 1) {
+        expect(registry.get(id, version)?.versionId).toBe(
+          `${active.versionId.split("/")[0]}/v${String(version)}`,
+        );
+      }
+      expect(registry.get(id, activeVersion + 1)).toBeUndefined();
     }
   });
 
@@ -169,7 +180,7 @@ describe("renderer", () => {
     expect(rendered.messages[0]?.content).toContain("You are Q");
     expect(rendered.messages[0]?.content).toContain("OPERATING MODE: DEBRIEF");
     expect(rendered.bundle.bundleVersion).toBe(
-      "q-system.v1_company-analyst.v1_comm.v1",
+      "q-system.v1_company-analyst.v2_comm.v1",
     );
     expect(rendered.bundle.bundleVersion).toMatch(
       /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/,
@@ -178,7 +189,11 @@ describe("renderer", () => {
     expect(rendered.bundle.communicationRenderingVersion).toBe(
       COMMUNICATION_RENDERING_VERSION,
     );
-    expect(rendered.taskClass).toBe("NORMAL_DIALOGUE");
+    // v2 declares EVIDENCE_SYNTHESIS: the task reads authorised evidence
+    // and reports what it supports. The conversational answer seam picks
+    // its own class from the capability, so this declaration governs the
+    // Company Intelligence specialist rather than that path.
+    expect(rendered.taskClass).toBe("EVIDENCE_SYNTHESIS");
     expect(rendered.output.kind).toBe("STRUCTURED");
     expect(rendered.outputSchema).toBeDefined();
   });

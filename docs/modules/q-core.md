@@ -69,13 +69,20 @@ version's text changes without a new version. A material change is
 | Prompt                        | Version                          | Task class            | Output                            |
 | ----------------------------- | -------------------------------- | --------------------- | --------------------------------- |
 | Q_SYSTEM                      | q-system/v1                      | (charter)             | text                              |
-| COMPANY_ANALYST               | company-analyst/v1               | NORMAL_DIALOGUE       | CompanyAnalystResult/v1           |
+| COMPANY_ANALYST               | company-analyst/v2               | EVIDENCE_SYNTHESIS    | CompanyAnalystResult/v2           |
 | FOUNDER_ONBOARDING_EXTRACTION | founder-onboarding-extraction/v1 | STRUCTURED_EXTRACTION | FounderExtractionResult/v1        |
 | INVESTOR_MANDATE_SYNTHESIS    | investor-mandate-synthesis/v1    | STRUCTURED_EXTRACTION | InvestorMandateSynthesisResult/v1 |
 | FIT_EXPLANATION               | fit-explanation/v1               | NORMAL_DIALOGUE       | FitExplanationResult/v1           |
 
 A task prompt's task class is a request to the Model Gateway; the routing
 policy chooses the model. No prompt names a provider or a model (tested).
+
+`company-analyst/v1` is retained as DEPRECATED — immutable, resolvable by
+exact version, and pinned in `prompts.lock.json` with its original hash — so
+a run recorded against it stays explainable. v2 (CQ-Q-020) adds the
+structured company reading, citation by opaque fact label, and the trusted
+institutional frame the server establishes before the model runs; every new
+output field is defaulted, so a response shaped for v1 still validates.
 
 ## Rendering
 

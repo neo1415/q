@@ -3,9 +3,10 @@
   "entries": {
     "q-system/v1": "bf49c4ecd849ba4437bda173e17424340d17bcb7753d7c6ac7448dfc3162b863",
     "founder-onboarding-extraction/v1": "98295baebb0cd8b62f008291c9c4d5947193d0122e706feb4ea67de3c87b3380",
+    "claim-extraction/v1": "455aed7768b6847996d82c38e3b745243aeebc4b4605677d0a0ac8a172b3adbe",
     "investor-mandate-synthesis/v1": "73557439a7a9fa001ba43f56f60faaa20c45f927faf4bcbbf76ccdf52df5ab9e",
     "company-analyst/v1": "869c46bf6d2055081a994bff86b1a94e6acbb17649b665aa4347293b584b0f69",
-    "fit-explanation/v1": "3d552b0e5bdb9497ae2259ea56d21acdbf9df2920ea3f64481b633ec2006cc85",
-    "claim-extraction/v1": "455aed7768b6847996d82c38e3b745243aeebc4b4605677d0a0ac8a172b3adbe"
+    "company-analyst/v2": "a506c0c35f17fdb1f55e63816af18be525c35c7ba0ab6542e62183837d3bb189",
+    "fit-explanation/v1": "3d552b0e5bdb9497ae2259ea56d21acdbf9df2920ea3f64481b633ec2006cc85"
   }
 }

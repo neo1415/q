@@ -92,7 +92,9 @@ import {
   createQSubjectResolverRegistry,
   createRelationshipQSubjectResolver,
   createUnconfiguredQRetrieval,
+  type QAnswerPort,
   type QRetrievalPort,
+  type QToolPort,
   neverPause,
   type QOrchestrator,
   type QRunEventNotifier,
@@ -175,6 +177,14 @@ export type QEvalWorldOptions = {
         readonly context: QAuthorisedContextPort;
       }
     | undefined;
+  /**
+   * Wraps the answer seam, so a Q specialist can be exercised through the
+   * SAME graph rather than beside it (CQ-Q-020 §91, §112). The wrapper
+   * receives the conversational answer port as its delegate, which is
+   * where a request the specialist does not support goes. Absent — which
+   * is every eval case today — the world behaves exactly as before.
+   */
+  readonly specialist?: ((delegate: QAnswerPort) => QAnswerPort) | undefined;
 };
 
 export type QEvalWorld = {
@@ -197,11 +207,15 @@ export type QEvalWorld = {
   readonly orchestrator: QOrchestrator;
   readonly gateway: ModelGateway;
   readonly answer: ModelGatewayQAnswer;
+  /** What the graph was actually given: the specialist wrapper, or `answer`. */
+  readonly answerPort: QAnswerPort;
   readonly actions: QActionService;
   readonly executions: () => number;
   readonly stream: QRunStreamService;
   readonly notifier: QRunEventNotifier;
   readonly toolVersions: readonly string[];
+  /** The real Tool Registry port, so a specialist reads canonical state the same way. */
+  readonly toolPort: QToolPort;
   readonly firewallPolicyVersion: string;
   readonly orchestrationVersion: string;
   readonly providerMode: QEvalProviderMode;
@@ -737,6 +751,11 @@ export async function createQEvalWorld(
     logger,
   });
 
+  // The graph is handed one port. When a specialist is composed it is that
+  // wrapper, and the conversational path becomes its delegate — so both
+  // live behind one seam and a person never learns which answered.
+  const answerPort: QAnswerPort = options.specialist?.(answer) ?? answer;
+
   const testAction = createTestConfirmRequiredAction();
   const actions = createQActionService({
     sql,
@@ -776,7 +795,7 @@ export async function createQEvalWorld(
     checkpoints,
     firewall,
     retrieval: options.retrieval?.port ?? createUnconfiguredQRetrieval(),
-    answer,
+    answer: answerPort,
     actions: actionPort,
     pausePolicy: neverPause,
     logger,
@@ -894,11 +913,13 @@ export async function createQEvalWorld(
     orchestrator,
     gateway,
     answer,
+    answerPort,
     actions,
     executions: () => testAction.state.executions(),
     stream,
     notifier,
     toolVersions: qTools.registry.list().map((r) => r.versionId),
+    toolPort: qTools.port,
     firewallPolicyVersion: CONTEXT_FIREWALL_POLICY_VERSION,
     orchestrationVersion: Q_ORCHESTRATION_VERSION,
     providerMode: options.providerMode,

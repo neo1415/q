@@ -36,6 +36,7 @@ export const Q_EVAL_SUITES = [
   "Q_STREAM",
   "Q_RETRIEVAL",
   "Q_MEMORY",
+  "Q_COMPANY_INTELLIGENCE",
   "Q_VOICE",
   "Q_CONNECTOR",
   "RECOMMENDATION",
@@ -94,6 +95,11 @@ export const Q_EVAL_SUITE_STATUS: Readonly<
   },
   Q_RETRIEVAL: { status: "DEFERRED", reason: "no retrieval until CQ-RAG-001" },
   Q_MEMORY: { status: "DEFERRED", reason: "no Q Knowledge until CQ-KNW-001" },
+  Q_COMPANY_INTELLIGENCE: {
+    status: "ACTIVE",
+    reason:
+      "Company Intelligence specialist through the real Q path (CQ-Q-020)",
+  },
   Q_VOICE: {
     status: "DEFERRED",
     reason: "no voice provider; contract reserved",

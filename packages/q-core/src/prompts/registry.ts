@@ -9,6 +9,7 @@ import {
 import { Q_SYSTEM_V1 } from "./charter/q-system.v1.js";
 import { CLAIM_EXTRACTION_V1 } from "./tasks/claim-extraction.v1.js";
 import { COMPANY_ANALYST_V1 } from "./tasks/company-analyst.v1.js";
+import { COMPANY_ANALYST_V2 } from "./tasks/company-analyst.v2.js";
 import { FIT_EXPLANATION_V1 } from "./tasks/fit-explanation.v1.js";
 import { FOUNDER_ONBOARDING_EXTRACTION_V1 } from "./tasks/founder-onboarding-extraction.v1.js";
 import { INVESTOR_MANDATE_SYNTHESIS_V1 } from "./tasks/investor-mandate-synthesis.v1.js";
@@ -130,6 +131,7 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition<unknown, unknown>[] =
     CLAIM_EXTRACTION_V1,
     INVESTOR_MANDATE_SYNTHESIS_V1,
     COMPANY_ANALYST_V1,
+    COMPANY_ANALYST_V2,
     FIT_EXPLANATION_V1,
   ];
 

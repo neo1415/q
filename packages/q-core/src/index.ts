@@ -64,6 +64,7 @@ export {
   type QSystemVariables,
 } from "./prompts/charter/q-system.v1.js";
 export { COMPANY_ANALYST_V1 } from "./prompts/tasks/company-analyst.v1.js";
+export { COMPANY_ANALYST_V2 } from "./prompts/tasks/company-analyst.v2.js";
 export { FOUNDER_ONBOARDING_EXTRACTION_V1 } from "./prompts/tasks/founder-onboarding-extraction.v1.js";
 export { INVESTOR_MANDATE_SYNTHESIS_V1 } from "./prompts/tasks/investor-mandate-synthesis.v1.js";
 export { FIT_EXPLANATION_V1 } from "./prompts/tasks/fit-explanation.v1.js";
@@ -83,11 +84,32 @@ export {
 export {
   COMPANY_ANALYST_SCHEMA_NAME,
   COMPANY_ANALYST_SCHEMA_VERSION,
+  COMPANY_ANALYST_V2_SCHEMA_NAME,
+  COMPANY_ANALYST_V2_SCHEMA_VERSION,
   CompanyAnalystResultSchema,
+  CompanyAnalystV2ResultSchema,
+  CompanyAnalystV2VariablesSchema,
   CompanyAnalystVariablesSchema,
   type CompanyAnalystResult,
+  type CompanyAnalystV2Result,
+  type CompanyAnalystV2Variables,
   type CompanyAnalystVariables,
 } from "./prompts/schemas/company-analyst.js";
+export {
+  COMPANY_EVIDENCE_COVERAGE,
+  COMPANY_INTELLIGENCE_DIMENSIONS,
+  CompanyDimensionCoverageSchema,
+  CompanyEvidenceCoverageSchema,
+  CompanyIntelligenceDimensionSchema,
+  CompanyIntelligenceFindingSchema,
+  CompanyIntelligenceModelOutputSchema,
+  CompanyMaterialChangeSchema,
+  type CompanyEvidenceCoverage,
+  type CompanyIntelligenceDimension,
+  type CompanyIntelligenceFinding,
+  type CompanyIntelligenceModelOutput,
+  type CompanyMaterialChange,
+} from "./prompts/schemas/company-intelligence.js";
 export {
   CLAIM_ASSERTION_KINDS,
   CLAIM_EXTRACTION_SCHEMA_NAME,

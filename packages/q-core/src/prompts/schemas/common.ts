@@ -39,6 +39,17 @@ export const AuthorisedFactSchema = z
     /** Coarse source description, never a private identifier or path. */
     source: z.string().max(200).optional(),
     asOf: z.string().max(40).optional(),
+    /**
+     * The label this fact is shown under, so a model can cite it (CQ-Q-020
+     * §58, §61). Opaque and per-render: `F1`, `F2`. It is deliberately NOT
+     * an identifier of anything — a model that invents `F99` cites nothing,
+     * and a model that echoes a real evidence id has still not produced one,
+     * because the specialist resolves labels and never reads ids from output.
+     */
+    ref: z
+      .string()
+      .regex(/^F[0-9]{1,3}$/)
+      .optional(),
   })
   .strict();
 export type AuthorisedFact = z.infer<typeof AuthorisedFactSchema>;

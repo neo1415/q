@@ -244,3 +244,30 @@ harness's hard privacy invariants. The runner reports; a person decides.
 - No seeded role holds `company.financials.view`, so
   `COMPANY_PRIVATE_FINANCIALS` is planned for nobody yet; the eval's
   founder-private positive control uses the capital objective scope.
+
+## Q_COMPANY_INTELLIGENCE (CQ-Q-020)
+
+The Company Intelligence suite is ACTIVE. Its cases live where the property
+they measure can actually be asserted, not where a suite name would suggest:
+
+| Cases                         | Where                                                              | Why there                                                                                                                                                                                                                                                                                                         |
+| ----------------------------- | ------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| QCIU-001..011 (43 assertions) | `packages/q-specialists/test/company-intelligence.test.ts`         | Citation resolution, truth-class bounding, forbidden-claim rejection and gap reclassification are deterministic software properties. Wrapping them in a scripted conversation would add a model-shaped wrapper around an assertion that needs none, and would put the release gate at risk for no extra coverage. |
+| QCI-001..017                  | `packages/q-evals/test/q-company-intelligence.integration.test.ts` | Everything that must be proved _through_ the real Q path: the firewall running first, what reaches a provider, contradictions and staleness from real knowledge, and a four-turn conversation.                                                                                                                    |
+
+The integration cases run the real `createRun` → LangGraph orchestrator →
+Context Firewall → Safe Read tools → Q Knowledge → hybrid retrieval → Model
+Gateway → specialist path. The only substitution is the ModelProvider
+adapter, scripted under the real provider codes and wrapped by the recorder,
+so assertions can be made on the **provider input** — the last surface before
+a model, and the only honest place to prove a private figure never travelled.
+
+The scripted model is deliberately adversarial: it cites a label it was never
+shown, asserts a headcount nothing supports, calls an absence a risk and
+claims an investor fit score. A compliant script would prove nothing about
+containment.
+
+The eval world gained a `specialist` option (`packages/q-evals/src/fixtures/world.ts`)
+that wraps the answer seam, so a specialist is exercised through the same
+graph rather than beside it. Absent — which is every dataset case today — the
+world behaves exactly as before.

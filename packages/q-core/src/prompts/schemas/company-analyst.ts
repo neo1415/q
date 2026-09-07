@@ -15,6 +15,11 @@ import {
   TaskFrameSchema,
   TEXT_MAX,
 } from "./common.js";
+import {
+  CompanyDimensionCoverageSchema,
+  CompanyIntelligenceFindingSchema,
+  CompanyMaterialChangeSchema,
+} from "./company-intelligence.js";
 
 /**
  * COMPANY_ANALYST (CQ-Q-006 §31): analyse supplied authorised company
@@ -85,3 +90,59 @@ export type CompanyAnalystResult = z.infer<typeof CompanyAnalystResultSchema>;
 
 export const COMPANY_ANALYST_SCHEMA_NAME = "CompanyAnalystResult";
 export const COMPANY_ANALYST_SCHEMA_VERSION = 1;
+
+// ---------------------------------------------------------------------------
+// v2 (CQ-Q-020 §41-§42)
+// ---------------------------------------------------------------------------
+
+/**
+ * v1's variables plus the trusted institutional frame the Company
+ * Intelligence specialist establishes before any model runs (§15-§17,
+ * §20-§22): open disagreements, figures past their useful life, changes
+ * between recorded readings, and dimensions nothing supports.
+ *
+ * TRUSTED, and outside the untrusted fence, because it is Capital Q's own
+ * deterministic reading of institutional state rather than anybody's
+ * assertion. The prompt tells the model it may not overturn it — a
+ * contradiction the server found is not a thing a model gets to resolve.
+ *
+ * Defaulted to the empty string so the conversational answer path, which
+ * has no such frame, renders exactly as it did under v1.
+ */
+export const CompanyAnalystV2VariablesSchema =
+  CompanyAnalystVariablesSchema.extend({
+    institutionalNotes: z
+      .string()
+      .max(6_000)
+      .default("Nothing was established in advance for this request."),
+  }).strict();
+export type CompanyAnalystV2Variables = z.infer<
+  typeof CompanyAnalystV2VariablesSchema
+>;
+
+export const COMPANY_ANALYST_V2_UNTRUSTED = [
+  ...COMPANY_ANALYST_UNTRUSTED,
+] as const;
+
+/**
+ * v1's result plus the structured company reading (§13, §14, §60).
+ *
+ * Every new field is defaulted: a model that answers in the v1 shape still
+ * validates, so adding the structure did not narrow what the conversational
+ * path accepts. The specialist is what asks for these fields and what
+ * checks them; nothing here is trusted merely because it parsed.
+ */
+export const CompanyAnalystV2ResultSchema = CompanyAnalystResultSchema.extend({
+  companyFindings: z
+    .array(CompanyIntelligenceFindingSchema)
+    .max(LIST_MAX)
+    .default([]),
+  coverage: z.array(CompanyDimensionCoverageSchema).max(16).default([]),
+  materialChanges: z.array(CompanyMaterialChangeSchema).max(12).default([]),
+}).strict();
+export type CompanyAnalystV2Result = z.infer<
+  typeof CompanyAnalystV2ResultSchema
+>;
+
+export const COMPANY_ANALYST_V2_SCHEMA_NAME = "CompanyAnalystResult";
+export const COMPANY_ANALYST_V2_SCHEMA_VERSION = 2;

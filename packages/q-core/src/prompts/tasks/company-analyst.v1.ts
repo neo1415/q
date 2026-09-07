@@ -43,7 +43,9 @@ export const COMPANY_ANALYST_V1: PromptDefinition<
 > = {
   id: "COMPANY_ANALYST",
   version: 1,
-  status: "ACTIVE",
+  // Superseded by v2 (CQ-Q-020 §41). Retained, immutable and resolvable by
+  // exact version, so a run recorded against it stays explainable.
+  status: "DEPRECATED",
   kind: "TASK",
   taskClass: "NORMAL_DIALOGUE",
   owner: "q-core",

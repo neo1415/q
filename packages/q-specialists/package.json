@@ -1,0 +1,40 @@
+{
+  "name": "@capital-q/q-specialists",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Capital Q Q specialists (CQ-Q-020): the bounded specialist contract under one Q, and the Company Intelligence specialist — deterministic assembly over canonical state, authorised Q Knowledge and authorised hybrid retrieval, one governed model call through the Model Gateway, and structured institutional findings whose citations are resolved from supplied facts. No provider SDK, no SQL, no scoring, no InvestIQ methodology, no consequential action, no user-facing persona.",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "clean": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\""
+  },
+  "dependencies": {
+    "@capital-q/contracts": "workspace:*",
+    "@capital-q/database": "workspace:*",
+    "@capital-q/model-gateway": "workspace:*",
+    "@capital-q/observability": "workspace:*",
+    "@capital-q/q-core": "workspace:*",
+    "@capital-q/q-knowledge": "workspace:*",
+    "@capital-q/q-runtime": "workspace:*",
+    "@capital-q/q-tools": "workspace:*",
+    "@capital-q/security": "workspace:*",
+    "zod": "4.5.4"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.3",
+    "typescript": "5.9.3"
+  }
+}

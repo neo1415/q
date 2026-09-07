@@ -519,7 +519,51 @@ CQ-KNW-003          VERIFIED   Contradictions, temporal knowledge and revision
                     knowledge:temporal:smoke, free and deterministic. No new
                     service, account, API key or ENV; no model call anywhere in
                     this packet. Gates 2026-09-07: see the CQ-KNW-003 postflight.
-CQ-Q-020            NEXT       Not started.
+CQ-Q-020            VERIFIED   Company Intelligence specialist — Q's first real
+                    specialist capability, packages/q-specialists (the bounded
+                    QSpecialist contract under one Q; createCompanyIntelligence-
+                    Specialist; createSpecialistQAnswer implementing the runtime's
+                    existing QAnswerPort so the graph, firewall, lifecycle and
+                    stream are untouched and an unsupported request falls through
+                    to the conversational path). One bounded investigation:
+                    canonical structured state through the Safe Read tools called
+                    DETERMINISTICALLY (never offered to the model) -> authorised Q
+                    Knowledge (current/as-of/series/disputes under the plan's own
+                    envelope) -> ONE authorised hybrid retrieval search with the
+                    person's own words -> deterministic findings -> ONE model call
+                    -> validated model findings. Contradictions, staleness,
+                    material changes, gaps, evidence coverage and information
+                    confidence are COMPUTED, never asked, and become the trusted
+                    frame the prompt tells the model it may not overturn: those
+                    are exactly the statements a fluent model gets wrong in the
+                    direction that flatters. Citation is by opaque per-render
+                    label (F1..Fn) resolved server-side, so a model never writes
+                    an identifier and citation fabrication is inexpressible rather
+                    than merely discouraged; an invented label is dropped and
+                    counted. validateModelFindings drops (never repairs) findings
+                    that assert a score/fit/probability/peer benchmark, that make
+                    an unsupported entity-specific material claim, or that would
+                    upgrade truth class beyond what they cite; absence becomes GAP
+                    whatever type the model chose. VERIFIED is reachable only by
+                    restating something already verified upstream. COMPANY_ANALYST
+                    v2 ACTIVE (EVIDENCE_SYNTHESIS), v1 DEPRECATED but retained
+                    immutable with its hash unchanged; every new output field is
+                    defaulted so the conversational path is unaffected. NO score,
+                    fit, funding probability, InvestIQ methodology or peer
+                    benchmark; NO canonical mutation, NO consequential action, NO
+                    knowledge write, NO provider SDK, NO SQL, NO web/connector.
+                    Findings: the developer smoke surfaced that evidence coverage
+                    read from facts alone reported INSUFFICIENT beside findings
+                    plainly resting on documents (a retrieved passage carries no
+                    dimension), fixed by reading coverage from the findings' own
+                    support; and that a reading swept to STALE leaves
+                    currentForSubject entirely, so the specialist stops seeing it
+                    rather than reporting its age — a real CQ-KNW-003/CQ-Q-020
+                    seam, recorded rather than papered over. Schema impact NONE;
+                    migration NONE; no new service, account, API key, ENV, paid
+                    service or model. Gates 2026-09-07: see the CQ-Q-020
+                    postflight.
+CQ-Q-021            NEXT       Not started.
 ```
 
 ## Architecture coverage (doc 25 §198) — Q rows
@@ -831,3 +875,23 @@ CQ-Q-020            NEXT       Not started.
 | A contradiction's identity edited after the fact                    | Trigger refuses any change to what is contested, and refuses reopening a settled set      | rls/380 immutability and reopen tests                     |
 | Another tenant's understanding dragged into a disagreement          | Composite FKs on (set, tenant) and (object, tenant)                                       | rls/380 cross-tenant test                                 |
 | A browser reading contradiction sets                                | RLS on, no policy, no grant, no route                                                     | rls/380 policy and RLS tests; schema guard                |
+
+## Threat coverage (doc 16) — CQ-Q-020 rows
+
+| Threat                                                                | Control                                                                                          | Proof                                       |
+| --------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ | ------------------------------------------- |
+| Founder-private context silently lowering an investor-facing finding  | The investor's plan never reaches the deck, so no private figure exists in the run to influence  | integration QCI-008                         |
+| Another tenant's company material reaching an investigation           | Every read carries the plan's envelope; the specialist cannot fetch on its own initiative        | integration QCI-009                         |
+| Confirming that a private document exists by declining to show it     | An unauthorised reader's context contains no such source; empty and denied are indistinguishable | integration QCI-010                         |
+| Instructions inside a deck changing authority or tooling              | Retrieved text is fenced data; the tool calls are decided before the model is asked anything     | integration QCI-011                         |
+| A model citing a document, slide or knowledge object it never saw     | Citation is by opaque per-render label resolved server-side; a model never writes an identifier  | unit QCIU-001; integration QCI-006          |
+| General model knowledge becoming an entity-specific fact              | An unsupported material assertion is dropped, not softened                                       | unit QCIU-002; integration QCI-004          |
+| A USER_CLAIM becoming VERIFIED by being restated confidently          | Truth class is capped by the best class among the facts a finding actually cites                 | unit QCIU-003                               |
+| An invented score, fit, probability or peer benchmark reaching a user | Findings whose language asserts one are dropped whole                                            | unit QCIU-004; integration QCI-005          |
+| Missing information reported as weakness                              | Absence is reclassified to GAP whatever type the model chose; gaps need no support               | unit QCIU-005; integration QCI-007, QCI-016 |
+| Capital Q choosing, averaging or preferring a conflicting figure      | Disagreements are computed and both sides travel; the frame forbids resolving them               | integration QCI-013                         |
+| A five-month-old balance presented as the current position            | Freshness is assessed on read and stated in the fact, the finding and the frame                  | integration QCI-014                         |
+| A company's own growth reported back as a discrepancy                 | Change is compared between recorded readings of one key, never between model answers             | integration QCI-015                         |
+| Private context sent to an ineligible provider to keep a feature up   | Eligibility is decided from declared sensitivity before any provider call; the refusal is coded  | specialist blocked: NO_ELIGIBLE_MODEL_ROUTE |
+| A specialist becoming a second chatbot with its own persona           | The specialist writes no message and names itself nowhere a person reads                         | integration QCI-001, QCI-017                |
+| A private statement or figure leaking through logs or telemetry       | Telemetry carries counts, codes and identifiers only                                             | integration QCI-012                         |

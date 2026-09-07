@@ -46,6 +46,7 @@
     "@capital-q/q-knowledge": "workspace:*",
     "@capital-q/q-orchestrator": "workspace:*",
     "@capital-q/q-runtime": "workspace:*",
+    "@capital-q/q-specialists": "workspace:*",
     "@capital-q/q-tools": "workspace:*",
     "@capital-q/security": "workspace:*",
     "zod": "4.5.4"

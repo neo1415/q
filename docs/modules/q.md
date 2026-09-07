@@ -1019,3 +1019,53 @@ internal-reasoning leakage) are graded deterministically on the provider
 input, the answer, the events and the logs, and are never averaged: one
 leak fails the run. Quality is observed and, where nuanced, handed to a
 person; no LLM judges an invariant.
+
+# Q specialists (`@capital-q/q-specialists`, CQ-Q-020)
+
+Q's first real specialist intelligence capability. Full module documentation
+lives in [`q-specialists.md`](./q-specialists.md); what matters for the Q
+picture is where it sits and what it does not become.
+
+## Where it sits
+
+The specialist registers through the runtime's existing `QAnswerPort`, so
+the investigation graph, the Context Firewall, the run lifecycle and the
+stream are unchanged. `createSpecialistQAnswer` asks `supports()`; a request
+about one company goes to Company Intelligence, and anything else falls
+through to the conversational answer path as its delegate.
+
+```
+QOrchestrator → Context Firewall → answer seam → specialist → findings
+                                              ↘ unsupported → conversational path
+                                                                → Q writes the message
+```
+
+## One Q
+
+A specialist is a bounded capability Q reaches for, never an agent a person
+talks to. Nothing a person reads names the specialist, its version, the
+provider, the prompt bundle or a graph node; the person asks Q and Q answers.
+`QSpecialistProbe` reads the question only to decide whether it is that
+specialist's kind of question — never as an instruction about what it may do.
+
+## What it must never become
+
+```
+Company Intelligence ≠ InvestIQ ≠ matching ≠ recommendation ≠ investor fit
+Company Intelligence ≠ the canonical Company domain
+```
+
+No company score, no investor fit, no funding probability, no readiness
+level, no peer benchmark and no InvestIQ methodology. Findings whose language
+asserts one are dropped rather than softened. Canonical company state and the
+capital objective are read, never written, and the specialist has no write
+path, no approval path and no consequential action at all.
+
+## Where the guarantees live
+
+The prompt states the rules; code enforces them. Contradictions, staleness,
+material change, gaps, coverage and information confidence are computed
+before any model runs and shown to the model as a frame it may not overturn.
+Citations are opaque per-render labels resolved on the server, so a model
+cannot cite a source it was never given — not because it is told not to, but
+because it never sees an identifier to write.

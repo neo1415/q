@@ -19,13 +19,13 @@ import {
 import type { DatabaseExecutor, TransactionManager } from "@capital-q/database";
 import type { Logger } from "@capital-q/observability";
 import {
-  CompanyAnalystResultSchema,
+  CompanyAnalystV2ResultSchema,
   createDefaultPromptRegistry,
   DEFAULT_COMMUNICATION_PROFILE,
   renderPrompt,
   type AuthorisedFact,
-  type CompanyAnalystResult,
-  type CompanyAnalystVariables,
+  type CompanyAnalystV2Result,
+  type CompanyAnalystV2Variables,
   type PromptRegistry,
 } from "@capital-q/q-core";
 import {
@@ -53,7 +53,7 @@ import { acceptStructuredOutput } from "../policy/structured.js";
  *   run → Context Firewall plan → authorised facts (port) → tools offered
  *   for this plan (port) → resolve bundle → render charter + task with
  *   untrusted fences → bounded tool loop through the gateway → validated
- *   CompanyAnalystResult → Q message + bundle version on the run
+ *   CompanyAnalystV2Result → Q message + bundle version on the run
  *
  * The tool loop: while tools are offered, the model is asked with a TEXT
  * output and may either propose tool calls or answer with the JSON the
@@ -74,6 +74,14 @@ export type QAuthorisedContextPort = {
   readonly assemble: (request: QAnswerRequest) => Promise<{
     readonly facts: readonly AuthorisedFact[];
     readonly subjectDescription: string;
+    /**
+     * What the server established about the subject before any model ran
+     * (CQ-Q-020 §15-§22): open disagreements, figures past their useful
+     * life, changes between recorded readings. Trusted text, rendered
+     * outside the untrusted fence. Absent here means exactly that —
+     * nothing was established — and never that nothing is true.
+     */
+    readonly institutionalNotes?: string | undefined;
   }>;
 };
 
@@ -317,7 +325,7 @@ export type QToolCallObservation = {
 };
 
 export type QAnswerObservation = {
-  readonly result: CompanyAnalystResult;
+  readonly result: CompanyAnalystV2Result;
   readonly providerCode: string;
   readonly modelCode: string;
   readonly promptBundleVersion: string;
@@ -428,7 +436,7 @@ export function createModelGatewayQAnswer(
       );
 
       const variables: Omit<
-        CompanyAnalystVariables,
+        CompanyAnalystV2Variables,
         | "operatingMode"
         | "communicationProfile"
         | "communicationGuidance"
@@ -442,8 +450,11 @@ export function createModelGatewayQAnswer(
         })),
         authorisedFacts: [...assembled.facts],
         subjectDescription: assembled.subjectDescription,
+        institutionalNotes:
+          assembled.institutionalNotes ??
+          "Nothing was established in advance for this request.",
       };
-      const rendered = renderPrompt<CompanyAnalystVariables>(registry, {
+      const rendered = renderPrompt<CompanyAnalystV2Variables>(registry, {
         task: "COMPANY_ANALYST",
         operatingMode: operatingModeForCapability(request.capability),
         communicationProfile: profile,
@@ -470,9 +481,9 @@ export function createModelGatewayQAnswer(
           ? {}
           : { tenantPolicy: dependencies.tenantPolicy }),
       };
-      const options: ModelGatewayExecuteOptions<CompanyAnalystResult> = {
+      const options: ModelGatewayExecuteOptions<CompanyAnalystV2Result> = {
         signal: request.signal,
-        schema: CompanyAnalystResultSchema,
+        schema: CompanyAnalystV2ResultSchema,
       };
       const toolCalls: QToolCallObservation[] = [];
       let modelCalls = 0;
@@ -480,9 +491,9 @@ export function createModelGatewayQAnswer(
 
       try {
         let final:
-          | Awaited<ReturnType<typeof gateway.execute<CompanyAnalystResult>>>
+          | Awaited<ReturnType<typeof gateway.execute<CompanyAnalystV2Result>>>
           | undefined;
-        let analyst: CompanyAnalystResult | undefined;
+        let analyst: CompanyAnalystV2Result | undefined;
 
         if (offered.length > 0) {
           let rounds = 0;
@@ -492,7 +503,7 @@ export function createModelGatewayQAnswer(
             calls < Q_TOOL_LOOP_MAX_CALLS
           ) {
             modelCalls += 1;
-            const result = await gateway.execute<CompanyAnalystResult>(
+            const result = await gateway.execute<CompanyAnalystV2Result>(
               {
                 ...base,
                 messages,
@@ -506,7 +517,7 @@ export function createModelGatewayQAnswer(
               // task's schema, exactly as the structured path would.
               const accepted = acceptStructuredOutput(
                 result.output.text,
-                CompanyAnalystResultSchema,
+                CompanyAnalystV2ResultSchema,
               );
               if (accepted.ok) {
                 final = result;
@@ -563,7 +574,7 @@ export function createModelGatewayQAnswer(
 
         if (analyst === undefined || final === undefined) {
           modelCalls += 1;
-          final = await gateway.execute<CompanyAnalystResult>(
+          final = await gateway.execute<CompanyAnalystV2Result>(
             { ...base, messages, output: rendered.output },
             options,
           );
