@@ -421,6 +421,155 @@ strategies and prints the table above. Both seed a synthetic tenant in a
 transaction and roll it back; neither is an HTTP endpoint, and neither
 prints a vector or a private marker.
 
+## Q Knowledge Objects and the Write Gate (CQ-KNW-002)
+
+The difference between "this document says ARR is $2.4m" and "Capital Q
+currently understands ARR to be approximately $2.4m, on this evidence, with
+this confidence".
+
+```
+candidate -> schema -> subject -> provenance identity -> tenant/ownership ->
+scope and visibility -> truth class -> evidence links -> temporal validity ->
+sensitivity -> contradiction pre-check -> confidence -> persist | hold | reject
+```
+
+A model may propose. Nothing in the path lets it decide, and there is no
+second way into `q_knowledge.objects`.
+
+### What a candidate cannot say
+
+Not "cannot say convincingly" — cannot express. `KnowledgeCandidate` is
+`.strict()` and has no field for a tenant, a visibility scope, a sensitivity
+class, a status, a confidence, an evidence status, a reliability, a revision
+number or any canonical company field. A candidate carrying `status: ACTIVE`
+or `confidence: 0.92` is refused at the schema, before any rule runs.
+
+`truthClassProposal` exists, and its enum has no `VERIFIED` member. The
+policy that maps it has no branch that returns VERIFIED either, and the
+database refuses a VERIFIED object whose evidence status is not
+`EXTERNALLY_VERIFIED` or `PLATFORM_VERIFIED`. Three independent layers, none
+of which an extraction can reach.
+
+### Confidence is a category a rule produced
+
+| Rule (in order)              | Class                   | Reason                         |
+| ---------------------------- | ----------------------- | ------------------------------ |
+| sources disagree             | `CONFLICTING_EVIDENCE`  | `CONFLICTING_SUPPORT`          |
+| support was withdrawn        | `INSUFFICIENT_EVIDENCE` | `SUPPORT_WITHDRAWN`            |
+| nothing behind it            | `INSUFFICIENT_EVIDENCE` | `NO_SUPPORTING_EVIDENCE`       |
+| verified evidence            | `HIGH`                  | `VERIFIED_SUPPORT`             |
+| Q's own conclusion           | `LOW`                   | `INFERENCE_NOT_ASSERTED`       |
+| a projection                 | `LOW`                   | `ESTIMATE_NOT_ACTUAL`          |
+| two or more distinct sources | `MODERATE`              | `MULTIPLE_INDEPENDENT_SOURCES` |
+| one document                 | `MODERATE`              | `SINGLE_DOCUMENT_SOURCE`       |
+| a bare statement             | `LOW`                   | `SELF_REPORTED_ONLY`           |
+
+Conflict and withdrawal come first because they are facts about the evidence
+rather than gradations of it: an understanding whose sources disagree is not
+"a bit less confident", it is a different situation.
+
+**HIGH is reachable only from verified evidence.** Nothing an extraction or
+an inference does gets there. A pitch deck agreeing with itself nine times is
+still a pitch deck.
+
+There is no percentage anywhere. This repository has no calibrated
+methodology, and a number that looks measured but is not is worse than a
+category everyone reads correctly.
+
+### Inheritance
+
+Visibility takes the **narrowest** input scope, never the widest. An
+understanding drawn from a founder-private source and a network-visible one
+could not have been reached without the private half, so it carries the
+private half's scope. A source already broader than private is narrowed to
+`organisation_private`.
+
+Sensitivity takes the **strongest** input class and never descends, with a
+`CONFIDENTIAL` floor. The floor is there for combination risk: cash, burn and
+payroll may each be classified one way while the runway they jointly imply is
+more sensitive than any of them.
+
+### Multi-source means distinct sources
+
+`MULTI_SOURCE_SUPPORTED` requires genuinely distinct sources. Two passages of
+one deck, or two evidence items from one source, are one source saying a
+thing twice; counting that as corroboration is how a single unchecked
+assertion acquires the appearance of independent support.
+
+### Conflict, and what is deliberately not done
+
+A candidate whose value disagrees with the current understanding is **HELD**
+as a `CANDIDATE`. The existing object keeps its value, its status and its
+history — nothing preferred the larger number, and nothing preferred the
+newer one. What does change is that Capital Q stops claiming confidence it no
+longer has: the active object gains a revision setting confidence to
+`CONFLICTING_EVIDENCE`, and a `reassesses` lineage edge records that one
+reading reassesses the other.
+
+That is the input CQ-KNW-003 needs. Resolution is its packet, not this one.
+
+### Revocation
+
+`reassessForWithdrawnEvidence` finds the understandings resting on evidence
+that is no longer valid and re-derives their confidence. Nothing is deleted
+and no statement is rewritten; what changes is that an understanding whose
+only support disappeared stops looking supported, and carries
+`reassessment_required_at`. The earlier, better-supported revision remains
+reconstructable.
+
+### Reads are authorisation, not existence
+
+`KnowledgeQueryService` takes the same envelope CQ-RAG-004 uses — one
+disjunction of constraints for the whole knowledge context, projected from
+the Context Firewall's plan. There is no `getAllKnowledge`, no tenant-wide
+list, and no method that takes a subject without an envelope. The constraint
+is applied IN the query, so an unauthorised understanding is never a row.
+
+Only `ACTIVE` objects are answers. A held candidate is a proposal awaiting a
+person, not Capital Q's position.
+
+Existing in this schema grants nothing: not a Data Room grant, not download,
+not share, not recommendation eligibility. The table has no column for any of
+them.
+
+### Where knowledge sits in Q's retrieval hierarchy
+
+```
+canonical structured state   (the Tool Registry; still authoritative)
+  -> authorised Knowledge Objects   (settled understanding, with confidence)
+    -> authorised document retrieval  (the passages themselves)
+```
+
+Knowledge is offered to the model before the passages it was derived from,
+because it is the settled reading of them — but both travel, so the model can
+see the passage behind the summary. Confidence reaches the model as a word,
+so an answer can say "moderate confidence, document-supported" rather than
+asserting a number as fact.
+
+Canonical state is untouched. The gate never writes `core.companies`, a
+capital objective, an investor mandate or relationship state; a candidate
+implying a canonical update is a suggestion for the owning domain, and this
+packet does not build that path.
+
+### Commands
+
+```bash
+pnpm knowledge:write:smoke
+```
+
+Claim and evidence in, six candidates through the gate, knowledge object out,
+read back under three different envelopes. Free, deterministic, no provider.
+It seeds two synthetic tenants in a transaction and rolls back, and it prints
+keys, classes and codes — never a statement, never a value.
+
+Observed: a document-supported candidate ACCEPTED at MODERATE; the same one
+again DUPLICATE; a second independent source REVISED to
+MULTI_SOURCE_SUPPORTED; a conflicting value HELD with the active object moved
+to CONFLICTING_EVIDENCE; another tenant's evidence REJECTED
+`PROVENANCE_NOT_FOUND`; and a candidate asserting VERIFIED, ACTIVE and 92%
+REJECTED `CANDIDATE_INVALID`. Counterparty and other-tenant reads: 0.
+VERIFIED objects: 0. Non-private objects: 0.
+
 ## Known limitations
 
 - Automated malware scanning does not exist. Outside a local stack the
@@ -452,11 +601,16 @@ chunk's visibility and sensitivity.
 
 ## Deferrals
 
-Claims and evidence intelligence → CQ-KNW-001. Retrieval returns source
-material; nothing here promotes a passage to a claim, a truth class or a
-confidence.
+Contradiction resolution, conflict sets and temporal reconciliation →
+CQ-KNW-003. This packet identifies a conflict, keeps both readings and stops
+claiming confidence; it settles nothing.
 
-Knowledge objects → CQ-KNW-002 · contradictions and revisions → CQ-KNW-003.
+Long-term entity memory (`q_knowledge.memory_items`) → a later packet. KNW-002
+is knowledge, not memory, and the table deliberately does not exist yet.
+
+A canonical-state suggestion path — a confirmed knowledge object proposing an
+update to `core.companies` or a capital objective → the owning domain's own
+packet. Nothing here writes canonical state.
 
 A cross-encoder reranker → only if a measured RRF baseline justifies the
 latency and the compute. The baseline above is that measurement's starting

@@ -11,9 +11,15 @@
  * Firewall's plan before ranking, fused by Reciprocal Rank Fusion, and
  * assembled into bounded, source-labelled evidence for Q.
  *
+ * Owns since CQ-KNW-002: Q Knowledge Objects — what Capital Q understands,
+ * as opposed to what a source said — with append-only revisions, evidence
+ * and source provenance, lineage, a deterministic Knowledge Write Gate and
+ * permission-aware reads.
+ *
  * Does not own (yet or ever): permission decisions (the Context Firewall
- * decides; this obeys), claims and evidence intelligence (CQ-KNW-001),
- * knowledge objects (CQ-KNW-002), documents or extraction (Evidence),
+ * decides; this obeys), claims and evidence (CQ-KNW-001 and the Evidence
+ * context own them), contradiction resolution (CQ-KNW-003), documents or
+ * extraction (Evidence), canonical company state (the owning domain),
  * recommendation ranking, the Data Room. It calls no model to rank or
  * rewrite, exposes no search API, fetches no URL, and executes nothing a
  * document says.
@@ -123,6 +129,36 @@ export {
   createPostgresChunkHydration,
   createPostgresLexicalSearch,
 } from "./infrastructure/postgres-retrieval-repository.js";
+export * from "./knowledge/contracts.js";
+export {
+  classifyConfidence,
+  derivedKnowledgeSensitivity,
+  derivedKnowledgeVisibility,
+  evidenceStatusForSupport,
+  knowledgeValuesAgree,
+  sourceEnvironmentFor,
+  truthClassForKnowledge,
+  type ConfidenceDecision,
+} from "./knowledge/policy.js";
+export {
+  createKnowledgeWriteGate,
+  type KnowledgeWriteCommand,
+  type KnowledgeWriteGate,
+  type KnowledgeWriteGateDependencies,
+} from "./knowledge/write-gate.js";
+export {
+  createKnowledgeQueryService,
+  KNOWLEDGE_QUERY_MAX,
+  knowledgeConstraintsFor,
+  type KnowledgeQueryScope,
+  type KnowledgeQueryService,
+} from "./knowledge/query.js";
+export {
+  createPostgresKnowledgeRepository,
+  toKnowledgeObject,
+  type KnowledgeRepository,
+  type NewKnowledgeObject,
+} from "./infrastructure/postgres-knowledge-repository.js";
 export {
   createQEvidenceRetrieval,
   type QAuthorisedEvidenceContext,

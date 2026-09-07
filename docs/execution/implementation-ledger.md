@@ -432,7 +432,48 @@ CQ-KNW-001          VERIFIED   Claims + evidence interpretation — the boundary
                     new service, account, API key or ENV. No Q Knowledge
                     Object, no canonical company mutation. Gates 2026-09-07:
                     see the CQ-KNW-001 postflight. Uncommitted.
-CQ-KNW-002          NEXT       Q Knowledge Objects + Knowledge Write Gate (not started)
+CQ-KNW-002          VERIFIED   Q Knowledge Objects + deterministic Knowledge Write Gate
+                    — what Capital Q understands, kept apart from what a source
+                    said. Migration 20260911090000 creates q_knowledge.objects,
+                    revisions, object_evidence, object_sources and lineage; the
+                    Evidence and RAG migrations are untouched. Objects carry the
+                    three ADR-001 axes plus a confidence CLASS a named rule
+                    produced, direct tenant ownership, one ACTIVE understanding
+                    per (subject, key), append-only revisions, immutable identity
+                    and RLS on with no policy. Three independent layers make
+                    VERIFIED unreachable: the candidate enum has no such member,
+                    the policy has no branch that returns it, and the database
+                    refuses it without EXTERNALLY_VERIFIED or PLATFORM_VERIFIED
+                    evidence. KnowledgeCandidate is .strict() with no field for
+                    tenant, visibility, sensitivity, status, confidence, evidence
+                    status or any canonical company value, so a candidate
+                    carrying status ACTIVE or confidence 0.92 is refused at the
+                    schema. Confidence is nine ordered named rules — conflict and
+                    withdrawal first, HIGH reachable only from verified evidence
+                    — and no percentage exists anywhere in the path. Visibility
+                    takes the NARROWEST input scope and sensitivity the
+                    STRONGEST, with a CONFIDENTIAL floor for combination risk.
+                    MULTI_SOURCE_SUPPORTED requires genuinely distinct sources.
+                    A conflicting candidate is HELD and the active object gains a
+                    revision moving it to CONFLICTING_EVIDENCE plus a `reassesses`
+                    lineage edge: both readings kept, neither chosen, which is
+                    what CQ-KNW-003 needs. reassessForWithdrawnEvidence
+                    re-derives confidence when support disappears without
+                    deleting or rewriting anything. Reads go through
+                    KnowledgeQueryService under the same envelope CQ-RAG-004
+                    uses, ACTIVE only, applied in the query; Q's answer context
+                    now offers knowledge before the passages it came from, with
+                    confidence as a word. Canonical state, the Data Room and
+                    recommendation features are untouched — the table has no
+                    column for any of them. 28 unit + 18 integration tests
+                    (KNWW-001..008 named in the integration suite, with the
+                    reasoning for that placement in its header) + rls/370 (32
+                    tests) + schema guard rows. pnpm knowledge:write:smoke, free
+                    and deterministic. No new service, account, API key or ENV;
+                    no live model call anywhere in this packet. Gates 2026-09-07:
+                    see the CQ-KNW-002 postflight. Uncommitted.
+CQ-KNW-003          NEXT       Contradictions / revisions (not started; a demo web
+                    integration slice is planned before it)
 ```
 
 ## Architecture coverage (doc 25 §198) — Q rows

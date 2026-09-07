@@ -3483,6 +3483,260 @@ export type Database = {
           },
         ]
       }
+      lineage: {
+        Row: {
+          child_object_id: string
+          created_at: string
+          parent_object_id: string
+          relationship: string
+          tenant_id: string
+        }
+        Insert: {
+          child_object_id: string
+          created_at?: string
+          parent_object_id: string
+          relationship: string
+          tenant_id: string
+        }
+        Update: {
+          child_object_id?: string
+          created_at?: string
+          parent_object_id?: string
+          relationship?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lineage_child_object_id_tenant_id_fkey"
+            columns: ["child_object_id", "tenant_id"]
+            isOneToOne: false
+            referencedRelation: "objects"
+            referencedColumns: ["id", "tenant_id"]
+          },
+          {
+            foreignKeyName: "lineage_parent_object_id_tenant_id_fkey"
+            columns: ["parent_object_id", "tenant_id"]
+            isOneToOne: false
+            referencedRelation: "objects"
+            referencedColumns: ["id", "tenant_id"]
+          },
+        ]
+      }
+      object_evidence: {
+        Row: {
+          created_at: string
+          evidence_item_id: string
+          knowledge_object_id: string
+          relationship: string
+          tenant_id: string
+        }
+        Insert: {
+          created_at?: string
+          evidence_item_id: string
+          knowledge_object_id: string
+          relationship: string
+          tenant_id: string
+        }
+        Update: {
+          created_at?: string
+          evidence_item_id?: string
+          knowledge_object_id?: string
+          relationship?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "object_evidence_knowledge_object_id_tenant_id_fkey"
+            columns: ["knowledge_object_id", "tenant_id"]
+            isOneToOne: false
+            referencedRelation: "objects"
+            referencedColumns: ["id", "tenant_id"]
+          },
+        ]
+      }
+      object_sources: {
+        Row: {
+          created_at: string
+          knowledge_object_id: string
+          source_id: string
+          tenant_id: string
+        }
+        Insert: {
+          created_at?: string
+          knowledge_object_id: string
+          source_id: string
+          tenant_id: string
+        }
+        Update: {
+          created_at?: string
+          knowledge_object_id?: string
+          source_id?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "object_sources_knowledge_object_id_tenant_id_fkey"
+            columns: ["knowledge_object_id", "tenant_id"]
+            isOneToOne: false
+            referencedRelation: "objects"
+            referencedColumns: ["id", "tenant_id"]
+          },
+        ]
+      }
+      objects: {
+        Row: {
+          confidence_class: string
+          created_at: string
+          current_revision_id: string | null
+          current_revision_number: number
+          evidence_status: string
+          hold_reason: string | null
+          id: string
+          knowledge_key: string
+          knowledge_type: string
+          reassessment_reason: string | null
+          reassessment_required_at: string | null
+          recorded_at: string
+          reliability_class: string | null
+          sensitivity_class: string
+          source_environment: string
+          statement: string
+          status: string
+          structured_value: Json | null
+          subject_id: string
+          subject_type: string
+          tenant_id: string
+          truth_class: string
+          valid_from: string | null
+          valid_to: string | null
+          visibility_scope: string
+        }
+        Insert: {
+          confidence_class: string
+          created_at?: string
+          current_revision_id?: string | null
+          current_revision_number?: number
+          evidence_status: string
+          hold_reason?: string | null
+          id?: string
+          knowledge_key: string
+          knowledge_type: string
+          reassessment_reason?: string | null
+          reassessment_required_at?: string | null
+          recorded_at?: string
+          reliability_class?: string | null
+          sensitivity_class: string
+          source_environment?: string
+          statement: string
+          status?: string
+          structured_value?: Json | null
+          subject_id: string
+          subject_type: string
+          tenant_id: string
+          truth_class: string
+          valid_from?: string | null
+          valid_to?: string | null
+          visibility_scope: string
+        }
+        Update: {
+          confidence_class?: string
+          created_at?: string
+          current_revision_id?: string | null
+          current_revision_number?: number
+          evidence_status?: string
+          hold_reason?: string | null
+          id?: string
+          knowledge_key?: string
+          knowledge_type?: string
+          reassessment_reason?: string | null
+          reassessment_required_at?: string | null
+          recorded_at?: string
+          reliability_class?: string | null
+          sensitivity_class?: string
+          source_environment?: string
+          statement?: string
+          status?: string
+          structured_value?: Json | null
+          subject_id?: string
+          subject_type?: string
+          tenant_id?: string
+          truth_class?: string
+          valid_from?: string | null
+          valid_to?: string | null
+          visibility_scope?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "objects_current_revision_fk"
+            columns: ["current_revision_id"]
+            isOneToOne: false
+            referencedRelation: "revisions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      revisions: {
+        Row: {
+          change_reason: string
+          confidence_class: string
+          created_at: string
+          created_by_id: string | null
+          created_by_type: string
+          evidence_status: string
+          id: string
+          knowledge_object_id: string
+          revision_number: number
+          statement: string
+          structured_value: Json | null
+          tenant_id: string
+          truth_class: string
+          valid_from: string | null
+          valid_to: string | null
+        }
+        Insert: {
+          change_reason: string
+          confidence_class: string
+          created_at?: string
+          created_by_id?: string | null
+          created_by_type: string
+          evidence_status: string
+          id?: string
+          knowledge_object_id: string
+          revision_number: number
+          statement: string
+          structured_value?: Json | null
+          tenant_id: string
+          truth_class: string
+          valid_from?: string | null
+          valid_to?: string | null
+        }
+        Update: {
+          change_reason?: string
+          confidence_class?: string
+          created_at?: string
+          created_by_id?: string | null
+          created_by_type?: string
+          evidence_status?: string
+          id?: string
+          knowledge_object_id?: string
+          revision_number?: number
+          statement?: string
+          structured_value?: Json | null
+          tenant_id?: string
+          truth_class?: string
+          valid_from?: string | null
+          valid_to?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "revisions_knowledge_object_id_tenant_id_fkey"
+            columns: ["knowledge_object_id", "tenant_id"]
+            isOneToOne: false
+            referencedRelation: "objects"
+            referencedColumns: ["id", "tenant_id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never

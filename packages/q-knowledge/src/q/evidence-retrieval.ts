@@ -18,6 +18,10 @@ import type { AuthorisedRetrievalResult } from "../retrieval/contracts.js";
 import { envelopeFromPlan } from "../retrieval/envelope.js";
 import type { ChunkHydrationPort } from "../retrieval/ports.js";
 import type { AuthorisedRetrievalService } from "../retrieval/service.js";
+import {
+  knowledgeConstraintsFor,
+  type KnowledgeQueryService,
+} from "../knowledge/query.js";
 
 /**
  * The Q seam (CQ-RAG-004 §35, §37, §55).
@@ -48,6 +52,11 @@ export type QEvidenceRetrievalDependencies = {
   readonly repositories: QRuntimeRepositories;
   readonly retrieval: AuthorisedRetrievalService;
   readonly hydration: ChunkHydrationPort;
+  /**
+   * Authorised knowledge reads (CQ-KNW-002 §23, §34). Optional: an
+   * environment without a knowledge store still answers from documents.
+   */
+  readonly knowledge?: KnowledgeQueryService | undefined;
   readonly logger?: Logger | undefined;
 };
 
@@ -81,7 +90,8 @@ const CORPUS_PROBE_LIMIT = 100;
 export function createQEvidenceRetrieval(
   dependencies: QEvidenceRetrievalDependencies,
 ): QEvidenceRetrieval {
-  const { sql, repositories, retrieval, hydration, logger } = dependencies;
+  const { sql, repositories, retrieval, hydration, knowledge, logger } =
+    dependencies;
   let last: AuthorisedRetrievalResult | null = null;
 
   const port: QRetrievalPort = {
@@ -150,12 +160,70 @@ export function createQEvidenceRetrieval(
         ...(request.signal === undefined ? {} : { signal: request.signal }),
       });
       last = result;
+
+      // The retrieval hierarchy (§23): canonical structured state answers
+      // first, through the Tool Registry, which is why nothing here reaches
+      // for it. Then what Capital Q already understands, which carries its
+      // own evidence and confidence. Then the documents themselves.
+      //
+      // Knowledge is listed BEFORE the passages it was derived from because
+      // it is the settled reading of them; it does not replace them, and
+      // both travel so the model can see the passage behind the summary.
+      const knowledgeFacts =
+        knowledge === undefined
+          ? []
+          : await authorisedKnowledgeFacts(request.plan);
+
       return {
-        facts: assembleAuthorisedFacts(result),
+        facts: [...knowledgeFacts, ...assembleAuthorisedFacts(result)],
         subjectDescription: describeRetrieval(result),
       };
     },
   };
+
+  /**
+   * What Capital Q currently understands about this run's subjects, as
+   * facts the prompt may reason over.
+   *
+   * Every reading goes through the permission-aware query service under the
+   * plan's own envelope, so an understanding this actor may not have is
+   * never a row. Confidence travels with the statement: an answer that says
+   * "moderate confidence, document-supported" is honest in a way that
+   * "ARR is 2.4m" is not.
+   */
+  async function authorisedKnowledgeFacts(
+    plan: PermittedContextPlan,
+  ): Promise<readonly AuthorisedFact[]> {
+    if (knowledge === undefined) {
+      return [];
+    }
+    const constraints = knowledgeConstraintsFor(plan);
+    if (constraints.length === 0) {
+      return [];
+    }
+    const companies = plan.subjects.flatMap((subject) =>
+      subject.kind === "COMPANY" ? [subject.companyId] : [],
+    );
+    const facts: AuthorisedFact[] = [];
+    for (const companyId of companies) {
+      const known = await knowledge.currentForSubject(
+        { tenantId: plan.tenantId, constraints },
+        { subjectType: "COMPANY", subjectId: companyId },
+      );
+      for (const entry of known) {
+        facts.push({
+          scope: "KNOWLEDGE_OBJECTS",
+          statement: entry.object.statement,
+          truthClass: entry.object.truthClass,
+          evidenceStatus: entry.object.evidenceStatus,
+          // Confidence reaches the model as a word, because that is what it
+          // is. There is no number to round, inflate or misread.
+          source: `Capital Q's current understanding · ${entry.object.confidenceClass} confidence · ${String(entry.evidence.length)} supporting evidence item(s)`,
+        });
+      }
+    }
+    return facts;
+  }
 
   return { port, context, lastResult: () => last };
 }
