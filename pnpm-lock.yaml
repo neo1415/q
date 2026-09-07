@@ -730,6 +730,9 @@ importers:
       '@capital-q/database':
         specifier: workspace:*
         version: link:../database
+      '@capital-q/evidence':
+        specifier: workspace:*
+        version: link:../evidence
       '@capital-q/observability':
         specifier: workspace:*
         version: link:../observability

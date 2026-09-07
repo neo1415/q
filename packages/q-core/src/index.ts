@@ -89,6 +89,22 @@ export {
   type CompanyAnalystVariables,
 } from "./prompts/schemas/company-analyst.js";
 export {
+  CLAIM_ASSERTION_KINDS,
+  CLAIM_EXTRACTION_SCHEMA_NAME,
+  CLAIM_EXTRACTION_SCHEMA_VERSION,
+  CLAIM_EXTRACTION_UNTRUSTED,
+  ClaimAssertionKindSchema,
+  ClaimExtractionResultSchema,
+  ClaimExtractionVariablesSchema,
+  ClaimLocatorHintSchema,
+  ClaimProposedValueSchema,
+  ProposedClaimSchema,
+  type ClaimExtractionResult,
+  type ClaimExtractionVariables,
+  type ClaimProposedValue,
+  type ProposedClaim,
+} from "./prompts/schemas/claim-extraction.js";
+export {
   FOUNDER_EXTRACTION_SCHEMA_NAME,
   FOUNDER_EXTRACTION_SCHEMA_VERSION,
   FOUNDER_FACT_KEYS,

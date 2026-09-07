@@ -289,6 +289,144 @@ claims to items with SUPPORTS, CONTRADICTS, QUALIFIES or SUPERSEDES,
 unique per relationship; SUPPORTS and CONTRADICTS coexist and nothing is
 deleted. `weight` exists as an extension point and is unset.
 
+## Claim interpretation (CQ-KNW-001)
+
+The boundary between what a source SAID and what Capital Q RECORDED.
+
+```
+authorised passage -> proposer -> schema -> provenance checks -> truth
+policy -> inheritance -> idempotency -> conflict check -> the Evidence
+application services -> recorded
+```
+
+A proposer reads one passage and returns candidates. It may be a language
+model or the deterministic line parser; either way its output is untrusted,
+and it never touches the database. Persistence goes through `createClaim`,
+`createEvidenceItem` and `linkClaimEvidence` — the same services a person
+uses, with the same authorisation, audit and events. There is no second
+claims table and no direct insert.
+
+### What a proposal cannot say
+
+Not "cannot say convincingly" — cannot express. The proposal type has no
+field for a tenant, a visibility scope, a sensitivity class, an evidence
+status, a lifecycle status, an author, a confidence, an evidence weight, a
+claim id or an evidence item id. Each is derived server-side from the source
+row and the actor.
+
+It has no field for a truth class either. A proposer names an
+`assertionKind` — SOURCE_ASSERTION, SOURCE_ESTIMATE or MODEL_INFERENCE — and
+deterministic policy maps that onto the canonical class. **VERIFIED is not
+filtered out; there is no branch that returns it.** A document instructing
+Capital Q to mark it verified is asking for a value nothing in the pipeline
+can produce, and the database refuses it independently: a VERIFIED claim
+requires EXTERNALLY_VERIFIED or PLATFORM_VERIFIED evidence, which an
+extraction cannot create.
+
+### The two axes, kept apart
+
+The packet's own wording treats "document supported" as a truth class. In
+this repository it is an EVIDENCE STATUS, and ADR-001 keeps the two axes
+separate on purpose. So a deck asserting its own ARR becomes:
+
+| Axis              | Value                | Why                                  |
+| ----------------- | -------------------- | ------------------------------------ |
+| `truth_class`     | `USER_CLAIM`         | the company is speaking about itself |
+| `evidence_status` | `DOCUMENT_SUPPORTED` | a document version stands behind it  |
+
+Collapsing those two is exactly how a pitch deck ends up counting as
+verification. A founder saying the same thing aloud produces the same truth
+class with `SELF_REPORTED` — the claim is no less real, and no better
+evidenced.
+
+### What is checked, and why each check exists
+
+- **Source, subject and tenant** come from the source row, never the
+  proposal. A cross-tenant source id and a wrong-subject source id both stop
+  at the same refusal, because a source id is a selection and not authority.
+- **The document version** is validated by the evidence service itself. A
+  proposal naming a plausible uuid has not read a document.
+- **The excerpt must appear in the passage.** A proposal quoting words the
+  passage does not contain did not read it, and the claim it carries has no
+  provenance whatever the model believes. This is what stops general model
+  knowledge becoming entity evidence.
+- **The claim key must be permitted, and its value must have that key's
+  shape.** `financial.arr` is money; `traction.customer_count` is a count. A
+  customer count denominated in dollars is a different claim, not a
+  formatting slip. The key — not the number — is what keeps `financial.arr`
+  and `capital.raise_target` apart when both read "$2m".
+- **Currency is never inferred and never converted.** "$2.4m" is USD;
+  "£2.4m" is GBP; "2.4m" has no currency and is refused rather than assumed.
+  A claim whose currency was guessed is worse than a claim with no number.
+- **`asOf` is the period the source attached**, or null. Never today.
+
+### Inheritance
+
+Visibility narrows or stays: a private source keeps its exact scope, and a
+network-visible or public source is narrowed to `organisation_private`,
+because a claim is the organisation's own record of what a source said and
+CQ-EVD-001 refuses to record one at a shared scope. Widening is a disclosure
+decision with its own workflow, its own audit and its own actor.
+
+Sensitivity climbs only: the strongest of the source's class and the
+caller's floor. A RESTRICTED source cannot produce an INTERNAL claim through
+this path.
+
+Reliability is a classification — `MODEL_DERIVED`, `USER_STATEMENT`,
+`UNKNOWN` — never a score. There is no weighting methodology in the
+repository, and inventing one (audited 0.95, deck 0.40) would be a number
+nobody could defend and everything downstream would treat as measured.
+
+### Idempotency, corroboration and conflict
+
+Identity is `(source, locator, claim key)` plus the value, which is what
+CQ-EVD-001 already stores; no column was added. A retried worker finds its
+own earlier evidence item rather than making a second one.
+
+When a claim already exists for `(subject, claim key)`:
+
+- **the same value** links the new evidence as `SUPPORTS`. One claim, two
+  independent evidence items behind it.
+- **a different value** links it as `CONTRADICTS` and holds. The existing
+  claim is not revised, not superseded and not overwritten; the larger
+  number is not preferred and neither is the newer one. Both readings are
+  reachable from the claim, which is precisely the input CQ-KNW-003 needs.
+
+A `MODEL_INFERENCE` is held as well: the evidence is kept and linked to
+nothing, because an inference read out of a passage is not something the
+source said.
+
+### When no provider may see the material
+
+Provider eligibility is the Model Gateway's, decided from the source's own
+sensitivity before any provider is called. If nothing configured may receive
+it, the result is `blocked: PROVIDER_INELIGIBLE` — nothing recorded, and the
+passage NOT relabelled to find a provider that would accept it. A blocked
+extraction is distinguishable from an empty one, because the difference is
+whether Capital Q looked.
+
+Verified locally against the running gateway: a `founder_private` /
+`CONFIDENTIAL` source is refused by both configured providers with
+`SENSITIVITY_EXCEEDS_CEILING` at `attempts: 0`.
+
+### Commands
+
+```bash
+pnpm knowledge:claims:smoke
+pnpm knowledge:claims:smoke -- --live [--public-source]
+```
+
+Normal mode uses the deterministic line parser: no provider, no cost, and
+what CI runs. `--live` routes the same synthetic passage through the Model
+Gateway. Both seed a synthetic company, source and deck page in a
+transaction and roll it back, and neither prints the passage, the statements
+or the excerpts — a smoke that echoes private source text leaks it into a
+scrollback buffer.
+
+The synthetic passage ends with an instruction demanding to be treated as
+VERIFIED and made public. Both modes report `VERIFIED claims: 0 ·
+non-private claims: 0`.
+
 ## Authority, access and privacy
 
 Capabilities: `document.create`, `document.view`, `document.download`,

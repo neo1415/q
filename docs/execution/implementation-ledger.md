@@ -382,7 +382,57 @@ CQ-RAG-004          VERIFIED   Hybrid authorised retrieval + Q evidence retrieva
                     no vector SaaS, no reranker API, no account, no API key, no
                     new ENV, $0. Gemini/Groq/ElevenLabs NOT USED. Gates
                     2026-09-07: see the CQ-RAG-004 postflight. Uncommitted.
-CQ-KNW-001          NEXT       Claims / evidence intelligence (not started)
+CQ-KNW-001          VERIFIED   Claims + evidence interpretation — the boundary between
+                    what a source SAID and what Capital Q RECORDED. NO migration
+                    and no new table: CQ-EVD-001's evidence.claims,
+                    claim_revisions, evidence_items and claim_evidence are
+                    reused unchanged, and idempotency is derived from
+                    (source, locator, claim key) which they already store.
+                    packages/evidence gains an interpretation layer —
+                    ClaimProposal (untrusted whatever produced it),
+                    ClaimProposerPort, deterministic policy, and a service
+                    that persists ONLY through createClaim /
+                    createEvidenceItem / linkClaimEvidence, so authorisation,
+                    audit, events and the axis rules all still apply. The
+                    proposal type has no field for tenant, visibility,
+                    sensitivity, evidence status, lifecycle, author,
+                    confidence, weight or any id; it has no truth-class field
+                    either. A proposer names SOURCE_ASSERTION /
+                    SOURCE_ESTIMATE / MODEL_INFERENCE and policy maps that —
+                    VERIFIED is not filtered out, there is no branch that
+                    returns it, and the database refuses it independently.
+                    Vocabulary reconciled to ADR-001: a deck's own ARR is
+                    truth_class USER_CLAIM with evidence_status
+                    DOCUMENT_SUPPORTED, because "document supported" is an
+                    evidence status here and collapsing the axes is how a
+                    deck becomes verification. Excerpts must appear verbatim
+                    in the passage (which is what stops general model
+                    knowledge becoming entity evidence); currency is never
+                    inferred or converted; asOf is the source's period or
+                    null. Visibility narrows or holds, sensitivity climbs
+                    only, reliability is a class not a score. A second source
+                    agreeing links SUPPORTS; disagreeing links CONTRADICTS
+                    and HOLDS without revising, superseding or preferring
+                    either number — the input CQ-KNW-003 needs. When no
+                    provider may receive the source's sensitivity the result
+                    is blocked: PROVIDER_INELIGIBLE, nothing recorded and
+                    nothing relabelled (verified live: both providers refused
+                    a CONFIDENTIAL source with SENSITIVITY_EXCEEDS_CEILING at
+                    attempts 0). Prompt claim-extraction/v1 registered and
+                    hash-pinned; model path behind
+                    @capital-q/model-gateway/extraction so Evidence stays
+                    model-free. 25 unit + 19 integration tests (9 BLOCKERs:
+                    cross-tenant source, wrong subject, fabricated document
+                    version, another tenant's version, founder-private and
+                    investor-private inheritance, a source demanding VERIFIED
+                    and public, a fabricated excerpt, a key outside the
+                    permitted set, a count in currency). pnpm
+                    knowledge:claims:smoke, free and deterministic; --live
+                    measured at groq/openai/gpt-oss-20b, 2.0 s, $0.00057. No
+                    new service, account, API key or ENV. No Q Knowledge
+                    Object, no canonical company mutation. Gates 2026-09-07:
+                    see the CQ-KNW-001 postflight. Uncommitted.
+CQ-KNW-002          NEXT       Q Knowledge Objects + Knowledge Write Gate (not started)
 ```
 
 ## Architecture coverage (doc 25 §198) — Q rows

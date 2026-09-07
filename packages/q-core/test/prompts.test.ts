@@ -74,11 +74,13 @@ function render(
 }
 
 describe("registry", () => {
-  it("registers exactly the five initial prompt families, each with one ACTIVE version", () => {
+  it("registers exactly the published prompt families, each with one ACTIVE version", () => {
     expect([...PROMPT_IDS].sort()).toEqual(
       [
         "Q_SYSTEM",
         "FOUNDER_ONBOARDING_EXTRACTION",
+        // CQ-KNW-001: reads one authorised passage and proposes claims.
+        "CLAIM_EXTRACTION",
         "INVESTOR_MANDATE_SYNTHESIS",
         "COMPANY_ANALYST",
         "FIT_EXPLANATION",

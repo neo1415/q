@@ -7,6 +7,7 @@ import {
   type PromptVersionId,
 } from "./definition.js";
 import { Q_SYSTEM_V1 } from "./charter/q-system.v1.js";
+import { CLAIM_EXTRACTION_V1 } from "./tasks/claim-extraction.v1.js";
 import { COMPANY_ANALYST_V1 } from "./tasks/company-analyst.v1.js";
 import { FIT_EXPLANATION_V1 } from "./tasks/fit-explanation.v1.js";
 import { FOUNDER_ONBOARDING_EXTRACTION_V1 } from "./tasks/founder-onboarding-extraction.v1.js";
@@ -126,6 +127,7 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition<unknown, unknown>[] =
   [
     Q_SYSTEM_V1,
     FOUNDER_ONBOARDING_EXTRACTION_V1,
+    CLAIM_EXTRACTION_V1,
     INVESTOR_MANDATE_SYNTHESIS_V1,
     COMPANY_ANALYST_V1,
     FIT_EXPLANATION_V1,

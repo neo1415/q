@@ -20,6 +20,10 @@
     "./q": {
       "types": "./dist/q/index.d.ts",
       "default": "./dist/q/index.js"
+    },
+    "./extraction": {
+      "types": "./dist/extraction/claim-proposer.d.ts",
+      "default": "./dist/extraction/claim-proposer.js"
     }
   },
   "main": "./dist/index.js",
@@ -36,6 +40,7 @@
   "dependencies": {
     "@capital-q/contracts": "workspace:*",
     "@capital-q/database": "workspace:*",
+    "@capital-q/evidence": "workspace:*",
     "@capital-q/observability": "workspace:*",
     "@capital-q/q-core": "workspace:*",
     "@capital-q/q-runtime": "workspace:*",

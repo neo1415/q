@@ -103,6 +103,57 @@ export {
   createPostgresDocumentUploadSessionRepository,
 } from "./infrastructure/postgres-upload-repository.js";
 export { createSupabaseDocumentStorageProvider } from "./infrastructure/supabase-storage-provider.js";
+export {
+  CLAIM_ASSERTION_KINDS,
+  CLAIM_EXTRACTION_PIPELINE_VERSION,
+  CLAIM_INTERPRETATION_OUTCOMES,
+  CLAIM_INTERPRETATION_REASONS,
+  ClaimAssertionKindSchema,
+  ClaimInterpretationRecordSchema,
+  ClaimProposalSchema,
+  ExtractionPassageSchema,
+  PERMITTED_CLAIM_KEYS,
+  ProposedValueSchema,
+  type ClaimAssertionKind,
+  type ClaimInterpretationOutcome,
+  type ClaimInterpretationReason,
+  type ClaimInterpretationRecord,
+  type ClaimInterpretationRequest,
+  type ClaimInterpretationResult,
+  type ClaimProposal,
+  type ClaimProposalBatch,
+  type ExtractionPassage,
+  type ExtractionProvenance,
+  type ProposedValue,
+} from "./interpretation/contracts.js";
+export {
+  ClaimProposalBlockedError,
+  type ClaimProposerPort,
+} from "./interpretation/ports.js";
+export {
+  claimKeyAccepts,
+  claimTypeFor,
+  derivedSensitivity,
+  derivedVisibility,
+  evidenceStatusFor,
+  excerptIsPresent,
+  isMultiSourceSupported,
+  locatorFor,
+  reliabilityFor,
+  structuredValueFor,
+  truthClassFor,
+  valuesAgree,
+} from "./interpretation/policy.js";
+export {
+  createDeterministicClaimProposer,
+  parseLabelledValue,
+  proposeDeterministically,
+} from "./interpretation/deterministic.js";
+export {
+  createClaimInterpretationService,
+  type ClaimInterpretationDependencies,
+  type ClaimInterpretationService,
+} from "./interpretation/service.js";
 export type {
   ClaimEvidenceRepository,
   ClaimQueryPort,

@@ -15,7 +15,10 @@
  * evidence or relationship truth.
  *
  * Provider SDKs are imported only behind the `./providers/google` and
- * `./providers/groq` subpaths; nothing on this entry point loads one.
+ * `./providers/groq` subpaths; nothing on this entry point loads one. The
+ * Q answer seam is `./q`, and CQ-KNW-001's claim proposer is
+ * `./extraction`: both reach for prompts and domain contracts this entry
+ * point deliberately does not.
  * Server-only.
  */
 
