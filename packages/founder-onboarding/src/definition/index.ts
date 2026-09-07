@@ -40,6 +40,14 @@ export {
   type FounderStepKey,
 } from "./founder-v1.js";
 export {
+  FOUNDER_DEFINITION_V2,
+  FOUNDER_DEFINITION_V2_VERSION,
+  FOUNDER_MATERIAL_DOCUMENT_TYPES,
+  FOUNDER_V2_REPLACED_STEPS,
+  FOUNDER_V2_STEP_CONTEXTS,
+  type FounderMaterialDocumentType,
+} from "./founder-v2.js";
+export {
   FounderRaiseContextSchema,
   FounderReviewContextSchema,
   FounderSnapshotContextSchema,

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import {
   OnboardingClientError,
+  type MaterialUploadOutcome,
   type OnboardingClient,
   type TaxonomyCandidateView,
 } from "./client";
@@ -45,6 +46,16 @@ export type OnboardingActions<TResponse> = {
   readonly findTaxonomyCandidates: (
     text: string,
   ) => Promise<readonly TaxonomyCandidateView[]>;
+  /**
+   * Upload a document for the current document-gathering step. Refuses
+   * plainly when the composed client has no upload path, rather than
+   * reporting a success nothing performed.
+   */
+  readonly uploadMaterial: (input: {
+    readonly file: File;
+    readonly documentType: string;
+  }) => Promise<MaterialUploadOutcome>;
+  readonly removeMaterial: (documentId: string) => Promise<void>;
   readonly retry: () => Promise<void>;
 };
 
@@ -200,6 +211,45 @@ export function useOnboardingJourney<
     complete: () => run(() => requireClient().complete(), true),
     findTaxonomyCandidates: (text) =>
       requireClient().findTaxonomyCandidates({ text }),
+    uploadMaterial: async (input) => {
+      const upload = requireClient().uploadMaterial;
+      if (upload === undefined) {
+        // No upload path is composed. Saying so is the honest answer; a
+        // fabricated success would tell the founder their deck was read.
+        return {
+          ok: false,
+          message: "Uploading isn't available here right now.",
+        };
+      }
+      setBusy(true);
+      try {
+        const outcome = await upload(input);
+        if (outcome.ok) {
+          // The session view carries the document list and its processing
+          // state, so a completed upload is reflected by re-reading it
+          // rather than by the browser remembering what it sent.
+          await run(() => requireClient().getSession(), false);
+        }
+        return outcome;
+      } catch (error: unknown) {
+        return {
+          ok: false,
+          message:
+            error instanceof OnboardingClientError
+              ? error.message
+              : "We couldn't upload that file. Try again, or continue without it.",
+        };
+      } finally {
+        setBusy(false);
+      }
+    },
+    removeMaterial: async (documentId) => {
+      const remove = requireClient().removeMaterial;
+      if (remove === undefined) {
+        return;
+      }
+      await run(() => remove({ documentId }), false);
+    },
     retry: async () => {
       const operation = lastOperation.current;
       if (operation !== null) {

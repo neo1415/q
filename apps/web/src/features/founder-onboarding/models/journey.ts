@@ -6,8 +6,8 @@ import type {
 import {
   COUNTRY_OTHER_OPTION,
   CURRENCY_OPTIONS,
-  FOUNDER_DEFINITION_V1,
-  FOUNDER_DEFINITION_VERSION,
+  FOUNDER_DEFINITION_V2,
+  FOUNDER_DEFINITION_V2_VERSION,
   FOUNDER_STEPS,
   FounderRaiseContextSchema,
   FounderReviewContextSchema,
@@ -26,6 +26,8 @@ import type { SnapshotSection } from "@capital-q/ui/intelligence-snapshot";
 
 import type {
   FounderOnboardingSessionView,
+  MaterialFileView,
+  MaterialKindOption,
   MetricQuestion,
   ReviewItem,
   SectionId,
@@ -123,7 +125,7 @@ export const GROUPS: readonly Group[] = [
   },
   {
     id: "materials",
-    kind: "multi_choice",
+    kind: "materials",
     section: "company",
     title: "What do you already have?",
     stepKeys: [S.materials],
@@ -192,7 +194,9 @@ const GROUP_BY_STEP = new Map<string, Group>(
 );
 const GROUP_BY_ID = new Map(GROUPS.map((group) => [group.id, group]));
 const STEP_CONFIG = new Map(
-  FOUNDER_DEFINITION_V1.steps.map((step) => [step.stepKey, step]),
+  // v2 is the published journey. Every step v2 did not replace carries v1's
+  // configuration verbatim, so reading from v2 changes nothing but F2.
+  FOUNDER_DEFINITION_V2.steps.map((step) => [step.stepKey, step]),
 );
 
 export function groupOf(stepKey: string): Group | undefined {
@@ -253,7 +257,10 @@ export function runtimeState(view: OnboardingSessionView): RuntimeState {
 }
 
 export function isSupportedVersion(view: OnboardingSessionView): boolean {
-  return view.session.definitionVersion === FOUNDER_DEFINITION_VERSION;
+  // v2 only. A session pinned to v1 still runs v1's journey on the server;
+  // this screen would render its F2 as an upload it never collected, so it
+  // says plainly that it cannot render rather than misrepresenting it (§82).
+  return view.session.definitionVersion === FOUNDER_DEFINITION_V2_VERSION;
 }
 
 function single(state: RuntimeState, key: string): string | undefined {
@@ -327,7 +334,47 @@ function skippedGroup(group: Group, state: RuntimeState): boolean {
 export type PresentationExtras = {
   /** Labels for taxonomy node ids the founder already selected. */
   readonly selectedTaxonomy?: readonly TaxonomyCandidateView[] | undefined;
+  /**
+   * The documents this company has, with their REAL processing state
+   * (CQ-Q-021 §14, §16). Read from the Evidence API on every load, so a
+   * refresh or a return days later shows where each file actually is
+   * rather than what the browser last remembered.
+   */
+  readonly materials?: readonly MaterialFileView[] | undefined;
 };
+
+/**
+ * Friendly labels over canonical Evidence document types (§8). The enum
+ * values travel to the API; a person only ever reads the label.
+ */
+export const MATERIAL_KIND_OPTIONS: readonly MaterialKindOption[] = [
+  { value: "PITCH_DECK", label: "Pitch deck" },
+  { value: "FINANCIAL_MODEL", label: "Financial model" },
+  { value: "MANAGEMENT_ACCOUNTS", label: "Management accounts" },
+  { value: "COMPANY_PROFILE", label: "Company profile or memo" },
+  { value: "OTHER", label: "Something else" },
+];
+
+/**
+ * What the processing pipeline can actually read today.
+ *
+ * Deliberately not a wish list. Offering a spreadsheet here would let a
+ * founder upload one and then be told nothing came of it, which is worse
+ * than not offering it (§9).
+ */
+export const MATERIAL_MIME_TYPES: readonly string[] = [
+  "application/pdf",
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "text/plain",
+];
+export const MATERIAL_EXTENSIONS: readonly string[] = [
+  ".pdf",
+  ".pptx",
+  ".docx",
+  ".txt",
+];
+export const MATERIAL_MAX_BYTES = 25_000_000;
 
 export function toPresentation(
   view: OnboardingSessionView,
@@ -457,16 +504,23 @@ function buildStep(
     }
     case "materials": {
       const { configuration } = config(S.materials);
-      const values = multi(state, S.materials);
+      const documentIds = refs(state, S.materials);
+      const files = extras.materials ?? [];
       return {
-        ...base(group, "multi_choice", state),
-        options: optionsOf(S.materials),
-        exclusiveValues:
-          configuration.stepType === "multi_select"
-            ? configuration.exclusiveOptionKeys
-            : [],
+        ...base(group, "materials", state),
+        kinds: MATERIAL_KIND_OPTIONS,
+        acceptedExtensions: MATERIAL_EXTENSIONS,
+        acceptedMimeTypes: MATERIAL_MIME_TYPES,
+        maxFiles:
+          configuration.stepType === "document_upload"
+            ? configuration.maxItems
+            : 6,
+        maxBytes: MATERIAL_MAX_BYTES,
+        files,
         response:
-          values === undefined ? undefined : { kind: "multi_choice", values },
+          documentIds === undefined
+            ? undefined
+            : { kind: "materials", documentIds },
       };
     }
     case "review":
@@ -849,6 +903,18 @@ export function planSubmissions(
       ];
     case "multi_choice":
       return [multiOrSkip(group.stepKeys[0], response.values)];
+    case "materials":
+      // No documents is "Nothing yet", and skipping says that honestly
+      // rather than recording an empty upload as an answer (§3).
+      return response.documentIds.length === 0
+        ? [skip(group.stepKeys[0])]
+        : [
+            submit(group.stepKeys[0], {
+              type: "RESOURCE_REFERENCE",
+              resourceType: "EVIDENCE_DOCUMENT",
+              resourceIds: [...response.documentIds],
+            }),
+          ];
     case "narrative":
       return [textOrSkip(group.stepKeys[0], response.text)];
     case "company_basics":

@@ -70,12 +70,18 @@ version's text changes without a new version. A material change is
 | ----------------------------- | -------------------------------- | --------------------- | --------------------------------- |
 | Q_SYSTEM                      | q-system/v1                      | (charter)             | text                              |
 | COMPANY_ANALYST               | company-analyst/v2               | EVIDENCE_SYNTHESIS    | CompanyAnalystResult/v2           |
-| FOUNDER_ONBOARDING_EXTRACTION | founder-onboarding-extraction/v1 | STRUCTURED_EXTRACTION | FounderExtractionResult/v1        |
+| FOUNDER_ONBOARDING_EXTRACTION | founder-onboarding-extraction/v2 | STRUCTURED_EXTRACTION | FounderExtractionResult/v2        |
 | INVESTOR_MANDATE_SYNTHESIS    | investor-mandate-synthesis/v1    | STRUCTURED_EXTRACTION | InvestorMandateSynthesisResult/v1 |
 | FIT_EXPLANATION               | fit-explanation/v1               | NORMAL_DIALOGUE       | FitExplanationResult/v1           |
 
 A task prompt's task class is a request to the Model Gateway; the routing
 policy chooses the model. No prompt names a provider or a model (tested).
+
+`founder-onboarding-extraction/v1` is retained the same way. v2 (CQ-Q-021)
+reads a founder's uploaded material as well as their narrative: passages
+cited by opaque label, taxonomy candidates as plain phrases, conflicts as two
+readings with a settling question, and proposed questions bounded to keys the
+server said are unanswered.
 
 `company-analyst/v1` is retained as DEPRECATED — immutable, resolvable by
 exact version, and pinned in `prompts.lock.json` with its original hash — so

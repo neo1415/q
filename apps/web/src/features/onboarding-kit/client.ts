@@ -22,7 +22,34 @@ export type OnboardingClient<TView, TResponse> = {
   readonly findTaxonomyCandidates: (input: {
     readonly text: string;
   }) => Promise<readonly TaxonomyCandidateView[]>;
+  /**
+   * Upload one document for a document-gathering step (CQ-Q-021 §10).
+   *
+   * Absent on journeys that gather no documents. Present, it goes to the
+   * real Evidence upload API — an authorised session, a signed target,
+   * private storage, an immutable version and a processing job. There is
+   * no path here that stores bytes in the browser or reports a success
+   * that did not happen.
+   */
+  readonly uploadMaterial?: (input: {
+    readonly file: File;
+    readonly documentType: string;
+  }) => Promise<MaterialUploadOutcome>;
+  /** Detach a document from the step. The Evidence record itself is not deleted. */
+  readonly removeMaterial?: (input: {
+    readonly documentId: string;
+  }) => Promise<TView>;
 };
+
+/**
+ * What an upload attempt reports back.
+ *
+ * A failure carries a sentence a founder can act on and never a parser
+ * message, a MIME code, a queue id or a storage key (§15).
+ */
+export type MaterialUploadOutcome =
+  | { readonly ok: true; readonly documentId: string }
+  | { readonly ok: false; readonly message: string };
 
 /** A canonical taxonomy node offered for confirmation. Never auto-assigned. */
 export type TaxonomyCandidateView = {

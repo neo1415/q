@@ -40,7 +40,9 @@ export const FOUNDER_ONBOARDING_EXTRACTION_V1: PromptDefinition<
 > = {
   id: "FOUNDER_ONBOARDING_EXTRACTION",
   version: 1,
-  status: "ACTIVE",
+  // Superseded by v2 (CQ-Q-021 §39). Retained, immutable and resolvable by
+  // exact version, so a run recorded against it stays explainable.
+  status: "DEPRECATED",
   kind: "TASK",
   taskClass: "STRUCTURED_EXTRACTION",
   owner: "q-core",

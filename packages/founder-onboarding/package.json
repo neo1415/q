@@ -32,15 +32,18 @@
     "@capital-q/contracts": "workspace:*",
     "@capital-q/database": "workspace:*",
     "@capital-q/eventing": "workspace:*",
+    "@capital-q/evidence": "workspace:*",
+    "@capital-q/observability": "workspace:*",
     "@capital-q/onboarding": "workspace:*",
     "@capital-q/organisations": "workspace:*",
+    "@capital-q/q-core": "workspace:*",
+    "@capital-q/q-knowledge": "workspace:*",
     "@capital-q/security": "workspace:*",
     "@capital-q/taxonomy": "workspace:*",
     "zod": "4.5.4"
   },
   "devDependencies": {
     "@capital-q/config": "workspace:*",
-    "@capital-q/observability": "workspace:*",
     "@capital-q/permissions": "workspace:*",
     "@types/node": "^24.13.3",
     "typescript": "5.9.3"

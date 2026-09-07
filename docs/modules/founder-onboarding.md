@@ -1,163 +1,194 @@
-# Founder onboarding (`@capital-q/founder-onboarding`, CQ-ONB-002)
+# founder-onboarding — the founder journey and Founder Onboarding Q
 
-The Founder journey F0–F8 running on the onboarding runtime
-(`docs/modules/onboarding.md`). The package owns two things: **Founder
-Definition v1** as declarative reference data, and the **integration layer**
-that maps its semantic write targets and review/snapshot contexts onto the
-canonical domains through their public services. It owns no journey state
-(the runtime does) and no business truth (Organisation, Company, Taxonomy
-and Capital do). Zero model calls, zero provider SDKs, no Evidence, no voice.
+**Packets:** CQ-ONB-002 (journey v1) · CQ-Q-021 (Q, and journey v2)
+**Package:** `@capital-q/founder-onboarding`
 
-## Definition v1
+The published founder journey as declarative data, the integration layer that
+carries confirmed answers into the owning domains, and — from CQ-Q-021 — what
+Q does with the material a founder already has.
 
-`src/definition/founder-v1.ts` is the manifest; the production migration
-`supabase/migrations/20260905090000_founder_onboarding_definition_v1.sql`
-is rendered from it by `renderOnboardingDefinitionMigration` and drift-guarded
-by `test/definition.test.ts` (the committed file must end with the rendered
-SQL, and the manifest hash must match). Publishing the same manifest through
-the runtime publisher is an idempotent no-op; a change to the journey is v2.
-Ids are UUIDv5 over journey + version so every environment shares them.
+## The idea CQ-Q-021 implements
 
-Phases `F0`…`F8`; 28 steps. The runtime gained one step type for this packet,
-`reference_select` (select canonical reference entities by stable id), and
-the `steps_step_type_check` constraint was extended in the same migration.
+```
+give Q what already exists → Q reads it → Q shows what it understood
+→ the founder confirms or corrects it → Q asks only what is still missing
+→ a first Company Intelligence reading
+```
 
-| Step                                                                                                   | Type                     | Writes to                                     |
-| ------------------------------------------------------------------------------------------------------ | ------------------------ | --------------------------------------------- |
-| `F0.intent`                                                                                            | single_select            | — (onboarding-only)                           |
-| `F1.company_name`                                                                                      | short_text               | `company.bootstrap`                           |
-| `F1.website`, `F1.country`, `F1.stage`, `F1.description`                                               | text / single_select     | `company.basics`                              |
-| `F1.categories`                                                                                        | reference_select         | `company.taxonomy`                            |
-| `F2.materials`                                                                                         | multi_select             | — (declaration only; no upload, no Evidence)  |
-| `F3.review`                                                                                            | confirmation             | — (context `founder.review`)                  |
-| `F4.founder_role`                                                                                      | single_select            | `founder.membership`                          |
-| `F4.founder_count`, `F4.full_time`, `F4.team_size`                                                     | range / single_select    | `company.team_facts`                          |
-| `F4.functions`                                                                                         | multi_select             | — (onboarding-only)                           |
-| `F5.signal`, `F5.pilots` (early stages) / `F5.revenue_status`, `F5.customers`, `F5.growth` (Series A+) | branched on `F1.stage`   | — (onboarding-only)                           |
-| `F6.raising`, `F6.currency`, `F6.target_amount`, `F6.instrument`, `F6.timeframe`, `F6.use_of_funds`    | branched on `F6.raising` | — (collected)                                 |
-| `F6.confirm`                                                                                           | confirmation             | `capital.objective` (context `founder.raise`) |
-| `F7.follow_up`                                                                                         | long_text                | — (founder-private)                           |
-| `F8.snapshot`                                                                                          | confirmation             | — (context `founder.snapshot`)                |
+A founder who uploads a deck should type **materially less** than one who
+does not. That sentence is the whole packet, and most of the code below
+exists to make it decidable rather than aspirational.
 
-Canonical versus onboarding-only is deliberate: a band ("four or more
-founders") is never turned into a number, a timeframe band is never turned
-into a date, "some founders are full-time" records no count. Unknown stays
-unknown.
+## Journey versions
 
-## Integration layer
+|              | v1 (CQ-ONB-002)                                                                          | v2 (CQ-Q-021)                                                                                           |
+| ------------ | ---------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| F2 Materials | `multi_select` — checkboxes, and copy admitting _"uploading arrives in a later release"_ | **`document_upload`** against the real Evidence API                                                     |
+| F3 Review    | confirmation of what the founder typed                                                   | confirmation framed as _"Here's what I understood"_, with Q's readings offered beside it as suggestions |
+| F7 Follow-up | `long_text` — "Anything else?"                                                           | the few questions the planner decided are worth asking                                                  |
+| F8 Snapshot  | confirmation saying _"Q has not analysed anything yet"_                                  | a first reading of the company                                                                          |
 
-`createFounderOnboardingIntegration({ outbox, audit, securityEvents? })`
-returns the `writeTargets` and `stepContextProviders` the API composition
-root hands to `createOnboardingService`. Handlers run inside the runtime's
-transaction; `createFounderDomainServices(tx, …)` composes the Organisation,
-Company, Taxonomy and Capital services on that transaction's executor with a
-savepoint-backed `TransactionManager` (`createSavepointTransactionManager`,
-new in `@capital-q/database`), so a domain use case's own unit of work nests
-inside the onboarding step and its authorization reads see rows the same
-transaction created. Every canonical write goes through the owning
-service's public contract with its own authorization, versioning, audit and
-events. No SQL, no direct tables, no temporary company truth.
+v1 stays published and immutable; sessions pinned to it keep running its own
+journey. v2 is published by the generated migration
+`20260913090000_founder_onboarding_definition_v2.sql` and inherits every step
+it did not replace from v1 verbatim, so the two cannot drift on what they
+share (a test asserts this).
 
-- **`company.bootstrap` (F1.company_name)** — with no organisation context:
-  `organisations.createOrganisation` (tenant, organisation, admin membership,
-  active context) from the verified principal, then `companies.createCompany`
-  and `upsertMyCompanyMembership({ isFounder: true })`, then the session is
-  bound one-way to the company through `context.bindContext`. With an
-  existing context: create the company there (the company service decides
-  whether the actor may). After binding, a repeated F1 renames the same
-  company. Idempotency keys derive from the session id.
-- **`company.basics`** — read the company, update only what differs with
-  `expectedVersion`. Website "example.com" becomes `https://example.com`;
-  "Somewhere else" and "Not sure yet" record null.
-- **`company.taxonomy`** — `replaceCompanyAssignments` per allowed vocabulary
-  (industry, product_category, business_model, customer_type) with the
-  founder's explicitly chosen node ids; unknown ids or other vocabularies
-  are refused (422) and nothing is assigned. Candidates come from
-  `POST /v1/taxonomy/candidates` ("Suggested categories"); nothing is
-  auto-accepted.
-- **`founder.membership`** — `upsertMyCompanyMembership` with the business
-  title for the chosen role.
-- **`company.team_facts`** — `updateCompanyTeamFacts` with the founder count,
-  team size and the exact full-time count when it is knowable.
-- **`capital.objective` (F6.confirm)** — `createCapitalObjective` when the
-  company has no active objective, otherwise `updateCapitalObjective`
-  (recalibrate) with `expectedVersion`. Never a duplicate active objective;
-  no `if (isFounder)` anywhere — the capital service authorises.
+**F2 stays immediately after company basics.** Asking for documents _before_
+forty manual questions is the point; asking after them is the failure mode
+this packet exists to remove.
 
-Step contexts are deterministic projections read back through the same
-services under the founder's context: `founder.review` (F3, "Here's what we
-have so far"), `founder.raise` (create vs recalibrate) and
-`founder.snapshot` (F8). They contain labels and values, never analysis,
-readiness, visibility, verification or Q claims; the F7 note is reported
-only as "recorded", never as text.
+## F2 — what a founder actually gets
 
-Actor resolution: handlers re-resolve the actor context for the session's
-organisation from the verified principal (`OnboardingActor.principal`, set by
-the API hook) on the transaction's executor. The session row is scope, never
-authority.
+A real upload against the Evidence API, and nothing about it is simulated:
 
-## Runtime additions (generic)
+```
+ask permission → short-lived signed target → browser PUTs bytes straight to
+private storage → server verifies what landed and freezes an immutable
+version → processing job queued
+```
 
-- `OnboardingWriteContext.bindContext` — one-way binding inside the handler
-  transaction (same rules as the internal bind).
-- Step-context providers (`stepContextProviders`, `context` on the step
-  view) — a confirmation step may name a `contextKey`; a missing provider is
-  a redacted 500 with fault `STEP_CONTEXT_PROVIDER_MISSING`.
-- `responses` on the session view — the caller's current answers on the
-  eligible path, so composite screens can prefill without a call per step.
-- `GET /v1/onboarding/sessions/current?journeyType=` — the caller's latest
-  active or completed session (404 when none). An unbound start resumes the
-  person's latest active session of the journey even after it bound its
-  company, so a refresh can never create a second company.
-- Navigation (`POST …/back` with `targetStepKey`) accepts any visited,
-  currently eligible step, earlier or later; unvisited future steps stay
-  locked.
+- **Private by default.** The document's scope is the Evidence context's
+  decision; uploading is not publishing, and the screen says so in the open
+  rather than in a tooltip.
+- **The states are real.** A file waiting in a queue says it is waiting. A
+  file the parser could not read says so. Nothing shows a spinner labelled
+  "Q is thinking" over work that has not started.
+- **Skipping is a first-class path**, worded as a choice. A founder without
+  documents is not behind.
+- **Drag-and-drop is an enhancement.** The file picker is a real button,
+  reachable by keyboard and usable on a phone.
+- **Only formats the pipeline can read** are offered: PDF, PPTX, DOCX and
+  plain text. Offering a spreadsheet would let a founder upload one and then
+  learn nothing came of it.
 
-## Web
+## What Q does with it
 
-`apps/web/src/features/founder-onboarding`: one `FounderOnboardingClient`
-implemented over a `RuntimePort` (the generic session API + two taxonomy
-reads). The `api` adapter implements the port with server actions that
-forward the HttpOnly session's token server-to-server; the browser holds only
-session and step ids. The development `fixture` adapter is an in-memory
-runtime over the same definition data and the same session-view contract,
-validated with `OnboardingSessionViewSchema`. `models/journey.ts` is the pure
-mapper: runtime steps are grouped into the screens the founder sees (one
-"team" screen over five runtime steps), copy and options come from the
-definition, state from the session view. A composite save becomes ordered
-runtime submissions, each carrying the version the previous returned;
-unchanged answers are not re-sent, confirmations always are, and a question
-that became eligible during the save keeps the screen open rather than being
-skipped. Version conflicts reload the latest view ("Updated elsewhere") and
-never retry the stale write.
+```
+processed documents → authorised passages → ONE model call
+→ validated candidates → onboarding suggestions
+→ the founder confirms / edits / rejects
+→ the journey's existing validated-response path → owning domain
+```
 
-Config: `CQ_FOUNDER_ONBOARDING_ADAPTER` is `api` by default whenever
-`CQ_API_URL` is set; `fixture` only on a non-production build without an API
-URL, and refused on any production build or environment; `none` otherwise.
-There is no fallback from `api` to `fixture`.
+### Provenance, and why citation fabrication is inexpressible
 
-## Tests
+Passages reach the model as `[S1] … [Sn]`. A candidate cites those labels,
+and the server resolves each to a document, version and locator. The model
+never writes an identifier, so a candidate cannot claim to come from a slide
+nobody supplied — an invented `S9` resolves to nothing and is dropped,
+counted in `telemetry.rejectedCitationCount`.
 
-- `packages/founder-onboarding/test/definition.test.ts` — manifest, mappings,
-  migration drift.
-- `packages/founder-onboarding/test/founder-onboarding.integration.test.ts` —
-  F0→F8 against local PostgreSQL through the runtime with the real domains:
-  bootstrap and binding, basics, taxonomy, membership, team facts, branch
-  selection, objective create then recalibrate, snapshot, completion;
-  retry safety and resume; refused writes roll the step back; cross-user
-  isolation; privacy markers never in logs or event payloads.
-- `supabase/tests/database/rls/240_founder_onboarding_definition.test.sql`.
-- `apps/web/test/founder-onboarding-journey.test.ts` — the mapper and client
-  over the fixture runtime; `packages/config/test/web.test.ts` — adapter
-  selection.
-- `tests/e2e/founder-onboarding.{desktop,mobile}.spec.ts` — the real journey
-  in a browser against the API and the local database, including refresh and
-  resume and a stale-tab conflict.
+What a founder reads is the resolved locator in their own words: _"From your
+pitch deck, slide 6"_ — never a document id, a bucket or a storage key.
 
-## Deferred
+### What is refused
 
-Evidence upload and extraction (F2 stays a declaration), Q-generated
-suggestions and any model call, voice capture, the Investor journey
-(CQ-ONB-003), rate limiting (none exists in the repository), a
-`GET /v1/onboarding/founder/current` alias (the generic `sessions/current`
-route serves it).
+- **Nothing becomes VERIFIED.** The schema excludes it and the mapper
+  refuses it again, so the guarantee does not rest on one file staying
+  correct. A deck asserting five hundred customers is a claim.
+- **A specific figure with nothing behind it is dropped.** That shape is
+  what general model knowledge produces, and it is never evidence about this
+  company.
+- **A model's suggestion is never a company record.** The onboarding runtime
+  validates every suggestion against the pinned step's own schema before
+  storing it, and accepting one creates a normal validated response through
+  the same path a typed answer takes. There is no route from model output to
+  canonical state that does not pass through a person.
+
+### The adaptive planner
+
+Deterministic, and deliberately so. A model may _propose_ questions; the
+planner decides which are asked, in what order, and how many — because four
+properties must hold every time and a fluent proposer guarantees none of
+them:
+
+1. **Never ask what is already answered.** A confirmed response, or a
+   pending suggestion awaiting confirmation, removes the question. This is
+   the packet's central promise.
+2. **Never ask what this business does not produce.** A pre-revenue company
+   is not asked for customer counts or growth rates. The shape comes from
+   the founder's own revenue answer, and an unknown shape excludes nothing.
+3. **Every question maps to a real step** of the pinned definition, so the
+   answer lands somewhere with a schema, a validator and a write target.
+4. **The count is bounded** (four per iteration). Onboarding must feel
+   finished; twenty "just in case" questions is the questionnaire this
+   packet replaces.
+
+Order encodes what _material_ means: contradictions between the founder's
+own documents first, then what onboarding cannot complete without, then
+figures whose meaning is unclear, then everything else. A contradiction
+outranks a gap because a wrong number already in the record does more damage
+than a missing one.
+
+### Contradictions
+
+Two documents disagreeing becomes **one question with both readings
+attached**. Nothing averages them, prefers the larger, or prefers the newer.
+A conflict is asked even when the fact already has an answer — because two
+sources disagreeing is precisely the case where the recorded answer may be
+the wrong reading.
+
+### Unknown
+
+"I don't know" is a real answer. Absence is missing information — never a
+zero, never a false, never a mark against the company. Onboarding completes
+on a short required set; everything else stays a visible gap rather than a
+blocked journey, and there is no completion percentage to chase.
+
+### No coaching before assessment
+
+The prompt may say _why_ Q needs a figure. It must not tell a founder what a
+better-looking answer would be. Establishing what is true comes first;
+advice comes after.
+
+## Prompt
+
+`FOUNDER_ONBOARDING_EXTRACTION` **v2** (`q-core`, `STRUCTURED_EXTRACTION`),
+ACTIVE. v1 is DEPRECATED — retained, immutable, resolvable by exact version,
+hash unchanged in `prompts.lock.json`.
+
+v2 adds source passages cited by opaque label, taxonomy candidates as plain
+phrases (Capital Q's own service maps them; a model that could emit taxonomy
+ids could invent one), conflicts recorded as two readings plus a settling
+question, ambiguity as its own finding, and bounded proposed questions
+restricted to keys the server already said are unanswered.
+
+## Security
+
+- All model access through the Model Gateway. No provider SDK, no HTTP
+  client, no API key anywhere in this package.
+- Uploads carry the HttpOnly session's token server-to-server. The browser
+  never holds a Capital Q token and never chooses a tenant.
+- The Context Firewall is unchanged: there is no onboarding bypass, and a
+  founder-private document stays founder-private afterwards.
+- A model that cannot be reached, or context no configured provider may
+  receive, becomes a coded blocked state. Onboarding continues by asking.
+
+## Malware scanning — stated plainly
+
+**Not implemented.** `packages/config/src/workers.ts` defaults
+`CQ_MALWARE_POLICY=REQUIRE_CLEAN`, and with no scanner attached the verdict
+is `UNAVAILABLE`, so **an unscanned document is BLOCKED rather than parsed**.
+`ALLOW_UNSCANNED` exists for local development and is refused outside a local
+environment. This packet added no scanner and marks nothing CLEAN.
+
+The consequence for a production deployment is real: until a scanner is
+attached, F2 accepts uploads and the pipeline will not open them.
+
+## Verification
+
+| What                                                   | Where                                              |
+| ------------------------------------------------------ | -------------------------------------------------- |
+| Journey v2, planner, mapping, suggestions (27)         | `test/founder-onboarding-q.test.ts`                |
+| The replan: session facts, suggestions, questions (16) | `test/founder-review.test.ts`                      |
+| v1 journey and write targets (11)                      | `test/definition.test.ts`                          |
+| The web journey over the runtime contract              | `apps/web/test/founder-onboarding-journey.test.ts` |
+
+## Known limitations
+
+See the CQ-Q-021 postflight. In short: the F2 upload path, the extraction,
+the planner and the replan are real and tested; the F3 review screen does not
+yet render Q's suggestions, F7 and F8 are not yet wired to the live session,
+and nothing in production yet triggers the review when a document finishes
+processing.

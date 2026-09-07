@@ -6,6 +6,7 @@ import { CapitalObjectiveStep } from "./capital-objective-step";
 import { ChoiceStep } from "./choice-step";
 import { CompanyBasicsStep } from "./company-basics-step";
 import { IntelligenceStep } from "./intelligence-step";
+import { MaterialsStep } from "./materials-step";
 import { MultiChoiceStep } from "./multi-choice-step";
 import { NarrativeStep } from "./narrative-step";
 import { ReviewStep } from "./review-step";
@@ -36,6 +37,8 @@ export function renderStep(input: {
       return <CompanyBasicsStep step={step} {...common} />;
     case "taxonomy_select":
       return <TaxonomyStep step={step} {...common} />;
+    case "materials":
+      return <MaterialsStep step={step} {...common} />;
     case "review":
       return <ReviewStep step={step} {...common} />;
     case "team":

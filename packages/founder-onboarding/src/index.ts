@@ -60,3 +60,4 @@ export function createFounderOnboardingIntegration(
 }
 
 export const PACKAGE_NAME = "@capital-q/founder-onboarding" as const;
+export * from "./intelligence/index.js";

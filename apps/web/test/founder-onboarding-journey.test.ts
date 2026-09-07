@@ -78,7 +78,9 @@ describe("founder journey over the runtime contract", () => {
     const port = createFixtureRuntimePort({ storage: null, seed: "reset" });
     const view = await port.start("00000000-0000-4000-8000-000000000001");
     expect(() => OnboardingSessionViewSchema.parse(view)).not.toThrow();
-    expect(view.session.definitionVersion).toBe(1);
+    // v2 is the published journey: F2 gathers documents rather than
+    // declaring which ones exist (CQ-Q-021 §3).
+    expect(view.session.definitionVersion).toBe(2);
     expect(view.session.currentStepKey).toBe(FOUNDER_STEPS.intent);
     const presented = toPresentation(view, SOURCE);
     expect(presented.currentStepId).toBe("intent");
@@ -160,9 +162,11 @@ describe("founder journey over the runtime contract", () => {
     });
     expect(session.currentStepId).toBe("materials");
 
+    // No documents on the fixture path: skipping is the honest answer and
+    // a first-class route through F2, not a penalty (§3, §71).
     session = await founder.saveResponse({
       stepId: "materials",
-      response: { kind: "multi_choice", values: ["pitch_deck"] },
+      response: { kind: "materials", documentIds: [] },
     });
     const review = expectKind(session.step, "review");
     expect(review.items.find((i) => i.id === "name")?.value).toBe(
@@ -173,7 +177,8 @@ describe("founder journey over the runtime contract", () => {
     );
     expect(review.items.find((i) => i.id === "country")?.value).toBe("Nigeria");
     expect(review.categories).toHaveLength(2);
-    expect(review.materials).toEqual(["Pitch deck"]);
+    // Nothing was uploaded, so the review lists no materials.
+    expect(review.materials ?? []).toEqual([]);
 
     session = await founder.saveResponse({
       stepId: "review",
@@ -243,7 +248,9 @@ describe("founder journey over the runtime contract", () => {
     expect(text).toContain("Raising USD 500000");
     expect(text).toContain("2 founders, 2 full-time");
     expect(text).not.toMatch(/readiness|score|verified|Q inferred|match/i);
-    expect(snapshot.nextSteps).toEqual([]);
+    // The founder skipped F2, so material to share is an open gap — stated
+    // as something they can still do, never as a mark against them (§30).
+    expect(snapshot.nextSteps.map((step) => step.id)).toEqual(["materials"]);
 
     // Finishing: confirm the snapshot, complete, and the view says so.
     await founder.saveResponse({
@@ -410,17 +417,17 @@ describe("founder journey over the runtime contract", () => {
 
   it("refuses a session pinned to a definition version this build cannot present", async () => {
     const port = createFixtureRuntimePort({ storage: null, seed: "reset" });
-    const v2: RuntimePort = {
+    const unknownVersion: RuntimePort = {
       ...port,
       current: async () => {
         const view = await port.current();
         return view === null
           ? null
-          : { ...view, session: { ...view.session, definitionVersion: 2 } };
+          : { ...view, session: { ...view.session, definitionVersion: 3 } };
       },
     };
     await expect(
-      createRuntimeFounderClient(v2, SOURCE).getSession(),
+      createRuntimeFounderClient(unknownVersion, SOURCE).getSession(),
     ).rejects.toMatchObject({ kind: "UNAVAILABLE" });
   });
 });

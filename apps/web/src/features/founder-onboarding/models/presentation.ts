@@ -4,6 +4,7 @@ import type { ChoiceOption } from "@capital-q/ui/choice-list";
 import type { SnapshotSection } from "@capital-q/ui/intelligence-snapshot";
 import type { CurrencyOption } from "@capital-q/ui/money-input";
 
+import type { MaterialFileView } from "../../onboarding-kit/materials";
 import type { TaxonomyCandidateView } from "../../onboarding-kit/client";
 
 /**
@@ -58,6 +59,11 @@ export const StepResponseSchema = z.discriminatedUnion("kind", [
   z.object({
     kind: z.literal("taxonomy_select"),
     nodeIds: z.array(z.string().uuid()).max(8),
+  }),
+  z.object({
+    kind: z.literal("materials"),
+    /** Canonical Evidence document ids this step gathered. Never contents. */
+    documentIds: z.array(z.string().uuid()).max(6),
   }),
   z.object({ kind: z.literal("review"), confirmed: z.literal(true) }),
   z.object({
@@ -119,6 +125,16 @@ export type MetricQuestion = {
 
 export type { TaxonomyCandidateView } from "../../onboarding-kit/client";
 
+export type {
+  MaterialFileView,
+  MaterialState,
+} from "../../onboarding-kit/materials";
+
+export type MaterialKindOption = {
+  readonly value: string;
+  readonly label: string;
+};
+
 export type ReviewItem = {
   readonly id: string;
   readonly label: string;
@@ -160,6 +176,18 @@ export type StepView =
         Extract<StepResponse, { kind: "taxonomy_select" }> | undefined;
       /** Labels for already-selected ids, so a revisit can render them. */
       readonly selected: readonly TaxonomyCandidateView[];
+    })
+  | (StepBase<"materials"> & {
+      /** Friendly labels over canonical Evidence document types (§8). */
+      readonly kinds: readonly MaterialKindOption[];
+      readonly acceptedExtensions: readonly string[];
+      /** What the processing pipeline can actually read. No fake promises (§9). */
+      readonly acceptedMimeTypes: readonly string[];
+      readonly maxFiles: number;
+      readonly maxBytes: number;
+      readonly files: readonly MaterialFileView[];
+      readonly response?:
+        Extract<StepResponse, { kind: "materials" }> | undefined;
     })
   | (StepBase<"review"> & {
       readonly intro: string;

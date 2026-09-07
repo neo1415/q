@@ -66,6 +66,7 @@ export {
 export { COMPANY_ANALYST_V1 } from "./prompts/tasks/company-analyst.v1.js";
 export { COMPANY_ANALYST_V2 } from "./prompts/tasks/company-analyst.v2.js";
 export { FOUNDER_ONBOARDING_EXTRACTION_V1 } from "./prompts/tasks/founder-onboarding-extraction.v1.js";
+export { FOUNDER_ONBOARDING_EXTRACTION_V2 } from "./prompts/tasks/founder-onboarding-extraction.v2.js";
 export { INVESTOR_MANDATE_SYNTHESIS_V1 } from "./prompts/tasks/investor-mandate-synthesis.v1.js";
 export { FIT_EXPLANATION_V1 } from "./prompts/tasks/fit-explanation.v1.js";
 
@@ -132,12 +133,21 @@ export {
   FOUNDER_FACT_KEYS,
   FounderCandidateFactSchema,
   FounderExtractionResultSchema,
+  FounderExtractionV2ResultSchema,
+  FounderExtractionV2VariablesSchema,
   FounderExtractionVariablesSchema,
   FounderFactKeySchema,
+  FounderSourcePassageSchema,
+  FOUNDER_EXTRACTION_V2_SCHEMA_NAME,
+  FOUNDER_EXTRACTION_V2_SCHEMA_VERSION,
   type FounderCandidateFact,
+  type FounderCandidateFactV2,
   type FounderExtractionResult,
+  type FounderExtractionV2Result,
+  type FounderExtractionV2Variables,
   type FounderExtractionVariables,
   type FounderFactKey,
+  type FounderSourcePassage,
 } from "./prompts/schemas/founder-extraction.js";
 export {
   DeclaredMandateCandidateSchema,

@@ -563,7 +563,50 @@ CQ-Q-020            VERIFIED   Company Intelligence specialist — Q's first rea
                     migration NONE; no new service, account, API key, ENV, paid
                     service or model. Gates 2026-09-07: see the CQ-Q-020
                     postflight.
-CQ-Q-021            NEXT       Not started.
+CQ-Q-021            PARTIAL    Founder Onboarding Q + document-assisted adaptive
+                    interview. LANDED AND VERIFIED: founder definition v2
+                    (migration 20260913090000, generated from the manifest) makes
+                    F2 a REAL document_upload against the existing Evidence upload
+                    API instead of v1's checkbox declaration whose own copy said
+                    "uploading arrives in a later release"; v1 stays published and
+                    immutable and v2 inherits every step it did not replace
+                    verbatim (drift-guarded by test). Web: a document_upload
+                    renderer with a keyboard-reachable file picker (drag/drop is an
+                    enhancement, never a requirement), real processing states from
+                    the version's own status — a queued file says it is waiting
+                    rather than showing a spinner over work that has not started —
+                    a first-class skip path, privacy stated in the open, and
+                    server actions that carry the HttpOnly session token
+                    server-to-server through the real create-session ->
+                    signed-target -> complete sequence. FOUNDER_ONBOARDING_EXTRACTION
+                    v2 ACTIVE (v1 DEPRECATED, immutable, hash unchanged): source
+                    passages cited by opaque per-render label so the model never
+                    writes an identifier and citation fabrication is inexpressible;
+                    taxonomy candidates as plain phrases mapped by Capital Q's own
+                    service; conflicts as two readings plus a settling question;
+                    ambiguity as its own finding; proposed questions bounded and
+                    restricted to keys the SERVER said are unanswered. Extraction
+                    service resolves citations, refuses VERIFIED a second time
+                    after the schema already excludes it, and drops a specific
+                    figure with nothing behind it. Deterministic adaptive planner:
+                    never asks what is answered or awaiting confirmation, never
+                    asks a metric this business shape does not produce, maps every
+                    question to a real step, orders contradiction > required > gap,
+                    and bounds the count. Review bridge turns a processed document
+                    into suggestions (never responses, never canonical writes) and
+                    replans the questions around them; safe to run twice.
+                    NOT LANDED: the F3 screen does not yet render those
+                    suggestions, F7/F8 are not wired to the live session, nothing
+                    in production yet triggers the review when processing
+                    completes, and the DB-backed integration tests, QFO eval suite,
+                    Playwright E2E and developer smoke are absent. Malware
+                    scanning remains NOT IMPLEMENTED: REQUIRE_CLEAN is the default
+                    and an unscanned document is BLOCKED, not parsed. Schema
+                    impact: one onboarding definition-version migration; no new
+                    core table. No new service, account, API key, ENV, paid
+                    service or model. Gates 2026-09-07: see the CQ-Q-021
+                    postflight.
+CQ-Q-022            NEXT       Not started.
 ```
 
 ## Architecture coverage (doc 25 §198) — Q rows
@@ -895,3 +938,24 @@ CQ-Q-021            NEXT       Not started.
 | Private context sent to an ineligible provider to keep a feature up   | Eligibility is decided from declared sensitivity before any provider call; the refusal is coded  | specialist blocked: NO_ELIGIBLE_MODEL_ROUTE |
 | A specialist becoming a second chatbot with its own persona           | The specialist writes no message and names itself nowhere a person reads                         | integration QCI-001, QCI-017                |
 | A private statement or figure leaking through logs or telemetry       | Telemetry carries counts, codes and identifiers only                                             | integration QCI-012                         |
+
+## Threat coverage (doc 16) — CQ-Q-021 rows
+
+| Threat                                                         | Control                                                                                          | Proof                                  |
+| -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ | -------------------------------------- |
+| A model's reading of a deck becoming company truth             | A candidate becomes a suggestion; the runtime validates it and only a person's acceptance writes | QFOU-007; QFOR-003/004                 |
+| A founder's own answer overwritten by an extraction            | Candidates about answered facts are dropped before any suggestion is drafted                     | QFOR-004                               |
+| A candidate citing a slide nobody supplied                     | Citation is by opaque per-render label resolved server-side; a model never writes an identifier  | extraction resolve(); QFOR-007         |
+| A deck's assertion recorded as VERIFIED                        | The schema excludes VERIFIED and the mapper refuses it again                                     | founder-extraction schema; extraction  |
+| General model knowledge becoming an entity fact                | A specific figure with no citation and no quote is dropped                                       | extraction unsupported check           |
+| A founder asked to retype what their deck already answered     | The planner treats an answered fact and a pending suggestion alike as not-to-ask                 | QFOU-002; QFOR-005                     |
+| A pre-revenue company quizzed on retention or growth           | Business shape excludes inapplicable facts; unknown shape excludes nothing                       | QFOU-003                               |
+| Capital Q choosing between two documents' figures              | A conflict becomes one question carrying both readings; nothing averages or prefers              | QFOU-004; QFOR-005                     |
+| Missing information read as a weakness                         | Absence is a gap; completion needs only the required set; no completion percentage exists        | QFOU-006                               |
+| An endless model-driven interview                              | The planner bounds the count and admits each fact once                                           | QFOU-005                               |
+| A model introducing a question with no schema behind it        | Every planned question maps to a step of the pinned definition                                   | QFOU-005                               |
+| A fake upload success over work that did not happen            | States are derived from the version's own processing status; no client-side success is invented  | material-actions stateOf()             |
+| A format offered that the pipeline cannot read                 | F2 accepts only PDF, PPTX, DOCX and plain text — the extractors that exist                       | journey MATERIAL_MIME_TYPES            |
+| An uploaded document silently becoming investor-visible        | Visibility is the Evidence context's decision; F2 writes no scope and says so on the screen      | founder-v2 F2 writesTo: []             |
+| A browser choosing its own tenant or holding a Capital Q token | Upload actions run server-side with the HttpOnly session token                                   | material-actions run()                 |
+| An unscanned document being parsed                             | REQUIRE_CLEAN is the default; no scanner means UNAVAILABLE, which blocks rather than opens       | workers config; malware.ts (unchanged) |

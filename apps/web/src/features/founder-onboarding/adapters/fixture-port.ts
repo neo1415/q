@@ -1,5 +1,5 @@
 import {
-  FOUNDER_DEFINITION_V1,
+  FOUNDER_DEFINITION_V2,
   FOUNDER_STEPS,
   INSTRUMENT_CODES,
   type FounderRaiseContext,
@@ -108,7 +108,10 @@ const SYNTHETIC_NODES: readonly SyntheticNode[] = [
   },
 ];
 
-const D = FOUNDER_DEFINITION_V1;
+// The fixture publishes the SAME journey the server does. A fixture on a
+// different definition version would let a screen pass here and fail in
+// production, which is the one thing a development fixture must not do.
+const D = FOUNDER_DEFINITION_V2;
 const S = FOUNDER_STEPS;
 
 type Objective = { amount: string; currency: string; version: number };
