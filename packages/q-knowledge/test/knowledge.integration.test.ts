@@ -21,8 +21,9 @@ import { createPostgresActorContextResolver } from "@capital-q/security/postgres
 import {
   createKnowledgeQueryService,
   createKnowledgeWriteGate,
+  createPostgresContradictionRepository,
   createPostgresKnowledgeRepository,
-  type KnowledgeCandidate,
+  type KnowledgeCandidateInput,
   type KnowledgeQueryScope,
 } from "../src/index.js";
 import type { RetrievalScopeConstraint } from "../src/retrieval/contracts.js";
@@ -82,6 +83,9 @@ type World = {
   readonly b: Tenant;
   readonly gate: ReturnType<typeof createKnowledgeWriteGate>;
   readonly query: ReturnType<typeof createKnowledgeQueryService>;
+  readonly contradictions: ReturnType<
+    typeof createPostgresContradictionRepository
+  >;
   readonly seedEvidence: (input: {
     readonly tenant: Tenant;
     readonly visibility?: string;
@@ -152,6 +156,7 @@ describe("the Knowledge Write Gate against local PostgreSQL", () => {
         const a = await seedTenant(tx, "Tenant A");
         const b = await seedTenant(tx, "Tenant B");
         const knowledge = createPostgresKnowledgeRepository();
+        const contradictions = createPostgresContradictionRepository();
         const evidence = createPostgresEvidenceRepositories();
 
         const seedEvidence: World["seedEvidence"] = async (input) => {
@@ -176,9 +181,11 @@ describe("the Knowledge Write Gate against local PostgreSQL", () => {
             sql: tx.sql,
             transactions: nestedTransactions(tx),
             knowledge,
+            contradictions,
             evidence,
           }),
           query: createKnowledgeQueryService({ sql: tx.sql, knowledge }),
+          contradictions,
         });
         completed = true;
         throw new Rollback();
@@ -192,8 +199,8 @@ describe("the Knowledge Write Gate against local PostgreSQL", () => {
   const candidate = (
     tenant: Tenant,
     evidenceItemId: string,
-    overrides: Partial<KnowledgeCandidate> = {},
-  ): KnowledgeCandidate => ({
+    overrides: Partial<KnowledgeCandidateInput> = {},
+  ): KnowledgeCandidateInput => ({
     subject: { subjectType: "COMPANY", subjectId: tenant.companyId },
     knowledgeType: "fact",
     knowledgeKey: "financial.arr",
@@ -630,6 +637,8 @@ describe("the Knowledge Write Gate against local PostgreSQL", () => {
       expect(conflicting.outcome).toBe("HELD");
       expect(conflicting.reason).toBe("CONFLICTS_WITH_ACTIVE");
       expect(conflicting.status).toBe("CANDIDATE");
+      // CQ-KNW-003: the disagreement now has somewhere to live.
+      expect(conflicting.contradictionSetId).not.toBeNull();
 
       // The existing understanding keeps its value and its history. Nothing
       // preferred the larger number, and nothing preferred the newer one.
@@ -642,8 +651,9 @@ describe("the Knowledge Write Gate against local PostgreSQL", () => {
       >`select structured_value, confidence_class, status from q_knowledge.objects
           where id = ${active.objectId ?? ""}`;
       expect(row?.structured_value).toMatchObject({ amount: 2_400_000 });
-      expect(row?.status).toBe("ACTIVE");
-      // But Capital Q stops claiming confidence it no longer has.
+      // Contested, not withdrawn and not chosen against.
+      expect(row?.status).toBe("DISPUTED");
+      // And Capital Q stops claiming confidence it no longer has.
       expect(row?.confidence_class).toBe("CONFLICTING_EVIDENCE");
 
       // Both readings exist, and the lineage records that one reassesses
@@ -807,6 +817,554 @@ describe("the Knowledge Write Gate against local PostgreSQL", () => {
       );
       expect(asB).toEqual([]);
       expect(JSON.stringify(asB)).not.toContain(MARKERS.crossTenant);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // CQ-KNW-003 — time, difference and disagreement
+  // -------------------------------------------------------------------------
+
+  const period = (from: string, to: string | null) => ({
+    validFrom: from as never,
+    validTo: to as never,
+  });
+
+  it("KNW3-001: a metric has a history, and growth is not a conflict", async () => {
+    await withWorld(async (world) => {
+      const first = await world.seedEvidence({ tenant: world.a });
+      const second = await world.seedEvidence({ tenant: world.a });
+      const january = await world.gate.submit({
+        actor: world.a.actor,
+        candidate: candidate(world.a, first.evidenceItemId, {
+          statement: "ARR was USD 1.8m in January.",
+          structuredValue: {
+            kind: "MONEY",
+            amount: 1_800_000,
+            currency: "USD",
+          },
+          ...period("2026-01-01T00:00:00.000Z", "2026-02-01T00:00:00.000Z"),
+        }),
+        correlationId: CORRELATION(),
+        automatic: true,
+      });
+      const august = await world.gate.submit({
+        actor: world.a.actor,
+        candidate: candidate(world.a, second.evidenceItemId, {
+          statement: "ARR was USD 2.4m in August.",
+          structuredValue: {
+            kind: "MONEY",
+            amount: 2_400_000,
+            currency: "USD",
+          },
+          ...period("2026-08-01T00:00:00.000Z", "2026-09-01T00:00:00.000Z"),
+        }),
+        correlationId: CORRELATION(),
+        automatic: true,
+      });
+
+      // Both stand. Neither is a discrepancy, and nothing was superseded.
+      expect(january.outcome).toBe("ACCEPTED");
+      expect(august.outcome).toBe("ACCEPTED_DIFFERENCE");
+      expect(august.reason).toBe("DIFFERENT_PERIOD");
+      expect(august.contradictionSetId).toBeNull();
+
+      const subject = {
+        subjectType: "COMPANY" as const,
+        subjectId: world.a.companyId,
+      };
+      const history = await world.query.historyForKey(
+        ownerScope(world.a),
+        subject,
+        "financial.arr",
+      );
+      expect(history).toHaveLength(2);
+      expect(history[0]?.object.id).toBe(august.objectId);
+
+      // "What was ARR in June" is answered from valid time.
+      const inJune = await world.query.asOfForKey(
+        ownerScope(world.a),
+        subject,
+        "financial.arr",
+        new Date("2026-06-15T00:00:00.000Z"),
+      );
+      expect(inJune).toBeNull();
+      const inJanuary = await world.query.asOfForKey(
+        ownerScope(world.a),
+        subject,
+        "financial.arr",
+        new Date("2026-01-15T00:00:00.000Z"),
+      );
+      expect(inJanuary?.object.id).toBe(january.objectId);
+
+      // And "what is it now" is the latest effective reading, once.
+      const current = await world.query.currentForSubject(
+        ownerScope(world.a),
+        subject,
+      );
+      expect(current).toHaveLength(1);
+      expect(current[0]?.object.id).toBe(august.objectId);
+    });
+  });
+
+  it("KNW3-002: a definition and a basis coexist rather than compete", async () => {
+    await withWorld(async (world) => {
+      const seeds = [
+        await world.seedEvidence({ tenant: world.a }),
+        await world.seedEvidence({ tenant: world.a }),
+        await world.seedEvidence({ tenant: world.a }),
+      ];
+      const gross = await world.gate.submit({
+        actor: world.a.actor,
+        candidate: candidate(world.a, seeds[0]?.evidenceItemId ?? "", {
+          definitionQualifier: "gross",
+        }),
+        correlationId: CORRELATION(),
+        automatic: true,
+      });
+      const net = await world.gate.submit({
+        actor: world.a.actor,
+        candidate: candidate(world.a, seeds[1]?.evidenceItemId ?? "", {
+          statement: "ARR net of churn is approximately USD 2.1m.",
+          structuredValue: {
+            kind: "MONEY",
+            amount: 2_100_000,
+            currency: "USD",
+          },
+          definitionQualifier: "net_of_churn",
+        }),
+        correlationId: CORRELATION(),
+        automatic: true,
+      });
+      const forecast = await world.gate.submit({
+        actor: world.a.actor,
+        candidate: candidate(world.a, seeds[2]?.evidenceItemId ?? "", {
+          statement: "ARR is forecast at USD 4m.",
+          structuredValue: {
+            kind: "MONEY",
+            amount: 4_000_000,
+            currency: "USD",
+          },
+          definitionQualifier: "gross",
+          measurementBasis: "FORECAST",
+        }),
+        correlationId: CORRELATION(),
+        automatic: true,
+      });
+
+      expect(gross.outcome).toBe("ACCEPTED");
+      expect(net.outcome).toBe("ACCEPTED_DIFFERENCE");
+      expect(net.reason).toBe("DIFFERENT_DEFINITION");
+      expect(forecast.outcome).toBe("ACCEPTED_DIFFERENCE");
+      // Three readings, no disagreement, nothing superseded.
+      for (const result of [gross, net, forecast]) {
+        expect(result.status).toBe("ACTIVE");
+        expect(result.contradictionSetId).toBeNull();
+      }
+      const [open] = await world.tx.sql<{ n: number }[]>`
+        select count(*)::int as n from q_knowledge.contradiction_sets
+         where tenant_id = ${world.a.tenantId}`;
+      expect(open?.n).toBe(0);
+    });
+  });
+
+  it("KNW3-003: a correction supersedes the period it restates, and keeps it", async () => {
+    await withWorld(async (world) => {
+      const first = await world.seedEvidence({ tenant: world.a });
+      const second = await world.seedEvidence({ tenant: world.a });
+      const original = await world.gate.submit({
+        actor: world.a.actor,
+        candidate: candidate(world.a, first.evidenceItemId, {
+          statement: "ARR was USD 1.8m in June.",
+          structuredValue: {
+            kind: "MONEY",
+            amount: 1_800_000,
+            currency: "USD",
+          },
+          ...period("2026-06-01T00:00:00.000Z", "2026-07-01T00:00:00.000Z"),
+        }),
+        correlationId: CORRELATION(),
+        automatic: true,
+      });
+      const corrected = await world.gate.submit({
+        actor: world.a.actor,
+        candidate: candidate(world.a, second.evidenceItemId, {
+          statement: "ARR was USD 1.75m in June.",
+          structuredValue: {
+            kind: "MONEY",
+            amount: 1_750_000,
+            currency: "USD",
+          },
+          ...period("2026-06-01T00:00:00.000Z", "2026-07-01T00:00:00.000Z"),
+          correctsEarlier: true,
+          reason: "CORRECTION",
+        }),
+        correlationId: CORRELATION(),
+        automatic: true,
+      });
+
+      expect(corrected.outcome).toBe("CORRECTED");
+      expect(corrected.reason).toBe("CORRECTS_EARLIER_PERIOD");
+      expect(corrected.status).toBe("ACTIVE");
+      // A fixed typo is not a disagreement and not a decline.
+      expect(corrected.contradictionSetId).toBeNull();
+      expect(corrected.confidenceClass).not.toBe("CONFLICTING_EVIDENCE");
+
+      const [before] = await world.tx.sql<{ status: string }[]>`
+        select status from q_knowledge.objects where id = ${original.objectId ?? ""}`;
+      // Superseded, never deleted: it is what June looked like before.
+      expect(before?.status).toBe("SUPERSEDED");
+
+      const lineage = await world.tx.sql<{ relationship: string }[]>`
+        select relationship from q_knowledge.lineage
+         where parent_object_id = ${original.objectId ?? ""}
+           and child_object_id = ${corrected.objectId ?? ""}`;
+      expect(lineage.map((l) => l.relationship)).toEqual(["supersedes"]);
+
+      const history = await world.query.historyForKey(
+        ownerScope(world.a),
+        { subjectType: "COMPANY", subjectId: world.a.companyId },
+        "financial.arr",
+      );
+      expect(history).toHaveLength(2);
+    });
+  });
+
+  it("KNW3-004: a candidate cannot supersede a figure by claiming to correct it", async () => {
+    await withWorld(async (world) => {
+      const first = await world.seedEvidence({ tenant: world.a });
+      const second = await world.seedEvidence({ tenant: world.a });
+      const june = await world.gate.submit({
+        actor: world.a.actor,
+        candidate: candidate(world.a, first.evidenceItemId, {
+          ...period("2026-06-01T00:00:00.000Z", "2026-07-01T00:00:00.000Z"),
+        }),
+        correlationId: CORRELATION(),
+        automatic: true,
+      });
+      // Same key, DIFFERENT period, but asserting a correction. The periods
+      // do not match, so the flag decides nothing.
+      const pretender = await world.gate.submit({
+        actor: world.a.actor,
+        candidate: candidate(world.a, second.evidenceItemId, {
+          statement: "ARR was USD 9m in August.",
+          structuredValue: {
+            kind: "MONEY",
+            amount: 9_000_000,
+            currency: "USD",
+          },
+          ...period("2026-08-01T00:00:00.000Z", "2026-09-01T00:00:00.000Z"),
+          correctsEarlier: true,
+          reason: "CORRECTION",
+        }),
+        correlationId: CORRELATION(),
+        automatic: true,
+      });
+      expect(pretender.outcome).not.toBe("CORRECTED");
+      const [row] = await world.tx.sql<{ status: string }[]>`
+        select status from q_knowledge.objects where id = ${june.objectId ?? ""}`;
+      expect(row?.status).toBe("ACTIVE");
+    });
+  });
+
+  it("KNW3-005: both sides of a disagreement travel, and only a person settles it", async () => {
+    await withWorld(async (world) => {
+      const first = await world.seedEvidence({ tenant: world.a });
+      const second = await world.seedEvidence({ tenant: world.a });
+      const incumbent = await world.gate.submit({
+        actor: world.a.actor,
+        candidate: candidate(world.a, first.evidenceItemId),
+        correlationId: CORRELATION(),
+        automatic: true,
+      });
+      const challenger = await world.gate.submit({
+        actor: world.a.actor,
+        candidate: candidate(world.a, second.evidenceItemId, {
+          statement: "Annual recurring revenue is approximately USD 1.9m.",
+          structuredValue: {
+            kind: "MONEY",
+            amount: 1_900_000,
+            currency: "USD",
+          },
+        }),
+        correlationId: CORRELATION(),
+        automatic: true,
+      });
+      const setId = challenger.contradictionSetId ?? "";
+      expect(setId).not.toBe("");
+
+      const subject = {
+        subjectType: "COMPANY" as const,
+        subjectId: world.a.companyId,
+      };
+      const disputes = await world.query.disputesForSubject(
+        ownerScope(world.a),
+        subject,
+      );
+      expect(disputes).toHaveLength(1);
+      // Neither number was chosen, and neither travels alone.
+      expect(disputes[0]?.members).toHaveLength(2);
+      expect(disputes[0]?.set.materiality).toBe("UNDETERMINED");
+      expect(disputes[0]?.members.map((m) => m.object.id).sort()).toEqual(
+        [incumbent.objectId, challenger.objectId].sort(),
+      );
+      // The reading Q still holds says it is contested.
+      const current = await world.query.currentForKey(
+        ownerScope(world.a),
+        subject,
+        "financial.arr",
+      );
+      expect(current?.disputed).toBe(true);
+
+      // A second conflicting candidate joins the argument rather than
+      // starting a parallel one.
+      const third = await world.seedEvidence({ tenant: world.a });
+      const again = await world.gate.submit({
+        actor: world.a.actor,
+        candidate: candidate(world.a, third.evidenceItemId, {
+          statement: "Annual recurring revenue is approximately USD 1.7m.",
+          structuredValue: {
+            kind: "MONEY",
+            amount: 1_700_000,
+            currency: "USD",
+          },
+        }),
+        correlationId: CORRELATION(),
+        automatic: true,
+      });
+      expect(again.contradictionSetId).toBe(setId);
+
+      // Nothing automatic may settle it.
+      const machine = await world.gate.settleContradiction({
+        actor: { ...world.a.actor, actorType: "SYSTEM" },
+        setId,
+        status: "RESOLVED",
+        reason: "FOUNDER_CONFIRMED",
+        chosenObjectId: incumbent.objectId ?? "",
+      });
+      expect(machine.outcome).toBe("REFUSED");
+      expect(machine.reason).toBe("NOT_A_HUMAN_DECISION");
+
+      // And a person cannot choose a reading that is not in the set.
+      const stray = await world.gate.settleContradiction({
+        actor: world.a.actor,
+        setId,
+        status: "RESOLVED",
+        reason: "FOUNDER_CONFIRMED",
+        chosenObjectId: world.a.companyId,
+      });
+      expect(stray.reason).toBe("CHOICE_NOT_A_MEMBER");
+
+      const settled = await world.gate.settleContradiction({
+        actor: world.a.actor,
+        setId,
+        status: "RESOLVED",
+        reason: "FOUNDER_CONFIRMED",
+        chosenObjectId: incumbent.objectId ?? "",
+      });
+      expect(settled.outcome).toBe("SETTLED");
+      expect(settled.standingObjectId).toBe(incumbent.objectId);
+
+      // Every member survives; the ones not chosen are superseded, not gone.
+      const [total] = await world.tx.sql<{ n: number }[]>`
+        select count(*)::int as n from q_knowledge.objects
+         where tenant_id = ${world.a.tenantId}`;
+      expect(total?.n).toBe(3);
+      const [standing] = await world.tx.sql<{ status: string }[]>`
+        select status from q_knowledge.objects where id = ${incumbent.objectId ?? ""}`;
+      expect(standing?.status).toBe("ACTIVE");
+      expect(
+        await world.query.disputesForSubject(ownerScope(world.a), subject),
+      ).toHaveLength(0);
+    });
+  });
+
+  it("KNW3-006 BLOCKER: a disagreement is never filed more openly than what it is about", async () => {
+    await withWorld(async (world) => {
+      const first = await world.seedEvidence({ tenant: world.a });
+      const second = await world.seedEvidence({ tenant: world.a });
+      await world.gate.submit({
+        actor: world.a.actor,
+        candidate: candidate(world.a, first.evidenceItemId),
+        correlationId: CORRELATION(),
+        automatic: true,
+      });
+      const challenger = await world.gate.submit({
+        actor: world.a.actor,
+        candidate: candidate(world.a, second.evidenceItemId, {
+          statement: "Annual recurring revenue is approximately USD 1.9m.",
+          structuredValue: {
+            kind: "MONEY",
+            amount: 1_900_000,
+            currency: "USD",
+          },
+        }),
+        correlationId: CORRELATION(),
+        automatic: true,
+      });
+
+      const [set] = await world.tx.sql<
+        { visibility_scope: string; sensitivity_class: string }[]
+      >`select visibility_scope, sensitivity_class from q_knowledge.contradiction_sets
+          where id = ${challenger.contradictionSetId ?? ""}`;
+      // "These two figures conflict" discloses as much as the figures do.
+      expect(set?.visibility_scope).toBe("founder_private");
+      expect(set?.sensitivity_class).toBe("CONFIDENTIAL");
+
+      // A counterparty envelope reaches neither the set nor its members.
+      expect(
+        await world.query.disputesForSubject(counterpartyScope(world.b), {
+          subjectType: "COMPANY",
+          subjectId: world.a.companyId,
+        }),
+      ).toEqual([]);
+    });
+  });
+
+  it("KNW3-007: an unauthorised later reading never suppresses an authorised earlier one", async () => {
+    await withWorld(async (world) => {
+      const open = await world.seedEvidence({
+        tenant: world.a,
+        visibility: "network_visible",
+        sensitivity: "NETWORK_VISIBLE",
+      });
+      const closed = await world.seedEvidence({ tenant: world.a });
+      const shared = await world.gate.submit({
+        actor: world.a.actor,
+        candidate: candidate(world.a, open.evidenceItemId, {
+          statement: "ARR was USD 1.8m in January.",
+          structuredValue: {
+            kind: "MONEY",
+            amount: 1_800_000,
+            currency: "USD",
+          },
+          ...period("2026-01-01T00:00:00.000Z", "2026-02-01T00:00:00.000Z"),
+        }),
+        correlationId: CORRELATION(),
+        automatic: true,
+      });
+      await world.gate.submit({
+        actor: world.a.actor,
+        candidate: candidate(world.a, closed.evidenceItemId, {
+          statement: "ARR was USD 2.4m in August.",
+          structuredValue: {
+            kind: "MONEY",
+            amount: 2_400_000,
+            currency: "USD",
+          },
+          ...period("2026-08-01T00:00:00.000Z", "2026-09-01T00:00:00.000Z"),
+        }),
+        correlationId: CORRELATION(),
+        automatic: true,
+      });
+
+      // Derived knowledge is never as open as its source: a network-visible
+      // document yields organisation-private understanding. The August
+      // figure is narrower still, so a viewer holding only the wider scope
+      // sees January — not silence, and not the private figure.
+      const seen = await world.query.currentForSubject(
+        {
+          tenantId: world.a.tenantId,
+          constraints: [
+            {
+              scopeKind: "COMPANY_PROFILE",
+              layer: "KNOWLEDGE_OBJECTS",
+              subjectIds: [world.a.companyId],
+              visibilityScopes: ["organisation_private"],
+              sensitivityCeiling: "CONFIDENTIAL",
+              canDiscloseExistence: true,
+              canQuote: true,
+              canProvideLink: false,
+            } satisfies RetrievalScopeConstraint,
+          ],
+        },
+        { subjectType: "COMPANY", subjectId: world.a.companyId },
+      );
+      expect(seen.map((k) => k.object.id)).toEqual([shared.objectId]);
+    });
+  });
+
+  it("KNW3-008: an aged understanding goes stale without changing what it says", async () => {
+    await withWorld(async (world) => {
+      const { evidenceItemId } = await world.seedEvidence({ tenant: world.a });
+      const recorded = await world.gate.submit({
+        actor: world.a.actor,
+        candidate: candidate(world.a, evidenceItemId, {
+          knowledgeKey: "financial.cash_balance",
+          statement: "Cash on hand was USD 900k in May.",
+          structuredValue: { kind: "MONEY", amount: 900_000, currency: "USD" },
+          ...period("2026-05-01T00:00:00.000Z", null),
+        }),
+        correlationId: CORRELATION(),
+        automatic: true,
+      });
+
+      const swept = await world.gate.reassessForFreshness({
+        actor: world.a.actor,
+        subject: { subjectType: "COMPANY", subjectId: world.a.companyId },
+        now: new Date("2026-09-01T00:00:00.000Z"),
+      });
+      expect(swept.map((r) => r.objectId)).toEqual([recorded.objectId]);
+
+      const [row] = await world.tx.sql<
+        {
+          status: string;
+          statement: string;
+          visibility_scope: string;
+          sensitivity_class: string;
+        }[]
+      >`select status, statement, visibility_scope, sensitivity_class
+          from q_knowledge.objects where id = ${recorded.objectId ?? ""}`;
+      expect(row?.status).toBe("STALE");
+      // Stale is not false, and it is never a permission.
+      expect(row?.statement).toBe("Cash on hand was USD 900k in May.");
+      expect(row?.visibility_scope).toBe("founder_private");
+      expect(row?.sensitivity_class).toBe("CONFIDENTIAL");
+
+      // It still answers "what was it in May", and no longer answers "now".
+      const subject = {
+        subjectType: "COMPANY" as const,
+        subjectId: world.a.companyId,
+      };
+      expect(
+        (
+          await world.query.asOfForKey(
+            ownerScope(world.a),
+            subject,
+            "financial.cash_balance",
+            new Date("2026-05-15T00:00:00.000Z"),
+          )
+        )?.object.id,
+      ).toBe(recorded.objectId);
+      expect(
+        await world.query.currentForKey(
+          ownerScope(world.a),
+          subject,
+          "financial.cash_balance",
+        ),
+      ).toBeNull();
+    });
+  });
+
+  it("KNW3-009: a read reports age without a model and without widening scope", async () => {
+    await withWorld(async (world) => {
+      const { evidenceItemId } = await world.seedEvidence({ tenant: world.a });
+      await world.gate.submit({
+        actor: world.a.actor,
+        candidate: candidate(world.a, evidenceItemId, {
+          knowledgeKey: "financial.cash_balance",
+          ...period("2026-05-01T00:00:00.000Z", null),
+        }),
+        correlationId: CORRELATION(),
+        automatic: true,
+      });
+      const read = await world.query.currentForKey(
+        ownerScope(world.a),
+        { subjectType: "COMPANY", subjectId: world.a.companyId },
+        "financial.cash_balance",
+      );
+      expect(read?.freshness.policyVersion).toBe("knowledge-freshness-v1");
+      expect(read?.freshness.ageDays).toBeGreaterThan(45);
+      expect(read?.object.visibilityScope).toBe("founder_private");
     });
   });
 

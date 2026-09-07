@@ -14,6 +14,7 @@ import {
 } from "@capital-q/security";
 import { createPostgresActorContextResolver } from "@capital-q/security/postgres";
 
+import { createPostgresContradictionRepository } from "../infrastructure/postgres-contradiction-repository.js";
 import { createPostgresKnowledgeRepository } from "../infrastructure/postgres-knowledge-repository.js";
 import { createKnowledgeQueryService } from "../knowledge/query.js";
 import { createKnowledgeWriteGate } from "../knowledge/write-gate.js";
@@ -121,6 +122,7 @@ async function main(): Promise<number> {
         sql,
         transactions: nestedTransactions(tx),
         knowledge,
+        contradictions: createPostgresContradictionRepository(),
         evidence: createPostgresEvidenceRepositories(),
       });
       const query = createKnowledgeQueryService({ sql, knowledge });

@@ -128,6 +128,8 @@ insert into rls_inventory (schema_name, table_name, classification, authenticate
   ('q_knowledge', 'object_evidence',        'INTERNAL_SERVER_ONLY', '{}'),
   ('q_knowledge', 'object_sources',         'INTERNAL_SERVER_ONLY', '{}'),
   ('q_knowledge', 'lineage',                'INTERNAL_SERVER_ONLY', '{}'),
+  ('q_knowledge', 'contradiction_sets',     'INTERNAL_SERVER_ONLY', '{}'),
+  ('q_knowledge', 'contradiction_members',  'INTERNAL_SERVER_ONLY', '{}'),
   ('events', 'outbox',                     'INTERNAL_SERVER_ONLY', '{}'),
   ('audit', 'material_actions',            'INTERNAL_SERVER_ONLY', '{}'),
   ('audit', 'security_events',             'INTERNAL_SERVER_ONLY', '{}');

@@ -506,7 +506,9 @@ longer has: the active object gains a revision setting confidence to
 `CONFLICTING_EVIDENCE`, and a `reassesses` lineage edge records that one
 reading reassesses the other.
 
-That is the input CQ-KNW-003 needs. Resolution is its packet, not this one.
+That is the input CQ-KNW-003 needs, and the section below is what it does
+with it. Since CQ-KNW-003 the incumbent also moves to `DISPUTED` and a
+contradiction set is opened.
 
 ### Revocation
 
@@ -525,8 +527,8 @@ the Context Firewall's plan. There is no `getAllKnowledge`, no tenant-wide
 list, and no method that takes a subject without an envelope. The constraint
 is applied IN the query, so an unauthorised understanding is never a row.
 
-Only `ACTIVE` objects are answers. A held candidate is a proposal awaiting a
-person, not Capital Q's position.
+`ACTIVE` and `DISPUTED` objects are answers; a `DISPUTED` one says so. A held
+candidate is a proposal awaiting a person, not Capital Q's position.
 
 Existing in this schema grants nothing: not a Data Room grant, not download,
 not share, not recommendation eligibility. The table has no column for any of
@@ -570,6 +572,176 @@ to CONFLICTING_EVIDENCE; another tenant's evidence REJECTED
 REJECTED `CANDIDATE_INVALID`. Counterparty and other-tenant reads: 0.
 VERIFIED objects: 0. Non-private objects: 0.
 
+## Time and disagreement (CQ-KNW-003)
+
+Two things change here, and both follow from one observation: a company's
+numbers move, and a system that treats every difference as a discrepancy will
+report a founder's own growth back to them as an inconsistency.
+
+```
+historical ≠ false      old ≠ wrong           corrected ≠ fraudulent
+different ≠ contradictory   disputed ≠ rejected   superseded ≠ deleted
+stale ≠ incorrect       latest ≠ most reliable    highest ≠ true
+```
+
+### "Current" stops being a status
+
+CQ-KNW-002 allowed one `ACTIVE` row per `(subject, key)`. That made "current"
+a stored flag, and a metric with a history impossible: January, June and
+August ARR are all true, of different months.
+
+The constraint moves down to the period. The partial unique index is now
+`(tenant, subject, key, coalesce(definition_qualifier,''), measurement_basis,
+coalesce(valid_from,'-infinity')) where status = 'ACTIVE'`, and _current_ is
+derived — the latest effective reading, where effective means
+`coalesce(valid_from, recorded_at)`. The application and the index order by
+the same expression on purpose.
+
+The only thing still forbidden is two settled answers to the same question
+about the same period, which is exactly a contradiction, and is held rather
+than stored.
+
+Two clocks, never conflated: **valid time** is when the information applies to
+the world; **record time** is when Capital Q came to hold it. "What was ARR in
+June?" is a valid-time question, and answering it from record time returns
+whatever was learned most recently, which may be about August.
+
+### Difference is examined before it is called a conflict
+
+`compareKnowledge` walks the axes in order of how completely each one explains
+a difference, and stops at the first that does:
+
+| axis       | example                                  | verdict                    |
+| ---------- | ---------------------------------------- | -------------------------- |
+| metric     | FY revenue against current ARR           | `DIFFERENT_SUBJECT_MATTER` |
+| period     | January ARR against August ARR           | `DIFFERENT_PERIOD`         |
+| definition | gross ARR against ARR net of churn       | `ACCEPTED_DIFFERENCE`      |
+| basis      | a 4m forecast against a 2m actual        | `DIFFERENT_BASIS`          |
+| kind       | a headcount against an amount of money   | `INCOMPARABLE`             |
+| currency   | 100m naira against 65k dollars           | `INCOMPARABLE`             |
+| value      | 2.4m against 1.8m, everything else equal | `CONTRADICTION`            |
+
+Currency is deliberately `INCOMPARABLE` rather than a conflict: 100m naira and
+65k dollars may be exactly the same money, and without a trusted dated
+conversion basis, deciding would mean inventing an FX rate. Both readings are
+kept, each with its own currency.
+
+Materiality is `UNDETERMINED` for every genuine conflict. This repository has
+no calibrated materiality methodology, and "more than 5% is material" would
+put a number nobody measured in front of a founder as though it had been.
+
+### Corrections
+
+A correction restates a period already recorded; a new value describes a
+different one. Conflating them turns a fixed typo into a reported decline.
+
+`correctsEarlier` on a candidate is a **request, never a decision**: the gate
+reads it only after `isCorrectionOf` confirms the periods match, so a
+candidate cannot supersede an inconvenient figure by asserting that it
+corrects it. When it is a correction, the earlier reading is marked
+`SUPERSEDED` — kept, because it is what the period looked like before — and a
+`supersedes` lineage edge records what was fixed. Confidence is not lowered:
+being told which reading stands is not a disagreement.
+
+### Disagreement has somewhere to live
+
+`q_knowledge.contradiction_sets` and `contradiction_members` record which
+understandings disagree, about which metric, definition, basis and period, and
+whether anyone has settled it. A set holds **references and codes only** — no
+statement, no value — because the members already carry those along with the
+permissions that govern them, and a set that copied them would be a second
+place a private figure could leak from.
+
+A set inherits its members' classification through the same
+`derivedKnowledgeVisibility` / `derivedKnowledgeSensitivity` rules the objects
+use. "These two figures conflict" can disclose as much as the figures do, so a
+set is never filed more openly than what it is about.
+
+When a contradiction opens: the challenger is held as a `CANDIDATE`, the
+incumbent moves to `DISPUTED` with confidence `CONFLICTING_EVIDENCE`, a
+`reassesses` lineage edge is written, and a set is opened — or joined, if one
+is already open about that question. A third disagreeing reading joins the
+same argument rather than starting a parallel one.
+
+Reads carry both sides. `disputesForSubject` returns a set with **every member
+the envelope reaches, or nothing at all**: one side alone would be Capital Q
+silently picking a number, which is the single thing this exists to prevent.
+`currentForKey` still returns the disputed reading, marked `disputed: true`,
+because withholding it entirely would turn a known disagreement into a claimed
+absence of knowledge.
+
+`settleContradiction` requires a **human actor**. Choosing between two readings
+of a company's own numbers is commercial authority; nothing about being newer,
+larger or better evidenced transfers it, and a `SYSTEM` or `Q` actor is
+refused `NOT_A_HUMAN_DECISION`. Every member survives the decision: the reading
+not chosen becomes `SUPERSEDED`, which is a record of having been considered.
+
+### Freshness, which is not permission
+
+`assessFreshness` measures age from the later of validity start and last
+verification, against a declared policy per key
+(`knowledge-freshness-v1`: cash balance 45 days, burn rate 90, ARR 120,
+investor mandate 365). Each rule carries the reasoning for its number.
+
+A key with **no declared rule never goes stale by time**. There are no
+universal TTLs here, because a company's address and its cash position do not
+age at the same rate, and inventing a number for each would be inventing a
+fact about each.
+
+`reassessForFreshness` marks aged understandings `STALE`. It changes lifecycle
+and nothing else — the statement, the value, the visibility scope and the
+sensitivity class are untouched. An old founder-private figure is
+founder-private. Stale still answers "what was it in May"; it stops answering
+"what is it now".
+
+### Reads
+
+| method               | question                                                  |
+| -------------------- | --------------------------------------------------------- |
+| `currentForKey`      | the latest effective reading **this viewer may see**      |
+| `currentForSubject`  | one current reading per (key, definition, basis)          |
+| `asOfForKey`         | what applied at an instant, from valid time               |
+| `historyForKey`      | the whole authorised series, superseded readings included |
+| `disputesForSubject` | open disagreements, with every side                       |
+
+The Context Firewall applies inside the derivation, not after it.
+`currentForSubject` decides "is there a later reading" **under the same
+envelope**: if a founder-private August figure suppressed an
+organisation-visible January figure, private information would have silently
+altered what a counterparty is shown without ever being shown to them. That is
+the release-blocking invariant, and it is why the envelope predicate appears
+twice in that query.
+
+`asOfForKey` answers from one series. Omitting the slot means the unqualified
+actual — a defined thing, not a preferred one: a caller asking about a
+definition or a projection names it, and nothing silently picks the reading
+that answers best.
+
+### Commands
+
+```bash
+pnpm knowledge:temporal:smoke
+```
+
+Six candidates against the local database inside a rolled-back transaction:
+growth, a definition, a projection, a correction and a conflict. Free,
+deterministic, no provider. Observed:
+
+```
+january (gross, actual)      ACCEPTED             RECORDED                 ACTIVE
+august (gross, actual)       ACCEPTED_DIFFERENCE  DIFFERENT_PERIOD         ACTIVE
+january net of churn         ACCEPTED_DIFFERENCE  DIFFERENT_DEFINITION     ACTIVE
+january forecast             ACCEPTED_DIFFERENCE  DIFFERENT_BASIS          ACTIVE
+january restated             CORRECTED            CORRECTS_EARLIER_PERIOD  ACTIVE
+august, disagreeing          HELD                 CONFLICTS_WITH_ACTIVE    CANDIDATE
+```
+
+with 5 readings in history, 3 current, 1 open disagreement carrying 2 members
+at `UNDETERMINED` materiality, the corrected January reading `SUPERSEDED`
+rather than deleted, no settled August answer while it is contested, and the
+disagreement filed `founder_private`. Keys, outcomes and codes only — never a
+statement, never a value.
+
 ## Known limitations
 
 - Automated malware scanning does not exist. Outside a local stack the
@@ -601,9 +773,25 @@ chunk's visibility and sensitivity.
 
 ## Deferrals
 
-Contradiction resolution, conflict sets and temporal reconciliation →
-CQ-KNW-003. This packet identifies a conflict, keeps both readings and stops
-claiming confidence; it settles nothing.
+A reassessment worker and its schedule. `reassessForFreshness` and
+`reassessForWithdrawnEvidence` are the seams; nothing calls them on a timer
+yet, and no job row exists.
+
+A calibrated materiality methodology. `classifyMateriality` returns
+`UNDETERMINED` for every genuine conflict, and the function is where a
+measured policy goes when one exists — with its version beside it.
+
+Dated currency conversion. Two readings in different currencies stay
+`INCOMPARABLE`; resolving them needs a trusted, dated rate that this
+repository does not have.
+
+A reviewer's queue or any UI over `contradiction_sets`. The settlement seam is
+`settleContradiction` and it requires a human actor; the surface a person uses
+belongs to a UI packet.
+
+Contradiction detection across keys — "cash and burn imply a runway that
+disagrees with the stated one". Comparison here is within one key, and
+combination reasoning is the Context Firewall's problem, not the comparator's.
 
 Long-term entity memory (`q_knowledge.memory_items`) → a later packet. KNW-002
 is knowledge, not memory, and the table deliberately does not exist yet.

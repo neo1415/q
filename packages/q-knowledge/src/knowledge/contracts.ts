@@ -18,6 +18,9 @@ import {
 } from "@capital-q/evidence/contracts";
 import type { TenantId } from "@capital-q/security";
 
+import type { MeasurementBasis } from "./compatibility.js";
+import type { FreshnessAssessment } from "./freshness.js";
+
 /**
  * Q Knowledge Objects (CQ-KNW-002).
  *
@@ -119,6 +122,30 @@ export const KnowledgeCandidateSchema = z
     supportingSourceIds: z.array(z.string().uuid()).max(32),
     validFrom: UtcTimestampSchema.nullable(),
     validTo: UtcTimestampSchema.nullable(),
+    /**
+     * How the metric is defined, when the subject measures it more than one
+     * way (gross, net_of_churn). Two understandings of one key under
+     * different definitions are an accepted difference, not a conflict.
+     */
+    definitionQualifier: z
+      .string()
+      .regex(/^[a-z][a-z0-9_]{0,63}$/)
+      .nullable()
+      .default(null),
+    /** ACTUAL, FORECAST or ESTIMATE. A forecast is not a competing measurement. */
+    measurementBasis: z
+      .enum(["ACTUAL", "FORECAST", "ESTIMATE", "UNSPECIFIED"])
+      .default("ACTUAL"),
+    /**
+     * The caller stating this restates a period already recorded, rather
+     * than describing a later one.
+     *
+     * It is a request, never a decision. The gate still checks that the two
+     * periods actually match before treating anything as a correction, so a
+     * candidate cannot supersede an inconvenient figure by asserting that it
+     * corrects it.
+     */
+    correctsEarlier: z.boolean().default(false),
     /** Existing knowledge this one is derived from. Bounded relationships. */
     lineage: z
       .array(
@@ -157,6 +184,13 @@ export const KnowledgeCandidateSchema = z
     },
   );
 export type KnowledgeCandidate = z.infer<typeof KnowledgeCandidateSchema>;
+/**
+ * What a caller supplies. The measurement context and the correction flag
+ * have defaults, so an existing caller that never heard of them keeps
+ * working and gets the conservative reading: an actual measurement, not a
+ * correction.
+ */
+export type KnowledgeCandidateInput = z.input<typeof KnowledgeCandidateSchema>;
 
 /** A stored understanding, as the application reads it back. */
 export type KnowledgeObject = {
@@ -177,6 +211,11 @@ export type KnowledgeObject = {
   readonly sourceEnvironment: KnowledgeSourceEnvironment;
   readonly visibilityScope: MarketplaceVisibility;
   readonly sensitivityClass: MessageSensitivity;
+  /** How the metric is defined, when a subject measures it more than one way. */
+  readonly definitionQualifier: string | null;
+  readonly measurementBasis: MeasurementBasis;
+  /** When this was last checked against its source. Freshness, never permission. */
+  readonly lastVerifiedAt: UtcTimestamp | null;
   readonly status: KnowledgeStatus;
   readonly holdReason: string | null;
   readonly reassessmentRequiredAt: UtcTimestamp | null;
@@ -217,6 +256,10 @@ export const KNOWLEDGE_WRITE_OUTCOMES = [
   "REVISED",
   "HELD",
   "DUPLICATE",
+  /** Recorded beside an existing understanding that measures the metric differently. */
+  "ACCEPTED_DIFFERENCE",
+  /** A restatement of a period already recorded; the earlier reading is superseded, never deleted. */
+  "CORRECTED",
   "REJECTED",
 ] as const;
 export type KnowledgeWriteOutcome = (typeof KNOWLEDGE_WRITE_OUTCOMES)[number];
@@ -235,6 +278,16 @@ export const KNOWLEDGE_WRITE_REASONS = [
   "INFERENCE_NEEDS_CONFIRMATION",
   /** A current understanding on this key disagrees. Neither is chosen. */
   "CONFLICTS_WITH_ACTIVE",
+  /** The same metric, defined differently. Both stand. */
+  "DIFFERENT_DEFINITION",
+  /** A projection beside a measurement, or the reverse. */
+  "DIFFERENT_BASIS",
+  /** A different stretch of time. A series, not a disagreement. */
+  "DIFFERENT_PERIOD",
+  /** The same period restated. The earlier reading is kept as superseded. */
+  "CORRECTS_EARLIER_PERIOD",
+  /** Same question, no basis on which to compare the answers. */
+  "NOT_COMPARABLE",
   /** Nothing stands behind it. No source, no entity evidence. */
   "NO_SUPPORTING_EVIDENCE",
   /** A claim, evidence item or source id that is not this tenant's, or not this subject's. */
@@ -260,6 +313,10 @@ export type KnowledgeWriteResult = {
   readonly revisionNumber: number | null;
   /** How many distinct registered sources stand behind it. */
   readonly supportingSourceCount: number;
+  /** The recorded disagreement this candidate joined or opened, if any. */
+  readonly contradictionSetId: string | null;
+  /** Why the comparison decided as it did. Never a private value. */
+  readonly comparison: string | null;
 };
 
 export const KnowledgeWriteResultSchema = z
@@ -276,6 +333,8 @@ export const KnowledgeWriteResultSchema = z
     sensitivityClass: MessageSensitivitySchema.nullable(),
     revisionNumber: z.number().int().min(1).nullable(),
     supportingSourceCount: z.number().int().min(0),
+    contradictionSetId: z.string().uuid().nullable(),
+    comparison: z.string().nullable(),
   })
   .strict();
 
@@ -289,4 +348,15 @@ export type AuthorisedKnowledge = {
       "SUPPORTS" | "CONTRADICTS" | "QUALIFIES" | "SUPERSEDES";
   }[];
   readonly sourceIds: readonly string[];
+  /**
+   * Whether this has outlived its useful life. Stale is not false, and it is
+   * never a permission: an old founder-private figure is founder-private.
+   */
+  readonly freshness: FreshnessAssessment;
+  /**
+   * Whether another settled understanding of the same period disagrees. True
+   * means the answer must not be given alone — the other side travels with
+   * it (§55).
+   */
+  readonly disputed: boolean;
 };

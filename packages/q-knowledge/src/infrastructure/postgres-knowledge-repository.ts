@@ -80,6 +80,9 @@ const ObjectRow = z.object({
   ]),
   visibility_scope: MarketplaceVisibilitySchema,
   sensitivity_class: MessageSensitivitySchema,
+  definition_qualifier: z.string().nullable(),
+  measurement_basis: z.enum(["ACTUAL", "FORECAST", "ESTIMATE", "UNSPECIFIED"]),
+  last_verified_at: NullableTimestamp,
   status: KnowledgeStatusSchema,
   hold_reason: z.string().nullable(),
   reassessment_required_at: NullableTimestamp,
@@ -108,6 +111,9 @@ export function toKnowledgeObject(row: unknown): KnowledgeObject {
     sourceEnvironment: r.source_environment,
     visibilityScope: r.visibility_scope,
     sensitivityClass: r.sensitivity_class,
+    definitionQualifier: r.definition_qualifier,
+    measurementBasis: r.measurement_basis,
+    lastVerifiedAt: r.last_verified_at,
     status: r.status,
     holdReason: r.hold_reason,
     reassessmentRequiredAt: r.reassessment_required_at,
@@ -170,6 +176,8 @@ export type NewKnowledgeObject = {
   readonly sourceEnvironment: KnowledgeObject["sourceEnvironment"];
   readonly visibilityScope: KnowledgeObject["visibilityScope"];
   readonly sensitivityClass: KnowledgeObject["sensitivityClass"];
+  readonly definitionQualifier: string | null;
+  readonly measurementBasis: KnowledgeObject["measurementBasis"];
   readonly status: KnowledgeObject["status"];
   readonly holdReason: string | null;
   readonly changeReason: string;
@@ -203,12 +211,46 @@ export type KnowledgeRepository = {
       readonly reassessmentReason?: string | null | undefined;
     },
   ) => Promise<KnowledgeObject>;
+  /**
+   * The single ACTIVE understanding of a key, from before knowledge had a
+   * history. Kept for callers that ask "what is the current ARR" without a
+   * period, and now ambiguous by construction: a metric with a series has
+   * several ACTIVE rows and this returns the one with the latest effective
+   * date. Prefer `listSeries` with `selectCurrent`.
+   */
   readonly findActiveByKey: (
     executor: DatabaseExecutor,
     tenantId: TenantId,
     subject: KnowledgeSubjectRef,
     knowledgeKey: string,
   ) => Promise<KnowledgeObject | null>;
+  /**
+   * The row occupying one period's slot: the exact tuple the partial unique
+   * index protects. Two understandings that differ on any of these are not
+   * competing for the same place and coexist.
+   */
+  readonly findActiveForPeriod: (
+    executor: DatabaseExecutor,
+    tenantId: TenantId,
+    subject: KnowledgeSubjectRef,
+    slot: {
+      readonly knowledgeKey: string;
+      readonly definitionQualifier: string | null;
+      readonly measurementBasis: string;
+      readonly validFrom: string | null;
+    },
+  ) => Promise<KnowledgeObject | null>;
+  /**
+   * Everything Capital Q has understood about one key, newest effective date
+   * first, including what has since been superseded or disputed. Historical
+   * is not false, so nothing here is filtered out for being old.
+   */
+  readonly listSeries: (
+    executor: DatabaseExecutor,
+    tenantId: TenantId,
+    subject: KnowledgeSubjectRef,
+    knowledgeKey: string,
+  ) => Promise<readonly KnowledgeObject[]>;
   readonly findById: (
     executor: DatabaseExecutor,
     tenantId: TenantId,
@@ -278,6 +320,17 @@ export type KnowledgeRepository = {
     tenantId: TenantId,
     sourceId: string,
   ) => Promise<readonly KnowledgeObject[]>;
+  /**
+   * Every settled understanding about a subject, for the reassessment
+   * worker. No envelope, because this is not a read on anyone's behalf: it
+   * decides whether Capital Q's own understanding has aged, and its results
+   * never leave the server.
+   */
+  readonly listActiveForSubject: (
+    executor: DatabaseExecutor,
+    tenantId: TenantId,
+    subject: KnowledgeSubjectRef,
+  ) => Promise<readonly KnowledgeObject[]>;
   readonly markReassessment: (
     tx: TransactionContext,
     input: {
@@ -296,7 +349,8 @@ export function createPostgresKnowledgeRepository(): KnowledgeRepository {
           (tenant_id, subject_type, subject_id, knowledge_type, knowledge_key,
            statement, structured_value, truth_class, evidence_status, confidence_class,
            reliability_class, valid_from, valid_to, source_environment,
-           visibility_scope, sensitivity_class, status, hold_reason)
+           visibility_scope, sensitivity_class, definition_qualifier,
+           measurement_basis, status, hold_reason)
         values
           (${input.tenantId}, ${input.subject.subjectType}, ${input.subject.subjectId},
            ${input.knowledgeType}, ${input.knowledgeKey}, ${input.statement},
@@ -304,6 +358,7 @@ export function createPostgresKnowledgeRepository(): KnowledgeRepository {
            ${input.truthClass}, ${input.evidenceStatus}, ${input.confidenceClass},
            ${input.reliabilityClass}, ${input.validFrom}, ${input.validTo},
            ${input.sourceEnvironment}, ${input.visibilityScope}, ${input.sensitivityClass},
+           ${input.definitionQualifier}, ${input.measurementBasis},
            ${input.status}, ${input.holdReason})
         returning id`;
       if (inserted === undefined) {
@@ -328,7 +383,8 @@ export function createPostgresKnowledgeRepository(): KnowledgeRepository {
         select id, tenant_id, subject_type, subject_id, knowledge_type,
                knowledge_key, statement, structured_value, truth_class, evidence_status,
                confidence_class, reliability_class, valid_from, valid_to, recorded_at,
-               source_environment, visibility_scope, sensitivity_class, status, hold_reason,
+               source_environment, visibility_scope, sensitivity_class,
+               definition_qualifier, measurement_basis, last_verified_at, status, hold_reason,
                reassessment_required_at, reassessment_reason, current_revision_number, created_at
           from q_knowledge.objects
          where id = ${inserted.id} and tenant_id = ${input.tenantId}`;
@@ -369,6 +425,12 @@ export function createPostgresKnowledgeRepository(): KnowledgeRepository {
                valid_from = ${input.validFrom},
                valid_to = ${input.validTo},
                status = coalesce(${input.status ?? null}, status),
+               -- A hold reason explains why something is waiting on a
+               -- person. Once it stops waiting the reason is spent, and
+               -- leaving it behind would keep a settled object looking held.
+               hold_reason = case
+                 when coalesce(${input.status ?? null}, status) = 'CANDIDATE'
+                 then hold_reason else null end,
                reassessment_reason = ${input.reassessmentReason ?? null},
                reassessment_required_at = case when ${input.reassessmentReason ?? null}::text is null
                                               then null else now() end,
@@ -379,7 +441,8 @@ export function createPostgresKnowledgeRepository(): KnowledgeRepository {
         select id, tenant_id, subject_type, subject_id, knowledge_type,
                knowledge_key, statement, structured_value, truth_class, evidence_status,
                confidence_class, reliability_class, valid_from, valid_to, recorded_at,
-               source_environment, visibility_scope, sensitivity_class, status, hold_reason,
+               source_environment, visibility_scope, sensitivity_class,
+               definition_qualifier, measurement_basis, last_verified_at, status, hold_reason,
                reassessment_required_at, reassessment_reason, current_revision_number, created_at
           from q_knowledge.objects
          where id = ${input.objectId} and tenant_id = ${input.tenantId}`;
@@ -391,7 +454,8 @@ export function createPostgresKnowledgeRepository(): KnowledgeRepository {
         select id, tenant_id, subject_type, subject_id, knowledge_type, knowledge_key,
                statement, structured_value, truth_class, evidence_status, confidence_class,
                reliability_class, valid_from, valid_to, recorded_at, source_environment,
-               visibility_scope, sensitivity_class, status, hold_reason,
+               visibility_scope, sensitivity_class, definition_qualifier, measurement_basis,
+               last_verified_at, status, hold_reason,
                reassessment_required_at, reassessment_reason, current_revision_number, created_at
           from q_knowledge.objects
          where tenant_id = ${tenantId}
@@ -402,12 +466,58 @@ export function createPostgresKnowledgeRepository(): KnowledgeRepository {
       return row === undefined ? null : toKnowledgeObject(row);
     },
 
+    findActiveForPeriod: async (executor, tenantId, subject, slot) => {
+      // The predicate is the index expression, written the same way on
+      // purpose: if the two ever drift, one of them silently stops meaning
+      // "the same period".
+      const [row] = await executor`
+        select id, tenant_id, subject_type, subject_id, knowledge_type, knowledge_key,
+               statement, structured_value, truth_class, evidence_status, confidence_class,
+               reliability_class, valid_from, valid_to, recorded_at, source_environment,
+               visibility_scope, sensitivity_class, definition_qualifier, measurement_basis,
+               last_verified_at, status, hold_reason,
+               reassessment_required_at, reassessment_reason, current_revision_number, created_at
+          from q_knowledge.objects
+         where tenant_id = ${tenantId}
+           and subject_type = ${subject.subjectType}
+           and subject_id = ${subject.subjectId}
+           and knowledge_key = ${slot.knowledgeKey}
+           and coalesce(definition_qualifier, '') = ${slot.definitionQualifier ?? ""}
+           and measurement_basis = ${slot.measurementBasis}
+           and coalesce(valid_from, '-infinity'::timestamptz)
+               = coalesce(${slot.validFrom}::timestamptz, '-infinity'::timestamptz)
+           and status in ('ACTIVE', 'DISPUTED')
+         -- A settled reading first; a contested one still occupies the slot.
+         order by (status = 'ACTIVE') desc, recorded_at desc
+         limit 1`;
+      return row === undefined ? null : toKnowledgeObject(row);
+    },
+
+    listSeries: async (executor, tenantId, subject, knowledgeKey) => {
+      const rows = await executor`
+        select id, tenant_id, subject_type, subject_id, knowledge_type, knowledge_key,
+               statement, structured_value, truth_class, evidence_status, confidence_class,
+               reliability_class, valid_from, valid_to, recorded_at, source_environment,
+               visibility_scope, sensitivity_class, definition_qualifier, measurement_basis,
+               last_verified_at, status, hold_reason,
+               reassessment_required_at, reassessment_reason, current_revision_number, created_at
+          from q_knowledge.objects
+         where tenant_id = ${tenantId}
+           and subject_type = ${subject.subjectType}
+           and subject_id = ${subject.subjectId}
+           and knowledge_key = ${knowledgeKey}
+           and status in ('ACTIVE', 'SUPERSEDED', 'DISPUTED', 'STALE')
+         order by coalesce(valid_from, recorded_at) desc, recorded_at desc`;
+      return rows.map((row) => toKnowledgeObject(row));
+    },
+
     findById: async (executor, tenantId, objectId) => {
       const [row] = await executor`
         select id, tenant_id, subject_type, subject_id, knowledge_type, knowledge_key,
                statement, structured_value, truth_class, evidence_status, confidence_class,
                reliability_class, valid_from, valid_to, recorded_at, source_environment,
-               visibility_scope, sensitivity_class, status, hold_reason,
+               visibility_scope, sensitivity_class, definition_qualifier, measurement_basis,
+               last_verified_at, status, hold_reason,
                reassessment_required_at, reassessment_reason, current_revision_number, created_at
           from q_knowledge.objects
          where tenant_id = ${tenantId} and id = ${objectId}`;
@@ -479,7 +589,8 @@ export function createPostgresKnowledgeRepository(): KnowledgeRepository {
                o.knowledge_key, o.statement, o.structured_value, o.truth_class,
                o.evidence_status, o.confidence_class, o.reliability_class, o.valid_from,
                o.valid_to, o.recorded_at, o.source_environment, o.visibility_scope,
-               o.sensitivity_class, o.status, o.hold_reason, o.reassessment_required_at,
+               o.sensitivity_class, o.definition_qualifier, o.measurement_basis,
+               o.last_verified_at, o.status, o.hold_reason, o.reassessment_required_at,
                o.reassessment_reason, o.current_revision_number, o.created_at
           from q_knowledge.objects o
           join q_knowledge.object_evidence e
@@ -496,12 +607,30 @@ export function createPostgresKnowledgeRepository(): KnowledgeRepository {
                o.knowledge_key, o.statement, o.structured_value, o.truth_class,
                o.evidence_status, o.confidence_class, o.reliability_class, o.valid_from,
                o.valid_to, o.recorded_at, o.source_environment, o.visibility_scope,
-               o.sensitivity_class, o.status, o.hold_reason, o.reassessment_required_at,
+               o.sensitivity_class, o.definition_qualifier, o.measurement_basis,
+               o.last_verified_at, o.status, o.hold_reason, o.reassessment_required_at,
                o.reassessment_reason, o.current_revision_number, o.created_at
           from q_knowledge.objects o
           join q_knowledge.object_sources s
             on s.knowledge_object_id = o.id and s.tenant_id = o.tenant_id
          where o.tenant_id = ${tenantId} and s.source_id = ${sourceId}`;
+      return rows.map((row) => toKnowledgeObject(row));
+    },
+
+    listActiveForSubject: async (executor, tenantId, subject) => {
+      const rows = await executor`
+        select id, tenant_id, subject_type, subject_id, knowledge_type, knowledge_key,
+               statement, structured_value, truth_class, evidence_status, confidence_class,
+               reliability_class, valid_from, valid_to, recorded_at, source_environment,
+               visibility_scope, sensitivity_class, definition_qualifier, measurement_basis,
+               last_verified_at, status, hold_reason,
+               reassessment_required_at, reassessment_reason, current_revision_number, created_at
+          from q_knowledge.objects
+         where tenant_id = ${tenantId}
+           and subject_type = ${subject.subjectType}
+           and subject_id = ${subject.subjectId}
+           and status in ('ACTIVE', 'DISPUTED')
+         order by knowledge_key`;
       return rows.map((row) => toKnowledgeObject(row));
     },
 

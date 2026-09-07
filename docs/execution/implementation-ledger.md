@@ -472,8 +472,54 @@ CQ-KNW-002          VERIFIED   Q Knowledge Objects + deterministic Knowledge Wri
                     and deterministic. No new service, account, API key or ENV;
                     no live model call anywhere in this packet. Gates 2026-09-07:
                     see the CQ-KNW-002 postflight. Uncommitted.
-CQ-KNW-003          NEXT       Contradictions / revisions (not started; a demo web
-                    integration slice is planned before it)
+CQ-KNW-003          VERIFIED   Contradictions, temporal knowledge and revision
+                    resolution — a metric that has a history, and disagreement
+                    with somewhere durable to live. Migration 20260912090000
+                    adds definition_qualifier, measurement_basis and
+                    last_verified_at to objects, replaces the one-ACTIVE-per-key
+                    index with one per (subject, key, definition, basis,
+                    period), adds an effective-date index, adds
+                    revisions.correction_of_revision_id, and creates
+                    contradiction_sets + contradiction_members with an identity
+                    trigger and RLS on with no policy. "Current" stops being a
+                    status and becomes the latest effective reading, where
+                    effective is coalesce(valid_from, recorded_at) — the same
+                    expression the index orders by. compareKnowledge examines
+                    metric, period, definition, basis, value kind and currency
+                    BEFORE calling anything a conflict, so growth, a second
+                    definition and a forecast are never reported as
+                    discrepancies; different currencies are INCOMPARABLE rather
+                    than contradictory because deciding would mean inventing an
+                    FX rate. Materiality is UNDETERMINED for every genuine
+                    conflict — no calibrated methodology exists here and one was
+                    not invented. correctsEarlier is a REQUEST: the gate reads it
+                    only after isCorrectionOf confirms the periods match, so no
+                    candidate can supersede an inconvenient figure by claiming to
+                    correct it; the earlier reading becomes SUPERSEDED with a
+                    `supersedes` lineage edge, never deleted. A conflict holds the
+                    challenger, moves the incumbent to DISPUTED at
+                    CONFLICTING_EVIDENCE and opens — or joins — a contradiction
+                    set that inherits its members' visibility and sensitivity, so
+                    "these two figures conflict" is never filed more openly than
+                    the figures. settleContradiction requires a HUMAN actor and
+                    every member survives the decision. Reads gain currentForKey,
+                    currentForSubject, asOfForKey, historyForKey and
+                    disputesForSubject; a dispute returns every authorised member
+                    or nothing, and the "is there a later reading" predicate
+                    carries the SAME envelope so an unauthorised founder-private
+                    figure can never suppress an authorised earlier one.
+                    Freshness is a declared per-key policy
+                    (knowledge-freshness-v1) with a rationale on each rule; a key
+                    with no rule never ages; reassessForFreshness marks STALE and
+                    touches lifecycle only — scope and sensitivity are untouched,
+                    because age qualifies an answer and never widens who may hear
+                    it. 27 new unit tests (KNWC-001..012) + 9 new integration
+                    tests (KNW3-001..009) + rls/380 (31 tests) + schema guard
+                    rows; the whole RLS suite is 838 tests across 29 files. pnpm
+                    knowledge:temporal:smoke, free and deterministic. No new
+                    service, account, API key or ENV; no model call anywhere in
+                    this packet. Gates 2026-09-07: see the CQ-KNW-003 postflight.
+CQ-Q-020            NEXT       Not started.
 ```
 
 ## Architecture coverage (doc 25 §198) — Q rows
@@ -763,3 +809,25 @@ CQ-KNW-003          NEXT       Contradictions / revisions (not started; a demo w
 | Unbounded retrieval or context assembly                          | Bounded lexical K, semantic K, fused K, final hits, per-hit and total characters              | service bound tests; integration bound test                   |
 | A cached private result outliving its permission                 | No retrieval cache exists                                                                     | rls/360 hasnt_table tests                                     |
 | A browser reading the lexical index                              | RLS on, no policy, no grant, no route                                                         | rls/360 anonymous and cross-tenant tests                      |
+
+## Threat coverage (doc 16) — CQ-KNW-003 rows
+
+| Threat                                                              | Control                                                                                   | Proof                                                     |
+| ------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- | --------------------------------------------------------- |
+| A company's own growth reported back to it as a discrepancy         | Period is compared before value; a series is `DIFFERENT_PERIOD`, never a conflict         | temporal.test KNWC-004; integration KNW3-001              |
+| A forecast or a second definition treated as a competing figure     | Definition and basis are part of the slot and of the comparison                           | temporal.test KNWC-005/006; integration KNW3-002; rls/380 |
+| A corrected typo recorded as a decline                              | `isCorrectionOf` requires the same period; the earlier reading is SUPERSEDED, not deleted | temporal.test KNWC-011; integration KNW3-003              |
+| A candidate superseding a figure by asserting it corrects it        | `correctsEarlier` is read only after the periods match                                    | integration KNW3-004                                      |
+| Capital Q silently choosing the larger or the newer number          | Conflict is held; both readings persist; resolution requires a human actor                | integration KNW3-005; rls/380 members-survive test        |
+| A machine settling a disagreement                                   | `settleContradiction` refuses a non-HUMAN actor with `NOT_A_HUMAN_DECISION`               | integration KNW3-005                                      |
+| An invented materiality threshold shown as measured                 | `classifyMateriality` returns UNDETERMINED for every genuine conflict; DB default matches | temporal.test KNWC-010; rls/380 default test              |
+| An invented FX rate deciding a currency difference                  | Different currencies are INCOMPARABLE; both readings kept                                 | temporal.test KNWC-008                                    |
+| "These two figures conflict" leaking what the figures are           | A set inherits its members' classification and holds no statement or value                | integration KNW3-006; rls/380 shape tests                 |
+| One side of a disagreement travelling alone                         | `disputesForSubject` returns every authorised member or nothing                           | integration KNW3-005/006                                  |
+| An unauthorised later reading suppressing an authorised earlier one | The "is there a later reading" predicate carries the same envelope                        | integration KNW3-007                                      |
+| Age silently widening who may read something                        | Freshness changes lifecycle only; scope and sensitivity untouched                         | integration KNW3-008; temporal.test KNWC-012              |
+| A universal TTL inventing an expiry nobody measured                 | Only declared keys age; each rule carries its rationale; no policy means no expiry        | temporal.test KNWC-012                                    |
+| A held candidate keeping its hold reason after being settled        | `revise` clears `hold_reason` whenever the status leaves CANDIDATE; DB CHECK enforces it  | integration KNW3-005; rls/370 held-and-settled test       |
+| A contradiction's identity edited after the fact                    | Trigger refuses any change to what is contested, and refuses reopening a settled set      | rls/380 immutability and reopen tests                     |
+| Another tenant's understanding dragged into a disagreement          | Composite FKs on (set, tenant) and (object, tenant)                                       | rls/380 cross-tenant test                                 |
+| A browser reading contradiction sets                                | RLS on, no policy, no grant, no route                                                     | rls/380 policy and RLS tests; schema guard                |

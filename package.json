@@ -51,7 +51,8 @@
     "rag:retrieval:smoke": "node scripts/rag-retrieval.mjs smoke",
     "rag:retrieval:eval": "node scripts/rag-retrieval.mjs eval",
     "knowledge:claims:smoke": "node scripts/knowledge-claims-smoke.mjs",
-    "knowledge:write:smoke": "node scripts/knowledge-write-smoke.mjs"
+    "knowledge:write:smoke": "node scripts/knowledge-write-smoke.mjs",
+    "knowledge:temporal:smoke": "node scripts/knowledge-temporal-smoke.mjs"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

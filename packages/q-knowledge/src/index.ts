@@ -16,10 +16,16 @@
  * and source provenance, lineage, a deterministic Knowledge Write Gate and
  * permission-aware reads.
  *
+ * Owns since CQ-KNW-003: time and disagreement — bitemporal validity,
+ * corrections, compatibility comparison, freshness policy, recorded
+ * contradiction sets, and reads that answer "current", "as of" and "the
+ * history of" without ever preferring a number.
+ *
  * Does not own (yet or ever): permission decisions (the Context Firewall
  * decides; this obeys), claims and evidence (CQ-KNW-001 and the Evidence
- * context own them), contradiction resolution (CQ-KNW-003), documents or
- * extraction (Evidence), canonical company state (the owning domain),
+ * context own them), which reading of a disagreement is true (a person
+ * decides), documents or extraction (Evidence), canonical company state
+ * (the owning domain),
  * recommendation ranking, the Data Room. It calls no model to rank or
  * rewrite, exposes no search API, fetches no URL, and executes nothing a
  * document says.
@@ -142,17 +148,53 @@ export {
 } from "./knowledge/policy.js";
 export {
   createKnowledgeWriteGate,
+  type ContradictionSettlement,
   type KnowledgeWriteCommand,
   type KnowledgeWriteGate,
   type KnowledgeWriteGateDependencies,
 } from "./knowledge/write-gate.js";
 export {
+  classifyMateriality,
+  compareKnowledge,
+  COMPATIBILITY_VERDICTS,
+  type ComparableKnowledge,
+  type CompatibilityResult,
+  type CompatibilityVerdict,
+  type MeasurementBasis,
+} from "./knowledge/compatibility.js";
+export {
+  effectiveFrom,
+  effectiveTo,
+  isCorrectionOf,
+  periodsOverlap,
+  samePeriod,
+  selectAsOf,
+  selectCurrent,
+  type KnowledgePeriod,
+} from "./knowledge/temporal.js";
+export {
+  assessFreshness,
+  freshnessRuleFor,
+  KNOWLEDGE_FRESHNESS_POLICY_VERSION,
+  KNOWLEDGE_FRESHNESS_RULES,
+  type FreshnessAssessment,
+  type FreshnessRule,
+} from "./knowledge/freshness.js";
+export {
   createKnowledgeQueryService,
   KNOWLEDGE_QUERY_MAX,
   knowledgeConstraintsFor,
+  type AuthorisedDispute,
   type KnowledgeQueryScope,
   type KnowledgeQueryService,
 } from "./knowledge/query.js";
+export {
+  createPostgresContradictionRepository,
+  CONTRADICTION_STATUSES,
+  type ContradictionRepository,
+  type ContradictionSet,
+  type ContradictionStatus,
+} from "./infrastructure/postgres-contradiction-repository.js";
 export {
   createPostgresKnowledgeRepository,
   toKnowledgeObject,
