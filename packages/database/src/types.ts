@@ -50,9 +50,23 @@ export type TransactionManager = {
   readonly run: <T>(work: (tx: TransactionContext) => Promise<T>) => Promise<T>;
 };
 
+/**
+ * A LISTEN subscription. `onNotify` receives each NOTIFY payload on the
+ * channel; `onListen` fires when the dedicated connection is (re)established,
+ * which is the moment a consumer must assume it missed notifications and
+ * re-read durable state. Notifications are wake-ups, never truth.
+ */
+export type DatabaseNotificationListener = (
+  channel: string,
+  onNotify: (payload: string) => void,
+  onListen?: () => void,
+) => Promise<{ readonly unlisten: () => Promise<void> }>;
+
 type DatabaseClientBase = {
   readonly sql: DatabaseExecutor;
   readonly transactions: TransactionManager;
+  /** LISTEN on a channel over the driver's dedicated notification connection. */
+  readonly listen: DatabaseNotificationListener;
   /** Drain the pool. Persistent services call this on graceful shutdown. */
   readonly close: () => Promise<void>;
 };

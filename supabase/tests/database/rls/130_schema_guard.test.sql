@@ -32,7 +32,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 
 create temporary table guarded_schemas (schema_name text primary key) on commit drop;
-insert into guarded_schemas values ('identity'), ('permissions'), ('events'), ('audit'), ('core'), ('network'), ('taxonomy'), ('onboarding'), ('evidence'), ('media');
+insert into guarded_schemas values ('identity'), ('permissions'), ('events'), ('audit'), ('core'), ('network'), ('taxonomy'), ('onboarding'), ('evidence'), ('media'), ('q_runtime'), ('ai_ops'), ('q_knowledge');
 
 create temporary table rls_inventory (
   schema_name text not null,
@@ -103,6 +103,26 @@ insert into rls_inventory (schema_name, table_name, classification, authenticate
   ('evidence', 'document_upload_requests',  'INTERNAL_SERVER_ONLY', '{}'),
   ('evidence', 'document_extractions',      'INTERNAL_SERVER_ONLY', '{}'),
   ('media',    'media_assets',              'INTERNAL_SERVER_ONLY', '{}'),
+  ('q_runtime', 'conversations',            'INTERNAL_SERVER_ONLY', '{}'),
+  ('q_runtime', 'conversation_messages',    'INTERNAL_SERVER_ONLY', '{}'),
+  ('q_runtime', 'runs',                     'INTERNAL_SERVER_ONLY', '{}'),
+  ('q_runtime', 'run_events',               'INTERNAL_SERVER_ONLY', '{}'),
+  ('q_runtime', 'run_creation_requests',    'INTERNAL_SERVER_ONLY', '{}'),
+  ('q_runtime', 'message_creation_requests', 'INTERNAL_SERVER_ONLY', '{}'),
+  ('q_runtime', 'checkpoint_migrations',     'INTERNAL_SERVER_ONLY', '{}'),
+  ('q_runtime', 'checkpoints',               'INTERNAL_SERVER_ONLY', '{}'),
+  ('q_runtime', 'checkpoint_blobs',          'INTERNAL_SERVER_ONLY', '{}'),
+  ('q_runtime', 'checkpoint_writes',         'INTERNAL_SERVER_ONLY', '{}'),
+  ('q_runtime', 'actions',                   'INTERNAL_SERVER_ONLY', '{}'),
+  ('q_runtime', 'approvals',                 'INTERNAL_SERVER_ONLY', '{}'),
+  ('ai_ops', 'providers',                   'INTERNAL_SERVER_ONLY', '{}'),
+  ('ai_ops', 'models',                      'INTERNAL_SERVER_ONLY', '{}'),
+  ('ai_ops', 'model_prices',                'INTERNAL_SERVER_ONLY', '{}'),
+  ('ai_ops', 'routing_policies',            'INTERNAL_SERVER_ONLY', '{}'),
+  ('ai_ops', 'model_usage',                 'INTERNAL_SERVER_ONLY', '{}'),
+  ('q_knowledge', 'chunk_sets',             'INTERNAL_SERVER_ONLY', '{}'),
+  ('q_knowledge', 'chunks',                 'INTERNAL_SERVER_ONLY', '{}'),
+  ('q_knowledge', 'embeddings',             'INTERNAL_SERVER_ONLY', '{}'),
   ('events', 'outbox',                     'INTERNAL_SERVER_ONLY', '{}'),
   ('audit', 'material_actions',            'INTERNAL_SERVER_ONLY', '{}'),
   ('audit', 'security_events',             'INTERNAL_SERVER_ONLY', '{}');
@@ -184,8 +204,9 @@ select ok(not has_schema_privilege('authenticated', 'events', 'usage')
       and not has_schema_privilege('authenticated', 'onboarding', 'usage')
       and not has_schema_privilege('authenticated', 'evidence', 'usage')
       and not has_schema_privilege('authenticated', 'media', 'usage')
+      and not has_schema_privilege('authenticated', 'q_runtime', 'usage')
       and not has_schema_privilege('authenticated', 'pgmq', 'usage'),
-  'authenticated has no usage on events, audit, network, taxonomy, onboarding, evidence, media or pgmq');
+  'authenticated has no usage on events, audit, network, taxonomy, onboarding, evidence, media, q_runtime or pgmq');
 
 -- SECURITY DEFINER helpers -----------------------------------------------------
 

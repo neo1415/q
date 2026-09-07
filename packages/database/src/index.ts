@@ -37,6 +37,7 @@ export {
 } from "./errors.js";
 export type {
   DatabaseExecutor,
+  DatabaseNotificationListener,
   MigrationDatabase,
   PrivilegedDatabase,
   RequestDatabase,

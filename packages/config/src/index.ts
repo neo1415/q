@@ -13,6 +13,7 @@
  *   @capital-q/config/q-api
  *   @capital-q/config/workers
  *   @capital-q/config/web
+ *   @capital-q/config/embeddings
  *
  * There is deliberately no single schema covering every variable: the API must
  * not require the worker's credentials, and the browser must not require the
@@ -58,5 +59,21 @@ export {
   type SupabaseAuthConfig,
   type SupabaseKeyClass,
 } from "./supabase-auth.js";
+
+export {
+  EMBEDDING_ENV_NAMES,
+  EMBEDDING_PROVIDERS,
+  isPrivateEmbeddingHost,
+  type EmbeddingConfig,
+  type EmbeddingProviderSetting,
+} from "./embeddings.js";
+
+export {
+  MODEL_PROVIDER_ENV_NAMES,
+  modelProviderConfigStatus,
+  ProviderCredential,
+  type ModelProviderConfigStatus,
+  type ModelProviderSecrets,
+} from "./model-providers.js";
 
 export const CONFIG_SCHEMA_VERSION = 1;

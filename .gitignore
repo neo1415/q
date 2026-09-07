@@ -45,3 +45,14 @@ Thumbs.db
 
 # Per-developer in-app browser preview configuration.
 .claude/launch.json
+
+# Eval run reports (volatile; baselines are source-controlled under packages/q-evals/baselines)
+artifacts/
+
+# Embedding model weights and caches (CQ-RAG-002). Weights live in a Docker
+# named volume, never in source control and never inside an application
+# image; these entries catch a local bind mount by accident.
+models/
+.cache/huggingface/
+*.safetensors
+*.onnx

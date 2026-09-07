@@ -7,6 +7,10 @@ packages:
 # eslint-config-next; it ships prebuilt platform binaries as optional
 # dependencies, so its build script is not required for lint to resolve imports.
 allowBuilds:
+  # @google/genai's "prepare" is a maintainer step and protobufjs's postinstall
+  # only prints a notice; neither is needed at runtime (CQ-Q-005).
+  "@google/genai": false
+  protobufjs: false
   unrs-resolver: false
 minimumReleaseAgeExclude:
   - "@testing-library/user-event@14.6.7"
@@ -16,3 +20,5 @@ minimumReleaseAgeExclude:
   - "@supabase/realtime-js@2.114.0"
   - "@supabase/storage-js@2.114.0"
   - "@supabase/supabase-js@2.114.0"
+  - "@langchain/langgraph-sdk@1.10.2"
+  - "@langchain/langgraph@1.4.14"

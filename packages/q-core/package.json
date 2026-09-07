@@ -1,0 +1,32 @@
+{
+  "name": "@capital-q/q-core",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Q's governed behavioural core: the versioned, immutable, provider-neutral Prompt Registry (Q System Charter and task prompts), prompt variable and output schemas, the prompt renderer with untrusted-content boundaries, bounded communication guidance, and prompt bundle identity. Pure: no database, no provider SDK, no retrieval, no tool.",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "clean": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\""
+  },
+  "dependencies": {
+    "@capital-q/contracts": "workspace:*",
+    "zod": "4.5.4"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.3",
+    "typescript": "5.9.3"
+  }
+}

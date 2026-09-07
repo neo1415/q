@@ -29,6 +29,8 @@ export * from "./evidence/index.js";
 export * from "./events/index.js";
 export * from "./jobs/index.js";
 export * from "./providers/index.js";
+export * from "./q/index.js";
+export * from "./model/index.js";
 
 export const PACKAGE_NAME = "@capital-q/contracts" as const;
 

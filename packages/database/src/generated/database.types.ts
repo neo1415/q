@@ -7,6 +7,348 @@ export type Json =
   | Json[]
 
 export type Database = {
+  ai_ops: {
+    Tables: {
+      model_prices: {
+        Row: {
+          batch_input_per_million: number | null
+          batch_output_per_million: number | null
+          cached_input_per_million: number | null
+          created_at: string
+          currency: string
+          effective_from: string
+          effective_to: string | null
+          free_tier_description: string | null
+          id: string
+          input_per_million: number
+          model_id: string
+          output_per_million: number
+          pricing_region: string
+          source_url: string
+          verified_at: string
+        }
+        Insert: {
+          batch_input_per_million?: number | null
+          batch_output_per_million?: number | null
+          cached_input_per_million?: number | null
+          created_at?: string
+          currency?: string
+          effective_from: string
+          effective_to?: string | null
+          free_tier_description?: string | null
+          id?: string
+          input_per_million: number
+          model_id: string
+          output_per_million: number
+          pricing_region?: string
+          source_url: string
+          verified_at: string
+        }
+        Update: {
+          batch_input_per_million?: number | null
+          batch_output_per_million?: number | null
+          cached_input_per_million?: number | null
+          created_at?: string
+          currency?: string
+          effective_from?: string
+          effective_to?: string | null
+          free_tier_description?: string | null
+          id?: string
+          input_per_million?: number
+          model_id?: string
+          output_per_million?: number
+          pricing_region?: string
+          source_url?: string
+          verified_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "model_prices_model_id_fkey"
+            columns: ["model_id"]
+            isOneToOne: false
+            referencedRelation: "models"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      model_usage: {
+        Row: {
+          attempt: number
+          cached_input_tokens: number
+          correlation_id: string | null
+          cost_basis: string
+          cost_usd: number | null
+          error_code: string | null
+          id: number
+          input_tokens: number
+          latency_ms: number
+          model_id: string
+          occurred_at: string
+          output_tokens: number
+          provider_id: string
+          q_run_id: string | null
+          routing_policy_id: string | null
+          success: boolean
+          task_class: string
+          tenant_id: string
+          user_id: string | null
+        }
+        Insert: {
+          attempt: number
+          cached_input_tokens?: number
+          correlation_id?: string | null
+          cost_basis: string
+          cost_usd?: number | null
+          error_code?: string | null
+          id?: number
+          input_tokens?: number
+          latency_ms: number
+          model_id: string
+          occurred_at?: string
+          output_tokens?: number
+          provider_id: string
+          q_run_id?: string | null
+          routing_policy_id?: string | null
+          success: boolean
+          task_class: string
+          tenant_id: string
+          user_id?: string | null
+        }
+        Update: {
+          attempt?: number
+          cached_input_tokens?: number
+          correlation_id?: string | null
+          cost_basis?: string
+          cost_usd?: number | null
+          error_code?: string | null
+          id?: number
+          input_tokens?: number
+          latency_ms?: number
+          model_id?: string
+          occurred_at?: string
+          output_tokens?: number
+          provider_id?: string
+          q_run_id?: string | null
+          routing_policy_id?: string | null
+          success?: boolean
+          task_class?: string
+          tenant_id?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "model_usage_model_id_fkey"
+            columns: ["model_id"]
+            isOneToOne: false
+            referencedRelation: "models"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "model_usage_provider_id_fkey"
+            columns: ["provider_id"]
+            isOneToOne: false
+            referencedRelation: "providers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "model_usage_routing_policy_id_fkey"
+            columns: ["routing_policy_id"]
+            isOneToOne: false
+            referencedRelation: "routing_policies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      models: {
+        Row: {
+          context_window: number
+          created_at: string
+          effective_from: string
+          effective_to: string | null
+          id: string
+          latency_class: string
+          max_output_tokens: number
+          metadata: Json
+          model_code: string
+          model_family: string
+          model_type: string
+          provider_id: string
+          quality_class: string
+          sensitivity_ceiling: string
+          status: string
+          supports_audio: boolean
+          supports_prompt_cache: boolean
+          supports_realtime: boolean
+          supports_reasoning: boolean
+          supports_structured_output: boolean
+          supports_tools: boolean
+          supports_vision: boolean
+          updated_at: string
+        }
+        Insert: {
+          context_window: number
+          created_at?: string
+          effective_from?: string
+          effective_to?: string | null
+          id?: string
+          latency_class: string
+          max_output_tokens: number
+          metadata?: Json
+          model_code: string
+          model_family: string
+          model_type: string
+          provider_id: string
+          quality_class: string
+          sensitivity_ceiling: string
+          status?: string
+          supports_audio?: boolean
+          supports_prompt_cache?: boolean
+          supports_realtime?: boolean
+          supports_reasoning?: boolean
+          supports_structured_output?: boolean
+          supports_tools?: boolean
+          supports_vision?: boolean
+          updated_at?: string
+        }
+        Update: {
+          context_window?: number
+          created_at?: string
+          effective_from?: string
+          effective_to?: string | null
+          id?: string
+          latency_class?: string
+          max_output_tokens?: number
+          metadata?: Json
+          model_code?: string
+          model_family?: string
+          model_type?: string
+          provider_id?: string
+          quality_class?: string
+          sensitivity_ceiling?: string
+          status?: string
+          supports_audio?: boolean
+          supports_prompt_cache?: boolean
+          supports_realtime?: boolean
+          supports_reasoning?: boolean
+          supports_structured_output?: boolean
+          supports_tools?: boolean
+          supports_vision?: boolean
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "models_provider_id_fkey"
+            columns: ["provider_id"]
+            isOneToOne: false
+            referencedRelation: "providers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      providers: {
+        Row: {
+          code: string
+          created_at: string
+          id: string
+          metadata: Json
+          name: string
+          privacy_policy_class: string
+          region_support: Json
+          status: string
+          supports_byo_key: boolean
+          supports_zero_retention: boolean
+          updated_at: string
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          id?: string
+          metadata?: Json
+          name: string
+          privacy_policy_class?: string
+          region_support?: Json
+          status?: string
+          supports_byo_key?: boolean
+          supports_zero_retention?: boolean
+          updated_at?: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          id?: string
+          metadata?: Json
+          name?: string
+          privacy_policy_class?: string
+          region_support?: Json
+          status?: string
+          supports_byo_key?: boolean
+          supports_zero_retention?: boolean
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      routing_policies: {
+        Row: {
+          allow_free_router: boolean
+          code: string
+          cost_ceiling_usd: number | null
+          created_at: string
+          fallback_models: string[]
+          id: string
+          latency_target_ms: number | null
+          preferred_models: string[]
+          quality_floor: string
+          sensitivity_class: string
+          status: string
+          task_class: string
+          version: number
+        }
+        Insert: {
+          allow_free_router?: boolean
+          code: string
+          cost_ceiling_usd?: number | null
+          created_at?: string
+          fallback_models?: string[]
+          id?: string
+          latency_target_ms?: number | null
+          preferred_models: string[]
+          quality_floor: string
+          sensitivity_class: string
+          status?: string
+          task_class: string
+          version: number
+        }
+        Update: {
+          allow_free_router?: boolean
+          code?: string
+          cost_ceiling_usd?: number | null
+          created_at?: string
+          fallback_models?: string[]
+          id?: string
+          latency_target_ms?: number | null
+          preferred_models?: string[]
+          quality_floor?: string
+          sensitivity_class?: string
+          status?: string
+          task_class?: string
+          version?: number
+        }
+        Relationships: []
+      }
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      [_ in never]: never
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   audit: {
     Tables: {
       material_actions: {
@@ -1265,6 +1607,7 @@ export type Database = {
       }
       document_processing_runs: {
         Row: {
+          chunking_version: string | null
           classifier_version: string | null
           completed_at: string | null
           cost_usd: number
@@ -1280,6 +1623,7 @@ export type Database = {
           status: string
         }
         Insert: {
+          chunking_version?: string | null
           classifier_version?: string | null
           completed_at?: string | null
           cost_usd?: number
@@ -1295,6 +1639,7 @@ export type Database = {
           status?: string
         }
         Update: {
+          chunking_version?: string | null
           classifier_version?: string | null
           completed_at?: string | null
           cost_usd?: number
@@ -2921,6 +3266,788 @@ export type Database = {
       [_ in never]: never
     }
   }
+  q_knowledge: {
+    Tables: {
+      chunk_sets: {
+        Row: {
+          chunk_count: number
+          chunking_strategy: string
+          chunking_version: string
+          created_at: string
+          document_id: string
+          document_version_id: string
+          extraction_id: string
+          extractor_id: string
+          extractor_version: string
+          id: string
+          invalidated_at: string | null
+          owner_organisation_id: string
+          sensitivity_class: string
+          source_id: string | null
+          status: string
+          status_reason: string | null
+          subject_id: string
+          subject_type: string
+          tenant_id: string
+          token_estimate: number
+          visibility_scope: string
+        }
+        Insert: {
+          chunk_count: number
+          chunking_strategy: string
+          chunking_version: string
+          created_at?: string
+          document_id: string
+          document_version_id: string
+          extraction_id: string
+          extractor_id: string
+          extractor_version: string
+          id?: string
+          invalidated_at?: string | null
+          owner_organisation_id: string
+          sensitivity_class: string
+          source_id?: string | null
+          status?: string
+          status_reason?: string | null
+          subject_id: string
+          subject_type: string
+          tenant_id: string
+          token_estimate: number
+          visibility_scope: string
+        }
+        Update: {
+          chunk_count?: number
+          chunking_strategy?: string
+          chunking_version?: string
+          created_at?: string
+          document_id?: string
+          document_version_id?: string
+          extraction_id?: string
+          extractor_id?: string
+          extractor_version?: string
+          id?: string
+          invalidated_at?: string | null
+          owner_organisation_id?: string
+          sensitivity_class?: string
+          source_id?: string | null
+          status?: string
+          status_reason?: string | null
+          subject_id?: string
+          subject_type?: string
+          tenant_id?: string
+          token_estimate?: number
+          visibility_scope?: string
+        }
+        Relationships: []
+      }
+      chunks: {
+        Row: {
+          block_index_end: number
+          block_index_start: number
+          chunk_index: number
+          chunk_kind: string
+          chunk_set_id: string
+          content: string
+          content_sha256: string
+          content_tsv: unknown
+          created_at: string
+          document_version_id: string
+          id: string
+          instruction_risk_signals: number
+          invalidated_at: string | null
+          locator: Json
+          parent_chunk_id: string | null
+          role: string
+          sensitivity_class: string
+          status: string
+          subject_id: string
+          subject_type: string
+          tenant_id: string
+          token_estimate: number
+          visibility_scope: string
+        }
+        Insert: {
+          block_index_end: number
+          block_index_start: number
+          chunk_index: number
+          chunk_kind: string
+          chunk_set_id: string
+          content: string
+          content_sha256: string
+          content_tsv?: unknown
+          created_at?: string
+          document_version_id: string
+          id?: string
+          instruction_risk_signals?: number
+          invalidated_at?: string | null
+          locator: Json
+          parent_chunk_id?: string | null
+          role: string
+          sensitivity_class: string
+          status?: string
+          subject_id: string
+          subject_type: string
+          tenant_id: string
+          token_estimate: number
+          visibility_scope: string
+        }
+        Update: {
+          block_index_end?: number
+          block_index_start?: number
+          chunk_index?: number
+          chunk_kind?: string
+          chunk_set_id?: string
+          content?: string
+          content_sha256?: string
+          content_tsv?: unknown
+          created_at?: string
+          document_version_id?: string
+          id?: string
+          instruction_risk_signals?: number
+          invalidated_at?: string | null
+          locator?: Json
+          parent_chunk_id?: string | null
+          role?: string
+          sensitivity_class?: string
+          status?: string
+          subject_id?: string
+          subject_type?: string
+          tenant_id?: string
+          token_estimate?: number
+          visibility_scope?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chunks_chunk_set_id_tenant_id_fkey"
+            columns: ["chunk_set_id", "tenant_id"]
+            isOneToOne: false
+            referencedRelation: "chunk_sets"
+            referencedColumns: ["id", "tenant_id"]
+          },
+          {
+            foreignKeyName: "chunks_parent_chunk_id_chunk_set_id_fkey"
+            columns: ["parent_chunk_id", "chunk_set_id"]
+            isOneToOne: false
+            referencedRelation: "chunks"
+            referencedColumns: ["id", "chunk_set_id"]
+          },
+        ]
+      }
+      embeddings: {
+        Row: {
+          chunk_id: string
+          configuration_version: string
+          created_at: string
+          embedding: string
+          embedding_dimension: number
+          id: string
+          instruction_version: string
+          model_code: string
+          model_revision: string | null
+          provider_code: string
+          tenant_id: string
+        }
+        Insert: {
+          chunk_id: string
+          configuration_version: string
+          created_at?: string
+          embedding: string
+          embedding_dimension: number
+          id?: string
+          instruction_version: string
+          model_code: string
+          model_revision?: string | null
+          provider_code: string
+          tenant_id: string
+        }
+        Update: {
+          chunk_id?: string
+          configuration_version?: string
+          created_at?: string
+          embedding?: string
+          embedding_dimension?: number
+          id?: string
+          instruction_version?: string
+          model_code?: string
+          model_revision?: string | null
+          provider_code?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "embeddings_chunk_id_tenant_id_fkey"
+            columns: ["chunk_id", "tenant_id"]
+            isOneToOne: false
+            referencedRelation: "chunks"
+            referencedColumns: ["id", "tenant_id"]
+          },
+        ]
+      }
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      sensitivity_rank: { Args: { class: string }; Returns: number }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
+  q_runtime: {
+    Tables: {
+      actions: {
+        Row: {
+          action_type: string
+          action_version: number
+          created_at: string
+          executed_at: string | null
+          execution_attempts: number
+          execution_result: Json | null
+          failure_code: string | null
+          id: string
+          idempotency_key: string
+          organisation_id: string | null
+          preview: string | null
+          proposed_by_user_id: string
+          proposed_payload: Json
+          proposed_payload_hash: string
+          retry_permitted: boolean
+          risk_class: string
+          run_id: string
+          status: string
+          summary: string
+          target_refs: Json
+          tenant_id: string
+          updated_at: string
+          version: number
+        }
+        Insert: {
+          action_type: string
+          action_version: number
+          created_at?: string
+          executed_at?: string | null
+          execution_attempts?: number
+          execution_result?: Json | null
+          failure_code?: string | null
+          id?: string
+          idempotency_key: string
+          organisation_id?: string | null
+          preview?: string | null
+          proposed_by_user_id: string
+          proposed_payload: Json
+          proposed_payload_hash: string
+          retry_permitted?: boolean
+          risk_class: string
+          run_id: string
+          status?: string
+          summary: string
+          target_refs: Json
+          tenant_id: string
+          updated_at?: string
+          version?: number
+        }
+        Update: {
+          action_type?: string
+          action_version?: number
+          created_at?: string
+          executed_at?: string | null
+          execution_attempts?: number
+          execution_result?: Json | null
+          failure_code?: string | null
+          id?: string
+          idempotency_key?: string
+          organisation_id?: string | null
+          preview?: string | null
+          proposed_by_user_id?: string
+          proposed_payload?: Json
+          proposed_payload_hash?: string
+          retry_permitted?: boolean
+          risk_class?: string
+          run_id?: string
+          status?: string
+          summary?: string
+          target_refs?: Json
+          tenant_id?: string
+          updated_at?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "actions_run_id_tenant_id_fkey"
+            columns: ["run_id", "tenant_id"]
+            isOneToOne: false
+            referencedRelation: "runs"
+            referencedColumns: ["id", "tenant_id"]
+          },
+        ]
+      }
+      approvals: {
+        Row: {
+          action_id: string
+          approval_payload_hash: string | null
+          approved_at: string | null
+          approved_by_user_id: string | null
+          expires_at: string
+          id: string
+          rejected_at: string | null
+          rejected_by_user_id: string | null
+          rejection_reason: string | null
+          requested_at: string
+          requested_from_user_id: string
+          revoked_at: string | null
+          revoked_by_user_id: string | null
+          status: string
+          tenant_id: string
+          version: number
+        }
+        Insert: {
+          action_id: string
+          approval_payload_hash?: string | null
+          approved_at?: string | null
+          approved_by_user_id?: string | null
+          expires_at: string
+          id?: string
+          rejected_at?: string | null
+          rejected_by_user_id?: string | null
+          rejection_reason?: string | null
+          requested_at?: string
+          requested_from_user_id: string
+          revoked_at?: string | null
+          revoked_by_user_id?: string | null
+          status?: string
+          tenant_id: string
+          version?: number
+        }
+        Update: {
+          action_id?: string
+          approval_payload_hash?: string | null
+          approved_at?: string | null
+          approved_by_user_id?: string | null
+          expires_at?: string
+          id?: string
+          rejected_at?: string | null
+          rejected_by_user_id?: string | null
+          rejection_reason?: string | null
+          requested_at?: string
+          requested_from_user_id?: string
+          revoked_at?: string | null
+          revoked_by_user_id?: string | null
+          status?: string
+          tenant_id?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "approvals_action_id_tenant_id_fkey"
+            columns: ["action_id", "tenant_id"]
+            isOneToOne: false
+            referencedRelation: "actions"
+            referencedColumns: ["id", "tenant_id"]
+          },
+        ]
+      }
+      checkpoint_blobs: {
+        Row: {
+          blob: string | null
+          channel: string
+          checkpoint_ns: string
+          thread_id: string
+          type: string
+          version: string
+        }
+        Insert: {
+          blob?: string | null
+          channel: string
+          checkpoint_ns?: string
+          thread_id: string
+          type: string
+          version: string
+        }
+        Update: {
+          blob?: string | null
+          channel?: string
+          checkpoint_ns?: string
+          thread_id?: string
+          type?: string
+          version?: string
+        }
+        Relationships: []
+      }
+      checkpoint_migrations: {
+        Row: {
+          v: number
+        }
+        Insert: {
+          v: number
+        }
+        Update: {
+          v?: number
+        }
+        Relationships: []
+      }
+      checkpoint_writes: {
+        Row: {
+          blob: string
+          channel: string
+          checkpoint_id: string
+          checkpoint_ns: string
+          idx: number
+          task_id: string
+          thread_id: string
+          type: string | null
+        }
+        Insert: {
+          blob: string
+          channel: string
+          checkpoint_id: string
+          checkpoint_ns?: string
+          idx: number
+          task_id: string
+          thread_id: string
+          type?: string | null
+        }
+        Update: {
+          blob?: string
+          channel?: string
+          checkpoint_id?: string
+          checkpoint_ns?: string
+          idx?: number
+          task_id?: string
+          thread_id?: string
+          type?: string | null
+        }
+        Relationships: []
+      }
+      checkpoints: {
+        Row: {
+          checkpoint: Json
+          checkpoint_id: string
+          checkpoint_ns: string
+          metadata: Json
+          parent_checkpoint_id: string | null
+          thread_id: string
+          type: string | null
+        }
+        Insert: {
+          checkpoint: Json
+          checkpoint_id: string
+          checkpoint_ns?: string
+          metadata?: Json
+          parent_checkpoint_id?: string | null
+          thread_id: string
+          type?: string | null
+        }
+        Update: {
+          checkpoint?: Json
+          checkpoint_id?: string
+          checkpoint_ns?: string
+          metadata?: Json
+          parent_checkpoint_id?: string | null
+          thread_id?: string
+          type?: string | null
+        }
+        Relationships: []
+      }
+      conversation_messages: {
+        Row: {
+          content: string
+          content_type: string
+          conversation_id: string
+          created_at: string
+          id: string
+          provider_message_ref: string | null
+          role: string
+          run_id: string
+          tenant_id: string
+        }
+        Insert: {
+          content: string
+          content_type?: string
+          conversation_id: string
+          created_at?: string
+          id?: string
+          provider_message_ref?: string | null
+          role: string
+          run_id: string
+          tenant_id: string
+        }
+        Update: {
+          content?: string
+          content_type?: string
+          conversation_id?: string
+          created_at?: string
+          id?: string
+          provider_message_ref?: string | null
+          role?: string
+          run_id?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversation_messages_conversation_id_tenant_id_fkey"
+            columns: ["conversation_id", "tenant_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id", "tenant_id"]
+          },
+          {
+            foreignKeyName: "conversation_messages_run_id_tenant_id_fkey"
+            columns: ["run_id", "tenant_id"]
+            isOneToOne: false
+            referencedRelation: "runs"
+            referencedColumns: ["id", "tenant_id"]
+          },
+        ]
+      }
+      conversations: {
+        Row: {
+          archived_at: string | null
+          context_type: string
+          created_at: string
+          id: string
+          organisation_id: string | null
+          subject_refs: Json
+          tenant_id: string
+          user_id: string
+        }
+        Insert: {
+          archived_at?: string | null
+          context_type: string
+          created_at?: string
+          id?: string
+          organisation_id?: string | null
+          subject_refs?: Json
+          tenant_id: string
+          user_id: string
+        }
+        Update: {
+          archived_at?: string | null
+          context_type?: string
+          created_at?: string
+          id?: string
+          organisation_id?: string | null
+          subject_refs?: Json
+          tenant_id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      message_creation_requests: {
+        Row: {
+          created_at: string
+          idempotency_key_hash: string
+          message_id: string
+          request_hash: string
+          run_id: string
+          tenant_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          idempotency_key_hash: string
+          message_id: string
+          request_hash: string
+          run_id: string
+          tenant_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          idempotency_key_hash?: string
+          message_id?: string
+          request_hash?: string
+          run_id?: string
+          tenant_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "message_creation_requests_message_id_tenant_id_fkey"
+            columns: ["message_id", "tenant_id"]
+            isOneToOne: false
+            referencedRelation: "conversation_messages"
+            referencedColumns: ["id", "tenant_id"]
+          },
+          {
+            foreignKeyName: "message_creation_requests_run_id_tenant_id_fkey"
+            columns: ["run_id", "tenant_id"]
+            isOneToOne: false
+            referencedRelation: "runs"
+            referencedColumns: ["id", "tenant_id"]
+          },
+        ]
+      }
+      run_creation_requests: {
+        Row: {
+          created_at: string
+          idempotency_key_hash: string
+          request_hash: string
+          run_id: string
+          tenant_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          idempotency_key_hash: string
+          request_hash: string
+          run_id: string
+          tenant_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          idempotency_key_hash?: string
+          request_hash?: string
+          run_id?: string
+          tenant_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "run_creation_requests_run_id_tenant_id_fkey"
+            columns: ["run_id", "tenant_id"]
+            isOneToOne: false
+            referencedRelation: "runs"
+            referencedColumns: ["id", "tenant_id"]
+          },
+        ]
+      }
+      run_events: {
+        Row: {
+          event_type: string
+          id: string
+          occurred_at: string
+          payload: Json
+          run_id: string
+          sequence: number
+          tenant_id: string
+          visible_stage: string | null
+        }
+        Insert: {
+          event_type: string
+          id?: string
+          occurred_at?: string
+          payload?: Json
+          run_id: string
+          sequence: number
+          tenant_id: string
+          visible_stage?: string | null
+        }
+        Update: {
+          event_type?: string
+          id?: string
+          occurred_at?: string
+          payload?: Json
+          run_id?: string
+          sequence?: number
+          tenant_id?: string
+          visible_stage?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "run_events_run_id_tenant_id_fkey"
+            columns: ["run_id", "tenant_id"]
+            isOneToOne: false
+            referencedRelation: "runs"
+            referencedColumns: ["id", "tenant_id"]
+          },
+        ]
+      }
+      runs: {
+        Row: {
+          actor_organisation_id: string | null
+          actor_user_id: string
+          capability: string
+          completed_at: string | null
+          consequence_class: string
+          conversation_id: string | null
+          correlation_id: string
+          created_at: string
+          failure_code: string | null
+          id: string
+          last_event_sequence: number
+          model_policy_version: string | null
+          objective: string
+          orchestration_version: string | null
+          prompt_bundle_version: string | null
+          started_at: string | null
+          status: string
+          subject_refs: Json
+          tenant_id: string
+          version: number
+        }
+        Insert: {
+          actor_organisation_id?: string | null
+          actor_user_id: string
+          capability: string
+          completed_at?: string | null
+          consequence_class: string
+          conversation_id?: string | null
+          correlation_id: string
+          created_at?: string
+          failure_code?: string | null
+          id?: string
+          last_event_sequence?: number
+          model_policy_version?: string | null
+          objective: string
+          orchestration_version?: string | null
+          prompt_bundle_version?: string | null
+          started_at?: string | null
+          status?: string
+          subject_refs?: Json
+          tenant_id: string
+          version?: number
+        }
+        Update: {
+          actor_organisation_id?: string | null
+          actor_user_id?: string
+          capability?: string
+          completed_at?: string | null
+          consequence_class?: string
+          conversation_id?: string | null
+          correlation_id?: string
+          created_at?: string
+          failure_code?: string | null
+          id?: string
+          last_event_sequence?: number
+          model_policy_version?: string | null
+          objective?: string
+          orchestration_version?: string | null
+          prompt_bundle_version?: string | null
+          started_at?: string | null
+          status?: string
+          subject_refs?: Json
+          tenant_id?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "runs_conversation_id_tenant_id_fkey"
+            columns: ["conversation_id", "tenant_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id", "tenant_id"]
+          },
+        ]
+      }
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      [_ in never]: never
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   taxonomy: {
     Tables: {
       aliases: {
@@ -3436,6 +4563,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  ai_ops: {
+    Enums: {},
+  },
   audit: {
     Enums: {},
   },
@@ -3461,6 +4591,12 @@ export const Constants = {
     Enums: {},
   },
   permissions: {
+    Enums: {},
+  },
+  q_knowledge: {
+    Enums: {},
+  },
+  q_runtime: {
     Enums: {},
   },
   taxonomy: {

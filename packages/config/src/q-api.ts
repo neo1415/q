@@ -12,6 +12,11 @@ import {
   type RuntimeConfig,
 } from "./common.js";
 import {
+  modelProviderEnvShape,
+  toModelProviderSecrets,
+  type ModelProviderSecrets,
+} from "./model-providers.js";
+import {
   supabaseAuthEnvShape,
   toSupabaseAuthConfig,
   type SupabaseAuthConfig,
@@ -30,6 +35,10 @@ const qApiEnvSchema = z.object({
   SUPABASE_URL: supabaseAuthEnvShape.SUPABASE_URL.optional(),
   SUPABASE_PUBLISHABLE_KEY:
     supabaseAuthEnvShape.SUPABASE_PUBLISHABLE_KEY.optional(),
+  // Model provider keys (CQ-Q-005). Each optional: the Model Gateway routes
+  // around an unconfigured provider, and a service with neither still
+  // starts — model-capable tasks then fail safely as "unavailable".
+  ...modelProviderEnvShape,
 });
 
 /**
@@ -38,7 +47,10 @@ const qApiEnvSchema = z.object({
  * run budgets and checkpoint settings; none of that belongs in the normal API's
  * configuration surface.
  */
-export type QApiSecrets = Readonly<Record<string, never>>;
+export type QApiSecrets = {
+  /** Server-only. Never serialised, logged, or handed to a client or a prompt. */
+  readonly modelProviders: ModelProviderSecrets;
+};
 
 export type QApiPublicConfig = Readonly<Record<string, never>>;
 
@@ -69,7 +81,7 @@ export function parseQApiConfig(env: EnvironmentInput): QApiConfig {
           })
         : undefined,
     public: {},
-    secrets: {},
+    secrets: { modelProviders: toModelProviderSecrets(parsed) },
   };
 }
 

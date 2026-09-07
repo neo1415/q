@@ -1,0 +1,45 @@
+{
+  "name": "@capital-q/q-firewall",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Q Context Firewall: the deterministic boundary between everything Capital Q can technically access and the bounded context Q is permitted to reason over for one actor, organisation, purpose and subject set. Pure policy over the disclosure and authorization layers. No model, no retrieval, no ranking, no Data Room, no SQL.",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "clean": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\""
+  },
+  "dependencies": {
+    "@capital-q/capital": "workspace:*",
+    "@capital-q/contracts": "workspace:*",
+    "@capital-q/evidence": "workspace:*",
+    "@capital-q/investors": "workspace:*",
+    "@capital-q/observability": "workspace:*",
+    "@capital-q/permissions": "workspace:*",
+    "@capital-q/q-runtime": "workspace:*",
+    "@capital-q/security": "workspace:*",
+    "zod": "4.5.4"
+  },
+  "devDependencies": {
+    "@capital-q/audit": "workspace:*",
+    "@capital-q/companies": "workspace:*",
+    "@capital-q/config": "workspace:*",
+    "@capital-q/database": "workspace:*",
+    "@capital-q/eventing": "workspace:*",
+    "@capital-q/network": "workspace:*",
+    "@types/node": "^24.13.3",
+    "typescript": "5.9.3"
+  }
+}

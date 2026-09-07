@@ -44,15 +44,22 @@ export {
   hashCreateCompanyRequest,
 } from "./domain/idempotency.js";
 
-export type {
-  CompanyCreationRecord,
-  CompanyCreationRequestStore,
-  CompanyProfileChanges,
-  CompanyQueryPort,
-  CompanyRepository,
-  CompanyVisibilityFacts,
-  FounderProfileOwnershipFacts,
-  NewCompany,
+export {
+  COMPANY_SEARCH_LIMIT_MAX,
+  COMPANY_SEARCH_TEXT_MAX_LENGTH,
+  CompanySearchCursorError,
+  type CompanyCreationRecord,
+  type CompanyCreationRequestStore,
+  type CompanyProfileChanges,
+  type CompanyProfileFacts,
+  type CompanyQueryPort,
+  type CompanyRepository,
+  type CompanySearchCandidate,
+  type CompanySearchPage,
+  type CompanySearchQuery,
+  type CompanyVisibilityFacts,
+  type FounderProfileOwnershipFacts,
+  type NewCompany,
 } from "./application/ports.js";
 export type { CompanyServiceDependencies } from "./application/dependencies.js";
 export {

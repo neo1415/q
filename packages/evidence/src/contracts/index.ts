@@ -436,6 +436,8 @@ export type DocumentProcessingRun = {
   readonly completedAt: UtcTimestamp | null;
   readonly errorCode: string | null;
   readonly extractorVersion: string | null;
+  /** Which chunker derived the version's chunk set, once one has (CQ-RAG-001). */
+  readonly chunkingVersion: string | null;
   readonly classifierVersion: string | null;
   readonly embeddingModelId: string | null;
   /** Exact decimal string; never a float. */

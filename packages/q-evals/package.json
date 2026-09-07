@@ -1,0 +1,57 @@
+{
+  "name": "@capital-q/q-evals",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Capital Q evaluation harness (CQ-Q-010): versioned synthetic datasets, typed eval cases, deterministic-first graders, the provider-agnostic runner that drives the real Q runtime (Context Firewall, Prompt Registry, Model Gateway, Tool Registry, Approval Engine, stream) with a scripted or a live model, machine- and human-readable reports, baselines and comparison, and the Wave-4 C4 readiness evidence. No provider SDK, no eval SaaS, no LLM judge, no production data.",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "bin": {
+    "q-eval": "./dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "baselines"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "clean": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\""
+  },
+  "dependencies": {
+    "@capital-q/audit": "workspace:*",
+    "@capital-q/capital": "workspace:*",
+    "@capital-q/companies": "workspace:*",
+    "@capital-q/config": "workspace:*",
+    "@capital-q/contracts": "workspace:*",
+    "@capital-q/database": "workspace:*",
+    "@capital-q/eventing": "workspace:*",
+    "@capital-q/evidence": "workspace:*",
+    "@capital-q/investors": "workspace:*",
+    "@capital-q/model-gateway": "workspace:*",
+    "@capital-q/network": "workspace:*",
+    "@capital-q/observability": "workspace:*",
+    "@capital-q/permissions": "workspace:*",
+    "@capital-q/q-actions": "workspace:*",
+    "@capital-q/q-core": "workspace:*",
+    "@capital-q/q-embeddings": "workspace:*",
+    "@capital-q/q-firewall": "workspace:*",
+    "@capital-q/q-knowledge": "workspace:*",
+    "@capital-q/q-orchestrator": "workspace:*",
+    "@capital-q/q-runtime": "workspace:*",
+    "@capital-q/q-tools": "workspace:*",
+    "@capital-q/security": "workspace:*",
+    "zod": "4.5.4"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.3",
+    "typescript": "5.9.3"
+  }
+}

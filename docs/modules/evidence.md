@@ -234,9 +234,17 @@ model key or connector token. Output is revalidated with
 
 **Extractors.** PDF (`pdfjs-dist`, evaluation and system fonts disabled),
 DOCX and PPTX (own bounded OOXML reader: entry, size, total and ratio
-limits checked before inflating; XML scanned, never entity-resolved), and
-plain text. XLSX and CSV are deferred: a valid upload gets
-`text_extraction_status = 'UNSUPPORTED'`, never COMPLETED.
+limits checked before inflating; XML scanned, never entity-resolved),
+plain text, and since CQ-RAG-001 XLSX (the same OOXML reader: shared
+strings, cached cell values as text, no formula evaluation, a VBA project
+refused, sheet/row/column/cell limits) and CSV (RFC 4180). Spreadsheets
+become `spreadsheet_range` blocks with sheet, A1 range and row locators.
+Images remain UNSUPPORTED, never COMPLETED.
+
+**Chunking (CQ-RAG-001).** After the extraction is recorded, the same
+worker derives the version's chunk set through `@capital-q/q-knowledge`
+and records `chunking_version` on the run; see
+`docs/modules/q-knowledge.md`.
 
 **Malware gate.** A port with one implementation that answers UNAVAILABLE.
 Under the default `REQUIRE_CLEAN` policy an unscanned document is BLOCKED

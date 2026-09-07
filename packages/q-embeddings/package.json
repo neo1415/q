@@ -1,0 +1,42 @@
+{
+  "name": "@capital-q/q-embeddings",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Capital Q embedding provider boundary (CQ-RAG-002): a provider-neutral EmbeddingProvider port, versioned model/configuration descriptors, versioned query-instruction profiles, vector validation, bounded batching, health, and a local Text Embeddings Inference adapter for the open-weight Qwen3-Embedding-0.6B runtime. No hosted embedding API, no credential, no vector persistence, no retrieval.",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./contracts": {
+      "types": "./dist/contracts/index.d.ts",
+      "default": "./dist/contracts/index.js"
+    },
+    "./testing": {
+      "types": "./dist/providers/fake.d.ts",
+      "default": "./dist/providers/fake.js"
+    }
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "clean": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\""
+  },
+  "dependencies": {
+    "@capital-q/config": "workspace:*",
+    "@capital-q/contracts": "workspace:*",
+    "@capital-q/observability": "workspace:*",
+    "zod": "4.5.4"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.3",
+    "typescript": "5.9.3"
+  }
+}

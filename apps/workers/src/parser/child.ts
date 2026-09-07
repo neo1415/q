@@ -9,6 +9,7 @@ import {
   createTextExtractor,
   type ContentExtractor,
 } from "./extractors.js";
+import { createCsvExtractor, createXlsxExtractor } from "./spreadsheets.js";
 import { OoxmlRefusedError } from "./ooxml.js";
 import {
   PARSER_INPUT_FILE,
@@ -87,6 +88,8 @@ function buildRegistry(): readonly ContentExtractor[] {
     createPdfExtractor(loadPdfDocument),
     createDocxExtractor(),
     createPptxExtractor(),
+    createXlsxExtractor(),
+    createCsvExtractor(),
     createTextExtractor(),
   ];
 }
@@ -130,8 +133,8 @@ async function main(): Promise<void> {
     sizeBytes: request.sizeBytes,
   });
   if (extractor === null) {
-    // Spreadsheets and CSV are admissible uploads with no extractor yet. The
-    // pipeline records that honestly instead of reporting a completed run.
+    // Images are admissible uploads with no extractor. The pipeline records
+    // that honestly instead of reporting a completed run.
     emit({ ok: false, code: "UNSUPPORTED_MEDIA_TYPE" });
     return;
   }

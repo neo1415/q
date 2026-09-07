@@ -8,7 +8,8 @@
  * the durable pgmq `domain-events` queue. A domain-event consumer turns
  * `evidence.document.version_created` into an `evidence.document.process` job.
  * The documents consumer runs that job: security gate, malware gate, isolated
- * parse, structured extraction, `evidence.document.ready`.
+ * parse, structured extraction, structure-aware chunking (CQ-RAG-001),
+ * `evidence.document.ready`.
  *
  * This process holds the database and the storage credential. The parser does
  * not: it runs in a child process with a scrubbed environment, which is what
@@ -31,6 +32,7 @@ import {
 } from "@capital-q/evidence";
 import { ProcessDocumentJob } from "@capital-q/evidence/jobs";
 import { createLogger, createTelemetryRuntime } from "@capital-q/observability";
+import { createQKnowledgeService } from "@capital-q/q-knowledge";
 
 import { createDocumentProcessingPipeline } from "./documents/pipeline.js";
 import { createPipelineMetrics } from "./documents/metrics.js";
@@ -132,6 +134,13 @@ const documents =
             storage,
           }),
           storage,
+          // Derived chunks are written by the same worker, after the
+          // extraction is recorded and before the run completes.
+          knowledge: createQKnowledgeService({
+            sql: database.sql,
+            transactions: database.transactions,
+            storage,
+          }),
           // No scanner exists yet. Under the default policy this blocks
           // processing; it never reports a document clean.
           scanner: createUnavailableMalwareScanner(),

@@ -17,7 +17,13 @@ export default defineConfig({
       "apps/**/*.integration.test.ts",
       "packages/**/*.integration.test.ts",
     ],
-    exclude: ["**/node_modules/**", "**/dist/**", "tests/e2e/**"],
+    exclude: [
+      "**/node_modules/**",
+      "**/dist/**",
+      "tests/e2e/**",
+      // Real model calls run only via `pnpm test:live-model` (CQ-Q-005).
+      "**/*.live.test.ts",
+    ],
     // Real network round-trips; still bounded.
     testTimeout: 20_000,
     hookTimeout: 20_000,

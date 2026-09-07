@@ -16,6 +16,9 @@ export function createPipelineMetrics(): PipelineMetrics {
   const duration = meter.createHistogram(
     "document_processing_duration_milliseconds",
   );
+  // Chunk counts per document (CQ-RAG-001 §66): a size distribution, never
+  // a document identity.
+  const chunks = meter.createHistogram("document_chunks_per_document");
 
   return {
     observe: (event) => {
@@ -27,6 +30,9 @@ export function createPipelineMetrics(): PipelineMetrics {
       };
       outcomes.add(1, attributes);
       duration.record(event.durationMs, attributes);
+      if (event.chunkCount !== undefined) {
+        chunks.record(event.chunkCount, attributes);
+      }
     },
   };
 }

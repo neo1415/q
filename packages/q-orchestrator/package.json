@@ -1,0 +1,54 @@
+{
+  "name": "@capital-q/q-orchestrator",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Q orchestration adapter: the LangGraph-backed implementation of the Capital Q-owned QOrchestrator port, with durable PostgreSQL checkpoints under q_runtime. The only package that imports LangGraph. Never a model, never retrieval, never the Context Firewall, never Q knowledge.",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "clean": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\""
+  },
+  "dependencies": {
+    "@capital-q/contracts": "workspace:*",
+    "@capital-q/observability": "workspace:*",
+    "@capital-q/q-runtime": "workspace:*",
+    "@capital-q/security": "workspace:*",
+    "@langchain/core": "1.2.9",
+    "@langchain/langgraph": "1.4.14",
+    "@langchain/langgraph-checkpoint": "1.1.5",
+    "@langchain/langgraph-checkpoint-postgres": "1.0.5",
+    "zod": "4.5.4"
+  },
+  "devDependencies": {
+    "@capital-q/audit": "workspace:*",
+    "@capital-q/capital": "workspace:*",
+    "@capital-q/companies": "workspace:*",
+    "@capital-q/config": "workspace:*",
+    "@capital-q/database": "workspace:*",
+    "@capital-q/eventing": "workspace:*",
+    "@capital-q/evidence": "workspace:*",
+    "@capital-q/investors": "workspace:*",
+    "@capital-q/model-gateway": "workspace:*",
+    "@capital-q/network": "workspace:*",
+    "@capital-q/permissions": "workspace:*",
+    "@capital-q/q-actions": "workspace:*",
+    "@capital-q/q-core": "workspace:*",
+    "@capital-q/q-firewall": "workspace:*",
+    "@capital-q/q-tools": "workspace:*",
+    "@types/node": "^24.13.3",
+    "typescript": "5.9.3"
+  }
+}

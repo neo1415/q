@@ -35,6 +35,22 @@ const APP_IMPORT_PATTERNS = APP_PACKAGES.flatMap((name) => [name, `${name}/*`]);
 /** Reaching into another workspace package's implementation. */
 const DEEP_INTERNAL_PATTERN = "@capital-q/*/src/*";
 
+/** Model provider SDKs, present and future; adapters only. */
+const MODEL_SDK_IMPORT_PATTERNS = [
+  "@google/genai",
+  "@google/genai/*",
+  "groq-sdk",
+  "groq-sdk/*",
+  "openai",
+  "openai/*",
+  "@anthropic-ai/*",
+  "@google-cloud/vertexai",
+  "@langchain/openai",
+  "@langchain/anthropic",
+  "@langchain/google-genai",
+  "@langchain/groq",
+];
+
 /** Browser-reachable source: the web app and the shared component package. */
 const WEB_SOURCE = ["apps/web/**/*.{ts,tsx}"];
 
@@ -293,6 +309,30 @@ export default tseslint.config(
     ["apps/**", "packages/**"],
     [deepInternal, relativeEscape],
   ),
+
+  // Rule G -- model provider SDKs exist only inside the Model Gateway's
+  // provider adapters (doc 23 s126; CQ-Q-005 s80). Business, domain, app and
+  // web code request task classes from the gateway and never see a vendor
+  // type. Uses the core rule so it composes with the boundary scopes above
+  // instead of replacing their patterns.
+  {
+    files: ["apps/**/*.{ts,tsx}", "packages/**/*.{ts,tsx}"],
+    ignores: ["packages/model-gateway/src/providers/**"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: MODEL_SDK_IMPORT_PATTERNS,
+              message:
+                "Model provider SDKs are imported only by @capital-q/model-gateway's provider adapters. Request a task class through the ModelGateway instead (doc 12 s24.5, doc 23 s126).",
+            },
+          ],
+        },
+      ],
+    },
+  },
 
   // Parameterisation is never bypassed outside the driver adapter itself.
   {

@@ -19,12 +19,19 @@ import {
   type Company,
   type CompanyIdentity,
 } from "../contracts/index.js";
-import type {
-  CompanyCreationRecord,
-  CompanyCreationRequestStore,
-  CompanyProfileChanges,
-  CompanyQueryPort,
-  CompanyRepository,
+import {
+  COMPANY_SEARCH_LIMIT_MAX,
+  COMPANY_SEARCH_TEXT_MAX_LENGTH,
+  CompanySearchCursorError,
+  type CompanyCreationRecord,
+  type CompanyCreationRequestStore,
+  type CompanyProfileChanges,
+  type CompanyProfileFacts,
+  type CompanyQueryPort,
+  type CompanyRepository,
+  type CompanySearchCandidate,
+  type CompanySearchPage,
+  type CompanySearchQuery,
 } from "../application/ports.js";
 
 /**
@@ -276,6 +283,95 @@ export function createPostgresCompanyCreationRequestStore(): CompanyCreationRequ
   };
 }
 
+const ProfileRowSchema = CompanyRowSchema.pick({
+  id: true,
+  tenant_id: true,
+  organisation_id: true,
+  canonical_name: true,
+  legal_name: true,
+  website_url: true,
+  founded_date: true,
+  headquarters_country: true,
+  headquarters_city: true,
+  current_stage_code: true,
+  primary_description: true,
+  short_description: true,
+  company_status: true,
+  marketplace_visibility: true,
+});
+
+function toProfileFacts(row: unknown): CompanyProfileFacts {
+  const p = ProfileRowSchema.parse(row);
+  return {
+    id: p.id,
+    tenantId: p.tenant_id,
+    organisationId: p.organisation_id,
+    canonicalName: p.canonical_name,
+    legalName: p.legal_name,
+    websiteUrl: p.website_url,
+    foundedDate: p.founded_date,
+    headquartersCountry: p.headquarters_country,
+    headquartersCity: p.headquarters_city,
+    currentStageCode: p.current_stage_code,
+    primaryDescription: p.primary_description,
+    shortDescription: p.short_description,
+    companyStatus: p.company_status,
+    marketplaceVisibility: p.marketplace_visibility,
+  };
+}
+
+const SearchRowSchema = CompanyRowSchema.pick({
+  id: true,
+  tenant_id: true,
+  organisation_id: true,
+  canonical_name: true,
+  current_stage_code: true,
+  headquarters_country: true,
+  short_description: true,
+  marketplace_visibility: true,
+});
+
+const SearchCursorSchema = z
+  .object({ n: z.string().min(1).max(200), id: CompanyIdSchema })
+  .strict();
+
+function encodeSearchCursor(name: string, id: string): string {
+  return Buffer.from(JSON.stringify({ n: name, id }), "utf8").toString(
+    "base64url",
+  );
+}
+
+function decodeSearchCursor(
+  cursor: string,
+): z.infer<typeof SearchCursorSchema> {
+  if (cursor.length > 512 || !/^[A-Za-z0-9_-]+$/.test(cursor)) {
+    throw new CompanySearchCursorError();
+  }
+  let decoded: unknown;
+  try {
+    decoded = JSON.parse(Buffer.from(cursor, "base64url").toString("utf8"));
+  } catch {
+    throw new CompanySearchCursorError();
+  }
+  const parsed = SearchCursorSchema.safeParse(decoded);
+  if (!parsed.success) {
+    throw new CompanySearchCursorError();
+  }
+  return parsed.data;
+}
+
+/** A LIKE pattern from untrusted text: wildcards in the text are literal. */
+function likePattern(text: string): string {
+  const escaped = text.replace(/[\\%_]/g, (ch) => `\\${ch}`);
+  return `%${escaped}%`;
+}
+
+/** Candidate classifications for network discovery (ADR-001). Never merged with each other. */
+const DISCOVERABLE_VISIBILITIES = [
+  "network_visible",
+  "public_external",
+] as const;
+
 export function createPostgresCompanyQueryPort(options: {
   readonly sql: DatabaseExecutor;
 }): CompanyQueryPort {
@@ -331,6 +427,75 @@ export function createPostgresCompanyQueryPort(options: {
         tenantId: parsed.tenant_id,
         organisationId: parsed.organisation_id,
         marketplaceVisibility: parsed.marketplace_visibility,
+      };
+    },
+    findCanonicalCompanyProfile: async (companyId) => {
+      const rows = await sql`
+        select c.id, c.tenant_id, c.organisation_id, c.canonical_name, c.legal_name,
+               c.website_url, c.founded_date::text as founded_date, c.headquarters_country,
+               c.headquarters_city, c.current_stage_code, c.primary_description,
+               c.short_description, c.company_status, c.marketplace_visibility
+          from core.companies c
+         where c.id = ${companyId}`;
+      return rows.length === 0 ? null : toProfileFacts(rows[0]);
+    },
+    searchCompanies: async (
+      query: CompanySearchQuery,
+    ): Promise<CompanySearchPage> => {
+      const limit = Math.max(
+        1,
+        Math.min(query.limit, COMPANY_SEARCH_LIMIT_MAX),
+      );
+      const text = query.text?.trim().slice(0, COMPANY_SEARCH_TEXT_MAX_LENGTH);
+      const pattern =
+        text === undefined || text.length === 0 ? null : likePattern(text);
+      const after =
+        query.cursor === undefined ? null : decodeSearchCursor(query.cursor);
+      const viewerOrganisation = query.viewer.organisationId ?? null;
+      // Discoverable classification OR the viewer's own organisation; active
+      // companies only. Keyset on (canonical_name, id), one row past the
+      // page to learn whether another exists.
+      const rows = await sql`
+        select c.id, c.tenant_id, c.organisation_id, c.canonical_name, c.current_stage_code,
+               c.headquarters_country, c.short_description, c.marketplace_visibility
+          from core.companies c
+         where c.company_status = 'active'
+           and (c.marketplace_visibility = any(${[...DISCOVERABLE_VISIBILITIES]}::text[])
+                or (${viewerOrganisation}::uuid is not null
+                    and c.tenant_id = ${query.viewer.tenantId}
+                    and c.organisation_id = ${viewerOrganisation}::uuid))
+           and (${pattern}::text is null or c.canonical_name ilike ${pattern}::text escape '\\')
+           and (${query.stageCode ?? null}::text is null or c.current_stage_code = ${query.stageCode ?? null}::text)
+           and (${query.headquartersCountry ?? null}::text is null
+                or c.headquarters_country = ${query.headquartersCountry ?? null}::text)
+           and (${after?.n ?? null}::text is null
+                or (c.canonical_name, c.id) > (${after?.n ?? null}::text, ${after?.id ?? null}::uuid))
+         order by c.canonical_name, c.id
+         limit ${limit + 1}`;
+      const page = rows.slice(0, limit).map((row): CompanySearchCandidate => {
+        const p = SearchRowSchema.parse(row);
+        return {
+          id: p.id,
+          tenantId: p.tenant_id,
+          organisationId: p.organisation_id,
+          canonicalName: p.canonical_name,
+          currentStageCode: p.current_stage_code,
+          headquartersCountry: p.headquarters_country,
+          shortDescription: p.short_description,
+          marketplaceVisibility: p.marketplace_visibility,
+          ownedByViewer:
+            viewerOrganisation !== null &&
+            p.tenant_id === query.viewer.tenantId &&
+            p.organisation_id === viewerOrganisation,
+        };
+      });
+      const last = page.at(-1);
+      return {
+        items: page,
+        nextCursor:
+          rows.length > limit && last !== undefined
+            ? encodeSearchCursor(last.canonicalName, last.id)
+            : null,
       };
     },
     findCanonicalFounderProfile: async (founderProfileId) => {

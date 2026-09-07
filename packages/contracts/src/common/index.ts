@@ -16,6 +16,12 @@ export {
 export { DecimalStringSchema, type DecimalString } from "./decimal.js";
 
 export {
+  CanonicalJsonError,
+  canonicalJsonStringify,
+  toCanonicalJsonValue,
+} from "./canonical-json.js";
+
+export {
   CurrencyCodeSchema,
   MoneySchema,
   type CurrencyCode,

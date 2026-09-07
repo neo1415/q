@@ -34,6 +34,8 @@ export function createRequestDatabaseClient(
     accessClass: "REQUEST",
     sql,
     transactions: createTransactionManager(sql),
+    listen: (channel, onNotify, onListen) =>
+      sql.listen(channel, onNotify, onListen),
     close: () => sql.end(),
   };
 }

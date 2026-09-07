@@ -89,6 +89,8 @@ function textOf(block: ExtractedBlock): string {
       return block.rows.map((row) => row.join(" ")).join("\n");
     case "slide":
       return `${block.title ?? ""}\n${block.text}`;
+    case "spreadsheet_range":
+      return block.rows.map((row) => row.join(" ")).join("\n");
     case "page_break":
       return "";
   }

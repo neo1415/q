@@ -29,6 +29,12 @@ export const ParserLimitsSchema = z
     maxSlides: z.number().int().min(1),
     maxXmlNodes: z.number().int().min(1),
     maxXmlDepth: z.number().int().min(1),
+    /** Workbook and delimited-text bounds (CQ-RAG-001 §19). */
+    maxSheets: z.number().int().min(1),
+    maxRowsPerSheet: z.number().int().min(1),
+    maxColumnsPerSheet: z.number().int().min(1),
+    maxCellsTotal: z.number().int().min(1),
+    maxRangeRows: z.number().int().min(1),
   })
   .strict();
 export type ParserLimits = z.infer<typeof ParserLimitsSchema>;

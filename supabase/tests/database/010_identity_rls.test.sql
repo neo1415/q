@@ -137,8 +137,8 @@ select results_eq(
             ('investor.create'), ('investor.edit'), ('investor.mandate.create'),
             ('investor.mandate.edit'), ('investor.mandate.view'), ('investor.representative.self_edit'),
             ('investor.view'), ('media.create'), ('media.manage'), ('media.view'),
-            ('organisation.admin'), ('organisation.view') $$,
-  'organisation_admin maps to organisation, company, team, investor, mandate, capital, disclosure, document, evidence and media capabilities only');
+            ('organisation.admin'), ('organisation.view'), ('q.action.approve') $$,
+  'organisation_admin maps to organisation, company, team, investor, mandate, capital, disclosure, document, evidence, media and Q approval capabilities only (CQ-Q-008 adds q.action.approve)');
 select results_eq(
   $$ select c.code from permissions.role_capabilities rc
        join permissions.roles r on r.id = rc.role_id
@@ -149,8 +149,8 @@ select results_eq(
             ('document.create'), ('document.download'), ('document.view'),
             ('evidence.record'), ('evidence.view'),
             ('investor.mandate.view'), ('investor.representative.self_edit'), ('investor.view'),
-            ('media.create'), ('media.view'), ('organisation.view') $$,
-  'organisation_member may publish and replace a pitch but not delete one; everything else stays view, self-edit, document and evidence-recording (CQ-ORG-001, CQ-COMP-001, CQ-COMP-002, CQ-INV-001, CQ-INV-002, CQ-CAP-001, CQ-EVD-001, CQ-MEDIA-001)');
+            ('media.create'), ('media.view'), ('organisation.view'), ('q.action.approve') $$,
+  'organisation_member may publish and replace a pitch but not delete one; everything else stays view, self-edit, document, evidence-recording and approving Q actions Q prepared for them (CQ-ORG-001, CQ-COMP-001, CQ-COMP-002, CQ-INV-001, CQ-INV-002, CQ-CAP-001, CQ-EVD-001, CQ-MEDIA-001, CQ-Q-008)');
 
 -- ===========================================================================
 -- Fixtures (as the migration owner; RLS bypassed)

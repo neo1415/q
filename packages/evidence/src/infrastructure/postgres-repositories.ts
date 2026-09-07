@@ -477,6 +477,7 @@ const RunRow = z.object({
   completed_at: Timestamp.nullable(),
   error_code: z.string().nullable(),
   extractor_version: z.string().nullable(),
+  chunking_version: z.string().nullable(),
   classifier_version: z.string().nullable(),
   embedding_model_id: z.string().nullable(),
   cost_usd: z.union([z.number(), z.string()]).transform(String),
@@ -495,6 +496,7 @@ function toRun(row: unknown): DocumentProcessingRun {
     completedAt: r.completed_at,
     errorCode: r.error_code,
     extractorVersion: r.extractor_version,
+    chunkingVersion: r.chunking_version,
     classifierVersion: r.classifier_version,
     embeddingModelId: r.embedding_model_id,
     costUsd: r.cost_usd,
@@ -507,7 +509,7 @@ function toRun(row: unknown): DocumentProcessingRun {
 function selectRuns(executor: DatabaseExecutor) {
   return executor`
     select r.id, r.document_version_id, r.pipeline_version, r.status, r.started_at, r.completed_at,
-           r.error_code, r.extractor_version, r.classifier_version, r.embedding_model_id,
+           r.error_code, r.extractor_version, r.chunking_version, r.classifier_version, r.embedding_model_id,
            r.cost_usd, r.metadata, r.created_at
       from evidence.document_processing_runs r
       join evidence.document_versions v on v.id = r.document_version_id`;
@@ -559,6 +561,7 @@ export function createPostgresDocumentProcessingRunRepository(): DocumentProcess
            set status = ${input.status},
                error_code = ${input.errorCode},
                extractor_version = coalesce(${provenance.extractorVersion ?? null}, r.extractor_version),
+               chunking_version = coalesce(${provenance.chunkingVersion ?? null}, r.chunking_version),
                cost_usd = coalesce(${provenance.costUsd ?? null}::numeric, r.cost_usd),
                metadata = coalesce(${provenance.metadata === undefined ? null : JSON.stringify(provenance.metadata)}::jsonb, r.metadata),
                started_at = case when ${input.status} = 'RUNNING' then clock_timestamp() else r.started_at end,

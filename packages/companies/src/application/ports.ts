@@ -1,7 +1,10 @@
 import type { DatabaseExecutor, TransactionContext } from "@capital-q/database";
 import type { OrganisationId, TenantId, UserId } from "@capital-q/security";
 
-import type { MarketplaceVisibility } from "@capital-q/contracts";
+import type {
+  CompanyStatus,
+  MarketplaceVisibility,
+} from "@capital-q/contracts";
 
 import type {
   Company,
@@ -157,7 +160,90 @@ export type CompanyQueryPort = {
   readonly findCanonicalFounderProfile: (
     founderProfileId: FounderProfileId,
   ) => Promise<FounderProfileOwnershipFacts | null>;
+  /**
+   * The profile core of one company with its trusted ownership and
+   * classification, tenant-agnostic, for consumers that authorise the read
+   * themselves first (the Q Tool Registry, CQ-Q-007). Permission-neutral:
+   * returning a row is not permission to show it. No founder, financial,
+   * evidence or score content lives here.
+   */
+  readonly findCanonicalCompanyProfile: (
+    companyId: CompanyId,
+  ) => Promise<CompanyProfileFacts | null>;
+  /**
+   * Bounded discovery over companies a viewer could be allowed to see: the
+   * viewer's own organisation's companies plus companies classified
+   * network_visible or public_external. Classification is a candidate
+   * filter, not the disclosure decision — callers re-check each candidate
+   * through the Permissions bounded context before showing it. Keyset
+   * pagination on (canonical_name, id); never offset.
+   */
+  readonly searchCompanies: (
+    query: CompanySearchQuery,
+  ) => Promise<CompanySearchPage>;
 };
+
+/** Profile core + trusted ownership/classification. Permission-neutral. */
+export type CompanyProfileFacts = {
+  readonly id: CompanyId;
+  readonly tenantId: TenantId;
+  readonly organisationId: OrganisationId;
+  readonly canonicalName: string;
+  readonly legalName: string | null;
+  readonly websiteUrl: string | null;
+  readonly foundedDate: string | null;
+  readonly headquartersCountry: string | null;
+  readonly headquartersCity: string | null;
+  readonly currentStageCode: string | null;
+  readonly primaryDescription: string | null;
+  readonly shortDescription: string | null;
+  readonly companyStatus: CompanyStatus;
+  readonly marketplaceVisibility: MarketplaceVisibility;
+};
+
+export const COMPANY_SEARCH_LIMIT_MAX = 50;
+export const COMPANY_SEARCH_TEXT_MAX_LENGTH = 120;
+
+export type CompanySearchQuery = {
+  /** Whose own-organisation companies are candidates. Server-resolved. */
+  readonly viewer: {
+    readonly tenantId: TenantId;
+    readonly organisationId: OrganisationId | undefined;
+  };
+  /** Case-insensitive substring of the canonical name. */
+  readonly text?: string | undefined;
+  readonly stageCode?: string | undefined;
+  readonly headquartersCountry?: string | undefined;
+  readonly limit: number;
+  /** Opaque cursor from a previous page. */
+  readonly cursor?: string | undefined;
+};
+
+export type CompanySearchCandidate = {
+  readonly id: CompanyId;
+  readonly tenantId: TenantId;
+  readonly organisationId: OrganisationId;
+  readonly canonicalName: string;
+  readonly currentStageCode: string | null;
+  readonly headquartersCountry: string | null;
+  readonly shortDescription: string | null;
+  readonly marketplaceVisibility: MarketplaceVisibility;
+  /** True when the viewer's own organisation owns the company. */
+  readonly ownedByViewer: boolean;
+};
+
+export type CompanySearchPage = {
+  readonly items: readonly CompanySearchCandidate[];
+  readonly nextCursor: string | null;
+};
+
+/** Thrown for a cursor that is not one this port issued. */
+export class CompanySearchCursorError extends Error {
+  constructor() {
+    super("company search cursor is invalid");
+    this.name = "CompanySearchCursorError";
+  }
+}
 
 /** Trusted ownership + classification of a company. Permission-neutral. */
 export type CompanyVisibilityFacts = {

@@ -28,6 +28,14 @@
     "./jobs": {
       "types": "./dist/jobs/index.d.ts",
       "default": "./dist/jobs/index.js"
+    },
+    "./q": {
+      "types": "./dist/q/index.d.ts",
+      "default": "./dist/q/index.js"
+    },
+    "./model": {
+      "types": "./dist/model/index.d.ts",
+      "default": "./dist/model/index.js"
     }
   },
   "main": "./dist/index.js",

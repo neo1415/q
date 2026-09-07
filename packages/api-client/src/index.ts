@@ -104,3 +104,32 @@ export {
   getCompanyPitch,
   listCompanyMedia,
 } from "./media.js";
+
+export {
+  appendQRunMessage,
+  approveQApproval,
+  cancelQRun,
+  createQRun,
+  getQApproval,
+  getQRun,
+  rejectQApproval,
+} from "./q.js";
+
+export {
+  streamQRunEvents,
+  describeQStreamTransport,
+  type QRunStreamOptions,
+  type QRunStreamResult,
+  type QStreamCloseReason,
+  type QStreamEventMeta,
+  type QStreamTransportStatus,
+} from "./q-stream.js";
+export {
+  createQStreamState,
+  describeQStage,
+  reduceQStream,
+  type QStreamApprovalState,
+  type QStreamPartialMessage,
+  type QStreamState,
+} from "./q-stream-reducer.js";
+export { createSseParser, type SseMessage, type SseParser } from "./sse.js";

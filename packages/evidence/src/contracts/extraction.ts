@@ -52,9 +52,18 @@ export const EXTRACTION_LIMITS = {
   maxTableRows: 500,
   maxTableColumns: 64,
   maxListItems: 500,
+  /** One spreadsheet range block: a bounded window of a sheet, never a whole workbook. */
+  maxRangeRows: 200,
+  maxRangeColumns: 256,
+  maxSheetNameCharacters: 255,
   /** Serialized artifact ceiling, checked before anything is persisted. */
   maxArtifactBytes: 8 * 1024 * 1024,
 } as const;
+
+/** A1-style inclusive cell range, as a sheet reader reports it. */
+export const CellRangeSchema = z
+  .string()
+  .regex(/^[A-Z]{1,3}[1-9][0-9]{0,6}:[A-Z]{1,3}[1-9][0-9]{0,6}$/);
 
 const BlockText = z.string().max(EXTRACTION_LIMITS.maxBlockCharacters);
 
@@ -75,6 +84,13 @@ export const BlockLocatorSchema = z
     lineEnd: z.number().int().min(1).optional(),
     /** Section or paragraph ordinal, where the format exposes one. */
     section: z.number().int().min(0).max(100_000).optional(),
+    /** Worksheet name, for workbooks (CQ-RAG-001). */
+    sheet: z.string().max(EXTRACTION_LIMITS.maxSheetNameCharacters).optional(),
+    /** A1-style range the block covers, for workbooks. */
+    range: CellRangeSchema.optional(),
+    /** 1-based inclusive record range, for delimited text and sheets. */
+    rowStart: z.number().int().min(1).optional(),
+    rowEnd: z.number().int().min(1).optional(),
   })
   .strict();
 export type BlockLocator = z.infer<typeof BlockLocatorSchema>;
@@ -119,6 +135,26 @@ export const ExtractedBlockSchema = z.discriminatedUnion("kind", [
     .strict(),
   z.object({ ...base, kind: z.literal("footnote"), text: BlockText }).strict(),
   z.object({ ...base, kind: z.literal("page_break") }).strict(),
+  /**
+   * A bounded window of a worksheet or delimited file (CQ-RAG-001, doc 14
+   * §11.2). Cells are the displayed or cached values as text; no formula is
+   * evaluated and no financial meaning is attached. The first row is the
+   * first row of the window, never assumed to be a header here.
+   */
+  z
+    .object({
+      ...base,
+      kind: z.literal("spreadsheet_range"),
+      sheet: z
+        .string()
+        .max(EXTRACTION_LIMITS.maxSheetNameCharacters)
+        .optional(),
+      range: CellRangeSchema.optional(),
+      rows: z
+        .array(z.array(BlockText).max(EXTRACTION_LIMITS.maxRangeColumns))
+        .max(EXTRACTION_LIMITS.maxRangeRows),
+    })
+    .strict(),
 ]);
 export type ExtractedBlock = z.infer<typeof ExtractedBlockSchema>;
 export type ExtractedBlockKind = ExtractedBlock["kind"];
@@ -180,6 +216,11 @@ export function blockCharacters(block: ExtractedBlock): number {
       );
     case "slide":
       return block.text.length + (block.title?.length ?? 0);
+    case "spreadsheet_range":
+      return block.rows.reduce(
+        (total, row) => total + row.reduce((sum, cell) => sum + cell.length, 0),
+        block.sheet?.length ?? 0,
+      );
     case "page_break":
       return 0;
   }

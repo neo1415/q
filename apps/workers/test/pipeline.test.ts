@@ -501,6 +501,96 @@ describe("document processing pipeline", () => {
     });
   });
 
+  it("derives the chunk set from the parsed blocks and records the chunking version", async () => {
+    const version = makeVersion();
+    const evidence = createFakeEvidence({
+      version,
+      pipelineVersion: PIPELINE_VERSION,
+      instructionRiskSignals: 1,
+    });
+    const storage = storageStub(version.sizeBytes);
+    const inputs: unknown[] = [];
+    const { handle, logger } = build({
+      evidence: evidence.service,
+      storage: storage.provider,
+      knowledge: {
+        buildChunkSet: (input) => {
+          inputs.push(input);
+          return Promise.resolve({
+            outcome: "BUILT",
+            chunkSet: {
+              chunkingVersion: "q-chunking-v1",
+              chunkingStrategy: "narrative",
+              chunkCount: 1,
+            } as never,
+            plan: {
+              strategy: "narrative",
+              truncated: false,
+              tokenEstimate: 12,
+            },
+            chunkCount: 1,
+            supersededSetIds: [],
+          });
+        },
+      },
+    });
+
+    const outcome = await handle(jobMessage({ documentVersionId: version.id }));
+
+    expect(outcome).toEqual({ kind: "DONE" });
+    expect(inputs).toHaveLength(1);
+    expect(inputs[0]).toMatchObject({
+      tenantId: TENANT_A,
+      documentVersionId: version.id,
+      pipelineVersion: PIPELINE_VERSION,
+    });
+    // The chunker receives the blocks themselves; the run's provenance and
+    // the logs receive only counts and versions.
+    expect(JSON.stringify(inputs[0])).toContain(PRIVACY_MARKER);
+    const completion = evidence.calls.find(
+      (call) => call.name === "completeDocumentProcessing",
+    );
+    expect(completion?.input).toMatchObject({
+      provenance: {
+        chunkingVersion: "q-chunking-v1",
+        metadata: {
+          chunkingOutcome: "BUILT",
+          chunkCount: 1,
+          chunkingStrategy: "narrative",
+        },
+      },
+    });
+    expect(JSON.stringify(completion)).not.toContain(PRIVACY_MARKER);
+    expect(JSON.stringify(logger.lines)).not.toContain(PRIVACY_MARKER);
+    expect(evidence.status()).toBe("COMPLETED");
+  });
+
+  it("retries the attempt when chunking fails, leaving the run open and the extraction recorded", async () => {
+    const version = makeVersion();
+    const evidence = createFakeEvidence({
+      version,
+      pipelineVersion: PIPELINE_VERSION,
+    });
+    const storage = storageStub(version.sizeBytes);
+    const { handle, logger } = build({
+      evidence: evidence.service,
+      storage: storage.provider,
+      knowledge: {
+        buildChunkSet: () =>
+          Promise.reject(new Error(`database gone ${PRIVACY_MARKER}`)),
+      },
+    });
+
+    const outcome = await handle(jobMessage({ documentVersionId: version.id }));
+
+    expect(outcome).toEqual({ kind: "RETRY", errorCode: "CHUNKING_FAILED" });
+    const names = evidence.calls.map((call) => call.name);
+    expect(names).toContain("recordDocumentExtraction");
+    expect(names).not.toContain("completeDocumentProcessing");
+    expect(evidence.status()).toBe("RUNNING");
+    expect(JSON.stringify(logger.lines)).not.toContain(PRIVACY_MARKER);
+  });
+
   it("dead-letters a message that is not a valid job", async () => {
     const version = makeVersion();
     const evidence = createFakeEvidence({

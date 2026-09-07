@@ -97,13 +97,18 @@ describe("per-service isolation", () => {
   it("keeps public and secret areas defined, and never fills a secret by default", () => {
     // The shape exists so provider credentials have a defined home and
     // cannot be mixed into runtime config.
-    for (const config of [
-      parseQApiConfig(EMPTY_ENV),
-      parseWorkerConfig(EMPTY_ENV),
-    ]) {
-      expect(config.public).toEqual({});
-      expect(config.secrets).toEqual({});
-    }
+    const qApi = parseQApiConfig(EMPTY_ENV);
+    expect(qApi.public).toEqual({});
+    // Q's secret area has a defined home for provider credentials (CQ-Q-005),
+    // and holds none by default.
+    expect(qApi.secrets).toEqual({
+      modelProviders: { google: undefined, groq: undefined },
+    });
+    const workers = parseWorkerConfig(EMPTY_ENV);
+    expect(workers.public).toEqual({});
+    expect(Object.values(workers.secrets).every((v) => v === undefined)).toBe(
+      true,
+    );
     // The API carries the document upload limit as public operational value
     // and the storage credential as a secret that is absent unless configured.
     const api = parseApiConfig(EMPTY_ENV);

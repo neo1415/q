@@ -11,6 +11,7 @@
   "include": [
     "vitest.config.ts",
     "vitest.integration.config.ts",
+    "vitest.live-model.config.ts",
     "playwright.config.ts",
     "tests/**/*.ts",
     "apps/**/*.test.ts",

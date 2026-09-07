@@ -110,11 +110,17 @@ reveals private relationships and sharing patterns.
 
 ## Q and the Context Firewall
 
-This module is the deterministic predicate the Context Firewall will apply
-**before** any model sees context (filter first; output checks are a second
-layer). Not implemented here: Q delegation envelopes, sensitivity
-inheritance, combination risk, data-use policy, verification gating,
-recommendation feature filtering, Data Room, signed URLs, caching.
+This module is the deterministic predicate the Context Firewall
+(`@capital-q/q-firewall`, CQ-Q-004) applies **before** any model sees context
+(filter first; output checks are a second layer). The firewall consumes
+`DisclosureAccessService.evaluateMany`, the resolver registry and the
+relationship-party resolver as they are; it adds purpose limitation,
+sensitivity ceilings, derived labels and combination-risk rules on top and
+persists nothing. A revoked policy is not loaded (the repository reads live
+policies only), so to the firewall a revoked share is a plain denial, with
+no trace that access was once held. Not implemented here: data-use policy,
+verification gating, recommendation feature filtering, Data Room, signed
+URLs, caching.
 Founder-private sources must never become investor-facing recommendation
 features without a legitimate disclosure / data-use path; CQ-REC packets
 reuse this contract.

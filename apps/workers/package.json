@@ -25,6 +25,7 @@
     "@capital-q/onboarding": "workspace:*",
     "@capital-q/organisations": "workspace:*",
     "@capital-q/permissions": "workspace:*",
+    "@capital-q/q-knowledge": "workspace:*",
     "@capital-q/taxonomy": "workspace:*",
     "pdfjs-dist": "6.3.289",
     "zod": "4.5.4"

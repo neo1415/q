@@ -25,4 +25,11 @@ export const EXTRACTION_PARSER_LIMITS: ParserLimits = {
   maxSlides: 1_000,
   maxXmlNodes: 500_000,
   maxXmlDepth: 100,
+  // A financial model is tens of sheets and thousands of rows; a workbook
+  // past these bounds is truncated and says so, never silently completed.
+  maxSheets: 64,
+  maxRowsPerSheet: 20_000,
+  maxColumnsPerSheet: EXTRACTION_LIMITS.maxRangeColumns,
+  maxCellsTotal: 400_000,
+  maxRangeRows: 100,
 };

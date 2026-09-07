@@ -17,7 +17,12 @@ select plan(32);
 select has_table('taxonomy', 'classification_runs', 'taxonomy.classification_runs exists');
 select has_table('taxonomy', 'classification_candidates', 'taxonomy.classification_candidates exists');
 select has_extension('pg_trgm', 'pg_trgm is installed for lexical typo tolerance');
-select is((select count(*)::int from pg_extension where extname = 'vector'), 0, 'no pgvector: taxonomy embeddings are not part of CQ-TAX-002');
+-- pgvector exists from CQ-RAG-003 for the Q knowledge index. What must stay
+-- true here is narrower and unchanged: taxonomy classification is lexical,
+-- so no taxonomy table stores a vector.
+select is((select count(*)::int from information_schema.columns
+            where table_schema = 'taxonomy' and udt_name = 'vector'), 0,
+  'no vector column in taxonomy: classification is lexical, not semantic');
 select is(
   (select count(*)::int from information_schema.columns
     where table_schema = 'taxonomy' and (udt_name = 'vector' or column_name ilike '%embedding%')),

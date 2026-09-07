@@ -32,6 +32,14 @@
     "./supabase-auth": {
       "types": "./dist/supabase-auth.d.ts",
       "default": "./dist/supabase-auth.js"
+    },
+    "./embeddings": {
+      "types": "./dist/embeddings.d.ts",
+      "default": "./dist/embeddings.js"
+    },
+    "./model-providers": {
+      "types": "./dist/model-providers.d.ts",
+      "default": "./dist/model-providers.js"
     }
   },
   "main": "./dist/index.js",

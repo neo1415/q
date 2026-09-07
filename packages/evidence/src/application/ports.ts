@@ -268,6 +268,7 @@ export type DocumentProcessingRunRepository = {
       readonly provenance?:
         | {
             readonly extractorVersion?: string | undefined;
+            readonly chunkingVersion?: string | undefined;
             readonly costUsd?: string | undefined;
             readonly metadata?: ProcessingRunMetadata | undefined;
           }

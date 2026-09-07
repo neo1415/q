@@ -382,11 +382,16 @@ describe("@capital-q/organisations against local PostgreSQL", () => {
         expect(
           (await decide(authorization, actor, ORGANISATION_ADMIN)).outcome,
         ).toBe("ALLOW");
+        // CQ-Q-008 grants approving Q-prepared actions to the admin role; it
+        // is a decision right over exact proposals, never a data right.
+        expect(
+          (await decide(authorization, actor, capability("q.action.approve")))
+            .outcome,
+        ).toBe("ALLOW");
         for (const future of [
           "company.financials.edit",
           "company.financials.view",
           "data_room.share",
-          "q.action.approve",
         ]) {
           expect(
             (await decide(authorization, actor, capability(future))).outcome,

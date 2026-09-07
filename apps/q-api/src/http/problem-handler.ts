@@ -7,6 +7,38 @@ import {
 } from "@capital-q/contracts";
 import type { Logger } from "@capital-q/observability";
 import {
+  QConversationArchivedError,
+  QConversationNotFoundError,
+  QMessageCreationConflictError,
+  QOrchestrationVersionError,
+  QRunAlreadyStartedError,
+  QRunAlreadyTerminalError,
+  QRunCreationConflictError,
+  QRunNotAcceptingMessagesError,
+  QRunNotFoundError,
+  QRunNotResumableError,
+  QRunTransitionError,
+  QRunVersionConflictError,
+  QSubjectNotFoundError,
+  QSubjectUnsupportedError,
+} from "@capital-q/q-runtime";
+
+import { QStreamLimitError } from "./q-events.js";
+import {
+  QActionAlreadyCompletedError,
+  QActionNotFoundError,
+  QActionNotPermittedError,
+  QActionPayloadMismatchError,
+  QActionTransitionError,
+  QActionUnavailableError,
+  QActionVersionConflictError,
+  QApprovalAlreadyDecidedError,
+  QApprovalExpiredError,
+  QApprovalNotFoundError,
+  QApprovalNotPermittedError,
+  QApprovalTransitionError,
+} from "@capital-q/q-actions";
+import {
   ActorContextDeniedError,
   ActorContextRequiredError,
   AuthenticationRequiredError,
@@ -109,6 +141,131 @@ function toProblem(error: unknown, requestId: string): ProblemDetails {
   if (error instanceof AuthorizationRequirementError) {
     return createProblemDetails({
       code: "PERMISSION_DENIED",
+      requestId,
+      detail: error.message,
+    });
+  }
+
+  // Q runtime. Each "not found" is enumeration-safe by construction: the
+  // runtime raises the same error for an absent run, another person's run
+  // and another tenant's run, so mapping it is purely a status decision.
+  // The detail is the runtime's own plain-English sentence; it names no
+  // tenant, person, table or status word.
+  if (
+    error instanceof QRunNotFoundError ||
+    error instanceof QConversationNotFoundError ||
+    error instanceof QSubjectNotFoundError
+  ) {
+    return createProblemDetails({
+      code: "RESOURCE_NOT_FOUND",
+      requestId,
+      detail: error.message,
+    });
+  }
+
+  if (error instanceof QSubjectUnsupportedError) {
+    return createProblemDetails({
+      code: "INVALID_REQUEST",
+      requestId,
+      detail: error.message,
+    });
+  }
+
+  // The run is finished, finishing, archived, or cannot make that move.
+  // The caller owns the run, so confirming its state discloses nothing.
+  if (
+    error instanceof QRunAlreadyTerminalError ||
+    error instanceof QRunNotAcceptingMessagesError ||
+    error instanceof QRunTransitionError ||
+    error instanceof QConversationArchivedError ||
+    // Orchestration preconditions: already started, not paused, or paused
+    // by a version this build cannot continue. The internal version string
+    // stays on the error object; only the plain sentence travels.
+    error instanceof QRunAlreadyStartedError ||
+    error instanceof QRunNotResumableError ||
+    error instanceof QOrchestrationVersionError
+  ) {
+    return createProblemDetails({
+      code: "RESOURCE_CONFLICT",
+      requestId,
+      detail: error.message,
+    });
+  }
+
+  if (
+    error instanceof QRunCreationConflictError ||
+    error instanceof QMessageCreationConflictError
+  ) {
+    return createProblemDetails({
+      code: "IDEMPOTENCY_CONFLICT",
+      requestId,
+      detail: error.message,
+    });
+  }
+
+  // Approval Engine (CQ-Q-008). Each domain error carries the plain-English
+  // sentence a person reads; the internal code stays in logs. Not found,
+  // another tenant's and not this person's are one 404 by design.
+  if (
+    error instanceof QApprovalNotFoundError ||
+    error instanceof QActionNotFoundError
+  ) {
+    return createProblemDetails({
+      code: "RESOURCE_NOT_FOUND",
+      requestId,
+      detail: error.message,
+    });
+  }
+  if (
+    error instanceof QApprovalNotPermittedError ||
+    error instanceof QActionNotPermittedError
+  ) {
+    return createProblemDetails({
+      code: "PERMISSION_DENIED",
+      requestId,
+      detail: error.message,
+    });
+  }
+  if (error instanceof QApprovalExpiredError) {
+    return createProblemDetails({
+      code: "Q_ACTION_EXPIRED",
+      requestId,
+      detail: error.message,
+    });
+  }
+  if (
+    error instanceof QApprovalAlreadyDecidedError ||
+    error instanceof QActionPayloadMismatchError ||
+    error instanceof QActionAlreadyCompletedError ||
+    error instanceof QActionUnavailableError ||
+    error instanceof QApprovalTransitionError ||
+    error instanceof QActionTransitionError
+  ) {
+    return createProblemDetails({
+      code: "RESOURCE_CONFLICT",
+      requestId,
+      detail: error.message,
+    });
+  }
+  if (error instanceof QActionVersionConflictError) {
+    return createProblemDetails({
+      code: "VERSION_CONFLICT",
+      requestId,
+      detail: error.message,
+    });
+  }
+
+  if (error instanceof QRunVersionConflictError) {
+    return createProblemDetails({
+      code: "VERSION_CONFLICT",
+      requestId,
+      detail: error.message,
+    });
+  }
+
+  if (error instanceof QStreamLimitError) {
+    return createProblemDetails({
+      code: "RATE_LIMITED",
       requestId,
       detail: error.message,
     });

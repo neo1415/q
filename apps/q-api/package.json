@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "Q runtime service — independently deployable Capital Q intelligence boundary.",
+  "description": "Q runtime service \u2014 independently deployable Capital Q intelligence boundary.",
   "scripts": {
     "dev": "node --watch src/main.ts",
     "build": "tsc",
@@ -12,13 +12,31 @@
     "clean": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\""
   },
   "dependencies": {
+    "@capital-q/audit": "workspace:*",
+    "@capital-q/capital": "workspace:*",
+    "@capital-q/companies": "workspace:*",
     "@capital-q/config": "workspace:*",
     "@capital-q/contracts": "workspace:*",
+    "@capital-q/database": "workspace:*",
+    "@capital-q/eventing": "workspace:*",
+    "@capital-q/evidence": "workspace:*",
+    "@capital-q/investors": "workspace:*",
+    "@capital-q/model-gateway": "workspace:*",
+    "@capital-q/network": "workspace:*",
     "@capital-q/observability": "workspace:*",
-    "fastify": "^5.12.1",
-    "@capital-q/security": "workspace:*"
+    "@capital-q/organisations": "workspace:*",
+    "@capital-q/permissions": "workspace:*",
+    "@capital-q/q-actions": "workspace:*",
+    "@capital-q/q-core": "workspace:*",
+    "@capital-q/q-firewall": "workspace:*",
+    "@capital-q/q-orchestrator": "workspace:*",
+    "@capital-q/q-runtime": "workspace:*",
+    "@capital-q/q-tools": "workspace:*",
+    "@capital-q/security": "workspace:*",
+    "fastify": "^5.12.1"
   },
   "devDependencies": {
+    "@capital-q/api-client": "workspace:*",
     "@types/node": "^24.13.3",
     "typescript": "5.9.3"
   }

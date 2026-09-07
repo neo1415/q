@@ -41,6 +41,11 @@ export type ExtractionLimits = ZipLimits & {
   readonly maxSlides: number;
   readonly maxXmlNodes: number;
   readonly maxXmlDepth: number;
+  readonly maxSheets: number;
+  readonly maxRowsPerSheet: number;
+  readonly maxColumnsPerSheet: number;
+  readonly maxCellsTotal: number;
+  readonly maxRangeRows: number;
 };
 
 export type ExtractionContext = {
@@ -62,7 +67,7 @@ export type ContentExtractorRegistry = {
 };
 
 /** Collects blocks while enforcing the bounds the artifact schema also checks. */
-class BlockBuilder {
+export class BlockBuilder {
   private readonly blocks: ExtractedBlock[] = [];
   private readonly limits: ExtractionLimits;
   private characters = 0;
@@ -107,7 +112,7 @@ class BlockBuilder {
   }
 }
 
-function normaliseWhitespace(value: string): string {
+export function normaliseWhitespace(value: string): string {
   return value
     .replace(/\r\n?/g, "\n")
     .replace(/[ \t]+/g, " ")
@@ -124,9 +129,8 @@ export function createTextExtractor(): ContentExtractor {
   return {
     id: "text",
     version: TEXT_EXTRACTOR_VERSION,
-    supports: (descriptor) =>
-      descriptor.mimeType === "text/plain" ||
-      descriptor.mimeType === "text/csv",
+    // CSV has its own row-preserving extractor (CQ-RAG-001).
+    supports: (descriptor) => descriptor.mimeType === "text/plain",
     extract: (input, context) => {
       const builder = new BlockBuilder(context.limits);
       // Decoded leniently: a document with a bad byte is still a document,

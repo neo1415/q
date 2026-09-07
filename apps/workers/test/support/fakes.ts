@@ -117,6 +117,7 @@ export function makeRun(
     completedAt: null,
     errorCode: null,
     extractorVersion: null,
+    chunkingVersion: null,
     classifierVersion: null,
     embeddingModelId: null,
     costUsd: "0",

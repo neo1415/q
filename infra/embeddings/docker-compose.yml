@@ -1,0 +1,86 @@
+# Capital Q local embedding runtime (CQ-RAG-002 §11-§17).
+#
+# One open-weight embedding model, served by Hugging Face Text Embeddings
+# Inference on loopback only. No account, no API key, no paid service and no
+# document text leaving this machine: that privacy property is the reason the
+# local runtime is preferred over a hosted embedding API, not a side effect.
+#
+#   pnpm embedding:up       start it (first run downloads ~1.2 GB of weights)
+#   pnpm embedding:health   ask what it is serving
+#   pnpm embedding:down     stop it; the model cache survives
+#
+# Supabase runs its own containers through the Supabase CLI; this stack is
+# separate on purpose and owns nothing but the embedding runtime.
+
+name: capital-q-embeddings
+
+services:
+  embeddings:
+    # x86_64 CPU image. TEI 1.9 supports the Qwen3 embedding architecture
+    # natively in Rust: no model-repository Python is executed, and no
+    # trust-remote-code option exists or is passed.
+    image: ghcr.io/huggingface/text-embeddings-inference:cpu-1.9
+    container_name: capital-q-embeddings
+    # Loopback only. The runtime holds confidential document text while it
+    # embeds it and is never published on a routable interface.
+    ports:
+      # Host port is configurable because a developer machine may already
+      # have 8080; keep the loopback binding whatever it becomes.
+      - "127.0.0.1:${CQ_EMBEDDING_HOST_PORT:-8080}:80"
+    volumes:
+      # Weights persist across restarts; they are never copied into an
+      # application image and never committed.
+      - capital-q-embedding-cache:/data
+    environment:
+      HUGGINGFACE_HUB_CACHE: /data
+    command:
+      - "--model-id"
+      - "Qwen/Qwen3-Embedding-0.6B"
+      # Pinned commit: a vector is attributable to exactly these weights.
+      - "--revision"
+      - "97b0c614be4d77ee51c0cef4e5f07c00f9eb65b3"
+      # Conservative local bounds so a development machine stays usable.
+      - "--max-client-batch-size"
+      - "16"
+      - "--max-concurrent-requests"
+      - "8"
+      # A batch budget a CPU can actually warm up. The model's own ceiling
+      # is 32768 tokens, and warming a batch that size is not survivable on
+      # CPU: candle materialises the attention matrix.
+      #
+      # TEI only permits a budget below the model ceiling with its
+      # auto-truncate default, so the no-silent-truncation guarantee is
+      # enforced one level up instead, where it is stronger:
+      #   - Capital Q refuses any input over 24,000 CHARACTERS before a byte
+      #     is sent, and a token is never shorter than a character, so an
+      #     input can never reach the 32,768-token size at which TEI would
+      #     truncate. That branch is unreachable, not merely unlikely.
+      #   - An input that exceeds this batch budget does not get truncated
+      #     either: it does not fit a batch, TEI answers 413, and the adapter
+      #     reports INPUT_TOO_LARGE. A refusal, never a silent shortening.
+      #
+      # 4096 is what a CPU can warm up here: TEI runs a full forward pass at
+      # this size on start, and the attention cost grows with the square of
+      # it (8192 needed ~12 GB and was killed by this container's limit).
+      # Real Capital Q chunks are at most ~1,200 tokens, so this leaves
+      # generous headroom for anything the chunker actually produces.
+      - "--max-batch-tokens"
+      - "4096"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:80/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      # A cold start downloads and loads the model; failures before then are
+      # expected rather than alarming.
+      start_period: 600s
+      retries: 5
+    restart: unless-stopped
+    # Warming the model up costs several gigabytes for a short burst; a
+    # limit below that is silently fatal, so this leaves real headroom on a
+    # 16 GB machine.
+    cpus: 6
+    mem_limit: 12g
+
+volumes:
+  capital-q-embedding-cache:
+    name: capital-q-embedding-cache

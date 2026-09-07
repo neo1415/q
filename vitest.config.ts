@@ -45,6 +45,8 @@ export default defineConfig({
       "tests/e2e/**",
       // Real-infrastructure tests run separately via `pnpm test:integration`.
       "**/*.integration.test.ts",
+      // Real model calls run only via `pnpm test:live-model` (CQ-Q-005).
+      "**/*.live.test.ts",
     ],
 
     // Deterministic tests fail fast. Long-running integration and browser

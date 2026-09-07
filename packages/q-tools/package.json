@@ -1,0 +1,46 @@
+{
+  "name": "@capital-q/q-tools",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Capital Q Tool Registry and Safe Read tools: the versioned, Capital Q-owned catalogue of typed tools a Q run may be offered, the deterministic execution pipeline (validate, actor, firewall plan, capability, resource authorization, execute, output validation, sanitised result) and the four SAFE_READ tools over the owning domains' public query ports. No SQL tool, no HTTP tool, no side effect, no model, no provider.",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "clean": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\""
+  },
+  "dependencies": {
+    "@capital-q/capital": "workspace:*",
+    "@capital-q/companies": "workspace:*",
+    "@capital-q/contracts": "workspace:*",
+    "@capital-q/investors": "workspace:*",
+    "@capital-q/observability": "workspace:*",
+    "@capital-q/permissions": "workspace:*",
+    "@capital-q/q-runtime": "workspace:*",
+    "@capital-q/security": "workspace:*",
+    "zod": "4.5.4"
+  },
+  "devDependencies": {
+    "@capital-q/audit": "workspace:*",
+    "@capital-q/config": "workspace:*",
+    "@capital-q/database": "workspace:*",
+    "@capital-q/eventing": "workspace:*",
+    "@capital-q/evidence": "workspace:*",
+    "@capital-q/network": "workspace:*",
+    "@capital-q/q-firewall": "workspace:*",
+    "@types/node": "^24.13.3",
+    "typescript": "5.9.3"
+  }
+}

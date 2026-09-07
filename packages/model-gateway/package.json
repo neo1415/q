@@ -1,0 +1,53 @@
+{
+  "name": "@capital-q/model-gateway",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Capital Q Model Gateway: the one provider-neutral inference boundary. Task classes in, validated normalized results out. Owns eligibility, deterministic routing, fallback, bounded retry, timeouts, cancellation, budgets, structured-output validation, cost accounting and the usage ledger. Provider SDKs live only behind the ./providers/* subpaths. No prompts, no Context Firewall, no retrieval, no tools, no approvals.",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./providers/google": {
+      "types": "./dist/providers/google.d.ts",
+      "default": "./dist/providers/google.js"
+    },
+    "./providers/groq": {
+      "types": "./dist/providers/groq.d.ts",
+      "default": "./dist/providers/groq.js"
+    },
+    "./q": {
+      "types": "./dist/q/index.d.ts",
+      "default": "./dist/q/index.js"
+    }
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "clean": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\""
+  },
+  "dependencies": {
+    "@capital-q/contracts": "workspace:*",
+    "@capital-q/database": "workspace:*",
+    "@capital-q/observability": "workspace:*",
+    "@capital-q/q-core": "workspace:*",
+    "@capital-q/q-runtime": "workspace:*",
+    "@capital-q/security": "workspace:*",
+    "@google/genai": "2.21.0",
+    "groq-sdk": "1.6.0",
+    "zod": "4.5.4"
+  },
+  "devDependencies": {
+    "@capital-q/config": "workspace:*",
+    "@capital-q/q-tools": "workspace:*",
+    "@types/node": "^24.13.3",
+    "typescript": "5.9.3"
+  }
+}

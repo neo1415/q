@@ -10,6 +10,10 @@ import type {
   PrivateDocumentStorageProvider,
 } from "@capital-q/evidence";
 import { ProcessDocumentJob } from "@capital-q/evidence/jobs";
+import type {
+  BuildChunkSetInput,
+  BuildChunkSetResult,
+} from "@capital-q/q-knowledge";
 
 import type { RunnerLogger } from "../outbox-runner.js";
 import type { MessageOutcome } from "../queue/runner.js";
@@ -26,7 +30,7 @@ import {
  * The document processing pipeline (doc 14 §9, doc 15 §26–28, doc 16 TM-FILE).
  *
  *   version created → job → security gate → malware gate → isolated parse
- *   → structured extraction → instruction-risk signal → ready
+ *   → structured extraction → instruction-risk signal → chunk set → ready
  *
  * Two rules shape everything below.
  *
@@ -48,7 +52,19 @@ export type PipelineMetrics = {
     readonly outcome: string;
     readonly extractorId?: string | undefined;
     readonly durationMs: number;
+    readonly chunkCount?: number | undefined;
   }) => void;
+};
+
+/**
+ * The chunking stage (CQ-RAG-001 §67): derives the version's chunk set from
+ * the blocks just extracted. Deterministic and idempotent on (version,
+ * extraction, chunking version); absent in a build that only extracts.
+ */
+export type DocumentChunkingPort = {
+  readonly buildChunkSet: (
+    input: BuildChunkSetInput,
+  ) => Promise<BuildChunkSetResult>;
 };
 
 export type DocumentPipelineOptions = {
@@ -57,6 +73,7 @@ export type DocumentPipelineOptions = {
   readonly scanner: MalwareScanner;
   readonly malwarePolicy: MalwarePolicy;
   readonly sandbox: ParserSandbox;
+  readonly knowledge?: DocumentChunkingPort | undefined;
   readonly pipelineVersion: string;
   /** Ceiling on bytes read out of storage, independent of the parser's own. */
   readonly maxDocumentBytes: number;
@@ -88,11 +105,13 @@ export function createDocumentProcessingPipeline(
     outcome: string,
     startedAt: number,
     extractorId?: string,
+    chunkCount?: number,
   ): void => {
     options.metrics?.observe({
       outcome,
       ...(extractorId === undefined ? {} : { extractorId }),
       durationMs: Date.now() - startedAt,
+      ...(chunkCount === undefined ? {} : { chunkCount }),
     });
   };
 
@@ -306,6 +325,74 @@ export function createDocumentProcessingPipeline(
       output: result.output,
     });
 
+    // --- Structure-aware chunking -------------------------------------------
+    // Blocks go straight from the validated parser output into the chunker;
+    // nothing is re-read from storage and nothing is interpreted. A failure
+    // here is this attempt's, not the document's: the extraction stays
+    // recorded and the job retries into an idempotent build.
+    let chunking:
+      | {
+          readonly outcome: BuildChunkSetResult["outcome"];
+          readonly chunkingVersion?: string | undefined;
+          readonly chunkCount?: number | undefined;
+          readonly strategy?: string | undefined;
+          readonly truncated?: boolean | undefined;
+          readonly supersededSets?: number | undefined;
+          readonly reason?: string | undefined;
+        }
+      | undefined;
+    if (options.knowledge !== undefined) {
+      const chunkingStartedAt = Date.now();
+      let built: BuildChunkSetResult;
+      try {
+        built = await options.knowledge.buildChunkSet({
+          tenantId,
+          documentVersionId: version.id,
+          pipelineVersion,
+          blocks: [...result.output.blocks],
+        });
+      } catch (error: unknown) {
+        logger.warn(
+          {
+            msgId: message.msgId,
+            runId: run.id,
+            failure: error instanceof Error ? error.name : "unknown",
+          },
+          "chunking attempt failed; will retry",
+        );
+        observe("CHUNKING_FAILED", startedAt, result.extractorId);
+        return { kind: "RETRY", errorCode: "CHUNKING_FAILED" };
+      }
+      chunking =
+        built.outcome === "BUILT"
+          ? {
+              outcome: built.outcome,
+              chunkingVersion: built.chunkSet.chunkingVersion,
+              chunkCount: built.chunkCount,
+              strategy: built.plan.strategy,
+              truncated: built.plan.truncated,
+              supersededSets: built.supersededSetIds.length,
+            }
+          : built.outcome === "ALREADY_BUILT"
+            ? {
+                outcome: built.outcome,
+                chunkingVersion: built.chunkSet.chunkingVersion,
+                chunkCount: built.chunkSet.chunkCount,
+                strategy: built.chunkSet.chunkingStrategy,
+              }
+            : { outcome: built.outcome, reason: built.reason };
+      logger.info(
+        {
+          msgId: message.msgId,
+          runId: run.id,
+          chunking: chunking.outcome,
+          chunkCount: chunking.chunkCount ?? 0,
+          chunkingDurationMs: Date.now() - chunkingStartedAt,
+        },
+        "document chunk set settled",
+      );
+    }
+
     const correlationId = CorrelationIdSchema.parse(
       job.correlationId ?? `cor_${randomUUID()}`,
     );
@@ -319,6 +406,9 @@ export function createDocumentProcessingPipeline(
       scannedClean: decision.scanned,
       provenance: {
         extractorVersion: result.output.metadata.parserVersion,
+        ...(chunking?.chunkingVersion === undefined
+          ? {}
+          : { chunkingVersion: chunking.chunkingVersion }),
         // Structural counts and coded categories only. Never a title, never a
         // block of text, never a matched passage: this metadata is read by
         // operators and could otherwise carry document content into logs.
@@ -330,6 +420,26 @@ export function createDocumentProcessingPipeline(
           truncated: result.output.metadata.truncated === true,
           parseDurationMs: result.durationMs,
           scanned: decision.scanned,
+          ...(chunking === undefined
+            ? {}
+            : {
+                chunkingOutcome: chunking.outcome,
+                ...(chunking.reason === undefined
+                  ? {}
+                  : { chunkingSkipped: chunking.reason }),
+                ...(chunking.chunkCount === undefined
+                  ? {}
+                  : { chunkCount: chunking.chunkCount }),
+                ...(chunking.strategy === undefined
+                  ? {}
+                  : { chunkingStrategy: chunking.strategy }),
+                ...(chunking.truncated === undefined
+                  ? {}
+                  : { chunkingTruncated: chunking.truncated }),
+                ...(chunking.supersededSets === undefined
+                  ? {}
+                  : { chunkSetsSuperseded: chunking.supersededSets }),
+              }),
         },
       },
     });
@@ -344,11 +454,12 @@ export function createDocumentProcessingPipeline(
         blockCount: result.output.blocks.length,
         instructionRiskSignals: recorded.extraction.instructionRiskSignals,
         alreadyRecorded: recorded.alreadyRecorded,
+        chunkCount: chunking?.chunkCount ?? 0,
         emitted: completion.emitted,
       },
       "document extraction recorded",
     );
-    observe("COMPLETED", startedAt, result.extractorId);
+    observe("COMPLETED", startedAt, result.extractorId, chunking?.chunkCount);
     return { kind: "DONE" };
   };
 }

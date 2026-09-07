@@ -268,6 +268,7 @@ export const CompleteDocumentProcessingInputSchema = z
     provenance: z
       .object({
         extractorVersion: z.string().min(1).max(64).optional(),
+        chunkingVersion: PipelineVersionSchema.optional(),
         metadata: ProcessingRunMetadataSchema.optional(),
       })
       .strict()
