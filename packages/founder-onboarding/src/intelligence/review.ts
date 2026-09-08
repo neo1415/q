@@ -219,6 +219,8 @@ export type FounderReviewCommand = {
   readonly sql: DatabaseExecutor;
   readonly facts: FounderSessionFacts;
   readonly sources: readonly FounderExtractionSource[];
+  /** The unit of work, carried through to the model call's attribution. */
+  readonly correlationId: string;
   readonly signal?: AbortSignal | undefined;
 };
 
@@ -255,6 +257,7 @@ export function createFounderReview(dependencies: FounderReviewDependencies): {
         unansweredKeys: unanswered,
         shape,
         stage: facts.stage,
+        correlationId: command.correlationId,
         ...(command.signal === undefined ? {} : { signal: command.signal }),
       });
 

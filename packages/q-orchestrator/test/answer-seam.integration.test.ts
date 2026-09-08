@@ -557,15 +557,19 @@ describe("Model Gateway answer seam inside the Q orchestrator", () => {
     }
   });
 
-  it("refuses a confidential plan before any provider is called: no seeded model is cleared", async () => {
+  it("refuses a plan above every reviewed ceiling before any provider is called", async () => {
     const world = await commitWorld();
     try {
       const { engine, google, groq } = orchestrator(world, {
         google: [{ kind: "JSON", value: analystResult("must not be called") }],
         groq: [{ kind: "JSON", value: analystResult("must not be called") }],
-        maxSensitivity: "CONFIDENTIAL",
+        // Above every reviewed provider ceiling there is. Groq carries
+        // CONFIDENTIAL under its zero-retention review (CQ-C5-R2A); nothing
+        // carries more, by construction, so this is the class that proves
+        // the refusal still happens rather than the one that happened to.
+        maxSensitivity: "RESTRICTED",
       });
-      const run = await createRun(world, "Confidential question.");
+      const run = await createRun(world, "Restricted question.");
       const handle = await engine.start({
         actor: world.actor,
         runId: run.id,

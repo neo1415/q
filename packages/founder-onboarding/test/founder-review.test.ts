@@ -108,6 +108,7 @@ async function prepare(
     sql: undefined as never,
     facts: sessionFactsFrom(facts),
     sources: [],
+    correlationId: "cor_founder_review_test",
   });
   return { plan, request: seen[0] };
 }

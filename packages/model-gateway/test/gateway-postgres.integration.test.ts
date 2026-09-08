@@ -169,20 +169,34 @@ describe("@capital-q/model-gateway against local PostgreSQL", () => {
     });
     expect(google.calls).toHaveLength(1);
 
-    // CONFIDENTIAL: nothing seeded is cleared; no token is sent anywhere.
+    // CONFIDENTIAL now routes, and only to the provider whose reviewed
+    // terms justify it: Groq under zero data retention (CQ-C5-R2A). Gemini
+    // stays unreviewed and public-only, so it must not be the one that
+    // answers.
+    await gateway.execute({
+      ...base,
+      taskClass: "NORMAL_DIALOGUE",
+      sensitivity: "CONFIDENTIAL",
+    });
+    expect(google.calls).toHaveLength(1);
+    expect(groq.calls).toHaveLength(2);
+
+    // RESTRICTED: nothing seeded is cleared for it, and no token is sent
+    // anywhere. Approving a vendor for confidential work is not approving
+    // it for everything.
     let denied: ModelGatewayError | undefined;
     try {
       await gateway.execute({
         ...base,
         taskClass: "NORMAL_DIALOGUE",
-        sensitivity: "CONFIDENTIAL",
+        sensitivity: "RESTRICTED",
       });
     } catch (error: unknown) {
       denied = error instanceof ModelGatewayError ? error : undefined;
     }
     expect(denied?.failureClass).toBe("POLICY_INELIGIBLE");
     expect(google.calls).toHaveLength(1);
-    expect(groq.calls).toHaveLength(1);
+    expect(groq.calls).toHaveLength(2);
 
     const rows = await db.sql<
       {
@@ -196,9 +210,14 @@ describe("@capital-q/model-gateway against local PostgreSQL", () => {
     >`select u.task_class, u.success, u.cost_usd::text as cost_usd, u.cost_basis, u.error_code, m.model_code
         from ai_ops.model_usage u join ai_ops.models m on m.id = u.model_id
        where u.q_run_id = ${runId} order by u.id`;
+    // Three ledger rows now: the public run, the INTERNAL run, and the
+    // CONFIDENTIAL run that Groq's reviewed zero-retention terms admit. The
+    // RESTRICTED attempt is refused before a provider is contacted, so it
+    // leaves no row — a refusal costs nothing and is not an execution.
     expect(rows.map((r) => [r.model_code, r.success, r.cost_basis])).toEqual([
       ["gemini-3.5-flash-lite", true, "PRICE_SNAPSHOT"],
       ["openai/gpt-oss-20b", true, "PRICE_SNAPSHOT"],
+      ["openai/gpt-oss-120b", true, "PRICE_SNAPSHOT"],
     ]);
     expect(Number(rows[0]?.cost_usd)).toBeGreaterThan(0);
     // 40 in × 0.30 + 10 out × 2.50, per million.

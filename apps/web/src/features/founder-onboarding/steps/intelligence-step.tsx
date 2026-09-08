@@ -4,12 +4,20 @@ import { ContextIndicator } from "@capital-q/ui/context-indicator";
 import { IntelligenceSnapshot } from "@capital-q/ui/intelligence-snapshot";
 import { InlineNotice } from "@capital-q/ui/states";
 
+import { CompanyIntelligencePanel } from "./company-intelligence-panel";
 import type { StepProps } from "./step-props";
 
 /**
- * F8. "Here's what we have so far": structured, sourced from the founder's
- * own answers, no score, no investor matches, no "complete" banner and no
- * claim that Q has analysed anything. The shell supplies the actions.
+ * F8. Two things, kept apart on purpose.
+ *
+ * A deterministic snapshot of what the founder entered — structured, no
+ * score, no investor matches, no "complete" banner.
+ *
+ * And, since CQ-C5-R2B, Q's first reading of the company, asked through the
+ * ordinary Q boundary so it is the same Company Intelligence the rest of the
+ * product uses. It appears only when the session is bound to a company Q can
+ * be asked about; otherwise the snapshot stands alone rather than a reading
+ * of nothing being invented.
  */
 export function IntelligenceStep({ step }: StepProps<"snapshot">) {
   return (
@@ -23,6 +31,12 @@ export function IntelligenceStep({ step }: StepProps<"snapshot">) {
         nextStepsTitle="What would help next"
         provenanceNote={step.provenanceNote}
       />
+      {step.companyId !== undefined && step.companyName !== undefined ? (
+        <CompanyIntelligencePanel
+          companyId={step.companyId}
+          companyName={step.companyName}
+        />
+      ) : null}
       <div className="flex flex-col gap-3">
         <ContextIndicator scope="organisation_private" detail="your company" />
         <InlineNotice tone="info" title="Investors don't see this.">

@@ -299,9 +299,15 @@ importers:
       '@capital-q/evidence':
         specifier: workspace:*
         version: link:../../packages/evidence
+      '@capital-q/founder-onboarding':
+        specifier: workspace:*
+        version: link:../../packages/founder-onboarding
       '@capital-q/investors':
         specifier: workspace:*
         version: link:../../packages/investors
+      '@capital-q/model-gateway':
+        specifier: workspace:*
+        version: link:../../packages/model-gateway
       '@capital-q/network':
         specifier: workspace:*
         version: link:../../packages/network

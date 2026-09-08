@@ -22,6 +22,27 @@ import type { TaxonomyCandidateView } from "../../onboarding-kit/client";
  * as TypeScript types.
  */
 
+/**
+ * One thing Q proposes from a founder's own material (CQ-C5-R2B §10-§12).
+ *
+ * A suggestion, not a fact, and the shape says so: it carries what Q read,
+ * where it read it, and the identifier the runtime needs to resolve it. It
+ * carries no truth class, because it has none — until a person accepts it,
+ * nothing about it is recorded as anything.
+ */
+export type FounderSuggestionView = {
+  readonly id: string;
+  /** Which screen this belongs to, so accepting it lands somewhere real. */
+  readonly stepId: string;
+  readonly label: string;
+  /** What Q understood, as a person would read it. */
+  readonly value: string;
+  /** "From your pitch deck, slide 6", when the source is known. */
+  readonly source: string | undefined;
+  /** Q's own confidence word. Never a percentage, never invented. */
+  readonly confidence: string | undefined;
+};
+
 export const SECTION_IDS = ["company", "business", "raise", "review"] as const;
 export type SectionId = (typeof SECTION_IDS)[number];
 
@@ -194,6 +215,12 @@ export type StepView =
       readonly items: readonly ReviewItem[];
       readonly categories: readonly string[];
       readonly materials: readonly string[] | undefined;
+      /**
+       * What Q read in the founder's own documents, still a proposal
+       * (CQ-C5-R2B §10-§11). Empty until a document has been processed, and
+       * empty is a normal, unremarkable state.
+       */
+      readonly suggestions: readonly FounderSuggestionView[];
       readonly response?: Extract<StepResponse, { kind: "review" }> | undefined;
     })
   | (StepBase<"team"> & {
@@ -230,6 +257,14 @@ export type StepView =
         readonly text: string;
       }[];
       readonly provenanceNote: string;
+      /**
+       * The canonical company this snapshot is about, when the session is
+       * bound to one (CQ-C5-R2B §18). Present, the screen asks Q for a first
+       * reading through the ordinary Q boundary; absent, it shows the
+       * deterministic snapshot alone rather than asking about nothing.
+       */
+      readonly companyId: string | undefined;
+      readonly companyName: string | undefined;
       readonly response?:
         Extract<StepResponse, { kind: "snapshot" }> | undefined;
     });

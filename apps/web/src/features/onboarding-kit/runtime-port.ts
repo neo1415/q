@@ -5,9 +5,11 @@ import type {
 
 import {
   OnboardingClientError,
+  type MaterialUploadOutcome,
   type OnboardingClient,
   type TaxonomyCandidateView,
 } from "./client";
+import type { MaterialFileView } from "./materials";
 import type { SessionPresentation } from "./session";
 
 /**
@@ -33,6 +35,36 @@ export type RuntimePort = {
     readonly expectedSessionVersion: number;
     readonly idempotencyKey: string;
   }) => Promise<OnboardingSessionView>;
+  /**
+   * Accept, correct or decline one of Q's proposals. Absent on a port with
+   * no suggestion path, so a screen can tell the difference between "the
+   * founder declined" and "this build cannot record a decision".
+   */
+  readonly resolveSuggestion?:
+    | ((input: {
+        readonly sessionId: string;
+        readonly suggestionId: string;
+        readonly resolution: "ACCEPT" | "EDIT" | "REJECT";
+        readonly response?: OnboardingResponseValue | undefined;
+        readonly expectedSessionVersion: number;
+        readonly idempotencyKey: string;
+      }) => Promise<OnboardingSessionView>)
+    | undefined;
+  /**
+   * Upload one document for a document-gathering step. Absent on a port
+   * with no upload path, so a screen says so rather than reporting a
+   * success nothing performed.
+   */
+  readonly uploadMaterial?:
+    | ((input: {
+        readonly companyId: string;
+        readonly file: File;
+        readonly documentType: string;
+      }) => Promise<MaterialUploadOutcome>)
+    | undefined;
+  /** The company's documents with their real processing state. */
+  readonly listMaterials?:
+    ((companyId: string) => Promise<readonly MaterialFileView[]>) | undefined;
   readonly navigate: (input: {
     readonly sessionId: string;
     readonly expectedSessionVersion: number;
@@ -274,6 +306,76 @@ export function createRuntimeClient<
 
   return {
     getSession: () => guarded(async () => present(await session())),
+
+    ...(port.uploadMaterial === undefined
+      ? {}
+      : {
+          uploadMaterial: async (input: {
+            readonly file: File;
+            readonly documentType: string;
+          }): Promise<MaterialUploadOutcome> => {
+            const upload = port.uploadMaterial;
+            if (upload === undefined) {
+              return {
+                ok: false,
+                message: "Uploading isn't available here right now.",
+              };
+            }
+            const view = await session();
+            const companyId =
+              view.session.subject?.type === "COMPANY"
+                ? view.session.subject.id
+                : undefined;
+            if (companyId === undefined) {
+              // A document belongs to a company. Until the journey has
+              // established one there is nothing to attach it to, and
+              // saying so beats inventing an owner.
+              return {
+                ok: false,
+                message:
+                  "Add your company name first, then Q can read your documents.",
+              };
+            }
+            return upload({ companyId, ...input });
+          },
+        }),
+
+    ...(port.resolveSuggestion === undefined
+      ? {}
+      : {
+          resolveSuggestion: (input: {
+            readonly suggestionId: string;
+            readonly resolution: "ACCEPT" | "EDIT" | "REJECT";
+            readonly response?: OnboardingResponseValue | undefined;
+          }) =>
+            guarded(async () => {
+              const resolve = port.resolveSuggestion;
+              if (resolve === undefined) {
+                throw new OnboardingClientError(
+                  "UNAVAILABLE",
+                  "Capital Q can't record that decision on this build yet.",
+                );
+              }
+              const view = await session();
+              // The API validates an accepted or corrected proposal against
+              // the pinned step exactly as it validates a typed answer, and
+              // returns the session the decision produced.
+              return present(
+                remember(
+                  await resolve({
+                    sessionId: view.session.id,
+                    suggestionId: input.suggestionId,
+                    resolution: input.resolution,
+                    ...(input.response === undefined
+                      ? {}
+                      : { response: input.response }),
+                    expectedSessionVersion: view.session.version,
+                    idempotencyKey: crypto.randomUUID(),
+                  }),
+                ),
+              );
+            }),
+        }),
 
     saveResponse: ({ stepId, response }) =>
       guarded(async () => {

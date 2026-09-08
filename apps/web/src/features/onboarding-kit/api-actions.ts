@@ -8,6 +8,7 @@ import {
   findTaxonomyCandidates,
   getCurrentOnboardingSession,
   getOnboardingSession,
+  resolveOnboardingSuggestion,
   getTaxonomyNode,
   goBackInOnboarding,
   listTaxonomyNodes,
@@ -192,6 +193,46 @@ export async function onboardingSkipAction(
       input.sessionId,
       input.stepKey,
       { expectedSessionVersion: input.expectedSessionVersion },
+      input.idempotencyKey,
+    ),
+  );
+}
+
+/**
+ * Resolving one of Q's proposals (CQ-C5-R2B §11).
+ *
+ * ACCEPT records what Q read as the founder's own answer. EDIT records the
+ * founder's correction instead, validated by the runtime against the pinned
+ * step exactly as a typed answer is. REJECT records that they said no, and
+ * a rejected proposal is not company truth waiting to be found later.
+ *
+ * The API decides all three; nothing is applied here.
+ */
+const ResolveSuggestionInput = z.object({
+  sessionId: Uuid,
+  suggestionId: Uuid,
+  resolution: z.enum(["ACCEPT", "EDIT", "REJECT"]),
+  response: OnboardingResponseValueSchema.optional(),
+  expectedSessionVersion: Version,
+  idempotencyKey: Uuid,
+});
+
+export async function onboardingResolveSuggestionAction(
+  raw: unknown,
+): Promise<ActionResult<OnboardingSessionView>> {
+  const input = ResolveSuggestionInput.parse(raw);
+  return run((session) =>
+    resolveOnboardingSuggestion(
+      session,
+      input.sessionId,
+      input.suggestionId,
+      {
+        resolution: input.resolution,
+        ...(input.response === undefined
+          ? {}
+          : { response: { value: input.response } }),
+        expectedSessionVersion: input.expectedSessionVersion,
+      },
       input.idempotencyKey,
     ),
   );

@@ -60,4 +60,12 @@ export function createFounderOnboardingIntegration(
 }
 
 export const PACKAGE_NAME = "@capital-q/founder-onboarding" as const;
+export {
+  createFounderDocumentReview,
+  FOUNDER_REVIEW_SKIP_REASONS,
+  type FounderDocumentReview,
+  type FounderReviewResult,
+  type FounderReviewServiceDependencies,
+  type FounderReviewSkipReason,
+} from "./integration/review-service.js";
 export * from "./intelligence/index.js";

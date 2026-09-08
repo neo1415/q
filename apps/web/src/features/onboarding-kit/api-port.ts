@@ -8,11 +8,17 @@ import {
   onboardingGetAction,
   onboardingListNodesAction,
   onboardingNavigateAction,
+  onboardingResolveSuggestionAction,
   onboardingSkipAction,
   onboardingStartAction,
   onboardingSubmitAction,
   type ActionResult,
 } from "./api-actions";
+import {
+  materialListAction,
+  materialUploadCompleteAction,
+  materialUploadTargetAction,
+} from "./material-actions";
 import { OnboardingClientError } from "./client";
 import type { RuntimePort } from "./runtime-port";
 
@@ -56,6 +62,48 @@ export function createApiRuntimePort(input: {
     get: (sessionId) => through(onboardingGetAction(sessionId)),
     submit: (request) => through(onboardingSubmitAction(request)),
     skip: (request) => through(onboardingSkipAction(request)),
+    resolveSuggestion: (request) =>
+      through(onboardingResolveSuggestionAction(request)),
+
+    /**
+     * The real Evidence upload, in the three steps the API actually has
+     * (CQ-C5-R2B §7): ask permission, put the bytes straight into private
+     * storage from the browser, then let the server verify what landed and
+     * freeze an immutable version. The bytes never travel through the
+     * application server, and the session token never reaches the browser.
+     */
+    uploadMaterial: async (input) => {
+      const target = await materialUploadTargetAction({
+        companyId: input.companyId,
+        documentType: input.documentType,
+        filename: input.file.name,
+        mimeType: input.file.type,
+        sizeBytes: input.file.size,
+      });
+      if (!target.ok) {
+        return { ok: false, message: target.message };
+      }
+      const put = await fetch(target.value.url, {
+        method: target.value.method,
+        headers: target.value.headers,
+        body: input.file,
+      });
+      if (!put.ok) {
+        // The bytes did not land. The upload session is left unfinished
+        // rather than completed over nothing.
+        return {
+          ok: false,
+          message: "We couldn't upload that file. Please try again.",
+        };
+      }
+      const completed = await materialUploadCompleteAction(
+        target.value.uploadSessionId,
+      );
+      return completed.ok
+        ? { ok: true, documentId: completed.value.documentId }
+        : { ok: false, message: completed.message };
+    },
+    listMaterials: (companyId) => through(materialListAction(companyId)),
     navigate: (request) => through(onboardingNavigateAction(request)),
     complete: (request) => through(onboardingCompleteAction(request)),
     candidates: (text) =>

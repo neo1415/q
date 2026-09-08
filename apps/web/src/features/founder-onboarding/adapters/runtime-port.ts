@@ -9,6 +9,7 @@ import {
   groupById,
   isSupportedVersion,
   planSubmissions,
+  describeSuggestion,
   toPresentation,
   type PresentationExtras,
 } from "../models/journey";
@@ -33,6 +34,31 @@ export const FOUNDER_JOURNEY_MODEL: JourneyModel<
   planSubmissions,
   toPresentation,
   enrich: async (view, group, port) => {
+    if (group.id === "materials") {
+      // The documents and where each one really is, read from the Evidence
+      // API on every load. The browser remembers nothing, so there is
+      // nothing for it to remember wrongly.
+      const companyId =
+        view.session.subject?.type === "COMPANY"
+          ? view.session.subject.id
+          : undefined;
+      const list = port.listMaterials;
+      if (companyId === undefined || list === undefined) {
+        return { materials: [] };
+      }
+      return { materials: await list(companyId) };
+    }
+    if (group.id === "review") {
+      // Straight from the session's own pending suggestions. Nothing is
+      // reconstructed and nothing is invented: an empty list means Q has
+      // proposed nothing, which is what F3 then says.
+      return {
+        suggestions: view.pendingSuggestions.flatMap((suggestion) => {
+          const described = describeSuggestion(suggestion);
+          return described === null ? [] : [described];
+        }),
+      };
+    }
     if (group.id !== "categories") {
       return {};
     }

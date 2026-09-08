@@ -26,6 +26,7 @@ import type { SnapshotSection } from "@capital-q/ui/intelligence-snapshot";
 
 import type {
   FounderOnboardingSessionView,
+  FounderSuggestionView,
   MaterialFileView,
   MaterialKindOption,
   MetricQuestion,
@@ -236,6 +237,78 @@ function labelOf(stepKey: string, optionKey: string | undefined) {
   return optionsOf(stepKey).find((o) => o.value === optionKey)?.label;
 }
 
+/**
+ * One of Q's proposals, as a person reads it (CQ-C5-R2B §10).
+ *
+ * The journey's own definition supplies both halves: which screen a step
+ * belongs to gives the heading, and the step's option table turns a stored
+ * key into the words the founder was originally offered. A value this
+ * function cannot render is dropped rather than shown as JSON — a proposal
+ * nobody can read is not a proposal.
+ */
+/**
+ * A stored response value as the words a person was originally offered.
+ *
+ * A shape this cannot render returns null and the proposal is dropped: a
+ * suggestion nobody can read is not a suggestion, and showing raw JSON
+ * would be worse than showing nothing.
+ */
+function renderValue(
+  stepKey: string,
+  value: OnboardingResponseValue,
+): string | null {
+  switch (value.type) {
+    case "TEXT":
+      return value.text;
+    case "SINGLE_SELECT":
+      return labelOf(stepKey, value.optionKey) ?? null;
+    case "MULTI_SELECT": {
+      const labels = value.optionKeys.flatMap((key) => {
+        const label = labelOf(stepKey, key);
+        return label === undefined ? [] : [label];
+      });
+      return labels.length === 0 ? null : labels.join(", ");
+    }
+    case "RANGE":
+      return value.value;
+    case "RESOURCE_REFERENCE":
+    case "CONFIRMATION":
+      // Neither is a proposal a founder confirms in prose: a document set
+      // and a yes/no are decided on their own screens.
+      return null;
+  }
+}
+
+export function describeSuggestion(
+  suggestion: {
+    readonly id: string;
+    readonly stepKey: string;
+    readonly suggestedValue: OnboardingResponseValue;
+    readonly confidence: string | null;
+  },
+): FounderSuggestionView | null {
+  const group = GROUPS.find((candidate) =>
+    candidate.stepKeys.includes(suggestion.stepKey),
+  );
+  if (group === undefined) {
+    return null;
+  }
+  const rendered = renderValue(suggestion.stepKey, suggestion.suggestedValue);
+  if (rendered === null || rendered.trim().length === 0) {
+    return null;
+  }
+  return {
+    id: suggestion.id,
+    stepId: group.id,
+    label: group.title,
+    value: rendered,
+    // The suggestion contract carries no source reference, so there is
+    // nothing safe to show yet; provenance stays on the server (§12).
+    source: undefined,
+    confidence: suggestion.confidence ?? undefined,
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Runtime state helpers
 // ---------------------------------------------------------------------------
@@ -341,6 +414,14 @@ export type PresentationExtras = {
    * rather than what the browser last remembered.
    */
   readonly materials?: readonly MaterialFileView[] | undefined;
+  /**
+   * What Q proposed from the founder's documents, straight from the session
+   * view's own pending suggestions (CQ-C5-R2B §10). Nothing is reconstructed
+   * here: if the list is empty, Q proposed nothing, and F3 says so.
+   */
+  readonly suggestions?: readonly FounderSuggestionView[] | undefined;
+  /** The canonical company the session is bound to, when it is bound. */
+  readonly companyId?: string | undefined;
 };
 
 /**
@@ -404,7 +485,16 @@ export function toPresentation(
     sections: [...SECTIONS],
     steps,
     currentStepId: current.id,
-    step: complete ? undefined : buildStep(current, state, extras),
+    step: complete
+      ? undefined
+      : buildStep(current, state, {
+          ...extras,
+          // The subject is the session's own canonical binding, never a
+          // value a screen chose.
+          ...(view.session.subject?.type === "COMPANY"
+            ? { companyId: view.session.subject.id }
+            : {}),
+        }),
     source,
   };
 }
@@ -524,7 +614,7 @@ function buildStep(
       };
     }
     case "review":
-      return buildReview(group, state, context);
+      return buildReview(group, state, context, extras.suggestions ?? []);
     case "team": {
       const role = single(state, S.founderRole);
       const founders = range(state, S.founderCount);
@@ -558,7 +648,7 @@ function buildStep(
     case "capital_objective":
       return buildCapitalObjective(group, state, context);
     case "snapshot":
-      return buildSnapshot(group, state, context);
+      return buildSnapshot(group, state, context, extras.companyId);
   }
 }
 
@@ -566,6 +656,7 @@ function buildReview(
   group: Group,
   state: RuntimeState,
   context: unknown,
+  suggestions: readonly FounderSuggestionView[] = [],
 ): StepView {
   const parsed = FounderReviewContextSchema.safeParse(context);
   const review = parsed.success ? parsed.data : undefined;
@@ -578,8 +669,11 @@ function buildReview(
   return {
     ...base(group, "review", state),
     primaryActionLabel: "Looks right",
+    suggestions,
     intro:
-      "Everything below is what you entered. Nothing has been analysed or shared.",
+      suggestions.length === 0
+        ? "Everything below is what you entered. Nothing has been analysed or shared."
+        : "Below is what you entered, and what Q read in the documents you shared. Confirm what's right, fix what isn't.",
     items: [
       item("intent", "Why you're here", review?.intent?.label, "intent"),
       item("name", "Company", review?.company.name, "company_basics"),
@@ -713,6 +807,7 @@ function buildSnapshot(
   group: Group,
   state: RuntimeState,
   context: unknown,
+  companyId: string | undefined,
 ): StepView {
   const parsed = FounderSnapshotContextSchema.safeParse(context);
   const snapshot: FounderSnapshotContext | undefined = parsed.success
@@ -721,12 +816,19 @@ function buildSnapshot(
   const sections: SnapshotSection[] =
     snapshot === undefined ? [] : snapshotSections(snapshot);
   const missing = snapshot?.missing ?? [];
+  const companyName = snapshot?.company.name;
+  // Q reads the company only when the session is bound to one and Q knows
+  // its name. Both are canonical facts; neither is inferred here.
+  const readable = companyId !== undefined && companyName !== undefined;
   return {
     ...base(group, "snapshot", state),
     primaryActionLabel: "Go to Home",
+    companyId: readable ? companyId : undefined,
+    companyName: readable ? companyName : undefined,
     headline: "Here's what we have so far.",
-    summary:
-      "A plain summary of what you entered. Q has not analysed anything, and investors don't see this.",
+    summary: readable
+      ? "A plain summary of what you entered, and Q's first reading of it. Investors don't see this."
+      : "A plain summary of what you entered. Q has not analysed anything, and investors don't see this.",
     sections,
     nextSteps: missing.flatMap((key) => {
       const copy = MISSING_COPY[key];

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { OnboardingResponseValueSchema } from "@capital-q/contracts";
 import type { FounderFactKey } from "@capital-q/q-core";
 
 import {
@@ -391,6 +392,54 @@ describe("QFOU-008 · steps and facts agree in both directions", () => {
     const keys = new Set(FOUNDER_DEFINITION_V2.steps.map((s) => s.stepKey));
     for (const key of FOUNDER_REQUIRED_FACTS) {
       expect(keys.has(stepForFactKey(key) ?? "")).toBe(true);
+    }
+  });
+});
+
+describe("QFOU-009 · a drafted suggestion is a valid answer to its step", () => {
+  it("carries the response contract's discriminator, so the runtime accepts it", () => {
+    // The onboarding runtime validates every suggestion against the pinned
+    // step's own schema before storing it. A draft shaped { text } instead
+    // of { type: "TEXT", text } parses as no member of the union, and every
+    // suggestion Q produced was silently refused — the whole feature was
+    // inert in the product while this suite stayed green, because it only
+    // ever asserted the draft's own shape.
+    for (const key of ["company_name", "website", "description"] as const) {
+      const [draft] = draftSuggestions([
+        candidate({ key, value: `a value for ${key}` }),
+      ]);
+      expect(draft).toBeDefined();
+      const parsed = OnboardingResponseValueSchema.safeParse(
+        draft?.suggestedValue,
+      );
+      expect(parsed.success).toBe(true);
+    }
+  });
+
+  it("only drafts for steps the published journey answers with plain text", () => {
+    // The class of bug this closes: use_of_funds was listed as free text
+    // while its step is a multi_select over a fixed vocabulary, so every
+    // suggestion Q made for it was refused. Asserting against the published
+    // definition means the set cannot drift from the journey again.
+    const stepTypes = new Map(
+      FOUNDER_DEFINITION_V2.steps.map((step) => [
+        step.stepKey,
+        step.configuration.stepType,
+      ]),
+    );
+    const textual = new Set(["short_text", "long_text", "url", "company_name"]);
+    for (const key of FOUNDER_REQUIRED_FACTS) {
+      if (!isDirectlySuggestable(key)) {
+        continue;
+      }
+      const stepKey = stepForFactKey(key) ?? "";
+      const stepType = stepTypes.get(stepKey);
+      expect(
+        stepType === undefined ? "missing" : stepType,
+        `${key} -> ${stepKey}`,
+      ).toSatisfy((value: unknown) => textual.has(String(value)));
+      const [draft] = draftSuggestions([candidate({ key, value: "x" })]);
+      expect(draft?.suggestedValue).toMatchObject({ type: "TEXT" });
     }
   });
 });

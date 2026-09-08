@@ -71,6 +71,12 @@ export type FounderExtractionRequest = {
   readonly unansweredKeys: readonly FounderFactKey[];
   readonly shape: BusinessShape | null;
   readonly stage: string | null;
+  /**
+   * The unit of work this reading belongs to. Required by the gateway's
+   * attribution, and the reason a model call can be traced back to the
+   * document that caused it.
+   */
+  readonly correlationId: string;
   readonly signal?: AbortSignal | undefined;
 };
 
@@ -86,6 +92,7 @@ export type FounderExtractionGateway = {
       readonly attribution: {
         readonly tenantId: string;
         readonly userId: string;
+        readonly correlationId: string;
       };
     },
     options: {
@@ -237,6 +244,7 @@ export function createFounderExtraction(
             attribution: {
               tenantId: request.tenantId,
               userId: request.userId,
+              correlationId: request.correlationId,
             },
           },
           {

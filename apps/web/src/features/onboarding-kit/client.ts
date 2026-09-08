@@ -5,6 +5,8 @@
  * onboarding runtime contract and fed by the real API or a dev fixture.
  * Every mutation returns the whole session view.
  */
+import type { OnboardingResponseValue } from "@capital-q/contracts";
+
 export type OnboardingClient<TView, TResponse> = {
   /** The current session, started if none exists yet. */
   readonly getSession: () => Promise<TView>;
@@ -18,6 +20,20 @@ export type OnboardingClient<TView, TResponse> = {
   readonly openStep: (input: { readonly stepId: string }) => Promise<TView>;
   /** Journey completion only: not visibility, readiness or verification. */
   readonly complete: () => Promise<TView>;
+  /**
+   * Accept, correct or decline one of Q's proposals (CQ-C5-R2B §11).
+   *
+   * Absent when the composed client has no suggestion path, so a screen can
+   * tell "the founder declined" from "this build cannot record a decision"
+   * — and never reports the first when it means the second.
+   */
+  readonly resolveSuggestion?:
+    | ((input: {
+        readonly suggestionId: string;
+        readonly resolution: "ACCEPT" | "EDIT" | "REJECT";
+        readonly response?: OnboardingResponseValue | undefined;
+      }) => Promise<TView>)
+    | undefined;
   /** Deterministic taxonomy candidates for the user's own text. Never assigned here. */
   readonly findTaxonomyCandidates: (input: {
     readonly text: string;

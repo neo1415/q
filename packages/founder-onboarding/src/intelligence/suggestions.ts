@@ -40,7 +40,10 @@ const FREE_TEXT_KEYS: ReadonlySet<FounderFactKey> = new Set<FounderFactKey>([
   "company_name",
   "website",
   "description",
-  "use_of_funds",
+  // `use_of_funds` is deliberately absent: its step is a multi_select over
+  // a fixed vocabulary, so a { type: "TEXT" } value for it is refused by
+  // the runtime every time. Its candidates reach the founder through the
+  // review list instead, which is what this set's own comment asks for.
 ]);
 
 export function isDirectlySuggestable(key: FounderFactKey): boolean {
@@ -100,8 +103,11 @@ export function draftSuggestions(
     drafts.push({
       stepKey,
       targetField: candidate.key,
-      // The step's own response shape. A free-text step stores { text }.
-      suggestedValue: { text: candidate.value },
+      // The step's own response shape, discriminator included. Every one of
+      // these keys is a free-text step, and the onboarding contract's
+      // response value is a union tagged by `type`: without it the runtime
+      // refuses the suggestion, which is exactly what it should do.
+      suggestedValue: { type: "TEXT", text: candidate.value },
       sourceRefs: sourceRefs.slice(0, 20),
       confidence: confidenceFor(candidate),
     });

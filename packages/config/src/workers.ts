@@ -11,6 +11,11 @@ import {
 } from "./common.js";
 import { ConfigurationError } from "./errors.js";
 import {
+  modelProviderEnvShape,
+  toModelProviderSecrets,
+  type ModelProviderSecrets,
+} from "./model-providers.js";
+import {
   supabaseAuthEnvShape,
   supabaseSecretKeySchema,
 } from "./supabase-auth.js";
@@ -40,6 +45,14 @@ const workerEnvSchema = z.object({
   // time: without it the pipeline does not start at all, rather than running
   // in a degraded shape that looks like it works.
   SUPABASE_URL: supabaseAuthEnvShape.SUPABASE_URL.optional(),
+
+  // Model provider keys (CQ-C5-R2B §7). The worker reads a founder's
+  // processed document through the Q extraction, which is one governed model
+  // call through the same Model Gateway the Q service uses. The variables are
+  // the ones q-api already reads, not new ones; each stays optional, and with
+  // neither configured the review simply reports that no model was available
+  // and onboarding continues.
+  ...modelProviderEnvShape,
   SUPABASE_SECRET_KEY: supabaseSecretKeySchema.optional(),
   // One pipeline version per deployment. Extraction is keyed by it, so a
   // change here produces new artifacts instead of rewriting old ones.
@@ -80,6 +93,8 @@ export type OutboxRunnerConfig = {
 export type WorkerSecrets = {
   /** Privileged Supabase key for private document storage (CQ-EVD-003). */
   readonly supabaseSecretKey: string | undefined;
+  /** Model provider keys, revealed once at the composition root (CQ-Q-005). */
+  readonly modelProviders: ModelProviderSecrets;
 };
 
 /** Non-secret operational values, safe in diagnostics. */
@@ -150,7 +165,10 @@ export function parseWorkerConfig(env: EnvironmentInput): WorkerConfig {
       maxDocumentBytes: parsed.CQ_DOCUMENT_MAX_BYTES,
     },
     public: { supabaseUrl: parsed.SUPABASE_URL },
-    secrets: { supabaseSecretKey: parsed.SUPABASE_SECRET_KEY },
+    secrets: {
+      supabaseSecretKey: parsed.SUPABASE_SECRET_KEY,
+      modelProviders: toModelProviderSecrets(parsed),
+    },
   };
 }
 

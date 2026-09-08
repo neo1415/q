@@ -106,9 +106,13 @@ describe("per-service isolation", () => {
     });
     const workers = parseWorkerConfig(EMPTY_ENV);
     expect(workers.public).toEqual({});
-    expect(Object.values(workers.secrets).every((v) => v === undefined)).toBe(
-      true,
-    );
+    // The worker reads a founder's processed document through one governed
+    // model call (CQ-C5-R2B), so it has the same defined home for provider
+    // credentials q-api has — and holds none by default either.
+    expect(workers.secrets).toEqual({
+      supabaseSecretKey: undefined,
+      modelProviders: { google: undefined, groq: undefined },
+    });
     // The API carries the document upload limit as public operational value
     // and the storage credential as a secret that is absent unless configured.
     const api = parseApiConfig(EMPTY_ENV);

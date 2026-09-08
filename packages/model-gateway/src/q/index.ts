@@ -189,7 +189,14 @@ export function budgetForTaskClass(taskClass: ModelTextTaskClass): ModelBudget {
       return {
         maxAttempts: 3,
         maxEstimatedCostUsd: 0.05,
-        maxOutputTokens: 2_048,
+        // The largest structured output Capital Q asks for: a founder
+        // extraction returns candidates with their supporting quotes,
+        // taxonomy phrases, conflicts, ambiguities, gaps and proposed
+        // questions in one object. At 2,048 the answer was truncated
+        // mid-JSON and rejected as invalid output — a budget too small to
+        // finish the work is a budget that spends the whole call for
+        // nothing (CQ-C5-R2B §37).
+        maxOutputTokens: 6_144,
         attemptTimeoutMs: 30_000,
       };
     case "NORMAL_DIALOGUE":

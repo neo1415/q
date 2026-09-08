@@ -6,6 +6,7 @@ import {
   type EventRegistry,
 } from "@capital-q/contracts";
 import { ProcessDocumentJob } from "@capital-q/evidence/jobs";
+import { TenantIdSchema, type TenantId } from "@capital-q/security";
 import { randomUUID } from "node:crypto";
 
 import type { MessageOutcome } from "../queue/runner.js";
@@ -17,6 +18,8 @@ import {
 import type { RunnerLogger } from "../outbox-runner.js";
 
 /**
+ * The domain-event consumer. Two events matter to this worker.
+ *
  * `evidence.document.version_created` → `evidence.document.process`.
  *
  * A fact becomes an instruction here and nowhere else. The event says a
@@ -24,13 +27,22 @@ import type { RunnerLogger } from "../outbox-runner.js";
  * concepts on separate queues, because a system that blurs them loses the
  * ability to reason about either.
  *
- * The job carries two identifiers. Everything else the pipeline needs — the
- * document, the storage identity, the tenant, whether processing is even
- * eligible — the worker resolves from the database, so a forged or stale
- * message can name a resource but never reach one.
+ * `evidence.document.ready` → the founder's onboarding review
+ * (CQ-C5-R2B §7-§8).
+ *
+ * The READY event, not the version event: "a file was uploaded" is not "a
+ * document can be read", and preparing a review from an unprocessed version
+ * would produce a confident reading of nothing. Waiting for the pipeline's
+ * own completion is what makes the trigger honest.
+ *
+ * Both events carry identifiers only. Everything else — the document, the
+ * storage identity, the tenant, the company, whether a founder is even in a
+ * journey — is resolved from the database, so a forged or stale message can
+ * name a resource but never reach one.
  */
 
-const TRIGGER_EVENT = "evidence.document.version_created";
+const PROCESS_TRIGGER_EVENT = "evidence.document.version_created";
+const READY_EVENT = "evidence.document.ready";
 
 const ProcessDocumentJobSchema = createJobSchema(ProcessDocumentJob.dataSchema);
 
@@ -38,10 +50,29 @@ export type DocumentProcessingHandlerOptions = {
   readonly registry: EventRegistry;
   readonly queues: QueueClient;
   readonly pipelineVersion: string;
+  /**
+   * The founder onboarding review, when this deployment composes one.
+   * Optional: a worker without a model provider still processes documents,
+   * and onboarding continues without a review rather than stalling on it.
+   */
+  readonly founderReview?:
+    | {
+        readonly onDocumentReady: (event: {
+          readonly tenantId: TenantId;
+          readonly documentId: string;
+          readonly documentVersionId: string;
+        }) => Promise<{ readonly kind: string }>;
+      }
+    | undefined;
   readonly logger: RunnerLogger;
 };
 
 type VersionCreatedData = {
+  readonly documentId: string;
+  readonly documentVersionId: string;
+};
+
+type DocumentReadyData = {
   readonly documentId: string;
   readonly documentVersionId: string;
 };
@@ -54,7 +85,7 @@ type VersionCreatedData = {
 export function createDomainEventHandler(
   options: DocumentProcessingHandlerOptions,
 ): (message: QueueMessage) => Promise<MessageOutcome> {
-  const { registry, queues, logger } = options;
+  const { registry, queues, founderReview, logger } = options;
 
   return async (message) => {
     const parsed = registry.parse(message.message);
@@ -69,14 +100,49 @@ export function createDomainEventHandler(
     }
 
     const event: CapitalQEvent<unknown> = parsed.message;
-    if (event.type !== TRIGGER_EVENT) {
+    if (event.type !== PROCESS_TRIGGER_EVENT && event.type !== READY_EVENT) {
       return { kind: "ARCHIVE" };
     }
     if (event.tenantId === undefined) {
       logger.warn(
         { msgId: message.msgId, eventId: event.id },
-        "document version event carried no tenant; archived",
+        "document event carried no tenant; archived",
       );
+      return { kind: "ARCHIVE" };
+    }
+
+    if (event.type === READY_EVENT) {
+      if (founderReview === undefined) {
+        return { kind: "ARCHIVE" };
+      }
+      const ready = event.data as DocumentReadyData;
+      try {
+        const outcome = await founderReview.onDocumentReady({
+          // A queue message is untrusted input: the tenant is validated
+          // here, at the boundary, before it names anything.
+          tenantId: TenantIdSchema.parse(event.tenantId),
+          documentId: ready.documentId,
+          documentVersionId: ready.documentVersionId,
+        });
+        logger.info(
+          {
+            msgId: message.msgId,
+            eventId: event.id,
+            documentVersionId: ready.documentVersionId,
+            outcome: outcome.kind,
+          },
+          "founder onboarding review handled",
+        );
+      } catch (error: unknown) {
+        // The document is processed and retrievable either way. A failed
+        // review is worth retrying, but it must never send the document
+        // back through the pipeline, so it retries on its own message.
+        logger.warn(
+          { err: error, msgId: message.msgId, eventId: event.id },
+          "founder onboarding review failed; retrying",
+        );
+        return { kind: "RETRY", errorCode: "FOUNDER_REVIEW_FAILED" };
+      }
       return { kind: "ARCHIVE" };
     }
 

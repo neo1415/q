@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import type { OnboardingResponseValue } from "@capital-q/contracts";
 
 import {
   OnboardingClientError,
@@ -56,6 +57,16 @@ export type OnboardingActions<TResponse> = {
     readonly documentType: string;
   }) => Promise<MaterialUploadOutcome>;
   readonly removeMaterial: (documentId: string) => Promise<void>;
+  /**
+   * Accept, correct or decline one of Q's proposals (CQ-C5-R2B §11).
+   * Returns false when this build has no path to record the decision, so a
+   * screen never shows a confirmation nothing performed.
+   */
+  readonly resolveSuggestion: (input: {
+    readonly suggestionId: string;
+    readonly resolution: "ACCEPT" | "EDIT" | "REJECT";
+    readonly response?: OnboardingResponseValue | undefined;
+  }) => Promise<boolean>;
   readonly retry: () => Promise<void>;
 };
 
@@ -249,6 +260,16 @@ export function useOnboardingJourney<
         return;
       }
       await run(() => remove({ documentId }), false);
+    },
+    resolveSuggestion: async (input) => {
+      const resolve = requireClient().resolveSuggestion;
+      if (resolve === undefined) {
+        // No path to record the decision. Saying so is the honest answer;
+        // a silent success would leave a proposal looking accepted.
+        return false;
+      }
+      await run(() => resolve(input), true);
+      return true;
     },
     retry: async () => {
       const operation = lastOperation.current;

@@ -28,11 +28,37 @@ import {
 import { createOutboxWriter, DOMAIN_EVENTS_QUEUE } from "@capital-q/eventing";
 import {
   createDocumentProcessingService,
+  createPostgresEvidenceRepositories,
   createSupabaseDocumentStorageProvider,
 } from "@capital-q/evidence";
+import {
+  createFounderDocumentReview,
+  createFounderExtraction,
+} from "@capital-q/founder-onboarding";
+import { modelProviderConfigStatus } from "@capital-q/config/model-providers";
+import {
+  createModelGateway,
+  createModelProviderRegistry,
+  createPostgresModelCatalog,
+  createPostgresModelUsageRepository,
+  createProcessLocalProviderHealth,
+  type ModelProvider,
+} from "@capital-q/model-gateway";
+import { createGoogleModelProvider } from "@capital-q/model-gateway/providers/google";
+import { createGroqModelProvider } from "@capital-q/model-gateway/providers/groq";
+import { budgetForTaskClass } from "@capital-q/model-gateway/q";
+import {
+  createOnboardingService,
+  createPostgresOnboardingResponseRepository,
+  createPostgresOnboardingSessionRepository,
+  createPostgresOnboardingSuggestionRepository,
+} from "@capital-q/onboarding";
 import { ProcessDocumentJob } from "@capital-q/evidence/jobs";
 import { createLogger, createTelemetryRuntime } from "@capital-q/observability";
-import { createQKnowledgeService } from "@capital-q/q-knowledge";
+import {
+  createPostgresChunkRepository,
+  createQKnowledgeService,
+} from "@capital-q/q-knowledge";
 
 import { createDocumentProcessingPipeline } from "./documents/pipeline.js";
 import { createPipelineMetrics } from "./documents/metrics.js";
@@ -88,6 +114,86 @@ const runner = createOutboxPublisherRunner({
   logger,
 });
 
+/**
+ * Founder Onboarding Q (CQ-Q-021), finally reachable (CQ-C5-R2B §7).
+ *
+ * The worker composes one governed model call — the same Model Gateway,
+ * the same catalogue, the same reviewed provider ceilings the Q service uses
+ * — and the founder-onboarding review service that turns a processed
+ * document into onboarding suggestions. With no provider key configured the
+ * whole thing is absent: documents still process, and onboarding continues
+ * without a review rather than stalling on one.
+ */
+const providerSecrets = config.secrets.modelProviders;
+const modelProviders: ModelProvider[] = [];
+if (providerSecrets.google !== undefined) {
+  modelProviders.push(
+    createGoogleModelProvider({ apiKey: providerSecrets.google.reveal() }),
+  );
+}
+if (providerSecrets.groq !== undefined) {
+  modelProviders.push(
+    createGroqModelProvider({ apiKey: providerSecrets.groq.reveal() }),
+  );
+}
+
+const modelGateway = createModelGateway({
+  catalog: createPostgresModelCatalog({ sql: database.sql }),
+  registry: createModelProviderRegistry(modelProviders),
+  usage: createPostgresModelUsageRepository({ sql: database.sql }),
+  health: createProcessLocalProviderHealth(),
+  logger,
+});
+
+// One onboarding service for the worker. Its `internal` operations are the
+// trusted, never-browser-reachable ones; nothing here registers a write
+// handler, so a suggestion can only ever be an offer.
+const onboarding = createOnboardingService({
+  sql: database.sql,
+  transactions: database.transactions,
+  outbox: createOutboxWriter({ registry }),
+  logger,
+});
+
+const founderReview =
+  modelProviders.length === 0
+    ? undefined
+    : createFounderDocumentReview({
+        sql: database.sql,
+        documents: createPostgresEvidenceRepositories().documents,
+        chunks: createPostgresChunkRepository(),
+        sessions: createPostgresOnboardingSessionRepository(),
+        responses: createPostgresOnboardingResponseRepository(),
+        suggestions: createPostgresOnboardingSuggestionRepository(),
+        createSuggestion: (command) =>
+          onboarding.internal.createSuggestion(command as never),
+        extraction: createFounderExtraction({
+          // The extraction declares the narrow slice of the gateway it uses
+          // — one task class, one output shape — which is deliberately not
+          // the gateway's full signature. Bridging the two is exactly what a
+          // composition root is for; no behaviour is changed and no policy is
+          // bypassed, because the object on the right is the real gateway.
+          gateway: {
+            execute: (request, options) =>
+              modelGateway.execute(request as never, options as never),
+          },
+          // One place decides what a task class may cost and how long it may
+          // take; a caller inventing its own budget would be a second,
+          // quieter answer to a question the gateway already governs.
+          budget: budgetForTaskClass("STRUCTURED_EXTRACTION"),
+          logger,
+        }),
+        logger,
+      });
+
+logger.info(
+  {
+    modelProviders: modelProviderConfigStatus(providerSecrets),
+    founderReview: founderReview === undefined ? "disabled" : "composed",
+  },
+  "founder onboarding review composed",
+);
+
 const documentEvents = createQueueRunner({
   queue: DOMAIN_EVENTS_QUEUE,
   client: queues,
@@ -95,6 +201,7 @@ const documentEvents = createQueueRunner({
     registry,
     queues,
     pipelineVersion: config.documents.pipelineVersion,
+    ...(founderReview === undefined ? {} : { founderReview }),
     logger,
   }),
   batchSize: config.documents.batchSize,

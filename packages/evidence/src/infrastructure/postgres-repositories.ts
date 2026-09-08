@@ -556,6 +556,11 @@ export function createPostgresDocumentProcessingRunRepository(): DocumentProcess
     findById,
     transition: async (tx, input) => {
       const provenance = input.provenance ?? {};
+      // metadata is cast ::text::jsonb, the idiom every other repository
+      // here uses. Cast straight to ::jsonb and the driver JSON-encodes the
+      // string it was handed, storing a jsonb STRING; the table's
+      // jsonb_typeof(metadata) = 'object' check then rejects the row, and no
+      // document version can ever finish processing.
       const rows = await tx.sql`
         update evidence.document_processing_runs r
            set status = ${input.status},
@@ -563,7 +568,7 @@ export function createPostgresDocumentProcessingRunRepository(): DocumentProcess
                extractor_version = coalesce(${provenance.extractorVersion ?? null}, r.extractor_version),
                chunking_version = coalesce(${provenance.chunkingVersion ?? null}, r.chunking_version),
                cost_usd = coalesce(${provenance.costUsd ?? null}::numeric, r.cost_usd),
-               metadata = coalesce(${provenance.metadata === undefined ? null : JSON.stringify(provenance.metadata)}::jsonb, r.metadata),
+               metadata = coalesce(${provenance.metadata === undefined ? null : JSON.stringify(provenance.metadata)}::text::jsonb, r.metadata),
                started_at = case when ${input.status} = 'RUNNING' then clock_timestamp() else r.started_at end,
                completed_at = case when ${input.status} in ('COMPLETED', 'FAILED', 'BLOCKED') then clock_timestamp() else null end
           from evidence.document_versions v

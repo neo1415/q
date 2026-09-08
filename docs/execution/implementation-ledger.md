@@ -915,6 +915,91 @@ CQ-C5-R2A           PARTIAL    Reliable authentication, provider privacy unblock
                     New service NONE; new API key NONE; new paid service NONE;
                     Qwen, Gemini and Groq unchanged as services; ElevenLabs
                     NOT USED.
+CQ-C5-R2B           PARTIAL    Founder production integration. The founder
+                    document path is REAL and proven end to end in the
+                    browser; the investor path and F7 are NOT done, so C5
+                    still FAILS.
+                    WHAT NOW WORKS, VERIFIED LIVE, NOT ONLY IN TESTS:
+                    a founder uploads a deck at F2 -> the real Evidence upload
+                    API issues a signed target and the browser puts the bytes
+                    into private storage -> an immutable version and a
+                    processing job -> the pipeline parses, extracts and chunks
+                    -> evidence.document.ready on the outbox -> the worker's
+                    new founder-review caller -> ONE governed Groq call under
+                    the reviewed CONFIDENTIAL ceiling -> validated candidates
+                    -> onboarding suggestions -> F3 shows "What Q read in your
+                    documents" -> the founder confirms -> the onboarding
+                    runtime validates it against the pinned step -> the
+                    company's canonical primary_description is what Q read.
+                    Confirmed in the database: suggestion ACCEPTED, and
+                    core.companies.primary_description holds the sentence from
+                    the deck.
+                    THREE PRE-EXISTING DEFECTS FOUND BY RUNNING IT, all fixed,
+                    none of which any test could have caught because no test
+                    ran the real pipeline:
+                    (1) DOCUMENT PROCESSING HAD NEVER COMPLETED. The run
+                    completion wrote its metadata as ${JSON.stringify(x)}::jsonb;
+                    the driver JSON-ENCODES a parameter cast straight to
+                    jsonb, so the column received a jsonb STRING and the
+                    table's jsonb_typeof(metadata) = 'object' check rejected
+                    every row. Every other repository in the tree uses
+                    ::text::jsonb; this one site did not. Nothing could ever
+                    reach evidence.document.ready, which is why the founder
+                    document path had never run.
+                    (2) EVERY SUGGESTION Q PRODUCED WAS SILENTLY REFUSED.
+                    draftSuggestions emitted { text } where the onboarding
+                    response contract is a union tagged by `type`, so the
+                    runtime rejected each one at validation. The CQ-Q-021
+                    suite stayed green throughout because it only asserted the
+                    draft's own shape, never that the runtime accepts it.
+                    QFOU-009 now parses every draft with the real
+                    OnboardingResponseValueSchema.
+                    (3) use_of_funds WAS LISTED AS FREE TEXT while its step is
+                    a multi_select over a fixed vocabulary, so its suggestion
+                    could never be accepted. Removed, and the test now asserts
+                    every directly-suggestable key against the PUBLISHED
+                    definition's step type, so the set cannot drift again.
+                    Also: STRUCTURED_EXTRACTION's output budget was 2,048
+                    tokens, which truncated the founder extraction mid-JSON
+                    and spent the whole call for nothing. Raised to 6,144 in
+                    the one place budgets are decided.
+                    ALSO WIRED: F2's upload, whose server actions CQ-Q-021
+                    wrote and never connected to the client — the composer
+                    said "uploading isn't available here" while the whole
+                    Evidence path sat ready. F8 now asks the SAME production Q
+                    boundary the Home composer asks, so the founder's first
+                    intelligence is the same Company Intelligence specialist
+                    rather than a second analyst; it renders only when the
+                    session is bound to a company. F3 confirm, change and
+                    decline all go through the existing resolve contract.
+                    NOT DONE: F7 adaptive follow-up (the planner runs and its
+                    questions are counted, but nothing persists a model-
+                    proposed question, so F7 still renders the static long
+                    text); investor mandate synthesis caller; I11; mandate
+                    confirmation; the C5 demo command. C5 pass conditions 6
+                    and 7 therefore do not hold.
+                    THE INVESTOR DESIGN QUESTION, unanswered on purpose: a
+                    mandate synthesis result has nowhere to live. Onboarding
+                    suggestions cannot carry it (a constraint is not a valid
+                    answer to a step), and core.investor_mandates could hold a
+                    DRAFT with constraints — which is probably right, and is a
+                    decision about canonical state that belongs to a person
+                    rather than to an agent mid-packet.
+                    Two policy-era integration expectations moved with the
+                    R2A provider review and got stronger: both now assert that
+                    CONFIDENTIAL routes only to the reviewed provider and that
+                    RESTRICTED is still refused before any provider is called.
+                    Sixteen integration failures remain, all in the three
+                    q-evals suites. They fail IDENTICALLY at 6a3fd3c, whose own
+                    postflight recorded the suite fully green, so they are
+                    environmental or data-state rather than a regression from
+                    this packet or R2A. Not isolated; recorded rather than
+                    hidden.
+                    Schema impact NONE; migration NONE. New service NONE; new
+                    account NONE; new API key NONE; new ENV NONE — the worker
+                    reads the same GEMINI_API_KEY and GROQ_API_KEY q-api
+                    already reads. Qwen, Gemini, Groq unchanged; ElevenLabs
+                    NOT USED.
 ```
 
 ## Architecture coverage (doc 25 §198) — Q rows
@@ -1330,3 +1415,17 @@ CQ-C5-R2A           PARTIAL    Reliable authentication, provider privacy unblock
 | A sign-in control that cannot work                                        | Rendered only when the Auth server reports the provider enabled; failure to ask means not offered                                   | R2A-A01           |
 | A Google session mistaken for authority                                   | Authentication yields CONTEXT_REQUIRED; a run naming another organisation's company is refused before any context                   | live probe        |
 | A client's memory of a conversation outliving the access that produced it | Only run ids are cached; every turn is read back from the server under the person's own session                                     | browser reload    |
+
+## Threat coverage (doc 16) — CQ-C5-R2B rows
+
+| Threat                                                                     | Control                                                                                                  | Proof                         |
+| -------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- | ----------------------------- |
+| A model writing company truth directly                                     | The review's entire output is suggestions; the onboarding runtime validates each against the pinned step | live run; QFOU-009            |
+| A suggestion the runtime cannot accept, shown as if it could be            | Every draft is parsed with the real response schema, and only free-text steps are drafted for            | QFOU-009                      |
+| An upload request waiting on a model                                       | The review runs off `evidence.document.ready` in the worker, never in the upload request                 | live run; worker log          |
+| A replayed event burying a founder in duplicate suggestions                | Only facts neither answered nor already offered are drafted, read fresh from the session on every run    | review service; §9            |
+| A stale document's reading overwriting a newer answer                      | The review only ever ADDS an offer for something still open; nothing here supersedes anything            | review service                |
+| A second, unreconcilable company analysis inside onboarding                | F8 asks the same Q boundary the Home composer asks; no onboarding analyst exists                         | intelligence panel            |
+| A queue message naming a tenant it does not own                            | The tenant is validated at the queue boundary before it names anything                                   | document-processing handler   |
+| A processing failure reported as a successful read                         | A file's state comes from the version's own processing status; "Read" only after extraction completed    | F2 live run                   |
+| A vendor approved for confidential work treated as approved for everything | CONFIDENTIAL routes only to the reviewed provider; RESTRICTED is refused before any provider is called   | gateway-postgres; answer-seam |
