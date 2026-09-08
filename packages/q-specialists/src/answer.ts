@@ -1,4 +1,5 @@
 import type { QResponseMessage } from "@capital-q/contracts";
+import { withoutRecommendationClaims } from "@capital-q/q-core";
 import type { DatabaseExecutor, TransactionManager } from "@capital-q/database";
 import type { Logger } from "@capital-q/observability";
 import {
@@ -174,13 +175,22 @@ export function createSpecialistQAnswer(
       if (result.blocked === "CANCELLED") {
         return { kind: "FAILED", diagnosticCode: "RUN_CANCELLED" };
       }
-      const content = (
+      // Last surface before a person reads it (CQ-Q-023). Capital Q has no
+      // deterministic recommendation factors yet, so a sentence explaining
+      // why something was recommended, ranked or matched was invented — and
+      // the prompt forbidding it is not what stops it reaching an investor.
+      const guarded = withoutRecommendationClaims(
         result.blocked !== null
           ? publicBlockedMessage(result.blocked)
-          : (result.synthesis ?? synthesisFromFindings(result))
-      )
-        .slice(0, ANSWER_LIMIT_CHARS)
-        .trim();
+          : (result.synthesis ?? synthesisFromFindings(result)),
+      );
+      if (guarded.removed > 0) {
+        logger?.warn(
+          { qRunId: request.runId, removed: guarded.removed },
+          "recommendation claims removed from a Q answer",
+        );
+      }
+      const content = guarded.text.slice(0, ANSWER_LIMIT_CHARS).trim();
       if (content.length === 0) {
         return { kind: "FAILED", diagnosticCode: "MODEL_PROVIDER_UNAVAILABLE" };
       }

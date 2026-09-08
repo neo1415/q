@@ -23,6 +23,7 @@ import {
   createDefaultPromptRegistry,
   DEFAULT_COMMUNICATION_PROFILE,
   renderPrompt,
+  withoutRecommendationClaims,
   type AuthorisedFact,
   type CompanyAnalystV2Result,
   type CompanyAnalystV2Variables,
@@ -584,7 +585,19 @@ export function createModelGatewayQAnswer(
           analyst = final.output.value;
         }
 
-        const content = analyst.answer.slice(0, ANSWER_LIMIT_CHARS).trim();
+        // The last surface before a person reads it (CQ-Q-023). Capital Q
+        // has no deterministic recommendation factors yet, so any sentence
+        // explaining why something was recommended, ranked or matched was
+        // invented. COMPANY_ANALYST forbids writing one; a prompt is not
+        // the boundary, so the text is checked rather than trusted.
+        const guarded = withoutRecommendationClaims(analyst.answer);
+        if (guarded.removed > 0) {
+          logger?.warn(
+            { qRunId: request.runId, removed: guarded.removed },
+            "recommendation claims removed from a Q answer",
+          );
+        }
+        const content = guarded.text.slice(0, ANSWER_LIMIT_CHARS).trim();
         if (content.length === 0) {
           return {
             kind: "FAILED",

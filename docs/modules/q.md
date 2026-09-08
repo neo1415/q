@@ -1069,3 +1069,55 @@ before any model runs and shown to the model as a frame it may not overturn.
 Citations are opaque per-render labels resolved on the server, so a model
 cannot cite a source it was never given — not because it is told not to, but
 because it never sees an identifier to write.
+
+# Recommendation explanation — deferred (CQ-Q-023)
+
+Capital Q does **not** explain why a company was recommended to an investor,
+and must not until a deterministic recommendation factor model exists. Doc 25
+states it plainly at C5: _no recommendation explanation by Q before the
+deterministic factor model exists._
+
+## Why there is nothing to explain yet
+
+An explanation is only true if something computed the thing being explained.
+Today there is no recommendation package, no ranking or feature version, no
+factor snapshot, no reason-code catalogue and no slate — Wave 6 owns all of
+it. Any sentence answering "why was this recommended to me?" would therefore
+be invented, however fluent.
+
+`FIT_EXPLANATION` is registered in the Prompt Registry from CQ-Q-006 and has
+zero callers. It stays versioned and dormant.
+
+## The guard, and why prose needed one
+
+`COMPANY_ANALYST` v2 forbids scores, fit, probabilities and peer benchmarks,
+and CQ-Q-020's validation drops _findings_ that assert one. Neither reached
+the text a person actually reads: the model's `answer` prose went to the
+stored Q message with only a length trim.
+
+The prompt is not the security boundary. `withoutRecommendationClaims`
+(q-core) now sits on the last surface before the message is stored, in both
+answer seams. It removes the offending sentence rather than rewriting it — a
+rewritten explanation is one nobody wrote — and substitutes a plain message
+when nothing honest survives:
+
+> I can't explain how you'd be recommended to an investor yet — Capital Q
+> doesn't match companies and investors at this stage.
+
+It matches the assertion, not the vocabulary: "your mandate covers Seed and
+Series A" passes untouched, "this is a 91% fit" does not.
+
+## What still works
+
+Company Intelligence answers what a company does, its risks and what evidence
+supports its traction. Investor Mandate Q answers what an investor's own
+declared mandate covers. **Neither authorises "therefore this company ranks
+third for you"** — composing two independent outputs and calling the result a
+recommendation is exactly what this guard prevents.
+
+## Activation
+
+When the deterministic factor model lands (expected around CQ-REC-004), the
+guard is not deleted. It becomes the check that an explanation cites factors
+the ranker actually produced, and CQ-Q-023 is implemented as a consumer of
+that snapshot — never as an owner of ranking.

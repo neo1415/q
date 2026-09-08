@@ -187,6 +187,13 @@ export {
 } from "./prompts/schemas/fit-explanation.js";
 
 export {
+  claimsRecommendationExplanation,
+  RECOMMENDATION_UNAVAILABLE_MESSAGE,
+  withoutRecommendationClaims,
+  type GuardedAnswer,
+} from "./communication/recommendation-guard.js";
+
+export {
   COMMUNICATION_FORBIDDEN_TERMS,
   COMMUNICATION_RENDERING_VERSION,
   communicationProfileFor,

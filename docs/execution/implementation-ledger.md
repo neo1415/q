@@ -653,7 +653,46 @@ CQ-Q-022            PARTIAL    Investor Mandate Q. The canonical mandate
                     everything). No new service, account, API key, ENV, paid
                     service or model. Gates 2026-09-08: see the CQ-Q-022
                     postflight.
-CQ-Q-023            NEXT       Not started.
+CQ-Q-023            DEFERRED_BY_DEPENDENCY
+                    Recommendation / Fit Explanation Q. NOT IMPLEMENTED, and must
+                    not be until a deterministic recommendation factor model
+                    exists. Doc 25 C5: "No recommendation explanation by Q before
+                    deterministic factor model exists."
+                    ACTIVATION DEPENDENCY: the versioned feature snapshot,
+                    ranking configuration, factor contributions and reason codes
+                    — expected around CQ-REC-004. A later agent MUST return to
+                    this row once that lands; nothing else in the repository
+                    will prompt for it.
+                    Verified absent at this build: no recommendation package, no
+                    recommendation/ranking/slate table, no feature or ranking
+                    version, no reason-code catalogue, no explanation service, no
+                    Q production fit-explanation route. FIT_EXPLANATION v1 is
+                    registered in the Prompt Registry and has ZERO callers — it
+                    stays versioned and dormant, and was not modified.
+                    ARCHITECTURE VIOLATION FOUND AND FIXED: both Q answer seams
+                    wrote the model's `answer` prose to the stored Q message with
+                    only a length trim. COMPANY_ANALYST v2 forbids scores, fit,
+                    probabilities and benchmarks, and CQ-Q-020's validation drops
+                    FINDINGS asserting one, but neither reached the text a person
+                    actually reads — so a fluent or injected model could have
+                    published "this is a 91% fit for Apex" as a Capital Q
+                    recommendation explanation that no ranker produced. A guard
+                    now sits on the last surface before the message is stored, in
+                    q-core beside the existing communication rules (both seams
+                    depend on q-core; q-specialists depends on model-gateway, so
+                    the guard could not live in either seam without a cycle). It
+                    removes the offending sentence rather than rewriting it — a
+                    rewritten explanation is one nobody wrote — and substitutes a
+                    plain message when nothing honest survives. Twenty cases,
+                    written failing first: 20/20 failed before the guard existed.
+                    When the factor model lands the guard is not deleted; it
+                    becomes the check that an explanation cites factors the
+                    ranker actually produced.
+                    No ranker, no factor model, no recommendation contract, no
+                    fit score and no temporary pseudo-ranker were introduced.
+                    Schema impact NONE; migration NONE; no new service, account,
+                    API key, ENV or paid service; ZERO live model calls.
+C5                  NEXT       Wave-5 checkpoint. Not started.
 ```
 
 ## Architecture coverage (doc 25 §198) — Q rows
@@ -1025,3 +1064,16 @@ CQ-Q-023            NEXT       Not started.
 | A mandate quietly broadened by a synthesis                       | A dimension already answered by selection is never re-proposed                                                 | synthesis declaredAlready |
 | Commercially sensitive mandate text reaching an unsuitable model | Declared CONFIDENTIAL; the gateway decides eligibility before contacting a provider, and a refusal is honoured | synthesis blocked path    |
 | A cheque ceiling or exclusion appearing in a log line            | Telemetry carries counts, codes and versions only                                                              | synthesis telemetry       |
+
+## Threat coverage (doc 16) — CQ-Q-023 rows
+
+| Threat                                                    | Control                                                                                                    | Proof                   |
+| --------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- | ----------------------- |
+| A model inventing why a company was recommended           | Both answer seams strip recommendation, ranking and fit claims from the prose before the message is stored | QREC-001                |
+| A fabricated fit score or percentage reaching an investor | The same guard, matched on the assertion rather than the vocabulary                                        | QREC-001                |
+| A claimed rank position that no ranker computed           | Ordering claims are removed with the rest                                                                  | QREC-001                |
+| An honest answer deleted by an over-broad filter          | Patterns target the comparative claim; mandate, sector and evidence sentences pass untouched               | QREC-001 negative cases |
+| Silence where a question deserved an answer               | When nothing honest survives, a plain message says Capital Q does not match yet                            | QREC-001                |
+| Implementation jargon leaking into a refusal              | The message carries no factor, snapshot, ranker or version wording                                         | QREC-001                |
+| FIT_EXPLANATION being invoked before factors exist        | Registered, zero callers, unmodified and dormant                                                           | inspection; grep        |
+| A pseudo-ranker introduced to make the packet pass        | None added; no recommendation package, table, contract or score exists                                     | inspection              |
