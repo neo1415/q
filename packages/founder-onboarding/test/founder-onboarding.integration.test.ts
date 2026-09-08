@@ -385,7 +385,9 @@ describe("@capital-q/founder-onboarding against local PostgreSQL", () => {
       const journey = await startFounder(world, newcomer);
       expect(journey.view().session.subject).toBeNull();
       expect(journey.view().currentStep?.stepKey).toBe(FOUNDER_STEPS.intent);
-      expect(journey.view().session.definitionVersion).toBe(1);
+      // v2 is the published journey (CQ-Q-021): F2 gathers documents
+      // rather than declaring which ones exist.
+      expect(journey.view().session.definitionVersion).toBe(2);
 
       await journey.submit(FOUNDER_STEPS.intent, single("raising_now"));
       expect(journey.view().currentStep?.stepKey).toBe(
@@ -461,11 +463,10 @@ describe("@capital-q/founder-onboarding against local PostgreSQL", () => {
         new Set(["user_selected"]),
       );
 
-      // F2 is a declaration only: no evidence, no upload.
-      await journey.submit(
-        FOUNDER_STEPS.materials,
-        multi(["pitch_deck", "financial_model"]),
-      );
+      // F2 gathers real documents through the Evidence API (CQ-Q-021). This
+      // test builds no Evidence rows, so it takes the skip path — which is a
+      // first-class route, not a penalty.
+      await journey.skip(FOUNDER_STEPS.materials);
 
       // F3 -- deterministic review of what exists now.
       const review = journey.view();
@@ -480,10 +481,8 @@ describe("@capital-q/founder-onboarding against local PostgreSQL", () => {
         stage: { key: "seed", label: "Seed" },
       });
       expect(reviewContext.categories).toHaveLength(2);
-      expect(reviewContext.materials?.map((m) => m.key)).toEqual([
-        "pitch_deck",
-        "financial_model",
-      ]);
+      // Nothing was uploaded, so the review lists no materials.
+      expect(reviewContext.materials).toBeNull();
       expect(reviewContext.intent?.key).toBe("raising_now");
       expect(JSON.stringify(reviewContext)).not.toMatch(
         /readiness|score|verified|Q analysis/i,
@@ -634,7 +633,9 @@ describe("@capital-q/founder-onboarding against local PostgreSQL", () => {
         currency: "USD",
       });
       expect(snapshot.followUpRecorded).toBe(true);
-      expect(snapshot.missing).toEqual([]);
+      // F2 was skipped, so material to share is a genuine open gap. Stated
+      // as something the founder can still do, never as a mark against them.
+      expect(snapshot.missing).toEqual(["materials"]);
       const serialised = JSON.stringify(snapshot);
       expect(serialised).not.toContain(FOLLOW_UP_MARKER);
       expect(serialised).not.toMatch(/readiness|score|verified|discoverab/i);

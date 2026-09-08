@@ -1,5 +1,6 @@
--- CQ-ONB-002 · Founder Definition v1 is published reference data: one
--- founder definition, version 1 published and current, every F0–F8 step
+-- CQ-ONB-002 / CQ-Q-021 · Founder definitions are published reference data:
+-- one founder definition, v1 and v2 both published, v2 current (CQ-Q-021 made
+-- F2 a real document upload), every F0–F8 step
 -- present with its declared type, the reference_select step type accepted,
 -- and the published rows frozen.
 --
@@ -13,15 +14,23 @@ create extension if not exists pgtap with schema extensions;
 \ir support/fixture.psql
 select pg_temp.rls_setup();
 
-select plan(17);
+select plan(18);
 
 -- The definition and its published version ----------------------------------
 select is(
   (select count(*)::int from onboarding.definitions where journey_type = 'founder'),
   1, 'exactly one founder definition');
+-- New sessions pin to v2. v1 stays published and immutable so sessions
+-- already running it keep their own journey (CQ-Q-021 §82).
 select is(
   (select current_version from onboarding.definitions where journey_type = 'founder'),
-  1, 'founder definition points new sessions at version 1');
+  2, 'founder definition points new sessions at version 2');
+select is(
+  (select count(*)::int
+     from onboarding.definition_versions v
+     join onboarding.definitions d on d.id = v.definition_id
+    where d.journey_type = 'founder' and v.published_at is not null),
+  2, 'both founder definition versions are published');
 select is(
   (select count(*)::int
      from onboarding.definition_versions v

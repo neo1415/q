@@ -378,7 +378,7 @@ describe("Model Gateway answer seam inside the Q orchestrator", () => {
       expect(final.run.orchestrationVersion).toBe(Q_ORCHESTRATION_VERSION);
       expect(final.run.modelPolicyVersion).toBe("normal_dialogue.v1");
       expect(final.run.promptBundleVersion).toBe(
-        "q-system.v1_company-analyst.v1_comm.v1",
+        "q-system.v1_company-analyst.v2_comm.v1",
       );
       expect(groq.calls[0]?.request.messages[0]?.content).toContain(
         "You are Q",

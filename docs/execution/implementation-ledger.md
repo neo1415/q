@@ -692,7 +692,59 @@ CQ-Q-023            DEFERRED_BY_DEPENDENCY
                     fit score and no temporary pseudo-ranker were introduced.
                     Schema impact NONE; migration NONE; no new service, account,
                     API key, ENV or paid service; ZERO live model calls.
-C5                  NEXT       Wave-5 checkpoint. Not started.
+C5                  FAIL       First Q Intelligence integration gate. Every
+                    Wave-5 LAYER is real and verified; NONE of it is composed
+                    into the running application.
+                    THE FINDING: apps/q-api/src/main.ts wires
+                    `retrieval: createUnconfiguredQRetrieval()` and calls
+                    createModelGatewayQAnswer with no `context` port, so the
+                    production seam falls back to `noAuthorisedContext` — whose
+                    own text reads "no subject context is available in this
+                    environment (retrieval is not implemented yet)". apps/q-api
+                    imports neither @capital-q/q-knowledge nor
+                    @capital-q/q-specialists. In the deployed product Q therefore
+                    answers with ZERO authorised facts: no RAG-004 retrieval, no
+                    KNW knowledge, no Company Intelligence specialist. Separately,
+                    grep for production callers finds NONE for
+                    createFounderExtraction, createFounderReview, draftSuggestions,
+                    createMandateSynthesis or confirmMandate; the only caller of
+                    createCompanyIntelligenceSpecialist is the q-evals dev smoke.
+                    This is accumulated un-wired integration rather than a
+                    regression — each packet built its layer and left composition
+                    to a later one, exactly as RAG-004's postflight said — and it
+                    is precisely what an integration checkpoint exists to catch.
+                    C5 PASS conditions 2, 6 and 7 (founder document-assisted
+                    intelligence end to end; uploaded evidence reusable by Q;
+                    RAG retrieves authorised evidence) do not hold IN THE PRODUCT.
+                    WHAT IS VERIFIED: the same paths work end to end through the
+                    real Q graph in the eval world — createRun, LangGraph
+                    orchestrator, Context Firewall, Safe Read tools, Q Knowledge,
+                    hybrid retrieval, Model Gateway — proven by QCI-001..017
+                    (17/17) including founder-private, cross-tenant, source
+                    existence and injection as hard invariants. Integration suite
+                    422/427 passed (5 skipped, 0 failed), RLS 839/839, evals 29/29
+                    with no baseline regression, repository gate 2096/2096.
+                    THREE STALE EXPECTATIONS FOUND AND FIXED, all consequences of
+                    Wave-5 version bumps that `pnpm test` alone could not surface
+                    because it excludes integration and pgTAP:
+                    founder-onboarding.integration (definitionVersion 1->2, F2 now
+                    document_upload so the flow skips it, materials becomes a
+                    genuine open gap), q-orchestrator answer-seam.integration
+                    (company-analyst v1->v2 bundle), and rls/240 ("points new
+                    sessions at version 1" -> version 2, plus a new assertion that
+                    both versions stay published). Also found: the local database
+                    held a v2 definition published BEFORE its context keys were
+                    corrected; db:reset republished the current migration.
+                    Test-weakening audit across the whole wave: 7017 test lines
+                    added, 14 removed, every removal a version-bump expectation
+                    replaced by an equal or stronger assertion; no .only, no .skip,
+                    no broadened matcher, no deleted security case.
+                    REMEDIATION FOR C5 RE-RUN: compose createQEvidenceRetrieval,
+                    createKnowledgeQueryService and createSpecialistQAnswer into
+                    apps/q-api; trigger the founder review when a document
+                    finishes processing; call the mandate synthesis from the
+                    investor session; render F3/F7/F8 and I11. No new architecture
+                    is required — every seam already exists and is tested.
 ```
 
 ## Architecture coverage (doc 25 §198) — Q rows
