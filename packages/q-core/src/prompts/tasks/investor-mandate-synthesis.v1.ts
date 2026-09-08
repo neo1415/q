@@ -42,7 +42,9 @@ export const INVESTOR_MANDATE_SYNTHESIS_V1: PromptDefinition<
 > = {
   id: "INVESTOR_MANDATE_SYNTHESIS",
   version: 1,
-  status: "ACTIVE",
+  // Superseded by v2 (CQ-Q-022 §66). Retained, immutable and resolvable by
+  // exact version, so a run recorded against it stays explainable.
+  status: "DEPRECATED",
   kind: "TASK",
   taskClass: "STRUCTURED_EXTRACTION",
   owner: "q-core",

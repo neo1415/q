@@ -71,11 +71,17 @@ version's text changes without a new version. A material change is
 | Q_SYSTEM                      | q-system/v1                      | (charter)             | text                              |
 | COMPANY_ANALYST               | company-analyst/v2               | EVIDENCE_SYNTHESIS    | CompanyAnalystResult/v2           |
 | FOUNDER_ONBOARDING_EXTRACTION | founder-onboarding-extraction/v2 | STRUCTURED_EXTRACTION | FounderExtractionResult/v2        |
-| INVESTOR_MANDATE_SYNTHESIS    | investor-mandate-synthesis/v1    | STRUCTURED_EXTRACTION | InvestorMandateSynthesisResult/v1 |
+| INVESTOR_MANDATE_SYNTHESIS    | investor-mandate-synthesis/v2    | STRUCTURED_EXTRACTION | InvestorMandateSynthesisResult/v2 |
 | FIT_EXPLANATION               | fit-explanation/v1               | NORMAL_DIALOGUE       | FitExplanationResult/v1           |
 
 A task prompt's task class is a request to the Model Gateway; the routing
 policy chooses the model. No prompt names a provider or a model (tested).
+
+`investor-mandate-synthesis/v1` is retained the same way. v2 (CQ-Q-022) adds
+AVOID to the strength scale — v1 could only say HARD, STRONG or PREFERENCE and
+so could not express a soft negative at all — renames HARD to
+EXCLUSION_CLAIMED to mark it a reading rather than a decision, and ties
+ambiguity to a dimension with the question that settles it.
 
 `founder-onboarding-extraction/v1` is retained the same way. v2 (CQ-Q-021)
 reads a founder's uploaded material as well as their narrative: passages

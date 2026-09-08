@@ -606,7 +606,54 @@ CQ-Q-021            PARTIAL    Founder Onboarding Q + document-assisted adaptive
                     core table. No new service, account, API key, ENV, paid
                     service or model. Gates 2026-09-07: see the CQ-Q-021
                     postflight.
-CQ-Q-022            NEXT       Not started.
+CQ-Q-022            PARTIAL    Investor Mandate Q. The canonical mandate
+                    architecture was already complete (CQ-INV-002: versioned
+                    core.investor_mandates, core.investor_mandate_constraints with
+                    a closed dimension allowlist, a closed operator set, the
+                    MUST/STRONG/NICE/NEUTRAL/AVOID/HARD_EXCLUSION scale and a DB
+                    CHECK keeping importance and is_hard_exclusion in lockstep,
+                    plus InvestorMandateSnapshot as the Wave-6 handoff), and the
+                    I0-I12 journey and its review screen were already built
+                    (CQ-ONB-003). What was missing was Q: the synthesis prompt
+                    existed and NOTHING CALLED IT. LANDED AND VERIFIED:
+                    INVESTOR_MANDATE_SYNTHESIS v2 ACTIVE (v1 DEPRECATED, immutable,
+                    hash unchanged) adds AVOID to the strength scale — v1 had only
+                    HARD/STRONG/PREFERENCE and therefore could not express a soft
+                    negative at all, which is the packet's central distinction —
+                    renames HARD to EXCLUSION_CLAIMED to mark it as a reading
+                    rather than a decision, ties ambiguity to a dimension and kind
+                    (SCOPE_OR_EXCLUSION, TYPICAL_OR_LIMIT, IMPRECISE_VALUE) with
+                    the neutral question that settles it, keeps sector language as
+                    plain phrases for Capital Q's own taxonomy service, and reports
+                    protected-trait screening rather than encoding it. Semantics
+                    layer makes HARD_EXCLUSION UNREACHABLE from model output:
+                    preferenceClassFor has no branch returning it and the only
+                    function that does takes the investor's confirmation as an
+                    argument, so silence, a firm tone or a forgotten flag can never
+                    make a candidate ineligible. Synthesis service: one gateway
+                    call, refuses to re-propose a dimension already answered by
+                    selection (never broadens), files no constraint for an
+                    unresolved taxonomy phrase (a free string would look like a
+                    filter while matching nothing), records the session revision so
+                    a stale result cannot overwrite newer choices, and reports a
+                    protected-screening request in the open. Confirmation gate maps
+                    a confirmed exclusion to HARD_EXCLUSION and derives
+                    isHardExclusion from the same source so the two cannot
+                    disagree; sameMandate makes a repeated confirmation idempotent
+                    by semantic content rather than row order. Inferences,
+                    observed behaviour and tensions exist but are structurally
+                    excluded from what confirmMandate returns, so neither can reach
+                    a declared mandate. NOT LANDED: the I11 review screen still
+                    renders the deterministic projection of what the investor
+                    selected rather than Q's reading; nothing calls the synthesis
+                    from the live session; the QIM Playwright E2E, the DB-backed
+                    integration tests and the developer smoke are absent. No
+                    ranking, no fit score, no feed — none claimed. Schema impact
+                    NONE; migration NONE (the existing schema represents
+                    everything). No new service, account, API key, ENV, paid
+                    service or model. Gates 2026-09-08: see the CQ-Q-022
+                    postflight.
+CQ-Q-023            NEXT       Not started.
 ```
 
 ## Architecture coverage (doc 25 §198) — Q rows
@@ -959,3 +1006,22 @@ CQ-Q-022            NEXT       Not started.
 | An uploaded document silently becoming investor-visible        | Visibility is the Evidence context's decision; F2 writes no scope and says so on the screen      | founder-v2 F2 writesTo: []             |
 | A browser choosing its own tenant or holding a Capital Q token | Upload actions run server-side with the HttpOnly session token                                   | material-actions run()                 |
 | An unscanned document being parsed                             | REQUIRE_CLEAN is the default; no scanner means UNAVAILABLE, which blocks rather than opens       | workers config; malware.ts (unchanged) |
+
+## Threat coverage (doc 16) — CQ-Q-022 rows
+
+| Threat                                                           | Control                                                                                                        | Proof                     |
+| ---------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- | ------------------------- |
+| A model's reading making candidates ineligible                   | `preferenceClassFor` has no branch returning HARD_EXCLUSION; the only route takes the investor's confirmation  | QIM-005                   |
+| Silence read as consent to exclude                               | A proposal with no decision keeps its soft negative                                                            | QIM-005                   |
+| A firm tone collapsing avoid into exclusion                      | EXCLUSION_CLAIMED maps to AVOID; only an answered decision changes it                                          | QIM-005                   |
+| importance and is_hard_exclusion disagreeing                     | Derived from one source on the way in; a DB CHECK enforces it at rest                                          | QIM-005                   |
+| A model-invented taxonomy id becoming a matching criterion       | Phrases are resolved by Capital Q's own service; an unresolved phrase files nothing                            | QIM-003                   |
+| Screening on a protected characteristic                          | No canonical dimension can express one; a request is reported and refused in the open                          | QIM-015                   |
+| Observed behaviour rewriting a declared mandate                  | Observations reach inferences and tensions only; confirmMandate never reads them                               | QIM-011                   |
+| Q inference becoming a declaration                               | Same separation, with the basis carried so it cannot be presented as declared                                  | QIM-011                   |
+| Discovery mode derived from the constraints                      | The mode is the investor's I9 choice; nothing infers it, and no mode touches an exclusion                      | QIM-011                   |
+| A stale synthesis overwriting newer selections                   | Each synthesis records its session revision; `synthesisIsCurrent` refuses an older one                         | QIM-017                   |
+| A repeated confirmation creating a duplicate mandate version     | `sameMandate` compares semantic content, not row order                                                         | QIM-018                   |
+| A mandate quietly broadened by a synthesis                       | A dimension already answered by selection is never re-proposed                                                 | synthesis declaredAlready |
+| Commercially sensitive mandate text reaching an unsuitable model | Declared CONFIDENTIAL; the gateway decides eligibility before contacting a provider, and a refusal is honoured | synthesis blocked path    |
+| A cheque ceiling or exclusion appearing in a log line            | Telemetry carries counts, codes and versions only                                                              | synthesis telemetry       |

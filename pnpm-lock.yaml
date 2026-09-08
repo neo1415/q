@@ -622,12 +622,18 @@ importers:
       '@capital-q/investors':
         specifier: workspace:*
         version: link:../investors
+      '@capital-q/observability':
+        specifier: workspace:*
+        version: link:../observability
       '@capital-q/onboarding':
         specifier: workspace:*
         version: link:../onboarding
       '@capital-q/organisations':
         specifier: workspace:*
         version: link:../organisations
+      '@capital-q/q-core':
+        specifier: workspace:*
+        version: link:../q-core
       '@capital-q/security':
         specifier: workspace:*
         version: link:../security
@@ -644,9 +650,6 @@ importers:
       '@capital-q/config':
         specifier: workspace:*
         version: link:../config
-      '@capital-q/observability':
-        specifier: workspace:*
-        version: link:../observability
       '@capital-q/permissions':
         specifier: workspace:*
         version: link:../permissions

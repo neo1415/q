@@ -31,8 +31,10 @@
     "@capital-q/database": "workspace:*",
     "@capital-q/eventing": "workspace:*",
     "@capital-q/investors": "workspace:*",
+    "@capital-q/observability": "workspace:*",
     "@capital-q/onboarding": "workspace:*",
     "@capital-q/organisations": "workspace:*",
+    "@capital-q/q-core": "workspace:*",
     "@capital-q/security": "workspace:*",
     "@capital-q/taxonomy": "workspace:*",
     "zod": "4.5.4"

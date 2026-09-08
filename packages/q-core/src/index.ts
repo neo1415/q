@@ -68,6 +68,7 @@ export { COMPANY_ANALYST_V2 } from "./prompts/tasks/company-analyst.v2.js";
 export { FOUNDER_ONBOARDING_EXTRACTION_V1 } from "./prompts/tasks/founder-onboarding-extraction.v1.js";
 export { FOUNDER_ONBOARDING_EXTRACTION_V2 } from "./prompts/tasks/founder-onboarding-extraction.v2.js";
 export { INVESTOR_MANDATE_SYNTHESIS_V1 } from "./prompts/tasks/investor-mandate-synthesis.v1.js";
+export { INVESTOR_MANDATE_SYNTHESIS_V2 } from "./prompts/tasks/investor-mandate-synthesis.v2.js";
 export { FIT_EXPLANATION_V1 } from "./prompts/tasks/fit-explanation.v1.js";
 
 export {
@@ -154,11 +155,22 @@ export {
   InferredPreferenceSchema,
   INVESTOR_MANDATE_SCHEMA_NAME,
   INVESTOR_MANDATE_SCHEMA_VERSION,
+  INVESTOR_MANDATE_V2_SCHEMA_NAME,
+  INVESTOR_MANDATE_V2_SCHEMA_VERSION,
   InvestorMandateSynthesisResultSchema,
+  InvestorMandateSynthesisV2ResultSchema,
+  MANDATE_AMBIGUITY_KINDS,
+  MANDATE_STRENGTHS,
+  MandateAmbiguityKindSchema,
+  MandateAmbiguitySchema,
+  MandateStrengthSchema,
   InvestorMandateVariablesSchema,
   MANDATE_DIMENSIONS,
   MandateDimensionSchema,
+  type DeclaredMandateCandidateV2,
   type InvestorMandateSynthesisResult,
+  type InvestorMandateSynthesisV2Result,
+  type MandateStrength,
   type InvestorMandateVariables,
   type MandateDimension,
 } from "./prompts/schemas/investor-mandate.js";

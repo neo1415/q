@@ -1,169 +1,146 @@
-# Investor onboarding (`@capital-q/investor-onboarding`, CQ-ONB-003)
+# investor-onboarding — the investor journey and Investor Mandate Q
 
-The Investor journey I0–I12 running on the onboarding runtime
-(`docs/modules/onboarding.md`). The package owns **Investor Definition v1**
-as declarative reference data and the **integration layer** that maps its
-semantic write targets and step contexts onto the canonical domains through
-their public services (Organisation, Investor, Taxonomy). It owns no journey
-state (the runtime does) and no business truth. Zero model calls, zero
-provider SDKs, zero ranking, zero GateQ evaluation.
+**Packets:** CQ-ONB-003 (journey v1) · CQ-Q-022 (Mandate Q)
+**Package:** `@capital-q/investor-onboarding`
+
+The published investor journey (I0–I12), the integration layer that carries
+confirmed answers into the Investor domain, and — from CQ-Q-022 — what Q does
+with an investor's own description of what they invest in.
+
+## What CQ-Q-022 adds, and what it deliberately does not
+
+CQ-INV-002 and CQ-ONB-003 already built the hard parts: a versioned
+`core.investor_mandates`, a `core.investor_mandate_constraints` table with a
+closed dimension allowlist and a DB CHECK keeping `importance =
+'HARD_EXCLUSION'` and `is_hard_exclusion` in lockstep, and every phase from
+I0 to I12 including the review screen. Nothing here replaces any of it.
+
+What was missing was Q. `INVESTOR_MANDATE_SYNTHESIS` existed and nothing
+called it, so an investor's typed thesis was stored as text beside the
+structure and never read.
+
+## The one rule this module is built around
 
 ```
-Declared Mandate ≠ Observed Behaviour ≠ Q Inference ≠ GateQ Rules
-deployment state (investor) ≠ mandate status (DRAFT | ACTIVE | CLOSED)
-AVOID (soft, can still appear) ≠ HARD_EXCLUSION (never in standard discovery)
-onboarding answer ≠ canonical mandate constraint
+HARD_EXCLUSION is unreachable from anything a model produced.
 ```
 
-## Definition v1
+Not discouraged. Not behind a flag a caller could pass. `preferenceClassFor`
+has no branch that returns it; the only function that does takes the
+investor's confirmation as an argument. A hard exclusion decides what a
+person never sees, and that consequence belongs to the person who chose it.
 
-`src/definition/investor-v1.ts` is the manifest; the production migration
-`supabase/migrations/20260905120000_investor_onboarding_v1.sql` is rendered
-from it by the runtime's `renderOnboardingDefinitionMigration` and
-drift-guarded by `test/definition.test.ts`. Publishing the same manifest again
-is an idempotent no-op; a change to the journey is v2. Ids are UUIDv5 over
-journey + version. Phases `I0`…`I12`; 35 steps; runtime subject type
-`INVESTOR_ORGANISATION`, unbound start allowed.
+The consequence is that these three stay distinct all the way down:
 
-| Step                                                                          | Type                              | Writes to / context                                       |
-| ----------------------------------------------------------------------------- | --------------------------------- | --------------------------------------------------------- |
-| `I0.investor_type`                                                            | single_select (canonical types)   | — (consumed by bootstrap)                                 |
-| `I0.organisation_name`                                                        | short_text                        | `investor.bootstrap`                                      |
-| `I0.business_title`                                                           | short_text (optional)             | `investor.representative`                                 |
-| `I1.deployment_status`                                                        | single_select                     | `investor.deployment_status`, `investor.mandate.ensure`   |
-| `I1.mandate_context`                                                          | reference_select INVESTOR_MANDATE | `investor.mandate.select` (context `investor.mandates`)   |
-| `I2.stages`, `I2.currency`, `I2.cheque_min/typical/max`, `I2.investment_role` | multi/single_select, range        | `investor.mandate.stage_cheque`                           |
-| `I3.geography`, `I3.sectors`, `I3.sectors_avoid` (+ strength steps)           | reference_select TAXONOMY_NODE    | `investor.mandate.taxonomy`                               |
-| `I4.business_models`, `I4.customer_types`                                     | reference_select TAXONOMY_NODE    | `investor.mandate.taxonomy`                               |
-| `I4.capital_intensity`, `I4.regulatory_appetite`                              | single_select                     | `investor.mandate.business_attributes`                    |
-| `I4.revenue_state`                                                            | single_select                     | — (DEFERRED: onboarding-only until revenue policy exists) |
-| `I5.founder_preferences` (+ strength)                                         | multi_select (allowlist)          | `investor.mandate.founder_preferences`                    |
-| `I6.green_flags` (+ strength), `I6.custom_criteria`                           | multi_select, long_text           | `investor.mandate.green_flags` (custom → `custom.text`)   |
-| `I7.avoid`, `I7.hard_exclusions`                                              | multi_select                      | `investor.mandate.exclusions`                             |
-| `I7.sector_exclusions`                                                        | reference_select TAXONOMY_NODE    | `investor.mandate.taxonomy` (HARD_EXCLUSION)              |
-| `I8.portfolio`                                                                | long_text (≤ 5 lines)             | `investor.portfolio`                                      |
-| `I9.discovery_mode`                                                           | single_select                     | `investor.mandate.discovery_mode`                         |
-| `I10.inbound_preference`                                                      | single_select                     | — (onboarding-only; `InvestorInboundPreference` seam)     |
-| `I11.additional_context`                                                      | long_text                         | `investor.mandate.raw_text`                               |
-| `I11.review`                                                                  | confirmation                      | `investor.mandate.confirm` (context `investor.review`)    |
-| `I12.handoff`                                                                 | confirmation                      | — (context `investor.handoff`)                            |
+|                                       | meaning              | effect                  |
+| ------------------------------------- | -------------------- | ----------------------- |
+| preference (`STRONG`, `NICE`)         | "we like this"       | ranks up                |
+| **avoid** (`AVOID`)                   | "I'd rather not"     | ranks down, still shown |
+| **hard exclusion** (`HARD_EXCLUSION`) | "never show me this" | **ineligible**          |
 
-Field matrix: TAXONOMY (geography, sectors, business models, customer types,
-sector exclusions) uses the same `TaxonomyNodeId` namespace as company
-classification and lands in `taxonomy.mandate_preferences` with an explicit
-strength. MANDATE CONSTRAINT (stage, cheque, investment role, business
-attributes, founder attributes, green/red flags, custom text) lands in the
-mandate's constraint set through `MANDATE_CONSTRAINT_REGISTRY`. DEFERRED
-(revenue expectations, inbound preference) stays a typed onboarding answer
-shown in the review as "onboarding-only". Nothing is collapsed into a single
-"sector" label.
+A model reading firm wording produces `EXCLUSION_CLAIMED` — named for what it
+is, a reading — which maps to `AVOID`. Nothing is lost while it waits for an
+answer: an unconfirmed exclusion still ranks the candidate down.
 
-## Integration layer
+## How a thesis becomes a mandate
 
-`createInvestorOnboardingIntegration({ outbox, audit, securityEvents? })`
-returns the `writeTargets` and `stepContextProviders` the API composition
-root merges with the Founder ones. Handlers run inside the runtime's
-transaction on a savepoint-backed `TransactionManager`; every canonical
-write goes through the owning service's public contract with its own
-authorization, versioning, audit and events.
+```
+narrative + the selections already made
+  → ONE model call through the Model Gateway
+  → validated proposals (never exclusions, never taxonomy ids)
+  → the investor confirms, edits or rejects — exclusions individually
+  → the Investor service writes and versions it
+```
 
-- **`investor.bootstrap` (I0.organisation_name)** — with no organisation
-  context: `organisations.createOrganisation` from the verified principal
-  (type mapped from the investor type; a solo angel's workspace is
-  "Personal Investing"), then `investors.createInvestorOrganisation`, then a
-  representative row for the acting person, then the session binds one-way
-  to the investor organisation. With an existing context: the existing
-  investor organisation is reused (one per organisation) or created. Never
-  a self-join by typing a fund's name; never a first-membership fallback;
-  retry-safe (a repeated I0 renames the same organisation).
-- **`investor.representative`** — upserts the caller's business title.
-  Descriptive only; grants nothing.
-- **`investor.deployment_status`** — `deploymentState` on the investor
-  organisation (ACTIVELY_INVESTING | SELECTIVE | PAUSED | EXPLORING_ONLY),
-  distinct from mandate status.
-- **`investor.mandate.ensure`** — creates "Primary mandate" as DRAFT when the
-  investor has no open mandate. Nothing is activated here.
-- **`investor.mandate.select`** — the chosen mandate is stored as a typed
-  `RESOURCE_REFERENCE` response (never arbitrary JSON) and validated: it must
-  belong to the bound investor and must not be CLOSED. With one draft the
-  context suggests it; with several the choice is explicit, never implicit.
-- **`investor.mandate.*`** — each handler reads the mandate fresh, replaces
-  only its own constraint dimensions and updates with `expectedVersion`;
-  cheques are exact `DecimalString`s with min ≤ typical ≤ max enforced;
-  stages use canonical codes; taxonomy preferences are replaced atomically
-  with explicit strengths (MUST/STRONG/NICE/AVOID/HARD_EXCLUSION); a node
-  that is both a preference and an exclusion, an unknown node, a protected
-  founder trait, or an AVOID/HARD_EXCLUSION overlap is refused (422) and the
-  step rolls back.
-- **`investor.portfolio` (I8)** — `core.investor_portfolio_references`
-  (ADR 0007): investor-owned names, 1–5 per submission, source USER_ENTERED,
-  soft-removed on resubmission. No Company rows, no lookup, no linking.
-- **`investor.mandate.confirm` (I11)** — activates the DRAFT with
-  `expectedVersion` under `investor.mandate.edit`. An already ACTIVE mandate
-  stays active; a declined confirmation writes nothing.
+### What the synthesis refuses
 
-Step contexts (`investor.mandates`, `investor.review`, `investor.handoff`)
-are deterministic projections read back through the services under the
-investor's context: labels, values and strengths only. The review is
-"Here's the mandate you've defined"; the handoff reports the mandate status
-and version and `recommendation: "NOT_AVAILABLE"`. Free text is reported
-only as recorded, never as content. No score, no inference, no "Q
-understood".
+- **Nothing broadens the mandate.** A dimension the investor answered by
+  selection is not re-proposed, so a synthesis cannot quietly widen a stage
+  range they narrowed by hand.
+- **No sector phrase becomes a taxonomy id.** Capital Q's own service maps
+  them. Companies are classified with those same ids, so a model-invented id
+  would be a criterion nobody chose — and a phrase that resolves to nothing
+  files no constraint at all, because a free string would look like a filter
+  while matching nothing. It survives in the raw narrative, where a person
+  reads it.
+- **No invented precision.** "Early stage" is not resolved into a stage
+  range and "usually $250k–$1m, but we've gone higher" does not make $1m an
+  absolute ceiling. Both become ambiguities with the question that settles
+  them.
+- **No protected-trait screening.** The canonical dimension allowlist has no
+  column such a criterion could occupy, so it is structurally
+  unrepresentable. The check in `semantics.ts` is a second line that lets
+  Capital Q _say so_ rather than have the request vanish. It matches
+  requests to screen **by** a characteristic — "we back female founders
+  through our diversity fund" is a legitimate sentence and is left alone.
 
-## Web
+### Ambiguity
 
-`apps/web/src/features/investor-onboarding` on the shared onboarding kit
-(`apps/web/src/features/onboarding-kit`): one generic `OnboardingClient` over
-a `RuntimePort`, one pure mapper (`models/journey.ts`) grouping the 35 runtime
-steps into sixteen screens under four semantic sections (Context / Mandate /
-Preferences / Review), typed composite responses, and a development fixture
-that speaks the same session-view contract. Route: `/onboarding/investor`
-(route group `(onboarding)`, session required, no organisation required).
-The single `CQ_FOUNDER_ONBOARDING_ADAPTER` setting governs both journeys;
-`api` uses the real runtime through server actions, `fixture` only on
-non-production builds, `none` renders the unavailable surface. There is no
-fallback from `api` to `fixture`.
+Three kinds, each tied to a dimension and asked neutrally:
 
-Screen rules the components enforce: exact-string cheque ordering (no
-floats); "Suggested categories" from the investor's words, confirmed by the
-investor; every positive preference carries a visible strength; "I'd rather
-not see" (AVOID) and "Never show me" (HARD_EXCLUSION) are separate lists
-that cannot overlap; the review lists hard exclusions apart from soft
-preferences; the handoff says recommendations are not available and links to
-Discover's honest empty state.
+- `SCOPE_OR_EXCLUSION` — "I mostly invest in Africa." Preference, or exclude
+  everywhere else? This one changes eligibility, so it is asked first.
+- `TYPICAL_OR_LIMIT` — a range that may be typical or absolute.
+- `IMPRECISE_VALUE` — a phrase that maps to more than one canonical value.
 
-## Security and privacy
+The question is never leading: _"Should Capital Q exclude these entirely, or
+show them lower?"_ — not _"you probably meant"_.
 
-Handlers re-resolve the actor from the verified principal on the transaction
-executor; the session row is scope, never authority. Titles grant no
-capability. Investor-private data (mandate, preferences, portfolio, free
-text) is never emitted in outbox payloads, audit rows or logs (identifiers,
-step keys and versions only; the integration test asserts the privacy marker
-never leaks). Cross-user and cross-tenant access is enumeration-safe. The
-portfolio table is RLS-guarded (member select only; writes through the
-privileged server role inside the use case).
+## The separations, and where each is enforced
 
-## Tests
+| Separation                     | Enforcement                                                                                                                                                                                                            |
+| ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Declared ≠ Observed behaviour  | Observations reach `inferences` and `tensions` only; `confirmMandate` never reads them                                                                                                                                 |
+| Declared ≠ Q inference         | Same — an inference carries its basis and is never presented as a declaration                                                                                                                                          |
+| Declared ≠ GateQ               | I10 inbound preference is a separate column from I9 discovery mode; neither is derived from the other                                                                                                                  |
+| Discovery mode ≠ mandate       | The mode is whatever the investor chose at I9. A mandate full of exclusions is not automatically STRICT, and EXPLORATORY overrides no hard exclusion — exclusions are constraint rows, and the mode never touches them |
+| Preference ≠ avoid ≠ exclusion | The class scale above, plus the confirmation gate                                                                                                                                                                      |
 
-- `packages/investor-onboarding/test/definition.test.ts` — manifest,
-  mappings, migration drift.
-- `packages/investor-onboarding/test/investor-onboarding.integration.test.ts`
-  — I0→I12 against local PostgreSQL through the runtime with the real
-  domains; retry and resume; existing organisation and spoofed context;
-  titles grant nothing; ambiguous and foreign mandates refused; inverted
-  cheques and protected traits refused; cross-user isolation and stale
-  versions.
-- `supabase/tests/database/rls/250_investor_onboarding.test.sql`.
-- `apps/web/test/investor-onboarding-journey.test.ts` — mapper and client
-  over the fixture runtime, including the I11/I12 copy regression.
-- `tests/e2e/investor-onboarding.{desktop,mobile}.spec.ts` — the real journey
-  in a browser against the API and the local database, including refresh,
-  recalibration from the review (version increments), activation and a
-  stale-tab conflict.
+## Staleness and idempotency
 
-## Deferred
+A synthesis records the session revision it was computed from.
+`synthesisIsCurrent` refuses one computed from an older revision, so an
+investor who edits their stages while a call is in flight does not get the
+older reading landing on top. Recomputing costs one model call; being wrong
+costs a mandate that misdescribes them.
 
-Recommendation and slates (CQ-DISC), GateQ evaluation and inbound
-qualification (CQ-GATE-001 consumes `InvestorInboundPreference`), revenue
-threshold policy, Q-generated suggestions and any model call, portfolio
-enrichment, Evidence (CQ-EVD-001).
+`sameMandate` compares two confirmed inputs by semantic content — dimension,
+value, importance — and not row order, so clicking "Looks right" twice or
+retrying a request does not create a second identical version.
+
+## Wave 6 handoff
+
+`InvestorMandateSnapshot` (CQ-INV-002) is already exactly what recommendation
+needs: deterministic per `(mandateId, version)`, typed constraints each
+carrying `automatedUse`, canonical taxonomy ids, cheque band, stage envelope
+and discovery mode — with the raw narrative excluded. No later component
+needs to re-parse onboarding text.
+
+**No ranking exists yet, and none is claimed.** CQ-Q-022 prepares the input;
+Wave 6 does the matching. No model ranks companies, here or anywhere.
+
+## Security
+
+- All model access through the Model Gateway; no provider SDK in this
+  package.
+- Mandate material is declared CONFIDENTIAL to the gateway, which decides
+  provider eligibility _before_ contacting one. A refusal becomes
+  `NO_ELIGIBLE_MODEL_ROUTE` and is honoured rather than worked around.
+- Telemetry carries counts, codes and versions — never a cheque figure, an
+  exclusion, a phrase or the narrative.
+- Authorisation, versioning, events and audit belong to the Investor
+  service. This module returns input; it writes nothing.
+
+## Verification
+
+| What                                             | Where                             |
+| ------------------------------------------------ | --------------------------------- |
+| QIM-002..006, 011, 015, 017, 018 (44 assertions) | `test/investor-mandate-q.test.ts` |
+| Journey v1 and write targets (10)                | `test/definition.test.ts`         |
+
+## Known limitations
+
+See the CQ-Q-022 postflight. In short: the semantics, the synthesis service
+and the confirmation gate are real and tested; the I11 review screen still
+renders the deterministic projection of what the investor selected rather
+than Q's reading, and nothing yet calls the synthesis from the live session.
