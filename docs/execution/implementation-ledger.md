@@ -824,6 +824,97 @@ CQ-C5-R1            PARTIAL    Wave-5 production composition. Closes the FIRST
                     model. Unset, the composer keeps its previous honest "Q isn't
                     connected" state and nothing changes. Schema impact NONE;
                     migration NONE.
+CQ-C5-R2A           PARTIAL    Reliable authentication, provider privacy unblock and
+                    live Q proof. The Q half is DONE and proven live; the
+                    authentication half is done in code and waits on two
+                    console actions only a person can take.
+                    THE HEADLINE: Q now gives a real, substantive, grounded
+                    answer in the browser. "Analyse Northstar." reached the
+                    Home composer, the real q-api, the Context Firewall
+                    (OWN_COMPANY_QUESTION, maxSensitivity CONFIDENTIAL,
+                    AUTHORISED), authorised Knowledge and retrieval, the
+                    Company Intelligence specialist, and an APPROVED Groq
+                    route -- provider groq, model openai/gpt-oss-120b, 5
+                    findings, blocked null. Follow-ups continued the same
+                    server conversation and stayed grounded; asked "What
+                    evidence supports that?" Q named the two authorised facts
+                    with their truth class and evidence status and said they
+                    were self-reported and unverified. Four successful live
+                    calls, 14,802 input / 9,826 output tokens, ~6.4s per
+                    EVIDENCE_SYNTHESIS call, USD 0.0117 total.
+                    HOW THE BLOCK WAS CLEARED, AND HOW IT WAS NOT. The C5-R1
+                    finding was that every Q request is at least CONFIDENTIAL
+                    (OWN_Q_CONVERSATION is classified CONFIDENTIAL and appears
+                    in every plan) while both providers sat UNREVIEWED at
+                    PUBLIC/INTERNAL. NOTHING WAS RECLASSIFIED: the firewall
+                    catalogue is untouched and the plan is still CONFIDENTIAL.
+                    What changed is one vendor's reviewed terms, recorded as a
+                    dated migration -- groq to NO_TRAINING_ZERO_RETENTION with
+                    supports_zero_retention true and its two models raised to
+                    CONFIDENTIAL. Zero Data Retention being ENABLED is an
+                    assertion made by the human operator on 2026-09-08 and is
+                    labelled as such IN THE ROW, because no process here can
+                    read a vendor console. Gemini is deliberately untouched:
+                    its free-tier terms permit training on content, so it stays
+                    UNREVIEWED at PUBLIC and remains available for public and
+                    synthetic work only.
+                    A GAP FOUND AND CLOSED WHILE DOING IT: eligibility read
+                    only the MODEL's ceiling, so one edit to one row could have
+                    sent confidential customer data to an unreviewed vendor
+                    with nothing in the system objecting. `providerJustifiedCeiling`
+                    is now a second, independent limit -- UNREVIEWED and
+                    TRAINING_PERMITTED justify PUBLIC, NO_TRAINING_DEFAULT_RETENTION
+                    INTERNAL, NO_TRAINING_ZERO_RETENTION CONFIDENTIAL only when
+                    zero retention is actually enabled, ENTERPRISE_CONTRACT
+                    CONFIDENTIAL -- and NO class reaches HIGHLY_CONFIDENTIAL or
+                    RESTRICTED, by construction. 14 tests, each using a model
+                    whose own ceiling admits the request so the refusal can
+                    only be the provider gate. The pgTAP expectations moved
+                    with the policy and got stronger: "no model is cleared for
+                    confidential data" became "no model is cleared ABOVE
+                    confidential" plus a join proving every CONFIDENTIAL model
+                    sits behind a provider whose review justifies it.
+                    AUTHENTICATION -- DIAGNOSED. The email failure was never an
+                    SMTP bug. `.env.local` points the whole application at
+                    hosted project vcohxiqsmnkzxnvawgri, whose auth settings
+                    report mailer_autoconfirm false (so signup REQUIRES a
+                    confirmation email) and google false. Worse, that project
+                    has NONE of Capital Q's schemas -- no core, ai_ops,
+                    q_runtime, q_knowledge, evidence or onboarding, only
+                    auth.users -- so even a successful sign-in reaches an
+                    application that cannot work. The local stack, which has
+                    every migration, sends to Mailpit and was rate-limited to
+                    2 emails/hour, which reads as "email is broken" within one
+                    minute of testing; raised to 30 for LOCAL only, where no
+                    message reaches a real inbox. Hosted rate limits and SMTP
+                    are untouched.
+                    GOOGLE SIGN-IN -- BUILT, INERT UNTIL ENABLED. Through
+                    Supabase Auth, not beside it: signInWithOAuth on the server
+                    so the PKCE verifier cookie is written where the callback
+                    can read it, the existing callback exchanging the code, and
+                    the same redirect allow-list every emailed link already
+                    uses, so no ?next=https://evil survives a round trip
+                    through Google. No new auth library, no provider token
+                    persisted, no scope beyond identity. The control renders
+                    only when the Auth server itself reports the provider
+                    enabled, asked of /auth/v1/settings rather than declared in
+                    a second switch that could disagree with the truth in
+                    either direction -- verified in the browser, where it is
+                    correctly absent today. Email and password are untouched
+                    and remain a first-class way in.
+                    ALSO FIXED: reload restored only the LAST run's turns,
+                    because each question is its own run and the restore read
+                    one. It now remembers the conversation's run ids and reads
+                    each back from the server; the turns are still never
+                    cached. Verified across a two-run conversation.
+                    HUMAN ACTION REQUIRED, and nothing here works around it:
+                    enable Google in the hosted Supabase dashboard with the
+                    existing OAuth client, and decide whether the hosted
+                    project gets Capital Q's schema or the product runs
+                    locally. Neither is an agent's decision.
+                    New service NONE; new API key NONE; new paid service NONE;
+                    Qwen, Gemini and Groq unchanged as services; ElevenLabs
+                    NOT USED.
 ```
 
 ## Architecture coverage (doc 25 §198) — Q rows
@@ -1223,3 +1314,19 @@ CQ-C5-R1            PARTIAL    Wave-5 production composition. Closes the FIRST
 | Engineering detail in a user-facing failure                               | The contract's public failure projection supplies the sentence; the fallback carries no status, host or table | C5R1-W02                    |
 | Evidence identifiers leaking into the browser                             | A count is rendered, never a reference; nothing resolves one into something safe to show yet                  | C5R1-W03                    |
 | A client's memory of a conversation outliving the access that produced it | Reload reads the run back from the server under the person's own session; only the run id is cached           | C5R1 browser reload         |
+
+## Threat coverage (doc 16) — CQ-C5-R2A rows
+
+| Threat                                                                    | Control                                                                                                                             | Proof             |
+| ------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- | ----------------- |
+| Confidential customer data reaching a vendor nobody reviewed              | The provider's reviewed class is an independent ceiling; the model's own ceiling cannot widen it                                    | R2A-P02           |
+| A single row edit unblocking a demo and leaking customer data             | Raising a model ceiling alone still refuses: both limits must admit the request                                                     | R2A-P02           |
+| A vendor's brochure mistaken for our configuration                        | NO_TRAINING_ZERO_RETENTION justifies CONFIDENTIAL only when zero retention is recorded as enabled                                   | R2A-P01           |
+| Approving a vendor for one class silently approving it for all            | No privacy class reaches HIGHLY_CONFIDENTIAL or RESTRICTED, by construction                                                         | R2A-P01, R2A-P02  |
+| Data reclassified downward to satisfy a model vendor                      | The firewall catalogue is untouched; the live run still plans at CONFIDENTIAL                                                       | live run log      |
+| An unverified vendor assertion recorded as a verified fact                | The row itself says ZDR is a human assertion, not a verification, and carries its date                                              | migration row     |
+| An open redirect through the OAuth round trip                             | `next` is resolved before it enters redirectTo and again on return; absolute, protocol-relative and encoded forms fall back to Home | R2A-A02           |
+| A provider's configuration error described to whoever asked               | Every Google refusal is one sentence; the provider's own text is never reflected                                                    | callback; R2A-A01 |
+| A sign-in control that cannot work                                        | Rendered only when the Auth server reports the provider enabled; failure to ask means not offered                                   | R2A-A01           |
+| A Google session mistaken for authority                                   | Authentication yields CONTEXT_REQUIRED; a run naming another organisation's company is refused before any context                   | live probe        |
+| A client's memory of a conversation outliving the access that produced it | Only run ids are cached; every turn is read back from the server under the person's own session                                     | browser reload    |

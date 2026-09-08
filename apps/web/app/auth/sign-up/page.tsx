@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 
+import { googleSignInEnabled } from "@/auth/providers";
 import { resolveSafeReturnPath } from "@/auth/redirect-safety";
 import { SignUpForm } from "@/features/auth";
 
@@ -11,5 +12,10 @@ export default async function SignUpPage({
   readonly searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const params = await searchParams;
-  return <SignUpForm next={resolveSafeReturnPath(params["next"])} />;
+  return (
+    <SignUpForm
+      next={resolveSafeReturnPath(params["next"])}
+      googleEnabled={await googleSignInEnabled()}
+    />
+  );
 }

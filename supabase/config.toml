@@ -201,7 +201,11 @@ password_requirements = ""
 
 [auth.rate_limit]
 # Number of emails that can be sent per hour. Requires auth.email.smtp to be enabled.
-email_sent = 2
+# Raised for the LOCAL stack only, where every message is captured by Mailpit
+# and reaches no real inbox: at 2/hour a developer testing signup and recovery
+# is rate-limited within one minute, which reads as "email is broken". Hosted
+# projects keep their own value, which is a real abuse control (CQ-C5-R2A §18).
+email_sent = 30
 # Number of SMS messages that can be sent per hour. Requires auth.sms to be enabled.
 sms_sent = 30
 # Number of anonymous sign-ins that can be made per hour per IP address. Requires enable_anonymous_sign_ins = true.
@@ -326,6 +330,25 @@ max_frequency = "5s"
 # Use an external OAuth provider. The full list of providers are: `apple`, `azure`, `bitbucket`,
 # `discord`, `facebook`, `github`, `gitlab`, `google`, `keycloak`, `linkedin_oidc`, `notion`, `twitch`,
 # `twitter`, `x`, `slack`, `spotify`, `workos`, `zoom`.
+# Continue with Google (CQ-C5-R2A). Off by default: turning it on without both
+# variables set makes `supabase start` fail, and every other developer would
+# inherit that. To use Google against the LOCAL stack, export
+# SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID and
+# SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_SECRET, set enabled = true here, and add
+# http://127.0.0.1:54321/auth/v1/callback to the Google client's authorised
+# redirect URIs. HOSTED projects configure the provider in the dashboard
+# instead; this file never touches them.
+[auth.external.google]
+enabled = false
+client_id = "env(SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID)"
+# DO NOT commit your OAuth provider secret to git.
+secret = "env(SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_SECRET)"
+redirect_uri = ""
+url = ""
+# Required for local sign in with Google auth, per the note below.
+skip_nonce_check = true
+email_optional = false
+
 [auth.external.apple]
 enabled = false
 client_id = ""

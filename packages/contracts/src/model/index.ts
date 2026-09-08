@@ -558,6 +558,13 @@ export const MODEL_ELIGIBILITY_REASONS = [
   "SENSITIVITY_EXCEEDS_CEILING",
   "TENANT_POLICY_DENIES_PROVIDER",
   "CAPABILITY_MISSING",
+  /**
+   * The model's own ceiling admits this request, but the provider's reviewed
+   * data-use terms do not justify that ceiling. Distinct from
+   * SENSITIVITY_EXCEEDS_CEILING so an operator can tell "this model is not
+   * for this data" from "nobody has reviewed what this vendor may keep".
+   */
+  "PROVIDER_POLICY_INSUFFICIENT",
   "CONTEXT_WINDOW_TOO_SMALL",
   "OUTPUT_LIMIT_TOO_SMALL",
   "QUALITY_BELOW_FLOOR",

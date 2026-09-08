@@ -47,34 +47,53 @@ import type { PendingTurn } from "./conversation";
 const STREAM_BASE_URL = "/api/q-stream";
 
 /**
- * Which run this tab was following, so a refresh reopens the conversation
- * rather than starting a new one.
+ * Which runs this tab has been following, so a refresh reopens the whole
+ * conversation rather than only its last exchange.
  *
- * A run id, and nothing else. The conversation itself is never cached here:
- * on reload the turns are read back from the Q API under the person's own
+ * Run ids, and nothing else. The turns themselves are never cached here: on
+ * reload each run is read back from the Q API under the person's own
  * session, so what reappears is what the server recorded — not a browser's
- * account of it, which could outlive the access that produced it.
+ * account of it, which could outlive the access that produced it. A run this
+ * person may no longer read simply does not come back.
+ *
+ * Why a list: a conversation is made of runs, one per question, and there is
+ * no endpoint that reads a conversation whole. Remembering which runs
+ * belonged to this exchange is the smallest thing that restores it honestly;
+ * a conversation history product is a different piece of work.
  */
-const RUN_STORAGE_KEY = "cq.q.run";
+const RUN_STORAGE_KEY = "cq.q.runs";
 
-function rememberRun(runId: string | null): void {
+/** Bounded: a tab's working conversation, not an archive. */
+const REMEMBERED_RUNS_MAX = 20;
+
+function rememberRuns(runIds: readonly string[]): void {
   try {
-    if (runId === null) {
+    if (runIds.length === 0) {
       window.sessionStorage.removeItem(RUN_STORAGE_KEY);
     } else {
-      window.sessionStorage.setItem(RUN_STORAGE_KEY, runId);
+      window.sessionStorage.setItem(
+        RUN_STORAGE_KEY,
+        JSON.stringify(runIds.slice(-REMEMBERED_RUNS_MAX)),
+      );
     }
   } catch {
-    // Storage can be unavailable or full. Losing the pointer costs a
+    // Storage can be unavailable or full. Losing the pointers costs a
     // reopened conversation, never a lost one: the server still has it.
   }
 }
 
-function rememberedRun(): string | null {
+function rememberedRuns(): readonly string[] {
   try {
-    return window.sessionStorage.getItem(RUN_STORAGE_KEY);
+    const raw = window.sessionStorage.getItem(RUN_STORAGE_KEY);
+    if (raw === null) {
+      return [];
+    }
+    const parsed: unknown = JSON.parse(raw);
+    return Array.isArray(parsed)
+      ? parsed.filter((value): value is string => typeof value === "string")
+      : [];
   } catch {
-    return null;
+    return [];
   }
 }
 
@@ -121,6 +140,8 @@ export function useQConversation(
 
   const conversationId = useRef<string | null>(null);
   const openRun = useRef<string | null>(null);
+  /** Every run of this conversation, oldest first. */
+  const runIds = useRef<readonly string[]>([]);
   /** Whether the open run has reached a terminal event. True when none is open. */
   const finished = useRef(true);
   const abort = useRef<AbortController | null>(null);
@@ -161,35 +182,50 @@ export function useQConversation(
       });
   }, []);
 
-  // Reopen the conversation this tab was in (§15, §44). The run is read
-  // back from the server, so a refresh shows the turns that were actually
-  // recorded; a run this person may no longer read simply does not return.
+  // Reopen the conversation this tab was in (sections 15, 44). Every run is
+  // read back from the server, so a refresh shows the turns that were
+  // actually recorded; a run this person may no longer read does not return,
+  // and its absence is simply a shorter conversation rather than an error.
   useEffect(() => {
-    const remembered = rememberedRun();
-    if (remembered === null) {
+    const remembered = rememberedRuns();
+    if (remembered.length === 0) {
       return;
     }
     let cancelled = false;
-    void readQRunAction(remembered).then((result) => {
-      if (cancelled) {
-        return;
-      }
-      if (!result.ok) {
-        rememberRun(null);
-        return;
-      }
-      openRun.current = result.value.runId;
-      conversationId.current = result.value.conversationId ?? null;
-      setRunId(result.value.runId);
-      setHistory(result.value.messages ?? []);
-      // A run still in flight keeps streaming; a finished one does not
-      // reconnect, because there is nothing further to receive.
-      const live = !FINISHED_STATUSES.has(result.value.status);
-      finished.current = !live;
-      if (live) {
-        follow(result.value.runId);
-      }
-    });
+    void Promise.all(remembered.map((run) => readQRunAction(run))).then(
+      (results) => {
+        if (cancelled) {
+          return;
+        }
+        const readable = results.flatMap((result) =>
+          result.ok ? [result.value] : [],
+        );
+        const last = readable.at(-1);
+        if (last === undefined) {
+          rememberRuns([]);
+          return;
+        }
+        // Only the runs that came back are still worth remembering.
+        runIds.current = readable.map((run) => run.runId);
+        rememberRuns(runIds.current);
+        openRun.current = last.runId;
+        conversationId.current = last.conversationId ?? null;
+        setRunId(last.runId);
+        setHistory(readable.flatMap((run) => run.messages ?? []));
+        // A run still in flight keeps streaming; a finished one does not
+        // reconnect, because there is nothing further to receive.
+        const live = !FINISHED_STATUSES.has(last.status);
+        finished.current = !live;
+        if (live) {
+          // Its own turns arrive again on the stream, so they are not also
+          // taken from the summary above.
+          setHistory(
+            readable.slice(0, -1).flatMap((run) => run.messages ?? []),
+          );
+          follow(last.runId);
+        }
+      },
+    );
     return () => {
       cancelled = true;
     };
@@ -247,8 +283,9 @@ export function useQConversation(
         conversationId.current =
           started.value.conversationId ?? conversationId.current;
         openRun.current = started.value.runId;
+        runIds.current = [...runIds.current, started.value.runId];
         setRunId(started.value.runId);
-        rememberRun(started.value.runId);
+        rememberRuns(runIds.current);
         follow(started.value.runId);
       } finally {
         setSubmitting(false);

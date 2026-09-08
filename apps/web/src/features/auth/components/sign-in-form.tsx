@@ -13,6 +13,7 @@ import { INITIAL_AUTH_FORM_STATE } from "@/auth/form-state";
 import { AuthHeading } from "./auth-heading";
 import { EmailField } from "./email-field";
 import { FormNotice } from "./form-notice";
+import { AuthDivider, GoogleSignIn } from "./google-sign-in";
 import { PasswordField } from "./password-field";
 import { SubmitButton } from "./submit-button";
 
@@ -22,15 +23,23 @@ export type SignInNotice = {
 };
 
 /**
- * Sign in: email, password, Continue. The emailed sign-in link is the
- * secondary path, one tap away, on the same screen.
+ * Sign in: Continue with Google where the Auth server offers it, then email
+ * and password. The emailed sign-in link is the secondary path, one tap
+ * away, on the same screen.
+ *
+ * Google is additive and deliberately not the only way in: an account made
+ * with a password keeps working, and nobody is locked out of Capital Q
+ * because they do not have, or do not want to use, a Google account (§6).
  */
 export function SignInForm({
   next,
   notice,
+  googleEnabled = false,
 }: {
   readonly next: string;
   readonly notice?: SignInNotice | undefined;
+  /** Whether the Auth server actually offers Google. Resolved on the server. */
+  readonly googleEnabled?: boolean | undefined;
 }) {
   const [mode, setMode] = useState<"password" | "link">("password");
   const [passwordState, passwordAction] = useActionState(
@@ -53,6 +62,13 @@ export function SignInForm({
 
       {notice !== undefined ? (
         <FormNotice tone={notice.tone}>{notice.message}</FormNotice>
+      ) : null}
+
+      {googleEnabled ? (
+        <div className="flex flex-col gap-5">
+          <GoogleSignIn next={next} />
+          <AuthDivider />
+        </div>
       ) : null}
 
       {mode === "password" ? (

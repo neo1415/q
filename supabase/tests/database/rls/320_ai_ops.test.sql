@@ -19,7 +19,7 @@ create extension if not exists pgtap with schema extensions;
 \ir support/fixture.psql
 select pg_temp.rls_setup();
 
-select plan(31);
+select plan(33);
 
 -- Seed is present and shaped as the packet verified it -------------------------------
 select is((select count(*)::int from ai_ops.providers), 2, 'two V1 providers are seeded');
@@ -29,18 +29,32 @@ select results_eq(
   'the providers are google and groq');
 select is((select privacy_policy_class from ai_ops.providers where code = 'google'), 'UNREVIEWED',
   'google data-use terms are recorded as unreviewed');
-select is((select privacy_policy_class from ai_ops.providers where code = 'groq'), 'UNREVIEWED',
-  'groq data-use terms are recorded as unreviewed');
+-- CQ-C5-R2A: groq was reviewed on 2026-09-08. The class states what the
+-- vendor offers; the flag states what was enabled for this organisation, and
+-- the ceiling below rests on BOTH, so both are asserted.
+select is((select privacy_policy_class from ai_ops.providers where code = 'groq'), 'NO_TRAINING_ZERO_RETENTION',
+  'groq data-use terms are reviewed: no training, zero retention');
+select ok((select supports_zero_retention from ai_ops.providers where code = 'groq'),
+  'groq zero data retention is recorded as enabled for this organisation');
 select results_eq(
   $$ select model_code from ai_ops.models order by model_code $$,
   $$ values ('gemini-3.5-flash-lite'), ('gemini-3.8-flash'), ('openai/gpt-oss-120b'), ('openai/gpt-oss-20b') $$,
   'the four verified model ids are seeded, exactly');
-select is((select count(*)::int from ai_ops.models where sensitivity_ceiling in ('CONFIDENTIAL', 'HIGHLY_CONFIDENTIAL', 'RESTRICTED')), 0,
-  'no seeded model is cleared for confidential data');
+select is((select count(*)::int from ai_ops.models where sensitivity_ceiling in ('HIGHLY_CONFIDENTIAL', 'RESTRICTED')), 0,
+  'no model is cleared above CONFIDENTIAL: the strongest material never leaves through a vendor');
+select is(
+  (select count(*)::int
+     from ai_ops.models m
+     join ai_ops.providers p on p.id = m.provider_id
+    where m.sensitivity_ceiling = 'CONFIDENTIAL'
+      and not (p.privacy_policy_class in ('NO_TRAINING_ZERO_RETENTION', 'ENTERPRISE_CONTRACT')
+               and (p.privacy_policy_class = 'ENTERPRISE_CONTRACT' or p.supports_zero_retention))),
+  0,
+  'every model cleared for confidential data sits behind a provider whose review justifies it');
 select is((select sensitivity_ceiling from ai_ops.models where model_code = 'gemini-3.8-flash'), 'PUBLIC',
   'unverified gemini is public-only');
-select is((select sensitivity_ceiling from ai_ops.models where model_code = 'openai/gpt-oss-120b'), 'INTERNAL',
-  'groq is capped at INTERNAL pending review');
+select is((select sensitivity_ceiling from ai_ops.models where model_code = 'openai/gpt-oss-120b'), 'CONFIDENTIAL',
+  'groq carries confidential work under its reviewed zero-retention terms');
 select is((select count(*)::int from ai_ops.model_prices), 5, 'five price snapshots are seeded');
 select is(
   (select effective_to from ai_ops.model_prices where id = 'a3000000-0000-4000-8000-000000000002'),

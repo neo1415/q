@@ -10,6 +10,7 @@ import {
   describeSignUpFailure,
   GENERIC_FAILURE,
   GENERIC_SIGN_IN_FAILURE,
+  GOOGLE_SIGN_IN_FAILURE,
 } from "./auth-errors";
 import type { AuthFormState } from "./form-state";
 import { DEFAULT_RETURN_PATH, resolveSafeReturnPath } from "./redirect-safety";
@@ -50,6 +51,44 @@ function callbackUrl(
     url.searchParams.set("flow", flow);
   }
   return url.toString();
+}
+
+/**
+ * Continue with Google (CQ-C5-R2A §7, §10, §14).
+ *
+ * Supabase Auth remains the authentication authority: this asks it to begin
+ * the OAuth flow and follows the URL it returns. Capital Q verifies no Google
+ * token, runs no OAuth server of its own and creates no second user system.
+ *
+ * Scopes are Supabase's defaults for this provider — openid, email, profile.
+ * Nothing here asks for Drive, Gmail or Calendar, and no provider token is
+ * persisted: signing in with Google is proof of identity and nothing else.
+ *
+ * The PKCE verifier is written as a cookie by the SSR client on this call and
+ * read back by the callback, which is why both halves must run on the server.
+ */
+export async function signInWithGoogleAction(
+  _previous: AuthFormState,
+  formData: FormData,
+): Promise<AuthFormState> {
+  const next = resolveSafeReturnPath(field(formData, "next"));
+  const { auth } = loadWebServerConfig();
+  const supabase = await createServerSupabaseClient();
+
+  const { data, error } = await supabase.auth.signInWithOAuth({
+    provider: "google",
+    options: {
+      // Built from configuration, never from a request header, and passed
+      // through the same allow-list every emailed link uses.
+      redirectTo: callbackUrl(auth.appOrigin, next),
+    },
+  });
+
+  if (error !== null || data.url === null) {
+    return { status: "error", message: GOOGLE_SIGN_IN_FAILURE };
+  }
+
+  redirect(data.url);
 }
 
 export async function signInWithPasswordAction(

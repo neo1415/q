@@ -1,3 +1,5 @@
+import { fileURLToPath } from "node:url";
+
 import { defineConfig } from "vitest/config";
 
 /**
@@ -19,6 +21,15 @@ import { defineConfig } from "vitest/config";
 export default defineConfig({
   // Component tests are TSX; opt into the automatic React runtime.
   oxc: { jsx: { runtime: "automatic" } },
+  resolve: {
+    alias: {
+      // See tests/support/server-only.ts. The guard stays in the build; the
+      // runner is simply not a browser bundle.
+      "server-only": fileURLToPath(
+        new URL("./tests/support/server-only.ts", import.meta.url),
+      ),
+    },
+  },
   test: {
     // Testing Library auto-cleans between tests when the globals exist.
     globals: true,

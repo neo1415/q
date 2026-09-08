@@ -11,6 +11,7 @@ import { INITIAL_AUTH_FORM_STATE } from "@/auth/form-state";
 import { AuthHeading } from "./auth-heading";
 import { EmailField } from "./email-field";
 import { FormNotice } from "./form-notice";
+import { AuthDivider, GoogleSignIn } from "./google-sign-in";
 import { PasswordField } from "./password-field";
 import { SubmitButton } from "./submit-button";
 
@@ -18,7 +19,14 @@ import { SubmitButton } from "./submit-button";
  * Create account: email and password, nothing else. Company, role, sector
  * and intent belong to onboarding, after the person exists.
  */
-export function SignUpForm({ next }: { readonly next: string }) {
+export function SignUpForm({
+  next,
+  googleEnabled = false,
+}: {
+  readonly next: string;
+  /** Whether the Auth server actually offers Google. Resolved on the server. */
+  readonly googleEnabled?: boolean | undefined;
+}) {
   const [state, action] = useActionState(
     signUpWithPasswordAction,
     INITIAL_AUTH_FORM_STATE,
@@ -35,6 +43,13 @@ export function SignUpForm({ next }: { readonly next: string }) {
         title="Create your account"
         description="Q works with what you already have. Set up your company or mandate after this."
       />
+
+      {googleEnabled ? (
+        <div className="flex flex-col gap-5">
+          <GoogleSignIn next={next} />
+          <AuthDivider />
+        </div>
+      ) : null}
 
       <form action={action} className="flex flex-col gap-5">
         <input type="hidden" name="next" value={next} />

@@ -8,6 +8,7 @@ import {
   type ModelGatewayRequest,
   type ModelLatencyClass,
   type ModelQualityClass,
+  type ModelSensitivity,
   type TenantModelPolicy,
 } from "@capital-q/contracts";
 
@@ -37,6 +38,58 @@ import { estimateAttemptCost } from "./cost.js";
  * fallback as to a first choice, so availability can never widen what a
  * request may reach.
  */
+
+/**
+ * The strongest class a provider's REVIEWED TERMS justify sending it
+ * (CQ-C5-R2A §20-§25; doc 15 §61-§62).
+ *
+ * A model's `sensitivity_ceiling` is a per-model policy record, and until
+ * now it was the only thing eligibility read. That left one edit — raising a
+ * single model's ceiling — able to send confidential customer data to a
+ * vendor whose terms nobody had verified, with no second opinion anywhere in
+ * the system. This is that second opinion: the effective ceiling is the
+ * WEAKER of the model's own and the one its provider's class justifies, so
+ * approving a provider is a deliberate, reviewable act rather than a side
+ * effect of a number in a different row.
+ *
+ * The mapping is the review policy, written once:
+ *
+ *   UNREVIEWED                     nothing is known. PUBLIC only.
+ *   TRAINING_PERMITTED             inputs may train the vendor's models, so
+ *                                  customer data must never reach it. PUBLIC.
+ *   NO_TRAINING_DEFAULT_RETENTION  not trained on, but retained under the
+ *                                  vendor's ordinary policy. INTERNAL.
+ *   NO_TRAINING_ZERO_RETENTION     not trained on and not retained — the
+ *                                  first class that may carry a customer's
+ *                                  confidential material. CONFIDENTIAL, and
+ *                                  only when zero retention is actually
+ *                                  asserted for this account, because the
+ *                                  class describes what the vendor OFFERS
+ *                                  and the flag records what we ENABLED.
+ *   ENTERPRISE_CONTRACT            a signed agreement. CONFIDENTIAL.
+ *
+ * No class reaches HIGHLY_CONFIDENTIAL or RESTRICTED. That is deliberate and
+ * is the reason this function exists as a ceiling rather than a lookup: the
+ * strongest material Capital Q holds does not leave it through a model
+ * provider under any review short of a decision nobody has made yet.
+ */
+export function providerJustifiedCeiling(
+  provider: ProviderRecord,
+): ModelSensitivity {
+  switch (provider.privacyPolicyClass) {
+    case "UNREVIEWED":
+    case "TRAINING_PERMITTED":
+      return "PUBLIC";
+    case "NO_TRAINING_DEFAULT_RETENTION":
+      return "INTERNAL";
+    case "NO_TRAINING_ZERO_RETENTION":
+      // The class is the vendor's offer; the flag is our configuration of it.
+      // Without the second, the first is a brochure.
+      return provider.supportsZeroRetention ? "CONFIDENTIAL" : "INTERNAL";
+    case "ENTERPRISE_CONTRACT":
+      return "CONFIDENTIAL";
+  }
+}
 
 export type EligibleCandidate = {
   readonly candidateIndex: number;
@@ -210,8 +263,22 @@ export function planRoute(
     }
     // Privacy before everything that follows: the ceiling is the reviewed
     // policy record, and nothing cheaper or more available can lower it.
+    //
+    // Two independent limits, and the request must satisfy both. The model's
+    // own ceiling is checked first so its refusal is the one recorded when
+    // both would refuse — "this model is not for this data" is the more
+    // specific fact.
     if (!sensitivityAtMost(request.sensitivity, model.sensitivityCeiling)) {
       decide("SENSITIVITY_EXCEEDS_CEILING");
+      return;
+    }
+    if (
+      !sensitivityAtMost(
+        request.sensitivity,
+        providerJustifiedCeiling(provider),
+      )
+    ) {
+      decide("PROVIDER_POLICY_INSUFFICIENT");
       return;
     }
     if (!tenantAllows(input.tenantPolicy, provider.code)) {

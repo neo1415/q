@@ -15,9 +15,17 @@ import { createServerSupabaseClient } from "@/auth/supabase-server";
  * the flow started, so a link opened elsewhere -- or by someone who merely
  * intercepted it -- cannot complete the exchange.
  *
+ * Since CQ-C5-R2A it is also where Google sign-in lands: Supabase sends the
+ * provider's response here as the same PKCE `code`, so the exchange below is
+ * unchanged. What is new is the refusal path — a provider that declines,
+ * a consent screen the person closed, or a client we have misconfigured all
+ * arrive as `error` in the query string, and each gets one plain sentence.
+ *
  * Failure of any kind ends at sign-in with a generic notice. The response is
  * never cacheable and the redirect target is built from the configured
- * origin, not the request's Host header.
+ * origin, not the request's Host header — and `next` is resolved through the
+ * same allow-list as every other return path, so no `?next=https://evil` can
+ * survive a round trip through Google.
  */
 
 const EMAIL_OTP_TYPES = new Set([
@@ -38,6 +46,20 @@ function isEmailOtpType(value: string | null): value is EmailOtpType {
 export async function GET(request: NextRequest): Promise<NextResponse> {
   const { auth } = loadWebServerConfig();
   const params = request.nextUrl.searchParams;
+
+  // An OAuth provider reports refusal in the query string rather than by
+  // withholding the code. It is a different event from an expired emailed
+  // link and deserves different words; the provider's own description is
+  // logged, never reflected, because it describes our client configuration.
+  const oauthError = params.get("error");
+  if (oauthError !== null) {
+    const response = NextResponse.redirect(
+      new URL("/auth/sign-in?notice=google-failed", auth.appOrigin),
+    );
+    response.headers.set("Cache-Control", "no-store");
+    return response;
+  }
+
   const code = params.get("code");
   const tokenHash = params.get("token_hash");
   const otpType = params.get("type");
