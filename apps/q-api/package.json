@@ -28,9 +28,12 @@
     "@capital-q/permissions": "workspace:*",
     "@capital-q/q-actions": "workspace:*",
     "@capital-q/q-core": "workspace:*",
+    "@capital-q/q-embeddings": "workspace:*",
     "@capital-q/q-firewall": "workspace:*",
+    "@capital-q/q-knowledge": "workspace:*",
     "@capital-q/q-orchestrator": "workspace:*",
     "@capital-q/q-runtime": "workspace:*",
+    "@capital-q/q-specialists": "workspace:*",
     "@capital-q/q-tools": "workspace:*",
     "@capital-q/security": "workspace:*",
     "fastify": "^5.12.1"

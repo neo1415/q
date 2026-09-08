@@ -165,15 +165,24 @@ importers:
       '@capital-q/q-core':
         specifier: workspace:*
         version: link:../../packages/q-core
+      '@capital-q/q-embeddings':
+        specifier: workspace:*
+        version: link:../../packages/q-embeddings
       '@capital-q/q-firewall':
         specifier: workspace:*
         version: link:../../packages/q-firewall
+      '@capital-q/q-knowledge':
+        specifier: workspace:*
+        version: link:../../packages/q-knowledge
       '@capital-q/q-orchestrator':
         specifier: workspace:*
         version: link:../../packages/q-orchestrator
       '@capital-q/q-runtime':
         specifier: workspace:*
         version: link:../../packages/q-runtime
+      '@capital-q/q-specialists':
+        specifier: workspace:*
+        version: link:../../packages/q-specialists
       '@capital-q/q-tools':
         specifier: workspace:*
         version: link:../../packages/q-tools

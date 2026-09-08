@@ -1,14 +1,17 @@
 import Link from "next/link";
 
+import { loadWebServerConfig } from "@capital-q/config/web";
 import { buttonClassName } from "@capital-q/ui/button";
 import { PriorityList } from "@capital-q/ui/priority-list";
-import { QComposer } from "@capital-q/ui/q-composer";
 
 import {
   PageContainer,
   PageHeader,
   PageSection,
 } from "@/components/app-shell/page-container";
+
+import { ownCompanyIdAction } from "@/features/q/actions";
+import { QConversationPanel } from "@/features/q/q-conversation";
 
 import { ActivitySummary } from "./activity-summary";
 
@@ -18,7 +21,12 @@ import { ActivitySummary } from "./activity-summary";
  * authoritative data there is no greeting by name, no invented priority
  * and no fabricated activity. The two setup paths are the useful action.
  *
- * Nothing on this screen is read from a session, a fixture or demo data.
+ * Since CQ-C5-R1 the composer is connected to the real Q API: a question
+ * here starts a real run, and the answer streams from the service. Whether
+ * this build can reach Q is a server-side fact, resolved here and passed
+ * down as a boolean -- the browser is told what is available, never where.
+ *
+ * Nothing else on this screen is read from a session, a fixture or demo data.
  */
 
 const SETUP_PATHS = [
@@ -40,7 +48,12 @@ const SETUP_PATHS = [
   },
 ] as const;
 
-export function HomeScreen() {
+export async function HomeScreen() {
+  const qConnected = loadWebServerConfig().qApiBaseUrl !== undefined;
+  // Which company Q's questions are about, if Capital Q knows of one. A
+  // server fact, resolved once per render and never asked of the browser.
+  const companyId = qConnected ? await ownCompanyIdAction() : null;
+
   return (
     <PageContainer>
       <PageHeader
@@ -50,7 +63,10 @@ export function HomeScreen() {
 
       <div className="flex flex-col gap-8">
         <PageSection id="q" title="Ask Q" titleHidden>
-          <QComposer id="home-q" contextScope="unset" />
+          <QConversationPanel
+            connected={qConnected}
+            {...(companyId === null ? {} : { companyId })}
+          />
         </PageSection>
 
         <PageSection id="priority" title="Next priority">

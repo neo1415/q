@@ -89,6 +89,14 @@ export type WebServerConfig = {
   readonly auth: WebAuthConfig;
   /** Base URL of the Capital Q API for server-side calls. Absent locally by default. */
   readonly apiBaseUrl: string | undefined;
+  /**
+   * Base URL of the Q API, which is a separate deployable from the
+   * application API (TA-005). Absent means Q is not connected on this
+   * build: the composer says so plainly and sends nothing, which is what it
+   * did before this variable existed. It is never a default — a URL that
+   * guessed at a Q service would be a worse failure than an honest one.
+   */
+  readonly qApiBaseUrl: string | undefined;
   readonly public: WebPublicConfig;
   readonly secrets: WebServerSecrets;
 };
@@ -117,6 +125,7 @@ const webServerEnvSchema = z.object({
   CQ_FOUNDER_ONBOARDING_ADAPTER: z.enum(FOUNDER_ONBOARDING_ADAPTERS).optional(),
   CQ_WEB_ORIGIN: originSchema.optional(),
   CQ_API_URL: z.string().url("expected an absolute http(s) URL").optional(),
+  CQ_Q_API_URL: z.string().url("expected an absolute http(s) URL").optional(),
 });
 
 /** Server-only. Never pass the result to a Client Component. */
@@ -181,6 +190,7 @@ export function parseWebServerConfig(env: EnvironmentInput): WebServerConfig {
       secureCookies: !isLocal,
     },
     apiBaseUrl: parsed.CQ_API_URL?.replace(/\/$/, ""),
+    qApiBaseUrl: parsed.CQ_Q_API_URL?.replace(/\/$/, ""),
     public: {
       supabaseUrl: supabase.url,
       supabasePublishableKey: supabase.publishableKey,

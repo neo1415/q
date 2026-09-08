@@ -745,6 +745,85 @@ C5                  FAIL       First Q Intelligence integration gate. Every
                     finishes processing; call the mandate synthesis from the
                     investor session; render F3/F7/F8 and I11. No new architecture
                     is required — every seam already exists and is tested.
+CQ-C5-R1            PARTIAL    Wave-5 production composition. Closes the FIRST
+                    HALF of the C5 gap; C5 itself stays FAIL until the rest is
+                    done. Recorded honestly rather than as a pass, because a
+                    checkpoint that moves for partial work stops being one.
+                    DONE — Q API composition (packet Part A). apps/q-api now
+                    composes the real Wave-5 path in
+                    apps/q-api/src/composition/q-intelligence.ts: authorised
+                    hybrid retrieval (CQ-RAG-004) with the local query-embedding
+                    runtime, the authorised Knowledge query service
+                    (CQ-KNW-002/003), the Company Intelligence specialist
+                    (CQ-Q-020) behind the existing answer seam, and — the exact
+                    thing C5 found missing — the real authorised `context` port
+                    on createModelGatewayQAnswer. `createUnconfiguredQRetrieval`
+                    is gone from apps/q-api/src/main.ts; sensitivity is FROM_PLAN
+                    rather than the smoke's DECLARED_SYNTHETIC, so provider
+                    eligibility is decided from the plan's own ceiling.
+                    VERIFIED IN A LIVE PROCESS, not only in tests: q-api logs
+                    `q intelligence composed` with all four capabilities true,
+                    and a real browser question produced a run whose log shows
+                    company.get executed, knowledgeReads=2, retrievalCalls=1,
+                    facts=2 and `company intelligence completed`. Six composition
+                    tests hold the wiring itself (C5R1-001..003), each keyed to a
+                    tell that cannot pass by accident — an unconfigured retrieval
+                    port can only answer NOT_CONFIGURED, and noAuthorisedContext
+                    has its own sentence that must not reach the prompt.
+                    DONE — visual Q (packet Part B). The Home QComposer, present
+                    but deliberately unwired since the design system landed, now
+                    calls the real Q API: create run, append turn, cancel, and
+                    the CQ-Q-009 SSE client through one single-purpose Next route
+                    that attaches the HttpOnly session token server-side. No
+                    catch-all proxy: the browser gets one run's event stream and
+                    nothing else of the Q API's surface. Turns, streaming text,
+                    plain working stages from Q_VISIBLE_STAGE_LABELS, Stop,
+                    plain failures from the contract's own public projection, and
+                    server-side persistence with the active conversation restored
+                    after a refresh. Verified in a real browser against the real
+                    services end to end.
+                    TWO DEFECTS FOUND BY RUNNING THE PRODUCT, both fixed:
+                    (1) Q's answer rendered ABOVE the question it answered,
+                    because the run persists Q's message as a durable event while
+                    the person's own turn is still an unconfirmed placeholder —
+                    turns are now ordered by when they happened, and the case is
+                    a test; (2) F2 (CQ-Q-021's document upload) rendered with no
+                    heading and no styling at all: it never called StepHeading
+                    and its `cq-materials*` class names are defined in no
+                    stylesheet. Nothing caught either, because no test renders a
+                    step and no E2E covers F2.
+                    NOT DONE — packet Parts C, D and E. Founder document ->
+                    review trigger, F3/F7/F8, investor mandate synthesis caller,
+                    I11, and the C5 demo command are NOT implemented. The
+                    production-caller audit therefore still finds NONE for
+                    createFounderExtraction, createFounderReview,
+                    draftSuggestions, createMandateSynthesis and confirmMandate.
+                    BLOCKING FINDING FOR THE HUMAN — no configured provider may
+                    see a founder's own company. Every plan includes
+                    OWN_Q_CONVERSATION, which the firewall catalogue classifies
+                    CONFIDENTIAL, so maxSensitivity is CONFIDENTIAL on every Q
+                    run; both seeded providers are UNREVIEWED with model ceilings
+                    of PUBLIC (google) and INTERNAL (groq). The gateway therefore
+                    refuses every route with SENSITIVITY_EXCEEDS_CEILING and Q
+                    answers with the honest "too sensitive to send for analysis"
+                    message. This is the Context Firewall and doc 15 §88 working,
+                    not a bug, and it is PRE-EXISTING — it was equally true
+                    before this packet; production simply never reached the
+                    gateway with a real plan, so nothing could observe it.
+                    Clearing it is a data-governance decision about a provider's
+                    data-processing terms (privacy_policy_class, zero retention,
+                    a model's sensitivity_ceiling), which belongs to a person and
+                    not to an agent. NOT CHANGED HERE.
+                    Also observed: the local embedding runtime was not running,
+                    so retrieval degraded to lexical and said so in its own
+                    diagnostics — the designed behaviour, and evidence that the
+                    degradation path is honest rather than silent.
+                    One configuration addition, flagged before it was made:
+                    CQ_Q_API_URL, OPTIONAL, naming the q-api deployable the web
+                    app talks to. No new service, account, key, paid service or
+                    model. Unset, the composer keeps its previous honest "Q isn't
+                    connected" state and nothing changes. Schema impact NONE;
+                    migration NONE.
 ```
 
 ## Architecture coverage (doc 25 §198) — Q rows
@@ -1129,3 +1208,18 @@ C5                  FAIL       First Q Intelligence integration gate. Every
 | Implementation jargon leaking into a refusal              | The message carries no factor, snapshot, ranker or version wording                                         | QREC-001                |
 | FIT_EXPLANATION being invoked before factors exist        | Registered, zero callers, unmodified and dormant                                                           | inspection; grep        |
 | A pseudo-ranker introduced to make the packet pass        | None added; no recommendation package, table, contract or score exists                                     | inspection              |
+
+## Threat coverage (doc 16) — CQ-C5-R1 rows
+
+| Threat                                                                    | Control                                                                                                       | Proof                       |
+| ------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- | --------------------------- |
+| Verified intelligence that no user path reaches                           | The composition root itself is under test, keyed to tells an unconfigured wiring cannot produce               | C5R1-001..003               |
+| Retrieval running before the Context Firewall                             | Unchanged: the port takes the plan, and the envelope is built from the plan alone                             | live run log; RAG-004 tests |
+| A browser holding the Q API's session token                               | The token never leaves the server; writes go through server actions, the stream through one narrow route      | apps/web/app/api/q-stream   |
+| A general proxy handing the browser the whole Q API                       | GET only, one run's events only, no catch-all; the inbound Authorization header is never forwarded            | inspection                  |
+| Confidential context reaching an unreviewed provider                      | FROM_PLAN sensitivity; the gateway refused both providers on a real production run                            | live run log                |
+| A fabricated answer while the product is unfinished                       | No local reply exists: an unconfigured build says so and sends nothing                                        | QComposer; C5R1-W01         |
+| Invented progress stages                                                  | Only stages the server emitted, through the contract's own labels; no fallback guess                          | C5R1-W02                    |
+| Engineering detail in a user-facing failure                               | The contract's public failure projection supplies the sentence; the fallback carries no status, host or table | C5R1-W02                    |
+| Evidence identifiers leaking into the browser                             | A count is rendered, never a reference; nothing resolves one into something safe to show yet                  | C5R1-W03                    |
+| A client's memory of a conversation outliving the access that produced it | Reload reads the run back from the server under the person's own session; only the run id is cached           | C5R1 browser reload         |

@@ -51,7 +51,6 @@ import {
 } from "@capital-q/model-gateway";
 import { createGoogleModelProvider } from "@capital-q/model-gateway/providers/google";
 import { createGroqModelProvider } from "@capital-q/model-gateway/providers/groq";
-import { createModelGatewayQAnswer } from "@capital-q/model-gateway/q";
 import { createLogger, createTelemetryRuntime } from "@capital-q/observability";
 import { createPostgresOrganisationQueryPort } from "@capital-q/organisations";
 import {
@@ -91,7 +90,6 @@ import {
   createQSubjectResolverRegistry,
   createRelationshipQSubjectResolver,
   createSelfUserQSubjectResolver,
-  createUnconfiguredQRetrieval,
   neverPause,
 } from "@capital-q/q-runtime";
 import { createAuthorizationService } from "@capital-q/security";
@@ -102,6 +100,10 @@ import {
 import { createSupabaseAccessTokenAuthenticator } from "@capital-q/security/supabase";
 
 import { createApp, SERVICE_NAME } from "./app.js";
+import {
+  composeQIntelligence,
+  createProductionEmbeddingService,
+} from "./composition/q-intelligence.js";
 import { createSupabaseRequestAuthenticator } from "./security/supabase-authenticator.js";
 
 // Q configuration is loaded from its own schema, separate from the application
@@ -339,12 +341,36 @@ const qActions = createQActionService({
 });
 const qActionPort = createQActionPort({ service: qActions, logger });
 
+// Q's intelligence (CQ-C5-R1). Authorised hybrid retrieval (CQ-RAG-004),
+// authorised Q Knowledge (CQ-KNW-002/003) and the Company Intelligence
+// specialist (CQ-Q-020), composed into the two ports the orchestrator
+// takes. Until this packet the service wired an unconfigured retrieval and
+// no context port, so Q answered production questions with zero authorised
+// facts while every layer sat verified and unreachable — the finding C5
+// exists to catch.
+//
+// The query-embedding runtime holds confidential document text and lives on
+// a private network. It is composed unconditionally: when it cannot be
+// reached, retrieval runs lexically and says so in its own diagnostics,
+// which is an honest degradation rather than a silent one.
+const qIntelligence = composeQIntelligence({
+  sql: database.sql,
+  transactions: database.transactions,
+  repositories,
+  tools: qTools.port,
+  gateway: modelGateway,
+  embeddings: createProductionEmbeddingService(),
+  logger,
+});
+logger.info(
+  { capabilities: qIntelligence.capabilities },
+  "q intelligence composed",
+);
+
 // Orchestration (CQ-Q-003). LangGraph lives entirely behind the
 // QOrchestrator port; its checkpoints go to q_runtime.checkpoint* over the
 // same request-class credential, whose URL is resolved here and handed to
-// the store only. Retrieval stays unconfigured (CQ-RAG); the answer seam
-// is the Model Gateway, which receives the firewall's plan and sends only
-// the person's own words until retrieval exists.
+// the store only.
 const checkpoints = createPostgresQCheckpointStore({
   connectionString: resolveDatabaseUrl(loadDatabaseConfig(), "REQUEST"),
 });
@@ -356,15 +382,8 @@ const orchestrator = createLangGraphQOrchestrator({
   cancelRun: qRuntime.cancelRun,
   checkpoints,
   firewall,
-  retrieval: createUnconfiguredQRetrieval(),
-  answer: createModelGatewayQAnswer({
-    gateway: modelGateway,
-    repositories,
-    sql: database.sql,
-    transactions: database.transactions,
-    tools: qTools.port,
-    logger,
-  }),
+  retrieval: qIntelligence.retrieval,
+  answer: qIntelligence.answer,
   actions: qActionPort,
   pausePolicy: neverPause,
   logger,
@@ -372,9 +391,9 @@ const orchestrator = createLangGraphQOrchestrator({
 
 /**
  * The orchestration boundary. On: an accepted run is orchestrated at once
- * and reaches the (unconfigured) answer seam. This is a composition
- * decision, not configuration: flip it here, with the packet that changes
- * what the engine can honestly do.
+ * and reaches the composed answer seam. This is a composition decision, not
+ * configuration: flip it here, with the packet that changes what the engine
+ * can honestly do.
  */
 const Q_ORCHESTRATION_AUTOSTART = true;
 
