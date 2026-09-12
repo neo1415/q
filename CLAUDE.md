@@ -170,6 +170,24 @@ pnpm build
 
 Deterministic tests (Vitest) and probabilistic AI evals are separate systems. Do not ask an LLM to judge an invariant that code can assert. Sensitive functionality needs negative tests. Flaky tests are defects — never normalise retry-until-green, and never weaken an assertion to get green.
 
+## Git Continuity
+
+A completed implementation packet is not complete until its verified commit is also present on the configured remote. Work that exists only on one machine is unfinished work.
+
+For every completed packet or hotfix:
+
+1. review the diff;
+2. run the required checks;
+3. commit;
+4. push the current implementation branch;
+5. fetch and verify the remote branch;
+6. confirm local HEAD equals the remote branch HEAD;
+7. report both SHAs in the postflight.
+
+Never leave multiple completed packets only on a local machine. If the push fails, report the packet as `IMPLEMENTED BUT REMOTE BACKUP BLOCKED` and do not silently continue through later packets.
+
+Never force-push, reset or rebase shared history without explicit human approval. Never add secrets to Git.
+
 ## Forbidden Shortcuts
 
 Even under the 24-48 hour constraint, never compromise:
