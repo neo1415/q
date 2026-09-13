@@ -692,6 +692,7 @@ describe("contracts, idempotency, events and projection (§123, §125, §128, §
       ]),
       currentResponses: responses,
       pendingSuggestions: [],
+      pendingQuestions: [],
       path: computeActivePath(definition.steps, responses),
     });
     expect(OnboardingSessionViewSchema.safeParse(view).success).toBe(true);

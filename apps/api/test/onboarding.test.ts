@@ -129,6 +129,12 @@ function fakeRuntime(overrides: Partial<Runtime> = {}) {
     goBack: record("goBack", () => Promise.resolve(VIEW)),
     completeSession: record("completeSession", () => Promise.resolve(VIEW)),
     resolveSuggestion: record("resolveSuggestion", () => Promise.resolve(VIEW)),
+    answerInterviewQuestion: record("answerInterviewQuestion", () =>
+      Promise.resolve(VIEW),
+    ),
+    dismissInterviewQuestion: record("dismissInterviewQuestion", () =>
+      Promise.resolve(VIEW),
+    ),
     ...overrides,
   };
   return { runtime, calls };
