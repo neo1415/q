@@ -102,7 +102,30 @@ versions and changed field names only -- profile text is never on the bus or
 in audit metadata. Audit: `company_member.created/updated`,
 `founder_profile.created/updated`, `company_team.updated`.
 
-## Deferred
+## Visibility & Discovery (CQ-PRE-REC-001 §31-§36)
+
+Who may see the declared profile is an intentional choice by an editor of
+the company, never a side effect of finishing onboarding, of a document
+being processed or of anything Q read.
+
+- `setCompanyVisibility` (`POST /v1/companies/:id/visibility`) moves
+  `marketplace_visibility` between `organisation_private` and
+  `network_visible` — the only two choices a founder has. It requires
+  `company.edit` on the exact company, locks the row, checks the expected
+  version, records `company.visibility_changed` in the audit trail and
+  emits `core.company.visibility_changed` (identifiers, version and the
+  new visibility only). Public exposure and relationship-specific sharing
+  are not profile switches: the first is not a V1 rule, the second is the
+  Data Room's grant.
+- `projectCompanyForNetwork` is the one projection a viewer across the
+  network gets. Q's `company.get` tool serves it to an investor and
+  `GET /v1/companies/:id/network-preview` returns it to the founder as
+  "what investors will see", so the preview cannot drift from the answer
+  and nothing founder-private can appear in either: the projection reads
+  only the declared profile fields.
+- Marketplace readiness is untouched by visibility and is not assessed by
+  anything here. The web surface (`/company/visibility`) says so plainly
+  rather than inventing an eligibility.
 
 Invitations and member administration, founder claims/credential evidence,
 public founder presentation, business models,

@@ -83,12 +83,20 @@ export {
   MarketplaceVisibilitySchema,
   StageCodeSchema,
   UpdateCompanyRequestSchema,
+  COMPANY_NETWORK_PREVIEW_SEGMENT,
+  COMPANY_VISIBILITY_SEGMENT,
+  CompanyNetworkPreviewSchema,
+  CompanyVisibilityChoiceSchema,
+  SetCompanyVisibilityRequestSchema,
   type CompanyDto,
   type CompanyEditableField,
   type CompanyStatus,
   type CreateCompanyRequest,
   type MarketplaceVisibility,
   type UpdateCompanyRequest,
+  type CompanyNetworkPreview,
+  type CompanyVisibilityChoice,
+  type SetCompanyVisibilityRequest,
 } from "./companies.js";
 
 export {

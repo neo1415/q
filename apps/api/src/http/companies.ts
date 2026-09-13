@@ -1,13 +1,19 @@
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import {
   CompanyIdSchema,
+  isNetworkVisible,
+  projectCompanyForNetwork,
   toCompanyDto,
   type CompanyId,
   type CompanyService,
 } from "@capital-q/companies";
 import {
   COMPANIES_PATH,
+  COMPANY_NETWORK_PREVIEW_SEGMENT,
+  COMPANY_VISIBILITY_SEGMENT,
   CompanyDtoSchema,
+  CompanyNetworkPreviewSchema,
+  SetCompanyVisibilityRequestSchema,
   CorrelationIdSchema,
   CreateCompanyRequestSchema,
   IDEMPOTENCY_KEY_HEADER,
@@ -118,6 +124,47 @@ export function registerCompanyRoutes(
       });
       void reply.header("Cache-Control", "no-store");
       return CompanyDtoSchema.parse(toCompanyDto(company));
+    },
+  );
+  // Who may see the declared profile (CQ-PRE-REC-001 §31-§35). An
+  // intentional act by an editor, never a side effect of onboarding.
+  app.post(
+    `${COMPANIES_PATH}/:companyId${COMPANY_VISIBILITY_SEGMENT}`,
+    { onRequest: withContext },
+    async (request, reply) => {
+      const input = parseContract(
+        SetCompanyVisibilityRequestSchema,
+        request.body,
+        "The visibility request is not valid.",
+      );
+      const company = await service.setCompanyVisibility({
+        actor: getActorContext(request),
+        companyId: companyIdParam(request),
+        input,
+        correlationId: correlation(),
+      });
+      void reply.header("Cache-Control", "no-store");
+      return CompanyDtoSchema.parse(toCompanyDto(company));
+    },
+  );
+
+  // "What investors will see": the same projection Q serves across the
+  // network, built from the declared profile alone (§33). The founder's
+  // own read of the company authorises it; nothing founder-private can be
+  // in the result because the projection never reads it.
+  app.get(
+    `${COMPANIES_PATH}/:companyId${COMPANY_NETWORK_PREVIEW_SEGMENT}`,
+    { onRequest: withContext },
+    async (request, reply) => {
+      const company = await service.getCompany({
+        actor: getActorContext(request),
+        companyId: companyIdParam(request),
+      });
+      void reply.header("Cache-Control", "no-store");
+      return CompanyNetworkPreviewSchema.parse({
+        ...projectCompanyForNetwork(company),
+        networkVisible: isNetworkVisible(company.marketplaceVisibility),
+      });
     },
   );
 }

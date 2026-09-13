@@ -75,10 +75,12 @@ const COMPANY_A: Company = {
 const notUnderTest = () => Promise.reject(new Error("not under test"));
 
 function fakeService(overrides: Partial<CompanyService> = {}) {
-  const calls: { create: unknown[]; update: unknown[] } = {
-    create: [],
-    update: [],
-  };
+  const calls: { create: unknown[]; update: unknown[]; visibility: unknown[] } =
+    {
+      create: [],
+      update: [],
+      visibility: [],
+    };
   const service: CompanyService = {
     createCompany: (command) => {
       calls.create.push(command);
@@ -88,6 +90,14 @@ function fakeService(overrides: Partial<CompanyService> = {}) {
     updateCompany: (command) => {
       calls.update.push(command);
       return Promise.resolve({ ...COMPANY_A, version: 2 });
+    },
+    setCompanyVisibility: (command) => {
+      calls.visibility?.push(command);
+      return Promise.resolve({
+        ...COMPANY_A,
+        marketplaceVisibility: command.input.visibility,
+        version: 2,
+      });
     },
     // Founder / team operations are covered by company-team.test.ts.
     getMyCompanyMembership: notUnderTest,
@@ -362,6 +372,66 @@ describe("GET/PATCH /v1/companies/:companyId", () => {
       url: "/v1/companies/not-a-uuid",
     });
     expect(response.statusCode).toBe(422);
+    await app.close();
+  });
+});
+
+describe("company visibility (CQ-PRE-REC-001 §31-§35)", () => {
+  it("records the founder's choice through the service and returns the company", async () => {
+    const { service, calls } = fakeService();
+    const app = buildApp({ principal: PRINCIPAL, context: CONTEXT, service });
+    const response = await app.inject({
+      method: "POST",
+      url: `/v1/companies/${COMPANY_A.id}/visibility`,
+      payload: { visibility: "network_visible", expectedVersion: 1 },
+    });
+    expect(response.statusCode).toBe(200);
+    expect(
+      response.json<{ marketplaceVisibility: string }>().marketplaceVisibility,
+    ).toBe("network_visible");
+    expect(calls.visibility).toHaveLength(1);
+    await app.close();
+  });
+
+  it("refuses a visibility the product does not offer before the service is called", async () => {
+    const { service, calls } = fakeService();
+    const app = buildApp({ principal: PRINCIPAL, context: CONTEXT, service });
+    const response = await app.inject({
+      method: "POST",
+      url: `/v1/companies/${COMPANY_A.id}/visibility`,
+      payload: { visibility: "public_external", expectedVersion: 1 },
+    });
+    expect(response.statusCode).toBe(422);
+    expect(calls.visibility).toHaveLength(0);
+    await app.close();
+  });
+
+  it("previews exactly the network projection, with no readiness, slug or visibility columns", async () => {
+    const { service } = fakeService();
+    const app = buildApp({ principal: PRINCIPAL, context: CONTEXT, service });
+    const response = await app.inject({
+      method: "GET",
+      url: `/v1/companies/${COMPANY_A.id}/network-preview`,
+    });
+    expect(response.statusCode).toBe(200);
+    const body = response.json<Record<string, unknown>>();
+    expect(Object.keys(body).sort()).toEqual(
+      [
+        "canonicalName",
+        "companyId",
+        "companyStatus",
+        "currentStageCode",
+        "foundedDate",
+        "headquartersCity",
+        "headquartersCountry",
+        "legalName",
+        "networkVisible",
+        "primaryDescription",
+        "shortDescription",
+        "websiteUrl",
+      ].sort(),
+    );
+    expect(body["networkVisible"]).toBe(false);
     await app.close();
   });
 });

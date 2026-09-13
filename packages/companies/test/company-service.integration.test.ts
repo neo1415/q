@@ -37,6 +37,7 @@ import {
   CompanyVersionConflictError,
   createCompanyService,
   createPostgresCompanyQueryPort,
+  projectCompanyForNetwork,
   type CompanyService,
 } from "../src/index.js";
 import { COMPANY_EVENTS } from "../src/events/index.js";
@@ -638,6 +639,106 @@ describe("@capital-q/companies against local PostgreSQL", () => {
         marketplace_visibility: "organisation_private",
         marketplace_readiness_state: "not_assessed",
       });
+    });
+  });
+
+  it("an editor publishes the declared profile to the network and takes it back; a member cannot; the projection reads only declared fields (CQ-PRE-REC-001 §31-§35)", async () => {
+    await withWorld(async ({ tx, service, adminA, memberA, adminB }) => {
+      const a = await service.createCompany({
+        actor: adminA,
+        input: request("Visible A"),
+        idempotencyKey: "vis-a",
+        correlationId: CORRELATION(),
+      });
+      expect(a.marketplaceVisibility).toBe("organisation_private");
+
+      // Finishing anything never publishes: only this call does.
+      const publishCorrelation = CORRELATION();
+      const published = await service.setCompanyVisibility({
+        actor: adminA,
+        companyId: a.id,
+        input: { visibility: "network_visible", expectedVersion: 1 },
+        correlationId: publishCorrelation,
+      });
+      expect(published.marketplaceVisibility).toBe("network_visible");
+      expect(published.version).toBe(2);
+      const audits = await tx.sql`
+        select action_type from audit.material_actions
+         where correlation_id = ${publishCorrelation.slice(4)}::uuid
+           and action_type = 'company.visibility_changed'`;
+      expect(audits).toHaveLength(1);
+      const events = await tx.sql`
+        select payload from events.outbox
+         where event_type = 'core.company.visibility_changed'
+           and payload -> 'data' ->> 'companyId' = ${a.id}`;
+      expect(events).toHaveLength(1);
+
+      // Choosing the same visibility again changes nothing.
+      const same = await service.setCompanyVisibility({
+        actor: adminA,
+        companyId: a.id,
+        input: { visibility: "network_visible", expectedVersion: 2 },
+        correlationId: CORRELATION(),
+      });
+      expect(same.version).toBe(2);
+
+      // The projection an investor gets is the declared profile only.
+      const projection = projectCompanyForNetwork(published);
+      expect(Object.keys(projection).sort()).toEqual(
+        [
+          "canonicalName",
+          "companyId",
+          "companyStatus",
+          "currentStageCode",
+          "foundedDate",
+          "headquartersCity",
+          "headquartersCountry",
+          "legalName",
+          "primaryDescription",
+          "shortDescription",
+          "websiteUrl",
+        ].sort(),
+      );
+      expect(JSON.stringify(projection)).not.toContain("marketplace");
+      expect(JSON.stringify(projection)).not.toContain("readiness");
+
+      // An ordinary member may read but not publish.
+      await expect(
+        service.setCompanyVisibility({
+          actor: memberA,
+          companyId: a.id,
+          input: { visibility: "organisation_private", expectedVersion: 2 },
+          correlationId: CORRELATION(),
+        }),
+      ).rejects.toBeInstanceOf(AuthorizationDeniedError);
+
+      // A stale writer conflicts; a foreign organisation learns nothing.
+      await expect(
+        service.setCompanyVisibility({
+          actor: adminA,
+          companyId: a.id,
+          input: { visibility: "organisation_private", expectedVersion: 1 },
+          correlationId: CORRELATION(),
+        }),
+      ).rejects.toBeInstanceOf(CompanyVersionConflictError);
+      await expect(
+        service.setCompanyVisibility({
+          actor: adminB,
+          companyId: a.id,
+          input: { visibility: "organisation_private", expectedVersion: 2 },
+          correlationId: CORRELATION(),
+        }),
+      ).rejects.toBeInstanceOf(CompanyNotFoundError);
+
+      // And back to private, intentionally.
+      const withdrawn = await service.setCompanyVisibility({
+        actor: adminA,
+        companyId: a.id,
+        input: { visibility: "organisation_private", expectedVersion: 2 },
+        correlationId: CORRELATION(),
+      });
+      expect(withdrawn.marketplaceVisibility).toBe("organisation_private");
+      expect(withdrawn.version).toBe(3);
     });
   });
 

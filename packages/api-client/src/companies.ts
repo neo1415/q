@@ -1,5 +1,9 @@
 import {
   COMPANIES_PATH,
+  COMPANY_NETWORK_PREVIEW_SEGMENT,
+  COMPANY_VISIBILITY_SEGMENT,
+  CompanyNetworkPreviewSchema,
+  type SetCompanyVisibilityRequest,
   CompanyDtoSchema,
   IDEMPOTENCY_KEY_HEADER,
   type CreateCompanyRequest,
@@ -47,5 +51,33 @@ export function updateCompany(
     `${COMPANIES_PATH}/${encodeURIComponent(companyId)}`,
     CompanyDtoSchema,
     { body: input },
+  );
+}
+
+/** `POST /v1/companies/:companyId/visibility` (CQ-PRE-REC-001 §31-§35). */
+export function setCompanyVisibility(
+  session: ApiSession,
+  companyId: string,
+  request: SetCompanyVisibilityRequest,
+) {
+  return call(
+    session,
+    "POST",
+    `${COMPANIES_PATH}/${encodeURIComponent(companyId)}${COMPANY_VISIBILITY_SEGMENT}`,
+    CompanyDtoSchema,
+    { body: request },
+  );
+}
+
+/** `GET /v1/companies/:companyId/network-preview` — what investors will see (§33). */
+export function getCompanyNetworkPreview(
+  session: ApiSession,
+  companyId: string,
+) {
+  return call(
+    session,
+    "GET",
+    `${COMPANIES_PATH}/${encodeURIComponent(companyId)}${COMPANY_NETWORK_PREVIEW_SEGMENT}`,
+    CompanyNetworkPreviewSchema,
   );
 }

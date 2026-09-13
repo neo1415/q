@@ -97,6 +97,14 @@ function fakeService(overrides: Partial<CompanyService> = {}) {
       calls["upsert"]?.push(command);
       return Promise.resolve(MEMBER);
     },
+    setCompanyVisibility: (command) => {
+      calls.visibility?.push(command);
+      return Promise.resolve({
+        ...COMPANY_A,
+        marketplaceVisibility: command.input.visibility,
+        version: 2,
+      });
+    },
     getMyFounderProfile: () => Promise.resolve(PROFILE),
     updateMyFounderProfile: (command) => {
       calls["profile"]?.push(command);

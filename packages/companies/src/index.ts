@@ -134,3 +134,21 @@ export {
 } from "./infrastructure/postgres-team-repositories.js";
 
 export const PACKAGE_NAME = "@capital-q/companies" as const;
+
+export {
+  COMPANY_VISIBILITY_CHOICES,
+  isNetworkVisible,
+  NETWORK_PROJECTION_DESCRIPTION_MAX,
+  projectCompanyForNetwork,
+  type CompanyVisibilityChoice,
+  type NetworkProjectionSource,
+  type NetworkVisibleCompanyProfile,
+} from "./domain/network-projection.js";
+export {
+  createSetCompanyVisibility,
+  type SetCompanyVisibilityCommand,
+} from "./application/set-company-visibility.js";
+export {
+  CompanyVisibilityChangedEvent,
+  companyVisibilityChangedEvent,
+} from "./events/index.js";

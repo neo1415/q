@@ -170,3 +170,54 @@ export const CompanyDtoSchema = z.object({
 export type CompanyDto = z.infer<typeof CompanyDtoSchema>;
 
 export const COMPANIES_PATH = "/v1/companies" as const;
+
+/**
+ * Who may see the declared company profile (CQ-PRE-REC-001 §31-§35). The
+ * founder chooses between private to the organisation and visible to
+ * investors across the network; nothing else is a profile switch.
+ */
+export const COMPANY_VISIBILITY_SEGMENT = "/visibility" as const;
+export const COMPANY_NETWORK_PREVIEW_SEGMENT = "/network-preview" as const;
+
+export const CompanyVisibilityChoiceSchema = z.enum([
+  "organisation_private",
+  "network_visible",
+]);
+export type CompanyVisibilityChoice = z.infer<
+  typeof CompanyVisibilityChoiceSchema
+>;
+
+export const SetCompanyVisibilityRequestSchema = z
+  .object({
+    visibility: CompanyVisibilityChoiceSchema,
+    expectedVersion: ResourceVersionSchema,
+  })
+  .strict();
+export type SetCompanyVisibilityRequest = z.infer<
+  typeof SetCompanyVisibilityRequestSchema
+>;
+
+/**
+ * What an investor across the network sees of a company: the same
+ * projection Q's company tool serves, returned to the founder as a preview
+ * (§33). Nothing founder-private can appear here because the projection
+ * only reads these declared fields.
+ */
+export const CompanyNetworkPreviewSchema = z
+  .object({
+    companyId: UuidSchema,
+    canonicalName: z.string(),
+    legalName: z.string().nullable(),
+    websiteUrl: z.string().nullable(),
+    foundedDate: z.string().nullable(),
+    headquartersCountry: z.string().nullable(),
+    headquartersCity: z.string().nullable(),
+    currentStageCode: z.string().nullable(),
+    shortDescription: z.string().nullable(),
+    primaryDescription: z.string().nullable(),
+    companyStatus: CompanyStatusSchema,
+    /** True when investors across the network can currently reach this profile. */
+    networkVisible: z.boolean(),
+  })
+  .strict();
+export type CompanyNetworkPreview = z.infer<typeof CompanyNetworkPreviewSchema>;

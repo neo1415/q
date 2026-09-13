@@ -226,6 +226,25 @@ export function createPostgresCompanyRepository(): CompanyRepository {
       return toCompany(rows[0]);
     },
 
+    updateVisibility: async (tx, input) => {
+      const updated = await tx.sql`
+        update core.companies c
+           set marketplace_visibility = ${input.visibility},
+               version = c.version + 1
+         where c.id = ${input.companyId}
+           and c.tenant_id = ${input.tenantId}
+           and c.organisation_id = ${input.organisationId}
+           and c.version = ${input.expectedVersion}
+        returning c.id`;
+      if (updated.length === 0) {
+        return null;
+      }
+      const rows = await tx.sql`
+        ${companySelect(tx.sql)}
+         where c.id = ${input.companyId} and c.tenant_id = ${input.tenantId}`;
+      return toCompany(rows[0]);
+    },
+
     lockSlug: async (tx, tenantId, baseSlug) => {
       await tx.sql`
         select pg_advisory_xact_lock(hashtext(${tenantId}::text), hashtext(${baseSlug}))`;

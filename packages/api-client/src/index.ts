@@ -32,7 +32,13 @@ export {
   type ApiSession,
 } from "./organisations.js";
 
-export { createCompany, getCompany, updateCompany } from "./companies.js";
+export {
+  createCompany,
+  getCompany,
+  getCompanyNetworkPreview,
+  setCompanyVisibility,
+  updateCompany,
+} from "./companies.js";
 
 export {
   getCompanyTeamFacts,

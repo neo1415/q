@@ -114,6 +114,23 @@ export async function HomeScreen() {
           />
         </PageSection>
 
+        {context.kind === "FOUNDER" ? (
+          <PageSection
+            id="visibility"
+            title="Visibility & Discovery"
+            description="Who can see your company, what investors would see, and whether they can find you. Nothing becomes visible until you choose."
+          >
+            <div>
+              <Link
+                href="/company/visibility"
+                className={buttonClassName("secondary", "regular")}
+              >
+                Manage visibility
+              </Link>
+            </div>
+          </PageSection>
+        ) : null}
+
         {context.kind === "NONE" ? (
           <PageSection
             id="setup"

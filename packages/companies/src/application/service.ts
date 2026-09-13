@@ -37,6 +37,10 @@ import {
   createUpdateCompany,
   type UpdateCompanyCommand,
 } from "./update-company.js";
+import {
+  createSetCompanyVisibility,
+  type SetCompanyVisibilityCommand,
+} from "./set-company-visibility.js";
 
 /**
  * The company application service: the one entry point HTTP (and later
@@ -46,6 +50,10 @@ export type CompanyService = {
   readonly createCompany: (command: CreateCompanyCommand) => Promise<Company>;
   readonly getCompany: (query: GetCompanyQuery) => Promise<Company>;
   readonly updateCompany: (command: UpdateCompanyCommand) => Promise<Company>;
+  /** Who may see the declared profile (CQ-PRE-REC-001 §31-§35). */
+  readonly setCompanyVisibility: (
+    command: SetCompanyVisibilityCommand,
+  ) => Promise<Company>;
   readonly getMyCompanyMembership: (
     query: GetMyCompanyMembershipQuery,
   ) => Promise<CompanyMember>;
@@ -92,6 +100,7 @@ export function createCompanyService(
     createCompany: createCreateCompany(dependencies),
     getCompany: createGetCompany(dependencies),
     updateCompany: createUpdateCompany(dependencies),
+    setCompanyVisibility: createSetCompanyVisibility(dependencies),
     getMyCompanyMembership: createGetMyCompanyMembership(dependencies),
     upsertMyCompanyMembership: createUpsertMyCompanyMembership(dependencies),
     getMyFounderProfile: createGetMyFounderProfile(dependencies),
