@@ -5,7 +5,7 @@
   "type": "module",
   "description": "Capital Q application API \u00e2\u20ac\u201d Fastify composition root.",
   "scripts": {
-    "dev": "node --watch src/main.ts",
+    "dev": "node --watch --import ../../scripts/dev-env.mjs src/main.ts",
     "build": "tsc",
     "start": "node dist/main.js",
     "typecheck": "tsc --noEmit",
