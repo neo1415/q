@@ -1,7 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { OnboardingResponseValue } from "@capital-q/contracts";
+import type {
+  OnboardingResponseValue,
+  OnboardingUnderstanding,
+} from "@capital-q/contracts";
 
 import {
   OnboardingClientError,
@@ -77,6 +80,14 @@ export type OnboardingActions<TResponse> = {
     readonly value: OnboardingResponseValue;
   }) => Promise<boolean>;
   readonly dismissQuestion: (questionId: string) => Promise<boolean>;
+  /**
+   * One turn of the conversational interview (CQ-PRE-REC-001 §16-§21).
+   * Resolves to what the runtime understood, or null when this build has
+   * no path — never a fabricated acknowledgement.
+   */
+  readonly say: (text: string) => Promise<OnboardingUnderstanding | null>;
+  /** Re-read the session from the runtime (Q's reading may have landed). */
+  readonly refresh: () => Promise<void>;
   readonly retry: () => Promise<void>;
 };
 
@@ -294,6 +305,26 @@ export function useOnboardingJourney<
         return false;
       }
       return run(() => dismiss({ questionId }), true);
+    },
+    say: async (text) => {
+      const say = requireClient().say;
+      if (say === undefined) {
+        return null;
+      }
+      let understood: OnboardingUnderstanding | null = null;
+      const ok = await run(async () => {
+        const outcome = await say({ text });
+        understood = outcome.understood;
+        return outcome.view;
+      }, true);
+      return ok ? understood : null;
+    },
+    refresh: async () => {
+      const reload = requireClient().reload;
+      if (reload === undefined) {
+        return;
+      }
+      await run(reload, false);
     },
     retry: async () => {
       const operation = lastOperation.current;

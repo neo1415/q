@@ -211,6 +211,53 @@ The Founder journey itself lives in `docs/modules/founder-onboarding.md`.
 
 The Investor journey itself lives in `docs/modules/investor-onboarding.md`.
 
+## Conversational interview (CQ-PRE-REC-001 §16-§30)
+
+The Q-led interview is a reading of this runtime, not a second store of
+progress. Q asks the session's current step in the words the pinned
+definition gives it, with the step's own options as quick controls; what Q
+picked up is the session's pending suggestions; what Q still needs is its
+pending questions; progress is its step states. A refresh, a logout or a
+new device shows the same interview because nothing authoritative lives in
+the browser, a graph process or a provider conversation.
+
+- `POST /v1/onboarding/sessions/:id/say` (`SayOnboardingRequest`) is the one
+  entry point for a turn. `domain/interpretation.ts` reads what was said
+  deterministically against the current step — an option named in plain
+  words (with journey alias tables such as `FOUNDER_UTTERANCE_ALIASES`), a
+  figure inside a range, a plain text answer, a yes on a confirmation — and
+  a few conversational moves (skip, I don't know, why, upload). A
+  recognised answer goes through `submitResponse`; a skip through
+  `skipStep`; both exactly as a tap would. The reply
+  (`OnboardingUnderstanding`) says which: ANSWERED, SKIPPED, REQUIRED, WHY,
+  UPLOAD, AMBIGUOUS, DECLINED, READING, UNCLEAR.
+- A sentence no rule can place (several facts, a figure with context, a
+  preference in the person's own words) is recorded in
+  `onboarding.utterances` (PENDING → READ | IGNORED) and announced by
+  `onboarding.utterance.recorded` (identifiers only). The journey's own
+  reading — the founder extraction, the investor mandate synthesis — turns
+  it into ordinary suggestions and questions the person confirms. The
+  founder reading also reacts to `onboarding.response.committed` on its
+  narrative steps (description, follow-up), so prose typed as an answer is
+  read too. An utterance is never a value.
+- Nothing the model proposes is authoritative: suggestions still pass the
+  pinned step's validation on creation and again on acceptance, and the
+  founder mapper (`structuredValueFor`) only lands a reading in a step's
+  own vocabulary — "Seed" becomes the `seed` option, "$3m" a range value —
+  or leaves it for the review list. A hard exclusion is still only ever
+  written by the investor's explicit answer to an EXCLUSION_CONFIRMATION
+  question.
+- Idempotency: a `say` that records an utterance uses the `say` operation;
+  one that answers or skips carries its key into the submit or skip it
+  delegates to.
+
+The web workspace (`apps/web/src/features/onboarding-conversation`) is
+shared by both journeys; each supplies a `JourneyVocabulary` (titles, value
+descriptions, review groups, the editor that owns a step) so the interview
+speaks the definition's language and never a field name. Direct editing
+opens the existing structured screen for the step; it is the same runtime
+mutation either way.
+
 ## Frontend boundary
 
 The web keeps one generic `OnboardingClient` (`apps/web/src/features/onboarding-kit`)

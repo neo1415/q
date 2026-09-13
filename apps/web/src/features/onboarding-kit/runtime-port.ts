@@ -1,6 +1,7 @@
 import type {
   OnboardingResponseValue,
   OnboardingSessionView,
+  SayOnboardingResponse,
 } from "@capital-q/contracts";
 
 import {
@@ -72,6 +73,19 @@ export type RuntimePort = {
         readonly expectedSessionVersion: number;
         readonly idempotencyKey: string;
       }) => Promise<OnboardingSessionView>)
+    | undefined;
+  /**
+   * One turn of the conversational interview (CQ-PRE-REC-001 §16-§21):
+   * what the person said about the current step, placed by the runtime or
+   * recorded for Q's reading. Absent on a port without the path.
+   */
+  readonly say?:
+    | ((input: {
+        readonly sessionId: string;
+        readonly text: string;
+        readonly expectedSessionVersion: number;
+        readonly idempotencyKey: string;
+      }) => Promise<SayOnboardingResponse>)
     | undefined;
   /**
    * Upload one document for a document-gathering step. Absent on a port
@@ -228,11 +242,15 @@ export function createRuntimeClient<
       );
     }
     const group = model.currentGroup(view);
-    return model.toPresentation(
+    const presentation = model.toPresentation(
       view,
       source,
       await model.enrich(view, group, port),
     );
+    // The runtime view itself travels with the presentation: the
+    // conversational interview asks one runtime step at a time and needs
+    // its prompt, options and reasons, not the composite screen.
+    return { ...presentation, raw: view };
   };
 
   const eligibleStatus = (view: OnboardingSessionView, stepKey: string) =>
@@ -429,6 +447,38 @@ export function createRuntimeClient<
                   }),
                 ),
               );
+            }),
+        }),
+
+    reload: () =>
+      guarded(async () => {
+        latest = null;
+        return present(await session());
+      }),
+
+    ...(port.say === undefined
+      ? {}
+      : {
+          say: (input: { readonly text: string }) =>
+            guarded(async () => {
+              const say = port.say;
+              if (say === undefined) {
+                throw new OnboardingClientError(
+                  "UNAVAILABLE",
+                  "Capital Q cannot take that on this build yet.",
+                );
+              }
+              const view = await session();
+              const outcome = await say({
+                sessionId: view.session.id,
+                text: input.text,
+                expectedSessionVersion: view.session.version,
+                idempotencyKey: crypto.randomUUID(),
+              });
+              return {
+                view: await present(remember(outcome.view)),
+                understood: outcome.understood,
+              };
             }),
         }),
 

@@ -2,13 +2,15 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 
 import type { FounderOnboardingAdapter } from "@capital-q/config/web";
 import { Button, buttonClassName } from "@capital-q/ui/button";
 import { EmptyState, InlineNotice, Skeleton } from "@capital-q/ui/states";
 
 import { createFounderOnboardingClient } from "./adapters/compose";
+import { FOUNDER_VOCABULARY } from "./conversation-adapter";
+import { QOnboardingWorkspace } from "../onboarding-conversation/q-onboarding-workspace";
 import { OnboardingProgress } from "../onboarding-kit/components/onboarding-progress";
 import { OnboardingShell } from "../onboarding-kit/components/onboarding-shell";
 import { useFounderOnboarding } from "./controller/use-founder-onboarding";
@@ -34,6 +36,9 @@ export function FounderOnboardingScreen({
     [adapter, seed],
   );
   const [state, actions] = useFounderOnboarding(client);
+  // Q leads by default (CQ-PRE-REC-001 §16); the structured screens remain
+  // for direct editing (§30) and as the fallback when a step needs them.
+  const [mode, setMode] = useState<"conversation" | "form">("conversation");
 
   if (state.phase === "unavailable") {
     return (
@@ -96,6 +101,64 @@ export function FounderOnboardingScreen({
   const step = session.step;
   const isFirst = session.steps[0]?.id === step.id;
   const isFinal = step.kind === "snapshot";
+
+  const finishFromQ = async () => {
+    await actions.submit({ kind: "snapshot", confirmed: true });
+    if (await actions.complete()) {
+      router.push("/home");
+    }
+  };
+
+  if (mode === "conversation" && session.raw !== undefined) {
+    const companyId = session.raw.session.subject?.id;
+    return (
+      <div className="mx-auto flex min-h-dvh w-full max-w-(--cq-layout-reading) flex-col gap-6 px-4 py-6">
+        <div className="flex items-center justify-between gap-2">
+          <Link href="/home" className="cq-label text-(--cq-text-tertiary)">
+            Save &amp; leave
+          </Link>
+          <span className="cq-label text-(--cq-text-primary)">
+            Founder setup
+          </span>
+          <Button
+            variant="quiet"
+            size="compact"
+            onClick={() => setMode("form")}
+          >
+            Use the form
+          </Button>
+        </div>
+        <QOnboardingWorkspace
+          session={session}
+          vocabulary={FOUNDER_VOCABULARY}
+          actions={actions}
+          busy={state.busy}
+          errorMessage={state.errorMessage}
+          onEdit={(editorId) => {
+            setMode("form");
+            void actions.openStep(editorId);
+          }}
+          onFinish={() => void finishFromQ()}
+          qSubject={companyId === undefined ? undefined : { companyId }}
+          contextLabel={
+            session.raw.session.subject === null ? undefined : "Your company"
+          }
+        />
+      </div>
+    );
+  }
+
+  const backToQ = (
+    <div className="flex justify-end">
+      <Button
+        variant="quiet"
+        size="compact"
+        onClick={() => setMode("conversation")}
+      >
+        Back to Q
+      </Button>
+    </div>
+  );
 
   const notice =
     state.errorMessage !== undefined ? (
@@ -163,6 +226,7 @@ export function FounderOnboardingScreen({
       }
     >
       <div key={step.id} className="contents">
+        {backToQ}
         {renderStep({ step, formId: STEP_FORM_ID, busy: state.busy, actions })}
       </div>
     </OnboardingShell>

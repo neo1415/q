@@ -1,6 +1,9 @@
 import {
   IDEMPOTENCY_KEY_HEADER,
   ONBOARDING_ANSWER_SEGMENT,
+  ONBOARDING_SAY_SEGMENT,
+  SayOnboardingResponseSchema,
+  type SayOnboardingRequest,
   ONBOARDING_DISMISS_SEGMENT,
   ONBOARDING_QUESTIONS_SEGMENT,
   ONBOARDING_BACK_SEGMENT,
@@ -181,6 +184,22 @@ export function dismissOnboardingQuestion(
     "POST",
     `${byId(sessionId)}${ONBOARDING_QUESTIONS_SEGMENT}/${encodeURIComponent(questionId)}${ONBOARDING_DISMISS_SEGMENT}`,
     OnboardingSessionViewSchema,
+    { body: request, ...idempotent(idempotencyKey) },
+  );
+}
+
+/** `POST /v1/onboarding/sessions/:sessionId/say` — the conversational interview (CQ-PRE-REC-001). */
+export function sayToOnboarding(
+  session: ApiSession,
+  sessionId: string,
+  request: SayOnboardingRequest,
+  idempotencyKey: string,
+) {
+  return call(
+    session,
+    "POST",
+    `${byId(sessionId)}${ONBOARDING_SAY_SEGMENT}`,
+    SayOnboardingResponseSchema,
     { body: request, ...idempotent(idempotencyKey) },
   );
 }

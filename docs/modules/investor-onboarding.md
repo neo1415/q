@@ -119,6 +119,17 @@ needs to re-parse onboarding text.
 **No ranking exists yet, and none is claimed.** CQ-Q-022 prepares the input;
 Wave 6 does the matching. No model ranks companies, here or anywhere.
 
+## Conversational interview (CQ-PRE-REC-001)
+
+The same Q-led workspace drives Investor Definition v1. `INVESTOR_UTTERANCE_ALIASES`
+lets "Seed and Series A", "we lead" or "dollars" land on the right options
+through the runtime's `say` path; anything richer — a cheque band, a sector
+list, "never show me gambling" — is recorded as an utterance and read by the
+mandate synthesis (`createMandateReview.onUtterance`), which proposes
+suggestions on the structured steps and EXCLUSION_CONFIRMATION questions.
+A hard exclusion is still created only by the investor's explicit answer;
+no reading writes one.
+
 ## Security
 
 - All model access through the Model Gateway; no provider SDK in this

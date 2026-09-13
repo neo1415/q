@@ -43,3 +43,5 @@ export {
   type InvestorMandatesContext,
   type InvestorReviewContext,
 } from "./contexts.js";
+
+export { INVESTOR_UTTERANCE_ALIASES } from "./utterance-aliases.js";

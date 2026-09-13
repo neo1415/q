@@ -666,6 +666,86 @@ describe("@capital-q/onboarding against local PostgreSQL", () => {
     });
   });
 
+  it("the conversational interview places what a person says through the same paths, or records it for Q (CQ-PRE-REC-001 §16-§21)", async () => {
+    await withWorld(async (world) => {
+      const { service, adminA } = world;
+      const { view } = await start(world, adminA);
+      const id = view.session.id;
+      const say = (text: string, version: number, key = randomUUID()) =>
+        service.runtime.say({
+          actor: adminA,
+          sessionId: id as OnboardingSessionId,
+          text,
+          expectedSessionVersion: version,
+          idempotencyKey: key,
+          correlationId: CORRELATION(),
+        });
+
+      // A move the interview owns: nothing is written.
+      const why = await say("Why do you need this?", 1);
+      expect(why.understood.kind).toBe("WHY");
+      expect(why.view.session.version).toBe(1);
+
+      // A required step cannot be talked past.
+      const later = await say("come back to this later", 1);
+      expect(later.understood).toMatchObject({
+        kind: "REQUIRED",
+        stepKey: "intent",
+      });
+
+      // An option named in plain words is the answer, through submitResponse.
+      const answered = await say("just exploring, really", 1);
+      expect(answered.understood).toEqual({
+        kind: "ANSWERED",
+        stepKey: "intent",
+        summary: "Just exploring",
+      });
+      expect(answered.view.session.version).toBe(2);
+      expect(answered.view.session.currentStepKey).toBe("sectors");
+
+      // Prose no rule can place is recorded for Q's reading, not guessed.
+      const reading = await say(
+        "We build underwriting tools for regional banks and some clinics use us too",
+        2,
+      );
+      expect(reading.understood.kind).toBe("READING");
+      // Recorded once, announced once, and the session itself unchanged.
+      expect(reading.view.session.version).toBe(2);
+      const utterances = await world.tx.sql`
+        select status, step_key from onboarding.utterances where session_id = ${id}`;
+      expect(utterances).toEqual([{ status: "PENDING", step_key: "sectors" }]);
+      expect(
+        await count(world.tx.sql`
+          select count(*)::int as count from events.outbox
+           where event_type = 'onboarding.utterance.recorded'`),
+      ).toBe(1);
+      // The outbox carries identifiers only, never the words.
+      const [payload] = await world.tx.sql`
+        select payload::text as body from events.outbox
+         where event_type = 'onboarding.utterance.recorded'`;
+      expect(String(payload?.["body"])).not.toContain("underwriting");
+
+      // The same key replays the same reading without a second row.
+      const key = randomUUID();
+      const first = await say(
+        "Also we have a waitlist of three hundred",
+        2,
+        key,
+      );
+      const replay = await say(
+        "Also we have a waitlist of three hundred",
+        2,
+        key,
+      );
+      expect(first.understood.kind).toBe("READING");
+      expect(replay.understood.kind).toBe("READING");
+      expect(
+        await count(world.tx.sql`
+          select count(*)::int as count from onboarding.utterances where session_id = ${id}`),
+      ).toBe(2);
+    });
+  });
+
   it("optional steps can be skipped without a fake answer; required steps cannot (§80-82, §211-212)", async () => {
     await withWorld(async (world) => {
       const { tx, service, adminA } = world;

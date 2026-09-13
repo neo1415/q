@@ -45,6 +45,32 @@ const PROCESS_TRIGGER_EVENT = "evidence.document.version_created";
 const READY_EVENT = "evidence.document.ready";
 /** An investor's narrative answer → Q's reading of the mandate (CQ-PRE-REC-001 §6). */
 const RESPONSE_COMMITTED_EVENT = "onboarding.response.committed";
+/**
+ * A free-text turn of the conversational interview that no deterministic
+ * rule could place (CQ-PRE-REC-001 §20): the journey's own reading turns it
+ * into suggestions and questions the person then confirms.
+ */
+const UTTERANCE_RECORDED_EVENT = "onboarding.utterance.recorded";
+
+type UtteranceRecordedData = {
+  readonly sessionId: string;
+  readonly utteranceId: string;
+  readonly journeyType: string;
+  readonly stepKey: string | null;
+};
+
+/** A journey reading of one committed response (a narrative step). */
+type ResponseReader = (event: {
+  readonly sessionId: string;
+  readonly stepKey: string;
+  readonly responseId: string;
+}) => Promise<{ readonly kind: string; readonly blocked?: unknown }>;
+
+/** A journey reading of one free-text turn (CQ-PRE-REC-001 §20). */
+type UtteranceReader = (event: {
+  readonly sessionId: string;
+  readonly utteranceId: string;
+}) => Promise<{ readonly kind: string; readonly blocked?: unknown }>;
 
 const ProcessDocumentJobSchema = createJobSchema(ProcessDocumentJob.dataSchema);
 
@@ -64,6 +90,8 @@ export type DocumentProcessingHandlerOptions = {
           readonly documentId: string;
           readonly documentVersionId: string;
         }) => Promise<{ readonly kind: string; readonly blocked?: unknown }>;
+        readonly onResponseCommitted: ResponseReader;
+        readonly onUtterance: UtteranceReader;
       }
     | undefined;
   /**
@@ -79,6 +107,7 @@ export type DocumentProcessingHandlerOptions = {
           readonly stepKey: string;
           readonly responseId: string;
         }) => Promise<{ readonly kind: string; readonly blocked?: unknown }>;
+        readonly onUtterance: UtteranceReader;
       }
     | undefined;
   readonly logger: RunnerLogger;
@@ -138,39 +167,89 @@ export function createDomainEventHandler(
 
     const event: CapitalQEvent<unknown> = parsed.message;
     if (event.type === RESPONSE_COMMITTED_EVENT) {
-      if (mandateReview === undefined) {
+      const committed = event.data as ResponseCommittedData;
+      // Each journey's reading decides for itself whether the step is one
+      // of its narrative steps; a session belongs to exactly one of them.
+      const readers = [
+        ...(mandateReview === undefined
+          ? []
+          : [{ name: "investor mandate reading", reader: mandateReview }]),
+        ...(founderReview === undefined
+          ? []
+          : [{ name: "founder narrative reading", reader: founderReview }]),
+      ];
+      for (const { name, reader } of readers) {
+        try {
+          const outcome = await reader.onResponseCommitted({
+            sessionId: committed.sessionId,
+            stepKey: committed.stepKey,
+            responseId: committed.responseId,
+          });
+          if (transientlyBlocked(outcome)) {
+            return {
+              kind: "RETRY",
+              errorCode: "NARRATIVE_READING_MODEL_UNAVAILABLE",
+            };
+          }
+          if (outcome.kind !== "SKIPPED") {
+            logger.info(
+              {
+                msgId: message.msgId,
+                eventId: event.id,
+                sessionId: committed.sessionId,
+                outcome: outcome.kind,
+              },
+              `${name} handled`,
+            );
+          }
+        } catch (error: unknown) {
+          logger.warn(
+            { err: error, msgId: message.msgId, eventId: event.id },
+            `${name} failed; retrying`,
+          );
+          return { kind: "RETRY", errorCode: "NARRATIVE_READING_FAILED" };
+        }
+      }
+      return { kind: "ARCHIVE" };
+    }
+    if (event.type === UTTERANCE_RECORDED_EVENT) {
+      const said = event.data as UtteranceRecordedData;
+      const reader =
+        said.journeyType === "founder"
+          ? founderReview
+          : said.journeyType === "investor"
+            ? mandateReview
+            : undefined;
+      if (reader === undefined) {
         return { kind: "ARCHIVE" };
       }
-      const committed = event.data as ResponseCommittedData;
       try {
-        const outcome = await mandateReview.onResponseCommitted({
-          sessionId: committed.sessionId,
-          stepKey: committed.stepKey,
-          responseId: committed.responseId,
+        const outcome = await reader.onUtterance({
+          sessionId: said.sessionId,
+          utteranceId: said.utteranceId,
         });
         if (transientlyBlocked(outcome)) {
           return {
             kind: "RETRY",
-            errorCode: "MANDATE_REVIEW_MODEL_UNAVAILABLE",
+            errorCode: "UTTERANCE_READING_MODEL_UNAVAILABLE",
           };
         }
-        if (outcome.kind !== "SKIPPED") {
-          logger.info(
-            {
-              msgId: message.msgId,
-              eventId: event.id,
-              sessionId: committed.sessionId,
-              outcome: outcome.kind,
-            },
-            "investor mandate reading handled",
-          );
-        }
+        logger.info(
+          {
+            msgId: message.msgId,
+            eventId: event.id,
+            sessionId: said.sessionId,
+            journeyType: said.journeyType,
+            outcome: outcome.kind,
+          },
+          "conversational interview turn read",
+        );
       } catch (error: unknown) {
         logger.warn(
           { err: error, msgId: message.msgId, eventId: event.id },
-          "investor mandate reading failed; retrying",
+          "conversational interview turn reading failed; retrying",
         );
-        return { kind: "RETRY", errorCode: "MANDATE_REVIEW_FAILED" };
+        return { kind: "RETRY", errorCode: "UTTERANCE_READING_FAILED" };
       }
       return { kind: "ARCHIVE" };
     }

@@ -338,6 +338,33 @@ export async function enrich(
   group: JourneyGroup,
   port: RuntimePort,
 ): Promise<PresentationExtras> {
+  // Labels for every taxonomy id a pending suggestion proposes, whichever
+  // screen is current: the Q-led interview shows what was picked up as
+  // words, never as ids (CQ-PRE-REC-001 §21).
+  const taxonomyIds = (value: OnboardingResponseValue): readonly string[] =>
+    value.type === "RESOURCE_REFERENCE" && value.resourceType === "TAXONOMY_NODE"
+      ? value.resourceIds
+      : [];
+  const suggestedIds = [
+    ...new Set([
+      ...view.pendingSuggestions.flatMap((suggestion) =>
+        taxonomyIds(suggestion.suggestedValue),
+      ),
+      // Answered picks too, so "Review what Q knows" reads as words.
+      ...view.responses.flatMap((response) => taxonomyIds(response.value)),
+    ]),
+  ];
+  const suggestedTaxonomy =
+    suggestedIds.length === 0 ? [] : await port.describeNodes(suggestedIds);
+  const extras = await enrichGroup(view, group, port);
+  return { ...extras, suggestedTaxonomy };
+}
+
+async function enrichGroup(
+  view: OnboardingSessionView,
+  group: JourneyGroup,
+  port: RuntimePort,
+): Promise<PresentationExtras> {
   const state = runtimeState(view);
   const selectedTaxonomy: Record<string, readonly TaxonomyCandidateView[]> = {};
   const describe = async (stepKey: string) => {
@@ -356,21 +383,9 @@ export async function enrich(
     case "red_flags":
       await describe(S.sectorExclusions);
       return { selectedTaxonomy };
-    case "review": {
-      const ids = [
-        ...new Set(
-          view.pendingSuggestions.flatMap((suggestion) =>
-            suggestion.suggestedValue.type === "RESOURCE_REFERENCE"
-              ? suggestion.suggestedValue.resourceIds
-              : [],
-          ),
-        ),
-      ];
-      return {
-        suggestedTaxonomy:
-          ids.length === 0 ? [] : await port.describeNodes(ids),
-      };
-    }
+    case "review":
+      // Suggested taxonomy labels are fetched for every group above.
+      return {};
     case "attributes": {
       const [businessModels, customerTypes] = await Promise.all([
         port.listNodes(BUSINESS_MODEL_VOCABULARIES[0]),
@@ -419,6 +434,9 @@ export function toPresentation(
     questions: view.pendingQuestions ?? [],
     step: complete ? undefined : buildStep(current, state, extras),
     source,
+    labels: Object.fromEntries(
+      (extras.suggestedTaxonomy ?? []).map((node) => [node.nodeId, node.label]),
+    ),
   };
 }
 
@@ -428,6 +446,11 @@ const GROUP_BY_STEP_KEY: ReadonlyMap<string, Group> = new Map(
     group.stepKeys.map((key) => [key, group] as const),
   ),
 );
+
+/** The screen that owns a runtime step, for direct editing (CQ-PRE-REC-001 §30). */
+export function groupOf(stepKey: string): Group | undefined {
+  return GROUP_BY_STEP_KEY.get(stepKey);
+}
 
 /**
  * A pending suggestion as the words the investor was offered. Option keys

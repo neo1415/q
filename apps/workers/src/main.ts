@@ -62,6 +62,7 @@ import {
   createPostgresOnboardingResponseRepository,
   createPostgresOnboardingSessionRepository,
   createPostgresOnboardingSuggestionRepository,
+  createPostgresOnboardingUtteranceRepository,
 } from "@capital-q/onboarding";
 import { ProcessDocumentJob } from "@capital-q/evidence/jobs";
 import { createLogger, createTelemetryRuntime } from "@capital-q/observability";
@@ -175,6 +176,7 @@ const founderReview =
         sessions: createPostgresOnboardingSessionRepository(),
         responses: createPostgresOnboardingResponseRepository(),
         suggestions: createPostgresOnboardingSuggestionRepository(),
+        utterances: createPostgresOnboardingUtteranceRepository(),
         createSuggestion: (command) =>
           onboarding.internal.createSuggestion(command as never),
         recordQuestions: (command) =>
@@ -222,6 +224,7 @@ const mandateReview =
         sessions: createPostgresOnboardingSessionRepository(),
         responses: createPostgresOnboardingResponseRepository(),
         suggestions: createPostgresOnboardingSuggestionRepository(),
+        utterances: createPostgresOnboardingUtteranceRepository(),
         synthesis: createMandateSynthesis({
           gateway: {
             execute: (request, options) =>

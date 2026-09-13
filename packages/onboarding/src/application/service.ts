@@ -4,6 +4,8 @@ import type { Logger } from "@capital-q/observability";
 
 import { createPostgresOnboardingDefinitionRepository } from "../infrastructure/postgres-definition-repository.js";
 import { createPostgresOnboardingInterviewQuestionRepository } from "../infrastructure/postgres-question-repository.js";
+import { createPostgresOnboardingUtteranceRepository } from "../infrastructure/postgres-utterance-repository.js";
+import type { OnboardingUtteranceAliases } from "../domain/interpretation.js";
 import {
   createPostgresOnboardingIdempotencyRepository,
   createPostgresOnboardingResponseRepository,
@@ -17,10 +19,11 @@ import type {
   OnboardingInterviewQuestionRepository,
   OnboardingResponseRepository,
   OnboardingSessionRepository,
-  OnboardingStepStateRepository,
   OnboardingStepContextProvider,
+  OnboardingStepStateRepository,
   OnboardingSubjectResolver,
   OnboardingSuggestionRepository,
+  OnboardingUtteranceRepository,
   OnboardingWriteTargetHandler,
 } from "./ports.js";
 import {
@@ -57,6 +60,7 @@ export type OnboardingService = {
     | "resolveSuggestion"
     | "answerInterviewQuestion"
     | "dismissInterviewQuestion"
+    | "say"
   >;
   readonly internal: Pick<
     OnboardingUseCases,
@@ -86,9 +90,16 @@ export type OnboardingServiceOptions = {
         readonly responses?: OnboardingResponseRepository | undefined;
         readonly suggestions?: OnboardingSuggestionRepository | undefined;
         readonly questions?: OnboardingInterviewQuestionRepository | undefined;
+        readonly utterances?: OnboardingUtteranceRepository | undefined;
         readonly idempotency?: OnboardingIdempotencyRepository | undefined;
       }
     | undefined;
+  /**
+   * Plain-language names journeys accept for their options in the
+   * conversational interview (CQ-PRE-REC-001 §19): step key → option key →
+   * phrases. Recognition only; the definition still validates the answer.
+   */
+  readonly utteranceAliases?: OnboardingUtteranceAliases | undefined;
   /** Safe structured logging only; never response content. */
   readonly logger?: Logger | undefined;
 };
@@ -119,6 +130,10 @@ export function createOnboardingService(
     questions:
       options.repositories?.questions ??
       createPostgresOnboardingInterviewQuestionRepository(),
+    utterances:
+      options.repositories?.utterances ??
+      createPostgresOnboardingUtteranceRepository(),
+    utteranceAliases: options.utteranceAliases,
     idempotency:
       options.repositories?.idempotency ??
       createPostgresOnboardingIdempotencyRepository(),
@@ -145,6 +160,7 @@ export function createOnboardingService(
       resolveSuggestion: useCases.resolveSuggestion,
       answerInterviewQuestion: useCases.answerInterviewQuestion,
       dismissInterviewQuestion: useCases.dismissInterviewQuestion,
+      say: useCases.say,
     },
     internal: {
       bindSessionContext: useCases.bindSessionContext,

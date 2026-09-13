@@ -1,11 +1,29 @@
+import type { OnboardingResponseValue } from "@capital-q/contracts";
+import { parseFigure } from "@capital-q/onboarding";
 import type { FounderFactKey } from "@capital-q/q-core";
 
+import {
+  COUNTRY_OPTIONS,
+  CURRENCY_OPTIONS,
+  FULL_TIME_OPTIONS,
+  FUNCTION_OPTIONS,
+  FOUNDER_ROLE_OPTIONS,
+  GROWTH_OPTIONS,
+  INSTRUMENT_OPTIONS,
+  RAISING_OPTIONS,
+  REVENUE_STATUS_OPTIONS,
+  SIGNAL_OPTIONS,
+  STAGE_OPTIONS,
+  TIMEFRAME_OPTIONS,
+  USE_OF_FUNDS_OPTIONS,
+} from "../definition/founder-v1.js";
+import { FOUNDER_UTTERANCE_ALIASES } from "../definition/utterance-aliases.js";
 import type { FounderCandidate, FounderSuggestionDraft } from "./contracts.js";
 import { stepForFactKey } from "./mapping.js";
 
 /**
  * Turning what Q read into something a founder can accept or reject
- * (CQ-Q-021 §19, §20, §21, §51).
+ * (CQ-Q-021 §19, §20, §21, §51; CQ-PRE-REC-001 §23).
  *
  * A candidate becomes a suggestion, never a response and never a company
  * record. The onboarding runtime already validates a suggestion against the
@@ -18,6 +36,13 @@ import { stepForFactKey } from "./mapping.js";
  * lost: provenance. Every draft carries the document and version its value
  * came from, so months later Capital Q can still answer "where did that
  * come from" with something better than "a model said so".
+ *
+ * Since CQ-PRE-REC-001 §23 (the document-first shortcut) a candidate for a
+ * structured step is mapped onto that step's own vocabulary here,
+ * deterministically: "Seed" becomes the `seed` option, "Lagos, Nigeria"
+ * the `ng` option, "$3m" a range value of 3000000. A value the vocabulary
+ * does not contain is not guessed; it reaches the founder through the
+ * review list instead, as information without a one-tap accept.
  */
 
 /** How a source is named in a suggestion's refs. Bounded, opaque, no URL. */
@@ -26,28 +51,159 @@ export const FOUNDER_SOURCE_REF_TYPES = {
   documentVersion: "EVIDENCE_DOCUMENT_VERSION",
 } as const;
 
-/**
- * Keys whose journey step takes a plain string answer.
- *
- * Everything else — a select, a range, a multi-select — needs a value in
- * that step's own shape, and guessing one would produce a suggestion the
- * runtime rejects at validation. Rather than emit a value that cannot be
- * stored, those candidates are surfaced in the review context as
- * information without a one-tap accept. Widening this set means teaching
- * the mapper that step's vocabulary, deliberately.
- */
+/** Keys whose journey step takes a plain string answer. */
 const FREE_TEXT_KEYS: ReadonlySet<FounderFactKey> = new Set<FounderFactKey>([
   "company_name",
   "website",
   "description",
-  // `use_of_funds` is deliberately absent: its step is a multi_select over
-  // a fixed vocabulary, so a { type: "TEXT" } value for it is refused by
-  // the runtime every time. Its candidates reach the founder through the
-  // review list instead, which is what this set's own comment asks for.
 ]);
 
+type Option = { readonly optionKey: string; readonly label: string };
+
+/** Keys whose step is a single choice from a closed vocabulary. */
+const SINGLE_SELECT_KEYS: ReadonlyMap<FounderFactKey, readonly Option[]> =
+  new Map<FounderFactKey, readonly Option[]>([
+    ["stage", STAGE_OPTIONS],
+    ["country", COUNTRY_OPTIONS],
+    ["founder_role", FOUNDER_ROLE_OPTIONS],
+    ["full_time", FULL_TIME_OPTIONS],
+    ["signal", SIGNAL_OPTIONS],
+    ["revenue_status", REVENUE_STATUS_OPTIONS],
+    ["growth", GROWTH_OPTIONS],
+    ["raising", RAISING_OPTIONS],
+    ["currency", CURRENCY_OPTIONS],
+    ["instrument", INSTRUMENT_OPTIONS],
+    ["timeframe", TIMEFRAME_OPTIONS],
+  ]);
+
+/** Keys whose step is several choices from a closed vocabulary. */
+const MULTI_SELECT_KEYS: ReadonlyMap<
+  FounderFactKey,
+  { readonly options: readonly Option[]; readonly max: number }
+> = new Map<
+  FounderFactKey,
+  { readonly options: readonly Option[]; readonly max: number }
+>([
+  ["functions", { options: FUNCTION_OPTIONS, max: 6 }],
+  ["use_of_funds", { options: USE_OF_FUNDS_OPTIONS, max: 5 }],
+]);
+
+/** Keys whose step is a figure inside a range; the definition's own bounds. */
+const RANGE_KEYS: ReadonlyMap<
+  FounderFactKey,
+  { readonly min: number; readonly max: number }
+> = new Map<FounderFactKey, { readonly min: number; readonly max: number }>([
+  ["founder_count", { min: 1, max: 50 }],
+  ["team_size", { min: 1, max: 100_000 }],
+  ["pilots", { min: 0, max: 10_000 }],
+  ["customers", { min: 0, max: 10_000_000 }],
+  ["target_amount", { min: 1, max: 1_000_000_000_000 }],
+]);
+
+/** Options that mean "the founder cannot say" are never proposed from a reading. */
+const NEVER_PROPOSED = new Set(["unsure", "other", "none", "not_now"]);
+
+function normalise(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/[.,!?;:]+(?=\s|$)/g, "")
+    .replace(/[’']/g, "'")
+    .replace(/[^a-z0-9'+&/ .$£€-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function mentions(text: string, phrase: string): boolean {
+  const needle = normalise(phrase);
+  return needle.length > 0 && ` ${normalise(text)} `.includes(` ${needle} `);
+}
+
+function matchingOptions(
+  key: FounderFactKey,
+  text: string,
+  options: readonly Option[],
+): readonly Option[] {
+  const stepKey = stepForFactKey(key);
+  const aliases =
+    stepKey === null ? undefined : FOUNDER_UTTERANCE_ALIASES[stepKey];
+  const exact = normalise(text);
+  return options.filter((option) => {
+    if (NEVER_PROPOSED.has(option.optionKey)) {
+      return false;
+    }
+    const names = [
+      option.label,
+      ...(option.optionKey.length >= 4
+        ? [option.optionKey.replace(/_/g, " ")]
+        : []),
+      ...(aliases?.[option.optionKey] ?? []),
+    ];
+    return (
+      names.some((name) => normalise(name) === exact) ||
+      names.some((name) => mentions(text, name))
+    );
+  });
+}
+
+/**
+ * The step's own response value for a candidate, or null when the reading
+ * does not land unambiguously in the step's vocabulary.
+ */
+export function structuredValueFor(
+  key: FounderFactKey,
+  value: string,
+): OnboardingResponseValue | null {
+  if (FREE_TEXT_KEYS.has(key)) {
+    const text = value.trim();
+    return text.length === 0 ? null : { type: "TEXT", text };
+  }
+  const single = SINGLE_SELECT_KEYS.get(key);
+  if (single !== undefined) {
+    const matched = matchingOptions(key, value, single);
+    return matched.length === 1 && matched[0] !== undefined
+      ? { type: "SINGLE_SELECT", optionKey: matched[0].optionKey }
+      : null;
+  }
+  const multi = MULTI_SELECT_KEYS.get(key);
+  if (multi !== undefined) {
+    const matched = matchingOptions(key, value, multi.options).slice(
+      0,
+      multi.max,
+    );
+    return matched.length === 0
+      ? null
+      : {
+          type: "MULTI_SELECT",
+          optionKeys: matched.map((option) => option.optionKey),
+        };
+  }
+  const range = RANGE_KEYS.get(key);
+  if (range !== undefined) {
+    const figure = parseFigure(value);
+    if (figure === null) {
+      return null;
+    }
+    const amount = Number.parseFloat(figure);
+    if (!Number.isFinite(amount) || amount < range.min || amount > range.max) {
+      return null;
+    }
+    // Counts are whole; a money figure keeps its cents.
+    return {
+      type: "RANGE",
+      value: key === "target_amount" ? figure : String(Math.round(amount)),
+    };
+  }
+  return null;
+}
+
 export function isDirectlySuggestable(key: FounderFactKey): boolean {
-  return FREE_TEXT_KEYS.has(key) && stepForFactKey(key) !== null;
+  return (
+    stepForFactKey(key) !== null &&
+    (FREE_TEXT_KEYS.has(key) ||
+      SINGLE_SELECT_KEYS.has(key) ||
+      MULTI_SELECT_KEYS.has(key) ||
+      RANGE_KEYS.has(key))
+  );
 }
 
 /**
@@ -87,6 +243,15 @@ export function draftSuggestions(
     if (stepKey === null) {
       continue;
     }
+    // The step's own response shape, discriminator included: the onboarding
+    // contract's response value is a union tagged by `type`, and without
+    // the right one the runtime refuses the suggestion, which is exactly
+    // what it should do. A reading the vocabulary cannot hold is left for
+    // the review list rather than forced into an option.
+    const suggestedValue = structuredValueFor(candidate.key, candidate.value);
+    if (suggestedValue === null) {
+      continue;
+    }
     claimed.add(candidate.key);
 
     const sourceRefs = candidate.origins.flatMap((origin) => [
@@ -103,11 +268,7 @@ export function draftSuggestions(
     drafts.push({
       stepKey,
       targetField: candidate.key,
-      // The step's own response shape, discriminator included. Every one of
-      // these keys is a free-text step, and the onboarding contract's
-      // response value is a union tagged by `type`: without it the runtime
-      // refuses the suggestion, which is exactly what it should do.
-      suggestedValue: { type: "TEXT", text: candidate.value },
+      suggestedValue,
       sourceRefs: sourceRefs.slice(0, 20),
       confidence: confidenceFor(candidate),
     });

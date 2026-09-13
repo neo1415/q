@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import type { OnboardingSessionView } from "@capital-q/contracts";
+
 import type { ChoiceOption } from "@capital-q/ui/choice-list";
 import type { SnapshotSection } from "@capital-q/ui/intelligence-snapshot";
 import type { CurrencyOption } from "@capital-q/ui/money-input";
@@ -311,4 +313,6 @@ export type FounderOnboardingSessionView = {
   readonly questions: readonly QuestionView[];
   /** Which adapter produced this view. Synthetic views say so on screen. */
   readonly source: { readonly adapter: string; readonly synthetic: boolean };
+  /** The runtime's own view, for the Q-led interview (CQ-PRE-REC-001). */
+  readonly raw?: OnboardingSessionView | undefined;
 };

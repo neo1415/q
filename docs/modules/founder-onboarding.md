@@ -154,6 +154,28 @@ ids could invent one), conflicts recorded as two readings plus a settling
 question, ambiguity as its own finding, and bounded proposed questions
 restricted to keys the server already said are unanswered.
 
+## Conversational interview (CQ-PRE-REC-001)
+
+The Q-led workspace asks Founder Definition v2 one step at a time through
+the onboarding runtime's `say` path (see `docs/modules/onboarding.md`).
+Two founder-specific pieces live here:
+
+- `FOUNDER_UTTERANCE_ALIASES` — the plain words a founder uses for the
+  definition's options ("Lagos" → Nigeria, "SAFE", "we lead"). Recognition
+  only; the definition still validates the answer.
+- `structuredValueFor` in `intelligence/suggestions.ts` — the document-first
+  shortcut (§23). A candidate the extraction reads from a deck or from prose
+  is mapped deterministically onto the step's own vocabulary (stage,
+  country, currency, instrument, timeframe, use of funds, counts, the raise
+  amount) so it can be offered as a one-tap suggestion; a reading the
+  vocabulary cannot hold stays in the review list. Suggestions for steps the
+  branching has not yet reached surface when the step becomes eligible, and
+  an accepted one means the step is never asked.
+- The founder reading now runs on three triggers: a processed document, a
+  committed narrative response (description, follow-up) and a recorded
+  utterance from the interview. All three feed the same extraction, the
+  same suggestions and the same persisted questions.
+
 ## Security
 
 - All model access through the Model Gateway. No provider SDK, no HTTP

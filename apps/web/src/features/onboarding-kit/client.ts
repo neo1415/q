@@ -5,7 +5,10 @@
  * onboarding runtime contract and fed by the real API or a dev fixture.
  * Every mutation returns the whole session view.
  */
-import type { OnboardingResponseValue } from "@capital-q/contracts";
+import type {
+  OnboardingResponseValue,
+  OnboardingUnderstanding,
+} from "@capital-q/contracts";
 
 export type OnboardingClient<TView, TResponse> = {
   /** The current session, started if none exists yet. */
@@ -47,6 +50,20 @@ export type OnboardingClient<TView, TResponse> = {
     | undefined;
   readonly dismissQuestion?:
     ((input: { readonly questionId: string }) => Promise<TView>) | undefined;
+  /**
+   * One turn of the conversational interview (CQ-PRE-REC-001 §16-§21). The
+   * runtime places what was said where it can, or records it for Q's
+   * reading; the reply says which. Absent when the composed client has no
+   * path, so a screen never pretends Q heard something it did not.
+   */
+  /** Re-read the session from the runtime, dropping any cached view. */
+  readonly reload?: (() => Promise<TView>) | undefined;
+  readonly say?:
+    | ((input: { readonly text: string }) => Promise<{
+        readonly view: TView;
+        readonly understood: OnboardingUnderstanding;
+      }>)
+    | undefined;
   /** Deterministic taxonomy candidates for the user's own text. Never assigned here. */
   readonly findTaxonomyCandidates: (input: {
     readonly text: string;

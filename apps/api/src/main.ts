@@ -17,8 +17,14 @@ import {
 import { createRequestDatabaseClient } from "@capital-q/database";
 import { createOutboxWriter } from "@capital-q/eventing";
 import { createLogger, createTelemetryRuntime } from "@capital-q/observability";
-import { createFounderOnboardingIntegration } from "@capital-q/founder-onboarding";
-import { createInvestorOnboardingIntegration } from "@capital-q/investor-onboarding";
+import {
+  createFounderOnboardingIntegration,
+  FOUNDER_UTTERANCE_ALIASES,
+} from "@capital-q/founder-onboarding";
+import {
+  createInvestorOnboardingIntegration,
+  INVESTOR_UTTERANCE_ALIASES,
+} from "@capital-q/investor-onboarding";
 import { createCapitalService } from "@capital-q/capital";
 import {
   createCompanyService,
@@ -187,6 +193,13 @@ const onboarding = createOnboardingService({
     ...(founder.stepContextProviders ?? []),
     ...(investorOnboarding.stepContextProviders ?? []),
   ],
+  // Plain-language names for options in the conversational interview
+  // (CQ-PRE-REC-001 §19). Recognition only; each journey definition still
+  // validates the answer it produces.
+  utteranceAliases: {
+    ...FOUNDER_UTTERANCE_ALIASES,
+    ...INVESTOR_UTTERANCE_ALIASES,
+  },
   subjectResolvers: [
     createInvestorOrganisationOnboardingSubjectResolver(
       createPostgresInvestorOrganisationQueryPort({ sql: database.sql }),

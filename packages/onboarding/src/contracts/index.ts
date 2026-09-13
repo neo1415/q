@@ -77,6 +77,11 @@ export type OnboardingInterviewQuestionId = z.infer<
   typeof OnboardingInterviewQuestionIdSchema
 >;
 
+export const OnboardingUtteranceIdSchema = createUuidIdSchema(
+  "OnboardingUtteranceId",
+);
+export type OnboardingUtteranceId = z.infer<typeof OnboardingUtteranceIdSchema>;
+
 export const ONBOARDING_DEFINITION_STATUSES = ["ACTIVE", "RETIRED"] as const;
 export const OnboardingDefinitionStatusSchema = z.enum(
   ONBOARDING_DEFINITION_STATUSES,
@@ -271,4 +276,28 @@ export type OnboardingInterviewQuestion = {
   readonly status: OnboardingQuestionStatus;
   readonly createdAt: UtcTimestamp;
   readonly resolvedAt: UtcTimestamp | null;
+};
+
+export const ONBOARDING_UTTERANCE_STATUSES = [
+  "PENDING",
+  "READ",
+  "IGNORED",
+] as const;
+export type OnboardingUtteranceStatus =
+  (typeof ONBOARDING_UTTERANCE_STATUSES)[number];
+
+/**
+ * Something a person said in the conversational interview that no
+ * deterministic rule could place (CQ-PRE-REC-001 §20). Journey state that
+ * awaits Q's reading; its proposals arrive as suggestions and questions,
+ * and the utterance itself is never a value.
+ */
+export type OnboardingUtterance = {
+  readonly id: OnboardingUtteranceId;
+  readonly sessionId: OnboardingSessionId;
+  readonly stepKey: string | null;
+  readonly text: string;
+  readonly status: OnboardingUtteranceStatus;
+  readonly createdAt: UtcTimestamp;
+  readonly readAt: UtcTimestamp | null;
 };

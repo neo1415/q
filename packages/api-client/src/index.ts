@@ -80,6 +80,7 @@ export {
 
 export {
   answerOnboardingQuestion,
+  sayToOnboarding,
   completeOnboardingSession,
   dismissOnboardingQuestion,
   getCurrentOnboardingSession,

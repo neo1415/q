@@ -7,17 +7,22 @@ import type {
   OnboardingResponseRepository,
   OnboardingSessionRepository,
   OnboardingSuggestionRepository,
+  OnboardingUtteranceRepository,
 } from "@capital-q/onboarding";
 import type { ChunkRepository } from "@capital-q/q-knowledge";
-import type { TenantId } from "@capital-q/security";
+import type { TenantId, UserId } from "@capital-q/security";
 
 import { FOUNDER_JOURNEY_TYPE, FOUNDER_STEPS } from "../definition/index.js";
 import type { FounderExtractionOutcome } from "../intelligence/contracts.js";
-import type { FounderExtractionRequest } from "../intelligence/extraction.js";
+import type {
+  FounderExtractionRequest,
+  FounderExtractionSource,
+} from "../intelligence/extraction.js";
 import {
   createFounderReview,
   passagesFrom,
   sessionFactsFrom,
+  type FounderReviewPlan,
 } from "../intelligence/review.js";
 
 /**
@@ -35,6 +40,14 @@ import {
  *     → the document's chunks as labelled passages
  *     → ONE model call, through the gateway, behind the firewall's ceiling
  *     → onboarding suggestions the founder confirms, edits or rejects
+ *
+ * and, since CQ-PRE-REC-001 §20, when the founder says something to Q in
+ * the conversational interview that no deterministic rule could place:
+ *
+ *   onboarding.utterance.recorded
+ *     → the session and the utterance
+ *     → the same session state, the utterance as the narrative
+ *     → the same one model call, the same suggestions and questions
  *
  * Three properties it is built to hold.
  *
@@ -63,6 +76,8 @@ export const FOUNDER_REVIEW_SKIP_REASONS = [
   "NO_ACTIVE_SESSION",
   /** Processing finished but produced no readable passages. */
   "NO_PASSAGES",
+  /** The utterance belongs to no active founder session, or was read already. */
+  "NO_UTTERANCE",
 ] as const;
 
 export type FounderReviewSkipReason =
@@ -88,6 +103,8 @@ export type FounderReviewServiceDependencies = {
   readonly sessions: OnboardingSessionRepository;
   readonly responses: OnboardingResponseRepository;
   readonly suggestions: OnboardingSuggestionRepository;
+  /** The conversational interview's free-text turns. Optional: without it, none are read. */
+  readonly utterances?: OnboardingUtteranceRepository | undefined;
   /** The onboarding runtime's internal, never-browser-reachable creation. */
   readonly createSuggestion: (command: {
     readonly sessionId: string;
@@ -135,13 +152,32 @@ export type FounderReviewServiceDependencies = {
 /** How many of a document's chunks the model reads. Bounded (CQ-Q-021 §79). */
 const PASSAGES_PER_DOCUMENT = 12;
 
+/** The narrative steps whose commit is worth Q's reading (CQ-PRE-REC-001 §20). */
+export const FOUNDER_NARRATIVE_STEP_KEYS: readonly string[] = [
+  FOUNDER_STEPS.description,
+  FOUNDER_STEPS.followUp,
+];
+
 export type FounderDocumentReview = {
+  /** A founder wrote prose on a narrative step: read it like a turn of the interview. */
+  readonly onResponseCommitted: (event: {
+    readonly sessionId: string;
+    readonly stepKey: string;
+    readonly responseId: string;
+  }) => Promise<FounderReviewResult>;
   readonly onDocumentReady: (event: {
     readonly tenantId: TenantId;
     readonly documentId: string;
     readonly documentVersionId: string;
   }) => Promise<FounderReviewResult>;
+  /** A free-text turn of the conversational interview (CQ-PRE-REC-001 §20). */
+  readonly onUtterance: (event: {
+    readonly sessionId: string;
+    readonly utteranceId: string;
+  }) => Promise<FounderReviewResult>;
 };
+
+type SourceRef = { readonly sourceType: string; readonly sourceId: string };
 
 export function createFounderDocumentReview(
   dependencies: FounderReviewServiceDependencies,
@@ -153,11 +189,134 @@ export function createFounderDocumentReview(
     sessions,
     responses,
     suggestions,
+    utterances,
     createSuggestion,
     extraction,
     recordQuestions,
     logger,
   } = dependencies;
+
+  /** One reading of the session against some material, then its offers. */
+  async function read(input: {
+    readonly tenantId: TenantId;
+    readonly userId: UserId;
+    readonly sessionId: string;
+    readonly sources: readonly FounderExtractionSource[];
+    /** The founder's own words for this reading; the description otherwise. */
+    readonly narrative: string | null;
+    readonly sourceRef: SourceRef;
+    readonly context: Readonly<Record<string, string | number>>;
+  }): Promise<FounderReviewResult> {
+    const [current, pending] = await Promise.all([
+      responses.listCurrent(sql, input.sessionId as never),
+      suggestions.listPending(sql, input.sessionId as never),
+    ]);
+
+    const facts = sessionFactsFrom({
+      responses: current.map((response) => ({
+        stepKey: response.stepKey,
+        value: response.value,
+      })),
+      pendingSuggestionSteps: pending.map((suggestion) => suggestion.stepKey),
+      narrative: input.narrative ?? narrativeOf(current),
+    });
+
+    const plan = await createFounderReview({
+      extraction,
+      ...(logger === undefined ? {} : { logger }),
+    }).prepare({
+      tenantId: input.tenantId,
+      userId: input.userId,
+      sql,
+      facts,
+      sources: input.sources,
+      // One unit of work per reading, so the model call can be traced back
+      // to the document or the turn that caused it.
+      correlationId: `cor_${randomUUID()}`,
+    });
+
+    return applyPlan(input.sessionId, plan, input.sourceRef, input.context);
+  }
+
+  /** The plan's offers, persisted through the runtime's own validation. */
+  async function applyPlan(
+    sessionId: string,
+    plan: FounderReviewPlan,
+    sourceRef: SourceRef,
+    context: Readonly<Record<string, string | number>>,
+  ): Promise<FounderReviewResult> {
+    let created = 0;
+    for (const draft of plan.suggestions) {
+      // One at a time and independently: a single rejected draft — a value
+      // the pinned step's schema refuses — must not discard the others.
+      try {
+        await createSuggestion({
+          sessionId,
+          stepKey: draft.stepKey,
+          targetField: draft.targetField,
+          suggestedValue: draft.suggestedValue,
+          sourceRefs:
+            draft.sourceRefs.length === 0 ? [sourceRef] : draft.sourceRefs,
+          confidence: draft.confidence,
+        });
+        created += 1;
+      } catch (error: unknown) {
+        logger?.warn(
+          { err: error, sessionId, stepKey: draft.stepKey },
+          "founder review suggestion refused by the onboarding runtime",
+        );
+      }
+    }
+
+    // The planner's questions are journey state, not a model's opinion:
+    // every one maps to a real step of the pinned definition, and the
+    // runtime validates that again before storing. A question a later
+    // reading re-plans supersedes the earlier one for the same fact.
+    let questionsRecorded = 0;
+    if (recordQuestions !== undefined && plan.questions.length > 0) {
+      try {
+        await recordQuestions({
+          sessionId,
+          questions: plan.questions.map((question) => ({
+            stepKey: question.stepKey,
+            factKey: question.key,
+            question: question.question,
+            why: question.why,
+            reason: question.reason,
+            readings: question.readings,
+            sourceRefs: [sourceRef],
+          })),
+        });
+        questionsRecorded = plan.questions.length;
+      } catch (error: unknown) {
+        logger?.warn(
+          { err: error, sessionId },
+          "founder follow-up questions refused by the onboarding runtime",
+        );
+      }
+    }
+
+    logger?.info(
+      {
+        sessionId,
+        ...context,
+        drafted: plan.suggestions.length,
+        created,
+        questions: plan.questions.length,
+        questionsRecorded,
+        blocked: plan.outcome.blocked,
+      },
+      "founder review prepared",
+    );
+
+    return {
+      kind: "PREPARED",
+      sessionId,
+      suggestionsCreated: created,
+      questionsPlanned: plan.questions.length,
+      blocked: plan.outcome.blocked,
+    };
+  }
 
   return {
     onDocumentReady: async (event): Promise<FounderReviewResult> => {
@@ -192,20 +351,6 @@ export function createFounderDocumentReview(
         return { kind: "SKIPPED", reason: "NO_PASSAGES" };
       }
 
-      const [current, pending] = await Promise.all([
-        responses.listCurrent(sql, session.id),
-        suggestions.listPending(sql, session.id),
-      ]);
-
-      const facts = sessionFactsFrom({
-        responses: current.map((response) => ({
-          stepKey: response.stepKey,
-          value: response.value,
-        })),
-        pendingSuggestionSteps: pending.map((suggestion) => suggestion.stepKey),
-        narrative: narrativeOf(current),
-      });
-
       const sources = passagesFrom(
         [
           {
@@ -222,93 +367,100 @@ export function createFounderDocumentReview(
         PASSAGES_PER_DOCUMENT,
       );
 
-      const plan = await createFounderReview({
-        extraction,
-        ...(logger === undefined ? {} : { logger }),
-      }).prepare({
+      return read({
         tenantId: event.tenantId,
         userId: document.createdByUserId,
-        sql,
-        facts,
-        sources,
-        // One unit of work per ready document, so the model call can be
-        // traced back to the document that caused it.
-        correlationId: `cor_${randomUUID()}`,
-      });
-
-      let created = 0;
-      for (const draft of plan.suggestions) {
-        // One at a time and independently: a single rejected draft — a value
-        // the pinned step's schema refuses — must not discard the others.
-        try {
-          await createSuggestion({
-            sessionId: session.id,
-            stepKey: draft.stepKey,
-            targetField: draft.targetField,
-            suggestedValue: draft.suggestedValue,
-            sourceRefs: draft.sourceRefs,
-            confidence: draft.confidence,
-          });
-          created += 1;
-        } catch (error: unknown) {
-          logger?.warn(
-            { err: error, sessionId: session.id, stepKey: draft.stepKey },
-            "founder review suggestion refused by the onboarding runtime",
-          );
-        }
-      }
-
-      // The planner's questions are journey state, not a model's opinion:
-      // every one maps to a real step of the pinned definition, and the
-      // runtime validates that again before storing. A question a later
-      // reading re-plans supersedes the earlier one for the same fact.
-      let questionsRecorded = 0;
-      if (recordQuestions !== undefined && plan.questions.length > 0) {
-        try {
-          await recordQuestions({
-            sessionId: session.id,
-            questions: plan.questions.map((question) => ({
-              stepKey: question.stepKey,
-              factKey: question.key,
-              question: question.question,
-              why: question.why,
-              reason: question.reason,
-              readings: question.readings,
-              sourceRefs: [
-                { sourceType: "EVIDENCE_DOCUMENT", sourceId: event.documentId },
-              ],
-            })),
-          });
-          questionsRecorded = plan.questions.length;
-        } catch (error: unknown) {
-          logger?.warn(
-            { err: error, sessionId: session.id },
-            "founder follow-up questions refused by the onboarding runtime",
-          );
-        }
-      }
-
-      logger?.info(
-        {
-          sessionId: session.id,
-          documentId: event.documentId,
-          passages: sources.length,
-          drafted: plan.suggestions.length,
-          created,
-          questions: plan.questions.length,
-          questionsRecorded,
-          blocked: plan.outcome.blocked,
-        },
-        "founder document review prepared",
-      );
-
-      return {
-        kind: "PREPARED",
         sessionId: session.id,
-        suggestionsCreated: created,
-        questionsPlanned: plan.questions.length,
-        blocked: plan.outcome.blocked,
-      };
+        sources,
+        narrative: null,
+        sourceRef: {
+          sourceType: "EVIDENCE_DOCUMENT",
+          sourceId: event.documentId,
+        },
+        context: { documentId: event.documentId, passages: sources.length },
+      });
+    },
+
+    onResponseCommitted: async (event): Promise<FounderReviewResult> => {
+      if (!FOUNDER_NARRATIVE_STEP_KEYS.includes(event.stepKey)) {
+        return { kind: "SKIPPED", reason: "NO_ACTIVE_SESSION" };
+      }
+      const session = await sessions.findById(sql, event.sessionId as never);
+      if (
+        session === null ||
+        session.journeyType !== FOUNDER_JOURNEY_TYPE ||
+        session.status !== "ACTIVE" ||
+        session.tenantId === null
+      ) {
+        return { kind: "SKIPPED", reason: "NO_ACTIVE_SESSION" };
+      }
+      const current = await responses.listCurrent(sql, session.id);
+      const response = current.find(
+        (candidate) =>
+          candidate.stepKey === event.stepKey &&
+          candidate.id === event.responseId,
+      );
+      const text =
+        response !== undefined && response.value.type === "TEXT"
+          ? response.value.text.trim()
+          : "";
+      if (text.length === 0) {
+        return { kind: "SKIPPED", reason: "NO_PASSAGES" };
+      }
+      return read({
+        tenantId: session.tenantId,
+        userId: session.userId,
+        sessionId: session.id,
+        sources: [],
+        narrative: text,
+        sourceRef: {
+          sourceType: "ONBOARDING_RESPONSE",
+          sourceId: event.responseId,
+        },
+        context: { responseId: event.responseId, passages: 0 },
+      });
+    },
+
+    onUtterance: async (event): Promise<FounderReviewResult> => {
+      if (utterances === undefined) {
+        return { kind: "SKIPPED", reason: "NO_UTTERANCE" };
+      }
+      const session = await sessions.findById(sql, event.sessionId as never);
+      if (
+        session === null ||
+        session.journeyType !== FOUNDER_JOURNEY_TYPE ||
+        session.status !== "ACTIVE" ||
+        session.tenantId === null
+      ) {
+        return { kind: "SKIPPED", reason: "NO_ACTIVE_SESSION" };
+      }
+      const utterance = await utterances.findById(
+        sql,
+        session.id,
+        event.utteranceId as never,
+      );
+      if (utterance === null || utterance.status !== "PENDING") {
+        return { kind: "SKIPPED", reason: "NO_UTTERANCE" };
+      }
+
+      const result = await read({
+        tenantId: session.tenantId,
+        userId: session.userId,
+        sessionId: session.id,
+        sources: [],
+        narrative: utterance.text,
+        sourceRef: {
+          sourceType: "ONBOARDING_UTTERANCE",
+          sourceId: utterance.id,
+        },
+        context: { utteranceId: utterance.id, passages: 0 },
+      });
+      // Read once. A reading the model could not complete stays PENDING so
+      // the retried event finds it again; a completed one is done.
+      if (result.kind === "PREPARED" && result.blocked === null) {
+        await utterances.markRead(sql, utterance.id, "READ");
+      }
+      return result;
     },
   };
 }
@@ -330,5 +482,5 @@ function narrativeOf(
     return null;
   }
   const text = (description.value as Record<string, unknown>)["text"];
-  return typeof text === "string" && text.length > 0 ? text : null;
+  return typeof text === "string" && text.trim().length > 0 ? text : null;
 }

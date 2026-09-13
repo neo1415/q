@@ -4,6 +4,7 @@ import {
   onboardingAnswerQuestionAction,
   onboardingCandidatesAction,
   onboardingDismissQuestionAction,
+  onboardingSayAction,
   onboardingCompleteAction,
   onboardingCurrentAction,
   onboardingDescribeNodesAction,
@@ -70,6 +71,7 @@ export function createApiRuntimePort(input: {
       through(onboardingAnswerQuestionAction(request)),
     dismissQuestion: (request) =>
       through(onboardingDismissQuestionAction(request)),
+    say: (request) => through(onboardingSayAction(request)),
 
     /**
      * The real Evidence upload, in the three steps the API actually has

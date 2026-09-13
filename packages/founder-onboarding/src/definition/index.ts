@@ -55,3 +55,5 @@ export {
   type FounderReviewContext,
   type FounderSnapshotContext,
 } from "./contexts.js";
+
+export { FOUNDER_UTTERANCE_ALIASES } from "./utterance-aliases.js";

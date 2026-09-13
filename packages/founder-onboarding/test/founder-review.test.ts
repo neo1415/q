@@ -214,8 +214,9 @@ describe("QFOR-003 · candidates become suggestions, not answers", () => {
   });
 
   it("surfaces a candidate it cannot suggest for review rather than dropping it", async () => {
+    // A reading the step's vocabulary cannot hold (no "mezzanine" stage).
     const { plan } = await prepare(
-      outcome({ candidates: [candidate("stage", "Seed")] }),
+      outcome({ candidates: [candidate("stage", "Mezzanine")] }),
       NOTHING_ANSWERED,
     );
     expect(plan.suggestions).toHaveLength(0);

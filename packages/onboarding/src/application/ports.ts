@@ -32,6 +32,9 @@ import type {
   OnboardingSubject,
   OnboardingSuggestion,
   OnboardingSuggestionId,
+  OnboardingUtterance,
+  OnboardingUtteranceId,
+  OnboardingUtteranceStatus,
   PublishedOnboardingDefinition,
   ValidatedOnboardingResponse,
 } from "../contracts/index.js";
@@ -297,6 +300,34 @@ export type OnboardingInterviewQuestionRepository = {
     tx: TransactionContext,
     questionId: OnboardingInterviewQuestionId,
     status: Exclude<OnboardingQuestionStatus, "PENDING">,
+  ) => Promise<boolean>;
+};
+
+export type NewOnboardingUtterance = Pick<
+  OnboardingUtterance,
+  "sessionId" | "stepKey" | "text"
+>;
+
+/** Free-text turns awaiting Q's reading (CQ-PRE-REC-001 §20). */
+export type OnboardingUtteranceRepository = {
+  readonly insert: (
+    tx: TransactionContext,
+    input: NewOnboardingUtterance,
+  ) => Promise<OnboardingUtterance>;
+  readonly findById: (
+    executor: DatabaseExecutor,
+    sessionId: OnboardingSessionId,
+    utteranceId: OnboardingUtteranceId,
+  ) => Promise<OnboardingUtterance | null>;
+  readonly listPending: (
+    executor: DatabaseExecutor,
+    sessionId: OnboardingSessionId,
+  ) => Promise<readonly OnboardingUtterance[]>;
+  /** PENDING -> READ or IGNORED; false if it was already read. */
+  readonly markRead: (
+    executor: DatabaseExecutor,
+    utteranceId: OnboardingUtteranceId,
+    status: Exclude<OnboardingUtteranceStatus, "PENDING">,
   ) => Promise<boolean>;
 };
 

@@ -369,6 +369,88 @@ export type DismissOnboardingQuestionRequest = z.infer<
   typeof DismissOnboardingQuestionRequestSchema
 >;
 
+/**
+ * The conversational interview (CQ-PRE-REC-001 §16-§21). A person says
+ * something to Q about the current step; the runtime places it
+ * deterministically where it can (an option, a figure, a plain answer, a
+ * skip, a question back) and otherwise records it for Q's reading, whose
+ * proposals then arrive as ordinary suggestions and questions.
+ */
+export const ONBOARDING_SAY_SEGMENT = "/say";
+
+export const SayOnboardingRequestSchema = z
+  .object({
+    text: z.string().trim().min(1).max(2000),
+    expectedSessionVersion: SessionVersionSchema,
+  })
+  .strict();
+export type SayOnboardingRequest = z.infer<typeof SayOnboardingRequestSchema>;
+
+const Why = z.string().max(500).nullable();
+
+/** What the runtime made of what was said. Never a model's opinion of truth. */
+export const OnboardingUnderstandingSchema = z.discriminatedUnion("kind", [
+  /** Placed on the step as a normal validated response. */
+  z
+    .object({
+      kind: z.literal("ANSWERED"),
+      stepKey: OnboardingStepKeySchema,
+      summary: z.string().max(300),
+    })
+    .strict(),
+  /** The optional step was skipped; unknown stays unknown. */
+  z
+    .object({ kind: z.literal("SKIPPED"), stepKey: OnboardingStepKeySchema })
+    .strict(),
+  /** They asked to move on, but the step is needed to complete the journey. */
+  z
+    .object({
+      kind: z.literal("REQUIRED"),
+      stepKey: OnboardingStepKeySchema,
+      why: Why,
+    })
+    .strict(),
+  /** They asked why Q needs this. */
+  z
+    .object({
+      kind: z.literal("WHY"),
+      stepKey: OnboardingStepKeySchema,
+      why: Why,
+    })
+    .strict(),
+  /** They would rather upload something. */
+  z
+    .object({ kind: z.literal("UPLOAD"), stepKey: OnboardingStepKeySchema })
+    .strict(),
+  /** More than one option fits; the person picks. */
+  z
+    .object({
+      kind: z.literal("AMBIGUOUS"),
+      stepKey: OnboardingStepKeySchema,
+      optionKeys: z.array(OnboardingOptionKeySchema).min(2).max(20),
+    })
+    .strict(),
+  /** A confirmation step was declined; something needs changing. */
+  z
+    .object({ kind: z.literal("DECLINED"), stepKey: OnboardingStepKeySchema })
+    .strict(),
+  /** Recorded for Q's reading; proposals follow as suggestions and questions. */
+  z
+    .object({
+      kind: z.literal("READING"),
+      stepKey: OnboardingStepKeySchema,
+      utteranceId: UuidSchema,
+    })
+    .strict(),
+  /** Nothing could be made of it; the person picks or says more. */
+  z
+    .object({ kind: z.literal("UNCLEAR"), stepKey: OnboardingStepKeySchema })
+    .strict(),
+]);
+export type OnboardingUnderstanding = z.infer<
+  typeof OnboardingUnderstandingSchema
+>;
+
 export const ResolveOnboardingSuggestionRequestSchema = z
   .object({
     resolution: OnboardingSuggestionResolutionSchema,
@@ -616,3 +698,12 @@ export const OnboardingSessionViewSchema = z.object({
   pathChanges: OnboardingPathChangesSchema.optional(),
 });
 export type OnboardingSessionView = z.infer<typeof OnboardingSessionViewSchema>;
+
+/** The conversational interview's reply: the updated view and what was understood. */
+export const SayOnboardingResponseSchema = z
+  .object({
+    view: OnboardingSessionViewSchema,
+    understood: OnboardingUnderstandingSchema,
+  })
+  .strict();
+export type SayOnboardingResponse = z.infer<typeof SayOnboardingResponseSchema>;

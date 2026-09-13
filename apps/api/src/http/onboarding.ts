@@ -7,6 +7,9 @@ import {
   IDEMPOTENCY_KEY_HEADER,
   IdempotencyKeyHeaderSchema,
   ONBOARDING_ANSWER_SEGMENT,
+  ONBOARDING_SAY_SEGMENT,
+  SayOnboardingRequestSchema,
+  SayOnboardingResponseSchema,
   ONBOARDING_BACK_SEGMENT,
   ONBOARDING_DISMISS_SEGMENT,
   ONBOARDING_QUESTIONS_SEGMENT,
@@ -314,6 +317,32 @@ export function registerOnboardingRoutes(
       });
       void reply.header("Cache-Control", "no-store");
       return OnboardingSessionViewSchema.parse(view);
+    },
+  );
+
+  // The conversational interview (CQ-PRE-REC-001 §16-§21): what a person
+  // says about the current step is placed through the same submit and skip
+  // paths a tap uses, or recorded for Q's reading. The reply says which.
+  app.post(
+    `${byId}${ONBOARDING_SAY_SEGMENT}`,
+    { onRequest: withActor },
+    async (request, reply) => {
+      const key = idempotencyKey(request, "say something to Q");
+      const input = parseContract(
+        SayOnboardingRequestSchema,
+        request.body,
+        "The message is not valid.",
+      );
+      const outcome = await runtime.say({
+        actor: getOnboardingActor(request),
+        sessionId: sessionIdParam(request),
+        text: input.text,
+        expectedSessionVersion: input.expectedSessionVersion,
+        idempotencyKey: key,
+        correlationId: correlation(),
+      });
+      void reply.header("Cache-Control", "no-store");
+      return SayOnboardingResponseSchema.parse(outcome);
     },
   );
 

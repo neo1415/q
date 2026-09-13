@@ -4,7 +4,10 @@
  * the shell, progress and controller only need this much.
  */
 
-import type { OnboardingInterviewQuestionView } from "@capital-q/contracts";
+import type {
+  OnboardingInterviewQuestionView,
+  OnboardingSessionView,
+} from "@capital-q/contracts";
 
 /** A question Q still wants answered, straight from the runtime view (CQ-PRE-REC-001). */
 export type QuestionView = OnboardingInterviewQuestionView;
@@ -58,6 +61,14 @@ export type SessionPresentation<TStep> = {
   readonly questions: readonly QuestionView[];
   /** Which adapter produced this view. Synthetic views say so on screen. */
   readonly source: { readonly adapter: string; readonly synthetic: boolean };
+  /**
+   * The runtime's own session view, when the client has it (CQ-PRE-REC-001).
+   * The conversational interview works from this one step at a time; the
+   * composite screens above never read it.
+   */
+  readonly raw?: OnboardingSessionView | undefined;
+  /** Plain labels for reference ids the view mentions (taxonomy nodes), when fetched. */
+  readonly labels?: Readonly<Record<string, string>> | undefined;
 };
 
 /** What the progress header needs; any journey view satisfies it. */

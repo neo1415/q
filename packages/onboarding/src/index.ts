@@ -110,7 +110,9 @@ export type {
   NewOnboardingSession,
   NewOnboardingSuggestion,
   NewOnboardingInterviewQuestion,
+  NewOnboardingUtterance,
   OnboardingInterviewQuestionRepository,
+  OnboardingUtteranceRepository,
   OnboardingDefinitionRepository,
   OnboardingIdempotencyRepository,
   OnboardingResponseRepository,
@@ -167,6 +169,8 @@ export {
   type SkipOnboardingStepCommand,
   type StartOnboardingSessionCommand,
   type StartOnboardingSessionResult,
+  type SayOnboardingCommand,
+  type SayOnboardingOutcome,
   type SubmitOnboardingResponseCommand,
 } from "./application/use-cases.js";
 export { getOnboardingMetrics } from "./application/metrics.js";
@@ -177,6 +181,13 @@ export {
 } from "./application/service.js";
 export { createPostgresOnboardingDefinitionRepository } from "./infrastructure/postgres-definition-repository.js";
 export { createPostgresOnboardingInterviewQuestionRepository } from "./infrastructure/postgres-question-repository.js";
+export { createPostgresOnboardingUtteranceRepository } from "./infrastructure/postgres-utterance-repository.js";
+export {
+  interpretUtterance,
+  parseFigure,
+  type OnboardingUtteranceAliases,
+  type StepInterpretation,
+} from "./domain/interpretation.js";
 export {
   createPostgresOnboardingIdempotencyRepository,
   createPostgresOnboardingResponseRepository,

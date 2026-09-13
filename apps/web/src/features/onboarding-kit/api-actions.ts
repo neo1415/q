@@ -11,6 +11,7 @@ import {
   getCurrentOnboardingSession,
   getOnboardingSession,
   resolveOnboardingSuggestion,
+  sayToOnboarding,
   getTaxonomyNode,
   goBackInOnboarding,
   listTaxonomyNodes,
@@ -24,6 +25,7 @@ import {
   OnboardingJourneyTypeSchema,
   OnboardingResponseValueSchema,
   OnboardingStepKeySchema,
+  type SayOnboardingResponse,
   TAXONOMY_CLASSIFICATION_TEXT_MAX_LENGTH,
   TaxonomyVocabularyCodeSchema,
   type OnboardingJourneyType,
@@ -261,6 +263,31 @@ export async function onboardingAnswerQuestionAction(
       {
         stepKey: input.stepKey,
         response: { value: input.value },
+        expectedSessionVersion: input.expectedSessionVersion,
+      },
+      input.idempotencyKey,
+    ),
+  );
+}
+
+const SayInput = z.object({
+  sessionId: Uuid,
+  text: z.string().trim().min(1).max(2000),
+  expectedSessionVersion: Version,
+  idempotencyKey: Uuid,
+});
+
+/** The conversational interview (CQ-PRE-REC-001 §16-§21): one turn to Q about the current step. */
+export async function onboardingSayAction(
+  raw: unknown,
+): Promise<ActionResult<SayOnboardingResponse>> {
+  const input = SayInput.parse(raw);
+  return run((session) =>
+    sayToOnboarding(
+      session,
+      input.sessionId,
+      {
+        text: input.text,
         expectedSessionVersion: input.expectedSessionVersion,
       },
       input.idempotencyKey,

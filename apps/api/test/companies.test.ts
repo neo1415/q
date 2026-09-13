@@ -149,7 +149,7 @@ describe("POST /v1/companies", () => {
     });
     expect(response.statusCode).toBe(400);
     expect(response.json<{ code: string; detail: string }>().detail).toMatch(
-      /organisation context/,
+      /organisation/,
     );
     expect(calls.create).toHaveLength(0);
     await app.close();

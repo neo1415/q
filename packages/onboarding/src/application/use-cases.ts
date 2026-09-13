@@ -16,6 +16,7 @@ import {
   type OnboardingJourneyType,
   type OnboardingPathChanges,
   type OnboardingSessionView,
+  type OnboardingUnderstanding,
   type OnboardingSuggestionResolution,
 } from "@capital-q/contracts";
 import type {
@@ -85,7 +86,6 @@ import {
 import { validateOnboardingResponse } from "../runtime/validate-response.js";
 import { getOnboardingMetrics } from "./metrics.js";
 import type {
-  OnboardingWriteContext,
   OnboardingDefinitionRepository,
   OnboardingIdempotencyRepository,
   OnboardingInterviewQuestionRepository,
@@ -95,8 +95,15 @@ import type {
   OnboardingStepStateRepository,
   OnboardingSubjectResolverRegistry,
   OnboardingSuggestionRepository,
+  OnboardingUtteranceRepository,
+  OnboardingWriteContext,
   OnboardingWriteTargetRegistry,
 } from "./ports.js";
+import {
+  interpretUtterance,
+  type OnboardingUtteranceAliases,
+} from "../domain/interpretation.js";
+import { utteranceRecordedEvent } from "../events/index.js";
 import {
   createDefinitionCache,
   loadAggregate,
@@ -127,6 +134,10 @@ export type OnboardingRuntimeDependencies = {
   readonly suggestions: OnboardingSuggestionRepository;
   /** Optional so older compositions keep working; absent disables questions. */
   readonly questions?: OnboardingInterviewQuestionRepository | undefined;
+  /** Optional; absent means a free-text turn Q would read is refused, never dropped. */
+  readonly utterances?: OnboardingUtteranceRepository | undefined;
+  /** Journey-supplied plain-language names for options (CQ-PRE-REC-001 §19). */
+  readonly utteranceAliases?: OnboardingUtteranceAliases | undefined;
   readonly idempotency: OnboardingIdempotencyRepository;
   readonly subjects: OnboardingSubjectResolverRegistry;
   readonly writeTargets: OnboardingWriteTargetRegistry;
@@ -163,6 +174,20 @@ export type StartOnboardingSessionResult = {
   readonly view: OnboardingSessionView;
   /** False when an existing ACTIVE session was resumed or an idempotent replay answered. */
   readonly created: boolean;
+};
+
+export type SayOnboardingCommand = {
+  readonly actor: OnboardingActor;
+  readonly sessionId: OnboardingSessionId;
+  readonly text: string;
+  readonly expectedSessionVersion: number;
+  readonly idempotencyKey: string;
+  readonly correlationId: CorrelationId;
+};
+
+export type SayOnboardingOutcome = {
+  readonly view: OnboardingSessionView;
+  readonly understood: OnboardingUnderstanding;
 };
 
 export type SessionScopedQuery = {
@@ -1649,6 +1674,184 @@ export function createOnboardingUseCases(
     });
   };
 
+  const utterancesRepo = (): OnboardingUtteranceRepository => {
+    if (runtime.utterances === undefined) {
+      throw new OnboardingRuntimeConfigurationError(
+        "UTTERANCES_UNAVAILABLE",
+        "no utterance repository is composed",
+      );
+    }
+    return runtime.utterances;
+  };
+
+  /**
+   * The conversational interview's one entry point (CQ-PRE-REC-001 §16-§21).
+   *
+   * What a person says about the current step is placed deterministically
+   * where the pinned definition already knows how to hold it — an option, a
+   * figure, a plain answer, a skip — through the very same submit and skip
+   * paths a tap uses, so there is one persistence path and one validation.
+   * A sentence nothing here can place is recorded for Q's reading, whose
+   * proposals return as ordinary suggestions and questions for the person
+   * to confirm. Nothing said becomes canonical by being said.
+   */
+  const say = async (
+    raw: SayOnboardingCommand,
+  ): Promise<SayOnboardingOutcome> => {
+    const command = z
+      .object({
+        actor: ActorSchema,
+        sessionId: OnboardingSessionIdSchema,
+        text: z.string().trim().min(1).max(2000),
+        expectedSessionVersion: VersionSchema,
+        idempotencyKey: IdempotencyKeySchema,
+        correlationId: CorrelationIdSchema,
+      })
+      .strict()
+      .parse(raw);
+    const { actor } = command;
+    const current = await getSession({ actor, sessionId: command.sessionId });
+    if (current.session.status !== "ACTIVE" || current.currentStep === null) {
+      throw new OnboardingSessionStateError("SESSION_NOT_ACTIVE");
+    }
+    if (current.session.version !== command.expectedSessionVersion) {
+      throw new OnboardingSessionVersionConflictError();
+    }
+    const step = current.currentStep;
+    const stepKey = step.stepKey;
+    const reading = interpretUtterance(
+      command.text,
+      { stepKey, required: step.required, presentation: step.presentation },
+      runtime.utteranceAliases ?? {},
+    );
+    const why = step.whyQAsks ?? step.supportingText ?? null;
+
+    switch (reading.kind) {
+      case "ANSWER": {
+        const view = await submitResponse({
+          actor,
+          sessionId: command.sessionId,
+          stepKey,
+          // The step's own default modality applies: a definition that only
+          // takes selections records a typed option as one.
+          response: { value: reading.value },
+          expectedSessionVersion: command.expectedSessionVersion,
+          idempotencyKey: command.idempotencyKey,
+          correlationId: command.correlationId,
+        });
+        return {
+          view,
+          understood: { kind: "ANSWERED", stepKey, summary: reading.summary },
+        };
+      }
+      case "SKIP": {
+        if (step.required) {
+          return {
+            view: current,
+            understood: { kind: "REQUIRED", stepKey, why },
+          };
+        }
+        const view = await skipStep({
+          actor,
+          sessionId: command.sessionId,
+          stepKey,
+          expectedSessionVersion: command.expectedSessionVersion,
+          idempotencyKey: command.idempotencyKey,
+          correlationId: command.correlationId,
+        });
+        return { view, understood: { kind: "SKIPPED", stepKey } };
+      }
+      case "WHY":
+        return { view: current, understood: { kind: "WHY", stepKey, why } };
+      case "UPLOAD":
+        return { view: current, understood: { kind: "UPLOAD", stepKey } };
+      case "AMBIGUOUS":
+        return {
+          view: current,
+          understood: {
+            kind: "AMBIGUOUS",
+            stepKey,
+            optionKeys: [...reading.optionKeys],
+          },
+        };
+      case "DECLINE":
+        return { view: current, understood: { kind: "DECLINED", stepKey } };
+      case "UNCLEAR":
+        return { view: current, understood: { kind: "UNCLEAR", stepKey } };
+      case "NARRATIVE": {
+        const utterances = utterancesRepo();
+        return transactions.run(async (tx) => {
+          const locked = await sessions.lockForUpdate(
+            tx,
+            command.sessionId,
+            actor.userId,
+          );
+          if (locked === null) {
+            throw new OnboardingSessionNotFoundError();
+          }
+          const idem = await replayOrRecordable(
+            runtime,
+            tx,
+            locked,
+            "say",
+            command.idempotencyKey,
+            {
+              text: command.text,
+              expectedSessionVersion: command.expectedSessionVersion,
+            },
+          );
+          const session = await lockedActiveSession(
+            runtime,
+            tx,
+            actor,
+            command.sessionId,
+            command.expectedSessionVersion,
+          );
+          if (idem.replay) {
+            // Replayed: the utterance is already recorded and being read.
+            const pending = await utterances.listPending(tx.sql, session.id);
+            const last = pending.at(-1);
+            const view = await getSession({ actor, sessionId: session.id });
+            return {
+              view,
+              understood:
+                last === undefined
+                  ? { kind: "UNCLEAR", stepKey }
+                  : { kind: "READING", stepKey, utteranceId: last.id },
+            };
+          }
+          const utterance = await utterances.insert(tx, {
+            sessionId: session.id,
+            stepKey,
+            text: command.text,
+          });
+          await idempotency.recordMutation(tx, {
+            sessionId: session.id,
+            keyHash: idem.keyHash,
+            operation: "say",
+            requestHash: idem.requestHash,
+            resultVersion: session.version,
+          });
+          await outbox.enqueue(
+            tx,
+            utteranceRecordedEvent({
+              session,
+              correlationId: command.correlationId,
+              utteranceId: utterance.id,
+              stepKey,
+            }),
+          );
+          safeLog(runtime, "utterance.recorded", session, { stepKey });
+          const view = await getSession({ actor, sessionId: session.id });
+          return {
+            view,
+            understood: { kind: "READING", stepKey, utteranceId: utterance.id },
+          };
+        });
+      }
+    }
+  };
+
   return {
     startSession,
     getCurrentSession,
@@ -1664,6 +1867,7 @@ export function createOnboardingUseCases(
     recordInterviewQuestions,
     answerInterviewQuestion,
     dismissInterviewQuestion,
+    say,
   };
 }
 

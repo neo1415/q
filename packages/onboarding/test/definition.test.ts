@@ -643,11 +643,12 @@ describe("contracts, idempotency, events and projection (§123, §125, §128, §
     ).toBe(hashOnboardingRequest({ a: [2, { d: 1 }], b: 1 }));
   });
 
-  it("registers five runtime events whose payloads carry identifiers only", () => {
+  it("registers six runtime events whose payloads carry identifiers only", () => {
     const registry = createEventRegistry([...ONBOARDING_EVENTS]);
     expect(
       ONBOARDING_EVENTS.map((e) => `${e.name}@${e.version}:${e.sensitivity}`),
     ).toEqual([
+      "onboarding.utterance.recorded@1:CONFIDENTIAL",
       "onboarding.session.started@1:CONFIDENTIAL",
       "onboarding.response.committed@1:CONFIDENTIAL",
       "onboarding.step.skipped@1:CONFIDENTIAL",
