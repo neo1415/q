@@ -108,6 +108,11 @@ describe("scope catalogue", () => {
     expect(SCOPE_CATALOGUE.COMPANY_CAPITAL_OBJECTIVE.ownerSensitivity).toBe(
       "CONFIDENTIAL",
     );
+    // Evidence is admitted up to CONFIDENTIAL: a HIGHLY_CONFIDENTIAL document
+    // is outside every plan rather than inside one no provider may receive.
+    expect(SCOPE_CATALOGUE.EVIDENCE_DOCUMENTS.ownerSensitivity).toBe(
+      "CONFIDENTIAL",
+    );
   });
 });
 
@@ -149,11 +154,15 @@ describe("purpose policy", () => {
     );
   });
 
-  it("gives a plain answer the minimum: profile and capital objective, no financials or documents", () => {
+  it("gives a plain answer the minimum: profile, capital objective and own evidence, no financials", () => {
     expect(candidateScopeKinds("ANSWER", "COMPANY")).toEqual([
       "COMPANY_PROFILE",
       "COMPANY_CAPITAL_OBJECTIVE",
+      "EVIDENCE_DOCUMENTS",
     ]);
+    expect(candidateScopeKinds("ANSWER", "COMPANY")).not.toContain(
+      "COMPANY_PRIVATE_FINANCIALS",
+    );
     expect(candidateScopeKinds("INVESTIGATE", "COMPANY")).toContain(
       "COMPANY_PRIVATE_FINANCIALS",
     );

@@ -67,6 +67,16 @@ export type OnboardingActions<TResponse> = {
     readonly resolution: "ACCEPT" | "EDIT" | "REJECT";
     readonly response?: OnboardingResponseValue | undefined;
   }) => Promise<boolean>;
+  /**
+   * Answer or set aside one of Q's questions (CQ-PRE-REC-001). Returns
+   * false when this build has no path to record it.
+   */
+  readonly answerQuestion: (input: {
+    readonly questionId: string;
+    readonly stepKey: string;
+    readonly value: OnboardingResponseValue;
+  }) => Promise<boolean>;
+  readonly dismissQuestion: (questionId: string) => Promise<boolean>;
   readonly retry: () => Promise<void>;
 };
 
@@ -270,6 +280,20 @@ export function useOnboardingJourney<
       }
       await run(() => resolve(input), true);
       return true;
+    },
+    answerQuestion: async (input) => {
+      const answer = requireClient().answerQuestion;
+      if (answer === undefined) {
+        return false;
+      }
+      return run(() => answer(input), true);
+    },
+    dismissQuestion: async (questionId) => {
+      const dismiss = requireClient().dismissQuestion;
+      if (dismiss === undefined) {
+        return false;
+      }
+      return run(() => dismiss({ questionId }), true);
     },
     retry: async () => {
       const operation = lastOperation.current;

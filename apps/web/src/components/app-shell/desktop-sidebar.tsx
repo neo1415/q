@@ -9,6 +9,7 @@ import { ContextIndicator } from "@capital-q/ui/context-indicator";
 import { ICON_SIZE, ICON_STROKE } from "@capital-q/ui/icons";
 import { QMark } from "@capital-q/ui/q-mark";
 
+import type { ShellContext } from "./app-shell";
 import {
   isActiveRoute,
   PRIMARY_NAVIGATION,
@@ -22,7 +23,11 @@ import {
  * Hidden below the desktop breakpoint, where the bottom navigation is
  * canonical.
  */
-export function DesktopSidebar() {
+export function DesktopSidebar({
+  context,
+}: {
+  readonly context: ShellContext;
+}) {
   const pathname = usePathname();
 
   return (
@@ -53,10 +58,12 @@ export function DesktopSidebar() {
 
       <div className="mt-6 flex flex-col gap-3 border-t border-(--cq-border-subtle) px-5 pt-5">
         <p className="cq-label text-(--cq-text-secondary)">Organisation</p>
-        <ContextIndicator scope="unset" />
-        <p className="cq-caption text-(--cq-text-tertiary)">
-          Your organisation appears here once you belong to one.
-        </p>
+        <ContextIndicator scope={context.scope} detail={context.label} />
+        {context.scope === "unset" ? (
+          <p className="cq-caption text-(--cq-text-tertiary)">
+            Your organisation appears here once you belong to one.
+          </p>
+        ) : null}
       </div>
 
       <div className="px-3 pt-6">

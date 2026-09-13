@@ -17,8 +17,14 @@ import type { SubjectRelation } from "./catalogue.js";
  * may need at most. Everything downstream can only remove from it.
  *
  * Minimum sufficient context is a property of this table: a plain answer
- * about one's own company gets its profile and capital objective, not its
- * financial model, its document corpus or its investor relationships.
+ * about one's own company gets its profile, its capital objective and the
+ * evidence its own people uploaded, not its financial model or its investor
+ * relationships. Evidence is a candidate for a plain answer because a
+ * founder who asks what their deck said is asking about their own material
+ * (CQ-PRE-REC-001 §11: what was uploaded once is reused, never re-asked
+ * for); whether the actor may actually see it stays the permission layer's
+ * answer (owner only, `document.view`), and the specialist still prefers a
+ * canonical fact over a passage where both speak to the same thing.
  */
 
 export type SubjectSummary = {
@@ -68,7 +74,11 @@ export function candidateScopeKinds(
     case "COMPANY":
       switch (capability) {
         case "ANSWER":
-          return ["COMPANY_PROFILE", "COMPANY_CAPITAL_OBJECTIVE"];
+          return [
+            "COMPANY_PROFILE",
+            "COMPANY_CAPITAL_OBJECTIVE",
+            "EVIDENCE_DOCUMENTS",
+          ];
         case "INVESTIGATE":
         case "ASSESS":
           return [

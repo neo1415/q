@@ -483,7 +483,10 @@ export function createModelGatewayQAnswer(
           tenantId: request.tenantId,
           userId: request.actorUserId,
           qRunId: request.runId,
-          correlationId: plan.runId,
+          // The request's own correlation id, so a model call is traceable
+          // to the HTTP request that caused it; the run id is already
+          // attributed separately above.
+          correlationId: request.correlationId,
         },
         ...(dependencies.tenantPolicy === undefined
           ? {}
@@ -511,15 +514,38 @@ export function createModelGatewayQAnswer(
             calls < Q_TOOL_LOOP_MAX_CALLS
           ) {
             modelCalls += 1;
-            const result = await gateway.execute<CompanyAnalystV2Result>(
-              {
-                ...base,
-                messages,
-                output: { kind: "TEXT" },
-                tools: offered.map((tool) => tool.definition),
-              },
-              { signal: request.signal },
-            );
+            let result: Awaited<
+              ReturnType<typeof gateway.execute<CompanyAnalystV2Result>>
+            >;
+            try {
+              result = await gateway.execute<CompanyAnalystV2Result>(
+                {
+                  ...base,
+                  messages,
+                  output: { kind: "TEXT" },
+                  tools: offered.map((tool) => tool.definition),
+                },
+                { signal: request.signal },
+              );
+            } catch (error: unknown) {
+              // Groq validates a model's tool call against the declared
+              // schema and refuses the whole request when the model got it
+              // wrong (tool_use_failed) — including on turns that never
+              // needed a tool at all. That is the model's output failing,
+              // not the person's question: the answer is produced without
+              // tools instead of the run failing (CQ-PRE-REC-001 §8).
+              if (
+                isModelGatewayError(error) &&
+                error.failureClass === "INVALID_MODEL_OUTPUT"
+              ) {
+                logger?.warn(
+                  { qRunId: request.runId, rounds, calls },
+                  "tool round refused by the provider; answering without tools",
+                );
+                break;
+              }
+              throw error;
+            }
             if (result.output.kind === "TEXT") {
               // The model answered without (further) tools: accept only the
               // task's schema, exactly as the structured path would.

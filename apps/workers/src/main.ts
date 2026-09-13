@@ -35,6 +35,16 @@ import {
   createFounderDocumentReview,
   createFounderExtraction,
 } from "@capital-q/founder-onboarding";
+import {
+  createMandateReview,
+  createMandateSynthesis,
+} from "@capital-q/investor-onboarding";
+import {
+  createPostgresTaxonomyLexicalSearchRepository,
+  createPostgresTaxonomyReferenceRepository,
+  createTaxonomyCandidateFinder,
+  createTaxonomyClassifier,
+} from "@capital-q/taxonomy";
 import { modelProviderConfigStatus } from "@capital-q/config/model-providers";
 import {
   createModelGateway,
@@ -167,6 +177,8 @@ const founderReview =
         suggestions: createPostgresOnboardingSuggestionRepository(),
         createSuggestion: (command) =>
           onboarding.internal.createSuggestion(command as never),
+        recordQuestions: (command) =>
+          onboarding.internal.recordInterviewQuestions(command as never),
         extraction: createFounderExtraction({
           // The extraction declares the narrow slice of the gateway it uses
           // — one task class, one output shape — which is deliberately not
@@ -186,10 +198,70 @@ const founderReview =
         logger,
       });
 
+/**
+ * Investor Mandate Q (CQ-Q-022), finally reachable (CQ-PRE-REC-001 §6).
+ * One governed call per narrative answer, through the same gateway and
+ * ceilings; the reading becomes onboarding suggestions and questions on
+ * the real investor steps. Taxonomy phrases resolve through Capital Q's own
+ * deterministic classifier, never the model.
+ */
+const taxonomyClassifier = createTaxonomyClassifier({
+  reference: createPostgresTaxonomyReferenceRepository(),
+  lexical: createPostgresTaxonomyLexicalSearchRepository(),
+});
+const taxonomyCandidates = createTaxonomyCandidateFinder({
+  sql: database.sql,
+  classifier: taxonomyClassifier,
+  logger,
+});
+const mandateReview =
+  modelProviders.length === 0
+    ? undefined
+    : createMandateReview({
+        sql: database.sql,
+        sessions: createPostgresOnboardingSessionRepository(),
+        responses: createPostgresOnboardingResponseRepository(),
+        suggestions: createPostgresOnboardingSuggestionRepository(),
+        synthesis: createMandateSynthesis({
+          gateway: {
+            execute: (request, options) =>
+              modelGateway.execute(request as never, options as never),
+          },
+          budget: budgetForTaskClass("STRUCTURED_EXTRACTION"),
+          logger,
+        }),
+        taxonomy: {
+          resolve: async (phrase, vocabularyCodes) => {
+            const result = await taxonomyCandidates.findCandidates({
+              text: phrase,
+              vocabularyCodes: vocabularyCodes,
+              limit: 3,
+            });
+            // Only a confident, unambiguous resolution becomes a criterion:
+            // a phrase that could mean several categories is left for the
+            // investor's own search rather than guessed.
+            if (result.resolution === "EXACT") {
+              return result.candidates.map((c) => String(c.nodeId));
+            }
+            if (result.resolution === "CANDIDATES") {
+              const [top] = result.candidates;
+              return top === undefined ? [] : [String(top.nodeId)];
+            }
+            return [];
+          },
+        },
+        createSuggestion: (command) =>
+          onboarding.internal.createSuggestion(command as never),
+        recordQuestions: (command) =>
+          onboarding.internal.recordInterviewQuestions(command as never),
+        logger,
+      });
+
 logger.info(
   {
     modelProviders: modelProviderConfigStatus(providerSecrets),
     founderReview: founderReview === undefined ? "disabled" : "composed",
+    mandateReview: mandateReview === undefined ? "disabled" : "composed",
   },
   "founder onboarding review composed",
 );
@@ -202,6 +274,7 @@ const documentEvents = createQueueRunner({
     queues,
     pipelineVersion: config.documents.pipelineVersion,
     ...(founderReview === undefined ? {} : { founderReview }),
+    ...(mandateReview === undefined ? {} : { mandateReview }),
     logger,
   }),
   batchSize: config.documents.batchSize,

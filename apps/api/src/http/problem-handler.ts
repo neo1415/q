@@ -81,6 +81,7 @@ import {
   OnboardingSessionVersionConflictError,
   OnboardingSubjectNotFoundError,
   OnboardingSuggestionNotFoundError,
+  OnboardingInterviewQuestionNotFoundError,
 } from "@capital-q/onboarding";
 import {
   TaxonomyClassificationCandidateDecidedError,
@@ -254,6 +255,7 @@ function toProblem(
     error instanceof TaxonomyClassificationCandidateNotFoundError ||
     error instanceof OnboardingSessionNotFoundError ||
     error instanceof OnboardingSuggestionNotFoundError ||
+    error instanceof OnboardingInterviewQuestionNotFoundError ||
     error instanceof OnboardingSubjectNotFoundError ||
     error instanceof OnboardingDefinitionUnavailableError ||
     error instanceof EvidenceSourceNotFoundError ||

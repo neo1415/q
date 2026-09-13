@@ -88,6 +88,15 @@ export type QRunRepository = {
     readonly tenantId: TenantId;
     readonly actorUserId: UserId;
   } | null>;
+  /**
+   * Every run that has not reached a terminal status, oldest first, bounded.
+   * For the startup sweep: with one orchestrating process, a non-terminal
+   * run at startup has no engine working on it and never will.
+   */
+  readonly listNonTerminal: (
+    executor: DatabaseExecutor,
+    limit: number,
+  ) => Promise<readonly QRunRecord[]>;
   /** Row lock for a lifecycle decision made from the current state. */
   readonly lockForActor: (
     tx: TransactionContext,

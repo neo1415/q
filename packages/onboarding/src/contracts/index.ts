@@ -10,6 +10,8 @@ import {
   type OnboardingStepStateStatus,
   type OnboardingStepType,
   type OnboardingSubjectType,
+  type OnboardingQuestionOptionView,
+  type OnboardingQuestionReason,
   type OnboardingSuggestionStatus,
   type UtcTimestamp,
 } from "@capital-q/contracts";
@@ -66,6 +68,13 @@ export const OnboardingSuggestionIdSchema = createUuidIdSchema(
 );
 export type OnboardingSuggestionId = z.infer<
   typeof OnboardingSuggestionIdSchema
+>;
+
+export const OnboardingInterviewQuestionIdSchema = createUuidIdSchema(
+  "OnboardingInterviewQuestionId",
+);
+export type OnboardingInterviewQuestionId = z.infer<
+  typeof OnboardingInterviewQuestionIdSchema
 >;
 
 export const ONBOARDING_DEFINITION_STATUSES = ["ACTIVE", "RETIRED"] as const;
@@ -225,6 +234,41 @@ export type OnboardingSuggestion = {
   readonly status: OnboardingSuggestionStatus;
   /** Future Q run reference; no FK until the Q runtime tables exist. */
   readonly modelRunId: string | null;
+  readonly createdAt: UtcTimestamp;
+  readonly resolvedAt: UtcTimestamp | null;
+};
+
+// ---------------------------------------------------------------------------
+// Interview questions (CQ-PRE-REC-001): what Q still wants to ask
+// ---------------------------------------------------------------------------
+
+export const ONBOARDING_QUESTION_STATUSES = [
+  "PENDING",
+  "ANSWERED",
+  "DISMISSED",
+  "SUPERSEDED",
+] as const;
+export type OnboardingQuestionStatus =
+  (typeof ONBOARDING_QUESTION_STATUSES)[number];
+
+/**
+ * A persisted question. Journey state, never a value: answering submits a
+ * normal validated response to `stepKey` (or an option's step) and marks
+ * the row ANSWERED. Options are server-built and each is already a valid
+ * response for the step it names.
+ */
+export type OnboardingInterviewQuestion = {
+  readonly id: OnboardingInterviewQuestionId;
+  readonly sessionId: OnboardingSessionId;
+  readonly stepKey: string;
+  readonly factKey: string;
+  readonly question: string;
+  readonly why: string | null;
+  readonly reason: OnboardingQuestionReason;
+  readonly readings: readonly string[];
+  readonly options: readonly OnboardingQuestionOptionView[];
+  readonly sourceRefs: readonly OnboardingSourceRef[];
+  readonly status: OnboardingQuestionStatus;
   readonly createdAt: UtcTimestamp;
   readonly resolvedAt: UtcTimestamp | null;
 };

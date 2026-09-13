@@ -5,6 +5,8 @@ import { z } from "zod";
 import {
   CorrelationIdSchema,
   OnboardingJourneyTypeSchema,
+  OnboardingQuestionOptionViewSchema,
+  OnboardingQuestionReasonSchema,
   OnboardingResponseValueSchema,
   OnboardingStepKeySchema,
   OnboardingSubjectTypeSchema,
@@ -31,12 +33,15 @@ import {
 } from "@capital-q/security";
 
 import {
+  OnboardingInterviewQuestionIdSchema,
   OnboardingResponseIdSchema,
   OnboardingSessionIdSchema,
   OnboardingSourceRefsSchema,
   OnboardingSuggestionConfidenceSchema,
   OnboardingSuggestionIdSchema,
   type OnboardingActor,
+  type OnboardingInterviewQuestion,
+  type OnboardingInterviewQuestionId,
   type OnboardingResponse,
   type OnboardingSession,
   type OnboardingSessionId,
@@ -49,6 +54,7 @@ import {
 import {
   OnboardingContextRequiredError,
   OnboardingDefinitionUnavailableError,
+  OnboardingInterviewQuestionNotFoundError,
   OnboardingMutationConflictError,
   OnboardingRuntimeConfigurationError,
   OnboardingSessionNotFoundError,
@@ -82,6 +88,7 @@ import type {
   OnboardingWriteContext,
   OnboardingDefinitionRepository,
   OnboardingIdempotencyRepository,
+  OnboardingInterviewQuestionRepository,
   OnboardingResponseRepository,
   OnboardingSessionRepository,
   OnboardingStepContextRegistry,
@@ -118,6 +125,8 @@ export type OnboardingRuntimeDependencies = {
   readonly stepStates: OnboardingStepStateRepository;
   readonly responses: OnboardingResponseRepository;
   readonly suggestions: OnboardingSuggestionRepository;
+  /** Optional so older compositions keep working; absent disables questions. */
+  readonly questions?: OnboardingInterviewQuestionRepository | undefined;
   readonly idempotency: OnboardingIdempotencyRepository;
   readonly subjects: OnboardingSubjectResolverRegistry;
   readonly writeTargets: OnboardingWriteTargetRegistry;
@@ -215,6 +224,39 @@ export type CreateOnboardingSuggestionCommand = {
     readonly { sourceType: string; sourceId: string }[] | undefined;
   readonly confidence?: string | null | undefined;
   readonly modelRunId?: string | null | undefined;
+};
+
+/** Internal trusted operation: what a planner decided is worth asking. Never browser-reachable. */
+export type RecordOnboardingQuestionsCommand = {
+  readonly sessionId: OnboardingSessionId;
+  readonly questions: readonly {
+    readonly stepKey: string;
+    readonly factKey: string;
+    readonly question: string;
+    readonly why?: string | null | undefined;
+    readonly reason: string;
+    readonly readings?: readonly string[] | undefined;
+    readonly options?:
+      readonly { label: string; stepKey: string; value: unknown }[] | undefined;
+    readonly sourceRefs?:
+      readonly { sourceType: string; sourceId: string }[] | undefined;
+  }[];
+};
+
+export type AnswerOnboardingQuestionCommand = SessionScopedQuery & {
+  readonly questionId: OnboardingInterviewQuestionId;
+  readonly stepKey: string;
+  readonly response: unknown;
+  readonly expectedSessionVersion: number;
+  readonly idempotencyKey: string;
+  readonly correlationId: CorrelationId;
+};
+
+export type DismissOnboardingQuestionCommand = SessionScopedQuery & {
+  readonly questionId: OnboardingInterviewQuestionId;
+  readonly expectedSessionVersion: number;
+  readonly idempotencyKey: string;
+  readonly correlationId: CorrelationId;
 };
 
 export type ExpireOnboardingSuggestionCommand = {
@@ -1307,6 +1349,306 @@ export function createOnboardingUseCases(
     });
   };
 
+  const questionsRepo = (): OnboardingInterviewQuestionRepository => {
+    if (runtime.questions === undefined) {
+      throw new OnboardingRuntimeConfigurationError(
+        "QUESTIONS_UNAVAILABLE",
+        "no interview question repository is composed",
+      );
+    }
+    return runtime.questions;
+  };
+
+  /**
+   * Records what a planner decided is worth asking (CQ-PRE-REC-001).
+   * Trusted, internal. Every question must map to a step of the pinned
+   * definition and every option must already be a valid answer for the step
+   * it names, so nothing a client later submits from a question can be
+   * anything the runtime would not have accepted typed. A new question for a
+   * fact supersedes the pending one, so a re-plan never asks twice.
+   */
+  const recordInterviewQuestions = async (
+    raw: RecordOnboardingQuestionsCommand,
+  ): Promise<readonly OnboardingInterviewQuestion[]> => {
+    const command = z
+      .object({
+        sessionId: OnboardingSessionIdSchema,
+        questions: z
+          .array(
+            z
+              .object({
+                stepKey: OnboardingStepKeySchema,
+                factKey: z.string().regex(/^[a-z][a-z0-9_.]{0,79}$/),
+                question: z.string().min(1).max(500),
+                why: z.string().max(500).nullable().default(null),
+                reason: OnboardingQuestionReasonSchema,
+                readings: z.array(z.string().max(200)).max(8).default([]),
+                options: z
+                  .array(
+                    z.object({
+                      label: z.string().min(1).max(120),
+                      stepKey: OnboardingStepKeySchema,
+                      value: OnboardingResponseValueSchema,
+                    }),
+                  )
+                  .max(8)
+                  .default([]),
+                sourceRefs: OnboardingSourceRefsSchema.default([]),
+              })
+              .strict(),
+          )
+          .max(24),
+      })
+      .strict()
+      .parse(raw);
+    const questions = questionsRepo();
+    return transactions.run(async (tx) => {
+      const session = await sessions.findById(tx.sql, command.sessionId);
+      if (session === null || session.status !== "ACTIVE") {
+        throw new OnboardingSessionNotFoundError();
+      }
+      const published = await runtime.loadDefinition(
+        tx.sql,
+        session.definitionVersionId,
+      );
+      const stepsByKey = new Map(published.steps.map((s) => [s.stepKey, s]));
+      for (const question of command.questions) {
+        if (!stepsByKey.has(question.stepKey)) {
+          throw new OnboardingSessionStateError("STEP_NOT_ELIGIBLE");
+        }
+        for (const option of question.options) {
+          const step = stepsByKey.get(option.stepKey);
+          if (step === undefined) {
+            throw new OnboardingSessionStateError("STEP_NOT_ELIGIBLE");
+          }
+          validateOnboardingResponse(step, { value: option.value });
+        }
+      }
+      await questions.supersedePending(
+        tx,
+        session.id,
+        command.questions.map((q) => q.factKey),
+      );
+      const created: OnboardingInterviewQuestion[] = [];
+      for (const question of command.questions) {
+        created.push(
+          await questions.insert(tx, {
+            sessionId: session.id,
+            stepKey: question.stepKey,
+            factKey: question.factKey,
+            question: question.question,
+            why: question.why,
+            reason: question.reason,
+            readings: question.readings,
+            options: question.options.map((option) =>
+              OnboardingQuestionOptionViewSchema.parse(option),
+            ),
+            sourceRefs: question.sourceRefs,
+          }),
+        );
+      }
+      safeLog(runtime, "questions.recorded", session, {
+        count: created.length,
+      });
+      return created;
+    });
+  };
+
+  /**
+   * Answers a question by committing a normal validated response to the
+   * step it names — the same path a typed answer takes, write targets and
+   * events included — and marking the question answered in the same
+   * transaction. A question may only be answered on its own step or one of
+   * its option steps, so a client cannot use it to reach an unrelated step.
+   */
+  const answerInterviewQuestion = async (
+    raw: AnswerOnboardingQuestionCommand,
+  ): Promise<OnboardingSessionView> => {
+    const command = z
+      .object({
+        actor: ActorSchema,
+        sessionId: OnboardingSessionIdSchema,
+        questionId: OnboardingInterviewQuestionIdSchema,
+        stepKey: OnboardingStepKeySchema,
+        response: z.unknown(),
+        expectedSessionVersion: VersionSchema,
+        idempotencyKey: IdempotencyKeySchema,
+        correlationId: CorrelationIdSchema,
+      })
+      .strict()
+      .parse(raw);
+    const { actor } = command;
+    const questions = questionsRepo();
+    return transactions.run(async (tx) => {
+      const locked = await sessions.lockForUpdate(
+        tx,
+        command.sessionId,
+        actor.userId,
+      );
+      if (locked === null) {
+        throw new OnboardingSessionNotFoundError();
+      }
+      const idem = await replayOrRecordable(
+        runtime,
+        tx,
+        locked,
+        "answer_question",
+        command.idempotencyKey,
+        {
+          questionId: command.questionId,
+          stepKey: command.stepKey,
+          response: command.response,
+          expectedSessionVersion: command.expectedSessionVersion,
+        },
+      );
+      if (idem.replay) {
+        return view(tx.sql, actor, locked);
+      }
+      const session = await lockedActiveSession(
+        runtime,
+        tx,
+        actor,
+        command.sessionId,
+        command.expectedSessionVersion,
+      );
+      const question = await questions.findById(
+        tx.sql,
+        session.id,
+        command.questionId,
+      );
+      if (question === null) {
+        throw new OnboardingInterviewQuestionNotFoundError();
+      }
+      if (question.status !== "PENDING") {
+        throw new OnboardingSessionStateError("QUESTION_ALREADY_RESOLVED");
+      }
+      const permitted = new Set([
+        question.stepKey,
+        ...question.options.map((option) => option.stepKey),
+      ]);
+      if (!permitted.has(command.stepKey)) {
+        throw new OnboardingSessionStateError("STEP_NOT_ELIGIBLE");
+      }
+      const aggregate = await aggregateOf(runtime, tx.sql, session);
+      const step = eligibleStep(aggregate, command.stepKey);
+      const validated = validateOnboardingResponse(step, command.response);
+      const committed = await commitResponse(
+        runtime,
+        tx,
+        actor,
+        aggregate,
+        step,
+        validated,
+        command.correlationId,
+      );
+      await questions.resolve(tx, question.id, "ANSWERED");
+      await idempotency.recordMutation(tx, {
+        sessionId: session.id,
+        keyHash: idem.keyHash,
+        operation: "answer_question",
+        requestHash: idem.requestHash,
+        resultVersion: committed.session.version,
+      });
+      await outbox.enqueue(
+        tx,
+        responseCommittedEvent({
+          session: committed.session,
+          correlationId: command.correlationId,
+          stepKey: step.stepKey,
+          responseId: committed.response.id,
+        }),
+      );
+      getOnboardingMetrics().responsesCommitted.add(1, {
+        journeyType: session.journeyType,
+        stepType: step.stepType,
+      });
+      safeLog(runtime, "question.answered", committed.session, {
+        stepKey: step.stepKey,
+        reason: question.reason,
+      });
+      return view(tx.sql, actor, committed.session, committed.changes);
+    });
+  };
+
+  /** "I do not know" or "later": the question is set aside; nothing is written. */
+  const dismissInterviewQuestion = async (
+    raw: DismissOnboardingQuestionCommand,
+  ): Promise<OnboardingSessionView> => {
+    const command = z
+      .object({
+        actor: ActorSchema,
+        sessionId: OnboardingSessionIdSchema,
+        questionId: OnboardingInterviewQuestionIdSchema,
+        expectedSessionVersion: VersionSchema,
+        idempotencyKey: IdempotencyKeySchema,
+        correlationId: CorrelationIdSchema,
+      })
+      .strict()
+      .parse(raw);
+    const { actor } = command;
+    const questions = questionsRepo();
+    return transactions.run(async (tx) => {
+      const locked = await sessions.lockForUpdate(
+        tx,
+        command.sessionId,
+        actor.userId,
+      );
+      if (locked === null) {
+        throw new OnboardingSessionNotFoundError();
+      }
+      const idem = await replayOrRecordable(
+        runtime,
+        tx,
+        locked,
+        "dismiss_question",
+        command.idempotencyKey,
+        {
+          questionId: command.questionId,
+          expectedSessionVersion: command.expectedSessionVersion,
+        },
+      );
+      if (idem.replay) {
+        return view(tx.sql, actor, locked);
+      }
+      const session = await lockedActiveSession(
+        runtime,
+        tx,
+        actor,
+        command.sessionId,
+        command.expectedSessionVersion,
+      );
+      const question = await questions.findById(
+        tx.sql,
+        session.id,
+        command.questionId,
+      );
+      if (question === null) {
+        throw new OnboardingInterviewQuestionNotFoundError();
+      }
+      if (question.status !== "PENDING") {
+        throw new OnboardingSessionStateError("QUESTION_ALREADY_RESOLVED");
+      }
+      await questions.resolve(tx, question.id, "DISMISSED");
+      const updated = await sessions.commit(
+        tx,
+        session.id,
+        session.version,
+        {},
+      );
+      await idempotency.recordMutation(tx, {
+        sessionId: session.id,
+        keyHash: idem.keyHash,
+        operation: "dismiss_question",
+        requestHash: idem.requestHash,
+        resultVersion: updated.version,
+      });
+      safeLog(runtime, "question.dismissed", updated, {
+        reason: question.reason,
+      });
+      return view(tx.sql, actor, updated);
+    });
+  };
+
   return {
     startSession,
     getCurrentSession,
@@ -1319,6 +1661,9 @@ export function createOnboardingUseCases(
     createSuggestion,
     resolveSuggestion,
     expireSuggestion,
+    recordInterviewQuestions,
+    answerInterviewQuestion,
+    dismissInterviewQuestion,
   };
 }
 

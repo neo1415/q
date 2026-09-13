@@ -6,6 +6,7 @@ import type { CurrencyOption } from "@capital-q/ui/money-input";
 
 import type { MaterialFileView } from "../../onboarding-kit/materials";
 import type { TaxonomyCandidateView } from "../../onboarding-kit/client";
+import type { QuestionView } from "../../onboarding-kit/session";
 
 /**
  * Frontend presentation contract for founder onboarding.
@@ -166,6 +167,11 @@ export type ReviewItem = {
   readonly editStepId: string;
 };
 
+/** A persisted question with the screen that answers it, for a step to render (CQ-PRE-REC-001). */
+export type AskedQuestionView = QuestionView & {
+  readonly editStepId: string | undefined;
+};
+
 export type StepView =
   | (StepBase<"choice"> & {
       readonly options: readonly ChoiceOption[];
@@ -181,6 +187,8 @@ export type StepView =
       readonly placeholder?: string | undefined;
       readonly maxLength: number;
       readonly voiceEnabled: boolean;
+      /** F7 only: what Q still wants to ask, most material first. */
+      readonly questions?: readonly AskedQuestionView[] | undefined;
       readonly response?:
         Extract<StepResponse, { kind: "narrative" }> | undefined;
     })
@@ -299,6 +307,8 @@ export type FounderOnboardingSessionView = {
   readonly currentStepId: string;
   /** Absent only once the session is complete. */
   readonly step: StepView | undefined;
+  /** Questions Q still wants answered, most material first. */
+  readonly questions: readonly QuestionView[];
   /** Which adapter produced this view. Synthetic views say so on screen. */
   readonly source: { readonly adapter: string; readonly synthetic: boolean };
 };

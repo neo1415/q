@@ -7,53 +7,61 @@ import { Button } from "@capital-q/ui/button";
 import { QComposer } from "@capital-q/ui/q-composer";
 import { QStateIndicator } from "@capital-q/ui/q-state";
 import { InlineNotice } from "@capital-q/ui/states";
+import type { ContextScope } from "@capital-q/ui/tokens";
 
 import { failureMessage, turnsFrom, workingLabel } from "./conversation";
 import { useQConversation } from "./use-q-conversation";
 
 /**
- * Q, in the browser (CQ-C5-R1 §13-§19).
+ * Q, in the browser (CQ-C5-R1 §13-§19; CQ-PRE-REC-001 §12-§13).
  *
- * The composer that has been on Home since the design system landed, now
- * connected to the real thing: a real run, a real stream, a real answer,
- * and the same conversation for the next question.
+ * The composer connected to the real thing: a real run, a real stream, a
+ * real answer, and the same conversation for the next question. The
+ * conversation is the primary surface: before the first turn a few
+ * contextual suggestions sit above the composer; after it they recede, and
+ * the thread takes the space. The composer stays reachable — sticky at the
+ * bottom of the workspace, above the mobile navigation — so a long answer
+ * never pushes the next question off the screen.
  *
  * What is deliberately absent: a local reply of any kind. There is no
  * fixture, no canned response, no simulated typing and no fabricated
  * progress. When Q is not connected on this build the composer says exactly
- * that and sends nothing — which is what it did before, and is still better
- * than an answer nobody computed.
- *
- * This is not the dedicated Q workspace. No history sidebar, no saved
- * conversations, no evidence drill-down: those are their own work, and
- * shipping a shell of them here would make the product look further along
- * than it is.
+ * that and sends nothing.
  */
+
+export type QSurfaceContext = {
+  /** Which platform subject this surface's questions are about, if any. */
+  readonly companyId?: string | undefined;
+  readonly investorOrganisationId?: string | undefined;
+  /** The visibility scope the cue shows. `unset` when nothing is known. */
+  readonly scope: ContextScope;
+  /** Plain name for the cue (a company, an investor organisation). */
+  readonly label?: string | undefined;
+  /** Contextual prompts offered before the first turn. */
+  readonly suggestions: readonly string[];
+};
 
 export type QConversationPanelProps = {
   /** False when this build has no Q API configured. */
   readonly connected: boolean;
-  /**
-   * The company these questions are about, when Capital Q knows of one.
-   * Resolved on the server and passed down; the browser never chooses it,
-   * and the Q API authorises it again regardless.
-   */
-  readonly companyId?: string | undefined;
+  readonly context: QSurfaceContext;
 };
 
 export function QConversationPanel({
   connected,
-  companyId,
+  context,
 }: QConversationPanelProps) {
-  const q = useQConversation({ companyId });
+  const q = useQConversation({
+    companyId: context.companyId,
+    investorOrganisationId: context.investorOrganisationId,
+  });
   const turns = turnsFrom(q.state, q.pending);
   const endRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     // Follow the answer as it arrives, and respect a reader who has asked
     // for less motion. `nearest` scrolls only when the end of the
-    // conversation has actually gone out of view: `end` would pull the
-    // composer off the screen after every turn.
+    // conversation has actually gone out of view.
     endRef.current?.scrollIntoView({
       behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches
         ? "auto"
@@ -63,9 +71,12 @@ export function QConversationPanel({
   }, [turns.length, q.state.partial?.text]);
 
   const stage = workingLabel(q.state);
+  // Suggestions are an on-ramp, not a feature: gone after the first turn.
+  const showSuggestions =
+    connected && turns.length === 0 && !q.working && q.state.failure === null;
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-4" data-q-workspace>
       {turns.length > 0 ? (
         <ol className="flex flex-col gap-4" aria-live="polite">
           {turns.map((turn) => (
@@ -95,9 +106,6 @@ export function QConversationPanel({
                 {turn.text}
               </p>
               {turn.kind === "Q" && turn.sourceCount > 0 ? (
-                // A count, not a link. An evidence reference carries only
-                // identifiers, and there is no seam yet that turns one into
-                // something a person may safely see (§18).
                 <span className="cq-caption text-(--cq-text-secondary)">
                   Based on {turn.sourceCount} recorded source
                   {turn.sourceCount === 1 ? "" : "s"}.
@@ -134,18 +142,41 @@ export function QConversationPanel({
         </InlineNotice>
       ) : null}
 
-      {q.notice !== null ? (
+      {q.notice !== null && q.state.failure === null ? (
         <InlineNotice tone="warning" title="That didn't go through">
           {q.notice}
         </InlineNotice>
       ) : null}
 
-      <QComposer
-        id="home-q"
-        contextScope="unset"
-        disabled={q.working}
-        {...(connected ? { onSubmit: q.ask } : {})}
-      />
+      {showSuggestions ? (
+        <ul
+          aria-label="Suggested questions"
+          className="flex flex-wrap gap-2"
+          data-q-suggestions
+        >
+          {context.suggestions.map((suggestion) => (
+            <li key={suggestion}>
+              <Button
+                variant="secondary"
+                size="compact"
+                onClick={() => void q.ask(suggestion)}
+              >
+                {suggestion}
+              </Button>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+
+      <div className="cq-q-composer-dock">
+        <QComposer
+          id="home-q"
+          contextScope={context.scope}
+          contextDetail={context.label}
+          disabled={q.working}
+          {...(connected ? { onSubmit: q.ask } : {})}
+        />
+      </div>
     </div>
   );
 }

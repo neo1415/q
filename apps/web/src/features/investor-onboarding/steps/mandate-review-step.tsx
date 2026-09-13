@@ -7,6 +7,7 @@ import { Button } from "@capital-q/ui/button";
 import { ContextIndicator } from "@capital-q/ui/context-indicator";
 import { InlineNotice } from "@capital-q/ui/states";
 
+import type { AskedQuestionView, QReadingItem } from "../models/presentation";
 import { StepHeading, type StepProps } from "./step-props";
 
 type Row = {
@@ -188,10 +189,15 @@ function rows(review: InvestorReviewContext): readonly Row[] {
 }
 
 /**
- * I11. "Here's the mandate you've defined": a deterministic projection of
- * what the investor declared, each line with a Change action. Hard
- * exclusions are shown apart from soft preferences so the difference is
- * never lost. No score, no inference, no claim that Q understood anything.
+ * I11. "Here's the mandate I understood" (doc 17 §50; CQ-PRE-REC-001 §6).
+ *
+ * Two things, kept apart on purpose. First, what Q READ from the investor's
+ * own words: pending proposals on real steps, each accepted or declined
+ * here through the same suggestion path a founder uses, and every proposed
+ * exclusion asked as an explicit two-way question — because a hard
+ * exclusion exists only when the investor chooses "never show". Second,
+ * the deterministic projection of what is DECLARED on the draft mandate,
+ * each line with a Change action. Confirming activates the mandate.
  */
 export function MandateReviewStep({
   step,
@@ -209,6 +215,12 @@ export function MandateReviewStep({
   return (
     <form id={formId} onSubmit={handleSubmit} className="flex flex-col gap-6">
       <StepHeading title={step.title} prompt={step.prompt} help={step.help} />
+      <QReading
+        reading={step.reading}
+        questions={step.questions}
+        busy={busy}
+        actions={actions}
+      />
       {review === undefined ? (
         <InlineNotice tone="info" title="Nothing to review yet">
           Answer the earlier screens and your mandate will be listed here.
@@ -289,5 +301,162 @@ export function MandateReviewStep({
         detail="Declared by you. Founders never see your mandate."
       />
     </form>
+  );
+}
+
+function QReading({
+  reading,
+  questions,
+  busy,
+  actions,
+}: {
+  readonly reading: readonly QReadingItem[];
+  readonly questions: readonly AskedQuestionView[];
+  readonly busy: boolean;
+  readonly actions: StepProps<"mandate_review">["actions"];
+}) {
+  if (reading.length === 0 && questions.length === 0) {
+    return null;
+  }
+  return (
+    <section
+      aria-labelledby="q-reading"
+      data-q-reading={reading.length}
+      data-q-questions={questions.length}
+      className="flex flex-col gap-4 rounded-(--cq-radius-md) border border-(--cq-border-subtle) bg-(--cq-surface-sunken) p-4"
+    >
+      <div className="flex flex-col gap-1">
+        <h2 id="q-reading" className="cq-label text-(--cq-text-primary)">
+          What I read from your description
+        </h2>
+        <p className="cq-caption text-(--cq-text-tertiary)">
+          Proposals, not decisions. Nothing below is part of your mandate until
+          you keep it.
+        </p>
+      </div>
+      {reading.length > 0 ? (
+        <ul className="flex flex-col divide-y divide-(--cq-border-subtle)">
+          {reading.map((item) => (
+            <li
+              key={item.id}
+              data-q-proposal={item.stepId}
+              className="flex items-start justify-between gap-4 py-3"
+            >
+              <div className="flex min-w-0 flex-col gap-1">
+                <p className="cq-caption text-(--cq-text-tertiary)">
+                  {item.label}
+                </p>
+                <p className="cq-body text-(--cq-text-primary)">{item.value}</p>
+              </div>
+              <div className="flex shrink-0 gap-2">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="compact"
+                  disabled={busy}
+                  onClick={() =>
+                    void actions.resolveSuggestion({
+                      suggestionId: item.id,
+                      resolution: "ACCEPT",
+                    })
+                  }
+                >
+                  Keep<span className="sr-only"> {item.label}</span>
+                </Button>
+                <Button
+                  type="button"
+                  variant="quiet"
+                  size="compact"
+                  disabled={busy}
+                  onClick={() => void actions.openStep(item.stepId)}
+                >
+                  Change<span className="sr-only"> {item.label}</span>
+                </Button>
+                <Button
+                  type="button"
+                  variant="quiet"
+                  size="compact"
+                  disabled={busy}
+                  onClick={() =>
+                    void actions.resolveSuggestion({
+                      suggestionId: item.id,
+                      resolution: "REJECT",
+                    })
+                  }
+                >
+                  Not this<span className="sr-only"> {item.label}</span>
+                </Button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      {questions.length > 0 ? (
+        <ol className="flex flex-col gap-3">
+          {questions.map((question) => (
+            <li
+              key={question.id}
+              data-question-reason={question.reason}
+              className="flex flex-col gap-2 rounded-(--cq-radius-md) border border-(--cq-border-subtle) bg-(--cq-surface) p-3"
+            >
+              <p className="cq-body text-(--cq-text-primary)">
+                {question.question}
+              </p>
+              {question.why !== null ? (
+                <p className="cq-caption text-(--cq-text-tertiary)">
+                  {question.why}
+                </p>
+              ) : null}
+              <div className="flex flex-wrap gap-2">
+                {question.options.map((option, index) => (
+                  <Button
+                    key={`${question.id}-${String(index)}`}
+                    type="button"
+                    variant="secondary"
+                    size="compact"
+                    disabled={busy}
+                    onClick={() =>
+                      void actions.answerQuestion({
+                        questionId: question.id,
+                        stepKey: option.stepKey,
+                        value: option.value,
+                      })
+                    }
+                  >
+                    {option.label}
+                  </Button>
+                ))}
+                {question.options.length === 0 &&
+                question.editStepId !== undefined ? (
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="compact"
+                    disabled={busy}
+                    onClick={() => {
+                      const target = question.editStepId;
+                      if (target !== undefined) {
+                        void actions.openStep(target);
+                      }
+                    }}
+                  >
+                    Answer
+                  </Button>
+                ) : null}
+                <Button
+                  type="button"
+                  variant="quiet"
+                  size="compact"
+                  disabled={busy}
+                  onClick={() => void actions.dismissQuestion(question.id)}
+                >
+                  Leave it
+                </Button>
+              </div>
+            </li>
+          ))}
+        </ol>
+      ) : null}
+    </section>
   );
 }

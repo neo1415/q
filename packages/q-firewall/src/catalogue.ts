@@ -161,8 +161,18 @@ export const SCOPE_CATALOGUE: Readonly<Record<QKnowledgeScopeKind, ScopeSpec>> =
       kind: "EVIDENCE_DOCUMENTS",
       bound: true,
       defaultLabel: "founder_private",
-      ownerSensitivity: "HIGHLY_CONFIDENTIAL",
-      sharedSensitivity: "HIGHLY_CONFIDENTIAL",
+      // Evidence classifies each document on its own (docs/modules/evidence.md:
+      // CONFIDENTIAL by default; financial models, management accounts and
+      // FINANCIAL material HIGHLY_CONFIDENTIAL). This scope admits evidence
+      // up to CONFIDENTIAL: the retrieval envelope applies the ceiling per
+      // chunk, so a HIGHLY_CONFIDENTIAL document is outside every plan and
+      // never reaches a model provider, which no privacy class may receive
+      // it anyway (model-gateway eligibility). A plan that reasons over a
+      // deck is therefore declared CONFIDENTIAL, which is what the deck is,
+      // rather than at the class of material it was never allowed to read
+      // (CQ-PRE-REC-001 §11: an uploaded deck is reusable from Home Q).
+      ownerSensitivity: "CONFIDENTIAL",
+      sharedSensitivity: "CONFIDENTIAL",
       layer: "EVIDENCE_DOCUMENTS",
       factCategories: [],
       ownerCapability: capability("document.view"),

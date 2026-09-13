@@ -302,6 +302,9 @@ importers:
       '@capital-q/founder-onboarding':
         specifier: workspace:*
         version: link:../../packages/founder-onboarding
+      '@capital-q/investor-onboarding':
+        specifier: workspace:*
+        version: link:../../packages/investor-onboarding
       '@capital-q/investors':
         specifier: workspace:*
         version: link:../../packages/investors

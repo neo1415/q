@@ -219,7 +219,18 @@ function classify(
 ): ModelFailureClass {
   if (status === 401 || status === 403) return "AUTHENTICATION";
   if (status === 429) return "RATE_LIMIT";
-  if (status === 413) return "CONTEXT_LIMIT";
+  // Groq answers 413 for two different things: a request that genuinely
+  // exceeds the model's window, and its tokens-per-minute cap ("Request too
+  // large for ... on tokens per minute (TPM)", code rate_limit_exceeded).
+  // Only the first is permanent; the second clears within the minute and
+  // is a rate limit, so it is retried and worded as one, never as "too big".
+  if (status === 413) {
+    return /rate[_ ]limit|per minute|(?:^|[^A-Za-z])TPM(?:[^A-Za-z]|$)/i.test(
+      message,
+    )
+      ? "RATE_LIMIT"
+      : "CONTEXT_LIMIT";
+  }
   // Groq validates a model's generated tool call against the declared
   // schema and refuses the request when the model got it wrong: that is
   // the model's output failing, retryable like any invalid output.

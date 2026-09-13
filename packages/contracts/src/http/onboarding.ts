@@ -27,6 +27,10 @@ export const ONBOARDING_SUGGESTIONS_SEGMENT = "/suggestions";
 export const ONBOARDING_RESOLVE_SEGMENT = "/resolve";
 /** `GET /v1/onboarding/sessions/current?journeyType=` -- the caller's latest active session. */
 export const ONBOARDING_CURRENT_SEGMENT = "/current";
+/** `POST /v1/onboarding/sessions/:id/questions/:questionId/answer|dismiss` (CQ-PRE-REC-001). */
+export const ONBOARDING_QUESTIONS_SEGMENT = "/questions";
+export const ONBOARDING_ANSWER_SEGMENT = "/answer";
+export const ONBOARDING_DISMISS_SEGMENT = "/dismiss";
 
 // ---------------------------------------------------------------------------
 // Closed vocabularies
@@ -321,6 +325,50 @@ export type OnboardingSuggestionResolution = z.infer<
   typeof OnboardingSuggestionResolutionSchema
 >;
 
+/**
+ * Why Q is asking a question (CQ-PRE-REC-001). Ordered by how much a wrong
+ * or missing answer matters; the planner, not the client, decides it.
+ */
+export const ONBOARDING_QUESTION_REASONS = [
+  "CONTRADICTION",
+  "REQUIRED_AND_UNANSWERED",
+  "AMBIGUITY",
+  "MATERIAL_GAP",
+  /** Q read firm wording; only the person can turn it into a hard exclusion. */
+  "EXCLUSION_CONFIRMATION",
+] as const;
+export const OnboardingQuestionReasonSchema = z.enum(
+  ONBOARDING_QUESTION_REASONS,
+);
+export type OnboardingQuestionReason = z.infer<
+  typeof OnboardingQuestionReasonSchema
+>;
+
+/**
+ * Answer a persisted interview question: the response lands on `stepKey`
+ * through the ordinary validated-response path, and the question is then
+ * marked answered. `stepKey` is normally the question's own step; it may be
+ * one of the question's option steps.
+ */
+export const AnswerOnboardingQuestionRequestSchema = z
+  .object({
+    stepKey: OnboardingStepKeySchema,
+    response: OnboardingResponseInputSchema,
+    expectedSessionVersion: SessionVersionSchema,
+  })
+  .strict();
+export type AnswerOnboardingQuestionRequest = z.infer<
+  typeof AnswerOnboardingQuestionRequestSchema
+>;
+
+/** "I don't know" / "come back to this": the question is set aside, nothing is written. */
+export const DismissOnboardingQuestionRequestSchema = z
+  .object({ expectedSessionVersion: SessionVersionSchema })
+  .strict();
+export type DismissOnboardingQuestionRequest = z.infer<
+  typeof DismissOnboardingQuestionRequestSchema
+>;
+
 export const ResolveOnboardingSuggestionRequestSchema = z
   .object({
     resolution: OnboardingSuggestionResolutionSchema,
@@ -465,6 +513,37 @@ export type OnboardingSuggestionView = z.infer<
   typeof OnboardingSuggestionViewSchema
 >;
 
+/** A server-built quick answer to a question: submitting `value` to `stepKey` answers it. */
+export const OnboardingQuestionOptionViewSchema = z.object({
+  label: z.string().min(1).max(120),
+  stepKey: OnboardingStepKeySchema,
+  value: OnboardingResponseValueSchema,
+});
+export type OnboardingQuestionOptionView = z.infer<
+  typeof OnboardingQuestionOptionViewSchema
+>;
+
+/**
+ * A question Q still wants answered (CQ-PRE-REC-001). Persisted journey
+ * state, never a value: answering submits a normal response to `stepKey`.
+ * `readings` carry the competing figures behind a contradiction so the
+ * person, never Q, chooses between them.
+ */
+export const OnboardingInterviewQuestionViewSchema = z.object({
+  id: UuidSchema,
+  stepKey: OnboardingStepKeySchema,
+  factKey: z.string(),
+  question: z.string(),
+  why: z.string().nullable(),
+  reason: OnboardingQuestionReasonSchema,
+  readings: z.array(z.string()),
+  options: z.array(OnboardingQuestionOptionViewSchema),
+  createdAt: UtcTimestampSchema,
+});
+export type OnboardingInterviewQuestionView = z.infer<
+  typeof OnboardingInterviewQuestionViewSchema
+>;
+
 export const OnboardingPhaseViewSchema = z.object({
   phaseKey: OnboardingPhaseKeySchema,
   label: z.string(),
@@ -527,6 +606,12 @@ export const OnboardingSessionViewSchema = z.object({
    * trip per step. Only the caller's own answers; never another user's.
    */
   responses: z.array(OnboardingResponseViewSchema),
+  /**
+   * Questions Q still wants answered on the eligible path, most material
+   * first. Absent on a runtime that predates them; empty when there is
+   * nothing left to ask.
+   */
+  pendingQuestions: z.array(OnboardingInterviewQuestionViewSchema).optional(),
   /** Present after a mutation that changed the eligible path. */
   pathChanges: OnboardingPathChangesSchema.optional(),
 });

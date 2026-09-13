@@ -1,7 +1,9 @@
 import type { OnboardingJourneyType } from "@capital-q/contracts";
 
 import {
+  onboardingAnswerQuestionAction,
   onboardingCandidatesAction,
+  onboardingDismissQuestionAction,
   onboardingCompleteAction,
   onboardingCurrentAction,
   onboardingDescribeNodesAction,
@@ -64,6 +66,10 @@ export function createApiRuntimePort(input: {
     skip: (request) => through(onboardingSkipAction(request)),
     resolveSuggestion: (request) =>
       through(onboardingResolveSuggestionAction(request)),
+    answerQuestion: (request) =>
+      through(onboardingAnswerQuestionAction(request)),
+    dismissQuestion: (request) =>
+      through(onboardingDismissQuestionAction(request)),
 
     /**
      * The real Evidence upload, in the three steps the API actually has

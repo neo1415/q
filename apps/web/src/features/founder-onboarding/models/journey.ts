@@ -485,6 +485,7 @@ export function toPresentation(
     sections: [...SECTIONS],
     steps,
     currentStepId: current.id,
+    questions: view.pendingQuestions ?? [],
     step: complete
       ? undefined
       : buildStep(current, state, {
@@ -569,6 +570,15 @@ function buildStep(
           ? {
               privacyNote:
                 "Private to you. Investors never see this and it changes nothing about your company profile.",
+              // What Q still wants to ask, from the session itself. Every
+              // question names a real step; the screen that owns that step
+              // is where a plain answer goes.
+              questions: (state.view.pendingQuestions ?? []).map(
+                (question) => ({
+                  ...question,
+                  editStepId: GROUP_BY_STEP.get(question.stepKey)?.id,
+                }),
+              ),
             }
           : {}),
         response:

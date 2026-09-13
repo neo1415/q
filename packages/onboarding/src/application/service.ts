@@ -3,6 +3,7 @@ import type { OutboxWriter } from "@capital-q/eventing";
 import type { Logger } from "@capital-q/observability";
 
 import { createPostgresOnboardingDefinitionRepository } from "../infrastructure/postgres-definition-repository.js";
+import { createPostgresOnboardingInterviewQuestionRepository } from "../infrastructure/postgres-question-repository.js";
 import {
   createPostgresOnboardingIdempotencyRepository,
   createPostgresOnboardingResponseRepository,
@@ -13,6 +14,7 @@ import {
 import type {
   OnboardingDefinitionRepository,
   OnboardingIdempotencyRepository,
+  OnboardingInterviewQuestionRepository,
   OnboardingResponseRepository,
   OnboardingSessionRepository,
   OnboardingStepStateRepository,
@@ -53,10 +55,15 @@ export type OnboardingService = {
     | "goBack"
     | "completeSession"
     | "resolveSuggestion"
+    | "answerInterviewQuestion"
+    | "dismissInterviewQuestion"
   >;
   readonly internal: Pick<
     OnboardingUseCases,
-    "bindSessionContext" | "createSuggestion" | "expireSuggestion"
+    | "bindSessionContext"
+    | "createSuggestion"
+    | "expireSuggestion"
+    | "recordInterviewQuestions"
   >;
   readonly publisher: OnboardingDefinitionPublisher;
 };
@@ -78,6 +85,7 @@ export type OnboardingServiceOptions = {
         readonly stepStates?: OnboardingStepStateRepository | undefined;
         readonly responses?: OnboardingResponseRepository | undefined;
         readonly suggestions?: OnboardingSuggestionRepository | undefined;
+        readonly questions?: OnboardingInterviewQuestionRepository | undefined;
         readonly idempotency?: OnboardingIdempotencyRepository | undefined;
       }
     | undefined;
@@ -108,6 +116,9 @@ export function createOnboardingService(
     suggestions:
       options.repositories?.suggestions ??
       createPostgresOnboardingSuggestionRepository(),
+    questions:
+      options.repositories?.questions ??
+      createPostgresOnboardingInterviewQuestionRepository(),
     idempotency:
       options.repositories?.idempotency ??
       createPostgresOnboardingIdempotencyRepository(),
@@ -132,11 +143,14 @@ export function createOnboardingService(
       goBack: useCases.goBack,
       completeSession: useCases.completeSession,
       resolveSuggestion: useCases.resolveSuggestion,
+      answerInterviewQuestion: useCases.answerInterviewQuestion,
+      dismissInterviewQuestion: useCases.dismissInterviewQuestion,
     },
     internal: {
       bindSessionContext: useCases.bindSessionContext,
       createSuggestion: useCases.createSuggestion,
       expireSuggestion: useCases.expireSuggestion,
+      recordInterviewQuestions: useCases.recordInterviewQuestions,
     },
     publisher: createOnboardingDefinitionPublisher({
       transactions: options.transactions,

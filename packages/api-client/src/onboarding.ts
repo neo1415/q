@@ -1,5 +1,8 @@
 import {
   IDEMPOTENCY_KEY_HEADER,
+  ONBOARDING_ANSWER_SEGMENT,
+  ONBOARDING_DISMISS_SEGMENT,
+  ONBOARDING_QUESTIONS_SEGMENT,
   ONBOARDING_BACK_SEGMENT,
   ONBOARDING_COMPLETE_SEGMENT,
   ONBOARDING_CURRENT_SEGMENT,
@@ -11,7 +14,9 @@ import {
   ONBOARDING_STEPS_SEGMENT,
   ONBOARDING_SUGGESTIONS_SEGMENT,
   OnboardingSessionViewSchema,
+  type AnswerOnboardingQuestionRequest,
   type CompleteOnboardingSessionRequest,
+  type DismissOnboardingQuestionRequest,
   type OnboardingJourneyType,
   type OnboardingBackRequest,
   type ResolveOnboardingSuggestionRequest,
@@ -141,6 +146,40 @@ export function resolveOnboardingSuggestion(
     session,
     "POST",
     `${byId(sessionId)}${ONBOARDING_SUGGESTIONS_SEGMENT}/${encodeURIComponent(suggestionId)}${ONBOARDING_RESOLVE_SEGMENT}`,
+    OnboardingSessionViewSchema,
+    { body: request, ...idempotent(idempotencyKey) },
+  );
+}
+
+/** `POST /v1/onboarding/sessions/:sessionId/questions/:questionId/answer` (CQ-PRE-REC-001) */
+export function answerOnboardingQuestion(
+  session: ApiSession,
+  sessionId: string,
+  questionId: string,
+  request: AnswerOnboardingQuestionRequest,
+  idempotencyKey: string,
+) {
+  return call(
+    session,
+    "POST",
+    `${byId(sessionId)}${ONBOARDING_QUESTIONS_SEGMENT}/${encodeURIComponent(questionId)}${ONBOARDING_ANSWER_SEGMENT}`,
+    OnboardingSessionViewSchema,
+    { body: request, ...idempotent(idempotencyKey) },
+  );
+}
+
+/** `POST /v1/onboarding/sessions/:sessionId/questions/:questionId/dismiss` */
+export function dismissOnboardingQuestion(
+  session: ApiSession,
+  sessionId: string,
+  questionId: string,
+  request: DismissOnboardingQuestionRequest,
+  idempotencyKey: string,
+) {
+  return call(
+    session,
+    "POST",
+    `${byId(sessionId)}${ONBOARDING_QUESTIONS_SEGMENT}/${encodeURIComponent(questionId)}${ONBOARDING_DISMISS_SEGMENT}`,
     OnboardingSessionViewSchema,
     { body: request, ...idempotent(idempotencyKey) },
   );

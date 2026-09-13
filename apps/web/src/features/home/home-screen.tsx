@@ -2,7 +2,6 @@ import Link from "next/link";
 
 import { loadWebServerConfig } from "@capital-q/config/web";
 import { buttonClassName } from "@capital-q/ui/button";
-import { PriorityList } from "@capital-q/ui/priority-list";
 
 import {
   PageContainer,
@@ -10,23 +9,26 @@ import {
   PageSection,
 } from "@/components/app-shell/page-container";
 
-import { ownCompanyIdAction } from "@/features/q/actions";
-import { QConversationPanel } from "@/features/q/q-conversation";
-
-import { ActivitySummary } from "./activity-summary";
+import { resolveOwnContext, type OwnContext } from "@/features/q/context";
+import {
+  QConversationPanel,
+  type QSurfaceContext,
+} from "@/features/q/q-conversation";
 
 /**
- * Home answers: where am I, what matters, what is happening, what next.
- * Q-centric, mobile-first, and honest about its fresh state: with no
- * authoritative data there is no greeting by name, no invented priority
- * and no fabricated activity. The two setup paths are the useful action.
+ * Home is the Q workspace (doc 17 §60-§63; CQ-PRE-REC-001 §12).
  *
- * Since CQ-C5-R1 the composer is connected to the real Q API: a question
- * here starts a real run, and the answer streams from the service. Whether
- * this build can reach Q is a server-side fact, resolved here and passed
- * down as a boolean -- the browser is told what is available, never where.
+ * Q first: the conversation is the primary surface, with a few contextual
+ * suggestions before the first turn and a composer that stays reachable.
+ * Honest about its fresh state: no greeting by an invented name, no empty
+ * "next priority" panel pretending to be a queue, no fabricated activity.
+ * The setup paths appear only for a person Capital Q knows nothing about
+ * yet; once a company or an investor organisation exists, the context cue
+ * says so and Q's questions are about it.
  *
- * Nothing else on this screen is read from a session, a fixture or demo data.
+ * Whether this build can reach Q is a server-side fact, resolved here and
+ * passed down as a boolean -- the browser is told what is available, never
+ * where. Nothing else on this screen is read from a fixture or demo data.
  */
 
 const SETUP_PATHS = [
@@ -48,66 +50,105 @@ const SETUP_PATHS = [
   },
 ] as const;
 
+function surfaceContext(context: OwnContext): QSurfaceContext {
+  switch (context.kind) {
+    case "FOUNDER":
+      return {
+        companyId: context.companyId,
+        scope: "founder_private",
+        label: context.label ?? undefined,
+        suggestions: [
+          "Analyse my company",
+          "What did my deck say about our customers?",
+          "What should I fix before investors see this?",
+          "What can you help me with?",
+        ],
+      };
+    case "INVESTOR":
+      return {
+        investorOrganisationId: context.investorOrganisationId,
+        scope: "investor_private",
+        label: context.label ?? undefined,
+        suggestions: [
+          "What is my mandate?",
+          "What are my hard exclusions?",
+          "What can you help me with?",
+        ],
+      };
+    case "NONE":
+      return {
+        scope: "unset",
+        suggestions: [
+          "What can you help me with?",
+          "Who are you?",
+          "How do I get started?",
+        ],
+      };
+  }
+}
+
 export async function HomeScreen() {
   const qConnected = loadWebServerConfig().qApiBaseUrl !== undefined;
-  // Which company Q's questions are about, if Capital Q knows of one. A
+  // Which subject Q's questions are about, if Capital Q knows of one. A
   // server fact, resolved once per render and never asked of the browser.
-  const companyId = qConnected ? await ownCompanyIdAction() : null;
+  const context = qConnected
+    ? await resolveOwnContext()
+    : { kind: "NONE" as const };
 
   return (
     <PageContainer>
       <PageHeader
         title="Home"
-        description="Ask Q, then handle what matters next."
+        description={
+          context.kind === "NONE"
+            ? "Ask Q, or tell Q what you're here to do."
+            : "Ask Q, then handle what matters next."
+        }
       />
 
       <div className="flex flex-col gap-8">
         <PageSection id="q" title="Ask Q" titleHidden>
           <QConversationPanel
             connected={qConnected}
-            {...(companyId === null ? {} : { companyId })}
+            context={surfaceContext(context)}
           />
         </PageSection>
 
-        <PageSection id="priority" title="Next priority">
-          <PriorityList state="empty" />
-        </PageSection>
-
-        <PageSection
-          id="setup"
-          title="Help Q understand what you're here to do"
-          description="Choose a path. Q works from whatever you already have and asks only for what's missing."
-        >
-          <ul className="flex flex-col divide-y divide-(--cq-border-subtle) border-y border-(--cq-border-subtle)">
-            {SETUP_PATHS.map((path) => (
-              <li
-                key={path.id}
-                className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between"
-              >
-                <div className="flex min-w-0 flex-col gap-1">
-                  <p className="cq-body font-medium text-(--cq-text-primary)">
-                    {path.title}
-                  </p>
-                  <p className="cq-body-sm max-w-(--cq-layout-narrow) text-(--cq-text-secondary)">
-                    {path.description}
-                  </p>
-                </div>
-                <Link
-                  href={path.href}
-                  className={buttonClassName(
-                    "secondary",
-                    "regular",
-                    "shrink-0 sm:self-center",
-                  )}
+        {context.kind === "NONE" ? (
+          <PageSection
+            id="setup"
+            title="Help Q understand what you're here to do"
+            description="Choose a path. Q works from whatever you already have and asks only for what's missing."
+          >
+            <ul className="flex flex-col divide-y divide-(--cq-border-subtle) border-y border-(--cq-border-subtle)">
+              {SETUP_PATHS.map((path) => (
+                <li
+                  key={path.id}
+                  className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between"
                 >
-                  {path.action}
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </PageSection>
-
-        <ActivitySummary />
+                  <div className="flex min-w-0 flex-col gap-1">
+                    <p className="cq-body font-medium text-(--cq-text-primary)">
+                      {path.title}
+                    </p>
+                    <p className="cq-body-sm max-w-(--cq-layout-narrow) text-(--cq-text-secondary)">
+                      {path.description}
+                    </p>
+                  </div>
+                  <Link
+                    href={path.href}
+                    className={buttonClassName(
+                      "secondary",
+                      "regular",
+                      "shrink-0 sm:self-center",
+                    )}
+                  >
+                    {path.action}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </PageSection>
+        ) : null}
       </div>
     </PageContainer>
   );

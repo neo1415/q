@@ -51,6 +51,29 @@ export type RuntimePort = {
       }) => Promise<OnboardingSessionView>)
     | undefined;
   /**
+   * Answer or set aside one of Q's persisted questions (CQ-PRE-REC-001).
+   * Answering commits a normal validated response to the step the question
+   * (or one of its options) names. Absent on a port without the path.
+   */
+  readonly answerQuestion?:
+    | ((input: {
+        readonly sessionId: string;
+        readonly questionId: string;
+        readonly stepKey: string;
+        readonly value: OnboardingResponseValue;
+        readonly expectedSessionVersion: number;
+        readonly idempotencyKey: string;
+      }) => Promise<OnboardingSessionView>)
+    | undefined;
+  readonly dismissQuestion?:
+    | ((input: {
+        readonly sessionId: string;
+        readonly questionId: string;
+        readonly expectedSessionVersion: number;
+        readonly idempotencyKey: string;
+      }) => Promise<OnboardingSessionView>)
+    | undefined;
+  /**
    * Upload one document for a document-gathering step. Absent on a port
    * with no upload path, so a screen says so rather than reporting a
    * success nothing performed.
@@ -369,6 +392,64 @@ export function createRuntimeClient<
                     ...(input.response === undefined
                       ? {}
                       : { response: input.response }),
+                    expectedSessionVersion: view.session.version,
+                    idempotencyKey: crypto.randomUUID(),
+                  }),
+                ),
+              );
+            }),
+        }),
+
+    ...(port.answerQuestion === undefined
+      ? {}
+      : {
+          answerQuestion: (input: {
+            readonly questionId: string;
+            readonly stepKey: string;
+            readonly value: OnboardingResponseValue;
+          }) =>
+            guarded(async () => {
+              const answer = port.answerQuestion;
+              if (answer === undefined) {
+                throw new OnboardingClientError(
+                  "UNAVAILABLE",
+                  "Capital Q cannot record that answer on this build yet.",
+                );
+              }
+              const view = await session();
+              return present(
+                remember(
+                  await answer({
+                    sessionId: view.session.id,
+                    questionId: input.questionId,
+                    stepKey: input.stepKey,
+                    value: input.value,
+                    expectedSessionVersion: view.session.version,
+                    idempotencyKey: crypto.randomUUID(),
+                  }),
+                ),
+              );
+            }),
+        }),
+
+    ...(port.dismissQuestion === undefined
+      ? {}
+      : {
+          dismissQuestion: (input: { readonly questionId: string }) =>
+            guarded(async () => {
+              const dismiss = port.dismissQuestion;
+              if (dismiss === undefined) {
+                throw new OnboardingClientError(
+                  "UNAVAILABLE",
+                  "Capital Q cannot record that on this build yet.",
+                );
+              }
+              const view = await session();
+              return present(
+                remember(
+                  await dismiss({
+                    sessionId: view.session.id,
+                    questionId: input.questionId,
                     expectedSessionVersion: view.session.version,
                     idempotencyKey: crypto.randomUUID(),
                   }),

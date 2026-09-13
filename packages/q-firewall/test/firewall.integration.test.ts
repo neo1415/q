@@ -897,7 +897,7 @@ describe("@capital-q/q-firewall against local PostgreSQL", () => {
   // §83 minimum context, and the owner's own reach
   // -------------------------------------------------------------------------
 
-  it("gives the owner the minimum for a plain answer and more, deterministically, for an investigation", async () => {
+  it("gives the owner the minimum for a plain answer (profile, objective, own evidence) and more, deterministically, for an investigation", async () => {
     await withWorld(async (world) => {
       const answer = await world.firewall.plan(
         ask(world.founderAlpha, "ANSWER", [company(world.companyAlpha)]),
@@ -908,13 +908,27 @@ describe("@capital-q/q-firewall against local PostgreSQL", () => {
           [
             "COMPANY_PROFILE",
             "COMPANY_CAPITAL_OBJECTIVE",
+            "EVIDENCE_DOCUMENTS",
             "OWN_Q_CONVERSATION",
             "NETWORK_VISIBLE_DATA",
             "PUBLIC_EXTERNAL_DATA",
             "GENERAL_MODEL_KNOWLEDGE",
           ].sort(),
         );
+        // Own evidence is admitted up to CONFIDENTIAL (a deck, not a
+        // financial model), so a plain answer over it stays CONFIDENTIAL.
         expect(answer.plan.maxSensitivity).toBe("CONFIDENTIAL");
+        expect(answer.plan.scopes.map((s) => s.kind)).not.toContain(
+          "COMPANY_PRIVATE_FINANCIALS",
+        );
+        const evidence = answer.plan.scopes.find(
+          (s) => s.kind === "EVIDENCE_DOCUMENTS",
+        );
+        expect(evidence?.filter.companyId).toBe(world.companyAlpha);
+        expect(evidence?.filter.contextLabels).toEqual([
+          "founder_private",
+          "organisation_private",
+        ]);
         const objective = answer.plan.scopes.find(
           (s) => s.kind === "COMPANY_CAPITAL_OBJECTIVE",
         );
@@ -943,7 +957,9 @@ describe("@capital-q/q-firewall against local PostgreSQL", () => {
             }),
           ]),
         );
-        expect(investigate.plan.maxSensitivity).toBe("HIGHLY_CONFIDENTIAL");
+        // Nothing HIGHLY_CONFIDENTIAL survived (financials denied, evidence
+        // capped at CONFIDENTIAL), so the investigation can still be routed.
+        expect(investigate.plan.maxSensitivity).toBe("CONFIDENTIAL");
       }
     });
   });

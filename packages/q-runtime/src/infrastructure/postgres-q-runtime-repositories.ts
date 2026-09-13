@@ -331,6 +331,14 @@ export function createPostgresQRuntimeRepositories(): QRuntimeRepositories {
           .parse(rows[0]);
         return { tenantId: r.tenant_id, actorUserId: r.actor_user_id };
       },
+      listNonTerminal: async (executor, limit) => {
+        const rows = await executor`
+          ${selectRun(executor)}
+           where r.status not in ('COMPLETED', 'FAILED', 'CANCELLED', 'EXPIRED')
+           order by r.created_at
+           limit ${limit}`;
+        return rows.map(toRun);
+      },
       lockForActor: async (tx, tenantId, userId, runId) => {
         const rows = await tx.sql`
           ${selectRun(tx.sql)}

@@ -121,6 +121,8 @@ export type QConversation = {
 export type QConversationOptions = {
   /** The company this surface's questions are about, resolved on the server. */
   readonly companyId?: string | undefined;
+  /** Or the investor organisation, for an investor. Never both. */
+  readonly investorOrganisationId?: string | undefined;
 };
 
 export function useQConversation(
@@ -267,7 +269,11 @@ export function useQConversation(
         const started = await askQAction(
           text,
           conversationId.current ?? undefined,
-          options.companyId,
+          options.companyId !== undefined
+            ? { companyId: options.companyId }
+            : options.investorOrganisationId !== undefined
+              ? { investorOrganisationId: options.investorOrganisationId }
+              : undefined,
         );
         if (!started.ok) {
           drop();
@@ -291,7 +297,14 @@ export function useQConversation(
         setSubmitting(false);
       }
     },
-    [follow, options.companyId, runState.messages, streaming, submitting],
+    [
+      follow,
+      options.companyId,
+      options.investorOrganisationId,
+      runState.messages,
+      streaming,
+      submitting,
+    ],
   );
 
   const stop = useCallback(async () => {

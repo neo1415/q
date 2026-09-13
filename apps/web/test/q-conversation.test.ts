@@ -106,6 +106,31 @@ describe("C5R1-W01 · the turns a person reads are the server's", () => {
     expect(turns[0]).toMatchObject({ unconfirmed: false, id: USER_MESSAGE });
   });
 
+  it("keeps a repeated question as a placeholder when only an older identical turn exists", () => {
+    // The person asks the same thing again, minutes later. The earlier turn
+    // is history, not confirmation of the one just typed.
+    const earlier = apply([
+      durable("q.message.completed", {
+        message: {
+          messageId: "msg_user_earlier",
+          runId: RUN,
+          role: "USER",
+          text: "Analyse Northstar.",
+          createdAt: "2026-09-12T09:00:00.000Z",
+        },
+      }),
+    ]);
+    const turns = turnsFrom(earlier, [
+      {
+        id: "local-2",
+        text: "Analyse Northstar.",
+        at: "2026-09-12T10:00:00.000Z",
+      },
+    ]);
+    expect(turns).toHaveLength(2);
+    expect(turns[1]).toMatchObject({ kind: "PERSON", unconfirmed: true });
+  });
+
   it("streams Q's answer, then lets the persisted message replace it", () => {
     const streaming = apply([
       userTurn,

@@ -105,6 +105,30 @@ export type FounderReviewServiceDependencies = {
       request: FounderExtractionRequest,
     ) => Promise<FounderExtractionOutcome>;
   };
+  /**
+   * The onboarding runtime's internal question recording (CQ-PRE-REC-001).
+   * What the planner decided is worth asking is persisted as journey state
+   * so F7 — and the conversational interview — can ask it after a refresh
+   * or a new machine. Optional: a composition without it still produces
+   * suggestions, and the planned questions are merely counted.
+   */
+  readonly recordQuestions?:
+    | ((command: {
+        readonly sessionId: string;
+        readonly questions: readonly {
+          readonly stepKey: string;
+          readonly factKey: string;
+          readonly question: string;
+          readonly why: string | null;
+          readonly reason: string;
+          readonly readings: readonly string[];
+          readonly sourceRefs: readonly {
+            readonly sourceType: string;
+            readonly sourceId: string;
+          }[];
+        }[];
+      }) => Promise<unknown>)
+    | undefined;
   readonly logger?: Logger | undefined;
 };
 
@@ -131,6 +155,7 @@ export function createFounderDocumentReview(
     suggestions,
     createSuggestion,
     extraction,
+    recordQuestions,
     logger,
   } = dependencies;
 
@@ -233,6 +258,36 @@ export function createFounderDocumentReview(
         }
       }
 
+      // The planner's questions are journey state, not a model's opinion:
+      // every one maps to a real step of the pinned definition, and the
+      // runtime validates that again before storing. A question a later
+      // reading re-plans supersedes the earlier one for the same fact.
+      let questionsRecorded = 0;
+      if (recordQuestions !== undefined && plan.questions.length > 0) {
+        try {
+          await recordQuestions({
+            sessionId: session.id,
+            questions: plan.questions.map((question) => ({
+              stepKey: question.stepKey,
+              factKey: question.key,
+              question: question.question,
+              why: question.why,
+              reason: question.reason,
+              readings: question.readings,
+              sourceRefs: [
+                { sourceType: "EVIDENCE_DOCUMENT", sourceId: event.documentId },
+              ],
+            })),
+          });
+          questionsRecorded = plan.questions.length;
+        } catch (error: unknown) {
+          logger?.warn(
+            { err: error, sessionId: session.id },
+            "founder follow-up questions refused by the onboarding runtime",
+          );
+        }
+      }
+
       logger?.info(
         {
           sessionId: session.id,
@@ -241,6 +296,7 @@ export function createFounderDocumentReview(
           drafted: plan.suggestions.length,
           created,
           questions: plan.questions.length,
+          questionsRecorded,
           blocked: plan.outcome.blocked,
         },
         "founder document review prepared",

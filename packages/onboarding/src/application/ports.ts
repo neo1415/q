@@ -19,6 +19,9 @@ import type {
   OnboardingDefinitionId,
   OnboardingDefinitionVersion,
   OnboardingDefinitionVersionId,
+  OnboardingInterviewQuestion,
+  OnboardingInterviewQuestionId,
+  OnboardingQuestionStatus,
   OnboardingResponse,
   OnboardingResponseId,
   OnboardingSession,
@@ -256,6 +259,44 @@ export type OnboardingSuggestionRepository = {
     tx: TransactionContext,
     suggestionId: OnboardingSuggestionId,
     status: Exclude<OnboardingSuggestionStatus, "PENDING">,
+  ) => Promise<boolean>;
+};
+
+export type NewOnboardingInterviewQuestion = Omit<
+  OnboardingInterviewQuestion,
+  "id" | "status" | "createdAt" | "resolvedAt"
+>;
+
+/**
+ * Persisted interview questions (CQ-PRE-REC-001). Creation replaces any
+ * PENDING question for the same fact so a re-planned interview never shows
+ * two questions about one thing; answering and dismissing are terminal.
+ */
+export type OnboardingInterviewQuestionRepository = {
+  readonly listPending: (
+    executor: DatabaseExecutor,
+    sessionId: OnboardingSessionId,
+  ) => Promise<readonly OnboardingInterviewQuestion[]>;
+  readonly findById: (
+    executor: DatabaseExecutor,
+    sessionId: OnboardingSessionId,
+    questionId: OnboardingInterviewQuestionId,
+  ) => Promise<OnboardingInterviewQuestion | null>;
+  readonly insert: (
+    tx: TransactionContext,
+    input: NewOnboardingInterviewQuestion,
+  ) => Promise<OnboardingInterviewQuestion>;
+  /** PENDING -> SUPERSEDED for the named facts; returns how many changed. */
+  readonly supersedePending: (
+    tx: TransactionContext,
+    sessionId: OnboardingSessionId,
+    factKeys: readonly string[],
+  ) => Promise<number>;
+  /** PENDING -> terminal status; false if it was already resolved. */
+  readonly resolve: (
+    tx: TransactionContext,
+    questionId: OnboardingInterviewQuestionId,
+    status: Exclude<OnboardingQuestionStatus, "PENDING">,
   ) => Promise<boolean>;
 };
 

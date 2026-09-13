@@ -79,7 +79,9 @@ export {
 } from "./taxonomy.js";
 
 export {
+  answerOnboardingQuestion,
   completeOnboardingSession,
+  dismissOnboardingQuestion,
   getCurrentOnboardingSession,
   getOnboardingSession,
   goBackInOnboarding,

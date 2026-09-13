@@ -105,6 +105,18 @@ async function run<T>(
   }
 }
 
+/**
+ * Which platform subject a run is about. Resolved on the server; the Q API
+ * resolves and authorises it again before the run reaches any context.
+ */
+export type QSubjectInput =
+  { readonly companyId: string } | { readonly investorOrganisationId: string };
+
+const SubjectInputSchema = z.union([
+  z.object({ companyId: z.string().uuid() }).strict(),
+  z.object({ investorOrganisationId: z.string().uuid() }).strict(),
+]);
+
 export type QStartedRun = {
   readonly runId: string;
   readonly conversationId: string | undefined;
@@ -157,7 +169,7 @@ export async function ownCompanyIdAction(): Promise<string | null> {
 export async function askQAction(
   rawQuestion: string,
   rawConversationId?: string,
-  rawCompanyId?: string,
+  rawSubject?: QSubjectInput | string,
 ): Promise<QActionResult<QStartedRun>> {
   const parsed = QuestionSchema.safeParse(rawQuestion);
   if (!parsed.success) {
@@ -170,10 +182,24 @@ export async function askQAction(
     rawConversationId === undefined
       ? undefined
       : QConversationIdSchema.safeParse(rawConversationId).data;
-  const companyId =
-    rawCompanyId === undefined
+  // A bare string is the older company-only form (F8 still uses it).
+  const subject =
+    rawSubject === undefined
       ? undefined
-      : z.string().uuid().safeParse(rawCompanyId).data;
+      : typeof rawSubject === "string"
+        ? SubjectInputSchema.safeParse({ companyId: rawSubject }).data
+        : SubjectInputSchema.safeParse(rawSubject).data;
+  const subjects =
+    subject === undefined
+      ? undefined
+      : "companyId" in subject
+        ? [{ kind: "COMPANY" as const, companyId: subject.companyId }]
+        : [
+            {
+              kind: "INVESTOR_ORGANISATION" as const,
+              investorOrganisationId: subject.investorOrganisationId,
+            },
+          ];
 
   return run(async (session) => {
     const handle = await createQRun(
@@ -182,9 +208,7 @@ export async function askQAction(
         capability: "ANSWER",
         message: { text: parsed.data },
         modality: "TEXT",
-        ...(companyId === undefined
-          ? {}
-          : { subjects: [{ kind: "COMPANY" as const, companyId }] }),
+        ...(subjects === undefined ? {} : { subjects }),
         ...(conversationId === undefined ? {} : { conversationId }),
       },
       crypto.randomUUID(),

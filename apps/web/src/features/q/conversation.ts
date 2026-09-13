@@ -67,6 +67,30 @@ function sourceCountOf(blocks: readonly QResultBlock[] | undefined): number {
   );
 }
 
+/**
+ * How far apart the browser's clock and the server's may be for a recorded
+ * turn to still count as the one just typed. Generous, because the cost of
+ * being wrong is one sentence shown twice for a moment, not a lost turn.
+ */
+const CONFIRMATION_SKEW_MS = 5 * 60 * 1000;
+
+function isConfirmed(
+  turn: PendingTurn,
+  confirmed: ReadonlyMap<string, readonly string[]>,
+): boolean {
+  const recorded = confirmed.get(turn.text.trim());
+  if (recorded === undefined) {
+    return false;
+  }
+  const typedAt = Date.parse(turn.at);
+  if (Number.isNaN(typedAt)) {
+    return true;
+  }
+  return recorded.some(
+    (at) => Date.parse(at) >= typedAt - CONFIRMATION_SKEW_MS,
+  );
+}
+
 export function turnsFrom(
   state: QStreamState,
   pending: readonly PendingTurn[],
@@ -76,7 +100,8 @@ export function turnsFrom(
   // event before the person's own turn has been confirmed, and rendering
   // the reply above the question it answers is a conversation nobody had.
   const dated: { readonly at: string; readonly turn: QTurn }[] = [];
-  const confirmed = new Set<string>();
+  // Every confirmed turn of the person, by text, with when it was recorded.
+  const confirmed = new Map<string, string[]>();
 
   for (const message of state.messages) {
     const text = textOf(message);
@@ -84,7 +109,8 @@ export function turnsFrom(
       continue;
     }
     if (message.role === "USER") {
-      confirmed.add(text.trim());
+      const key = text.trim();
+      confirmed.set(key, [...(confirmed.get(key) ?? []), message.createdAt]);
       dated.push({
         at: message.createdAt,
         turn: {
@@ -109,9 +135,13 @@ export function turnsFrom(
   }
 
   // Anything the server has now confirmed stops being a placeholder. Text
-  // is the only thing the two sides share before a message id exists.
+  // is the only thing the two sides share before a message id exists — but
+  // only a turn recorded around the time this one was typed confirms it.
+  // The same question asked again later in a conversation is a new turn,
+  // and an identical older one must not swallow its placeholder (seen in
+  // the browser: the repeated question vanished until a refresh).
   for (const turn of pending) {
-    if (!confirmed.has(turn.text.trim())) {
+    if (!isConfirmed(turn, confirmed)) {
       dated.push({
         at: turn.at,
         turn: {

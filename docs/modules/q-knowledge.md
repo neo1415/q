@@ -311,6 +311,12 @@ oversight:
   investor asking about a company they do not own reaches no chunk-backed
   scope at all. Founder-private material is not filtered out of their
   answer; it is never searched.
+- The evidence scope admits documents up to `CONFIDENTIAL`, and the plain
+  `ANSWER` capability on one's own company carries it (CQ-PRE-REC-001 §11:
+  a deck uploaded once is reused from Home Q, never asked for again). A
+  `HIGHLY_CONFIDENTIAL` document (a financial model, management accounts)
+  is outside every V1 envelope rather than inside one that no model
+  provider may receive; the per-chunk ceiling in SQL is what keeps it out.
 - `relationship_shared` and `specifically_shared` chunks are outside every
   V1 envelope. Document sharing is the Data Room's grant to make, and the
   firewall's evidence scope does not carry those labels. An expired or

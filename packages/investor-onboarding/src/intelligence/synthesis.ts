@@ -69,6 +69,7 @@ export type MandateSynthesisGateway = {
       readonly attribution: {
         readonly tenantId: string;
         readonly userId: string;
+        readonly correlationId: string;
       };
     },
     options: {
@@ -125,6 +126,8 @@ export type MandateSynthesisRequest = {
   readonly observedBehaviour: readonly string[];
   /** The session revision this runs against, so a stale result is refusable (§49). */
   readonly revision: number;
+  /** The unit of work, carried through to the model call's attribution. */
+  readonly correlationId: string;
   readonly signal?: AbortSignal | undefined;
 };
 
@@ -248,6 +251,7 @@ export function createMandateSynthesis(
               attribution: {
                 tenantId: request.tenantId,
                 userId: request.userId,
+                correlationId: request.correlationId,
               },
             },
             {

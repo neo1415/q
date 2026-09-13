@@ -1,4 +1,5 @@
 import type {
+  OnboardingInterviewQuestionView,
   OnboardingPathChanges,
   OnboardingResponseView,
   OnboardingSessionView,
@@ -9,6 +10,7 @@ import type {
 import type { DatabaseExecutor } from "@capital-q/database";
 
 import type {
+  OnboardingInterviewQuestion,
   OnboardingResponse,
   OnboardingSession,
   OnboardingStepDefinition,
@@ -25,6 +27,7 @@ import {
 } from "../runtime/path.js";
 import type {
   OnboardingDefinitionRepository,
+  OnboardingInterviewQuestionRepository,
   OnboardingResponseRepository,
   OnboardingStepStateRepository,
   OnboardingSuggestionRepository,
@@ -45,6 +48,8 @@ export type OnboardingSessionAggregate = {
   readonly states: ReadonlyMap<string, OnboardingStepState>;
   readonly currentResponses: ReadonlyMap<string, OnboardingResponse>;
   readonly pendingSuggestions: readonly OnboardingSuggestion[];
+  /** Questions Q still wants answered (CQ-PRE-REC-001). */
+  readonly pendingQuestions: readonly OnboardingInterviewQuestion[];
   readonly path: ActivePath;
 };
 
@@ -53,6 +58,8 @@ export type AggregateLoaderDependencies = {
   readonly stepStates: OnboardingStepStateRepository;
   readonly responses: OnboardingResponseRepository;
   readonly suggestions: OnboardingSuggestionRepository;
+  /** Optional so older compositions keep working; absent means no questions. */
+  readonly questions?: OnboardingInterviewQuestionRepository | undefined;
 };
 
 /** Published versions are immutable, so a process-local cache is always correct. */
@@ -89,13 +96,21 @@ export async function loadAggregate(
   loadDefinition: ReturnType<typeof createDefinitionCache>,
   session: OnboardingSession,
 ): Promise<OnboardingSessionAggregate> {
-  const [definition, stateRows, responseRows, pendingSuggestions] =
-    await Promise.all([
-      loadDefinition(executor, session.definitionVersionId),
-      dependencies.stepStates.listBySession(executor, session.id),
-      dependencies.responses.listCurrent(executor, session.id),
-      dependencies.suggestions.listPending(executor, session.id),
-    ]);
+  const [
+    definition,
+    stateRows,
+    responseRows,
+    pendingSuggestions,
+    pendingQuestions,
+  ] = await Promise.all([
+    loadDefinition(executor, session.definitionVersionId),
+    dependencies.stepStates.listBySession(executor, session.id),
+    dependencies.responses.listCurrent(executor, session.id),
+    dependencies.suggestions.listPending(executor, session.id),
+    dependencies.questions === undefined
+      ? Promise.resolve([] as readonly OnboardingInterviewQuestion[])
+      : dependencies.questions.listPending(executor, session.id),
+  ]);
   const stepsByKey = new Map(
     definition.steps.map((step) => [step.stepKey, step]),
   );
@@ -110,6 +125,7 @@ export async function loadAggregate(
     states,
     currentResponses,
     pendingSuggestions,
+    pendingQuestions,
     path: computeActivePath(definition.steps, currentResponses),
   };
 }
@@ -250,6 +266,65 @@ export function toSuggestionView(
   };
 }
 
+export function toQuestionView(
+  question: OnboardingInterviewQuestion,
+): OnboardingInterviewQuestionView {
+  return {
+    id: question.id,
+    stepKey: question.stepKey,
+    factKey: question.factKey,
+    question: question.question,
+    why: question.why,
+    reason: question.reason,
+    readings: [...question.readings],
+    options: question.options.map((option) => ({
+      label: option.label,
+      stepKey: option.stepKey,
+      value: option.value,
+    })),
+    createdAt: question.createdAt,
+  };
+}
+
+/** Most material first; the reason vocabulary is already in that order. */
+const QUESTION_RANK: Readonly<
+  Record<OnboardingInterviewQuestion["reason"], number>
+> = {
+  CONTRADICTION: 0,
+  EXCLUSION_CONFIRMATION: 1,
+  REQUIRED_AND_UNANSWERED: 2,
+  AMBIGUITY: 3,
+  MATERIAL_GAP: 4,
+};
+
+/**
+ * The questions a client should still show: on the eligible path, and not
+ * overtaken by an answer given to the mapped step after the question was
+ * asked. The second condition is belt and braces for the explicit ANSWERED
+ * transition, so a crash between a submit and its mark never re-asks.
+ */
+export function pendingQuestionViews(
+  aggregate: OnboardingSessionAggregate,
+): OnboardingInterviewQuestionView[] {
+  const { path, currentResponses } = aggregate;
+  // Tolerant of an aggregate assembled without questions (older callers,
+  // tests): no questions is the same as none pending.
+  return [...(aggregate.pendingQuestions ?? [])]
+    .filter((question) => {
+      if (!path.eligibleKeys.has(question.stepKey)) {
+        return false;
+      }
+      const response = currentResponses.get(question.stepKey);
+      return response === undefined || response.createdAt <= question.createdAt;
+    })
+    .sort(
+      (a, b) =>
+        QUESTION_RANK[a.reason] - QUESTION_RANK[b.reason] ||
+        (a.createdAt < b.createdAt ? -1 : a.createdAt > b.createdAt ? 1 : 0),
+    )
+    .map(toQuestionView);
+}
+
 export function toSessionView(
   aggregate: OnboardingSessionAggregate,
   pathChanges?: OnboardingPathChanges,
@@ -297,6 +372,7 @@ export function toSessionView(
       const response = currentResponses.get(step.stepKey);
       return response === undefined ? [] : [toResponseView(response)];
     }),
+    pendingQuestions: pendingQuestionViews(aggregate),
     ...(pathChanges === undefined ? {} : { pathChanges }),
   };
 }

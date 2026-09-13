@@ -73,6 +73,7 @@ export {
   OnboardingSessionVersionConflictError,
   OnboardingSubjectNotFoundError,
   OnboardingSuggestionNotFoundError,
+  OnboardingInterviewQuestionNotFoundError,
   type OnboardingRuntimeFault,
   type OnboardingStateReason,
 } from "./domain/errors.js";
@@ -108,6 +109,8 @@ export {
 export type {
   NewOnboardingSession,
   NewOnboardingSuggestion,
+  NewOnboardingInterviewQuestion,
+  OnboardingInterviewQuestionRepository,
   OnboardingDefinitionRepository,
   OnboardingIdempotencyRepository,
   OnboardingResponseRepository,
@@ -142,6 +145,8 @@ export {
   toSessionView,
   toStepView,
   toSuggestionView,
+  toQuestionView,
+  pendingQuestionViews,
   type OnboardingSessionAggregate,
 } from "./application/view.js";
 export {
@@ -155,6 +160,9 @@ export {
   type OnboardingRuntimeDependencies,
   type OnboardingUseCases,
   type ResolveOnboardingSuggestionCommand,
+  type RecordOnboardingQuestionsCommand,
+  type AnswerOnboardingQuestionCommand,
+  type DismissOnboardingQuestionCommand,
   type SessionScopedQuery,
   type SkipOnboardingStepCommand,
   type StartOnboardingSessionCommand,
@@ -168,6 +176,7 @@ export {
   type OnboardingServiceOptions,
 } from "./application/service.js";
 export { createPostgresOnboardingDefinitionRepository } from "./infrastructure/postgres-definition-repository.js";
+export { createPostgresOnboardingInterviewQuestionRepository } from "./infrastructure/postgres-question-repository.js";
 export {
   createPostgresOnboardingIdempotencyRepository,
   createPostgresOnboardingResponseRepository,

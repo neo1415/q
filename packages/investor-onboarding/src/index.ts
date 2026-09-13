@@ -40,6 +40,17 @@ export {
   type InvestorWriteTargetOptions,
 } from "./integration/write-targets.js";
 export {
+  createMandateReview,
+  MANDATE_NARRATIVE_STEP_KEYS,
+  MANDATE_REVIEW_SKIP_REASONS,
+  parseMoney,
+  type MandateReview,
+  type MandateReviewResult,
+  type MandateReviewServiceDependencies,
+  type MandateReviewSkipReason,
+  type MandateTaxonomyResolver,
+} from "./integration/mandate-review-service.js";
+export {
   createInvestorStepContextProviders,
   type InvestorStepContextOptions,
 } from "./integration/step-contexts.js";

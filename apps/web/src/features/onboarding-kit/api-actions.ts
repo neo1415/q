@@ -4,7 +4,9 @@ import { z } from "zod";
 
 import {
   ApiProblemError,
+  answerOnboardingQuestion,
   completeOnboardingSession,
+  dismissOnboardingQuestion,
   findTaxonomyCandidates,
   getCurrentOnboardingSession,
   getOnboardingSession,
@@ -233,6 +235,56 @@ export async function onboardingResolveSuggestionAction(
           : { response: { value: input.response } }),
         expectedSessionVersion: input.expectedSessionVersion,
       },
+      input.idempotencyKey,
+    ),
+  );
+}
+
+const AnswerQuestionInput = z.object({
+  sessionId: Uuid,
+  questionId: Uuid,
+  stepKey: OnboardingStepKeySchema,
+  value: OnboardingResponseValueSchema,
+  expectedSessionVersion: Version,
+  idempotencyKey: Uuid,
+});
+
+export async function onboardingAnswerQuestionAction(
+  raw: unknown,
+): Promise<ActionResult<OnboardingSessionView>> {
+  const input = AnswerQuestionInput.parse(raw);
+  return run((session) =>
+    answerOnboardingQuestion(
+      session,
+      input.sessionId,
+      input.questionId,
+      {
+        stepKey: input.stepKey,
+        response: { value: input.value },
+        expectedSessionVersion: input.expectedSessionVersion,
+      },
+      input.idempotencyKey,
+    ),
+  );
+}
+
+const DismissQuestionInput = z.object({
+  sessionId: Uuid,
+  questionId: Uuid,
+  expectedSessionVersion: Version,
+  idempotencyKey: Uuid,
+});
+
+export async function onboardingDismissQuestionAction(
+  raw: unknown,
+): Promise<ActionResult<OnboardingSessionView>> {
+  const input = DismissQuestionInput.parse(raw);
+  return run((session) =>
+    dismissOnboardingQuestion(
+      session,
+      input.sessionId,
+      input.questionId,
+      { expectedSessionVersion: input.expectedSessionVersion },
       input.idempotencyKey,
     ),
   );

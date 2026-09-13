@@ -29,6 +29,7 @@ import {
 import type { StepStatus, StepSummary } from "../../onboarding-kit/session";
 import type {
   InvestorOnboardingSessionView,
+  QReadingItem,
   SectionId,
   StepKind,
   StepResponse,
@@ -327,6 +328,8 @@ export type PresentationExtras = {
   /** Small vocabularies listed for pick-lists, by vocabulary code. */
   readonly nodeLists?:
     Readonly<Record<string, readonly TaxonomyCandidateView[]>> | undefined;
+  /** Labels for taxonomy ids that pending suggestions propose (the I11 reading). */
+  readonly suggestedTaxonomy?: readonly TaxonomyCandidateView[] | undefined;
 };
 
 /** What the runtime client fetches for the current screen before presenting it. */
@@ -353,6 +356,21 @@ export async function enrich(
     case "red_flags":
       await describe(S.sectorExclusions);
       return { selectedTaxonomy };
+    case "review": {
+      const ids = [
+        ...new Set(
+          view.pendingSuggestions.flatMap((suggestion) =>
+            suggestion.suggestedValue.type === "RESOURCE_REFERENCE"
+              ? suggestion.suggestedValue.resourceIds
+              : [],
+          ),
+        ),
+      ];
+      return {
+        suggestedTaxonomy:
+          ids.length === 0 ? [] : await port.describeNodes(ids),
+      };
+    }
     case "attributes": {
       const [businessModels, customerTypes] = await Promise.all([
         port.listNodes(BUSINESS_MODEL_VOCABULARIES[0]),
@@ -398,9 +416,85 @@ export function toPresentation(
     sections: [...SECTIONS],
     steps,
     currentStepId: current.id,
+    questions: view.pendingQuestions ?? [],
     step: complete ? undefined : buildStep(current, state, extras),
     source,
   };
+}
+
+/** The group a runtime step belongs to, for "change this" navigation. */
+const GROUP_BY_STEP_KEY: ReadonlyMap<string, Group> = new Map(
+  [...GROUPS, HANDOFF_GROUP].flatMap((group) =>
+    group.stepKeys.map((key) => [key, group] as const),
+  ),
+);
+
+/**
+ * A pending suggestion as the words the investor was offered. Option keys
+ * become labels from the published definition; taxonomy ids become labels
+ * the port described. A value nothing can render is dropped rather than
+ * shown as JSON.
+ */
+function readingItems(
+  view: OnboardingSessionView,
+  described: readonly TaxonomyCandidateView[],
+): QReadingItem[] {
+  const labelByNode = new Map(
+    described.map((node) => [node.nodeId, node.label]),
+  );
+  return view.pendingSuggestions.flatMap((suggestion) => {
+    const group = GROUP_BY_STEP_KEY.get(suggestion.stepKey);
+    if (group === undefined) {
+      return [];
+    }
+    const value = suggestion.suggestedValue;
+    let rendered: string | null = null;
+    switch (value.type) {
+      case "SINGLE_SELECT":
+        rendered =
+          optionsOf(suggestion.stepKey).find(
+            (o) => o.value === value.optionKey,
+          )?.label ?? null;
+        break;
+      case "MULTI_SELECT": {
+        const options = optionsOf(suggestion.stepKey);
+        const labels = value.optionKeys.flatMap((key) => {
+          const label = options.find((o) => o.value === key)?.label;
+          return label === undefined ? [] : [label];
+        });
+        rendered = labels.length === 0 ? null : labels.join(", ");
+        break;
+      }
+      case "RANGE":
+        rendered = value.value;
+        break;
+      case "RESOURCE_REFERENCE": {
+        const labels = value.resourceIds.flatMap((id) => {
+          const label = labelByNode.get(id);
+          return label === undefined ? [] : [label];
+        });
+        rendered = labels.length === 0 ? null : labels.join(", ");
+        break;
+      }
+      case "TEXT":
+        rendered = value.text;
+        break;
+      case "CONFIRMATION":
+        rendered = null;
+    }
+    if (rendered === null) {
+      return [];
+    }
+    const stepLabel = config(suggestion.stepKey).configuration.prompt;
+    return [
+      {
+        id: suggestion.id,
+        stepId: group.id,
+        label: stepLabel,
+        value: rendered,
+      },
+    ];
+  });
 }
 
 function base<TKind extends StepKind>(
@@ -680,6 +774,11 @@ function buildStep(
         ...base(group, "mandate_review", state),
         primaryActionLabel: "Looks right",
         review: parsed.success ? parsed.data : undefined,
+        reading: readingItems(state.view, extras.suggestedTaxonomy ?? []),
+        questions: (state.view.pendingQuestions ?? []).map((question) => ({
+          ...question,
+          editStepId: GROUP_BY_STEP_KEY.get(question.stepKey)?.id,
+        })),
         response: undefined,
       };
     }

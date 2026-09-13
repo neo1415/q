@@ -79,11 +79,12 @@ import {
   createCapitalObjectiveQSubjectResolver,
   createCompanyQSubjectResolver,
   createDocumentQSubjectResolver,
+  createInProcessQLiveDeltaBus,
   createInvestorOrganisationQSubjectResolver,
   createOrganisationQSubjectResolver,
-  createPostgresQRuntimeRepositories,
-  createInProcessQLiveDeltaBus,
+  createOrphanedRunSweep,
   createPostgresQRunEventNotifier,
+  createPostgresQRuntimeRepositories,
   createQOrchestrationRuntime,
   createQRunStreamService,
   createQRuntimeService,
@@ -374,11 +375,12 @@ logger.info(
 const checkpoints = createPostgresQCheckpointStore({
   connectionString: resolveDatabaseUrl(loadDatabaseConfig(), "REQUEST"),
 });
+const orchestrationRuntime = createQOrchestrationRuntime({
+  ...runtimeDependencies,
+  repositories,
+});
 const orchestrator = createLangGraphQOrchestrator({
-  runtime: createQOrchestrationRuntime({
-    ...runtimeDependencies,
-    repositories,
-  }),
+  runtime: orchestrationRuntime,
   cancelRun: qRuntime.cancelRun,
   checkpoints,
   firewall,
@@ -396,6 +398,16 @@ const orchestrator = createLangGraphQOrchestrator({
  * can honestly do.
  */
 const Q_ORCHESTRATION_AUTOSTART = true;
+
+// Runs this process was orchestrating when it last stopped have no engine
+// any more. Close them before serving, so a reconnecting client receives one
+// terminal, retryable failure instead of "working" forever (CQ-PRE-REC-001 §8).
+await createOrphanedRunSweep({
+  sql: database.sql,
+  runs: repositories.runs,
+  runtime: orchestrationRuntime,
+  logger,
+}).sweep();
 
 const { app, logger: appLogger } = createApp(
   config,

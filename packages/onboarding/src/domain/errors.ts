@@ -48,6 +48,14 @@ export class OnboardingSuggestionNotFoundError extends Error {
   }
 }
 
+/** Enumeration-safe: a question of another session reads as absent. */
+export class OnboardingInterviewQuestionNotFoundError extends Error {
+  constructor() {
+    super("The requested resource was not found.");
+    this.name = "OnboardingInterviewQuestionNotFoundError";
+  }
+}
+
 export class OnboardingSubjectNotFoundError extends Error {
   constructor() {
     super("The requested resource was not found.");
@@ -82,6 +90,7 @@ export const ONBOARDING_STATE_REASONS = [
   "REQUIRED_STEPS_INCOMPLETE",
   "SUGGESTION_ALREADY_RESOLVED",
   "SUGGESTION_STEP_MISMATCH",
+  "QUESTION_ALREADY_RESOLVED",
   "SUBJECT_ALREADY_BOUND",
   "CONTEXT_ALREADY_BOUND",
   "UNBOUND_START_NOT_ALLOWED",
@@ -114,6 +123,7 @@ export const ONBOARDING_RUNTIME_FAULTS = [
   "SUBJECT_RESOLVER_MISSING",
   "DEFINITION_STEP_MISSING",
   "DEFINITION_VERSION_MISSING",
+  "QUESTIONS_UNAVAILABLE",
 ] as const;
 export type OnboardingRuntimeFault = (typeof ONBOARDING_RUNTIME_FAULTS)[number];
 

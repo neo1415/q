@@ -1,9 +1,24 @@
 import type { ReactNode } from "react";
 
+import type { ContextScope } from "@capital-q/ui/tokens";
+
 import { AppHeader } from "./app-header";
 import { DesktopSidebar } from "./desktop-sidebar";
 import { MobileNavigation } from "./mobile-navigation";
 import { NetworkStatus } from "./network-status";
+
+/**
+ * The workspace cue the shell shows: which organisation context this person
+ * is acting in, resolved on the server. `unset` is an honest answer for a
+ * person with no company and no investor organisation yet; the shell never
+ * invents one (CQ-PRE-REC-001 §12).
+ */
+export type ShellContext = {
+  readonly scope: ContextScope;
+  readonly label?: string | undefined;
+};
+
+const UNSET: ShellContext = { scope: "unset" };
 
 /**
  * The application shell. Server-rendered structure; only the pieces that
@@ -12,7 +27,13 @@ import { NetworkStatus } from "./network-status";
  * Mobile: header → main → bottom navigation. Desktop: sidebar + workspace.
  * `main` carries the id the skip link targets.
  */
-export function AppShell({ children }: { readonly children: ReactNode }) {
+export function AppShell({
+  children,
+  context = UNSET,
+}: {
+  readonly children: ReactNode;
+  readonly context?: ShellContext | undefined;
+}) {
   return (
     <div className="cq-shell">
       <a
@@ -21,9 +42,9 @@ export function AppShell({ children }: { readonly children: ReactNode }) {
       >
         Skip to content
       </a>
-      <DesktopSidebar />
+      <DesktopSidebar context={context} />
       <div className="cq-shell-body">
-        <AppHeader />
+        <AppHeader context={context} />
         <NetworkStatus />
         <main id="main" className="cq-shell-main">
           {children}

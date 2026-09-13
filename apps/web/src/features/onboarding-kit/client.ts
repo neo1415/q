@@ -34,6 +34,19 @@ export type OnboardingClient<TView, TResponse> = {
         readonly response?: OnboardingResponseValue | undefined;
       }) => Promise<TView>)
     | undefined;
+  /**
+   * Answer one of Q's persisted questions on the step it names, or set it
+   * aside (CQ-PRE-REC-001). Absent when the composed client has no path.
+   */
+  readonly answerQuestion?:
+    | ((input: {
+        readonly questionId: string;
+        readonly stepKey: string;
+        readonly value: OnboardingResponseValue;
+      }) => Promise<TView>)
+    | undefined;
+  readonly dismissQuestion?:
+    ((input: { readonly questionId: string }) => Promise<TView>) | undefined;
   /** Deterministic taxonomy candidates for the user's own text. Never assigned here. */
   readonly findTaxonomyCandidates: (input: {
     readonly text: string;

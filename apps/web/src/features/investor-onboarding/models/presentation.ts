@@ -9,6 +9,7 @@ import type { CurrencyOption } from "@capital-q/ui/money-input";
 
 import type { TaxonomyCandidateView } from "../../onboarding-kit/client";
 import type {
+  QuestionView,
   SessionPresentation,
   StepBase,
 } from "../../onboarding-kit/session";
@@ -158,12 +159,29 @@ export type StepView =
     })
   | (Base<"mandate_review"> & {
       readonly review: InvestorReviewContext | undefined;
+      /** What Q read from the narrative, as pending proposals with labels (CQ-PRE-REC-001). */
+      readonly reading: readonly QReadingItem[];
+      /** What Q still needs the investor to settle, most material first. */
+      readonly questions: readonly AskedQuestionView[];
       readonly response?: undefined;
     })
   | (Base<"handoff"> & {
       readonly handoff: InvestorHandoffContext | undefined;
       readonly response?: undefined;
     });
+
+/** One pending suggestion rendered in words the investor was offered. */
+export type QReadingItem = {
+  readonly id: string;
+  readonly stepId: string;
+  readonly label: string;
+  readonly value: string;
+};
+
+/** A persisted question with the screen that answers it. */
+export type AskedQuestionView = QuestionView & {
+  readonly editStepId: string | undefined;
+};
 
 export type StepViewOfKind<TKind extends StepKind> = Extract<
   StepView,

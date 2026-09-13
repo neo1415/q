@@ -1,10 +1,15 @@
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import {
+  AnswerOnboardingQuestionRequestSchema,
   CompleteOnboardingSessionRequestSchema,
+  DismissOnboardingQuestionRequestSchema,
   CorrelationIdSchema,
   IDEMPOTENCY_KEY_HEADER,
   IdempotencyKeyHeaderSchema,
+  ONBOARDING_ANSWER_SEGMENT,
   ONBOARDING_BACK_SEGMENT,
+  ONBOARDING_DISMISS_SEGMENT,
+  ONBOARDING_QUESTIONS_SEGMENT,
   ONBOARDING_COMPLETE_SEGMENT,
   ONBOARDING_CURRENT_SEGMENT,
   OnboardingJourneyTypeSchema,
@@ -26,9 +31,11 @@ import {
   type CorrelationId,
 } from "@capital-q/contracts";
 import {
+  OnboardingInterviewQuestionIdSchema,
   OnboardingSessionIdSchema,
   OnboardingSessionNotFoundError,
   OnboardingSuggestionIdSchema,
+  type OnboardingInterviewQuestionId,
   type OnboardingService,
   type OnboardingSessionId,
   type OnboardingSuggestionId,
@@ -74,6 +81,17 @@ function stepKeyParam(request: FastifyRequest): string {
     OnboardingStepKeySchema,
     params["stepKey"],
     "The step key is not valid.",
+  );
+}
+
+function questionIdParam(
+  request: FastifyRequest,
+): OnboardingInterviewQuestionId {
+  const params = request.params as Record<string, unknown>;
+  return parseContract(
+    OnboardingInterviewQuestionIdSchema,
+    params["questionId"],
+    "The question identifier is not valid.",
   );
 }
 
@@ -264,6 +282,55 @@ export function registerOnboardingRoutes(
         suggestionId: suggestionIdParam(request),
         resolution: input.resolution,
         response: input.response,
+        expectedSessionVersion: input.expectedSessionVersion,
+        idempotencyKey: key,
+        correlationId: correlation(),
+      });
+      void reply.header("Cache-Control", "no-store");
+      return OnboardingSessionViewSchema.parse(view);
+    },
+  );
+  // Interview questions (CQ-PRE-REC-001): answering commits a normal
+  // validated response to the mapped step; dismissing writes nothing.
+  app.post(
+    `${byId}${ONBOARDING_QUESTIONS_SEGMENT}/:questionId${ONBOARDING_ANSWER_SEGMENT}`,
+    { onRequest: withActor },
+    async (request, reply) => {
+      const key = idempotencyKey(request, "answer an onboarding question");
+      const input = parseContract(
+        AnswerOnboardingQuestionRequestSchema,
+        request.body,
+        "The answer request is not valid.",
+      );
+      const view = await runtime.answerInterviewQuestion({
+        actor: getOnboardingActor(request),
+        sessionId: sessionIdParam(request),
+        questionId: questionIdParam(request),
+        stepKey: input.stepKey,
+        response: input.response,
+        expectedSessionVersion: input.expectedSessionVersion,
+        idempotencyKey: key,
+        correlationId: correlation(),
+      });
+      void reply.header("Cache-Control", "no-store");
+      return OnboardingSessionViewSchema.parse(view);
+    },
+  );
+
+  app.post(
+    `${byId}${ONBOARDING_QUESTIONS_SEGMENT}/:questionId${ONBOARDING_DISMISS_SEGMENT}`,
+    { onRequest: withActor },
+    async (request, reply) => {
+      const key = idempotencyKey(request, "dismiss an onboarding question");
+      const input = parseContract(
+        DismissOnboardingQuestionRequestSchema,
+        request.body,
+        "The dismiss request is not valid.",
+      );
+      const view = await runtime.dismissInterviewQuestion({
+        actor: getOnboardingActor(request),
+        sessionId: sessionIdParam(request),
+        questionId: questionIdParam(request),
         expectedSessionVersion: input.expectedSessionVersion,
         idempotencyKey: key,
         correlationId: correlation(),

@@ -89,6 +89,19 @@
     padding-bottom: calc(var(--cq-bottom-nav-height) + var(--cq-safe-bottom));
   }
 
+  /*
+   * The Q composer stays reachable: docked to the bottom of the workspace,
+   * clear of the mobile navigation, with a soft fade so a long answer never
+   * runs underneath it (CQ-PRE-REC-001 section 13).
+   */
+  .cq-q-composer-dock {
+    position: sticky;
+    bottom: calc(var(--cq-bottom-nav-height) + var(--cq-safe-bottom) + 8px);
+    z-index: var(--cq-z-sticky);
+    padding-top: 12px;
+    background: linear-gradient(to bottom, transparent, var(--cq-canvas) 28%);
+  }
+
   .cq-bottom-nav {
     position: fixed;
     inset-inline: 0;
@@ -164,6 +177,10 @@
 
     .cq-shell-main {
       padding-bottom: 0;
+    }
+
+    .cq-q-composer-dock {
+      bottom: 16px;
     }
   }
 }

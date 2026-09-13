@@ -43,6 +43,8 @@ import type { RunnerLogger } from "../outbox-runner.js";
 
 const PROCESS_TRIGGER_EVENT = "evidence.document.version_created";
 const READY_EVENT = "evidence.document.ready";
+/** An investor's narrative answer → Q's reading of the mandate (CQ-PRE-REC-001 §6). */
+const RESPONSE_COMMITTED_EVENT = "onboarding.response.committed";
 
 const ProcessDocumentJobSchema = createJobSchema(ProcessDocumentJob.dataSchema);
 
@@ -61,10 +63,45 @@ export type DocumentProcessingHandlerOptions = {
           readonly tenantId: TenantId;
           readonly documentId: string;
           readonly documentVersionId: string;
-        }) => Promise<{ readonly kind: string }>;
+        }) => Promise<{ readonly kind: string; readonly blocked?: unknown }>;
+      }
+    | undefined;
+  /**
+   * The investor mandate reading, when this deployment composes one. Runs
+   * off the onboarding runtime's own response event; the session, tenant
+   * and narrative are all re-read from the database, never from the
+   * message.
+   */
+  readonly mandateReview?:
+    | {
+        readonly onResponseCommitted: (event: {
+          readonly sessionId: string;
+          readonly stepKey: string;
+          readonly responseId: string;
+        }) => Promise<{ readonly kind: string; readonly blocked?: unknown }>;
       }
     | undefined;
   readonly logger: RunnerLogger;
+};
+
+/**
+ * A reading the model could not produce because no provider could take the
+ * call right now (a rate limit, an outage) is worth another attempt on the
+ * queue's own backoff; the review is idempotent, so a retry adds nothing
+ * twice. Every other outcome — including "no eligible provider", which
+ * will not change by waiting — is final.
+ */
+function transientlyBlocked(outcome: {
+  readonly kind: string;
+  readonly blocked?: unknown;
+}): boolean {
+  return outcome.kind === "PREPARED" && outcome.blocked === "MODEL_UNAVAILABLE";
+}
+
+type ResponseCommittedData = {
+  readonly sessionId: string;
+  readonly stepKey: string;
+  readonly responseId: string;
 };
 
 type VersionCreatedData = {
@@ -85,7 +122,7 @@ type DocumentReadyData = {
 export function createDomainEventHandler(
   options: DocumentProcessingHandlerOptions,
 ): (message: QueueMessage) => Promise<MessageOutcome> {
-  const { registry, queues, founderReview, logger } = options;
+  const { registry, queues, founderReview, mandateReview, logger } = options;
 
   return async (message) => {
     const parsed = registry.parse(message.message);
@@ -100,6 +137,43 @@ export function createDomainEventHandler(
     }
 
     const event: CapitalQEvent<unknown> = parsed.message;
+    if (event.type === RESPONSE_COMMITTED_EVENT) {
+      if (mandateReview === undefined) {
+        return { kind: "ARCHIVE" };
+      }
+      const committed = event.data as ResponseCommittedData;
+      try {
+        const outcome = await mandateReview.onResponseCommitted({
+          sessionId: committed.sessionId,
+          stepKey: committed.stepKey,
+          responseId: committed.responseId,
+        });
+        if (transientlyBlocked(outcome)) {
+          return {
+            kind: "RETRY",
+            errorCode: "MANDATE_REVIEW_MODEL_UNAVAILABLE",
+          };
+        }
+        if (outcome.kind !== "SKIPPED") {
+          logger.info(
+            {
+              msgId: message.msgId,
+              eventId: event.id,
+              sessionId: committed.sessionId,
+              outcome: outcome.kind,
+            },
+            "investor mandate reading handled",
+          );
+        }
+      } catch (error: unknown) {
+        logger.warn(
+          { err: error, msgId: message.msgId, eventId: event.id },
+          "investor mandate reading failed; retrying",
+        );
+        return { kind: "RETRY", errorCode: "MANDATE_REVIEW_FAILED" };
+      }
+      return { kind: "ARCHIVE" };
+    }
     if (event.type !== PROCESS_TRIGGER_EVENT && event.type !== READY_EVENT) {
       return { kind: "ARCHIVE" };
     }
@@ -124,6 +198,12 @@ export function createDomainEventHandler(
           documentId: ready.documentId,
           documentVersionId: ready.documentVersionId,
         });
+        if (transientlyBlocked(outcome)) {
+          return {
+            kind: "RETRY",
+            errorCode: "FOUNDER_REVIEW_MODEL_UNAVAILABLE",
+          };
+        }
         logger.info(
           {
             msgId: message.msgId,

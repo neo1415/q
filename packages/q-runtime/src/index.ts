@@ -190,3 +190,8 @@ export {
 } from "./application/stream.js";
 
 export const PACKAGE_NAME = "@capital-q/q-runtime" as const;
+export {
+  createOrphanedRunSweep,
+  type OrphanedRunSweepDependencies,
+  type OrphanedRunSweepResult,
+} from "./application/orphaned-runs.js";
