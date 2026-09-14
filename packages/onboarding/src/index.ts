@@ -200,3 +200,41 @@ export {
 } from "./infrastructure/postgres-session-repository.js";
 
 export const PACKAGE_NAME = "@capital-q/onboarding" as const;
+export {
+  affirmativeText,
+  affirmedMention,
+  clausesOf,
+  NEGATION_MARKERS,
+  negatedMention,
+} from "./domain/negation.js";
+export { mentions, normalise, wordsOf } from "./domain/text.js";
+export {
+  matchedOptions,
+  matchOptions,
+  mentionedOptions,
+  type OptionAliases,
+  type OptionMatch,
+} from "./domain/resolution/options.js";
+export {
+  CROSS_STEP_MAX_READINGS,
+  parseFigurePair,
+  resolveAcrossSteps,
+  type CrossStepInput,
+  type CrossStepReading,
+  type InterviewCues,
+  type InterviewStepCue,
+} from "./domain/resolution/cross-step.js";
+export {
+  aggregateTaxonomyCandidates,
+  TAXONOMY_PHRASE_MAX,
+  TAXONOMY_STRONG_CONFIDENCE,
+  TAXONOMY_WEAK_CONFIDENCE,
+  taxonomyPhrases,
+  type AggregatedTaxonomyCandidates,
+  type TaxonomyPhraseCandidate,
+} from "./domain/resolution/taxonomy-phrases.js";
+export {
+  correctionIntent,
+  type CorrectionIntent,
+} from "./domain/resolution/correction.js";
+export type { OnboardingTaxonomyResolver } from "./application/ports.js";

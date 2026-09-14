@@ -226,3 +226,15 @@ the planner and the replan are real and tested; the F3 review screen does not
 yet render Q's suggestions, F7 and F8 are not yet wired to the live session,
 and nothing in production yet triggers the review when a document finishes
 processing.
+
+## Interview cues (CQ-Q-VOICE-001 A)
+
+`FOUNDER_INTERVIEW_CUES` (`definition/interview-cues.ts`) tells the runtime where a
+founder's figures live in a sentence: a figure near "raising", "raise", "round",
+"looking for", "seeking" is the raise amount (F6.target_amount); near "people",
+"employees", "team of" the team size; near "founders" the founder count. A figure
+with none of those words nearby ("$90k MRR") is assigned to no step. Category
+phrases in a description resolve to F1.categories candidates through the taxonomy
+classifier and are proposed as a set to keep or adjust. Document-derived
+suggestions now ignore an option the founder named only after a negation ("past
+pilots").

@@ -1,5 +1,5 @@
 import type { OnboardingResponseValue } from "@capital-q/contracts";
-import { parseFigure } from "@capital-q/onboarding";
+import { affirmedMention, parseFigure } from "@capital-q/onboarding";
 import type { FounderFactKey } from "@capital-q/q-core";
 
 import {
@@ -140,7 +140,9 @@ function matchingOptions(
     ];
     return (
       names.some((name) => normalise(name) === exact) ||
-      names.some((name) => mentions(text, name))
+      // Said affirmatively: "past pilots" and "not a SAFE" name what the
+      // founder is not saying (CQ-Q-VOICE-001 A §7).
+      names.some((name) => mentions(text, name) && affirmedMention(text, name))
     );
   });
 }

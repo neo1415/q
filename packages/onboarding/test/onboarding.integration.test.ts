@@ -42,6 +42,8 @@ import {
   type OnboardingService,
   type OnboardingSessionId,
   type OnboardingWriteTargetHandler,
+  type InterviewCues,
+  type OnboardingTaxonomyResolver,
 } from "../src/index.js";
 import {
   SYNTHETIC_FOUNDER_MANIFEST,
@@ -101,6 +103,8 @@ type World = {
   readonly companyC: string;
   readonly build: (options?: {
     readonly writeTargets?: readonly OnboardingWriteTargetHandler[];
+    readonly interviewCues?: InterviewCues;
+    readonly taxonomy?: OnboardingTaxonomyResolver;
   }) => OnboardingService;
 };
 
@@ -256,12 +260,16 @@ describe("@capital-q/onboarding against local PostgreSQL", () => {
     const build = (
       options: {
         readonly writeTargets?: readonly OnboardingWriteTargetHandler[];
+        readonly interviewCues?: InterviewCues;
+        readonly taxonomy?: OnboardingTaxonomyResolver;
       } = {},
     ) =>
       createOnboardingService({
         sql: tx.sql,
         transactions: nestedTransactions(tx),
         outbox: createOutboxWriter({ registry }),
+        interviewCues: options.interviewCues,
+        taxonomy: options.taxonomy,
         subjectResolvers: [
           createCompanyOnboardingSubjectResolver(
             createPostgresCompanyQueryPort({ sql: tx.sql }),
@@ -771,6 +779,91 @@ describe("@capital-q/onboarding against local PostgreSQL", () => {
            where event_type = 'onboarding.utterance.recorded'
              and payload->'data'->>'sessionId' = ${id}`),
       ).toBe(3);
+    });
+  });
+
+  it("one sentence answers many questions: the asked step is placed, the others become proposals, and a correction supersedes (CQ-Q-VOICE-001 A §8-§9, §14)", async () => {
+    await withWorld(async (world) => {
+      const { adminA } = world;
+      const service = world.build({
+        interviewCues: {
+          raise_amount: { kind: "FIGURE", cues: ["raise", "raising"] },
+        },
+      });
+      const { view } = await start(world, adminA);
+      const id = view.session.id;
+      const say = (text: string, version: number) =>
+        service.runtime.say({
+          actor: adminA,
+          sessionId: id as OnboardingSessionId,
+          text,
+          expectedSessionVersion: version,
+          idempotencyKey: randomUUID(),
+          correlationId: CORRELATION(),
+        });
+
+      // Q asked about intent; the sentence also names sectors and a raise.
+      const first = await say(
+        "We're raising now — mostly fintech and health — and looking to raise about $2m",
+        1,
+      );
+      expect(first.understood).toMatchObject({
+        kind: "ANSWERED",
+        stepKey: "intent",
+        summary: "I'm raising now",
+        proposed: 2,
+      });
+      const proposals = first.view.pendingSuggestions.map((s) => ({
+        stepKey: s.stepKey,
+        value: s.suggestedValue,
+      }));
+      expect(proposals).toContainEqual({
+        stepKey: "sectors",
+        value: { type: "MULTI_SELECT", optionKeys: ["fintech", "health"] },
+      });
+      expect(proposals).toContainEqual({
+        stepKey: "raise_amount",
+        value: { type: "RANGE", value: "2000000" },
+      });
+      // Proposals are offers: nothing was written to the steps themselves.
+      expect(
+        first.view.responses.filter((r) => r.stepKey !== "intent"),
+      ).toEqual([]);
+
+      // A correction right after the answer re-reads the words against the
+      // step just answered and supersedes it through the normal response
+      // history.
+      const corrected = await say(
+        "Actually, I meant just exploring",
+        first.view.session.version,
+      );
+      expect(corrected.understood).toMatchObject({
+        kind: "CORRECTED",
+        stepKey: "intent",
+        summary: "Just exploring",
+      });
+      const intent = corrected.view.responses.find(
+        (r) => r.stepKey === "intent",
+      );
+      expect(intent?.value).toEqual({
+        type: "SINGLE_SELECT",
+        optionKey: "exploring",
+      });
+
+      // The same sectors sentence again proposes nothing twice.
+      const again = await say(
+        "Mostly fintech and health, and looking to raise about $2m",
+        corrected.view.session.version,
+      );
+      expect(
+        again.view.pendingSuggestions.filter((s) => s.stepKey === "sectors")
+          .length,
+      ).toBeLessThanOrEqual(1);
+      expect(
+        await count(world.tx.sql`
+          select count(*)::int as count from onboarding.responses
+           where session_id = ${id} and step_key = 'intent'`),
+      ).toBe(2);
     });
   });
 

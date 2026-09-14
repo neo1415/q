@@ -19,10 +19,12 @@ import { createOutboxWriter } from "@capital-q/eventing";
 import { createLogger, createTelemetryRuntime } from "@capital-q/observability";
 import {
   createFounderOnboardingIntegration,
+  FOUNDER_INTERVIEW_CUES,
   FOUNDER_UTTERANCE_ALIASES,
 } from "@capital-q/founder-onboarding";
 import {
   createInvestorOnboardingIntegration,
+  INVESTOR_INTERVIEW_CUES,
   INVESTOR_UTTERANCE_ALIASES,
 } from "@capital-q/investor-onboarding";
 import { createCapitalService } from "@capital-q/capital";
@@ -199,6 +201,27 @@ const onboarding = createOnboardingService({
   utteranceAliases: {
     ...FOUNDER_UTTERANCE_ALIASES,
     ...INVESTOR_UTTERANCE_ALIASES,
+  },
+  // Where each journey's figures and exclusions live in a sentence, and
+  // Capital Q's own taxonomy classifier for category phrases
+  // (CQ-Q-VOICE-001 A): one sentence may answer many questions, each
+  // proposal validated by the definition and confirmed by the person.
+  interviewCues: { ...FOUNDER_INTERVIEW_CUES, ...INVESTOR_INTERVIEW_CUES },
+  taxonomy: {
+    findCandidates: async (input) => {
+      const result = await taxonomy.classification.candidates.findCandidates({
+        text: input.text,
+        vocabularyCodes: input.vocabularyCodes,
+        limit: input.limit,
+      });
+      return result.candidates.map((candidate) => ({
+        nodeId: String(candidate.nodeId),
+        displayName: candidate.displayName,
+        vocabularyCode: String(candidate.vocabularyCode),
+        confidence: String(candidate.confidence),
+        exact: candidate.matchTypes.some((type) => type !== "LEXICAL"),
+      }));
+    },
   },
   subjectResolvers: [
     createInvestorOrganisationOnboardingSubjectResolver(

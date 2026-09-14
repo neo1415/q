@@ -134,7 +134,7 @@ export async function loadAggregate(
 // Safe projections
 // ---------------------------------------------------------------------------
 
-function presentationOf(
+export function presentationOf(
   configuration: OnboardingStepConfiguration,
 ): OnboardingStepPresentation {
   switch (configuration.stepType) {

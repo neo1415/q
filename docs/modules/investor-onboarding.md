@@ -205,3 +205,13 @@ See the CQ-Q-022 postflight. In short: the semantics, the synthesis service
 and the confirmation gate are real and tested; the I11 review screen still
 renders the deterministic projection of what the investor selected rather
 than Q's reading, and nothing yet calls the synthesis from the live session.
+
+## Interview cues (CQ-Q-VOICE-001 A)
+
+`INVESTOR_INTERVIEW_CUES` (`definition/interview-cues.ts`): "$250k to $1m" is the
+cheque range (I2.cheque_min / I2.cheque_max); a figure near "typically", "usually",
+"sweet spot" is the typical cheque; any mention of a red-flag option ("we never
+invest in gambling", "hardware isn't our thing") becomes an EXCLUSION_CONFIRMATION
+question with two real answers — never show, or rank lower — because the only route
+to a hard exclusion remains the investor's own answer. Stages named in a sentence
+are proposed on I2.stages.

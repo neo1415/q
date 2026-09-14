@@ -291,3 +291,56 @@ adapter and the development fixture implement the port. One adapter setting
 Evidence sources and upload (CQ-EVD), voice capture and transcription,
 Q-generated suggestions, pitch media, recommendation, GateQ evaluation, an
 onboarding builder UI, `onboarding.voice_captures`.
+
+## Natural language → canonical meaning (CQ-Q-VOICE-001 A)
+
+One sentence may answer many questions, and it is read deterministically before
+Q's model reading runs. `POST /v1/onboarding/sessions/:id/say` now does, in order:
+
+1. **Correction** (`domain/resolution/correction.ts`). "No, that's wrong.",
+   "What I meant was Series A", "Actually, we're enterprise software" — the words
+   after the objection are re-read against the step most recently answered and
+   land through the same supersede path every revision uses (`CORRECTED`). A
+   bare objection asks what should change (`DECLINED`).
+2. **The asked step**, as before (`interpretUtterance`), now through the one
+   option resolver (`domain/resolution/options.ts`): exact label, key or alias
+   first, then whole-word mentions — on the **affirmative** text only.
+3. **Every other step** (`domain/resolution/cross-step.ts`): each unanswered
+   single- or multi-select the sentence names unambiguously becomes a
+   **suggestion** the person confirms (retained until the step is reached); a
+   name that fits several options becomes an **AMBIGUITY question** with the
+   real options; a figure next to a journey-declared cue word ("raising $1.5m",
+   "$250k to $1m") becomes a range suggestion; a mention of a hard-exclusion
+   option becomes an **EXCLUSION_CONFIRMATION question** — never a value.
+   Journeys declare cues (`FOUNDER_INTERVIEW_CUES`, `INVESTOR_INTERVIEW_CUES`).
+4. **Category phrases** (`domain/resolution/taxonomy-phrases.ts`): short
+   n-grams of the affirmed words are resolved by Capital Q's own taxonomy
+   classifier (exact label/alias, then bounded lexical scoring) through the
+   `OnboardingTaxonomyResolver` port the API composes. Per phrase: an exact
+   match or a clear lexical leader is proposed as one set to keep or adjust;
+   several candidates within a hair of each other become a choice among real
+   nodes ("That could mean a few things here. Which is closest?"). No model
+   emits an id; a phrase that resolves nothing proposes nothing.
+5. **The asked step's own ambiguity** is persisted as a question with options,
+   so it survives a refresh.
+
+**Negation, contrast and scope** (`domain/negation.ts`): a sentence is read
+clause by clause; everything after a negation marker in its clause ("not",
+"never", "don't", "isn't really", "unlike", "except", "beyond", …) is what the
+person is NOT saying. "We don't do fintech", "We're not really fintech — we're
+logistics infrastructure" and "Unlike fintech companies, we…" select no fintech;
+"Nigeria and Ghana, but not Kenya" keeps Nigeria and Ghana. Founder document
+suggestions apply the same rule.
+
+**Confirmation policy.** The step Q asked is placed directly when the sentence
+names exactly one option (as before). Everything read for another step is a
+proposal — one tap to keep, one to change, none to ignore — because a sentence
+about one thing is evidence, not a form submission, for the others. Hard
+exclusions are only ever the person's explicit answer. The understanding carries
+`proposed` (how many proposals and questions the sentence produced) so Q can
+say "I also picked up N other things".
+
+Tests: `test/negation.test.ts`, `test/cross-step.test.ts`,
+`test/taxonomy-phrases.test.ts`, `test/correction.test.ts`, and the
+integration case "one sentence answers many questions" in
+`test/onboarding.integration.test.ts`.

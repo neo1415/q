@@ -396,15 +396,33 @@ function joinNames(names: readonly string[]): string {
 }
 
 /** Q's short acknowledgement of what the runtime understood (§18). */
+/** "…and I picked up N other things" when a sentence answered more than it was asked (CQ-Q-VOICE-001 A §8). */
+function withProposals(text: string, proposed: number | undefined): string {
+  if (proposed === undefined || proposed === 0) {
+    return text;
+  }
+  return proposed === 1
+    ? `${text} I also picked up one more thing from that; it's below for you to confirm.`
+    : `${text} I also picked up ${String(proposed)} other things from that; they're below for you to confirm.`;
+}
+
 export function acknowledge(
   understood: OnboardingUnderstanding,
   vocabulary: JourneyVocabulary,
 ): string {
   switch (understood.kind) {
     case "ANSWERED":
-      return understood.utteranceId === undefined
-        ? `${vocabulary.stepTitle(understood.stepKey)}: ${trimSentenceEnd(understood.summary)}. Noted.`
-        : `${vocabulary.stepTitle(understood.stepKey)}: ${trimSentenceEnd(understood.summary)}. Noted. I'm reading the rest of that too; anything else I pick up will appear for you to confirm.`;
+      return withProposals(
+        understood.utteranceId === undefined
+          ? `${vocabulary.stepTitle(understood.stepKey)}: ${trimSentenceEnd(understood.summary)}. Noted.`
+          : `${vocabulary.stepTitle(understood.stepKey)}: ${trimSentenceEnd(understood.summary)}. Noted. I'm reading the rest of that too; anything else I pick up will appear for you to confirm.`,
+        understood.proposed,
+      );
+    case "CORRECTED":
+      return withProposals(
+        `Updated — ${vocabulary.stepTitle(understood.stepKey)}: ${trimSentenceEnd(understood.summary)}.`,
+        understood.proposed,
+      );
     case "SKIPPED":
       return "Noted. I'll leave that open; you can come back to it any time.";
     case "REQUIRED":
@@ -418,13 +436,22 @@ export function acknowledge(
     case "UPLOAD":
       return "Go ahead. Whatever the document covers, I won't ask again.";
     case "AMBIGUOUS":
-      return "I can see more than one that fits. Which do you mean?";
+      return withProposals(
+        "I can see more than one that fits. Which do you mean?",
+        understood.proposed,
+      );
     case "DECLINED":
       return "What should change? Pick the item below and I'll open it.";
     case "READING":
-      return "Thanks. I'm reading that now; I'll show you what I picked up in a moment so you can confirm it.";
+      return withProposals(
+        "Thanks. I'm reading that now; I'll show you what I picked up in a moment so you can confirm it.",
+        understood.proposed,
+      );
     case "UNCLEAR":
-      return "I didn't catch that. Pick one below, or tell me a little more.";
+      return withProposals(
+        "I didn't catch that. Pick one below, or tell me a little more.",
+        understood.proposed,
+      );
   }
 }
 

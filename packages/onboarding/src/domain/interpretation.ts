@@ -1,8 +1,13 @@
 import type {
-  OnboardingOptionView,
   OnboardingResponseValue,
   OnboardingStepPresentation,
 } from "@capital-q/contracts";
+
+import { parseFigure } from "./figure.js";
+import { matchedOptions } from "./resolution/options.js";
+import { mentions, normalise, wordsOf } from "./text.js";
+
+export { parseFigure } from "./figure.js";
 
 /**
  * Deterministic reading of what a person said to Q about one step
@@ -63,145 +68,6 @@ const UNSURE_OPTION_KEYS = new Set([
   "not_now",
   "no_preference",
 ]);
-
-function normalise(text: string): string {
-  return (
-    text
-      .toLowerCase()
-      // Sentence punctuation goes; a decimal point inside a figure stays.
-      .replace(/[.,!?;:]+(?=\s|$)/g, "")
-      .replace(/[’']/g, "'")
-      .replace(/[^a-z0-9'+&/ .-]+/g, " ")
-      .replace(/\s+/g, " ")
-      .trim()
-  );
-}
-
-function wordsOf(text: string): readonly string[] {
-  return normalise(text)
-    .split(" ")
-    .filter((w) => w.length > 0);
-}
-
-/** True when `phrase` occurs in `text` as whole words. */
-function mentions(text: string, phrase: string): boolean {
-  const needle = normalise(phrase);
-  if (needle.length === 0) {
-    return false;
-  }
-  const hay = ` ${normalise(text)} `;
-  return hay.includes(` ${needle} `);
-}
-
-/**
- * Words that turn the phrase after them into what the person is NOT saying:
- * "beyond pilots", "not a SAFE", "past the waitlist stage", "no longer
- * pre-revenue". A single article or short word may sit between the marker and the phrase.
- */
-const NEGATION_MARKERS =
-  "(?:not|no|never|beyond|past|without|instead of|rather than|more than|no longer|not just|aren't|isn't|wasn't|weren't|don't|doesn't|didn't|haven't|hasn't|ex)";
-
-/** True when every mention of `phrase` in `text` follows a negation marker. */
-function negated(text: string, phrase: string): boolean {
-  const needle = normalise(phrase);
-  if (needle.length === 0) {
-    return false;
-  }
-  const hay = ` ${normalise(text)} `;
-  const escaped = needle.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const all = [...hay.matchAll(new RegExp(` ${escaped} `, "g"))].length;
-  if (all === 0) {
-    return false;
-  }
-  const negatedCount = [
-    ...hay.matchAll(
-      new RegExp(
-        ` ${NEGATION_MARKERS}(?: (?:a|an|the|any|just|really|our|my|your|their|only|at|in))? ${escaped} `,
-        "g",
-      ),
-    ),
-  ].length;
-  return negatedCount >= all;
-}
-
-function optionMatches(
-  text: string,
-  options: readonly OnboardingOptionView[],
-  aliases: Readonly<Record<string, readonly string[]>> | undefined,
-): readonly OnboardingOptionView[] {
-  const exact = normalise(text);
-  const matched: { option: OnboardingOptionView; phrases: string[] }[] = [];
-  for (const option of options) {
-    // A short key ("in", "us", "gb") is a code, not a word a person says;
-    // matching it would read "based in Lagos" as India.
-    const names = [
-      option.label,
-      ...(option.optionKey.length >= 4
-        ? [option.optionKey.replace(/_/g, " ")]
-        : []),
-      ...(aliases?.[option.optionKey] ?? []),
-    ];
-    if (names.some((name) => normalise(name) === exact)) {
-      return [option];
-    }
-    const phrases = names
-      .filter((name) => mentions(text, name) && !negated(text, name))
-      .map((name) => normalise(name));
-    if (phrases.length > 0) {
-      matched.push({ option, phrases });
-    }
-  }
-  // A phrase that only occurs inside another matched option's phrase is that
-  // option's words, not a second answer: "co-invest alongside a lead" names
-  // co-investing, not leading, although "lead" is in it.
-  return matched
-    .filter(({ option, phrases }) =>
-      phrases.some(
-        (phrase) =>
-          !matched.some(
-            (other) =>
-              other.option !== option &&
-              other.phrases.some(
-                (outer) =>
-                  outer.length > phrase.length &&
-                  ` ${outer} `.includes(` ${phrase} `),
-              ),
-          ),
-      ),
-    )
-    .map(({ option }) => option);
-}
-
-/** "3", "3m", "$1.8m", "250k", "1,000" → a plain decimal string, or null. */
-export function parseFigure(text: string): string | null {
-  const match =
-    /(?:^|[^a-z0-9.])(?:[$£€]|usd|gbp|eur|ngn|kes|zar)?\s*(\d{1,3}(?:,\d{3})+|\d+)(?:\.(\d+))?\s*(k|m|mn|million|bn|b|billion|thousand)?(?![a-z0-9])/i.exec(
-      text,
-    );
-  if (match === null) {
-    return null;
-  }
-  const whole = (match[1] ?? "0").replace(/,/g, "");
-  const fraction = match[2] ?? "";
-  const suffix = (match[3] ?? "").toLowerCase();
-  let value = Number.parseFloat(
-    `${whole}${fraction.length > 0 ? `.${fraction}` : ""}`,
-  );
-  if (!Number.isFinite(value)) {
-    return null;
-  }
-  if (suffix === "k" || suffix === "thousand") {
-    value *= 1_000;
-  } else if (suffix === "m" || suffix === "mn" || suffix === "million") {
-    value *= 1_000_000;
-  } else if (suffix === "b" || suffix === "bn" || suffix === "billion") {
-    value *= 1_000_000_000;
-  }
-  if (!Number.isInteger(value) && Math.abs(value) >= 1) {
-    value = Math.round(value * 100) / 100;
-  }
-  return Number.isInteger(value) ? String(value) : value.toFixed(2);
-}
 
 /** A sentence carrying more than one thing, or a figure with context: Q reads it. */
 /**
@@ -342,7 +208,11 @@ export function interpretUtterance(
 
   switch (presentation.stepType) {
     case "single_select": {
-      const matched = optionMatches(trimmed, presentation.options, stepAliases);
+      const matched = matchedOptions(
+        trimmed,
+        presentation.options,
+        stepAliases,
+      );
       const only = matched.length === 1 ? matched[0] : undefined;
       if (only !== undefined) {
         return {
@@ -378,7 +248,11 @@ export function interpretUtterance(
       return isNarrative(trimmed) ? { kind: "NARRATIVE" } : { kind: "UNCLEAR" };
     }
     case "multi_select": {
-      const matched = optionMatches(trimmed, presentation.options, stepAliases);
+      const matched = matchedOptions(
+        trimmed,
+        presentation.options,
+        stepAliases,
+      );
       const exclusive = new Set(presentation.exclusiveOptionKeys);
       const chosen = matched.some((option) => exclusive.has(option.optionKey))
         ? matched

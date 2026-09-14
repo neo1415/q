@@ -1,3 +1,4 @@
+import type { TaxonomyPhraseCandidate } from "../domain/resolution/taxonomy-phrases.js";
 import type {
   OnboardingJourneyType,
   OnboardingSessionStatus,
@@ -471,3 +472,18 @@ export type OnboardingSubjectResolverRegistry = {
 };
 
 export type { OnboardingSourceModality };
+
+/**
+ * Capital Q's own taxonomy classifier, as the interview needs it
+ * (CQ-Q-VOICE-001 A §5): phrases in, canonical candidates out. Exact label
+ * and alias matches and bounded lexical scoring against the vocabularies a
+ * step allows; never a model naming an id. Absent means category phrases in
+ * a sentence are not resolved synchronously (Q's reading still runs).
+ */
+export type OnboardingTaxonomyResolver = {
+  readonly findCandidates: (input: {
+    readonly text: string;
+    readonly vocabularyCodes: readonly string[];
+    readonly limit: number;
+  }) => Promise<readonly TaxonomyPhraseCandidate[]>;
+};

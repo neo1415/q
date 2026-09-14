@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 
 import { z } from "zod";
 
@@ -18,6 +18,7 @@ import {
   type OnboardingSessionView,
   type OnboardingUnderstanding,
   type OnboardingSuggestionResolution,
+  type OnboardingResponseValue,
 } from "@capital-q/contracts";
 import type {
   DatabaseExecutor,
@@ -98,18 +99,30 @@ import type {
   OnboardingUtteranceRepository,
   OnboardingWriteContext,
   OnboardingWriteTargetRegistry,
+  OnboardingTaxonomyResolver,
 } from "./ports.js";
 import {
   interpretUtterance,
   isRichUtterance,
   type OnboardingUtteranceAliases,
 } from "../domain/interpretation.js";
+import { correctionIntent } from "../domain/resolution/correction.js";
+import {
+  resolveAcrossSteps,
+  type InterviewCues,
+} from "../domain/resolution/cross-step.js";
+import {
+  aggregateTaxonomyCandidates,
+  taxonomyPhrases,
+} from "../domain/resolution/taxonomy-phrases.js";
+import { wordsOf } from "../domain/text.js";
 import { utteranceRecordedEvent } from "../events/index.js";
 import {
   createDefinitionCache,
   loadAggregate,
   toSessionView,
   type OnboardingSessionAggregate,
+  presentationOf,
 } from "./view.js";
 
 /**
@@ -139,6 +152,10 @@ export type OnboardingRuntimeDependencies = {
   readonly utterances?: OnboardingUtteranceRepository | undefined;
   /** Journey-supplied plain-language names for options (CQ-PRE-REC-001 §19). */
   readonly utteranceAliases?: OnboardingUtteranceAliases | undefined;
+  /** Where a journey's figures and exclusions live (CQ-Q-VOICE-001 A §8, §12). */
+  readonly interviewCues?: InterviewCues | undefined;
+  /** Capital Q's taxonomy classifier, for category phrases in a sentence (§5, §10-§11). */
+  readonly taxonomy?: OnboardingTaxonomyResolver | undefined;
   readonly idempotency: OnboardingIdempotencyRepository;
   readonly subjects: OnboardingSubjectResolverRegistry;
   readonly writeTargets: OnboardingWriteTargetRegistry;
@@ -1731,6 +1748,412 @@ export function createOnboardingUseCases(
       runtime.utteranceAliases ?? {},
     );
     const why = step.whyQAsks ?? step.supportingText ?? null;
+    const slug = (key: string): string =>
+      key.toLowerCase().replace(/[^a-z0-9_.]/g, "_");
+    const setKey = (values: readonly string[]): string =>
+      createHash("sha256")
+        .update([...values].sort().join("|"))
+        .digest("hex")
+        .slice(0, 8);
+    const turnRef = {
+      sourceType: "INTERVIEW_TURN",
+      sourceId: command.idempotencyKey.slice(0, 200),
+    };
+
+    /**
+     * Everything else the sentence answered (CQ-Q-VOICE-001 A §8-§12): each
+     * other step it named unambiguously becomes a suggestion the person
+     * confirms, retained until that step is reached; an ambiguous hit
+     * becomes a choice; an exclusion mention becomes a confirmation
+     * question; category phrases become taxonomy candidates through Capital
+     * Q's own classifier. A failure here never fails the turn.
+     */
+    const proposeFromUtterance = async (
+      placed: SayOnboardingOutcome,
+      options: {
+        readonly text: string;
+        readonly onlyStepKeys?: readonly string[] | undefined;
+        readonly includeCompleted?: boolean | undefined;
+      },
+    ): Promise<SayOnboardingOutcome> => {
+      const kind = placed.understood.kind;
+      if (
+        kind !== "ANSWERED" &&
+        kind !== "READING" &&
+        kind !== "UNCLEAR" &&
+        kind !== "AMBIGUOUS" &&
+        kind !== "CORRECTED"
+      ) {
+        return placed;
+      }
+      if (wordsOf(options.text).length < 2) {
+        return placed;
+      }
+      try {
+        const session = await sessions.findById(sql, command.sessionId);
+        if (session === null) {
+          return placed;
+        }
+        const published = await runtime.loadDefinition(
+          sql,
+          session.definitionVersionId,
+        );
+        const states = await stepStates.listBySession(sql, session.id);
+        const statusOf = new Map(states.map((s) => [s.stepKey, s.status]));
+        const only =
+          options.onlyStepKeys === undefined
+            ? null
+            : new Set(options.onlyStepKeys);
+        const steps = published.steps
+          .filter((s) => only === null || only.has(s.stepKey))
+          .map((s) => ({
+            stepKey: s.stepKey,
+            status:
+              options.includeCompleted === true
+                ? ("UNSEEN" as const)
+                : (statusOf.get(s.stepKey) ?? ("UNSEEN" as const)),
+            configuration: s.configuration,
+          }));
+        const pendingSuggestions = await suggestions.listPending(
+          sql,
+          session.id,
+        );
+        const pendingQuestions =
+          runtime.questions === undefined
+            ? []
+            : await runtime.questions.listPending(sql, session.id);
+        const alreadySuggested = (
+          key: string,
+          value: OnboardingResponseValue,
+        ): boolean =>
+          pendingSuggestions.some(
+            (s) =>
+              s.stepKey === key &&
+              JSON.stringify(s.suggestedValue) === JSON.stringify(value),
+          );
+        const alreadyAsked = (factKey: string): boolean =>
+          pendingQuestions.some((q) => q.factKey === factKey);
+        type QuestionToRecord = Parameters<
+          typeof recordInterviewQuestions
+        >[0]["questions"][number];
+        const questionsToRecord: QuestionToRecord[] = [];
+        let proposed = 0;
+
+        const propose = async (
+          key: string,
+          value: OnboardingResponseValue,
+          confidence: string,
+        ): Promise<void> => {
+          if (alreadySuggested(key, value)) {
+            return;
+          }
+          try {
+            await createSuggestion({
+              sessionId: session.id,
+              stepKey: key,
+              targetField: slug(key),
+              suggestedValue: value,
+              sourceRefs: [turnRef],
+              confidence,
+              modelRunId: null,
+            });
+            proposed += 1;
+          } catch (error: unknown) {
+            // The definition refused the value (bounds, count, vocabulary):
+            // nothing is proposed for that step, nothing else is lost.
+            runtime.logger?.debug(
+              {
+                sessionId: session.id,
+                stepKey: key,
+                reason: error instanceof Error ? error.name : "unknown",
+              },
+              "onboarding.interview.proposal_refused",
+            );
+          }
+        };
+
+        const readings = resolveAcrossSteps({
+          text: options.text,
+          steps,
+          currentStepKey: options.includeCompleted === true ? null : stepKey,
+          aliases: runtime.utteranceAliases ?? {},
+          cues: runtime.interviewCues ?? {},
+        });
+        for (const item of readings) {
+          if (item.kind === "PROPOSE") {
+            await propose(item.stepKey, item.value, "0.9");
+          } else if (item.kind === "CHOOSE") {
+            const factKey = `choice.${slug(item.stepKey)}.${setKey(item.options.map((o) => o.optionKey))}`;
+            if (!alreadyAsked(factKey)) {
+              questionsToRecord.push({
+                stepKey: item.stepKey,
+                factKey,
+                question:
+                  "I can see more than one that fits there. Which do you mean?",
+                why: null,
+                reason: "AMBIGUITY",
+                readings: [],
+                options: item.options.map((option) => ({
+                  label: option.label,
+                  stepKey: item.stepKey,
+                  value: { type: "SINGLE_SELECT", optionKey: option.optionKey },
+                })),
+                sourceRefs: [turnRef],
+              });
+            }
+          } else {
+            const factKey = `exclusion.${slug(item.optionKey)}`;
+            if (!alreadyAsked(factKey)) {
+              questionsToRecord.push({
+                stepKey: item.hardStepKey,
+                factKey,
+                question: `You mentioned ${item.label.toLowerCase()}. Should I never show you those, or just rank them lower?`,
+                why: "A hard exclusion removes them entirely; nothing is excluded until you say so.",
+                reason: "EXCLUSION_CONFIRMATION",
+                readings: [],
+                options: [
+                  {
+                    label: `Never show me ${item.label.toLowerCase()}`,
+                    stepKey: item.hardStepKey,
+                    value: {
+                      type: "MULTI_SELECT",
+                      optionKeys: [item.optionKey],
+                    },
+                  },
+                  {
+                    label: "Just show it lower",
+                    stepKey: item.softStepKey,
+                    value: {
+                      type: "MULTI_SELECT",
+                      optionKeys: [item.optionKey],
+                    },
+                  },
+                ],
+                sourceRefs: [turnRef],
+              });
+            }
+          }
+        }
+
+        // The question Q is asking, when the sentence fits more than one of
+        // its options: a choice that survives a refresh, with real options.
+        if (
+          placed.understood.kind === "AMBIGUOUS" &&
+          step.presentation.stepType === "single_select"
+        ) {
+          const keys = new Set(placed.understood.optionKeys);
+          const factKey = `choice.${slug(stepKey)}.${setKey([...keys])}`;
+          if (!alreadyAsked(factKey)) {
+            questionsToRecord.push({
+              stepKey,
+              factKey,
+              question: "I can see more than one that fits. Which do you mean?",
+              why: null,
+              reason: "AMBIGUITY",
+              readings: [],
+              options: step.presentation.options
+                .filter((option) => keys.has(option.optionKey))
+                .map((option) => ({
+                  label: option.label,
+                  stepKey,
+                  value: { type: "SINGLE_SELECT", optionKey: option.optionKey },
+                })),
+              sourceRefs: [turnRef],
+            });
+          }
+        }
+
+        // Category phrases → canonical candidates through Capital Q's own
+        // classifier: strong ones are proposed as a set to keep or adjust;
+        // weak ones are a choice among real options; nothing is invented.
+        const taxonomy = runtime.taxonomy;
+        if (taxonomy !== undefined) {
+          const phrases = taxonomyPhrases(options.text).slice(0, 16);
+          for (const target of steps) {
+            const configuration = target.configuration;
+            if (
+              phrases.length === 0 ||
+              configuration.stepType !== "reference_select" ||
+              configuration.resourceType !== "TAXONOMY_NODE" ||
+              target.status === "COMPLETED"
+            ) {
+              continue;
+            }
+            const results = await Promise.all(
+              phrases.map((phrase) =>
+                taxonomy.findCandidates({
+                  text: phrase,
+                  vocabularyCodes: configuration.vocabularyCodes,
+                  limit: 3,
+                }),
+              ),
+            );
+            const { strong, ambiguous } = aggregateTaxonomyCandidates(results);
+            if (strong.length > 0) {
+              const chosen = strong.slice(0, configuration.maxItems);
+              const value: OnboardingResponseValue = {
+                type: "RESOURCE_REFERENCE",
+                resourceType: "TAXONOMY_NODE",
+                resourceIds: chosen.map((c) => c.nodeId),
+              };
+              if (!alreadySuggested(target.stepKey, value)) {
+                for (const stale of pendingSuggestions.filter(
+                  (existing) =>
+                    existing.stepKey === target.stepKey &&
+                    existing.suggestedValue.type === "RESOURCE_REFERENCE",
+                )) {
+                  await expireSuggestion({
+                    sessionId: session.id,
+                    suggestionId: stale.id,
+                    correlationId: command.correlationId,
+                  });
+                }
+              }
+              await propose(
+                target.stepKey,
+                value,
+                chosen[0]?.confidence ?? "0.6",
+              );
+            }
+            if (ambiguous.length > 0) {
+              const factKey = `taxonomy.${slug(target.stepKey)}.${setKey(ambiguous.map((c) => c.nodeId))}`;
+              if (!alreadyAsked(factKey)) {
+                questionsToRecord.push({
+                  stepKey: target.stepKey,
+                  factKey,
+                  question:
+                    "That could mean a few things here. Which is closest?",
+                  why: null,
+                  reason: "AMBIGUITY",
+                  readings: [],
+                  options: ambiguous.map((c) => ({
+                    label: c.displayName,
+                    stepKey: target.stepKey,
+                    value: {
+                      type: "RESOURCE_REFERENCE",
+                      resourceType: "TAXONOMY_NODE",
+                      resourceIds: [c.nodeId],
+                    },
+                  })),
+                  sourceRefs: [turnRef],
+                });
+              }
+            }
+          }
+        }
+
+        if (questionsToRecord.length > 0 && runtime.questions !== undefined) {
+          await recordInterviewQuestions({
+            sessionId: session.id,
+            questions: questionsToRecord,
+          });
+        }
+        const asked = questionsToRecord.length;
+        if (proposed === 0 && asked === 0) {
+          return placed;
+        }
+        const view = await getSession({ actor, sessionId: command.sessionId });
+        return {
+          view,
+          understood: { ...placed.understood, proposed: proposed + asked },
+        };
+      } catch (error: unknown) {
+        runtime.logger?.warn(
+          {
+            sessionId: command.sessionId,
+            reason: error instanceof Error ? error.name : "unknown",
+          },
+          "onboarding.interview.proposals_failed",
+        );
+        return placed;
+      }
+    };
+
+    // A correction re-reads the words after the objection against the step
+    // the person most recently answered, through the same supersede path
+    // every revision uses (§14). A bare objection asks what should change.
+    const correction = correctionIntent(command.text);
+    if (correction !== null) {
+      if (correction.remainder.length === 0) {
+        return { view: current, understood: { kind: "DECLINED", stepKey } };
+      }
+      const session = await sessions.findById(sql, command.sessionId);
+      const latest = (
+        await runtime.responses.listCurrent(sql, command.sessionId)
+      )
+        .slice()
+        .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
+      if (session !== null && latest !== undefined) {
+        const published = await runtime.loadDefinition(
+          sql,
+          session.definitionVersionId,
+        );
+        const target = published.steps.find(
+          (s) => s.stepKey === latest.stepKey,
+        );
+        if (target !== undefined) {
+          const targetAliases = runtime.utteranceAliases ?? {};
+          const again = interpretUtterance(
+            correction.remainder,
+            {
+              stepKey: target.stepKey,
+              required: target.required,
+              presentation: presentationOf(target.configuration),
+            },
+            targetAliases,
+          );
+          if (again.kind === "ANSWER") {
+            const view = await submitResponse({
+              actor,
+              sessionId: command.sessionId,
+              stepKey: target.stepKey,
+              response: { value: again.value },
+              expectedSessionVersion: command.expectedSessionVersion,
+              idempotencyKey: command.idempotencyKey,
+              correlationId: command.correlationId,
+            });
+            return proposeFromUtterance(
+              {
+                view,
+                understood: {
+                  kind: "CORRECTED",
+                  stepKey: target.stepKey,
+                  summary: again.summary,
+                },
+              },
+              { text: correction.remainder },
+            );
+          }
+          if (
+            target.configuration.stepType === "reference_select" &&
+            target.configuration.resourceType === "TAXONOMY_NODE"
+          ) {
+            const proposedView = await proposeFromUtterance(
+              {
+                view: current,
+                understood: {
+                  kind: "CORRECTED",
+                  stepKey: target.stepKey,
+                  summary: correction.remainder.slice(0, 120),
+                },
+              },
+              {
+                text: correction.remainder,
+                onlyStepKeys: [target.stepKey],
+                includeCompleted: true,
+              },
+            );
+            if (
+              proposedView.understood.kind === "CORRECTED" &&
+              (proposedView.understood.proposed ?? 0) > 0
+            ) {
+              return proposedView;
+            }
+          }
+        }
+      }
+      // Nothing to correct against: the words are read as a normal turn.
+    }
 
     // Records the sentence for Q's reading: one utterance row, one event
     // with identifiers only, replayed (not repeated) under the same key.
@@ -1797,95 +2220,101 @@ export function createOnboardingUseCases(
       });
     };
 
-    switch (reading.kind) {
-      case "ANSWER": {
-        let view = await submitResponse({
-          actor,
-          sessionId: command.sessionId,
-          stepKey,
-          // The step's own default modality applies: a definition that only
-          // takes selections records a typed option as one.
-          response: { value: reading.value },
-          expectedSessionVersion: command.expectedSessionVersion,
-          idempotencyKey: command.idempotencyKey,
-          correlationId: command.correlationId,
-        });
-        // A rich sentence that names an option carries more than the option
-        // ("Series A and B in fintech across Nigeria, one to three million"):
-        // the option is placed now and the sentence is read by Q as well, so
-        // nothing the person said is dropped (CQ-PRE-REC-001 §44).
-        let utteranceId: string | undefined;
-        if (
-          isRichUtterance(command.text) &&
-          (step.presentation.stepType === "single_select" ||
-            step.presentation.stepType === "multi_select")
-        ) {
-          const recorded = await recordUtterance({
-            expectedSessionVersion: view.session.version,
-            idempotencyKey: `${command.idempotencyKey}:reading`,
-          });
-          utteranceId = recorded.utteranceId;
-          view = await getSession({ actor, sessionId: command.sessionId });
-        }
-        return {
-          view,
-          understood: {
-            kind: "ANSWERED",
+    const placed = await (async (): Promise<SayOnboardingOutcome> => {
+      switch (reading.kind) {
+        case "ANSWER": {
+          let view = await submitResponse({
+            actor,
+            sessionId: command.sessionId,
             stepKey,
-            summary: reading.summary,
-            ...(utteranceId === undefined ? {} : { utteranceId }),
-          },
-        };
-      }
-      case "SKIP": {
-        if (step.required) {
+            // The step's own default modality applies: a definition that only
+            // takes selections records a typed option as one.
+            response: { value: reading.value },
+            expectedSessionVersion: command.expectedSessionVersion,
+            idempotencyKey: command.idempotencyKey,
+            correlationId: command.correlationId,
+          });
+          // A rich sentence that names an option carries more than the option
+          // ("Series A and B in fintech across Nigeria, one to three million"):
+          // the option is placed now and the sentence is read by Q as well, so
+          // nothing the person said is dropped (CQ-PRE-REC-001 §44).
+          let utteranceId: string | undefined;
+          if (isRichUtterance(command.text)) {
+            const recorded = await recordUtterance({
+              expectedSessionVersion: view.session.version,
+              idempotencyKey: `${command.idempotencyKey}:reading`,
+            });
+            utteranceId = recorded.utteranceId;
+            view = await getSession({ actor, sessionId: command.sessionId });
+          }
           return {
-            view: current,
-            understood: { kind: "REQUIRED", stepKey, why },
+            view,
+            understood: {
+              kind: "ANSWERED",
+              stepKey,
+              summary: reading.summary,
+              ...(utteranceId === undefined ? {} : { utteranceId }),
+            },
           };
         }
-        const view = await skipStep({
-          actor,
-          sessionId: command.sessionId,
-          stepKey,
-          expectedSessionVersion: command.expectedSessionVersion,
-          idempotencyKey: command.idempotencyKey,
-          correlationId: command.correlationId,
-        });
-        return { view, understood: { kind: "SKIPPED", stepKey } };
-      }
-      case "WHY":
-        return { view: current, understood: { kind: "WHY", stepKey, why } };
-      case "UPLOAD":
-        return { view: current, understood: { kind: "UPLOAD", stepKey } };
-      case "AMBIGUOUS":
-        return {
-          view: current,
-          understood: {
-            kind: "AMBIGUOUS",
+        case "SKIP": {
+          if (step.required) {
+            return {
+              view: current,
+              understood: { kind: "REQUIRED", stepKey, why },
+            };
+          }
+          const view = await skipStep({
+            actor,
+            sessionId: command.sessionId,
             stepKey,
-            optionKeys: [...reading.optionKeys],
-          },
-        };
-      case "DECLINE":
-        return { view: current, understood: { kind: "DECLINED", stepKey } };
-      case "UNCLEAR":
-        return { view: current, understood: { kind: "UNCLEAR", stepKey } };
-      case "NARRATIVE": {
-        const recorded = await recordUtterance({
-          expectedSessionVersion: command.expectedSessionVersion,
-          idempotencyKey: command.idempotencyKey,
-        });
-        const view = await getSession({ actor, sessionId: command.sessionId });
-        return {
-          view,
-          understood:
-            recorded.utteranceId === undefined
-              ? { kind: "UNCLEAR", stepKey }
-              : { kind: "READING", stepKey, utteranceId: recorded.utteranceId },
-        };
+            expectedSessionVersion: command.expectedSessionVersion,
+            idempotencyKey: command.idempotencyKey,
+            correlationId: command.correlationId,
+          });
+          return { view, understood: { kind: "SKIPPED", stepKey } };
+        }
+        case "WHY":
+          return { view: current, understood: { kind: "WHY", stepKey, why } };
+        case "UPLOAD":
+          return { view: current, understood: { kind: "UPLOAD", stepKey } };
+        case "AMBIGUOUS":
+          return {
+            view: current,
+            understood: {
+              kind: "AMBIGUOUS",
+              stepKey,
+              optionKeys: [...reading.optionKeys],
+            },
+          };
+        case "DECLINE":
+          return { view: current, understood: { kind: "DECLINED", stepKey } };
+        case "UNCLEAR":
+          return { view: current, understood: { kind: "UNCLEAR", stepKey } };
+        case "NARRATIVE": {
+          const recorded = await recordUtterance({
+            expectedSessionVersion: command.expectedSessionVersion,
+            idempotencyKey: command.idempotencyKey,
+          });
+          const view = await getSession({
+            actor,
+            sessionId: command.sessionId,
+          });
+          return {
+            view,
+            understood:
+              recorded.utteranceId === undefined
+                ? { kind: "UNCLEAR", stepKey }
+                : {
+                    kind: "READING",
+                    stepKey,
+                    utteranceId: recorded.utteranceId,
+                  },
+          };
+        }
       }
-    }
+    })();
+    return proposeFromUtterance(placed, { text: command.text });
   };
 
   return {

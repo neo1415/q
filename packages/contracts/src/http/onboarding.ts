@@ -387,6 +387,8 @@ export const SayOnboardingRequestSchema = z
 export type SayOnboardingRequest = z.infer<typeof SayOnboardingRequestSchema>;
 
 const Why = z.string().max(500).nullable();
+/** Proposals (suggestions and questions) a sentence produced for other steps. */
+const ProposedCount = z.number().int().min(0).max(48).optional();
 
 /** What the runtime made of what was said. Never a model's opinion of truth. */
 export const OnboardingUnderstandingSchema = z.discriminatedUnion("kind", [
@@ -398,6 +400,17 @@ export const OnboardingUnderstandingSchema = z.discriminatedUnion("kind", [
       summary: z.string().max(300),
       /** Set when the sentence said more than the option and Q is reading the rest. */
       utteranceId: UuidSchema.optional(),
+      /** How many other things the sentence answered, now waiting to be confirmed. */
+      proposed: ProposedCount,
+    })
+    .strict(),
+  /** An earlier answer was corrected and superseded (CQ-Q-VOICE-001 A §14). */
+  z
+    .object({
+      kind: z.literal("CORRECTED"),
+      stepKey: OnboardingStepKeySchema,
+      summary: z.string().max(300),
+      proposed: ProposedCount,
     })
     .strict(),
   /** The optional step was skipped; unknown stays unknown. */
@@ -430,6 +443,7 @@ export const OnboardingUnderstandingSchema = z.discriminatedUnion("kind", [
       kind: z.literal("AMBIGUOUS"),
       stepKey: OnboardingStepKeySchema,
       optionKeys: z.array(OnboardingOptionKeySchema).min(2).max(20),
+      proposed: ProposedCount,
     })
     .strict(),
   /** A confirmation step was declined; something needs changing. */
@@ -442,11 +456,16 @@ export const OnboardingUnderstandingSchema = z.discriminatedUnion("kind", [
       kind: z.literal("READING"),
       stepKey: OnboardingStepKeySchema,
       utteranceId: UuidSchema,
+      proposed: ProposedCount,
     })
     .strict(),
   /** Nothing could be made of it; the person picks or says more. */
   z
-    .object({ kind: z.literal("UNCLEAR"), stepKey: OnboardingStepKeySchema })
+    .object({
+      kind: z.literal("UNCLEAR"),
+      stepKey: OnboardingStepKeySchema,
+      proposed: ProposedCount,
+    })
     .strict(),
 ]);
 export type OnboardingUnderstanding = z.infer<

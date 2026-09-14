@@ -1,3 +1,4 @@
+import type { InterviewCues } from "../domain/resolution/cross-step.js";
 import type { DatabaseExecutor, TransactionManager } from "@capital-q/database";
 import type { OutboxWriter } from "@capital-q/eventing";
 import type { Logger } from "@capital-q/observability";
@@ -25,6 +26,7 @@ import type {
   OnboardingSuggestionRepository,
   OnboardingUtteranceRepository,
   OnboardingWriteTargetHandler,
+  OnboardingTaxonomyResolver,
 } from "./ports.js";
 import {
   createOnboardingDefinitionPublisher,
@@ -100,6 +102,10 @@ export type OnboardingServiceOptions = {
    * phrases. Recognition only; the definition still validates the answer.
    */
   readonly utteranceAliases?: OnboardingUtteranceAliases | undefined;
+  /** Figures and exclusions a journey declares for the interview (CQ-Q-VOICE-001 A). */
+  readonly interviewCues?: InterviewCues | undefined;
+  /** Capital Q's taxonomy classifier for category phrases (CQ-Q-VOICE-001 A). */
+  readonly taxonomy?: OnboardingTaxonomyResolver | undefined;
   /** Safe structured logging only; never response content. */
   readonly logger?: Logger | undefined;
 };
@@ -134,6 +140,8 @@ export function createOnboardingService(
       options.repositories?.utterances ??
       createPostgresOnboardingUtteranceRepository(),
     utteranceAliases: options.utteranceAliases,
+    interviewCues: options.interviewCues,
+    taxonomy: options.taxonomy,
     idempotency:
       options.repositories?.idempotency ??
       createPostgresOnboardingIdempotencyRepository(),
