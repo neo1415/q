@@ -149,11 +149,30 @@ questions), with `RESEARCH_NOTE` on how to cite and separate voices.
 
 Provider failures are typed (`AUTHENTICATION`, `RATE_LIMIT`, `TIMEOUT`,
 `UNAVAILABLE`, `VALIDATION`) and reach Q as `PROVIDER_UNAVAILABLE` with one plain
-sentence; no status code, endpoint or stack travels. Progress: the contract has
-`SEARCHING_PUBLIC_SOURCES` ("Searching public sources"), but `q_runtime.run_events`
-still enforces the original stage list in a CHECK constraint; widening it is a
-migration this packet did not create, so research is shown as `CHECKING_EVIDENCE`
-until it lands.
+sentence; no status code, endpoint or stack travels. Progress: the run records the
+approved stage `SEARCHING_PUBLIC_SOURCES` ("Searching public sources"), admitted
+by migration `20260917090000` (CQ-Q-VOICE-001 R1) — a high-level stage, never
+chain-of-thought.
+
+## One presentation of a source (CQ-Q-VOICE-001 R3)
+
+Every path that shows or speaks a source projects it through q-core's
+`presentPublicSource` / `describePublicSource` / `citePublicSources`
+(`packages/q-core/src/communication/source-presentation.ts`): title (or the
+domain when the page had none), domain, one defensible date ("published …" when
+the provider dated the page, otherwise "retrieved …"), the public URL, a short
+provenance phrase and a spoken form (the title, never the URL). Company
+Intelligence and the conversational seam both rewrite a model's "(source S1)"
+through it. Nothing else — no evidence id, tenant, storage locator, provider
+request id or raw payload — is part of the projection.
+
+## One research per run and question (CQ-Q-VOICE-001 R4)
+
+The service remembers a successful outcome by tenant, run and composed query
+(bounded like the URL allow-list). A model's own call, the seam's deterministic
+call and an answer retry that ask the same question in the same run receive the
+same result: one search, one extract, one set of evidence writes. A new run or a
+different question is a new research.
 
 ## Configuration
 

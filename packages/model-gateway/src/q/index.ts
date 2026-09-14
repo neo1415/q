@@ -22,7 +22,9 @@ import type { Logger } from "@capital-q/observability";
 import type { ActorContext } from "@capital-q/security";
 import {
   asksForPublicResearch,
+  citePublicSources,
   type AuthorisedFact,
+  type PublicSourceLike,
   type CompanyAnalystV2Result,
   CompanyAnalystV2ResultSchema,
   type CompanyAnalystV2Variables,
@@ -615,6 +617,39 @@ export function createModelGatewayQAnswer(
         schema: CompanyAnalystV2ResultSchema,
       };
       const toolCalls: QToolCallObservation[] = [];
+      // Public sources this run read, for the one human-safe presentation
+      // of a source in the answer (CQ-Q-VOICE-001 R3). Public fields only.
+      const publicSources: PublicSourceLike[] = [];
+      const collectSources = (outcome: QToolCallOutcome): void => {
+        if (outcome.toolName !== "public_web.search" || !outcome.result.ok) {
+          return;
+        }
+        const data = outcome.result.data as {
+          sources?: readonly PublicSourceLike[];
+        };
+        for (const source of data.sources ?? []) {
+          // Only a well-formed public source is presentable; anything else
+          // stays in the tool transcript as data and is never cited.
+          if (
+            typeof source.url !== "string" ||
+            typeof source.domain !== "string" ||
+            typeof source.retrievedAt !== "string" ||
+            typeof source.index !== "number"
+          ) {
+            continue;
+          }
+          if (!publicSources.some((known) => known.url === source.url)) {
+            publicSources.push({
+              index: source.index,
+              url: source.url,
+              domain: source.domain,
+              title: source.title,
+              publishedAt: source.publishedAt,
+              retrievedAt: source.retrievedAt,
+            });
+          }
+        }
+      };
       let modelCalls = 0;
       let messages: ModelMessage[] = [...rendered.messages];
 
@@ -722,6 +757,7 @@ export function createModelGatewayQAnswer(
                 failureCode: outcome.failureCode,
                 latencyMs: outcome.latencyMs,
               });
+              collectSources(outcome);
               results.push(toolResultMessage(call, outcome));
             }
             messages = [...messages, assistant, ...results];
@@ -767,6 +803,7 @@ export function createModelGatewayQAnswer(
             failureCode: outcome.failureCode,
             latencyMs: outcome.latencyMs,
           });
+          collectSources(outcome);
           messages = [
             ...messages,
             { role: "ASSISTANT", content: "", toolCalls: [call] },
@@ -794,7 +831,11 @@ export function createModelGatewayQAnswer(
         // explaining why something was recommended, ranked or matched was
         // invented. COMPANY_ANALYST forbids writing one; a prompt is not
         // the boundary, so the text is checked rather than trusted.
-        const guarded = withoutRecommendationClaims(analyst.answer);
+        // Source labels become the one human-safe presentation (R3);
+        // the recommendation guard runs on the text a person will read.
+        const guarded = withoutRecommendationClaims(
+          citePublicSources(analyst.answer, publicSources),
+        );
         if (guarded.removed > 0) {
           logger?.warn(
             { qRunId: request.runId, removed: guarded.removed },

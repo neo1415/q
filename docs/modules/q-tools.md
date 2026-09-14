@@ -117,9 +117,9 @@ without one they do not exist. Both require the actor-wide
 
 The query that leaves Capital Q is composed by the research capability from
 the person's own words and the authorised identity, never from the model's
-argument as given (`context.conversation.latestUserText`). Until the
-`run_events` stage constraint is widened by migration, both tools show the
-`CHECKING_EVIDENCE` stage.
+argument as given (`context.conversation.latestUserText`). Both tools show
+the approved `SEARCHING_PUBLIC_SOURCES` stage (persisted since migration
+`20260917090000`).
 
 ## What was deliberately not built
 

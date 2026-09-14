@@ -181,13 +181,7 @@ export function createResearchPublicWebTool(
     approval: "NONE",
     idempotency: "SAFE_TO_REPEAT",
     owner: "q-tools",
-    // The approved vocabulary gained SEARCHING_PUBLIC_SOURCES (contracts +
-    // web label), but q_runtime.run_events still enforces the original stage
-    // list in a CHECK constraint, and widening it is a migration this packet
-    // deliberately did not create (CQ-Q-RESEARCH-001 migration rule). Until
-    // that migration lands, public research is shown as the nearest existing
-    // stage. Checking public sources IS checking evidence; nothing is misstated.
-    visibleStage: "CHECKING_EVIDENCE",
+    visibleStage: "SEARCHING_PUBLIC_SOURCES",
     input: ResearchPublicWebInputSchema,
     output: ResearchPublicWebOutputSchema,
     authorize: async (input, context) => {

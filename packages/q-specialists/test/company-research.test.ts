@@ -296,7 +296,7 @@ describe("company intelligence with public-web research", () => {
     expect(h.researchCalls).toEqual([
       { companyId: COMPANY, question, latest: question },
     ]);
-    expect(h.stages).toEqual(["CHECKING_EVIDENCE"]);
+    expect(h.stages).toEqual(["SEARCHING_PUBLIC_SOURCES"]);
     expect(result.research).toEqual({
       status: "OK",
       sourceCount: 2,
@@ -516,7 +516,7 @@ describe("specialist answer seam", () => {
         version: "v1",
         supports: () => true,
         investigate: async (_request, context) => {
-          await context.showStage?.("CHECKING_EVIDENCE");
+          await context.showStage?.("SEARCHING_PUBLIC_SOURCES");
           const result: CompanyIntelligenceResult = {
             companyId: COMPANY,
             specialistVersion: "company-intelligence/v1",
@@ -583,7 +583,7 @@ describe("specialist answer seam", () => {
     const outcome = await seam.answer(request);
     expect(outcome.kind).toBe("ANSWERED");
     expect(events.filter((e) => e.type === "q.stage.changed")).toEqual([
-      { type: "q.stage.changed", stage: "CHECKING_EVIDENCE" },
+      { type: "q.stage.changed", stage: "SEARCHING_PUBLIC_SOURCES" },
     ]);
     const answer = messages.at(-1)?.content ?? "";
     expect(answer).toContain("Thank you — I have that now.");

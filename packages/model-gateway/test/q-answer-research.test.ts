@@ -79,8 +79,7 @@ const RESEARCH: QOfferedTool = {
     description: "Searches the public web once.",
     inputJsonSchema: { type: "object", properties: {} },
   },
-  // Interim until the run_events stage constraint is widened by migration.
-  visibleStage: "CHECKING_EVIDENCE",
+  visibleStage: "SEARCHING_PUBLIC_SOURCES",
 };
 
 const GET_COMPANY: QOfferedTool = {
@@ -141,6 +140,7 @@ function researchOutcome(
             domain: "news.example.com",
             title: "Northstar expands to Kenya",
             publishedAt: "2026-09-02",
+            retrievedAt: "2026-09-14T10:00:00.000Z",
             excerpt,
             instructionRiskSignals: 1,
           },
@@ -361,7 +361,7 @@ describe("answer seam: Q decides to research", () => {
       query: question,
       maxSources: 2,
     });
-    expect(stages).toEqual(["REVIEWING_COMPANY", "CHECKING_EVIDENCE"]);
+    expect(stages).toEqual(["REVIEWING_COMPANY", "SEARCHING_PUBLIC_SOURCES"]);
     // The research result reached the final structured call as a TOOL turn.
     const finalCall = alpha.calls.at(-1)?.request;
     expect(finalCall?.output.kind).toBe("STRUCTURED");
@@ -393,6 +393,33 @@ describe("answer seam: Q decides to research", () => {
     expect(once.executed.map((e) => e.proposal.name)).toEqual([
       "research_public_web",
     ]);
+  });
+});
+
+describe("answer seam: one source presentation (R3)", () => {
+  it("presents a source the model cited by label as title, domain, date and link", async () => {
+    const tools = toolPort([RESEARCH], (p) =>
+      researchOutcome(p, "Northstar now operates in Nigeria, Ghana and Kenya."),
+    );
+    const { seam, request, messages } = build({
+      script: [
+        researchCall,
+        {
+          kind: "JSON",
+          value: analystResult(
+            "A recent article (source S1) reports a Kenya hub.",
+          ),
+        },
+      ],
+      tools: tools.port,
+      userText: "What does the public web say about us?",
+    });
+    await seam.answer(request);
+    const answer = messages.at(-1)?.content ?? "";
+    expect(answer).not.toContain("S1");
+    expect(answer).toContain(
+      "(Northstar expands to Kenya (news.example.com, published 2026-09-02, https://news.example.com/2026/09/northstar))",
+    );
   });
 });
 
@@ -439,7 +466,7 @@ describe("answer seam: public-web research", () => {
     expect(tools.executed[0]?.context.conversation).toEqual({
       latestUserText: "Which markets does the public web say we operate in?",
     });
-    expect(stages).toEqual(["CHECKING_EVIDENCE"]);
+    expect(stages).toEqual(["SEARCHING_PUBLIC_SOURCES"]);
     const toolTurn = alpha.calls[1]?.request.messages.at(-1);
     expect(toolTurn?.role).toBe("TOOL");
     expect(toolTurn?.content).toContain("news.example.com");

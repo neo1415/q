@@ -129,10 +129,14 @@ retrieved page text ≠ instruction
   no request id, status code or endpoint reaches a caller, a log or a person.
 - Cost is bounded per run and observable (`q.research.*` metrics carry counts and
   provider code only).
-- A visible stage `SEARCHING_PUBLIC_SOURCES` exists in the contract and has a web
-  label, but `q_runtime.run_events` still enforces the original stage list in a
-  CHECK constraint. Widening it is a migration this packet deliberately did not
-  create; until it lands, research shows as `CHECKING_EVIDENCE`.
+- The visible stage `SEARCHING_PUBLIC_SOURCES` is persisted: migration
+  `20260917090000` (CQ-Q-VOICE-001 R1) widened the `q_runtime.run_events`
+  CHECK constraint additively, keeping every earlier value.
+- One human-safe presentation of a source (`presentPublicSource`,
+  `describePublicSource`, `citePublicSources` in q-core) is used by Company
+  Intelligence, the conversational seam and, later, voice (CQ-Q-VOICE-001 R3).
+- A run's successful research is reused for the same composed query within that
+  run: no second provider call, no second evidence write (CQ-Q-VOICE-001 R4).
 - Research about a non-owned company is transient (see Decision 6). Recording it
   would need an evidence subject or ownership rule the Evidence owner does not have.
 - Voice, recommendations, GateQ, connectors and Tavily Research/Crawl remain outside

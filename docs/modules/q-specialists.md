@@ -251,7 +251,8 @@ finding that cites one is bounded to that status. Capital Q's comparison
 notes go into the institutional notes; a `QUALIFIES` or `CONTRADICTS` note
 adds a deterministic `CLARIFY` instruction so the answer ends with one
 question to the person. Labels such as "(source S1)" in the synthesis are
-rewritten into title, domain, date and link (`citePublicSources`).
+rewritten into title, domain, date and link through q-core's one source
+presentation (`citePublicSources`, shared with the conversational seam).
 
 The analyst may return `userStatements`; each is recorded through the
 conversation statement recorder only when its quote occurs verbatim in the
@@ -275,9 +276,8 @@ Tests: `test/company-research.test.ts`, `test/cite-public-sources.test.ts`.
   so a clarification is understood from the person's message and Capital Q's
   records rather than from Q's previous question. The recorded statement does
   not depend on it.
-- Research shows the `CHECKING_EVIDENCE` stage until the `run_events` stage
-  constraint admits `SEARCHING_PUBLIC_SOURCES` (a migration this packet did not
-  create).
+- Research shows the `SEARCHING_PUBLIC_SOURCES` stage (migration
+  `20260917090000`, CQ-Q-VOICE-001 R1).
 - The rendered `COMPANY_ANALYST` bundle sits close to the repository's
   3,000-token prompt budget; a materially longer v3 would need that budget
   revisited rather than quietly exceeded.

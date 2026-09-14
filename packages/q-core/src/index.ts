@@ -196,6 +196,13 @@ export {
   asksForPublicResearch,
   PUBLIC_RESEARCH_CUES,
 } from "./communication/research-cues.js";
+export {
+  citePublicSources,
+  describePublicSource,
+  presentPublicSource,
+  type PublicSourceLike,
+  type PublicSourcePresentation,
+} from "./communication/source-presentation.js";
 
 export {
   COMMUNICATION_FORBIDDEN_TERMS,

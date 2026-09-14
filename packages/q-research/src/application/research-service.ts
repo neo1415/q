@@ -275,6 +275,7 @@ export function createPublicWebResearchService(
   const meter = getMeter("@capital-q/q-research");
   const metrics = {
     requested: meter.createCounter("q.research.requested"),
+    reused: meter.createCounter("q.research.reused"),
     providerFailures: meter.createCounter("q.research.provider_failures"),
     sourcesRetained: meter.createCounter("q.research.sources_retained"),
     comparisons: meter.createCounter("q.research.comparison_notes"),
@@ -442,6 +443,24 @@ export function createPublicWebResearchService(
     };
   };
 
+  /** Successful research outcomes by tenant, run and composed query. Bounded like the allowlist. */
+  const completed = new Map<
+    string,
+    Extract<ResearchOutcome, { status: "OK" }>
+  >();
+  const rememberCompleted = (
+    key: string,
+    outcome: Extract<ResearchOutcome, { status: "OK" }>,
+  ): void => {
+    if (completed.size >= RUN_ALLOWLIST_MAX_RUNS) {
+      const oldest = completed.keys().next().value;
+      if (oldest !== undefined) {
+        completed.delete(oldest);
+      }
+    }
+    completed.set(key, outcome);
+  };
+
   return {
     seenInRun: (runId) => [...(allowlist.get(runId)?.urls ?? [])],
 
@@ -456,6 +475,20 @@ export function createPublicWebResearchService(
       });
       if (!egress.ok) {
         return { status: "NO_PUBLIC_IDENTITY", message: NO_IDENTITY_MESSAGE };
+      }
+      // One successful bounded research per run and query (CQ-Q-VOICE-001
+      // R4): a model round, the deterministic seam call and an answer retry
+      // that ask the same question in the same run get the same result
+      // back, with no second provider call and no second evidence write.
+      const reuseKey = `${command.actor.tenantId}:${command.runId}:${egress.query}`;
+      const reused = completed.get(reuseKey);
+      if (reused !== undefined) {
+        metrics.reused.add(1, { operation: "research" });
+        logger?.debug(
+          { runId: command.runId, sources: reused.sources.length },
+          "public research reused within the run",
+        );
+        return reused;
       }
       const extractCount = Math.min(
         Math.max(
@@ -629,7 +662,7 @@ export function createPublicWebResearchService(
         },
         "public research completed",
       );
-      return {
+      const outcome: Extract<ResearchOutcome, { status: "OK" }> = {
         status: "OK",
         query: egress.query,
         queryMinimised: egress.droppedTokens > 0 || egress.fellBackToIdentity,
@@ -643,6 +676,8 @@ export function createPublicWebResearchService(
           sourcesRetained: sources.length,
         },
       };
+      rememberCompleted(reuseKey, outcome);
+      return outcome;
     },
 
     extract: async (command) => {

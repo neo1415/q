@@ -2718,6 +2718,62 @@ export type Database = {
         }
         Relationships: []
       }
+      interview_questions: {
+        Row: {
+          created_at: string
+          fact_key: string
+          id: string
+          options: Json
+          question: string
+          readings: Json
+          reason: string
+          resolved_at: string | null
+          session_id: string
+          source_refs: Json
+          status: string
+          step_key: string
+          why: string | null
+        }
+        Insert: {
+          created_at?: string
+          fact_key: string
+          id?: string
+          options?: Json
+          question: string
+          readings?: Json
+          reason: string
+          resolved_at?: string | null
+          session_id: string
+          source_refs?: Json
+          status?: string
+          step_key: string
+          why?: string | null
+        }
+        Update: {
+          created_at?: string
+          fact_key?: string
+          id?: string
+          options?: Json
+          question?: string
+          readings?: Json
+          reason?: string
+          resolved_at?: string | null
+          session_id?: string
+          source_refs?: Json
+          status?: string
+          step_key?: string
+          why?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "interview_questions_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       responses: {
         Row: {
           created_at: string
@@ -3020,6 +3076,44 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "suggestions_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      utterances: {
+        Row: {
+          created_at: string
+          id: string
+          read_at: string | null
+          session_id: string
+          status: string
+          step_key: string | null
+          text: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          read_at?: string | null
+          session_id: string
+          status?: string
+          step_key?: string | null
+          text: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          read_at?: string | null
+          session_id?: string
+          status?: string
+          step_key?: string | null
+          text?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "utterances_session_id_fkey"
             columns: ["session_id"]
             isOneToOne: false
             referencedRelation: "sessions"
@@ -3433,6 +3527,102 @@ export type Database = {
           },
         ]
       }
+      contradiction_members: {
+        Row: {
+          contradiction_set_id: string
+          created_at: string
+          knowledge_object_id: string
+          role: string
+          tenant_id: string
+        }
+        Insert: {
+          contradiction_set_id: string
+          created_at?: string
+          knowledge_object_id: string
+          role: string
+          tenant_id: string
+        }
+        Update: {
+          contradiction_set_id?: string
+          created_at?: string
+          knowledge_object_id?: string
+          role?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contradiction_members_contradiction_set_id_tenant_id_fkey"
+            columns: ["contradiction_set_id", "tenant_id"]
+            isOneToOne: false
+            referencedRelation: "contradiction_sets"
+            referencedColumns: ["id", "tenant_id"]
+          },
+          {
+            foreignKeyName: "contradiction_members_knowledge_object_id_tenant_id_fkey"
+            columns: ["knowledge_object_id", "tenant_id"]
+            isOneToOne: false
+            referencedRelation: "objects"
+            referencedColumns: ["id", "tenant_id"]
+          },
+        ]
+      }
+      contradiction_sets: {
+        Row: {
+          conflict_kind: string
+          contested_from: string | null
+          created_at: string
+          definition_qualifier: string | null
+          id: string
+          knowledge_key: string
+          materiality: string
+          measurement_basis: string
+          resolution_reason: string | null
+          resolved_at: string | null
+          sensitivity_class: string
+          status: string
+          subject_id: string
+          subject_type: string
+          tenant_id: string
+          visibility_scope: string
+        }
+        Insert: {
+          conflict_kind: string
+          contested_from?: string | null
+          created_at?: string
+          definition_qualifier?: string | null
+          id?: string
+          knowledge_key: string
+          materiality?: string
+          measurement_basis: string
+          resolution_reason?: string | null
+          resolved_at?: string | null
+          sensitivity_class: string
+          status?: string
+          subject_id: string
+          subject_type: string
+          tenant_id: string
+          visibility_scope: string
+        }
+        Update: {
+          conflict_kind?: string
+          contested_from?: string | null
+          created_at?: string
+          definition_qualifier?: string | null
+          id?: string
+          knowledge_key?: string
+          materiality?: string
+          measurement_basis?: string
+          resolution_reason?: string | null
+          resolved_at?: string | null
+          sensitivity_class?: string
+          status?: string
+          subject_id?: string
+          subject_type?: string
+          tenant_id?: string
+          visibility_scope?: string
+        }
+        Relationships: []
+      }
       embeddings: {
         Row: {
           chunk_id: string
@@ -3589,11 +3779,14 @@ export type Database = {
           created_at: string
           current_revision_id: string | null
           current_revision_number: number
+          definition_qualifier: string | null
           evidence_status: string
           hold_reason: string | null
           id: string
           knowledge_key: string
           knowledge_type: string
+          last_verified_at: string | null
+          measurement_basis: string
           reassessment_reason: string | null
           reassessment_required_at: string | null
           recorded_at: string
@@ -3616,11 +3809,14 @@ export type Database = {
           created_at?: string
           current_revision_id?: string | null
           current_revision_number?: number
+          definition_qualifier?: string | null
           evidence_status: string
           hold_reason?: string | null
           id?: string
           knowledge_key: string
           knowledge_type: string
+          last_verified_at?: string | null
+          measurement_basis?: string
           reassessment_reason?: string | null
           reassessment_required_at?: string | null
           recorded_at?: string
@@ -3643,11 +3839,14 @@ export type Database = {
           created_at?: string
           current_revision_id?: string | null
           current_revision_number?: number
+          definition_qualifier?: string | null
           evidence_status?: string
           hold_reason?: string | null
           id?: string
           knowledge_key?: string
           knowledge_type?: string
+          last_verified_at?: string | null
+          measurement_basis?: string
           reassessment_reason?: string | null
           reassessment_required_at?: string | null
           recorded_at?: string
@@ -3679,6 +3878,7 @@ export type Database = {
         Row: {
           change_reason: string
           confidence_class: string
+          correction_of_revision_id: string | null
           created_at: string
           created_by_id: string | null
           created_by_type: string
@@ -3696,6 +3896,7 @@ export type Database = {
         Insert: {
           change_reason: string
           confidence_class: string
+          correction_of_revision_id?: string | null
           created_at?: string
           created_by_id?: string | null
           created_by_type: string
@@ -3713,6 +3914,7 @@ export type Database = {
         Update: {
           change_reason?: string
           confidence_class?: string
+          correction_of_revision_id?: string | null
           created_at?: string
           created_by_id?: string | null
           created_by_type?: string
@@ -3728,6 +3930,13 @@ export type Database = {
           valid_to?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "revisions_correction_of_revision_id_fkey"
+            columns: ["correction_of_revision_id"]
+            isOneToOne: false
+            referencedRelation: "revisions"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "revisions_knowledge_object_id_tenant_id_fkey"
             columns: ["knowledge_object_id", "tenant_id"]

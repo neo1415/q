@@ -248,7 +248,7 @@ Q message      ≠ canonical company truth    Q run event ≠ domain event ≠ a
 run accepted   ≠ analysis completed         message persisted ≠ message understood
 ```
 
-## Schema (`q_runtime`, migration `20260906120000`)
+## Schema (`q_runtime`, migration `20260906120000`; `run_events.visible_stage` widened by `20260917090000`)
 
 Doc 13 §34/§47, one canonical message store, all tables
 `INTERNAL_SERVER_ONLY` (RLS on, no policies, no client grants; guarded by
