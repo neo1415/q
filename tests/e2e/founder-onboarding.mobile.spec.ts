@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 
 import { signUpThroughUi, uniqueEmail } from "./support/local-auth.js";
+import { useTheForm } from "./support/onboarding-form.js";
 
 /**
  * Founder onboarding on a phone (390 × 844, touch) against the real API.
@@ -36,6 +37,7 @@ test.describe("founder onboarding (mobile, real API)", () => {
     test.slow();
     await signUpThroughUi(page, uniqueEmail("founder-mobile"));
     await page.goto("/onboarding/founder");
+    await useTheForm(page);
 
     await expect(heading(page, "What brings you to Capital Q?")).toBeVisible();
     await expect(progressText(page)).toHaveText("Company, step 1 of 7");
@@ -69,27 +71,30 @@ test.describe("founder onboarding (mobile, real API)", () => {
     ).toBeVisible();
     await page.getByRole("button", { name: "Skip for now" }).tap();
     await expect(heading(page, "What do you already have?")).toBeVisible();
-    await page.getByRole("checkbox", { name: "Nothing yet" }).check();
     await expectNoHorizontalOverflow(page);
-    await continueStep(page);
+    await page.getByRole("button", { name: "Skip for now" }).tap();
 
-    await expect(heading(page, "Here's what we have so far")).toBeVisible();
+    await expect(heading(page, "Here's what I understood")).toBeVisible();
     await expect(page.locator('[data-review-item="name"]')).toContainText(name);
     await expect(page.locator('[data-review-item="country"]')).toContainText(
       "Kenya",
     );
     await expect(page.locator('[data-review-item="materials"]')).toContainText(
-      "Nothing yet",
+      "None declared yet",
     );
 
     // Refresh, leave to Home and return: the same session and company.
     await page.reload();
-    await expect(heading(page, "Here's what we have so far")).toBeVisible();
+    await useTheForm(page);
+    await expect(heading(page, "Here's what I understood")).toBeVisible();
     await page.getByRole("link", { name: "Save & leave" }).tap();
     await expect(page).toHaveURL(/\/home$/);
-    await page.getByRole("link", { name: "Set up as a founder" }).tap();
+    // Home no longer offers "Set up as a founder" once the company exists;
+    // it offers the way back into the unfinished setup instead.
+    await page.getByRole("link", { name: "Continue setup" }).tap();
     await expect(page).toHaveURL(/\/onboarding\/founder$/);
-    await expect(heading(page, "Here's what we have so far")).toBeVisible();
+    await useTheForm(page);
+    await expect(heading(page, "Here's what I understood")).toBeVisible();
     await expect(page.locator('[data-review-item="name"]')).toContainText(name);
     await expect(progressText(page)).toHaveText("Company, step 7 of 7");
 
@@ -122,6 +127,7 @@ test.describe("founder onboarding (mobile, real API)", () => {
     await signUpThroughUi(page, uniqueEmail("founder-targets"));
     await page.setViewportSize({ width: 390, height: 500 });
     await page.goto("/onboarding/founder");
+    await useTheForm(page);
     await expect(heading(page, "What brings you to Capital Q?")).toBeVisible();
     await continueStep(page); // nothing chosen → inline error, still on F0
     await expect(
@@ -156,6 +162,7 @@ test.describe("founder onboarding (mobile, real API)", () => {
   }) => {
     await signUpThroughUi(page, uniqueEmail("founder-keys"));
     await page.goto("/onboarding/founder");
+    await useTheForm(page);
     await page.getByRole("radio", { name: /I'm raising/ }).focus();
     await page.keyboard.press("ArrowDown");
     await expect(page.getByRole("radio", { name: /preparing/ })).toBeChecked();

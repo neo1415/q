@@ -546,7 +546,12 @@ describe("the Knowledge Write Gate against local PostgreSQL", () => {
       expect(honest.truthClass).not.toBe("VERIFIED");
       // Confidence is a category with no numeric form anywhere in the path.
       expect(typeof honest.confidenceClass).toBe("string");
-      expect(JSON.stringify(honest)).not.toMatch(/0\.9|92/);
+      expect(
+        JSON.stringify(honest).replace(
+          /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/g,
+          "<id>",
+        ),
+      ).not.toMatch(/0\.9|92/);
     });
   });
 

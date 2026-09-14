@@ -135,6 +135,12 @@ function fakeRuntime(overrides: Partial<Runtime> = {}) {
     dismissInterviewQuestion: record("dismissInterviewQuestion", () =>
       Promise.resolve(VIEW),
     ),
+    say: record("say", () =>
+      Promise.resolve({
+        view: VIEW,
+        understood: { kind: "UNCLEAR" as const, stepKey: "intent" },
+      }),
+    ),
     ...overrides,
   };
   return { runtime, calls };

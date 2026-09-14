@@ -184,6 +184,7 @@ export { createPostgresOnboardingInterviewQuestionRepository } from "./infrastru
 export { createPostgresOnboardingUtteranceRepository } from "./infrastructure/postgres-utterance-repository.js";
 export {
   interpretUtterance,
+  isRichUtterance,
   parseFigure,
   referenceCandidatesOf,
   type ReferenceCandidate,

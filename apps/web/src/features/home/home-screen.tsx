@@ -9,7 +9,11 @@ import {
   PageSection,
 } from "@/components/app-shell/page-container";
 
-import { resolveOwnContext, type OwnContext } from "@/features/q/context";
+import {
+  resolveOwnContext,
+  resolveUnfinishedSetup,
+  type OwnContext,
+} from "@/features/q/context";
 import {
   QConversationPanel,
   type QSurfaceContext,
@@ -94,6 +98,12 @@ export async function HomeScreen() {
   const context = qConnected
     ? await resolveOwnContext()
     : { kind: "NONE" as const };
+  // A setup that was left part-way is offered back, in one tap; the setup
+  // paths below are only for a person Capital Q knows nothing about yet.
+  const unfinished =
+    qConnected && context.kind !== "NONE"
+      ? await resolveUnfinishedSetup()
+      : null;
 
   return (
     <PageContainer>
@@ -113,6 +123,27 @@ export async function HomeScreen() {
             context={surfaceContext(context)}
           />
         </PageSection>
+
+        {unfinished !== null ? (
+          <PageSection
+            id="continue-setup"
+            title="Finish setting up"
+            description={
+              unfinished === "founder"
+                ? "Your company setup is part-way through. Q picks up exactly where you left off, and asks only for what is still missing."
+                : "Your mandate is part-way through. Q picks up exactly where you left off, and asks only for what is still missing."
+            }
+          >
+            <div>
+              <Link
+                href={`/onboarding/${unfinished}`}
+                className={buttonClassName("secondary", "regular")}
+              >
+                Continue setup
+              </Link>
+            </div>
+          </PageSection>
+        ) : null}
 
         {context.kind === "FOUNDER" ? (
           <PageSection

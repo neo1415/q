@@ -539,7 +539,7 @@ export const routingGrader: QEvalGrader = {
           ? grade(
               routingGrader,
               "PASS",
-              `no provider received the confidential request (${routing.outcome})`,
+              `no provider received the highly confidential request (${routing.outcome})`,
               metrics,
             )
           : grade(

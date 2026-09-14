@@ -252,7 +252,7 @@ describe("@capital-q/media against local PostgreSQL", () => {
   const outboxTypes = async (tx: TransactionContext) => {
     const rows = await tx.sql<
       { event_type: string }[]
-    >`select event_type from events.outbox order by id`;
+    >`select event_type from events.outbox where event_type like 'media.%' order by id`;
     return rows.map((row) => row.event_type);
   };
 

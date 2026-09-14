@@ -699,7 +699,7 @@ export function createMandateReview(
       questions.push({
         stepKey,
         factKey: `ambiguity.${ambiguity.dimension}`,
-        question: ambiguity.question.slice(0, 500),
+        question: ambiguityQuestion(ambiguity),
         why:
           ambiguity.kind === "SCOPE_OR_EXCLUSION"
             ? "This changes what you would never be shown, so Capital Q asks rather than guesses."
@@ -889,4 +889,50 @@ const AMBIGUITY_STEP: Readonly<Partial<Record<MandateDimension, string>>> = {
 
 function ambiguityStep(ambiguity: MandateAmbiguity): string | null {
   return AMBIGUITY_STEP[ambiguity.dimension] ?? null;
+}
+
+/** The dimension in the words the investor sees. */
+const DIMENSION_WORDS: Readonly<Partial<Record<MandateDimension, string>>> = {
+  geography: "geography",
+  stages: "stages",
+  cheque_min: "smallest cheque",
+  cheque_typical: "typical cheque",
+  cheque_max: "largest cheque",
+  sectors: "sectors",
+  sectors_avoid: "sectors to rank lower",
+  investment_role: "how you take part",
+};
+
+/** The exclusion example the synthesis prompt gives; a model sometimes repeats it for every kind. */
+const EXCLUSION_TEMPLATE =
+  /^should capital q exclude (?:these|this|it|them) entirely,? or (?:only )?show (?:them|it) lower[?]?$/i;
+
+/**
+ * The question that settles an ambiguity, in words that name what is open.
+ * The model supplies a question, but a question about hard exclusion is
+ * only right for SCOPE_OR_EXCLUSION; for a range that could be typical or a
+ * limit, or a phrase that maps two ways, the question is built here from
+ * the dimension and the quote so it never misdescribes what is being asked
+ * (CQ-PRE-REC-001 §44).
+ */
+export function ambiguityQuestion(ambiguity: MandateAmbiguity): string {
+  const words = DIMENSION_WORDS[ambiguity.dimension] ?? ambiguity.dimension;
+  const quoted =
+    ambiguity.quote === null || ambiguity.quote.trim().length === 0
+      ? null
+      : `You wrote “${ambiguity.quote.trim().slice(0, 160)}”. `;
+  const supplied = ambiguity.question.trim();
+  switch (ambiguity.kind) {
+    case "SCOPE_OR_EXCLUSION":
+      return (
+        supplied.slice(0, 500) ||
+        `${quoted ?? ""}Should Capital Q exclude that entirely, or only show it lower?`
+      );
+    case "TYPICAL_OR_LIMIT":
+      return `${quoted ?? ""}Is that your ${words} as a rule, or a limit you never go past?`;
+    case "IMPRECISE_VALUE":
+      return supplied.length > 0 && !EXCLUSION_TEMPLATE.test(supplied)
+        ? supplied.slice(0, 500)
+        : `${quoted ?? ""}Which ${words} do you mean? It reads more than one way.`;
+  }
 }

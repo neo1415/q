@@ -93,13 +93,44 @@ function mentions(text: string, phrase: string): boolean {
   return hay.includes(` ${needle} `);
 }
 
+/**
+ * Words that turn the phrase after them into what the person is NOT saying:
+ * "beyond pilots", "not a SAFE", "past the waitlist stage", "no longer
+ * pre-revenue". A single article or short word may sit between the marker and the phrase.
+ */
+const NEGATION_MARKERS =
+  "(?:not|no|never|beyond|past|without|instead of|rather than|more than|no longer|not just|aren't|isn't|wasn't|weren't|don't|doesn't|didn't|haven't|hasn't|ex)";
+
+/** True when every mention of `phrase` in `text` follows a negation marker. */
+function negated(text: string, phrase: string): boolean {
+  const needle = normalise(phrase);
+  if (needle.length === 0) {
+    return false;
+  }
+  const hay = ` ${normalise(text)} `;
+  const escaped = needle.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const all = [...hay.matchAll(new RegExp(` ${escaped} `, "g"))].length;
+  if (all === 0) {
+    return false;
+  }
+  const negatedCount = [
+    ...hay.matchAll(
+      new RegExp(
+        ` ${NEGATION_MARKERS}(?: (?:a|an|the|any|just|really|our|my|your|their|only|at|in))? ${escaped} `,
+        "g",
+      ),
+    ),
+  ].length;
+  return negatedCount >= all;
+}
+
 function optionMatches(
   text: string,
   options: readonly OnboardingOptionView[],
   aliases: Readonly<Record<string, readonly string[]>> | undefined,
 ): readonly OnboardingOptionView[] {
   const exact = normalise(text);
-  const matched: OnboardingOptionView[] = [];
+  const matched: { option: OnboardingOptionView; phrases: string[] }[] = [];
   for (const option of options) {
     // A short key ("in", "us", "gb") is a code, not a word a person says;
     // matching it would read "based in Lagos" as India.
@@ -110,14 +141,35 @@ function optionMatches(
         : []),
       ...(aliases?.[option.optionKey] ?? []),
     ];
-    if (
-      names.some((name) => normalise(name) === exact) ||
-      names.some((name) => mentions(text, name))
-    ) {
-      matched.push(option);
+    if (names.some((name) => normalise(name) === exact)) {
+      return [option];
+    }
+    const phrases = names
+      .filter((name) => mentions(text, name) && !negated(text, name))
+      .map((name) => normalise(name));
+    if (phrases.length > 0) {
+      matched.push({ option, phrases });
     }
   }
-  return matched;
+  // A phrase that only occurs inside another matched option's phrase is that
+  // option's words, not a second answer: "co-invest alongside a lead" names
+  // co-investing, not leading, although "lead" is in it.
+  return matched
+    .filter(({ option, phrases }) =>
+      phrases.some(
+        (phrase) =>
+          !matched.some(
+            (other) =>
+              other.option !== option &&
+              other.phrases.some(
+                (outer) =>
+                  outer.length > phrase.length &&
+                  ` ${outer} `.includes(` ${phrase} `),
+              ),
+          ),
+      ),
+    )
+    .map(({ option }) => option);
 }
 
 /** "3", "3m", "$1.8m", "250k", "1,000" → a plain decimal string, or null. */
@@ -152,6 +204,14 @@ export function parseFigure(text: string): string | null {
 }
 
 /** A sentence carrying more than one thing, or a figure with context: Q reads it. */
+/**
+ * A sentence with more in it than an option: six words or more, or a figure
+ * with a few words. The interview places what it can and gives the rest to Q.
+ */
+export function isRichUtterance(text: string): boolean {
+  return isNarrative(text);
+}
+
 function isNarrative(text: string): boolean {
   const words = wordsOf(text);
   const hasFigure = /\d/.test(text);
@@ -387,14 +447,21 @@ export function interpretUtterance(
       return { kind: "UNCLEAR" };
     }
     case "confirmation": {
-      if (YES.test(trimmed)) {
+      // The step's own labels ("Save my raise", "Looks right") are answers
+      // too; a chip says exactly them.
+      const exact = normalise(trimmed);
+      if (YES.test(trimmed) || exact === normalise(presentation.confirmLabel)) {
         return {
           kind: "ANSWER",
           value: { type: "CONFIRMATION", confirmed: true },
           summary: presentation.confirmLabel,
         };
       }
-      if (NO.test(trimmed)) {
+      if (
+        NO.test(trimmed) ||
+        (presentation.declineLabel !== undefined &&
+          exact === normalise(presentation.declineLabel))
+      ) {
         return { kind: "DECLINE" };
       }
       return isNarrative(trimmed) ? { kind: "NARRATIVE" } : { kind: "UNCLEAR" };

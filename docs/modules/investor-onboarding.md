@@ -156,6 +156,30 @@ no reading writes one.
   check in `taxonomyPreferencesFromResponses` still refuses a node in both
   buckets, naming the category.
 
+### Chat-first mandate (CQ-PRE-REC-001 §44)
+
+- An investor can describe the mandate in one breath at the stages step.
+  The options the sentence names are placed; the sentence is read by the
+  mandate synthesis, which proposes the typical cheque, the geography and
+  the sectors as suggestions and asks an EXCLUSION_CONFIRMATION question for
+  "we never touch gambling" with two answers — "Never show me gambling"
+  (I7 hard exclusion) or "Just show it lower" (I7 avoid). Only the
+  investor's answer writes either.
+- An ambiguity is asked in words that name what is open. The synthesis
+  prompt gives the model one example question (about exclusion) and a
+  model sometimes repeats it for a range; `ambiguityQuestion` builds the
+  question for TYPICAL_OR_LIMIT and IMPRECISE_VALUE from the dimension and
+  the quote ("You wrote “between 1 and 3 million dollars”. Is that your
+  largest cheque as a rule, or a limit you never go past?") and keeps the
+  model's wording only for SCOPE_OR_EXCLUSION or a genuinely specific
+  question.
+- Verified live: a fresh family office described its mandate in one
+  sentence, kept what Q picked up, confirmed the gambling exclusion
+  explicitly, left mid-way, signed out and back in, was greeted with what
+  was covered, finished with plain-word answers where a form was not needed
+  (a form for the pick-lists), and activated the mandate; Home Q answered
+  the hard exclusion and stages from the same mandate.
+
 ## Security
 
 - All model access through the Model Gateway; no provider SDK in this

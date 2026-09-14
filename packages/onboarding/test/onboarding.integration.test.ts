@@ -717,12 +717,14 @@ describe("@capital-q/onboarding against local PostgreSQL", () => {
       expect(
         await count(world.tx.sql`
           select count(*)::int as count from events.outbox
-           where event_type = 'onboarding.utterance.recorded'`),
+           where event_type = 'onboarding.utterance.recorded'
+             and payload->'data'->>'sessionId' = ${id}`),
       ).toBe(1);
       // The outbox carries identifiers only, never the words.
       const [payload] = await world.tx.sql`
         select payload::text as body from events.outbox
-         where event_type = 'onboarding.utterance.recorded'`;
+         where event_type = 'onboarding.utterance.recorded'
+             and payload->'data'->>'sessionId' = ${id}`;
       expect(String(payload?.["body"])).not.toContain("underwriting");
 
       // The same key replays the same reading without a second row.
@@ -743,6 +745,32 @@ describe("@capital-q/onboarding against local PostgreSQL", () => {
         await count(world.tx.sql`
           select count(*)::int as count from onboarding.utterances where session_id = ${id}`),
       ).toBe(2);
+
+      // A rich sentence that names an option is placed AND read: the option
+      // lands through submitResponse and the sentence is recorded for Q (§44).
+      const rich = await say(
+        "Mostly fintech, and we write cheques of about two million dollars",
+        2,
+      );
+      expect(rich.understood).toMatchObject({
+        kind: "ANSWERED",
+        stepKey: "sectors",
+        summary: "Fintech",
+      });
+      expect(
+        rich.understood.kind === "ANSWERED" && rich.understood.utteranceId,
+      ).toBeTruthy();
+      expect(rich.view.session.version).toBe(3);
+      expect(
+        await count(world.tx.sql`
+          select count(*)::int as count from onboarding.utterances where session_id = ${id}`),
+      ).toBe(3);
+      expect(
+        await count(world.tx.sql`
+          select count(*)::int as count from events.outbox
+           where event_type = 'onboarding.utterance.recorded'
+             and payload->'data'->>'sessionId' = ${id}`),
+      ).toBe(3);
     });
   });
 

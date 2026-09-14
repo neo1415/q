@@ -109,6 +109,28 @@ function candidatesOf(
 
 const MAX_CHIPS = 12;
 
+/**
+ * A strength step asks "How firm is that?" in the definition, which is clear
+ * on a form under its list and ambiguous in a thread where two such steps
+ * follow each other. Q names the subject instead: "How firm on geography?"
+ */
+const GENERIC_STRENGTH_PROMPT =
+  /^how firm (?:is|are) (?:that|this|those|these)[?]?$/i;
+
+function questionText(
+  step: OnboardingStepView,
+  vocabulary: JourneyVocabulary,
+): string {
+  return GENERIC_STRENGTH_PROMPT.test(step.prompt.trim())
+    ? `${vocabulary.stepTitle(step.stepKey)}?`
+    : step.prompt;
+}
+
+/** "Founders who have sold into banks before." reads once, not "before.. Noted." */
+function trimSentenceEnd(summary: string): string {
+  return summary.replace(/[.!?]+$/, "");
+}
+
 /** The question Q asks now, from the session's current step. */
 export function promptFor(
   step: OnboardingStepView,
@@ -116,7 +138,7 @@ export function promptFor(
 ): QPrompt {
   const base = {
     stepKey: step.stepKey,
-    text: step.prompt,
+    text: questionText(step, vocabulary),
     why: step.whyQAsks ?? step.supportingText,
     optional: !step.required,
     editorLabel: undefined,
@@ -380,7 +402,9 @@ export function acknowledge(
 ): string {
   switch (understood.kind) {
     case "ANSWERED":
-      return `${vocabulary.stepTitle(understood.stepKey)}: ${understood.summary}. Noted.`;
+      return understood.utteranceId === undefined
+        ? `${vocabulary.stepTitle(understood.stepKey)}: ${trimSentenceEnd(understood.summary)}. Noted.`
+        : `${vocabulary.stepTitle(understood.stepKey)}: ${trimSentenceEnd(understood.summary)}. Noted. I'm reading the rest of that too; anything else I pick up will appear for you to confirm.`;
     case "SKIPPED":
       return "Noted. I'll leave that open; you can come back to it any time.";
     case "REQUIRED":

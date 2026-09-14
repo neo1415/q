@@ -175,6 +175,18 @@ Two founder-specific pieces live here:
   committed narrative response (description, follow-up) and a recorded
   utterance from the interview. All three feed the same extraction, the
   same suggestions and the same persisted questions.
+- The review (F3) and the snapshot (F8) name what F2 gathered under
+  definition v2: the evidence documents by title and kind ("kibo-deck.txt
+  (Pitch deck)"), read by id within the tenant through the founder read
+  services; a v1 session's declared material kinds still read. Nothing about
+  a document's contents crosses into the onboarding context (§43).
+- Verified live (§43, CQ-PRE-REC-001): a fresh founder answered in plain
+  words (an ambiguous stage narrowed to two chips, not guessed), uploaded a
+  deck, saw Q's reading (role, founders, team size, functions) and kept it,
+  was not asked the four questions those answers settled, left after the
+  company review, signed out and back in, was greeted with what was covered
+  and what remained, finished, and asked Home Q about paying clinics and the
+  deck — answered from the same state.
 
 ## Security
 

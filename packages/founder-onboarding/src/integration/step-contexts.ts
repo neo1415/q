@@ -9,6 +9,7 @@ import {
   type CompanyTeamFacts,
 } from "@capital-q/companies";
 import type { DatabaseExecutor } from "@capital-q/database";
+import { DocumentIdSchema } from "@capital-q/evidence";
 import type {
   OnboardingStepContextInput,
   OnboardingStepContextProvider,
@@ -41,6 +42,7 @@ import {
   labelOf,
   labelsOf,
   multiSelect,
+  resourceIds,
   responseValues,
   singleSelect,
   text,
@@ -124,11 +126,51 @@ async function companyFacts(
         labelByNode.get(String(assignment.nodeId)) ?? assignment.canonicalCode,
       vocabularyCode: String(assignment.vocabularyCode),
     })),
-    materials: labelsOf(
+    materials: await materialsOnFile(services, bound, values),
+  };
+}
+
+/**
+ * What F2 gathered. Definition v2 records the evidence documents the founder
+ * uploaded (by id, never their contents), so the review and the snapshot
+ * name them: "kibo-deck.txt (Pitch deck)". A v1 session recorded the kinds
+ * of material the founder said they had; those labels still read. Null when
+ * the step was not answered.
+ */
+async function materialsOnFile(
+  services: FounderDomainServices,
+  bound: BoundCompany,
+  values: ResponseValues,
+): Promise<{ key: string; label: string }[] | null> {
+  const documentIds = resourceIds(values, FOUNDER_STEPS.materials);
+  if (documentIds === null) {
+    return labelsOf(
       MATERIAL_OPTIONS,
       multiSelect(values, FOUNDER_STEPS.materials),
+    );
+  }
+  const documents = await Promise.all(
+    documentIds.map((id) =>
+      services.documents.findInTenant(
+        bound.context.tenantId,
+        DocumentIdSchema.parse(id),
+      ),
     ),
-  };
+  );
+  return documents.flatMap((document) => {
+    if (document === null) {
+      return [];
+    }
+    const kind =
+      labelOf(MATERIAL_OPTIONS, document.documentType.toLowerCase()) ?? null;
+    return [
+      {
+        key: String(document.id),
+        label:
+          kind === null ? document.title : `${document.title} (${kind.label})`,
+      },
+    ];
+  });
 }
 
 function reviewProvider(

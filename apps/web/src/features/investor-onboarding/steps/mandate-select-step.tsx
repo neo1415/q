@@ -58,7 +58,8 @@ export function MandateSelectStep({
         </InlineNotice>
       ) : only !== undefined ? (
         <InlineNotice tone="info">
-          You have one mandate, {only.name}. That&apos;s the one we&apos;ll define.
+          You have one mandate, {only.name}. That&apos;s the one we&apos;ll
+          define.
         </InlineNotice>
       ) : (
         <ChoiceList

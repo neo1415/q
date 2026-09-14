@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 
 import { signUpThroughUi, uniqueEmail } from "./support/local-auth.js";
+import { useTheForm } from "./support/onboarding-form.js";
 
 /**
  * Founder onboarding F0 → F8 on desktop against the real Capital Q API and
@@ -36,6 +37,7 @@ test.describe("founder onboarding (desktop, real API)", () => {
     await signUpThroughUi(page, uniqueEmail("founder"));
     await page.getByRole("link", { name: "Set up as a founder" }).click();
     await expect(page).toHaveURL(/\/onboarding\/founder$/);
+    await useTheForm(page);
 
     // F0 — intent.
     await expect(heading(page, "What brings you to Capital Q?")).toBeVisible();
@@ -86,14 +88,16 @@ test.describe("founder onboarding (desktop, real API)", () => {
       await page.getByRole("button", { name: "Skip for now" }).click();
     }
 
-    // F2 — materials: a declaration, no file picker anywhere.
+    // F2 — materials: documents are Evidence, optional here; a founder
+    // without one is never turned away (definition v2).
     await expect(heading(page, "What do you already have?")).toBeVisible();
-    await expect(page.locator('input[type="file"]')).toHaveCount(0);
-    await page.getByRole("checkbox", { name: "Pitch deck" }).check();
-    await continueStep(page);
+    await expect(
+      page.getByRole("button", { name: "Choose files" }),
+    ).toBeVisible();
+    await page.getByRole("button", { name: "Skip for now" }).click();
 
     // F3 — review: exactly what was entered, from the canonical company.
-    await expect(heading(page, "Here's what we have so far")).toBeVisible();
+    await expect(heading(page, "Here's what I understood")).toBeVisible();
     await expect(page.locator('[data-review-item="name"]')).toContainText(name);
     await expect(page.locator('[data-review-item="website"]')).toContainText(
       "https://e2e-rail.example",
@@ -105,13 +109,14 @@ test.describe("founder onboarding (desktop, real API)", () => {
       "Seed",
     );
     await expect(page.locator('[data-review-item="materials"]')).toContainText(
-      "Pitch deck",
+      "None declared yet",
     );
     await expect(page.getByText(/readiness|verified|score/i)).toHaveCount(0);
 
     // A refresh mid-journey resumes exactly here, with the same company.
     await page.reload();
-    await expect(heading(page, "Here's what we have so far")).toBeVisible();
+    await useTheForm(page);
+    await expect(heading(page, "Here's what I understood")).toBeVisible();
     await expect(page.locator('[data-review-item="name"]')).toContainText(name);
     await page.getByRole("button", { name: "Looks right" }).click();
 
@@ -159,10 +164,8 @@ test.describe("founder onboarding (desktop, real API)", () => {
     await continueStep(page);
 
     // F7 — private follow-up, skipped.
-    await expect(
-      heading(page, "Anything else you want on record?"),
-    ).toBeVisible();
-    await expect(page.getByText(/Private to you/)).toBeVisible();
+    // F7 — what Q still needs, as questions the founder may answer or leave.
+    await expect(heading(page, "A few things I still need")).toBeVisible();
     await page.getByRole("button", { name: "Skip for now" }).click();
 
     // F8 — the snapshot: what was entered, no score, no matches, no banner.
@@ -186,7 +189,7 @@ test.describe("founder onboarding (desktop, real API)", () => {
 
     // Back from the snapshot reopens the review with the same facts.
     await page.getByRole("button", { name: "Keep improving" }).click();
-    await expect(heading(page, "Here's what we have so far")).toBeVisible();
+    await expect(heading(page, "Here's what I understood")).toBeVisible();
     await expect(page.locator('[data-review-item="name"]')).toContainText(name);
     await page.getByRole("button", { name: "Looks right" }).click();
     await expect(
@@ -209,6 +212,7 @@ test.describe("founder onboarding (desktop, real API)", () => {
   }) => {
     await signUpThroughUi(page, uniqueEmail("founder-back"));
     await page.goto("/onboarding/founder");
+    await useTheForm(page);
     await page.getByRole("radio", { name: /I'm preparing to raise/ }).check();
     await continueStep(page);
     await expect(heading(page, "Your company")).toBeVisible();
@@ -218,12 +222,12 @@ test.describe("founder onboarding (desktop, real API)", () => {
     await continueStep(page);
     await expect(heading(page, "What stage is the company at?")).toBeVisible();
 
-    await page.getByRole("button", { name: "Back" }).click();
+    await page.getByRole("button", { name: "Back", exact: true }).click();
     await expect(heading(page, "Your company")).toBeVisible();
     await expect(
       page.getByRole("textbox", { name: "Company name" }),
     ).toHaveValue(/Back Co/);
-    await page.getByRole("button", { name: "Back" }).click();
+    await page.getByRole("button", { name: "Back", exact: true }).click();
     await expect(
       page.getByRole("radio", { name: /I'm preparing to raise/ }),
     ).toBeChecked();
@@ -232,6 +236,7 @@ test.describe("founder onboarding (desktop, real API)", () => {
     // instead of overwriting it.
     const other = await context.newPage();
     await other.goto("/onboarding/founder");
+    await useTheForm(other);
     await expect(
       other.getByRole("radio", { name: /I'm preparing to raise/ }),
     ).toBeChecked();
@@ -247,8 +252,8 @@ test.describe("founder onboarding (desktop, real API)", () => {
     await continueStep(page);
     await expect(page.getByText("Updated elsewhere")).toBeVisible();
     await expect(heading(page, "What stage is the company at?")).toBeVisible();
-    await page.getByRole("button", { name: "Back" }).click();
-    await page.getByRole("button", { name: "Back" }).click();
+    await page.getByRole("button", { name: "Back", exact: true }).click();
+    await page.getByRole("button", { name: "Back", exact: true }).click();
     await expect(page.getByRole("radio", { name: /exploring/ })).toBeChecked();
   });
 });

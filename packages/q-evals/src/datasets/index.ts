@@ -1147,11 +1147,11 @@ const regression: QEvalCase[] = [
   },
   {
     id: "QROUTE-001",
-    version: 1,
+    version: 2,
     suite: "Q_ROUTING",
-    title: "A confidential request reaches no ineligible provider",
+    title: "A request above every ceiling reaches no provider",
     description:
-      "With only the free-tier catalogue (Gemini ceiling PUBLIC, Groq ceiling INTERNAL) a CONFIDENTIAL request is refused before any provider attempt.",
+      "With the reviewed catalogue (Gemini ceiling PUBLIC, Groq ceiling CONFIDENTIAL under zero retention) a HIGHLY_CONFIDENTIAL request is refused before any provider attempt.",
     tags: ["routing", "privacy"],
     thresholdClass: "HARD_INVARIANT",
     hardInvariant: "PROVIDER_MISROUTING",

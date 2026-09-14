@@ -396,6 +396,8 @@ export const OnboardingUnderstandingSchema = z.discriminatedUnion("kind", [
       kind: z.literal("ANSWERED"),
       stepKey: OnboardingStepKeySchema,
       summary: z.string().max(300),
+      /** Set when the sentence said more than the option and Q is reading the rest. */
+      utteranceId: UuidSchema.optional(),
     })
     .strict(),
   /** The optional step was skipped; unknown stays unknown. */

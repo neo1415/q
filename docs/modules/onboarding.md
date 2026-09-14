@@ -250,6 +250,26 @@ the browser, a graph process or a provider conversation.
 - Idempotency: a `say` that records an utterance uses the `say` operation;
   one that answers or skips carries its key into the submit or skip it
   delegates to.
+- A rich sentence that names an option is placed **and** read (§44): "We
+  back Series A and B in fintech across Nigeria, one to three million" lands
+  Series A and B on the stages step through `submitResponse`, and the whole
+  sentence is recorded as an utterance under `<key>:reading` so Q proposes
+  the cheque, the geography and the sectors for confirmation. The
+  `ANSWERED` understanding carries the `utteranceId` when that happened.
+  A bare option ("Seed") is only placed.
+- What the interview will not read into an option: a mention right after a
+  negation or contrast word ("beyond pilots", "not a SAFE") is what the
+  person is not saying, and a word that only occurs inside another matched
+  option's phrase ("co-invest alongside a lead" names co-investing, not
+  leading). A confirmation step accepts its own labels ("Save my raise") as
+  well as plain assent. A reference step whose server context lists
+  candidates (the investor's mandates) is answered by name, or by assent
+  when there is exactly one; it is never chosen by position.
+- The way back in: once a company or investor organisation exists, Home no
+  longer shows the setup paths for a stranger; while a journey session is
+  still ACTIVE it shows "Finish setting up" with one link, "Continue setup",
+  to that journey (`resolveUnfinishedSetup`, a server fact). Resume itself
+  is the runtime's persisted session; Home only points at it.
 
 The web workspace (`apps/web/src/features/onboarding-conversation`) is
 shared by both journeys; each supplies a `JourneyVocabulary` (titles, value

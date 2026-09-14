@@ -101,6 +101,7 @@ import type {
 } from "./ports.js";
 import {
   interpretUtterance,
+  isRichUtterance,
   type OnboardingUtteranceAliases,
 } from "../domain/interpretation.js";
 import { utteranceRecordedEvent } from "../events/index.js";
@@ -1731,9 +1732,74 @@ export function createOnboardingUseCases(
     );
     const why = step.whyQAsks ?? step.supportingText ?? null;
 
+    // Records the sentence for Q's reading: one utterance row, one event
+    // with identifiers only, replayed (not repeated) under the same key.
+    const recordUtterance = async (input: {
+      readonly expectedSessionVersion: number;
+      readonly idempotencyKey: string;
+    }) => {
+      const utterances = utterancesRepo();
+      return transactions.run(async (tx) => {
+        const locked = await sessions.lockForUpdate(
+          tx,
+          command.sessionId,
+          actor.userId,
+        );
+        if (locked === null) {
+          throw new OnboardingSessionNotFoundError();
+        }
+        const idem = await replayOrRecordable(
+          runtime,
+          tx,
+          locked,
+          "say",
+          input.idempotencyKey,
+          {
+            text: command.text,
+            expectedSessionVersion: input.expectedSessionVersion,
+          },
+        );
+        const session = await lockedActiveSession(
+          runtime,
+          tx,
+          actor,
+          command.sessionId,
+          input.expectedSessionVersion,
+        );
+        if (idem.replay) {
+          // Replayed: the utterance is already recorded and being read.
+          const pending = await utterances.listPending(tx.sql, session.id);
+          return { session, utteranceId: pending.at(-1)?.id };
+        }
+        const utterance = await utterances.insert(tx, {
+          sessionId: session.id,
+          stepKey,
+          text: command.text,
+        });
+        await idempotency.recordMutation(tx, {
+          sessionId: session.id,
+          keyHash: idem.keyHash,
+          operation: "say",
+          requestHash: idem.requestHash,
+          resultVersion: session.version,
+        });
+        await outbox.enqueue(
+          tx,
+          utteranceRecordedEvent({
+            session,
+            correlationId: command.correlationId,
+            utteranceId: utterance.id,
+            stepKey,
+          }),
+        );
+        safeLog(runtime, "utterance.recorded", session, { stepKey });
+        return { session, utteranceId: utterance.id };
+      });
+    };
+
     switch (reading.kind) {
       case "ANSWER": {
-        const view = await submitResponse({
+        let view = await submitResponse({
           actor,
           sessionId: command.sessionId,
           stepKey,
@@ -1744,9 +1810,31 @@ export function createOnboardingUseCases(
           idempotencyKey: command.idempotencyKey,
           correlationId: command.correlationId,
         });
+        // A rich sentence that names an option carries more than the option
+        // ("Series A and B in fintech across Nigeria, one to three million"):
+        // the option is placed now and the sentence is read by Q as well, so
+        // nothing the person said is dropped (CQ-PRE-REC-001 §44).
+        let utteranceId: string | undefined;
+        if (
+          isRichUtterance(command.text) &&
+          (step.presentation.stepType === "single_select" ||
+            step.presentation.stepType === "multi_select")
+        ) {
+          const recorded = await recordUtterance({
+            expectedSessionVersion: view.session.version,
+            idempotencyKey: `${command.idempotencyKey}:reading`,
+          });
+          utteranceId = recorded.utteranceId;
+          view = await getSession({ actor, sessionId: command.sessionId });
+        }
         return {
           view,
-          understood: { kind: "ANSWERED", stepKey, summary: reading.summary },
+          understood: {
+            kind: "ANSWERED",
+            stepKey,
+            summary: reading.summary,
+            ...(utteranceId === undefined ? {} : { utteranceId }),
+          },
         };
       }
       case "SKIP": {
@@ -1784,75 +1872,18 @@ export function createOnboardingUseCases(
       case "UNCLEAR":
         return { view: current, understood: { kind: "UNCLEAR", stepKey } };
       case "NARRATIVE": {
-        const utterances = utterancesRepo();
-        return transactions.run(async (tx) => {
-          const locked = await sessions.lockForUpdate(
-            tx,
-            command.sessionId,
-            actor.userId,
-          );
-          if (locked === null) {
-            throw new OnboardingSessionNotFoundError();
-          }
-          const idem = await replayOrRecordable(
-            runtime,
-            tx,
-            locked,
-            "say",
-            command.idempotencyKey,
-            {
-              text: command.text,
-              expectedSessionVersion: command.expectedSessionVersion,
-            },
-          );
-          const session = await lockedActiveSession(
-            runtime,
-            tx,
-            actor,
-            command.sessionId,
-            command.expectedSessionVersion,
-          );
-          if (idem.replay) {
-            // Replayed: the utterance is already recorded and being read.
-            const pending = await utterances.listPending(tx.sql, session.id);
-            const last = pending.at(-1);
-            const view = await getSession({ actor, sessionId: session.id });
-            return {
-              view,
-              understood:
-                last === undefined
-                  ? { kind: "UNCLEAR", stepKey }
-                  : { kind: "READING", stepKey, utteranceId: last.id },
-            };
-          }
-          const utterance = await utterances.insert(tx, {
-            sessionId: session.id,
-            stepKey,
-            text: command.text,
-          });
-          await idempotency.recordMutation(tx, {
-            sessionId: session.id,
-            keyHash: idem.keyHash,
-            operation: "say",
-            requestHash: idem.requestHash,
-            resultVersion: session.version,
-          });
-          await outbox.enqueue(
-            tx,
-            utteranceRecordedEvent({
-              session,
-              correlationId: command.correlationId,
-              utteranceId: utterance.id,
-              stepKey,
-            }),
-          );
-          safeLog(runtime, "utterance.recorded", session, { stepKey });
-          const view = await getSession({ actor, sessionId: session.id });
-          return {
-            view,
-            understood: { kind: "READING", stepKey, utteranceId: utterance.id },
-          };
+        const recorded = await recordUtterance({
+          expectedSessionVersion: command.expectedSessionVersion,
+          idempotencyKey: command.idempotencyKey,
         });
+        const view = await getSession({ actor, sessionId: command.sessionId });
+        return {
+          view,
+          understood:
+            recorded.utteranceId === undefined
+              ? { kind: "UNCLEAR", stepKey }
+              : { kind: "READING", stepKey, utteranceId: recorded.utteranceId },
+        };
       }
     }
   };

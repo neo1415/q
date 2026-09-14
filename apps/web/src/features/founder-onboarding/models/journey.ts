@@ -806,8 +806,7 @@ const MISSING_COPY: Readonly<Record<string, string>> = {
   description: "Add a sentence or two on what the company does.",
   categories: "Confirm the categories investors would find you under.",
   stage: "Set the company's stage.",
-  materials:
-    "Note which materials you have; uploads arrive in a later release.",
+  materials: "Add a deck or a memo so Q can read it; a founder without one is not turned away.",
   founder_count: "Complete the founding team facts.",
   team_size: "Add today's team size.",
   capital_objective: "Define your raise when you're ready.",
@@ -947,7 +946,11 @@ function snapshotSections(snapshot: FounderSnapshotContext): SnapshotSection[] {
                 "instrument",
                 raise.instrumentCode === null
                   ? undefined
-                  : `Instrument: ${raise.instrumentCode}`,
+                  : `Instrument: ${
+                      optionsOf(S.instrument).find(
+                        (option) => option.value === raise.instrumentCode,
+                      )?.label ?? raise.instrumentCode
+                    }`,
               ),
               ...item("use", raise.useOfFundsSummary ?? undefined),
             ]

@@ -86,6 +86,32 @@ async function investorContext(
  * the company they are onboarding: that is the context whose evidence and
  * Q Knowledge exist. If neither resolves, Q has no subject and says so.
  */
+/**
+ * The journey this person started and has not finished, if any: Home offers
+ * the way back in ("Continue setup"), because once a company or investor
+ * organisation exists the setup paths for a stranger are no longer shown
+ * (CQ-PRE-REC-001 §22, §43–§44). Founder first, as for the context.
+ */
+export const resolveUnfinishedSetup = cache(
+  async (): Promise<"founder" | "investor" | null> => {
+    const session = await apiSession();
+    if (session === null) {
+      return null;
+    }
+    for (const journey of ["founder", "investor"] as const) {
+      try {
+        const view = await getCurrentOnboardingSession(session, journey);
+        if (view.session.status === "ACTIVE") {
+          return journey;
+        }
+      } catch {
+        // No such journey for this person. A normal state, not an error.
+      }
+    }
+    return null;
+  },
+);
+
 export const resolveOwnContext = cache(async (): Promise<OwnContext> => {
   const session = await apiSession();
   if (session === null) {

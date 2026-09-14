@@ -212,6 +212,107 @@ describe("parseFigure", () => {
   });
 });
 
+describe("interpretUtterance · negation and confirmation labels (CQ-PRE-REC-001 §43)", () => {
+  const signal: OnboardingStepPresentation = {
+    stepType: "single_select",
+    options: [
+      { optionKey: "pilots", label: "Pilots running" },
+      { optionKey: "lois", label: "Signed letters of intent" },
+      { optionKey: "waitlist", label: "A waitlist" },
+      { optionKey: "none", label: "Nothing measurable yet" },
+    ],
+  };
+  const step = { stepKey: "F5.signal", required: true, presentation: signal };
+  const aliases = {
+    "F5.signal": { pilots: ["pilots", "pilot"], waitlist: ["waitlist"] },
+  };
+
+  it("does not read a negated mention as the answer; a rich sentence goes to Q instead", () => {
+    expect(
+      interpretUtterance(
+        "We already have 40 paying clinics, so beyond pilots",
+        step,
+        aliases,
+      ),
+    ).toEqual({ kind: "NARRATIVE" });
+    expect(
+      interpretUtterance("not a waitlist, pilots", step, aliases),
+    ).toMatchObject({
+      kind: "ANSWER",
+      value: { optionKey: "pilots" },
+    });
+    // A plain mention still answers.
+    expect(
+      interpretUtterance("two pilots running", step, aliases),
+    ).toMatchObject({
+      kind: "ANSWER",
+      value: { optionKey: "pilots" },
+    });
+  });
+
+  it("does not read a word inside another matched option's phrase as a second answer", () => {
+    const roles: OnboardingStepPresentation = {
+      stepType: "multi_select",
+      options: [
+        { optionKey: "lead", label: "Lead rounds" },
+        { optionKey: "co_invest", label: "Co-invest alongside a lead" },
+        { optionKey: "follow", label: "Follow in later rounds" },
+      ],
+      minSelections: 1,
+      maxSelections: 3,
+      exclusiveOptionKeys: [],
+    };
+    const role = {
+      stepKey: "I2.investment_role",
+      required: false,
+      presentation: roles,
+    };
+    const roleAliases = {
+      "I2.investment_role": {
+        lead: ["lead", "we lead"],
+        co_invest: ["co-invest", "co invest"],
+      },
+    };
+    expect(
+      interpretUtterance("We co-invest alongside a lead", role, roleAliases),
+    ).toMatchObject({ kind: "ANSWER", value: { optionKeys: ["co_invest"] } });
+    expect(interpretUtterance("we lead", role, roleAliases)).toMatchObject({
+      kind: "ANSWER",
+      value: { optionKeys: ["lead"] },
+    });
+    expect(
+      interpretUtterance("we lead and we co-invest", role, roleAliases),
+    ).toMatchObject({
+      kind: "ANSWER",
+      value: { optionKeys: ["lead", "co_invest"] },
+    });
+  });
+
+  it("accepts a confirmation step's own labels as the answer", () => {
+    const confirm: OnboardingStepPresentation = {
+      stepType: "confirmation",
+      confirmLabel: "Save my raise",
+      requireAffirmative: true,
+      declineLabel: "Not yet",
+      contextKey: "founder.raise",
+    };
+    const raise = {
+      stepKey: "F6.confirm",
+      required: true,
+      presentation: confirm,
+    };
+    expect(interpretUtterance("Save my raise", raise)).toEqual({
+      kind: "ANSWER",
+      value: { type: "CONFIRMATION", confirmed: true },
+      summary: "Save my raise",
+    });
+    expect(interpretUtterance("Not yet", raise)).toEqual({ kind: "DECLINE" });
+    expect(interpretUtterance("Save it please", raise)).toEqual({
+      kind: "UNCLEAR",
+    });
+  });
+});
+
 describe("interpretUtterance · reference steps with candidates (CQ-PRE-REC-001 §38)", () => {
   const mandates: OnboardingStepPresentation = {
     stepType: "reference_select",

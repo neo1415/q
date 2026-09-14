@@ -728,9 +728,12 @@ async function executeRouting(
   }
   const before = snapshot(world);
   const person = world.people.FOUNDER;
+  // Groq's reviewed ceiling is CONFIDENTIAL (groq.v1 zero-retention review,
+  // migration 20260914090000), so the request no configured provider may
+  // serve is HIGHLY_CONFIDENTIAL; INTERNAL still has exactly one route.
   const sensitivity =
     execution.scenario === "INELIGIBLE_PROVIDER_EXCLUDED"
-      ? "CONFIDENTIAL"
+      ? "HIGHLY_CONFIDENTIAL"
       : "INTERNAL";
   if (world.providerMode === "FAKE") {
     world.setScript(

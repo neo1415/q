@@ -117,7 +117,7 @@ test.describe("mobile application shell", () => {
     await expect(page.getByRole("textbox", { name: "Ask Q" })).toBeVisible();
   });
 
-  test("the Q composer takes keyboard input and never fabricates an answer", async ({
+  test("the Q composer takes keyboard input, sends it to Q and never fabricates an answer", async ({
     page,
   }) => {
     await page.goto("/home");
@@ -129,13 +129,20 @@ test.describe("mobile application shell", () => {
     await expect(send).toBeEnabled();
     await send.tap();
 
-    await expect(
-      page.getByRole("status").filter({ hasText: "Nothing was sent" }),
-    ).toBeVisible();
-    await expect(composer).toHaveValue(
+    // The question is the person's turn, verbatim; the composer clears.
+    const thread = page.locator("[data-q-workspace] ol");
+    await expect(thread).toContainText(
       "What should I prepare before a Series A?",
     );
-    await expect(page.getByText(/thinking|analysing|agent/i)).toHaveCount(0);
+    await expect(composer).toHaveValue("");
+    // What comes back is what Capital Q knows, never an invented persona:
+    // this synthetic account has no organisation, so Q says exactly that.
+    await expect(
+      page.getByRole("status").filter({
+        hasText: "not working inside an organisation yet",
+      }),
+    ).toBeVisible({ timeout: 60_000 });
+    await expect(page.getByText(/agent|thinking\.\.\./i)).toHaveCount(0);
   });
 
   test("long context and headings wrap or truncate without horizontal overflow", async ({

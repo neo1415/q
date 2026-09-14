@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 
 import { signUpThroughUi, uniqueEmail } from "./support/local-auth.js";
+import { useTheForm } from "./support/onboarding-form.js";
 
 /**
  * Investor onboarding on a phone (390 × 844, touch) against the real API.
@@ -47,6 +48,7 @@ test.describe("investor onboarding (mobile, real API)", () => {
     test.setTimeout(420_000);
     await signUpThroughUi(page, uniqueEmail("investor-mobile"));
     await page.goto("/onboarding/investor");
+    await useTheForm(page);
 
     await screen(page, "How do you invest?");
     await expect(progressText(page)).toHaveText("Context, step 1 of 3");
@@ -74,13 +76,8 @@ test.describe("investor onboarding (mobile, real API)", () => {
     await page.getByRole("radio", { name: "Paused" }).check();
     await continueStep(page);
 
-    await screen(page, "Which mandate are we defining?");
-    await expect(progressText(page)).toHaveText("Context, step 3 of 3");
-    await expect(
-      page.getByRole("radio", { name: /Primary mandate/ }),
-    ).toBeChecked();
-    await continueStep(page);
-
+    // The only draft mandate is selected and submitted for the investor
+    // (CQ-PRE-REC-001 §38); the journey moves straight on.
     await screen(page, "Stage and cheque");
     await expect(progressText(page)).toHaveText("Mandate, step 1 of 4");
     await page.getByRole("checkbox", { name: "Pre-seed" }).check();
@@ -89,14 +86,18 @@ test.describe("investor onboarding (mobile, real API)", () => {
 
     // Refresh, leave to Home and return: the same session and mandate.
     await page.reload();
+    await useTheForm(page);
     await screen(page, "Stage and cheque");
     await page.getByRole("link", { name: "Save & leave" }).tap();
     await expect(page).toHaveURL(/\/home$/);
-    await page.getByRole("link", { name: "Set up as an investor" }).tap();
+    // Home no longer offers "Set up as an investor" once the organisation
+    // exists; it offers the way back into the unfinished setup instead.
+    await page.getByRole("link", { name: "Continue setup" }).tap();
     await expect(page).toHaveURL(/\/onboarding\/investor$/);
+    await useTheForm(page);
     await screen(page, "Stage and cheque");
     await expect(progressText(page)).toHaveText("Mandate, step 1 of 4");
-    await page.getByRole("button", { name: "Back" }).tap();
+    await page.getByRole("button", { name: "Back", exact: true }).tap();
     await expect(
       page.getByRole("radio", { name: /Primary mandate/ }),
     ).toBeChecked();
@@ -108,12 +109,12 @@ test.describe("investor onboarding (mobile, real API)", () => {
     test.setTimeout(420_000);
     await signUpThroughUi(page, uniqueEmail("investor-flags"));
     await page.goto("/onboarding/investor");
+    await useTheForm(page);
     await page.getByRole("radio", { name: "Angel investor" }).check();
     await continueStep(page);
     await page.getByRole("radio", { name: "Exploring only" }).check();
     await continueStep(page);
-    await screen(page, "Which mandate are we defining?");
-    await continueStep(page);
+    // The only draft mandate is selected and submitted for the investor.
 
     // Inverted cheques are refused before anything is sent.
     await screen(page, "Stage and cheque");
@@ -147,14 +148,14 @@ test.describe("investor onboarding (mobile, real API)", () => {
     await expect(avoid.getByText("I'd rather not see")).toBeVisible();
     await expect(hard.getByText("Never show me")).toBeVisible();
     await expectNoHorizontalOverflow(page);
-    // The same flag cannot be both a soft avoid and a hard exclusion.
+    // The same flag cannot be both a soft avoid and a hard exclusion:
+    // ticking it in one list moves it out of the other (CQ-PRE-REC-001 §41).
     await avoid.getByRole("checkbox", { name: "Tobacco" }).check();
     await hard.getByRole("checkbox", { name: "Tobacco" }).check();
-    await continueStep(page);
     await expect(
-      page.getByRole("alert").filter({ hasText: "not both" }),
-    ).toBeVisible();
-    await avoid.getByRole("checkbox", { name: "Tobacco" }).uncheck();
+      avoid.getByRole("checkbox", { name: "Tobacco" }),
+    ).not.toBeChecked();
+    await expect(hard.getByRole("checkbox", { name: "Tobacco" })).toBeChecked();
     await continueStep(page);
     await screen(page, "A few representative portfolio companies");
   });

@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 
 import { signUpThroughUi, uniqueEmail } from "./support/local-auth.js";
+import { useTheForm } from "./support/onboarding-form.js";
 
 /**
  * Investor onboarding I0 → I12 on desktop against the real Capital Q API
@@ -44,10 +45,14 @@ async function expectNoHorizontalOverflow(page: Page) {
 }
 
 async function suggestAndPickFirst(page: Page, query: string) {
-  await page.getByRole("textbox", { name: "Search categories" }).fill(query);
+  await page
+    .getByRole("textbox", {
+      name: /^Search (?:countries or regions|sectors or product areas)$/,
+    })
+    .fill(query);
   await page.getByRole("button", { name: "Suggest" }).click();
   const suggestions = page
-    .getByRole("list", { name: "Suggested categories" })
+    .getByRole("list", { name: "Suggestions" })
     .getByRole("button", { name: /add as a preference/ });
   await expect(suggestions.first()).toBeVisible();
   const label = (await suggestions.first().textContent()) ?? "";
@@ -63,6 +68,7 @@ test.describe("investor onboarding (desktop, real API)", () => {
     await signUpThroughUi(page, uniqueEmail("investor"));
     await page.getByRole("link", { name: "Set up as an investor" }).click();
     await expect(page).toHaveURL(/\/onboarding\/investor$/);
+    await useTheForm(page);
 
     // I0 — role: the investor type describes the organisation; the firm
     // name creates its workspace; the title grants nothing.
@@ -81,12 +87,8 @@ test.describe("investor onboarding (desktop, real API)", () => {
     await page.getByRole("radio", { name: "Actively investing" }).check();
     await continueStep(page);
 
-    // I1 — mandate context: exactly one draft exists and is preselected.
-    await screen(page, "Which mandate are we defining?");
-    const draft = page.getByRole("radio", { name: /Primary mandate/ });
-    await expect(draft).toBeChecked();
-    await expect(page.getByText("Draft — not active yet")).toBeVisible();
-    await continueStep(page);
+    // I1 — mandate context: exactly one draft exists, so it is selected and
+    // submitted for the investor (CQ-PRE-REC-001 §38); the journey moves on.
 
     // I2 — stage and cheque: exact amounts, one currency.
     await screen(page, "Stage and cheque");
@@ -203,6 +205,7 @@ test.describe("investor onboarding (desktop, real API)", () => {
 
     // A refresh mid-journey resumes exactly here, with the same mandate.
     await page.reload();
+    await useTheForm(page);
     await screen(page, "Here's the mandate you've defined");
     await expect(page.locator('[data-review-item="investor"]')).toContainText(
       firm,
@@ -263,6 +266,7 @@ test.describe("investor onboarding (desktop, real API)", () => {
     test.setTimeout(420_000);
     await signUpThroughUi(page, uniqueEmail("investor-back"));
     await page.goto("/onboarding/investor");
+    await useTheForm(page);
     await page.getByRole("radio", { name: "Angel investor" }).check();
     // A solo angel keeps the personal workspace; no firm is joined.
     await expect(page.getByRole("textbox", { name: "Your firm" })).toHaveValue(
@@ -272,11 +276,17 @@ test.describe("investor onboarding (desktop, real API)", () => {
     await screen(page, "Are you deploying capital right now?");
     await page.getByRole("radio", { name: "Selective" }).check();
     await continueStep(page);
-    await screen(page, "Which mandate are we defining?");
+    // The only draft is selected and submitted for the investor (§38).
+    await screen(page, "Stage and cheque");
 
-    await page.getByRole("button", { name: "Back" }).click();
+    await page.getByRole("button", { name: "Back", exact: true }).click();
+    await screen(page, "Which mandate are we defining?");
+    await expect(
+      page.getByRole("radio", { name: /Primary mandate/ }),
+    ).toBeChecked();
+    await page.getByRole("button", { name: "Back", exact: true }).click();
     await expect(page.getByRole("radio", { name: "Selective" })).toBeChecked();
-    await page.getByRole("button", { name: "Back" }).click();
+    await page.getByRole("button", { name: "Back", exact: true }).click();
     await expect(
       page.getByRole("radio", { name: "Angel investor" }),
     ).toBeChecked();
@@ -288,21 +298,23 @@ test.describe("investor onboarding (desktop, real API)", () => {
     // instead of overwriting it.
     const other = await context.newPage();
     await other.goto("/onboarding/investor");
+    await useTheForm(other);
     await expect(
       other.getByRole("radio", { name: "Angel investor" }),
     ).toBeChecked();
     await other.getByRole("textbox", { name: "Your role there" }).fill("Angel");
     await continueStep(other);
-    // Deployment is already answered, so the runtime moves on to the next
-    // incomplete step.
-    await screen(other, "Which mandate are we defining?");
+    // Deployment is already answered and the only mandate is selected for
+    // the investor, so the runtime moves on to the next incomplete step.
+    await screen(other, "Stage and cheque");
 
     await page.getByRole("textbox", { name: "Your role there" }).fill("Scout");
     await continueStep(page);
     await expect(page.getByText("Updated elsewhere")).toBeVisible();
-    await screen(page, "Which mandate are we defining?");
-    await page.getByRole("button", { name: "Back" }).click();
-    await page.getByRole("button", { name: "Back" }).click();
+    await screen(page, "Stage and cheque");
+    await page.getByRole("button", { name: "Back", exact: true }).click();
+    await page.getByRole("button", { name: "Back", exact: true }).click();
+    await page.getByRole("button", { name: "Back", exact: true }).click();
     await expect(
       page.getByRole("textbox", { name: "Your role there" }),
     ).toHaveValue("Angel");

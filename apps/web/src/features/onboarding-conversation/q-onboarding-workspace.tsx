@@ -186,7 +186,10 @@ export function QOnboardingWorkspace({
       setNarrowedTo(
         understood.kind === "AMBIGUOUS" ? understood.optionKeys : null,
       );
-      if (understood.kind === "READING") {
+      if (
+        understood.kind === "READING" ||
+        (understood.kind === "ANSWERED" && understood.utteranceId !== undefined)
+      ) {
         setReading(true);
         setReadingPolls(0);
       }

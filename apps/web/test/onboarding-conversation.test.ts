@@ -181,6 +181,41 @@ describe("promptFor", () => {
   });
 });
 
+describe("promptFor · generic strength prompts", () => {
+  it("names the subject when the definition asks a bare how-firm question", () => {
+    const step: OnboardingStepView = {
+      stepKey: "F1.stage",
+      stepType: "single_select",
+      required: false,
+      prompt: "How firm is that?",
+      presentation: {
+        stepType: "single_select",
+        options: [{ optionKey: "strong", label: "Strong preference" }],
+      },
+    };
+    expect(promptFor(step, VOCABULARY).text).toBe("Stage?");
+    expect(
+      promptFor({ ...step, prompt: "Which stage are you at?" }, VOCABULARY)
+        .text,
+    ).toBe("Which stage are you at?");
+  });
+});
+
+describe("acknowledge", () => {
+  it("does not double the full stop when the answer ends a sentence", () => {
+    expect(
+      acknowledge(
+        {
+          kind: "ANSWERED",
+          stepKey: "F1.stage",
+          summary: "Founders who have sold into banks before.",
+        },
+        VOCABULARY,
+      ),
+    ).toBe("Stage: Founders who have sold into banks before. Noted.");
+  });
+});
+
 describe("welcomeBack", () => {
   it("greets from persisted state only: settled groups, documents, what remains", () => {
     expect(welcomeBack(view(), VOCABULARY)).toBe(
