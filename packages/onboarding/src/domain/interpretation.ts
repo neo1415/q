@@ -162,7 +162,81 @@ export type InterpretableStep = {
   readonly stepKey: string;
   readonly required: boolean;
   readonly presentation: OnboardingStepPresentation;
+  /** The step's server-assembled context, when it lists candidates to choose from. */
+  readonly context?: Readonly<Record<string, unknown>> | undefined;
 };
+
+/** A candidate a reference step's context offers: an id and a name to say. */
+export type ReferenceCandidate = {
+  readonly id: string;
+  readonly name: string;
+};
+
+const ONLY_ONE =
+  /^(?:yes|yep|ok|okay|sure|that one|the only one|use it|use that|go ahead|fine|that's the one)[.!]?$/i;
+
+/** Words that carry no name: "the growth fund" names "Growth Fund II". */
+const FILLER_WORDS = new Set([
+  "the",
+  "a",
+  "an",
+  "that",
+  "this",
+  "one",
+  "it",
+  "my",
+  "our",
+  "please",
+  "use",
+  "pick",
+  "choose",
+  "select",
+  "take",
+  "go",
+  "with",
+  "let's",
+  "lets",
+]);
+
+/**
+ * True when every meaningful word the person said is a word of the name.
+ * A partial name is enough; an unrelated word rules the candidate out.
+ */
+function namesPartially(text: string, name: string): boolean {
+  const said = wordsOf(text).filter((w) => !FILLER_WORDS.has(w));
+  if (said.length === 0) {
+    return false;
+  }
+  const nameWords = new Set(wordsOf(name));
+  return said.every((w) => nameWords.has(w));
+}
+
+/**
+ * Candidates named by a step context, whatever the journey calls them:
+ * `{ mandateId, name }` (investor mandates), `{ id, label }`,
+ * `{ nodeId, label }`. Anything without an id and a name is ignored.
+ */
+export function referenceCandidatesOf(
+  context: Readonly<Record<string, unknown>> | undefined,
+): readonly ReferenceCandidate[] {
+  const list = context?.["candidates"];
+  if (!Array.isArray(list)) {
+    return [];
+  }
+  const out: ReferenceCandidate[] = [];
+  for (const item of list) {
+    if (typeof item !== "object" || item === null) {
+      continue;
+    }
+    const record = item as Record<string, unknown>;
+    const id = record["mandateId"] ?? record["id"] ?? record["nodeId"];
+    const name = record["name"] ?? record["label"] ?? record["displayName"];
+    if (typeof id === "string" && typeof name === "string" && name.length > 0) {
+      out.push({ id, name });
+    }
+  }
+  return out;
+}
 
 export function interpretUtterance(
   text: string,
@@ -327,9 +401,44 @@ export function interpretUtterance(
     }
     case "document_upload":
       return { kind: "UPLOAD" };
-    case "reference_select":
+    case "reference_select": {
+      // A step whose context lists candidates (the investor's mandates) is
+      // answered by naming one — or by assent when there is only one.
+      const candidates = referenceCandidatesOf(step.context);
+      if (candidates.length > 0) {
+        const exact = normalise(trimmed);
+        const named = candidates.filter(
+          (candidate) =>
+            normalise(candidate.name) === exact ||
+            mentions(trimmed, candidate.name) ||
+            namesPartially(trimmed, candidate.name),
+        );
+        const chosen =
+          named.length === 1
+            ? named[0]
+            : named.length === 0 &&
+                candidates.length === 1 &&
+                ONLY_ONE.test(trimmed)
+              ? candidates[0]
+              : undefined;
+        if (chosen !== undefined) {
+          return {
+            kind: "ANSWER",
+            value: {
+              type: "RESOURCE_REFERENCE",
+              resourceType: presentation.resourceType,
+              resourceIds: [chosen.id],
+            },
+            summary: chosen.name,
+          };
+        }
+        if (named.length > 1) {
+          return { kind: "UNCLEAR" };
+        }
+      }
       // Taxonomy and resource picks are made from search results the
       // person sees; a sentence about them is worth Q's reading instead.
       return isNarrative(trimmed) ? { kind: "NARRATIVE" } : { kind: "UNCLEAR" };
+    }
   }
 }

@@ -185,6 +185,8 @@ export { createPostgresOnboardingUtteranceRepository } from "./infrastructure/po
 export {
   interpretUtterance,
   parseFigure,
+  referenceCandidatesOf,
+  type ReferenceCandidate,
   type OnboardingUtteranceAliases,
   type StepInterpretation,
 } from "./domain/interpretation.js";

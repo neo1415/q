@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { OnboardingSessionViewSchema } from "@capital-q/contracts";
+import {
+  OnboardingSessionViewSchema,
+  type OnboardingSessionView,
+} from "@capital-q/contracts";
 import { INVESTOR_STEPS } from "@capital-q/investor-onboarding/definition";
 
 import { OnboardingClientError } from "../src/features/investor-onboarding/adapters/client";
@@ -446,7 +449,9 @@ describe("investor journey over the runtime contract", () => {
         hard: ["gambling"],
         sectorExclusionIds: [],
       }),
-    ).toThrow(/both/);
+    ).toThrow(
+      /Gambling is listed both as something to avoid and as something never to show/,
+    );
     const role = requireGroup("role");
     expect(
       planSubmissions(role, {
@@ -458,6 +463,85 @@ describe("investor journey over the runtime contract", () => {
       [INVESTOR_STEPS.investorType, "submit"],
       [INVESTOR_STEPS.organisationName, "submit"],
       [INVESTOR_STEPS.businessTitle, "skip"],
+    ]);
+  });
+
+  it("keeps a sector in one place: excluding it moves it out of the preferences, preferring it moves it out of the exclusions (§41)", () => {
+    const fintech = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+    const health = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+    const gaming = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
+    const held = (entries: readonly [string, unknown][]) =>
+      ({
+        progress: {
+          eligibleSteps: entries.map(([stepKey]) => ({
+            stepKey,
+            status: "COMPLETED",
+          })),
+        },
+        responses: entries.map(([stepKey, value]) => ({ stepKey, value })),
+      }) as unknown as OnboardingSessionView;
+    const nodes = (ids: readonly string[]) => ({
+      type: "RESOURCE_REFERENCE",
+      resourceType: "TAXONOMY_NODE",
+      resourceIds: [...ids],
+    });
+
+    // Red flags: excluding fintech, which I3 holds as a preference.
+    const fromPreferences = planSubmissions(
+      requireGroup("red_flags"),
+      { kind: "red_flags", avoid: [], hard: [], sectorExclusionIds: [fintech] },
+      held([
+        [INVESTOR_STEPS.sectors, nodes([fintech, health])],
+        [
+          INVESTOR_STEPS.sectorStrength,
+          { type: "SINGLE_SELECT", optionKey: "strong" },
+        ],
+        [INVESTOR_STEPS.sectorsAvoid, nodes([gaming])],
+      ]),
+    );
+    expect(fromPreferences.map((s) => [s.stepKey, s.action])).toEqual([
+      [INVESTOR_STEPS.sectors, "submit"],
+      [INVESTOR_STEPS.sectorStrength, "submit"],
+      [INVESTOR_STEPS.avoid, "skip"],
+      [INVESTOR_STEPS.hardExclusions, "skip"],
+      [INVESTOR_STEPS.sectorExclusions, "submit"],
+    ]);
+    expect(fromPreferences[0]).toMatchObject({
+      value: { resourceIds: [health] },
+    });
+
+    // Sectors: preferring gaming, which I7 holds as a hard exclusion.
+    const fromExclusions = planSubmissions(
+      requireGroup("sectors"),
+      { kind: "taxonomy_focus", nodeIds: [gaming], avoidNodeIds: [] },
+      held([[INVESTOR_STEPS.sectorExclusions, nodes([gaming, fintech])]]),
+    );
+    expect(fromExclusions.map((s) => [s.stepKey, s.action])).toEqual([
+      [INVESTOR_STEPS.sectorExclusions, "submit"],
+      [INVESTOR_STEPS.sectors, "submit"],
+      [INVESTOR_STEPS.sectorStrength, "skip"],
+      [INVESTOR_STEPS.sectorsAvoid, "skip"],
+    ]);
+    expect(fromExclusions[0]).toMatchObject({
+      value: { resourceIds: [fintech] },
+    });
+
+    // Nothing held elsewhere: the plan is the screen's own steps only.
+    expect(
+      planSubmissions(
+        requireGroup("red_flags"),
+        {
+          kind: "red_flags",
+          avoid: [],
+          hard: [],
+          sectorExclusionIds: [fintech],
+        },
+        held([]),
+      ).map((s) => s.stepKey),
+    ).toEqual([
+      INVESTOR_STEPS.avoid,
+      INVESTOR_STEPS.hardExclusions,
+      INVESTOR_STEPS.sectorExclusions,
     ]);
   });
 

@@ -117,8 +117,9 @@ export function TaxonomyFocusStep({
       <div className="flex items-end gap-2">
         <Input
           id={`${step.id}-search`}
-          label="Search categories"
-          description="Type a word or two; suggested categories come from the canonical taxonomy."
+          label={step.searchLabel}
+          placeholder={step.searchPlaceholder}
+          description="Type a word or two; suggestions come from the canonical taxonomy. Add as many as apply."
           value={query}
           disabled={busy}
           onChange={(event) => setQuery(event.target.value)}
@@ -141,12 +142,9 @@ export function TaxonomyFocusStep({
       {offered.length > 0 ? (
         <fieldset className="flex flex-col gap-2">
           <legend className="cq-label text-(--cq-text-primary)">
-            Suggested categories
+            Suggestions
           </legend>
-          <ul
-            className="flex flex-wrap gap-2"
-            aria-label="Suggested categories"
-          >
+          <ul className="flex flex-wrap gap-2" aria-label="Suggestions">
             {offered.map((candidate) => (
               <li key={candidate.nodeId} className="flex items-center gap-1">
                 <Button
@@ -183,7 +181,7 @@ export function TaxonomyFocusStep({
         </legend>
         {focus.length === 0 ? (
           <p className="cq-body-sm text-(--cq-text-secondary)">
-            Nothing chosen yet. Leaving this empty means anywhere.
+            {step.emptyHint}
           </p>
         ) : (
           <ul className="flex flex-wrap gap-2" aria-label="Chosen categories">

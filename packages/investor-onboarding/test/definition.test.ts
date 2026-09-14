@@ -352,7 +352,7 @@ describe("Investor canonical mappings", () => {
           [INVESTOR_STEPS.hardExclusions]: multi(["gambling"]),
         }),
       ),
-    ).toThrow(/either something to avoid/);
+    ).toThrow(/Gambling is listed both as something to avoid/);
   });
 
   it("parses up to five portfolio names and maps investor types to organisation types", () => {

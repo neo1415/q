@@ -73,7 +73,39 @@ export type QPrompt = {
   /** For editor controls: what the button says. */
   readonly editorLabel: string | undefined;
   readonly placeholder: string | undefined;
+  /**
+   * When the step has exactly one candidate (an investor's only mandate),
+   * Q says so and answers it rather than asking; this is what it says on the
+   * person's behalf, and the line that explains it (§38).
+   */
+  readonly autoSay: string | undefined;
+  readonly autoNote: string | undefined;
 };
+
+/** A candidate a reference step's server context offers, whatever it calls it. */
+type Candidate = { readonly id: string; readonly name: string };
+
+function candidatesOf(
+  context: Readonly<Record<string, unknown>> | undefined,
+): readonly Candidate[] {
+  const list = context?.["candidates"];
+  if (!Array.isArray(list)) {
+    return [];
+  }
+  const out: Candidate[] = [];
+  for (const item of list) {
+    if (typeof item !== "object" || item === null) {
+      continue;
+    }
+    const record = item as Record<string, unknown>;
+    const id = record["mandateId"] ?? record["id"] ?? record["nodeId"];
+    const name = record["name"] ?? record["label"] ?? record["displayName"];
+    if (typeof id === "string" && typeof name === "string" && name.length > 0) {
+      out.push({ id, name });
+    }
+  }
+  return out;
+}
 
 const MAX_CHIPS = 12;
 
@@ -89,6 +121,8 @@ export function promptFor(
     optional: !step.required,
     editorLabel: undefined,
     placeholder: undefined,
+    autoSay: undefined,
+    autoNote: undefined,
   };
   const presentation = step.presentation;
   switch (presentation.stepType) {
@@ -154,13 +188,33 @@ export function promptFor(
         chips: [],
         editorLabel: "Add a document",
       };
-    case "reference_select":
+    case "reference_select": {
+      const candidates = candidatesOf(step.context);
+      const only = candidates.length === 1 ? candidates[0] : undefined;
+      if (candidates.length > 0) {
+        return {
+          ...base,
+          control: "chips",
+          chips: candidates.slice(0, MAX_CHIPS).map((candidate) => ({
+            label: candidate.name,
+            say: candidate.name,
+            optionKey: candidate.id,
+          })),
+          ...(only === undefined
+            ? {}
+            : {
+                autoSay: only.name,
+                autoNote: `You have one ${vocabulary.stepTitle(step.stepKey).toLowerCase()}, ${only.name}. That's the one we'll define.`,
+              }),
+        };
+      }
       return {
         ...base,
         control: "editor",
         chips: [],
         editorLabel: `Choose ${vocabulary.stepTitle(step.stepKey).toLowerCase()}`,
       };
+    }
   }
 }
 

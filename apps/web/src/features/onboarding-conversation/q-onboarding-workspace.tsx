@@ -266,7 +266,7 @@ export function QOnboardingWorkspace({
       const narrativeStep =
         prompt !== null &&
         prompt.control === "text" &&
-        trimmed.split(/s+/).length >= 6;
+        trimmed.split(/\s+/).length >= 6;
       const understood = await actions.say(trimmed);
       handleUnderstanding(understood);
       if (understood?.kind === "ANSWERED" && narrativeStep) {
@@ -276,6 +276,29 @@ export function QOnboardingWorkspace({
     },
     [prompt, push, settleReading, askQ, handleUnderstanding, actions],
   );
+
+  // A step with exactly one candidate is answered by Q, once, with a line
+  // saying so (§38). The ref remembers the step so a re-render or a failed
+  // save never answers it twice.
+  const autoAnsweredRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (
+      prompt === null ||
+      prompt.autoSay === undefined ||
+      autoAnsweredRef.current === prompt.stepKey
+    ) {
+      return;
+    }
+    const { stepKey, autoSay, autoNote } = prompt;
+    const timer = setTimeout(() => {
+      autoAnsweredRef.current = stepKey;
+      if (autoNote !== undefined) {
+        push("Q", autoNote);
+      }
+      void actions.say(autoSay);
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [prompt, push, actions]);
 
   const keep = async (suggestionId: string) => {
     settleReading();
@@ -489,16 +512,16 @@ export function QOnboardingWorkspace({
                 narrowedTo.includes(chip.optionKey),
             )
             .map((chip) => (
-            <Button
-              key={chip.label}
-              size="compact"
-              variant="secondary"
-              disabled={working}
-              onClick={() => void say(chip.say)}
-            >
-              {chip.label}
-            </Button>
-          ))}
+              <Button
+                key={chip.label}
+                size="compact"
+                variant="secondary"
+                disabled={working}
+                onClick={() => void say(chip.say)}
+              >
+                {chip.label}
+              </Button>
+            ))}
           {prompt.control === "editor" || prompt.control === "upload" ? (
             <Button
               size="compact"
@@ -638,7 +661,9 @@ function QLine({
     <li
       data-turn={id}
       className={
-        kind === "PERSON" ? "flex flex-col items-end gap-1" : "flex flex-col gap-1"
+        kind === "PERSON"
+          ? "flex flex-col items-end gap-1"
+          : "flex flex-col gap-1"
       }
     >
       <span className="cq-label text-(--cq-text-tertiary)">

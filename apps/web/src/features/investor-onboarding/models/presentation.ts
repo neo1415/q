@@ -129,6 +129,11 @@ export type StepView =
       readonly strengthOptions: readonly ChoiceOption[];
       readonly allowAvoid: boolean;
       readonly maxItems: number;
+      /** What the search control is called, in this group's words (§39/§40). */
+      readonly searchLabel: string;
+      readonly searchPlaceholder: string;
+      /** What an empty list means here; only geography means "anywhere". */
+      readonly emptyHint: string;
       /** Labels for already-selected ids, so a revisit can render them. */
       readonly selected: readonly TaxonomyCandidateView[];
       readonly avoidSelected: readonly TaxonomyCandidateView[];
@@ -154,6 +159,8 @@ export type StepView =
   | (Base<"red_flags"> & {
       readonly options: readonly ChoiceOption[];
       readonly sectorExclusionSelected: readonly TaxonomyCandidateView[];
+      /** Sectors currently held as preferences (I3); excluding one moves it here. */
+      readonly preferredSectors: readonly TaxonomyCandidateView[];
       readonly response?:
         Extract<StepResponse, { kind: "red_flags" }> | undefined;
     })

@@ -167,6 +167,7 @@ export type JourneyModel<
   readonly planSubmissions: (
     group: JourneyGroup,
     response: TResponse,
+    view: OnboardingSessionView,
   ) => readonly Submission[];
   readonly toPresentation: (
     view: OnboardingSessionView,
@@ -511,9 +512,10 @@ export function createRuntimeClient<
     saveResponse: ({ stepId, response }) =>
       guarded(async () => {
         const group = requireGroup(stepId);
+        let view = await session();
         let plan: readonly Submission[];
         try {
-          plan = model.planSubmissions(group, response);
+          plan = model.planSubmissions(group, response, view);
         } catch (error) {
           throw new OnboardingClientError(
             "REJECTED",
@@ -522,7 +524,6 @@ export function createRuntimeClient<
               : "That answer couldn't be saved.",
           );
         }
-        let view = await session();
         for (const submission of plan) {
           const status = eligibleStatus(view, submission.stepKey);
           if (status === undefined || submission.action === "leave") {

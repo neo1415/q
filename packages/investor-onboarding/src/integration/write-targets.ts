@@ -95,6 +95,14 @@ function invalid(path: string, code: string, message: string): never {
   throw new ContractValidationError(message, [{ path, code, message }]);
 }
 
+/** "Gambling", "Gambling and Tobacco", "Gambling, Tobacco and Weapons". */
+function joinNames(names: readonly string[]): string {
+  if (names.length <= 1) {
+    return names[0] ?? "";
+  }
+  return `${names.slice(0, -1).join(", ")} and ${names.at(-1) ?? ""}`;
+}
+
 /** Resolve the actor context for `organisationId` from the verified principal. */
 export async function resolveInvestorContext(
   services: InvestorDomainServices,
@@ -323,19 +331,32 @@ export async function taxonomyPreferencesFromResponses(
     string,
     { strength: MandatePreferenceClass; vocabularies: readonly string[] }
   >();
+  const conflicting = new Set<string>();
   for (const source of TAXONOMY_SOURCES) {
     const strength = source.strength(values);
     for (const id of resourceIds(values, source.stepKey) ?? []) {
       const existing = wanted.get(id);
       if (existing !== undefined && existing.strength !== strength) {
-        invalid(
-          "value.resourceIds",
-          "conflicting_preference",
-          "A category cannot be both a preference and an exclusion.",
-        );
+        conflicting.add(id);
       }
       wanted.set(id, { strength, vocabularies: source.vocabularies });
     }
+  }
+  if (conflicting.size > 0) {
+    // Named, so the person knows which category to move (CQ-PRE-REC-001 §41).
+    const named = await services.taxonomy.findNodesByIds(
+      [...conflicting].map((id) => TaxonomyNodeIdSchema.parse(id)),
+    );
+    const labels = [...conflicting].map(
+      (id) =>
+        named.find((node) => String(node.id) === id)?.displayName ??
+        "A category",
+    );
+    invalid(
+      "value.resourceIds",
+      "conflicting_preference",
+      `${joinNames(labels)} ${labels.length === 1 ? "is" : "are"} both a preference and an exclusion. Keep ${labels.length === 1 ? "it" : "each"} in one place.`,
+    );
   }
   if (wanted.size === 0) {
     return [];
@@ -468,10 +489,17 @@ export function exclusionConstraints(
   );
   const overlap = avoid.filter((code) => hard.includes(code));
   if (overlap.length > 0) {
+    // The error names the criterion, so the person can move it rather
+    // than hunt for it (CQ-PRE-REC-001 §41).
+    const labels = overlap.map(
+      (code) =>
+        RED_FLAG_OPTIONS.find((option) => option.optionKey === code)?.label ??
+        code,
+    );
     invalid(
       "value.optionKeys",
       "conflicting_exclusion",
-      "A red flag is either something to avoid or something never to show, not both.",
+      `${joinNames(labels)} ${labels.length === 1 ? "is" : "are"} listed both as something to avoid and as something never to show. Keep ${labels.length === 1 ? "it" : "each"} in one list.`,
     );
   }
   const constraints: MandateConstraintInput[] = [];

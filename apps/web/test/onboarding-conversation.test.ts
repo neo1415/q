@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import type { OnboardingSessionView } from "@capital-q/contracts";
+import type {
+  OnboardingSessionView,
+  OnboardingStepView,
+} from "@capital-q/contracts";
 
 import {
   acknowledge,
@@ -109,6 +112,72 @@ describe("promptFor", () => {
       optional: false,
     });
     expect(prompt.chips.map((chip) => chip.say)).toEqual(["Seed", "Series A"]);
+  });
+
+  it("offers a reference step's candidates as chips, and answers a single one itself (§38)", () => {
+    const step: OnboardingStepView = {
+      stepKey: "I1.mandate_context",
+      stepType: "reference_select",
+      required: true,
+      prompt: "Which mandate are we defining?",
+      presentation: {
+        stepType: "reference_select",
+        resourceType: "INVESTOR_MANDATE",
+        vocabularyCodes: [],
+        minItems: 1,
+        maxItems: 1,
+        contextKey: "investor.mandates",
+      },
+      context: {
+        kind: "investor.mandates",
+        candidates: [
+          {
+            mandateId: "m-1",
+            name: "Primary mandate",
+            status: "DRAFT",
+            version: 1,
+          },
+          {
+            mandateId: "m-2",
+            name: "Growth fund II",
+            status: "ACTIVE",
+            version: 4,
+          },
+        ],
+      },
+    };
+    const two = promptFor(step, VOCABULARY);
+    expect(two.control).toBe("chips");
+    expect(two.chips.map((chip) => chip.say)).toEqual([
+      "Primary mandate",
+      "Growth fund II",
+    ]);
+    expect(two.autoSay).toBeUndefined();
+
+    const one = promptFor(
+      {
+        ...step,
+        context: {
+          kind: "investor.mandates",
+          candidates: [
+            {
+              mandateId: "m-1",
+              name: "Primary mandate",
+              status: "DRAFT",
+              version: 1,
+            },
+          ],
+        },
+      },
+      VOCABULARY,
+    );
+    expect(one.autoSay).toBe("Primary mandate");
+    expect(one.autoNote).toContain("Primary mandate");
+
+    // Without candidates the step is still an editor, never invented chips.
+    const none = promptFor({ ...step, context: undefined }, VOCABULARY);
+    expect(none.control).toBe("editor");
+    expect(none.autoSay).toBeUndefined();
   });
 });
 

@@ -1721,7 +1721,12 @@ export function createOnboardingUseCases(
     const stepKey = step.stepKey;
     const reading = interpretUtterance(
       command.text,
-      { stepKey, required: step.required, presentation: step.presentation },
+      {
+        stepKey,
+        required: step.required,
+        presentation: step.presentation,
+        context: step.context,
+      },
       runtime.utteranceAliases ?? {},
     );
     const why = step.whyQAsks ?? step.supportingText ?? null;

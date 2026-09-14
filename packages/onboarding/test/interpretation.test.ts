@@ -211,3 +211,51 @@ describe("parseFigure", () => {
     expect(parseFigure("none")).toBeNull();
   });
 });
+
+describe("interpretUtterance · reference steps with candidates (CQ-PRE-REC-001 §38)", () => {
+  const mandates: OnboardingStepPresentation = {
+    stepType: "reference_select",
+    resourceType: "INVESTOR_MANDATE",
+    vocabularyCodes: [],
+    minItems: 1,
+    maxItems: 1,
+    contextKey: "investor.mandates",
+  };
+  const withCandidates = (
+    candidates: readonly { mandateId: string; name: string }[],
+  ) => ({
+    stepKey: "I1.mandate_context",
+    required: true,
+    presentation: mandates,
+    context: { kind: "investor.mandates", candidates },
+  });
+
+  it("answers a single candidate on plain assent, and a named one by name", () => {
+    const one = withCandidates([{ mandateId: "m-1", name: "Primary mandate" }]);
+    expect(interpretUtterance("yes", one)).toEqual({
+      kind: "ANSWER",
+      value: {
+        type: "RESOURCE_REFERENCE",
+        resourceType: "INVESTOR_MANDATE",
+        resourceIds: ["m-1"],
+      },
+      summary: "Primary mandate",
+    });
+    const two = withCandidates([
+      { mandateId: "m-1", name: "Primary mandate" },
+      { mandateId: "m-2", name: "Growth fund II" },
+    ]);
+    expect(interpretUtterance("the growth fund", two)).toMatchObject({
+      kind: "ANSWER",
+      value: { resourceIds: ["m-2"] },
+    });
+    // Assent alone cannot pick between two.
+    expect(interpretUtterance("yes", two)).toEqual({ kind: "UNCLEAR" });
+  });
+
+  it("never invents a candidate", () => {
+    expect(
+      interpretUtterance("yes", { ...withCandidates([]), context: undefined }),
+    ).toEqual({ kind: "UNCLEAR" });
+  });
+});

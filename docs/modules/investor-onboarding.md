@@ -130,6 +130,32 @@ suggestions on the structured steps and EXCLUSION_CONFIRMATION questions.
 A hard exclusion is still created only by the investor's explicit answer;
 no reading writes one.
 
+### Structured inputs (CQ-PRE-REC-001 §38–§41)
+
+- **Mandate context (I1).** The step before it ensures one DRAFT exists
+  when the investor has no open mandate. With exactly one open mandate the
+  step is answered for the investor, once, with a line saying which
+  mandate ("You have one mandate, Primary mandate. That's the one we'll
+  define.") — in the form and in the conversation, where the runtime's
+  `say` path also accepts a mandate by name when there are several. With
+  several, the choice is explicit; nothing is picked by position.
+- **Geography and sectors (I3).** Real multi-select over canonical
+  taxonomy nodes, labelled in the group's words ("Search countries or
+  regions…", "Search sectors or product areas…"). Only geography says that
+  an empty list means anywhere; a sector list never does. Ids are canonical
+  node ids internally; the screen shows display names, and a revisit
+  renders the persisted selection.
+- **Avoid and hard exclusion (I7).** Two lists that coexist. Ticking a flag
+  in one list moves it out of the other; a conflict that still reaches
+  submission is refused and names the flag ("Gambling is listed both as
+  something to avoid and as something never to show. Keep it in one list.")
+  — the validation is kept, on the client and in `exclusionConstraints`.
+  A sector excluded at I7 that I3 holds as a preference is moved: the plan
+  writes the reduced I3 list first, then the exclusion; and a sector
+  preferred at I3 leaves the I7 exclusions the same way. The server-side
+  check in `taxonomyPreferencesFromResponses` still refuses a node in both
+  buckets, naming the category.
+
 ## Security
 
 - All model access through the Model Gateway; no provider SDK in this
