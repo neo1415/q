@@ -13,7 +13,7 @@
  * Does not own: models or providers (the Model Gateway projects these
  * definitions), prompts, the Context Firewall (whose plan every tool
  * obeys), approvals (CQ-Q-008), retrieval, Q knowledge, or any write.
- * There is no SQL tool, no HTTP tool, no shell, no connector and no MCP.
+ * There is no SQL tool, no arbitrary HTTP tool, no shell, no connector and no MCP; the only outbound capability is the bounded public-web research port (CQ-Q-RESEARCH-001), whose queries are composed from allowed words and whose reads are limited to URLs a search in the same run surfaced.
  *
  *   tool offered   ≠ tool authorised ≠ tool executed
  *   tool result    ≠ canonical truth ≠ instruction
@@ -90,3 +90,19 @@ export {
 export { createDefaultQTools, createQTools } from "./default-tools.js";
 
 export const PACKAGE_NAME = "@capital-q/q-tools" as const;
+export {
+  createExtractPublicWebTool,
+  EXTRACT_PUBLIC_WEB,
+  ExtractPublicWebInputSchema,
+  ExtractPublicWebOutputSchema,
+  type ExtractPublicWebInput,
+  type ExtractPublicWebOutput,
+} from "./tools/extract-public-web.js";
+export {
+  createResearchPublicWebTool,
+  RESEARCH_PUBLIC_WEB,
+  ResearchPublicWebInputSchema,
+  ResearchPublicWebOutputSchema,
+  type ResearchPublicWebInput,
+  type ResearchPublicWebOutput,
+} from "./tools/research-public-web.js";

@@ -17,6 +17,11 @@ import {
   type ModelProviderSecrets,
 } from "./model-providers.js";
 import {
+  researchProviderEnvShape,
+  toResearchProviderSecrets,
+  type ResearchProviderSecrets,
+} from "./research-providers.js";
+import {
   supabaseAuthEnvShape,
   toSupabaseAuthConfig,
   type SupabaseAuthConfig,
@@ -39,6 +44,9 @@ const qApiEnvSchema = z.object({
   // around an unconfigured provider, and a service with neither still
   // starts — model-capable tasks then fail safely as "unavailable".
   ...modelProviderEnvShape,
+  // Public-web research provider key (CQ-Q-RESEARCH-001). Optional: without
+  // it the research tools are not composed and Q answers from Capital Q alone.
+  ...researchProviderEnvShape,
 });
 
 /**
@@ -50,6 +58,8 @@ const qApiEnvSchema = z.object({
 export type QApiSecrets = {
   /** Server-only. Never serialised, logged, or handed to a client or a prompt. */
   readonly modelProviders: ModelProviderSecrets;
+  /** Server-only. Read once by the research adapter at composition. */
+  readonly researchProviders: ResearchProviderSecrets;
 };
 
 export type QApiPublicConfig = Readonly<Record<string, never>>;
@@ -81,7 +91,10 @@ export function parseQApiConfig(env: EnvironmentInput): QApiConfig {
           })
         : undefined,
     public: {},
-    secrets: { modelProviders: toModelProviderSecrets(parsed) },
+    secrets: {
+      modelProviders: toModelProviderSecrets(parsed),
+      researchProviders: toResearchProviderSecrets(parsed),
+    },
   };
 }
 

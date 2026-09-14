@@ -192,6 +192,10 @@ export {
   withoutRecommendationClaims,
   type GuardedAnswer,
 } from "./communication/recommendation-guard.js";
+export {
+  asksForPublicResearch,
+  PUBLIC_RESEARCH_CUES,
+} from "./communication/research-cues.js";
 
 export {
   COMMUNICATION_FORBIDDEN_TERMS,

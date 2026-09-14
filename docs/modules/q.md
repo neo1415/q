@@ -159,6 +159,14 @@ an internal `QToolCallRecord` and a public `QToolProgress` that withholds the
 tool name. Neither carries arguments or results; per-tool Zod schemas are
 CQ-Q-007's, and no client can submit a "tool result".
 
+Controlled public-web research (CQ-Q-RESEARCH-001) reaches Q only through
+this registry: two bounded, provider-mediated tools whose outbound query is
+composed from the person's own words and authorised public identity, whose
+results are unverified data with provenance, and whose sources a founder's Q
+reads about their own company are recorded as that company's evidence. See
+[q-research.md](q-research.md) and ADR 0009. `QToolExecutionContext` carries
+`conversation.latestUserText` for that one purpose.
+
 ## Stream events
 
 `QStreamEvent` is a closed union on `type`: `q.run.started`, `q.stage.changed`,

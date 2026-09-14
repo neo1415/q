@@ -5,6 +5,7 @@ import type {
   InvestorOrganisationQueryPort,
 } from "@capital-q/investors";
 import type { DisclosureAccessService } from "@capital-q/permissions";
+import type { PublicWebResearchService } from "@capital-q/q-research";
 import type { AuthorizationService } from "@capital-q/security";
 
 /**
@@ -12,6 +13,11 @@ import type { AuthorizationService } from "@capital-q/security";
  * query ports and the two deterministic authorities. No executor, no
  * connection, no credential — a tool cannot compose a statement, only
  * call a named operation another context owns.
+ *
+ * `research` is the one capability that reaches outside Capital Q
+ * (CQ-Q-RESEARCH-001): a named operation over a provider-neutral port whose
+ * outbound query is composed from allowed words, never forwarded. It is
+ * optional; without a configured provider the research tools do not exist.
  */
 export type QToolPorts = {
   readonly companies: CompanyQueryPort;
@@ -20,4 +26,5 @@ export type QToolPorts = {
   readonly investors: InvestorOrganisationQueryPort;
   readonly authorization: AuthorizationService;
   readonly disclosure: DisclosureAccessService;
+  readonly research?: PublicWebResearchService | undefined;
 };

@@ -1,0 +1,43 @@
+{
+  "name": "@capital-q/q-research",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Capital Q controlled public-web research (CQ-Q-RESEARCH-001): a provider-neutral PublicWebResearchProvider port (search + extract only), the outbound egress composer that decides what may leave Capital Q in a query, public-URL safety, bounded excerpts, deterministic public-vs-recorded comparison notes, and the Tavily adapter behind a subpath. No crawl, no research report, no arbitrary fetch, no knowledge store of its own.",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./providers/tavily": {
+      "types": "./dist/providers/tavily.d.ts",
+      "default": "./dist/providers/tavily.js"
+    },
+    "./testing": {
+      "types": "./dist/providers/fake.d.ts",
+      "default": "./dist/providers/fake.js"
+    }
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "clean": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\""
+  },
+  "dependencies": {
+    "@capital-q/contracts": "workspace:*",
+    "@capital-q/observability": "workspace:*",
+    "@capital-q/security": "workspace:*",
+    "@tavily/core": "0.7.11",
+    "zod": "4.5.4"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.3",
+    "typescript": "5.9.3"
+  }
+}

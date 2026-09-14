@@ -175,6 +175,13 @@ export function focusFromQuestion(
 }
 
 /**
+ * The public-research cue is q-core's (`asksForPublicResearch`): one
+ * deterministic reading of a question, shared with the conversational seam,
+ * re-exported here for the specialist's callers.
+ */
+export { asksForPublicResearch } from "@capital-q/q-core";
+
+/**
  * Whether the question is asking what changed. Used only to decide whether
  * to read a knowledge SERIES rather than only its current reading — never
  * to decide what may be read.

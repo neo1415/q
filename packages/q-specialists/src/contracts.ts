@@ -5,6 +5,7 @@ import type {
   QInternalFinding,
   QRunId,
   QSubjectRef,
+  QVisibleStage,
 } from "@capital-q/contracts";
 import type { ActorContext } from "@capital-q/security";
 
@@ -58,6 +59,12 @@ export type QSpecialistExecutionContext = {
   readonly plan: PermittedContextPlan;
   /** Cooperative cancellation, propagated to reads and to the model call (§101). */
   readonly signal?: AbortSignal | undefined;
+  /**
+   * Approved progress only (CQ-Q-RESEARCH-001 §31): a specialist may say
+   * which visible stage it is in, never what it is sending or reading.
+   * Best effort; a failure to show progress never fails the investigation.
+   */
+  readonly showStage?: ((stage: QVisibleStage) => Promise<void>) | undefined;
 };
 
 /**

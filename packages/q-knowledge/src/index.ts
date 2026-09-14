@@ -214,3 +214,12 @@ export {
 } from "./infrastructure/postgres-chunk-repositories.js";
 
 export const PACKAGE_NAME = "@capital-q/q-knowledge" as const;
+export {
+  createConversationStatementRecorder,
+  quoteOccursIn,
+  type ConversationStatement,
+  type ConversationStatementRecorder,
+  type RecordStatementCommand,
+  type RecordStatementOutcome,
+  type StatementEvidencePort,
+} from "./q/statement-recorder.js";

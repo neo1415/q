@@ -51,6 +51,9 @@ const MODEL_SDK_IMPORT_PATTERNS = [
   "@langchain/groq",
 ];
 
+/** Public-web research provider SDKs; the research adapter only (CQ-Q-RESEARCH-001 §5). */
+const RESEARCH_SDK_IMPORT_PATTERNS = ["@tavily/core", "@tavily/*"];
+
 /** Browser-reachable source: the web app and the shared component package. */
 const WEB_SOURCE = ["apps/web/**/*.{ts,tsx}"];
 
@@ -327,6 +330,29 @@ export default tseslint.config(
               group: MODEL_SDK_IMPORT_PATTERNS,
               message:
                 "Model provider SDKs are imported only by @capital-q/model-gateway's provider adapters. Request a task class through the ModelGateway instead (doc 12 s24.5, doc 23 s126).",
+            },
+          ],
+        },
+      ],
+    },
+  },
+
+  // Rule G' -- the public-web research SDK exists only inside
+  // @capital-q/q-research's provider adapter (CQ-Q-RESEARCH-001 §5, §45).
+  // Tools, domains, apps and web code call the research port and never see
+  // a vendor type, request id or raw payload.
+  {
+    files: ["apps/**/*.{ts,tsx}", "packages/**/*.{ts,tsx}"],
+    ignores: ["packages/q-research/src/providers/**"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: RESEARCH_SDK_IMPORT_PATTERNS,
+              message:
+                "The research provider SDK is imported only by @capital-q/q-research's Tavily adapter. Call the PublicWebResearchProvider port instead (CQ-Q-RESEARCH-001 §5, §45).",
             },
           ],
         },

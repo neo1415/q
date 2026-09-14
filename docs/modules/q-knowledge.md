@@ -540,6 +540,22 @@ Existing in this schema grants nothing: not a Data Room grant, not download,
 not share, not recommendation eligibility. The table has no column for any of
 them.
 
+### A person's clarification in a Q conversation (CQ-Q-RESEARCH-001)
+
+`createConversationStatementRecorder` (`src/q/statement-recorder.ts`) turns
+what a person stated about their own company in a Q conversation into their
+recorded claim, through this gate and nothing else. The quote the model
+attributed to the person must occur verbatim (case- and whitespace-
+insensitively) in the person's own message or nothing is recorded; the
+statement, key and date are validated; a `USER_STATEMENT` evidence source
+(`founder_private`, `CONFIDENTIAL`, external reference `q-run:<id>`) and one
+item carrying the quoted words are registered through the Evidence owner; and
+a `USER_CLAIM` candidate is submitted under `USER_CLARIFIED_IN_CONVERSATION`
+with `automatic: true`. It lands `ACTIVE` at `SELF_REPORTED` / `LOW` and is
+read back by `authorisedKnowledgeFacts` in a later conversation with the
+provenance "stated by the person in a Q conversation". Canonical company
+state is not touched. Tests: `test/statement-recorder.test.ts`.
+
 ### Where knowledge sits in Q's retrieval hierarchy
 
 ```

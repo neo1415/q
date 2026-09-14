@@ -203,6 +203,11 @@ const specialist = createCompanyIntelligenceSpecialist({
   canonical: createToolCanonicalPort(toolPort),
   knowledge: createKnowledgeCompanyPort(knowledgeQueryService),
   evidence: createRetrievalEvidencePort(authorisedRetrievalService),
+  // CQ-Q-RESEARCH-001: bounded public-web research through the same registry,
+  // asked for only when the person's words ask for public information, and
+  // the recorder for what the person states about their own company.
+  research: createToolResearchPort(toolPort),
+  statements: conversationStatementRecorder,
 });
 
 const answer = createSpecialistQAnswer({
@@ -231,6 +236,31 @@ input** (the last surface before a model, and the only honest place to prove
 a private figure never travelled), the **specialist result**, and the
 **stored Q message**.
 
+## Public-web research and the person's statements (CQ-Q-RESEARCH-001)
+
+A fourth narrow port, `CompanyResearchPort`, is called deterministically
+between the knowledge reads and retrieval when `asksForPublicResearch`
+finds a public-facing cue in the question (the web, a website, news, press,
+competitors, "look it up"). The Tool Registry decides whether this run may
+research; the research capability decides what leaves; the specialist only
+asks and reads. Sources join the assembled context last, as
+`PUBLIC_EXTERNAL_DATA` facts with truth class `UNKNOWN` and evidence
+status `SELF_REPORTED` (the company's own website) or `NO_EVIDENCE`
+(anyone else) — so a page cannot raise `informationConfidence` and a model
+finding that cites one is bounded to that status. Capital Q's comparison
+notes go into the institutional notes; a `QUALIFIES` or `CONTRADICTS` note
+adds a deterministic `CLARIFY` instruction so the answer ends with one
+question to the person. Labels such as "(source S1)" in the synthesis are
+rewritten into title, domain, date and link (`citePublicSources`).
+
+The analyst may return `userStatements`; each is recorded through the
+conversation statement recorder only when its quote occurs verbatim in the
+person's message, and the answer seam appends "Noted as your statement: …"
+for what was recorded. Progress is shown through
+`QSpecialistExecutionContext.showStage` (approved stages only). Result and
+telemetry carry `research` status and counts and `recordedStatements`.
+Tests: `test/company-research.test.ts`, `test/cite-public-sources.test.ts`.
+
 ## Known limitations
 
 - A reading swept to `STALE` by `reassessForFreshness` leaves
@@ -241,6 +271,13 @@ a private figure never travelled), the **specialist result**, and the
 - Comparison for material change is within one knowledge key. "Cash and burn
   imply a runway that disagrees with the stated one" is not detected.
 - No InvestIQ assessment is read as context, because none is implemented.
+- The specialist passes no earlier conversation turns to the model (`conversation: []`),
+  so a clarification is understood from the person's message and Capital Q's
+  records rather than from Q's previous question. The recorded statement does
+  not depend on it.
+- Research shows the `CHECKING_EVIDENCE` stage until the `run_events` stage
+  constraint admits `SEARCHING_PUBLIC_SOURCES` (a migration this packet did not
+  create).
 - The rendered `COMPANY_ANALYST` bundle sits close to the repository's
   3,000-token prompt budget; a materially longer v3 would need that budget
   revisited rather than quietly exceeded.

@@ -37,6 +37,10 @@
       "types": "./dist/embeddings.d.ts",
       "default": "./dist/embeddings.js"
     },
+    "./research-providers": {
+      "types": "./dist/research-providers.d.ts",
+      "default": "./dist/research-providers.js"
+    },
     "./model-providers": {
       "types": "./dist/model-providers.d.ts",
       "default": "./dist/model-providers.js"

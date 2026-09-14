@@ -118,6 +118,23 @@ export type CompanyIntelligenceResult = {
    * contribution to it, not a message and not a persona (§11, §56).
    */
   readonly synthesis: string | null;
+  /**
+   * The public-web read made for this question, when the person asked for
+   * public information (CQ-Q-RESEARCH-001). Counts and status only.
+   */
+  readonly research: {
+    readonly status:
+      "OK" | "NO_PUBLIC_IDENTITY" | "PROVIDER_UNAVAILABLE" | "NOT_OFFERED";
+    readonly sourceCount: number;
+    readonly comparisonCount: number;
+  } | null;
+  /**
+   * Statements the person made about their own company in this message,
+   * verified against their words and recorded as their claims through the
+   * Knowledge Write Gate (§20-§21). The quoted words, for the answer to
+   * acknowledge. Empty when nothing was recorded.
+   */
+  readonly recordedStatements: readonly string[];
   /** Safe operational record for traces, evals and the developer smoke. */
   readonly telemetry: CompanyIntelligenceTelemetry;
 };
@@ -157,4 +174,9 @@ export type CompanyIntelligenceTelemetry = {
   /** Model findings dropped because a claim or a citation did not hold (§61). */
   readonly rejectedFindingCount: number;
   readonly rejectedCitationCount: number;
+  /** Public-web research reads asked of the Tool Registry (0 or 1). */
+  readonly researchCalls: number;
+  readonly publicSourceCount: number;
+  /** The person's statements recorded through the Knowledge Write Gate. */
+  readonly statementsRecorded: number;
 };

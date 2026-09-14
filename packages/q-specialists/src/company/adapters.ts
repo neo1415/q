@@ -15,6 +15,10 @@ import type {
   CompanyCanonicalPort,
   CompanyEvidencePort,
   CompanyKnowledgePort,
+  CompanyResearchPort,
+  CompanyResearchRead,
+  PublicWebComparisonNote,
+  PublicWebSource,
 } from "./ports.js";
 
 /**
@@ -274,6 +278,102 @@ export function createRetrievalEvidencePort(
         "company intelligence retrieval",
       );
       return result.hits.slice(0, COMPANY_PASSAGE_LIMIT);
+    },
+  };
+}
+
+/**
+ * Public-web research through the Tool Registry (CQ-Q-RESEARCH-001 §24).
+ *
+ * Called deterministically, like the canonical read: the specialist decides
+ * from the person's words whether to research at all, the registry decides
+ * whether this run may, and the research capability decides what leaves.
+ * The model is never offered the tool and cannot be talked into a search
+ * by text inside a document or a page. A tool that is not offered to this
+ * run is reported as such; nothing is sent.
+ */
+export function createToolResearchPort(
+  tools: QToolPort,
+  logger?: Logger,
+): CompanyResearchPort {
+  return {
+    research: async (context: QToolExecutionContext, input) => {
+      const offered = await tools.offer(context);
+      if (
+        !offered.some((tool) => tool.definition.name === "research_public_web")
+      ) {
+        return {
+          status: "NOT_OFFERED",
+          message: null,
+          sources: [],
+          comparison: [],
+          toolCalls: 0,
+        };
+      }
+      const outcome = await tools.execute(
+        {
+          callId: "specialist-research",
+          name: "research_public_web",
+          arguments: {
+            // The person's words, bounded. The tool composes the real query
+            // from these and the authorised identity; private tokens drop.
+            query: input.question.trim().slice(0, 200) || "company",
+            companyId: input.companyId,
+          },
+        },
+        context,
+      );
+      if (!outcome.result.ok) {
+        // Denied or failed reads are one plain outcome; the reason stays in
+        // the tool's own telemetry.
+        logger?.debug(
+          { qRunId: context.runId, status: outcome.status },
+          "public research not available to this investigation",
+        );
+        return {
+          status: "NOT_OFFERED",
+          message: null,
+          sources: [],
+          comparison: [],
+          toolCalls: 1,
+        };
+      }
+      const data = outcome.result.data as {
+        status: CompanyResearchRead["status"];
+        message: string | null;
+        sources: readonly PublicWebSource[];
+        comparison: readonly PublicWebComparisonNote[];
+      };
+      const read: CompanyResearchRead = {
+        status: data.status,
+        message: data.message,
+        sources: data.sources.map((source) => ({
+          index: source.index,
+          url: source.url,
+          domain: source.domain,
+          title: source.title,
+          publishedAt: source.publishedAt,
+          retrievedAt: source.retrievedAt,
+          temporal: source.temporal,
+          excerpt: source.excerpt,
+          isSubjectWebsite: source.isSubjectWebsite,
+          mentionedCountries: [...source.mentionedCountries],
+          instructionRiskSignals: source.instructionRiskSignals,
+          recordedAsEvidence: source.recordedAsEvidence,
+        })),
+        comparison: data.comparison.map((note) => ({ ...note })),
+        toolCalls: 1,
+      };
+      logger?.debug(
+        {
+          qRunId: context.runId,
+          status: read.status,
+          sources: read.sources.length,
+          comparison: read.comparison.length,
+        },
+        "public research read",
+      );
+      return read;
     },
   };
 }

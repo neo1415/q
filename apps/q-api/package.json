@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "Q runtime service \u2014 independently deployable Capital Q intelligence boundary.",
+  "description": "Q runtime service — independently deployable Capital Q intelligence boundary.",
   "scripts": {
     "dev": "node --watch --import ../../scripts/dev-env.mjs src/main.ts",
     "build": "tsc",
@@ -32,6 +32,7 @@
     "@capital-q/q-firewall": "workspace:*",
     "@capital-q/q-knowledge": "workspace:*",
     "@capital-q/q-orchestrator": "workspace:*",
+    "@capital-q/q-research": "workspace:*",
     "@capital-q/q-runtime": "workspace:*",
     "@capital-q/q-specialists": "workspace:*",
     "@capital-q/q-tools": "workspace:*",

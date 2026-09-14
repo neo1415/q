@@ -218,6 +218,13 @@ export type QToolExecutionContext = {
   readonly capability: QCapability;
   readonly plan: PermittedContextPlan;
   readonly signal?: AbortSignal | undefined;
+  /**
+   * The person's latest message in this run, verbatim (CQ-Q-RESEARCH-001
+   * §9). A tool that sends anything outside Capital Q composes its request
+   * from these words and from authorised public identity — never from a
+   * model's argument as given. Absent when a caller has no conversation.
+   */
+  readonly conversation?: { readonly latestUserText: string } | undefined;
 };
 
 /**

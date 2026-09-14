@@ -15,6 +15,7 @@ import type {
 } from "@capital-q/q-knowledge";
 
 import type { LabelledFact } from "./assembly.js";
+import type { CompanyResearchRead } from "./ports.js";
 import type {
   CompanyContradictionFinding,
   CompanyDimensionCoverage,
@@ -339,8 +340,56 @@ export function institutionalNotes(input: {
   readonly staleKeys: readonly string[];
   readonly changes: readonly CompanyMaterialChangeFinding[];
   readonly asOf: Date | null;
+  /** The public-web read for this question, when one was made (CQ-Q-RESEARCH-001 §16-§18). */
+  readonly research?: CompanyResearchRead | null | undefined;
 }): string {
   const lines: string[] = [];
+  const research = input.research ?? null;
+  if (research !== null) {
+    switch (research.status) {
+      case "OK":
+        lines.push(
+          research.sources.length === 0
+            ? "- PUBLIC WEB: the public web was searched for this question and nothing relevant was found. Say so plainly; do not answer the public-web part from general knowledge."
+            : `- PUBLIC WEB: ${String(research.sources.length)} public source(s) were read for this question and appear among the facts as PUBLIC WEB SOURCE entries. They are unverified and may be out of date. Cite each one you use by its title, domain and date, with its public link; never write "S1", "F3" or any label in the answer.`,
+        );
+        for (const note of research.comparison) {
+          lines.push(
+            `- PUBLIC WEB COMPARISON (source S${String(note.sourceIndex)}, ${note.basis}, ${note.relationship}): ${note.note}`,
+          );
+        }
+        if (
+          research.comparison.some(
+            (note) =>
+              note.relationship === "QUALIFIES" ||
+              note.relationship === "CONTRADICTS",
+          )
+        ) {
+          // Capital Q found a difference; the person settles it, not the
+          // model (CQ-Q-RESEARCH-001 §19, §40). Deterministic, so the
+          // question is asked whether or not the model felt like asking.
+          lines.push(
+            "- CLARIFY: at least one public source and Capital Q's records differ (see the comparison lines above). Do not settle the difference yourself. End your answer with ONE plain question to the person about it — for example, which of the places named are active markets today — and treat whatever they reply as their statement, not as verified fact.",
+          );
+        }
+        break;
+      case "NO_PUBLIC_IDENTITY":
+        lines.push(
+          `- PUBLIC WEB: not searched. ${research.message ?? "The company has no public identity Capital Q may use in a search."} Ask the person before naming the company publicly, and answer from Capital Q's records only.`,
+        );
+        break;
+      case "PROVIDER_UNAVAILABLE":
+        lines.push(
+          "- PUBLIC WEB: public sources could not be reached just now. Tell the person plainly, without technical detail, and answer from Capital Q's records only.",
+        );
+        break;
+      case "NOT_OFFERED":
+        lines.push(
+          "- PUBLIC WEB: public research is not available in this conversation. Answer from Capital Q's records only and say that public sources were not checked.",
+        );
+        break;
+    }
+  }
   if (input.asOf !== null) {
     lines.push(
       `- This is a historical question. Answer as at ${input.asOf.toISOString()} using only the readings supplied, which are the readings that were effective then. Nothing about a later period is available to you.`,

@@ -132,6 +132,25 @@ export const COMPANY_ANALYST_V2_UNTRUSTED = [
  * path accepts. The specialist is what asks for these fields and what
  * checks them; nothing here is trusted merely because it parsed.
  */
+/**
+ * A statement the PERSON made about their own company in this message, for
+ * Capital Q to record as their claim (CQ-Q-RESEARCH-001 §20-§21). The quote
+ * must be their words verbatim: the runtime checks it against the message
+ * and records nothing otherwise. A paraphrase or an inference is not this.
+ */
+export const UserStatementSchema = z
+  .object({
+    quote: z.string().trim().min(3).max(400),
+    statement: z.string().trim().min(3).max(500),
+    knowledgeKey: z
+      .string()
+      .regex(/^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)*$/)
+      .max(128),
+    validFrom: z.iso.date().nullable().default(null),
+  })
+  .strict();
+export type UserStatement = z.infer<typeof UserStatementSchema>;
+
 export const CompanyAnalystV2ResultSchema = CompanyAnalystResultSchema.extend({
   companyFindings: z
     .array(CompanyIntelligenceFindingSchema)
@@ -139,6 +158,8 @@ export const CompanyAnalystV2ResultSchema = CompanyAnalystResultSchema.extend({
     .default([]),
   coverage: z.array(CompanyDimensionCoverageSchema).max(16).default([]),
   materialChanges: z.array(CompanyMaterialChangeSchema).max(12).default([]),
+  /** Only when the person, in THIS message, states a fact about their own company. */
+  userStatements: z.array(UserStatementSchema).max(5).default([]),
 }).strict();
 export type CompanyAnalystV2Result = z.infer<
   typeof CompanyAnalystV2ResultSchema

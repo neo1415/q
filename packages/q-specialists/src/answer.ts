@@ -1,4 +1,4 @@
-import type { QResponseMessage } from "@capital-q/contracts";
+import type { QResponseMessage, QVisibleStage } from "@capital-q/contracts";
 import { withoutRecommendationClaims } from "@capital-q/q-core";
 import type { DatabaseExecutor, TransactionManager } from "@capital-q/database";
 import type { Logger } from "@capital-q/observability";
@@ -121,6 +121,28 @@ export function createSpecialistQAnswer(
     dependencies;
   let last: CompanyIntelligenceResult | null = null;
 
+  /** Approved progress only; best effort, never a reason to fail the answer. */
+  async function showStage(
+    request: QAnswerRequest,
+    stage: QVisibleStage,
+  ): Promise<void> {
+    try {
+      await transactions.run((tx) =>
+        appendRunEvent(
+          repositories,
+          tx,
+          { id: request.runId, tenantId: request.tenantId },
+          { type: "q.stage.changed", data: { stage } },
+        ),
+      );
+    } catch (error: unknown) {
+      logger?.warn(
+        { err: error, qRunId: request.runId },
+        "q specialist stage event not recorded",
+      );
+    }
+  }
+
   return {
     lastResult: () => last,
     answer: async (request: QAnswerRequest): Promise<QAnswerOutcome> => {
@@ -168,6 +190,7 @@ export function createSpecialistQAnswer(
           capability: request.capability,
           plan: request.plan,
           ...(request.signal === undefined ? {} : { signal: request.signal }),
+          showStage: (stage) => showStage(request, stage),
         },
       );
       last = result;
@@ -190,7 +213,20 @@ export function createSpecialistQAnswer(
           "recommendation claims removed from a Q answer",
         );
       }
-      const content = guarded.text.slice(0, ANSWER_LIMIT_CHARS).trim();
+      // What the person stated about their own company was recorded as
+      // their claim (CQ-Q-RESEARCH-001 §21, §40); the answer says so, in
+      // Capital Q's words, deterministically.
+      const acknowledgement =
+        result.recordedStatements.length === 0
+          ? ""
+          : `\n\nNoted as your statement: ${result.recordedStatements
+              .map((statement) => `\u201c${statement}\u201d`)
+              .join(
+                "; ",
+              )}. Capital Q records it as what you told me, not as verified fact; say so if it needs correcting.`;
+      const content = `${guarded.text}${acknowledgement}`
+        .slice(0, ANSWER_LIMIT_CHARS)
+        .trim();
       if (content.length === 0) {
         return { kind: "FAILED", diagnosticCode: "MODEL_PROVIDER_UNAVAILABLE" };
       }

@@ -19,7 +19,9 @@
  *   a specialist ≠ an agent a person talks to
  *
  * There is no provider SDK, no SQL, no HTTP client, no write and no
- * scoring anywhere in this package, and a person never learns it ran.
+ * scoring anywhere in this package, and a person never learns it ran. Its
+ * one outward-facing read — bounded public-web research — goes through the
+ * Tool Registry like every other read (CQ-Q-RESEARCH-001).
  */
 
 export {
@@ -38,6 +40,7 @@ export {
   knowledgeToFact,
   labelAt,
   passageToFact,
+  publicSourceToFact,
   type AssembledCompanyContext,
   type CompanyContextInput,
   type LabelledFact,
@@ -64,6 +67,7 @@ export {
 export {
   asksAboutChange,
   asksAboutGaps,
+  asksForPublicResearch,
   dimensionForKnowledgeKey,
   focusFromQuestion,
 } from "./company/dimensions.js";
@@ -73,15 +77,21 @@ export {
   createKnowledgeCompanyPort,
   createRetrievalEvidencePort,
   createToolCanonicalPort,
+  createToolResearchPort,
 } from "./company/adapters.js";
 export type {
   CompanyCanonicalPort,
   CompanyEvidencePort,
   CompanyKnowledgePort,
+  CompanyResearchPort,
+  CompanyResearchRead,
+  PublicWebComparisonNote,
+  PublicWebSource,
 } from "./company/ports.js";
 export {
   COMPANY_INTELLIGENCE_ID,
   COMPANY_INTELLIGENCE_VERSION,
+  citePublicSources,
   createCompanyIntelligenceSpecialist,
   type CompanyIntelligenceDependencies,
 } from "./company/specialist.js";

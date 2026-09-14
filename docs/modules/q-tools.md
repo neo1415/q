@@ -102,13 +102,35 @@ a bounded name `ILIKE` over the discoverable rows; no migration was needed.
 A name-search index is a later change when the network grows. No taxonomy
 filter yet (the Taxonomy context has no companies-by-node query).
 
+## The two research tools (CQ-Q-RESEARCH-001)
+
+Registered only when a research provider is composed (`ports.research`);
+without one they do not exist. Both require the actor-wide
+`PUBLIC_EXTERNAL_DATA` scope, are `READ_ONLY` / `SAFE_READ`, return
+`truthClass: "UNKNOWN"`, and are documented in full in
+[q-research.md](q-research.md) and ADR 0009.
+
+| Tool                 | Path                                                                                                                                                                                                                                                                                                                                                                                                                                              | Sensitivity |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------- |
+| `public_web.search`  | One bounded research turn (≤ 2 searches, ≤ 5 results, top 1–3 extracted). The subject is the named or single plan company, else the actor's own investor organisation. Owner: `company.view`; identity leaves only when the company is network-visible/public or has a website; sources recorded as the company's evidence. Non-owner: disclosure must say NETWORK_VISIBLE/PUBLIC; network projection only; nothing recorded. Else NOT_AVAILABLE. | PUBLIC      |
+| `public_web.extract` | Reads up to three public URLs that a `public_web.search` in THIS run surfaced; anything else, and any non-public destination, is refused with a reason and nothing is sent.                                                                                                                                                                                                                                                                       | PUBLIC      |
+
+The query that leaves Capital Q is composed by the research capability from
+the person's own words and the authorised identity, never from the model's
+argument as given (`context.conversation.latestUserText`). Until the
+`run_events` stage constraint is widened by migration, both tools show the
+`CHECKING_EVIDENCE` stage.
+
 ## What was deliberately not built
 
-No `run_sql`, no `execute_query`, no HTTP or browser tool, no shell, no
-connector, no MCP (doc 12 §34.3: architecturally possible, not a V1
-blocker), no side-effect or prepare tool, no voice provider. Tools do not
-write; the only writes on the Q side remain a conversation message and
-approved visible stages.
+No `run_sql`, no `execute_query`, no arbitrary HTTP or browser tool (the
+research tools reach only a provider-mediated public search and pages that
+search surfaced), no shell, no connector, no MCP (doc 12 §34.3:
+architecturally possible, not a V1 blocker), no side-effect or prepare
+tool, no voice provider. Tools do not write canonical state; the only
+writes on the Q side remain a conversation message, approved visible
+stages, and — through the Evidence owner — the public sources a founder's
+Q read about their own company.
 
 ## Tests
 
@@ -117,6 +139,11 @@ switch, eligibility by purpose/scope/actor, every pipeline step's refusal,
 internal-error and output markers never leaking, cancellation);
 `safe-read-tools.test.ts` (each tool's authorization paths over fake ports,
 enumeration-safe denials, disclosure re-check on search, foreign cursor);
+`research-tools.test.ts` (CQ-Q-RESEARCH-001 security tests A–I: founder and
+investor markers never leave, cross-tenant and unknown companies are one
+denial, network projection only for a non-owner, injected page text is
+data, provider failure is one plain sentence, private and unsearched URLs
+refused);
 `tools.integration.test.ts` (real local database, real authorization,
 disclosure, query ports and Context Firewall plans: founder/colleague own
 paths, GOLDEN cross-tenant and investor-private denials with markers, network

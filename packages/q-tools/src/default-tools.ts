@@ -7,18 +7,31 @@ import type { QToolPorts } from "./ports.js";
 import { createQToolRegistry, type QToolRegistry } from "./registry.js";
 import { createGetCapitalObjectiveTool } from "./tools/get-capital-objective.js";
 import { createGetCompanyTool } from "./tools/get-company.js";
+import { createExtractPublicWebTool } from "./tools/extract-public-web.js";
 import { createGetInvestorMandateTool } from "./tools/get-investor-mandate.js";
+import { createResearchPublicWebTool } from "./tools/research-public-web.js";
 import { createSearchCompaniesTool } from "./tools/search-companies.js";
 
-/** The V1 catalogue: four SAFE_READ tools, all over public query ports. */
+/**
+ * The catalogue: four SAFE_READ tools over public query ports, plus the two
+ * public-web research tools when a research capability is composed
+ * (CQ-Q-RESEARCH-001). No provider means no research tool exists at all.
+ */
 export function createDefaultQTools(
   ports: QToolPorts,
 ): readonly AnyQToolDefinition[] {
+  const research = ports.research;
   return [
     createGetCompanyTool(ports),
     createGetCapitalObjectiveTool(ports),
     createGetInvestorMandateTool(ports),
     createSearchCompaniesTool(ports),
+    ...(research === undefined
+      ? []
+      : [
+          createResearchPublicWebTool({ ...ports, research }),
+          createExtractPublicWebTool({ ...ports, research }),
+        ]),
   ];
 }
 

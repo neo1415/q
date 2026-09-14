@@ -103,6 +103,8 @@ describe("per-service isolation", () => {
     // and holds none by default.
     expect(qApi.secrets).toEqual({
       modelProviders: { google: undefined, groq: undefined },
+      // The research provider (CQ-Q-RESEARCH-001) has the same defined home.
+      researchProviders: { tavily: undefined },
     });
     const workers = parseWorkerConfig(EMPTY_ENV);
     expect(workers.public).toEqual({});

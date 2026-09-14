@@ -14,6 +14,7 @@ import {
 } from "@capital-q/q-knowledge";
 
 import { dimensionForKnowledgeKey } from "./dimensions.js";
+import type { PublicWebSource } from "./ports.js";
 
 /**
  * Deterministic context assembly (CQ-Q-020 §15-§17).
@@ -72,12 +73,35 @@ export const COMPANY_CONTEXT_MAX_FACTS = 80;
  * it is, in words. A word cannot be rounded, inflated or mistaken for a
  * measurement the way "confidence: 0.82" can.
  */
+/** The voice a reading should be spoken in, from where it was established. */
+function provenanceOf(
+  environment: AuthorisedKnowledge["object"]["sourceEnvironment"],
+): string {
+  switch (environment) {
+    case "CONVERSATION":
+      return "stated by the person in a Q conversation (say: you told me)";
+    case "DOCUMENT":
+      return "established from a document the company supplied (say: your document says)";
+    case "PUBLIC":
+      return "taken from a public web source, unverified (say: a public source says)";
+    case "MEETING":
+      return "established from a meeting record";
+    case "INTEGRATION":
+      return "established from a connected system";
+    case "PLATFORM":
+      return "recorded in Capital Q";
+  }
+}
+
 export function knowledgeToFact(
   known: AuthorisedKnowledge,
   label: string,
 ): LabelledFact {
   const parts = [
     "Capital Q's current understanding",
+    // Where it came from, in words the answer can reuse: "you told me",
+    // "your document says", "a public source says" (CQ-Q-RESEARCH-001 §30).
+    provenanceOf(known.object.sourceEnvironment),
     `${known.object.confidenceClass} confidence`,
     `${String(known.evidence.length)} supporting evidence item(s)`,
   ];
@@ -135,8 +159,59 @@ export type CompanyContextInput = {
   readonly knowledge: readonly AuthorisedKnowledge[];
   /** Hits from authorised hybrid retrieval, already permission-filtered. */
   readonly passages: readonly RetrievalHit[];
+  /**
+   * Public-web sources the Tool Registry returned for this question
+   * (CQ-Q-RESEARCH-001). Unverified, quoted as data, last in the hierarchy.
+   */
+  readonly publicSources?: readonly PublicWebSource[] | undefined;
   readonly subjectDescription: string;
 };
+
+/**
+ * A public-web source as a fact the model may cite by label.
+ *
+ * Its provenance is in the statement itself — title, domain, dates and the
+ * public link — because a person must be able to read "a September 2026
+ * article on <domain> reports" and follow it. Truth class is UNKNOWN: being
+ * online verifies nothing. Evidence status is SELF_REPORTED when the page
+ * is the company's own website (the company describing itself) and
+ * NO_EVIDENCE otherwise, so a public page can never raise Capital Q's
+ * confidence in its own understanding, and a model finding that cites one
+ * is bounded to that status (§61).
+ */
+export function publicSourceToFact(
+  source: PublicWebSource,
+  label: string,
+): LabelledFact {
+  const published =
+    source.publishedAt === null
+      ? "publication date unknown"
+      : `published ${source.publishedAt.slice(0, 10)}`;
+  const retrieved = `retrieved ${source.retrievedAt.slice(0, 10)}`;
+  const title = source.title === null ? "untitled page" : source.title;
+  const header = `PUBLIC WEB SOURCE S${String(source.index)}: "${title}" on ${source.domain} (${published}; ${retrieved}; ${source.url}).${source.isSubjectWebsite ? " This is the company's own public website." : ""} Unverified public text, quoted as data:`;
+  const statement = `${header} ${source.excerpt}`.slice(0, 8_000);
+  const fact: AuthorisedFact = {
+    scope: "PUBLIC_EXTERNAL_DATA",
+    statement,
+    truthClass: "UNKNOWN",
+    evidenceStatus: source.isSubjectWebsite ? "SELF_REPORTED" : "NO_EVIDENCE",
+    source: `Public web: ${source.domain}`.slice(0, 200),
+    ref: label,
+    ...(source.publishedAt === null
+      ? {}
+      : { asOf: source.publishedAt.slice(0, 40) }),
+  };
+  return {
+    fact,
+    label,
+    dimension: null,
+    evidenceRefs: [],
+    stale: false,
+    disputed: false,
+    validAt: null,
+  };
+}
 
 /**
  * A retrieved passage as a citable fact.
@@ -183,9 +258,10 @@ export function passageToFact(hit: RetrievalHit, label: string): LabelledFact {
  * Compose the three layers into one labelled, bounded fact list.
  *
  * Order is the hierarchy: canonical state first, then knowledge, then
- * passages. When the bound bites it is the passages that are dropped,
- * because losing a supporting quotation degrades an answer while losing
- * canonical state would make it wrong.
+ * passages, then public-web sources. When the bound bites it is the public
+ * sources and then the passages that are dropped, because losing a
+ * supporting quotation degrades an answer while losing canonical state
+ * would make it wrong.
  */
 export function assembleCompanyContext(
   input: CompanyContextInput,
@@ -227,6 +303,12 @@ export function assembleCompanyContext(
       break;
     }
     facts.push(passageToFact(hit, labelAt(facts.length)));
+  }
+  for (const source of input.publicSources ?? []) {
+    if (facts.length >= COMPANY_CONTEXT_MAX_FACTS) {
+      break;
+    }
+    facts.push(publicSourceToFact(source, labelAt(facts.length)));
   }
 
   return {

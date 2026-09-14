@@ -3,7 +3,7 @@
 /**
  * Runs the live model smoke suites (CQ-Q-005 §52-53).
  *
- * Reads ONLY the two provider key names from `.env.local` (if present) and
+ * Reads ONLY the provider key names below from `.env.local` (if present) and
  * passes them to a child vitest process. Nothing is printed, no other
  * variable from that file is loaded, and the values never touch a shell.
  * Presence is reported by name; values are never reported.
@@ -13,7 +13,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const NAMES = ["GEMINI_API_KEY", "GROQ_API_KEY"];
+const NAMES = ["GEMINI_API_KEY", "GROQ_API_KEY", "TAVILY_API_KEY"];
 const root = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const envFile = resolve(root, ".env.local");
 const env = { ...process.env };

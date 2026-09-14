@@ -41,6 +41,7 @@ import {
   type RelationshipQueryPort,
 } from "@capital-q/network";
 import { modelProviderConfigStatus } from "@capital-q/config/model-providers";
+import { researchProviderConfigStatus } from "@capital-q/config/research-providers";
 import {
   createModelGateway,
   createModelProviderRegistry,
@@ -105,6 +106,7 @@ import {
   composeQIntelligence,
   createProductionEmbeddingService,
 } from "./composition/q-intelligence.js";
+import { composeResearch } from "./composition/research.js";
 import { createSupabaseRequestAuthenticator } from "./security/supabase-authenticator.js";
 
 // Q configuration is loaded from its own schema, separate from the application
@@ -298,11 +300,35 @@ logger.info(
   "model gateway composed",
 );
 
+// Controlled public-web research (CQ-Q-RESEARCH-001): the provider exists
+// only when its key is configured, its outbound queries are composed from
+// allowed words, its reads are limited to URLs a search in the same run
+// surfaced, and what a founder's Q reads about their own company is
+// recorded as the company's evidence. The same module composes the
+// conversational statement recorder over the Knowledge Write Gate.
+const researchComposition = composeResearch({
+  sql: database.sql,
+  transactions: database.transactions,
+  authorization,
+  secrets: config.secrets.researchProviders,
+  logger,
+});
+logger.info(
+  {
+    researchProviders: researchProviderConfigStatus(
+      config.secrets.researchProviders,
+    ),
+  },
+  "public research composed",
+);
+
 // The Tool Registry (CQ-Q-007): four SAFE_READ tools over the same public
-// query ports and the same two authorities the firewall uses. A run is
-// offered only the tools its plan admits; every proposal is validated,
-// authorised and executed deterministically before anything returns to
-// the model. No SQL, HTTP, shell or connector tool exists.
+// query ports and the same two authorities the firewall uses, plus the two
+// bounded public-web research tools when a research provider is composed.
+// A run is offered only the tools its plan admits; every proposal is
+// validated, authorised and executed deterministically before anything
+// returns to the model. No SQL, arbitrary HTTP, shell or connector tool
+// exists.
 const qTools = createQTools({
   ports: {
     companies,
@@ -311,6 +337,9 @@ const qTools = createQTools({
     investors,
     authorization,
     disclosure,
+    ...(researchComposition.research === undefined
+      ? {}
+      : { research: researchComposition.research }),
   },
   logger,
 });
@@ -361,6 +390,7 @@ const qIntelligence = composeQIntelligence({
   tools: qTools.port,
   gateway: modelGateway,
   embeddings: createProductionEmbeddingService(),
+  statements: researchComposition.statements,
   logger,
 });
 logger.info(

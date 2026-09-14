@@ -1,7 +1,10 @@
 import { loadEmbeddingConfig } from "@capital-q/config/embeddings";
 import type { DatabaseExecutor, TransactionManager } from "@capital-q/database";
 import type { ModelGateway } from "@capital-q/model-gateway";
-import { createModelGatewayQAnswer } from "@capital-q/model-gateway/q";
+import {
+  createModelGatewayQAnswer,
+  type QUserStatementRecorder,
+} from "@capital-q/model-gateway/q";
 import type { Logger } from "@capital-q/observability";
 import {
   createEmbeddingService,
@@ -26,6 +29,7 @@ import type {
 } from "@capital-q/q-runtime";
 import {
   createCompanyIntelligenceSpecialist,
+  createToolResearchPort,
   createKnowledgeCompanyPort,
   createRetrievalEvidencePort,
   createSpecialistQAnswer,
@@ -75,6 +79,11 @@ export type QIntelligenceDependencies = {
    * degradation; it never reaches for a paid embedding API instead.
    */
   readonly embeddings?: EmbeddingService | undefined;
+  /**
+   * Records a person's statement about their own company as their claim
+   * (CQ-Q-RESEARCH-001 §21). Absent means a proposed statement is not kept.
+   */
+  readonly statements?: QUserStatementRecorder | undefined;
   readonly logger?: Logger | undefined;
 };
 
@@ -129,6 +138,7 @@ export function composeQIntelligence(
     tools,
     gateway,
     embeddings,
+    statements,
     logger,
   } = dependencies;
 
@@ -172,6 +182,7 @@ export function composeQIntelligence(
     transactions,
     tools,
     context: evidence.context,
+    ...(statements === undefined ? {} : { statements }),
     ...(logger === undefined ? {} : { logger }),
   });
 
@@ -181,6 +192,11 @@ export function composeQIntelligence(
   const specialist = createCompanyIntelligenceSpecialist({
     gateway,
     canonical: createToolCanonicalPort(tools, logger),
+    // Public-web research through the same registry (CQ-Q-RESEARCH-001):
+    // present whether or not a provider is composed — the registry says
+    // "not offered" when none is, and the specialist answers accordingly.
+    research: createToolResearchPort(tools, logger),
+    ...(statements === undefined ? {} : { statements }),
     knowledge: createKnowledgeCompanyPort(knowledge),
     evidence: createRetrievalEvidencePort(retrievalService, logger),
     // The plan's ceiling, never a declaration made at composition time.
