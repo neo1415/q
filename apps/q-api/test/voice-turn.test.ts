@@ -395,6 +395,104 @@ describe("a spoken interview answer", () => {
   });
 });
 
+describe("a spoken category confirmation", () => {
+  it("accepts Q's pending proposal on the category step with the same ACCEPT the tap performs", async () => {
+    const requests: { url: string; method: string; body: unknown }[] = [];
+    const categoriesStep = view({
+      session: { ...view().session, currentStepKey: "F1.categories" },
+      currentStep: {
+        stepKey: "F1.categories",
+        stepType: "reference_select",
+        required: false,
+        prompt: "How would you categorise the company?",
+        presentation: {
+          stepType: "reference_select",
+          resourceType: "TAXONOMY_NODE",
+          vocabularyCodes: ["industry"],
+          minItems: 1,
+          maxItems: 8,
+        },
+      },
+      pendingSuggestions: [
+        {
+          id: "f0000000-0000-4000-8000-000000000040",
+          stepKey: "F1.categories",
+          targetField: "categories",
+          suggestedValue: {
+            type: "RESOURCE_REFERENCE",
+            resourceType: "TAXONOMY_NODE",
+            resourceIds: ["f0000000-0000-4000-8000-000000000041"],
+          },
+          confidence: "0.9",
+          status: "PENDING",
+          createdAt: NOW,
+        },
+      ],
+    });
+    const after = view({
+      session: {
+        ...view().session,
+        version: 4,
+        currentStepKey: "F2.materials",
+      },
+      currentStep: {
+        stepKey: "F4.founder_role",
+        stepType: "short_text",
+        required: true,
+        prompt: "What do you already have?",
+        presentation: { stepType: "short_text", minLength: 1, maxLength: 120 },
+      },
+    });
+    const fetchFake: typeof fetch = (input, init) => {
+      const url =
+        typeof input === "string"
+          ? input
+          : input instanceof URL
+            ? input.toString()
+            : input.url;
+      requests.push({
+        url,
+        method: init?.method ?? "GET",
+        body:
+          typeof init?.body === "string" ? JSON.parse(init.body) : undefined,
+      });
+      if (url.includes("/suggestions/")) {
+        return Promise.resolve(Response.json(after));
+      }
+      return Promise.resolve(Response.json(categoriesStep));
+    };
+    const runtime = fakeRuntime();
+    const handle = createVoiceTurnHandler({
+      qRuntime: runtime.service,
+      qStream: fakeStream([]),
+      onboarding: { apiBaseUrl: "http://api.test", fetch: fetchFake },
+      logger,
+    });
+    const speaker = fakeSpeaker();
+    const outcome = await handle(
+      binding({
+        conversationId: undefined,
+        subjects: undefined,
+        onboarding: { sessionId: SESSION_ID, journeyType: "founder" },
+      }),
+      [{ role: "user", content: "Yes, keep these." }],
+      new AbortController().signal,
+      speaker,
+    );
+    expect(outcome).toEqual({ kind: "SPOKEN", path: "INTERVIEW" });
+    expect(requests.map((r) => r.method)).toEqual(["GET", "POST"]);
+    expect(requests[1]?.url).toBe(
+      `http://api.test/v1/onboarding/sessions/${SESSION_ID}/suggestions/f0000000-0000-4000-8000-000000000040/resolve`,
+    );
+    expect(requests[1]?.body).toEqual({
+      resolution: "ACCEPT",
+      expectedSessionVersion: 3,
+    });
+    expect(speaker.spoken).toEqual(["Noted. What do you already have?"]);
+    expect(runtime.calls.createRun).toHaveLength(0);
+  });
+});
+
 describe("a spoken question for Q", () => {
   it("starts a VOICE run in the bound conversation, speaks it as it streams, and returns to the interview", async () => {
     const runtime = fakeRuntime();
@@ -502,6 +600,43 @@ describe("a spoken question for Q", () => {
       actor: CONTEXT,
       runId: RUN_ID,
     });
+  });
+
+  it("says it is looking at public sources when the run reaches that stage, once (D §56)", async () => {
+    const runtime = fakeRuntime();
+    const handle = createVoiceTurnHandler({
+      qRuntime: runtime.service,
+      qStream: fakeStream([
+        event("q.stage.changed", { stage: "SEARCHING_PUBLIC_SOURCES" }),
+        event("q.stage.changed", { stage: "SEARCHING_PUBLIC_SOURCES" }),
+        event("q.message.completed", {
+          message: {
+            messageId: "m1",
+            runId: RUN_ID,
+            role: "Q",
+            text: "Paystack raised a Series A in 2018.",
+            createdAt: NOW,
+          },
+        }),
+        event("q.run.completed", { status: "COMPLETED", completedAt: NOW }),
+      ]),
+      logger,
+    });
+    const speaker = fakeSpeaker();
+    await handle(
+      binding({
+        conversationId: undefined,
+        subjects: undefined,
+        onboarding: undefined,
+      }),
+      [{ role: "user", content: "What did Paystack raise?" }],
+      new AbortController().signal,
+      speaker,
+    );
+    expect(speaker.spoken).toEqual([
+      "Let me look at public sources.",
+      "Paystack raised a Series A in 2018.",
+    ]);
   });
 
   it("speaks a run's public failure and nothing internal", async () => {

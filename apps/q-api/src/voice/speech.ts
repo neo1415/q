@@ -99,3 +99,57 @@ export async function* bySentence(
     yield buffer.trim();
   }
 }
+
+/** Q says one short filler only when an answer is taking this long (D §53). */
+export const FILLER_AFTER_MS = 2_500;
+
+/**
+ * Yield the source's items, and — if the first one has not arrived after
+ * `afterMs` — one filler line first. At most one filler per turn, never
+ * a promise about time, nothing at all when the answer is quick. Stops
+ * when the signal aborts.
+ */
+export async function* withFiller(
+  source: AsyncIterable<string>,
+  options: {
+    readonly filler: string;
+    readonly afterMs?: number | undefined;
+    readonly signal?: AbortSignal | undefined;
+    readonly setTimeout?: typeof globalThis.setTimeout | undefined;
+    readonly clearTimeout?: typeof globalThis.clearTimeout | undefined;
+  },
+): AsyncGenerator<string> {
+  const schedule = options.setTimeout ?? globalThis.setTimeout;
+  const cancel = options.clearTimeout ?? globalThis.clearTimeout;
+  const iterator = source[Symbol.asyncIterator]();
+  let timer: ReturnType<typeof globalThis.setTimeout> | undefined;
+  const slow = new Promise<"slow">((resolve) => {
+    timer = schedule(() => resolve("slow"), options.afterMs ?? FILLER_AFTER_MS);
+  });
+  // Read through a call each time: the signal flips while this awaits, and
+  // a narrowed property read would be stale.
+  const isAborted = () => options.signal?.aborted === true;
+  const first = iterator.next();
+  const outcome = await Promise.race([
+    first.then(() => "first" as const),
+    slow,
+  ]);
+  if (outcome === "slow" && !isAborted()) {
+    yield options.filler;
+  }
+  const head = await first;
+  if (timer !== undefined) {
+    cancel(timer);
+  }
+  if ((head.done ?? false) || isAborted()) {
+    return;
+  }
+  yield head.value;
+  for (;;) {
+    const next = await iterator.next();
+    if ((next.done ?? false) || isAborted()) {
+      return;
+    }
+    yield next.value;
+  }
+}

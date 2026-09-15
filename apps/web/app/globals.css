@@ -102,6 +102,23 @@
     background: linear-gradient(to bottom, transparent, var(--cq-canvas) 28%);
   }
 
+  /*
+   * Q's presence while it thinks (CQ-Q-VOICE-001 D §46-§47): the ring
+   * breathes in opacity only. The global reduced-motion rule stills it.
+   */
+  @keyframes cq-presence-breathe {
+    0%,
+    100% {
+      opacity: 0.55;
+    }
+    50% {
+      opacity: 1;
+    }
+  }
+  .cq-presence-thinking {
+    animation: cq-presence-breathe 1.8s var(--cq-ease) infinite;
+  }
+
   .cq-bottom-nav {
     position: fixed;
     inset-inline: 0;

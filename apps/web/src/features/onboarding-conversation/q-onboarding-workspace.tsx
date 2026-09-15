@@ -11,6 +11,7 @@ import {
 import {
   isTerminalQStreamEvent,
   Q_VISIBLE_STAGE_LABELS,
+  QConversationIdSchema,
   type OnboardingResponseValue,
   type OnboardingUnderstanding,
 } from "@capital-q/contracts";
@@ -24,6 +25,8 @@ import { InlineNotice } from "@capital-q/ui/states";
 import type { TaxonomyCandidateView } from "../onboarding-kit/client";
 import type { SessionPresentation } from "../onboarding-kit/session";
 import { askQAction, readQRunAction } from "../q/actions";
+import { useVoiceInterview } from "../voice/use-voice-interview";
+import { VoicePanel } from "../voice/voice-panel";
 import {
   acknowledge,
   acknowledgeValue,
@@ -204,6 +207,25 @@ export function QOnboardingWorkspace({
   const push = useCallback((kind: Turn["kind"], text: string) => {
     setTurns((current) => [...current, { id: newId(), kind, text }]);
   }, []);
+
+  // Voice (CQ-Q-VOICE-001 D §44-§50; E §67-§74): the same interview,
+  // spoken. What the provider transcribes joins the thread as the person's
+  // words; what Q says aloud came from the runtime, so after each of Q's
+  // lines the session is re-read and the controls move on with it.
+  const refreshRef = useRef(actions.refresh);
+  useEffect(() => {
+    refreshRef.current = actions.refresh;
+  }, [actions.refresh]);
+  const voice = useVoiceInterview({
+    onLine: (line) => {
+      push(line.role === "user" ? "PERSON" : "Q", line.text);
+      if (line.role === "q") {
+        void refreshRef.current();
+      }
+    },
+  });
+  const voiceActive = voice.active;
+  const voiceSendText = voice.client.sendText;
 
   const prompt: QPrompt | null = useMemo(
     () =>
@@ -500,6 +522,11 @@ export function QOnboardingWorkspace({
       if (trimmed.length === 0) {
         return;
       }
+      if (voiceActive) {
+        // The spoken thread carries it: same runtime path, Q answers aloud.
+        voiceSendText(trimmed);
+        return;
+      }
       // The question Q was asking joins the thread with its answer, so the
       // exchange reads back as one; the live prompt below then moves on.
       if (prompt !== null) {
@@ -539,7 +566,16 @@ export function QOnboardingWorkspace({
         setReadingPolls(0);
       }
     },
-    [prompt, push, settleReading, askQ, handleUnderstanding, actions],
+    [
+      prompt,
+      push,
+      settleReading,
+      askQ,
+      handleUnderstanding,
+      actions,
+      voiceActive,
+      voiceSendText,
+    ],
   );
 
   /**
@@ -551,6 +587,10 @@ export function QOnboardingWorkspace({
   const submitChip = useCallback(
     async (chip: QuickChip, spoken?: string) => {
       if (prompt === null) {
+        return;
+      }
+      if (voiceActive) {
+        voiceSendText(spoken ?? chip.say);
         return;
       }
       if (chip.value === undefined) {
@@ -569,7 +609,16 @@ export function QOnboardingWorkspace({
         push("Q", acknowledgeValue(prompt.stepKey, chip.value, vocabulary));
       }
     },
-    [prompt, say, push, settleReading, actions, vocabulary],
+    [
+      prompt,
+      say,
+      push,
+      settleReading,
+      actions,
+      vocabulary,
+      voiceActive,
+      voiceSendText,
+    ],
   );
 
   const submitPicks = useCallback(async () => {
@@ -583,6 +632,10 @@ export function QOnboardingWorkspace({
     const chosen = prompt.chips.filter(
       (chip) => chip.optionKey !== undefined && picks.includes(chip.optionKey),
     );
+    if (voiceActive) {
+      voiceSendText(chosen.map((chip) => chip.label).join(", "));
+      return;
+    }
     push("Q", prompt.text);
     push("PERSON", chosen.map((chip) => chip.label).join(", "));
     settleReading();
@@ -590,7 +643,16 @@ export function QOnboardingWorkspace({
     if (ok) {
       push("Q", acknowledgeValue(prompt.stepKey, value, vocabulary));
     }
-  }, [prompt, picks, push, settleReading, actions, vocabulary]);
+  }, [
+    prompt,
+    picks,
+    push,
+    settleReading,
+    actions,
+    vocabulary,
+    voiceActive,
+    voiceSendText,
+  ]);
 
   const togglePick = (chip: QuickChip) => {
     const key = chip.optionKey;
@@ -625,6 +687,17 @@ export function QOnboardingWorkspace({
       resourceIds: keptTaxonomy.map((node) => node.nodeId),
     };
     const spoken = keptTaxonomy.map((node) => node.label).join(", ");
+    if (
+      voiceActive &&
+      taxonomy !== null &&
+      sameSet(
+        taxonomy.nodes.map((node) => node.nodeId),
+        value.resourceIds,
+      )
+    ) {
+      voiceSendText("Keep these");
+      return;
+    }
     push("Q", prompt.text);
     push("PERSON", spoken);
     settleReading();
@@ -645,6 +718,9 @@ export function QOnboardingWorkspace({
     if (ok) {
       push("Q", `${vocabulary.stepTitle(prompt.stepKey)}: ${spoken}. Noted.`);
     }
+    if (ok && voiceActive) {
+      voiceSendText("Let's continue.");
+    }
   }, [
     prompt,
     keptTaxonomy,
@@ -653,6 +729,8 @@ export function QOnboardingWorkspace({
     settleReading,
     actions,
     vocabulary,
+    voiceActive,
+    voiceSendText,
   ]);
 
   const toggleTaxonomy = (node: {
@@ -728,6 +806,37 @@ export function QOnboardingWorkspace({
     }
   };
 
+  const talkWithQ = async () => {
+    if (view === undefined) {
+      return;
+    }
+    const conversationId = QConversationIdSchema.safeParse(
+      qConversationId.current,
+    ).data;
+    await voice.talk({
+      thread: {
+        onboarding: {
+          sessionId: view.session.id,
+          journeyType: vocabulary.subject,
+        },
+        ...(qSubject === undefined
+          ? {}
+          : {
+              subjects: [
+                "companyId" in qSubject
+                  ? { kind: "COMPANY" as const, companyId: qSubject.companyId }
+                  : {
+                      kind: "INVESTOR_ORGANISATION" as const,
+                      investorOrganisationId: qSubject.investorOrganisationId,
+                    },
+              ],
+            }),
+        ...(conversationId === undefined ? {} : { conversationId }),
+      },
+      firstMessage: prompt === null || isFinal ? undefined : prompt.text,
+    });
+  };
+
   if (view === undefined) {
     return (
       <InlineNotice tone="info" title="Q can't lead this setup on this build.">
@@ -771,6 +880,28 @@ export function QOnboardingWorkspace({
 
   return (
     <div className="flex flex-col gap-4 pb-28" data-q-onboarding-workspace>
+      {voice.active ? (
+        <VoicePanel
+          client={voice.client}
+          detail={
+            reading && !readingLanded && !readingTimedOut
+              ? "Reading what you said"
+              : undefined
+          }
+          voice={voice.voice}
+          voices={["FEMALE", "MALE"]}
+          onChooseVoice={(choice) => void voice.chooseVoice(choice)}
+          onEnd={() => void voice.end()}
+          notice={voice.notice}
+          onDismissNotice={voice.clearNotice}
+        />
+      ) : voice.notice !== null ? (
+        <InlineNotice tone="warning" title={voice.notice}>
+          <Button size="compact" variant="quiet" onClick={voice.clearNotice}>
+            Dismiss
+          </Button>
+        </InlineNotice>
+      ) : null}
       <ProgressStrip lines={progress} />
 
       <ol className="flex flex-col gap-4" aria-live="polite">
@@ -1067,6 +1198,10 @@ export function QOnboardingWorkspace({
                 variant="quiet"
                 disabled={working}
                 onClick={() => {
+                  if (voiceActive) {
+                    voiceSendText("Skip this one");
+                    return;
+                  }
                   push("Q", prompt.text);
                   push("PERSON", "Skip this one");
                   settleReading();
@@ -1155,13 +1290,25 @@ export function QOnboardingWorkspace({
       ) : null}
 
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <Button
-          size="compact"
-          variant="quiet"
-          onClick={() => setShowReview((current) => !current)}
-        >
-          {showReview ? "Hide what Q knows" : "Review what Q knows"}
-        </Button>
+        <span className="flex flex-wrap items-center gap-2">
+          {!voice.active && prompt !== null && !isFinal ? (
+            <Button
+              size="compact"
+              variant="secondary"
+              onClick={() => void talkWithQ()}
+              data-q-talk
+            >
+              Talk with Q
+            </Button>
+          ) : null}
+          <Button
+            size="compact"
+            variant="quiet"
+            onClick={() => setShowReview((current) => !current)}
+          >
+            {showReview ? "Hide what Q knows" : "Review what Q knows"}
+          </Button>
+        </span>
         {prompt !== null && prompt.control !== "editor" ? (
           <Button
             size="compact"

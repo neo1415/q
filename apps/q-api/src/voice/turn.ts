@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 
 import {
   getOnboardingSession,
+  resolveOnboardingSuggestion,
   sayToOnboarding,
   type ApiSession,
 } from "@capital-q/api-client";
@@ -29,7 +30,7 @@ import type {
 
 import type { VoiceSessionBinding } from "./bindings.js";
 import type { VoiceSpeaker, VoiceTranscriptTurn } from "./provider.js";
-import { bounded, bySentence, speakable } from "./speech.js";
+import { bounded, bySentence, speakable, withFiller } from "./speech.js";
 
 /**
  * One spoken turn (CQ-Q-VOICE-001 C §35-§40).
@@ -76,6 +77,14 @@ export type VoiceTurnHandler = (
 
 const VOICE_TURN_MAX_CHARS = 2_000;
 
+/** "Keep these" / "yes" / "looks right" on a category step with a proposal (B §19 aloud). */
+const AFFIRMATIVE =
+  /^(?:(?:yes|yep|yeah|sure|ok(?:ay)?|right|correct|exactly|perfect)[,.!\s]*)*(?:yes|yep|yeah|sure|ok(?:ay)?|right|correct|exactly|perfect|keep (?:these|those|them|it|all(?: of them)?)|(?:that'?s|those are|these are|they'?re) (?:right|correct|fine|good|it|the ones)|looks? (?:right|good|correct)|(?:all )?good|go (?:with|for) (?:these|those|them|that))[.!\s]*$/i;
+
+/** Fillers are contextual and few (D §53-§54): one per slow turn, never a time promise. */
+const FILLER_THINKING = "Let me check that.";
+const FILLER_RESEARCH = "Let me look at public sources.";
+
 /** The person's latest words: the last user line, bounded like a typed turn. */
 export function latestUtterance(
   transcript: readonly VoiceTranscriptTurn[],
@@ -121,6 +130,27 @@ function currentOptions(view: OnboardingSessionView): readonly string[] {
     case "reference_select":
       return [];
   }
+}
+
+/** The pending category proposal for the step Q is asking, if any. */
+function pendingTaxonomyProposal(view: OnboardingSessionView): string | null {
+  const step = view.currentStep;
+  if (
+    step === null ||
+    step.presentation.stepType !== "reference_select" ||
+    step.presentation.resourceType !== "TAXONOMY_NODE"
+  ) {
+    return null;
+  }
+  const pending = view.pendingSuggestions
+    .filter(
+      (suggestion) =>
+        suggestion.stepKey === step.stepKey &&
+        suggestion.suggestedValue.type === "RESOURCE_REFERENCE" &&
+        suggestion.suggestedValue.resourceType === "TAXONOMY_NODE",
+    )
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  return pending[0]?.id ?? null;
 }
 
 /** The question Q asks next, spoken, when the interview moved on. */
@@ -255,6 +285,7 @@ export function createVoiceTurnHandler(
 
     let terminal = false;
     let streamedDeltas = false;
+    let saidResearch = false;
     const record = await qStream.authorize(actor, runId, correlationId);
     async function* answer(): AsyncGenerator<string> {
       for await (const item of qStream.open({
@@ -293,8 +324,18 @@ export function createVoiceTurnHandler(
           case "q.run.completed":
             terminal = true;
             return;
-          case "q.run.started":
           case "q.stage.changed":
+            // The one stage worth a spoken word: research takes seconds,
+            // and "Looking at public sources" is the approved label (D §56).
+            if (
+              event.data.stage === "SEARCHING_PUBLIC_SOURCES" &&
+              !saidResearch
+            ) {
+              saidResearch = true;
+              yield `${FILLER_RESEARCH} `;
+            }
+            break;
+          case "q.run.started":
           case "q.finding.available":
           case "q.action.proposed":
             break;
@@ -303,7 +344,12 @@ export function createVoiceTurnHandler(
     }
 
     try {
-      await speaker.speak(bySentence(answer(), signal));
+      await speaker.speak(
+        withFiller(bySentence(answer(), signal), {
+          filler: FILLER_THINKING,
+          signal,
+        }),
+      );
     } finally {
       if (signal.aborted && !terminal) {
         // Barge-in: the run stops through its own lifecycle, at its next
@@ -364,6 +410,25 @@ export function createVoiceTurnHandler(
       return (await speakLine(speaker, line, signal))
         ? { kind: "SPOKEN", path: "MOVE" }
         : { kind: "INTERRUPTED", path: "MOVE" };
+    }
+    const proposal = pendingTaxonomyProposal(before);
+    if (proposal !== null && AFFIRMATIVE.test(text)) {
+      // "Keep these": the same ACCEPT the tap performs (B §19), spoken.
+      const view = await resolveOnboardingSuggestion(
+        session,
+        onboarding.sessionId,
+        proposal,
+        {
+          resolution: "ACCEPT",
+          expectedSessionVersion: before.session.version,
+        },
+        randomUUID(),
+      );
+      const next = nextQuestion(before, view);
+      const line = next.length === 0 ? "Noted." : `Noted. ${next}`;
+      return (await speakLine(speaker, line, signal))
+        ? { kind: "SPOKEN", path: "INTERVIEW" }
+        : { kind: "INTERRUPTED", path: "INTERVIEW" };
     }
     if (looksLikeQuestionForQ(text)) {
       const outcome = await askQ(binding, text, signal, speaker);

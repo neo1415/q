@@ -49,6 +49,8 @@ test.describe("Q-led onboarding interview (desktop, real API)", () => {
       workspace(page).getByRole("button", { name: "Answer", exact: true }),
     ).toHaveCount(0);
     await expect(composer(page)).toBeEnabled();
+    // Voice is one tap away and never in the way (CQ-Q-VOICE-001 D §44).
+    await expect(chip(page, "Talk with Q")).toBeVisible();
 
     // F0 — a single tap submits the option and Q moves on.
     await chip(page, "I'm raising for a company").click();

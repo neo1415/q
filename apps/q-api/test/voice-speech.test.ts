@@ -6,6 +6,7 @@ import {
   sentences,
   SPOKEN_MAX_CHARS,
   speakable,
+  withFiller,
 } from "../src/voice/speech.js";
 
 /**
@@ -100,5 +101,52 @@ describe("bySentence", () => {
       ),
     );
     expect(spoken).toEqual(["First sentence."]);
+  });
+});
+
+describe("withFiller (D §53)", () => {
+  async function* slow(parts: readonly string[], gate: Promise<void>) {
+    await gate;
+    for (const part of parts) {
+      yield part;
+    }
+  }
+
+  it("says nothing extra when the answer is quick", async () => {
+    const spoken = await collect(
+      withFiller(deltas(["Seed."]), {
+        filler: "Let me check that.",
+        afterMs: 2_500,
+        setTimeout: () => 0 as never,
+        clearTimeout: () => undefined,
+      }),
+    );
+    expect(spoken).toEqual(["Seed."]);
+  });
+
+  it("says one filler when the first words take too long, then the answer", async () => {
+    let release: () => void = () => undefined;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let fire: () => void = () => undefined;
+    const spoken = collect(
+      withFiller(slow(["Seed rounds run from $500k."], gate), {
+        filler: "Let me check that.",
+        afterMs: 2_500,
+        setTimeout: ((callback: () => void) => {
+          fire = callback;
+          return 1 as never;
+        }) as never,
+        clearTimeout: () => undefined,
+      }),
+    );
+    fire();
+    await Promise.resolve();
+    release();
+    expect(await spoken).toEqual([
+      "Let me check that.",
+      "Seed rounds run from $500k.",
+    ]);
   });
 });
