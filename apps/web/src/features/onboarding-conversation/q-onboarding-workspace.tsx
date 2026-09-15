@@ -895,7 +895,31 @@ export function QOnboardingWorkspace({
           notice={voice.notice}
           onDismissNotice={voice.clearNotice}
         />
-      ) : voice.notice !== null ? (
+      ) : (
+        <div
+          className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-(--cq-border-subtle) bg-(--cq-surface) px-4 py-3"
+          data-q-voice-entry
+        >
+          <div className="flex min-w-0 flex-col">
+            <span className="cq-label text-(--cq-text-primary)">
+              Prefer to talk?
+            </span>
+            <span className="cq-caption text-(--cq-text-secondary)">
+              Q asks the same questions aloud; you can still tap or type.
+            </span>
+          </div>
+          <Button
+            variant="primary"
+            size="compact"
+            disabled={prompt === null || isFinal}
+            onClick={() => void talkWithQ()}
+            data-q-talk
+          >
+            Talk with Q
+          </Button>
+        </div>
+      )}
+      {!voice.active && voice.notice !== null ? (
         <InlineNotice tone="warning" title={voice.notice}>
           <Button size="compact" variant="quiet" onClick={voice.clearNotice}>
             Dismiss
@@ -1290,25 +1314,13 @@ export function QOnboardingWorkspace({
       ) : null}
 
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <span className="flex flex-wrap items-center gap-2">
-          {!voice.active && prompt !== null && !isFinal ? (
-            <Button
-              size="compact"
-              variant="secondary"
-              onClick={() => void talkWithQ()}
-              data-q-talk
-            >
-              Talk with Q
-            </Button>
-          ) : null}
-          <Button
-            size="compact"
-            variant="quiet"
-            onClick={() => setShowReview((current) => !current)}
-          >
-            {showReview ? "Hide what Q knows" : "Review what Q knows"}
-          </Button>
-        </span>
+        <Button
+          size="compact"
+          variant="quiet"
+          onClick={() => setShowReview((current) => !current)}
+        >
+          {showReview ? "Hide what Q knows" : "Review what Q knows"}
+        </Button>
         {prompt !== null && prompt.control !== "editor" ? (
           <Button
             size="compact"

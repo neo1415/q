@@ -4,6 +4,13 @@ Owner: `apps/q-api/src/voice/` (server), `apps/web/src/features/voice/`
 (browser). Decision: [ADR 0010](../adr/0010-realtime-voice-through-a-speech-engine.md).
 Packet: CQ-Q-VOICE-001 C-F.
 
+## Where to find it
+
+- **Home** (`/home`): the Q panel shows "Prefer to talk? — Talk with Q" above the thread. Voice joins the conversation the tab is already in and is bound to your company or organisation.
+- **Founder / investor setup** (`/onboarding/founder`, `/onboarding/investor`): the same card sits at the top of the Q-led interview, above progress. Q asks the live question aloud; tapping, typing and speaking all reach the same session.
+
+Until the Speech Engine is set up for the environment (see Local development), the button answers "Voice isn't available on this build yet." and nothing else changes.
+
 ## What it is
 
 One Q, spoken. ElevenLabs Speech Engine carries the microphone, speech

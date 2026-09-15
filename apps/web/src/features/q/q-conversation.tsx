@@ -1,16 +1,25 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { describeQStreamTransport } from "@capital-q/api-client";
+import { QConversationIdSchema } from "@capital-q/contracts";
 import { Button } from "@capital-q/ui/button";
 import { QComposer } from "@capital-q/ui/q-composer";
 import { QStateIndicator } from "@capital-q/ui/q-state";
 import { InlineNotice } from "@capital-q/ui/states";
 import type { ContextScope } from "@capital-q/ui/tokens";
 
+import { useVoiceInterview } from "../voice/use-voice-interview";
+import { VoicePanel } from "../voice/voice-panel";
 import { failureMessage, turnsFrom, workingLabel } from "./conversation";
 import { useQConversation } from "./use-q-conversation";
+
+type SpokenLine = {
+  readonly id: string;
+  readonly role: "user" | "q";
+  readonly text: string;
+};
 
 /**
  * Q, in the browser (CQ-C5-R1 §13-§19; CQ-PRE-REC-001 §12-§13).
@@ -58,6 +67,47 @@ export function QConversationPanel({
   const turns = turnsFrom(q.state, q.pending);
   const endRef = useRef<HTMLDivElement>(null);
 
+  // Voice (CQ-Q-VOICE-001): the same Q conversation, spoken. The credential
+  // is bound on the server to this person, this subject and the
+  // conversation this tab is already in; what is said either way is one
+  // thread. Spoken lines are shown as they are transcribed.
+  const [spoken, setSpoken] = useState<readonly SpokenLine[]>([]);
+  const voice = useVoiceInterview({
+    onLine: (line) => {
+      setSpoken((current) => [
+        ...current,
+        { id: line.id, role: line.role, text: line.text },
+      ]);
+    },
+  });
+  const talkWithQ = async () => {
+    const conversationId = QConversationIdSchema.safeParse(
+      q.conversationId ?? undefined,
+    ).data;
+    await voice.talk({
+      thread: {
+        ...(context.companyId !== undefined
+          ? {
+              subjects: [
+                { kind: "COMPANY" as const, companyId: context.companyId },
+              ],
+            }
+          : context.investorOrganisationId !== undefined
+            ? {
+                subjects: [
+                  {
+                    kind: "INVESTOR_ORGANISATION" as const,
+                    investorOrganisationId: context.investorOrganisationId,
+                  },
+                ],
+              }
+            : {}),
+        ...(conversationId === undefined ? {} : { conversationId }),
+      },
+      firstMessage: "I'm listening. What would you like to know?",
+    });
+  };
+
   useEffect(() => {
     // Follow the answer as it arrives, and respect a reader who has asked
     // for less motion. `nearest` scrolls only when the end of the
@@ -68,7 +118,7 @@ export function QConversationPanel({
         : "smooth",
       block: "nearest",
     });
-  }, [turns.length, q.state.partial?.text]);
+  }, [turns.length, spoken.length, q.state.partial?.text]);
 
   const stage = workingLabel(q.state);
   // Suggestions are an on-ramp, not a feature: gone after the first turn.
@@ -77,6 +127,73 @@ export function QConversationPanel({
 
   return (
     <div className="flex flex-col gap-4" data-q-workspace>
+      {voice.active ? (
+        <VoicePanel
+          client={voice.client}
+          voice={voice.voice}
+          voices={["FEMALE", "MALE"]}
+          onChooseVoice={(choice) => void voice.chooseVoice(choice)}
+          onEnd={() => void voice.end()}
+          notice={voice.notice}
+          onDismissNotice={voice.clearNotice}
+        />
+      ) : connected ? (
+        <div
+          className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-(--cq-border-subtle) bg-(--cq-surface) px-4 py-3"
+          data-q-voice-entry
+        >
+          <div className="flex min-w-0 flex-col">
+            <span className="cq-label text-(--cq-text-primary)">
+              Prefer to talk?
+            </span>
+            <span className="cq-caption text-(--cq-text-secondary)">
+              Ask Q aloud; you can still type.
+            </span>
+          </div>
+          <Button
+            variant="primary"
+            size="compact"
+            onClick={() => void talkWithQ()}
+            data-q-talk
+          >
+            Talk with Q
+          </Button>
+        </div>
+      ) : null}
+      {!voice.active && voice.notice !== null ? (
+        <InlineNotice tone="warning" title={voice.notice}>
+          <Button size="compact" variant="quiet" onClick={voice.clearNotice}>
+            Dismiss
+          </Button>
+        </InlineNotice>
+      ) : null}
+      {spoken.length > 0 ? (
+        <ol className="flex flex-col gap-4" aria-label="Spoken">
+          {spoken.map((line) => (
+            <li
+              key={line.id}
+              className={
+                line.role === "user"
+                  ? "flex flex-col items-end gap-1"
+                  : "flex flex-col gap-1"
+              }
+            >
+              <span className="cq-label text-(--cq-text-tertiary)">
+                {line.role === "user" ? "You" : "Q"}
+              </span>
+              <p
+                className={
+                  line.role === "user"
+                    ? "cq-body max-w-(--cq-layout-narrow) rounded-lg bg-(--cq-surface-sunken) px-3 py-2 text-(--cq-text-primary)"
+                    : "cq-body max-w-(--cq-layout-narrow) whitespace-pre-wrap text-(--cq-text-primary)"
+                }
+              >
+                {line.text}
+              </p>
+            </li>
+          ))}
+        </ol>
+      ) : null}
       {turns.length > 0 ? (
         <ol className="flex flex-col gap-4" aria-live="polite">
           {turns.map((turn) => (
@@ -174,7 +291,15 @@ export function QConversationPanel({
           contextScope={context.scope}
           contextDetail={context.label}
           disabled={q.working}
-          {...(connected ? { onSubmit: q.ask } : {})}
+          {...(connected
+            ? {
+                onSubmit: voice.active
+                  ? (text: string) => {
+                      voice.client.sendText(text);
+                    }
+                  : q.ask,
+              }
+            : {})}
         />
       </div>
     </div>

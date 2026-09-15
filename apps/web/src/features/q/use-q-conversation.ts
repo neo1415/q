@@ -114,6 +114,8 @@ export type QConversation = {
   /** Something that went wrong outside the stream. Plain wording only. */
   readonly notice: string | null;
   readonly runId: string | null;
+  /** The conversation this tab is in, once the server has named it. */
+  readonly conversationId: string | null;
   readonly ask: (question: string) => Promise<void>;
   readonly stop: () => Promise<void>;
 };
@@ -139,6 +141,9 @@ export function useQConversation(
   const [streaming, setStreaming] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [runId, setRunId] = useState<string | null>(null);
+  const [conversationIdState, setConversationIdState] = useState<string | null>(
+    null,
+  );
 
   const conversationId = useRef<string | null>(null);
   const openRun = useRef<string | null>(null);
@@ -212,6 +217,7 @@ export function useQConversation(
         rememberRuns(runIds.current);
         openRun.current = last.runId;
         conversationId.current = last.conversationId ?? null;
+        setConversationIdState(conversationId.current);
         setRunId(last.runId);
         setHistory(readable.flatMap((run) => run.messages ?? []));
         // A run still in flight keeps streaming; a finished one does not
@@ -288,6 +294,7 @@ export function useQConversation(
         finished.current = false;
         conversationId.current =
           started.value.conversationId ?? conversationId.current;
+        setConversationIdState(conversationId.current);
         openRun.current = started.value.runId;
         runIds.current = [...runIds.current, started.value.runId];
         setRunId(started.value.runId);
@@ -327,6 +334,7 @@ export function useQConversation(
     working: submitting || streaming,
     notice,
     runId,
+    conversationId: conversationIdState,
     ask,
     stop,
   };
