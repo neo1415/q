@@ -9,6 +9,10 @@
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     },
+    "./interview": {
+      "types": "./dist/domain/interview-moves.d.ts",
+      "default": "./dist/domain/interview-moves.js"
+    },
     "./contracts": {
       "types": "./dist/contracts/index.d.ts",
       "default": "./dist/contracts/index.js"

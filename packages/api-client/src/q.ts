@@ -1,6 +1,8 @@
 import {
   AppendQRunMessageResponseSchema,
   CreateQRunResponseSchema,
+  CreateQVoiceSessionResponseSchema,
+  Q_VOICE_SESSIONS_PATH,
   IDEMPOTENCY_KEY_HEADER,
   Q_APPROVAL_APPROVE_SUFFIX,
   Q_APPROVAL_REJECT_SUFFIX,
@@ -12,6 +14,7 @@ import {
   QRunSummarySchema,
   type AppendQRunMessageRequest,
   type CreateQRunRequest,
+  type CreateQVoiceSessionRequest,
   type RejectQApprovalRequest,
 } from "@capital-q/contracts";
 
@@ -121,6 +124,25 @@ export function rejectQApproval(
     "POST",
     `${approvalPath(approvalId)}${Q_APPROVAL_REJECT_SUFFIX}`,
     QApprovalViewSchema,
+    { body: input },
+  );
+}
+
+/**
+ * `POST /v1/q/voice/sessions` (CQ-Q-VOICE-001 C) — an ephemeral, scoped
+ * credential for one microphone session, bound on the server to the actor
+ * and the thread the person is in. It grants audio transport and nothing
+ * in Capital Q; the provider API key never leaves the Q API.
+ */
+export function createQVoiceSession(
+  session: ApiSession,
+  input: CreateQVoiceSessionRequest,
+) {
+  return call(
+    session,
+    "POST",
+    Q_VOICE_SESSIONS_PATH,
+    CreateQVoiceSessionResponseSchema,
     { body: input },
   );
 }

@@ -119,6 +119,7 @@ export {
   approveQApproval,
   cancelQRun,
   createQRun,
+  createQVoiceSession,
   getQApproval,
   getQRun,
   rejectQApproval,

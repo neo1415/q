@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "Capital Q web application \u00e2\u20ac\u201d Next.js App Router composition root.",
+  "description": "Capital Q web application â€” Next.js App Router composition root.",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -18,7 +18,9 @@
     "@capital-q/contracts": "workspace:*",
     "@capital-q/founder-onboarding": "workspace:*",
     "@capital-q/investor-onboarding": "workspace:*",
+    "@capital-q/onboarding": "workspace:*",
     "@capital-q/ui": "workspace:*",
+    "@elevenlabs/react": "1.15.2",
     "@supabase/ssr": "0.12.5",
     "@supabase/supabase-js": "2.114.0",
     "geist": "1.7.2",

@@ -238,3 +238,13 @@ export {
   type CorrectionIntent,
 } from "./domain/resolution/correction.js";
 export type { OnboardingTaxonomyResolver } from "./application/ports.js";
+export {
+  BRIDGE_LINE,
+  INTERVIEW_WHY,
+  looksLikeQuestionForQ,
+  PAUSED_LINE,
+  pauseIntent,
+  resumeIntent,
+  TAKE_YOUR_TIME_LINE,
+  thinkingIntent,
+} from "./domain/interview-moves.js";

@@ -22,6 +22,13 @@ import {
   type ResearchProviderSecrets,
 } from "./research-providers.js";
 import {
+  speechProviderEnvShape,
+  toSpeechEngineIds,
+  toSpeechProviderSecrets,
+  type SpeechEngineIds,
+  type SpeechProviderSecrets,
+} from "./speech-providers.js";
+import {
   supabaseAuthEnvShape,
   toSupabaseAuthConfig,
   type SupabaseAuthConfig,
@@ -47,6 +54,13 @@ const qApiEnvSchema = z.object({
   // Public-web research provider key (CQ-Q-RESEARCH-001). Optional: without
   // it the research tools are not composed and Q answers from Capital Q alone.
   ...researchProviderEnvShape,
+  // Realtime speech provider (CQ-Q-VOICE-001 C). Optional: without the key
+  // and a Speech Engine id the voice routes are not registered.
+  ...speechProviderEnvShape,
+  // Where the application API is, so a spoken interview answer reaches the
+  // same onboarding session a typed one does. Optional: without it voice
+  // carries Q conversations only.
+  CQ_API_URL: z.string().url("expected an absolute http(s) URL").optional(),
 });
 
 /**
@@ -60,6 +74,15 @@ export type QApiSecrets = {
   readonly modelProviders: ModelProviderSecrets;
   /** Server-only. Read once by the research adapter at composition. */
   readonly researchProviders: ResearchProviderSecrets;
+  /** Server-only. Read once by the speech adapter at composition. */
+  readonly speechProviders: SpeechProviderSecrets;
+};
+
+export type QApiVoiceConfig = {
+  /** The Speech Engine resources this environment speaks through; absent means no voice. */
+  readonly speechEngines: SpeechEngineIds | undefined;
+  /** The application API origin for spoken interview turns; absent means Q conversations only. */
+  readonly apiBaseUrl: string | undefined;
 };
 
 export type QApiPublicConfig = Readonly<Record<string, never>>;
@@ -71,6 +94,7 @@ export type QApiConfig = {
   /** Supabase Auth verification settings; absent means "not configured". */
   readonly supabaseAuth: SupabaseAuthConfig | undefined;
   readonly public: QApiPublicConfig;
+  readonly voice: QApiVoiceConfig;
   readonly secrets: QApiSecrets;
 };
 
@@ -91,9 +115,14 @@ export function parseQApiConfig(env: EnvironmentInput): QApiConfig {
           })
         : undefined,
     public: {},
+    voice: {
+      speechEngines: toSpeechEngineIds(parsed),
+      apiBaseUrl: parsed.CQ_API_URL?.replace(/\/$/, ""),
+    },
     secrets: {
       modelProviders: toModelProviderSecrets(parsed),
       researchProviders: toResearchProviderSecrets(parsed),
+      speechProviders: toSpeechProviderSecrets(parsed),
     },
   };
 }

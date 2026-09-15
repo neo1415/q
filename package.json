@@ -54,7 +54,8 @@
     "knowledge:claims:smoke": "node scripts/knowledge-claims-smoke.mjs",
     "knowledge:write:smoke": "node scripts/knowledge-write-smoke.mjs",
     "knowledge:temporal:smoke": "node scripts/knowledge-temporal-smoke.mjs",
-    "q:company-intelligence:smoke": "node scripts/q-company-intelligence-smoke.mjs"
+    "q:company-intelligence:smoke": "node scripts/q-company-intelligence-smoke.mjs",
+    "voice:setup": "node --import ./scripts/dev-env.mjs apps/q-api/src/dev/voice-setup.ts"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

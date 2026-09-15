@@ -29,6 +29,10 @@
       "types": "./dist/database.d.ts",
       "default": "./dist/database.js"
     },
+    "./speech-providers": {
+      "types": "./dist/speech-providers.d.ts",
+      "default": "./dist/speech-providers.js"
+    },
     "./supabase-auth": {
       "types": "./dist/supabase-auth.d.ts",
       "default": "./dist/supabase-auth.js"

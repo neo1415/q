@@ -42,6 +42,8 @@ import {
 } from "@capital-q/network";
 import { modelProviderConfigStatus } from "@capital-q/config/model-providers";
 import { researchProviderConfigStatus } from "@capital-q/config/research-providers";
+import { speechProviderConfigStatus } from "@capital-q/config/speech-providers";
+import { Q_VOICE_WS_PATH } from "@capital-q/contracts";
 import {
   createModelGateway,
   createModelProviderRegistry,
@@ -108,6 +110,10 @@ import {
 } from "./composition/q-intelligence.js";
 import { composeResearch } from "./composition/research.js";
 import { createSupabaseRequestAuthenticator } from "./security/supabase-authenticator.js";
+import { attachVoiceChannel } from "./voice/attach.js";
+import { createVoiceSessionBindings } from "./voice/bindings.js";
+import { createElevenLabsVoiceProvider } from "./voice/providers/elevenlabs.js";
+import { createVoiceTurnHandler } from "./voice/turn.js";
 
 // Q configuration is loaded from its own schema, separate from the application
 // API even where the current fields coincide.
@@ -439,6 +445,31 @@ await createOrphanedRunSweep({
   logger,
 }).sweep();
 
+// The realtime voice channel (CQ-Q-VOICE-001 C): ElevenLabs as the Speech
+// Engine, composed only when its key and a Speech Engine id are configured.
+// The key is revealed here, once, and handed to the adapter; the channel
+// itself is attached to the HTTP server below, after it listens, on the
+// route the Speech Engine resource points at. Without the application API
+// origin, spoken turns carry Q conversations only.
+const speechSecrets = config.secrets.speechProviders;
+const speechEngines = config.voice.speechEngines;
+const voiceProvider =
+  speechSecrets.elevenLabs !== undefined && speechEngines !== undefined
+    ? createElevenLabsVoiceProvider({
+        apiKey: speechSecrets.elevenLabs.reveal(),
+        speechEngines,
+      })
+    : undefined;
+const voiceBindings = createVoiceSessionBindings();
+logger.info(
+  {
+    speech: speechProviderConfigStatus(speechSecrets, speechEngines),
+    interviewApi:
+      config.voice.apiBaseUrl === undefined ? "unconfigured" : "configured",
+  },
+  "voice channel composed",
+);
+
 const { app, logger: appLogger } = createApp(
   config,
   {
@@ -452,6 +483,9 @@ const { app, logger: appLogger } = createApp(
     orchestration: { orchestrator, autostart: Q_ORCHESTRATION_AUTOSTART },
     qActions,
     qStream: { service: qStream },
+    ...(voiceProvider === undefined
+      ? {}
+      : { voice: { provider: voiceProvider, bindings: voiceBindings } }),
   },
 );
 
@@ -465,6 +499,29 @@ await app.listen({
   port: config.network.port,
   host: config.network.host,
 });
+
+if (voiceProvider !== undefined) {
+  const apiBaseUrl = config.voice.apiBaseUrl;
+  const voiceChannel = await attachVoiceChannel(app.server, Q_VOICE_WS_PATH, {
+    provider: voiceProvider,
+    bindings: voiceBindings,
+    turn: createVoiceTurnHandler({
+      qRuntime,
+      qStream,
+      orchestration: { orchestrator, autostart: Q_ORCHESTRATION_AUTOSTART },
+      ...(apiBaseUrl === undefined ? {} : { onboarding: { apiBaseUrl } }),
+      logger,
+    }),
+    logger,
+  });
+  app.addHook("onClose", async () => {
+    await voiceChannel.close();
+  });
+  appLogger.info(
+    { path: Q_VOICE_WS_PATH, voices: voiceProvider.voices },
+    "voice channel attached",
+  );
+}
 
 appLogger.info(
   { host: config.network.host, port: config.network.port },

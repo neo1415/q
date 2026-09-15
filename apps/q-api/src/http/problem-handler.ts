@@ -23,6 +23,7 @@ import {
   QSubjectUnsupportedError,
 } from "@capital-q/q-runtime";
 
+import { VoiceSessionLimitError } from "../voice/bindings.js";
 import { QStreamLimitError } from "./q-events.js";
 import {
   QActionAlreadyCompletedError,
@@ -263,7 +264,10 @@ function toProblem(error: unknown, requestId: string): ProblemDetails {
     });
   }
 
-  if (error instanceof QStreamLimitError) {
+  if (
+    error instanceof QStreamLimitError ||
+    error instanceof VoiceSessionLimitError
+  ) {
     return createProblemDetails({
       code: "RATE_LIMITED",
       requestId,

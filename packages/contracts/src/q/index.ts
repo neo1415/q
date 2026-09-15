@@ -187,6 +187,19 @@ export {
 } from "./run.js";
 
 export {
+  CreateQVoiceSessionRequestSchema,
+  CreateQVoiceSessionResponseSchema,
+  OnboardingJourneyTypeForVoiceSchema,
+  Q_VOICE_CHOICES,
+  Q_VOICE_SESSIONS_PATH,
+  Q_VOICE_WS_PATH,
+  QVoiceChoiceSchema,
+  type CreateQVoiceSessionRequest,
+  type CreateQVoiceSessionResponse,
+  type QVoiceChoice,
+} from "./voice.js";
+
+export {
   Q_VISIBLE_STAGE_LABELS,
   Q_VISIBLE_STAGES,
   qVisibleStageLabel,

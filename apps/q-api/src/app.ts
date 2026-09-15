@@ -24,6 +24,10 @@ import {
   type QRunRoutesDependencies,
 } from "./http/q-runs.js";
 import type { RequestAuthenticator } from "./security/actor-context.js";
+import {
+  registerQVoiceRoutes,
+  type QVoiceRoutesDependencies,
+} from "./voice/routes.js";
 
 export const SERVICE_NAME = "q-api";
 
@@ -61,6 +65,9 @@ export type QApiModules = {
         readonly options?: QEventRoutesDependencies["options"];
       }
     | undefined;
+  /** The realtime voice channel (CQ-Q-VOICE-001 C); absent means no voice routes. */
+  readonly voice?:
+    Pick<QVoiceRoutesDependencies, "provider" | "bindings" | "now"> | undefined;
 };
 
 declare module "fastify" {
@@ -194,6 +201,24 @@ export function createApp(
       qStream: modules.qStream.service,
       options: modules.qStream.options,
       logger,
+    });
+  }
+
+  // The voice session route (CQ-Q-VOICE-001 C). A credential is bound to
+  // a server-resolved actor before it is issued, so the same resolver rule
+  // applies.
+  if (modules.voice !== undefined) {
+    if (security.resolver === undefined) {
+      throw new Error(
+        "q-api: the Q voice routes require an actor context resolver",
+      );
+    }
+    registerQVoiceRoutes(app, {
+      authenticator: security.authenticator,
+      resolver: security.resolver,
+      provider: modules.voice.provider,
+      bindings: modules.voice.bindings,
+      now: modules.voice.now,
     });
   }
 

@@ -658,65 +658,24 @@ export function acknowledgeValue(
 }
 
 /**
- * "Let's continue." / "Where were we?" / "Back to onboarding." — the person
- * is returning from a tangent (CQ-Q-VOICE-001 B §24). Q picks the interview
- * up where the session says it is; nothing is sent to the runtime.
+ * The interview's own moves — a question for Q, a pause, a resume — are
+ * one implementation shared with the spoken thread (CQ-Q-VOICE-001 C):
+ * `@capital-q/onboarding/interview`. Re-exported here so this planner
+ * stays the thread's single vocabulary.
  */
-const RESUME =
-  /^(?:(?:ok(?:ay)?|right|so|anyway)[,.\s]+)?(?:let'?s (?:continue|carry on|finish (?:this|it|up)|get back(?: to it)?|go on|pick (?:it|this) up|resume)|continue(?: (?:the|with the|our) (?:interview|onboarding|setup|questions))?|carry on|where were we|where did we (?:leave off|stop)|back to (?:it|onboarding|the (?:interview|questions|setup))|resume(?: the interview)?|go on|next question|what(?:'s| is) next)[.!?]*$/i;
-
-export function resumeIntent(text: string): boolean {
-  return RESUME.test(text.trim());
-}
-
-/**
- * "Let's stop here." / "I'll finish this later." / "Pause the interview." —
- * the person is leaving for now (§25). Everything is already persisted; the
- * session stays open, never completed on their behalf.
- */
-const PAUSE =
-  /^(?:(?:ok(?:ay)?|right|so)[,.\s]+)?(?:let'?s (?:stop|pause|leave it|stop here|pause here|pick this up later|do this later)(?: (?:here|for now|there|for today))?|(?:i'?ll|let'?s|we'?ll|i can|we can) (?:finish|do|continue|complete|pick up) (?:this|it|the rest|this up) (?:later|another time|tomorrow|another day)|pause(?: the (?:interview|onboarding|setup))?|stop(?: the (?:interview|onboarding|setup))?(?: for now| here)?|(?:that'?s (?:enough|all) for (?:now|today))|i (?:need|have) to go|(?:can we|let'?s) (?:stop|pause|finish) (?:here|later|for now))[.!?]*$/i;
-
-export function pauseIntent(text: string): boolean {
-  return PAUSE.test(text.trim());
-}
-
-/** What Q says when the person pauses (§25). */
-export const PAUSED_LINE =
-  "Of course. Everything so far is saved. Come back whenever suits you and we'll pick up exactly here.";
+export {
+  BRIDGE_LINE,
+  looksLikeQuestionForQ,
+  PAUSED_LINE,
+  pauseIntent,
+  resumeIntent,
+} from "@capital-q/onboarding/interview";
 
 /** What Q says when the person asks to continue (§24). */
 export function resumeLine(prompt: QPrompt | null): string {
   return prompt === null
     ? "We're all caught up. There's nothing left for me to ask right now."
     : `Right, back to it. ${prompt.text}`;
-}
-
-/** What Q says after a tangent, before the live question shows again (§23). */
-export const BRIDGE_LINE = "Back to where we were.";
-
-/**
- * "Why do you need this?" is the interview's own move (the runtime answers
- * it from the step's own reason); any other question is for Q (§28).
- */
-const INTERVIEW_WHY =
-  /^(?:why|why (?:do you (?:need|ask|want)|does (?:this|that|it) matter|is (?:this|that) (?:needed|important|relevant))(?: (?:this|that|it))?|what(?:'s| is) (?:this|that) for)\??[.!]?$/i;
-
-/**
- * A request for Q that does not end in a question mark ("Tell me about
- * Series A rounds in Nigeria", "Can you check what Paystack raised",
- * "Look up Flutterwave") — the shape of a request, not of an answer (§23).
- */
-const REQUEST_FOR_Q =
-  /^(?:(?:can|could|would|will) you\b|tell me (?:about|what|how|more)\b|(?:please )?(?:look up|search(?: for)?|check|find out|research|compare|explain|summari[sz]e|help me (?:understand|with))\b|what (?:do you know|can you tell me|have you found)\b|how (?:do|does|would|should) (?:i|we|one|a founder|an investor)\b)/i;
-
-/** True when what was typed reads as a question for Q rather than an answer (§28, §23). */
-export function looksLikeQuestionForQ(text: string): boolean {
-  const trimmed = text.trim();
-  if (INTERVIEW_WHY.test(trimmed)) {
-    return false;
-  }
-  return trimmed.endsWith("?") || REQUEST_FOR_Q.test(trimmed);
 }
 
 /** The value a review line shows, or a plain "not yet" (§29). */

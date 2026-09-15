@@ -54,6 +54,9 @@ const MODEL_SDK_IMPORT_PATTERNS = [
 /** Public-web research provider SDKs; the research adapter only (CQ-Q-RESEARCH-001 §5). */
 const RESEARCH_SDK_IMPORT_PATTERNS = ["@tavily/core", "@tavily/*"];
 
+/** Realtime speech provider SDKs; the two voice adapters only (CQ-Q-VOICE-001 C §33). */
+const SPEECH_SDK_IMPORT_PATTERNS = ["@elevenlabs/*"];
+
 /** Browser-reachable source: the web app and the shared component package. */
 const WEB_SOURCE = ["apps/web/**/*.{ts,tsx}"];
 
@@ -353,6 +356,33 @@ export default tseslint.config(
               group: RESEARCH_SDK_IMPORT_PATTERNS,
               message:
                 "The research provider SDK is imported only by @capital-q/q-research's Tavily adapter. Call the PublicWebResearchProvider port instead (CQ-Q-RESEARCH-001 §5, §45).",
+            },
+          ],
+        },
+      ],
+    },
+  },
+
+  // Rule H -- the speech provider SDK exists only inside the two voice
+  // adapters: the Q API's Speech Engine adapter and the web app's browser
+  // session adapter (CQ-Q-VOICE-001 C §33). Company, Investor, Onboarding,
+  // Evidence, q-core, contracts and React business components see the
+  // RealtimeVoiceProvider port and nothing of the vendor.
+  {
+    files: ["apps/**/*.{ts,tsx}", "packages/**/*.{ts,tsx}"],
+    ignores: [
+      "apps/q-api/src/voice/providers/**",
+      "apps/web/src/features/voice/provider/**",
+    ],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: SPEECH_SDK_IMPORT_PATTERNS,
+              message:
+                "The speech provider SDK is imported only by the voice adapters (apps/q-api/src/voice/providers, apps/web/src/features/voice/provider). Use the RealtimeVoiceProvider port instead (CQ-Q-VOICE-001 C §33).",
             },
           ],
         },
