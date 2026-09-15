@@ -36,7 +36,7 @@ import {
  * land; latency optimisation on. Recorded here, not in a secret.
  */
 export const VOICE_TUNING = {
-  modelId: "eleven_flash_v2_5",
+  modelId: "eleven_flash_v2",
   stability: 0.55,
   similarityBoost: 0.75,
   speed: 0.97,

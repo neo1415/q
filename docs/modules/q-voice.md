@@ -73,7 +73,7 @@ Never `NEXT_PUBLIC_ELEVENLABS_*`.
 ## Voice tuning (D §52)
 
 Recorded in `dev/voice-setup.ts`, applied to both engines: model
-`eleven_flash_v2_5`, stability 0.55, similarity 0.75, speed 0.97,
+`eleven_flash_v2` (ElevenLabs requires turbo or flash v2 for English agents), stability 0.55, similarity 0.75, speed 0.97,
 `optimizeStreamingLatency` 2; ASR keywords for the interview vocabulary
 ("Capital Q", "MRR", "Series A", "Lagos", …); turn-taking `patient` with a
 10 s turn timeout; `recordVoice: false`, `deleteAudio: true`. Default voices:

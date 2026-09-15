@@ -17,7 +17,7 @@ export type SpeechEngineSpec = {
 };
 
 export type SpeechEngineTuning = {
-  readonly modelId: "eleven_flash_v2_5" | "eleven_turbo_v2_5";
+  readonly modelId: "eleven_flash_v2" | "eleven_turbo_v2";
   readonly stability: number;
   readonly similarityBoost: number;
   readonly speed: number;
