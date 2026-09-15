@@ -7,7 +7,7 @@ import {
   parseContract,
   Q_VOICE_SESSIONS_PATH,
 } from "@capital-q/contracts";
-import { getMeter } from "@capital-q/observability";
+import { createCorrelationId, getMeter } from "@capital-q/observability";
 import { AuthenticationRequiredError } from "@capital-q/security";
 import { extractBearerToken } from "@capital-q/security/supabase";
 
@@ -21,6 +21,7 @@ import {
   VoiceSessionLimitError,
   type VoiceSessionBindings,
 } from "./bindings.js";
+import type { Interviewer } from "./interviewer.js";
 import type { RealtimeVoiceProvider } from "./provider.js";
 
 /**
@@ -43,6 +44,10 @@ import type { RealtimeVoiceProvider } from "./provider.js";
 export type QVoiceRoutesDependencies = ActorContextDependencies & {
   readonly provider: RealtimeVoiceProvider;
   readonly bindings: VoiceSessionBindings;
+  /** Composes Q's opening line for an interview session, when present. */
+  readonly interviewer?: Interviewer | undefined;
+  /** The application API origin, needed for the opening line. */
+  readonly apiBaseUrl?: string | undefined;
   readonly now?: (() => number) | undefined;
 };
 
@@ -103,6 +108,37 @@ export function registerQVoiceRoutes(
       }
       started.add(1, { voice });
 
+      // Q opens the interview in its own words: a greeting and the live
+      // question, from the session's state. Composed here so the browser
+      // can hand it to the provider as the first thing Q says.
+      let firstMessage: string | undefined;
+      const interviewer = dependencies.interviewer;
+      const apiBaseUrl = dependencies.apiBaseUrl;
+      if (
+        input.onboarding !== undefined &&
+        interviewer !== undefined &&
+        apiBaseUrl !== undefined
+      ) {
+        try {
+          const opening = await interviewer.turn({
+            session: { baseUrl: apiBaseUrl, accessToken },
+            onboardingSessionId: input.onboarding.sessionId,
+            journeyType: input.onboarding.journeyType,
+            channel: "voice",
+            attribution: {
+              tenantId: actor.tenantId,
+              userId: actor.userId,
+              correlationId: createCorrelationId(),
+            },
+            utterance: "",
+            recentTurns: [],
+          });
+          firstMessage = opening.reply;
+        } catch (error: unknown) {
+          request.log.warn({ err: error }, "voice opening line unavailable");
+        }
+      }
+
       // Identifiers only: never the token, never the bearer.
       request.log.info(
         {
@@ -124,6 +160,7 @@ export function registerQVoiceRoutes(
             expiresAt: new Date(
               issuedAt + VOICE_CONNECT_WINDOW_MS,
             ).toISOString(),
+            ...(firstMessage === undefined ? {} : { firstMessage }),
           }),
         );
     },

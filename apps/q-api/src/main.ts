@@ -112,6 +112,7 @@ import { composeResearch } from "./composition/research.js";
 import { createSupabaseRequestAuthenticator } from "./security/supabase-authenticator.js";
 import { attachVoiceChannel } from "./voice/attach.js";
 import { createVoiceSessionBindings } from "./voice/bindings.js";
+import { createInterviewer } from "./voice/interviewer.js";
 import type { VoiceAttachment } from "./voice/provider.js";
 import { createElevenLabsVoiceProvider } from "./voice/providers/elevenlabs.js";
 import { createVoiceTurnHandler } from "./voice/turn.js";
@@ -467,6 +468,9 @@ const voiceProvider =
       })
     : undefined;
 const voiceBindings = createVoiceSessionBindings();
+// Q conducting the interview: one model-driven turn per utterance, every
+// reading validated and recorded through the onboarding runtime.
+const interviewer = createInterviewer({ gateway: modelGateway, logger });
 logger.info(
   {
     speech: speechProviderConfigStatus(speechSecrets, speechEngines),
@@ -491,7 +495,14 @@ const { app, logger: appLogger } = createApp(
     qStream: { service: qStream },
     ...(voiceProvider === undefined
       ? {}
-      : { voice: { provider: voiceProvider, bindings: voiceBindings } }),
+      : {
+          voice: {
+            provider: voiceProvider,
+            bindings: voiceBindings,
+            interviewer,
+            apiBaseUrl: config.voice.apiBaseUrl,
+          },
+        }),
   },
 );
 
@@ -518,6 +529,7 @@ if (voiceProvider !== undefined) {
     turn: createVoiceTurnHandler({
       qRuntime,
       qStream,
+      interviewer,
       orchestration: { orchestrator, autostart: Q_ORCHESTRATION_AUTOSTART },
       ...(apiBaseUrl === undefined ? {} : { onboarding: { apiBaseUrl } }),
       logger,

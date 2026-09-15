@@ -1,5 +1,4 @@
 {
-  "generatedBy": "CQ-Q-006",
   "entries": {
     "q-system/v1": "bf49c4ecd849ba4437bda173e17424340d17bcb7753d7c6ac7448dfc3162b863",
     "founder-onboarding-extraction/v1": "98295baebb0cd8b62f008291c9c4d5947193d0122e706feb4ea67de3c87b3380",
@@ -9,6 +8,8 @@
     "investor-mandate-synthesis/v2": "74c10a85a0697b41b681b06517fea21db5da8a9224005c454956633a8c695565",
     "company-analyst/v1": "869c46bf6d2055081a994bff86b1a94e6acbb17649b665aa4347293b584b0f69",
     "company-analyst/v2": "a506c0c35f17fdb1f55e63816af18be525c35c7ba0ab6542e62183837d3bb189",
-    "fit-explanation/v1": "3d552b0e5bdb9497ae2259ea56d21acdbf9df2920ea3f64481b633ec2006cc85"
-  }
+    "fit-explanation/v1": "3d552b0e5bdb9497ae2259ea56d21acdbf9df2920ea3f64481b633ec2006cc85",
+    "interview-conductor/v1": "092cd63702cabde5bb54e7b51219d74e669646555c2497c17fe4b59a4729962f"
+  },
+  "generatedBy": "CQ-Q-006"
 }

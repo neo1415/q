@@ -29,6 +29,7 @@ import type {
 } from "@capital-q/q-runtime";
 
 import type { VoiceSessionBinding } from "./bindings.js";
+import type { Interviewer } from "./interviewer.js";
 import type { VoiceSpeaker, VoiceTranscriptTurn } from "./provider.js";
 import { bounded, bySentence, speakable, withFiller } from "./speech.js";
 
@@ -56,6 +57,12 @@ export type VoiceTurnDependencies = {
   readonly orchestration?:
     | { readonly orchestrator: QOrchestrator; readonly autostart: boolean }
     | undefined;
+  /**
+   * Q conducting the interview (interviewer.ts). When present, every
+   * interview turn goes through it; the scripted per-step reading below
+   * remains only as the fallback when no model is composed.
+   */
+  readonly interviewer?: Interviewer | undefined;
   /** The application API, for spoken interview turns; absent means Q conversations only. */
   readonly onboarding?:
     | { readonly apiBaseUrl: string; readonly fetch?: typeof fetch | undefined }
@@ -92,6 +99,29 @@ export function latestUtterance(
   const last = [...transcript].reverse().find((turn) => turn.role === "user");
   const text = last?.content.trim() ?? "";
   return text.length === 0 ? null : text.slice(0, VOICE_TURN_MAX_CHARS);
+}
+
+/** The conversation so far as the provider transcribed it, per binding. */
+const transcripts = new WeakMap<
+  VoiceSessionBinding,
+  readonly { readonly role: "person" | "q"; readonly text: string }[]
+>();
+
+function rememberTranscript(
+  binding: VoiceSessionBinding,
+  transcript: readonly VoiceTranscriptTurn[],
+): void {
+  transcripts.set(
+    binding,
+    transcript.slice(-24).map((turn) => ({
+      role: turn.role === "user" ? ("person" as const) : ("q" as const),
+      text: turn.content,
+    })),
+  );
+}
+
+function transcriptOf(binding: VoiceSessionBinding) {
+  return transcripts.get(binding) ?? [];
 }
 
 function correlation(): CorrelationId {
@@ -387,6 +417,45 @@ export function createVoiceTurnHandler(
       accessToken: binding.accessToken,
       ...(api.fetch === undefined ? {} : { fetch: api.fetch }),
     };
+    const interviewer = dependencies.interviewer;
+    if (interviewer !== undefined) {
+      // Q leads. What the person said is read in full, validated by the
+      // runtime, and answered in Q's own words; a question for Q becomes
+      // a run in the bound conversation exactly as before.
+      const recentTurns = transcriptOf(binding).slice(0, -1);
+      const outcome = await interviewer.turn({
+        session,
+        onboardingSessionId: onboarding.sessionId,
+        journeyType: onboarding.journeyType,
+        channel: "voice",
+        attribution: {
+          tenantId: binding.actor.tenantId,
+          userId: binding.actor.userId,
+          correlationId: createCorrelationId(),
+        },
+        utterance: text,
+        recentTurns,
+        signal,
+      });
+      if (signal.aborted) {
+        return { kind: "INTERRUPTED", path: "INTERVIEW" };
+      }
+      if (outcome.questionForQ !== null) {
+        if (outcome.reply.length > 0) {
+          await speakLine(speaker, outcome.reply, signal);
+        }
+        const asked = await askQ(
+          binding,
+          outcome.questionForQ,
+          signal,
+          speaker,
+        );
+        return asked;
+      }
+      return (await speakLine(speaker, outcome.reply, signal))
+        ? { kind: "SPOKEN", path: "INTERVIEW" }
+        : { kind: "INTERRUPTED", path: "INTERVIEW" };
+    }
     const before = await getOnboardingSession(session, onboarding.sessionId);
     if (signal.aborted) {
       return { kind: "INTERRUPTED", path: "INTERVIEW" };
@@ -465,6 +534,7 @@ export function createVoiceTurnHandler(
     if (text === null || signal.aborted) {
       return { kind: "NOTHING" };
     }
+    rememberTranscript(binding, transcript);
     if (binding.thread.onboarding !== undefined) {
       return answerInterview(binding, text, signal, speaker);
     }

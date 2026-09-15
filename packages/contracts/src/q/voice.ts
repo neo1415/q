@@ -84,6 +84,11 @@ export const CreateQVoiceSessionResponseSchema = z
     token: z.string().min(1).max(8192),
     voice: QVoiceChoiceSchema,
     expiresAt: UtcTimestampSchema,
+    /**
+     * What Q says first, composed by Q from the interview's state (a
+     * greeting and the live question). Absent when Q waits for the person.
+     */
+    firstMessage: z.string().min(1).max(700).optional(),
   })
   .strict();
 

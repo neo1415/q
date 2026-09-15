@@ -67,7 +67,11 @@ export type QApiModules = {
     | undefined;
   /** The realtime voice channel (CQ-Q-VOICE-001 C); absent means no voice routes. */
   readonly voice?:
-    Pick<QVoiceRoutesDependencies, "provider" | "bindings" | "now"> | undefined;
+    | Pick<
+        QVoiceRoutesDependencies,
+        "provider" | "bindings" | "now" | "interviewer" | "apiBaseUrl"
+      >
+    | undefined;
 };
 
 declare module "fastify" {
@@ -218,6 +222,8 @@ export function createApp(
       resolver: security.resolver,
       provider: modules.voice.provider,
       bindings: modules.voice.bindings,
+      interviewer: modules.voice.interviewer,
+      apiBaseUrl: modules.voice.apiBaseUrl,
       now: modules.voice.now,
     });
   }

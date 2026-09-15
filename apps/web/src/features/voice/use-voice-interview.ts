@@ -92,7 +92,12 @@ export function useVoiceInterview(
       }
       setVoice(started.value.voice);
       setActive(true);
-      await client.start({ credential: started.value, firstMessage });
+      // Q composes its own opening from the interview's state; the caller's
+      // line is only a fallback when the server had none to give.
+      await client.start({
+        credential: started.value,
+        firstMessage: started.value.firstMessage ?? firstMessage,
+      });
     },
     [client, voice],
   );
