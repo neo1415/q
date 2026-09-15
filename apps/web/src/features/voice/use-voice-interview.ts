@@ -28,6 +28,8 @@ import type {
  */
 
 export type VoiceInterviewThread = {
+  /** Q's first minute with a new person: no onboarding session yet. */
+  readonly welcome?: true | undefined;
   readonly onboarding?: CreateQVoiceSessionRequest["onboarding"];
   readonly subjects?: CreateQVoiceSessionRequest["subjects"];
   readonly conversationId?: CreateQVoiceSessionRequest["conversationId"];
@@ -88,6 +90,7 @@ export function useVoiceInterview(
       setNotice(null);
       lastStart.current = { thread, firstMessage };
       const started = await startVoiceSessionAction({
+        ...(thread.welcome === true ? { welcome: true } : {}),
         ...(thread.onboarding === undefined
           ? {}
           : { onboarding: thread.onboarding }),

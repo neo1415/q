@@ -30,7 +30,10 @@ const STEP_FORM_ID = "investor-onboarding-step";
 export function InvestorOnboardingScreen({
   adapter,
   seed,
+  startTalking = false,
 }: {
+  /** Open already talking with Q (arrival hands over with the voice on). */
+  readonly startTalking?: boolean | undefined;
   readonly adapter: FounderOnboardingAdapter;
   readonly seed?: string | undefined;
 }) {
@@ -48,7 +51,7 @@ export function InvestorOnboardingScreen({
   const [mode, setMode] = useState<"conversation" | "form">("conversation");
   // Set when the person asks for Q's voice from the form: the workspace
   // opens already talking, then this is cleared so it happens once.
-  const [talkOnOpen, setTalkOnOpen] = useState(false);
+  const [talkOnOpen, setTalkOnOpen] = useState(startTalking);
 
   if (state.phase === "unavailable") {
     return (

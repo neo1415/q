@@ -10,7 +10,8 @@
     "company-analyst/v1": "869c46bf6d2055081a994bff86b1a94e6acbb17649b665aa4347293b584b0f69",
     "company-analyst/v2": "a506c0c35f17fdb1f55e63816af18be525c35c7ba0ab6542e62183837d3bb189",
     "fit-explanation/v1": "3d552b0e5bdb9497ae2259ea56d21acdbf9df2920ea3f64481b633ec2006cc85",
-    "interview-conductor/v1": "28cbaf9650cc58cbad3a6e77c345b0aabba53b5aa17477e8b0a3256e71c2824a"
+    "interview-conductor/v1": "daa90f97e5490a86c0f4cee4dd51457026fb547ddef7c7d0edf35d064156cba0",
+    "welcome-conductor/v1": "e32b2aba47e314dda8ab56806be0b9e9704466e38a2141c26b4cf5aaa2aed6f1"
   },
   "generatedBy": "CQ-Q-006"
 }

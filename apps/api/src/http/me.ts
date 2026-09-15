@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify";
 import {
   ME_PATH,
   MeResponseSchema,
+  UpdateMeRequestSchema,
   type MeResponse,
 } from "@capital-q/contracts";
 import {
@@ -47,6 +48,39 @@ export function registerMeRoute(
   app: FastifyInstance,
   dependencies: MeRouteDependencies,
 ): void {
+  // `PATCH /v1/me` — the one thing a person may set about themselves
+  // here: what to call them. Under their own session, never on behalf
+  // of anyone, and never more than a name.
+  app.patch(
+    ME_PATH,
+    {
+      onRequest: requireAuthenticationHook({
+        authenticator: dependencies.authenticator,
+      }),
+    },
+    async (request, reply) => {
+      const principal = getPrincipal(request);
+      const parsed = UpdateMeRequestSchema.safeParse(request.body ?? {});
+      if (!parsed.success) {
+        return reply.code(400).send({
+          type: "about:blank",
+          title: "Bad Request",
+          status: 400,
+          detail: "A display name between 1 and 80 characters is required.",
+        });
+      }
+      const update = dependencies.identities.updateDisplayName;
+      const updated =
+        update === undefined
+          ? false
+          : await update(principal, parsed.data.displayName);
+      if (!updated) {
+        throw new ActorContextDeniedError();
+      }
+      return reply.code(204).send();
+    },
+  );
+
   app.get(
     ME_PATH,
     {

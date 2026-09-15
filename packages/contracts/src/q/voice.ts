@@ -68,6 +68,12 @@ export const CreateQVoiceSessionRequestSchema = z
       .strict()
       .optional(),
     voice: QVoiceChoiceSchema.default("FEMALE"),
+    /**
+     * Q's first minute with a new person: no onboarding session yet. Q
+     * introduces itself, learns the person's name and reads which setup
+     * to start; the turn state then names the interview to open.
+     */
+    welcome: z.literal(true).optional(),
   })
   .strict();
 
@@ -109,6 +115,8 @@ export const Q_VOICE_DESTINATIONS = [
   "DISCOVER",
   "COMPANY_VISIBILITY",
   "INTERVIEW",
+  "INTERVIEW_FOUNDER",
+  "INTERVIEW_INVESTOR",
   "FORM",
 ] as const;
 export const QVoiceDestinationSchema = z.enum(Q_VOICE_DESTINATIONS);

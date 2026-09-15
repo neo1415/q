@@ -69,7 +69,13 @@ export type QApiModules = {
   readonly voice?:
     | Pick<
         QVoiceRoutesDependencies,
-        "provider" | "bindings" | "now" | "interviewer" | "apiBaseUrl" | "board"
+        | "provider"
+        | "bindings"
+        | "now"
+        | "interviewer"
+        | "apiBaseUrl"
+        | "board"
+        | "welcome"
       >
     | undefined;
 };
@@ -225,6 +231,7 @@ export function createApp(
       interviewer: modules.voice.interviewer,
       apiBaseUrl: modules.voice.apiBaseUrl,
       board: modules.voice.board,
+      welcome: modules.voice.welcome,
       now: modules.voice.now,
     });
   }

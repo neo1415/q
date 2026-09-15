@@ -2,6 +2,7 @@ import {
   ME_PATH,
   MeResponseSchema,
   type MeResponse,
+  type UpdateMeRequest,
 } from "@capital-q/contracts";
 
 import {
@@ -78,4 +79,29 @@ export async function fetchMe(input: FetchMeInput): Promise<MeResponse> {
 
 function stripTrailingSlash(url: string): string {
   return url.endsWith("/") ? url.slice(0, -1) : url;
+}
+
+/** Record what the person asks to be called. */
+export async function updateMe(
+  input: Omit<FetchMeInput, "organisationId"> & {
+    readonly body: UpdateMeRequest;
+  },
+): Promise<void> {
+  const doFetch = input.fetch ?? fetch;
+  const response = await doFetch(
+    `${stripTrailingSlash(input.baseUrl)}${ME_PATH}`,
+    {
+      method: "PATCH",
+      headers: {
+        accept: "application/json",
+        "content-type": "application/json",
+        authorization: `Bearer ${input.accessToken}`,
+      },
+      body: JSON.stringify(input.body),
+      cache: "no-store",
+    },
+  );
+  if (!response.ok) {
+    throw await readProblemResponse(response);
+  }
 }

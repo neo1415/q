@@ -45,3 +45,11 @@ export type MeContext = z.infer<typeof MeContextSchema>;
 export type MeResponse = z.infer<typeof MeResponseSchema>;
 
 export const ME_PATH = "/v1/me" as const;
+
+/** `PATCH /v1/me` — what the person asks to be called. The one field a person may set here. */
+export const UpdateMeRequestSchema = z
+  .object({
+    displayName: z.string().trim().min(1).max(80),
+  })
+  .strict();
+export type UpdateMeRequest = z.infer<typeof UpdateMeRequestSchema>;

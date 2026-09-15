@@ -83,6 +83,7 @@ describe("registry", () => {
         "FOUNDER_ONBOARDING_EXTRACTION",
         // CQ-Q-VOICE-001: Q conducts the onboarding interview.
         "INTERVIEW_CONDUCTOR",
+        "WELCOME_CONDUCTOR",
         // CQ-KNW-001: reads one authorised passage and proposes claims.
         "CLAIM_EXTRACTION",
         "INVESTOR_MANDATE_SYNTHESIS",

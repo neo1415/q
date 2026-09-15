@@ -59,6 +59,45 @@ a typed one does from the interview thread:
   (`handoff`). Owner only; the stage polls it every 1.5 s while talking.
   A tapped option is said to Q, the same path as speaking it.
 
+## Arrival (`voice/welcome.ts`, `/welcome`)
+
+Sign-in lands on `/welcome`. A person Capital Q already knows goes
+straight to Home; a new person meets Q: a quiet screen with the Q mark and
+one tap (browsers need a gesture before a microphone opens), then Q
+speaks first. `POST /v1/q/voice/sessions` with `welcome: true` binds a
+session with no onboarding thread; the welcome host renders
+`WELCOME_CONDUCTOR` (q-core) so Q introduces itself in its own words, asks
+what to call the person (recorded through `PATCH /v1/me` under their own
+token) and reads from anything they say whether they are raising or
+investing. The turn state then names `INTERVIEW_FOUNDER` or
+`INTERVIEW_INVESTOR`; the browser opens the interview with `?talk=1` and
+the voice carries across. `?again=1` reopens arrival for anyone.
+
+## Pause, not stop
+
+An interruption never throws Q's words away. A reply cut off mid-way keeps
+its unsaid sentences; a Q answer (a lookup, a question) keeps running in
+the background and holds its text. "Go on", "you were saying", a bare
+"okay" resumes from where Q was; a new subject is answered first and a
+finished answer is offered after it ("And on what you asked earlier…").
+Held speech is per binding and process-local, like the bindings.
+
+## Pronunciation
+
+"It's pronounced vault-line" is intent PRONOUNCE. The term and the spelling
+of the sound become an alias rule in one ElevenLabs pronunciation
+dictionary for the environment (`capital-q-voice`), and both engines are
+pointed at its new version. It applies to sessions that start afterwards.
+
+## Uploading while talking
+
+The stage's Upload control takes a deck or profile through the normal
+evidence path (upload target, PUT, complete), waits for the worker to read
+it, then says to Q "I've just uploaded <file>; read back what you found".
+The proposals the worker produced arrive as DOCUMENT PROPOSALS on that
+turn. Founder sessions only for now; an investor's documents attach to an
+organisation, which the upload action does not address yet.
+
 ## The interviewer (`voice/interviewer.ts`)
 
 Q conducts the interview rather than reading a script. Each spoken turn
@@ -129,6 +168,8 @@ latency of each call: the thing a browser transcript cannot show.
 | `voice/interviewer.ts`                | Q conducting the interview: one `INTERVIEW_CONDUCTOR` turn per utterance, validated and recorded through the onboarding API                |
 | `voice/turn.ts`                       | One spoken turn: interviewer turn (or scripted `say` fallback) or Q run; interruption → `cancelRun`                                        |
 | `voice/speech.ts`                     | Text as Q speaks it: markdown/citations/URLs stripped, bounded, sentence-chunked                                                           |
+| `voice/welcome.ts`                    | Q's first minute: WELCOME_CONDUCTOR turn — name, then which setup to start                                                                 |
+| `voice/pronunciation.ts`              | The pronunciation-teacher port; `providers/elevenlabs-pronunciation.ts` is the dictionary adapter                                          |
 | `voice/turn-board.ts`                 | Process-local: what Q is asking, and where it is taking the person, after each voice session's latest turn, for the screen                 |
 | `dev/interview-smoke.ts`              | `pnpm interview:smoke -- "<utterance>"...`: the interviewer against the live gateway, one turn per argument                                |
 | `dev/voice-setup.ts`                  | `pnpm voice:setup -- --ws-url wss://<host>/v1/q/voice/ws`: creates/updates the two Speech Engines, records their ids in `.env.local`       |
@@ -162,7 +203,19 @@ the voice detector missed at the timeout, and a person's "mm-hm", "okay",
 Sarah (female, mature, reassuring) and Daniel (male, steady broadcaster);
 override with `--female` / `--male`.
 
+## Demo posture
+
+Migration `20260919090000_demo_gemini_posture.sql` raises the Google
+models' sensitivity ceiling to CONFIDENTIAL and adds them to every
+policy's fallback chain, so a demo is not gated by one provider's free-tier
+minute. The google provider review is unchanged (UNREVIEWED for
+confidential customer data). Revert the ceiling before real customer data.
+
 ## Local development
+
+`pnpm demo` does all of the below in one command: starts the database if
+needed, opens the tunnel, points the Speech Engines at it, and runs
+`pnpm dev`. Manually:
 
 1. `ngrok http 3002` (ngrok must be authenticated on the machine; the
    tunnel hostname is runtime configuration and is never committed).

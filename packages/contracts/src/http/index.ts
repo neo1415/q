@@ -27,6 +27,8 @@ export {
   ME_PATH,
   MeContextSchema,
   MeResponseSchema,
+  UpdateMeRequestSchema,
+  type UpdateMeRequest,
   MeUserSchema,
   type MeContext,
   type MeResponse,

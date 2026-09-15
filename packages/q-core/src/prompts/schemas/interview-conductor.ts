@@ -23,7 +23,7 @@ import {
  */
 
 export const INTERVIEW_CONDUCTOR_SCHEMA_NAME = "InterviewConductorResult";
-export const INTERVIEW_CONDUCTOR_SCHEMA_VERSION = 2;
+export const INTERVIEW_CONDUCTOR_SCHEMA_VERSION = 3;
 
 const StepKey = z.string().min(1).max(64);
 
@@ -75,6 +75,8 @@ export const INTERVIEW_DESTINATIONS = [
   "DISCOVER",
   "COMPANY_VISIBILITY",
   "INTERVIEW",
+  "INTERVIEW_FOUNDER",
+  "INTERVIEW_INVESTOR",
   "FORM",
 ] as const;
 export const InterviewDestinationSchema = z.enum(INTERVIEW_DESTINATIONS);
@@ -172,6 +174,7 @@ export const InterviewConductorResultSchema = z
       "OFF_TOPIC",
       "NAVIGATE",
       "LOOKUP",
+      "PRONOUNCE",
       "SABOTAGE",
       "UNCLEAR",
       "OPENING",
@@ -215,6 +218,13 @@ export const InterviewConductorResultSchema = z
     questionForQ: z.string().max(1_000).nullable(),
     /** When intent is NAVIGATE: where the person asked to go. */
     navigate: InterviewDestinationSchema.nullable(),
+    /** When intent is PRONOUNCE: the name or term, and how the person says it. */
+    pronounce: z
+      .object({
+        term: z.string().min(1).max(60),
+        sayAs: z.string().min(1).max(60),
+      })
+      .nullable(),
     /** When intent is LOOKUP and the spelling is confirmed: what to research on the public web. */
     lookup: z
       .object({

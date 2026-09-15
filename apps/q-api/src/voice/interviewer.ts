@@ -106,6 +106,8 @@ export type InterviewTurnOutcome = {
   readonly navigate: InterviewDestination | null;
   /** Set when Q has stopped conducting and leaves the person with the form. */
   readonly handoff: "FORM" | null;
+  /** A name or term the person corrected the pronunciation of. */
+  readonly pronounce: { readonly term: string; readonly sayAs: string } | null;
   /** Warnings issued so far in this session about derailing the interview. */
   readonly warnings: number;
   /** The session after this turn. */
@@ -577,6 +579,7 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
           questionForQ: null,
           navigate: null,
           handoff: null,
+          pronounce: null,
           warnings: warningsBySession.get(input.onboardingSessionId) ?? 0,
           view,
           degraded: true,
@@ -843,6 +846,10 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
         questionForQ,
         navigate,
         handoff,
+        pronounce:
+          result.intent === "PRONOUNCE" && result.pronounce !== null
+            ? result.pronounce
+            : null,
         warnings,
         view,
         degraded: false,

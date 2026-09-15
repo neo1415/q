@@ -70,8 +70,9 @@ export function useElevenLabsVoiceSession(
   // Whatever is open when the interview unmounts is closed with it.
   useEffect(
     () => () => {
-      void conversationRef.current?.endSession();
+      const open = conversationRef.current;
       conversationRef.current = null;
+      void open?.endSession().catch(() => undefined);
     },
     [],
   );
@@ -180,7 +181,9 @@ export function useElevenLabsVoiceSession(
     setConnected(false);
     setState("IDLE");
     if (conversation !== null) {
-      await conversation.endSession();
+      // The provider's transport logs its own closing; a session that is
+      // already gone is not an error here.
+      await conversation.endSession().catch(() => undefined);
     }
   }, []);
 

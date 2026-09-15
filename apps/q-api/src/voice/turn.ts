@@ -5,6 +5,7 @@ import {
   resolveOnboardingSuggestion,
   sayToOnboarding,
   type ApiSession,
+  updateMe,
 } from "@capital-q/api-client";
 import {
   CorrelationIdSchema,
@@ -30,9 +31,17 @@ import type {
 
 import type { VoiceSessionBinding } from "./bindings.js";
 import type { Interviewer } from "./interviewer.js";
+import type { PronunciationTeacher } from "./pronunciation.js";
 import type { VoiceTurnBoard } from "./turn-board.js";
+import type { WelcomeHost } from "./welcome.js";
 import type { VoiceSpeaker, VoiceTranscriptTurn } from "./provider.js";
-import { bounded, bySentence, speakable, withFiller } from "./speech.js";
+import {
+  bounded,
+  bySentence,
+  sentences,
+  speakable,
+  withFiller,
+} from "./speech.js";
 
 /**
  * One spoken turn (CQ-Q-VOICE-001 C §35-§40).
@@ -66,6 +75,10 @@ export type VoiceTurnDependencies = {
   readonly interviewer?: Interviewer | undefined;
   /** Where each turn's asking/navigation is posted for the screen. */
   readonly board?: VoiceTurnBoard | undefined;
+  /** Q's first minute with a new person (welcome sessions). */
+  readonly welcome?: WelcomeHost | undefined;
+  /** Applies a pronunciation the person corrected. */
+  readonly pronunciation?: PronunciationTeacher | undefined;
   /** The application API, for spoken interview turns; absent means Q conversations only. */
   readonly onboarding?:
     | { readonly apiBaseUrl: string; readonly fetch?: typeof fetch | undefined }
@@ -125,6 +138,47 @@ function rememberTranscript(
 
 function transcriptOf(binding: VoiceSessionBinding) {
   return transcripts.get(binding) ?? [];
+}
+
+/**
+ * What an interruption paused, per binding (rework: pause, not stop). A
+ * reply cut off mid-way keeps its unsaid sentences; a Q answer cut off
+ * keeps running and holds its text. "Go on" resumes it; a new subject is
+ * answered first and a finished answer is offered after.
+ */
+type Held =
+  | { readonly kind: "REMAINDER"; readonly sentences: readonly string[] }
+  | {
+      readonly kind: "ANSWER";
+      text: string;
+      done: boolean;
+      readonly settled: Promise<void>;
+    };
+const held = new WeakMap<VoiceSessionBinding, Held>();
+
+/** "Go on", "you were saying", a bare "okay": the person wants the rest. */
+const CONTINUE_CUE =
+  /^(?:(?:um+|uh+|so|and|okay|ok|yes|yeah|yep|right|sure|please|sorry|no)[,.!\s]*)*(?:go on|continue|carry on|keep going|go ahead|finish(?: that| what you were saying)?|you were saying|what were you saying|say that again|repeat that|as you were|and then|the rest|what did you find|did you find (?:it|anything)|any luck|and\?)[.!?\s]*$/i;
+const BARE_BACKCHANNEL =
+  /^(?:(?:mm+-?hm+|mhm+|uh-?huh|okay|ok|yes|yeah|yep|right|sure|go on|please)[,.!\s]*){1,4}$/i;
+export function isContinueCue(text: string): boolean {
+  const trimmed = text.trim();
+  return CONTINUE_CUE.test(trimmed) || BARE_BACKCHANNEL.test(trimmed);
+}
+
+/** How long a resumed answer waits for a run that is still working. */
+const RESUME_WAIT_MS = 25_000;
+/** How long a paused answer keeps collecting after the person moved on. */
+const HELD_ANSWER_MAX_MS = 90_000;
+
+async function* tap(
+  source: AsyncIterable<string>,
+  onItem: (item: string) => void,
+): AsyncGenerator<string> {
+  for await (const item of source) {
+    onItem(item);
+    yield item;
+  }
 }
 
 function correlation(): CorrelationId {
@@ -264,12 +318,73 @@ export function createVoiceTurnHandler(
     speaker: VoiceSpeaker,
     text: string,
     signal: AbortSignal,
+    binding?: VoiceSessionBinding,
   ): Promise<boolean> => {
     if (signal.aborted) {
       return false;
     }
-    await speaker.speak(bounded(speakable(text)));
+    const parts = sentences(bounded(speakable(text)));
+    let next = 0;
+    // eslint-disable-next-line @typescript-eslint/require-await -- the speaker takes an async iterable; the sentences are already here
+    async function* spoken(): AsyncGenerator<string> {
+      while (next < parts.length) {
+        if (signal.aborted) {
+          return;
+        }
+        const part = parts[next];
+        next += 1;
+        if (part !== undefined) {
+          yield part;
+        }
+      }
+    }
+    await speaker.speak(spoken());
+    if (signal.aborted && binding !== undefined) {
+      // Pause, not stop: the sentence being said and everything after it
+      // wait for "go on". At most one sentence is lost to the cut.
+      const from = Math.max(0, next - 1);
+      const rest = parts.slice(from);
+      if (rest.length > 0) {
+        held.set(binding, { kind: "REMAINDER", sentences: rest });
+      }
+    }
     return !signal.aborted;
+  };
+
+  /** Speak what an interruption paused, once the person asks for it. */
+  const resumeHeld = async (
+    item: Held,
+    binding: VoiceSessionBinding,
+    signal: AbortSignal,
+    speaker: VoiceSpeaker,
+  ): Promise<VoiceTurnOutcome> => {
+    if (item.kind === "REMAINDER") {
+      return (await speakLine(
+        speaker,
+        item.sentences.join(" "),
+        signal,
+        binding,
+      ))
+        ? { kind: "SPOKEN", path: "MOVE" }
+        : { kind: "INTERRUPTED", path: "MOVE" };
+    }
+    if (!item.done) {
+      if (!(await speakLine(speaker, "Still on it, one moment.", signal))) {
+        held.set(binding, item);
+        return { kind: "INTERRUPTED", path: "Q" };
+      }
+      await Promise.race([
+        item.settled,
+        new Promise<void>((resolve) => setTimeout(resolve, RESUME_WAIT_MS)),
+      ]);
+    }
+    const text =
+      item.text.trim().length > 0
+        ? item.text
+        : "I couldn't finish that one. Ask me again and I'll start afresh.";
+    return (await speakLine(speaker, text, signal, binding))
+      ? { kind: "SPOKEN", path: "Q" }
+      : { kind: "INTERRUPTED", path: "Q" };
   };
 
   /** A question for Q: one run, modality VOICE, spoken as it streams. */
@@ -376,26 +491,72 @@ export function createVoiceTurnHandler(
       }
     }
 
+    let spokenSoFar = "";
     try {
       await speaker.speak(
-        withFiller(bySentence(answer(), signal), {
-          filler: FILLER_THINKING,
-          signal,
-        }),
+        withFiller(
+          tap(bySentence(answer(), signal), (part) => {
+            spokenSoFar += `${part} `;
+          }),
+          {
+            filler: FILLER_THINKING,
+            signal,
+          },
+        ),
       );
     } finally {
       if (signal.aborted && !terminal) {
-        // Barge-in: the run stops through its own lifecycle, at its next
-        // boundary. Nothing it produces after this is spoken or shown as
-        // this turn's answer.
-        void qRuntime
-          .cancelRun({ actor, runId, correlationId })
-          .catch((error: unknown) => {
+        // Barge-in pauses the answer; it does not throw it away. The run
+        // finishes on its own and its text waits for "go on" or for the
+        // end of whatever the person moved on to.
+        let settle: () => void = () => undefined;
+        const item: Held = {
+          kind: "ANSWER",
+          text: spokenSoFar.trim(),
+          done: false,
+          settled: new Promise<void>((resolve) => {
+            settle = resolve;
+          }),
+        };
+        held.set(binding, item);
+        const collector = new AbortController();
+        const stop = setTimeout(() => collector.abort(), HELD_ANSWER_MAX_MS);
+        void (async () => {
+          let full = "";
+          try {
+            for await (const collected of qStream.open({
+              run: record,
+              afterSequence: 0,
+              signal: collector.signal,
+            })) {
+              if (collected.kind === "end") break;
+              const event = collected.event;
+              if (event.type === "q.message.delta") {
+                full += event.data.text;
+              } else if (event.type === "q.message.completed") {
+                const text = event.data.message.text;
+                if (text !== undefined && text.length > full.length) {
+                  full = text;
+                }
+              } else if (event.type === "q.run.failed") {
+                full = full.length > 0 ? full : event.data.failure.message;
+                break;
+              } else if (event.type === "q.run.completed") {
+                break;
+              }
+            }
+          } catch (error: unknown) {
             logger.warn(
               { err: error, qRunId: runId, correlationId },
-              "voice interruption could not cancel the run",
+              "held answer could not be collected",
             );
-          });
+          } finally {
+            clearTimeout(stop);
+            item.text = bounded(speakable(full.length > 0 ? full : item.text));
+            item.done = true;
+            settle();
+          }
+        })();
       }
     }
     return signal.aborted
@@ -465,9 +626,15 @@ export function createVoiceTurnHandler(
         handoff: outcome.handoff,
         degraded: outcome.degraded,
       });
+      if (
+        outcome.pronounce !== null &&
+        dependencies.pronunciation !== undefined
+      ) {
+        void dependencies.pronunciation.teach(outcome.pronounce);
+      }
       if (outcome.questionForQ !== null) {
         if (outcome.reply.length > 0) {
-          await speakLine(speaker, outcome.reply, signal);
+          await speakLine(speaker, outcome.reply, signal, binding);
         }
         const asked = await askQ(
           binding,
@@ -477,7 +644,7 @@ export function createVoiceTurnHandler(
         );
         return asked;
       }
-      return (await speakLine(speaker, outcome.reply, signal))
+      return (await speakLine(speaker, outcome.reply, signal, binding))
         ? { kind: "SPOKEN", path: "INTERVIEW" }
         : { kind: "INTERRUPTED", path: "INTERVIEW" };
     }
@@ -554,20 +721,106 @@ export function createVoiceTurnHandler(
       : { kind: "INTERRUPTED", path: "INTERVIEW" };
   };
 
+  /** Q's first minute: name, then which setup to start. */
+  const welcomeTurn = async (
+    binding: VoiceSessionBinding,
+    text: string,
+    signal: AbortSignal,
+    speaker: VoiceSpeaker,
+  ): Promise<VoiceTurnOutcome> => {
+    const welcome = dependencies.welcome;
+    if (welcome === undefined) {
+      return askQ(binding, text, signal, speaker);
+    }
+    const api = dependencies.onboarding;
+    const outcome = await welcome.turn({
+      attribution: {
+        tenantId: binding.actor.tenantId,
+        userId: binding.actor.userId,
+        correlationId: createCorrelationId(),
+      },
+      knownName: null,
+      utterance: text,
+      recentTurns: transcriptOf(binding).slice(0, -1),
+      signal,
+    });
+    if (signal.aborted) {
+      return { kind: "INTERRUPTED", path: "MOVE" };
+    }
+    if (outcome.name !== null && api !== undefined) {
+      try {
+        await updateMe({
+          baseUrl: api.apiBaseUrl,
+          accessToken: binding.accessToken,
+          ...(api.fetch === undefined ? {} : { fetch: api.fetch }),
+          body: { displayName: outcome.name },
+        });
+      } catch (error: unknown) {
+        logger.warn({ err: error }, "the person's name was not recorded");
+      }
+    }
+    dependencies.board?.record(binding.voiceSessionId, {
+      asking: null,
+      navigate:
+        outcome.journey === "FOUNDER"
+          ? "INTERVIEW_FOUNDER"
+          : outcome.journey === "INVESTOR"
+            ? "INTERVIEW_INVESTOR"
+            : null,
+      handoff: null,
+      degraded: outcome.degraded,
+    });
+    if (outcome.questionForQ !== null) {
+      if (outcome.reply.length > 0) {
+        await speakLine(speaker, outcome.reply, signal, binding);
+      }
+      return askQ(binding, outcome.questionForQ, signal, speaker);
+    }
+    return (await speakLine(speaker, outcome.reply, signal, binding))
+      ? { kind: "SPOKEN", path: "MOVE" }
+      : { kind: "INTERRUPTED", path: "MOVE" };
+  };
+
   return async (binding, transcript, signal, speaker) => {
     const text = latestUtterance(transcript);
     if (text === null || signal.aborted) {
       return { kind: "NOTHING" };
     }
     rememberTranscript(binding, transcript);
-    if (binding.thread.onboarding !== undefined) {
-      return answerInterview(binding, text, signal, speaker);
+    const paused = held.get(binding);
+    if (paused !== undefined && isContinueCue(text)) {
+      held.delete(binding);
+      return resumeHeld(paused, binding, signal, speaker);
     }
-    if (thinkingIntent(text)) {
-      return (await speakLine(speaker, TAKE_YOUR_TIME_LINE, signal))
+    let outcome: VoiceTurnOutcome;
+    if (binding.thread.welcome === true) {
+      outcome = await welcomeTurn(binding, text, signal, speaker);
+    } else if (binding.thread.onboarding !== undefined) {
+      outcome = await answerInterview(binding, text, signal, speaker);
+    } else if (thinkingIntent(text)) {
+      outcome = (await speakLine(speaker, TAKE_YOUR_TIME_LINE, signal))
         ? { kind: "SPOKEN", path: "MOVE" }
         : { kind: "INTERRUPTED", path: "MOVE" };
+    } else {
+      outcome = await askQ(binding, text, signal, speaker);
     }
-    return askQ(binding, text, signal, speaker);
+    // An answer that finished while the person talked about something
+    // else is offered once they are done, not dropped.
+    if (
+      paused?.kind === "ANSWER" &&
+      paused.done &&
+      outcome.kind === "SPOKEN" &&
+      !signal.aborted &&
+      held.get(binding) === paused
+    ) {
+      held.delete(binding);
+      await speakLine(
+        speaker,
+        `And on what you asked earlier: ${paused.text}`,
+        signal,
+        binding,
+      );
+    }
+    return outcome;
   };
 }

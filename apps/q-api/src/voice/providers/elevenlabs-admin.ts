@@ -139,6 +139,7 @@ export function createSpeechEngineAdmin(options: { readonly apiKey: string }) {
       const turn = {
         turnTimeout: 10,
         turnEagerness: "patient" as const,
+        turnModel: "turn_v3" as const,
         retranscribeOnTurnTimeout: true,
         interruptionIgnoreTerms: [
           "mm-hm",

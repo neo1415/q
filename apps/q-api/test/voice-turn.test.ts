@@ -134,8 +134,12 @@ function fakeSpeaker(): VoiceSpeaker & { readonly spoken: string[] } {
         speaker.spoken.push(response);
         return;
       }
+      const parts: string[] = [];
       for await (const chunk of response) {
-        speaker.spoken.push(chunk);
+        parts.push(chunk);
+      }
+      if (parts.length > 0) {
+        speaker.spoken.push(parts.join(" ").replace(/\s+/g, " ").trim());
       }
     },
     close: () => undefined,
@@ -554,17 +558,16 @@ describe("a spoken question for Q", () => {
       message: { text: "How big are seed rounds in Nigeria?" },
       subjects: [{ kind: "COMPANY" }],
     });
-    // Spoken sentence by sentence as the deltas arrived, then the bridge back.
+    // Spoken as the deltas arrived (one line), then the bridge back.
     expect(speaker.spoken).toEqual([
-      "Seed rounds in Nigeria typically run from $500k.",
-      "Most close within a quarter.",
+      "Seed rounds in Nigeria typically run from $500k. Most close within a quarter.",
       "Back to where we were. What stage is the company at?",
     ]);
     expect(bound.thread.conversationId).toBe(CONVERSATION_ID);
     expect(runtime.calls.cancelRun).toHaveLength(0);
   });
 
-  it("stops at an interruption: the run is cancelled and nothing stale is spoken (§38)", async () => {
+  it("pauses at an interruption: nothing stale is spoken, the run keeps going, and 'go on' resumes the answer (rework)", async () => {
     const runtime = fakeRuntime();
     const controller = new AbortController();
     const handle = createVoiceTurnHandler({
@@ -581,12 +584,13 @@ describe("a spoken question for Q", () => {
       logger,
     });
     const speaker = fakeSpeaker();
+    const bound = binding({
+      conversationId: undefined,
+      subjects: undefined,
+      onboarding: undefined,
+    });
     const outcome = await handle(
-      binding({
-        conversationId: undefined,
-        subjects: undefined,
-        onboarding: undefined,
-      }),
+      bound,
       [{ role: "user", content: "Tell me about seed rounds" }],
       controller.signal,
       speaker,
@@ -594,12 +598,71 @@ describe("a spoken question for Q", () => {
     expect(outcome).toEqual({ kind: "INTERRUPTED", path: "Q" });
     expect(speaker.spoken).toEqual(["First point."]);
     expect(speaker.spoken.join(" ")).not.toContain("Third");
-    await new Promise((resolve) => setTimeout(resolve, 0));
-    expect(runtime.calls.cancelRun).toHaveLength(1);
-    expect(runtime.calls.cancelRun[0]).toMatchObject({
-      actor: CONTEXT,
-      runId: RUN_ID,
+    // The run is not cancelled: the answer finishes in the background.
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(runtime.calls.cancelRun).toHaveLength(0);
+    // "Go on" speaks the whole answer, from the top.
+    const resumed = await handle(
+      bound,
+      [
+        { role: "user", content: "Tell me about seed rounds" },
+        { role: "user", content: "okay, go on" },
+      ],
+      new AbortController().signal,
+      speaker,
+    );
+    expect(resumed).toEqual({ kind: "SPOKEN", path: "Q" });
+    expect(speaker.spoken.at(-1)).toBe(
+      "First point. Second point. Third point.",
+    );
+    expect(runtime.calls.cancelRun).toHaveLength(0);
+  });
+
+  it("offers a paused answer after the person's next subject, once it has finished (rework)", async () => {
+    const runtime = fakeRuntime();
+    const controller = new AbortController();
+    const handle = createVoiceTurnHandler({
+      qRuntime: runtime.service,
+      qStream: fakeStream(
+        [
+          event("q.message.delta", {
+            messageId: "m1",
+            text: "Seed rounds run small. ",
+          }),
+          event("q.message.delta", {
+            messageId: "m1",
+            text: "Most close fast.",
+          }),
+          event("q.run.completed", { status: "COMPLETED", completedAt: NOW }),
+        ],
+        { abortAfter: 0, controller },
+      ),
+      logger,
     });
+    const speaker = fakeSpeaker();
+    const bound = binding({
+      conversationId: undefined,
+      subjects: undefined,
+      onboarding: undefined,
+    });
+    await handle(
+      bound,
+      [{ role: "user", content: "Tell me about seed rounds" }],
+      controller.signal,
+      speaker,
+    );
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    // A new question: answered first (a fresh run), then the paused answer.
+    const next = await handle(
+      bound,
+      [{ role: "user", content: "Let me think" }],
+      new AbortController().signal,
+      speaker,
+    );
+    expect(next).toEqual({ kind: "SPOKEN", path: "MOVE" });
+    expect(speaker.spoken.at(-1)).toBe(
+      "And on what you asked earlier: Seed rounds run small. Most close fast.",
+    );
   });
 
   it("says it is looking at public sources when the run reaches that stage, once (D §56)", async () => {
@@ -634,8 +697,7 @@ describe("a spoken question for Q", () => {
       speaker,
     );
     expect(speaker.spoken).toEqual([
-      "Let me look at public sources.",
-      "Paystack raised a Series A in 2018.",
+      "Let me look at public sources. Paystack raised a Series A in 2018.",
     ]);
   });
 

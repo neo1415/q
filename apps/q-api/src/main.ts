@@ -113,7 +113,10 @@ import { createSupabaseRequestAuthenticator } from "./security/supabase-authenti
 import { attachVoiceChannel } from "./voice/attach.js";
 import { createVoiceSessionBindings } from "./voice/bindings.js";
 import { createInterviewer } from "./voice/interviewer.js";
+import { createLoggingPronunciationTeacher } from "./voice/pronunciation.js";
+import { createElevenLabsPronunciationTeacher } from "./voice/providers/elevenlabs-pronunciation.js";
 import { createVoiceTurnBoard } from "./voice/turn-board.js";
+import { createWelcomeHost } from "./voice/welcome.js";
 import type { VoiceAttachment } from "./voice/provider.js";
 import { createElevenLabsVoiceProvider } from "./voice/providers/elevenlabs.js";
 import { createVoiceTurnHandler } from "./voice/turn.js";
@@ -478,6 +481,26 @@ const interviewer = createInterviewer({
   expressive: config.voice.expressive,
 });
 const voiceTurnBoard = createVoiceTurnBoard();
+const welcomeHost = createWelcomeHost({
+  gateway: modelGateway,
+  logger,
+  personality: config.voice.personality,
+  expressive: config.voice.expressive,
+});
+const pronunciation =
+  config.secrets.speechProviders.elevenLabs !== undefined &&
+  config.voice.speechEngines !== undefined
+    ? createElevenLabsPronunciationTeacher({
+        apiKey: config.secrets.speechProviders.elevenLabs.reveal(),
+        engineIds: [
+          config.voice.speechEngines.default,
+          ...(config.voice.speechEngines.male === undefined
+            ? []
+            : [config.voice.speechEngines.male]),
+        ],
+        logger,
+      })
+    : createLoggingPronunciationTeacher(logger);
 logger.info(
   {
     speech: speechProviderConfigStatus(speechSecrets, speechEngines),
@@ -509,6 +532,7 @@ const { app, logger: appLogger } = createApp(
             interviewer,
             apiBaseUrl: config.voice.apiBaseUrl,
             board: voiceTurnBoard,
+            welcome: welcomeHost,
           },
         }),
   },
@@ -539,6 +563,8 @@ if (voiceProvider !== undefined) {
       qStream,
       interviewer,
       board: voiceTurnBoard,
+      welcome: welcomeHost,
+      pronunciation,
       orchestration: { orchestrator, autostart: Q_ORCHESTRATION_AUTOSTART },
       ...(apiBaseUrl === undefined ? {} : { onboarding: { apiBaseUrl } }),
       logger,

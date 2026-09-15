@@ -25,6 +25,8 @@ export type VoiceThread = {
   conversationId: CreateQVoiceSessionRequest["conversationId"];
   readonly subjects: CreateQVoiceSessionRequest["subjects"];
   readonly onboarding: CreateQVoiceSessionRequest["onboarding"];
+  /** Q's first minute with a new person: no onboarding session yet. */
+  readonly welcome?: boolean | undefined;
 };
 
 export type VoiceSessionBinding = {

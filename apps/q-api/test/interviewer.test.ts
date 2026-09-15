@@ -168,6 +168,7 @@ const base: InterviewConductorResult = {
   questionForQ: null,
   navigate: null,
   lookup: null,
+  pronounce: null,
 };
 
 function turnInput(fetchFake: typeof fetch, utterance: string) {

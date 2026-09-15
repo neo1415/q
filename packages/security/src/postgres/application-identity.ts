@@ -28,6 +28,11 @@ export type ApplicationIdentityLookup = {
   readonly lookup: (
     principal: AuthenticatedPrincipal,
   ) => Promise<ApplicationIdentity | null>;
+  /** Record what the person asks to be called; false when no active profile exists. */
+  readonly updateDisplayName?: (
+    principal: AuthenticatedPrincipal,
+    displayName: string,
+  ) => Promise<boolean>;
 };
 
 const RowSchema = z.object({
@@ -65,6 +70,15 @@ export function createPostgresApplicationIdentityLookup(options: {
         userId: parsed.data.id,
         displayName: parsed.data.display_name,
       };
+    },
+    updateDisplayName: async (principal, displayName) => {
+      const rows = await sql`
+        update identity.user_profiles
+           set display_name = ${displayName}
+         where auth_user_id = ${principal.authUserId}
+           and status = 'active'
+        returning id`;
+      return rows.length > 0;
     },
   };
 }

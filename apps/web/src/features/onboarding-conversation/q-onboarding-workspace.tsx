@@ -27,6 +27,11 @@ import type { TaxonomyCandidateView } from "../onboarding-kit/client";
 import type { SessionPresentation } from "../onboarding-kit/session";
 import { askQAction, readQRunAction } from "../q/actions";
 import { useVoiceInterview } from "../voice/use-voice-interview";
+import {
+  materialListAction,
+  materialUploadCompleteAction,
+  materialUploadTargetAction,
+} from "../onboarding-kit/material-actions";
 import { destinationPath } from "../voice/destinations";
 import { VoiceStage } from "../voice/voice-stage";
 import {
@@ -846,6 +851,82 @@ export function QOnboardingWorkspace({
     });
   };
 
+  // A document dropped in while talking: uploaded through the evidence
+  // path, watched until it is read, then handed to Q in words — the same
+  // proposals a typed upload produces, read back aloud (rework: "drop
+  // your profile and Q reads it back").
+  const [uploadNote, setUploadNote] = useState<string | null>(null);
+  const companyIdForUpload =
+    qSubject !== undefined && "companyId" in qSubject
+      ? qSubject.companyId
+      : undefined;
+  const uploadWhileTalking = useCallback(
+    async (file: File) => {
+      if (companyIdForUpload === undefined) return;
+      setUploadNote(`Uploading ${file.name}`);
+      const target = await materialUploadTargetAction({
+        companyId: companyIdForUpload,
+        documentType: /deck/i.test(file.name)
+          ? "PITCH_DECK"
+          : "COMPANY_PROFILE",
+        filename: file.name,
+        mimeType: file.type.length > 0 ? file.type : "application/octet-stream",
+        sizeBytes: file.size,
+      });
+      if (!target.ok) {
+        setUploadNote(target.message);
+        return;
+      }
+      try {
+        const put = await fetch(target.value.url, {
+          method: target.value.method,
+          headers: target.value.headers,
+          body: file,
+        });
+        if (!put.ok) {
+          setUploadNote("The upload didn't complete. Try again.");
+          return;
+        }
+      } catch {
+        setUploadNote("The upload didn't complete. Check your connection.");
+        return;
+      }
+      const done = await materialUploadCompleteAction(
+        target.value.uploadSessionId,
+      );
+      if (!done.ok) {
+        setUploadNote(done.message);
+        return;
+      }
+      setUploadNote(`Reading ${file.name}`);
+      // Wait for the reading to land (bounded), then let Q take it from there.
+      const startedAt = Date.now();
+      let ready = false;
+      while (Date.now() - startedAt < 120_000) {
+        await new Promise((resolve) => setTimeout(resolve, 3_000));
+        const listed = await materialListAction(companyIdForUpload);
+        if (!listed.ok) break;
+        const item = listed.value.find((f) => f.id === done.value.documentId);
+        if (item !== undefined && item.state === "ready") {
+          ready = true;
+          break;
+        }
+        if (item !== undefined && item.state === "unreadable") {
+          setUploadNote(item.stateLabel);
+          return;
+        }
+      }
+      setUploadNote(null);
+      await actions.refresh();
+      voiceSendText(
+        ready
+          ? `I've just uploaded ${file.name}. Read back what you found in it and check it with me.`
+          : `I've just uploaded ${file.name}; it's still being read. Carry on and come back to it when it's ready.`,
+      );
+    },
+    [companyIdForUpload, actions, voiceSendText],
+  );
+
   // Q takes the person somewhere, or leaves them with the form: followed
   // once per turn, never twice.
   const followedTurn = useRef(0);
@@ -938,6 +1019,10 @@ export function QOnboardingWorkspace({
           onDismissNotice={voice.clearNotice}
           asking={voice.turn?.asking ?? null}
           onSay={(text) => voiceSendText(text)}
+          onUpload={
+            companyIdForUpload === undefined ? undefined : uploadWhileTalking
+          }
+          uploadNote={uploadNote}
           onUseForm={
             prompt !== null &&
             vocabulary.editorFor(prompt.stepKey) !== undefined

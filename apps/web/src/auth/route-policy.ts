@@ -10,6 +10,7 @@
 
 export const PROTECTED_PATH_PREFIXES = [
   "/home",
+  "/welcome",
   "/discover",
   "/capital",
   "/profile",

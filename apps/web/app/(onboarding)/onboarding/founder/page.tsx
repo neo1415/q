@@ -25,6 +25,7 @@ export default async function FounderOnboardingPage({
 }) {
   const config = loadWebServerConfig();
   const params = await searchParams;
+  const startTalking = params["talk"] === "1";
   const rawSeed = params["fixture"];
   const seed =
     config.founderOnboardingAdapter === "fixture" && typeof rawSeed === "string"
@@ -35,6 +36,7 @@ export default async function FounderOnboardingPage({
     <FounderOnboardingScreen
       adapter={config.founderOnboardingAdapter}
       seed={seed}
+      startTalking={startTalking}
     />
   );
 }

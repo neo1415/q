@@ -12,6 +12,8 @@ const ROUTES: Readonly<Record<QVoiceDestination, string | null>> = {
   DISCOVER: "/discover",
   COMPANY_VISIBILITY: "/company/visibility",
   INTERVIEW: null,
+  INTERVIEW_FOUNDER: "/onboarding/founder?talk=1",
+  INTERVIEW_INVESTOR: "/onboarding/investor?talk=1",
   FORM: null,
 };
 

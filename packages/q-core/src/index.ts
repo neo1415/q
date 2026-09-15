@@ -73,6 +73,16 @@ export {
 } from "./personality.js";
 export { COMPANY_ANALYST_V1 } from "./prompts/tasks/company-analyst.v1.js";
 export { INTERVIEW_CONDUCTOR_V1 } from "./prompts/tasks/interview-conductor.v1.js";
+export { WELCOME_CONDUCTOR_V1 } from "./prompts/tasks/welcome-conductor.v1.js";
+export {
+  WELCOME_CONDUCTOR_SCHEMA_NAME,
+  WELCOME_CONDUCTOR_SCHEMA_VERSION,
+  WELCOME_CONDUCTOR_UNTRUSTED,
+  WelcomeConductorResultSchema,
+  WelcomeConductorVariablesSchema,
+  type WelcomeConductorResult,
+  type WelcomeConductorVariables,
+} from "./prompts/schemas/welcome-conductor.js";
 export {
   INTERVIEW_CONDUCTOR_SCHEMA_NAME,
   INTERVIEW_CONDUCTOR_SCHEMA_VERSION,

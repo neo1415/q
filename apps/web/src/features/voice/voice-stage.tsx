@@ -32,6 +32,10 @@ export type VoiceStageProps = {
   /** A tapped option, a set of them, or typed words: said to Q, the same path as speaking. */
   readonly onSay: (text: string) => void;
   readonly onUseForm: (() => void) | undefined;
+  /** Drop a deck or profile in while talking; Q reads it back next. */
+  readonly onUpload?: ((file: File) => Promise<void>) | undefined;
+  /** What the surface says about a document in flight, if any. */
+  readonly uploadNote?: string | null | undefined;
   readonly progress: readonly {
     readonly label: string;
     readonly done: number;
@@ -132,6 +136,8 @@ export function VoiceStage({
   asking,
   onSay,
   onUseForm,
+  onUpload,
+  uploadNote,
   progress,
 }: VoiceStageProps) {
   const [typing, setTyping] = useState(false);
@@ -139,6 +145,8 @@ export function VoiceStage({
   const [picks, setPicks] = useState<readonly string[]>([]);
   const [showAll, setShowAll] = useState(false);
   const inputId = useId();
+  const fileId = useId();
+  const [uploading, setUploading] = useState(false);
   const listRef = useRef<HTMLOListElement>(null);
 
   const lines = client.transcript;
@@ -261,6 +269,9 @@ export function VoiceStage({
           </ol>
         ) : null}
 
+        {uploadNote !== null && uploadNote !== undefined ? (
+          <span className="cq-caption text-white/55">{uploadNote}</span>
+        ) : null}
         {notice !== null ? (
           <div className="flex items-center gap-3 rounded-xl bg-white/10 px-4 py-3">
             <span className="cq-body text-white/85">{notice}</span>
@@ -392,6 +403,33 @@ export function VoiceStage({
           >
             Type
           </button>
+          {onUpload !== undefined ? (
+            <>
+              <input
+                id={fileId}
+                type="file"
+                accept=".pdf,.ppt,.pptx,.doc,.docx,.txt,application/pdf"
+                className="sr-only"
+                disabled={uploading}
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  event.target.value = "";
+                  if (file === undefined) return;
+                  setUploading(true);
+                  void onUpload(file).finally(() => setUploading(false));
+                }}
+              />
+              <label
+                htmlFor={fileId}
+                className={
+                  uploading ? "cq-stage-control is-active" : "cq-stage-control"
+                }
+                aria-busy={uploading}
+              >
+                {uploading ? "Reading" : "Upload"}
+              </label>
+            </>
+          ) : null}
           {voices.length > 1 ? (
             <div
               className="flex items-center gap-1"

@@ -9,6 +9,7 @@ import {
   Q_VOICE_TURN_PATH,
   QVoiceTurnStateSchema,
 } from "@capital-q/contracts";
+import { fetchMe } from "@capital-q/api-client";
 import { createCorrelationId, getMeter } from "@capital-q/observability";
 import { AuthenticationRequiredError } from "@capital-q/security";
 import { extractBearerToken } from "@capital-q/security/supabase";
@@ -26,6 +27,7 @@ import {
 import type { Interviewer } from "./interviewer.js";
 import type { RealtimeVoiceProvider } from "./provider.js";
 import type { VoiceTurnBoard } from "./turn-board.js";
+import type { WelcomeHost } from "./welcome.js";
 
 /**
  * `POST /v1/q/voice/sessions` (CQ-Q-VOICE-001 C §31, §34; doc 12 §7.2,
@@ -53,6 +55,8 @@ export type QVoiceRoutesDependencies = ActorContextDependencies & {
   readonly apiBaseUrl?: string | undefined;
   /** The turn board, for the screen to read what Q is asking. */
   readonly board?: VoiceTurnBoard | undefined;
+  /** Q's first minute with a new person. */
+  readonly welcome?: WelcomeHost | undefined;
   readonly now?: (() => number) | undefined;
 };
 
@@ -133,6 +137,7 @@ export function registerQVoiceRoutes(
           conversationId: input.conversationId,
           subjects: input.subjects,
           onboarding: input.onboarding,
+          welcome: input.welcome === true,
         },
         issuedAt,
         connectBy: issuedAt + VOICE_CONNECT_WINDOW_MS,
@@ -149,7 +154,32 @@ export function registerQVoiceRoutes(
       let firstMessage: string | undefined;
       const interviewer = dependencies.interviewer;
       const apiBaseUrl = dependencies.apiBaseUrl;
-      if (
+      if (input.welcome === true && dependencies.welcome !== undefined) {
+        let knownName: string | null = null;
+        if (apiBaseUrl !== undefined) {
+          try {
+            const me = await fetchMe({ baseUrl: apiBaseUrl, accessToken });
+            knownName = me.user.displayName;
+          } catch {
+            // Unknown name is a fine state to open from.
+          }
+        }
+        try {
+          const opening = await dependencies.welcome.turn({
+            attribution: {
+              tenantId: actor.tenantId,
+              userId: actor.userId,
+              correlationId: createCorrelationId(),
+            },
+            knownName,
+            utterance: "",
+            recentTurns: [],
+          });
+          firstMessage = opening.reply;
+        } catch (error: unknown) {
+          request.log.warn({ err: error }, "welcome opening line unavailable");
+        }
+      } else if (
         input.onboarding !== undefined &&
         interviewer !== undefined &&
         apiBaseUrl !== undefined
