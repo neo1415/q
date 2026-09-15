@@ -344,3 +344,45 @@ Tests: `test/negation.test.ts`, `test/cross-step.test.ts`,
 `test/taxonomy-phrases.test.ts`, `test/correction.test.ts`, and the
 integration case "one sentence answers many questions" in
 `test/onboarding.integration.test.ts`.
+
+## The interview without the robot (CQ-Q-VOICE-001 B)
+
+The Q-led workspace (`apps/web/src/features/onboarding-conversation/`) asks one
+question at a time, and the controls for that question are the input:
+
+- **Single select / confirmation**: a tap submits the option's own value through
+  the client's `submitValue` (the runtime's normal `submit`, validated like the
+  form's). No "Answer" button, no second click. **Multi select**: chips toggle;
+  "Done" submits the set; a stand-alone option ("Nothing yet") submits at once.
+  "I don't know" and "Skip" are one click each.
+- **Categories** (a `reference_select` over `TAXONOMY_NODE`): Q's pending
+  proposal for the step is shown as "I think these are the closest fits" with
+  the nodes as selected chips; "Keep these" accepts the suggestion, an adjusted
+  set corrects it (`EDIT`), and "Search categories" runs the real classifier over
+  the person's words to add more. Only real taxonomy nodes ever appear.
+- **Gaps** (pending interview questions) sit behind a small "N things left to
+  settle · Review remaining gaps" entry. Each gap is answered in place: the
+  question's own options, else the step's real options from the definition,
+  else a figure or a line — the form only when nothing else fits. "Skip this"
+  sets it aside.
+- **Text and options together**: the composer is always enabled; typing on a
+  select step is read by the runtime like any utterance.
+- **Tangents**: a question for Q — a "?" or the shape of a request ("Tell me
+  about…", "Can you check…", "Look up…") — is answered in the same thread over
+  the Q event stream (the approved stage labels show while it works), in one
+  continuing Q conversation, and the live question returns afterwards.
+- **Resume / pause**: "Let's continue.", "Where were we?", "Back to onboarding.",
+  "Carry on." bring the live question back; "Let's stop here.", "I'll finish
+  this later.", "Pause the interview." acknowledge that everything is already
+  persisted. Neither touches the runtime; nothing is completed on the person's
+  behalf.
+- **Welcome back** is said only after a real absence: `RESUME_AFTER_MS` (30
+  minutes) since the session's own `lastActivityAt`. A refresh, "Use the form"
+  and back, or a second tab a moment later greets nobody.
+- **Form mode** remains ("Use the form" / "Review as form"); both views read and
+  write the same session.
+
+Tests: `apps/web/test/onboarding-conversation.test.ts` (structured chips, multi
+select limits, taxonomy control, gap controls, resume/pause, request detection,
+the time-gated greeting) and the browser journey
+`tests/e2e/onboarding-conversation.desktop.spec.ts` against the real API.

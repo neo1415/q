@@ -2,48 +2,78 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import type {
-  OnboardingResponseValue,
-  OnboardingUnderstanding,
+import {
+  createQStreamState,
+  reduceQStream,
+  streamQRunEvents,
+  type QStreamState,
+} from "@capital-q/api-client";
+import {
+  isTerminalQStreamEvent,
+  Q_VISIBLE_STAGE_LABELS,
+  type OnboardingResponseValue,
+  type OnboardingUnderstanding,
 } from "@capital-q/contracts";
 import { Button } from "@capital-q/ui/button";
+import { ChoiceChip } from "@capital-q/ui/chip";
+import { Input } from "@capital-q/ui/input";
 import { QComposer } from "@capital-q/ui/q-composer";
 import { QStateIndicator } from "@capital-q/ui/q-state";
 import { InlineNotice } from "@capital-q/ui/states";
 
-import { askQAction, readQRunAction } from "../q/actions";
+import type { TaxonomyCandidateView } from "../onboarding-kit/client";
 import type { SessionPresentation } from "../onboarding-kit/session";
+import { askQAction, readQRunAction } from "../q/actions";
 import {
   acknowledge,
+  acknowledgeValue,
+  BRIDGE_LINE,
+  gapValue,
+  isTaxonomySuggestion,
   looksLikeQuestionForQ,
+  PAUSED_LINE,
+  pauseIntent,
   pickedUp,
   progressLines,
   promptFor,
+  remainingCount,
+  resumeIntent,
+  resumeLine,
   reviewLines,
   stillNeeded,
+  taxonomyProposal,
   welcomeBack,
   type JourneyVocabulary,
   type QPrompt,
+  type QuickChip,
+  type StillNeeded,
 } from "./conversation";
 
 /**
- * The Q-led onboarding workspace (CQ-PRE-REC-001 §15-§30).
+ * The Q-led onboarding workspace (CQ-PRE-REC-001 §15-§30; CQ-Q-VOICE-001 B
+ * §16-§27).
  *
  * One Q, for founders and investors alike: the same thread, the same
  * composer, the same quick controls, driven by each journey's own
- * definition through the onboarding runtime. Q asks one step at a time,
- * shows what it picked up for confirmation, keeps the gaps it still wants
- * closed in view, and lets the person open any item in the structured
- * editor. Every answer — a tapped chip, a typed sentence, a confirmed
- * proposal — reaches the runtime through the same validated paths the
- * form uses. Nothing in this component is a source of truth: the thread
- * is rebuilt from the session on every load, and the session is the
- * runtime's.
+ * definition through the onboarding runtime. Q asks one step at a time and
+ * the controls for that step are the input — a tap on an option submits
+ * it, several taps and "Done" submit a set, a typed sentence is read, and a
+ * question for Q is answered in the same thread before the interview
+ * resumes. What Q picked up is offered for confirmation; the gaps it still
+ * wants closed sit behind a small entry, each answerable in place. Every
+ * answer reaches the runtime through the same validated paths the form
+ * uses. Nothing in this component is a source of truth: the thread is
+ * rebuilt from the session on every load, and the session is the runtime's.
  */
 
 export type QOnboardingWorkspaceActions = {
   readonly say: (text: string) => Promise<OnboardingUnderstanding | null>;
   readonly skip: () => Promise<void>;
+  /** A tapped option, as the value it stands for (CQ-Q-VOICE-001 B §17). */
+  readonly submitValue: (input: {
+    readonly stepKey: string;
+    readonly value: OnboardingResponseValue;
+  }) => Promise<boolean>;
   readonly resolveSuggestion: (input: {
     readonly suggestionId: string;
     readonly resolution: "ACCEPT" | "EDIT" | "REJECT";
@@ -55,6 +85,9 @@ export type QOnboardingWorkspaceActions = {
     readonly value: OnboardingResponseValue;
   }) => Promise<boolean>;
   readonly dismissQuestion: (questionId: string) => Promise<boolean>;
+  readonly findTaxonomyCandidates: (
+    text: string,
+  ) => Promise<readonly TaxonomyCandidateView[]>;
   readonly refresh: () => Promise<void>;
 };
 
@@ -88,9 +121,39 @@ const READING_MAX_POLLS = 20;
 const Q_POLL_MS = 1500;
 const Q_MAX_POLLS = 40;
 const FINISHED_RUNS = new Set(["COMPLETED", "FAILED", "CANCELLED", "EXPIRED"]);
+/** Where the browser reaches the Q event stream. Same origin, cookie-authenticated. */
+const STREAM_BASE_URL = "/api/q-stream";
+const TAXONOMY_SEARCH_MIN = 2;
+const TAXONOMY_SEARCH_DEBOUNCE_MS = 250;
+
+/** What was tapped or typed on one step, remembered against that step (§17, §19). */
+type StepDraft = {
+  readonly stepKey: string | null;
+  readonly picks: readonly string[];
+  readonly taxonomyPicks:
+    readonly { readonly nodeId: string; readonly label: string }[] | null;
+  readonly taxonomyQuery: string;
+  readonly taxonomyResults: readonly TaxonomyCandidateView[];
+};
+const EMPTY_RESULTS: readonly TaxonomyCandidateView[] = [];
+const EMPTY_STEP_DRAFT: StepDraft = {
+  stepKey: null,
+  picks: [],
+  taxonomyPicks: null,
+  taxonomyQuery: "",
+  taxonomyResults: EMPTY_RESULTS,
+};
 
 function newId(): string {
   return crypto.randomUUID();
+}
+
+function sameSet(a: readonly string[], b: readonly string[]): boolean {
+  if (a.length !== b.length) {
+    return false;
+  }
+  const seen = new Set(a);
+  return b.every((item) => seen.has(item));
 }
 
 export function QOnboardingWorkspace({
@@ -106,7 +169,8 @@ export function QOnboardingWorkspace({
 }: QOnboardingWorkspaceProps) {
   const view = session.raw;
   // The greeting is read once, from persisted state, when the workspace
-  // opens (§26). It is never derived from anything the browser remembers.
+  // opens — and only after a genuine absence, measured from the session's
+  // own last activity (§26). Never from anything the browser remembers.
   const [greeting] = useState<string | null>(() =>
     view === undefined ? null : welcomeBack(view, vocabulary),
   );
@@ -114,10 +178,28 @@ export function QOnboardingWorkspace({
   const [reading, setReading] = useState(false);
   const [readingPolls, setReadingPolls] = useState(0);
   const [askingQ, setAskingQ] = useState(false);
+  const [qStream, setQStream] = useState<QStreamState | null>(null);
   const [showReview, setShowReview] = useState(false);
+  const [showGaps, setShowGaps] = useState(false);
   /** After an ambiguous answer, only the options that fit are offered. */
   const [narrowedTo, setNarrowedTo] = useState<readonly string[] | null>(null);
+  /**
+   * What was tapped on the step Q is asking (§17, §19): multi-select
+   * picks, the categories kept, the search typed and what it found. All
+   * of it is remembered against that step's key, so a new step starts
+   * clean without anything being reset.
+   */
+  const [stepDraft, setStepDraft] = useState<StepDraft>(EMPTY_STEP_DRAFT);
+  const [gapDrafts, setGapDrafts] = useState<Readonly<Record<string, string>>>(
+    {},
+  );
+  const [gapPicks, setGapPicks] = useState<
+    Readonly<Record<string, readonly string[]>>
+  >({});
   const endRef = useRef<HTMLDivElement>(null);
+  /** The Q conversation a tangent continues in, so follow-ups keep their thread (§23). */
+  const qConversationId = useRef<string | undefined>(undefined);
+  const streamAbort = useRef<AbortController | null>(null);
 
   const push = useCallback((kind: Turn["kind"], text: string) => {
     setTurns((current) => [...current, { id: newId(), kind, text }]);
@@ -143,12 +225,79 @@ export function QOnboardingWorkspace({
     () => (view === undefined ? [] : progressLines(view, vocabulary)),
     [view, vocabulary],
   );
+  const remaining = view === undefined ? 0 : remainingCount(view);
   const isFinal =
     prompt !== null && vocabulary.finalStepKeys.includes(prompt.stepKey);
+  const taxonomy = useMemo(
+    () =>
+      view === undefined || prompt === null || prompt.control !== "taxonomy"
+        ? null
+        : taxonomyProposal(view, prompt.stepKey, labels),
+    [view, prompt, labels],
+  );
+  // Proposals for the category step Q is asking are shown as that step's
+  // control, not twice; the confirmation card keeps the rest.
+  const otherProposals = useMemo(
+    () =>
+      taxonomy === null || prompt === null
+        ? proposals
+        : proposals.filter(
+            (item) => !isTaxonomySuggestion(item.suggestion, prompt.stepKey),
+          ),
+    [proposals, taxonomy, prompt],
+  );
   // Q's reading has landed when the session now carries proposals or
   // questions; the thread says so without another piece of state.
   const readingLanded = reading && proposals.length + gaps.length > 0;
   const readingTimedOut = reading && readingPolls >= READING_MAX_POLLS;
+
+  // A new step means fresh picks; nothing tapped for one step leaks into
+  // the next. The taxonomy set starts from Q's proposal when there is one.
+  const stepKey = prompt?.stepKey ?? null;
+  const draft = stepDraft.stepKey === stepKey ? stepDraft : EMPTY_STEP_DRAFT;
+  const picks = draft.picks;
+  const taxonomyPicks = draft.taxonomyPicks;
+  const taxonomyQuery = draft.taxonomyQuery;
+  const taxonomyResults =
+    taxonomyQuery.trim().length >= TAXONOMY_SEARCH_MIN
+      ? draft.taxonomyResults
+      : EMPTY_RESULTS;
+  const updateDraft = useCallback(
+    (change: (current: StepDraft) => Partial<StepDraft>) => {
+      setStepDraft((current) => {
+        const base =
+          current.stepKey === stepKey
+            ? current
+            : { ...EMPTY_STEP_DRAFT, stepKey };
+        return { ...base, ...change(base) };
+      });
+    },
+    [stepKey],
+  );
+  const setPicks = useCallback(
+    (next: (current: readonly string[]) => readonly string[]) =>
+      updateDraft((current) => ({ picks: next(current.picks) })),
+    [updateDraft],
+  );
+  const setTaxonomyPicks = useCallback(
+    (next: readonly { readonly nodeId: string; readonly label: string }[]) =>
+      updateDraft(() => ({ taxonomyPicks: next })),
+    [updateDraft],
+  );
+  const setTaxonomyQuery = useCallback(
+    (next: string) => updateDraft(() => ({ taxonomyQuery: next })),
+    [updateDraft],
+  );
+  const setTaxonomyResults = useCallback(
+    (next: readonly TaxonomyCandidateView[]) =>
+      updateDraft(() => ({ taxonomyResults: next })),
+    [updateDraft],
+  );
+  const proposedNodes = taxonomy?.nodes;
+  const keptTaxonomy = useMemo(
+    () => taxonomyPicks ?? proposedNodes ?? [],
+    [taxonomyPicks, proposedNodes],
+  );
 
   useEffect(() => {
     endRef.current?.scrollIntoView({
@@ -157,7 +306,7 @@ export function QOnboardingWorkspace({
         : "smooth",
       block: "nearest",
     });
-  }, [turns.length, proposals.length, gaps.length]);
+  }, [turns.length, proposals.length, gaps.length, qStream?.partial?.text]);
 
   // While Q is reading a free-text turn, re-read the session on a timer
   // through the same client; the proposals arrive as its state.
@@ -171,6 +320,42 @@ export function QOnboardingWorkspace({
     }, READING_POLL_MS);
     return () => clearInterval(timer);
   }, [reading, readingLanded, readingTimedOut, actions]);
+
+  // Taxonomy search: the real classifier over the person's own words, a
+  // moment after they stop typing (§19). Nothing is assigned by searching.
+  const taxonomyControl = prompt?.control === "taxonomy";
+  useEffect(() => {
+    const query = taxonomyQuery.trim();
+    if (!taxonomyControl || query.length < TAXONOMY_SEARCH_MIN) {
+      return;
+    }
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      actions
+        .findTaxonomyCandidates(query)
+        .then((results) => {
+          if (!cancelled) {
+            setTaxonomyResults(results);
+          }
+        })
+        .catch(() => {
+          if (!cancelled) {
+            setTaxonomyResults([]);
+          }
+        });
+    }, TAXONOMY_SEARCH_DEBOUNCE_MS);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [taxonomyQuery, taxonomyControl, actions, setTaxonomyResults]);
+
+  useEffect(
+    () => () => {
+      streamAbort.current?.abort();
+    },
+    [],
+  );
 
   const settleReading = useCallback(() => {
     setReading(false);
@@ -203,18 +388,81 @@ export function QOnboardingWorkspace({
     [push, vocabulary, onEdit],
   );
 
+  /** The last answer a finished run recorded, or its clarifying question. */
+  const answerOf = useCallback((state: QStreamState): string | undefined => {
+    const text = state.messages
+      .filter((message) => message.role === "Q")
+      .map((message) => message.text ?? "")
+      .filter((value) => value.length > 0)
+      .at(-1);
+    if (text !== undefined) {
+      return text;
+    }
+    return state.clarification?.question;
+  }, []);
+
+  /**
+   * A question for Q, answered in the same thread (§23). The run streams
+   * through the web app's own event route, so the answer appears as it is
+   * written and the stage Q is in is shown by its approved label; a stream
+   * that cannot be opened falls back to reading the finished run. Every
+   * tangent continues the same Q conversation, and the interview resumes
+   * where the session says it is.
+   */
   const askQ = useCallback(
     async (question: string) => {
       setAskingQ(true);
+      setQStream(null);
       try {
-        const started = await askQAction(question, undefined, qSubject);
+        const started = await askQAction(
+          question,
+          qConversationId.current,
+          qSubject,
+        );
         if (!started.ok) {
           push("Q", started.message);
           return;
         }
+        qConversationId.current =
+          started.value.conversationId ?? qConversationId.current;
+        const runId = started.value.runId;
+
+        streamAbort.current?.abort();
+        const controller = new AbortController();
+        streamAbort.current = controller;
+        let state = createQStreamState();
+        let streamed = false;
+        try {
+          await streamQRunEvents(
+            { baseUrl: STREAM_BASE_URL, accessToken: "" },
+            runId,
+            {
+              signal: controller.signal,
+              onEvent: (event) => {
+                state = reduceQStream(state, event);
+                setQStream(state);
+                if (isTerminalQStreamEvent(event)) {
+                  streamed = true;
+                  controller.abort();
+                }
+              },
+            },
+          );
+        } catch {
+          // The stream could not be opened or dropped; the run itself may
+          // still finish. Read it back below rather than claiming failure.
+        }
+        if (streamed) {
+          push(
+            "Q",
+            answerOf(state) ??
+              "I couldn't answer that just now. Let's carry on; you can ask again later.",
+          );
+          return;
+        }
         for (let polls = 0; polls < Q_MAX_POLLS; polls += 1) {
           await new Promise((resolve) => setTimeout(resolve, Q_POLL_MS));
-          const run = await readQRunAction(started.value.runId);
+          const run = await readQRunAction(runId);
           if (!run.ok) {
             push("Q", run.message);
             return;
@@ -240,9 +488,10 @@ export function QOnboardingWorkspace({
         );
       } finally {
         setAskingQ(false);
+        setQStream(null);
       }
     },
-    [push, qSubject],
+    [push, qSubject, answerOf],
   );
 
   const say = useCallback(
@@ -259,8 +508,21 @@ export function QOnboardingWorkspace({
       push("PERSON", trimmed);
       settleReading();
       setNarrowedTo(null);
+      // The interview's own moves (§24-§25): leaving for now, or coming back
+      // from a tangent. Both are answered from the session, not the runtime.
+      if (pauseIntent(trimmed)) {
+        push("Q", PAUSED_LINE);
+        return;
+      }
+      if (resumeIntent(trimmed)) {
+        push("Q", resumeLine(prompt));
+        return;
+      }
       if (looksLikeQuestionForQ(trimmed)) {
         await askQ(trimmed);
+        if (prompt !== null) {
+          push("Q", BRIDGE_LINE);
+        }
         return;
       }
       // Prose on a narrative step is committed as the answer and also read
@@ -280,6 +542,136 @@ export function QOnboardingWorkspace({
     [prompt, push, settleReading, askQ, handleUnderstanding, actions],
   );
 
+  /**
+   * A tapped option is submitted as the value it stands for — one tap, no
+   * "Answer" gate, no text round trip (§17-§18). A chip without a value
+   * (an older definition) says its label instead, which reaches the same
+   * runtime path.
+   */
+  const submitChip = useCallback(
+    async (chip: QuickChip, spoken?: string) => {
+      if (prompt === null) {
+        return;
+      }
+      if (chip.value === undefined) {
+        await say(chip.say);
+        return;
+      }
+      push("Q", prompt.text);
+      push("PERSON", spoken ?? chip.label);
+      settleReading();
+      setNarrowedTo(null);
+      const ok = await actions.submitValue({
+        stepKey: prompt.stepKey,
+        value: chip.value,
+      });
+      if (ok) {
+        push("Q", acknowledgeValue(prompt.stepKey, chip.value, vocabulary));
+      }
+    },
+    [prompt, say, push, settleReading, actions, vocabulary],
+  );
+
+  const submitPicks = useCallback(async () => {
+    if (prompt === null || picks.length === 0) {
+      return;
+    }
+    const value: OnboardingResponseValue = {
+      type: "MULTI_SELECT",
+      optionKeys: [...picks],
+    };
+    const chosen = prompt.chips.filter(
+      (chip) => chip.optionKey !== undefined && picks.includes(chip.optionKey),
+    );
+    push("Q", prompt.text);
+    push("PERSON", chosen.map((chip) => chip.label).join(", "));
+    settleReading();
+    const ok = await actions.submitValue({ stepKey: prompt.stepKey, value });
+    if (ok) {
+      push("Q", acknowledgeValue(prompt.stepKey, value, vocabulary));
+    }
+  }, [prompt, picks, push, settleReading, actions, vocabulary]);
+
+  const togglePick = (chip: QuickChip) => {
+    const key = chip.optionKey;
+    if (key === undefined) {
+      return;
+    }
+    if (chip.exclusive) {
+      void submitChip(chip);
+      return;
+    }
+    setPicks((current) => {
+      if (current.includes(key)) {
+        return current.filter((item) => item !== key);
+      }
+      const limit = prompt?.maxSelections ?? Number.POSITIVE_INFINITY;
+      return current.length >= limit ? current : [...current, key];
+    });
+  };
+
+  /**
+   * Keep the categories shown: Q's proposal accepted as is, corrected to
+   * what was adjusted, or — when Q proposed nothing — the person's own
+   * picks submitted directly. Real taxonomy nodes only, whichever way (§19).
+   */
+  const keepTaxonomy = useCallback(async () => {
+    if (prompt === null || keptTaxonomy.length === 0) {
+      return;
+    }
+    const value: OnboardingResponseValue = {
+      type: "RESOURCE_REFERENCE",
+      resourceType: "TAXONOMY_NODE",
+      resourceIds: keptTaxonomy.map((node) => node.nodeId),
+    };
+    const spoken = keptTaxonomy.map((node) => node.label).join(", ");
+    push("Q", prompt.text);
+    push("PERSON", spoken);
+    settleReading();
+    let ok: boolean;
+    if (taxonomy === null) {
+      ok = await actions.submitValue({ stepKey: prompt.stepKey, value });
+    } else {
+      const unchanged = sameSet(
+        taxonomy.nodes.map((node) => node.nodeId),
+        value.resourceIds,
+      );
+      ok = await actions.resolveSuggestion({
+        suggestionId: taxonomy.suggestion.id,
+        resolution: unchanged ? "ACCEPT" : "EDIT",
+        ...(unchanged ? {} : { response: value }),
+      });
+    }
+    if (ok) {
+      push("Q", `${vocabulary.stepTitle(prompt.stepKey)}: ${spoken}. Noted.`);
+    }
+  }, [
+    prompt,
+    keptTaxonomy,
+    taxonomy,
+    push,
+    settleReading,
+    actions,
+    vocabulary,
+  ]);
+
+  const toggleTaxonomy = (node: {
+    readonly nodeId: string;
+    readonly label: string;
+  }) => {
+    const current = keptTaxonomy;
+    const kept = current.some((item) => item.nodeId === node.nodeId);
+    if (kept) {
+      setTaxonomyPicks(current.filter((item) => item.nodeId !== node.nodeId));
+      return;
+    }
+    const limit = prompt?.maxSelections ?? Number.POSITIVE_INFINITY;
+    if (current.length >= limit) {
+      return;
+    }
+    setTaxonomyPicks([...current, node]);
+  };
+
   // A step with exactly one candidate is answered by Q, once, with a line
   // saying so (§38). The ref remembers the step so a re-render or a failed
   // save never answers it twice.
@@ -292,9 +684,9 @@ export function QOnboardingWorkspace({
     ) {
       return;
     }
-    const { stepKey, autoSay, autoNote } = prompt;
+    const { stepKey: autoStep, autoSay, autoNote } = prompt;
     const timer = setTimeout(() => {
-      autoAnsweredRef.current = stepKey;
+      autoAnsweredRef.current = autoStep;
       if (autoNote !== undefined) {
         push("Q", autoNote);
       }
@@ -312,10 +704,28 @@ export function QOnboardingWorkspace({
     await actions.resolveSuggestion({ suggestionId, resolution: "REJECT" });
   };
   const keepAll = async () => {
-    for (const item of proposals) {
+    for (const item of otherProposals) {
       await keep(item.suggestion.id);
     }
     push("Q", "All kept. Thank you.");
+  };
+
+  /** A gap answered in place, through the question's own path (§16, §21). */
+  const answerGap = async (
+    gap: StillNeeded,
+    value: OnboardingResponseValue,
+    spoken: string,
+  ) => {
+    push("Q", gap.question.question);
+    push("PERSON", spoken);
+    const ok = await actions.answerQuestion({
+      questionId: gap.question.id,
+      stepKey: gap.question.stepKey,
+      value,
+    });
+    if (ok) {
+      push("Q", acknowledgeValue(gap.question.stepKey, value, vocabulary));
+    }
   };
 
   if (view === undefined) {
@@ -329,12 +739,35 @@ export function QOnboardingWorkspace({
   const working = busy || askingQ;
   const review = showReview ? reviewLines(view, vocabulary, labels) : [];
   const stage = readingLanded
-    ? proposals.length > 0
+    ? otherProposals.length > 0
       ? "Here's what I picked up. Keep what's right, change what isn't."
-      : "I read that. A couple of things I'd still like to settle are below."
+      : taxonomy !== null
+        ? "I read that. Here are the closest fits I could find."
+        : "I read that. A couple of things I'd still like to settle are below."
     : readingTimedOut
       ? "I'm still reading that. Carry on; anything I pick up will appear here for you to confirm."
       : null;
+  const qStageLabel =
+    qStream?.stage === null || qStream?.stage === undefined
+      ? "Thinking"
+      : Q_VISIBLE_STAGE_LABELS[qStream.stage];
+  const visibleChips =
+    prompt === null
+      ? []
+      : prompt.chips.filter(
+          (chip) =>
+            narrowedTo === null ||
+            chip.optionKey === undefined ||
+            narrowedTo.includes(chip.optionKey),
+        );
+  const composerPlaceholder =
+    prompt === null
+      ? undefined
+      : prompt.control === "chips" ||
+          prompt.control === "multi_chips" ||
+          prompt.control === "confirm"
+        ? "Or say it in your own words"
+        : prompt.placeholder;
 
   return (
     <div className="flex flex-col gap-4 pb-28" data-q-onboarding-workspace>
@@ -347,16 +780,24 @@ export function QOnboardingWorkspace({
         {turns.map((turn) => (
           <QLine key={turn.id} id={turn.id} kind={turn.kind} text={turn.text} />
         ))}
+        {qStream?.partial !== null && qStream?.partial !== undefined ? (
+          <QLine
+            id="q-streaming"
+            kind="Q"
+            text={qStream.partial.text}
+            streaming
+          />
+        ) : null}
         {stage === null ? null : (
           <QLine id="reading-stage" kind="Q" text={stage} />
         )}
-        {prompt !== null && !isFinal ? (
+        {prompt !== null && !isFinal && !askingQ ? (
           <QLine id={`prompt:${prompt.stepKey}`} kind="Q" text={prompt.text} />
         ) : null}
         <div ref={endRef} />
       </ol>
 
-      {proposals.length > 0 ? (
+      {otherProposals.length > 0 ? (
         <section
           aria-label="What Q picked up"
           className="flex flex-col gap-3 rounded-lg border border-(--cq-border-subtle) p-3"
@@ -366,7 +807,7 @@ export function QOnboardingWorkspace({
             I picked up
           </span>
           <ul className="flex flex-col gap-2">
-            {proposals.map((item) => (
+            {otherProposals.map((item) => (
               <li
                 key={item.suggestion.id}
                 className="flex flex-wrap items-center justify-between gap-2"
@@ -409,7 +850,7 @@ export function QOnboardingWorkspace({
               </li>
             ))}
           </ul>
-          {proposals.length > 1 ? (
+          {otherProposals.length > 1 ? (
             <div>
               <Button
                 size="compact"
@@ -423,77 +864,10 @@ export function QOnboardingWorkspace({
         </section>
       ) : null}
 
-      {gaps.length > 0 ? (
-        <section
-          aria-label="What Q still needs"
-          className="flex flex-col gap-3 rounded-lg border border-(--cq-border-subtle) p-3"
-          data-q-still-needs
-        >
-          <span className="cq-label text-(--cq-text-secondary)">
-            I still need
-          </span>
-          <ul className="flex flex-col gap-3">
-            {gaps.map(({ question, editorId }) => (
-              <li
-                key={question.id}
-                className="flex flex-col gap-2"
-                data-question={question.id}
-              >
-                <p className="cq-body text-(--cq-text-primary)">
-                  {question.question}
-                </p>
-                {question.why === null ? null : (
-                  <p className="cq-caption text-(--cq-text-secondary)">
-                    {question.why}
-                  </p>
-                )}
-                <div className="flex flex-wrap gap-1">
-                  {question.options.map((option) => (
-                    <Button
-                      key={`${option.stepKey}:${option.label}`}
-                      size="compact"
-                      variant="secondary"
-                      disabled={working}
-                      onClick={() =>
-                        void actions.answerQuestion({
-                          questionId: question.id,
-                          stepKey: option.stepKey,
-                          value: option.value,
-                        })
-                      }
-                    >
-                      {option.label}
-                    </Button>
-                  ))}
-                  {editorId === undefined ? null : (
-                    <Button
-                      size="compact"
-                      variant="secondary"
-                      disabled={working}
-                      onClick={() => onEdit(editorId)}
-                    >
-                      Answer
-                    </Button>
-                  )}
-                  <Button
-                    size="compact"
-                    variant="quiet"
-                    disabled={working}
-                    onClick={() => void actions.dismissQuestion(question.id)}
-                  >
-                    I don&apos;t know
-                  </Button>
-                </div>
-              </li>
-            ))}
-          </ul>
-        </section>
-      ) : null}
-
-      {reading && !readingLanded && !readingTimedOut ? (
+      {askingQ ? (
+        <QStateIndicator state="WORKING" detail={qStageLabel} />
+      ) : reading && !readingLanded && !readingTimedOut ? (
         <QStateIndicator state="WORKING" detail="Reading what you said" />
-      ) : askingQ ? (
-        <QStateIndicator state="WORKING" detail="Thinking" />
       ) : null}
 
       {errorMessage !== undefined ? (
@@ -502,63 +876,217 @@ export function QOnboardingWorkspace({
         </InlineNotice>
       ) : null}
 
-      {prompt !== null && !isFinal ? (
-        <div
-          className="flex flex-wrap items-center gap-2"
-          data-q-quick-controls
-        >
-          {prompt.chips
-            .filter(
-              (chip) =>
-                narrowedTo === null ||
-                chip.optionKey === undefined ||
-                narrowedTo.includes(chip.optionKey),
-            )
-            .map((chip) => (
-              <Button
-                key={chip.label}
-                size="compact"
-                variant="secondary"
-                disabled={working}
-                onClick={() => void say(chip.say)}
+      {prompt !== null && !isFinal && !askingQ ? (
+        <div className="flex flex-col gap-3" data-q-quick-controls>
+          {prompt.control === "chips" || prompt.control === "confirm" ? (
+            <div className="flex flex-wrap items-center gap-2">
+              {visibleChips.map((chip) => (
+                <Button
+                  key={chip.label}
+                  size="compact"
+                  variant="secondary"
+                  disabled={working}
+                  onClick={() => void submitChip(chip)}
+                >
+                  {chip.label}
+                </Button>
+              ))}
+            </div>
+          ) : null}
+
+          {prompt.control === "multi_chips" ? (
+            <div className="flex flex-col gap-2">
+              <div
+                className="flex flex-wrap items-center gap-2"
+                role="group"
+                aria-label={prompt.text}
               >
-                {chip.label}
+                {visibleChips.map((chip) => (
+                  <ChoiceChip
+                    key={chip.label}
+                    selected={
+                      chip.optionKey !== undefined &&
+                      picks.includes(chip.optionKey)
+                    }
+                    disabled={working}
+                    onClick={() => togglePick(chip)}
+                  >
+                    {chip.label}
+                  </ChoiceChip>
+                ))}
+              </div>
+              {picks.length > 0 ? (
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    size="compact"
+                    disabled={working}
+                    onClick={() => void submitPicks()}
+                  >
+                    Done
+                  </Button>
+                  <span className="cq-caption text-(--cq-text-tertiary)">
+                    {picks.length === 1
+                      ? "1 picked"
+                      : `${String(picks.length)} picked`}
+                    {prompt.maxSelections === undefined
+                      ? ""
+                      : ` of up to ${String(prompt.maxSelections)}`}
+                  </span>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+
+          {prompt.control === "taxonomy" ? (
+            <div className="flex flex-col gap-3" data-q-taxonomy>
+              {taxonomy !== null && taxonomyPicks === null ? (
+                <p className="cq-body text-(--cq-text-primary)">
+                  I think these are the closest fits. Keep them, or adjust.
+                </p>
+              ) : null}
+              {keptTaxonomy.length > 0 ? (
+                <div
+                  className="flex flex-wrap items-center gap-2"
+                  role="group"
+                  aria-label="Categories to keep"
+                >
+                  {keptTaxonomy.map((node) => (
+                    <ChoiceChip
+                      key={node.nodeId}
+                      selected
+                      disabled={working}
+                      onClick={() => toggleTaxonomy(node)}
+                    >
+                      {node.label}
+                    </ChoiceChip>
+                  ))}
+                </div>
+              ) : (
+                <p className="cq-caption text-(--cq-text-secondary)">
+                  Describe the company in a sentence, or search the categories
+                  below.
+                </p>
+              )}
+              <div className="flex flex-col gap-2">
+                <Input
+                  id={`q-taxonomy-search-${prompt.stepKey}`}
+                  label="Search categories"
+                  labelHidden
+                  placeholder="Search categories"
+                  autoComplete="off"
+                  value={taxonomyQuery}
+                  disabled={working}
+                  onChange={(event) => setTaxonomyQuery(event.target.value)}
+                />
+                {taxonomyResults.length > 0 ? (
+                  <div
+                    className="flex flex-wrap items-center gap-2"
+                    role="group"
+                    aria-label="Matching categories"
+                  >
+                    {taxonomyResults
+                      .filter(
+                        (candidate) =>
+                          !keptTaxonomy.some(
+                            (node) => node.nodeId === candidate.nodeId,
+                          ),
+                      )
+                      .map((candidate) => (
+                        <ChoiceChip
+                          key={candidate.nodeId}
+                          selected={false}
+                          disabled={working}
+                          onClick={() =>
+                            toggleTaxonomy({
+                              nodeId: candidate.nodeId,
+                              label: candidate.label,
+                            })
+                          }
+                        >
+                          {candidate.label}
+                          <span className="text-(--cq-text-tertiary)">
+                            {" "}
+                            · {candidate.vocabularyLabel}
+                          </span>
+                        </ChoiceChip>
+                      ))}
+                  </div>
+                ) : null}
+              </div>
+              {keptTaxonomy.length > 0 ? (
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    size="compact"
+                    disabled={working}
+                    onClick={() => void keepTaxonomy()}
+                  >
+                    {taxonomy !== null && taxonomyPicks === null
+                      ? "Keep these"
+                      : "Continue"}
+                  </Button>
+                  {prompt.maxSelections === undefined ? null : (
+                    <span className="cq-caption text-(--cq-text-tertiary)">
+                      Up to {String(prompt.maxSelections)}
+                    </span>
+                  )}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+
+          <div className="flex flex-wrap items-center gap-2">
+            {prompt.control === "editor" || prompt.control === "upload" ? (
+              <Button
+                size="compact"
+                disabled={working}
+                onClick={() => {
+                  const editor = vocabulary.editorFor(prompt.stepKey);
+                  if (editor !== undefined) {
+                    onEdit(editor);
+                  }
+                }}
+              >
+                {prompt.editorLabel ?? "Open"}
               </Button>
-            ))}
-          {prompt.control === "editor" || prompt.control === "upload" ? (
-            <Button
-              size="compact"
-              disabled={working}
-              onClick={() => {
-                const editor = vocabulary.editorFor(prompt.stepKey);
-                if (editor !== undefined) {
-                  onEdit(editor);
-                }
-              }}
-            >
-              {prompt.editorLabel ?? "Open"}
-            </Button>
-          ) : null}
-          {prompt.optional ? (
-            <Button
-              size="compact"
-              variant="quiet"
-              disabled={working}
-              onClick={() => void say("skip")}
-            >
-              Skip
-            </Button>
-          ) : null}
-          {prompt.why === undefined ? null : (
-            <Button
-              size="compact"
-              variant="quiet"
-              disabled={working}
-              onClick={() => void say("Why do you need this?")}
-            >
-              Why?
-            </Button>
-          )}
+            ) : null}
+            {prompt.control === "chips" ||
+            prompt.control === "multi_chips" ||
+            prompt.control === "figure" ? (
+              <Button
+                size="compact"
+                variant="quiet"
+                disabled={working}
+                onClick={() => void say("I don't know")}
+              >
+                I don&apos;t know
+              </Button>
+            ) : null}
+            {prompt.optional ? (
+              <Button
+                size="compact"
+                variant="quiet"
+                disabled={working}
+                onClick={() => {
+                  push("Q", prompt.text);
+                  push("PERSON", "Skip this one");
+                  settleReading();
+                  void actions.skip();
+                }}
+              >
+                Skip
+              </Button>
+            ) : null}
+            {prompt.why === undefined ? null : (
+              <Button
+                size="compact"
+                variant="quiet"
+                disabled={working}
+                onClick={() => void say("Why do you need this?")}
+              >
+                Why?
+              </Button>
+            )}
+          </div>
         </div>
       ) : null}
 
@@ -568,6 +1096,62 @@ export function QOnboardingWorkspace({
             {prompt?.text ?? "Finish"}
           </Button>
         </div>
+      ) : null}
+
+      {gaps.length > 0 ? (
+        <section
+          aria-label="What Q still needs"
+          className="flex flex-col gap-3"
+          data-q-still-needs
+        >
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <span className="cq-caption text-(--cq-text-secondary)">
+              {gaps.length === 1
+                ? "1 thing left to settle"
+                : `${String(gaps.length)} things left to settle`}
+              {remaining > gaps.length
+                ? ` · ${String(remaining)} questions to go`
+                : ""}
+            </span>
+            <Button
+              size="compact"
+              variant="quiet"
+              onClick={() => setShowGaps((current) => !current)}
+            >
+              {showGaps ? "Hide gaps" : "Review remaining gaps"}
+            </Button>
+          </div>
+          {showGaps ? (
+            <ul className="flex flex-col gap-3 rounded-lg border border-(--cq-border-subtle) p-3">
+              {gaps.map((gap) => (
+                <GapItem
+                  key={gap.question.id}
+                  gap={gap}
+                  working={working}
+                  draft={gapDrafts[gap.question.id] ?? ""}
+                  picks={gapPicks[gap.question.id] ?? []}
+                  onDraft={(text) =>
+                    setGapDrafts((current) => ({
+                      ...current,
+                      [gap.question.id]: text,
+                    }))
+                  }
+                  onPicks={(next) =>
+                    setGapPicks((current) => ({
+                      ...current,
+                      [gap.question.id]: next,
+                    }))
+                  }
+                  onAnswer={(value, spoken) =>
+                    void answerGap(gap, value, spoken)
+                  }
+                  onSkip={() => void actions.dismissQuestion(gap.question.id)}
+                  onEdit={onEdit}
+                />
+              ))}
+            </ul>
+          ) : null}
+        </section>
       ) : null}
 
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -589,7 +1173,7 @@ export function QOnboardingWorkspace({
               }
             }}
           >
-            Use the form for this
+            Review as form
           </Button>
         ) : null}
       </div>
@@ -643,7 +1227,8 @@ export function QOnboardingWorkspace({
               : "investor_private"
           }
           contextDetail={contextLabel}
-          disabled={working || prompt === null}
+          placeholder={composerPlaceholder}
+          disabled={working}
           onSubmit={say}
         />
       </div>
@@ -651,14 +1236,180 @@ export function QOnboardingWorkspace({
   );
 }
 
+/**
+ * One gap, answered where it is shown (§16, §21): the question's own
+ * options, the step's real choices, a figure or a line — and only when
+ * none of those fit, the form. "Skip this" sets it aside; nothing is
+ * invented for it.
+ */
+function GapItem({
+  gap,
+  working,
+  draft,
+  picks,
+  onDraft,
+  onPicks,
+  onAnswer,
+  onSkip,
+  onEdit,
+}: {
+  readonly gap: StillNeeded;
+  readonly working: boolean;
+  readonly draft: string;
+  readonly picks: readonly string[];
+  readonly onDraft: (text: string) => void;
+  readonly onPicks: (next: readonly string[]) => void;
+  readonly onAnswer: (value: OnboardingResponseValue, spoken: string) => void;
+  readonly onSkip: () => void;
+  readonly onEdit: (editorId: string) => void;
+}) {
+  const { question, control, editorId } = gap;
+  const typedValue =
+    control.kind === "figure" || control.kind === "text"
+      ? gapValue(control, draft)
+      : null;
+  return (
+    <li className="flex flex-col gap-2" data-question={question.id}>
+      <p className="cq-body text-(--cq-text-primary)">{question.question}</p>
+      {question.why === null ? null : (
+        <p className="cq-caption text-(--cq-text-secondary)">{question.why}</p>
+      )}
+      <div className="flex flex-wrap items-center gap-2">
+        {control.kind === "options"
+          ? question.options.map((option) => (
+              <Button
+                key={`${option.stepKey}:${option.label}`}
+                size="compact"
+                variant="secondary"
+                disabled={working}
+                onClick={() => onAnswer(option.value, option.label)}
+              >
+                {option.label}
+              </Button>
+            ))
+          : null}
+        {control.kind === "choices" && !control.multi
+          ? control.options.map((option) => (
+              <Button
+                key={option.optionKey}
+                size="compact"
+                variant="secondary"
+                disabled={working}
+                onClick={() =>
+                  onAnswer(
+                    { type: "SINGLE_SELECT", optionKey: option.optionKey },
+                    option.label,
+                  )
+                }
+              >
+                {option.label}
+              </Button>
+            ))
+          : null}
+        {control.kind === "choices" && control.multi ? (
+          <>
+            {control.options.map((option) => (
+              <ChoiceChip
+                key={option.optionKey}
+                selected={picks.includes(option.optionKey)}
+                disabled={working}
+                onClick={() =>
+                  onPicks(
+                    picks.includes(option.optionKey)
+                      ? picks.filter((key) => key !== option.optionKey)
+                      : [...picks, option.optionKey],
+                  )
+                }
+              >
+                {option.label}
+              </ChoiceChip>
+            ))}
+            {picks.length > 0 ? (
+              <Button
+                size="compact"
+                disabled={working}
+                onClick={() =>
+                  onAnswer(
+                    { type: "MULTI_SELECT", optionKeys: [...picks] },
+                    control.options
+                      .filter((option) => picks.includes(option.optionKey))
+                      .map((option) => option.label)
+                      .join(", "),
+                  )
+                }
+              >
+                Done
+              </Button>
+            ) : null}
+          </>
+        ) : null}
+        {control.kind === "figure" || control.kind === "text" ? (
+          <form
+            className="flex min-w-0 flex-1 flex-wrap items-center gap-2"
+            onSubmit={(event) => {
+              event.preventDefault();
+              if (typedValue !== null) {
+                onAnswer(typedValue, draft.trim());
+              }
+            }}
+          >
+            <div className="min-w-48 flex-1">
+              <Input
+                id={`gap-${question.id}`}
+                label={question.question}
+                labelHidden
+                placeholder={
+                  control.kind === "figure" ? "A number" : "Your answer"
+                }
+                inputMode={control.kind === "figure" ? "decimal" : "text"}
+                autoComplete="off"
+                value={draft}
+                disabled={working}
+                onChange={(event) => onDraft(event.target.value)}
+              />
+            </div>
+            <Button
+              type="submit"
+              size="compact"
+              disabled={working || typedValue === null}
+            >
+              Save
+            </Button>
+          </form>
+        ) : null}
+        {control.kind === "editor" && editorId !== undefined ? (
+          <Button
+            size="compact"
+            variant="secondary"
+            disabled={working}
+            onClick={() => onEdit(editorId)}
+          >
+            Open in the form
+          </Button>
+        ) : null}
+        <Button
+          size="compact"
+          variant="quiet"
+          disabled={working}
+          onClick={onSkip}
+        >
+          Skip this
+        </Button>
+      </div>
+    </li>
+  );
+}
+
 function QLine({
   id,
   kind,
   text,
+  streaming = false,
 }: {
   readonly id: string;
   readonly kind: Turn["kind"];
   readonly text: string;
+  readonly streaming?: boolean;
 }) {
   return (
     <li
@@ -678,6 +1429,7 @@ function QLine({
             ? "cq-body max-w-(--cq-layout-narrow) rounded-lg bg-(--cq-surface-sunken) px-3 py-2 text-(--cq-text-primary)"
             : "cq-body max-w-(--cq-layout-narrow) whitespace-pre-wrap text-(--cq-text-primary)"
         }
+        data-streaming={streaming ? "true" : undefined}
       >
         {text}
       </p>

@@ -7,9 +7,16 @@ import type {
 
 import {
   acknowledge,
+  acknowledgeValue,
+  gapValue,
   looksLikeQuestionForQ,
+  pauseIntent,
   progressLines,
   promptFor,
+  RESUME_AFTER_MS,
+  resumeIntent,
+  stillNeeded,
+  taxonomyProposal,
   welcomeBack,
   type JourneyVocabulary,
 } from "../src/features/onboarding-conversation/conversation";
@@ -27,7 +34,25 @@ const VOCABULARY: JourneyVocabulary = {
       "F1.company_name": "Company",
       "F2.materials": "Documents",
     })[stepKey] ?? stepKey,
-  describe: (_stepKey, value) => JSON.stringify(value),
+  describe: (_stepKey, value) =>
+    value.type === "SINGLE_SELECT"
+      ? value.optionKey
+      : value.type === "RANGE"
+        ? value.value
+        : JSON.stringify(value),
+  stepType: (stepKey) =>
+    ({
+      "F1.stage": "single_select" as const,
+      "F5.mrr": "range" as const,
+      "F2.materials": "multi_select" as const,
+    })[stepKey],
+  optionsFor: (stepKey) =>
+    stepKey === "F1.stage"
+      ? [
+          { optionKey: "seed", label: "Seed" },
+          { optionKey: "series_a", label: "Series A" },
+        ]
+      : [],
   editorFor: (stepKey) => (stepKey === "F1.stage" ? "stage" : undefined),
   reviewGroups: [
     { label: "Company", stepKeys: ["F1.company_name", "F1.stage"] },
@@ -50,6 +75,7 @@ function view(
       currentStepKey: "F1.stage",
       subject: null,
       startedAt: "2026-09-13T10:00:00.000Z",
+      lastActivityAt: "2026-09-13T10:01:00.000Z",
       completedAt: null,
     },
     currentStep: {
@@ -112,6 +138,62 @@ describe("promptFor", () => {
       optional: false,
     });
     expect(prompt.chips.map((chip) => chip.say)).toEqual(["Seed", "Series A"]);
+    // A tap submits the option itself, not a sentence about it (CQ-Q-VOICE-001 B §17).
+    expect(prompt.chips.map((chip) => chip.value)).toEqual([
+      { type: "SINGLE_SELECT", optionKey: "seed" },
+      { type: "SINGLE_SELECT", optionKey: "series_a" },
+    ]);
+  });
+
+  it("offers multi-select options as toggles with the step's own limit, marking the stand-alone one (§17)", () => {
+    const step: OnboardingStepView = {
+      stepKey: "F2.materials",
+      stepType: "multi_select",
+      required: false,
+      prompt: "What do you already have?",
+      presentation: {
+        stepType: "multi_select",
+        options: [
+          { optionKey: "deck", label: "Deck" },
+          { optionKey: "model", label: "Financial model" },
+          { optionKey: "none", label: "Nothing yet" },
+        ],
+        minSelections: 1,
+        maxSelections: 6,
+        exclusiveOptionKeys: ["none"],
+      },
+    };
+    const prompt = promptFor(step, VOCABULARY);
+    expect(prompt.control).toBe("multi_chips");
+    expect(prompt.maxSelections).toBe(6);
+    expect(prompt.chips.map((chip) => chip.exclusive)).toEqual([
+      false,
+      false,
+      true,
+    ]);
+    expect(prompt.chips[0]?.value).toEqual({
+      type: "MULTI_SELECT",
+      optionKeys: ["deck"],
+    });
+  });
+
+  it("turns a taxonomy step into the category control, never a detour to the form (§19)", () => {
+    const step: OnboardingStepView = {
+      stepKey: "F1.categories",
+      stepType: "reference_select",
+      required: false,
+      prompt: "How would you categorise the company?",
+      presentation: {
+        stepType: "reference_select",
+        resourceType: "TAXONOMY_NODE",
+        vocabularyCodes: ["industry"],
+        minItems: 1,
+        maxItems: 8,
+      },
+    };
+    const prompt = promptFor(step, VOCABULARY);
+    expect(prompt.control).toBe("taxonomy");
+    expect(prompt.maxSelections).toBe(8);
   });
 
   it("offers a reference step's candidates as chips, and answers a single one itself (§38)", () => {
@@ -217,10 +299,21 @@ describe("acknowledge", () => {
 });
 
 describe("welcomeBack", () => {
+  const lastActivity = Date.parse("2026-09-13T10:01:00.000Z");
+
   it("greets from persisted state only: settled groups, documents, what remains", () => {
-    expect(welcomeBack(view(), VOCABULARY)).toBe(
+    expect(
+      welcomeBack(view(), VOCABULARY, lastActivity + RESUME_AFTER_MS),
+    ).toBe(
       "Welcome back. We already covered evidence. Your document is on file. 2 questions left.",
     );
+  });
+
+  it("says nothing when the person was here moments ago — a refresh, the form and back, a second tab (CQ-Q-VOICE-001 B §26)", () => {
+    expect(
+      welcomeBack(view(), VOCABULARY, lastActivity + RESUME_AFTER_MS - 1),
+    ).toBeNull();
+    expect(welcomeBack(view(), VOCABULARY, lastActivity + 5_000)).toBeNull();
   });
 
   it("says nothing on a journey with nothing settled yet", () => {
@@ -286,5 +379,178 @@ describe("looksLikeQuestionForQ", () => {
       looksLikeQuestionForQ("Why does the stage matter to investors?"),
     ).toBe(true);
     expect(looksLikeQuestionForQ("Seed")).toBe(false);
+  });
+
+  it("recognises a request for Q without a question mark, but not an answer (CQ-Q-VOICE-001 B §23)", () => {
+    expect(
+      looksLikeQuestionForQ("Tell me about Series A rounds in Nigeria"),
+    ).toBe(true);
+    expect(looksLikeQuestionForQ("Can you check what Paystack raised")).toBe(
+      true,
+    );
+    expect(looksLikeQuestionForQ("Look up Flutterwave")).toBe(true);
+    expect(
+      looksLikeQuestionForQ(
+        "We make AI software for freight forwarders and logistics companies.",
+      ),
+    ).toBe(false);
+    expect(looksLikeQuestionForQ("Lagos")).toBe(false);
+  });
+});
+
+describe("resume and pause (CQ-Q-VOICE-001 B §24-§25)", () => {
+  it("hears the explicit ways back to the interview", () => {
+    for (const phrase of [
+      "Let's continue.",
+      "Continue the interview.",
+      "Where were we?",
+      "Back to onboarding.",
+      "Carry on.",
+      "Let's finish this.",
+      "OK, let's continue",
+    ]) {
+      expect(resumeIntent(phrase), phrase).toBe(true);
+    }
+    expect(resumeIntent("Series A")).toBe(false);
+    expect(resumeIntent("We continue to sell in Ghana")).toBe(false);
+  });
+
+  it("hears a pause, which persists and never completes", () => {
+    for (const phrase of [
+      "Let's stop here.",
+      "I'll finish this later.",
+      "Pause the interview.",
+      "Let's finish this later",
+    ]) {
+      expect(pauseIntent(phrase), phrase).toBe(true);
+    }
+    expect(pauseIntent("Let's finish this.")).toBe(false);
+    expect(pauseIntent("We stopped selling hardware")).toBe(false);
+  });
+});
+
+describe("gaps answered in place (CQ-Q-VOICE-001 B §16, §21)", () => {
+  const question = {
+    id: "55555555-5555-4555-8555-555555555555",
+    factKey: "mrr",
+    question: "What was MRR last month?",
+    why: null,
+    reason: "MATERIAL_GAP" as const,
+    readings: [],
+    options: [],
+    createdAt: "2026-09-13T10:02:00.000Z",
+  };
+
+  it("offers a figure input for a range step, the definition's options for a select step, and the form only as a last resort", () => {
+    const gaps = stillNeeded(
+      view({
+        pendingQuestions: [
+          { ...question, stepKey: "F5.mrr" },
+          {
+            ...question,
+            id: "66666666-6666-4666-8666-666666666666",
+            stepKey: "F1.stage",
+            question: "What stage are you at?",
+          },
+          {
+            ...question,
+            id: "77777777-7777-4777-8777-777777777777",
+            stepKey: "F9.unknown",
+            question: "Something the definition does not type?",
+          },
+        ],
+      }),
+      VOCABULARY,
+    );
+    expect(gaps.map((gap) => gap.control)).toEqual([
+      { kind: "figure" },
+      {
+        kind: "choices",
+        multi: false,
+        options: [
+          { optionKey: "seed", label: "Seed" },
+          { optionKey: "series_a", label: "Series A" },
+        ],
+      },
+      { kind: "editor" },
+    ]);
+  });
+
+  it("prefers the question's own server-built options when it has them", () => {
+    const [gap] = stillNeeded(
+      view({
+        pendingQuestions: [
+          {
+            ...question,
+            stepKey: "F5.mrr",
+            options: [
+              {
+                label: "$90k",
+                stepKey: "F5.mrr",
+                value: { type: "RANGE", value: "90000" },
+              },
+            ],
+          },
+        ],
+      }),
+      VOCABULARY,
+    );
+    expect(gap?.control).toEqual({ kind: "options" });
+  });
+
+  it("turns a typed figure into a RANGE and a line into TEXT, refusing what is not a number", () => {
+    expect(gapValue({ kind: "figure" }, "90,000")).toEqual({
+      type: "RANGE",
+      value: "90000",
+    });
+    expect(gapValue({ kind: "figure" }, "about ninety")).toBeNull();
+    expect(gapValue({ kind: "text" }, "  Lagos  ")).toEqual({
+      type: "TEXT",
+      text: "Lagos",
+    });
+    expect(gapValue({ kind: "text" }, "   ")).toBeNull();
+  });
+});
+
+describe("taxonomyProposal", () => {
+  it("shows Q's closest fits for the category step as words, from the pending suggestion", () => {
+    const proposal = taxonomyProposal(
+      view({
+        pendingSuggestions: [
+          {
+            id: "88888888-8888-4888-8888-888888888888",
+            stepKey: "F1.categories",
+            targetField: "categories",
+            suggestedValue: {
+              type: "RESOURCE_REFERENCE",
+              resourceType: "TAXONOMY_NODE",
+              resourceIds: ["n-log", "n-ent"],
+            },
+            confidence: "0.9",
+            status: "PENDING",
+            createdAt: "2026-09-13T10:02:00.000Z",
+          },
+        ],
+      }),
+      "F1.categories",
+      { "n-log": "Logistics & Mobility", "n-ent": "Enterprise Software" },
+    );
+    expect(proposal?.nodes).toEqual([
+      { nodeId: "n-log", label: "Logistics & Mobility" },
+      { nodeId: "n-ent", label: "Enterprise Software" },
+    ]);
+    expect(taxonomyProposal(view(), "F1.categories", {})).toBeNull();
+  });
+});
+
+describe("acknowledgeValue", () => {
+  it("names the step and the tapped value", () => {
+    expect(
+      acknowledgeValue(
+        "F1.stage",
+        { type: "SINGLE_SELECT", optionKey: "seed" },
+        VOCABULARY,
+      ),
+    ).toBe("Stage: seed. Noted.");
   });
 });

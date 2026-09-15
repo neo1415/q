@@ -313,6 +313,8 @@ export type FounderOnboardingSessionView = {
   readonly questions: readonly QuestionView[];
   /** Which adapter produced this view. Synthetic views say so on screen. */
   readonly source: { readonly adapter: string; readonly synthetic: boolean };
+  /** Plain labels for taxonomy ids the view mentions, so Q shows categories as words. */
+  readonly labels?: Readonly<Record<string, string>> | undefined;
   /** The runtime's own view, for the Q-led interview (CQ-PRE-REC-001). */
   readonly raw?: OnboardingSessionView | undefined;
 };

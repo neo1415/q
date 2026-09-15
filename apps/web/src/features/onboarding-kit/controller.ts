@@ -81,6 +81,15 @@ export type OnboardingActions<TResponse> = {
   }) => Promise<boolean>;
   readonly dismissQuestion: (questionId: string) => Promise<boolean>;
   /**
+   * A tapped option, as the structured value it stands for
+   * (CQ-Q-VOICE-001 B §17-§18). Returns false when this build has no direct
+   * path to record it.
+   */
+  readonly submitValue: (input: {
+    readonly stepKey: string;
+    readonly value: OnboardingResponseValue;
+  }) => Promise<boolean>;
+  /**
    * One turn of the conversational interview (CQ-PRE-REC-001 §16-§21).
    * Resolves to what the runtime understood, or null when this build has
    * no path — never a fabricated acknowledgement.
@@ -305,6 +314,13 @@ export function useOnboardingJourney<
         return false;
       }
       return run(() => dismiss({ questionId }), true);
+    },
+    submitValue: async (input) => {
+      const submit = requireClient().submitValue;
+      if (submit === undefined) {
+        return false;
+      }
+      return run(() => submit(input), true);
     },
     say: async (text) => {
       const say = requireClient().say;

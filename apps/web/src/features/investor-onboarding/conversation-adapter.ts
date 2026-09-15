@@ -58,12 +58,21 @@ const STEPS = new Map(
   INVESTOR_DEFINITION_V1.steps.map((step) => [step.stepKey, step]),
 );
 
-function optionLabel(stepKey: string, optionKey: string): string {
+type OptionsConfiguration = {
+  readonly options?: readonly { optionKey: string; label: string }[];
+};
+
+function optionsFor(
+  stepKey: string,
+): readonly { readonly optionKey: string; readonly label: string }[] {
   const configuration = STEPS.get(stepKey)?.configuration as
-    | { readonly options?: readonly { optionKey: string; label: string }[] }
-    | undefined;
+    OptionsConfiguration | undefined;
+  return configuration?.options ?? [];
+}
+
+function optionLabel(stepKey: string, optionKey: string): string {
   return (
-    configuration?.options?.find((option) => option.optionKey === optionKey)
+    optionsFor(stepKey).find((option) => option.optionKey === optionKey)
       ?.label ?? optionKey.replace(/_/g, " ")
   );
 }
@@ -103,6 +112,8 @@ export const INVESTOR_VOCABULARY: JourneyVocabulary = {
   stepTitle: (stepKey) =>
     TITLES[stepKey] ?? STEPS.get(stepKey)?.configuration.prompt ?? stepKey,
   describe,
+  stepType: (stepKey) => STEPS.get(stepKey)?.configuration.stepType,
+  optionsFor,
   editorFor: (stepKey) => groupOf(stepKey)?.id,
   reviewGroups: [
     {

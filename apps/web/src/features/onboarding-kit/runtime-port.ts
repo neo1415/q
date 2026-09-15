@@ -457,6 +457,28 @@ export function createRuntimeClient<
         return present(await session());
       }),
 
+    // A tapped option is the same submission the form makes for that step:
+    // one validated response, the version the session is at, no text
+    // round trip through interpretation.
+    submitValue: (input: {
+      readonly stepKey: string;
+      readonly value: OnboardingResponseValue;
+    }) =>
+      guarded(async () => {
+        const view = await session();
+        return present(
+          remember(
+            await port.submit({
+              sessionId: view.session.id,
+              stepKey: input.stepKey,
+              value: input.value,
+              expectedSessionVersion: view.session.version,
+              idempotencyKey: crypto.randomUUID(),
+            }),
+          ),
+        );
+      }),
+
     ...(port.say === undefined
       ? {}
       : {

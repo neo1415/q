@@ -184,6 +184,17 @@ describe("interpretUtterance · other step types", () => {
         value: { type: "TEXT", text: "Northstar Logistics" },
       },
     );
+    // A figure inside a name is still a name, not prose to read (CQ-Q-VOICE-001 B).
+    expect(interpretUtterance("E2E Rail 2024", step(name))).toMatchObject({
+      kind: "ANSWER",
+      value: { type: "TEXT", text: "E2E Rail 2024" },
+    });
+    expect(
+      interpretUtterance(
+        "We are Northstar, a logistics software company based in Lagos",
+        step(name),
+      ),
+    ).toEqual({ kind: "NARRATIVE" });
     const confirm: OnboardingStepPresentation = {
       stepType: "confirmation",
       confirmLabel: "Looks right",

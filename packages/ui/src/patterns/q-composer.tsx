@@ -38,6 +38,8 @@ export type QComposerProps = {
   readonly disabled?: boolean | undefined;
   readonly autoFocus?: boolean | undefined;
   readonly className?: string | undefined;
+  /** What the input is waiting for on this surface; the general cue by default. */
+  readonly placeholder?: string | undefined;
 };
 
 export function QComposer({
@@ -48,6 +50,7 @@ export function QComposer({
   disabled = false,
   autoFocus = false,
   className,
+  placeholder = Q_COMPOSER_PLACEHOLDER,
 }: QComposerProps) {
   const generatedId = useId();
   const inputId = id ?? `q-composer-${generatedId}`;
@@ -127,7 +130,7 @@ export function QComposer({
             value={value}
             autoFocus={autoFocus}
             disabled={disabled}
-            placeholder={Q_COMPOSER_PLACEHOLDER}
+            placeholder={placeholder}
             enterKeyHint="send"
             autoComplete="off"
             onChange={(event) => {

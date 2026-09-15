@@ -408,6 +408,12 @@ export type PresentationExtras = {
   /** Labels for taxonomy node ids the founder already selected. */
   readonly selectedTaxonomy?: readonly TaxonomyCandidateView[] | undefined;
   /**
+   * Labels for every taxonomy id a pending suggestion or a recorded answer
+   * mentions, whichever screen is current, so the Q-led interview shows
+   * categories as words and never as ids (CQ-Q-VOICE-001 B §19).
+   */
+  readonly suggestedTaxonomy?: readonly TaxonomyCandidateView[] | undefined;
+  /**
    * The documents this company has, with their REAL processing state
    * (CQ-Q-021 §14, §16). Read from the Evidence API on every load, so a
    * refresh or a return days later shows where each file actually is
@@ -497,6 +503,12 @@ export function toPresentation(
             : {}),
         }),
     source,
+    labels: Object.fromEntries(
+      [
+        ...(extras.suggestedTaxonomy ?? []),
+        ...(extras.selectedTaxonomy ?? []),
+      ].map((node) => [node.nodeId, node.label]),
+    ),
   };
 }
 

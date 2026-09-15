@@ -58,6 +58,18 @@ export type OnboardingClient<TView, TResponse> = {
    */
   /** Re-read the session from the runtime, dropping any cached view. */
   readonly reload?: (() => Promise<TView>) | undefined;
+  /**
+   * A structured answer to one runtime step — the value a tapped option
+   * stands for, validated by the runtime exactly as a typed or spoken one
+   * (CQ-Q-VOICE-001 B §17-§18). Absent when the composed client has no
+   * direct path, so a screen falls back to saying the option's label.
+   */
+  readonly submitValue?:
+    | ((input: {
+        readonly stepKey: string;
+        readonly value: OnboardingResponseValue;
+      }) => Promise<TView>)
+    | undefined;
   readonly say?:
     | ((input: { readonly text: string }) => Promise<{
         readonly view: TView;

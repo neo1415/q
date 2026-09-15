@@ -78,10 +78,13 @@ export function isRichUtterance(text: string): boolean {
   return isNarrative(text);
 }
 
+/** From this many words on, a line is prose Q should read rather than a value. */
+const NARRATIVE_WORDS = 6;
+
 function isNarrative(text: string): boolean {
   const words = wordsOf(text);
   const hasFigure = /\d/.test(text);
-  return words.length >= 6 || (hasFigure && words.length >= 3);
+  return words.length >= NARRATIVE_WORDS || (hasFigure && words.length >= 3);
 }
 
 export type InterpretableStep = {
@@ -291,10 +294,13 @@ export function interpretUtterance(
       return isNarrative(trimmed) ? { kind: "NARRATIVE" } : { kind: "UNCLEAR" };
     }
     case "short_text": {
+      // A short line is the answer ("E2E Rail 2024", "Northbank Capital"):
+      // a figure inside a name does not make it a narrative, as it would on
+      // a step that asks for a figure.
       if (
         trimmed.length >= presentation.minLength &&
         trimmed.length <= presentation.maxLength &&
-        !isNarrative(trimmed)
+        wordsOf(trimmed).length < NARRATIVE_WORDS
       ) {
         return {
           kind: "ANSWER",

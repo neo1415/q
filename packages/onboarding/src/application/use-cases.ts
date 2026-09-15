@@ -421,6 +421,10 @@ async function commitResponse(
   step: OnboardingStepDefinition,
   validated: ValidatedOnboardingResponse,
   correlationId: CorrelationId,
+  options: {
+    /** The proposal being accepted or corrected by this very commit. */
+    readonly resolvingSuggestionId?: OnboardingSuggestionId | undefined;
+  } = {},
 ): Promise<{
   readonly session: OnboardingSession;
   readonly response: OnboardingResponse;
@@ -500,6 +504,29 @@ async function commitResponse(
     stepKey: step.stepKey,
     status: "COMPLETED",
   });
+
+  // The person has answered this step; any other proposal still pending for
+  // it would now be an offer to overwrite that answer. Retired, not applied.
+  for (const stale of aggregate.pendingSuggestions) {
+    if (
+      stale.stepKey !== step.stepKey ||
+      stale.id === options.resolvingSuggestionId
+    ) {
+      continue;
+    }
+    if (await runtime.suggestions.resolve(tx, stale.id, "EXPIRED")) {
+      await runtime.outbox.enqueue(
+        tx,
+        suggestionResolvedEvent({
+          session: currentSession,
+          correlationId,
+          suggestionId: stale.id,
+          stepKey: step.stepKey,
+          resolution: "EXPIRED",
+        }),
+      );
+    }
+  }
 
   const responsesAfter = new Map(aggregate.currentResponses);
   responsesAfter.set(step.stepKey, response);
@@ -1300,6 +1327,7 @@ export function createOnboardingUseCases(
           step,
           validated,
           command.correlationId,
+          { resolvingSuggestionId: suggestion.id },
         );
         updated = committed.session;
         changes = committed.changes;
