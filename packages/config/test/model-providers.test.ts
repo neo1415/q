@@ -38,12 +38,14 @@ describe("model provider configuration", () => {
     expect(modelProviderConfigStatus(none.secrets.modelProviders)).toEqual({
       google: "unconfigured",
       groq: "unconfigured",
+      groqKeys: 0,
     });
 
     const groqOnly = parseQApiConfig({ ...base, GROQ_API_KEY: GROQ });
     expect(modelProviderConfigStatus(groqOnly.secrets.modelProviders)).toEqual({
       google: "unconfigured",
       groq: "configured",
+      groqKeys: 1,
     });
     expect(groqOnly.secrets.modelProviders.google).toBeUndefined();
     expect(groqOnly.secrets.modelProviders.groq?.reveal()).toBe(GROQ);

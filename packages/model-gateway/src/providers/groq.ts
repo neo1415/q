@@ -50,7 +50,36 @@ export const GROQ_PROVIDER_CODE = "groq" as const;
 
 export type GroqModelProviderOptions = {
   readonly apiKey: string;
+  /**
+   * Further keys for the same account tier. When a request is rate-limited
+   * on one key it is retried at once on the next, and later requests start
+   * from the key that last succeeded. A key that was limited is left alone
+   * for a short while. Nothing about which key served a request is
+   * returned, logged or stored.
+   */
+  readonly additionalApiKeys?: readonly string[] | undefined;
+  /** Injected for tests; defaults to the real SDK client. */
+  readonly clientFactory?: ((apiKey: string) => GroqLikeClient) | undefined;
 };
+
+/** The slice of the SDK the adapter calls; a test supplies a fake. */
+export type GroqLikeClient = {
+  readonly chat: {
+    readonly completions: {
+      create(
+        params: ChatCompletionCreateParamsNonStreaming,
+        options: {
+          readonly signal?: AbortSignal | undefined;
+          readonly timeout?: number | undefined;
+          readonly maxRetries?: number | undefined;
+        },
+      ): Promise<ChatCompletion>;
+    };
+  };
+};
+
+/** A rate-limited key is not retried before this, unless the vendor said sooner. */
+const KEY_COOLDOWN_MS = 30_000;
 
 function reasoningEffort(
   level: ModelReasoningLevel,
@@ -190,7 +219,12 @@ type NormalizedApiError = APIError<
 >;
 
 function isApiError(error: unknown): error is NormalizedApiError {
-  return error instanceof APIError;
+  // The SDK error, or anything shaped like one (an injected client in tests).
+  return (
+    error instanceof APIError ||
+    (error instanceof Error &&
+      typeof (error as { status?: unknown }).status === "number")
+  );
 }
 
 /** The vendor's bounded error code token from the body, if it carries one. */
@@ -310,7 +344,25 @@ function normalizeError(error: unknown): ModelProviderFailure {
 export function createGroqModelProvider(
   options: GroqModelProviderOptions,
 ): ModelProvider {
-  const client = new Groq({ apiKey: options.apiKey, maxRetries: 0 });
+  const factory =
+    options.clientFactory ??
+    ((apiKey: string): GroqLikeClient =>
+      new Groq({ apiKey, maxRetries: 0 }) as unknown as GroqLikeClient);
+  const clients = [options.apiKey, ...(options.additionalApiKeys ?? [])].map(
+    (apiKey) => factory(apiKey),
+  );
+  // Per key: when it may be tried again. Index into `clients`.
+  const blockedUntil = clients.map(() => 0);
+  let cursor = 0;
+
+  /** Keys to try for one request: from the cursor, unblocked first. */
+  const order = (now: number): number[] => {
+    const all = clients.map((_, index) => (cursor + index) % clients.length);
+    const until = (index: number) => blockedUntil[index] ?? 0;
+    const open = all.filter((index) => until(index) <= now);
+    const blocked = all.filter((index) => until(index) > now);
+    return [...open, ...blocked];
+  };
 
   return {
     code: GROQ_PROVIDER_CODE,
@@ -354,15 +406,40 @@ export function createGroqModelProvider(
           : { tools: toolsForGroq(request.tools), tool_choice: "auto" }),
       };
 
-      let completion: ChatCompletion;
-      try {
-        completion = await client.chat.completions.create(params, {
-          signal: context.signal,
-          timeout: context.attemptTimeoutMs,
-          maxRetries: 0,
-        });
-      } catch (error: unknown) {
-        throw normalizeError(error);
+      let completion: ChatCompletion | undefined;
+      let lastFailure: ModelProviderFailure | undefined;
+      for (const index of order(Date.now())) {
+        const client = clients[index];
+        if (client === undefined) {
+          continue;
+        }
+        try {
+          completion = await client.chat.completions.create(params, {
+            signal: context.signal,
+            timeout: context.attemptTimeoutMs,
+            maxRetries: 0,
+          });
+          cursor = index;
+          break;
+        } catch (error: unknown) {
+          const failure = normalizeError(error);
+          if (failure.failureClass !== "RATE_LIMIT" || clients.length === 1) {
+            throw failure;
+          }
+          // This key is spent for now; the next one takes the same request.
+          blockedUntil[index] =
+            Date.now() + (failure.retryAfterMs ?? KEY_COOLDOWN_MS);
+          lastFailure = failure;
+        }
+      }
+      if (completion === undefined) {
+        throw (
+          lastFailure ??
+          new ModelProviderFailure("groq request failed", {
+            failureClass: "TRANSIENT",
+            providerCode: GROQ_PROVIDER_CODE,
+          })
+        );
       }
 
       const toolCalls = toolCallsOf(completion);

@@ -60,6 +60,11 @@ const apiKey = z
 export const modelProviderEnvShape = {
   GEMINI_API_KEY: apiKey.optional(),
   GROQ_API_KEY: apiKey.optional(),
+  // Further GroqCloud keys. The adapter rotates to the next one when a key
+  // is rate-limited, so one exhausted free tier does not stop Q.
+  GROQ_API_KEY_2: apiKey.optional(),
+  GROQ_API_KEY_3: apiKey.optional(),
+  GROQ_API_KEY_4: apiKey.optional(),
 };
 
 export type ModelProviderSecrets = {
@@ -67,26 +72,39 @@ export type ModelProviderSecrets = {
   readonly google: ProviderCredential | undefined;
   /** GroqCloud; absent means the adapter is not configured. */
   readonly groq: ProviderCredential | undefined;
+  /** Every GroqCloud key in order, the first being `groq`; empty when unconfigured. */
+  readonly groqKeys: readonly ProviderCredential[];
 };
 
 export type ModelProviderConfigStatus = {
   readonly google: "configured" | "unconfigured";
   readonly groq: "configured" | "unconfigured";
+  /** How many GroqCloud keys rotate; never which. */
+  readonly groqKeys: number;
 };
 
 export function toModelProviderSecrets(parsed: {
   readonly GEMINI_API_KEY?: string | undefined;
   readonly GROQ_API_KEY?: string | undefined;
+  readonly GROQ_API_KEY_2?: string | undefined;
+  readonly GROQ_API_KEY_3?: string | undefined;
+  readonly GROQ_API_KEY_4?: string | undefined;
 }): ModelProviderSecrets {
+  const groqKeys = [
+    parsed.GROQ_API_KEY,
+    parsed.GROQ_API_KEY_2,
+    parsed.GROQ_API_KEY_3,
+    parsed.GROQ_API_KEY_4,
+  ]
+    .filter((key): key is string => key !== undefined)
+    .map((key) => new ProviderCredential(key));
   return {
     google:
       parsed.GEMINI_API_KEY === undefined
         ? undefined
         : new ProviderCredential(parsed.GEMINI_API_KEY),
-    groq:
-      parsed.GROQ_API_KEY === undefined
-        ? undefined
-        : new ProviderCredential(parsed.GROQ_API_KEY),
+    groq: groqKeys[0],
+    groqKeys,
   };
 }
 
@@ -97,5 +115,6 @@ export function modelProviderConfigStatus(
   return {
     google: secrets.google === undefined ? "unconfigured" : "configured",
     groq: secrets.groq === undefined ? "unconfigured" : "configured",
+    groqKeys: secrets.groqKeys.length,
   };
 }

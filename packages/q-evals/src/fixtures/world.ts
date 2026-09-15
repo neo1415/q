@@ -658,7 +658,12 @@ export async function createQEvalWorld(
     if (secrets?.groq !== undefined && options.providerFilter !== "google") {
       providers.push(
         recordingProvider(
-          createGroqModelProvider({ apiKey: secrets.groq.reveal() }),
+          createGroqModelProvider({
+            apiKey: secrets.groq.reveal(),
+            additionalApiKeys: secrets.groqKeys
+              .slice(1)
+              .map((key) => key.reveal()),
+          }),
           recorded,
         ),
       );

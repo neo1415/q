@@ -291,7 +291,12 @@ if (providerSecrets.google !== undefined) {
 }
 if (providerSecrets.groq !== undefined) {
   providers.push(
-    createGroqModelProvider({ apiKey: providerSecrets.groq.reveal() }),
+    createGroqModelProvider({
+      apiKey: providerSecrets.groq.reveal(),
+      additionalApiKeys: providerSecrets.groqKeys
+        .slice(1)
+        .map((key) => key.reveal()),
+    }),
   );
 }
 const modelGateway = createModelGateway({

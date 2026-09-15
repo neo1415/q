@@ -102,7 +102,7 @@ describe("per-service isolation", () => {
     // Q's secret area has a defined home for provider credentials (CQ-Q-005),
     // and holds none by default.
     expect(qApi.secrets).toEqual({
-      modelProviders: { google: undefined, groq: undefined },
+      modelProviders: { google: undefined, groq: undefined, groqKeys: [] },
       // The research provider (CQ-Q-RESEARCH-001) has the same defined home.
       researchProviders: { tavily: undefined },
       // And the speech provider (CQ-Q-VOICE-001 C).
@@ -115,7 +115,7 @@ describe("per-service isolation", () => {
     // credentials q-api has — and holds none by default either.
     expect(workers.secrets).toEqual({
       supabaseSecretKey: undefined,
-      modelProviders: { google: undefined, groq: undefined },
+      modelProviders: { google: undefined, groq: undefined, groqKeys: [] },
     });
     // The API carries the document upload limit as public operational value
     // and the storage credential as a secret that is absent unless configured.
