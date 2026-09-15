@@ -342,7 +342,7 @@ describe("reliability", () => {
     expect(result.output).toEqual({ kind: "TEXT", text: "beta says hello" });
   });
 
-  it("retries a rate limit once with backoff, honouring retry-after, then succeeds", async () => {
+  it("moves to the next eligible model on a rate limit instead of sleeping on the first (a per-minute quota is spent for the minute)", async () => {
     const waits: number[] = [];
     const { gateway } = build({
       alpha: [
@@ -357,10 +357,13 @@ describe("reliability", () => {
       },
     });
     const result = await gateway.execute(request());
-    expect(result.providerCode).toBe("alpha");
-    expect(result.attempts).toHaveLength(2);
-    expect(result.fallbackUsed).toBe(false);
-    expect(waits).toEqual([1_500]);
+    expect(result.providerCode).toBe("beta");
+    expect(result.attempts.map((attempt) => attempt.outcome)).toEqual([
+      "RATE_LIMIT",
+      "SUCCESS",
+    ]);
+    expect(result.fallbackUsed).toBe(true);
+    expect(waits).toEqual([]);
   });
 
   it("bounds a hung provider by the attempt timeout, retries, then falls back", async () => {

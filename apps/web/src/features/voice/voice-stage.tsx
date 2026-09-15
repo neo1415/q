@@ -2,12 +2,8 @@
 
 import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 
-import type { QVoiceChoice } from "@capital-q/contracts";
+import type { QVoiceChoice, QVoiceTurnState } from "@capital-q/contracts";
 
-import type {
-  QPrompt,
-  QuickChip,
-} from "../onboarding-conversation/conversation";
 import type { VoiceSessionClient, VoiceState } from "./session";
 import { VOICE_STATE_LABELS } from "./session";
 
@@ -31,14 +27,10 @@ export type VoiceStageProps = {
   readonly onEnd: () => void;
   readonly notice: string | null;
   readonly onDismissNotice: () => void;
-  /** The step Q is asking, when the session knows one; its options are offered. */
-  readonly prompt: QPrompt | null;
-  /** A tapped option: the same path as saying it. */
-  readonly onChoose: (chip: QuickChip) => void;
-  /** A set of options, for a many-of step. */
-  readonly onChooseMany: (chips: readonly QuickChip[]) => void;
-  /** Typed words while talking: the same Q turn. */
-  readonly onType: (text: string) => void;
+  /** What Q is asking after its latest turn; options are offered only when Q chose to show them. */
+  readonly asking: QVoiceTurnState["asking"];
+  /** A tapped option, a set of them, or typed words: said to Q, the same path as speaking. */
+  readonly onSay: (text: string) => void;
   readonly onUseForm: (() => void) | undefined;
   readonly progress: readonly {
     readonly label: string;
@@ -137,10 +129,8 @@ export function VoiceStage({
   onEnd,
   notice,
   onDismissNotice,
-  prompt,
-  onChoose,
-  onChooseMany,
-  onType,
+  asking,
+  onSay,
   onUseForm,
   progress,
 }: VoiceStageProps) {
@@ -160,7 +150,7 @@ export function VoiceStage({
   }, [lines.length]);
 
   // A new step means fresh picks.
-  const stepKey = prompt?.stepKey ?? null;
+  const stepKey = asking?.stepKey ?? null;
   const [picksFor, setPicksFor] = useState<string | null>(stepKey);
   if (picksFor !== stepKey) {
     setPicksFor(stepKey);
@@ -168,13 +158,10 @@ export function VoiceStage({
   }
 
   const showOptions =
-    prompt !== null &&
-    (prompt.control === "chips" ||
-      prompt.control === "multi_chips" ||
-      prompt.control === "confirm") &&
-    prompt.chips.length > 0 &&
+    asking !== null &&
+    asking.options.length > 0 &&
     client.state !== "CONNECTING";
-  const multi = prompt?.control === "multi_chips";
+  const multi = asking?.kind === "MANY_OF";
   const done = progress.reduce((n, line) => n + line.done, 0);
   const total = progress.reduce((n, line) => n + line.total, 0);
 
@@ -184,7 +171,7 @@ export function VoiceStage({
     if (text.length === 0) {
       return;
     }
-    onType(text);
+    onSay(text);
     setDraft("");
     setTyping(false);
   };
@@ -247,7 +234,7 @@ export function VoiceStage({
               className="cq-stage-quiet"
               onClick={() => setShowAll((current) => !current)}
             >
-              {showAll ? "Hide what we said" : "Everything we&apos;ve said"}
+              {showAll ? "Hide what we said" : "Everything we’ve said"}
             </button>
           ) : null}
         </div>
@@ -287,7 +274,7 @@ export function VoiceStage({
           </div>
         ) : null}
 
-        {showOptions && prompt !== null ? (
+        {showOptions && asking !== null ? (
           <div
             className="flex w-full max-w-2xl flex-col items-center gap-3"
             data-q-stage-options
@@ -295,15 +282,16 @@ export function VoiceStage({
             <div
               className="flex flex-wrap justify-center gap-2"
               role="group"
-              aria-label={prompt.text}
+              aria-label="Options"
             >
-              {prompt.chips.map((chip) => {
-                const key = chip.optionKey ?? chip.label;
+              {asking.options.map((option) => {
+                const key = option.key;
                 const selected = multi && picks.includes(key);
                 return (
                   <button
-                    key={chip.label}
+                    key={option.key}
                     type="button"
+                    title={option.description}
                     aria-pressed={multi ? selected : undefined}
                     className={
                       selected
@@ -311,8 +299,8 @@ export function VoiceStage({
                         : "cq-stage-option"
                     }
                     onClick={() => {
-                      if (!multi || chip.exclusive) {
-                        onChoose(chip);
+                      if (!multi) {
+                        onSay(option.label);
                         return;
                       }
                       setPicks((current) =>
@@ -322,7 +310,7 @@ export function VoiceStage({
                       );
                     }}
                   >
-                    {chip.label}
+                    {option.label}
                   </button>
                 );
               })}
@@ -332,15 +320,16 @@ export function VoiceStage({
                 type="button"
                 className="cq-stage-primary"
                 onClick={() => {
-                  onChooseMany(
-                    prompt.chips.filter((chip) =>
-                      picks.includes(chip.optionKey ?? chip.label),
-                    ),
+                  onSay(
+                    asking.options
+                      .filter((option) => picks.includes(option.key))
+                      .map((option) => option.label)
+                      .join(", "),
                   );
                   setPicks([]);
                 }}
               >
-                That&apos;s all of them
+                That’s all of them
               </button>
             ) : null}
             <span className="cq-caption text-white/40">

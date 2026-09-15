@@ -52,6 +52,13 @@ a typed one does from the interview thread:
   of the live step. The form's header offers "Back to Q" and "Talk with Q",
   so every mode reaches every other.
 
+- `GET /v1/q/voice/sessions/:voiceSessionId/turn` (contract:
+  `QVoiceTurnState`). What Q is asking after its latest spoken turn, with
+  the step's options only when Q chose to show them, where Q is taking the
+  person (`navigate`), and whether Q has handed them to the form
+  (`handoff`). Owner only; the stage polls it every 1.5 s while talking.
+  A tapped option is said to Q, the same path as speaking it.
+
 ## The interviewer (`voice/interviewer.ts`)
 
 Q conducts the interview rather than reading a script. Each spoken turn
@@ -69,6 +76,46 @@ to the Q run. The prompt is not the security boundary; the model never
 writes to anything. When the model is unavailable, Q says so plainly and
 re-asks the current step. Pending confirmations are process-local for now.
 
+Conduct, after the first live transcripts:
+
+- **Manner.** `Q_PERSONALITY` (UPBEAT default, CALM, DIRECT) selects a
+  paragraph from q-core's personality registry; it shapes reactions and
+  humour, never what is recorded.
+- **Tangents.** Small talk gets one line in Q's manner and the interview
+  continues in the same breath; something unrelated is acknowledged and
+  brought back to the current step. Never rude.
+- **Derailing.** Abuse, instruction injection or repeated nonsense is
+  intent SABOTAGE; the code counts warnings per session (never the model).
+  Two friendly warnings, then `handoff: FORM` and the stage leaves the
+  person with the form.
+- **Navigation.** "Take me to my profile" is intent NAVIGATE with one of a
+  fixed list of destinations; the browser maps each to its one route.
+- **Lookups.** A website, company or person is read back with its spelling
+  first; once confirmed, the lookup becomes a question for Q's own
+  public-web research tools (CQ-Q-RESEARCH-001), answered aloud as
+  unverified context the person confirms or rejects. LinkedIn pages are not
+  crawled; only what a public search surfaces is read.
+- **Documents.** Pending suggestions lifted from uploads are handed to the
+  model as DOCUMENT PROPOSALS and read back like Q's own readings; a yes
+  resolves the suggestion through the runtime's ACCEPT path, a different
+  value through EDIT.
+- **Expressiveness.** With `Q_VOICE_EXPRESSIVE=true` (written by
+  `voice:setup`) Q may use one inline tag such as [laughs] per reply; the
+  engines render them only on `eleven_v3_conversational`.
+- **Size.** A live turn renders the `Q_SYSTEM_VOICE` charter (a third of
+  `Q_SYSTEM`) and a compact open-steps list (full options for the first
+  three open steps, ten and a count for the rest): about 3k tokens a turn
+  against 4.9k before. Groq's free tier allows 8k tokens a minute per
+  model, so `normal_dialogue.v1` now falls back across
+  `openai/gpt-oss-20b` and `qwen/qwen3.8-27b` (each its own quota) before
+  Google, and the gateway moves to the next model on a 429 instead of
+  sleeping on the first.
+
+`pnpm interview:smoke -- "I have two pilots" "and forty customers"` runs
+the interviewer against the live gateway and the dev founder's own session
+and prints what Q said, read, recorded and asked, with the provider and
+latency of each call: the thing a browser transcript cannot show.
+
 ## Server modules
 
 | File                                  | Role                                                                                                                                       |
@@ -82,6 +129,8 @@ re-asks the current step. Pending confirmations are process-local for now.
 | `voice/interviewer.ts`                | Q conducting the interview: one `INTERVIEW_CONDUCTOR` turn per utterance, validated and recorded through the onboarding API                |
 | `voice/turn.ts`                       | One spoken turn: interviewer turn (or scripted `say` fallback) or Q run; interruption → `cancelRun`                                        |
 | `voice/speech.ts`                     | Text as Q speaks it: markdown/citations/URLs stripped, bounded, sentence-chunked                                                           |
+| `voice/turn-board.ts`                 | Process-local: what Q is asking, and where it is taking the person, after each voice session's latest turn, for the screen                 |
+| `dev/interview-smoke.ts`              | `pnpm interview:smoke -- "<utterance>"...`: the interviewer against the live gateway, one turn per argument                                |
 | `dev/voice-setup.ts`                  | `pnpm voice:setup -- --ws-url wss://<host>/v1/q/voice/ws`: creates/updates the two Speech Engines, records their ids in `.env.local`       |
 
 ## Configuration
@@ -100,12 +149,16 @@ Never `NEXT_PUBLIC_ELEVENLABS_*`.
 ## Voice tuning (D §52)
 
 Recorded in `dev/voice-setup.ts`, applied to both engines: model
-`eleven_turbo_v2` (ElevenLabs requires turbo or flash v2 for English
-agents; turbo carries fuller prosody), stability 0.42 (low enough that a
-sentence rises and falls like speech), similarity 0.8, speed 1,
-`optimizeStreamingLatency` 1; ASR keywords for the interview vocabulary
-("Capital Q", "MRR", "Series A", "Lagos", …); turn-taking `patient` with a
-10 s turn timeout; `recordVoice: false`, `deleteAudio: true`. Default voices:
+`eleven_v3_conversational` with expressive mode and suggested audio tags
+(laughs, chuckles, sighs), stability 0.42 (low enough that a sentence
+rises and falls like speech), similarity 0.8, speed 1,
+`optimizeStreamingLatency` 1 (`--classic` returns to `eleven_turbo_v2`
+without tags); recogniser `scribe_realtime` with ASR keywords for the
+interview vocabulary and the names and places a Nigerian or wider West
+African founder is likely to say (a recogniser mis-hears an unknown name
+far more often than an accent); turn-taking `patient` with a 10 s turn timeout, re-transcription of audio
+the voice detector missed at the timeout, and a person's "mm-hm", "okay",
+"right" while Q speaks treated as listening rather than interruption; `recordVoice: false`, `deleteAudio: true`. Default voices:
 Sarah (female, mature, reassuring) and Daniel (male, steady broadcaster);
 override with `--female` / `--male`.
 

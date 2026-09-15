@@ -24,6 +24,7 @@ import type { ModelTextTaskClass } from "@capital-q/contracts";
 
 export const PROMPT_IDS = [
   "Q_SYSTEM",
+  "Q_SYSTEM_VOICE",
   "FOUNDER_ONBOARDING_EXTRACTION",
   "INTERVIEW_CONDUCTOR",
   "CLAIM_EXTRACTION",
@@ -35,6 +36,7 @@ export type PromptId = (typeof PROMPT_IDS)[number];
 
 export const PROMPT_SLUGS: Readonly<Record<PromptId, string>> = {
   Q_SYSTEM: "q-system",
+  Q_SYSTEM_VOICE: "q-system-voice",
   FOUNDER_ONBOARDING_EXTRACTION: "founder-onboarding-extraction",
   INTERVIEW_CONDUCTOR: "interview-conductor",
   CLAIM_EXTRACTION: "claim-extraction",

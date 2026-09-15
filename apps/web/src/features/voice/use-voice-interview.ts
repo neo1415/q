@@ -1,13 +1,14 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import type {
   CreateQVoiceSessionRequest,
   QVoiceChoice,
+  QVoiceTurnState,
 } from "@capital-q/contracts";
 
-import { startVoiceSessionAction } from "./actions";
+import { readVoiceTurnAction, startVoiceSessionAction } from "./actions";
 import { useElevenLabsVoiceSession } from "./provider/elevenlabs-session";
 import type {
   VoiceSessionClient,
@@ -46,7 +47,15 @@ export type VoiceInterview = {
   readonly end: () => Promise<void>;
   readonly chooseVoice: (voice: QVoiceChoice) => Promise<void>;
   readonly clearNotice: () => void;
+  /**
+   * What Q is asking, and where it is taking the person, after its latest
+   * turn; read from the server while talking. Nothing here is authority.
+   */
+  readonly turn: QVoiceTurnState | null;
 };
+
+/** How often the stage asks what Q is asking, while talking. */
+const TURN_POLL_MS = 1_500;
 
 export function useVoiceInterview(
   events: VoiceSessionEvents = {},
@@ -54,6 +63,8 @@ export function useVoiceInterview(
   const [active, setActive] = useState(false);
   const [voice, setVoice] = useState<QVoiceChoice>("FEMALE");
   const [notice, setNotice] = useState<string | null>(null);
+  const [turn, setTurn] = useState<QVoiceTurnState | null>(null);
+  const [voiceSessionId, setVoiceSessionId] = useState<string | null>(null);
   const lastStart = useRef<{
     thread: VoiceInterviewThread;
     firstMessage: string | undefined;
@@ -91,6 +102,8 @@ export function useVoiceInterview(
         return;
       }
       setVoice(started.value.voice);
+      setVoiceSessionId(started.value.voiceSessionId);
+      setTurn(null);
       setActive(true);
       // Q composes its own opening from the interview's state; the caller's
       // line is only a fallback when the server had none to give.
@@ -104,8 +117,40 @@ export function useVoiceInterview(
 
   const end = useCallback(async () => {
     setActive(false);
+    setVoiceSessionId(null);
+    setTurn(null);
     await client.end();
   }, [client]);
+
+  // While talking, follow what Q is asking; a stale read is dropped.
+  useEffect(() => {
+    if (!active || voiceSessionId === null) {
+      return;
+    }
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const tick = async () => {
+      const read = await readVoiceTurnAction(voiceSessionId);
+      if (cancelled) {
+        return;
+      }
+      if (read.ok) {
+        setTurn((current) =>
+          current !== null && current.sequence >= read.value.sequence
+            ? current
+            : read.value,
+        );
+      }
+      timer = setTimeout(() => void tick(), TURN_POLL_MS);
+    };
+    void tick();
+    return () => {
+      cancelled = true;
+      if (timer !== undefined) {
+        clearTimeout(timer);
+      }
+    };
+  }, [active, voiceSessionId]);
 
   const chooseVoice = useCallback(
     async (next: QVoiceChoice) => {
@@ -138,6 +183,7 @@ export function useVoiceInterview(
     end,
     chooseVoice,
     clearNotice: () => setNotice(null),
+    turn,
   };
 }
 

@@ -27,6 +27,11 @@ export const Q_VOICE_SESSIONS_PATH = "/v1/q/voice/sessions" as const;
  * the provider's signed header before a session exists.
  */
 export const Q_VOICE_WS_PATH = "/v1/q/voice/ws" as const;
+/** GET: what Q is asking, and where it is taking the person, after the latest spoken turn. */
+export const Q_VOICE_TURN_PATH =
+  "/v1/q/voice/sessions/:voiceSessionId/turn" as const;
+export const qVoiceTurnPath = (voiceSessionId: string) =>
+  `/v1/q/voice/sessions/${encodeURIComponent(voiceSessionId)}/turn`;
 
 export const Q_VOICE_CHOICES = ["FEMALE", "MALE"] as const;
 export type QVoiceChoice = (typeof Q_VOICE_CHOICES)[number];
@@ -95,3 +100,62 @@ export const CreateQVoiceSessionResponseSchema = z
 export type CreateQVoiceSessionResponse = z.infer<
   typeof CreateQVoiceSessionResponseSchema
 >;
+
+/** Where Q may take the person on a spoken request; the browser maps each to a route. */
+export const Q_VOICE_DESTINATIONS = [
+  "HOME",
+  "PROFILE",
+  "CAPITAL",
+  "DISCOVER",
+  "COMPANY_VISIBILITY",
+  "INTERVIEW",
+  "FORM",
+] as const;
+export const QVoiceDestinationSchema = z.enum(Q_VOICE_DESTINATIONS);
+export type QVoiceDestination = z.infer<typeof QVoiceDestinationSchema>;
+
+/**
+ * PUBLIC. The state of the interview after Q's latest spoken turn, for the
+ * screen: which step Q is asking and its options when they help, whether
+ * Q is taking the person somewhere, and whether Q has handed the person
+ * to the form. Read by the owning person only; nothing here is authority —
+ * a tapped option travels the same path as a spoken one.
+ */
+export const QVoiceTurnStateSchema = z
+  .object({
+    /** Increments on every turn Q completes; 0 before the first. */
+    sequence: z.number().int().min(0),
+    asking: z
+      .object({
+        stepKey: z.string().min(1).max(64),
+        kind: z.enum([
+          "ONE_OF",
+          "MANY_OF",
+          "NUMBER",
+          "SHORT_TEXT",
+          "LONG_TEXT",
+          "YES_NO",
+          "CATEGORIES",
+          "DOCUMENT",
+        ]),
+        options: z
+          .array(
+            z
+              .object({
+                key: z.string().max(64),
+                label: z.string().max(120),
+                description: z.string().max(300).optional(),
+              })
+              .strict(),
+          )
+          .max(50),
+        maxChoices: z.number().int().min(1).max(50).optional(),
+      })
+      .strict()
+      .nullable(),
+    navigate: QVoiceDestinationSchema.nullable(),
+    handoff: z.enum(["FORM"]).nullable(),
+    degraded: z.boolean(),
+  })
+  .strict();
+export type QVoiceTurnState = z.infer<typeof QVoiceTurnStateSchema>;

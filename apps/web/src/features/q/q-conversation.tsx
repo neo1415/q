@@ -137,28 +137,6 @@ export function QConversationPanel({
           notice={voice.notice}
           onDismissNotice={voice.clearNotice}
         />
-      ) : connected ? (
-        <div
-          className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-(--cq-border-subtle) bg-(--cq-surface) px-4 py-3"
-          data-q-voice-entry
-        >
-          <div className="flex min-w-0 flex-col">
-            <span className="cq-label text-(--cq-text-primary)">
-              Prefer to talk?
-            </span>
-            <span className="cq-caption text-(--cq-text-secondary)">
-              Ask Q aloud; you can still type.
-            </span>
-          </div>
-          <Button
-            variant="primary"
-            size="compact"
-            onClick={() => void talkWithQ()}
-            data-q-talk
-          >
-            Talk with Q
-          </Button>
-        </div>
       ) : null}
       {!voice.active && voice.notice !== null ? (
         <InlineNotice tone="warning" title={voice.notice}>
@@ -291,6 +269,9 @@ export function QConversationPanel({
           contextScope={context.scope}
           contextDetail={context.label}
           disabled={q.working}
+          onVoice={
+            connected && !voice.active ? () => void talkWithQ() : undefined
+          }
           {...(connected
             ? {
                 onSubmit: voice.active

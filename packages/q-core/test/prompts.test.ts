@@ -78,6 +78,8 @@ describe("registry", () => {
     expect([...PROMPT_IDS].sort()).toEqual(
       [
         "Q_SYSTEM",
+        // CQ-Q-VOICE-001 rework: the charter sized for a live turn.
+        "Q_SYSTEM_VOICE",
         "FOUNDER_ONBOARDING_EXTRACTION",
         // CQ-Q-VOICE-001: Q conducts the onboarding interview.
         "INTERVIEW_CONDUCTOR",

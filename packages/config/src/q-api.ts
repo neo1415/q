@@ -61,6 +61,11 @@ const qApiEnvSchema = z.object({
   // same onboarding session a typed one does. Optional: without it voice
   // carries Q conversations only.
   CQ_API_URL: z.string().url("expected an absolute http(s) URL").optional(),
+  // How Q carries itself in a live conversation (q-core personality registry).
+  Q_PERSONALITY: z.enum(["UPBEAT", "CALM", "DIRECT"]).optional(),
+  // Whether the Speech Engines render inline audio tags ([laughs]); set by
+  // voice:setup alongside the engine ids.
+  Q_VOICE_EXPRESSIVE: z.enum(["true", "false"]).optional(),
 });
 
 /**
@@ -83,6 +88,10 @@ export type QApiVoiceConfig = {
   readonly speechEngines: SpeechEngineIds | undefined;
   /** The application API origin for spoken interview turns; absent means Q conversations only. */
   readonly apiBaseUrl: string | undefined;
+  /** How Q carries itself in a live conversation (q-core personality registry). */
+  readonly personality: "UPBEAT" | "CALM" | "DIRECT";
+  /** Whether the Speech Engines render inline audio tags. */
+  readonly expressive: boolean;
 };
 
 export type QApiPublicConfig = Readonly<Record<string, never>>;
@@ -118,6 +127,8 @@ export function parseQApiConfig(env: EnvironmentInput): QApiConfig {
     voice: {
       speechEngines: toSpeechEngineIds(parsed),
       apiBaseUrl: parsed.CQ_API_URL?.replace(/\/$/, ""),
+      personality: parsed.Q_PERSONALITY ?? "UPBEAT",
+      expressive: parsed.Q_VOICE_EXPRESSIVE === "true",
     },
     secrets: {
       modelProviders: toModelProviderSecrets(parsed),

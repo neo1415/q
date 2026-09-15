@@ -30,6 +30,7 @@ import type {
 
 import type { VoiceSessionBinding } from "./bindings.js";
 import type { Interviewer } from "./interviewer.js";
+import type { VoiceTurnBoard } from "./turn-board.js";
 import type { VoiceSpeaker, VoiceTranscriptTurn } from "./provider.js";
 import { bounded, bySentence, speakable, withFiller } from "./speech.js";
 
@@ -63,6 +64,8 @@ export type VoiceTurnDependencies = {
    * remains only as the fallback when no model is composed.
    */
   readonly interviewer?: Interviewer | undefined;
+  /** Where each turn's asking/navigation is posted for the screen. */
+  readonly board?: VoiceTurnBoard | undefined;
   /** The application API, for spoken interview turns; absent means Q conversations only. */
   readonly onboarding?:
     | { readonly apiBaseUrl: string; readonly fetch?: typeof fetch | undefined }
@@ -440,6 +443,28 @@ export function createVoiceTurnHandler(
       if (signal.aborted) {
         return { kind: "INTERRUPTED", path: "INTERVIEW" };
       }
+      dependencies.board?.record(binding.voiceSessionId, {
+        asking:
+          outcome.asking === null
+            ? null
+            : {
+                stepKey: outcome.asking.stepKey,
+                kind: outcome.asking.kind,
+                options: outcome.asking.options.map((option) => ({
+                  key: option.key,
+                  label: option.label,
+                  ...(option.description === undefined
+                    ? {}
+                    : { description: option.description }),
+                })),
+                ...(outcome.asking.maxChoices === undefined
+                  ? {}
+                  : { maxChoices: outcome.asking.maxChoices }),
+              },
+        navigate: outcome.navigate,
+        handoff: outcome.handoff,
+        degraded: outcome.degraded,
+      });
       if (outcome.questionForQ !== null) {
         if (outcome.reply.length > 0) {
           await speakLine(speaker, outcome.reply, signal);

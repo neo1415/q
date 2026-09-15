@@ -53,6 +53,8 @@ export type VoiceSessionBindings = {
   connect(providerConversationId: string): VoiceSessionBinding | null;
   /** The live binding for an open conversation. */
   get(providerConversationId: string): VoiceSessionBinding | null;
+  /** The binding issued as this voice session, if it is still held. */
+  byVoiceSessionId(voiceSessionId: string): VoiceSessionBinding | null;
   release(providerConversationId: string): void;
   /** Bindings held by this person right now (issued or connected). */
   countFor(userId: string): number;
@@ -124,6 +126,12 @@ export function createVoiceSessionBindings(
       }
       binding.connectedAt = now();
       return binding;
+    },
+    byVoiceSessionId: (voiceSessionId) => {
+      for (const binding of bindings.values()) {
+        if (binding.voiceSessionId === voiceSessionId) return binding;
+      }
+      return null;
     },
     get: (providerConversationId) => {
       const binding = bindings.get(providerConversationId);

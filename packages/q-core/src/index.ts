@@ -63,6 +63,14 @@ export {
   QSystemVariablesSchema,
   type QSystemVariables,
 } from "./prompts/charter/q-system.v1.js";
+export { Q_SYSTEM_VOICE_V1 } from "./prompts/charter/q-system-voice.v1.js";
+export {
+  Q_PERSONALITIES,
+  Q_PERSONALITY_CODES,
+  personalityOf,
+  type QPersonality,
+  type QPersonalityCode,
+} from "./personality.js";
 export { COMPANY_ANALYST_V1 } from "./prompts/tasks/company-analyst.v1.js";
 export { INTERVIEW_CONDUCTOR_V1 } from "./prompts/tasks/interview-conductor.v1.js";
 export {
@@ -74,6 +82,9 @@ export {
   type InterviewConductorResult,
   type InterviewConductorVariables,
   type InterviewOpenStep,
+  INTERVIEW_DESTINATIONS,
+  InterviewDestinationSchema,
+  type InterviewDestination,
 } from "./prompts/schemas/interview-conductor.js";
 export { COMPANY_ANALYST_V2 } from "./prompts/tasks/company-analyst.v2.js";
 export { FOUNDER_ONBOARDING_EXTRACTION_V1 } from "./prompts/tasks/founder-onboarding-extraction.v1.js";

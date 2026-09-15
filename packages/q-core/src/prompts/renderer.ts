@@ -64,6 +64,8 @@ export type RenderedPrompt = {
 
 export type RenderRequest<V> = {
   readonly task: PromptId;
+  /** Which charter frames the task; the full Q_SYSTEM by default, Q_SYSTEM_VOICE for live turns. */
+  readonly charter?: "Q_SYSTEM" | "Q_SYSTEM_VOICE" | undefined;
   /** Explicit version; default: the active version. */
   readonly taskVersion?: number | undefined;
   readonly charterVersion?: number | undefined;
@@ -112,7 +114,11 @@ export function renderPrompt<V>(
   registry: PromptRegistry,
   request: RenderRequest<V>,
 ): RenderedPrompt {
-  const charter = resolve(registry, "Q_SYSTEM", request.charterVersion);
+  const charter = resolve(
+    registry,
+    request.charter ?? "Q_SYSTEM",
+    request.charterVersion,
+  );
   const task = resolve(registry, request.task, request.taskVersion);
   if (
     task.definition.kind !== "TASK" ||

@@ -686,8 +686,17 @@ export function createModelGateway(
             cause: lastCause,
           });
         }
+        // A per-minute quota is spent for the whole minute: when another
+        // eligible model is waiting, moving to it now beats sleeping on
+        // this one. The same model is retried only when it is the last.
+        const anotherCandidateWaits = plan.eligible.some(
+          (other) =>
+            other.candidateIndex > candidate.candidateIndex &&
+            dependencies.registry.get(other.provider.code) !== undefined,
+        );
         const canRetryHere =
           isRetryableModelFailure(outcome.failureClass) &&
+          !(outcome.failureClass === "RATE_LIMIT" && anotherCandidateWaits) &&
           attemptsOnCandidate < ATTEMPTS_PER_CANDIDATE &&
           attemptNumber < request.budget.maxAttempts;
         if (canRetryHere) {

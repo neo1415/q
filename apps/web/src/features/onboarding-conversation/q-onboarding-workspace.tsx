@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
@@ -26,6 +27,7 @@ import type { TaxonomyCandidateView } from "../onboarding-kit/client";
 import type { SessionPresentation } from "../onboarding-kit/session";
 import { askQAction, readQRunAction } from "../q/actions";
 import { useVoiceInterview } from "../voice/use-voice-interview";
+import { destinationPath } from "../voice/destinations";
 import { VoiceStage } from "../voice/voice-stage";
 import {
   acknowledge,
@@ -177,6 +179,7 @@ export function QOnboardingWorkspace({
   talkOnOpen = false,
 }: QOnboardingWorkspaceProps) {
   const view = session.raw;
+  const router = useRouter();
   // The greeting is read once, from persisted state, when the workspace
   // opens — and only after a genuine absence, measured from the session's
   // own last activity (§26). Never from anything the browser remembers.
@@ -843,6 +846,32 @@ export function QOnboardingWorkspace({
     });
   };
 
+  // Q takes the person somewhere, or leaves them with the form: followed
+  // once per turn, never twice.
+  const followedTurn = useRef(0);
+  const voiceTurn = voice.turn;
+  const voiceEnd = voice.end;
+  useEffect(() => {
+    if (voiceTurn === null || voiceTurn.sequence <= followedTurn.current) {
+      return;
+    }
+    followedTurn.current = voiceTurn.sequence;
+    if (voiceTurn.handoff === "FORM" || voiceTurn.navigate === "FORM") {
+      void voiceEnd();
+      const editor =
+        prompt === null ? undefined : vocabulary.editorFor(prompt.stepKey);
+      if (editor !== undefined) {
+        onEdit(editor);
+      }
+      return;
+    }
+    const path = destinationPath(voiceTurn.navigate);
+    if (path !== null) {
+      void voiceEnd();
+      router.push(path);
+    }
+  }, [voiceTurn, voiceEnd, prompt, vocabulary, onEdit, router]);
+
   // Asked to open talking: start once, as soon as the session is here.
   const talkedOnOpen = useRef(false);
   useEffect(() => {
@@ -907,12 +936,8 @@ export function QOnboardingWorkspace({
           onEnd={() => void voice.end()}
           notice={voice.notice}
           onDismissNotice={voice.clearNotice}
-          prompt={isFinal ? null : prompt}
-          onChoose={(chip) => void submitChip(chip)}
-          onChooseMany={(chips) =>
-            voiceSendText(chips.map((chip) => chip.label).join(", "))
-          }
-          onType={(text) => void say(text)}
+          asking={voice.turn?.asking ?? null}
+          onSay={(text) => voiceSendText(text)}
           onUseForm={
             prompt !== null &&
             vocabulary.editorFor(prompt.stepKey) !== undefined
@@ -927,30 +952,7 @@ export function QOnboardingWorkspace({
           }
           progress={progress}
         />
-      ) : (
-        <div
-          className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-(--cq-border-subtle) bg-(--cq-surface) px-4 py-3"
-          data-q-voice-entry
-        >
-          <div className="flex min-w-0 flex-col">
-            <span className="cq-label text-(--cq-text-primary)">
-              Prefer to talk?
-            </span>
-            <span className="cq-caption text-(--cq-text-secondary)">
-              Q asks the same questions aloud; you can still tap or type.
-            </span>
-          </div>
-          <Button
-            variant="primary"
-            size="compact"
-            disabled={prompt === null || isFinal}
-            onClick={() => void talkWithQ()}
-            data-q-talk
-          >
-            Talk with Q
-          </Button>
-        </div>
-      )}
+      ) : null}
       {!voice.active && voice.notice !== null ? (
         <InlineNotice tone="warning" title={voice.notice}>
           <Button size="compact" variant="quiet" onClick={voice.clearNotice}>
@@ -1411,6 +1413,9 @@ export function QOnboardingWorkspace({
           placeholder={composerPlaceholder}
           disabled={working}
           onSubmit={say}
+          onVoice={
+            prompt !== null && !isFinal ? () => void talkWithQ() : undefined
+          }
         />
       </div>
     </div>

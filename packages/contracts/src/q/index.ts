@@ -193,10 +193,17 @@ export {
   Q_VOICE_CHOICES,
   Q_VOICE_SESSIONS_PATH,
   Q_VOICE_WS_PATH,
+  Q_VOICE_TURN_PATH,
+  Q_VOICE_DESTINATIONS,
+  qVoiceTurnPath,
+  QVoiceDestinationSchema,
+  QVoiceTurnStateSchema,
   QVoiceChoiceSchema,
   type CreateQVoiceSessionRequest,
   type CreateQVoiceSessionResponse,
   type QVoiceChoice,
+  type QVoiceDestination,
+  type QVoiceTurnState,
 } from "./voice.js";
 
 export {

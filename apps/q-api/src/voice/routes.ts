@@ -6,6 +6,8 @@ import {
   CreateQVoiceSessionResponseSchema,
   parseContract,
   Q_VOICE_SESSIONS_PATH,
+  Q_VOICE_TURN_PATH,
+  QVoiceTurnStateSchema,
 } from "@capital-q/contracts";
 import { createCorrelationId, getMeter } from "@capital-q/observability";
 import { AuthenticationRequiredError } from "@capital-q/security";
@@ -23,6 +25,7 @@ import {
 } from "./bindings.js";
 import type { Interviewer } from "./interviewer.js";
 import type { RealtimeVoiceProvider } from "./provider.js";
+import type { VoiceTurnBoard } from "./turn-board.js";
 
 /**
  * `POST /v1/q/voice/sessions` (CQ-Q-VOICE-001 C §31, §34; doc 12 §7.2,
@@ -48,6 +51,8 @@ export type QVoiceRoutesDependencies = ActorContextDependencies & {
   readonly interviewer?: Interviewer | undefined;
   /** The application API origin, needed for the opening line. */
   readonly apiBaseUrl?: string | undefined;
+  /** The turn board, for the screen to read what Q is asking. */
+  readonly board?: VoiceTurnBoard | undefined;
   readonly now?: (() => number) | undefined;
 };
 
@@ -61,6 +66,36 @@ export function registerQVoiceRoutes(
   const started = meter.createCounter("q.voice.session.issued", {
     description: "Voice session credentials issued, by voice",
   });
+
+  // What Q is asking after its latest spoken turn: the owner's own
+  // session only; anyone else sees the same 404 as a session that does
+  // not exist.
+  app.get(
+    Q_VOICE_TURN_PATH,
+    { onRequest: withContext },
+    async (request, reply) => {
+      const actor = getActorContext(request);
+      const params = request.params as { voiceSessionId?: string };
+      const id = params.voiceSessionId ?? "";
+      const binding = dependencies.bindings.byVoiceSessionId(id);
+      if (binding === null || binding.actor.userId !== actor.userId) {
+        return reply.code(404).send({
+          type: "about:blank",
+          title: "Not found",
+          status: 404,
+          detail: "No such voice session.",
+        });
+      }
+      const state = dependencies.board?.read(id) ?? {
+        sequence: 0,
+        asking: null,
+        navigate: null,
+        handoff: null,
+        degraded: false,
+      };
+      return reply.code(200).send(QVoiceTurnStateSchema.parse(state));
+    },
+  );
 
   app.post(
     Q_VOICE_SESSIONS_PATH,

@@ -120,6 +120,7 @@ export {
   cancelQRun,
   createQRun,
   createQVoiceSession,
+  getQVoiceTurnState,
   getQApproval,
   getQRun,
   rejectQApproval,

@@ -12,15 +12,18 @@ import {
  * Inputs are the interview's state as Capital Q's own records hold it: what
  * is already answered, every step still open with its real options and
  * constraints, what Q last asked, anything Q read back and is waiting to
- * have confirmed, and the recent turns. The person's words are DATA.
+ * have confirmed, proposals lifted from the person's documents, and the
+ * recent turns. The person's words are DATA.
  *
  * Output is what Q says next plus structured readings of what the person
  * just said — proposals that deterministic code validates, confirms and
- * records; nothing becomes a record because the model wrote it.
+ * records; nothing becomes a record because the model wrote it. A
+ * navigation or a lookup is likewise a proposal: code checks it against a
+ * fixed list and the person's own authority before anything moves.
  */
 
 export const INTERVIEW_CONDUCTOR_SCHEMA_NAME = "InterviewConductorResult";
-export const INTERVIEW_CONDUCTOR_SCHEMA_VERSION = 1;
+export const INTERVIEW_CONDUCTOR_SCHEMA_VERSION = 2;
 
 const StepKey = z.string().min(1).max(64);
 
@@ -51,6 +54,8 @@ export const InterviewOpenStepSchema = z
       )
       .max(50)
       .optional(),
+    /** When the options list was cut short: how many more there are. */
+    moreOptions: z.number().int().min(1).max(500).optional(),
     maxChoices: z.number().int().min(1).max(50).optional(),
     /** For NUMBER: the unit and bounds. Answer with a plain number in this unit. */
     unit: z.string().max(16).optional(),
@@ -62,6 +67,19 @@ export const InterviewOpenStepSchema = z
   .strict();
 export type InterviewOpenStep = z.infer<typeof InterviewOpenStepSchema>;
 
+/** Where Q may take the person on request; code maps each to a route. */
+export const INTERVIEW_DESTINATIONS = [
+  "HOME",
+  "PROFILE",
+  "CAPITAL",
+  "DISCOVER",
+  "COMPANY_VISIBILITY",
+  "INTERVIEW",
+  "FORM",
+] as const;
+export const InterviewDestinationSchema = z.enum(INTERVIEW_DESTINATIONS);
+export type InterviewDestination = z.infer<typeof InterviewDestinationSchema>;
+
 export const InterviewConductorVariablesSchema = z
   .object({
     operatingMode: QOperatingModeSchema,
@@ -71,8 +89,14 @@ export const InterviewConductorVariablesSchema = z
     journey: z.enum(["founder", "investor"]),
     /** "voice" turns are spoken aloud; "text" turns are read. */
     channel: z.enum(["voice", "text"]),
+    /** Trusted: the manner Q carries itself in (q-core personality registry). */
+    personality: z.string().max(800),
+    /** True when the speech model renders inline audio tags such as [laughs]. */
+    expressive: z.boolean(),
     /** True for the very first line of a session: greet and ask, nothing was said yet. */
     opening: z.boolean(),
+    /** How many times Q has already warned this person about derailing the interview. */
+    warnings: z.number().int().min(0).max(3),
     knownAnswers: z
       .array(
         z.object({
@@ -95,6 +119,16 @@ export const InterviewConductorVariablesSchema = z
         }),
       )
       .max(8),
+    /** Values lifted from the person's own documents, unconfirmed; read back like a pending value. */
+    documentProposals: z
+      .array(
+        z.object({
+          stepKey: StepKey,
+          question: z.string().max(400),
+          value: z.string().max(400),
+        }),
+      )
+      .max(20),
     /** Things the runtime could not record last turn, so Q can ask again plainly. */
     notes: z.array(z.string().max(300)).max(6),
     recentTurns: z
@@ -135,6 +169,10 @@ export const InterviewConductorResultSchema = z
       "RESUME",
       "THINKING",
       "SMALL_TALK",
+      "OFF_TOPIC",
+      "NAVIGATE",
+      "LOOKUP",
+      "SABOTAGE",
       "UNCLEAR",
       "OPENING",
     ]),
@@ -157,7 +195,7 @@ export const InterviewConductorResultSchema = z
         }),
       )
       .max(4),
-    /** Decisions on values Q read back earlier. */
+    /** Decisions on values Q read back earlier, or on document proposals. */
     confirmations: z
       .array(
         z.object({
@@ -175,6 +213,15 @@ export const InterviewConductorResultSchema = z
     showOptions: z.boolean(),
     /** When intent is QUESTION_FOR_Q: the question, in the person's words. */
     questionForQ: z.string().max(1_000).nullable(),
+    /** When intent is NAVIGATE: where the person asked to go. */
+    navigate: InterviewDestinationSchema.nullable(),
+    /** When intent is LOOKUP and the spelling is confirmed: what to research on the public web. */
+    lookup: z
+      .object({
+        kind: z.enum(["WEBSITE", "COMPANY", "PERSON"]),
+        query: z.string().min(1).max(300),
+      })
+      .nullable(),
   })
   .strict();
 export type InterviewConductorResult = z.infer<

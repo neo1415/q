@@ -6,6 +6,7 @@ import {
   type PromptId,
   type PromptVersionId,
 } from "./definition.js";
+import { Q_SYSTEM_VOICE_V1 } from "./charter/q-system-voice.v1.js";
 import { Q_SYSTEM_V1 } from "./charter/q-system.v1.js";
 import { CLAIM_EXTRACTION_V1 } from "./tasks/claim-extraction.v1.js";
 import { COMPANY_ANALYST_V1 } from "./tasks/company-analyst.v1.js";
@@ -130,6 +131,7 @@ export function createPromptRegistry(
 export const PROMPT_DEFINITIONS: readonly PromptDefinition<unknown, unknown>[] =
   [
     Q_SYSTEM_V1,
+    Q_SYSTEM_VOICE_V1,
     FOUNDER_ONBOARDING_EXTRACTION_V1,
     FOUNDER_ONBOARDING_EXTRACTION_V2,
     INTERVIEW_CONDUCTOR_V1,

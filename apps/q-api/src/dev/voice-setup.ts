@@ -16,6 +16,7 @@
  *
  *   --ws-url <wss://…/v1/q/voice/ws>   required on first run; updates on later runs
  *   --female <voiceId>  --male <voiceId>   override the voice ids (defaults below)
+ *   --classic                             turbo v2 without inline audio tags
  *   --dry-run                               print the plan, touch nothing
  */
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
@@ -39,7 +40,18 @@ import {
  * traded for milliseconds. Recorded here, not in a secret.
  */
 export const VOICE_TUNING = {
+  modelId: "eleven_v3_conversational",
+  expressive: true,
+  stability: 0.42,
+  similarityBoost: 0.8,
+  speed: 1,
+  optimizeStreamingLatency: 1,
+} as const;
+
+/** The pre-v3 tuning, for `--classic`: turbo v2, no inline audio tags. */
+export const CLASSIC_VOICE_TUNING = {
   modelId: "eleven_turbo_v2",
+  expressive: false,
   stability: 0.42,
   similarityBoost: 0.8,
   speed: 1,
@@ -64,6 +76,8 @@ type Args = {
   female: string;
   male: string;
   dryRun: boolean;
+  /** Turbo v2 without inline audio tags, should v3 conversational be refused. */
+  classic: boolean;
 };
 
 function parseArgs(argv: readonly string[]): Args {
@@ -72,6 +86,7 @@ function parseArgs(argv: readonly string[]): Args {
     female: DEFAULT_VOICE_IDS.FEMALE,
     male: DEFAULT_VOICE_IDS.MALE,
     dryRun: false,
+    classic: false,
   };
   for (let index = 0; index < argv.length; index += 1) {
     const flag = argv[index];
@@ -91,6 +106,9 @@ function parseArgs(argv: readonly string[]): Args {
         break;
       case "--dry-run":
         args.dryRun = true;
+        break;
+      case "--classic":
+        args.classic = true;
         break;
       case undefined:
       default:
@@ -199,9 +217,16 @@ if (args.dryRun) {
 }
 
 const admin = createSpeechEngineAdmin({ apiKey: key.reveal() });
-const ids: Record<string, string> = {};
+const tuning = args.classic ? CLASSIC_VOICE_TUNING : VOICE_TUNING;
+console.log(
+  `[dev] tuning: ${tuning.modelId}${tuning.expressive ? " (expressive)" : ""}`,
+);
+const ids: Record<string, string> = {
+  // The interviewer allows inline audio tags only when the engines render them.
+  Q_VOICE_EXPRESSIVE: String(tuning.expressive),
+};
 for (const spec of specs) {
-  const id = await admin.upsert(spec, { wsUrl, tuning: VOICE_TUNING });
+  const id = await admin.upsert(spec, { wsUrl, tuning });
   ids[
     spec.voice === "FEMALE"
       ? "ELEVENLABS_SPEECH_ENGINE_ID"

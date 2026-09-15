@@ -1,11 +1,17 @@
 "use server";
 
-import { ApiProblemError, createQVoiceSession } from "@capital-q/api-client";
+import {
+  ApiProblemError,
+  createQVoiceSession,
+  getQVoiceTurnState,
+} from "@capital-q/api-client";
 import { loadWebServerConfig } from "@capital-q/config/web";
 import {
   CreateQVoiceSessionRequestSchema,
   type CreateQVoiceSessionRequest,
   type CreateQVoiceSessionResponse,
+  type QVoiceTurnState,
+  UuidSchema,
 } from "@capital-q/contracts";
 
 import { getSessionAccessToken } from "@/auth/session";
@@ -76,6 +82,33 @@ export async function startVoiceSessionAction(
     );
     return { ok: true, value };
   } catch (error) {
+    return translate(error);
+  }
+}
+
+/** What Q is asking after its latest spoken turn, for the stage; the owner's session only. */
+export async function readVoiceTurnAction(
+  rawVoiceSessionId: unknown,
+): Promise<VoiceActionResult<QVoiceTurnState>> {
+  const parsed = UuidSchema.safeParse(rawVoiceSessionId);
+  if (!parsed.success) {
+    return failure("That voice session isn't valid.");
+  }
+  const accessToken = await getSessionAccessToken();
+  if (accessToken === null) {
+    return failure("Please sign in again to continue.");
+  }
+  const { qApiBaseUrl } = loadWebServerConfig();
+  if (qApiBaseUrl === undefined) {
+    return failure("Q isn't connected on this build yet.");
+  }
+  try {
+    const value = await getQVoiceTurnState(
+      { baseUrl: qApiBaseUrl, accessToken },
+      parsed.data,
+    );
+    return { ok: true, value };
+  } catch (error: unknown) {
     return translate(error);
   }
 }

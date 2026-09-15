@@ -2,6 +2,8 @@ import {
   AppendQRunMessageResponseSchema,
   CreateQRunResponseSchema,
   CreateQVoiceSessionResponseSchema,
+  QVoiceTurnStateSchema,
+  qVoiceTurnPath,
   Q_VOICE_SESSIONS_PATH,
   IDEMPOTENCY_KEY_HEADER,
   Q_APPROVAL_APPROVE_SUFFIX,
@@ -134,6 +136,19 @@ export function rejectQApproval(
  * and the thread the person is in. It grants audio transport and nothing
  * in Capital Q; the provider API key never leaves the Q API.
  */
+/** What Q is asking after its latest spoken turn (owner only). */
+export function getQVoiceTurnState(
+  session: ApiSession,
+  voiceSessionId: string,
+) {
+  return call(
+    session,
+    "GET",
+    qVoiceTurnPath(voiceSessionId),
+    QVoiceTurnStateSchema,
+  );
+}
+
 export function createQVoiceSession(
   session: ApiSession,
   input: CreateQVoiceSessionRequest,

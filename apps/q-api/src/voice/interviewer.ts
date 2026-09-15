@@ -26,6 +26,9 @@ import {
   type InterviewConductorVariables,
   type InterviewOpenStep,
   type PromptRegistry,
+  personalityOf,
+  type InterviewDestination,
+  type QPersonalityCode,
 } from "@capital-q/q-core";
 
 /**
@@ -51,6 +54,10 @@ export type InterviewerDependencies = {
   readonly gateway: InterviewGateway;
   readonly registry?: PromptRegistry | undefined;
   readonly logger: Logger;
+  /** The manner Q carries itself in; UPBEAT when unset. */
+  readonly personality?: QPersonalityCode | undefined;
+  /** True when the speech model renders inline audio tags ([laughs]). */
+  readonly expressive?: boolean | undefined;
 };
 
 export type InterviewTurnInput = {
@@ -93,8 +100,14 @@ export type InterviewTurnOutcome = {
   readonly recorded: readonly string[];
   /** Steps set aside this turn. */
   readonly skipped: readonly string[];
-  /** A question for Q, when the person asked one. */
+  /** A question for Q, when the person asked one (a lookup becomes one). */
   readonly questionForQ: string | null;
+  /** Where the person asked to be taken, validated against the fixed list. */
+  readonly navigate: InterviewDestination | null;
+  /** Set when Q has stopped conducting and leaves the person with the form. */
+  readonly handoff: "FORM" | null;
+  /** Warnings issued so far in this session about derailing the interview. */
+  readonly warnings: number;
   /** The session after this turn. */
   readonly view: OnboardingSessionView;
   /** True when the model could not be reached and Q spoke a fallback line. */
@@ -110,7 +123,7 @@ type Pending = {
 };
 
 const DIALOGUE_BUDGET = {
-  maxAttempts: 3,
+  maxAttempts: 4,
   maxEstimatedCostUsd: 0.1,
   maxOutputTokens: 2_048,
   attemptTimeoutMs: 45_000,
@@ -123,8 +136,33 @@ const MATERIAL_STEP_PATTERNS = [
 ];
 
 const MAX_OPEN_STEPS = 40;
+/** Open steps beyond the current few carry a shortened options list. */
+const FULL_OPTIONS_STEPS = 3;
+const SHORT_OPTIONS = 10;
+/** Warnings before Q leaves the person with the form. */
+const WARNINGS_BEFORE_HANDOFF = 2;
 const MAX_RECENT_TURNS = 12;
 const RECENT_TURN_MAX_CHARS = 600;
+
+/**
+ * What Q asks its own research tools when the person names a website,
+ * company or person. The query is the person's words, bounded; the tools
+ * decide what may leave the platform (CQ-Q-RESEARCH-001).
+ */
+function lookupQuestion(
+  kind: "WEBSITE" | "COMPANY" | "PERSON",
+  query: string,
+): string {
+  const subject = query.trim().slice(0, 200);
+  switch (kind) {
+    case "WEBSITE":
+      return `Look at the public website ${subject}: what the company does, who it serves, its products and anything recent. Summarise it in a few spoken sentences as unverified public context for this interview.`;
+    case "COMPANY":
+      return `Research the company "${subject}" on the public web: what it does, who it serves, stage, funding and anything recent. Summarise in a few spoken sentences as unverified public context for this interview.`;
+    case "PERSON":
+      return `Research the person "${subject}" on the public web: role, company, public posts and interests. Summarise in a few spoken sentences as unverified public context for this interview.`;
+  }
+}
 
 function definitionFor(journey: "founder" | "investor") {
   return journey === "founder" ? FOUNDER_DEFINITION_V2 : INVESTOR_DEFINITION_V1;
@@ -375,11 +413,15 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
 
   const pendingFor = (sessionId: string) =>
     pendingBySession.get(sessionId) ?? [];
+  const warningsBySession = new Map<string, number>();
+  const personality = personalityOf(dependencies.personality);
+  const expressive = dependencies.expressive ?? false;
 
   return {
     /** Forget conversational state for a session (it ended). */
     forget: (sessionId: string) => {
       pendingBySession.delete(sessionId);
+      warningsBySession.delete(sessionId);
     },
 
     turn: async (input: InterviewTurnInput): Promise<InterviewTurnOutcome> => {
@@ -392,6 +434,23 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
         view.progress.eligibleSteps.map((s) => [s.stepKey, s.status]),
       );
       const openSteps: InterviewOpenStep[] = [];
+      const compact = (open: InterviewOpenStep): InterviewOpenStep => {
+        if (openSteps.length < FULL_OPTIONS_STEPS) return open;
+        const { note: _note, ...rest } = open;
+        if (
+          rest.options === undefined ||
+          rest.options.length <= SHORT_OPTIONS
+        ) {
+          return rest;
+        }
+        return {
+          ...rest,
+          options: rest.options
+            .slice(0, SHORT_OPTIONS)
+            .map(({ key, label }) => ({ key, label })),
+          moreOptions: rest.options.length - SHORT_OPTIONS,
+        };
+      };
       for (const step of definitionFor(input.journeyType).steps) {
         const status = statuses.get(step.stepKey);
         if (
@@ -402,7 +461,7 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
           continue;
         }
         const open = toOpenStep(step, view);
-        if (open !== null) openSteps.push(open);
+        if (open !== null) openSteps.push(compact(open));
         if (openSteps.length >= MAX_OPEN_STEPS) break;
       }
       const knownAnswers = view.responses.map((r) => {
@@ -414,6 +473,13 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
         };
       });
       const pending = pendingFor(input.onboardingSessionId);
+      // Proposals lifted from the person's documents, still unconfirmed and
+      // not already held by Q: Q reads them back like its own readings.
+      const proposals = view.pendingSuggestions.filter(
+        (p) =>
+          p.status === "PENDING" &&
+          !pending.some((held) => held.stepKey === p.stepKey),
+      );
 
       const variables: Omit<
         InterviewConductorVariables,
@@ -424,7 +490,10 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
       > = {
         journey: input.journeyType,
         channel: input.channel,
+        personality: personality.manner,
+        expressive,
         opening: input.utterance.trim().length === 0,
+        warnings: warningsBySession.get(input.onboardingSessionId) ?? 0,
         knownAnswers,
         openSteps,
         currentStepKey: view.currentStep?.stepKey ?? null,
@@ -432,6 +501,11 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
           stepKey: p.stepKey,
           question: p.question,
           value: p.spoken,
+        })),
+        documentProposals: proposals.map((p) => ({
+          stepKey: p.stepKey,
+          question: steps.get(p.stepKey)?.configuration.prompt ?? p.stepKey,
+          value: describeValue(steps.get(p.stepKey), p.suggestedValue),
         })),
         notes: [],
         recentTurns: input.recentTurns.slice(-MAX_RECENT_TURNS).map((t) => ({
@@ -442,12 +516,25 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
       };
       const rendered = renderPrompt<InterviewConductorVariables>(registry, {
         task: "INTERVIEW_CONDUCTOR",
+        charter: "Q_SYSTEM_VOICE",
         operatingMode: "ASSESSMENT",
         communicationProfile: DEFAULT_COMMUNICATION_PROFILE,
         environmentNotes:
           "You cannot record, verify or send anything yourself; Capital Q validates and records what you read, and holds material values until the person confirms them.",
         variables,
       });
+
+      logger.debug(
+        {
+          promptChars: rendered.messages.reduce(
+            (n, m) => n + m.content.length,
+            0,
+          ),
+          openSteps: openSteps.length,
+          knownAnswers: knownAnswers.length,
+        },
+        "interview prompt rendered",
+      );
 
       let result: InterviewConductorResult | undefined;
       try {
@@ -488,6 +575,9 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
           recorded: [],
           skipped: [],
           questionForQ: null,
+          navigate: null,
+          handoff: null,
+          warnings: warningsBySession.get(input.onboardingSessionId) ?? 0,
           view,
           degraded: true,
         };
@@ -522,10 +612,49 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
         }
       };
 
-      // 1. Decisions on what Q read back last time.
+      // 1. Decisions on what Q read back last time, and on document proposals.
       for (const decision of result.confirmations) {
         const held = pending.find((p) => p.stepKey === decision.stepKey);
-        if (held === undefined) continue;
+        if (held === undefined) {
+          const proposal = proposals.find(
+            (p) => p.stepKey === decision.stepKey,
+          );
+          if (proposal === undefined) continue;
+          const step = steps.get(proposal.stepKey);
+          const revised =
+            decision.decision === "REVISED" &&
+            decision.value !== undefined &&
+            step !== undefined
+              ? toResponseValue(step, decision.value)
+              : null;
+          try {
+            view = await resolveOnboardingSuggestion(
+              input.session,
+              input.onboardingSessionId,
+              proposal.id,
+              revised !== null
+                ? {
+                    resolution: "EDIT",
+                    response: { value: revised },
+                    expectedSessionVersion: view.session.version,
+                  }
+                : {
+                    resolution:
+                      decision.decision === "CONFIRMED" ? "ACCEPT" : "REJECT",
+                    expectedSessionVersion: view.session.version,
+                  },
+              randomUUID(),
+            );
+            if (decision.decision !== "REJECTED")
+              recorded.push(proposal.stepKey);
+          } catch (error: unknown) {
+            logger.warn(
+              { err: error, stepKey: proposal.stepKey },
+              "document proposal was not resolved",
+            );
+          }
+          continue;
+        }
         if (decision.decision === "CONFIRMED") {
           await commit(held.stepKey, held.value);
         } else if (
@@ -670,6 +799,30 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
 
       pendingBySession.set(input.onboardingSessionId, nextPending.slice(-8));
 
+      // 5. Conduct: a warning is counted here, never by the model; the
+      // third strike hands the person to the form and ends Q's part.
+      let warnings = warningsBySession.get(input.onboardingSessionId) ?? 0;
+      let handoff: "FORM" | null = null;
+      if (result.intent === "SABOTAGE") {
+        warnings += 1;
+        warningsBySession.set(input.onboardingSessionId, warnings);
+        if (warnings > WARNINGS_BEFORE_HANDOFF) handoff = "FORM";
+      }
+      const navigate = result.intent === "NAVIGATE" ? result.navigate : null;
+      if (navigate === "FORM") handoff = "FORM";
+      // A lookup is a question for Q: the research tools, under the
+      // person's own authority, with the answer spoken back.
+      const lookup =
+        result.intent === "LOOKUP" && result.lookup !== null
+          ? result.lookup
+          : null;
+      const questionForQ =
+        result.intent === "QUESTION_FOR_Q"
+          ? result.questionForQ
+          : lookup !== null
+            ? lookupQuestion(lookup.kind, lookup.query)
+            : null;
+
       const askStep =
         result.askNext === null ? undefined : steps.get(result.askNext);
       const askOpen = askStep === undefined ? null : toOpenStep(askStep, view);
@@ -687,8 +840,10 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
               },
         recorded,
         skipped,
-        questionForQ:
-          result.intent === "QUESTION_FOR_Q" ? result.questionForQ : null,
+        questionForQ,
+        navigate,
+        handoff,
+        warnings,
         view,
         degraded: false,
       };

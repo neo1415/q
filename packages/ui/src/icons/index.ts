@@ -24,6 +24,7 @@ export {
   Landmark,
   Lock,
   MessageSquare,
+  Mic,
   MoreHorizontal,
   Sparkle,
   Upload,

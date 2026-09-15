@@ -10,7 +10,7 @@ import {
 
 import { IconButton } from "../components/button.js";
 import { InlineNotice } from "../components/states.js";
-import { ArrowUp, ICON_SIZE } from "../icons/index.js";
+import { ArrowUp, ICON_SIZE, Mic } from "../icons/index.js";
 import { cx } from "../primitives/class-names.js";
 import type { ContextScope } from "../tokens/index.js";
 import { ContextIndicator } from "./context-indicator.js";
@@ -22,8 +22,9 @@ import { QMark } from "./q-mark.js";
  *
  * It is an entry point, not an intelligence. When no `onSubmit` is wired the
  * composer says plainly that nothing was sent; it never fabricates an
- * answer, a stage or a "thinking" animation. Voice is omitted until a real
- * capability exists -- a dead microphone is worse than none.
+ * answer, a stage or a "thinking" animation. The microphone appears only
+ * when a surface wires `onVoice` to a real capability: a dead microphone
+ * is worse than none.
  */
 
 export const Q_COMPOSER_PLACEHOLDER =
@@ -40,6 +41,9 @@ export type QComposerProps = {
   readonly className?: string | undefined;
   /** What the input is waiting for on this surface; the general cue by default. */
   readonly placeholder?: string | undefined;
+  /** Talk with Q instead: present only where voice is wired. */
+  readonly onVoice?: (() => void) | undefined;
+  readonly voiceLabel?: string | undefined;
 };
 
 export function QComposer({
@@ -51,6 +55,8 @@ export function QComposer({
   autoFocus = false,
   className,
   placeholder = Q_COMPOSER_PLACEHOLDER,
+  onVoice,
+  voiceLabel = "Talk with Q",
 }: QComposerProps) {
   const generatedId = useId();
   const inputId = id ?? `q-composer-${generatedId}`;
@@ -147,18 +153,37 @@ export function QComposer({
       </div>
       <div className="flex items-center justify-between gap-3">
         <ContextIndicator scope={contextScope} detail={contextDetail} />
-        <IconButton
-          type="submit"
-          variant="primary"
-          aria-label="Send to Q"
-          disabled={!canSubmit}
-        >
-          <ArrowUp
-            aria-hidden="true"
-            size={ICON_SIZE.prominent}
-            strokeWidth={2}
-          />
-        </IconButton>
+        <div className="flex items-center gap-1">
+          {onVoice !== undefined ? (
+            <IconButton
+              type="button"
+              variant="quiet"
+              aria-label={voiceLabel}
+              title={voiceLabel}
+              disabled={disabled}
+              onClick={onVoice}
+              data-q-talk
+            >
+              <Mic
+                aria-hidden="true"
+                size={ICON_SIZE.prominent}
+                strokeWidth={2}
+              />
+            </IconButton>
+          ) : null}
+          <IconButton
+            type="submit"
+            variant="primary"
+            aria-label="Send to Q"
+            disabled={!canSubmit}
+          >
+            <ArrowUp
+              aria-hidden="true"
+              size={ICON_SIZE.prominent}
+              strokeWidth={2}
+            />
+          </IconButton>
+        </div>
       </div>
       {notice === "unavailable" ? (
         <InlineNotice
