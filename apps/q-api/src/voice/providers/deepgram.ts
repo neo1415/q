@@ -112,6 +112,9 @@ export function createDeepgramVoiceProvider(
             version: "v2",
             model: "flux-general-en",
             keyterms: [...ASR_KEYWORDS],
+            // A person thinking mid-sentence is not a person done: wait for
+            // more confidence before ending the turn.
+            eot_threshold: 0.8,
           },
         },
         think: {

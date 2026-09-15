@@ -1,6 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { resolveSafeReturnPath } from "../src/auth/redirect-safety";
+import {
+  DEFAULT_RETURN_PATH,
+  resolveSafeReturnPath,
+} from "../src/auth/redirect-safety";
 
 /**
  * Continue with Google (CQ-C5-R2A §7, §11, §31, §35).
@@ -117,7 +120,7 @@ describe("R2A-A02 · the return path cannot become somebody else's site", () => 
     // The value handed to signInWithOAuth's redirectTo is built from this
     // result, so a destination that cannot survive here cannot be reached
     // through Google either.
-    expect(resolveSafeReturnPath(candidate)).toBe("/home");
+    expect(resolveSafeReturnPath(candidate)).toBe(DEFAULT_RETURN_PATH);
   });
 
   it("keeps a genuine in-app destination across the flow", () => {
@@ -127,6 +130,6 @@ describe("R2A-A02 · the return path cannot become somebody else's site", () => 
   });
 
   it("never returns someone to the authentication surface itself", () => {
-    expect(resolveSafeReturnPath("/auth/sign-in")).toBe("/home");
+    expect(resolveSafeReturnPath("/auth/sign-in")).toBe(DEFAULT_RETURN_PATH);
   });
 });

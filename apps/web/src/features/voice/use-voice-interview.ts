@@ -58,6 +58,8 @@ export type VoiceInterview = {
 
 /** How often the stage asks what Q is asking, while talking. */
 const TURN_POLL_MS = 1_500;
+const RECONNECT_DELAY_MS = 1_200;
+const RECONNECT_SPACING_MS = 30_000;
 
 export function useVoiceInterview(
   events: VoiceSessionEvents = {},
@@ -72,9 +74,30 @@ export function useVoiceInterview(
     firstMessage: string | undefined;
   } | null>(null);
 
+  // A session that drops on its own comes back on the same thread before
+  // the person has to do anything: once per half minute, so a line that
+  // keeps failing is shown as failed rather than retried in a storm.
+  const lastReconnectAt = useRef(0);
+  const talkRef = useRef<VoiceInterview["talk"] | null>(null);
   const client = useVoiceSession({
     ...events,
     onEnded: (reason) => {
+      const last = lastStart.current;
+      const again = talkRef.current;
+      if (
+        reason !== "ended" &&
+        last !== null &&
+        again !== null &&
+        Date.now() - lastReconnectAt.current > RECONNECT_SPACING_MS
+      ) {
+        lastReconnectAt.current = Date.now();
+        setNotice("The line dropped. Reconnecting…");
+        // `talk` clears the notice as it starts and sets its own on failure.
+        window.setTimeout(() => {
+          void again({ thread: last.thread, firstMessage: undefined });
+        }, RECONNECT_DELAY_MS);
+        return;
+      }
       setActive(false);
       events.onEnded?.(reason);
     },
@@ -118,10 +141,16 @@ export function useVoiceInterview(
     [client, voice],
   );
 
+  useEffect(() => {
+    talkRef.current = talk;
+  }, [talk]);
+
   const end = useCallback(async () => {
     setActive(false);
     setVoiceSessionId(null);
     setTurn(null);
+    lastStart.current = null;
+    lastReconnectAt.current = 0;
     await client.end();
   }, [client]);
 

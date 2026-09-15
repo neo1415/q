@@ -75,7 +75,7 @@ describe("resolveSafeReturnPath", () => {
 describe("signInPath", () => {
   it("returns a bare sign-in URL for the default destination", () => {
     expect(signInPath(undefined)).toBe("/auth/sign-in");
-    expect(signInPath("/home")).toBe("/auth/sign-in");
+    expect(signInPath(DEFAULT_RETURN_PATH)).toBe("/auth/sign-in");
     expect(signInPath("https://evil.example")).toBe("/auth/sign-in");
   });
 

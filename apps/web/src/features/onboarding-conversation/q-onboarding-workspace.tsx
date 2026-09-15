@@ -33,6 +33,7 @@ import {
   materialUploadTargetAction,
 } from "../onboarding-kit/material-actions";
 import { destinationPath } from "../voice/destinations";
+import { useFollowTurn } from "../voice/use-follow-turn";
 import { VoiceStage } from "../voice/voice-stage";
 import {
   acknowledge,
@@ -930,15 +931,9 @@ export function QOnboardingWorkspace({
 
   // Q takes the person somewhere, or leaves them with the form: followed
   // once per turn, never twice.
-  const followedTurn = useRef(0);
-  const voiceTurn = voice.turn;
   const voiceEnd = voice.end;
-  useEffect(() => {
-    if (voiceTurn === null || voiceTurn.sequence <= followedTurn.current) {
-      return;
-    }
-    followedTurn.current = voiceTurn.sequence;
-    if (voiceTurn.handoff === "FORM" || voiceTurn.navigate === "FORM") {
+  useFollowTurn(voice.turn, voice.client, (followed) => {
+    if (followed.handoff === "FORM" || followed.navigate === "FORM") {
       void voiceEnd();
       const editor =
         prompt === null ? undefined : vocabulary.editorFor(prompt.stepKey);
@@ -947,12 +942,12 @@ export function QOnboardingWorkspace({
       }
       return;
     }
-    const path = destinationPath(voiceTurn.navigate);
+    const path = destinationPath(followed.navigate);
     if (path !== null) {
       void voiceEnd();
       router.push(path);
     }
-  }, [voiceTurn, voiceEnd, prompt, vocabulary, onEdit, router]);
+  });
 
   // Asked to open talking: start once, as soon as the session is here.
   const talkedOnOpen = useRef(false);

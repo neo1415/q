@@ -32,6 +32,12 @@ const BodySchema = z
   })
   .passthrough();
 
+/** A stream comment every few seconds while a turn is still working. */
+const KEEP_ALIVE_MS = 5_000;
+/** If nothing has been said by then, one short beat so the person knows Q is there. */
+const SLOW_TURN_BEAT_MS = 3_500;
+const SLOW_TURN_BEAT = "One moment.";
+
 export type VoiceThinkDependencies = {
   readonly path: string;
   readonly bindings: VoiceSessionBindings;
@@ -139,10 +145,22 @@ export function registerVoiceThinkRoute(
     });
     raw.write(chunk(id, { role: "assistant" }, null));
     let open = true;
+    let wroteContent = false;
     const write = (text: string) => {
       if (!open || controller.signal.aborted) return;
+      wroteContent = true;
       raw.write(chunk(id, { content: text }, null));
     };
+    // A long turn (research, a document being read) must not look like
+    // a dead line to the provider or to the person: a comment keeps the
+    // stream open, and a short spoken beat lands before the silence
+    // gets awkward. At most one beat per turn; nothing when Q is quick.
+    const keepAlive = setInterval(() => {
+      if (open && !controller.signal.aborted) raw.write(": keep-alive\n\n");
+    }, KEEP_ALIVE_MS);
+    const beat = setTimeout(() => {
+      if (!wroteContent) write(SLOW_TURN_BEAT);
+    }, SLOW_TURN_BEAT_MS);
     const speaker: VoiceSpeaker = {
       providerConversationId: binding.providerConversationId,
       get isOpen() {
@@ -172,6 +190,8 @@ export function registerVoiceThinkRoute(
       );
       write("I couldn't take that just now. Could you say it again?");
     } finally {
+      clearInterval(keepAlive);
+      clearTimeout(beat);
       if (open) {
         raw.write(chunk(id, {}, "stop"));
         raw.write("data: [DONE]\n\n");

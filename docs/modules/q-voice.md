@@ -238,6 +238,46 @@ the voice detector missed at the timeout, and a person's "mm-hm", "okay",
 Sarah (female, mature, reassuring) and Daniel (male, steady broadcaster);
 override with `--female` / `--male`.
 
+## Long turns and dropped lines
+
+A turn that researches or reads a document can take longer than a person
+expects silence to last. Three things keep it from feeling like a hang:
+
+- `voice/think.ts` writes an SSE comment every 5 s while a turn is still
+  working, so neither the provider nor a proxy treats the line as dead;
+  and if nothing has been said after 3.5 s it speaks one short beat
+  ("One moment.") before the answer. At most one beat a turn; nothing
+  when Q is quick.
+- The stage's status line grows a note after 5 s ("Working on it") and
+  after 14 s ("Still on it. This one takes a moment.").
+- Deepgram's listener runs with `eot_threshold` 0.8 so a pause
+  mid-sentence is not taken as the end of a turn, which was cancelling
+  think requests in bursts.
+
+INTERVIEW_CONDUCTOR now forbids promising a later action ("I'll update
+your profile"): the platform records; Q says what it has taken from the
+person's words now, or asks the next question.
+
+A session that drops on its own (`onEnded` with a reason other than the
+person ending it) is reconnected once by `useVoiceInterview`, on the
+same thread, with "The line dropped. Reconnecting…" as the notice; a
+second drop is shown as before. A provider error carries its code in the
+notice so the person can say which leg failed.
+
+Q's destinations (a page, the form) are followed by `useFollowTurn`
+only once the client has stopped speaking or thinking, with a 1.5 s floor
+and a 12 s ceiling, so a goodbye is heard before the screen changes.
+
+## Home
+
+Talking with Q on Home mounts the same full-page stage as the interview
+(`VoiceStage`, no progress, no form), and follows Q's destinations the
+same way. Typed answers on Home render through `q-answer.tsx`: prose
+first, then the server's FINDING blocks as one plain list (type in words,
+the contract's confidence label, a source count), then UNCERTAINTY blocks
+under "Still open" with what would settle them, then the count of recorded
+sources. Nothing is coloured by truth and nothing is invented.
+
 ## When every session drops at once
 
 "The voice connection dropped" the moment Q appears, every time, is the

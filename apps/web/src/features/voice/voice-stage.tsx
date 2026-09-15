@@ -147,6 +147,35 @@ export function VoiceStage({
   const inputId = useId();
   const fileId = useId();
   const [uploading, setUploading] = useState(false);
+  // How long Q has been thinking, so a long turn reads as work, not a hang.
+  // Counted by a clock while the state lasts; read only while it lasts.
+  const [thinking, setThinking] = useState<{
+    readonly startedAt: number;
+    readonly now: number;
+  } | null>(null);
+  useEffect(() => {
+    if (client.state !== "THINKING") return;
+    const startedAt = Date.now();
+    const tick = () => setThinking({ startedAt, now: Date.now() });
+    const first = window.setTimeout(tick, 0);
+    const timer = window.setInterval(tick, 1_000);
+    return () => {
+      window.clearTimeout(first);
+      window.clearInterval(timer);
+    };
+  }, [client.state]);
+  const thinkingFor =
+    client.state === "THINKING" && thinking !== null
+      ? thinking.now - thinking.startedAt
+      : 0;
+  const thinkingNote =
+    client.state !== "THINKING"
+      ? null
+      : thinkingFor > 14_000
+        ? "Still on it. This one takes a moment."
+        : thinkingFor > 5_000
+          ? "Working on it"
+          : null;
   const listRef = useRef<HTMLOListElement>(null);
 
   const lines = client.transcript;
@@ -225,6 +254,9 @@ export function VoiceStage({
           <span className="cq-label text-white/70">
             {client.muted ? "Muted" : VOICE_STATE_LABELS[client.state]}
           </span>
+          {thinkingNote !== null ? (
+            <span className="cq-caption text-white/45">{thinkingNote}</span>
+          ) : null}
         </div>
 
         <div className="flex w-full max-w-2xl flex-col items-center gap-3 text-center">

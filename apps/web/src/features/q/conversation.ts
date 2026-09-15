@@ -1,5 +1,7 @@
 import {
   Q_VISIBLE_STAGE_LABELS,
+  type QConfidenceLevel,
+  type QFindingType,
   type QMessage,
   type QResultBlock,
 } from "@capital-q/contracts";
@@ -42,7 +44,59 @@ export type QTurn =
        * render time — not something this projection may pre-empt (§18).
        */
       readonly sourceCount: number;
+      /** What Q found, in plain statements, as the server labelled them. */
+      readonly findings: readonly QTurnFinding[];
+      /** What Q could not settle, and what would settle it. */
+      readonly uncertainties: readonly QTurnUncertainty[];
     };
+
+export type QTurnFinding = {
+  readonly id: string;
+  readonly type: QFindingType;
+  readonly statement: string;
+  readonly confidence: QConfidenceLevel;
+  /** How many recorded sources this finding rests on. */
+  readonly sourceCount: number;
+};
+
+export type QTurnUncertainty = {
+  readonly statement: string;
+  readonly missing: readonly string[];
+};
+
+function findingsOf(
+  blocks: readonly QResultBlock[] | undefined,
+): readonly QTurnFinding[] {
+  if (blocks === undefined) {
+    return [];
+  }
+  return blocks.flatMap((block) =>
+    block.kind === "FINDING"
+      ? [
+          {
+            id: block.finding.findingId,
+            type: block.finding.type,
+            statement: block.finding.statement,
+            confidence: block.finding.confidence,
+            sourceCount: block.finding.evidenceRefs.length,
+          },
+        ]
+      : [],
+  );
+}
+
+function uncertaintiesOf(
+  blocks: readonly QResultBlock[] | undefined,
+): readonly QTurnUncertainty[] {
+  if (blocks === undefined) {
+    return [];
+  }
+  return blocks.flatMap((block) =>
+    block.kind === "UNCERTAINTY"
+      ? [{ statement: block.statement, missing: block.missing ?? [] }]
+      : [],
+  );
+}
 
 /** What a person typed, before the server has a message id for it. */
 export type PendingTurn = {
@@ -130,6 +184,8 @@ export function turnsFrom(
         text,
         streaming: false,
         sourceCount: sourceCountOf(message.blocks),
+        findings: findingsOf(message.blocks),
+        uncertainties: uncertaintiesOf(message.blocks),
       },
     });
   }
@@ -172,6 +228,8 @@ export function turnsFrom(
       text: state.partial.text,
       streaming: true,
       sourceCount: 0,
+      findings: [],
+      uncertainties: [],
     });
   }
 

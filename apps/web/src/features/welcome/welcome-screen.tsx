@@ -1,9 +1,10 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 
 import { destinationPath } from "../voice/destinations";
+import { useFollowTurn } from "../voice/use-follow-turn";
 import { useVoiceInterview } from "../voice/use-voice-interview";
 import { VoiceStage } from "../voice/voice-stage";
 
@@ -27,8 +28,6 @@ export function WelcomeScreen({
   const router = useRouter();
   const voice = useVoiceInterview();
   const [begun, setBegun] = useState(false);
-  const followed = useRef(0);
-
   const begin = async () => {
     setBegun(true);
     await voice.talk({ thread: { welcome: true } });
@@ -36,17 +35,13 @@ export function WelcomeScreen({
 
   const turn = voice.turn;
   const end = voice.end;
-  useEffect(() => {
-    if (turn === null || turn.sequence <= followed.current) {
-      return;
-    }
-    followed.current = turn.sequence;
-    const path = destinationPath(turn.navigate);
+  useFollowTurn(turn, voice.client, (followed) => {
+    const path = destinationPath(followed.navigate);
     if (path !== null) {
       void end();
       router.push(path);
     }
-  }, [turn, end, router]);
+  });
 
   if (voice.active) {
     return (

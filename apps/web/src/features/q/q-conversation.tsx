@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
 import { describeQStreamTransport } from "@capital-q/api-client";
@@ -10,8 +11,11 @@ import { QStateIndicator } from "@capital-q/ui/q-state";
 import { InlineNotice } from "@capital-q/ui/states";
 import type { ContextScope } from "@capital-q/ui/tokens";
 
+import { destinationPath } from "../voice/destinations";
+import { useFollowTurn } from "../voice/use-follow-turn";
 import { useVoiceInterview } from "../voice/use-voice-interview";
-import { VoicePanel } from "../voice/voice-panel";
+import { VoiceStage } from "../voice/voice-stage";
+import { QAnswer } from "./q-answer";
 import { failureMessage, turnsFrom, workingLabel } from "./conversation";
 import { useQConversation } from "./use-q-conversation";
 
@@ -66,6 +70,7 @@ export function QConversationPanel({
   });
   const turns = turnsFrom(q.state, q.pending);
   const endRef = useRef<HTMLDivElement>(null);
+  const router = useRouter();
 
   // Voice (CQ-Q-VOICE-001): the same Q conversation, spoken. The credential
   // is bound on the server to this person, this subject and the
@@ -108,6 +113,16 @@ export function QConversationPanel({
     });
   };
 
+  // "Take me to my profile", said on Home: followed once Q has said so.
+  const voiceEnd = voice.end;
+  useFollowTurn(voice.turn, voice.client, (followed) => {
+    const path = destinationPath(followed.navigate);
+    if (path !== null) {
+      void voiceEnd();
+      router.push(path);
+    }
+  });
+
   useEffect(() => {
     // Follow the answer as it arrives, and respect a reader who has asked
     // for less motion. `nearest` scrolls only when the end of the
@@ -128,7 +143,9 @@ export function QConversationPanel({
   return (
     <div className="flex flex-col gap-4" data-q-workspace>
       {voice.active ? (
-        <VoicePanel
+        // Talking with Q on Home is the same stage as the interview: the
+        // screen is Q, wherever the conversation started.
+        <VoiceStage
           client={voice.client}
           voice={voice.voice}
           voices={["FEMALE", "MALE"]}
@@ -136,6 +153,10 @@ export function QConversationPanel({
           onEnd={() => void voice.end()}
           notice={voice.notice}
           onDismissNotice={voice.clearNotice}
+          asking={voice.turn?.asking ?? null}
+          onSay={(text) => voice.client.sendText(text)}
+          onUseForm={undefined}
+          progress={[]}
         />
       ) : null}
       {!voice.active && voice.notice !== null ? (
@@ -183,29 +204,21 @@ export function QConversationPanel({
                   : "flex flex-col gap-1"
               }
             >
-              <span className="cq-label text-(--cq-text-tertiary)">
-                {turn.kind === "PERSON" ? "You" : "Q"}
-              </span>
-              <p
-                className={
-                  turn.kind === "PERSON"
-                    ? "cq-body max-w-(--cq-layout-narrow) rounded-lg bg-(--cq-surface-sunken) px-3 py-2 text-(--cq-text-primary)"
-                    : "cq-body max-w-(--cq-layout-narrow) whitespace-pre-wrap text-(--cq-text-primary)"
-                }
-                data-unconfirmed={
-                  turn.kind === "PERSON" && turn.unconfirmed
-                    ? "true"
-                    : undefined
-                }
-              >
-                {turn.text}
-              </p>
-              {turn.kind === "Q" && turn.sourceCount > 0 ? (
-                <span className="cq-caption text-(--cq-text-secondary)">
-                  Based on {turn.sourceCount} recorded source
-                  {turn.sourceCount === 1 ? "" : "s"}.
-                </span>
-              ) : null}
+              {turn.kind === "PERSON" ? (
+                <>
+                  <span className="cq-label text-(--cq-text-tertiary)">
+                    You
+                  </span>
+                  <p
+                    className="cq-body max-w-(--cq-layout-narrow) rounded-lg bg-(--cq-surface-sunken) px-3 py-2 text-(--cq-text-primary)"
+                    data-unconfirmed={turn.unconfirmed ? "true" : undefined}
+                  >
+                    {turn.text}
+                  </p>
+                </>
+              ) : (
+                <QAnswer turn={turn} />
+              )}
             </li>
           ))}
           <div ref={endRef} />

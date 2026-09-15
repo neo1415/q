@@ -167,10 +167,13 @@ export function useDeepgramVoiceSession(
         );
       });
       session.on("error", (message) => {
-        // The provider's wording is for logs, not for people.
+        // The provider's wording is for logs; the code is for the person
+        // to tell us, since it names which leg failed.
         setState("ERROR");
-        eventsRef.current.onError?.(PLAIN_ERRORS.generic);
-        console.warn("voice agent error", message.code);
+        eventsRef.current.onError?.(
+          `${PLAIN_ERRORS.generic} (${message.code || "unknown"})`,
+        );
+        console.warn("voice agent error", message.code, message.description);
       });
       session.on("disconnected", (reason) => {
         const wasLive = liveRef.current === live;
