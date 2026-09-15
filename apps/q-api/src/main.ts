@@ -112,6 +112,7 @@ import { composeResearch } from "./composition/research.js";
 import { createSupabaseRequestAuthenticator } from "./security/supabase-authenticator.js";
 import { attachVoiceChannel } from "./voice/attach.js";
 import { createVoiceSessionBindings } from "./voice/bindings.js";
+import type { VoiceAttachment } from "./voice/provider.js";
 import { createElevenLabsVoiceProvider } from "./voice/providers/elevenlabs.js";
 import { createVoiceTurnHandler } from "./voice/turn.js";
 
@@ -494,7 +495,11 @@ const { app, logger: appLogger } = createApp(
   },
 );
 
+// The voice channel is attached once the server listens (below); its
+// close hook must be registered now, while hooks may still be added.
+let voiceChannel: VoiceAttachment | undefined;
 app.addHook("onClose", async () => {
+  await voiceChannel?.close();
   await runEventNotifier.close();
   await checkpoints.close();
   await database.close();
@@ -507,7 +512,7 @@ await app.listen({
 
 if (voiceProvider !== undefined) {
   const apiBaseUrl = config.voice.apiBaseUrl;
-  const voiceChannel = await attachVoiceChannel(app.server, Q_VOICE_WS_PATH, {
+  voiceChannel = await attachVoiceChannel(app.server, Q_VOICE_WS_PATH, {
     provider: voiceProvider,
     bindings: voiceBindings,
     turn: createVoiceTurnHandler({
@@ -518,9 +523,6 @@ if (voiceProvider !== undefined) {
       logger,
     }),
     logger,
-  });
-  app.addHook("onClose", async () => {
-    await voiceChannel.close();
   });
   appLogger.info(
     { path: Q_VOICE_WS_PATH, voices: voiceProvider.voices },
