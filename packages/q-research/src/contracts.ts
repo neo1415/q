@@ -130,5 +130,85 @@ export type ResearchProviderFailureClass =
   (typeof RESEARCH_PROVIDER_FAILURE_CLASSES)[number];
 
 /** The provider code recorded on evidence sources (`evidence.sources.provider`). */
-export const RESEARCH_PROVIDER_CODES = ["tavily", "fake"] as const;
+export const RESEARCH_PROVIDER_CODES = [
+  "tavily",
+  "brightdata",
+  "fake",
+] as const;
 export type ResearchProviderCode = (typeof RESEARCH_PROVIDER_CODES)[number];
+
+/**
+ * A public LinkedIn page, by URL, through a compliant data provider: one
+ * person or one company, bounded public fields, unverified. The URL is the
+ * person's own words (a link they gave); nothing else leaves.
+ */
+export const PublicProfileLookupRequestSchema = z
+  .object({ url: PublicUrlSchema })
+  .strict();
+export type PublicProfileLookupRequest = z.infer<
+  typeof PublicProfileLookupRequestSchema
+>;
+
+export const PublicCompanyProfileSchema = z
+  .object({
+    kind: z.literal("COMPANY"),
+    url: PublicUrlSchema,
+    name: z.string().max(200).nullable(),
+    about: z.string().max(2_000).nullable(),
+    website: z.string().max(2_048).nullable(),
+    industries: z.array(z.string().max(120)).max(10),
+    companySize: z.string().max(60).nullable(),
+    headquarters: z.string().max(200).nullable(),
+    countryCodes: z.array(z.string().max(8)).max(10),
+    followers: z.number().int().nullable(),
+    employeesOnLinkedIn: z.number().int().nullable(),
+    founded: z.string().max(40).nullable(),
+    retrievedAt: z.string().max(40),
+  })
+  .strict();
+export type PublicCompanyProfile = z.infer<typeof PublicCompanyProfileSchema>;
+
+export const PublicPersonProfileSchema = z
+  .object({
+    kind: z.literal("PERSON"),
+    url: PublicUrlSchema,
+    name: z.string().max(200).nullable(),
+    headline: z.string().max(300).nullable(),
+    about: z.string().max(2_000).nullable(),
+    location: z.string().max(200).nullable(),
+    currentCompany: z
+      .object({
+        name: z.string().max(200).nullable(),
+        title: z.string().max(200).nullable(),
+      })
+      .nullable(),
+    followers: z.number().int().nullable(),
+    connections: z.number().int().nullable(),
+    experience: z
+      .array(
+        z.object({
+          title: z.string().max(200).nullable(),
+          company: z.string().max(200).nullable(),
+          period: z.string().max(60),
+        }),
+      )
+      .max(8),
+    retrievedAt: z.string().max(40),
+  })
+  .strict();
+export type PublicPersonProfile = z.infer<typeof PublicPersonProfileSchema>;
+
+export const PublicProfileLookupResultSchema = z
+  .object({
+    status: z.enum(["FOUND", "NOT_FOUND", "NOT_LINKEDIN", "PENDING"]),
+    profile: z
+      .discriminatedUnion("kind", [
+        PublicCompanyProfileSchema,
+        PublicPersonProfileSchema,
+      ])
+      .nullable(),
+  })
+  .strict();
+export type PublicProfileLookupResult = z.infer<
+  typeof PublicProfileLookupResultSchema
+>;

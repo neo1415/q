@@ -40,7 +40,8 @@ import type { MaterialFileView, MaterialState } from "./materials";
  */
 
 const UploadInput = z.object({
-  companyId: z.string().uuid(),
+  /** Absent for an organisation's own documents (an investor's profile or mandate). */
+  companyId: z.string().uuid().optional(),
   documentType: DocumentTypeSchema,
   filename: z.string().min(1).max(255),
   mimeType: z.string().min(3).max(129),
@@ -109,7 +110,9 @@ export async function materialUploadTargetAction(
     const created = await createDocumentUploadSession(
       session,
       {
-        companyId: input.companyId,
+        ...(input.companyId === undefined
+          ? {}
+          : { companyId: input.companyId }),
         documentType: input.documentType,
         title: input.filename.replace(/\.[^.]+$/, "").slice(0, 200),
         filename: input.filename,
@@ -215,11 +218,17 @@ const TYPE_LABELS: Readonly<Record<string, string>> = {
  * remember wrongly.
  */
 export async function materialListAction(
-  rawCompanyId: string,
+  rawCompanyId?: string | undefined,
 ): Promise<ActionResult<readonly MaterialFileView[]>> {
-  const companyId = z.string().uuid().parse(rawCompanyId);
+  const companyId =
+    rawCompanyId === undefined
+      ? undefined
+      : z.string().uuid().parse(rawCompanyId);
   return run(async (session) => {
-    const listed = await listDocuments(session, { companyId });
+    const listed = await listDocuments(
+      session,
+      companyId === undefined ? {} : { companyId },
+    );
     return listed.documents.map((document): MaterialFileView => {
       const { state, label } = stateOf(document);
       return {

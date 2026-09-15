@@ -156,6 +156,9 @@ function lookupQuestion(
   query: string,
 ): string {
   const subject = query.trim().slice(0, 200);
+  if (/linkedin\.com\/(in|company)\//i.test(subject)) {
+    return `Look up this public LinkedIn page with the profile lookup: ${subject}. Summarise in a few spoken sentences what it says about them (name, role or what the company does, where, size) as unverified public context for this interview, said as "their LinkedIn page says".`;
+  }
   switch (kind) {
     case "WEBSITE":
       return `Look at the public website ${subject}: what the company does, who it serves, its products and anything recent. Summarise it in a few spoken sentences as unverified public context for this interview.`;

@@ -5,7 +5,10 @@ import type {
   InvestorOrganisationQueryPort,
 } from "@capital-q/investors";
 import type { DisclosureAccessService } from "@capital-q/permissions";
-import type { PublicWebResearchService } from "@capital-q/q-research";
+import type {
+  PublicProfileLookupProvider,
+  PublicWebResearchService,
+} from "@capital-q/q-research";
 import type { AuthorizationService } from "@capital-q/security";
 
 /**
@@ -27,4 +30,6 @@ export type QToolPorts = {
   readonly authorization: AuthorizationService;
   readonly disclosure: DisclosureAccessService;
   readonly research?: PublicWebResearchService | undefined;
+  /** Public LinkedIn pages by URL; absent means the lookup tool does not exist. */
+  readonly profiles?: PublicProfileLookupProvider | undefined;
 };

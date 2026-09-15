@@ -28,9 +28,14 @@ import {
 import {
   createPublicWebResearchService,
   type PublicWebResearchProvider,
+  type PublicProfileLookupProvider,
   type PublicWebResearchService,
   type ResearchEvidenceRecorder,
 } from "@capital-q/q-research";
+import {
+  createBrightDataProfileLookup,
+  createBrightDataResearchProvider,
+} from "@capital-q/q-research/providers/brightdata";
 import { createTavilyResearchProvider } from "@capital-q/q-research/providers/tavily";
 import type { AuthorizationService } from "@capital-q/security";
 
@@ -49,6 +54,8 @@ import type { AuthorizationService } from "@capital-q/security";
 export type ResearchComposition = {
   /** Absent when no provider is configured: the research tools do not exist. */
   readonly research: PublicWebResearchService | undefined;
+  /** Public LinkedIn pages by URL; absent without a Bright Data key. */
+  readonly profiles: PublicProfileLookupProvider | undefined;
   readonly statements: QUserStatementRecorder;
   readonly providerStatus: "configured" | "unconfigured";
 };
@@ -203,13 +210,29 @@ export function composeResearch(
     securityEvents: createPostgresSecurityEventWriter({ sql }),
   });
 
+  // Search and extraction: Bright Data when its zones are named (a Google
+  // index and an unlocker), else Tavily. Profiles: Bright Data's LinkedIn
+  // datasets need only the key.
+  const brightData = dependencies.secrets.brightData;
   const provider =
     dependencies.provider ??
-    (dependencies.secrets.tavily === undefined
+    (brightData !== undefined &&
+    brightData.serpZone !== undefined &&
+    brightData.unlockerZone !== undefined
+      ? createBrightDataResearchProvider({
+          apiKey: brightData.apiKey.reveal(),
+          serpZone: brightData.serpZone,
+          unlockerZone: brightData.unlockerZone,
+        })
+      : dependencies.secrets.tavily === undefined
+        ? undefined
+        : createTavilyResearchProvider({
+            apiKey: dependencies.secrets.tavily.reveal(),
+          }));
+  const profiles =
+    brightData === undefined
       ? undefined
-      : createTavilyResearchProvider({
-          apiKey: dependencies.secrets.tavily.reveal(),
-        }));
+      : createBrightDataProfileLookup({ apiKey: brightData.apiKey.reveal() });
   const research =
     provider === undefined
       ? undefined
@@ -241,6 +264,7 @@ export function composeResearch(
 
   return {
     research,
+    profiles,
     statements,
     providerStatus: provider === undefined ? "unconfigured" : "configured",
   };

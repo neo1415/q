@@ -115,6 +115,19 @@ honestly, with what exists:
    paid data providers exist, see §8), infer legitimacy from a model's
    impression, or let a research result overwrite anything the person said.
 
+## 5a. Public profiles (Bright Data)
+
+A LinkedIn link the person gives is looked up through Bright Data's
+LinkedIn datasets (`public_profile.lookup`): one person or company page,
+bounded public fields (name, headline or about, location, current role or
+industries, size, headquarters, website, follower counts), returned as
+unverified material Q reads back as "their LinkedIn page says". Only the
+URL leaves Capital Q. With a SERP API zone and a Web Unlocker zone named,
+search and page reading go through Bright Data as well (a Google index
+and a page fetcher that gets past blocks); without them Tavily remains
+the search provider. Zones are created in the Bright Data control panel;
+their names are configuration, not secrets.
+
 ## 6. Parallelism
 
 Today a Q run is a graph with sequential nodes. The interviewer turn and a
@@ -152,7 +165,9 @@ whatever the provider offers. The next architecture, when it is time:
 | Need | Options (free / freemium first) | Why |
 | --- | --- | --- |
 | Model quota that survives a demo | Groq developer tier; Gemini paid tier; Cerebras free tier as a third provider | 8k tokens a minute per model is the wall |
-| LinkedIn / people data | Bright Data (5k records/month free), Coresignal, Lix | Only if legitimacy needs more than the public web; each has terms to review |
+| LinkedIn / people data | Bright Data (integrated: profile lookups live; SERP + Unlocker once zones are named) | The key is configured; name the two zones to route search through it |
+| Voice transport credits | ElevenLabs Starter ($6/mo, 75 agent minutes) or Creator ($22/mo, 275 minutes); overage $0.08/min | The free plan's 15 minutes were spent; every session drops on "quota exceeded" until credits exist |
+| Free voice pipeline | LiveKit Cloud Build plan ($0: 1,000 agent minutes/month, Krisp noise cancellation, one hosted agent) + Deepgram ($200 free credit: Nova-3 STT, Aura-2 TTS) | The path that removes ElevenLabs minutes as a gate and adds backchannels and noise cancellation; needs LIVEKIT_URL, LIVEKIT_API_KEY, LIVEKIT_API_SECRET, DEEPGRAM_API_KEY |
 | Noise cancellation | LiveKit Cloud (Krisp) or a self-hosted RNNoise/DeepFilterNet stage | Only with the pipeline architecture |
 | Backchannels, tone | LiveKit Agents pipeline | Same |
 | Voice evals | Hamming, Coval, or our own scenario runner over `interview:smoke` | Regression safety once the conversation is good |

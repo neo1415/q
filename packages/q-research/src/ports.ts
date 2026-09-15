@@ -1,4 +1,6 @@
 import type {
+  PublicProfileLookupRequest,
+  PublicProfileLookupResult,
   PublicWebExtractRequest,
   PublicWebExtractResult,
   PublicWebSearchRequest,
@@ -69,4 +71,13 @@ export type PublicWebResearchProvider = {
     request: PublicWebExtractRequest,
     context: ResearchExecutionContext,
   ) => Promise<PublicWebExtractResult>;
+};
+
+/** One public LinkedIn page by URL, through a compliant provider. */
+export type PublicProfileLookupProvider = {
+  readonly code: ResearchProviderCode;
+  readonly lookup: (
+    request: PublicProfileLookupRequest,
+    context: ResearchExecutionContext,
+  ) => Promise<PublicProfileLookupResult>;
 };

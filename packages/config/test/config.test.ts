@@ -104,7 +104,7 @@ describe("per-service isolation", () => {
     expect(qApi.secrets).toEqual({
       modelProviders: { google: undefined, groq: undefined, groqKeys: [] },
       // The research provider (CQ-Q-RESEARCH-001) has the same defined home.
-      researchProviders: { tavily: undefined },
+      researchProviders: { tavily: undefined, brightData: undefined },
       // And the speech provider (CQ-Q-VOICE-001 C).
       speechProviders: { elevenLabs: undefined },
     });

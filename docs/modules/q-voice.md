@@ -203,6 +203,16 @@ the voice detector missed at the timeout, and a person's "mm-hm", "okay",
 Sarah (female, mature, reassuring) and Daniel (male, steady broadcaster);
 override with `--female` / `--male`.
 
+## When every session drops at once
+
+"The voice connection dropped" the moment Q appears, every time, is the
+provider refusing to start a conversation. The headless probe (scratch
+`probe-step.mjs` pattern: signed URL, `conversation_initiation_client_data`,
+read the close reason) shows it in one line; on 2026-09-15 it was
+`[quota_exceeded] You've run out of credits` — the ElevenLabs free plan's
+15 agent minutes were spent. Nothing in Capital Q can fix that; credits or
+another transport can.
+
 ## Demo posture
 
 Migration `20260919090000_demo_gemini_posture.sql` raises the Google

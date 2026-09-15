@@ -862,10 +862,11 @@ export function QOnboardingWorkspace({
       : undefined;
   const uploadWhileTalking = useCallback(
     async (file: File) => {
-      if (companyIdForUpload === undefined) return;
       setUploadNote(`Uploading ${file.name}`);
       const target = await materialUploadTargetAction({
-        companyId: companyIdForUpload,
+        ...(companyIdForUpload === undefined
+          ? {}
+          : { companyId: companyIdForUpload }),
         documentType: /deck/i.test(file.name)
           ? "PITCH_DECK"
           : "COMPANY_PROFILE",
@@ -1019,9 +1020,7 @@ export function QOnboardingWorkspace({
           onDismissNotice={voice.clearNotice}
           asking={voice.turn?.asking ?? null}
           onSay={(text) => voiceSendText(text)}
-          onUpload={
-            companyIdForUpload === undefined ? undefined : uploadWhileTalking
-          }
+          onUpload={uploadWhileTalking}
           uploadNote={uploadNote}
           onUseForm={
             prompt !== null &&

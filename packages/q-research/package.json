@@ -13,6 +13,10 @@
       "types": "./dist/providers/tavily.d.ts",
       "default": "./dist/providers/tavily.js"
     },
+    "./providers/brightdata": {
+      "types": "./dist/providers/brightdata.d.ts",
+      "default": "./dist/providers/brightdata.js"
+    },
     "./testing": {
       "types": "./dist/providers/fake.d.ts",
       "default": "./dist/providers/fake.js"

@@ -25,8 +25,11 @@ const base = {
 };
 
 describe("research provider configuration", () => {
-  it("names exactly one variable, and it is not a public one", () => {
-    expect([...RESEARCH_PROVIDER_ENV_NAMES]).toEqual(["TAVILY_API_KEY"]);
+  it("names its key variables, none of them public", () => {
+    expect([...RESEARCH_PROVIDER_ENV_NAMES]).toEqual([
+      "TAVILY_API_KEY",
+      "BRIGHT_DATA_API_KEY",
+    ]);
     for (const name of RESEARCH_PROVIDER_ENV_NAMES) {
       expect(name.startsWith("NEXT_PUBLIC_")).toBe(false);
     }
@@ -36,13 +39,21 @@ describe("research provider configuration", () => {
     const none = parseQApiConfig(base);
     expect(
       researchProviderConfigStatus(none.secrets.researchProviders),
-    ).toEqual({ tavily: "unconfigured" });
+    ).toEqual({
+      tavily: "unconfigured",
+      brightData: "unconfigured",
+      brightDataZones: "unconfigured",
+    });
     expect(none.secrets.researchProviders.tavily).toBeUndefined();
 
     const configured = parseQApiConfig({ ...base, TAVILY_API_KEY: KEY });
     expect(
       researchProviderConfigStatus(configured.secrets.researchProviders),
-    ).toEqual({ tavily: "configured" });
+    ).toEqual({
+      tavily: "configured",
+      brightData: "unconfigured",
+      brightDataZones: "unconfigured",
+    });
     expect(configured.secrets.researchProviders.tavily?.reveal()).toBe(KEY);
   });
 

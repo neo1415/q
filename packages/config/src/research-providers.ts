@@ -3,16 +3,20 @@ import { z } from "zod";
 import { ProviderCredential } from "./model-providers.js";
 
 /**
- * Public-web research provider credential (CQ-Q-RESEARCH-001 §4).
+ * Public-web research providers (CQ-Q-RESEARCH-001). Keys are server-only,
+ * revealed once at composition and handed to the adapter.
  *
- * Optional: q-api starts without it and the research tools are simply not
- * registered. The key is server-only — never NEXT_PUBLIC_, never a log
- * field, never a prompt, never a database row — and wrapped so that
- * stringifying configuration yields "[redacted]". The adapter reads it once
- * at composition through reveal(). Configuration reports presence only.
+ * Tavily: search + extract. Bright Data: the SERP API (search) and Web
+ * Unlocker (extract) when their zones are named, and the LinkedIn public
+ * profile datasets with the API key alone. Absent keys mean the matching
+ * tools are not composed; nothing falls back to a provider that was not
+ * configured.
  */
 
-export const RESEARCH_PROVIDER_ENV_NAMES = ["TAVILY_API_KEY"] as const;
+export const RESEARCH_PROVIDER_ENV_NAMES = [
+  "TAVILY_API_KEY",
+  "BRIGHT_DATA_API_KEY",
+] as const;
 
 const apiKey = z
   .string()
@@ -20,35 +24,73 @@ const apiKey = z
   .min(16, "expected a provider API key")
   .max(512, "expected a provider API key");
 
+const zone = z
+  .string()
+  .trim()
+  .regex(/^[a-z0-9_]{2,64}$/, "expected a Bright Data zone name");
+
 export const researchProviderEnvShape = {
   TAVILY_API_KEY: apiKey.optional(),
+  BRIGHT_DATA_API_KEY: apiKey.optional(),
+  /** The SERP API zone (control panel → Zones); search goes through Bright Data only when set. */
+  BRIGHT_DATA_SERP_ZONE: zone.optional(),
+  /** The Web Unlocker zone; page extraction goes through Bright Data only when set. */
+  BRIGHT_DATA_UNLOCKER_ZONE: zone.optional(),
+};
+
+export type BrightDataSecrets = {
+  readonly apiKey: ProviderCredential;
+  readonly serpZone: string | undefined;
+  readonly unlockerZone: string | undefined;
 };
 
 export type ResearchProviderSecrets = {
   /** Tavily search + extract; absent means the research tools are not composed. */
   readonly tavily: ProviderCredential | undefined;
+  /** Bright Data; absent means no profile lookups and no Bright Data search. */
+  readonly brightData: BrightDataSecrets | undefined;
 };
 
 export type ResearchProviderConfigStatus = {
   readonly tavily: "configured" | "unconfigured";
+  readonly brightData: "configured" | "unconfigured";
+  /** Both zones named: search and extraction may go through Bright Data. */
+  readonly brightDataZones: "configured" | "unconfigured";
 };
 
 export function toResearchProviderSecrets(parsed: {
   readonly TAVILY_API_KEY?: string | undefined;
+  readonly BRIGHT_DATA_API_KEY?: string | undefined;
+  readonly BRIGHT_DATA_SERP_ZONE?: string | undefined;
+  readonly BRIGHT_DATA_UNLOCKER_ZONE?: string | undefined;
 }): ResearchProviderSecrets {
   return {
     tavily:
       parsed.TAVILY_API_KEY === undefined
         ? undefined
         : new ProviderCredential(parsed.TAVILY_API_KEY),
+    brightData:
+      parsed.BRIGHT_DATA_API_KEY === undefined
+        ? undefined
+        : {
+            apiKey: new ProviderCredential(parsed.BRIGHT_DATA_API_KEY),
+            serpZone: parsed.BRIGHT_DATA_SERP_ZONE,
+            unlockerZone: parsed.BRIGHT_DATA_UNLOCKER_ZONE,
+          },
   };
 }
 
-/** Safe to log: whether the adapter exists, never what it holds. */
 export function researchProviderConfigStatus(
   secrets: ResearchProviderSecrets,
 ): ResearchProviderConfigStatus {
   return {
     tavily: secrets.tavily === undefined ? "unconfigured" : "configured",
+    brightData:
+      secrets.brightData === undefined ? "unconfigured" : "configured",
+    brightDataZones:
+      secrets.brightData?.serpZone !== undefined &&
+      secrets.brightData.unlockerZone !== undefined
+        ? "configured"
+        : "unconfigured",
   };
 }

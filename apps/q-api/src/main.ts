@@ -357,6 +357,9 @@ const qTools = createQTools({
     ...(researchComposition.research === undefined
       ? {}
       : { research: researchComposition.research }),
+    ...(researchComposition.profiles === undefined
+      ? {}
+      : { profiles: researchComposition.profiles }),
   },
   logger,
 });

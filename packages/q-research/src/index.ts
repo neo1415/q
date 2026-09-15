@@ -29,6 +29,14 @@ export {
   RESEARCH_BOUNDS,
   RESEARCH_PROVIDER_CODES,
   RESEARCH_PROVIDER_FAILURE_CLASSES,
+  PublicCompanyProfileSchema,
+  PublicPersonProfileSchema,
+  PublicProfileLookupRequestSchema,
+  PublicProfileLookupResultSchema,
+  type PublicCompanyProfile,
+  type PublicPersonProfile,
+  type PublicProfileLookupRequest,
+  type PublicProfileLookupResult,
   type PublicWebExtractRequest,
   type PublicWebExtractResult,
   type PublicWebExtractedPage,
@@ -42,6 +50,7 @@ export {
 export {
   isResearchProviderFailure,
   ResearchProviderFailure,
+  type PublicProfileLookupProvider,
   type PublicWebResearchProvider,
   type ResearchExecutionContext,
 } from "./ports.js";

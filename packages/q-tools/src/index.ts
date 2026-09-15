@@ -99,6 +99,14 @@ export {
   type ExtractPublicWebOutput,
 } from "./tools/extract-public-web.js";
 export {
+  createLookupPublicProfileTool,
+  LOOKUP_PUBLIC_PROFILE,
+  LookupPublicProfileInputSchema,
+  LookupPublicProfileOutputSchema,
+  type LookupPublicProfileInput,
+  type LookupPublicProfileOutput,
+} from "./tools/lookup-public-profile.js";
+export {
   createResearchPublicWebTool,
   RESEARCH_PUBLIC_WEB,
   ResearchPublicWebInputSchema,

@@ -9,6 +9,7 @@ import { createGetCapitalObjectiveTool } from "./tools/get-capital-objective.js"
 import { createGetCompanyTool } from "./tools/get-company.js";
 import { createExtractPublicWebTool } from "./tools/extract-public-web.js";
 import { createGetInvestorMandateTool } from "./tools/get-investor-mandate.js";
+import { createLookupPublicProfileTool } from "./tools/lookup-public-profile.js";
 import { createResearchPublicWebTool } from "./tools/research-public-web.js";
 import { createSearchCompaniesTool } from "./tools/search-companies.js";
 
@@ -21,6 +22,7 @@ export function createDefaultQTools(
   ports: QToolPorts,
 ): readonly AnyQToolDefinition[] {
   const research = ports.research;
+  const profiles = ports.profiles;
   return [
     createGetCompanyTool(ports),
     createGetCapitalObjectiveTool(ports),
@@ -32,6 +34,9 @@ export function createDefaultQTools(
           createResearchPublicWebTool({ ...ports, research }),
           createExtractPublicWebTool({ ...ports, research }),
         ]),
+    ...(profiles === undefined
+      ? []
+      : [createLookupPublicProfileTool({ ...ports, profiles })]),
   ];
 }
 
