@@ -119,6 +119,21 @@
     animation: cq-presence-breathe 1.8s var(--cq-ease) infinite;
   }
 
+  /* A form step arrives the way a sheet does: a short rise and settle. */
+  @keyframes cq-step-in {
+    from {
+      opacity: 0;
+      transform: translateY(14px) scale(0.995);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  .cq-step-enter {
+    animation: cq-step-in 420ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  }
+
   /*
    * The voice stage (CQ-Q-VOICE-001 rework): a dark, quiet field with Q at
    * its centre. Fixed colours on purpose — the stage is the same night in

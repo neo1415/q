@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 
 import type { FastifyInstance } from "fastify";
 import {
@@ -26,6 +26,10 @@ import {
 } from "./bindings.js";
 import type { Interviewer } from "./interviewer.js";
 import type { RealtimeVoiceProvider } from "./provider.js";
+import type {
+  DeepgramAgentSettings,
+  DeepgramVoiceProvider,
+} from "./providers/deepgram.js";
 import type { VoiceTurnBoard } from "./turn-board.js";
 import type { WelcomeHost } from "./welcome.js";
 
@@ -47,7 +51,10 @@ import type { WelcomeHost } from "./welcome.js";
  */
 
 export type QVoiceRoutesDependencies = ActorContextDependencies & {
-  readonly provider: RealtimeVoiceProvider;
+  /** The ElevenLabs transport, when composed. */
+  readonly provider?: RealtimeVoiceProvider | undefined;
+  /** The Deepgram transport, when composed; preferred when both exist. */
+  readonly deepgram?: DeepgramVoiceProvider | undefined;
   readonly bindings: VoiceSessionBindings;
   /** Composes Q's opening line for an interview session, when present. */
   readonly interviewer?: Interviewer | undefined;
@@ -120,33 +127,20 @@ export function registerQVoiceRoutes(
         // hook that changed. Fail closed rather than bind without authority.
         throw new AuthenticationRequiredError();
       }
-      const voice = dependencies.provider.voices.includes(input.voice)
+      const deepgram = dependencies.deepgram;
+      const elevenLabs = dependencies.provider;
+      const transport = deepgram ?? elevenLabs;
+      if (transport === undefined) {
+        return reply.code(404).send({
+          type: "about:blank",
+          title: "Not Found",
+          status: 404,
+          detail: "Voice isn't available on this build.",
+        });
+      }
+      const voice = transport.voices.includes(input.voice)
         ? input.voice
         : "FEMALE";
-
-      const issuedAt = now();
-      const credentials = await dependencies.provider.createSession({ voice });
-      const voiceSessionId = randomUUID();
-      const accepted = dependencies.bindings.issue({
-        voiceSessionId,
-        providerConversationId: credentials.providerConversationId,
-        actor,
-        accessToken,
-        voice,
-        thread: {
-          conversationId: input.conversationId,
-          subjects: input.subjects,
-          onboarding: input.onboarding,
-          welcome: input.welcome === true,
-        },
-        issuedAt,
-        connectBy: issuedAt + VOICE_CONNECT_WINDOW_MS,
-        connectedAt: undefined,
-      });
-      if (!accepted) {
-        throw new VoiceSessionLimitError();
-      }
-      started.add(1, { voice });
 
       // Q opens the interview in its own words: a greeting and the live
       // question, from the session's state. Composed here so the browser
@@ -204,6 +198,62 @@ export function registerQVoiceRoutes(
         }
       }
 
+      const issuedAt = now();
+      const voiceSessionId = randomUUID();
+      let credentials: {
+        readonly token: string;
+        readonly providerConversationId: string;
+        readonly thinkToken?: string | undefined;
+        readonly settings?: DeepgramAgentSettings | undefined;
+      };
+      if (deepgram !== undefined) {
+        // One voice session per person on this transport: a new one
+        // replaces whatever was left open.
+        dependencies.bindings.releaseFor(actor.userId);
+        const thinkToken = randomBytes(32).toString("base64url");
+        credentials = {
+          token: await deepgram.mintToken(),
+          providerConversationId: `dg_${voiceSessionId}`,
+          thinkToken,
+          settings: deepgram.settingsFor({
+            voice,
+            greeting: firstMessage,
+            thinkToken,
+          }),
+        };
+      } else if (elevenLabs !== undefined) {
+        const issued = await elevenLabs.createSession({ voice });
+        credentials = {
+          token: issued.token,
+          providerConversationId: issued.providerConversationId,
+        };
+      } else {
+        throw new Error("unreachable: no voice transport");
+      }
+      const accepted = dependencies.bindings.issue({
+        voiceSessionId,
+        providerConversationId: credentials.providerConversationId,
+        actor,
+        accessToken,
+        voice,
+        thread: {
+          conversationId: input.conversationId,
+          subjects: input.subjects,
+          onboarding: input.onboarding,
+          welcome: input.welcome === true,
+        },
+        issuedAt,
+        connectBy: issuedAt + VOICE_CONNECT_WINDOW_MS,
+        connectedAt: undefined,
+        ...(credentials.thinkToken === undefined
+          ? {}
+          : { thinkToken: credentials.thinkToken }),
+      });
+      if (!accepted) {
+        throw new VoiceSessionLimitError();
+      }
+      started.add(1, { voice });
+
       // Identifiers only: never the token, never the bearer.
       request.log.info(
         {
@@ -226,6 +276,11 @@ export function registerQVoiceRoutes(
               issuedAt + VOICE_CONNECT_WINDOW_MS,
             ).toISOString(),
             ...(firstMessage === undefined ? {} : { firstMessage }),
+            provider:
+              credentials.settings === undefined ? "elevenlabs" : "deepgram",
+            ...(credentials.settings === undefined
+              ? {}
+              : { deepgram: credentials.settings }),
           }),
         );
     },

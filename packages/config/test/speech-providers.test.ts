@@ -32,6 +32,7 @@ describe("speech provider configuration", () => {
       "ELEVENLABS_API_KEY",
       "ELEVENLABS_SPEECH_ENGINE_ID",
       "ELEVENLABS_SPEECH_ENGINE_ID_MALE",
+      "DEEPGRAM_API_KEY",
     ]);
     for (const name of SPEECH_PROVIDER_ENV_NAMES) {
       expect(name.startsWith("NEXT_PUBLIC_")).toBe(false);
@@ -47,7 +48,9 @@ describe("speech provider configuration", () => {
       ),
     ).toEqual({
       elevenLabs: "unconfigured",
+      deepgram: "unconfigured",
       speechEngines: "unconfigured",
+      provider: "none",
       voices: [],
     });
     expect(none.voice.speechEngines).toBeUndefined();
@@ -66,7 +69,9 @@ describe("speech provider configuration", () => {
       ),
     ).toEqual({
       elevenLabs: "configured",
+      deepgram: "unconfigured",
       speechEngines: "configured",
+      provider: "elevenlabs",
       voices: ["FEMALE"],
     });
     expect(one.voice.apiBaseUrl).toBe("http://127.0.0.1:3001");

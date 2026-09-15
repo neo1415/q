@@ -218,7 +218,7 @@ const TYPE_LABELS: Readonly<Record<string, string>> = {
  * remember wrongly.
  */
 export async function materialListAction(
-  rawCompanyId?: string | undefined,
+  rawCompanyId?: string,
 ): Promise<ActionResult<readonly MaterialFileView[]>> {
   const companyId =
     rawCompanyId === undefined

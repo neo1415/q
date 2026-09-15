@@ -139,6 +139,18 @@ documents and reasoning at once — is a change to the orchestrator graph
 the run budget. Worth doing when the research and RAG paths are both stable;
 the per-turn model quota is the real limit today, not the graph.
 
+## 6a. The Deepgram transport (built)
+
+The ElevenLabs credit ceiling made the transport question urgent. The
+Deepgram Voice Agent turned out to be the shortest free path: the browser
+connects to Deepgram with a short-lived token, and Deepgram calls *this
+server* for every turn through an OpenAI-shaped think endpoint, so Q's
+conductors, tools and records are untouched. What it gives: Flux
+turn-taking, barge-in, keyterms, two Aura-2 voices, and billing from the
+$200 starting credit. What it does not give: backchannels while the person
+speaks, tone, and noise cancellation beyond the browser's own. LiveKit
+(credentials recorded, nothing built) remains the path to those.
+
 ## 7. From transport to pipeline: the enterprise path
 
 The Speech Engine gives us a working, secure product quickly, and it has a

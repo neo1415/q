@@ -41,7 +41,8 @@
     "@capital-q/q-tools": "workspace:*",
     "@capital-q/security": "workspace:*",
     "@elevenlabs/elevenlabs-js": "2.68.0",
-    "fastify": "^5.12.1"
+    "fastify": "^5.12.1",
+    "zod": "4.5.4"
   },
   "devDependencies": {
     "@capital-q/api-client": "workspace:*",

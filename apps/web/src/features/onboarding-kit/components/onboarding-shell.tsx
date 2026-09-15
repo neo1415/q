@@ -15,6 +15,8 @@ import { SaveStatusIndicator } from "./save-status";
  * deliberately absent; "Save & leave" is the exit, always visible.
  */
 export type OnboardingShellProps = {
+  /** Changes when the step changes, so the new step animates in. */
+  readonly stepKey?: string | undefined;
   readonly progress: ReactNode;
   readonly children: ReactNode;
   readonly onBack: (() => void) | undefined;
@@ -33,6 +35,7 @@ export type OnboardingShellProps = {
 
 export function OnboardingShell({
   progress,
+  stepKey,
   children,
   onBack,
   busy,
@@ -75,7 +78,9 @@ export function OnboardingShell({
         className="mx-auto flex w-full max-w-(--cq-layout-reading) flex-1 flex-col gap-6 px-4 pt-6 pb-[calc(96px+var(--cq-safe-bottom))] sm:px-6"
       >
         {notice}
-        {children}
+        <div key={stepKey ?? "step"} className="cq-step-enter">
+          {children}
+        </div>
       </main>
 
       <div className="fixed inset-x-0 bottom-0 z-(--cq-z-navigation) border-t border-(--cq-border-subtle) bg-(--cq-surface) pb-(--cq-safe-bottom)">

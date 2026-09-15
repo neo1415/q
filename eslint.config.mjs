@@ -55,7 +55,7 @@ const MODEL_SDK_IMPORT_PATTERNS = [
 const RESEARCH_SDK_IMPORT_PATTERNS = ["@tavily/core", "@tavily/*"];
 
 /** Realtime speech provider SDKs; the two voice adapters only (CQ-Q-VOICE-001 C §33). */
-const SPEECH_SDK_IMPORT_PATTERNS = ["@elevenlabs/*"];
+const SPEECH_SDK_IMPORT_PATTERNS = ["@elevenlabs/*", "@deepgram/*"];
 
 /** Browser-reachable source: the web app and the shared component package. */
 const WEB_SOURCE = ["apps/web/**/*.{ts,tsx}"];

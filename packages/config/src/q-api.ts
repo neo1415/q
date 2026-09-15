@@ -27,6 +27,8 @@ import {
   toSpeechProviderSecrets,
   type SpeechEngineIds,
   type SpeechProviderSecrets,
+  resolveVoiceProvider,
+  type VoiceProviderCode,
 } from "./speech-providers.js";
 import {
   supabaseAuthEnvShape,
@@ -92,6 +94,10 @@ export type QApiVoiceConfig = {
   readonly personality: "UPBEAT" | "CALM" | "DIRECT";
   /** Whether the Speech Engines render inline audio tags. */
   readonly expressive: boolean;
+  /** The transport that carries the voice, resolved from keys and preference; absent means no voice. */
+  readonly provider: VoiceProviderCode | undefined;
+  /** This server's public origin as the speech provider reaches it (the tunnel in development). */
+  readonly publicUrl: string | undefined;
 };
 
 export type QApiPublicConfig = Readonly<Record<string, never>>;
@@ -129,6 +135,12 @@ export function parseQApiConfig(env: EnvironmentInput): QApiConfig {
       apiBaseUrl: parsed.CQ_API_URL?.replace(/\/$/, ""),
       personality: parsed.Q_PERSONALITY ?? "UPBEAT",
       expressive: parsed.Q_VOICE_EXPRESSIVE === "true",
+      provider: resolveVoiceProvider(
+        toSpeechProviderSecrets(parsed),
+        toSpeechEngineIds(parsed),
+        parsed.Q_VOICE_PROVIDER,
+      ),
+      publicUrl: parsed.Q_API_PUBLIC_URL?.replace(/\/$/, ""),
     },
     secrets: {
       modelProviders: toModelProviderSecrets(parsed),

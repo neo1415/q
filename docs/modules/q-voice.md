@@ -24,6 +24,30 @@ a typed one does from the interview thread:
 | a question or a request for Q                           | `createRun` with `modality: "VOICE"` in the bound Q conversation, spoken as it streams      | the Q runtime, Context Firewall, tools, approvals      |
 | "Let's stop here." / "Where were we?" / "Let me think." | answered from the session, nothing sent                                                     | —                                                      |
 
+## Transports
+
+Two transports carry the voice; Q is the brain on this server either way,
+and the browser sees one client.
+
+- **Deepgram Voice Agent** (default when `DEEPGRAM_API_KEY` exists). The
+  browser opens the agent websocket with a 60-second token this server
+  mints (`POST /v1/auth/grant`); the agent settings this server composes
+  point every "think" at `POST /v1/q/voice/think/chat/completions` on
+  `Q_API_PUBLIC_URL`, under a per-session bearer. That route speaks the
+  OpenAI chat-completions dialect because that is what the provider sends,
+  turns the messages into the turn's transcript, runs the same turn handler
+  the websocket channel uses, and streams Q's words back as chunks. Flux
+  (`flux-general-en`, keyterms from `voice/vocabulary.ts`) listens; Aura-2
+  (Thalia, Orion) speaks. Barge-in: the provider cuts the audio and drops
+  the think request, which aborts the turn's signal; pause-and-resume
+  behaves as on the other transport. Billed from Deepgram's balance (the
+  $200 starting credit), not from ElevenLabs minutes.
+- **ElevenLabs Speech Engine** (`Q_VOICE_PROVIDER=elevenlabs`): the
+  original transport, below.
+
+`pnpm demo` writes `Q_API_PUBLIC_URL` from the tunnel; without it the
+Deepgram transport is not composed and the log says why.
+
 ## Surfaces
 
 - `POST /v1/q/voice/sessions` (contract: `CreateQVoiceSessionRequest` /
@@ -72,6 +96,14 @@ token) and reads from anything they say whether they are raising or
 investing. The turn state then names `INTERVIEW_FOUNDER` or
 `INTERVIEW_INVESTOR`; the browser opens the interview with `?talk=1` and
 the voice carries across. `?again=1` reopens arrival for anyone.
+
+## Finishing
+
+When a recorded answer leaves no required step open and the runtime says
+the session can complete, the interviewer completes it through
+`POST /v1/onboarding/sessions/:id/complete`, adds "That's everything I need
+for now. I'm taking you to your home." to Q's reply, and the turn state
+names HOME; the stage follows it.
 
 ## Pause, not stop
 
@@ -170,6 +202,9 @@ latency of each call: the thing a browser transcript cannot show.
 | `voice/speech.ts`                     | Text as Q speaks it: markdown/citations/URLs stripped, bounded, sentence-chunked                                                           |
 | `voice/welcome.ts`                    | Q's first minute: WELCOME_CONDUCTOR turn — name, then which setup to start                                                                 |
 | `voice/pronunciation.ts`              | The pronunciation-teacher port; `providers/elevenlabs-pronunciation.ts` is the dictionary adapter                                          |
+| `voice/providers/deepgram.ts`         | The Deepgram transport: token grant, agent settings with the think endpoint and the session bearer                                         |
+| `voice/think.ts`                      | The think route: chat-completions in, the shared turn handler, chunks out                                                                  |
+| `voice/vocabulary.ts`                 | ASR keyterms shared by both transports                                                                                                     |
 | `voice/turn-board.ts`                 | Process-local: what Q is asking, and where it is taking the person, after each voice session's latest turn, for the screen                 |
 | `dev/interview-smoke.ts`              | `pnpm interview:smoke -- "<utterance>"...`: the interviewer against the live gateway, one turn per argument                                |
 | `dev/voice-setup.ts`                  | `pnpm voice:setup -- --ws-url wss://<host>/v1/q/voice/ws`: creates/updates the two Speech Engines, records their ids in `.env.local`       |

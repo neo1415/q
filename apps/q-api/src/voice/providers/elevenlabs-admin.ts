@@ -2,6 +2,8 @@ import { ElevenLabsClient } from "@elevenlabs/elevenlabs-js";
 
 import type { QVoiceChoice } from "@capital-q/contracts";
 
+import { ASR_KEYWORDS } from "../vocabulary.js";
+
 /**
  * Speech Engine resource administration (CQ-Q-VOICE-001 C §30-§31; D §52).
  * Used by the developer setup script only; the running service never
@@ -28,76 +30,6 @@ export type SpeechEngineTuning = {
 };
 
 /** Words the transcriber should expect in an investment interview. */
-/**
- * Words the recogniser should expect. The interview vocabulary, and the
- * names and places a Nigerian or wider West African founder is likely to
- * say — a recogniser mis-hears a name it has never been told about far
- * more often than an accent.
- */
-const ASR_KEYWORDS = [
-  "Capital Q",
-  "Vaultlyne",
-  "naira",
-  "Abuja",
-  "Port Harcourt",
-  "Ibadan",
-  "Yaba",
-  "Lekki",
-  "Accra",
-  "Kigali",
-  "Kampala",
-  "Cairo",
-  "Johannesburg",
-  "Cape Town",
-  "Paystack",
-  "Flutterwave",
-  "Moniepoint",
-  "OPay",
-  "Interswitch",
-  "Jumia",
-  "Andela",
-  "Y Combinator",
-  "angel",
-  "pre-money",
-  "post-money",
-  "SAFE",
-  "convertible note",
-  "cheque size",
-  "ticket size",
-  "LP",
-  "GP",
-  "fund of funds",
-  "family office",
-  "pilot",
-  "design partner",
-  "churn",
-  "runway",
-  "burn",
-  "gross margin",
-  "take rate",
-  "GMV",
-  "agritech",
-  "healthtech",
-  "edtech",
-  "proptech",
-  "insurtech",
-  "mobility",
-  "MRR",
-  "ARR",
-  "pre-seed",
-  "seed",
-  "Series A",
-  "Series B",
-  "Lagos",
-  "Nairobi",
-  "Nigeria",
-  "Ghana",
-  "Kenya",
-  "fintech",
-  "logistics",
-  "SaaS",
-  "B2B",
-];
 
 export function createSpeechEngineAdmin(options: { readonly apiKey: string }) {
   const client = new ElevenLabsClient({ apiKey: options.apiKey });
@@ -131,7 +63,7 @@ export function createSpeechEngineAdmin(options: { readonly apiKey: string }) {
       // The realtime Scribe recogniser, told the interview's vocabulary.
       const asr = {
         provider: "scribe_realtime" as const,
-        keywords: ASR_KEYWORDS,
+        keywords: [...ASR_KEYWORDS],
       };
       // Patient turn-taking (D §55): a person thinking is not a person done.
       // A person's "mm-hm", "okay", "right" while Q speaks is listening,

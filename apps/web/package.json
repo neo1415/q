@@ -20,6 +20,7 @@
     "@capital-q/investor-onboarding": "workspace:*",
     "@capital-q/onboarding": "workspace:*",
     "@capital-q/ui": "workspace:*",
+    "@deepgram/agents": "^0.1.2",
     "@elevenlabs/react": "1.15.2",
     "@supabase/ssr": "0.12.5",
     "@supabase/supabase-js": "2.114.0",

@@ -15,7 +15,7 @@
  * running. Nothing here prints a secret or a token.
  */
 import { spawn, spawnSync } from "node:child_process";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import process from "node:process";
 
@@ -28,6 +28,22 @@ const shell = isWindows;
 
 function log(message) {
   console.log(`[demo] ${message}`);
+}
+
+/** Set one key in .env.local, replacing an existing line or appending. */
+function upsertEnv(key, value) {
+  const file = resolve(root, ".env.local");
+  const lines = readFileSync(file, "utf8").split(/\r?\n/);
+  const index = lines.findIndex((line) => line.startsWith(`${key}=`));
+  const entry = `${key}=${value}`;
+  if (index >= 0) lines[index] = entry;
+  else lines.push(entry);
+  writeFileSync(file, lines.join("\n"));
+}
+
+function envHas(key) {
+  const file = resolve(root, ".env.local");
+  return new RegExp(`^${key}=.+`, "m").test(readFileSync(file, "utf8"));
 }
 
 function run(command, args, options = {}) {
@@ -109,22 +125,30 @@ async function main() {
   }
   log(`tunnel is up (…${host.slice(-18)}).`);
 
-  // 3. Speech Engines against this hostname.
-  log("pointing the Speech Engines at the tunnel...");
-  const setup = run(
-    pnpm,
-    ["voice:setup", "--", "--ws-url", `wss://${host}/v1/q/voice/ws`],
-    {
-      quiet: true,
-    },
-  );
-  if (setup.status !== 0) {
-    log("voice:setup failed:");
-    console.log((setup.stdout ?? "") + (setup.stderr ?? ""));
-    tunnel?.kill();
-    process.exit(1);
+  // 3. This server's public origin, for the Deepgram think route.
+  upsertEnv("Q_API_PUBLIC_URL", `https://${host}`);
+  log("public origin recorded for the voice transport.");
+
+  // 3b. ElevenLabs Speech Engines against this hostname, when they exist.
+  if (!envHas("ELEVENLABS_SPEECH_ENGINE_ID")) {
+    log("no ElevenLabs engines configured; skipping voice:setup.");
+  } else {
+    log("pointing the Speech Engines at the tunnel...");
+    const setup = run(
+      pnpm,
+      ["voice:setup", "--", "--ws-url", `wss://${host}/v1/q/voice/ws`],
+      {
+        quiet: true,
+      },
+    );
+    if (setup.status !== 0) {
+      log("voice:setup failed:");
+      console.log((setup.stdout ?? "") + (setup.stderr ?? ""));
+      tunnel?.kill();
+      process.exit(1);
+    }
+    log("Speech Engines ready.");
   }
-  log("Speech Engines ready.");
 
   // 4. Everything else.
   log("starting web, api, q-api and workers. Sign in at http://localhost:3000");

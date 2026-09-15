@@ -106,7 +106,7 @@ describe("per-service isolation", () => {
       // The research provider (CQ-Q-RESEARCH-001) has the same defined home.
       researchProviders: { tavily: undefined, brightData: undefined },
       // And the speech provider (CQ-Q-VOICE-001 C).
-      speechProviders: { elevenLabs: undefined },
+      speechProviders: { elevenLabs: undefined, deepgram: undefined },
     });
     const workers = parseWorkerConfig(EMPTY_ENV);
     expect(workers.public).toEqual({});

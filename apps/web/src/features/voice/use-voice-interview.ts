@@ -9,7 +9,7 @@ import type {
 } from "@capital-q/contracts";
 
 import { readVoiceTurnAction, startVoiceSessionAction } from "./actions";
-import { useElevenLabsVoiceSession } from "./provider/elevenlabs-session";
+import { useVoiceSession } from "./use-voice-session";
 import type {
   VoiceSessionClient,
   VoiceSessionEvents,
@@ -72,7 +72,7 @@ export function useVoiceInterview(
     firstMessage: string | undefined;
   } | null>(null);
 
-  const client = useElevenLabsVoiceSession({
+  const client = useVoiceSession({
     ...events,
     onEnded: (reason) => {
       setActive(false);

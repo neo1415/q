@@ -207,6 +207,9 @@ importers:
       fastify:
         specifier: ^5.12.1
         version: 5.12.1
+      zod:
+        specifier: 4.5.4
+        version: 4.5.4
     devDependencies:
       '@capital-q/api-client':
         specifier: workspace:*
@@ -241,6 +244,9 @@ importers:
       '@capital-q/ui':
         specifier: workspace:*
         version: link:../../packages/ui
+      '@deepgram/agents':
+        specifier: ^0.1.2
+        version: 0.1.2
       '@elevenlabs/react':
         specifier: 1.15.2
         version: 1.15.2(@types/dom-mediacapture-record@1.0.22)(react@19.2.8)
@@ -1748,6 +1754,13 @@ packages:
   '@csstools/css-tokenizer@4.0.0':
     resolution: {integrity: sha512-QxULHAm7cNu72w97JUNCBFODFaXpbDg+dP8b/oWFAZ2MTRppA3U00Y2L1HqaS4J6yBqxwa/Y3nMBaxVKbB/NsA==}
     engines: {node: '>=20.19.0'}
+
+  '@deepgram/agents@0.1.2':
+    resolution: {integrity: sha512-DLRJOGSe2c6THHLrHD67K0Kg6Le4+dqS04uRpwJBI+vGL2GjLCKX+OCyLMQskNTuDwRgRVfqleeZx4mgvtcPIw==}
+
+  '@deepgram/sdk@5.9.0':
+    resolution: {integrity: sha512-MZge3ClQnUbFb+3cz93WI+aljPo8xPVOH5aI/oQGZNuN7JbNJBkmtXnv0Y/3ocFyqmAJltrF6U8t0gpdXzNXUw==}
+    engines: {node: '>=18.0.0'}
 
   '@ecies/ciphers@0.2.6':
     resolution: {integrity: sha512-patgsRPKGkhhoBjETV4XxD0En4ui5fbX0hzayqI3M8tvNMGUoUvmyYAIWwlxBc1KX5cturfqByYdj5bYGRpN9g==}
@@ -5166,6 +5179,21 @@ snapshots:
       css-tree: 3.2.1
 
   '@csstools/css-tokenizer@4.0.0': {}
+
+  '@deepgram/agents@0.1.2':
+    dependencies:
+      '@deepgram/sdk': 5.9.0
+      eventemitter3: 5.0.4
+    transitivePeerDependencies:
+      - bufferutil
+      - utf-8-validate
+
+  '@deepgram/sdk@5.9.0':
+    dependencies:
+      ws: 8.21.3
+    transitivePeerDependencies:
+      - bufferutil
+      - utf-8-validate
 
   '@ecies/ciphers@0.2.6(@noble/ciphers@1.3.0)':
     dependencies:

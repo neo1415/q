@@ -27,6 +27,11 @@ export const Q_VOICE_SESSIONS_PATH = "/v1/q/voice/sessions" as const;
  * the provider's signed header before a session exists.
  */
 export const Q_VOICE_WS_PATH = "/v1/q/voice/ws" as const;
+/** Where the Deepgram Voice Agent brings each turn (OpenAI chat-completions dialect). */
+export const Q_VOICE_THINK_PATH = "/v1/q/voice/think" as const;
+export const Q_VOICE_PROVIDERS = ["elevenlabs", "deepgram"] as const;
+export const QVoiceProviderSchema = z.enum(Q_VOICE_PROVIDERS);
+export type QVoiceProvider = z.infer<typeof QVoiceProviderSchema>;
 /** GET: what Q is asking, and where it is taking the person, after the latest spoken turn. */
 export const Q_VOICE_TURN_PATH =
   "/v1/q/voice/sessions/:voiceSessionId/turn" as const;
@@ -100,6 +105,20 @@ export const CreateQVoiceSessionResponseSchema = z
      * greeting and the live question). Absent when Q waits for the person.
      */
     firstMessage: z.string().min(1).max(700).optional(),
+    /** Which transport the browser opens with this credential. */
+    provider: QVoiceProviderSchema.default("elevenlabs"),
+    /**
+     * For the Deepgram transport: the agent settings the browser sends on
+     * connect. Composed on the server; the think endpoint inside carries a
+     * per-session secret and nothing of the person's Capital Q session.
+     */
+    deepgram: z
+      .object({
+        agent: z.record(z.string(), z.unknown()),
+        audio: z.record(z.string(), z.unknown()),
+      })
+      .strict()
+      .optional(),
   })
   .strict();
 

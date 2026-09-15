@@ -43,7 +43,7 @@ import {
 import { modelProviderConfigStatus } from "@capital-q/config/model-providers";
 import { researchProviderConfigStatus } from "@capital-q/config/research-providers";
 import { speechProviderConfigStatus } from "@capital-q/config/speech-providers";
-import { Q_VOICE_WS_PATH } from "@capital-q/contracts";
+import { Q_VOICE_THINK_PATH, Q_VOICE_WS_PATH } from "@capital-q/contracts";
 import {
   createModelGateway,
   createModelProviderRegistry,
@@ -118,6 +118,7 @@ import { createElevenLabsPronunciationTeacher } from "./voice/providers/elevenla
 import { createVoiceTurnBoard } from "./voice/turn-board.js";
 import { createWelcomeHost } from "./voice/welcome.js";
 import type { VoiceAttachment } from "./voice/provider.js";
+import { createDeepgramVoiceProvider } from "./voice/providers/deepgram.js";
 import { createElevenLabsVoiceProvider } from "./voice/providers/elevenlabs.js";
 import { createVoiceTurnHandler } from "./voice/turn.js";
 
@@ -468,11 +469,29 @@ await createOrphanedRunSweep({
 const speechSecrets = config.secrets.speechProviders;
 const speechEngines = config.voice.speechEngines;
 const voiceProvider =
-  speechSecrets.elevenLabs !== undefined && speechEngines !== undefined
+  config.voice.provider === "elevenlabs" &&
+  speechSecrets.elevenLabs !== undefined &&
+  speechEngines !== undefined
     ? createElevenLabsVoiceProvider({
         apiKey: speechSecrets.elevenLabs.reveal(),
         speechEngines,
       })
+    : undefined;
+// The Deepgram Voice Agent transport: the key and this server's public
+// origin, so the agent's think calls come back here.
+const deepgramProvider =
+  config.voice.provider === "deepgram" && speechSecrets.deepgram !== undefined
+    ? config.voice.publicUrl === undefined
+      ? (logger.warn(
+          {},
+          "Q_VOICE_PROVIDER resolves to deepgram but Q_API_PUBLIC_URL is unset; voice is not composed",
+        ),
+        undefined)
+      : createDeepgramVoiceProvider({
+          apiKey: speechSecrets.deepgram.reveal(),
+          publicUrl: config.voice.publicUrl,
+          thinkPath: Q_VOICE_THINK_PATH,
+        })
     : undefined;
 const voiceBindings = createVoiceSessionBindings();
 // Q conducting the interview: one model-driven turn per utterance, every
@@ -504,9 +523,28 @@ const pronunciation =
         logger,
       })
     : createLoggingPronunciationTeacher(logger);
+// One turn handler for every transport: the websocket channel and the
+// think route both hand it a bound conversation and a speaker.
+const voiceTurn = createVoiceTurnHandler({
+  qRuntime,
+  qStream,
+  interviewer,
+  board: voiceTurnBoard,
+  welcome: welcomeHost,
+  pronunciation,
+  orchestration: { orchestrator, autostart: Q_ORCHESTRATION_AUTOSTART },
+  ...(config.voice.apiBaseUrl === undefined
+    ? {}
+    : { onboarding: { apiBaseUrl: config.voice.apiBaseUrl } }),
+  logger,
+});
 logger.info(
   {
-    speech: speechProviderConfigStatus(speechSecrets, speechEngines),
+    speech: speechProviderConfigStatus(
+      speechSecrets,
+      speechEngines,
+      config.voice.provider,
+    ),
     interviewApi:
       config.voice.apiBaseUrl === undefined ? "unconfigured" : "configured",
   },
@@ -526,16 +564,19 @@ const { app, logger: appLogger } = createApp(
     orchestration: { orchestrator, autostart: Q_ORCHESTRATION_AUTOSTART },
     qActions,
     qStream: { service: qStream },
-    ...(voiceProvider === undefined
+    ...(voiceProvider === undefined && deepgramProvider === undefined
       ? {}
       : {
           voice: {
             provider: voiceProvider,
+            deepgram: deepgramProvider,
             bindings: voiceBindings,
             interviewer,
             apiBaseUrl: config.voice.apiBaseUrl,
             board: voiceTurnBoard,
             welcome: welcomeHost,
+            turn: voiceTurn,
+            logger,
           },
         }),
   },
@@ -556,22 +597,17 @@ await app.listen({
   host: config.network.host,
 });
 
+if (deepgramProvider !== undefined) {
+  appLogger.info(
+    { thinkPath: Q_VOICE_THINK_PATH, voices: deepgramProvider.voices },
+    "voice transport: deepgram",
+  );
+}
 if (voiceProvider !== undefined) {
-  const apiBaseUrl = config.voice.apiBaseUrl;
   voiceChannel = await attachVoiceChannel(app.server, Q_VOICE_WS_PATH, {
     provider: voiceProvider,
     bindings: voiceBindings,
-    turn: createVoiceTurnHandler({
-      qRuntime,
-      qStream,
-      interviewer,
-      board: voiceTurnBoard,
-      welcome: welcomeHost,
-      pronunciation,
-      orchestration: { orchestrator, autostart: Q_ORCHESTRATION_AUTOSTART },
-      ...(apiBaseUrl === undefined ? {} : { onboarding: { apiBaseUrl } }),
-      logger,
-    }),
+    turn: voiceTurn,
     logger,
   });
   appLogger.info(

@@ -1,4 +1,6 @@
 import Fastify, { type FastifyBaseLogger, type FastifyInstance } from "fastify";
+
+import { Q_VOICE_THINK_PATH } from "@capital-q/contracts";
 import { CONTRACTS_VERSION } from "@capital-q/contracts";
 import type { QApiConfig } from "@capital-q/config/q-api";
 import {
@@ -28,6 +30,8 @@ import {
   registerQVoiceRoutes,
   type QVoiceRoutesDependencies,
 } from "./voice/routes.js";
+import { registerVoiceThinkRoute } from "./voice/think.js";
+import type { VoiceTurnHandler } from "./voice/turn.js";
 
 export const SERVICE_NAME = "q-api";
 
@@ -67,7 +71,11 @@ export type QApiModules = {
     | undefined;
   /** The realtime voice channel (CQ-Q-VOICE-001 C); absent means no voice routes. */
   readonly voice?:
-    | Pick<
+    | ({
+        /** The turn handler, for the Deepgram think route; absent means no think route. */
+        readonly turn?: VoiceTurnHandler | undefined;
+        readonly logger?: Logger | undefined;
+      } & Pick<
         QVoiceRoutesDependencies,
         | "provider"
         | "bindings"
@@ -76,7 +84,8 @@ export type QApiModules = {
         | "apiBaseUrl"
         | "board"
         | "welcome"
-      >
+        | "deepgram"
+      >)
     | undefined;
 };
 
@@ -232,8 +241,21 @@ export function createApp(
       apiBaseUrl: modules.voice.apiBaseUrl,
       board: modules.voice.board,
       welcome: modules.voice.welcome,
+      deepgram: modules.voice.deepgram,
       now: modules.voice.now,
     });
+    if (
+      modules.voice.deepgram !== undefined &&
+      modules.voice.turn !== undefined &&
+      modules.voice.logger !== undefined
+    ) {
+      registerVoiceThinkRoute(app, {
+        path: Q_VOICE_THINK_PATH,
+        bindings: modules.voice.bindings,
+        turn: modules.voice.turn,
+        logger: modules.voice.logger,
+      });
+    }
   }
 
   // Liveness and readiness are split per doc 21 (74-77): liveness proves the

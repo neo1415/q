@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 import {
+  completeOnboardingSession,
   findTaxonomyCandidates,
   getOnboardingSession,
   resolveOnboardingSuggestion,
@@ -814,8 +815,36 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
         warningsBySession.set(input.onboardingSessionId, warnings);
         if (warnings > WARNINGS_BEFORE_HANDOFF) handoff = "FORM";
       }
-      const navigate = result.intent === "NAVIGATE" ? result.navigate : null;
+      let navigate: InterviewDestination | null =
+        result.intent === "NAVIGATE" ? result.navigate : null;
       if (navigate === "FORM") handoff = "FORM";
+      let reply = result.reply;
+      // 6. Nothing left to ask: the setup completes through the runtime's
+      // own path and Q takes the person home.
+      const stillRequired = view.progress.eligibleSteps.filter(
+        (step) =>
+          step.required &&
+          step.status !== "COMPLETED" &&
+          step.status !== "SKIPPED",
+      );
+      if (
+        recorded.length > 0 &&
+        view.session.status === "ACTIVE" &&
+        view.progress.canComplete &&
+        stillRequired.length === 0
+      ) {
+        try {
+          view = await completeOnboardingSession(
+            input.session,
+            input.onboardingSessionId,
+            { expectedSessionVersion: view.session.version },
+          );
+          navigate = "HOME";
+          reply = `${reply} That's everything I need for now. I'm taking you to your home.`;
+        } catch (error: unknown) {
+          logger.warn({ err: error }, "interview completion was not accepted");
+        }
+      }
       // A lookup is a question for Q: the research tools, under the
       // person's own authority, with the answer spoken back.
       const lookup =
@@ -833,7 +862,7 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
         result.askNext === null ? undefined : steps.get(result.askNext);
       const askOpen = askStep === undefined ? null : toOpenStep(askStep, view);
       return {
-        reply: result.reply,
+        reply,
         intent: result.intent,
         asking:
           askOpen === null

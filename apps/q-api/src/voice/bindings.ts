@@ -46,6 +46,8 @@ export type VoiceSessionBinding = {
   /** After this, an unconnected binding is discarded. */
   readonly connectBy: number;
   connectedAt: number | undefined;
+  /** Deepgram transport: the bearer its think calls carry. Never logged. */
+  readonly thinkToken?: string | undefined;
 };
 
 export type VoiceSessionBindings = {
@@ -57,6 +59,10 @@ export type VoiceSessionBindings = {
   get(providerConversationId: string): VoiceSessionBinding | null;
   /** The binding issued as this voice session, if it is still held. */
   byVoiceSessionId(voiceSessionId: string): VoiceSessionBinding | null;
+  /** The binding whose think secret this is (connected or not). */
+  byThinkToken(thinkToken: string): VoiceSessionBinding | null;
+  /** Release every binding this person holds: one voice session at a time. */
+  releaseFor(userId: string): void;
   release(providerConversationId: string): void;
   /** Bindings held by this person right now (issued or connected). */
   countFor(userId: string): number;
@@ -128,6 +134,22 @@ export function createVoiceSessionBindings(
       }
       binding.connectedAt = now();
       return binding;
+    },
+    byThinkToken: (thinkToken) => {
+      sweep();
+      for (const binding of bindings.values()) {
+        if (
+          binding.thinkToken !== undefined &&
+          binding.thinkToken === thinkToken
+        )
+          return binding;
+      }
+      return null;
+    },
+    releaseFor: (userId) => {
+      for (const [id, binding] of bindings) {
+        if (binding.actor.userId === userId) bindings.delete(id);
+      }
     },
     byVoiceSessionId: (voiceSessionId) => {
       for (const binding of bindings.values()) {

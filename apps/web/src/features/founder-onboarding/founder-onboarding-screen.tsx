@@ -222,6 +222,7 @@ export function FounderOnboardingScreen({
 
   return (
     <OnboardingShell
+      stepKey={step.id}
       progress={<OnboardingProgress session={session} />}
       onBack={isFirst ? undefined : () => void actions.back()}
       busy={state.busy}
