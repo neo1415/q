@@ -39,6 +39,9 @@ export function FounderOnboardingScreen({
   // Q leads by default (CQ-PRE-REC-001 §16); the structured screens remain
   // for direct editing (§30) and as the fallback when a step needs them.
   const [mode, setMode] = useState<"conversation" | "form">("conversation");
+  // Set when the person asks for Q's voice from the form: the workspace
+  // opens already talking, then this is cleared so it happens once.
+  const [talkOnOpen, setTalkOnOpen] = useState(false);
 
   if (state.phase === "unavailable") {
     return (
@@ -134,7 +137,9 @@ export function FounderOnboardingScreen({
           actions={actions}
           busy={state.busy}
           errorMessage={state.errorMessage}
+          talkOnOpen={talkOnOpen}
           onEdit={(editorId) => {
+            setTalkOnOpen(false);
             setMode("form");
             void actions.openStep(editorId);
           }}
@@ -149,13 +154,26 @@ export function FounderOnboardingScreen({
   }
 
   const backToQ = (
-    <div className="flex justify-end">
+    <div className="flex flex-wrap items-center justify-end gap-2">
       <Button
         variant="quiet"
         size="compact"
-        onClick={() => setMode("conversation")}
+        onClick={() => {
+          setTalkOnOpen(false);
+          setMode("conversation");
+        }}
       >
         Back to Q
+      </Button>
+      <Button
+        variant="primary"
+        size="compact"
+        onClick={() => {
+          setTalkOnOpen(true);
+          setMode("conversation");
+        }}
+      >
+        Talk with Q
       </Button>
     </div>
   );

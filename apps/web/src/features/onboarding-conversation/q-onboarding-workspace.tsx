@@ -26,7 +26,7 @@ import type { TaxonomyCandidateView } from "../onboarding-kit/client";
 import type { SessionPresentation } from "../onboarding-kit/session";
 import { askQAction, readQRunAction } from "../q/actions";
 import { useVoiceInterview } from "../voice/use-voice-interview";
-import { VoicePanel } from "../voice/voice-panel";
+import { VoiceStage } from "../voice/voice-stage";
 import {
   acknowledge,
   acknowledgeValue,
@@ -111,6 +111,11 @@ export type QOnboardingWorkspaceProps = {
     | undefined;
   /** Plain name for the composer cue. */
   readonly contextLabel?: string | undefined;
+  /**
+   * Open already talking: the person asked for Q's voice from somewhere
+   * else (the form, say), so the stage starts without another tap.
+   */
+  readonly talkOnOpen?: boolean | undefined;
 };
 
 type Turn = {
@@ -169,6 +174,7 @@ export function QOnboardingWorkspace({
   onFinish,
   qSubject,
   contextLabel,
+  talkOnOpen = false,
 }: QOnboardingWorkspaceProps) {
   const view = session.raw;
   // The greeting is read once, from persisted state, when the workspace
@@ -837,6 +843,18 @@ export function QOnboardingWorkspace({
     });
   };
 
+  // Asked to open talking: start once, as soon as the session is here.
+  const talkedOnOpen = useRef(false);
+  useEffect(() => {
+    if (!talkOnOpen || talkedOnOpen.current || view === undefined) {
+      return;
+    }
+    talkedOnOpen.current = true;
+    void talkWithQ();
+    // talkWithQ is recreated each render; the guard makes this run once.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [talkOnOpen, view]);
+
   if (view === undefined) {
     return (
       <InlineNotice tone="info" title="Q can't lead this setup on this build.">
@@ -881,19 +899,33 @@ export function QOnboardingWorkspace({
   return (
     <div className="flex flex-col gap-4 pb-28" data-q-onboarding-workspace>
       {voice.active ? (
-        <VoicePanel
+        <VoiceStage
           client={voice.client}
-          detail={
-            reading && !readingLanded && !readingTimedOut
-              ? "Reading what you said"
-              : undefined
-          }
           voice={voice.voice}
           voices={["FEMALE", "MALE"]}
           onChooseVoice={(choice) => void voice.chooseVoice(choice)}
           onEnd={() => void voice.end()}
           notice={voice.notice}
           onDismissNotice={voice.clearNotice}
+          prompt={isFinal ? null : prompt}
+          onChoose={(chip) => void submitChip(chip)}
+          onChooseMany={(chips) =>
+            voiceSendText(chips.map((chip) => chip.label).join(", "))
+          }
+          onType={(text) => void say(text)}
+          onUseForm={
+            prompt !== null &&
+            vocabulary.editorFor(prompt.stepKey) !== undefined
+              ? () => {
+                  void voice.end();
+                  const editor = vocabulary.editorFor(prompt.stepKey);
+                  if (editor !== undefined) {
+                    onEdit(editor);
+                  }
+                }
+              : undefined
+          }
+          progress={progress}
         />
       ) : (
         <div
@@ -1235,16 +1267,6 @@ export function QOnboardingWorkspace({
                 Skip
               </Button>
             ) : null}
-            {prompt.why === undefined ? null : (
-              <Button
-                size="compact"
-                variant="quiet"
-                disabled={working}
-                onClick={() => void say("Why do you need this?")}
-              >
-                Why?
-              </Button>
-            )}
           </div>
         </div>
       ) : null}

@@ -39,9 +39,35 @@ a typed one does from the interview thread:
   the provider's signed header; `disableAuth` is not offered. `onInit`
   resolves the binding or closes the socket; `onTranscript` runs the turn
   as the bound actor; `onClose` / `onDisconnect` release it.
-- Browser: `startVoiceSessionAction` (web server action) → the credential;
-  the ElevenLabs React client opens the WebRTC session with it. The web
-  adapter lives in `apps/web/src/features/voice/provider/`.
+- Browser: `startVoiceSessionAction` (web server action) → the credential
+  and Q's model-composed opening line (`firstMessage`); the ElevenLabs
+  client opens the WebRTC session with both. The web adapter lives in
+  `apps/web/src/features/voice/provider/`.
+- The voice stage (`apps/web/src/features/voice/voice-stage.tsx`): while
+  the person talks with Q, the interview screen is Q — a dark field, the Q
+  mark breathing with the audio, Q's last words and the person's beneath
+  it, options only when the live step is a choice (tap or say), a Type
+  toggle, Mute, voice, volume, and "Use the form". Entered from "Talk with
+  Q" on the interview or the form; "Use the form" leaves it for the editor
+  of the live step. The form's header offers "Back to Q" and "Talk with Q",
+  so every mode reaches every other.
+
+## The interviewer (`voice/interviewer.ts`)
+
+Q conducts the interview rather than reading a script. Each spoken turn
+renders the `INTERVIEW_CONDUCTOR` prompt (q-core) with the session's known
+answers, the open steps with their own kinds and option keys, pending
+confirmations, and the recent turns; the model returns Q's words plus what
+it read (answers, category phrases, confirmations, skips, the step it asks
+next, whether options would help). Deterministic code then validates every
+reading against the step (option keys, ranges with k/m/b scaling, text
+bounds), holds material values (money, revenue, customers, exclusions) and
+MEDIUM-confidence readings as pending until the person confirms, maps
+category phrases through `findTaxonomyCandidates`, records through the
+onboarding API under the person's own token, and routes a question for Q
+to the Q run. The prompt is not the security boundary; the model never
+writes to anything. When the model is unavailable, Q says so plainly and
+re-asks the current step. Pending confirmations are process-local for now.
 
 ## Server modules
 
@@ -53,7 +79,8 @@ a typed one does from the interview thread:
 | `voice/bindings.ts`                   | Process-local bindings: issue → connect (once) → release; per-person and total bounds; connect window                                      |
 | `voice/routes.ts`                     | `POST /v1/q/voice/sessions`                                                                                                                |
 | `voice/attach.ts`                     | The channel on the running server: binding resolution, turn dispatch, metrics                                                              |
-| `voice/turn.ts`                       | One spoken turn: interview `say` or Q run; spoken acknowledgements; interruption → `cancelRun`                                             |
+| `voice/interviewer.ts`                | Q conducting the interview: one `INTERVIEW_CONDUCTOR` turn per utterance, validated and recorded through the onboarding API                |
+| `voice/turn.ts`                       | One spoken turn: interviewer turn (or scripted `say` fallback) or Q run; interruption → `cancelRun`                                        |
 | `voice/speech.ts`                     | Text as Q speaks it: markdown/citations/URLs stripped, bounded, sentence-chunked                                                           |
 | `dev/voice-setup.ts`                  | `pnpm voice:setup -- --ws-url wss://<host>/v1/q/voice/ws`: creates/updates the two Speech Engines, records their ids in `.env.local`       |
 
@@ -73,8 +100,10 @@ Never `NEXT_PUBLIC_ELEVENLABS_*`.
 ## Voice tuning (D §52)
 
 Recorded in `dev/voice-setup.ts`, applied to both engines: model
-`eleven_flash_v2` (ElevenLabs requires turbo or flash v2 for English agents), stability 0.55, similarity 0.75, speed 0.97,
-`optimizeStreamingLatency` 2; ASR keywords for the interview vocabulary
+`eleven_turbo_v2` (ElevenLabs requires turbo or flash v2 for English
+agents; turbo carries fuller prosody), stability 0.42 (low enough that a
+sentence rises and falls like speech), similarity 0.8, speed 1,
+`optimizeStreamingLatency` 1; ASR keywords for the interview vocabulary
 ("Capital Q", "MRR", "Series A", "Lagos", …); turn-taking `patient` with a
 10 s turn timeout; `recordVoice: false`, `deleteAudio: true`. Default voices:
 Sarah (female, mature, reassuring) and Daniel (male, steady broadcaster);

@@ -119,6 +119,172 @@
     animation: cq-presence-breathe 1.8s var(--cq-ease) infinite;
   }
 
+  /*
+   * The voice stage (CQ-Q-VOICE-001 rework): a dark, quiet field with Q at
+   * its centre. Fixed colours on purpose — the stage is the same night in
+   * either theme. Motion is amplitude-driven in script and stilled by the
+   * global reduced-motion rule.
+   */
+  .cq-stage {
+    background: radial-gradient(
+      120% 80% at 50% 0%,
+      oklch(0.32 0.09 262) 0%,
+      oklch(0.19 0.05 262) 42%,
+      oklch(0.12 0.02 262) 100%
+    );
+    color-scheme: dark;
+  }
+  .cq-stage-core {
+    background: radial-gradient(
+      circle at 35% 30%,
+      oklch(0.88 0.06 258) 0%,
+      oklch(0.66 0.16 258) 55%,
+      oklch(0.5 0.17 258) 100%
+    );
+    box-shadow:
+      0 0 0 1px oklch(1 0 0 / 0.14) inset,
+      0 20px 60px -20px oklch(0.6 0.18 258 / 0.7);
+  }
+  .cq-stage-mark {
+    color: oklch(0.99 0 0);
+    text-shadow: 0 2px 18px oklch(0.3 0.1 258 / 0.5);
+  }
+  .cq-stage-halo-listening {
+    background: radial-gradient(
+      circle,
+      oklch(0.62 0.16 258 / 0.55),
+      transparent 65%
+    );
+  }
+  .cq-stage-halo-speaking {
+    background: radial-gradient(
+      circle,
+      oklch(0.78 0.14 258 / 0.75),
+      transparent 68%
+    );
+  }
+  .cq-stage-halo-thinking {
+    background: radial-gradient(
+      circle,
+      oklch(0.7 0.1 300 / 0.55),
+      transparent 65%
+    );
+    animation: cq-presence-breathe 1.8s var(--cq-ease) infinite;
+  }
+  .cq-stage-halo-error {
+    background: radial-gradient(
+      circle,
+      oklch(0.6 0.15 25 / 0.5),
+      transparent 65%
+    );
+  }
+  .cq-stage-said {
+    text-wrap: balance;
+  }
+  .cq-stage-scroll {
+    scrollbar-width: thin;
+  }
+  .cq-stage-quiet {
+    border-radius: 999px;
+    padding: 6px 12px;
+    font: inherit;
+    font-size: 13px;
+    color: oklch(1 0 0 / 0.65);
+    background: transparent;
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition:
+      color var(--cq-motion-fast),
+      background-color var(--cq-motion-fast);
+  }
+  .cq-stage-quiet:hover,
+  .cq-stage-quiet:focus-visible {
+    color: oklch(1 0 0);
+    background: oklch(1 0 0 / 0.08);
+    outline: none;
+  }
+  .cq-stage-control {
+    min-height: 44px;
+    border-radius: 999px;
+    padding: 0 18px;
+    font: inherit;
+    font-size: 14px;
+    font-weight: 500;
+    color: oklch(1 0 0 / 0.85);
+    background: oklch(1 0 0 / 0.08);
+    border: 1px solid oklch(1 0 0 / 0.12);
+    cursor: pointer;
+    transition:
+      background-color var(--cq-motion-fast),
+      border-color var(--cq-motion-fast);
+  }
+  .cq-stage-control:hover,
+  .cq-stage-control:focus-visible {
+    background: oklch(1 0 0 / 0.14);
+    outline: none;
+  }
+  .cq-stage-control:disabled {
+    opacity: 0.4;
+    cursor: default;
+  }
+  .cq-stage-control.is-active {
+    background: oklch(1 0 0 / 0.92);
+    color: oklch(0.2 0.03 262);
+    border-color: transparent;
+  }
+  .cq-stage-option {
+    min-height: 44px;
+    border-radius: 14px;
+    padding: 0 18px;
+    font: inherit;
+    font-size: 15px;
+    color: oklch(1 0 0 / 0.92);
+    background: oklch(1 0 0 / 0.07);
+    border: 1px solid oklch(1 0 0 / 0.16);
+    cursor: pointer;
+    transition:
+      background-color var(--cq-motion-fast),
+      border-color var(--cq-motion-fast),
+      transform var(--cq-motion-fast);
+  }
+  .cq-stage-option:hover,
+  .cq-stage-option:focus-visible {
+    background: oklch(1 0 0 / 0.14);
+    border-color: oklch(1 0 0 / 0.3);
+    outline: none;
+  }
+  .cq-stage-option.is-selected {
+    background: oklch(0.72 0.15 258 / 0.35);
+    border-color: oklch(0.78 0.14 258);
+  }
+  .cq-stage-primary {
+    min-height: 44px;
+    border-radius: 999px;
+    padding: 0 20px;
+    font: inherit;
+    font-size: 14px;
+    font-weight: 600;
+    color: oklch(0.2 0.03 262);
+    background: oklch(0.97 0.01 258);
+    border: none;
+    cursor: pointer;
+  }
+  .cq-stage-input {
+    flex: 1 1 auto;
+    min-height: 44px;
+    border-radius: 999px;
+    padding: 0 18px;
+    font: inherit;
+    font-size: 15px;
+    color: oklch(1 0 0);
+    background: oklch(1 0 0 / 0.08);
+    border: 1px solid oklch(1 0 0 / 0.18);
+    outline: none;
+  }
+  .cq-stage-input:focus {
+    border-color: oklch(0.78 0.14 258);
+  }
+
   .cq-bottom-nav {
     position: fixed;
     inset-inline: 0;

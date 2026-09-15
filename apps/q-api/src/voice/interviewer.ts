@@ -209,7 +209,18 @@ function toOpenStep(
     case "voice_text":
       return { ...base, kind: "LONG_TEXT" };
     case "confirmation":
-      return { ...base, kind: "YES_NO" };
+      // A review of what has been gathered: Q reads it back in speech
+      // before it asks, rather than asking for a "confirmation".
+      return {
+        ...base,
+        kind: "YES_NO",
+        note: [
+          base.note,
+          "This is a review of what has been gathered so far: before asking, read the key KNOWN ANSWERS back in one or two natural spoken sentences (name, what the company does, stage, where it is based, the round), then ask whether that is right.",
+        ]
+          .filter((n): n is string => n !== undefined)
+          .join(" "),
+      };
     case "document_upload":
       return { ...base, kind: "DOCUMENT" };
     case "reference_select": {

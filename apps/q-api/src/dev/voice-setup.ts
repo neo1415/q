@@ -31,16 +31,19 @@ import {
 } from "../voice/providers/elevenlabs-admin.js";
 
 /**
- * Voice tuning (D §52): warm, professional, calm. Stability high enough to
- * stay even across long answers; speed a touch under 1 so figures and names
- * land; latency optimisation on. Recorded here, not in a secret.
+ * Voice tuning (D §52, revised after the first live transcripts): warm,
+ * professional, and alive. Turbo v2 over flash for the fuller delivery;
+ * stability low enough that a sentence rises and falls like a person's
+ * rather than a reader's, similarity high so it stays the same person;
+ * natural speed; latency optimisation kept modest so prosody is not
+ * traded for milliseconds. Recorded here, not in a secret.
  */
 export const VOICE_TUNING = {
-  modelId: "eleven_flash_v2",
-  stability: 0.55,
-  similarityBoost: 0.75,
-  speed: 0.97,
-  optimizeStreamingLatency: 2,
+  modelId: "eleven_turbo_v2",
+  stability: 0.42,
+  similarityBoost: 0.8,
+  speed: 1,
+  optimizeStreamingLatency: 1,
 } as const;
 
 /** Account voices chosen for Q. Overridable by flag; ids are public voice ids, not secrets. */
