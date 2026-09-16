@@ -69,9 +69,9 @@ const REMEMBERED_RUNS_MAX = 20;
 function rememberRuns(runIds: readonly string[]): void {
   try {
     if (runIds.length === 0) {
-      window.sessionStorage.removeItem(RUN_STORAGE_KEY);
+      window.localStorage.removeItem(RUN_STORAGE_KEY);
     } else {
-      window.sessionStorage.setItem(
+      window.localStorage.setItem(
         RUN_STORAGE_KEY,
         JSON.stringify(runIds.slice(-REMEMBERED_RUNS_MAX)),
       );
@@ -84,7 +84,7 @@ function rememberRuns(runIds: readonly string[]): void {
 
 function rememberedRuns(): readonly string[] {
   try {
-    const raw = window.sessionStorage.getItem(RUN_STORAGE_KEY);
+    const raw = window.localStorage.getItem(RUN_STORAGE_KEY);
     if (raw === null) {
       return [];
     }

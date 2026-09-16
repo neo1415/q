@@ -1,3 +1,4 @@
+import type { ApplicationIdentityLookup } from "@capital-q/security/postgres";
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import {
   AppendQRunMessageRequestSchema,
@@ -30,6 +31,7 @@ import {
 import {
   getActorContext,
   requireActorContextHook,
+  requireActorContextOrPersonalHook,
   type ActorContextDependencies,
 } from "../security/actor-context.js";
 
@@ -51,6 +53,8 @@ import {
 
 export type QRunRoutesDependencies = ActorContextDependencies & {
   readonly qRuntime: QRuntimeService;
+  /** When present, a person with no organisation yet may still ask Q under a personal context. */
+  readonly identity?: ApplicationIdentityLookup | undefined;
   /**
    * Orchestration behind a composition boundary. When present and
    * `autostart` is on, a newly created run is handed to the orchestrator
@@ -89,7 +93,11 @@ export function registerQRunRoutes(
   app: FastifyInstance,
   dependencies: QRunRoutesDependencies,
 ): void {
-  const withContext = requireActorContextHook(dependencies);
+  const identity = dependencies.identity;
+  const withContext =
+    identity === undefined
+      ? requireActorContextHook(dependencies)
+      : requireActorContextOrPersonalHook({ ...dependencies, identity });
   const service = dependencies.qRuntime;
   const runPath = `${Q_RUNS_PATH}/:runId`;
 

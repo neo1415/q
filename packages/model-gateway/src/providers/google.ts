@@ -106,6 +106,11 @@ function assistantParts(
           ? {}
           : { id: call.callId }),
       },
+      // Gemini 3 signs its function calls and rejects the follow-up that
+      // does not echo the signature.
+      ...(call.providerState === undefined
+        ? {}
+        : { thoughtSignature: call.providerState }),
     });
   }
   return parts;
@@ -252,6 +257,10 @@ function toolCallsOf(response: GenerateContentResponse): ModelToolCall[] {
           : `${GENERATED_CALL_ID_PREFIX}${String(index)}`,
       name: name.data,
       arguments: call.args ?? {},
+      ...(typeof part.thoughtSignature === "string" &&
+      part.thoughtSignature.length > 0
+        ? { providerState: part.thoughtSignature }
+        : {}),
     });
   });
   return calls;

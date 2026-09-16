@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import type { FounderOnboardingAdapter } from "@capital-q/config/web";
 import { Button, buttonClassName } from "@capital-q/ui/button";
@@ -27,9 +27,12 @@ export function FounderOnboardingScreen({
   adapter,
   seed,
   startTalking = false,
+  openReview = false,
 }: {
   /** Open already talking with Q (arrival hands over with the voice on). */
   readonly startTalking?: boolean | undefined;
+  /** Open the review of a finished setup, to change what the profile says. */
+  readonly openReview?: boolean | undefined;
   readonly adapter: FounderOnboardingAdapter;
   readonly seed?: string | undefined;
 }) {
@@ -45,6 +48,22 @@ export function FounderOnboardingScreen({
   // Set when the person asks for Q's voice from the form: the workspace
   // opens already talking, then this is cleared so it happens once.
   const [talkOnOpen, setTalkOnOpen] = useState(startTalking);
+  // A finished setup asked to be reviewed opens its review step once.
+  const reviewOpened = useRef(false);
+  const sessionStatus = state.session?.status;
+  const sessionStep = state.session?.step;
+  const openStep = actions.openStep;
+  useEffect(() => {
+    if (
+      openReview === true &&
+      !reviewOpened.current &&
+      sessionStatus === "complete" &&
+      sessionStep === undefined
+    ) {
+      reviewOpened.current = true;
+      void openStep("review");
+    }
+  }, [openReview, sessionStatus, sessionStep, openStep]);
 
   if (state.phase === "unavailable") {
     return (
@@ -93,11 +112,19 @@ export function FounderOnboardingScreen({
       <div className="mx-auto flex min-h-dvh w-full max-w-(--cq-layout-narrow) flex-col justify-center gap-6 px-4 py-10">
         <EmptyState
           title="Founder setup is complete."
-          description="Your company profile is in place. You can keep improving it from Home; investors don't see any of it until you choose to become discoverable."
+          description="Your company profile is in place. You can change what it says any time; investors don't see any of it until you choose to become discoverable."
           action={
-            <Link href="/home" className={buttonClassName("primary")}>
-              Go to Home
-            </Link>
+            <div className="flex flex-wrap gap-2">
+              <Link href="/home" className={buttonClassName("primary")}>
+                Go to Home
+              </Link>
+              <Button
+                variant="secondary"
+                onClick={() => void actions.openStep("review")}
+              >
+                Change what the profile says
+              </Button>
+            </div>
           }
         />
       </div>

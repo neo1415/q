@@ -3,6 +3,7 @@
 import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 
 import type { QVoiceChoice, QVoiceTurnState } from "@capital-q/contracts";
+import { ICON_SIZE, MessageSquare, Mic, Upload, X } from "@capital-q/ui/icons";
 
 import type { VoiceSessionClient, VoiceState } from "./session";
 import { VOICE_STATE_LABELS } from "./session";
@@ -238,6 +239,7 @@ export function VoiceStage({
             </button>
           ) : null}
           <button type="button" className="cq-stage-quiet" onClick={onEnd}>
+            <X size={ICON_SIZE.compact} aria-hidden="true" />
             End
           </button>
         </div>
@@ -423,6 +425,7 @@ export function VoiceStage({
             disabled={!client.connected}
             onClick={() => client.setMuted(!client.muted)}
           >
+            <Mic size={ICON_SIZE.compact} aria-hidden="true" />
             {client.muted ? "Unmute" : "Mute"}
           </button>
           <button
@@ -433,6 +436,7 @@ export function VoiceStage({
             aria-pressed={typing}
             onClick={() => setTyping((current) => !current)}
           >
+            <MessageSquare size={ICON_SIZE.compact} aria-hidden="true" />
             Type
           </button>
           {onUpload !== undefined ? (
@@ -458,6 +462,7 @@ export function VoiceStage({
                 }
                 aria-busy={uploading}
               >
+                <Upload size={ICON_SIZE.compact} aria-hidden="true" />
                 {uploading ? "Reading" : "Upload"}
               </label>
             </>

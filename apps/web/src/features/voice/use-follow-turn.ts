@@ -18,7 +18,10 @@ import type { VoiceSessionClient } from "./session";
  */
 
 const SPEECH_FLOOR_MS = 1_500;
+/** A destination named while Q is silent or only thinking moves on by then. */
 const SPEECH_CEILING_MS = 12_000;
+/** While Q is audibly speaking the goodbye, the screen waits much longer. */
+const SPEAKING_CEILING_MS = 90_000;
 const CHECK_MS = 250;
 
 export function useFollowTurn(
@@ -50,10 +53,9 @@ export function useFollowTurn(
         state !== "THINKING" &&
         state !== "CONNECTING";
       const elapsed = Date.now() - at;
-      if (
-        (quiet && elapsed >= SPEECH_FLOOR_MS) ||
-        elapsed >= SPEECH_CEILING_MS
-      ) {
+      const ceiling =
+        state === "Q_SPEAKING" ? SPEAKING_CEILING_MS : SPEECH_CEILING_MS;
+      if ((quiet && elapsed >= SPEECH_FLOOR_MS) || elapsed >= ceiling) {
         timer.current = null;
         followRef.current(turn);
         return;

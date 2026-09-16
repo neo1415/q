@@ -227,6 +227,12 @@
   .cq-stage-scroll {
     scrollbar-width: thin;
   }
+  .cq-stage-quiet,
+  .cq-stage-control {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
   .cq-stage-quiet {
     border-radius: 999px;
     padding: 6px 12px;

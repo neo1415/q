@@ -160,16 +160,16 @@ export function registerQVoiceRoutes(
       let firstMessage: string | undefined;
       const interviewer = dependencies.interviewer;
       const apiBaseUrl = dependencies.apiBaseUrl;
-      if (input.welcome === true && dependencies.welcome !== undefined) {
-        let knownName: string | null = null;
-        if (apiBaseUrl !== undefined) {
-          try {
-            const me = await fetchMe({ baseUrl: apiBaseUrl, accessToken });
-            knownName = me.user.displayName;
-          } catch {
-            // Unknown name is a fine state to open from.
-          }
+      let knownName: string | null = null;
+      if (apiBaseUrl !== undefined && input.onboarding === undefined) {
+        try {
+          const me = await fetchMe({ baseUrl: apiBaseUrl, accessToken });
+          knownName = me.user.displayName;
+        } catch {
+          // Unknown name is a fine state to open from.
         }
+      }
+      if (input.welcome === true && dependencies.welcome !== undefined) {
         try {
           const opening = await dependencies.welcome.turn({
             attribution: {
@@ -208,6 +208,16 @@ export function registerQVoiceRoutes(
         } catch (error: unknown) {
           request.log.warn({ err: error }, "voice opening line unavailable");
         }
+      }
+
+      if (firstMessage === undefined) {
+        // Q always speaks first. On the open thread there is no interview
+        // state to open from, so the line is a plain greeting.
+        const first = knownName?.trim().split(/\s+/)[0];
+        firstMessage =
+          first !== undefined && first.length > 0
+            ? `Hi ${first}. I'm listening; what would you like to look at?`
+            : "I'm listening. What would you like to look at?";
       }
 
       const issuedAt = now();

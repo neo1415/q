@@ -304,7 +304,7 @@ export function VisibilityScreen({ companyId }: VisibilityScreenProps) {
         </dl>
         <div>
           <Link
-            href="/onboarding/founder"
+            href="/onboarding/founder?review=1"
             className={buttonClassName("quiet", "compact")}
           >
             Change what the profile says

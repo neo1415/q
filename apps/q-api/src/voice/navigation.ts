@@ -159,3 +159,28 @@ const DESTINATION_LINES: Readonly<Record<QVoiceDestination, string>> = {
 export function destinationLine(destination: QVoiceDestination): string {
   return DESTINATION_LINES[destination];
 }
+
+/**
+ * A spoken request to be seen, or not, by investors on Capital Q. A
+ * consequential change: Q confirms first, and the platform's own
+ * visibility API performs it under the person's authority.
+ */
+const VISIBLE_ON_RE =
+  /\b(?:make|set|turn|get)\s+(?:me|us|my company|the company|our company|my profile|our profile|it)\s+(?:visible|public|discoverable|findable)|\b(?:i|we)(?:'d| would)? (?:want|like|wish) (?:to be|to go|to become) (?:visible|discoverable|public|findable)|\bgo (?:public|visible|live)\b|\b(?:be|become) (?:visible|discoverable) to investors\b/i;
+const VISIBLE_OFF_RE =
+  /\b(?:make|set|turn|keep)\s+(?:me|us|my company|the company|our company|my profile|our profile|it)\s+(?:private|hidden|invisible|not visible)|\bhide (?:me|us|my company|our company|my profile)\b|\b(?:i|we)(?:'d| would)? (?:want|like|prefer) to (?:be|stay|go) (?:private|hidden|invisible)\b|\bgo private\b/i;
+
+export type SpokenVisibility = "network_visible" | "organisation_private";
+
+export function spokenVisibility(text: string): SpokenVisibility | null {
+  if (VISIBLE_OFF_RE.test(text)) return "organisation_private";
+  if (VISIBLE_ON_RE.test(text)) return "network_visible";
+  return null;
+}
+
+const DECLINE_RE =
+  /^(?:(?:um+|uh+|no|nope|nah|not (?:now|yet|really)|leave it|don'?t|never mind|cancel|actually no|keep it as it is)[,.!\s]*)+$/i;
+
+export function declines(text: string): boolean {
+  return DECLINE_RE.test(text.trim());
+}

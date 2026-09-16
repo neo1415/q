@@ -1,9 +1,11 @@
 import { randomUUID } from "node:crypto";
 
 import {
+  getCompany,
   getOnboardingSession,
   resolveOnboardingSuggestion,
   sayToOnboarding,
+  setCompanyVisibility,
   type ApiSession,
   updateMe,
 } from "@capital-q/api-client";
@@ -32,8 +34,11 @@ import type {
 import type { VoiceSessionBinding } from "./bindings.js";
 import type { Interviewer } from "./interviewer.js";
 import {
+  declines,
   destinationLine,
   fillerLine,
+  spokenVisibility,
+  type SpokenVisibility,
   isNonLexical,
   recoveryLine,
   resumeAcknowledgement,
@@ -113,7 +118,25 @@ const VOICE_TURN_MAX_CHARS = 2_000;
 const AFFIRMATIVE =
   /^(?:(?:yes|yep|yeah|sure|ok(?:ay)?|right|correct|exactly|perfect)[,.!\s]*)*(?:yes|yep|yeah|sure|ok(?:ay)?|right|correct|exactly|perfect|keep (?:these|those|them|it|all(?: of them)?)|(?:that'?s|those are|these are|they'?re) (?:right|correct|fine|good|it|the ones)|looks? (?:right|good|correct)|(?:all )?good|go (?:with|for) (?:these|those|them|that))[.!\s]*$/i;
 
-/** Fillers are contextual and few (D §53-§54): one per slow turn, never a time promise. */
+/** A visibility change Q has asked about and not yet heard yes or no to. */
+const pendingVisibility = new WeakMap<
+  VoiceSessionBinding,
+  { readonly companyId: string; readonly visibility: SpokenVisibility }
+>();
+
+const VISIBILITY_QUESTION: Readonly<Record<SpokenVisibility, string>> = {
+  network_visible:
+    "Just to confirm: you'd like your company visible to investors on Capital Q, so they can find it and ask me about it. Shall I switch that on?",
+  organisation_private:
+    "Just to confirm: you'd like your company private again, so investors can no longer find it. Shall I switch that off?",
+};
+const VISIBILITY_DONE: Readonly<Record<SpokenVisibility, string>> = {
+  network_visible:
+    "Done. Investors on Capital Q can now find your company and ask me about it. You can change that any time.",
+  organisation_private:
+    "Done. Your company is private again; investors can't find it until you say otherwise.",
+};
+
 /** What Q says when a chat is ended aloud; the screen stays on the typed thread. */
 const END_LINE =
   "Alright, I'll stop talking. I'm right here if you want to type.";
@@ -820,12 +843,108 @@ export function createVoiceTurnHandler(
       : { kind: "INTERRUPTED", path: "MOVE" };
   };
 
+  const ownCompanyId = async (
+    binding: VoiceSessionBinding,
+    session: ApiSession,
+  ): Promise<string | null> => {
+    const subject = binding.thread.subjects?.find((s) => s.kind === "COMPANY");
+    if (subject !== undefined && subject.kind === "COMPANY") {
+      return subject.companyId;
+    }
+    const onboarding = binding.thread.onboarding;
+    if (onboarding === undefined) return null;
+    try {
+      const view = await getOnboardingSession(session, onboarding.sessionId);
+      const bound = view.session.subject;
+      return bound !== null && bound.type === "COMPANY" ? bound.id : null;
+    } catch {
+      return null;
+    }
+  };
+
+  /** A spoken yes to a visibility question: the change, then the word. */
+  const applyVisibility = async (
+    binding: VoiceSessionBinding,
+    session: ApiSession,
+    change: {
+      readonly companyId: string;
+      readonly visibility: SpokenVisibility;
+    },
+    signal: AbortSignal,
+    speaker: VoiceSpeaker,
+  ): Promise<VoiceTurnOutcome> => {
+    let line: string;
+    try {
+      const company = await getCompany(session, change.companyId);
+      await setCompanyVisibility(session, change.companyId, {
+        visibility: change.visibility,
+        expectedVersion: company.version,
+      });
+      line = VISIBILITY_DONE[change.visibility];
+    } catch (error: unknown) {
+      logger.warn(
+        { err: error, qVoiceSessionId: binding.voiceSessionId },
+        "spoken visibility change was not accepted",
+      );
+      line =
+        "I couldn't change that just now. You can do it from your visibility page, or ask me again in a moment.";
+    }
+    return (await speakLine(speaker, line, signal))
+      ? { kind: "SPOKEN", path: "MOVE" }
+      : { kind: "INTERRUPTED", path: "MOVE" };
+  };
+
   return async (binding, transcript, signal, speaker) => {
     const text = latestUtterance(transcript);
     if (text === null || signal.aborted) {
       return { kind: "NOTHING" };
     }
     rememberTranscript(binding, transcript);
+    // A visibility question waiting for yes or no.
+    const api = dependencies.onboarding;
+    const awaiting = pendingVisibility.get(binding);
+    if (awaiting !== undefined && api !== undefined) {
+      const session: ApiSession = {
+        baseUrl: api.apiBaseUrl,
+        accessToken: binding.accessToken,
+        ...(api.fetch === undefined ? {} : { fetch: api.fetch }),
+      };
+      if (AFFIRMATIVE.test(text)) {
+        pendingVisibility.delete(binding);
+        return applyVisibility(binding, session, awaiting, signal, speaker);
+      }
+      if (declines(text)) {
+        pendingVisibility.delete(binding);
+        return (await speakLine(
+          speaker,
+          "Alright, leaving it as it is.",
+          signal,
+        ))
+          ? { kind: "SPOKEN", path: "MOVE" }
+          : { kind: "INTERRUPTED", path: "MOVE" };
+      }
+      // Anything else moves on; the question can be asked again.
+      pendingVisibility.delete(binding);
+    }
+    const wanted = spokenVisibility(text);
+    if (wanted !== null && api !== undefined) {
+      const session: ApiSession = {
+        baseUrl: api.apiBaseUrl,
+        accessToken: binding.accessToken,
+        ...(api.fetch === undefined ? {} : { fetch: api.fetch }),
+      };
+      const companyId = await ownCompanyId(binding, session);
+      const line =
+        companyId === null
+          ? "I can switch that on once your company is set up on Capital Q. Shall we do the setup first?"
+          : VISIBILITY_QUESTION[wanted];
+      if (companyId !== null) {
+        pendingVisibility.set(binding, { companyId, visibility: wanted });
+      }
+      return (await speakLine(speaker, line, signal))
+        ? { kind: "SPOKEN", path: "MOVE" }
+        : { kind: "INTERRUPTED", path: "MOVE" };
+    }
     const paused = held.get(binding);
     // A cough, a laugh, a bare "uh", or the browser's cue after a false
     // interruption: not a turn. If something was cut, it carries on;

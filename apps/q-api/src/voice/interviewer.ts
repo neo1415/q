@@ -16,7 +16,10 @@ import type {
 import { FOUNDER_DEFINITION_V2 } from "@capital-q/founder-onboarding";
 import { INVESTOR_DEFINITION_V1 } from "@capital-q/investor-onboarding";
 import type { OnboardingStepManifest } from "@capital-q/onboarding";
-import type { ModelGateway } from "@capital-q/model-gateway";
+import {
+  isModelGatewayError,
+  type ModelGateway,
+} from "@capital-q/model-gateway";
 import type { Logger } from "@capital-q/observability";
 import {
   createDefaultPromptRegistry,
@@ -420,6 +423,9 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
   const pendingFor = (sessionId: string) =>
     pendingBySession.get(sessionId) ?? [];
   const warningsBySession = new Map<string, number>();
+  // Asides since the last recorded answer: the first two are answered in
+  // full, later ones steer back (the prompt reads the count).
+  const tangentsBySession = new Map<string, number>();
   const personality = personalityOf(dependencies.personality);
   const expressive = dependencies.expressive ?? false;
 
@@ -428,6 +434,7 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
     forget: (sessionId: string) => {
       pendingBySession.delete(sessionId);
       warningsBySession.delete(sessionId);
+      tangentsBySession.delete(sessionId);
     },
 
     turn: async (input: InterviewTurnInput): Promise<InterviewTurnOutcome> => {
@@ -500,6 +507,7 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
         expressive,
         opening: input.utterance.trim().length === 0,
         warnings: warningsBySession.get(input.onboardingSessionId) ?? 0,
+        tangents: tangentsBySession.get(input.onboardingSessionId) ?? 0,
         knownAnswers,
         openSteps,
         currentStepKey: view.currentStep?.stepKey ?? null,
@@ -564,6 +572,22 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
           ).value;
         }
       } catch (error: unknown) {
+        if (isModelGatewayError(error) && error.failureClass === "CANCELLED") {
+          return {
+            reply: "",
+            intent: "UNCLEAR",
+            asking: null,
+            recorded: [],
+            skipped: [],
+            questionForQ: null,
+            navigate: null,
+            handoff: null,
+            pronounce: null,
+            warnings: warningsBySession.get(input.onboardingSessionId) ?? 0,
+            view,
+            degraded: false,
+          };
+        }
         logger.warn(
           { err: error, journey: input.journeyType },
           "interview conductor model call failed",
@@ -809,6 +833,17 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
       // 5. Conduct: a warning is counted here, never by the model; the
       // third strike hands the person to the form and ends Q's part.
       let warnings = warningsBySession.get(input.onboardingSessionId) ?? 0;
+      if (result.intent === "SMALL_TALK" || result.intent === "OFF_TOPIC") {
+        tangentsBySession.set(
+          input.onboardingSessionId,
+          Math.min(
+            9,
+            (tangentsBySession.get(input.onboardingSessionId) ?? 0) + 1,
+          ),
+        );
+      } else if (recorded.length > 0) {
+        tangentsBySession.delete(input.onboardingSessionId);
+      }
       let handoff: "FORM" | null = null;
       if (result.intent === "SABOTAGE") {
         warnings += 1;
@@ -828,7 +863,7 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
           step.status !== "SKIPPED",
       );
       if (
-        recorded.length > 0 &&
+        (recorded.length > 0 || skipped.length > 0) &&
         view.session.status === "ACTIVE" &&
         view.progress.canComplete &&
         stillRequired.length === 0
@@ -870,7 +905,7 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
             : {
                 stepKey: askOpen.stepKey,
                 kind: askOpen.kind,
-                options: result.showOptions ? (askOpen.options ?? []) : [],
+                options: askOpen.options ?? [],
                 maxChoices: askOpen.maxChoices,
               },
         recorded,

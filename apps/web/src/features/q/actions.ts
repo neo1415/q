@@ -101,6 +101,16 @@ async function run<T>(
   try {
     return { ok: true, value: await work(session) };
   } catch (error) {
+    if (!(error instanceof ApiProblemError)) {
+      // The connection, not the answer: the Q API restarts in development
+      // and a mobile network drops. One retry after a beat.
+      await new Promise((resolve) => setTimeout(resolve, 1_200));
+      try {
+        return { ok: true, value: await work(session) };
+      } catch (again) {
+        return translate(again);
+      }
+    }
     return translate(error);
   }
 }

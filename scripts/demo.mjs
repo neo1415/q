@@ -41,6 +41,17 @@ function upsertEnv(key, value) {
   writeFileSync(file, lines.join("\n"));
 }
 
+/** Read one key from .env.local without printing it. */
+function envValue(key) {
+  const file = resolve(root, ".env.local");
+  const match = new RegExp(`^${key}=(.*)$`, "m").exec(
+    readFileSync(file, "utf8"),
+  );
+  return match === null
+    ? undefined
+    : match[1].trim().replace(/^["']|["']$/g, "");
+}
+
 function envHas(key) {
   const file = resolve(root, ".env.local");
   return new RegExp(`^${key}=.+`, "m").test(readFileSync(file, "utf8"));
@@ -87,7 +98,22 @@ async function main() {
     process.exit(1);
   }
 
-  // 1. Database.
+  // 1. Database. Google sign-in reads its credentials from the
+  // environment; without them the provider is declared but cannot work.
+  for (const key of [
+    "SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID",
+    "SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_SECRET",
+  ]) {
+    const value = envValue(key);
+    if (value !== undefined && value.length > 0) {
+      process.env[key] = value;
+    } else if (process.env[key] === undefined) {
+      process.env[key] = "unset";
+      log(
+        `${key} is not in .env.local; Google sign-in will not work until it is.`,
+      );
+    }
+  }
   const status = run("supabase", ["status"], { quiet: true });
   if (status.status !== 0) {
     log("starting the local database...");

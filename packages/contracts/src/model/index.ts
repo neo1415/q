@@ -258,6 +258,10 @@ export function isRetryableModelFailure(cls: ModelFailureClass): boolean {
 }
 
 export function allowsModelFallback(cls: ModelFailureClass): boolean {
+  // A request one provider rejects as malformed is that provider's quirk
+  // (a signature it wanted back, a schema it could not take): the next
+  // candidate gets the same request rather than the person getting nothing.
+  if (cls === "INVALID_REQUEST") return true;
   return (MODEL_FALLBACK_FAILURE_CLASSES as readonly string[]).includes(cls);
 }
 
@@ -322,6 +326,12 @@ export const ModelToolCallSchema = z
     callId: z.string().min(1).max(128),
     name: ModelToolNameSchema,
     arguments: z.record(z.string(), z.unknown()),
+    /**
+     * Opaque state the provider attached to this call and requires back
+     * on the next request (Gemini's thought signature). Never read, never
+     * shown; carried as-is by whichever adapter issued it.
+     */
+    providerState: z.string().max(16_384).optional(),
   })
   .strict();
 export type ModelToolCall = z.infer<typeof ModelToolCallSchema>;

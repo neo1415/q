@@ -186,6 +186,7 @@ export function createApp(
     registerQRunRoutes(app, {
       authenticator: security.authenticator,
       resolver: security.resolver,
+      identity: security.identity,
       qRuntime: modules.qRuntime,
       orchestration: modules.orchestration,
     });
@@ -219,6 +220,7 @@ export function createApp(
     streams = registerQEventRoutes(app, {
       authenticator: security.authenticator,
       resolver: security.resolver,
+      identity: security.identity,
       qStream: modules.qStream.service,
       options: modules.qStream.options,
       logger,

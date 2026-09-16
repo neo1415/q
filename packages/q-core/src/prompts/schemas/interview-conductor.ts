@@ -99,6 +99,8 @@ export const InterviewConductorVariablesSchema = z
     opening: z.boolean(),
     /** How many times Q has already warned this person about derailing the interview. */
     warnings: z.number().int().min(0).max(3),
+    /** Small talk and asides since the last recorded answer: the first two are welcome, later ones steer back. */
+    tangents: z.number().int().min(0).max(9),
     knownAnswers: z
       .array(
         z.object({

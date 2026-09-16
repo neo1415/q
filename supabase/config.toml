@@ -339,7 +339,11 @@ max_frequency = "5s"
 # redirect URIs. HOSTED projects configure the provider in the dashboard
 # instead; this file never touches them.
 [auth.external.google]
-enabled = false
+# Google sign-in. The credentials live in .env.local (never here); the demo
+# script exports them before starting the database. In Google Cloud the
+# authorised redirect URI for local work is
+# http://127.0.0.1:54321/auth/v1/callback.
+enabled = true
 client_id = "env(SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID)"
 # DO NOT commit your OAuth provider secret to git.
 secret = "env(SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_SECRET)"

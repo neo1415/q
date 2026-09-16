@@ -296,6 +296,30 @@ keeps going. When Q was cut and no words follow within 1.6 s, it injects
 `[continue]` as a user message; the server resumes and the transcript
 never shows the cue.
 
+## Visibility by voice
+
+"Make me visible to investors" / "make us private" (`spokenVisibility`
+in `voice/navigation.ts`): Q asks one confirming question, the spoken
+yes is the approval of that exact change, and the platform's own
+visibility API (`POST /v1/companies/:id/visibility`) performs it under
+the person's authority; a no leaves things as they are. The company is
+the thread's subject or the setup's bound company; without one Q offers
+the setup first. Investor organisations have no visibility choice yet.
+
+## Q speaks first
+
+Every thread opens with Q's line: the interview and the arrival compose
+theirs from state; the open thread greets by first name when Capital Q
+knows it ("Hi Daniel. I'm listening; what would you like to look at?").
+
+## Tangents
+
+The conductor counts small talk and asides since the last recorded answer
+(`tangents`): the first two are answered properly with no steering, the
+third is answered briefly and brought back, later ones get one line and
+the question. When it asks a choice step it names two or three options as
+examples; the screen always shows the full list.
+
 ## A person before any organisation
 
 Sign-in lands on arrival, and a person who has just signed in belongs to
@@ -305,7 +329,9 @@ authenticated person with an active profile and no organisation context
 gets a personal context attributed to the well-known personal tenant
 (`PERSONAL_BOOTSTRAP_TENANT_ID`, migration 20260922090000). It grants no
 organisation, no membership and no subject. A person with an organisation
-resolves exactly as everywhere else.
+resolves exactly as everywhere else. The typed thread (`POST /v1/q/runs`)
+and its event stream accept the same personal context, so Home works
+before setup; approvals stay strict.
 
 ## Home
 

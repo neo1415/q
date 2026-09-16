@@ -37,7 +37,7 @@ export type OwnContext =
     }
   | { readonly kind: "NONE" };
 
-async function apiSession(): Promise<ApiSession | null> {
+export async function apiSession(): Promise<ApiSession | null> {
   const { apiBaseUrl } = loadWebServerConfig();
   if (apiBaseUrl === undefined) {
     return null;
