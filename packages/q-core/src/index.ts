@@ -267,6 +267,13 @@ export {
 } from "./communication/promises.js";
 
 export {
+  isRecordableKnowledgeKey,
+  recordableNamespacesSentence,
+  RECORDABLE_KNOWLEDGE_NAMESPACES,
+  type RecordableKnowledgeNamespace,
+} from "./communication/knowledge-keys.js";
+
+export {
   PRIVATE_CHARTER_MARKER,
   PRIVATE_CONTEXT_MARKER,
   Q_CONVERSATION_SCENARIOS,

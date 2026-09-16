@@ -503,6 +503,57 @@ describe("@capital-q/q-firewall against local PostgreSQL", () => {
     });
   });
 
+  it("GOLDEN own public presence: the owner may read it and a counterparty never can", async () => {
+    await withWorld(async (world) => {
+      await makeNetworkVisible(world);
+
+      // The owner's own side. What Capital Q understands of the company's
+      // public footprint is the company's own reading of its own material.
+      const owner = await world.firewall.plan(
+        ask(world.founderAlpha, "INVESTIGATE", [company(world.companyAlpha)]),
+      );
+      expect(owner.outcome).toBe("AUTHORISED");
+      if (owner.outcome !== "AUTHORISED") {
+        return;
+      }
+      const presence = owner.plan.scopes.find(
+        (scope) => scope.kind === "OWN_PUBLIC_PRESENCE",
+      );
+      expect(presence).toBeDefined();
+      // Never public and never network-visible, whatever the company's
+      // marketplace visibility says: the material is public, the reading
+      // of it is not.
+      expect(presence?.contextLabel).toBe("organisation_private");
+      expect(presence?.sensitivity).not.toBe("PUBLIC");
+      expect(presence?.sensitivity).not.toBe("NETWORK_VISIBLE");
+      // Confined to the subject the plan named, so a read cannot wander.
+      expect(presence?.filter.companyId).toBe(world.companyAlpha);
+
+      // The counterparty's side. An investor who can see a network-visible
+      // profile still cannot see what Capital Q understands about it.
+      const counterparty = await world.firewall.plan(
+        ask(world.apexAdmin, "INVESTIGATE", [company(world.companyAlpha)]),
+      );
+      expect(counterparty.outcome).toBe("AUTHORISED");
+      if (counterparty.outcome !== "AUTHORISED") {
+        return;
+      }
+      expect(counterparty.plan.scopes.map((s) => s.kind)).not.toContain(
+        "OWN_PUBLIC_PRESENCE",
+      );
+      expect(counterparty.plan.denied).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            kind: "OWN_PUBLIC_PRESENCE",
+            reason: "OWNER_ONLY",
+          }),
+        ]),
+      );
+      assertNoMarkers(JSON.stringify(counterparty));
+      assertNoMarkers(world.logLines.join("\n"));
+    });
+  });
+
   // -------------------------------------------------------------------------
   // §74 investor-private → founder
   // -------------------------------------------------------------------------
@@ -909,6 +960,10 @@ describe("@capital-q/q-firewall against local PostgreSQL", () => {
             "COMPANY_PROFILE",
             "COMPANY_CAPITAL_OBJECTIVE",
             "EVIDENCE_DOCUMENTS",
+            // The company's own reading of its own public footprint.
+            // Owner side only; the counterparty golden test above proves
+            // it does not travel.
+            "OWN_PUBLIC_PRESENCE",
             "OWN_Q_CONVERSATION",
             "NETWORK_VISIBLE_DATA",
             "PUBLIC_EXTERNAL_DATA",

@@ -577,6 +577,24 @@ const voiceTurn = createVoiceTurnHandler({
     : {
         presence: createPresenceTrigger({
           presence: presenceComposition.presence,
+          // The name to look a person up by, read from their own profile
+          // row. Their own only: the query is keyed on the acting user.
+          people: {
+            displayNameFor: async (actor) => {
+              // A profile belongs to a person, not to a tenant: the table
+              // has no tenant column because the same person can act in
+              // more than one. The predicate is the acting user's own id,
+              // so this can only ever read the caller's own name.
+              const rows = await database.sql<
+                { display_name: string | null }[]
+              >`select p.display_name
+                  from identity.user_profiles p
+                 where p.id = ${actor.userId}
+                   and p.status = 'active'
+                 limit 1`;
+              return rows[0]?.display_name ?? null;
+            },
+          },
           logger,
         }),
       }),

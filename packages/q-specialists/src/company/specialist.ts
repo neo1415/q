@@ -23,6 +23,7 @@ import {
 import {
   CompanyAnalystV2ResultSchema,
   COMPANY_INTELLIGENCE_DIMENSIONS,
+  isRecordableKnowledgeKey,
 } from "@capital-q/q-core";
 import {
   isModelGatewayError,
@@ -196,6 +197,15 @@ async function recordUserStatements(
   }
   const recorded: string[] = [];
   for (const statement of statements.slice(0, 5)) {
+    // Same closed namespace as the conversational seam: a key the model
+    // invented is not a category of understanding Capital Q has.
+    if (!isRecordableKnowledgeKey(statement.knowledgeKey)) {
+      logger?.warn(
+        { qRunId: context.runId, knowledgeKey: statement.knowledgeKey },
+        "a proposed statement used a knowledge key outside the namespaces",
+      );
+      continue;
+    }
     try {
       const outcome = await recorder.record({
         actor: context.actor,

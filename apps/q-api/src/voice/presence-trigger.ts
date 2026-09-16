@@ -35,8 +35,24 @@ function firstText(
   return null;
 }
 
+/**
+ * What the person is called, for the one query that is about them.
+ *
+ * A name alone is a bad query and a person's name is the worst of them:
+ * the presence build drops every page that does not name the subject, so
+ * without something to disambiguate, a common name reads as nothing found.
+ * The company they have just named is that something.
+ */
+export type PersonNameLookup = {
+  readonly displayNameFor: (
+    actor: ActorContext,
+  ) => Promise<string | null> | string | null;
+};
+
 export type PresenceTriggerDependencies = {
   readonly presence: PresenceService;
+  /** Absent means companies only; a person is simply not looked up. */
+  readonly people?: PersonNameLookup | undefined;
   readonly logger?: Logger | undefined;
 };
 
@@ -54,7 +70,42 @@ export type PresenceTrigger = {
 export function createPresenceTrigger(
   dependencies: PresenceTriggerDependencies,
 ): PresenceTrigger {
-  const { presence, logger } = dependencies;
+  const { presence, people, logger } = dependencies;
+
+  /** One build, detached, never able to delay or fail a turn. */
+  const start = (
+    actor: ActorContext,
+    subjectType: "COMPANY" | "PERSON",
+    subjectId: string,
+    identity: {
+      readonly name: string;
+      readonly websiteUrl: string | null;
+      readonly profileUrl: string | null;
+      readonly qualifier: string | null;
+    },
+  ): void => {
+    void (async () => {
+      try {
+        const outcome = await presence.build({
+          actor,
+          subject: { subjectType, subjectId },
+          identity,
+          correlationId: createCorrelationId(),
+        });
+        // Counts and a status. Never a statement, a query or a page.
+        logger?.info(
+          { status: outcome.status, subjectType },
+          "public presence build finished",
+        );
+      } catch (error: unknown) {
+        logger?.warn(
+          { err: error, subjectType },
+          "public presence build threw",
+        );
+      }
+    })();
+  };
+
   return {
     afterInterviewTurn: (actor, view) => {
       const subject = view.session.subject;
@@ -63,29 +114,36 @@ export function createPresenceTrigger(
       if (name === null || name.length < 2) return;
       const website = firstText(view, FOUNDER_WEBSITE);
 
+      start(actor, "COMPANY", subject.id, {
+        name,
+        websiteUrl: website,
+        profileUrl: null,
+        qualifier: null,
+      });
+
+      /**
+       * And the person themselves, which is the whole point of doing this
+       * at arrival: what they have published, what they say they do, what
+       * they are known for. Their own row, never anybody else's; the
+       * presence service refuses a subject the actor does not own.
+       *
+       * Their company name is the qualifier, because it is the thing that
+       * tells one person of that name from another, and it is public.
+       * Their company's website is not theirs and is not passed.
+       */
+      if (people === undefined) return;
       void (async () => {
         try {
-          const outcome = await presence.build({
-            actor,
-            subject: { subjectType: "COMPANY", subjectId: subject.id },
-            identity: {
-              name,
-              websiteUrl: website,
-              profileUrl: null,
-              qualifier: null,
-            },
-            correlationId: createCorrelationId(),
+          const personName = await people.displayNameFor(actor);
+          if (personName === null || personName.trim().length < 2) return;
+          start(actor, "PERSON", actor.userId, {
+            name: personName.trim(),
+            websiteUrl: null,
+            profileUrl: null,
+            qualifier: name,
           });
-          // Counts and a status. Never a statement, a query or a page.
-          logger?.info(
-            {
-              status: outcome.status,
-              subjectType: "COMPANY",
-            },
-            "public presence build finished",
-          );
         } catch (error: unknown) {
-          logger?.warn({ err: error }, "public presence build threw");
+          logger?.warn({ err: error }, "could not read a name to look up");
         }
       })();
     },
