@@ -79,6 +79,11 @@ export {
 
 export { isActorContext, requireActorContext } from "./actor-context/guards.js";
 
+export {
+  PERSONAL_BOOTSTRAP_TENANT_ID,
+  personalActorContext,
+} from "./actor-context/personal.js";
+
 export * from "./authorization/index.js";
 
 export const PACKAGE_NAME = "@capital-q/security" as const;

@@ -36,6 +36,10 @@ export function WelcomeScreen({
   const turn = voice.turn;
   const end = voice.end;
   useFollowTurn(turn, voice.client, (followed) => {
+    if (followed.handoff === "CHAT") {
+      void end();
+      return;
+    }
     const path = destinationPath(followed.navigate);
     if (path !== null) {
       void end();

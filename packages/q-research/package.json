@@ -17,6 +17,18 @@
       "types": "./dist/providers/brightdata.d.ts",
       "default": "./dist/providers/brightdata.js"
     },
+    "./providers/serpapi": {
+      "types": "./dist/providers/serpapi.d.ts",
+      "default": "./dist/providers/serpapi.js"
+    },
+    "./providers/fallback": {
+      "types": "./dist/providers/fallback.d.ts",
+      "default": "./dist/providers/fallback.js"
+    },
+    "./providers/cached": {
+      "types": "./dist/providers/cached.d.ts",
+      "default": "./dist/providers/cached.js"
+    },
     "./testing": {
       "types": "./dist/providers/fake.d.ts",
       "default": "./dist/providers/fake.js"

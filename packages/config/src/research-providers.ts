@@ -16,6 +16,7 @@ import { ProviderCredential } from "./model-providers.js";
 export const RESEARCH_PROVIDER_ENV_NAMES = [
   "TAVILY_API_KEY",
   "BRIGHT_DATA_API_KEY",
+  "SERP_API_KEY",
 ] as const;
 
 const apiKey = z
@@ -32,6 +33,8 @@ const zone = z
 export const researchProviderEnvShape = {
   TAVILY_API_KEY: apiKey.optional(),
   BRIGHT_DATA_API_KEY: apiKey.optional(),
+  /** SerpApi (serpapi.com): a second Google index for search, behind Tavily. */
+  SERP_API_KEY: apiKey.optional(),
   /** The SERP API zone (control panel → Zones); search goes through Bright Data only when set. */
   BRIGHT_DATA_SERP_ZONE: zone.optional(),
   /** The Web Unlocker zone; page extraction goes through Bright Data only when set. */
@@ -49,6 +52,8 @@ export type ResearchProviderSecrets = {
   readonly tavily: ProviderCredential | undefined;
   /** Bright Data; absent means no profile lookups and no Bright Data search. */
   readonly brightData: BrightDataSecrets | undefined;
+  /** SerpApi search; absent means one search index only. */
+  readonly serpApi: ProviderCredential | undefined;
 };
 
 export type ResearchProviderConfigStatus = {
@@ -56,6 +61,7 @@ export type ResearchProviderConfigStatus = {
   readonly brightData: "configured" | "unconfigured";
   /** Both zones named: search and extraction may go through Bright Data. */
   readonly brightDataZones: "configured" | "unconfigured";
+  readonly serpApi: "configured" | "unconfigured";
 };
 
 export function toResearchProviderSecrets(parsed: {
@@ -63,8 +69,13 @@ export function toResearchProviderSecrets(parsed: {
   readonly BRIGHT_DATA_API_KEY?: string | undefined;
   readonly BRIGHT_DATA_SERP_ZONE?: string | undefined;
   readonly BRIGHT_DATA_UNLOCKER_ZONE?: string | undefined;
+  readonly SERP_API_KEY?: string | undefined;
 }): ResearchProviderSecrets {
   return {
+    serpApi:
+      parsed.SERP_API_KEY === undefined
+        ? undefined
+        : new ProviderCredential(parsed.SERP_API_KEY),
     tavily:
       parsed.TAVILY_API_KEY === undefined
         ? undefined
@@ -92,5 +103,6 @@ export function researchProviderConfigStatus(
       secrets.brightData.unlockerZone !== undefined
         ? "configured"
         : "unconfigured",
+    serpApi: secrets.serpApi === undefined ? "unconfigured" : "configured",
   };
 }

@@ -265,3 +265,23 @@ export function failureMessage(
     ? message
     : "I couldn't answer that right now. Please try again.";
 }
+
+/**
+ * After a failure, what Q can still do: one sentence, so a person is never
+ * left with only an apology (§19). Deterministic, by failure code.
+ */
+const RECOVERY_HINTS: Readonly<Partial<Record<string, string>>> = {
+  EVIDENCE_UNAVAILABLE:
+    "You can ask something narrower, point Q at a website to read, or try again in a moment.",
+  Q_TIMEOUT:
+    "Ask it again in a moment, or ask for something smaller and build up.",
+  NOT_AVAILABLE_IN_CONTEXT:
+    "Say which company or investor you mean, or finish setting one up.",
+};
+
+export function recoveryHint(failure: QStreamState["failure"]): string {
+  return (
+    (failure === null ? undefined : RECOVERY_HINTS[failure.code]) ??
+    "Try it another way, or ask for something Q can check directly."
+  );
+}

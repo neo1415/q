@@ -75,7 +75,7 @@ function publicBlockedMessage(
     case "NO_ELIGIBLE_MODEL_ROUTE":
       return "Some of the information involved is too sensitive to send for analysis with the options available right now, so I've stopped rather than work around it. I can still answer from what's already recorded if you'd like to ask something narrower.";
     case "MODEL_UNAVAILABLE":
-      return "I couldn't review the supporting information right now. Please try again shortly.";
+      return "I couldn't get a full review through just now. I can still answer from what's already recorded, read a website you point me at, or you can ask again in a moment.";
     case "MODEL_OUTPUT_REJECTED":
       return "I couldn't put together a reliable answer from the available information this time.";
     case "CANCELLED":
@@ -202,10 +202,17 @@ export function createSpecialistQAnswer(
       // deterministic recommendation factors yet, so a sentence explaining
       // why something was recommended, ranked or matched was invented — and
       // the prompt forbidding it is not what stops it reaching an investor.
+      // A model route that is out is not the end of the answer: what the
+      // deterministic pass computed still stands, and saying it beats an
+      // apology. Only when nothing was computed does the person hear why.
+      const degraded =
+        result.blocked === "MODEL_UNAVAILABLE" && result.findings.length > 0;
       const guarded = withoutRecommendationClaims(
-        result.blocked !== null
-          ? publicBlockedMessage(result.blocked)
-          : (result.synthesis ?? synthesisFromFindings(result)),
+        degraded
+          ? `${synthesisFromFindings(result)}\n\nThat is what's on record; the fuller review didn't come through this time, so ask again in a moment for more.`
+          : result.blocked !== null
+            ? publicBlockedMessage(result.blocked)
+            : (result.synthesis ?? synthesisFromFindings(result)),
       );
       if (guarded.removed > 0) {
         logger?.warn(

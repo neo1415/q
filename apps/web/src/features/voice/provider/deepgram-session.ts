@@ -30,6 +30,21 @@ const PLAIN_ERRORS = {
 const INPUT_SAMPLE_RATE = 16_000;
 const OUTPUT_SAMPLE_RATE = 24_000;
 
+/**
+ * Telling a cough from a sentence. The provider reports "user started
+ * speaking" on any sound; playback is cut only when the sound keeps going
+ * across a short window. When Q was cut and no words followed within
+ * a moment, the browser asks Q to carry on with a cue the server treats
+ * as "go on" and the transcript never shows.
+ */
+const SUSTAINED_WINDOW_MS = 420;
+const SUSTAINED_SAMPLE_MS = 60;
+const SUSTAINED_LEVEL = 0.06;
+const SUSTAINED_FRACTION = 0.5;
+const FALSE_INTERRUPTION_MS = 1_600;
+const RECENT_AUDIO_MS = 900;
+const CONTINUE_SIGNAL = "[continue]";
+
 let counter = 0;
 const newId = () => `dg-${String(Date.now())}-${String((counter += 1))}`;
 
@@ -54,6 +69,8 @@ export function useDeepgramVoiceSession(
   }, [events]);
   const liveRef = useRef<Live | null>(null);
   const speakingRef = useRef(false);
+  const lastAudioAtRef = useRef(0);
+  const lastUserTextAtRef = useRef(0);
 
   const teardown = useCallback(() => {
     const live = liveRef.current;
@@ -130,18 +147,55 @@ export function useDeepgramVoiceSession(
       });
       session.on("conversation-text", (message) => {
         const role = message.role === "user" ? "user" : "q";
+        if (role === "user") {
+          lastUserTextAtRef.current = Date.now();
+          if (message.content.trim() === CONTINUE_SIGNAL) return;
+        }
         addLine(role, message.content);
         if (role === "user") setState("THINKING");
       });
+      const sustained = async (): Promise<boolean> => {
+        const samples = Math.max(
+          1,
+          Math.round(SUSTAINED_WINDOW_MS / SUSTAINED_SAMPLE_MS),
+        );
+        let loud = 0;
+        for (let i = 0; i < samples; i += 1) {
+          await new Promise((resolve) =>
+            window.setTimeout(resolve, SUSTAINED_SAMPLE_MS),
+          );
+          if (liveRef.current !== live) return false;
+          if (microphone.getInputVolume() >= SUSTAINED_LEVEL) loud += 1;
+        }
+        return loud / samples >= SUSTAINED_FRACTION;
+      };
+      const repairFalseInterruption = () => {
+        const startedAt = Date.now();
+        window.setTimeout(() => {
+          if (liveRef.current !== live) return;
+          const wordsFollowed = lastUserTextAtRef.current >= startedAt;
+          const stillSpeaking =
+            Date.now() - lastAudioAtRef.current < RECENT_AUDIO_MS;
+          if (wordsFollowed || stillSpeaking) return;
+          session.injectUserMessage(CONTINUE_SIGNAL);
+          setState("THINKING");
+        }, FALSE_INTERRUPTION_MS);
+      };
       session.on("user-started-speaking", () => {
-        player.interrupt();
-        if (speakingRef.current) {
+        if (!speakingRef.current) {
+          setState("USER_SPEAKING");
+          return;
+        }
+        // Q is talking: cut playback only for a sound that keeps going.
+        void sustained().then((real) => {
+          if (liveRef.current !== live || !speakingRef.current) return;
+          if (!real) return;
+          player.interrupt();
           speakingRef.current = false;
           setState("INTERRUPTED");
           eventsRef.current.onInterrupted?.();
-        } else {
-          setState("USER_SPEAKING");
-        }
+          repairFalseInterruption();
+        });
       });
       session.on("agent-thinking", () => {
         setState("THINKING");
@@ -151,6 +205,7 @@ export function useDeepgramVoiceSession(
         setState("Q_SPEAKING");
       });
       session.on("audio", (chunk) => {
+        lastAudioAtRef.current = Date.now();
         player.queue(chunk);
       });
       session.on("agent-audio-done", () => {

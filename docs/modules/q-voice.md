@@ -268,6 +268,45 @@ Q's destinations (a page, the form) are followed by `useFollowTurn`
 only once the client has stopped speaking or thinking, with a 1.5 s floor
 and a 12 s ceiling, so a goodbye is heard before the screen changes.
 
+## Sounds, interruptions, endings and destinations
+
+`voice/navigation.ts` reads a few things deterministically before any
+path runs, so they work in the arrival conversation and the open thread
+as well as in the interview:
+
+- A cough, a laugh, a bare "uh" or the browser's `[continue]` cue is not
+  a turn. If Q was cut off it carries on; otherwise Q says nothing.
+- "End the chat", "let me type", "that's all for now" records a `CHAT`
+  handoff: the browser ends the voice and keeps the typed thread.
+- "Take me to Discover", "open my profile" records the destination (the
+  interview reads these through its own model, so this runs only outside
+  it); Q says where it is going and the screen follows once Q has said it.
+- Fillers, recovery lines and resume acknowledgements rotate; the same
+  apology is never heard twice in a row, and every recovery line names
+  what Q can still do.
+
+A held answer remembers what was already heard. Resuming, or offering the
+answer after the next reply, speaks only the unsaid part, after "Sorry, I
+got cut off. As I was saying," (`unsaidPartOf` in `turn.ts`). Nothing
+is repeated; an answer that had finished is not re-spoken.
+
+In the browser the Deepgram adapter no longer cuts playback on any sound:
+it samples the microphone for 420 ms and interrupts only for a sound that
+keeps going. When Q was cut and no words follow within 1.6 s, it injects
+`[continue]` as a user message; the server resumes and the transcript
+never shows the cue.
+
+## A person before any organisation
+
+Sign-in lands on arrival, and a person who has just signed in belongs to
+no organisation. The strict actor-context hook refuses them; the voice
+routes use `requireActorContextOrPersonalHook` instead: an
+authenticated person with an active profile and no organisation context
+gets a personal context attributed to the well-known personal tenant
+(`PERSONAL_BOOTSTRAP_TENANT_ID`, migration 20260922090000). It grants no
+organisation, no membership and no subject. A person with an organisation
+resolves exactly as everywhere else.
+
 ## Home
 
 Talking with Q on Home mounts the same full-page stage as the interview
@@ -287,6 +326,21 @@ read the close reason) shows it in one line; on 2026-09-15 it was
 `[quota_exceeded] You've run out of credits` — the ElevenLabs free plan's
 15 agent minutes were spent. Nothing in Capital Q can fix that; credits or
 another transport can.
+
+## Public research: indexes in a row, with a short memory
+
+Search goes to every configured index in turn (Bright Data when its zones
+are named, Tavily, SerpApi via `SERP_API_KEY`), so one index being
+rate-limited costs a second search rather than the answer; page reading
+goes to the first provider that reads pages. A short memory
+(`providers/cached.ts`, six hours, process-local) returns the same
+search or page without a second vendor call; "refresh", "latest",
+"again", "check now" in the person's words bypass it and replace the
+entry. Q reaches for the web on market, comparison, competitor, peer,
+trend and "rate me" questions as well as on explicit "online" cues
+(`q-core/communication/research-cues.ts`). When the synthesis model
+route is out, the deterministic findings are still spoken with a note
+that the fuller review did not come through (`q-specialists/answer.ts`).
 
 ## Demo posture
 

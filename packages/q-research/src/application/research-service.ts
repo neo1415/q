@@ -209,6 +209,10 @@ const PROVIDER_UNAVAILABLE_MESSAGE =
 const NO_IDENTITY_MESSAGE =
   "Nothing about this subject is authorised for public research yet: the company is private to its organisation and has no declared website. Ask the person which public name or website to search for.";
 
+/** "Refresh", "latest", "again", "check now": the person wants the web read afresh, not remembered. */
+const REFRESH_CUES =
+  /\b(?:refresh|re-?check|check again|look again|search again|latest|up[- ]to[- ]date|right now|as of (?:today|now)|newest|recent(?:ly)? changed|update[ds]?|has (?:anything|it) changed)\b/i;
+
 /** "us", "our", "we", "my": the person is asking about their own organisation. */
 const SELF_REFERENCE = /\b(?:we|us|our|ours|ourselves|my|me|mine)\b/i;
 
@@ -506,7 +510,10 @@ export function createPublicWebResearchService(
         )
         .filter((domain) => domain.length > 0 && domain.includes("."))
         .slice(0, RESEARCH_BOUNDS.maxIncludeDomains);
-      const context = { signal: command.signal };
+      const context = {
+        signal: command.signal,
+        freshRead: REFRESH_CUES.test(command.userText),
+      };
 
       let searchCalls = 0;
       let hits: readonly PublicWebSearchHit[];

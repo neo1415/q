@@ -181,7 +181,8 @@ export const QVoiceTurnStateSchema = z
       .strict()
       .nullable(),
     navigate: QVoiceDestinationSchema.nullable(),
-    handoff: z.enum(["FORM"]).nullable(),
+    /** FORM: the interview leaves the person with the form. CHAT: the voice ends and the typed thread stays. */
+    handoff: z.enum(["FORM", "CHAT"]).nullable(),
     degraded: z.boolean(),
   })
   .strict();

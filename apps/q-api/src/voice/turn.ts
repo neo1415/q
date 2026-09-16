@@ -31,6 +31,15 @@ import type {
 
 import type { VoiceSessionBinding } from "./bindings.js";
 import type { Interviewer } from "./interviewer.js";
+import {
+  destinationLine,
+  fillerLine,
+  isNonLexical,
+  recoveryLine,
+  resumeAcknowledgement,
+  spokenDestination,
+  wantsToEndVoice,
+} from "./navigation.js";
 import type { PronunciationTeacher } from "./pronunciation.js";
 import type { VoiceTurnBoard } from "./turn-board.js";
 import type { WelcomeHost } from "./welcome.js";
@@ -105,8 +114,9 @@ const AFFIRMATIVE =
   /^(?:(?:yes|yep|yeah|sure|ok(?:ay)?|right|correct|exactly|perfect)[,.!\s]*)*(?:yes|yep|yeah|sure|ok(?:ay)?|right|correct|exactly|perfect|keep (?:these|those|them|it|all(?: of them)?)|(?:that'?s|those are|these are|they'?re) (?:right|correct|fine|good|it|the ones)|looks? (?:right|good|correct)|(?:all )?good|go (?:with|for) (?:these|those|them|that))[.!\s]*$/i;
 
 /** Fillers are contextual and few (D §53-§54): one per slow turn, never a time promise. */
-const FILLER_THINKING = "Let me check that.";
-const FILLER_RESEARCH = "Let me look at public sources.";
+/** What Q says when a chat is ended aloud; the screen stays on the typed thread. */
+const END_LINE =
+  "Alright, I'll stop talking. I'm right here if you want to type.";
 
 /** The person's latest words: the last user line, bounded like a typed turn. */
 export function latestUtterance(
@@ -151,10 +161,35 @@ type Held =
   | {
       readonly kind: "ANSWER";
       text: string;
+      /** The part already heard before the cut; never said twice. */
+      spoken: string;
       done: boolean;
       readonly settled: Promise<void>;
     };
 const held = new WeakMap<VoiceSessionBinding, Held>();
+
+const squash = (text: string) => text.replace(/\s+/g, " ").trim();
+
+/**
+ * What of a held answer is still unsaid. The full text normally begins
+ * with what was heard; when it does not (the stream was re-collected and
+ * the model's own text differs from the sentences spoken), the sentences
+ * already heard are dropped one by one instead.
+ */
+export function unsaidPartOf(item: {
+  readonly text: string;
+  readonly spoken: string;
+}): string {
+  const full = squash(item.text);
+  const heard = squash(item.spoken);
+  if (heard.length === 0) return full;
+  if (full.startsWith(heard)) return full.slice(heard.length).trim();
+  const said = new Set(sentences(heard).map(squash));
+  return sentences(full)
+    .filter((sentence) => !said.has(squash(sentence)))
+    .join(" ")
+    .trim();
+}
 
 /** "Go on", "you were saying", a bare "okay": the person wants the rest. */
 const CONTINUE_CUE =
@@ -361,7 +396,7 @@ export function createVoiceTurnHandler(
     if (item.kind === "REMAINDER") {
       return (await speakLine(
         speaker,
-        item.sentences.join(" "),
+        `${resumeAcknowledgement()} ${item.sentences.join(" ")}`,
         signal,
         binding,
       ))
@@ -378,10 +413,13 @@ export function createVoiceTurnHandler(
         new Promise<void>((resolve) => setTimeout(resolve, RESUME_WAIT_MS)),
       ]);
     }
+    const unsaid = unsaidPartOf(item);
     const text =
-      item.text.trim().length > 0
-        ? item.text
-        : "I couldn't finish that one. Ask me again and I'll start afresh.";
+      unsaid.length > 0
+        ? `${resumeAcknowledgement()} ${unsaid}`
+        : item.text.trim().length > 0
+          ? "That was the end of it, actually. What would you like next?"
+          : "I couldn't finish that one. Ask me again and I'll start afresh.";
     return (await speakLine(speaker, text, signal, binding))
       ? { kind: "SPOKEN", path: "Q" }
       : { kind: "INTERRUPTED", path: "Q" };
@@ -467,7 +505,7 @@ export function createVoiceTurnHandler(
             break;
           case "q.run.failed":
             terminal = true;
-            yield event.data.failure.message;
+            yield recoveryLine(event.data.failure.code);
             return;
           case "q.run.completed":
             terminal = true;
@@ -480,7 +518,7 @@ export function createVoiceTurnHandler(
               !saidResearch
             ) {
               saidResearch = true;
-              yield `${FILLER_RESEARCH} `;
+              yield `${fillerLine("RESEARCH")} `;
             }
             break;
           case "q.run.started":
@@ -499,7 +537,7 @@ export function createVoiceTurnHandler(
             spokenSoFar += `${part} `;
           }),
           {
-            filler: FILLER_THINKING,
+            filler: fillerLine("THINKING"),
             signal,
           },
         ),
@@ -513,6 +551,7 @@ export function createVoiceTurnHandler(
         const item: Held = {
           kind: "ANSWER",
           text: spokenSoFar.trim(),
+          spoken: spokenSoFar.trim(),
           done: false,
           settled: new Promise<void>((resolve) => {
             settle = resolve;
@@ -788,9 +827,44 @@ export function createVoiceTurnHandler(
     }
     rememberTranscript(binding, transcript);
     const paused = held.get(binding);
+    // A cough, a laugh, a bare "uh", or the browser's cue after a false
+    // interruption: not a turn. If something was cut, it carries on;
+    // otherwise Q says nothing at all.
+    if (isNonLexical(text)) {
+      if (paused === undefined) return { kind: "NOTHING" };
+      held.delete(binding);
+      return resumeHeld(paused, binding, signal, speaker);
+    }
     if (paused !== undefined && isContinueCue(text)) {
       held.delete(binding);
       return resumeHeld(paused, binding, signal, speaker);
+    }
+    // "End the chat", "let me type": the screen keeps the typed thread.
+    if (wantsToEndVoice(text)) {
+      dependencies.board?.record(binding.voiceSessionId, {
+        asking: null,
+        navigate: null,
+        handoff: "CHAT",
+        degraded: false,
+      });
+      return (await speakLine(speaker, END_LINE, signal))
+        ? { kind: "SPOKEN", path: "MOVE" }
+        : { kind: "INTERRUPTED", path: "MOVE" };
+    }
+    // "Take me to Discover", outside the interview (which reads it itself).
+    if (binding.thread.onboarding === undefined) {
+      const destination = spokenDestination(text);
+      if (destination !== null && destination !== "FORM") {
+        dependencies.board?.record(binding.voiceSessionId, {
+          asking: null,
+          navigate: destination,
+          handoff: null,
+          degraded: false,
+        });
+        return (await speakLine(speaker, destinationLine(destination), signal))
+          ? { kind: "SPOKEN", path: "MOVE" }
+          : { kind: "INTERRUPTED", path: "MOVE" };
+      }
     }
     let outcome: VoiceTurnOutcome;
     if (binding.thread.welcome === true) {
@@ -814,12 +888,15 @@ export function createVoiceTurnHandler(
       held.get(binding) === paused
     ) {
       held.delete(binding);
-      await speakLine(
-        speaker,
-        `And on what you asked earlier: ${paused.text}`,
-        signal,
-        binding,
-      );
+      const unsaid = unsaidPartOf(paused);
+      if (unsaid.length > 0) {
+        await speakLine(
+          speaker,
+          `And to finish what I was saying earlier: ${unsaid}`,
+          signal,
+          binding,
+        );
+      }
     }
     return outcome;
   };

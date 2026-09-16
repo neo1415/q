@@ -53,6 +53,8 @@ export function isResearchProviderFailure(
 /** Cooperative cancellation and the attempt deadline; nothing else. */
 export type ResearchExecutionContext = {
   readonly signal?: AbortSignal | undefined;
+  /** The person asked for a fresh read: any short memory of this query is bypassed and replaced. */
+  readonly freshRead?: boolean | undefined;
 };
 
 /**

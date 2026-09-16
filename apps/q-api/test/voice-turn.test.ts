@@ -1,3 +1,4 @@
+import { FILLERS_RESEARCH } from "../src/voice/navigation.js";
 import { describe, expect, it } from "vitest";
 
 import type {
@@ -601,7 +602,7 @@ describe("a spoken question for Q", () => {
     // The run is not cancelled: the answer finishes in the background.
     await new Promise((resolve) => setTimeout(resolve, 20));
     expect(runtime.calls.cancelRun).toHaveLength(0);
-    // "Go on" speaks the whole answer, from the top.
+    // "Go on" acknowledges the cut and speaks only what was not heard.
     const resumed = await handle(
       bound,
       [
@@ -612,9 +613,10 @@ describe("a spoken question for Q", () => {
       speaker,
     );
     expect(resumed).toEqual({ kind: "SPOKEN", path: "Q" });
-    expect(speaker.spoken.at(-1)).toBe(
-      "First point. Second point. Third point.",
-    );
+    const last = speaker.spoken.at(-1) ?? "";
+    expect(last).toMatch(/Second point\. Third point\.$/);
+    expect(last).not.toContain("First point.");
+    expect(last.length).toBeGreaterThan("Second point. Third point.".length);
     expect(runtime.calls.cancelRun).toHaveLength(0);
   });
 
@@ -661,7 +663,7 @@ describe("a spoken question for Q", () => {
     );
     expect(next).toEqual({ kind: "SPOKEN", path: "MOVE" });
     expect(speaker.spoken.at(-1)).toBe(
-      "And on what you asked earlier: Seed rounds run small. Most close fast.",
+      "And to finish what I was saying earlier: Seed rounds run small. Most close fast.",
     );
   });
 
@@ -696,9 +698,14 @@ describe("a spoken question for Q", () => {
       new AbortController().signal,
       speaker,
     );
-    expect(speaker.spoken).toEqual([
-      "Let me look at public sources. Paystack raised a Series A in 2018.",
-    ]);
+    expect(speaker.spoken).toHaveLength(1);
+    const said = speaker.spoken[0] ?? "";
+    expect(
+      FILLERS_RESEARCH.some((line) =>
+        said.startsWith(`${line} Paystack raised a Series A in 2018.`),
+      ),
+      said,
+    ).toBe(true);
   });
 
   it("speaks a run's public failure and nothing internal", async () => {
@@ -728,8 +735,13 @@ describe("a spoken question for Q", () => {
       new AbortController().signal,
       speaker,
     );
-    expect(speaker.spoken.join(" ")).toBe(
-      "I couldn't answer that right now. Please try again.",
+    // A recovery line in Q's words, never the failure's own message and
+    // never anything internal; it says what Q can still do.
+    const said = speaker.spoken.join(" ");
+    expect(said).not.toContain("I couldn't answer that right now.");
+    expect(said).not.toMatch(/provider|schema|policy|internal/i);
+    expect(said).toMatch(
+      /ask (?:me|it) again|try it another way|tell me what/i,
     );
     expect(runtime.calls.cancelRun).toHaveLength(0);
   });

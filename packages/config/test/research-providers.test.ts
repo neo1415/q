@@ -29,6 +29,7 @@ describe("research provider configuration", () => {
     expect([...RESEARCH_PROVIDER_ENV_NAMES]).toEqual([
       "TAVILY_API_KEY",
       "BRIGHT_DATA_API_KEY",
+      "SERP_API_KEY",
     ]);
     for (const name of RESEARCH_PROVIDER_ENV_NAMES) {
       expect(name.startsWith("NEXT_PUBLIC_")).toBe(false);
@@ -43,6 +44,7 @@ describe("research provider configuration", () => {
       tavily: "unconfigured",
       brightData: "unconfigured",
       brightDataZones: "unconfigured",
+      serpApi: "unconfigured",
     });
     expect(none.secrets.researchProviders.tavily).toBeUndefined();
 
@@ -53,6 +55,7 @@ describe("research provider configuration", () => {
       tavily: "configured",
       brightData: "unconfigured",
       brightDataZones: "unconfigured",
+      serpApi: "unconfigured",
     });
     expect(configured.secrets.researchProviders.tavily?.reveal()).toBe(KEY);
   });

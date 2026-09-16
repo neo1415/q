@@ -16,7 +16,12 @@ import { useFollowTurn } from "../voice/use-follow-turn";
 import { useVoiceInterview } from "../voice/use-voice-interview";
 import { VoiceStage } from "../voice/voice-stage";
 import { QAnswer } from "./q-answer";
-import { failureMessage, turnsFrom, workingLabel } from "./conversation";
+import {
+  failureMessage,
+  recoveryHint,
+  turnsFrom,
+  workingLabel,
+} from "./conversation";
 import { useQConversation } from "./use-q-conversation";
 
 type SpokenLine = {
@@ -116,6 +121,10 @@ export function QConversationPanel({
   // "Take me to my profile", said on Home: followed once Q has said so.
   const voiceEnd = voice.end;
   useFollowTurn(voice.turn, voice.client, (followed) => {
+    if (followed.handoff === "CHAT") {
+      void voiceEnd();
+      return;
+    }
     const path = destinationPath(followed.navigate);
     if (path !== null) {
       void voiceEnd();
@@ -246,7 +255,7 @@ export function QConversationPanel({
 
       {q.state.failure !== null ? (
         <InlineNotice tone="warning" title="Q couldn't finish that">
-          {failureMessage(q.state.failure)}
+          {failureMessage(q.state.failure)} {recoveryHint(q.state.failure)}
         </InlineNotice>
       ) : null}
 

@@ -36,6 +36,9 @@ import {
   createBrightDataProfileLookup,
   createBrightDataResearchProvider,
 } from "@capital-q/q-research/providers/brightdata";
+import { createCachedResearchProvider } from "@capital-q/q-research/providers/cached";
+import { createFallbackResearchProvider } from "@capital-q/q-research/providers/fallback";
+import { createSerpApiResearchProvider } from "@capital-q/q-research/providers/serpapi";
 import { createTavilyResearchProvider } from "@capital-q/q-research/providers/tavily";
 import type { AuthorizationService } from "@capital-q/security";
 
@@ -210,25 +213,46 @@ export function composeResearch(
     securityEvents: createPostgresSecurityEventWriter({ sql }),
   });
 
-  // Search and extraction: Bright Data when its zones are named (a Google
-  // index and an unlocker), else Tavily. Profiles: Bright Data's LinkedIn
-  // datasets need only the key.
+  // Search and extraction: every configured index in a row (Bright Data
+  // when its zones are named, then Tavily, then SerpApi), so one index
+  // being rate-limited costs a second search rather than the answer; and
+  // a short memory in front, so the same page asked for twice is read
+  // once. Profiles: Bright Data's LinkedIn datasets need only the key.
   const brightData = dependencies.secrets.brightData;
-  const provider =
-    dependencies.provider ??
-    (brightData !== undefined &&
+  const indexes = [
+    ...(brightData !== undefined &&
     brightData.serpZone !== undefined &&
     brightData.unlockerZone !== undefined
-      ? createBrightDataResearchProvider({
-          apiKey: brightData.apiKey.reveal(),
-          serpZone: brightData.serpZone,
-          unlockerZone: brightData.unlockerZone,
-        })
-      : dependencies.secrets.tavily === undefined
-        ? undefined
-        : createTavilyResearchProvider({
+      ? [
+          createBrightDataResearchProvider({
+            apiKey: brightData.apiKey.reveal(),
+            serpZone: brightData.serpZone,
+            unlockerZone: brightData.unlockerZone,
+          }),
+        ]
+      : []),
+    ...(dependencies.secrets.tavily === undefined
+      ? []
+      : [
+          createTavilyResearchProvider({
             apiKey: dependencies.secrets.tavily.reveal(),
-          }));
+          }),
+        ]),
+    ...(dependencies.secrets.serpApi === undefined
+      ? []
+      : [
+          createSerpApiResearchProvider({
+            apiKey: dependencies.secrets.serpApi.reveal(),
+          }),
+        ]),
+  ];
+  const provider =
+    dependencies.provider ??
+    (indexes.length === 0
+      ? undefined
+      : createCachedResearchProvider({
+          provider: createFallbackResearchProvider({ providers: indexes }),
+        }));
   const profiles =
     brightData === undefined
       ? undefined

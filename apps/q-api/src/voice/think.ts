@@ -35,7 +35,7 @@ const BodySchema = z
 /** A stream comment every few seconds while a turn is still working. */
 const KEEP_ALIVE_MS = 5_000;
 /** If nothing has been said by then, one short beat so the person knows Q is there. */
-const SLOW_TURN_BEAT_MS = 3_500;
+const SLOW_TURN_BEAT_MS = 6_000;
 const SLOW_TURN_BEAT = "One moment.";
 
 export type VoiceThinkDependencies = {
@@ -156,7 +156,11 @@ export function registerVoiceThinkRoute(
     // stream open, and a short spoken beat lands before the silence
     // gets awkward. At most one beat per turn; nothing when Q is quick.
     const keepAlive = setInterval(() => {
-      if (open && !controller.signal.aborted) raw.write(": keep-alive\n\n");
+      // An empty delta rather than an SSE comment: every OpenAI-shaped
+      // parser accepts it, and the provider's is not ours to test.
+      if (open && !controller.signal.aborted) {
+        raw.write(chunk(id, { content: "" }, null));
+      }
     }, KEEP_ALIVE_MS);
     const beat = setTimeout(() => {
       if (!wroteContent) write(SLOW_TURN_BEAT);

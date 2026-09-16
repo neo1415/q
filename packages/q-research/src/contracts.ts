@@ -133,6 +133,7 @@ export type ResearchProviderFailureClass =
 export const RESEARCH_PROVIDER_CODES = [
   "tavily",
   "brightdata",
+  "serpapi",
   "fake",
 ] as const;
 export type ResearchProviderCode = (typeof RESEARCH_PROVIDER_CODES)[number];

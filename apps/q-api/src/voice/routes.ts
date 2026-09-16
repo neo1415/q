@@ -17,6 +17,7 @@ import { extractBearerToken } from "@capital-q/security/supabase";
 import {
   getActorContext,
   requireActorContextHook,
+  requireActorContextOrPersonalHook,
   type ActorContextDependencies,
 } from "../security/actor-context.js";
 import {
@@ -32,6 +33,7 @@ import type {
 } from "./providers/deepgram.js";
 import type { VoiceTurnBoard } from "./turn-board.js";
 import type { WelcomeHost } from "./welcome.js";
+import type { ApplicationIdentityLookup } from "@capital-q/security/postgres";
 
 /**
  * `POST /v1/q/voice/sessions` (CQ-Q-VOICE-001 C §31, §34; doc 12 §7.2,
@@ -65,13 +67,23 @@ export type QVoiceRoutesDependencies = ActorContextDependencies & {
   /** Q's first minute with a new person. */
   readonly welcome?: WelcomeHost | undefined;
   readonly now?: (() => number) | undefined;
+  /**
+   * When present, a person with no organisation yet may still talk with Q
+   * (arrival, the open thread) under a personal context; the interview and
+   * subject-bound threads resolve their organisation as everywhere else.
+   */
+  readonly identity?: ApplicationIdentityLookup | undefined;
 };
 
 export function registerQVoiceRoutes(
   app: FastifyInstance,
   dependencies: QVoiceRoutesDependencies,
 ): void {
-  const withContext = requireActorContextHook(dependencies);
+  const identity = dependencies.identity;
+  const withContext =
+    identity === undefined
+      ? requireActorContextHook(dependencies)
+      : requireActorContextOrPersonalHook({ ...dependencies, identity });
   const now = dependencies.now ?? Date.now;
   const meter = getMeter("@capital-q/q-api");
   const started = meter.createCounter("q.voice.session.issued", {

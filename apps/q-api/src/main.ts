@@ -99,6 +99,7 @@ import {
 import { createAuthorizationService } from "@capital-q/security";
 import {
   createPostgresActorContextResolver,
+  createPostgresApplicationIdentityLookup,
   createPostgresAuthorizationPolicySource,
 } from "@capital-q/security/postgres";
 import { createSupabaseAccessTokenAuthenticator } from "@capital-q/security/supabase";
@@ -558,6 +559,7 @@ const { app, logger: appLogger } = createApp(
       createSupabaseAccessTokenAuthenticator(supabaseAuth),
     ),
     resolver: createPostgresActorContextResolver({ sql: database.sql }),
+    identity: createPostgresApplicationIdentityLookup({ sql: database.sql }),
   },
   {
     qRuntime,

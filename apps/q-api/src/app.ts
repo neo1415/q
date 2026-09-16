@@ -49,6 +49,8 @@ export const SERVICE_NAME = "q-api";
 export type QApiSecurityDependencies = {
   readonly authenticator: RequestAuthenticator;
   readonly resolver?: QRunRoutesDependencies["resolver"] | undefined;
+  /** Application identity, for the routes a person may use before any organisation. */
+  readonly identity?: QVoiceRoutesDependencies["identity"] | undefined;
 };
 
 /**
@@ -235,6 +237,7 @@ export function createApp(
     registerQVoiceRoutes(app, {
       authenticator: security.authenticator,
       resolver: security.resolver,
+      identity: security.identity,
       provider: modules.voice.provider,
       bindings: modules.voice.bindings,
       interviewer: modules.voice.interviewer,

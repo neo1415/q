@@ -933,6 +933,10 @@ export function QOnboardingWorkspace({
   // once per turn, never twice.
   const voiceEnd = voice.end;
   useFollowTurn(voice.turn, voice.client, (followed) => {
+    if (followed.handoff === "CHAT") {
+      void voiceEnd();
+      return;
+    }
     if (followed.handoff === "FORM" || followed.navigate === "FORM") {
       void voiceEnd();
       const editor =

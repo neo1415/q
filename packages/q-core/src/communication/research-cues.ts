@@ -26,6 +26,26 @@ export const PUBLIC_RESEARCH_CUES: readonly RegExp[] = [
   /\bout there\b/,
   /\bcompetitors?\b/,
   /\breputation\b/,
+  // Market questions are answered from the market, not from memory.
+  /\bmarket\b/,
+  /\bindustry\b/,
+  /\blandscape\b/,
+  /\bbenchmark/,
+  /\bcompar(?:e|ed|ison|able)\b/,
+  /\bcompetition\b/,
+  /\bcompetitive\b/,
+  /\bsimilar (?:companies|startups|businesses|firms)\b/,
+  /\bpeers?\b/,
+  /\bothers? (?:like|doing)\b/,
+  /\bwho else\b/,
+  /\btrends?\b/,
+  /\brate (?:me|us|my|our)\b/,
+  /\bhow do (?:we|i) (?:stack up|compare|rank)\b/,
+  /\binvestors? (?:like|who|that|in|for)\b/,
+  /\bfunds? (?:that|who|investing)\b/,
+  /\bwhat'?s out\b/,
+  /\b(?:their|the) (?:website|site|linkedin|page)\b/,
+  /\bhttps?:\/\/|\bwww\.|\.(?:com|io|ng|co|org|net|ai|africa)\b/,
 ];
 
 export function asksForPublicResearch(question: string): boolean {
