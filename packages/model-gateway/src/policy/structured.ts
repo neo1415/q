@@ -17,6 +17,13 @@ export type StructuredOutcome<T> =
       readonly ok: false;
       /** Which stage refused: a bounded reason, never the model text. */
       readonly stage: "JSON" | "SCHEMA";
+      /**
+       * Which fields the schema refused and why, as field paths and Zod's
+       * own codes. Never a value the model wrote, so this is safe to log
+       * and is the difference between "the model is wrong" and "we are
+       * asking for something this model cannot produce". Bounded.
+       */
+      readonly refusals?: readonly string[];
     };
 
 const FENCE = /^\s*```(?:json)?\s*([\s\S]*?)\s*```\s*$/i;
@@ -34,7 +41,14 @@ export function acceptStructuredOutput<T>(
     return { ok: false, stage: "JSON" };
   }
   const parsed = schema.safeParse(decoded);
-  return parsed.success
-    ? { ok: true, value: parsed.data }
-    : { ok: false, stage: "SCHEMA" };
+  if (parsed.success) {
+    return { ok: true, value: parsed.data };
+  }
+  return {
+    ok: false,
+    stage: "SCHEMA",
+    refusals: parsed.error.issues
+      .slice(0, 8)
+      .map((issue) => `${issue.path.join(".") || "(root)"}:${issue.code}`),
+  };
 }

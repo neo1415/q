@@ -334,6 +334,20 @@ export function createModelGateway(
                 ...(truncated ? { truncated: true } : {}),
               };
               span.setAttribute("q.model.invalid_output_stage", accepted.stage);
+              // The stage, and nothing the model wrote: which step of
+              // acceptance refused it is ours to act on, and it is the
+              // difference between "the model is wrong" and "our schema is
+              // asking for something this model cannot produce".
+              logger?.warn(
+                {
+                  ...labels,
+                  qRunId: request.attribution.qRunId,
+                  stage: accepted.stage,
+                  truncated,
+                  refusals: accepted.refusals ?? [],
+                },
+                "structured output refused",
+              );
               if (truncated) {
                 span.setAttribute("q.model.output_truncated", true);
               }

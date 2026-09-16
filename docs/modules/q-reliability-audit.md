@@ -54,11 +54,22 @@ in under 3 s and the rest as it arrives. No turn is silent for longer than
   specialist.
 - A research turn yields its own first line before the lookup returns.
 
-**Verdict: PARTIAL.** Measured 6.4 s on a no-lookup question after the
-change, down from about 12 s. Under 3 s is not reached.
+**Verdict: PARTIAL**, and close. Measured against the running system: a
+question needing no lookup is now **one** model call and 3.3 to 4.1 s end
+to end, from 6.5 to 8.7 s.
 
-**Gap.** Two model calls still run in sequence for every answer. The
-gathering call is cheap but not free. The remaining lever is A2.
+What actually fixed it was the opposite of the first attempt. Splitting
+"do you need a tool?" onto a small prompt saved almost nothing, because
+what a turn costs is how many calls it makes rather than how large they
+are, and it put 1.5 s in front of every question that needed no tool. The
+round that may reach for a tool now carries the analyst's own prompt and
+writes the answer itself.
+
+The seam now logs where a turn's seconds went. That is how this was
+found: a turn measured at 13 s held 3.4 s of model.
+
+**Gap.** The last second is retrieval (0.4 to 0.9 s) plus a single model
+call. Below 3 s needs A2.
 
 ### A2. Nothing streams
 
@@ -99,9 +110,11 @@ web begins with what it is doing, which is information, not a tic.
 Raised to 4.5 s. Research turns yield their own line first and never reach
 the generic filler.
 
-**Verdict: SOLVED** for the symptom, **PARTIAL** as a design: the threshold
-is a constant tuned against current latency. When A2 lands, a streamed first
-sentence makes the filler nearly unreachable, which is the right end state.
+**Verdict: SOLVED.** 4.5 s was still under the time an answer took, so
+every reply began "Hold on, checking" and a transcript read as Q clearing
+its throat before every sentence. Now 8 s, above the slowest ordinary
+answer. **PARTIAL** as a design: it is a constant tuned against current
+latency, and A2 would retire it.
 
 ---
 
@@ -121,13 +134,12 @@ prompt discipline.
 action". Tool execution is observable through `lastObservation()`. The
 think-route keepalive and slow-turn beat keep a long turn audible.
 
-**Verdict: PARTIAL.** The rule is a prompt instruction. Nothing in code
-detects "Q said it would look something up and no lookup happened".
-
-**Gap.** A deterministic post-check: if the spoken text matches a promise
-pattern and no tool ran for the turn, the turn is a defect. Cheap to add,
-and it converts a prompt hope into a measurable invariant, which is exactly
-the kind of assertion doc 24 says code should make rather than an LLM.
+**Verdict: SOLVED.** An answer that opens by promising to check something
+has that sentence removed before anyone hears it, deterministically
+(`stripEmptyPromises` in q-core, tested). An answer is the checking: the
+promise is redundant when work was done and untrue when it was not. An
+answer that is ONLY a promise is left alone, so the real failure stays
+visible rather than becoming silence.
 
 ### B2. Routing that is announced but slow or wrong
 
@@ -178,9 +190,10 @@ through the Write Gate.
 (`domain/subject-match.ts`), evidence registration, Write Gate writes, and a
 smoke script. Presence triggers exist for companies.
 
-**Verdict: PARTIAL.**
+**Verdict: SOLVED** for the mechanism, **PARTIAL** until a person's
+profile has been read back in a live session.
 
-**Gap.** Traced end to end in this pass. The read-back is four layers, and
+**Gap, traced end to end.** The read-back is four layers, and
 they do not line up for a person:
 
 | Layer                            | Company                        | Person                         |
@@ -196,17 +209,36 @@ they do not line up for a person:
    organisation's understandings were written, gated, stored and then
    dropped on the way to the answer. It now maps all three subject types an
    understanding can be about, with a test.
-2. **No scope reaches a person's understandings** — open, and it is a
-   Context Firewall change, not a retrieval one. A knowledge constraint
-   takes its subject ids from the scope, and the only scope carrying the
-   `organisation_private` label that presence writes at is
-   `EVIDENCE_DOCUMENTS`, whose subject ids are company ids. So a company's
-   public presence does flow back into later answers, and a person's cannot
-   until the firewall grants a scope for a person's own understandings.
-   This is a packet, and it should be done deliberately rather than
-   appended to a long session: the firewall is a Forbidden Shortcut area.
-3. **No person trigger.** Only companies start a presence build, so a
-   question about a named person has no path even once (2) lands.
+2. **No scope reached a person's understandings** — fixed, as a policy
+   change. `OWN_PUBLIC_PRESENCE` is a scope of its own: bound to the
+   subject the plan named, owner side only, never shared, never labelled
+   public or network-visible. Plans are stamped `context-firewall-v2`. A
+   golden test proves the owner sees it and a counterparty holding a
+   network-visible profile does not.
+3. **No person trigger** — fixed. Arrival research now looks up the person
+   who arrived as well as the company they named: their own row only, told
+   apart from namesakes by that company name, never carrying the company's
+   website as their own.
+
+### C3. Refusing what everybody knows
+
+**Symptom.** "I asked who is the president of Nigeria and it still said
+checking." Then, after 13 seconds, it said the question fell outside its
+authorised context.
+
+**Fully solved.** A question that is not about a Capital Q subject is
+answered outright, fast, from what the model knows, labelled as general
+knowledge and never offered as evidence about a subject.
+
+**What exists (fixed in this pass).** Every plan had granted
+`GENERAL_MODEL_KNOWLEDGE` all along and nothing ever told the model so, so
+it read the charter's true rule — general knowledge is never
+company-specific evidence — as "never use general knowledge". The
+permission is now stated when the firewall has granted it, and the
+invariant is untouched.
+
+**Verdict: SOLVED.** Verified live: the question is answered in one model
+call, in about 3.3 s.
 
 ---
 
@@ -258,10 +290,40 @@ than a code defect: three Groq quotas, then Gemini.
 **Fully solved.** Q says so plainly in its own voice and re-offers the
 current step. It does not emit an error string.
 
-**What exists.** A conductor fallback line.
+**What exists.** A conductor fallback line, and a deadline of our own on
+the voice think route (20 s) so the speech provider's patience never runs
+out first. When it did, the person got the provider's failure instead of
+ours: the line died and a banner appeared.
 
-**Verdict: PARTIAL.** See F1: some of these lines still read as error
-messages.
+**Verdict: SOLVED.**
+
+### D4. The line dies and the person is left reading about it
+
+**Symptom.** "All of a sudden it can't think, all of a sudden voice is not
+working, all of a sudden this and that."
+
+**Fully solved.** A failure of the line ends it and picks the person back
+up, on the same conversation, without them doing anything. When it cannot
+be picked back up, Q says so once and stops.
+
+**What exists.** Three defects, all fixed. A speech-agent error set an
+error state and stopped, while a dropped socket healed itself, so a failed
+turn stranded the person behind a banner; both now end the session the
+same way and both reconnect. Reconnection was one attempt per thirty
+seconds with no limit; it is now three tries at widening gaps, reset the
+moment a session comes up, then one plain sentence and a stop. And the
+think route has its own deadline (D3).
+
+**Verdict: SOLVED** for the mechanism.
+
+**Gap worth naming, because it is most of what was happening.** Voice
+bindings are held in memory in the API process and a run is marked "did
+not finish" by a sweep that runs at startup. So every restart of that
+process kills every live voice session and every in-flight run at once.
+In development the process restarts on every rebuild, which is why these
+arrive in threes and feel like crashes. The reconnect above now covers it
+from the person's side. Bindings surviving a restart is a separate piece
+of work and is not done.
 
 ---
 
@@ -318,6 +380,35 @@ solved, only untested.
 
 ---
 
+## F0. Following the conversation
+
+**Symptom.** Q named a company from the discovery slate. Asked "can you
+tell me more about it?", it answered that no company had been named. The
+person asked whether it has context windows at all.
+
+**Fully solved.** A conversation is one thing. What Q said a moment ago is
+available to it, and "it" resolves to whatever is being discussed until
+somebody changes the subject.
+
+**What exists (fixed in this pass).** Two causes, both at the seam where
+they belong.
+
+History was scoped to the RUN. A voice turn is a run of its own, so the
+model was handed the newest sentence and nothing before it: it could not
+see what it had itself just said. History is now the conversation's.
+
+Subjects were never carried. A turn that named nothing arrived with an
+empty subject list, so the firewall planned a conversation about nothing.
+A conversation now keeps its subject until a turn names a different one.
+Inherited subjects are re-resolved on every run and dropped silently when
+they no longer resolve, so a revoked share ends a subject rather than
+failing a question; recording one grants nothing.
+
+**Verdict: SOLVED**, with integration tests for inheritance and for
+changing the subject mid-conversation.
+
+---
+
 ## F. How failure sounds
 
 ### F1. Error messages inside a conversation
@@ -329,14 +420,18 @@ through", "I couldn't get a full review through just now".
 voice, says what is true, and offers the next move. No transport name, no
 failure class, no "please try again" without a reason.
 
-**What exists.** Several of these lines were rewritten this session.
+**What exists.** `plainLineProblems` in q-core states the rule, and a test
+scans the fourteen files that hold person-facing wording and applies it.
+No line may name a supplier, carry a failure class or an HTTP status, use
+our vocabulary rather than the person's, or look like something that
+leaked.
 
-**Verdict: PARTIAL.**
+The line that prompted it was composed at runtime: the base sentence plus
+the speech provider's own failure class in brackets. It is the only
+runtime-composed one in the repository, and it is gone.
 
-**Gap.** There is no single inventory of person-facing failure strings, so
-there is no way to prove the rule holds. A file that owns every one of them,
-with a test asserting no line contains a provider name, a status code or the
-word "error", would make this checkable.
+**Verdict: SOLVED**, and self-enforcing: a new line that breaks the rule
+fails a test rather than reaching somebody.
 
 ### F2. Repeating a question already answered
 
@@ -374,7 +469,15 @@ confirmation, never persisted as fact.
 **What exists.** `packages/q-knowledge` implements the full chain; a
 non-automatic candidate is held for confirmation rather than written.
 
-**Verdict: SOLVED.**
+**Verdict: SOLVED** for the gate. **One hole found and closed beside it.**
+The gate governs whether a candidate may be written; it did not govern
+what the candidate could be ABOUT. The model proposed the knowledge keys
+`user.request`, `user.message` and `user.statement`, and three rows were
+written against a live company whose content was the conversation itself.
+The recordable keys are now a closed namespace and a key outside it is
+refused before anything is written, which is the discipline the presence
+build already had. Rows written before the fix are still there; removing
+them is the owner's call, not a migration's.
 
 ### G2. Editing the profile must update Q's memory
 
@@ -426,9 +529,17 @@ database, not by hiding UI.
 **What exists.** Scope filtering before model invocation; discovery ranking
 is deterministic with no model in the path.
 
-**Verdict: PARTIAL.** The mechanism is right. What is missing is the proof
-doc 24 asks for: positive, cross-tenant-negative and revoked-grant tests on
-the sensitive paths. Until those exist this is asserted, not demonstrated.
+**Verdict: PARTIAL**, and better than the last pass said. The firewall
+integration suite already holds the golden cases doc 24 asks for: founder-
+private to an investor with no hint, investor-private to a founder,
+organisation-private across organisations, relationship-shared to exact
+parties only, an unshared and a nonexistent company indistinguishable, a
+combination reduced to an aggregate, and expiry and revocation honoured at
+evaluation time. The scope added this pass has its own.
+
+**Gap.** Those prove the PLAN. Nothing yet proves the layer below it: that
+a retrieval given a plan cannot return a row outside it, against a real
+database. That is the test still missing.
 
 ### H3. Discovery quality
 
@@ -483,17 +594,27 @@ both themes since the tokens changed.
 
 ## K. What this audit says to do next, in order
 
-1. **A firewall scope for a person's own understandings** (C2, item 2).
-   Retrieval now asks for them; nothing authorises them. Until this lands,
-   the online and personality profile built at arrival is still research
-   performed and thrown away. Highest value per hour of anything on this
-   list, and the one item that needs a real packet rather than a patch.
-2. **Stream the spoken answer** (A2). The only path to the 3 s target, and
-   it retires the filler question permanently.
-3. **A promise without a tool call is a defect** (B1). Small, deterministic,
-   and it turns the most-reported complaint into something a test catches.
-4. **One home for person-facing failure lines, with a test** (F1).
-5. **The firewall tests doc 24 requires** (H2). Release-blocking invariants
-   should not rest on assertion.
-6. **A person trigger for presence** (C2).
-7. **Budgets into the model-ops schema** (I).
+Everything above numbered 1 to 7 in the previous pass is done except the
+first. What remains, in order:
+
+1. **Stream the spoken answer** (A2). The only path below 3 s, and it
+   retires the filler permanently. It needs a streaming method on the
+   provider port, adapters for both providers, and the analyst's prose
+   separated from its structure so a first sentence can leave before the
+   object closes. A real packet.
+2. **Prove the retrieval layer, not just the plan** (H2). The firewall's
+   goldens prove what a plan permits. Nothing yet proves that a retrieval
+   given that plan cannot return a row outside it, against a real
+   database. This is the release-blocking invariant and it is the half
+   still resting on assertion.
+3. **Voice bindings that survive a restart** (D4). Every restart of the
+   API kills every live voice session and marks every in-flight run
+   unfinished. Reconnection now covers it from the person's side; the
+   sessions themselves are still in memory.
+4. **Editing a stated fact updates Q's memory in the same session** (G2).
+   Still open, and it needs the edit surface first.
+5. **Semantic fit, evidence weighting, exploration and precomputed
+   slates** in Discover (H3).
+6. **Per-task budgets as rows rather than constants** (I).
+7. **A recorded set of Nigerian, Ghanaian and Kenyan speakers** (E4), so
+   the recogniser can be measured rather than hoped about.

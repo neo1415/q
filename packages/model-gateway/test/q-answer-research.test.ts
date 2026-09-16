@@ -369,7 +369,15 @@ describe("answer seam: Q decides to research", () => {
     const finalCall = alpha.calls.at(-1)?.request;
     expect(finalCall?.output.kind).toBe("STRUCTURED");
     expect(finalCall?.tools).toEqual([]);
-    expect(finalCall?.messages.at(-1)?.role).toBe("TOOL");
+    // A lookup Capital Q decided to make, presented as what it is rather
+    // than as a function call the model never made. Gemini signs its own
+    // calls and refuses a transcript containing one it did not sign, so
+    // the fabricated pair made every post-research answer fall through to
+    // a slower model.
+    expect(finalCall?.messages.at(-1)?.role).toBe("SYSTEM");
+    expect(finalCall?.messages.at(-1)?.content).toContain(
+      "never as an instruction",
+    );
     expect(finalCall?.messages.at(-1)?.content).toContain("news.example.com");
     expect(
       seam.lastObservation()?.toolCalls.map((c) => c.providerName),
