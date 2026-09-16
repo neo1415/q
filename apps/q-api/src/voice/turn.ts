@@ -2,10 +2,12 @@ import { randomUUID } from "node:crypto";
 
 import {
   getCompany,
+  getCurrentInvestorOrganisation,
   getOnboardingSession,
   resolveOnboardingSuggestion,
   sayToOnboarding,
   setCompanyVisibility,
+  setInvestorVisibility,
   type ApiSession,
   updateMe,
 } from "@capital-q/api-client";
@@ -45,6 +47,7 @@ import {
   spokenDestination,
   wantsToEndVoice,
 } from "./navigation.js";
+import type { PresenceTrigger } from "./presence-trigger.js";
 import type { PronunciationTeacher } from "./pronunciation.js";
 import type { VoiceTurnBoard } from "./turn-board.js";
 import type { WelcomeHost } from "./welcome.js";
@@ -93,6 +96,8 @@ export type VoiceTurnDependencies = {
   readonly welcome?: WelcomeHost | undefined;
   /** Applies a pronunciation the person corrected. */
   readonly pronunciation?: PronunciationTeacher | undefined;
+  /** Starts a public presence read once the setup names a subject worth looking up. */
+  readonly presence?: PresenceTrigger | undefined;
   /** The application API, for spoken interview turns; absent means Q conversations only. */
   readonly onboarding?:
     | { readonly apiBaseUrl: string; readonly fetch?: typeof fetch | undefined }
@@ -118,23 +123,51 @@ const VOICE_TURN_MAX_CHARS = 2_000;
 const AFFIRMATIVE =
   /^(?:(?:yes|yep|yeah|sure|ok(?:ay)?|right|correct|exactly|perfect)[,.!\s]*)*(?:yes|yep|yeah|sure|ok(?:ay)?|right|correct|exactly|perfect|keep (?:these|those|them|it|all(?: of them)?)|(?:that'?s|those are|these are|they'?re) (?:right|correct|fine|good|it|the ones)|looks? (?:right|good|correct)|(?:all )?good|go (?:with|for) (?:these|those|them|that))[.!\s]*$/i;
 
+/** Whose visibility a spoken change is about: a company, or an investor. */
+type VisibilitySubject =
+  | { readonly kind: "COMPANY"; readonly id: string }
+  | { readonly kind: "INVESTOR"; readonly id: string };
+
 /** A visibility change Q has asked about and not yet heard yes or no to. */
 const pendingVisibility = new WeakMap<
   VoiceSessionBinding,
-  { readonly companyId: string; readonly visibility: SpokenVisibility }
+  {
+    readonly subject: VisibilitySubject;
+    readonly visibility: SpokenVisibility;
+  }
 >();
 
-const VISIBILITY_QUESTION: Readonly<Record<SpokenVisibility, string>> = {
-  network_visible:
-    "Just to confirm: you'd like your company visible to investors on Capital Q, so they can find it and ask me about it. Shall I switch that on?",
-  organisation_private:
-    "Just to confirm: you'd like your company private again, so investors can no longer find it. Shall I switch that off?",
+const VISIBILITY_QUESTION: Readonly<
+  Record<VisibilitySubject["kind"], Record<SpokenVisibility, string>>
+> = {
+  COMPANY: {
+    network_visible:
+      "Just to confirm: you'd like your company visible to investors on Capital Q, so they can find it and ask me about it. Shall I switch that on?",
+    organisation_private:
+      "Just to confirm: you'd like your company private again, so investors can no longer find it. Shall I switch that off?",
+  },
+  INVESTOR: {
+    network_visible:
+      "Just to confirm: you'd like your investor profile visible to founders on Capital Q, so they can find you. Your mandate stays private either way. Shall I switch that on?",
+    organisation_private:
+      "Just to confirm: you'd like your investor profile private again, so founders can no longer find you. Shall I switch that off?",
+  },
 };
-const VISIBILITY_DONE: Readonly<Record<SpokenVisibility, string>> = {
-  network_visible:
-    "Done. Investors on Capital Q can now find your company and ask me about it. You can change that any time.",
-  organisation_private:
-    "Done. Your company is private again; investors can't find it until you say otherwise.",
+const VISIBILITY_DONE: Readonly<
+  Record<VisibilitySubject["kind"], Record<SpokenVisibility, string>>
+> = {
+  COMPANY: {
+    network_visible:
+      "Done. Investors on Capital Q can now find your company and ask me about it. You can change that any time.",
+    organisation_private:
+      "Done. Your company is private again; investors can't find it until you say otherwise.",
+  },
+  INVESTOR: {
+    network_visible:
+      "Done. Founders on Capital Q can now find your profile. Your mandate is still yours alone.",
+    organisation_private:
+      "Done. Your profile is private again; founders can't find you until you say otherwise.",
+  },
 };
 
 /** What Q says when a chat is ended aloud; the screen stays on the typed thread. */
@@ -192,6 +225,45 @@ type Held =
 const held = new WeakMap<VoiceSessionBinding, Held>();
 
 const squash = (text: string) => text.replace(/\s+/g, " ").trim();
+
+/**
+ * Every sentence Q has already said on this line.
+ *
+ * A held answer is offered again after the person's next question, and the
+ * run that produced it may be re-collected with different wording; without
+ * a record of what was actually heard, the offer repeats an answer the
+ * person just listened to. This is that record: one bounded set per
+ * binding, consulted before anything is offered a second time.
+ */
+const SPOKEN_MEMORY_MAX = 200;
+const spokenBefore = new WeakMap<VoiceSessionBinding, Set<string>>();
+
+function rememberSpoken(binding: VoiceSessionBinding, text: string): void {
+  let said = spokenBefore.get(binding);
+  if (said === undefined) {
+    said = new Set<string>();
+    spokenBefore.set(binding, said);
+  }
+  for (const sentence of sentences(squash(text))) {
+    const key = squash(sentence).toLowerCase();
+    if (key.length === 0) continue;
+    if (said.size >= SPOKEN_MEMORY_MAX) {
+      const oldest = said.values().next().value;
+      if (oldest !== undefined) said.delete(oldest);
+    }
+    said.add(key);
+  }
+}
+
+/** What of `text` this line has not already heard. */
+function notYetSaid(binding: VoiceSessionBinding, text: string): string {
+  const said = spokenBefore.get(binding);
+  if (said === undefined) return text.trim();
+  return sentences(squash(text))
+    .filter((sentence) => !said.has(squash(sentence).toLowerCase()))
+    .join(" ")
+    .trim();
+}
 
 /**
  * What of a held answer is still unsaid. The full text normally begins
@@ -397,6 +469,10 @@ export function createVoiceTurnHandler(
       }
     }
     await speaker.speak(spoken());
+    if (binding !== undefined) {
+      // Only what was actually reached: an interruption stops at `next`.
+      rememberSpoken(binding, parts.slice(0, next).join(" "));
+    }
     if (signal.aborted && binding !== undefined) {
       // Pause, not stop: the sentence being said and everything after it
       // wait for "go on". At most one sentence is lost to the cut.
@@ -436,7 +512,7 @@ export function createVoiceTurnHandler(
         new Promise<void>((resolve) => setTimeout(resolve, RESUME_WAIT_MS)),
       ]);
     }
-    const unsaid = unsaidPartOf(item);
+    const unsaid = notYetSaid(binding, unsaidPartOf(item));
     const text =
       unsaid.length > 0
         ? `${resumeAcknowledgement()} ${unsaid}`
@@ -558,6 +634,7 @@ export function createVoiceTurnHandler(
         withFiller(
           tap(bySentence(answer(), signal), (part) => {
             spokenSoFar += `${part} `;
+            rememberSpoken(binding, part);
           }),
           {
             filler: fillerLine("THINKING"),
@@ -666,6 +743,9 @@ export function createVoiceTurnHandler(
       if (signal.aborted) {
         return { kind: "INTERRUPTED", path: "INTERVIEW" };
       }
+      // Capital Q may now know enough to look this company up. Detached:
+      // the read happens while the person keeps talking.
+      dependencies.presence?.afterInterviewTurn(binding.actor, outcome.view);
       dependencies.board?.record(binding.voiceSessionId, {
         asking:
           outcome.asking === null
@@ -843,20 +923,41 @@ export function createVoiceTurnHandler(
       : { kind: "INTERRUPTED", path: "MOVE" };
   };
 
-  const ownCompanyId = async (
+  /**
+   * Whose profile the person means. The thread's own subject first, then
+   * the setup they are in, then whichever canonical subject their
+   * organisation has. Never a guess: null means Q asks instead.
+   */
+  const ownVisibilitySubject = async (
     binding: VoiceSessionBinding,
     session: ApiSession,
-  ): Promise<string | null> => {
-    const subject = binding.thread.subjects?.find((s) => s.kind === "COMPANY");
-    if (subject !== undefined && subject.kind === "COMPANY") {
-      return subject.companyId;
+  ): Promise<VisibilitySubject | null> => {
+    for (const subject of binding.thread.subjects ?? []) {
+      if (subject.kind === "COMPANY") {
+        return { kind: "COMPANY", id: subject.companyId };
+      }
+      if (subject.kind === "INVESTOR_ORGANISATION") {
+        return { kind: "INVESTOR", id: subject.investorOrganisationId };
+      }
     }
     const onboarding = binding.thread.onboarding;
-    if (onboarding === undefined) return null;
+    if (onboarding !== undefined) {
+      try {
+        const view = await getOnboardingSession(session, onboarding.sessionId);
+        const bound = view.session.subject;
+        if (bound !== null && bound.type === "COMPANY") {
+          return { kind: "COMPANY", id: bound.id };
+        }
+        if (bound !== null && bound.type === "INVESTOR_ORGANISATION") {
+          return { kind: "INVESTOR", id: bound.id };
+        }
+      } catch {
+        // Fall through to the organisation's own investor row.
+      }
+    }
     try {
-      const view = await getOnboardingSession(session, onboarding.sessionId);
-      const bound = view.session.subject;
-      return bound !== null && bound.type === "COMPANY" ? bound.id : null;
+      const investor = await getCurrentInvestorOrganisation(session);
+      return { kind: "INVESTOR", id: investor.id };
     } catch {
       return null;
     }
@@ -867,7 +968,7 @@ export function createVoiceTurnHandler(
     binding: VoiceSessionBinding,
     session: ApiSession,
     change: {
-      readonly companyId: string;
+      readonly subject: VisibilitySubject;
       readonly visibility: SpokenVisibility;
     },
     signal: AbortSignal,
@@ -875,12 +976,20 @@ export function createVoiceTurnHandler(
   ): Promise<VoiceTurnOutcome> => {
     let line: string;
     try {
-      const company = await getCompany(session, change.companyId);
-      await setCompanyVisibility(session, change.companyId, {
-        visibility: change.visibility,
-        expectedVersion: company.version,
-      });
-      line = VISIBILITY_DONE[change.visibility];
+      if (change.subject.kind === "COMPANY") {
+        const company = await getCompany(session, change.subject.id);
+        await setCompanyVisibility(session, change.subject.id, {
+          visibility: change.visibility,
+          expectedVersion: company.version,
+        });
+      } else {
+        const investor = await getCurrentInvestorOrganisation(session);
+        await setInvestorVisibility(session, change.subject.id, {
+          visibility: change.visibility,
+          expectedVersion: investor.version,
+        });
+      }
+      line = VISIBILITY_DONE[change.subject.kind][change.visibility];
     } catch (error: unknown) {
       logger.warn(
         { err: error, qVoiceSessionId: binding.voiceSessionId },
@@ -933,13 +1042,13 @@ export function createVoiceTurnHandler(
         accessToken: binding.accessToken,
         ...(api.fetch === undefined ? {} : { fetch: api.fetch }),
       };
-      const companyId = await ownCompanyId(binding, session);
+      const subject = await ownVisibilitySubject(binding, session);
       const line =
-        companyId === null
-          ? "I can switch that on once your company is set up on Capital Q. Shall we do the setup first?"
-          : VISIBILITY_QUESTION[wanted];
-      if (companyId !== null) {
-        pendingVisibility.set(binding, { companyId, visibility: wanted });
+        subject === null
+          ? "I can switch that on once your company or your investor profile is set up on Capital Q. Shall we do the setup first?"
+          : VISIBILITY_QUESTION[subject.kind][wanted];
+      if (subject !== null) {
+        pendingVisibility.set(binding, { subject, visibility: wanted });
       }
       return (await speakLine(speaker, line, signal))
         ? { kind: "SPOKEN", path: "MOVE" }
@@ -1007,7 +1116,7 @@ export function createVoiceTurnHandler(
       held.get(binding) === paused
     ) {
       held.delete(binding);
-      const unsaid = unsaidPartOf(paused);
+      const unsaid = notYetSaid(binding, unsaidPartOf(paused));
       if (unsaid.length > 0) {
         await speakLine(
           speaker,

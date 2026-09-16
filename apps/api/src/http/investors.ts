@@ -1,8 +1,10 @@
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import {
   InvestorOrganisationIdSchema,
+  isInvestorNetworkVisible,
   toInvestorOrganisationDto,
   toInvestorRepresentativeDto,
+  toNetworkVisibleInvestorProfile,
   type InvestorOrganisationId,
   type InvestorService,
 } from "@capital-q/investors";
@@ -11,12 +13,16 @@ import {
   CreateInvestorOrganisationRequestSchema,
   IDEMPOTENCY_KEY_HEADER,
   IdempotencyKeyHeaderSchema,
+  INVESTOR_NETWORK_PREVIEW_SEGMENT,
   INVESTOR_REPRESENTATIVE_ME_SUFFIX,
+  INVESTOR_VISIBILITY_SEGMENT,
   INVESTORS_CURRENT_PATH,
   INVESTORS_PATH,
+  InvestorNetworkPreviewSchema,
   InvestorOrganisationDtoSchema,
   InvestorRepresentativeDtoSchema,
   parseContract,
+  SetInvestorVisibilityRequestSchema,
   UpdateInvestorOrganisationRequestSchema,
   UpsertMyInvestorRepresentativeRequestSchema,
   type CorrelationId,
@@ -142,6 +148,48 @@ export function registerInvestorRoutes(
       toInvestorOrganisationDto(investor),
     );
   });
+
+  // Who may see the declared investor profile. An intentional act by an
+  // editor, never a side effect of a mandate being activated.
+  app.post(
+    `${byId}${INVESTOR_VISIBILITY_SEGMENT}`,
+    { onRequest: withContext },
+    async (request, reply) => {
+      const input = parseContract(
+        SetInvestorVisibilityRequestSchema,
+        request.body,
+        "The visibility request is not valid.",
+      );
+      const investor = await service.setInvestorVisibility({
+        actor: getActorContext(request),
+        investorOrganisationId: investorIdParam(request),
+        input,
+        correlationId: correlation(),
+      });
+      void reply.header("Cache-Control", "no-store");
+      return InvestorOrganisationDtoSchema.parse(
+        toInvestorOrganisationDto(investor),
+      );
+    },
+  );
+
+  // What founders across the network see, returned to the investor as a
+  // preview of their own row. The projection is the allowlist.
+  app.get(
+    `${byId}${INVESTOR_NETWORK_PREVIEW_SEGMENT}`,
+    { onRequest: withContext },
+    async (request, reply) => {
+      const investor = await service.getInvestorOrganisation({
+        actor: getActorContext(request),
+        investorOrganisationId: investorIdParam(request),
+      });
+      void reply.header("Cache-Control", "no-store");
+      return InvestorNetworkPreviewSchema.parse({
+        ...toNetworkVisibleInvestorProfile(investor),
+        networkVisible: isInvestorNetworkVisible(investor.visibility),
+      });
+    },
+  );
 
   app.get(
     `${byId}${INVESTOR_REPRESENTATIVE_ME_SUFFIX}`,

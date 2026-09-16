@@ -301,10 +301,17 @@ never shows the cue.
 "Make me visible to investors" / "make us private" (`spokenVisibility`
 in `voice/navigation.ts`): Q asks one confirming question, the spoken
 yes is the approval of that exact change, and the platform's own
-visibility API (`POST /v1/companies/:id/visibility`) performs it under
-the person's authority; a no leaves things as they are. The company is
-the thread's subject or the setup's bound company; without one Q offers
-the setup first. Investor organisations have no visibility choice yet.
+visibility API performs it under the person's authority; a no leaves
+things as they are.
+
+Both sides of the network have the switch and Q works out which one it is
+holding: the thread's subject, then the setup's bound subject, then the
+organisation's own investor row (`ownVisibilitySubject`). A founder
+publishes a company through `POST /v1/companies/:id/visibility`; an
+investor publishes the declared investor profile through
+`POST /v1/investors/:id/visibility`. Becoming visible as an investor
+exposes the declared profile only — never the mandate, the portfolio or
+anything observed. Without a subject at all Q offers the setup first.
 
 ## Q speaks first
 

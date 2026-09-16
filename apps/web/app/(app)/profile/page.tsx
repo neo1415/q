@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 
+import { buttonClassName } from "@capital-q/ui/button";
 import { ContextIndicator } from "@capital-q/ui/context-indicator";
 
 import { getCurrentIdentity } from "@/auth/current-identity";
@@ -55,6 +57,14 @@ export default async function ProfilePage() {
         </ProfileRow>
       </dl>
       <div className="flex flex-col gap-4 pt-5">
+        <div>
+          <Link
+            href="/company/visibility"
+            className={buttonClassName("secondary", "regular")}
+          >
+            Visibility &amp; Discovery
+          </Link>
+        </div>
         <p className="cq-body-sm text-(--cq-text-secondary)">
           Verification and organisation membership are managed by Capital Q and
           appear here once they exist.

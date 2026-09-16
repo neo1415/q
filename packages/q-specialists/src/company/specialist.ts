@@ -436,41 +436,48 @@ export function createCompanyIntelligenceSpecialist(
         );
       }
 
-      // ---- 2b. public-web research, only when asked for -------------------
-      // (CQ-Q-RESEARCH-001 §24-§26.) Decided here, deterministically, from
-      // the person's own words; the model never chooses to reach outside
-      // Capital Q. The Tool Registry authorises the read under this run's
-      // plan and the research capability composes what leaves. What comes
-      // back is unverified public text, handled as data from here on.
-      let researchRead: CompanyResearchRead | null = null;
-      if (research !== undefined && asksForPublicResearch(request.question)) {
+      // ---- 2b + 3. public-web research and authorised retrieval ----------
+      // (CQ-Q-RESEARCH-001 §24-§26; §17.) Two independent reads of two
+      // different stores, started together: the web call is seconds of
+      // network the retrieval does not need to wait for, and waiting for
+      // it in turn was most of what a person experienced as Q being slow.
+      // Neither influences the other's input, so concurrency changes the
+      // clock and nothing else. Research is decided here, deterministically,
+      // from the person's own words; the model never chooses to reach
+      // outside Capital Q. What comes back is unverified public text,
+      // handled as data from here on. The retrieval query is the person's
+      // own words, with no model spent rewriting it — one fewer place for
+      // an injected instruction to be laundered into a search.
+      const wantsResearch =
+        research !== undefined && asksForPublicResearch(request.question);
+      if (wantsResearch) {
         await context.showStage?.("SEARCHING_PUBLIC_SOURCES");
-        researchRead = await research.research(toolContext, {
-          companyId,
-          question: request.question,
-        });
+      }
+      const researching: Promise<CompanyResearchRead | null> = wantsResearch
+        ? research.research(toolContext, {
+            companyId,
+            question: request.question,
+          })
+        : Promise.resolve(null);
+      const retrieving = evidence.search(
+        context.plan,
+        request.question,
+        context.signal,
+      );
+      const [researchRead, hits] = await Promise.all([researching, retrieving]);
+      if (researchRead !== null) {
         telemetry = {
           ...telemetry,
           researchCalls: 1,
           publicSourceCount: researchRead.sources.length,
           toolCalls: telemetry.toolCalls + researchRead.toolCalls,
         };
-        if (cancelled()) {
-          return finish(
-            blockedResult(companyId, "CANCELLED", asOfStamp, telemetry),
-          );
-        }
       }
-
-      // ---- 3. authorised hybrid retrieval (§17) --------------------------
-      // One search, with the person's own words. No model is spent
-      // rewriting the query: a deterministic query is one fewer place for
-      // an injected instruction to be laundered into a search.
-      const hits = await evidence.search(
-        context.plan,
-        request.question,
-        context.signal,
-      );
+      if (cancelled()) {
+        return finish(
+          blockedResult(companyId, "CANCELLED", asOfStamp, telemetry),
+        );
+      }
       telemetry = { ...telemetry, retrievalCalls: 1 };
 
       const assembled = assembleCompanyContext({

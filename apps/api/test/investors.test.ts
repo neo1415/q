@@ -69,6 +69,7 @@ const INVESTOR_A: InvestorOrganisation = {
   publicDescription: null,
   verificationState: "unverified",
   deploymentState: null,
+  visibility: "organisation_private",
   version: 1,
   createdAt: NOW,
   updatedAt: NOW,

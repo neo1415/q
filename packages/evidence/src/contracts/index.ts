@@ -72,7 +72,12 @@ export type EvidenceItemId = z.infer<typeof EvidenceItemIdSchema>;
  * typed query port are listed; a subject id is resolved through the
  * registry before anything is written and never through dynamic SQL.
  */
-export const EVIDENCE_SUBJECT_TYPES = ["COMPANY"] as const;
+export const EVIDENCE_SUBJECT_TYPES = [
+  "COMPANY",
+  /** A person on Capital Q, as themselves. Their own organisation owns it. */
+  "PERSON",
+  "INVESTOR_ORGANISATION",
+] as const;
 export const EvidenceSubjectTypeSchema = z.enum(EVIDENCE_SUBJECT_TYPES);
 export type EvidenceSubjectType = z.infer<typeof EvidenceSubjectTypeSchema>;
 

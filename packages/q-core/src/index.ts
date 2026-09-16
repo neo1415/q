@@ -74,6 +74,17 @@ export {
 export { COMPANY_ANALYST_V1 } from "./prompts/tasks/company-analyst.v1.js";
 export { INTERVIEW_CONDUCTOR_V1 } from "./prompts/tasks/interview-conductor.v1.js";
 export { WELCOME_CONDUCTOR_V1 } from "./prompts/tasks/welcome-conductor.v1.js";
+export { PRESENCE_READER_V1 } from "./prompts/tasks/presence-reader.v1.js";
+export {
+  PRESENCE_KEY_VALUES,
+  PRESENCE_READER_SCHEMA_NAME,
+  PRESENCE_READER_SCHEMA_VERSION,
+  PRESENCE_READER_UNTRUSTED,
+  PresenceReaderResultSchema,
+  PresenceReaderVariablesSchema,
+  type PresenceReaderResult,
+  type PresenceReaderVariables,
+} from "./prompts/schemas/presence-reader.js";
 export {
   WELCOME_CONDUCTOR_SCHEMA_NAME,
   WELCOME_CONDUCTOR_SCHEMA_VERSION,

@@ -188,4 +188,14 @@ export {
 } from "./application/portfolio-use-cases.js";
 export { createPostgresInvestorPortfolioReferenceRepository } from "./infrastructure/postgres-portfolio-repository.js";
 
+export {
+  INVESTOR_VISIBILITY_CHOICES,
+  isInvestorNetworkVisible,
+  toNetworkVisibleInvestorProfile,
+  type InvestorVisibilityChoice,
+  type NetworkVisibleInvestorProfile,
+} from "./domain/network-projection.js";
+export type { SetInvestorVisibilityCommand } from "./application/set-investor-visibility.js";
+export { createSetInvestorVisibility } from "./application/set-investor-visibility.js";
+
 export const PACKAGE_NAME = "@capital-q/investors" as const;

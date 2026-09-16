@@ -147,6 +147,56 @@ export type UpdateInvestorOrganisationRequest = z.infer<
  * The organisation-internal investor profile. Verification state is
  * reported read-only; tenant, organisation and membership stay internal.
  */
+/**
+ * Who may see the declared investor profile. The same two states a founder
+ * chooses for a company, for the same reasons (doc 19 §44): private to the
+ * organisation, or visible to authenticated Capital Q participants.
+ */
+export const INVESTOR_VISIBILITY_SEGMENT = "/visibility" as const;
+export const INVESTOR_NETWORK_PREVIEW_SEGMENT = "/network-preview" as const;
+
+export const InvestorVisibilityChoiceSchema = z.enum([
+  "organisation_private",
+  "network_visible",
+]);
+export type InvestorVisibilityChoice = z.infer<
+  typeof InvestorVisibilityChoiceSchema
+>;
+
+export const SetInvestorVisibilityRequestSchema = z
+  .object({
+    visibility: InvestorVisibilityChoiceSchema,
+    expectedVersion: ResourceVersionSchema,
+  })
+  .strict();
+export type SetInvestorVisibilityRequest = z.infer<
+  typeof SetInvestorVisibilityRequestSchema
+>;
+
+/**
+ * What a founder across the network sees of an investor: the declared
+ * profile and nothing else. No mandate, no portfolio, no observed
+ * behaviour, no browsing history, no GateQ state and no score — doc 19
+ * §204.9 forbids private investor behaviour reaching a founder through
+ * discovery, and this shape has nowhere to put it.
+ */
+export const InvestorNetworkPreviewSchema = z
+  .object({
+    investorOrganisationId: UuidSchema,
+    displayName: z.string(),
+    investorType: InvestorTypeSchema,
+    websiteUrl: z.string().nullable(),
+    hqCountry: z.string().nullable(),
+    publicDescription: z.string().nullable(),
+    deploymentState: InvestorDeploymentStateSchema.nullable(),
+    /** True when founders across the network can currently reach this profile. */
+    networkVisible: z.boolean(),
+  })
+  .strict();
+export type InvestorNetworkPreview = z.infer<
+  typeof InvestorNetworkPreviewSchema
+>;
+
 export const InvestorOrganisationDtoSchema = z.object({
   id: UuidSchema,
   investorType: InvestorTypeSchema,
@@ -156,6 +206,8 @@ export const InvestorOrganisationDtoSchema = z.object({
   publicDescription: z.string().nullable(),
   deploymentState: InvestorDeploymentStateSchema.nullable(),
   verificationState: InvestorVerificationStateSchema,
+  /** Who may see this profile. Changed only through the visibility route. */
+  visibility: InvestorVisibilityChoiceSchema,
   version: ResourceVersionSchema,
   createdAt: UtcTimestampSchema,
   updatedAt: UtcTimestampSchema,

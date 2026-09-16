@@ -145,11 +145,15 @@ export async function HomeScreen() {
           </PageSection>
         ) : null}
 
-        {context.kind === "FOUNDER" ? (
+        {context.kind !== "NONE" ? (
           <PageSection
             id="visibility"
             title="Visibility & Discovery"
-            description="Who can see your company, what investors would see, and whether they can find you. Nothing becomes visible until you choose."
+            description={
+              context.kind === "INVESTOR"
+                ? "Who can see your investor profile, what founders would see, and whether they can find you. Nothing becomes visible until you choose."
+                : "Who can see your company, what investors would see, and whether they can find you. Nothing becomes visible until you choose."
+            }
           >
             <div>
               <Link

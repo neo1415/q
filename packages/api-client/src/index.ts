@@ -52,6 +52,8 @@ export {
 export {
   createInvestorOrganisation,
   getCurrentInvestorOrganisation,
+  getInvestorNetworkPreview,
+  setInvestorVisibility,
   getInvestorOrganisation,
   getMyInvestorRepresentative,
   updateInvestorOrganisation,

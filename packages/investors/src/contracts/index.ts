@@ -15,6 +15,9 @@ import type {
   TenantId,
   UserId,
 } from "@capital-q/security";
+import type { InvestorVisibilityChoice } from "../domain/network-projection.js";
+
+export type { InvestorVisibilityChoice };
 
 /**
  * @capital-q/investors/contracts
@@ -66,6 +69,8 @@ export type InvestorOrganisation = {
   readonly verificationState: InvestorVerificationState;
   /** `null` is unknown (not yet answered); never paused, never active. */
   readonly deploymentState: InvestorDeploymentState | null;
+  /** Who may see the declared profile (default organisation_private). */
+  readonly visibility: InvestorVisibilityChoice;
   readonly version: number;
   readonly createdAt: UtcTimestamp;
   readonly updatedAt: UtcTimestamp;
@@ -118,6 +123,7 @@ export function toInvestorOrganisationDto(
     publicDescription: investor.publicDescription,
     deploymentState: investor.deploymentState,
     verificationState: investor.verificationState,
+    visibility: investor.visibility,
     version: investor.version,
     createdAt: investor.createdAt,
     updatedAt: investor.updatedAt,

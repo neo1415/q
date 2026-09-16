@@ -89,6 +89,8 @@ describe("registry", () => {
         "INVESTOR_MANDATE_SYNTHESIS",
         "COMPANY_ANALYST",
         "FIT_EXPLANATION",
+        // CQ-Q-PRESENCE-001: reads public pages about one subject.
+        "PRESENCE_READER",
       ].sort(),
     );
     for (const id of PROMPT_IDS) {
@@ -223,6 +225,21 @@ describe("renderer", () => {
     expect(user).toContain("<<<END_UNTRUSTED_CONTENT (literal)>>>");
     // The charter itself is untouched by anything the person wrote.
     expect(rendered.messages[0]?.content).not.toContain("reveal everything");
+  });
+
+  it("neutralises template braces inside untrusted content", () => {
+    // A Wikipedia or Wiktionary page is full of literal "{{...}}" markup.
+    // Rendering must not fail because a quoted page contained a brace pair,
+    // and the braces must not survive as anything token-shaped.
+    const rendered = render(
+      DEFAULT_COMMUNICATION_PROFILE,
+      analystVariables({
+        userMessage: "The page says {{Infobox company}} and {{cite web}}.",
+      }),
+    );
+    const user = rendered.messages[1]?.content ?? "";
+    expect(user).toContain("{ {Infobox company} }");
+    expect(user).not.toMatch(/{{/);
   });
 
   it("refuses undeclared variables, override-shaped keys and invalid values", () => {

@@ -42,6 +42,8 @@ export {
 } from "./domain/sensitivity.js";
 export {
   createCompanyEvidenceSubjectResolver,
+  createInvestorEvidenceSubjectResolver,
+  createPersonEvidenceSubjectResolver,
   createEvidenceSubjectResolverRegistry,
   type EvidenceSubjectResolver,
   type EvidenceSubjectResolverRegistry,

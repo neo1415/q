@@ -43,6 +43,8 @@ import {
   InvestorOrganisationNotFoundError,
   InvestorRepresentativeNotFoundError,
   InvestorVersionConflictError,
+  isInvestorNetworkVisible,
+  toNetworkVisibleInvestorProfile,
   type InvestorService,
 } from "../src/index.js";
 
@@ -845,6 +847,117 @@ describe("@capital-q/investors against local PostgreSQL", () => {
   // -------------------------------------------------------------------------
   // Representatives
   // -------------------------------------------------------------------------
+
+  it("an editor publishes the declared investor profile to founders and takes it back; a member cannot; the projection carries the profile and nothing else", async () => {
+    await withWorld(async ({ tx, service, resolve, adminA, memberA }) => {
+      const admin = await resolve(adminA.principal);
+      const investor = await service.createInvestorOrganisation({
+        actor: admin,
+        input: request({ deploymentState: "ACTIVELY_INVESTING" }),
+        idempotencyKey: "visibility-a",
+        correlationId: CORRELATION(),
+      });
+      // Private is the default: becoming findable is always a decision.
+      expect(investor.visibility).toBe("organisation_private");
+
+      const correlationId = CORRELATION();
+      const visible = await service.setInvestorVisibility({
+        actor: admin,
+        investorOrganisationId: investor.id,
+        input: { visibility: "network_visible", expectedVersion: 1 },
+        correlationId,
+      });
+      expect(visible.visibility).toBe("network_visible");
+      expect(visible.version).toBe(2);
+
+      const audits = await tx.sql<{ action_type: string; metadata: unknown }[]>`
+        select action_type, metadata from audit.material_actions
+         where correlation_id = ${correlationId.slice(4)}::uuid`;
+      expect(audits).toHaveLength(1);
+      expect(audits[0]?.action_type).toBe(
+        "investor_organisation.visibility_changed",
+      );
+      expect(audits[0]?.metadata).toEqual({
+        previousVisibility: "organisation_private",
+        visibility: "network_visible",
+        previousVersion: 1,
+        newVersion: 2,
+      });
+
+      const events = await tx.sql<
+        { event_type: string; payload: { data: unknown } }[]
+      >`select event_type, payload from events.outbox
+          where payload ->> 'correlationId' = ${correlationId}`;
+      expect(events).toHaveLength(1);
+      expect(events[0]?.event_type).toBe(
+        "core.investor_organisation.visibility_changed",
+      );
+      expect(events[0]?.payload.data).toEqual({
+        investorOrganisationId: investor.id,
+        version: 2,
+        visibility: "network_visible",
+      });
+
+      // What a founder would see: the declared profile, and nothing that
+      // could carry a mandate, a portfolio or anything observed.
+      const projection = toNetworkVisibleInvestorProfile(visible);
+      expect(Object.keys(projection).sort()).toEqual([
+        "deploymentState",
+        "displayName",
+        "hqCountry",
+        "investorOrganisationId",
+        "investorType",
+        "publicDescription",
+        "websiteUrl",
+      ]);
+      expect(isInvestorNetworkVisible(visible.visibility)).toBe(true);
+
+      // The same request again is idempotent, not a version conflict.
+      const again = await service.setInvestorVisibility({
+        actor: admin,
+        investorOrganisationId: investor.id,
+        input: { visibility: "network_visible", expectedVersion: 2 },
+        correlationId: CORRELATION(),
+      });
+      expect(again.version).toBe(2);
+
+      // Taken back.
+      const hidden = await service.setInvestorVisibility({
+        actor: admin,
+        investorOrganisationId: investor.id,
+        input: { visibility: "organisation_private", expectedVersion: 2 },
+        correlationId: CORRELATION(),
+      });
+      expect(hidden.visibility).toBe("organisation_private");
+      expect(isInvestorNetworkVisible(hidden.visibility)).toBe(false);
+
+      // A stale version changes nothing.
+      await expect(
+        service.setInvestorVisibility({
+          actor: admin,
+          investorOrganisationId: investor.id,
+          input: { visibility: "network_visible", expectedVersion: 1 },
+          correlationId: CORRELATION(),
+        }),
+      ).rejects.toBeInstanceOf(InvestorVersionConflictError);
+
+      // An ordinary member cannot decide who sees the organisation.
+      await expect(
+        service.setInvestorVisibility({
+          actor: await resolve(memberA.principal),
+          investorOrganisationId: investor.id,
+          input: { visibility: "network_visible", expectedVersion: 3 },
+          correlationId: CORRELATION(),
+        }),
+      ).rejects.toBeInstanceOf(AuthorizationDeniedError);
+
+      const unchanged = await service.getInvestorOrganisation({
+        actor: admin,
+        investorOrganisationId: investor.id,
+      });
+      expect(unchanged.visibility).toBe("organisation_private");
+    });
+  });
 
   it("five members of one organisation each represent it: one investor organisation, five representatives, no role change, titles grant nothing", async () => {
     await withWorld(

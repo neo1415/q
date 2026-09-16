@@ -3,12 +3,18 @@ import {
   createPostgresSecurityEventWriter,
 } from "@capital-q/audit";
 import { createPostgresCompanyQueryPort } from "@capital-q/companies";
+import {
+  InvestorOrganisationIdSchema,
+  type InvestorOrganisationQueryPort,
+} from "@capital-q/investors";
 import type { ResearchProviderSecrets } from "@capital-q/config/research-providers";
 import { createEventRegistry } from "@capital-q/contracts";
 import type { DatabaseExecutor, TransactionManager } from "@capital-q/database";
 import { createOutboxWriter } from "@capital-q/eventing";
 import {
   createCompanyEvidenceSubjectResolver,
+  createInvestorEvidenceSubjectResolver,
+  createPersonEvidenceSubjectResolver,
   createEvidenceService,
   createEvidenceSubjectResolverRegistry,
   createPostgresEvidenceRepositories,
@@ -21,6 +27,7 @@ import type { Logger } from "@capital-q/observability";
 import {
   createConversationStatementRecorder,
   createKnowledgeWriteGate,
+  type KnowledgeWriteGate,
   createPostgresContradictionRepository,
   createPostgresKnowledgeRepository,
   type StatementEvidencePort,
@@ -57,6 +64,10 @@ import type { AuthorizationService } from "@capital-q/security";
 export type ResearchComposition = {
   /** Absent when no provider is configured: the research tools do not exist. */
   readonly research: PublicWebResearchService | undefined;
+  /** The Evidence owner these tools record through; shared, never rebuilt. */
+  readonly evidence: EvidenceService;
+  /** The Knowledge Write Gate the same material is held behind. */
+  readonly gate: KnowledgeWriteGate;
   /** Public LinkedIn pages by URL; absent without a Bright Data key. */
   readonly profiles: PublicProfileLookupProvider | undefined;
   readonly statements: QUserStatementRecorder;
@@ -64,6 +75,8 @@ export type ResearchComposition = {
 };
 
 export type ResearchCompositionDependencies = {
+  /** The investor context's public query port, for INVESTOR_ORGANISATION subjects. */
+  readonly investorQueries: InvestorOrganisationQueryPort;
   readonly sql: DatabaseExecutor;
   readonly transactions: TransactionManager;
   readonly authorization: AuthorizationService;
@@ -194,7 +207,8 @@ export function createStatementEvidencePort(
 export function composeResearch(
   dependencies: ResearchCompositionDependencies,
 ): ResearchComposition {
-  const { sql, transactions, authorization, logger } = dependencies;
+  const { sql, transactions, authorization, investorQueries, logger } =
+    dependencies;
   const repositories = createPostgresEvidenceRepositories();
   const evidence = createEvidenceService({
     sql,
@@ -204,6 +218,28 @@ export function composeResearch(
       createCompanyEvidenceSubjectResolver(
         createPostgresCompanyQueryPort({ sql }),
       ),
+      // A person is a subject of evidence about themselves only. Nothing
+      // here can express "evidence about somebody else", which is the
+      // point: reading up on a third party is a different capability.
+      createPersonEvidenceSubjectResolver({
+        isSelf: (actor, userId) => Promise.resolve(actor.userId === userId),
+      }),
+      createInvestorEvidenceSubjectResolver({
+        getInvestorOrganisationIdentity: async (tenantId, id) => {
+          const investor =
+            await investorQueries.getCanonicalInvestorOrganisation(
+              tenantId,
+              InvestorOrganisationIdSchema.parse(id),
+            );
+          return investor === null
+            ? null
+            : {
+                id: investor.id,
+                tenantId: investor.tenantId,
+                organisationId: investor.organisationId,
+              };
+        },
+      }),
     ]),
     outbox: createOutboxWriter({
       registry: createEventRegistry(EVIDENCE_EVENTS),
@@ -290,6 +326,8 @@ export function composeResearch(
     research,
     profiles,
     statements,
+    evidence,
+    gate,
     providerStatus: provider === undefined ? "unconfigured" : "configured",
   };
 }

@@ -249,6 +249,7 @@ describe("idempotency hashing", () => {
 
 describe("DTOs", () => {
   const investor: InvestorOrganisation = {
+    visibility: "organisation_private",
     id: INVESTOR,
     tenantId: TENANT,
     organisationId: ORG,

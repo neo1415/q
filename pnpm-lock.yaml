@@ -186,6 +186,9 @@ importers:
       '@capital-q/q-orchestrator':
         specifier: workspace:*
         version: link:../../packages/q-orchestrator
+      '@capital-q/q-presence':
+        specifier: workspace:*
+        version: link:../../packages/q-presence
       '@capital-q/q-research':
         specifier: workspace:*
         version: link:../../packages/q-research
@@ -1316,6 +1319,31 @@ importers:
       '@capital-q/q-tools':
         specifier: workspace:*
         version: link:../q-tools
+      '@types/node':
+        specifier: ^24.13.3
+        version: 24.13.3
+      typescript:
+        specifier: 5.9.3
+        version: 5.9.3
+
+  packages/q-presence:
+    dependencies:
+      '@capital-q/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      '@capital-q/database':
+        specifier: workspace:*
+        version: link:../database
+      '@capital-q/observability':
+        specifier: workspace:*
+        version: link:../observability
+      '@capital-q/security':
+        specifier: workspace:*
+        version: link:../security
+      zod:
+        specifier: 4.5.4
+        version: 4.5.4
+    devDependencies:
       '@types/node':
         specifier: ^24.13.3
         version: 24.13.3

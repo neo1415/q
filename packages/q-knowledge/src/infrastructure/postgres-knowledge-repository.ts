@@ -15,6 +15,7 @@ import { TenantIdSchema, type TenantId } from "@capital-q/security";
 
 import {
   KnowledgeKeySchema,
+  KnowledgeSubjectTypeSchema,
   KnowledgeStatusSchema,
   KnowledgeTypeSchema,
   type KnowledgeObject,
@@ -57,7 +58,7 @@ const NullableTimestamp = z
 const ObjectRow = z.object({
   id: z.string().uuid(),
   tenant_id: TenantIdSchema,
-  subject_type: z.literal("COMPANY"),
+  subject_type: KnowledgeSubjectTypeSchema,
   subject_id: z.string().uuid(),
   knowledge_type: KnowledgeTypeSchema,
   knowledge_key: KnowledgeKeySchema,

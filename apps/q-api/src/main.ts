@@ -109,6 +109,8 @@ import {
   composeQIntelligence,
   createProductionEmbeddingService,
 } from "./composition/q-intelligence.js";
+import { composePresence } from "./composition/presence.js";
+import { createPresenceTrigger } from "./voice/presence-trigger.js";
 import { composeResearch } from "./composition/research.js";
 import { createSupabaseRequestAuthenticator } from "./security/supabase-authenticator.js";
 import { attachVoiceChannel } from "./voice/attach.js";
@@ -329,9 +331,35 @@ const researchComposition = composeResearch({
   sql: database.sql,
   transactions: database.transactions,
   authorization,
+  investorQueries: investors,
   secrets: config.secrets.researchProviders,
   logger,
 });
+
+// Public presence (CQ-Q-PRESENCE-001): what the web already says about a
+// person, their company or their fund, read in parallel the first time
+// Capital Q knows enough to look and refreshed rather than rebuilt. It
+// shares the Evidence owner and the Write Gate the research tools use, so
+// there is one set of rules about what may be recorded and held.
+const presenceComposition = composePresence({
+  sql: database.sql,
+  evidence: researchComposition.evidence,
+  gateway: modelGateway,
+  gate: researchComposition.gate,
+  ...(researchComposition.research === undefined
+    ? {}
+    : { research: researchComposition.research }),
+  ...(researchComposition.profiles === undefined
+    ? {}
+    : { profiles: researchComposition.profiles }),
+  logger,
+});
+logger.info(
+  {
+    presence: presenceComposition === undefined ? "unconfigured" : "configured",
+  },
+  "public presence composed",
+);
 logger.info(
   {
     researchProviders: researchProviderConfigStatus(
@@ -533,6 +561,14 @@ const voiceTurn = createVoiceTurnHandler({
   board: voiceTurnBoard,
   welcome: welcomeHost,
   pronunciation,
+  ...(presenceComposition === undefined
+    ? {}
+    : {
+        presence: createPresenceTrigger({
+          presence: presenceComposition.presence,
+          logger,
+        }),
+      }),
   orchestration: { orchestrator, autostart: Q_ORCHESTRATION_AUTOSTART },
   ...(config.voice.apiBaseUrl === undefined
     ? {}

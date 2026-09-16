@@ -98,3 +98,72 @@ export function createCompanyEvidenceSubjectResolver(
     },
   };
 }
+
+/**
+ * The port a PERSON subject resolves through. Deliberately minimal: a
+ * person is a subject of evidence only as a member of the acting
+ * organisation, and only the acting person themselves. Evidence about
+ * somebody else's public presence is not something this packet collects,
+ * and a port that cannot express it cannot be asked for it.
+ */
+export type PersonSubjectQueryPort = {
+  readonly isSelf: (actor: ActorContext, userId: string) => Promise<boolean>;
+};
+
+export function createPersonEvidenceSubjectResolver(
+  people: PersonSubjectQueryPort,
+): EvidenceSubjectResolver {
+  return {
+    subjectType: "PERSON",
+    resolve: async (actor, subjectId) => {
+      const organisationId = actor.organisationId;
+      if (organisationId === undefined) {
+        return null;
+      }
+      if (!(await people.isSelf(actor, subjectId))) {
+        return null;
+      }
+      return {
+        subjectType: "PERSON",
+        subjectId,
+        tenantId: actor.tenantId,
+        ownerOrganisationId: organisationId,
+      };
+    },
+  };
+}
+
+/** The port an INVESTOR_ORGANISATION subject resolves through. */
+export type InvestorSubjectQueryPort = {
+  readonly getInvestorOrganisationIdentity: (
+    tenantId: TenantId,
+    investorOrganisationId: string,
+  ) => Promise<{
+    readonly id: string;
+    readonly tenantId: TenantId;
+    readonly organisationId: OrganisationId;
+  } | null>;
+};
+
+export function createInvestorEvidenceSubjectResolver(
+  investors: InvestorSubjectQueryPort,
+): EvidenceSubjectResolver {
+  return {
+    subjectType: "INVESTOR_ORGANISATION",
+    resolve: async (actor, subjectId) => {
+      const investor = await investors.getInvestorOrganisationIdentity(
+        actor.tenantId,
+        subjectId,
+      );
+      if (investor === null) {
+        return null;
+      }
+      return {
+        subjectType: "INVESTOR_ORGANISATION",
+        subjectId: investor.id,
+        tenantId: investor.tenantId,
+        ownerOrganisationId: investor.organisationId,
+      };
+    },
+  };
+}

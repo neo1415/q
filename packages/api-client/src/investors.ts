@@ -1,11 +1,15 @@
 import {
   IDEMPOTENCY_KEY_HEADER,
+  INVESTOR_NETWORK_PREVIEW_SEGMENT,
   INVESTOR_REPRESENTATIVE_ME_SUFFIX,
+  INVESTOR_VISIBILITY_SEGMENT,
   INVESTORS_CURRENT_PATH,
   INVESTORS_PATH,
+  InvestorNetworkPreviewSchema,
   InvestorOrganisationDtoSchema,
   InvestorRepresentativeDtoSchema,
   type CreateInvestorOrganisationRequest,
+  type SetInvestorVisibilityRequest,
   type UpdateInvestorOrganisationRequest,
   type UpsertMyInvestorRepresentativeRequest,
 } from "@capital-q/contracts";
@@ -95,5 +99,33 @@ export function upsertMyInvestorRepresentative(
     investorPath(investorOrganisationId, INVESTOR_REPRESENTATIVE_ME_SUFFIX),
     InvestorRepresentativeDtoSchema,
     { body: input },
+  );
+}
+
+/** `POST /v1/investors/:id/visibility` — who may see the declared profile. */
+export function setInvestorVisibility(
+  session: ApiSession,
+  investorOrganisationId: string,
+  request: SetInvestorVisibilityRequest,
+) {
+  return call(
+    session,
+    "POST",
+    `${INVESTORS_PATH}/${encodeURIComponent(investorOrganisationId)}${INVESTOR_VISIBILITY_SEGMENT}`,
+    InvestorOrganisationDtoSchema,
+    { body: request },
+  );
+}
+
+/** `GET /v1/investors/:id/network-preview` — what founders would see. */
+export function getInvestorNetworkPreview(
+  session: ApiSession,
+  investorOrganisationId: string,
+) {
+  return call(
+    session,
+    "GET",
+    `${INVESTORS_PATH}/${encodeURIComponent(investorOrganisationId)}${INVESTOR_NETWORK_PREVIEW_SEGMENT}`,
+    InvestorNetworkPreviewSchema,
   );
 }

@@ -32,6 +32,7 @@ export const PROMPT_IDS = [
   "INVESTOR_MANDATE_SYNTHESIS",
   "COMPANY_ANALYST",
   "FIT_EXPLANATION",
+  "PRESENCE_READER",
 ] as const;
 export type PromptId = (typeof PROMPT_IDS)[number];
 
@@ -45,6 +46,7 @@ export const PROMPT_SLUGS: Readonly<Record<PromptId, string>> = {
   INVESTOR_MANDATE_SYNTHESIS: "investor-mandate-synthesis",
   COMPANY_ANALYST: "company-analyst",
   FIT_EXPLANATION: "fit-explanation",
+  PRESENCE_READER: "presence-reader",
 };
 
 export type PromptKind = "CHARTER" | "TASK";
@@ -117,12 +119,21 @@ export function templateVariables(template: string): readonly string[] {
 }
 
 function neutraliseFences(text: string): string {
-  // Content cannot close or reopen a fence: the markers themselves are data.
+  // Content cannot close or reopen a fence, and it cannot look like a
+  // template token. A Wikipedia or Wiktionary page is full of literal
+  // "{{...}}" markup; left alone it survives rendering and trips the
+  // unrendered-token guard below, which would fail a whole turn because a
+  // page quoted a brace. Neutralising it here also means content can never
+  // be mistaken for a variable by anything downstream.
   return text
     .split(UNTRUSTED_CLOSE)
     .join("<<<END_UNTRUSTED_CONTENT (literal)>>>")
     .split(UNTRUSTED_OPEN)
-    .join("<<<UNTRUSTED_CONTENT (literal)");
+    .join("<<<UNTRUSTED_CONTENT (literal)")
+    .split("{{")
+    .join("{ {")
+    .split("}}")
+    .join("} }");
 }
 
 function formatValue(value: unknown): string {
