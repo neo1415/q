@@ -178,6 +178,7 @@ export function registerQVoiceRoutes(
               correlationId: createCorrelationId(),
             },
             knownName,
+            knownOrganisation: input.organisationHint ?? null,
             utterance: "",
             recentTurns: [],
           });
@@ -263,6 +264,9 @@ export function registerQVoiceRoutes(
           subjects: input.subjects,
           onboarding: input.onboarding,
           welcome: input.welcome === true,
+          ...(input.organisationHint === undefined
+            ? {}
+            : { organisationHint: input.organisationHint }),
         },
         issuedAt,
         connectBy: issuedAt + VOICE_CONNECT_WINDOW_MS,

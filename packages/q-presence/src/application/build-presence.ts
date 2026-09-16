@@ -4,6 +4,7 @@ import type { ActorContext } from "@capital-q/security";
 
 import {
   PRESENCE_BOUNDS,
+  PRESENCE_SAYABLE_MAX,
   PRESENCE_BUILD_STALE_AFTER_MS,
   PRESENCE_REFRESH_AFTER_MS,
   PresenceIdentitySchema,
@@ -12,7 +13,11 @@ import {
   type PresenceOutcome,
   type PresenceSubject,
 } from "../contracts.js";
-import { distinctiveTerms, pageNamesSubject } from "../domain/subject-match.js";
+import {
+  distinctiveTerms,
+  domainLabel,
+  pageNamesSubject,
+} from "../domain/subject-match.js";
 import type {
   PresenceBuildLog,
   PresenceEvidencePort,
@@ -142,6 +147,8 @@ export function createPresenceService(
       const buildId = started.id;
       let sourceCount = 0;
       let understandingCount = 0;
+      /** What was written, in its own words, for saying back to the subject. */
+      const accepted: { key: string; statement: string }[] = [];
 
       try {
         // ---- 1. the public web, every read at once ---------------------
@@ -294,7 +301,15 @@ export function createPresenceService(
               },
               correlationId,
             );
-            if (result.accepted) understandingCount += 1;
+            if (result.accepted) {
+              understandingCount += 1;
+              if (accepted.length < PRESENCE_SAYABLE_MAX) {
+                accepted.push({
+                  key: proposal.key,
+                  statement: proposal.statement,
+                });
+              }
+            }
           } catch (error: unknown) {
             logger?.warn(
               { err: error, correlationId, key: proposal.key },
@@ -325,6 +340,16 @@ export function createPresenceService(
           buildId,
           sourceCount,
           understandingCount,
+          understandings: accepted,
+          // Where it came from, so Q can say so rather than appear to
+          // simply know things about somebody.
+          domains: [
+            ...new Set(
+              found
+                .map((page) => domainLabel(page.url))
+                .filter((label): label is string => label !== null),
+            ),
+          ].slice(0, 4),
         };
       } catch (error: unknown) {
         // Identifiers and a code. Never the query, the page or the model's

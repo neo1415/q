@@ -171,6 +171,20 @@ describe("a public presence build", () => {
       buildId: "build-1",
       sourceCount: 2,
       understandingCount: 2,
+      // What was written, in its own words, so the caller can say it back
+      // to the subject and ask whether it has the right person. Only ever
+      // what the gate accepted, and only ever the subject's own.
+      understandings: [
+        {
+          key: "presence.what_they_do",
+          statement: "Their site says they connect legacy insurance systems.",
+        },
+        {
+          key: "presence.location",
+          statement: "A 2025 article places them in Lagos.",
+        },
+      ],
+      domains: [],
     });
     expect(evidence.registered).toHaveLength(2);
     expect(knowledge.proposed).toEqual([

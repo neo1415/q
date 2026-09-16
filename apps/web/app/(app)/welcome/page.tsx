@@ -5,7 +5,8 @@ import { loadWebServerConfig } from "@capital-q/config/web";
 
 import { resolveOwnContext } from "@/features/q/context";
 import { WelcomeScreen } from "@/features/welcome/welcome-screen";
-import { fetchMe } from "@capital-q/api-client";
+import { fetchMe, updateMe } from "@capital-q/api-client";
+import { accountDetails } from "@/auth/account-details";
 import { getSessionAccessToken } from "@/auth/session";
 
 export const metadata: Metadata = {
@@ -35,14 +36,43 @@ export default async function WelcomePage({
     redirect("/home");
   }
   let knownName: string | null = null;
+  let knownOrganisation: string | null = null;
   const accessToken = await getSessionAccessToken();
   if (accessToken !== null && config.apiBaseUrl !== undefined) {
+    /**
+     * What they told us when they signed up, becoming what Capital Q
+     * holds.
+     *
+     * The database trigger that creates a profile reads nothing a person
+     * supplied, deliberately, so a name typed into the sign-up form lives
+     * on the account and nowhere else until something copies it across.
+     * This is that something: first authenticated page load, through the
+     * ordinary API, under their own session, and only when the profile
+     * does not already have a name — a name they have since changed is
+     * theirs and is not overwritten by what they typed once.
+     */
+    const signedUpWith = await accountDetails();
+    knownOrganisation = signedUpWith.organisationName;
     try {
       const me = await fetchMe({ baseUrl: config.apiBaseUrl, accessToken });
       knownName = me.user.displayName;
+      if (knownName === null && signedUpWith.displayName !== null) {
+        await updateMe({
+          baseUrl: config.apiBaseUrl,
+          accessToken,
+          body: { displayName: signedUpWith.displayName },
+        });
+        knownName = signedUpWith.displayName;
+      }
     } catch {
-      knownName = null;
+      // Not knowing their name is a worse greeting, never a failure.
+      knownName = signedUpWith.displayName;
     }
   }
-  return <WelcomeScreen knownName={knownName} />;
+  return (
+    <WelcomeScreen
+      knownName={knownName}
+      knownOrganisation={knownOrganisation}
+    />
+  );
 }

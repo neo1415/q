@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 
 import {
   getCompany,
+  updateCompany,
   getCurrentInvestorOrganisation,
   getOnboardingSession,
   resolveOnboardingSuggestion,
@@ -35,6 +36,7 @@ import type {
 
 import type { VoiceSessionBinding } from "./bindings.js";
 import type { Interviewer } from "./interviewer.js";
+import type { PresenceFound } from "./presence-trigger.js";
 import {
   declines,
   destinationLine,
@@ -47,6 +49,17 @@ import {
   spokenDestination,
   wantsToEndVoice,
 } from "./navigation.js";
+import {
+  profileEditDone,
+  profileEditQuestion,
+  spokenProfileEdit,
+  type SpokenProfileEdit,
+} from "./profile-edit.js";
+import {
+  recognitionQuestion,
+  RIGHT_PERSON_LINE,
+  WRONG_PERSON_LINE,
+} from "./recognise.js";
 import type { PresenceTrigger } from "./presence-trigger.js";
 import type { PronunciationTeacher } from "./pronunciation.js";
 import type { VoiceTurnBoard } from "./turn-board.js";
@@ -121,6 +134,45 @@ export type VoiceTurnHandler = (
 const VOICE_TURN_MAX_CHARS = 2_000;
 
 /** "Keep these" / "yes" / "looks right" on a category step with a proposal (B §19 aloud). */
+/**
+ * The one question the first minute exists to answer, as something a
+ * person can tap. The labels are what somebody would have said, so a tap
+ * and a sentence arrive as the same answer.
+ */
+/** The one field this change touches, in the company API's own words. */
+function fieldFor(edit: SpokenProfileEdit): Record<string, string> {
+  switch (edit.field) {
+    case "companyName":
+      return { canonicalName: edit.value };
+    case "websiteUrl":
+      return { websiteUrl: edit.value };
+    case "headquartersCity":
+      return { headquartersCity: edit.value };
+    case "shortDescription":
+      return { shortDescription: edit.value };
+    case "displayName":
+      // Handled before this is reached; a person is not a company field.
+      return {};
+  }
+}
+
+const WELCOME_CHOICE = {
+  stepKey: "welcome.journey",
+  kind: "ONE_OF" as const,
+  options: [
+    {
+      key: "FOUNDER",
+      label: "I'm raising",
+      description: "You run a company and you are looking for capital.",
+    },
+    {
+      key: "INVESTOR",
+      label: "I'm investing",
+      description: "You deploy capital and you are looking for companies.",
+    },
+  ],
+};
+
 const AFFIRMATIVE =
   /^(?:(?:yes|yep|yeah|sure|ok(?:ay)?|right|correct|exactly|perfect)[,.!\s]*)*(?:yes|yep|yeah|sure|ok(?:ay)?|right|correct|exactly|perfect|keep (?:these|those|them|it|all(?: of them)?)|(?:that'?s|those are|these are|they'?re) (?:right|correct|fine|good|it|the ones)|looks? (?:right|good|correct)|(?:all )?good|go (?:with|for) (?:these|those|them|that))[.!\s]*$/i;
 
@@ -762,9 +814,16 @@ export function createVoiceTurnHandler(
       if (signal.aborted) {
         return { kind: "INTERRUPTED", path: "INTERVIEW" };
       }
-      // Capital Q may now know enough to look this company up. Detached:
-      // the read happens while the person keeps talking.
-      dependencies.presence?.afterInterviewTurn(binding.actor, outcome.view);
+      // Capital Q may now know enough to look this company up, and the
+      // person who named it. Detached: the read happens while they keep
+      // talking, and what it finds waits here for the next gap.
+      dependencies.presence?.afterInterviewTurn(
+        binding.actor,
+        outcome.view,
+        (found) => {
+          foundPerson.set(binding, found);
+        },
+      );
       dependencies.board?.record(binding.voiceSessionId, {
         asking:
           outcome.asking === null
@@ -804,6 +863,40 @@ export function createVoiceTurnHandler(
           speaker,
         );
         return asked;
+      }
+      /**
+       * Q showing it already knows who it is talking to.
+       *
+       * Asked here, once, in the gap after an answer has been taken and
+       * before the next question: the research finished while the person
+       * was mid-sentence, and interrupting them with it would be worse
+       * than not having done it. It rides along with the reply rather
+       * than becoming a turn of its own.
+       */
+      const found = foundPerson.get(binding);
+      if (found !== undefined && !awaitingRecognition.has(binding)) {
+        foundPerson.delete(binding);
+        const recognition = recognitionQuestion(found);
+        if (recognition !== null) {
+          awaitingRecognition.add(binding);
+          dependencies.board?.record(binding.voiceSessionId, {
+            asking: {
+              stepKey: "presence.recognition",
+              kind: "YES_NO",
+              options: [...recognition.options],
+            },
+            navigate: null,
+            handoff: null,
+            degraded: false,
+          });
+          const line =
+            outcome.reply.length > 0
+              ? `${outcome.reply} ${recognition.line}`
+              : recognition.line;
+          return (await speakLine(speaker, line, signal, binding))
+            ? { kind: "SPOKEN", path: "INTERVIEW" }
+            : { kind: "INTERRUPTED", path: "INTERVIEW" };
+        }
       }
       return (await speakLine(speaker, outcome.reply, signal, binding))
         ? { kind: "SPOKEN", path: "INTERVIEW" }
@@ -901,6 +994,7 @@ export function createVoiceTurnHandler(
         correlationId: createCorrelationId(),
       },
       knownName: null,
+      knownOrganisation: binding.thread.organisationHint ?? null,
       utterance: text,
       recentTurns: transcriptOf(binding).slice(0, -1),
       signal,
@@ -920,14 +1014,27 @@ export function createVoiceTurnHandler(
         logger.warn({ err: error }, "the person's name was not recorded");
       }
     }
+    const journey =
+      outcome.journey === "FOUNDER"
+        ? "INTERVIEW_FOUNDER"
+        : outcome.journey === "INVESTOR"
+          ? "INTERVIEW_INVESTOR"
+          : null;
     dependencies.board?.record(binding.voiceSessionId, {
-      asking: null,
-      navigate:
-        outcome.journey === "FOUNDER"
-          ? "INTERVIEW_FOUNDER"
-          : outcome.journey === "INVESTOR"
-            ? "INTERVIEW_INVESTOR"
-            : null,
+      /**
+       * Two cards, while Q is still asking which way round this is.
+       *
+       * The one question the first minute exists to answer had nothing to
+       * tap, so somebody in a noisy room, or who would simply rather not
+       * talk, had no way through it. Speaking still works and is still
+       * the default; the cards send the same words the person would have
+       * said, so there is one answer and one path for it.
+       *
+       * They disappear the moment the answer is known, because a question
+       * already answered should stop being asked.
+       */
+      asking: journey === null ? WELCOME_CHOICE : null,
+      navigate: journey,
       handoff: null,
       degraded: outcome.degraded,
     });
@@ -983,6 +1090,80 @@ export function createVoiceTurnHandler(
   };
 
   /** A spoken yes to a visibility question: the change, then the word. */
+  /**
+   * A change to somebody's own details, waiting on their yes.
+   *
+   * Same shape as the visibility question next door and for the same
+   * reason: a change to what Capital Q holds is proposed, approved and
+   * then performed. Nothing here is applied from a sentence alone.
+   */
+  const pendingProfileEdit = new WeakMap<
+    VoiceSessionBinding,
+    SpokenProfileEdit
+  >();
+
+  /**
+   * What Capital Q found about this person, waiting for Q to say it.
+   *
+   * The lookup happens the moment there is a name and something to tell
+   * them apart by, which is usually while they are mid-sentence. It is
+   * held here until the next natural gap, asked once, and then forgotten
+   * whichever way they answer.
+   */
+  const foundPerson = new WeakMap<VoiceSessionBinding, PresenceFound>();
+  /** Set while the recognition question is on the table. */
+  const awaitingRecognition = new WeakSet<VoiceSessionBinding>();
+
+  const applyProfileEdit = async (
+    binding: VoiceSessionBinding,
+    session: ApiSession,
+    edit: SpokenProfileEdit,
+    signal: AbortSignal,
+    speaker: VoiceSpeaker,
+  ): Promise<VoiceTurnOutcome> => {
+    let line: string;
+    try {
+      if (edit.field === "displayName") {
+        await updateMe({
+          baseUrl: session.baseUrl,
+          accessToken: session.accessToken,
+          ...(session.fetch === undefined ? {} : { fetch: session.fetch }),
+          body: { displayName: edit.value },
+        });
+      } else {
+        // Their own company, resolved from their own session and their own
+        // onboarding — never from anything they said. A person with no
+        // company to edit is told so rather than shown somebody else's.
+        const subject = await ownVisibilitySubject(binding, session);
+        if (subject === null || subject.kind !== "COMPANY") {
+          return (await speakLine(
+            speaker,
+            "I can change that once your company is set up on Capital Q. Shall we do the setup first?",
+            signal,
+          ))
+            ? { kind: "SPOKEN", path: "MOVE" }
+            : { kind: "INTERRUPTED", path: "MOVE" };
+        }
+        const company = await getCompany(session, subject.id);
+        await updateCompany(session, subject.id, {
+          expectedVersion: company.version,
+          ...fieldFor(edit),
+        });
+      }
+      line = profileEditDone(edit);
+    } catch (error: unknown) {
+      logger.warn(
+        { err: error, qVoiceSessionId: binding.voiceSessionId },
+        "spoken profile change was not accepted",
+      );
+      line =
+        "I couldn't change that just now. You can do it from your profile, or ask me again in a moment.";
+    }
+    return (await speakLine(speaker, line, signal))
+      ? { kind: "SPOKEN", path: "MOVE" }
+      : { kind: "INTERRUPTED", path: "MOVE" };
+  };
+
   const applyVisibility = async (
     binding: VoiceSessionBinding,
     session: ApiSession,
@@ -1053,6 +1234,54 @@ export function createVoiceTurnHandler(
       }
       // Anything else moves on; the question can be asked again.
       pendingVisibility.delete(binding);
+    }
+    // "Is this you?", answered.
+    if (awaitingRecognition.has(binding)) {
+      awaitingRecognition.delete(binding);
+      if (declines(text)) {
+        // Their word settles it. Nothing found under a name that is not
+        // theirs is theirs, and Q says so rather than quietly keeping it.
+        return (await speakLine(speaker, WRONG_PERSON_LINE, signal, binding))
+          ? { kind: "SPOKEN", path: "MOVE" }
+          : { kind: "INTERRUPTED", path: "MOVE" };
+      }
+      if (AFFIRMATIVE.test(text)) {
+        return (await speakLine(speaker, RIGHT_PERSON_LINE, signal, binding))
+          ? { kind: "SPOKEN", path: "MOVE" }
+          : { kind: "INTERRUPTED", path: "MOVE" };
+      }
+      // Anything else is them carrying on; the question is not asked again.
+    }
+
+    // A change to their own details waiting on a yes or a no.
+    const pendingEdit = pendingProfileEdit.get(binding);
+    if (pendingEdit !== undefined && api !== undefined) {
+      const session: ApiSession = {
+        baseUrl: api.apiBaseUrl,
+        accessToken: binding.accessToken,
+        ...(api.fetch === undefined ? {} : { fetch: api.fetch }),
+      };
+      pendingProfileEdit.delete(binding);
+      if (AFFIRMATIVE.test(text)) {
+        return applyProfileEdit(binding, session, pendingEdit, signal, speaker);
+      }
+      if (declines(text)) {
+        return (await speakLine(
+          speaker,
+          "Alright, leaving it as it is.",
+          signal,
+        ))
+          ? { kind: "SPOKEN", path: "MOVE" }
+          : { kind: "INTERRUPTED", path: "MOVE" };
+      }
+      // Anything else moves on; they can ask again.
+    }
+    const edit = spokenProfileEdit(text);
+    if (edit !== null && api !== undefined) {
+      pendingProfileEdit.set(binding, edit);
+      return (await speakLine(speaker, profileEditQuestion(edit), signal))
+        ? { kind: "SPOKEN", path: "MOVE" }
+        : { kind: "INTERRUPTED", path: "MOVE" };
     }
     const wanted = spokenVisibility(text);
     if (wanted !== null && api !== undefined) {

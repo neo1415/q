@@ -79,6 +79,17 @@ export const CreateQVoiceSessionRequestSchema = z
      * to start; the turn state then names the interview to open.
      */
     welcome: z.literal(true).optional(),
+    /**
+     * What the person said their organisation was called when they signed
+     * up, so Q does not open by asking something it was already told.
+     *
+     * Text a person typed, and treated as such: it is a hint for the
+     * greeting and a term for looking them up in public, never a claim
+     * about which organisation they belong to. Membership is resolved
+     * server-side from their session, as it always is, and nothing here
+     * can create or join one.
+     */
+    organisationHint: z.string().trim().min(1).max(120).optional(),
   })
   .strict();
 

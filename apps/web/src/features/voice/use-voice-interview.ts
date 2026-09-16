@@ -33,6 +33,7 @@ export type VoiceInterviewThread = {
   readonly onboarding?: CreateQVoiceSessionRequest["onboarding"];
   readonly subjects?: CreateQVoiceSessionRequest["subjects"];
   readonly conversationId?: CreateQVoiceSessionRequest["conversationId"];
+  readonly organisationHint?: CreateQVoiceSessionRequest["organisationHint"];
 };
 
 export type VoiceInterview = {
@@ -137,6 +138,9 @@ export function useVoiceInterview(
         ...(thread.conversationId === undefined
           ? {}
           : { conversationId: thread.conversationId }),
+        ...(thread.organisationHint === undefined
+          ? {}
+          : { organisationHint: thread.organisationHint }),
         voice: chosen,
       });
       if (!started.ok) {

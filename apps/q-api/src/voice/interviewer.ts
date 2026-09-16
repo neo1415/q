@@ -221,6 +221,25 @@ function describeValue(
   }
 }
 
+/**
+ * A question with nothing to tap is a question somebody may need to type.
+ *
+ * Every question that HAS choices now shows them, so the ones left are the
+ * ones where only the person's own words will do: a name, a website, a
+ * description, a number. Those are exactly the ones where somebody on a
+ * bus or in an open-plan office is stuck, and the stage has always had a
+ * Type button they had no reason to look for. So Q mentions it, once, on
+ * the questions where it is the answer.
+ */
+function typeable(note: string | undefined): string {
+  return [
+    note,
+    "There are no choices to tap for this one, so if speaking is awkward, mention once that they can tap Type and write it instead. Once only, and never on a question that has options.",
+  ]
+    .filter((n): n is string => n !== undefined)
+    .join(" ");
+}
+
 function toOpenStep(
   step: OnboardingStepManifest,
   view: OnboardingSessionView,
@@ -249,18 +268,29 @@ function toOpenStep(
         min: c.min,
         max: c.max,
         ...(c.unit === undefined ? {} : { unit: c.unit }),
+        note: typeable(base.note),
       };
     case "short_text":
-      return { ...base, kind: "SHORT_TEXT" };
+      return { ...base, kind: "SHORT_TEXT", note: typeable(base.note) };
     case "long_text":
     case "voice_text":
-      return { ...base, kind: "LONG_TEXT" };
+      return { ...base, kind: "LONG_TEXT", note: typeable(base.note) };
     case "confirmation":
       // A review of what has been gathered: Q reads it back in speech
       // before it asks, rather than asking for a "confirmation".
       return {
         ...base,
         kind: "YES_NO",
+        // Yes and no, as two things a person can tap.
+        //
+        // A step whose whole content is "is that right?" had nothing on
+        // screen to answer it with, so somebody in a noisy room, or who
+        // would rather not talk, was stuck on the one question that only
+        // needs a nod. The labels are what they would have said.
+        options: [
+          { key: "yes", label: "Yes, that's right" },
+          { key: "no", label: "No, something's off" },
+        ],
         note: [
           base.note,
           "This is a review of what has been gathered so far: before asking, read the key KNOWN ANSWERS back in one or two natural spoken sentences (name, what the company does, stage, where it is based, the round), then ask whether that is right.",
@@ -269,7 +299,7 @@ function toOpenStep(
           .join(" "),
       };
     case "document_upload":
-      return { ...base, kind: "DOCUMENT" };
+      return { ...base, kind: "DOCUMENT", note: typeable(base.note) };
     case "reference_select": {
       if (c.resourceType === "TAXONOMY_NODE") {
         return { ...base, kind: "CATEGORIES", maxChoices: c.maxItems };

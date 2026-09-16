@@ -126,16 +126,36 @@ export async function signUpWithPasswordAction(
 ): Promise<AuthFormState> {
   const next = resolveSafeReturnPath(field(formData, "next"));
   const input = z
-    .object({ email: EmailSchema, password: PasswordSchema })
+    .object({
+      email: EmailSchema,
+      password: PasswordSchema,
+      /**
+       * What to call them, and what they are here about.
+       *
+       * Both are asked here rather than left to the conversation because
+       * they are the two things Q needs before it can be any use: a name
+       * to greet somebody by, and an organisation to tell them apart from
+       * everybody else with that name when it goes looking for them.
+       *
+       * The organisation is optional. Somebody who has not decided what
+       * theirs is called, or who is here to invest under their own name,
+       * should not be stopped at the door.
+       */
+      fullName: z.string().trim().min(1).max(80),
+      organisationName: z.string().trim().max(120).optional(),
+    })
     .safeParse({
       email: field(formData, "email"),
       password: field(formData, "password"),
+      fullName: field(formData, "fullName"),
+      organisationName: field(formData, "organisationName") || undefined,
     });
 
   if (!input.success) {
     return {
       status: "error",
-      message: "Enter a valid email and a password of at least 8 characters.",
+      message:
+        "Enter your name, a valid email, and a password of at least 8 characters.",
     };
   }
 
@@ -144,7 +164,23 @@ export async function signUpWithPasswordAction(
   const { data, error } = await supabase.auth.signUp({
     email: input.data.email,
     password: input.data.password,
-    options: { emailRedirectTo: callbackUrl(auth.appOrigin, next) },
+    options: {
+      emailRedirectTo: callbackUrl(auth.appOrigin, next),
+      /**
+       * Carried on the account because it is the only thing that survives
+       * a confirmation email and a return trip. It is NOT where the name
+       * ends up: the database trigger reads nothing a person supplied, on
+       * purpose, so this is copied into the profile by the first
+       * authenticated page load, through the ordinary API, under their own
+       * session.
+       */
+      data: {
+        display_name: input.data.fullName,
+        ...(input.data.organisationName === undefined
+          ? {}
+          : { organisation_name: input.data.organisationName }),
+      },
+    },
   });
 
   if (error !== null) {

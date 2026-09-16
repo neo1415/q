@@ -33,6 +33,8 @@ export const WelcomeConductorVariablesSchema = z
     opening: z.boolean(),
     /** The name Capital Q already has for the person, if any. */
     knownName: z.string().max(120).nullable(),
+    /** What they said their organisation was called at sign-up, if they did. */
+    knownOrganisation: z.string().max(160).nullable(),
     recentTurns: z
       .array(
         z.object({

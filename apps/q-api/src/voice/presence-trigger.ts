@@ -49,10 +49,29 @@ export type PersonNameLookup = {
   ) => Promise<string | null> | string | null;
 };
 
+/**
+ * What was found about the person, on its way back to them.
+ *
+ * Looking somebody up at arrival is only worth doing if Q can then say so:
+ * here is what is public under your name, have I got the right person?
+ * Without this the research happened in silence and the person had no idea
+ * Q had done anything at all.
+ *
+ * Their own understandings, going back to them. Nobody else's ever reaches
+ * this, because a build only runs for a subject the actor already owns.
+ */
+export type PresenceFound = {
+  readonly name: string;
+  readonly statements: readonly string[];
+  readonly domains: readonly string[];
+};
+
 export type PresenceTriggerDependencies = {
   readonly presence: PresenceService;
   /** Absent means companies only; a person is simply not looked up. */
   readonly people?: PersonNameLookup | undefined;
+  /** Told what was found about the person, so Q can check it is them. */
+  readonly onPersonFound?: ((found: PresenceFound) => void) | undefined;
   readonly logger?: Logger | undefined;
 };
 
@@ -64,13 +83,15 @@ export type PresenceTrigger = {
   readonly afterInterviewTurn: (
     actor: ActorContext,
     view: OnboardingSessionView,
+    /** Told what was found about the person, so Q can check it is them. */
+    onFound?: (found: PresenceFound) => void,
   ) => void;
 };
 
 export function createPresenceTrigger(
   dependencies: PresenceTriggerDependencies,
 ): PresenceTrigger {
-  const { presence, people, logger } = dependencies;
+  const { presence, people, onPersonFound, logger } = dependencies;
 
   /** One build, detached, never able to delay or fail a turn. */
   const start = (
@@ -83,6 +104,7 @@ export function createPresenceTrigger(
       readonly profileUrl: string | null;
       readonly qualifier: string | null;
     },
+    report: ((found: PresenceFound) => void) | undefined,
   ): void => {
     void (async () => {
       try {
@@ -97,6 +119,18 @@ export function createPresenceTrigger(
           { status: outcome.status, subjectType },
           "public presence build finished",
         );
+        if (
+          subjectType === "PERSON" &&
+          outcome.status === "COMPLETED" &&
+          outcome.understandings.length > 0 &&
+          report !== undefined
+        ) {
+          report({
+            name: identity.name,
+            statements: outcome.understandings.map((u) => u.statement),
+            domains: outcome.domains,
+          });
+        }
       } catch (error: unknown) {
         logger?.warn(
           { err: error, subjectType },
@@ -107,19 +141,20 @@ export function createPresenceTrigger(
   };
 
   return {
-    afterInterviewTurn: (actor, view) => {
+    afterInterviewTurn: (actor, view, onFound) => {
       const subject = view.session.subject;
       if (subject === null || subject.type !== "COMPANY") return;
       const name = firstText(view, FOUNDER_COMPANY_NAME);
       if (name === null || name.length < 2) return;
       const website = firstText(view, FOUNDER_WEBSITE);
 
-      start(actor, "COMPANY", subject.id, {
-        name,
-        websiteUrl: website,
-        profileUrl: null,
-        qualifier: null,
-      });
+      start(
+        actor,
+        "COMPANY",
+        subject.id,
+        { name, websiteUrl: website, profileUrl: null, qualifier: null },
+        undefined,
+      );
 
       /**
        * And the person themselves, which is the whole point of doing this
@@ -136,12 +171,18 @@ export function createPresenceTrigger(
         try {
           const personName = await people.displayNameFor(actor);
           if (personName === null || personName.trim().length < 2) return;
-          start(actor, "PERSON", actor.userId, {
-            name: personName.trim(),
-            websiteUrl: null,
-            profileUrl: null,
-            qualifier: name,
-          });
+          start(
+            actor,
+            "PERSON",
+            actor.userId,
+            {
+              name: personName.trim(),
+              websiteUrl: null,
+              profileUrl: null,
+              qualifier: name,
+            },
+            onFound ?? onPersonFound,
+          );
         } catch (error: unknown) {
           logger?.warn({ err: error }, "could not read a name to look up");
         }

@@ -22,15 +22,25 @@ import { VoiceStage } from "../voice/voice-stage";
 
 export function WelcomeScreen({
   knownName,
+  knownOrganisation = null,
 }: {
   readonly knownName: string | null;
+  /** What they said their organisation was called at sign-up, if they did. */
+  readonly knownOrganisation?: string | null | undefined;
 }) {
   const router = useRouter();
   const voice = useVoiceInterview();
   const [begun, setBegun] = useState(false);
   const begin = async () => {
     setBegun(true);
-    await voice.talk({ thread: { welcome: true } });
+    await voice.talk({
+      thread: {
+        welcome: true,
+        ...(knownOrganisation === null
+          ? {}
+          : { organisationHint: knownOrganisation }),
+      },
+    });
   };
 
   const turn = voice.turn;

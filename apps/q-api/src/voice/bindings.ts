@@ -27,6 +27,12 @@ export type VoiceThread = {
   readonly onboarding: CreateQVoiceSessionRequest["onboarding"];
   /** Q's first minute with a new person: no onboarding session yet. */
   readonly welcome?: boolean | undefined;
+  /**
+   * What the person said their organisation was called at sign-up. A hint
+   * for the greeting and a term for looking them up in public; never a
+   * claim about membership, which is resolved from their session.
+   */
+  readonly organisationHint?: string | undefined;
 };
 
 export type VoiceSessionBinding = {

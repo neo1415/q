@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useActionState } from "react";
 
+import { Input } from "@capital-q/ui/input";
 import { linkClassName } from "@capital-q/ui/link";
 
 import { signUpWithPasswordAction } from "@/auth/actions";
@@ -16,8 +17,14 @@ import { PasswordField } from "./password-field";
 import { SubmitButton } from "./submit-button";
 
 /**
- * Create account: email and password, nothing else. Company, role, sector
- * and intent belong to onboarding, after the person exists.
+ * Create account: a name, an email, a password, and optionally what the
+ * organisation is called.
+ *
+ * Those last two are the least Q needs to be any use from the first
+ * sentence: something to call somebody, and something to tell them apart
+ * from everybody else with the same name when it goes looking for them.
+ * Role, sector, stage and intent still belong to onboarding, after the
+ * person exists.
  */
 export function SignUpForm({
   next,
@@ -53,6 +60,23 @@ export function SignUpForm({
 
       <form action={action} className="flex flex-col gap-5">
         <input type="hidden" name="next" value={next} />
+        <Input
+          id="fullName"
+          name="fullName"
+          label="Your name"
+          autoComplete="name"
+          required
+          maxLength={80}
+          description="What Q should call you."
+        />
+        <Input
+          id="organisationName"
+          name="organisationName"
+          label="Company or fund"
+          autoComplete="organization"
+          maxLength={120}
+          description="Optional. It helps Q find the right you."
+        />
         <EmailField />
         <PasswordField
           id="password"

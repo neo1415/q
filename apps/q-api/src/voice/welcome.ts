@@ -39,6 +39,8 @@ export type WelcomeTurnInput = {
   };
   readonly channel?: "voice" | "text" | undefined;
   readonly knownName: string | null;
+  /** Text the person typed at sign-up: a hint for the greeting, never a claim. */
+  readonly knownOrganisation?: string | null | undefined;
   /** Empty for Q's opening line. */
   readonly utterance: string;
   readonly recentTurns: readonly {
@@ -92,6 +94,7 @@ export function createWelcomeHost(dependencies: WelcomeHostDependencies) {
         expressive,
         opening,
         knownName: input.knownName,
+        knownOrganisation: input.knownOrganisation ?? null,
         recentTurns: input.recentTurns.slice(-12).map((t) => ({
           role: t.role,
           text: t.text.slice(0, 600),

@@ -145,6 +145,21 @@ export type PresenceOutcome =
       readonly buildId: string;
       readonly sourceCount: number;
       readonly understandingCount: number;
+      /**
+       * A few of the understandings that were written, in their own words,
+       * so the caller can show the subject what was found about them.
+       *
+       * The subject's own, going back to the subject: this is the sentence
+       * Q says to check it has the right person, and being able to say it
+       * is the whole reason for looking somebody up at arrival. Bounded,
+       * and only ever what the Write Gate accepted.
+       */
+      readonly understandings: readonly {
+        readonly key: string;
+        readonly statement: string;
+      }[];
+      /** The domains the understandings came from, for saying where. */
+      readonly domains: readonly string[];
     }
   | {
       readonly status: "NOTHING_FOUND";
@@ -166,6 +181,13 @@ export const PRESENCE_REFRESH_AFTER_MS = 14 * 24 * 60 * 60 * 1000;
 /** A build that never reported back is not treated as still running. */
 export const PRESENCE_BUILD_STALE_AFTER_MS = 10 * 60 * 1000;
 /** Bounded so one arrival cannot spend a day's search quota. */
+/**
+ * How many of a subject's own understandings Q may say back to them when
+ * it checks it has the right person. Enough to be recognisable, few enough
+ * to be a sentence rather than a dossier.
+ */
+export const PRESENCE_SAYABLE_MAX = 4;
+
 export const PRESENCE_BOUNDS = {
   maxReads: 3,
   maxSourcesPerRead: 5,
