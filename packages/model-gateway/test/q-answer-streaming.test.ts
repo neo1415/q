@@ -55,7 +55,7 @@ function plan(): PermittedContextPlan {
     evaluatedAt: "2026-09-16T10:00:00.000Z",
     revalidateAfter: "2026-09-16T10:05:00.000Z",
     revalidateOnResume: true,
-  } as PermittedContextPlan;
+  } as unknown as PermittedContextPlan;
 }
 
 function build(answer: string) {
@@ -100,8 +100,13 @@ function build(answer: string) {
     messages: {
       listRecentForConversationOfRun: () => Promise.resolve([...messages]),
       listForRun: () => Promise.resolve([...messages]),
-      insert: (_tx: unknown, input: { id?: string; content: string }) => {
-        stored.id = input.id;
+      insert: (
+        _tx: unknown,
+        input: { id?: string | undefined; content: string },
+      ) => {
+        if (input.id !== undefined) {
+          stored.id = input.id;
+        }
         const message = {
           ...messages[0],
           id: input.id ?? randomUUID(),
