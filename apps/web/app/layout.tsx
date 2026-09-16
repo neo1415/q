@@ -5,6 +5,7 @@ import { GeistSans } from "geist/font/sans";
 
 import { THEME_COLORS } from "@capital-q/ui/tokens";
 
+import { THEME_BOOT_SCRIPT } from "@/features/appearance/theme";
 import { ServiceWorkerRegistration } from "@/pwa/service-worker-registration";
 
 import "./globals.css";
@@ -52,6 +53,14 @@ export default function RootLayout({
 }): ReactNode {
   return (
     <html lang="en" className={`${GeistSans.variable} ${GeistMono.variable}`}>
+      <head>
+        {/*
+         * The person's own appearance choice, applied before anything is
+         * painted. It reads one key and sets one attribute; the tokens do
+         * the rest, and no choice at all leaves the device deciding.
+         */}
+        <script dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} />
+      </head>
       <body>
         <ServiceWorkerRegistration />
         {children}

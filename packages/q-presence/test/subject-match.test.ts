@@ -19,7 +19,7 @@ const VAULTLYNE = {
   websiteUrl: "https://thevaultlyne.com",
 };
 
-function page(url: string, title: string, excerpt: string) {
+function page(url: string, title: string | null, excerpt: string) {
   return { url, title, excerpt };
 }
 

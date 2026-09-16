@@ -100,8 +100,18 @@ export async function* bySentence(
   }
 }
 
-/** Q says one short filler only when an answer is taking this long (D §53). */
-export const FILLER_AFTER_MS = 2_500;
+/**
+ * Q says one short filler only when an answer is genuinely taking a while
+ * (D §53).
+ *
+ * It was 2.5 s, which was under the time an answer takes — so every single
+ * reply began "One second", which is worse than silence because it is a
+ * tic rather than information. A turn that reaches the public web yields
+ * its own line ("Checking the public web on that") as its first chunk and
+ * never gets here; this is only for a turn that is quiet for longer than a
+ * person will sit through.
+ */
+export const FILLER_AFTER_MS = 4_500;
 
 /**
  * Yield the source's items, and — if the first one has not arrived after
@@ -115,8 +125,16 @@ export async function* withFiller(
     readonly filler: string;
     readonly afterMs?: number | undefined;
     readonly signal?: AbortSignal | undefined;
-    readonly setTimeout?: typeof globalThis.setTimeout | undefined;
-    readonly clearTimeout?: typeof globalThis.clearTimeout | undefined;
+    /**
+     * Only what this needs: schedule one callback, cancel one handle. The
+     * global's own type carries Node's `__promisify__`, which a test's
+     * two-line clock has no reason to provide.
+     */
+    readonly setTimeout?:
+      | ((callback: () => void, ms: number) => ReturnType<typeof setTimeout>)
+      | undefined;
+    readonly clearTimeout?:
+      ((handle: ReturnType<typeof setTimeout>) => void) | undefined;
   },
 ): AsyncGenerator<string> {
   const schedule = options.setTimeout ?? globalThis.setTimeout;

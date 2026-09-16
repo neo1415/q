@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+/* global console, URL, fetch, setTimeout */
 /**
  * One command to demo Capital Q with Q's voice (CQ-Q-VOICE-001 rework):
  *

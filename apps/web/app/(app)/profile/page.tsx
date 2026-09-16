@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { buttonClassName } from "@capital-q/ui/button";
+
+import { ThemeToggle } from "@/features/appearance/theme-toggle";
 import { ContextIndicator } from "@capital-q/ui/context-indicator";
 
 import { getCurrentIdentity } from "@/auth/current-identity";
@@ -51,9 +53,7 @@ export default async function ProfilePage() {
           <OrganisationContext identity={identity} />
         </ProfileRow>
         <ProfileRow term="Appearance">
-          <span className="text-(--cq-text-secondary)">
-            Follows your device
-          </span>
+          <ThemeToggle />
         </ProfileRow>
       </dl>
       <div className="flex flex-col gap-4 pt-5">

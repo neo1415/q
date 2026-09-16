@@ -30,6 +30,7 @@ import {
   type CompanyAnalystV2Variables,
   createDefaultPromptRegistry,
   DEFAULT_COMMUNICATION_PROFILE,
+  fenceUntrusted,
   type PromptRegistry,
   renderPrompt,
   withoutRecommendationClaims,
@@ -50,7 +51,6 @@ import {
 
 import { isModelGatewayError } from "../errors.js";
 import type { ModelGateway, ModelGatewayExecuteOptions } from "../gateway.js";
-import { acceptStructuredOutput } from "../policy/structured.js";
 
 /**
  * The Q answer seam over the Prompt Registry, the Tool Registry and the
@@ -208,7 +208,7 @@ export function budgetForTaskClass(taskClass: ModelTextTaskClass): ModelBudget {
       return {
         maxAttempts: 3,
         maxEstimatedCostUsd: 0.1,
-        maxOutputTokens: 2_048,
+        maxOutputTokens: 4_096,
         attemptTimeoutMs: 45_000,
       };
     case "EVIDENCE_SYNTHESIS":
@@ -216,7 +216,14 @@ export function budgetForTaskClass(taskClass: ModelTextTaskClass): ModelBudget {
       return {
         maxAttempts: 3,
         maxEstimatedCostUsd: 0.5,
-        maxOutputTokens: 3_072,
+        // "Break what you just told me into actionable steps" is an
+        // ordinary request and a long answer, and the whole answer travels
+        // inside one JSON object. At 3,072 the ledger showed answers
+        // stopping at exactly the ceiling: the object never closed, so the
+        // parse failed, so every fallback model repeated it and the person
+        // was told the review could not be completed. Cost is still bounded
+        // by maxEstimatedCostUsd; only the room to finish a sentence is not.
+        maxOutputTokens: 8_192,
         attemptTimeoutMs: 60_000,
       };
     case "DEEP_INVESTIGATION":
@@ -684,6 +691,26 @@ export function createModelGatewayQAnswer(
       };
       let modelCalls = 0;
       let messages: ModelMessage[] = [...rendered.messages];
+      /**
+       * The gathering round's own, small prompt. Deciding whether to look
+       * something up needs the person's words and the tools, and nothing
+       * else: the facts are what a tool would add to, and the answer's
+       * rules apply to the answer. Same tools, same authorisation, a
+       * fraction of the tokens and of the wait.
+       */
+      const gatheringMessages: ModelMessage[] = [
+        GATHER_NOTE,
+        {
+          role: "USER",
+          content: [
+            `Subject: ${assembled.subjectDescription}`,
+            `${assembled.facts.length} authorised fact(s) are already available about it.`,
+            // Fenced here as everywhere else: a small prompt is not a
+            // reason for the person's words to arrive unmarked.
+            fenceUntrusted("userMessage", latest.content),
+          ].join("\n"),
+        },
+      ];
 
       try {
         let final:
@@ -710,8 +737,7 @@ export function createModelGatewayQAnswer(
                   // decides what to look up and calls it, or says it needs
                   // nothing. The gathering note is not part of the final
                   // answer's messages.
-                  messages:
-                    rounds === 0 ? [...messages, GATHER_NOTE] : messages,
+                  messages: rounds === 0 ? gatheringMessages : messages,
                   output: { kind: "TEXT" },
                   tools: offered.map((tool) => tool.definition),
                 },
@@ -737,18 +763,9 @@ export function createModelGatewayQAnswer(
               throw error;
             }
             if (result.output.kind === "TEXT") {
-              // The model answered without (further) tools: accept only the
-              // task's schema, exactly as the structured path would. A plain
-              // "nothing to look up" (or any other prose) means the answer
-              // is produced by the structured call that follows.
-              const accepted = acceptStructuredOutput(
-                result.output.text,
-                CompanyAnalystV2ResultSchema,
-              );
-              if (accepted.ok) {
-                final = result;
-                analyst = accepted.value;
-              }
+              // Nothing more to look up. Whatever prose it wrote here is
+              // discarded: the answer is produced by the structured call
+              // below, under the analyst's own rules.
               break;
             }
             if (result.output.kind !== "TOOL_CALLS") {
@@ -794,6 +811,8 @@ export function createModelGatewayQAnswer(
               results.push(toolResultMessage(call, outcome));
             }
             messages = [...messages, assistant, ...results];
+            // The next round continues the real transcript: the small
+            // gathering prompt existed only to ask the first question.
             if (request.signal?.aborted === true) {
               return { kind: "FAILED", diagnosticCode: "RUN_CANCELLED" };
             }

@@ -86,7 +86,7 @@ describe("Bright Data search and extract", () => {
         query: "vaultlyne",
         maxResults: 5,
         freshness: "ANY",
-        includeDomains: undefined,
+        includeDomains: [],
       },
       {},
     );
@@ -141,7 +141,7 @@ describe("Bright Data search and extract", () => {
           query: "x",
           maxResults: 3,
           freshness: "ANY",
-          includeDomains: undefined,
+          includeDomains: [],
         },
         {},
       ),

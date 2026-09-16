@@ -116,6 +116,9 @@ function fakeService(overrides: Partial<InvestorService> = {}) {
         deploymentState: "PAUSED",
       });
     },
+    // Visibility has its own route tests; this fake only has to satisfy
+    // the service shape.
+    setInvestorVisibility: () => Promise.resolve({ ...INVESTOR_A, version: 2 }),
     getMyInvestorRepresentative: () => Promise.resolve(REPRESENTATIVE),
     upsertMyInvestorRepresentative: (command) => {
       calls["upsert"]?.push(command);

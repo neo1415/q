@@ -103,6 +103,14 @@ type AttemptOutcome<T> =
       readonly failureClass: ModelFailureClass;
       readonly retryAfterMs: number | undefined;
       readonly cause: unknown;
+      /**
+       * The answer was cut off at the output ceiling rather than written
+       * badly. Observed in production: a long structured answer stopped at
+       * exactly maxOutputTokens, so the JSON never closed and every
+       * following attempt reproduced it on a different model. The next
+       * attempt raises the ceiling instead of blaming the next model.
+       */
+      readonly truncated?: boolean;
     };
 
 class AbortedError extends Error {
@@ -203,6 +211,9 @@ export function createModelGateway(
     attemptNumber: number,
     schema: z.ZodType<T> | undefined,
     callerSignal: AbortSignal,
+    // Set after an attempt ran out of room: ask this model for everything
+    // it will give rather than for the task's usual allowance.
+    reachForModelMaximum: boolean,
   ): Promise<AttemptOutcome<T> & { readonly record: ModelAttemptRecord }> {
     const labels = {
       provider: candidate.provider.code,
@@ -225,10 +236,12 @@ export function createModelGateway(
           request.budget.attemptTimeoutMs,
         );
         const signal = AbortSignal.any([callerSignal, timeoutSignal]);
-        const outputTokens = Math.min(
-          request.budget.maxOutputTokens,
-          candidate.model.maxOutputTokens,
-        );
+        const outputTokens = reachForModelMaximum
+          ? candidate.model.maxOutputTokens
+          : Math.min(
+              request.budget.maxOutputTokens,
+              candidate.model.maxOutputTokens,
+            );
         let outcome: AttemptOutcome<T>;
         let usage: ModelUsage | undefined;
         let cost: ModelCost | undefined;
@@ -308,13 +321,22 @@ export function createModelGateway(
             }
             const accepted = acceptStructuredOutput(result.text, schema);
             if (!accepted.ok) {
+              // Room, not competence: the model was still writing when the
+              // ceiling stopped it, so the object it was building could not
+              // close. Retrying the same request at the same ceiling on any
+              // model reproduces this exactly.
+              const truncated = result.finish === "MAX_OUTPUT_TOKENS";
               outcome = {
                 kind: "FAILURE",
                 failureClass: "INVALID_MODEL_OUTPUT",
                 retryAfterMs: undefined,
                 cause: undefined,
+                ...(truncated ? { truncated: true } : {}),
               };
               span.setAttribute("q.model.invalid_output_stage", accepted.stage);
+              if (truncated) {
+                span.setAttribute("q.model.output_truncated", true);
+              }
             } else {
               outcome = {
                 kind: "SUCCESS",
@@ -582,6 +604,12 @@ export function createModelGateway(
     let lastFailure: ModelFailureClass | undefined;
     let lastCause: unknown;
     let attemptNumber = 0;
+    /**
+     * An earlier answer hit the ceiling; later attempts ask for more. Held
+     * on an object rather than in a local so that reading it before an
+     * attempt does not depend on what that attempt turns out to be.
+     */
+    const room: { ranOut: boolean } = { ranOut: false };
 
     for (const candidate of plan.eligible) {
       const provider = dependencies.registry.get(candidate.provider.code);
@@ -629,6 +657,7 @@ export function createModelGateway(
           attemptNumber,
           schema,
           callerSignal,
+          room.ranOut,
         );
         attempts.push(outcome.record);
         spentUsd +=
@@ -676,6 +705,10 @@ export function createModelGateway(
 
         lastFailure = outcome.failureClass;
         lastCause = outcome.cause;
+        // Once an answer has been cut off, every later attempt asks for the
+        // most the chosen model will write. It never goes back down: the
+        // question that needed the room still needs it.
+        room.ranOut = room.ranOut || outcome.truncated === true;
         if (outcome.failureClass === "CANCELLED") {
           // The person stopped it. No retry, no fallback, no second answer.
           throw new ModelGatewayError("model request cancelled", {

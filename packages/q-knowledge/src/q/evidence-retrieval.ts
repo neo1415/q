@@ -18,6 +18,7 @@ import type { AuthorisedRetrievalResult } from "../retrieval/contracts.js";
 import { envelopeFromPlan } from "../retrieval/envelope.js";
 import type { ChunkHydrationPort } from "../retrieval/ports.js";
 import type { AuthorisedRetrievalService } from "../retrieval/service.js";
+import type { KnowledgeSubjectRef } from "../knowledge/contracts.js";
 import {
   knowledgeConstraintsFor,
   type KnowledgeQueryService,
@@ -201,14 +202,47 @@ export function createQEvidenceRetrieval(
     if (constraints.length === 0) {
       return [];
     }
-    const companies = plan.subjects.flatMap((subject) =>
-      subject.kind === "COMPANY" ? [subject.companyId] : [],
+    // All three subject types an understanding can be about (doc 14 §2.2),
+    // not only companies.
+    //
+    // This was reading companies alone, which meant the public presence
+    // built for a person at arrival — their own site, their own posts,
+    // gated and stored — was written and then never consulted when Q
+    // answered. A USER subject resolves only to oneself (the self resolver
+    // in q-runtime refuses any other id), so reading a person's own
+    // understanding here discloses nothing new; the plan's constraints
+    // still decide every row.
+    const subjects = plan.subjects.flatMap(
+      (subject): readonly KnowledgeSubjectRef[] => {
+        switch (subject.kind) {
+          case "COMPANY":
+            return [{ subjectType: "COMPANY", subjectId: subject.companyId }];
+          case "USER":
+            return [{ subjectType: "PERSON", subjectId: subject.userId }];
+          case "INVESTOR_ORGANISATION":
+            return [
+              {
+                subjectType: "INVESTOR_ORGANISATION",
+                subjectId: subject.investorOrganisationId,
+              },
+            ];
+          // An understanding is about a company, a person or an investor
+          // organisation, and nothing else (doc 14 §2.2). These are named
+          // rather than defaulted so that a new subject kind has to be
+          // decided here instead of silently dropping.
+          case "RELATIONSHIP":
+          case "DOCUMENT":
+          case "CAPITAL_OBJECTIVE":
+          case "ORGANISATION":
+            return [];
+        }
+      },
     );
     const facts: AuthorisedFact[] = [];
-    for (const companyId of companies) {
+    for (const subject of subjects) {
       const known = await knowledge.currentForSubject(
         { tenantId: plan.tenantId, constraints },
-        { subjectType: "COMPANY", subjectId: companyId },
+        subject,
       );
       for (const entry of known) {
         facts.push({

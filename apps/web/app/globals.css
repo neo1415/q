@@ -156,6 +156,33 @@
       transparent 120%
     );
   }
+  /* The appearance choice: three plain options, the current one filled. */
+  .cq-appearance-option {
+    min-height: 36px;
+    border-radius: 999px;
+    border: 1px solid var(--cq-border-subtle);
+    padding: 0 14px;
+    font: inherit;
+    font-size: 13px;
+    color: var(--cq-text-secondary);
+    background: transparent;
+    cursor: pointer;
+    transition:
+      color var(--cq-motion-fast),
+      background-color var(--cq-motion-fast),
+      border-color var(--cq-motion-fast);
+  }
+  .cq-appearance-option:hover {
+    color: var(--cq-text-primary);
+    background: var(--cq-surface-subtle);
+  }
+  .cq-appearance-option.is-active {
+    color: var(--cq-text-primary);
+    border-color: var(--cq-border-strong);
+    background: var(--cq-accent-soft);
+    font-weight: 500;
+  }
+
   .cq-discover-list > li + li {
     border-top: 1px solid var(--cq-border-subtle);
   }

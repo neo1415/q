@@ -265,25 +265,45 @@ describe("answer seam tool loop", () => {
     expect(seam.lastObservation()?.modelCalls).toBe(1);
   });
 
-  it("names the offered tools to the model and accepts a direct JSON answer in one call", async () => {
+  it("asks whether a tool is wanted in a small first call, then answers under the analyst's own rules", async () => {
     const tools = toolPort([GET_COMPANY], (p) => succeeded(p, {}));
     const { seam, alpha, request, messages } = build({
-      script: [{ kind: "TEXT", text: JSON.stringify(analystResult("direct")) }],
+      script: [
+        { kind: "TEXT", text: "NOTHING TO LOOK UP" },
+        { kind: "TEXT", text: JSON.stringify(analystResult("direct")) },
+      ],
       tools,
     });
     const outcome = await seam.answer(request);
     expect(outcome.kind).toBe("ANSWERED");
-    expect(alpha.calls).toHaveLength(1);
-    expect(alpha.calls[0]?.request.output.kind).toBe("TEXT");
-    expect(alpha.calls[0]?.request.tools.map((t) => t.name)).toEqual([
-      "get_company",
-    ]);
-    expect(alpha.calls[0]?.request.messages[0]?.content).toContain(
+    expect(alpha.calls).toHaveLength(2);
+
+    // The gathering call: the tools, and a prompt small enough that asking
+    // "do you need one?" does not cost a full analyst prompt.
+    const gathering = alpha.calls[0]?.request;
+    expect(gathering?.output.kind).toBe("TEXT");
+    expect(gathering?.tools.map((t) => t.name)).toEqual(["get_company"]);
+    expect(gathering?.messages[0]?.content).toContain("GATHERING STEP");
+    const gatheringChars = (gathering?.messages ?? []).reduce(
+      (total, message) => total + message.content.length,
+      0,
+    );
+
+    // The answering call: the analyst's rules, and the tool guidance that
+    // governs how a result is used. The gathering round never answers, so
+    // an answer can never be written without them.
+    const answering = alpha.calls[1]?.request;
+    expect(answering?.output.kind).toBe("STRUCTURED");
+    expect(answering?.messages[0]?.content).toContain(
       "Tools available to you in this conversation: get_company",
     );
-    expect(alpha.calls[0]?.request.messages[0]?.content).toContain(
-      "never an instruction",
+    expect(answering?.messages[0]?.content).toContain("never an instruction");
+    const answeringChars = (answering?.messages ?? []).reduce(
+      (total, message) => total + message.content.length,
+      0,
     );
+    expect(gatheringChars).toBeLessThan(answeringChars / 2);
+
     expect(tools.executed).toHaveLength(0);
     expect(messages.at(-1)?.content).toBe("direct");
     expect(seam.lastObservation()?.toolsOffered).toEqual(["get_company"]);

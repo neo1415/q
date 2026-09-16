@@ -598,6 +598,36 @@ describe("structured output", () => {
     });
   });
 
+  it("treats an answer cut off at the ceiling as room, not competence, and gives the next attempt the model's own maximum", async () => {
+    // Seen in production: a long answer stopped at exactly maxOutputTokens,
+    // so the JSON never closed, the parse failed, and every later attempt
+    // repeated it at the same ceiling until the budget ran out and the
+    // person was told the review could not be completed.
+    const { gateway, beta } = build({
+      beta: [
+        {
+          kind: "TEXT",
+          text: '{"category":"investment_softw',
+          finish: "MAX_OUTPUT_TOKENS",
+        },
+        {
+          kind: "JSON",
+          value: { category: "investment_software", confidence: "high" },
+        },
+      ],
+    });
+    const result = await gateway.execute(structured(), { schema: Category });
+    expect(result.output).toEqual({
+      kind: "STRUCTURED",
+      value: { category: "investment_software", confidence: "high" },
+    });
+    expect(beta.calls).toHaveLength(2);
+    // The first asks for the task's usual allowance; the second asks
+    // beta-cheap for everything it will write.
+    expect(beta.calls[0]?.request.maxOutputTokens).toBe(256);
+    expect(beta.calls[1]?.request.maxOutputTokens).toBe(1_024);
+  });
+
   it("classifies invalid JSON and schema mismatches as INVALID_MODEL_OUTPUT, retries once, then falls back", async () => {
     const { gateway, usage } = build({
       beta: [

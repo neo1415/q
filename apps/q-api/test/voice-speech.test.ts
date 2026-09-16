@@ -134,10 +134,10 @@ describe("withFiller (D §53)", () => {
       withFiller(slow(["Seed rounds run from $500k."], gate), {
         filler: "Let me check that.",
         afterMs: 2_500,
-        setTimeout: ((callback: () => void) => {
+        setTimeout: (callback: () => void) => {
           fire = callback;
           return 1 as never;
-        }) as never,
+        },
         clearTimeout: () => undefined,
       }),
     );
