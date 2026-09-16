@@ -4,7 +4,7 @@
   "recordedAt": "2026-09-06T15:18:29.493Z",
   "environment": {
     "orchestrationVersion": "q-orchestrator-v5",
-    "firewallPolicyVersion": "context-firewall-v1",
+    "firewallPolicyVersion": "context-firewall-v2",
     "promptBundleVersions": ["q-system.v1_company-analyst.v1_comm.v1"],
     "toolVersions": [
       "capital_objective.get/v1",

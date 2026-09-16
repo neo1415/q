@@ -695,7 +695,7 @@ against row-derived text.
 
 ## The plan (`PermittedContextPlan`, INTERNAL)
 
-`contractVersion` 1, `policyVersion` `context-firewall-v1`, a fresh `planId`
+`contractVersion` 1, `policyVersion` `context-firewall-v2`, a fresh `planId`
 per evaluation, a `fingerprint` over the policy-relevant content (identical
 inputs → identical fingerprint, so a re-plan can be compared without holding
 the old plan), the run and tenant ids, the actor (user + organisation), the

@@ -36,7 +36,7 @@ function plan(
 ): PermittedContextPlan {
   return {
     contractVersion: 1,
-    policyVersion: "context-firewall-v1",
+    policyVersion: "context-firewall-v2",
     planId: "77777777-7777-4777-8777-777777777777",
     fingerprint: "a".repeat(64),
     runId: RUN,
@@ -132,7 +132,7 @@ function build(planned: PermittedContextPlan) {
     sql: {} as never,
     repositories: {
       messages: {
-        listForRun: () =>
+        listRecentForConversationOfRun: () =>
           Promise.resolve([
             { role: "USER", content: "what do you know about me?" },
           ]),

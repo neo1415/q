@@ -146,12 +146,16 @@ export function createSpecialistQAnswer(
   return {
     lastResult: () => last,
     answer: async (request: QAnswerRequest): Promise<QAnswerOutcome> => {
-      const history = await repositories.messages.listForRun(
-        sql,
-        request.tenantId,
-        request.runId,
-        64,
-      );
+      // The conversation, not the run: a voice turn is its own run, and a
+      // specialist that sees one sentence cannot follow what is being
+      // talked about.
+      const history =
+        await repositories.messages.listRecentForConversationOfRun(
+          sql,
+          request.tenantId,
+          request.runId,
+          64,
+        );
       const conversationId = history[0]?.conversationId;
       const latest = [...history].reverse().find((m) => m.role === "USER");
       if (conversationId === undefined || latest === undefined) {

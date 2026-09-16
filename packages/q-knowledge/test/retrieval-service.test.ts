@@ -33,7 +33,7 @@ function envelope(
   return {
     planId: "77777777-7777-4777-8777-777777777777",
     planFingerprint: "a".repeat(64),
-    policyVersion: "context-firewall-v1",
+    policyVersion: "context-firewall-v2",
     tenantId: TENANT,
     actorUserId: "22222222-2222-4222-8222-222222222222",
     organisationId: "33333333-3333-4333-8333-333333333333",

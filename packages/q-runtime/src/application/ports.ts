@@ -3,6 +3,7 @@ import type {
   QMessageId,
   QRunId,
   QRunStatus,
+  QSubjectRef,
   QVisibleStage,
   UtcTimestamp,
 } from "@capital-q/contracts";
@@ -52,6 +53,20 @@ export type QConversationRepository = {
     executor: DatabaseExecutor,
     conversationId: QConversationId,
   ) => Promise<{ readonly tenantId: TenantId; readonly userId: UserId } | null>;
+  /**
+   * What the conversation is about, replaced.
+   *
+   * Set when a turn names a subject, so the next turn inherits it. Each
+   * subject is re-resolved for the actor on every run, so recording one
+   * here grants nothing: it is a memory of what was being discussed, not
+   * a standing permission.
+   */
+  readonly setSubjects: (
+    tx: TransactionContext,
+    tenantId: TenantId,
+    conversationId: QConversationId,
+    subjects: readonly QSubjectRef[],
+  ) => Promise<void>;
 };
 
 export type QRunTransition = {
@@ -136,6 +151,22 @@ export type QConversationMessageRepository = {
   ) => Promise<QConversationMessage | null>;
   /** Oldest first, bounded. */
   readonly listForRun: (
+    executor: DatabaseExecutor,
+    tenantId: TenantId,
+    runId: QRunId,
+    limit: number,
+  ) => Promise<readonly QConversationMessage[]>;
+  /**
+   * The most recent messages of the CONVERSATION the run belongs to,
+   * oldest first, bounded.
+   *
+   * A voice turn is its own run, so run-scoped history meant Q could not
+   * see the sentence it had spoken a moment earlier: it named a company,
+   * was asked "tell me more about it", and answered that no company had
+   * been named. A conversation is the thing a person is having; a run is
+   * one turn of it.
+   */
+  readonly listRecentForConversationOfRun: (
     executor: DatabaseExecutor,
     tenantId: TenantId,
     runId: QRunId,

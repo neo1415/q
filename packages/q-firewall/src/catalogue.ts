@@ -192,6 +192,28 @@ export const SCOPE_CATALOGUE: Readonly<Record<QKnowledgeScopeKind, ScopeSpec>> =
       sharedVia: null,
       isEvidence: false,
     },
+    OWN_PUBLIC_PRESENCE: {
+      kind: "OWN_PUBLIC_PRESENCE",
+      bound: true,
+      // The label the presence build writes at: material read from the
+      // open web, held as the subject's own organisation's understanding.
+      defaultLabel: "organisation_private",
+      ownerSensitivity: "INTERNAL",
+      // Unreachable while sharedVia is null, and kept honest anyway: a
+      // reading of somebody's public footprint is not public data.
+      sharedSensitivity: "INTERNAL",
+      layer: "KNOWLEDGE_OBJECTS",
+      // A person's presence is personal context; a company's is identity.
+      // The union is declared because one row serves all three subjects.
+      factCategories: ["PERSONAL_CONTEXT", "COMPANY_IDENTITY"],
+      // Reading back what Capital Q understands about oneself needs no
+      // capability beyond being that side; the relation decides it.
+      ownerCapability: null,
+      // No disclosure resource grants another party someone's presence.
+      // If that is ever wanted it is a product decision with its own row.
+      sharedVia: null,
+      isEvidence: true,
+    },
     NETWORK_VISIBLE_DATA: {
       kind: "NETWORK_VISIBLE_DATA",
       bound: false,

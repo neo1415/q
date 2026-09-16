@@ -180,6 +180,9 @@ function build(options: {
   const repositories = {
     messages: {
       listForRun: () => Promise.resolve([...messages]),
+      // The seam reads the conversation, not the run; the fake has one
+      // conversation, so both return the same thing.
+      listRecentForConversationOfRun: () => Promise.resolve([...messages]),
       insert: (
         _tx: unknown,
         input: { role: "USER" | "Q"; content: string },

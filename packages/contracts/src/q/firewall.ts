@@ -30,7 +30,7 @@ import { QSubjectRefSchema, QSubjectRefsSchema } from "./subject.js";
  */
 
 /** The deterministic policy generation that produced a plan. Never "latest". */
-export const Q_CONTEXT_FIREWALL_POLICY_VERSION = "context-firewall-v1" as const;
+export const Q_CONTEXT_FIREWALL_POLICY_VERSION = "context-firewall-v2" as const;
 
 /** Context labels: exactly ADR-001's disclosure scopes. No alias vocabulary. */
 export const QContextLabelSchema = MarketplaceVisibilitySchema;
@@ -88,6 +88,18 @@ export const Q_KNOWLEDGE_SCOPE_KINDS = [
   "EVIDENCE_DOCUMENTS",
   /** The actor's own Q conversation (personal_private). */
   "OWN_Q_CONVERSATION",
+  /**
+   * What Capital Q understands about a subject from that subject's own
+   * public footprint: their site, their profile, what they publish.
+   *
+   * Owner side only. It exists because a presence build researches a
+   * person, a company or an investor organisation, drops every page that
+   * does not name them, registers the evidence and writes through the
+   * Write Gate — and without a scope that authorises reading it back, all
+   * of that was performed and then discarded. The material is public; the
+   * reading of it is the subject's own and is never shared by this row.
+   */
+  "OWN_PUBLIC_PRESENCE",
   /** Anything classified network_visible across Capital Q. */
   "NETWORK_VISIBLE_DATA",
   /** Anything classified public_external. */

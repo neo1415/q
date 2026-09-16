@@ -279,6 +279,12 @@ export function createPostgresQRuntimeRepositories(): QRuntimeRepositories {
         return created;
       },
       findForOwner: findConversationForOwner,
+      setSubjects: async (tx, tenantId, conversationId, subjects) => {
+        await tx.sql`
+          update q_runtime.conversations
+             set subject_refs = ${JSON.stringify(subjects)}::text::jsonb
+           where id = ${conversationId} and tenant_id = ${tenantId}`;
+      },
       findOwnership: async (executor, conversationId) => {
         const rows = await executor`
           select c.tenant_id, c.user_id
@@ -422,6 +428,27 @@ export function createPostgresQRuntimeRepositories(): QRuntimeRepositories {
            order by m.created_at asc, m.id asc
            limit ${limit}`;
         return rows.map(toMessage);
+      },
+      listRecentForConversationOfRun: async (
+        executor,
+        tenantId,
+        runId,
+        limit,
+      ) => {
+        // The newest `limit` of the conversation, then put back in the
+        // order they were said. Taking the OLDEST would hand a long
+        // conversation its opening and hide the part being talked about.
+        const rows = await executor`
+          ${selectMessage(executor)}
+           where m.tenant_id = ${tenantId}
+             and m.conversation_id = (
+               select c.conversation_id
+                 from q_runtime.conversation_messages c
+                where c.run_id = ${runId} and c.tenant_id = ${tenantId}
+                limit 1)
+           order by m.created_at desc, m.id desc
+           limit ${limit}`;
+        return rows.map(toMessage).reverse();
       },
     },
 

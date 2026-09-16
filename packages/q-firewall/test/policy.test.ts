@@ -61,7 +61,7 @@ function scope(
 
 describe("policy version", () => {
   it("is explicit and stable", () => {
-    expect(CONTEXT_FIREWALL_POLICY_VERSION).toBe("context-firewall-v1");
+    expect(CONTEXT_FIREWALL_POLICY_VERSION).toBe("context-firewall-v2");
     expect(CONTEXT_FIREWALL_POLICY_VERSION).not.toMatch(/latest/i);
   });
 });
@@ -154,11 +154,45 @@ describe("purpose policy", () => {
     );
   });
 
+  it("lets a person reach what Capital Q understands of their own public footprint", () => {
+    // The presence build researches a person, drops every page that does
+    // not name them, and writes through the Write Gate. Without a scope
+    // that authorises reading it back, all of that was performed and then
+    // discarded, and Q answered "I have nothing about you".
+    //
+    // A USER subject is only ever oneself: the self resolver admits no
+    // other person, and this row is never shared (sharedVia is null), so
+    // widening the read does not widen disclosure.
+    expect(candidateScopeKinds("ANSWER", "USER")).toEqual([
+      "OWN_Q_CONVERSATION",
+      "OWN_PUBLIC_PRESENCE",
+    ]);
+    // Classifying a sentence never needs to know who somebody is.
+    expect(candidateScopeKinds("CLASSIFY", "USER")).toEqual([
+      "OWN_Q_CONVERSATION",
+    ]);
+    expect(candidateScopeKinds("ANSWER", "INVESTOR_ORGANISATION")).toContain(
+      "OWN_PUBLIC_PRESENCE",
+    );
+
+    const spec = SCOPE_CATALOGUE["OWN_PUBLIC_PRESENCE"];
+    // Owner side only, forever: nothing grants somebody else's reading of
+    // a person to a counterparty, and no label here is network or public.
+    expect(spec.sharedVia).toBeNull();
+    expect(spec.defaultLabel).toBe("organisation_private");
+    expect(spec.ownerSensitivity).not.toBe("PUBLIC");
+    expect(spec.sharedSensitivity).not.toBe("NETWORK_VISIBLE");
+  });
+
   it("gives a plain answer the minimum: profile, capital objective and own evidence, no financials", () => {
     expect(candidateScopeKinds("ANSWER", "COMPANY")).toEqual([
       "COMPANY_PROFILE",
       "COMPANY_CAPITAL_OBJECTIVE",
       "EVIDENCE_DOCUMENTS",
+      // What Capital Q understands of the company's own public footprint.
+      // It is the company's own material, read from the open web, so a
+      // plain answer may use it; nothing here shares it with anyone else.
+      "OWN_PUBLIC_PRESENCE",
     ]);
     expect(candidateScopeKinds("ANSWER", "COMPANY")).not.toContain(
       "COMPANY_PRIVATE_FINANCIALS",

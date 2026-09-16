@@ -78,6 +78,7 @@ export function candidateScopeKinds(
             "COMPANY_PROFILE",
             "COMPANY_CAPITAL_OBJECTIVE",
             "EVIDENCE_DOCUMENTS",
+            "OWN_PUBLIC_PRESENCE",
           ];
         case "INVESTIGATE":
         case "ASSESS":
@@ -86,6 +87,7 @@ export function candidateScopeKinds(
             "COMPANY_CAPITAL_OBJECTIVE",
             "COMPANY_PRIVATE_FINANCIALS",
             "EVIDENCE_DOCUMENTS",
+            "OWN_PUBLIC_PRESENCE",
           ];
         case "COMPARE":
           return ["COMPANY_PROFILE", "COMPANY_CAPITAL_OBJECTIVE"];
@@ -99,7 +101,11 @@ export function candidateScopeKinds(
         case "ANSWER":
         case "INVESTIGATE":
         case "ASSESS":
-          return ["INVESTOR_PROFILE", "INVESTOR_MANDATE"];
+          return [
+            "INVESTOR_PROFILE",
+            "INVESTOR_MANDATE",
+            "OWN_PUBLIC_PRESENCE",
+          ];
         case "COMPARE":
         case "CLASSIFY":
         case "PREPARE_ACTION":
@@ -113,7 +119,13 @@ export function candidateScopeKinds(
     case "DOCUMENT":
       return ["EVIDENCE_DOCUMENTS"];
     case "USER":
-      return ["OWN_Q_CONVERSATION"];
+      // A USER subject is only ever oneself. What Capital Q understands
+      // about the person from their own public footprint belongs to the
+      // person, and answering "what do you know about me" without it means
+      // the arrival research was performed and thrown away.
+      return capability === "CLASSIFY"
+        ? ["OWN_Q_CONVERSATION"]
+        : ["OWN_Q_CONVERSATION", "OWN_PUBLIC_PRESENCE"];
     case "ORGANISATION":
       // An organisation is a context, not knowledge.
       return [];

@@ -50,7 +50,7 @@ function observation(
       promptBundleVersion: "q-system.v1",
       orchestrationVersion: "q-orchestrator-v5",
       routingPolicyCode: "normal_dialogue.v1",
-      firewallPolicyVersion: "context-firewall-v1",
+      firewallPolicyVersion: "context-firewall-v2",
       toolVersions: ["company.get/v1"],
       latencyMs: 120,
       timeToFirstEventMs: null,
@@ -471,7 +471,7 @@ describe("reports and baselines", () => {
       environment: {
         contractsVersion: "0.0.0",
         orchestrationVersion: "q-orchestrator-v5",
-        firewallPolicyVersion: "context-firewall-v1",
+        firewallPolicyVersion: "context-firewall-v2",
         toolVersions: ["company.get/v1"],
         promptBundleVersions: ["q-system.v1"],
         routingPolicyCodes: ["normal_dialogue.v1"],

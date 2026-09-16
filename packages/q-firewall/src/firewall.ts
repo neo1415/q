@@ -333,6 +333,31 @@ export function createContextFirewall(
           });
           break;
 
+        case "OWN_PUBLIC_PRESENCE":
+          // Bound to whichever subject the plan named, so the knowledge
+          // read is restricted to that subject and nothing else. A USER
+          // subject has already been resolved to the actor themselves;
+          // the self resolver admits no other person.
+          candidates.push({
+            spec,
+            subject,
+            resource: subject.resource,
+            filter: {
+              ...base,
+              ...(subject.companyId === undefined
+                ? {}
+                : { companyId: subject.companyId }),
+              ...(subject.investorOrganisationId === undefined
+                ? {}
+                : { investorOrganisationId: subject.investorOrganisationId }),
+              ...(subject.ref.kind === "USER"
+                ? { userId: subject.ref.userId }
+                : {}),
+            },
+            labels: undefined,
+          });
+          break;
+
         case "NETWORK_VISIBLE_DATA":
         case "PUBLIC_EXTERNAL_DATA":
         case "GENERAL_MODEL_KNOWLEDGE":
@@ -737,10 +762,34 @@ function resourceTypeFor(
       return "investor_organisation";
     case "RELATIONSHIP_CONTEXT":
       return "relationship";
+    case "OWN_PUBLIC_PRESENCE":
+      return presenceResourceTypeFor(subject);
     case "OWN_Q_CONVERSATION":
     case "NETWORK_VISIBLE_DATA":
     case "PUBLIC_EXTERNAL_DATA":
     case "GENERAL_MODEL_KNOWLEDGE":
+      return "q_run";
+  }
+}
+
+/**
+ * One presence row serves three subject kinds, so the resource follows the
+ * subject. Nothing but the owning side can ever hold this scope, so the
+ * resource only has to name the thing the owner owns; a person's own
+ * presence hangs off the run, as their own conversation does, because
+ * there is no resource another party could be granted it on.
+ */
+function presenceResourceTypeFor(subject: ResolvedSubject): string {
+  switch (subject.kind) {
+    case "INVESTOR_ORGANISATION":
+      return "investor_organisation";
+    case "COMPANY":
+    case "CAPITAL_OBJECTIVE":
+    case "DOCUMENT":
+      return "company";
+    case "USER":
+    case "RELATIONSHIP":
+    case "ORGANISATION":
       return "q_run";
   }
 }

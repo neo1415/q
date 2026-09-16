@@ -545,12 +545,22 @@ export function createModelGatewayQAnswer(
         sensitivityPolicy.kind === "FROM_PLAN"
           ? plan.maxSensitivity
           : sensitivityPolicy.sensitivity;
-      const history = await repositories.messages.listForRun(
-        sql,
-        request.tenantId,
-        request.runId,
-        64,
-      );
+      /**
+       * Everything recently said in this CONVERSATION, not in this run.
+       *
+       * A voice turn is a run of its own, so run-scoped history gave the
+       * model a single sentence and no past: Q named a company, was asked
+       * "tell me more about it", and answered that no company had been
+       * named. The person is having one conversation; which run a sentence
+       * belonged to is our bookkeeping, not theirs.
+       */
+      const history =
+        await repositories.messages.listRecentForConversationOfRun(
+          sql,
+          request.tenantId,
+          request.runId,
+          64,
+        );
       const conversationId = history[0]?.conversationId;
       const latest = [...history].reverse().find((m) => m.role === "USER");
       if (conversationId === undefined || latest === undefined) {

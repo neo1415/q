@@ -99,8 +99,8 @@ export function createCreateQRun(dependencies: QRuntimeDependencies) {
     // Every subject must resolve in the actor's tenant through its owning
     // context's port. Unsupported kinds and unresolvable subjects both stop
     // the request before anything is written.
-    const refs: readonly QSubjectRef[] = input.subjects ?? [];
-    for (const ref of refs) {
+    const requested: readonly QSubjectRef[] = input.subjects ?? [];
+    for (const ref of requested) {
       if (!subjects.supports(ref.kind)) {
         throw new QSubjectUnsupportedError(ref.kind);
       }
@@ -108,6 +108,37 @@ export function createCreateQRun(dependencies: QRuntimeDependencies) {
       if (resolved === null) {
         throw new QSubjectNotFoundError();
       }
+    }
+
+    /**
+     * A conversation stays about what it was about until somebody changes
+     * the subject.
+     *
+     * A voice turn is a run of its own and carries no subject, so every
+     * turn arrived with an empty list: Q named a company and, asked to say
+     * more about it, replied that no company had been named. Carrying the
+     * conversation's own subjects forward is what a person means by "it".
+     *
+     * Inherited subjects are re-resolved here like any other, and a
+     * subject that no longer resolves for this actor is simply dropped
+     * rather than refused: a share can be revoked between two sentences,
+     * and that ends the subject, it does not fail the question. Recording
+     * a subject therefore grants nothing — authority is decided per run,
+     * by the firewall, after this.
+     */
+    let refs: readonly QSubjectRef[] = requested;
+    if (requested.length === 0 && existing !== null) {
+      const carried: QSubjectRef[] = [];
+      for (const ref of existing.subjects) {
+        if (!subjects.supports(ref.kind)) {
+          continue;
+        }
+        const resolved = await subjects.resolve(actor, ref);
+        if (resolved !== null) {
+          carried.push(ref);
+        }
+      }
+      refs = carried;
     }
 
     const keyHash = hashRunIdempotencyKey(command.idempotencyKey);
@@ -136,6 +167,17 @@ export function createCreateQRun(dependencies: QRuntimeDependencies) {
           organisationId,
           subjects: refs,
         }));
+
+      // A turn that names a subject changes what the conversation is
+      // about, so the next turn inherits the new one rather than the old.
+      if (existing !== null && requested.length > 0) {
+        await repositories.conversations.setSubjects(
+          tx,
+          actor.tenantId,
+          conversation.id,
+          refs,
+        );
+      }
 
       const run = await repositories.runs.insert(tx, {
         tenantId: actor.tenantId,

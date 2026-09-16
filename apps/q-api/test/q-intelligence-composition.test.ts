@@ -229,6 +229,7 @@ function fakeRepositories(userMessage: string) {
     repositories: {
       messages: {
         listForRun: () => Promise.resolve([...messages]),
+        listRecentForConversationOfRun: () => Promise.resolve([...messages]),
         insert: (_tx: unknown, input: { role: string; content: string }) => {
           const message = {
             ...messages[0],

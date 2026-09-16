@@ -73,6 +73,7 @@ type World = {
   readonly tenantA: string;
   readonly tenantB: string;
   readonly companyA: string;
+  readonly companyA2: string;
   readonly companyB: string;
   readonly adminA: Person;
   readonly memberA: Person;
@@ -227,6 +228,7 @@ describe("@capital-q/q-runtime against local PostgreSQL", () => {
         const orgA = await insertOrganisation(tx, tenantA, "Org A");
         const orgB = await insertOrganisation(tx, tenantB, "Org B");
         const companyA = await insertCompany(tx, tenantA, orgA, "Apex A");
+        const companyA2 = await insertCompany(tx, tenantA, orgA, "Apex A2");
         const companyB = await insertCompany(tx, tenantB, orgB, "Apex B");
         const adminA = await insertMember(tx, tenantA, orgA);
         const memberA = await insertMember(tx, tenantA, orgA);
@@ -241,6 +243,7 @@ describe("@capital-q/q-runtime against local PostgreSQL", () => {
           tenantA,
           tenantB,
           companyA,
+          companyA2,
           companyB,
           adminA,
           memberA,
@@ -373,8 +376,9 @@ describe("@capital-q/q-runtime against local PostgreSQL", () => {
           capability: "COMPARE",
           conversationId: first.conversation.id,
           message: { text: "And compared to last quarter?" },
-          // Different subjects for this run: the conversation's own are
-          // never rewritten.
+          // This turn names nothing, which is what "and compared to last
+          // quarter?" is: a question about what is already being
+          // discussed.
           subjects: [],
         }),
         idempotencyKey: "create-0004",
@@ -387,11 +391,60 @@ describe("@capital-q/q-runtime against local PostgreSQL", () => {
       expect(second.conversation.subjects).toEqual([
         { kind: "COMPANY", companyId: companyA },
       ]);
+      // And the run itself inherits it, re-resolved for this actor. A turn
+      // that names nothing used to arrive with no subject at all, so Q
+      // answered that no company had been named one sentence after naming
+      // one.
+      expect(second.run.subjects).toEqual([
+        { kind: "COMPANY", companyId: companyA },
+      ]);
 
       const runs = await tx.sql<
         { id: string }[]
       >`select id from q_runtime.runs where conversation_id = ${first.conversation.id} order by created_at`;
       expect(runs.map((r) => r.id)).toEqual([first.run.id, second.run.id]);
+    });
+  });
+
+  it("changes the subject when a turn names a different one, and carries the new one on", async () => {
+    await withWorld(async ({ service, adminA, companyA, companyA2 }) => {
+      const first = await service.createRun({
+        actor: adminA.actor,
+        input: request({
+          subjects: [{ kind: "COMPANY", companyId: companyA }],
+        }),
+        idempotencyKey: "create-0003b",
+        correlationId: CORRELATION(),
+      });
+
+      const moved = await service.createRun({
+        actor: adminA.actor,
+        input: request({
+          conversationId: first.conversation.id,
+          message: { text: "Actually, tell me about the other one." },
+          subjects: [{ kind: "COMPANY", companyId: companyA2 }],
+        }),
+        idempotencyKey: "create-0004b",
+        correlationId: CORRELATION(),
+      });
+      expect(moved.run.subjects).toEqual([
+        { kind: "COMPANY", companyId: companyA2 },
+      ]);
+
+      const after = await service.createRun({
+        actor: adminA.actor,
+        input: request({
+          conversationId: first.conversation.id,
+          message: { text: "And how big is it?" },
+          subjects: [],
+        }),
+        idempotencyKey: "create-0005b",
+        correlationId: CORRELATION(),
+      });
+      // "It" is the one just named, not the one the conversation opened on.
+      expect(after.run.subjects).toEqual([
+        { kind: "COMPANY", companyId: companyA2 },
+      ]);
     });
   });
 

@@ -977,7 +977,7 @@ describe("@capital-q/q-firewall against local PostgreSQL", () => {
       if (first.outcome === "AUTHORISED" && second.outcome === "AUTHORISED") {
         expect(first.plan.fingerprint).toBe(second.plan.fingerprint);
         expect(first.plan.planId).not.toBe(second.plan.planId);
-        expect(first.plan.policyVersion).toBe("context-firewall-v1");
+        expect(first.plan.policyVersion).toBe("context-firewall-v2");
         expect(first.plan.revalidateOnResume).toBe(true);
         expect(Date.parse(first.plan.revalidateAfter)).toBeGreaterThan(
           Date.parse(first.plan.evaluatedAt),

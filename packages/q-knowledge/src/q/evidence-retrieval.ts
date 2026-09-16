@@ -141,12 +141,15 @@ export function createQEvidenceRetrieval(
       // them: decomposition is a later specialist's job, and a deterministic
       // query is one fewer place for an injected instruction to be laundered
       // into a search.
-      const history = await repositories.messages.listForRun(
-        sql,
-        request.tenantId,
-        request.runId,
-        8,
-      );
+      // The conversation, not the run. The query is the person's own
+      // words, and on a voice turn the run holds only the newest sentence.
+      const history =
+        await repositories.messages.listRecentForConversationOfRun(
+          sql,
+          request.tenantId,
+          request.runId,
+          8,
+        );
       const latest = [...history].reverse().find((m) => m.role === "USER");
       if (latest === undefined) {
         return {
