@@ -116,7 +116,11 @@ export const Q_PUBLIC_FAILURE_MESSAGES: Readonly<
   ACTION_EXPIRED:
     "The prepared action is no longer available. Ask Q to prepare it again if you still need it.",
   CANCELLED: "This request was cancelled.",
-  EXPIRED: "This request expired before it could finish. Please try again.",
+  // Not a deadline: a run is only ever marked expired by the sweep that
+  // runs when Q starts, over runs that were still going when it last
+  // stopped. Saying "expired" implied a clock the person had run out of,
+  // and there is none. What is true is that it never finished.
+  EXPIRED: "That one didn't finish. Ask again and I'll start it fresh.",
   Q_FAILED: "Q couldn't complete this request. Please try again.",
 };
 

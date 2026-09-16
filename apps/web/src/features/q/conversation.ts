@@ -277,6 +277,9 @@ const RECOVERY_HINTS: Readonly<Partial<Record<string, string>>> = {
     "Ask it again in a moment, or ask for something smaller and build up.",
   NOT_AVAILABLE_IN_CONTEXT:
     "Say which company or investor you mean, or finish setting one up.",
+  EXPIRED: "Nothing was lost; asking again starts it from the beginning.",
+  CANCELLED: "Ask again whenever you're ready.",
+  Q_UNAVAILABLE: "Give it a moment and ask again; your conversation is kept.",
 };
 
 export function recoveryHint(failure: QStreamState["failure"]): string {

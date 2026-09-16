@@ -256,6 +256,17 @@ export {
 } from "./communication/guidance.js";
 
 export {
+  isPlainLine,
+  plainLineProblems,
+  type PlainLineProblem,
+} from "./communication/plain-lines.js";
+
+export {
+  stripEmptyPromises,
+  type PromiseStripResult,
+} from "./communication/promises.js";
+
+export {
   PRIVATE_CHARTER_MARKER,
   PRIVATE_CONTEXT_MARKER,
   Q_CONVERSATION_SCENARIOS,

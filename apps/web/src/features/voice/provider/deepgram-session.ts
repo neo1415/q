@@ -24,7 +24,7 @@ const PLAIN_ERRORS = {
     "Q can't hear you: the microphone isn't available. Check the browser's permission and try again.",
   connection:
     "The voice connection dropped. You can keep typing, or try again.",
-  generic: "Voice isn't working right now. You can keep typing.",
+  generic: "I lost the line there. Give me a second and I'll pick it back up.",
 } as const;
 
 const INPUT_SAMPLE_RATE = 16_000;
@@ -224,18 +224,24 @@ export function useDeepgramVoiceSession(
           Math.min(8_000, remaining * 1000 + 150),
         );
       });
-      session.on("error", (message) => {
-        // The provider's wording is for logs; the code is for the person
-        // to tell us, since it names which leg failed.
-        setState("ERROR");
-        eventsRef.current.onError?.(
-          `${PLAIN_ERRORS.generic} (${message.code || "unknown"})`,
-        );
-        console.warn("voice agent error", message.code, message.description);
-      });
-      session.on("disconnected", (reason) => {
-        const wasLive = liveRef.current === live;
-        if (wasLive) liveRef.current = null;
+      /**
+       * A line that has failed is finished, and the person should be
+       * picked back up rather than left reading about it.
+       *
+       * Both an agent error and an unclean disconnect end the session the
+       * same way — teardown, one plain sentence, then `dropped`, which is
+       * what the reconnect upstairs listens for. An agent error used to
+       * set an error state and stop there, so a failed turn stranded the
+       * person behind a banner while a dropped socket healed itself.
+       *
+       * Called at most once: whichever event arrives first claims the
+       * session, and the other finds it already gone.
+       */
+      const fail = (line: string) => {
+        if (liveRef.current !== live) {
+          return;
+        }
+        liveRef.current = null;
         try {
           microphone.stop();
           player.dispose();
@@ -243,10 +249,36 @@ export function useDeepgramVoiceSession(
           // Already gone.
         }
         setConnected(false);
+        setState("ERROR");
+        eventsRef.current.onError?.(line);
+        eventsRef.current.onEnded?.("dropped");
+      };
+
+      session.on("error", (message) => {
+        // The provider's code and wording are for our logs. A person is
+        // told what happened to them, in one sentence, with no code in it:
+        // "(FAILED_TO_THINK)" told them nothing and read like a crash.
+        console.warn("voice agent error", message.code, message.description);
+        fail(PLAIN_ERRORS.generic);
+      });
+      session.on("disconnected", (reason) => {
         const clean = /client|user|normal/i.test(reason);
-        setState(clean ? "IDLE" : "ERROR");
-        if (!clean) eventsRef.current.onError?.(PLAIN_ERRORS.connection);
-        eventsRef.current.onEnded?.(clean ? "ended" : "dropped");
+        if (!clean) {
+          fail(PLAIN_ERRORS.connection);
+          return;
+        }
+        if (liveRef.current === live) {
+          liveRef.current = null;
+        }
+        try {
+          microphone.stop();
+          player.dispose();
+        } catch {
+          // Already gone.
+        }
+        setConnected(false);
+        setState("IDLE");
+        eventsRef.current.onEnded?.("ended");
       });
 
       try {

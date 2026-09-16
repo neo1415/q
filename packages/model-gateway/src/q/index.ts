@@ -33,6 +33,7 @@ import {
   fenceUntrusted,
   type PromptRegistry,
   renderPrompt,
+  stripEmptyPromises,
   withoutRecommendationClaims,
 } from "@capital-q/q-core";
 import {
@@ -901,8 +902,23 @@ export function createModelGatewayQAnswer(
         // the boundary, so the text is checked rather than trusted.
         // Source labels become the one human-safe presentation (R3);
         // the recommendation guard runs on the text a person will read.
+        // An answer IS the checking, so a sentence in front of it that
+        // announces the checking is either redundant or untrue. The
+        // charter forbids writing one and a prompt is not a boundary, so
+        // it is removed here rather than hoped for.
+        const promises = stripEmptyPromises(analyst.answer);
+        if (promises.removed.length > 0) {
+          logger?.warn(
+            {
+              qRunId: request.runId,
+              removed: promises.removed.length,
+              toolsExecuted: toolCalls.length,
+            },
+            "an answer opened by promising to act; the promise was removed",
+          );
+        }
         const guarded = withoutRecommendationClaims(
-          citePublicSources(analyst.answer, publicSources),
+          citePublicSources(promises.text, publicSources),
         );
         if (guarded.removed > 0) {
           logger?.warn(

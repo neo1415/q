@@ -58,8 +58,20 @@ export type VoiceInterview = {
 
 /** How often the stage asks what Q is asking, while talking. */
 const TURN_POLL_MS = 1_500;
-const RECONNECT_DELAY_MS = 1_200;
-const RECONNECT_SPACING_MS = 30_000;
+
+/**
+ * Coming back after a dropped line.
+ *
+ * Three tries, spaced further apart each time, then a plain sentence and
+ * a stop. The previous rule was one attempt per thirty seconds with no
+ * limit: a line that failed twice in a row left the person reading an
+ * error for half a minute, and a line that failed forever retried
+ * forever. Attempts reset the moment a session comes up, so an hour of
+ * talking with one blip in it is not two blips away from giving up.
+ */
+const RECONNECT_DELAYS_MS = [1_200, 3_000, 8_000] as const;
+const GAVE_UP =
+  "I couldn't get the line back. You can keep typing, or start voice again when you're ready.";
 
 export function useVoiceInterview(
   events: VoiceSessionEvents = {},
@@ -75,31 +87,35 @@ export function useVoiceInterview(
   } | null>(null);
 
   // A session that drops on its own comes back on the same thread before
-  // the person has to do anything: once per half minute, so a line that
-  // keeps failing is shown as failed rather than retried in a storm.
-  const lastReconnectAt = useRef(0);
+  // the person has to do anything.
+  const reconnectAttempts = useRef(0);
   const talkRef = useRef<VoiceInterview["talk"] | null>(null);
   const client = useVoiceSession({
     ...events,
     onEnded: (reason) => {
       const last = lastStart.current;
       const again = talkRef.current;
-      if (
-        reason !== "ended" &&
-        last !== null &&
-        again !== null &&
-        Date.now() - lastReconnectAt.current > RECONNECT_SPACING_MS
-      ) {
-        lastReconnectAt.current = Date.now();
-        setNotice("The line dropped. Reconnecting…");
-        // `talk` clears the notice as it starts and sets its own on failure.
-        window.setTimeout(() => {
-          void again({ thread: last.thread, firstMessage: undefined });
-        }, RECONNECT_DELAY_MS);
+      if (reason === "ended" || last === null || again === null) {
+        reconnectAttempts.current = 0;
+        setActive(false);
+        events.onEnded?.(reason);
         return;
       }
-      setActive(false);
-      events.onEnded?.(reason);
+      const delay = RECONNECT_DELAYS_MS[reconnectAttempts.current];
+      if (delay === undefined) {
+        // Out of tries. Say so once, in Q's own words, and stop.
+        reconnectAttempts.current = 0;
+        setActive(false);
+        setNotice(GAVE_UP);
+        events.onEnded?.(reason);
+        return;
+      }
+      reconnectAttempts.current += 1;
+      setNotice("The line dropped. Picking it back up…");
+      // `talk` clears the notice as it starts and sets its own on failure.
+      window.setTimeout(() => {
+        void again({ thread: last.thread, firstMessage: undefined });
+      }, delay);
     },
     onError: (message) => {
       setNotice(message);
@@ -131,6 +147,9 @@ export function useVoiceInterview(
       setVoiceSessionId(started.value.voiceSessionId);
       setTurn(null);
       setActive(true);
+      // A session that came up is a line that works; the next blip gets
+      // the full three tries again.
+      reconnectAttempts.current = 0;
       // Q composes its own opening from the interview's state; the caller's
       // line is only a fallback when the server had none to give.
       await client.start({
@@ -150,7 +169,7 @@ export function useVoiceInterview(
     setVoiceSessionId(null);
     setTurn(null);
     lastStart.current = null;
-    lastReconnectAt.current = 0;
+    reconnectAttempts.current = 0;
     await client.end();
   }, [client]);
 

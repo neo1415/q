@@ -104,14 +104,23 @@ export async function* bySentence(
  * Q says one short filler only when an answer is genuinely taking a while
  * (D §53).
  *
- * It was 2.5 s, which was under the time an answer takes — so every single
- * reply began "One second", which is worse than silence because it is a
- * tic rather than information. A turn that reaches the public web yields
- * its own line ("Checking the public web on that") as its first chunk and
- * never gets here; this is only for a turn that is quiet for longer than a
- * person will sit through.
+ * It was 2.5 s, then 4.5 s, and both were under the time an ordinary
+ * answer takes — so every single reply began "One second" or "Hold on,
+ * checking", which is worse than silence because it is a tic rather than
+ * information. A person reading a transcript of it sees Q clearing its
+ * throat before every sentence.
+ *
+ * Now above the slowest ordinary answer measured, so it fires for a turn
+ * that is genuinely stuck rather than for every turn. A turn that reaches
+ * the public web yields its own line ("Checking the public web on that")
+ * as its first chunk and never gets here, because that line says
+ * something true about what is happening.
+ *
+ * The durable fix is to speak the answer as it is written rather than
+ * after it: a first sentence at a second and a half leaves nothing for a
+ * filler to fill.
  */
-export const FILLER_AFTER_MS = 4_500;
+export const FILLER_AFTER_MS = 8_000;
 
 /**
  * Yield the source's items, and — if the first one has not arrived after

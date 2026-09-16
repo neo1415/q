@@ -38,6 +38,22 @@ const KEEP_ALIVE_MS = 5_000;
 const SLOW_TURN_BEAT_MS = 6_000;
 const SLOW_TURN_BEAT = "One moment.";
 
+/**
+ * The longest a turn may run before this route ends it in Q's own words.
+ *
+ * The speech provider has a patience of its own for a think that never
+ * finishes, and when it runs out first the person gets the provider's
+ * failure instead of ours: the line dies and a banner appears. Ending the
+ * turn here first means the worst case is a sentence Q says, which the
+ * person can answer. Longer than the slowest turn measured (research,
+ * about eleven seconds), shorter than a provider is likely to wait.
+ */
+const TURN_DEADLINE_MS = 20_000;
+const TURN_TOO_LONG =
+  "That one is taking longer than I want to keep you waiting. Ask me again, or ask me something smaller and I'll build up.";
+const TURN_CUT_SHORT =
+  "I'm going to stop there, that was taking too long. Ask me again if you want the rest.";
+
 export type VoiceThinkDependencies = {
   readonly path: string;
   readonly bindings: VoiceSessionBindings;
@@ -146,8 +162,12 @@ export function registerVoiceThinkRoute(
     raw.write(chunk(id, { role: "assistant" }, null));
     let open = true;
     let wroteContent = false;
+    let timedOut = false;
     const write = (text: string) => {
       if (!open || controller.signal.aborted) return;
+      // Once the deadline has spoken, the turn's own late words are not
+      // wanted: they would arrive after Q has already moved on.
+      if (timedOut) return;
       wroteContent = true;
       raw.write(chunk(id, { content: text }, null));
     };
@@ -165,6 +185,16 @@ export function registerVoiceThinkRoute(
     const beat = setTimeout(() => {
       if (!wroteContent) write(SLOW_TURN_BEAT);
     }, SLOW_TURN_BEAT_MS);
+    // Our own deadline, ahead of the provider's. The line is written
+    // before the turn is cancelled, because cancelling closes writing.
+    const deadline = setTimeout(() => {
+      if (!open || controller.signal.aborted) {
+        return;
+      }
+      timedOut = true;
+      write(wroteContent ? TURN_CUT_SHORT : TURN_TOO_LONG);
+      controller.abort();
+    }, TURN_DEADLINE_MS);
     const speaker: VoiceSpeaker = {
       providerConversationId: binding.providerConversationId,
       get isOpen() {
@@ -192,10 +222,14 @@ export function registerVoiceThinkRoute(
         { err: error, qVoiceSessionId: binding.voiceSessionId },
         "voice think turn failed",
       );
-      write("I couldn't take that just now. Could you say it again?");
+      // A turn we stopped has already said so; do not say it twice.
+      if (!timedOut) {
+        write("I couldn't take that just now. Could you say it again?");
+      }
     } finally {
       clearInterval(keepAlive);
       clearTimeout(beat);
+      clearTimeout(deadline);
       if (open) {
         raw.write(chunk(id, {}, "stop"));
         raw.write("data: [DONE]\n\n");
