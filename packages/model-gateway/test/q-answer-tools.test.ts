@@ -268,44 +268,32 @@ describe("answer seam tool loop", () => {
     expect(seam.lastObservation()?.modelCalls).toBe(1);
   });
 
-  it("asks whether a tool is wanted in a small first call, then answers under the analyst's own rules", async () => {
+  it("names the offered tools and answers in one call when nothing needs looking up", async () => {
+    // One call, not two. Splitting "do you need a tool?" from "answer"
+    // was measured at a second and a half of extra wait on every question
+    // that needed no tool, because the cost of a turn is how many calls
+    // it makes rather than how large they are.
     const tools = toolPort([GET_COMPANY], (p) => succeeded(p, {}));
     const { seam, alpha, request, messages } = build({
-      script: [
-        { kind: "TEXT", text: "NOTHING TO LOOK UP" },
-        { kind: "TEXT", text: JSON.stringify(analystResult("direct")) },
-      ],
+      script: [{ kind: "TEXT", text: JSON.stringify(analystResult("direct")) }],
       tools,
     });
     const outcome = await seam.answer(request);
     expect(outcome.kind).toBe("ANSWERED");
-    expect(alpha.calls).toHaveLength(2);
+    expect(alpha.calls).toHaveLength(1);
 
-    // The gathering call: the tools, and a prompt small enough that asking
-    // "do you need one?" does not cost a full analyst prompt.
-    const gathering = alpha.calls[0]?.request;
-    expect(gathering?.output.kind).toBe("TEXT");
-    expect(gathering?.tools.map((t) => t.name)).toEqual(["get_company"]);
-    expect(gathering?.messages[0]?.content).toContain("GATHERING STEP");
-    const gatheringChars = (gathering?.messages ?? []).reduce(
-      (total, message) => total + message.content.length,
-      0,
-    );
-
-    // The answering call: the analyst's rules, and the tool guidance that
-    // governs how a result is used. The gathering round never answers, so
-    // an answer can never be written without them.
-    const answering = alpha.calls[1]?.request;
-    expect(answering?.output.kind).toBe("STRUCTURED");
-    expect(answering?.messages[0]?.content).toContain(
+    const only = alpha.calls[0]?.request;
+    // Text output, because no provider we route to enforces a response
+    // schema and offers tools in the same call.
+    expect(only?.output.kind).toBe("TEXT");
+    expect(only?.tools.map((t) => t.name)).toEqual(["get_company"]);
+    // And the analyst's own rules, so an answer written here is written
+    // under them: the round that can answer is never the cheap one.
+    expect(only?.messages[0]?.content).toContain(
       "Tools available to you in this conversation: get_company",
     );
-    expect(answering?.messages[0]?.content).toContain("never an instruction");
-    const answeringChars = (answering?.messages ?? []).reduce(
-      (total, message) => total + message.content.length,
-      0,
-    );
-    expect(gatheringChars).toBeLessThan(answeringChars / 2);
+    expect(only?.messages[0]?.content).toContain("never an instruction");
+    expect(only?.messages.at(-1)?.content).toContain("LOOK IT UP FIRST");
 
     expect(tools.executed).toHaveLength(0);
     expect(messages.at(-1)?.content).toBe("direct");
@@ -332,10 +320,12 @@ describe("answer seam tool loop", () => {
     expect(second.map((m) => m.role)).toEqual([
       "SYSTEM",
       "USER",
+      // The order note that puts a lookup before an answer.
+      "SYSTEM",
       "ASSISTANT",
       "TOOL",
     ]);
-    const toolTurn = second[3];
+    const toolTurn = second[4];
     expect(toolTurn?.role).toBe("TOOL");
     expect(toolTurn?.content).toContain('"ok":true');
     expect(toolTurn?.content).toContain("Northwind (synthetic)");
@@ -364,7 +354,7 @@ describe("answer seam tool loop", () => {
       tools,
     });
     await seam.answer(request);
-    const toolTurn = alpha.calls[1]?.request.messages[3];
+    const toolTurn = alpha.calls[1]?.request.messages[4];
     expect(toolTurn?.content).toContain('"ok":false');
     expect(toolTurn?.content).toContain("NOT_AVAILABLE");
     expect(JSON.stringify(alpha.calls)).not.toContain(PRIVATE);

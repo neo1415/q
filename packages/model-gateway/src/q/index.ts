@@ -30,7 +30,6 @@ import {
   type CompanyAnalystV2Variables,
   createDefaultPromptRegistry,
   DEFAULT_COMMUNICATION_PROFILE,
-  fenceUntrusted,
   type PromptRegistry,
   renderPrompt,
   stripEmptyPromises,
@@ -52,6 +51,7 @@ import {
 
 import { isModelGatewayError } from "../errors.js";
 import type { ModelGateway, ModelGatewayExecuteOptions } from "../gateway.js";
+import { acceptStructuredOutput } from "../policy/structured.js";
 
 /**
  * The Q answer seam over the Prompt Registry, the Tool Registry and the
@@ -275,13 +275,13 @@ export function diagnosticCodeFor(
  * Without it, a model given both tools and an instruction to answer in
  * JSON tends to skip the tools and return its JSON as a pseudo tool call,
  * which the provider rejects; and it asks the person for identifiers it
- * could have looked up. The note makes the round a gathering step: look
- * up what is named, or say plainly that nothing is needed.
+ * could have looked up. The note sets the order: look up what is named,
+ * then answer.
  */
-const GATHER_NOTE: ModelMessage = {
+const TOOLS_FIRST_NOTE: ModelMessage = {
   role: "SYSTEM",
   content:
-    "GATHERING STEP. Before you answer: if the message names a company, organisation or person you have no authorised facts about, look it up now with the tools (search_companies with the name as given, then get_company with the returned companyId). If the person asks for public, current, external or web information, or asks you to check or compare what the public web says, call research_public_web now with a short public query (a few words: the subject as named plus what to look for; never a figure, a customer name or an identifier). If any tool is needed, call it now through the function-calling interface and write nothing else. If no tool is needed, reply with the plain words NOTHING TO LOOK UP and nothing else. Do not write the JSON object in this step.",
+    'LOOK IT UP FIRST. If the message names a company, organisation or person you have no authorised facts about, look it up now with the tools (search_companies with the name as given, then get_company with the returned companyId). If the person asks for public, current, external or web information, or asks you to check or compare what the public web says, call research_public_web now with a short public query (a few words: the subject as named plus what to look for; never a figure, a customer name or an identifier). Call the tool through the function-calling interface and write nothing else in that turn. THEN ANSWER IN THE SAME TURN. When nothing needs looking up, or once results are in front of you, write the JSON object and nothing else: at minimum {"answer": "...", "responseShape": "CONCISE" or "ANALYTICAL", "insufficientEvidence": true or false}, plus any other field of the schema that applies. Never reply with prose outside the object, and never reply that you are about to answer.',
 };
 
 /** What the model is told when public research is among its tools (CQ-Q-RESEARCH-001 §26, §30). */
@@ -321,10 +321,25 @@ export function subjectIdentifierNotes(
     : `This conversation is about: ${lines.join("; ")}. Use these identifiers, exactly as given, when a tool needs one.`;
 }
 
+/**
+ * What the model is told when the plan grants GENERAL_MODEL_KNOWLEDGE.
+ *
+ * The scope was in every plan and nothing ever mentioned it, so Q read the
+ * charter's true rule — general knowledge is never company-specific
+ * evidence — as "never use general knowledge", and answered "who is the
+ * president of Nigeria" with a sentence about authorised context. An
+ * analyst who cannot say what everybody knows is not careful, it is
+ * useless. The invariant is unchanged: this is never evidence ABOUT a
+ * Capital Q subject, and it never becomes a stored fact.
+ */
+const GENERAL_KNOWLEDGE_NOTE =
+  "A question that is not about a particular company, investor or person on Capital Q — the world, a market, a term, a public fact, how something normally works — you answer outright, briefly, from what you know. Give the actual answer first. Never reply with only a remark about where the answer comes from, never refuse it, and never describe your scope or your access. You may add a short note that it is general knowledge rather than something Capital Q holds, and if it may have changed since you learned it, say so. It is never evidence about a subject and never grounds for a conclusion about one.";
+
 export function environmentNotesFor(
   facts: readonly AuthorisedFact[],
   tools: readonly QOfferedTool[] = [],
   subjects: readonly QSubjectRef[] = [],
+  options: { readonly generalKnowledge?: boolean } = {},
 ): string {
   const factsNote =
     facts.length > 0
@@ -352,6 +367,7 @@ export function environmentNotesFor(
       factsNote,
       ...(tools.length === 0 ? [] : [subjectIdentifierNotes(subjects)]),
       toolsNote,
+      ...(options.generalKnowledge === true ? [GENERAL_KNOWLEDGE_NOTE] : []),
       ...(researchNote === null ? [] : [researchNote]),
       "No scoring or ranking service is available; do not produce scores.",
     ].join(" ");
@@ -540,6 +556,23 @@ export function createModelGatewayQAnswer(
     lastObservation: () => last,
     answer: async (request: QAnswerRequest): Promise<QAnswerOutcome> => {
       last = undefined;
+      /**
+       * Where a turn's seconds go.
+       *
+       * Model latency is already in the usage ledger; everything around it
+       * was invisible, and a turn measured at thirteen seconds turned out
+       * to hold three and a half seconds of model and the rest here. A
+       * breakdown on every answer costs one log line and ends that class
+       * of guesswork.
+       */
+      const startedAt = Date.now();
+      let mark = startedAt;
+      const phases: Record<string, number> = {};
+      const took = (phase: string): void => {
+        const now = Date.now();
+        phases[phase] = now - mark;
+        mark = now;
+      };
       const plan: PermittedContextPlan = request.plan;
       const taskClass = taskClassForCapability(request.capability);
       const sensitivity: ModelSensitivity =
@@ -568,8 +601,11 @@ export function createModelGatewayQAnswer(
         return { kind: "FAILED", diagnosticCode: "INTERNAL_ERROR" };
       }
       const earlier = history.filter((m) => m.id !== latest.id);
+      took("history");
       const assembled = await context.assemble(request);
+      took("assemble");
       const profile = await communication.profileFor(request);
+      took("profile");
       const toolContext: QToolExecutionContext = {
         actor: request.actor,
         runId: request.runId,
@@ -583,6 +619,7 @@ export function createModelGatewayQAnswer(
         conversation: { latestUserText: latest.content },
       };
       const offered = await tools.offer(toolContext);
+      took("tools");
       const offeredByName = new Map(
         offered.map((tool) => [tool.definition.name, tool] as const),
       );
@@ -614,6 +651,13 @@ export function createModelGatewayQAnswer(
           assembled.facts,
           offered,
           request.subjects,
+          {
+            // Only when the firewall actually granted it. The plan has
+            // said so all along; nothing was reading it.
+            generalKnowledge: plan.scopes.some(
+              (scope) => scope.kind === "GENERAL_MODEL_KNOWLEDGE",
+            ),
+          },
         ),
         variables,
       });
@@ -701,35 +745,23 @@ export function createModelGatewayQAnswer(
         }
       };
       let modelCalls = 0;
-      let messages: ModelMessage[] = [...rendered.messages];
-      /**
-       * The gathering round's own, small prompt. Deciding whether to look
-       * something up needs the person's words and the tools, and nothing
-       * else: the facts are what a tool would add to, and the answer's
-       * rules apply to the answer. Same tools, same authorisation, a
-       * fraction of the tokens and of the wait.
-       */
-      const gatheringMessages: ModelMessage[] = [
-        GATHER_NOTE,
-        {
-          role: "USER",
-          content: [
-            `Subject: ${assembled.subjectDescription}`,
-            `${assembled.facts.length} authorised fact(s) are already available about it.`,
-            // Fenced here as everywhere else: a small prompt is not a
-            // reason for the person's words to arrive unmarked.
-            fenceUntrusted("userMessage", latest.content),
-          ].join("\n"),
-        },
-      ];
+      // The order matters more than the words: a model handed tools and a
+      // response shape at once reaches for the shape first.
+      let messages: ModelMessage[] =
+        offered.length === 0
+          ? [...rendered.messages]
+          : [...rendered.messages, TOOLS_FIRST_NOTE];
+
+      type AnswerResult = Awaited<
+        ReturnType<typeof gateway.execute<CompanyAnalystV2Result>>
+      >;
 
       try {
-        let final:
-          | Awaited<ReturnType<typeof gateway.execute<CompanyAnalystV2Result>>>
-          | undefined;
+        let final: AnswerResult | undefined;
         let analyst: CompanyAnalystV2Result | undefined;
 
         if (offered.length > 0) {
+          took("prepare");
           let rounds = 0;
           let calls = 0;
           while (
@@ -744,11 +776,14 @@ export function createModelGatewayQAnswer(
               result = await gateway.execute<CompanyAnalystV2Result>(
                 {
                   ...base,
-                  // The first tool round is a gathering step: the model
-                  // decides what to look up and calls it, or says it needs
-                  // nothing. The gathering note is not part of the final
-                  // answer's messages.
-                  messages: rounds === 0 ? gatheringMessages : messages,
+                  messages,
+                  /**
+                   * Text, not a schema, because no provider we route to
+                   * will enforce a response schema and offer tools in the
+                   * same call. The task's shape is in the prompt, and a
+                   * reply that satisfies it is accepted below exactly as
+                   * the structured path would accept it.
+                   */
                   output: { kind: "TEXT" },
                   tools: offered.map((tool) => tool.definition),
                 },
@@ -773,16 +808,44 @@ export function createModelGatewayQAnswer(
               }
               throw error;
             }
+            took(`round${String(rounds)}`);
             if (result.output.kind === "TEXT") {
-              // Nothing more to look up. Whatever prose it wrote here is
-              // discarded: the answer is produced by the structured call
-              // below, under the analyst's own rules.
+              /**
+               * Nothing (more) to look up, so this is the answer.
+               *
+               * This round carries the analyst's own prompt, so an answer
+               * written here is written under the analyst's rules, and it
+               * is accepted only if it satisfies the task's schema —
+               * exactly as the structured call below would accept it.
+               * Anything else falls through to that call.
+               *
+               * The alternative, asking a cheap throwaway prompt whether a
+               * tool is wanted and then asking again for the answer, was
+               * measured: the small prompt saved almost nothing, because
+               * the cost of a turn is how many calls it makes rather than
+               * how large they are, and it put a second and a half in
+               * front of every question that needed no tool at all.
+               */
+              const accepted = acceptStructuredOutput(
+                result.output.text,
+                CompanyAnalystV2ResultSchema,
+              );
+              if (accepted.ok) {
+                final = result;
+                analyst = accepted.value;
+              } else {
+                logger?.debug(
+                  { qRunId: request.runId, stage: accepted.stage },
+                  "a tool round answered outside the task's shape",
+                );
+              }
               break;
             }
             if (result.output.kind !== "TOOL_CALLS") {
               break;
             }
             rounds += 1;
+            took(`round${String(rounds)}`);
             const proposals = result.output.calls.slice(
               0,
               Q_TOOL_LOOP_MAX_CALLS - calls,
@@ -864,7 +927,9 @@ export function createModelGatewayQAnswer(
               maxSources: 2,
             },
           };
+          took("beforeResearch");
           const outcome = await tools.execute(call, toolContext);
+          took("research");
           toolCalls.push({
             toolName: outcome.toolName,
             providerName: call.name,
@@ -906,6 +971,7 @@ export function createModelGatewayQAnswer(
         // announces the checking is either redundant or untrue. The
         // charter forbids writing one and a prompt is not a boundary, so
         // it is removed here rather than hoped for.
+        took("answer");
         const promises = stripEmptyPromises(analyst.answer);
         if (promises.removed.length > 0) {
           logger?.warn(
@@ -930,6 +996,7 @@ export function createModelGatewayQAnswer(
         // claim through the knowledge gate — only when the quote is their own
         // words and the conversation is about a company they own
         // (CQ-Q-RESEARCH-001 §21, §40). The answer says so, deterministically.
+        took("guards");
         const recordedStatements = await recordUserStatements(
           dependencies.statements,
           request,
@@ -1015,6 +1082,8 @@ export function createModelGatewayQAnswer(
             toolsOffered: offered.length,
             toolCalls: toolCalls.length,
             modelCalls,
+            totalMs: Date.now() - startedAt,
+            phases,
           },
           "q answer produced",
         );
