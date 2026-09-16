@@ -6,7 +6,9 @@ import Groq, {
 } from "groq-sdk";
 import type {
   ChatCompletion,
+  ChatCompletionChunk,
   ChatCompletionCreateParamsNonStreaming,
+  ChatCompletionCreateParamsStreaming,
   ChatCompletionMessageParam,
   ChatCompletionTool,
 } from "groq-sdk/resources/chat/completions";
@@ -62,24 +64,169 @@ export type GroqModelProviderOptions = {
   readonly clientFactory?: ((apiKey: string) => GroqLikeClient) | undefined;
 };
 
-/** The slice of the SDK the adapter calls; a test supplies a fake. */
+type GroqCallOptions = {
+  readonly signal?: AbortSignal | undefined;
+  readonly timeout?: number | undefined;
+  readonly maxRetries?: number | undefined;
+};
+
+/**
+ * The slice of the SDK the adapter calls; a test supplies a fake.
+ *
+ * Two overloads because the SDK has two: the parameters decide whether the
+ * answer comes back whole or in pieces. A fake that only implements the
+ * first is still a valid fake for every non-streaming test.
+ */
 export type GroqLikeClient = {
   readonly chat: {
     readonly completions: {
       create(
+        params: ChatCompletionCreateParamsStreaming,
+        options: GroqCallOptions,
+      ): Promise<AsyncIterable<ChatCompletionChunk>>;
+      create(
         params: ChatCompletionCreateParamsNonStreaming,
-        options: {
-          readonly signal?: AbortSignal | undefined;
-          readonly timeout?: number | undefined;
-          readonly maxRetries?: number | undefined;
-        },
+        options: GroqCallOptions,
       ): Promise<ChatCompletion>;
     };
   };
 };
 
+/**
+ * A tool call as it arrives in pieces.
+ *
+ * OpenAI-shaped streaming sends a call's arguments as string fragments
+ * keyed by position, so nothing about a call can be judged until the
+ * stream ends: a fragment is not malformed JSON, it is unfinished JSON.
+ */
+type PartialToolCall = {
+  id: string;
+  name: string;
+  arguments: string;
+};
+
 /** A rate-limited key is not retried before this, unless the vendor said sooner. */
 const KEY_COOLDOWN_MS = 30_000;
+
+function whole(
+  request: ModelProviderRequest,
+  completion: ChatCompletion,
+  text: string,
+  toolCalls: readonly ModelToolCall[],
+): ModelProviderResult {
+  if (text.length === 0 && toolCalls.length === 0) {
+    throw new ModelProviderFailure("groq returned no message content", {
+      failureClass: "INVALID_MODEL_OUTPUT",
+      providerCode: GROQ_PROVIDER_CODE,
+    });
+  }
+  return {
+    text,
+    toolCalls: toolCalls.length === 0 ? undefined : [...toolCalls],
+    usage: usageOf(completion),
+    finish: finishStatus(completion, toolCalls),
+    modelCode: completion.model || request.modelCode,
+    providerReference: completion.x_groq?.id ?? completion.id,
+  };
+}
+
+/**
+ * The stream, read into one result.
+ *
+ * Text goes out as it arrives. Everything else waits: a call's arguments
+ * come as fragments keyed by position, usage and the stop reason come on
+ * the last chunk, and a half-arrived call is unfinished rather than
+ * malformed, so nothing is judged until there is nothing left.
+ *
+ * Reasoning is requested hidden and is never read here. A chunk's
+ * reasoning field is not text and never becomes any.
+ */
+async function readStream(
+  chunks: AsyncIterable<ChatCompletionChunk>,
+  request: ModelProviderRequest,
+  emit: (fragment: string) => void,
+): Promise<ModelProviderResult> {
+  let text = "";
+  let finishReason: ChatCompletionChunk.Choice["finish_reason"] = null;
+  let modelCode = "";
+  let reference: string | undefined;
+  let usage: ModelUsage | undefined;
+  const partial = new Map<number, PartialToolCall>();
+
+  for await (const chunk of chunks) {
+    modelCode = chunk.model || modelCode;
+    reference = reference ?? chunk.x_groq?.id ?? chunk.id;
+    // Groq puts a stream's usage on its own extension, in the final
+    // chunk. Missing it would not fail anything; it would quietly turn
+    // every streamed row in the ledger from a price into an estimate.
+    const counted = chunk.x_groq?.usage;
+    if (counted !== undefined && counted !== null) {
+      usage = usageOf({ usage: counted } as unknown as ChatCompletion);
+    }
+    const choice = chunk.choices[0];
+    if (choice === undefined) {
+      continue;
+    }
+    finishReason = choice.finish_reason ?? finishReason;
+    const fragment = choice.delta.content;
+    if (typeof fragment === "string" && fragment.length > 0) {
+      text += fragment;
+      emit(fragment);
+    }
+    for (const call of choice.delta.tool_calls ?? []) {
+      const held = partial.get(call.index) ?? {
+        id: "",
+        name: "",
+        arguments: "",
+      };
+      partial.set(call.index, {
+        id: call.id ?? held.id,
+        name: call.function?.name ?? held.name,
+        arguments: held.arguments + (call.function?.arguments ?? ""),
+      });
+    }
+  }
+
+  const toolCalls = [...partial.entries()]
+    .sort(([left], [right]) => left - right)
+    .map(([, call]) => decodeToolCall(call));
+  // Back into the shape a whole completion has, so one piece of code
+  // decides what an empty answer means and what the stop reason was.
+  return whole(
+    request,
+    {
+      id: reference ?? "",
+      model: modelCode,
+      choices: [
+        {
+          index: 0,
+          finish_reason: finishReason ?? "stop",
+          message: { role: "assistant", content: text },
+        },
+      ],
+      ...(usage === undefined ? {} : { usage: toGroqUsage(usage) }),
+    } as unknown as ChatCompletion,
+    text,
+    toolCalls,
+  );
+}
+
+/** Back into the provider's own shape, so usageOf stays the one reader. */
+function toGroqUsage(usage: ModelUsage): Record<string, unknown> {
+  return {
+    prompt_tokens: usage.inputTokens,
+    completion_tokens: usage.outputTokens,
+    total_tokens: usage.inputTokens + usage.outputTokens,
+    prompt_tokens_details: { cached_tokens: usage.cachedInputTokens },
+    ...(usage.reasoningTokens === undefined
+      ? {}
+      : {
+          completion_tokens_details: {
+            reasoning_tokens: usage.reasoningTokens,
+          },
+        }),
+  };
+}
 
 function reasoningEffort(
   level: ModelReasoningLevel,
@@ -165,33 +312,40 @@ function finishStatus(
 
 function toolCallsOf(completion: ChatCompletion): ModelToolCall[] {
   const raw = completion.choices[0]?.message.tool_calls ?? [];
-  return raw.map((call) => {
-    const name = ModelToolNameSchema.safeParse(call.function.name);
-    let decoded: unknown;
-    try {
-      decoded = JSON.parse(
-        call.function.arguments.length === 0 ? "{}" : call.function.arguments,
-      );
-    } catch {
-      decoded = undefined;
-    }
-    if (
-      !name.success ||
-      decoded === null ||
-      typeof decoded !== "object" ||
-      Array.isArray(decoded)
-    ) {
-      throw new ModelProviderFailure("groq proposed a malformed tool call", {
-        failureClass: "INVALID_MODEL_OUTPUT",
-        providerCode: GROQ_PROVIDER_CODE,
-      });
-    }
-    return {
-      callId: call.id,
-      name: name.data,
-      arguments: decoded as Record<string, unknown>,
-    };
-  });
+  return raw.map((call) =>
+    decodeToolCall({
+      id: call.id,
+      name: call.function.name,
+      arguments: call.function.arguments,
+    }),
+  );
+}
+
+/** One assembled call, judged. Malformed here means malformed, not unfinished. */
+function decodeToolCall(call: PartialToolCall): ModelToolCall {
+  const name = ModelToolNameSchema.safeParse(call.name);
+  let decoded: unknown;
+  try {
+    decoded = JSON.parse(call.arguments.length === 0 ? "{}" : call.arguments);
+  } catch {
+    decoded = undefined;
+  }
+  if (
+    !name.success ||
+    decoded === null ||
+    typeof decoded !== "object" ||
+    Array.isArray(decoded)
+  ) {
+    throw new ModelProviderFailure("groq proposed a malformed tool call", {
+      failureClass: "INVALID_MODEL_OUTPUT",
+      providerCode: GROQ_PROVIDER_CODE,
+    });
+  }
+  return {
+    callId: call.id,
+    name: name.data,
+    arguments: decoded as Record<string, unknown>,
+  };
 }
 
 function usageOf(completion: ChatCompletion): ModelUsage | undefined {
@@ -369,7 +523,7 @@ export function createGroqModelProvider(
     capabilities: () => ({
       structuredOutput: true,
       toolCalling: true,
-      streaming: false,
+      streaming: true,
       cancellation: true,
     }),
     generate: async (
@@ -406,24 +560,64 @@ export function createGroqModelProvider(
           : { tools: toolsForGroq(request.tools), tool_choice: "auto" }),
       };
 
-      let completion: ChatCompletion | undefined;
+      const streaming = context.onTextDelta !== undefined;
+      const options = {
+        signal: context.signal,
+        timeout: context.attemptTimeoutMs,
+        maxRetries: 0,
+      };
+
+      let result: ModelProviderResult | undefined;
       let lastFailure: ModelProviderFailure | undefined;
       for (const index of order(Date.now())) {
         const client = clients[index];
         if (client === undefined) {
           continue;
         }
+        /**
+         * Whether anything has left for the caller on THIS key.
+         *
+         * A spent key is ordinarily invisible: the same request goes to
+         * the next one and nobody hears about it. That holds only while
+         * nothing has been said yet. Once a fragment has gone out, moving
+         * to another key would say the opening of the answer twice, so the
+         * failure becomes the caller's to see.
+         */
+        let spoke = false;
         try {
-          completion = await client.chat.completions.create(params, {
-            signal: context.signal,
-            timeout: context.attemptTimeoutMs,
-            maxRetries: 0,
-          });
+          if (streaming) {
+            result = await readStream(
+              await client.chat.completions.create(
+                { ...params, stream: true },
+                options,
+              ),
+              request,
+              (fragment) => {
+                spoke = true;
+                context.onTextDelta?.(fragment);
+              },
+            );
+          } else {
+            const completion = await client.chat.completions.create(
+              params,
+              options,
+            );
+            result = whole(
+              request,
+              completion,
+              completion.choices[0]?.message.content ?? "",
+              toolCallsOf(completion),
+            );
+          }
           cursor = index;
           break;
         } catch (error: unknown) {
           const failure = normalizeError(error);
-          if (failure.failureClass !== "RATE_LIMIT" || clients.length === 1) {
+          if (
+            spoke ||
+            failure.failureClass !== "RATE_LIMIT" ||
+            clients.length === 1
+          ) {
             throw failure;
           }
           // This key is spent for now; the next one takes the same request.
@@ -432,7 +626,7 @@ export function createGroqModelProvider(
           lastFailure = failure;
         }
       }
-      if (completion === undefined) {
+      if (result === undefined) {
         throw (
           lastFailure ??
           new ModelProviderFailure("groq request failed", {
@@ -441,23 +635,7 @@ export function createGroqModelProvider(
           })
         );
       }
-
-      const toolCalls = toolCallsOf(completion);
-      const text = completion.choices[0]?.message.content ?? "";
-      if (text.length === 0 && toolCalls.length === 0) {
-        throw new ModelProviderFailure("groq returned no message content", {
-          failureClass: "INVALID_MODEL_OUTPUT",
-          providerCode: GROQ_PROVIDER_CODE,
-        });
-      }
-      return {
-        text,
-        toolCalls: toolCalls.length === 0 ? undefined : toolCalls,
-        usage: usageOf(completion),
-        finish: finishStatus(completion, toolCalls),
-        modelCode: completion.model || request.modelCode,
-        providerReference: completion.x_groq?.id ?? completion.id,
-      };
+      return result;
     },
   };
 }

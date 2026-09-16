@@ -72,6 +72,16 @@ const RECOMMENDATION_CLAIM_PATTERNS: readonly RegExp[] = [
   /\b(?:you|this|the company)\s+ranks?\s+(?:highly|well|above|below|first|\d)/i,
   /\b(?:top|bottom)\s+\d{1,2}\s*%/i,
   /\b(?:top|bottom)\s+\d{1,2}\s*(?:companies|matches|company|match)\b/i,
+
+  // A place in a distribution nobody measured. The analyst charter names
+  // two of these outright, "do not say a company is above average or
+  // top-decile", and there was no pattern for either: the one sentence the
+  // prompt forbids by name was the one that got through.
+  /\b(?:top|bottom|upper|lower)[\s-](?:decile|quartile|quintile|third|half)\b/i,
+  /\b(?:above|below)\s+(?:the\s+)?(?:average|median|par)\b/i,
+  /\bbest[\s-]in[\s-]class\b/i,
+  /\b(?:out|under)performs?\s+(?:its|their|the)\s+(?:peers|peer group|category|sector)\b/i,
+  /\b(?:compares?|compared)\s+(?:favourably|favorably|poorly)\b/i,
 ];
 
 /** Whether one sentence asserts a recommendation Capital Q has not made. */

@@ -78,6 +78,22 @@ export type ModelGatewayExecuteOptions<T> = {
   readonly schema?: z.ZodType<T> | undefined;
   /** The caller's cancellation. A cancelled request never falls back. */
   readonly signal?: AbortSignal | undefined;
+  /**
+   * Called with each piece of text as the model writes it, in order.
+   *
+   * Asking for this changes what a failure means. Retrying a model and
+   * falling back to another are invisible precisely because nothing has
+   * left the building yet; once a fragment has gone out, a second attempt
+   * would say the opening of the answer twice, and on a voice call it
+   * would say it out loud. So the gateway stops retrying the moment it
+   * has spoken, and the failure becomes the caller's to handle.
+   *
+   * In practice that costs little: the failures actually seen — a refused
+   * request, a spent quota, a malformed tool call, a provider hiccup —
+   * all arrive before the first token. What it buys is that a person
+   * hears the answer as it is written instead of after it.
+   */
+  readonly onTextDelta?: ((text: string) => void) | undefined;
 };
 
 export type ModelGateway = {
@@ -164,6 +180,8 @@ export function createModelGateway(
     attempts: meter.createCounter("q.model.attempts"),
     fallbacks: meter.createCounter("q.model.fallbacks"),
     rateLimits: meter.createCounter("q.model.rate_limits"),
+    /** Failures that arrived after part of the answer had already gone out. */
+    spokenFailures: meter.createCounter("q.model.spoken_failures"),
     policyIneligible: meter.createCounter("q.model.policy_ineligible"),
     budgetRejected: meter.createCounter("q.model.budget_rejected"),
     usageRecordFailures: meter.createCounter("q.model.usage_record_failures"),
@@ -214,6 +232,10 @@ export function createModelGateway(
     // Set after an attempt ran out of room: ask this model for everything
     // it will give rather than for the task's usual allowance.
     reachForModelMaximum: boolean,
+    /** Where text goes as it is written, when the caller wants it. */
+    onTextDelta: ((text: string) => void) | undefined,
+    /** Set by this attempt the first time it emits; read by the caller. */
+    spoke: { spoke: boolean },
   ): Promise<AttemptOutcome<T> & { readonly record: ModelAttemptRecord }> {
     const labels = {
       provider: candidate.provider.code,
@@ -261,6 +283,14 @@ export function createModelGateway(
               attemptTimeoutMs: request.budget.attemptTimeoutMs,
               attempt: attemptNumber,
               correlationId: request.attribution.correlationId,
+              ...(onTextDelta === undefined
+                ? {}
+                : {
+                    onTextDelta: (text: string) => {
+                      spoke.spoke = true;
+                      onTextDelta(text);
+                    },
+                  }),
             },
           );
           const latencyMs = Date.now() - startedAt;
@@ -512,7 +542,13 @@ export function createModelGateway(
       },
       async (span) => {
         try {
-          return await route(request, options.schema, callerSignal, span);
+          return await route(
+            request,
+            options.schema,
+            callerSignal,
+            span,
+            options.onTextDelta,
+          );
         } finally {
           span.end();
         }
@@ -527,6 +563,7 @@ export function createModelGateway(
     span: {
       setAttribute: (key: string, value: string | number | boolean) => unknown;
     },
+    onTextDelta: ((text: string) => void) | undefined,
   ): Promise<ModelGatewayResult<T>> {
     if (callerSignal.aborted) {
       throw new ModelGatewayError("model request cancelled before routing", {
@@ -663,6 +700,7 @@ export function createModelGateway(
         }
         attemptNumber += 1;
         attemptsOnCandidate += 1;
+        const spoke = { spoke: false };
         const outcome = await attempt(
           request,
           candidate,
@@ -672,6 +710,8 @@ export function createModelGateway(
           schema,
           callerSignal,
           room.ranOut,
+          onTextDelta,
+          spoke,
         );
         attempts.push(outcome.record);
         spentUsd +=
@@ -719,6 +759,24 @@ export function createModelGateway(
 
         lastFailure = outcome.failureClass;
         lastCause = outcome.cause;
+        if (spoke.spoke) {
+          // Part of the answer is already with the person. Another attempt
+          // would repeat it, and on a voice call it has been said aloud.
+          metrics.spokenFailures.add(1, {
+            task_class: request.taskClass,
+            provider: candidate.provider.code,
+          });
+          throw new ModelGatewayError(
+            "the model stopped after the answer had begun",
+            {
+              failureClass: outcome.failureClass,
+              attempts: attempts.length,
+              candidates: plan.decisions,
+              routingPolicyCode: policy.code,
+              cause: lastCause,
+            },
+          );
+        }
         // Once an answer has been cut off, every later attempt asks for the
         // most the chosen model will write. It never goes back down: the
         // question that needed the room still needs it.

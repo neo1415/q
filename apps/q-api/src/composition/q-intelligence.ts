@@ -23,6 +23,7 @@ import {
 } from "@capital-q/q-knowledge";
 import type {
   QAnswerPort,
+  QLiveDeltaBus,
   QRetrievalPort,
   QRuntimeRepositories,
   QToolPort,
@@ -84,6 +85,12 @@ export type QIntelligenceDependencies = {
    * (CQ-Q-RESEARCH-001 §21). Absent means a proposed statement is not kept.
    */
   readonly statements?: QUserStatementRecorder | undefined;
+  /**
+   * Where an answer goes as it is written. Absent means it goes out only
+   * when it is finished; the stored message and its completion event are
+   * the same either way.
+   */
+  readonly deltas?: QLiveDeltaBus | undefined;
   readonly logger?: Logger | undefined;
 };
 
@@ -183,6 +190,9 @@ export function composeQIntelligence(
     tools,
     context: evidence.context,
     ...(statements === undefined ? {} : { statements }),
+    ...(dependencies.deltas === undefined
+      ? {}
+      : { deltas: dependencies.deltas }),
     ...(logger === undefined ? {} : { logger }),
   });
 

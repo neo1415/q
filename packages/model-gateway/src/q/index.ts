@@ -1,5 +1,8 @@
+import { randomUUID } from "node:crypto";
+
 import {
   MODEL_TOOL_RESULT_MAX_CHARS,
+  QMessageIdSchema,
   type ModelBudget,
   type ModelFailureClass,
   type ModelMessage,
@@ -22,6 +25,7 @@ import type { Logger } from "@capital-q/observability";
 import type { ActorContext } from "@capital-q/security";
 import {
   asksForPublicResearch,
+  createSentenceCutter,
   isRecordableKnowledgeKey,
   recordableNamespacesSentence,
   citePublicSources,
@@ -41,6 +45,7 @@ import {
   appendRunEvent,
   createUnconfiguredQTools,
   toQMessage,
+  type QLiveDeltaBus,
   type QAnswerOutcome,
   type QAnswerPort,
   type QAnswerRequest,
@@ -52,6 +57,7 @@ import {
 } from "@capital-q/q-runtime";
 
 import { isModelGatewayError } from "../errors.js";
+import { createPartialAnswerReader } from "../policy/partial-answer.js";
 import type { ModelGateway, ModelGatewayExecuteOptions } from "../gateway.js";
 import { acceptStructuredOutput } from "../policy/structured.js";
 
@@ -417,6 +423,12 @@ export type ModelGatewayQAnswerDependencies = {
   readonly transactions: TransactionManager;
   /** Persists a person's own statements about their own company (CQ-Q-RESEARCH-001). */
   readonly statements?: QUserStatementRecorder | undefined;
+  /**
+   * Where the answer goes as it is written. Absent means it goes out only
+   * when it is finished, which is what happened before and is still what
+   * happens for every caller that does not want it sooner.
+   */
+  readonly deltas?: QLiveDeltaBus | undefined;
   readonly registry?: PromptRegistry | undefined;
   readonly context?: QAuthorisedContextPort | undefined;
   /** The Tool Registry's port (CQ-Q-007). Absent: no tool is offered. */
@@ -508,6 +520,30 @@ export function fetchedForYouMessage(
   };
 }
 
+/**
+ * The guards, run on one sentence rather than on a finished answer.
+ *
+ * Same rules, same order, applied where a person will actually receive
+ * the words. A sentence the recommendation guard removes entirely is
+ * simply never sent; the finished answer is guarded again as a whole, so
+ * nothing depends on this having caught everything.
+ *
+ * The promise stripper needs a sentence after the promise to know it was
+ * only a promise, so it is asked at the opening with a second sentence
+ * that is not going anywhere.
+ */
+function guardSentence(sentence: string, first: boolean): string | null {
+  const withoutPromise = first
+    ? stripEmptyPromises(`${sentence} .`).text.replace(/\s*\.$/, "")
+    : sentence;
+  if (withoutPromise.trim().length === 0) {
+    return null;
+  }
+  const guarded = withoutRecommendationClaims(withoutPromise);
+  const text = guarded.text.trim();
+  return text.length === 0 ? null : text;
+}
+
 async function recordUserStatements(
   recorder: QUserStatementRecorder | undefined,
   request: QAnswerRequest,
@@ -569,7 +605,8 @@ async function recordUserStatements(
 export function createModelGatewayQAnswer(
   dependencies: ModelGatewayQAnswerDependencies,
 ): ModelGatewayQAnswer {
-  const { gateway, repositories, sql, transactions, logger } = dependencies;
+  const { gateway, repositories, sql, transactions, deltas, logger } =
+    dependencies;
   const registry = dependencies.registry ?? createDefaultPromptRegistry();
   const context = dependencies.context ?? noAuthorisedContext;
   const tools = dependencies.tools ?? createUnconfiguredQTools();
@@ -729,9 +766,65 @@ export function createModelGatewayQAnswer(
           ? {}
           : { tenantPolicy: dependencies.tenantPolicy }),
       };
+      /**
+       * The message is named before its text exists, so every fragment
+       * that goes out early and the message that is finally stored are
+       * one thing to whoever is reading.
+       */
+      const messageId = QMessageIdSchema.parse(randomUUID());
+
+      /**
+       * The answer, going out a sentence at a time as the model writes it.
+       *
+       * Three things have to be true of a fragment before a person can
+       * have it, and all three are why the unit is a sentence rather than
+       * a token. It has to be the ANSWER and not the JSON object around
+       * it, so it is read out of the document by key. It has to be whole,
+       * because the guard that removes an invented recommendation removes
+       * a sentence and cannot judge half of one. And it has to have been
+       * through those guards, because on a voice call it is about to be
+       * said out loud and nothing said can be unsaid.
+       *
+       * A turn that reaches for a tool publishes nothing: a tool call
+       * carries no text, and text that is not the analyst's object never
+       * matches the key. The last, unfinished sentence is never published
+       * either — it arrives with the completed message, which is the
+       * durable form and the one that decides what was said.
+       */
+      const partial = createPartialAnswerReader();
+      const cutter = createSentenceCutter();
+      let streamedText = "";
+      let seenText = "";
+      let firstSentence = true;
+      const onTextDelta =
+        deltas === undefined
+          ? undefined
+          : (fragment: string): void => {
+              seenText += fragment;
+              const fresh = partial.push(seenText);
+              if (fresh.length === 0) {
+                return;
+              }
+              for (const sentence of cutter.push(fresh)) {
+                const guarded = guardSentence(sentence, firstSentence);
+                firstSentence = false;
+                if (guarded === null || guarded.length === 0) {
+                  continue;
+                }
+                streamedText += `${guarded} `;
+                deltas.publish({
+                  runId: request.runId,
+                  tenantId: request.tenantId,
+                  messageId,
+                  text: `${guarded} `,
+                });
+              }
+            };
+
       const options: ModelGatewayExecuteOptions<CompanyAnalystV2Result> = {
         signal: request.signal,
         schema: CompanyAnalystV2ResultSchema,
+        ...(onTextDelta === undefined ? {} : { onTextDelta }),
       };
       const toolCalls: QToolCallObservation[] = [];
       // Public sources this run read, for the one human-safe presentation
@@ -836,7 +929,10 @@ export function createModelGatewayQAnswer(
                   output: { kind: "TEXT" },
                   tools: offered.map((tool) => tool.definition),
                 },
-                { signal: request.signal },
+                {
+                  signal: request.signal,
+                  ...(onTextDelta === undefined ? {} : { onTextDelta }),
+                },
               );
             } catch (error: unknown) {
               // Groq validates a model's tool call against the declared
@@ -1075,6 +1171,7 @@ export function createModelGatewayQAnswer(
         // client that missed every live delta converges on this text.
         const message = await transactions.run(async (tx) => {
           const stored = await repositories.messages.insert(tx, {
+            id: messageId,
             tenantId: request.tenantId,
             conversationId,
             runId: request.runId,
@@ -1129,6 +1226,10 @@ export function createModelGatewayQAnswer(
             modelCalls,
             totalMs: Date.now() - startedAt,
             phases,
+            // How much of the answer the person already had before the
+            // turn finished. Zero means nobody was listening, or the
+            // model wrote its object in an order this cannot read.
+            streamedCharacters: streamedText.length,
           },
           "q answer produced",
         );

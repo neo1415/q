@@ -267,6 +267,11 @@ export {
 } from "./communication/promises.js";
 
 export {
+  createSentenceCutter,
+  type SentenceCutter,
+} from "./communication/sentences.js";
+
+export {
   isRecordableKnowledgeKey,
   recordableNamespacesSentence,
   RECORDABLE_KNOWLEDGE_NAMESPACES,

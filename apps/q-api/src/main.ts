@@ -452,6 +452,9 @@ const qIntelligence = composeQIntelligence({
   gateway: modelGateway,
   embeddings: createProductionEmbeddingService(),
   statements: researchComposition.statements,
+  // The same bus the run stream publishes from, so an answer reaches a
+  // person as it is written rather than after it.
+  deltas: liveDeltas,
   logger,
 });
 logger.info(

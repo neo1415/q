@@ -54,6 +54,7 @@ import type { WelcomeHost } from "./welcome.js";
 import type { VoiceSpeaker, VoiceTranscriptTurn } from "./provider.js";
 import {
   bounded,
+  SPOKEN_MAX_CHARS,
   bySentence,
   sentences,
   speakable,
@@ -570,6 +571,7 @@ export function createVoiceTurnHandler(
 
     let terminal = false;
     let streamedDeltas = false;
+    let spokenCharacters = 0;
     let saidResearch = false;
     const record = await qStream.authorize(actor, runId, correlationId);
     async function* answer(): AsyncGenerator<string> {
@@ -583,10 +585,27 @@ export function createVoiceTurnHandler(
         }
         const event = item.event;
         switch (event.type) {
-          case "q.message.delta":
+          case "q.message.delta": {
+            // A delta is a whole sentence that has already been through
+            // the answer's guards, so `speakable` can do its work on it:
+            // several of its rules are anchored to a line or need a
+            // matching pair, and neither survives being handed half a
+            // sentence.
+            const spoken = speakable(event.data.text);
+            if (spoken.length === 0) {
+              break;
+            }
+            // The spoken cap applies to a streamed answer as it applies
+            // to a finished one: a listener can take in only so much, and
+            // the rest is on their screen either way.
+            if (spokenCharacters >= SPOKEN_MAX_CHARS) {
+              break;
+            }
             streamedDeltas = true;
-            yield event.data.text;
+            spokenCharacters += spoken.length + 1;
+            yield `${spoken} `;
             break;
+          }
           case "q.message.completed": {
             const text = event.data.message.text;
             if (!streamedDeltas && text !== undefined) {

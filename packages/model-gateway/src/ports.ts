@@ -47,6 +47,23 @@ export type ModelExecutionContext = {
   readonly attemptTimeoutMs: number;
   readonly attempt: number;
   readonly correlationId: string;
+  /**
+   * Called with each new piece of text as the model writes it, when the
+   * caller wants the answer as it is written rather than after it.
+   *
+   * An adapter that cannot stream ignores this and is still correct: the
+   * result it returns is the same either way, and a caller that receives
+   * no fragment simply has nothing to show early. That is why this is a
+   * field on the context rather than a second method on the port — a
+   * provider is not a different kind of provider for streaming, and a
+   * gateway that had to branch on it would have two of everything.
+   *
+   * The fragments are raw model text in order, and together they are
+   * exactly the `text` on the result. Nothing is de-duplicated for the
+   * caller and nothing is guaranteed about where a fragment ends: a word,
+   * even a character, may be split across two.
+   */
+  readonly onTextDelta?: ((text: string) => void) | undefined;
 };
 
 /**

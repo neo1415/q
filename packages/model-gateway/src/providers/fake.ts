@@ -93,6 +93,22 @@ function waitForAbort(signal: AbortSignal): Promise<never> {
   });
 }
 
+function emit(context: ModelExecutionContext, text: string): void {
+  const send = context.onTextDelta;
+  if (send === undefined) {
+    return;
+  }
+  const sizes = [3, 11, 1, 7, 29];
+  let at = 0;
+  let which = 0;
+  while (at < text.length) {
+    const size = sizes[which % sizes.length] ?? 5;
+    send(text.slice(at, at + size));
+    at += size;
+    which += 1;
+  }
+}
+
 function delay(ms: number, signal: AbortSignal): Promise<void> {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(resolve, ms);
@@ -132,6 +148,12 @@ export function createFakeModelProvider(
       cancellation: true,
       ...options.capabilities,
     }),
+    /**
+     * A caller that asked for the answer as it is written gets it in
+     * pieces, because a fake that handed it over whole would let a
+     * reassembly bug pass every test. Small, uneven pieces on purpose:
+     * nothing downstream may assume a fragment is a word or a sentence.
+     */
     generate: async (
       request: ModelProviderRequest,
       context: ModelExecutionContext,
@@ -144,6 +166,7 @@ export function createFakeModelProvider(
             if (behaviour.delayMs !== undefined) {
               await delay(behaviour.delayMs, context.signal);
             }
+            emit(context, behaviour.text);
             return {
               text: behaviour.text,
               toolCalls: undefined,
@@ -152,18 +175,21 @@ export function createFakeModelProvider(
               modelCode: request.modelCode,
               providerReference: behaviour.providerReference,
             };
-          case "JSON":
+          case "JSON": {
             if (behaviour.delayMs !== undefined) {
               await delay(behaviour.delayMs, context.signal);
             }
+            const json = JSON.stringify(behaviour.value);
+            emit(context, json);
             return {
-              text: JSON.stringify(behaviour.value),
+              text: json,
               toolCalls: undefined,
               usage: behaviour.usage,
               finish: "COMPLETE",
               modelCode: request.modelCode,
               providerReference: undefined,
             };
+          }
           case "TOOL_CALLS":
             return {
               text: behaviour.text ?? "",

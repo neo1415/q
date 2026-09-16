@@ -235,14 +235,23 @@ function textOf(response: GenerateContentResponse): string {
     .join("");
 }
 
-function toolCallsOf(response: GenerateContentResponse): ModelToolCall[] {
+/**
+ * `offset` numbers a synthesised call id from where this response sits in
+ * a longer stream, so two chunks cannot both produce "gen_0". It is 0 for
+ * a single response, which is every non-streamed call.
+ */
+function toolCallsOf(
+  response: GenerateContentResponse,
+  offset = 0,
+): ModelToolCall[] {
   const parts = response.candidates?.[0]?.content?.parts ?? [];
   const calls: ModelToolCall[] = [];
-  parts.forEach((part, index) => {
+  parts.forEach((part) => {
     const call = part.functionCall;
     if (call === undefined) {
       return;
     }
+    const index = offset + calls.length;
     const name = ModelToolNameSchema.safeParse(call.name);
     if (!name.success) {
       throw new ModelProviderFailure("gemini proposed a malformed tool call", {
@@ -264,6 +273,36 @@ function toolCallsOf(response: GenerateContentResponse): ModelToolCall[] {
     });
   });
   return calls;
+}
+
+/**
+ * One result from one response, however it was read. The empty-candidate
+ * guard belongs here because it can only be judged once: an early chunk
+ * with no text is ordinary, an entire answer with none is not.
+ */
+function finished(
+  request: ModelProviderRequest,
+  response: GenerateContentResponse,
+  text: string,
+  toolCalls: readonly ModelToolCall[],
+): ModelProviderResult {
+  if (text.length === 0 && toolCalls.length === 0) {
+    throw new ModelProviderFailure("gemini returned no text candidate", {
+      failureClass:
+        finishStatus(response, toolCalls) === "CONTENT_FILTERED"
+          ? "PERMANENT"
+          : "INVALID_MODEL_OUTPUT",
+      providerCode: GOOGLE_PROVIDER_CODE,
+    });
+  }
+  return {
+    text,
+    toolCalls: toolCalls.length === 0 ? undefined : [...toolCalls],
+    usage: usageOf(response),
+    finish: finishStatus(response, toolCalls),
+    modelCode: response.modelVersion ?? request.modelCode,
+    providerReference: response.responseId,
+  };
 }
 
 function classify(status: number): ModelFailureClass {
@@ -362,7 +401,7 @@ export function createGoogleModelProvider(
     capabilities: () => ({
       structuredOutput: true,
       toolCalling: true,
-      streaming: false,
+      streaming: true,
       cancellation: true,
     }),
     generate: async (
@@ -402,36 +441,63 @@ export function createGoogleModelProvider(
             : [{ functionDeclarations: toolsForGemini(request.tools) }],
       };
 
-      let response: GenerateContentResponse;
+      const params = {
+        model: request.modelCode,
+        contents,
+        config,
+      };
+
+      /**
+       * Streamed only when somebody is listening. The same parameters
+       * either way: for this SDK the only difference between the two
+       * calls is which method is named, so a caller that wants the answer
+       * as it is written gets it, and one that does not pays nothing for
+       * the machinery.
+       */
+      if (context.onTextDelta === undefined) {
+        let response: GenerateContentResponse;
+        try {
+          response = await client.models.generateContent(params);
+        } catch (error: unknown) {
+          throw normalizeError(error);
+        }
+        const toolCalls = toolCallsOf(response);
+        const text = textOf(response);
+        return finished(request, response, text, toolCalls);
+      }
+
+      let text = "";
+      const toolCalls: ModelToolCall[] = [];
+      let last: GenerateContentResponse | undefined;
+      // Gemini numbers a synthesised call id by its position among the
+      // parts it arrived with, so in a stream the numbering has to be
+      // ours: two chunks each holding their first part would otherwise
+      // both be "gen_0".
+      let callsSoFar = 0;
       try {
-        response = await client.models.generateContent({
-          model: request.modelCode,
-          contents,
-          config,
-        });
+        const stream = await client.models.generateContentStream(params);
+        for await (const chunk of stream) {
+          last = chunk;
+          const fragment = textOf(chunk);
+          if (fragment.length > 0) {
+            text += fragment;
+            context.onTextDelta(fragment);
+          }
+          for (const call of toolCallsOf(chunk, callsSoFar)) {
+            toolCalls.push(call);
+            callsSoFar += 1;
+          }
+        }
       } catch (error: unknown) {
         throw normalizeError(error);
       }
-
-      const toolCalls = toolCallsOf(response);
-      const text = textOf(response);
-      if (text.length === 0 && toolCalls.length === 0) {
-        throw new ModelProviderFailure("gemini returned no text candidate", {
-          failureClass:
-            finishStatus(response, toolCalls) === "CONTENT_FILTERED"
-              ? "PERMANENT"
-              : "INVALID_MODEL_OUTPUT",
+      if (last === undefined) {
+        throw new ModelProviderFailure("gemini streamed nothing at all", {
+          failureClass: "INVALID_MODEL_OUTPUT",
           providerCode: GOOGLE_PROVIDER_CODE,
         });
       }
-      return {
-        text,
-        toolCalls: toolCalls.length === 0 ? undefined : toolCalls,
-        usage: usageOf(response),
-        finish: finishStatus(response, toolCalls),
-        modelCode: response.modelVersion ?? request.modelCode,
-        providerReference: response.responseId,
-      };
+      return finished(request, last, text, toolCalls);
     },
   };
 }
