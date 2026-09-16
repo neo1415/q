@@ -535,3 +535,20 @@ export {
   type MediaAssetDto,
   type PitchGuidance,
 } from "./media.js";
+
+export {
+  DISCOVERY_COMPANIES_PATH,
+  DISCOVERY_INVESTORS_PATH,
+  DiscoveredCompanyDtoSchema,
+  DiscoveredInvestorDtoSchema,
+  DiscoveryCompanySlateDtoSchema,
+  DiscoveryInvestorSlateDtoSchema,
+  DiscoveryNoteDtoSchema,
+  DiscoveryReasonDtoSchema,
+  type DiscoveredCompanyDto,
+  type DiscoveredInvestorDto,
+  type DiscoveryCompanySlateDto,
+  type DiscoveryInvestorSlateDto,
+  type DiscoveryNoteDto,
+  type DiscoveryReasonDto,
+} from "./discovery.js";

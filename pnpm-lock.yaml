@@ -65,6 +65,9 @@ importers:
       '@capital-q/database':
         specifier: workspace:*
         version: link:../../packages/database
+      '@capital-q/discovery':
+        specifier: workspace:*
+        version: link:../../packages/discovery
       '@capital-q/eventing':
         specifier: workspace:*
         version: link:../../packages/eventing
@@ -135,6 +138,9 @@ importers:
       '@capital-q/database':
         specifier: workspace:*
         version: link:../../packages/database
+      '@capital-q/discovery':
+        specifier: workspace:*
+        version: link:../../packages/discovery
       '@capital-q/eventing':
         specifier: workspace:*
         version: link:../../packages/eventing
@@ -525,6 +531,31 @@ importers:
       postgres:
         specifier: 3.4.9
         version: 3.4.9
+    devDependencies:
+      '@types/node':
+        specifier: ^24.13.3
+        version: 24.13.3
+      typescript:
+        specifier: 5.9.3
+        version: 5.9.3
+
+  packages/discovery:
+    dependencies:
+      '@capital-q/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      '@capital-q/database':
+        specifier: workspace:*
+        version: link:../database
+      '@capital-q/observability':
+        specifier: workspace:*
+        version: link:../observability
+      '@capital-q/security':
+        specifier: workspace:*
+        version: link:../security
+      zod:
+        specifier: 4.5.4
+        version: 4.5.4
     devDependencies:
       '@types/node':
         specifier: ^24.13.3
@@ -1476,6 +1507,9 @@ importers:
       '@capital-q/contracts':
         specifier: workspace:*
         version: link:../contracts
+      '@capital-q/discovery':
+        specifier: workspace:*
+        version: link:../discovery
       '@capital-q/investors':
         specifier: workspace:*
         version: link:../investors

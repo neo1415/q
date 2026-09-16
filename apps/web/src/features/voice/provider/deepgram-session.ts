@@ -37,10 +37,10 @@ const OUTPUT_SAMPLE_RATE = 24_000;
  * a moment, the browser asks Q to carry on with a cue the server treats
  * as "go on" and the transcript never shows.
  */
-const SUSTAINED_WINDOW_MS = 420;
-const SUSTAINED_SAMPLE_MS = 60;
-const SUSTAINED_LEVEL = 0.06;
-const SUSTAINED_FRACTION = 0.5;
+const SUSTAINED_WINDOW_MS = 260;
+const SUSTAINED_SAMPLE_MS = 40;
+const SUSTAINED_LEVEL = 0.02;
+const SUSTAINED_FRACTION = 0.3;
 const FALSE_INTERRUPTION_MS = 1_600;
 const RECENT_AUDIO_MS = 900;
 const CONTINUE_SIGNAL = "[continue]";
@@ -186,7 +186,10 @@ export function useDeepgramVoiceSession(
           setState("USER_SPEAKING");
           return;
         }
-        // Q is talking: cut playback only for a sound that keeps going.
+        // Q is talking: cut playback for a sound that keeps going. The
+        // window is short and the threshold low, because failing to stop
+        // when a person speaks is far worse than stopping for a cough —
+        // a false stop resumes itself a moment later.
         void sustained().then((real) => {
           if (liveRef.current !== live || !speakingRef.current) return;
           if (!real) return;

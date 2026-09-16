@@ -109,6 +109,11 @@ import {
   composeQIntelligence,
   createProductionEmbeddingService,
 } from "./composition/q-intelligence.js";
+import {
+  createDiscoveryService,
+  createPostgresDiscoveryRepository,
+} from "@capital-q/discovery";
+
 import { composePresence } from "./composition/presence.js";
 import { createPresenceTrigger } from "./voice/presence-trigger.js";
 import { composeResearch } from "./composition/research.js";
@@ -384,6 +389,12 @@ const qTools = createQTools({
     investors,
     authorization,
     disclosure,
+    // Discovery (doc 19): the same deterministic slate the Discover
+    // surface shows, so Q answers "who can you tell me about" from the
+    // platform rather than from nothing.
+    discovery: createDiscoveryService({
+      repository: createPostgresDiscoveryRepository({ sql: database.sql }),
+    }),
     ...(researchComposition.research === undefined
       ? {}
       : { research: researchComposition.research }),

@@ -24,6 +24,7 @@
   "dependencies": {
     "@capital-q/capital": "workspace:*",
     "@capital-q/companies": "workspace:*",
+    "@capital-q/discovery": "workspace:*",
     "@capital-q/contracts": "workspace:*",
     "@capital-q/investors": "workspace:*",
     "@capital-q/observability": "workspace:*",

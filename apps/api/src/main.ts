@@ -27,6 +27,10 @@ import {
   INVESTOR_INTERVIEW_CUES,
   INVESTOR_UTTERANCE_ALIASES,
 } from "@capital-q/investor-onboarding";
+import {
+  createDiscoveryService,
+  createPostgresDiscoveryRepository,
+} from "@capital-q/discovery";
 import { createCapitalService } from "@capital-q/capital";
 import {
   createCompanyService,
@@ -288,10 +292,17 @@ const media = createMediaService({
   audit,
 });
 
+// Discovery (doc 19): one deterministic slate for both sides, over the
+// declared visibility columns. It writes nothing and reads no behaviour.
+const discovery = createDiscoveryService({
+  repository: createPostgresDiscoveryRepository({ sql: database.sql }),
+});
+
 const { app, logger } = createApp(config, security, {
   organisations,
   companies,
   investors,
+  discovery,
   capital,
   taxonomy: {
     query: taxonomy.query,

@@ -89,6 +89,15 @@ export {
 } from "./tools/search-companies.js";
 export { createDefaultQTools, createQTools } from "./default-tools.js";
 
+export {
+  createDiscoverySlateTool,
+  DISCOVERY_SLATE,
+  DiscoverySlateInputSchema,
+  DiscoverySlateOutputSchema,
+  type DiscoverySlateInput,
+  type DiscoverySlateOutput,
+} from "./tools/discovery-slate.js";
+
 export const PACKAGE_NAME = "@capital-q/q-tools" as const;
 export {
   createExtractPublicWebTool,

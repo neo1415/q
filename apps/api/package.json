@@ -22,6 +22,7 @@
     "@capital-q/evidence": "workspace:*",
     "@capital-q/founder-onboarding": "workspace:*",
     "@capital-q/investor-onboarding": "workspace:*",
+    "@capital-q/discovery": "workspace:*",
     "@capital-q/investors": "workspace:*",
     "@capital-q/media": "workspace:*",
     "@capital-q/network": "workspace:*",

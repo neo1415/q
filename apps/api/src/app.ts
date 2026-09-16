@@ -29,6 +29,10 @@ import {
   type MediaRoutesDependencies,
 } from "./http/media.js";
 import {
+  registerDiscoveryRoutes,
+  type DiscoveryRoutesDependencies,
+} from "./http/discovery.js";
+import {
   registerInvestorRoutes,
   type InvestorRoutesDependencies,
 } from "./http/investors.js";
@@ -78,6 +82,7 @@ export type ApiModules = {
     OrganisationRoutesDependencies["organisations"] | undefined;
   readonly companies?: CompanyRoutesDependencies["companies"] | undefined;
   readonly investors?: InvestorRoutesDependencies["investors"] | undefined;
+  readonly discovery?: DiscoveryRoutesDependencies["discovery"] | undefined;
   readonly capital?: CapitalRoutesDependencies["capital"] | undefined;
   readonly taxonomy?: TaxonomyRoutesDependencies["taxonomy"] | undefined;
   readonly onboarding?: OnboardingRoutesDependencies["onboarding"] | undefined;
@@ -175,6 +180,16 @@ export function createApp(
       authenticator: security.authenticator,
       resolver: security.resolver,
       investors: modules.investors,
+    });
+  }
+
+  // Discovery (doc 19): the slate both sides read. Registered on its own
+  // because it belongs to neither the company nor the investor context.
+  if (modules.discovery !== undefined) {
+    registerDiscoveryRoutes(app, {
+      authenticator: security.authenticator,
+      resolver: security.resolver,
+      discovery: modules.discovery,
     });
   }
 

@@ -268,6 +268,15 @@ Q's destinations (a page, the form) are followed by `useFollowTurn`
 only once the client has stopped speaking or thinking, with a 1.5 s floor
 and a 12 s ceiling, so a goodbye is heard before the screen changes.
 
+## Barge-in
+
+The provider reports "user started speaking" on any sound, so Q sampled
+the microphone before cutting playback — and the first threshold was set
+so high that Q carried on talking over people. It is now 260 ms at a low
+level: failing to stop when somebody speaks is far worse than stopping for
+a cough, because a false stop repairs itself a moment later through the
+hidden `[continue]` cue and a missed one does not.
+
 ## Sounds, interruptions, endings and destinations
 
 `voice/navigation.ts` reads a few things deterministically before any

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
-import { listInvestorMandates } from "@capital-q/api-client";
+import { discoverCompanies, discoverInvestors } from "@capital-q/api-client";
 import { buttonClassName } from "@capital-q/ui/button";
 import { EmptyState } from "@capital-q/ui/states";
 
@@ -9,65 +9,82 @@ import {
   PageContainer,
   PageHeader,
 } from "@/components/app-shell/page-container";
+import {
+  DiscoverCompanies,
+  DiscoverInvestors,
+} from "@/features/discover/discover-screen";
 import { apiSession, resolveOwnContext } from "@/features/q/context";
 
 export const metadata: Metadata = { title: "Discover" };
 export const dynamic = "force-dynamic";
 
 /**
- * Discover shell. The mobile vertical feed arrives with its own packet; this
- * surface is deliberately a first-class empty state, and the shell adds no
- * chrome that would stop the future feed from taking the full viewport.
- * It does know whether the mandate is already set, so a person who has
- * finished is not told to start.
+ * Discover (doc 19). An investor sees companies that made themselves
+ * discoverable, ordered against their own declared mandate. A founder sees
+ * investors who made themselves discoverable, ordered on what those
+ * investors declared publicly — never on a mandate, which is theirs.
+ *
+ * The slate is built server-side by the discovery context under the
+ * person's own session. Nothing on this page ranks anything.
  */
 export default async function DiscoverPage() {
   const context = await resolveOwnContext();
-  let mandateReady = false;
-  if (context.kind === "INVESTOR") {
-    const session = await apiSession();
-    if (session !== null) {
-      try {
-        const page = await listInvestorMandates(
-          session,
-          context.investorOrganisationId,
-          { status: "ACTIVE", limit: 1 },
-        );
-        mandateReady = page.items.length > 0;
-      } catch {
-        // Unknown is shown as not ready; nothing is invented.
-      }
-    }
+  const session = await apiSession();
+
+  if (context.kind === "NONE" || session === null) {
+    return (
+      <PageContainer>
+        <PageHeader
+          title="Discover"
+          description="Opportunities ranked by fit and evidence, with the reasons alongside."
+        />
+        <EmptyState
+          title="Tell Q what you're here to do first."
+          description="Discover shows companies to investors and investors to founders. Which one you see follows from your setup."
+          action={
+            <Link href="/home" className={buttonClassName("secondary")}>
+              Get set up
+            </Link>
+          }
+        />
+      </PageContainer>
+    );
   }
+
+  if (context.kind === "INVESTOR") {
+    const slate = await discoverCompanies(session).catch(() => null);
+    return (
+      <PageContainer>
+        <PageHeader
+          title="Discover"
+          description="Companies that chose to be discoverable, ordered against the mandate you declared."
+        />
+        {slate === null ? (
+          <EmptyState
+            title="Discover couldn't load."
+            description="Nothing is wrong with your mandate. Try again in a moment."
+          />
+        ) : (
+          <DiscoverCompanies items={slate.items} notes={slate.notes} />
+        )}
+      </PageContainer>
+    );
+  }
+
+  const slate = await discoverInvestors(session).catch(() => null);
   return (
     <PageContainer>
       <PageHeader
         title="Discover"
-        description="Opportunities ranked by fit and evidence, with the reasons alongside."
+        description="Investors who chose to be discoverable, and what each one has said publicly."
       />
-      {mandateReady ? (
+      {slate === null ? (
         <EmptyState
-          title="Your mandate is set. Opportunities appear here as companies become discoverable."
-          description="Q matches on your declared mandate and observed evidence, and explains every recommendation. Ask Q about your mandate any time."
-          action={
-            <Link href="/home" className={buttonClassName("secondary")}>
-              Ask Q
-            </Link>
-          }
+          title="Discover couldn't load."
+          description="Nothing is wrong with your profile. Try again in a moment."
         />
       ) : (
-        <EmptyState
-          title="Relevant opportunities will appear here once your investment mandate is ready."
-          description="Q matches on declared mandate and observed evidence, and explains every recommendation. Nothing is ranked by popularity."
-          action={
-            <Link
-              href="/onboarding/investor"
-              className={buttonClassName("secondary")}
-            >
-              Set up your mandate
-            </Link>
-          }
-        />
+        <DiscoverInvestors items={slate.items} notes={slate.notes} />
       )}
     </PageContainer>
   );
