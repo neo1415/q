@@ -116,6 +116,9 @@ function emptyResult(
   };
 }
 
+/** A retrieval longer than this is reported step by step, not as a total. */
+const SLOW_RETRIEVAL_MS = 2_000;
+
 export function createAuthorisedRetrievalService(
   dependencies: AuthorisedRetrievalDependencies,
 ): AuthorisedRetrievalService {
@@ -192,12 +195,19 @@ export function createAuthorisedRetrievalService(
     let vector: readonly number[];
     let dimension: number;
     let configurationVersion: string;
+    // A budget of its own, well under the provider's. A query embedding
+    // that takes longer than a person will wait is not worth having: the
+    // lexical half still runs, the answer still comes, and the retrieval
+    // says it was degraded. Without this, one cold or busy embedder held a
+    // retrieval for twelve seconds before any model had been asked
+    // anything, with the sixty-second provider timeout as the only limit.
+    const budget = AbortSignal.timeout(config.queryEmbeddingBudgetMs);
+    const bounded =
+      signal === undefined ? budget : AbortSignal.any([signal, budget]);
     try {
-      const result = await embeddings.embedQuery(
-        text,
-        "EVIDENCE_RETRIEVAL",
-        signal === undefined ? undefined : { signal },
-      );
+      const result = await embeddings.embedQuery(text, "EVIDENCE_RETRIEVAL", {
+        signal: bounded,
+      });
       vector = result.vector;
       dimension = result.dimension;
       configurationVersion = result.configurationVersion;
@@ -469,19 +479,31 @@ export function createAuthorisedRetrievalService(
       // Counts and codes only: no query text, no chunk text, no title, and
       // no count of what was excluded — "3 results were withheld" discloses
       // existence as surely as naming the file would.
-      logger?.debug(
-        {
-          planId: envelope.planId,
-          configVersion: config.configVersion,
-          strategy: executed,
-          lexicalCandidates: lexicalOutcome.candidates.length,
-          semanticCandidates: semanticOutcome.candidates.length,
-          fusedCandidates: fused.length,
-          hits: hits.length,
-          totalMs,
-        },
-        "authorised retrieval completed",
-      );
+      const timings = {
+        planId: envelope.planId,
+        configVersion: config.configVersion,
+        strategy: executed,
+        degraded: degraded.reason,
+        lexicalCandidates: lexicalOutcome.candidates.length,
+        semanticCandidates: semanticOutcome.candidates.length,
+        fusedCandidates: fused.length,
+        hits: hits.length,
+        lexicalMs: lexicalOutcome.ms,
+        queryEmbeddingMs: semanticOutcome.embeddingMs,
+        semanticMs: semanticOutcome.searchMs,
+        fusionMs,
+        expansionMs,
+        totalMs,
+      };
+      // Which step took the time, at a level somebody will see, whenever
+      // a retrieval is slow enough to be felt. A twelve-second retrieval
+      // was once logged as a single total, and nothing said where the
+      // seconds went.
+      if (totalMs >= SLOW_RETRIEVAL_MS) {
+        logger?.warn(timings, "authorised retrieval was slow");
+      } else {
+        logger?.debug(timings, "authorised retrieval completed");
+      }
 
       return {
         configVersion: config.configVersion,

@@ -444,13 +444,27 @@ const qActionPort = createQActionPort({ service: qActions, logger });
 // a private network. It is composed unconditionally: when it cannot be
 // reached, retrieval runs lexically and says so in its own diagnostics,
 // which is an honest degradation rather than a silent one.
+const embeddings = createProductionEmbeddingService();
+// One embedding before anyone asks for one. The runtime loads its model
+// on first use, and that cost landed on the first person to speak after a
+// start: a retrieval that should take under a second took twelve. Best
+// effort and detached; a runtime that is not there yet is reported by
+// retrieval itself, per request, as a degradation.
+void embeddings
+  .embedQuery("Capital Q is starting.", "EVIDENCE_RETRIEVAL", {
+    signal: AbortSignal.timeout(30_000),
+  })
+  .then(() => logger.info({}, "embedding runtime warm"))
+  .catch((error: unknown) =>
+    logger.warn({ err: error }, "embedding runtime not warmed"),
+  );
 const qIntelligence = composeQIntelligence({
   sql: database.sql,
   transactions: database.transactions,
   repositories,
   tools: qTools.port,
   gateway: modelGateway,
-  embeddings: createProductionEmbeddingService(),
+  embeddings,
   statements: researchComposition.statements,
   // The same bus the run stream publishes from, so an answer reaches a
   // person as it is written rather than after it.

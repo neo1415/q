@@ -156,6 +156,13 @@ export type RetrievalConfig = {
   readonly lexicalCandidates: number;
   /** Candidates the semantic half returns before fusion. */
   readonly semanticCandidates: number;
+  /**
+   * The longest a query embedding may take before the semantic half is
+   * given up and retrieval runs lexically, reported as degraded. Not a
+   * ranking tunable: it changes nothing about what a result is, only how
+   * long a person can be kept waiting for one.
+   */
+  readonly queryEmbeddingBudgetMs: number;
   /** Candidates surviving fusion, before evidence expansion. */
   readonly fusedCandidates: number;
   /** Evidence hits handed to context assembly. */
@@ -339,6 +346,7 @@ export const DEFAULT_RETRIEVAL_CONFIG: RetrievalConfig = {
   configVersion: RETRIEVAL_CONFIG_VERSION,
   lexicalCandidates: 30,
   semanticCandidates: 30,
+  queryEmbeddingBudgetMs: 2_500,
   fusedCandidates: 20,
   finalHits: 8,
   rrfK: 60,
