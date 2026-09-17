@@ -169,12 +169,18 @@ async function main() {
       },
     );
     if (setup.status !== 0) {
-      log("voice:setup failed:");
+      // Not fatal. The transport in use is Deepgram, which is configured
+      // per session and needs nothing here; the ElevenLabs engines are
+      // the secondary path. A ten-second network blip reaching
+      // ElevenLabs once took the whole stack down before anything had
+      // started, with a working tunnel left running on its own.
+      log(
+        "voice:setup did not complete; carrying on. ElevenLabs engines still point at the previous hostname. Re-run `pnpm voice:setup` once the network is back.",
+      );
       console.log((setup.stdout ?? "") + (setup.stderr ?? ""));
-      tunnel?.kill();
-      process.exit(1);
+    } else {
+      log("Speech Engines ready.");
     }
-    log("Speech Engines ready.");
   }
 
   // 4. Everything else.

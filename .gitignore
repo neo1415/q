@@ -56,3 +56,6 @@ models/
 .cache/huggingface/
 *.safetensors
 *.onnx
+
+# Local demo launcher output
+demo.log
