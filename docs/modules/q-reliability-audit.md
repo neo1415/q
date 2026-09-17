@@ -700,6 +700,78 @@ own identifier, which is not configured. Nothing here can be guessed at.
 
 ---
 
+## N. The second demo: what a founder's session showed
+
+Run against the working system by the person it is for, with a company on
+the profile. Everything here was found by that session, not by reading.
+
+### N1. Every question went to the company specialist
+
+**Symptom.** "What's up", "who is the CEO of Paystack", "you can just
+search online" — each refused as outside the scope of the company's data.
+
+**Cause.** With a company as the subject, the specialist claimed every
+question and answered only from that company's records. None of the
+general-knowledge, lookup, research or streaming behaviour lives there.
+
+**Fixed.** The specialist takes only questions that are about the company:
+first person, an analysis asked for outright, or a dimension of it.
+Anything about somebody else, the outside world, or nothing in particular
+goes to the conversational path. The reading is deterministic and says
+why. Verified live: small talk is answered and the Paystack question was
+researched on the web instead of refused.
+
+### N2. A raise target read as a string of zeros
+
+**Fixed.** Money and grouped numbers are spoken as a person says them:
+"200 000 000 NGN" is "200 million naira". The stored figure is untouched.
+
+### N3. "Thinking" for good, and three refused calls a second
+
+**Cause.** A failed session stopped its microphone but not its socket, so
+the provider kept thinking against a binding the reconnect had replaced;
+and nothing told the browser the server had let its session go.
+
+**Fixed.** The socket is closed with the session. A refused think call
+logs why. The turn poll notices a vanished session and ends the line as
+dropped, which is what brings it back.
+
+### N4. Five seconds of silence before every reply
+
+**Cause.** The turn-end threshold was 0.8 with the provider's five-second
+timeout, so a short utterance ended only when the timeout did.
+
+**Fixed.** 0.7 and three seconds.
+
+### N5. Sixteen seconds for "what's up"
+
+**Cause.** Twelve of them were retrieval, before any model was asked. The
+query embedding had only the provider's sixty-second timeout as a limit.
+
+**Fixed.** A two-and-a-half-second budget on the query embedding, past
+which retrieval runs lexically and says so; a step-by-step log for any
+retrieval over two seconds; and the embedder warmed at startup. Measured
+after: about nine seconds end to end on a cold path, which is still more
+than it should be and is now attributable.
+
+### N6. The server died
+
+**Cause.** It was a child process of the assistant's own session, and
+went down with it. Separately, a ten-second network blip reaching the
+secondary speech engine was treated as fatal by the launcher.
+
+**Fixed.** The launcher runs detached in its own window, and the
+secondary engine step is a warning.
+
+### N7. The microphone
+
+**Not reproduced.** Nothing spoken in that session reached the server;
+everything in the transcript was typed. Scripts can drive the think route
+but not a microphone, so this is unverified. The browser now prints one
+line every five seconds saying how many audio frames left it and what the
+provider last said back, which is enough to tell the three causes apart
+next time.
+
 ## M. What this audit says to do next, in order
 
 1. **Prove the retrieval layer, not just the plan** (H2). The firewall's

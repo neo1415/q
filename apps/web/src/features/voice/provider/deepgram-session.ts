@@ -132,12 +132,49 @@ export function useDeepgramVoiceSession(
         },
       });
       const player = new AgentPlayer({ sampleRate: OUTPUT_SAMPLE_RATE });
+      /**
+       * Where the audio stops, if it stops.
+       *
+       * "Q can't hear me" has three different causes that look identical
+       * from the chair: the microphone is not producing frames, the frames
+       * are not reaching the provider, or the provider hears them and
+       * never decides the person has finished. This counts frames leaving
+       * the browser and notes the last thing the provider said back, and
+       * prints one line every few seconds in the console. Nothing about
+       * the audio itself is logged, only that it moved.
+       */
+      const heard = { frames: 0, lastEvent: "none", lastEventAt: 0 };
       const microphone = new AgentMicrophone(
         (data) => {
+          heard.frames += 1;
           session.sendAudio(data);
         },
         { sampleRate: INPUT_SAMPLE_RATE, echoCancellation: true },
       );
+      const heartbeat = window.setInterval(() => {
+        if (liveRef.current !== live) {
+          window.clearInterval(heartbeat);
+          return;
+        }
+        console.info(
+          "[voice] audio frames sent in last 5s:",
+          heard.frames,
+          "| last provider event:",
+          heard.lastEvent,
+          heard.lastEventAt === 0
+            ? ""
+            : `${String(Math.round((Date.now() - heard.lastEventAt) / 1000))}s ago`,
+          "| muted:",
+          microphone.muted,
+          "| input level:",
+          microphone.getInputVolume().toFixed(3),
+        );
+        heard.frames = 0;
+      }, 5_000);
+      const noteEvent = (name: string) => {
+        heard.lastEvent = name;
+        heard.lastEventAt = Date.now();
+      };
       const live: Live = { session, microphone, player };
       liveRef.current = live;
 
@@ -146,6 +183,7 @@ export function useDeepgramVoiceSession(
         setState("LISTENING");
       });
       session.on("conversation-text", (message) => {
+        noteEvent(`conversation-text:${message.role}`);
         const role = message.role === "user" ? "user" : "q";
         if (role === "user") {
           lastUserTextAtRef.current = Date.now();
@@ -182,6 +220,7 @@ export function useDeepgramVoiceSession(
         }, FALSE_INTERRUPTION_MS);
       };
       session.on("user-started-speaking", () => {
+        noteEvent("user-started-speaking");
         if (!speakingRef.current) {
           setState("USER_SPEAKING");
           return;
@@ -201,6 +240,7 @@ export function useDeepgramVoiceSession(
         });
       });
       session.on("agent-thinking", () => {
+        noteEvent("agent-thinking");
         setState("THINKING");
       });
       session.on("agent-started-speaking", () => {

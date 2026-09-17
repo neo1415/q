@@ -26,6 +26,7 @@ import type { ActorContext } from "@capital-q/security";
 import {
   asksForPublicResearch,
   createSentenceCutter,
+  namesSomething,
   isRecordableKnowledgeKey,
   recordableNamespacesSentence,
   citePublicSources,
@@ -1053,8 +1054,12 @@ export function createModelGatewayQAnswer(
         if (
           analyst === undefined &&
           researchTool !== undefined &&
+          // An empty platform lookup earns a trip to the public web only
+          // when the words name something to look up. A lookup comes back
+          // empty for "what's up" too, and small talk was being followed
+          // by three seconds on the web for nothing.
           (asksForPublicResearch(latest.content) ||
-            platformLookupFoundNothing) &&
+            (platformLookupFoundNothing && namesSomething(latest.content))) &&
           !toolCalls.some((call) => call.providerName === "research_public_web")
         ) {
           if (

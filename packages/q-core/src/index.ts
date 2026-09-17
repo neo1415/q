@@ -271,6 +271,8 @@ export {
   type SentenceCutter,
 } from "./communication/sentences.js";
 
+export { namesSomething } from "./communication/names-something.js";
+
 export {
   isRecordableKnowledgeKey,
   recordableNamespacesSentence,
