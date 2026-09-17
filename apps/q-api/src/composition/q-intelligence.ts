@@ -3,6 +3,7 @@ import type { DatabaseExecutor, TransactionManager } from "@capital-q/database";
 import type { ModelGateway } from "@capital-q/model-gateway";
 import {
   createModelGatewayQAnswer,
+  type QProfileUpdateNotebook,
   type QUserStatementRecorder,
 } from "@capital-q/model-gateway/q";
 import type { Logger } from "@capital-q/observability";
@@ -85,6 +86,8 @@ export type QIntelligenceDependencies = {
    * (CQ-Q-RESEARCH-001 §21). Absent means a proposed statement is not kept.
    */
   readonly statements?: QUserStatementRecorder | undefined;
+  /** Where a requested profile change is noted for the action proposer (ADR 0011). */
+  readonly profileUpdates?: QProfileUpdateNotebook | undefined;
   /**
    * Where an answer goes as it is written. Absent means it goes out only
    * when it is finished; the stored message and its completion event are
@@ -190,6 +193,9 @@ export function composeQIntelligence(
     tools,
     context: evidence.context,
     ...(statements === undefined ? {} : { statements }),
+    ...(dependencies.profileUpdates === undefined
+      ? {}
+      : { profileUpdates: dependencies.profileUpdates }),
     ...(dependencies.deltas === undefined
       ? {}
       : { deltas: dependencies.deltas }),
@@ -207,6 +213,9 @@ export function composeQIntelligence(
     // "not offered" when none is, and the specialist answers accordingly.
     research: createToolResearchPort(tools, logger),
     ...(statements === undefined ? {} : { statements }),
+    ...(dependencies.profileUpdates === undefined
+      ? {}
+      : { profileUpdates: dependencies.profileUpdates }),
     knowledge: createKnowledgeCompanyPort(knowledge),
     evidence: createRetrievalEvidencePort(retrievalService, logger),
     // The plan's ceiling, never a declaration made at composition time.

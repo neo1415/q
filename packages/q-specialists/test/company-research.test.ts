@@ -99,6 +99,7 @@ function analyst(
     coverage: [],
     materialChanges: [],
     userStatements: [],
+    profileUpdates: [],
     ...extra,
   };
 }

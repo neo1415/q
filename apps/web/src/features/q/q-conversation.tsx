@@ -290,6 +290,48 @@ export function QConversationPanel({
         </InlineNotice>
       ) : null}
 
+      {q.state.approval !== null
+        ? (() => {
+            // What Q has prepared and is waiting on (CQ-Q-008, ADR 0011).
+            // The summary and preview are the server's own words for the
+            // exact payload the decision binds to; nothing here rewrites
+            // them. One yes applies it; one no leaves everything as it was.
+            const approval = q.state.approval;
+            const proposal = q.state.proposals.find(
+              (candidate) => candidate.proposalId === approval.proposalId,
+            );
+            return (
+              <InlineNotice
+                tone="info"
+                title={
+                  proposal?.summary ??
+                  "Q has prepared something for you to approve."
+                }
+              >
+                <div className="flex flex-col gap-3" data-q-approval>
+                  {proposal?.preview !== undefined ? (
+                    <pre className="cq-body whitespace-pre-wrap font-sans">
+                      {proposal.preview}
+                    </pre>
+                  ) : null}
+                  <div className="flex flex-wrap gap-2">
+                    <Button size="compact" onClick={() => void q.approve()}>
+                      Approve
+                    </Button>
+                    <Button
+                      size="compact"
+                      variant="secondary"
+                      onClick={() => void q.decline()}
+                    >
+                      Decline
+                    </Button>
+                  </div>
+                </div>
+              </InlineNotice>
+            );
+          })()
+        : null}
+
       {q.notice !== null && q.state.failure === null ? (
         <InlineNotice tone="warning" title="That didn't go through">
           {q.notice}

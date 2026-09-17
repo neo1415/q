@@ -5,7 +5,9 @@ import { z } from "zod";
 import {
   ApiProblemError,
   appendQRunMessage,
+  approveQApproval,
   cancelQRun,
+  rejectQApproval,
   createQRun,
   getCurrentOnboardingSession,
   getQRun,
@@ -261,6 +263,40 @@ export async function cancelQRunAction(
   }
   return run(async (session) => {
     await cancelQRun(session, runId.data);
+    return null;
+  });
+}
+
+const ApprovalIdSchema = z.string().uuid();
+
+/**
+ * The person's decision on something Q prepared (CQ-Q-008, ADR 0011).
+ * The server owns the proposal and its exact payload; this sends the
+ * decision and nothing else. Approving resumes the run, which executes
+ * through the gate; declining ends it with nothing changed.
+ */
+export async function approveQApprovalAction(
+  rawApprovalId: string,
+): Promise<QActionResult<null>> {
+  const approvalId = ApprovalIdSchema.safeParse(rawApprovalId);
+  if (!approvalId.success) {
+    return failure("I couldn't record that decision.");
+  }
+  return run(async (session) => {
+    await approveQApproval(session, approvalId.data);
+    return null;
+  });
+}
+
+export async function rejectQApprovalAction(
+  rawApprovalId: string,
+): Promise<QActionResult<null>> {
+  const approvalId = ApprovalIdSchema.safeParse(rawApprovalId);
+  if (!approvalId.success) {
+    return failure("I couldn't record that decision.");
+  }
+  return run(async (session) => {
+    await rejectQApproval(session, approvalId.data);
     return null;
   });
 }

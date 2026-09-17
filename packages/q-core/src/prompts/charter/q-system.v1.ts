@@ -29,7 +29,8 @@ export const QSystemVariablesSchema = z
     operatingMode: QOperatingModeSchema,
     communicationProfile: QCommunicationProfileSchema,
     communicationGuidance: z.string().max(4_000),
-    environmentNotes: z.string().max(2_000),
+    // 2,600 since 2026-09-17 (ADR 0011): see schemas/common.ts.
+    environmentNotes: z.string().max(2_600),
   })
   .strict();
 export type QSystemVariables = z.infer<typeof QSystemVariablesSchema>;

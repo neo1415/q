@@ -108,6 +108,7 @@ export {
   type InterviewDestination,
 } from "./prompts/schemas/interview-conductor.js";
 export { COMPANY_ANALYST_V2 } from "./prompts/tasks/company-analyst.v2.js";
+export { COMPANY_ANALYST_V3 } from "./prompts/tasks/company-analyst.v3.js";
 export { FOUNDER_ONBOARDING_EXTRACTION_V1 } from "./prompts/tasks/founder-onboarding-extraction.v1.js";
 export { FOUNDER_ONBOARDING_EXTRACTION_V2 } from "./prompts/tasks/founder-onboarding-extraction.v2.js";
 export { INVESTOR_MANDATE_SYNTHESIS_V1 } from "./prompts/tasks/investor-mandate-synthesis.v1.js";
@@ -133,6 +134,11 @@ export {
   COMPANY_ANALYST_V2_SCHEMA_VERSION,
   CompanyAnalystResultSchema,
   CompanyAnalystV2ResultSchema,
+  CompanyAnalystV3ResultSchema,
+  COMPANY_ANALYST_V3_SCHEMA_VERSION,
+  type CompanyAnalystV3Result,
+  ProfileUpdateSchema,
+  type ProfileUpdate,
   CompanyAnalystV2VariablesSchema,
   CompanyAnalystVariablesSchema,
   type CompanyAnalystResult,

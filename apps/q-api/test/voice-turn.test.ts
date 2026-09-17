@@ -786,6 +786,92 @@ describe("a spoken question for Q", () => {
     expect(said).not.toMatch(/snag|ask (?:me|it) again|try it another way/i);
   });
 
+  it("speaks what Q prepared, and a spoken yes is the approval (CQ-Q-008, ADR 0011)", async () => {
+    const runtime = fakeRuntime();
+    const approvals = { approve: [] as unknown[], reject: [] as unknown[] };
+    const resumed: unknown[] = [];
+    const handle = createVoiceTurnHandler({
+      qRuntime: runtime.service,
+      qStream: fakeStream([
+        event("q.message.delta", {
+          messageId: "m1",
+          text: "I've prepared that change to your profile. ",
+        }),
+        event("q.action.proposed", {
+          proposal: {
+            proposalId: "p1",
+            summary:
+              "Update your company profile. Website: https://thevaultlyne.com",
+          },
+        }),
+        event("q.approval.required", {
+          approvalId: "33333333-3333-4333-8333-333333333333",
+          proposalId: "p1",
+        }),
+      ]),
+      orchestration: {
+        orchestrator: {
+          start: () => Promise.resolve(),
+          resume: (command: unknown) => {
+            resumed.push(command);
+            return Promise.resolve();
+          },
+        } as never,
+        autostart: false,
+      },
+      approvals: {
+        approve: (command: unknown) => {
+          approvals.approve.push(command);
+          return Promise.resolve({
+            decided: true,
+            action: { runId: RUN_ID },
+            view: {},
+          } as never);
+        },
+        reject: (command: unknown) => {
+          approvals.reject.push(command);
+          return Promise.resolve({} as never);
+        },
+      },
+      logger,
+    });
+    const thread = {
+      conversationId: undefined,
+      subjects: undefined,
+      onboarding: undefined,
+    };
+    const bound = binding(thread);
+    const speaker = fakeSpeaker();
+    await handle(
+      bound,
+      [{ role: "user", content: "Put our website as thevaultlyne.com" }],
+      new AbortController().signal,
+      speaker,
+    );
+    expect(speaker.spoken.join(" ")).toContain("Shall I go ahead?");
+    expect(speaker.spoken.join(" ")).toContain("thevaultlyne.com");
+
+    const yes = fakeSpeaker();
+    await handle(
+      bound,
+      [
+        { role: "user", content: "Put our website as thevaultlyne.com" },
+        { role: "agent", content: "Shall I go ahead?" },
+        { role: "user", content: "Yes." },
+      ],
+      new AbortController().signal,
+      yes,
+    );
+    expect(approvals.approve).toHaveLength(1);
+    expect((approvals.approve[0] as { approvalId: string }).approvalId).toBe(
+      "33333333-3333-4333-8333-333333333333",
+    );
+    expect(resumed).toHaveLength(1);
+    expect(yes.spoken.join(" ")).toMatch(/Done/);
+    // A yes was the decision; no run was started for the word "yes".
+    expect(runtime.calls.createRun).toHaveLength(1);
+  });
+
   it("does nothing for a transcript with no words from the person", async () => {
     const runtime = fakeRuntime();
     const handle = createVoiceTurnHandler({

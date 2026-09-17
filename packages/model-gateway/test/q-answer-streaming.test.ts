@@ -61,7 +61,7 @@ function plan(): PermittedContextPlan {
 function build(
   answer: string,
   extras: Record<string, unknown> = {},
-  capture: { content?: string } = {},
+  capture: { content?: string; noted?: unknown[] } = {},
 ) {
   const messages: QConversationMessage[] = [
     {
@@ -139,6 +139,11 @@ function build(
       subscribe: () => () => undefined,
       subscriberCount: () => 1,
     },
+    profileUpdates: {
+      note: (entry) => {
+        capture.noted = [...(capture.noted ?? []), entry];
+      },
+    },
   });
 
   const request: QAnswerRequest = {
@@ -152,7 +157,7 @@ function build(
     }),
     correlationId: `cor_${RUN}`,
     capability: "ANSWER",
-    subjects: [],
+    subjects: [{ kind: "COMPANY", companyId: ORG }],
     plan: plan(),
   } as unknown as QAnswerRequest;
 
@@ -218,6 +223,43 @@ describe("an answer that arrives as it is written", () => {
     expect(stored.content).toBe(
       "Paystack is a Nigerian payments company. Stripe acquired it in 2020. It serves many merchants.",
     );
+  });
+
+  it("hands a requested profile change to the proposer only when the person actually said it", async () => {
+    // The person's message in this harness is "Tell me about Paystack.";
+    // a reading whose quote is not in it is dropped, one that is goes on.
+    const capture: { content?: string; noted?: unknown[] } = {};
+    const { seam, request } = build(
+      "Done.",
+      {
+        profileUpdates: [
+          { field: "websiteUrl", value: "https://x.com", quote: "invented" },
+          {
+            field: "shortDescription",
+            value: "Payments",
+            quote: "tell me about paystack",
+          },
+        ],
+      },
+      capture,
+    );
+    const outcome = await seam.answer(request);
+    expect(outcome.kind).toBe("ANSWERED");
+    expect(capture.noted).toEqual([
+      {
+        runId: RUN,
+        tenantId: TENANT,
+        companyId: ORG,
+        updates: [
+          {
+            field: "shortDescription",
+            value: "Payments",
+            quote: "tell me about paystack",
+          },
+        ],
+      },
+    ]);
+    expect(capture.content).toContain("prepared that change to your profile");
   });
 
   it("puts a sentence through the guards before anybody hears it", async () => {

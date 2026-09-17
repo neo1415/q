@@ -72,7 +72,10 @@ export const TaskFrameSchema = {
   /** Rendered communication guidance (from the profile), trusted text. */
   communicationGuidance: z.string().max(4_000),
   /** What the runtime honestly knows about its own limits, trusted text. */
-  environmentNotes: z.string().max(2_000),
+  // 2,600 since 2026-09-17: the research guidance and the profile-change
+  // instruction (ADR 0011) together did not fit 2,000 on a company
+  // conversation. The rendered charter stays within its token bound.
+  environmentNotes: z.string().max(2_600),
 };
 
 /** A finding as a model may state it: vocabulary only, no ids, no references. */

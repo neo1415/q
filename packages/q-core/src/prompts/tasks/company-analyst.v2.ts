@@ -75,7 +75,9 @@ export const COMPANY_ANALYST_V2: PromptDefinition<
 > = {
   id: "COMPANY_ANALYST",
   version: 2,
-  status: "ACTIVE",
+  // Superseded by v3 (ADR 0011), which carries the same template with a
+  // wider structured result.
+  status: "DEPRECATED",
   kind: "TASK",
   taskClass: "EVIDENCE_SYNTHESIS",
   owner: "q-core",

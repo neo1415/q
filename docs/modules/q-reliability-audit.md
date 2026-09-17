@@ -841,12 +841,13 @@ stream until a sentence follows it.
 **P4. Every sentence of the person shown twice.** The transcript line and
 the recorded turn differ in punctuation; they are now compared as words.
 
-**P5. "You cannot update Capital Q's records in our conversation."** Not
-fixed here. Q records what a person states about their own company as
-their claim already; the answer denied that. This needs the analyst
-prompt to say what Q can take down and where documents go, and the
-"what investors will see" fields need a path from Q's understanding to a
-confirmed profile value. Both are listed under M.
+**P5. "You cannot update Capital Q's records in our conversation."**
+Fixed by ADR 0011: the analyst reads a request to change a declared
+profile field, quoting the person; the answer seam hands it to the
+action proposer; the Approval Engine proposes `company.profile.update`;
+the person approves on screen or by saying yes; the companies context
+performs the update. Q's own presence findings do not yet flow into the
+profile through the same action; that is listed under M.
 
 **P6. The setup.** A website said aloud was recorded letter for letter
 ("Savage Bridge dot com") and looked up as words; "four" was no number;

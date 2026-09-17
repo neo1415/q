@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import {
+  COMPANY_EDITABLE_FIELDS,
   QCapabilitySchema,
   QConfidenceLevelSchema,
 } from "@capital-q/contracts";
@@ -151,6 +152,25 @@ export const UserStatementSchema = z
   .strict();
 export type UserStatement = z.infer<typeof UserStatementSchema>;
 
+/**
+ * A change the PERSON asked for, in THIS message, to one of their own
+ * company's declared profile fields (ADR 0011): "put our website as
+ * x.com", "add that we're based in Lagos", "change the short description
+ * to…". The quote is their words verbatim; the runtime checks it against
+ * the message and proposes nothing otherwise. A fact merely stated is a
+ * userStatement, not this; this is a request to change what the profile
+ * says. Nothing here is applied: it becomes a proposal the person approves.
+ */
+export const ProfileUpdateSchema = z
+  .object({
+    field: z.enum(COMPANY_EDITABLE_FIELDS),
+    /** The new value, in the field's own form; null clears the field. */
+    value: z.string().trim().max(4_000).nullable(),
+    quote: z.string().trim().min(3).max(400),
+  })
+  .strict();
+export type ProfileUpdate = z.infer<typeof ProfileUpdateSchema>;
+
 export const CompanyAnalystV2ResultSchema = CompanyAnalystResultSchema.extend({
   companyFindings: z
     .array(CompanyIntelligenceFindingSchema)
@@ -167,3 +187,15 @@ export type CompanyAnalystV2Result = z.infer<
 
 export const COMPANY_ANALYST_V2_SCHEMA_NAME = "CompanyAnalystResult";
 export const COMPANY_ANALYST_V2_SCHEMA_VERSION = 2;
+
+/** v2's result plus what the person asked to change (ADR 0011). */
+export const CompanyAnalystV3ResultSchema = CompanyAnalystV2ResultSchema.extend(
+  {
+    /** Only when the person, in THIS message, asks to change their own profile. */
+    profileUpdates: z.array(ProfileUpdateSchema).max(6).default([]),
+  },
+).strict();
+export type CompanyAnalystV3Result = z.infer<
+  typeof CompanyAnalystV3ResultSchema
+>;
+export const COMPANY_ANALYST_V3_SCHEMA_VERSION = 3;

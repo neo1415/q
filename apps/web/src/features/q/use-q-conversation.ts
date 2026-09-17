@@ -12,10 +12,12 @@ import {
 import { isTerminalQStreamEvent, type QMessage } from "@capital-q/contracts";
 
 import {
+  approveQApprovalAction,
   askQAction,
   cancelQRunAction,
   continueQRunAction,
   readQRunAction,
+  rejectQApprovalAction,
 } from "./actions";
 import type { PendingTurn } from "./conversation";
 
@@ -118,6 +120,9 @@ export type QConversation = {
   readonly conversationId: string | null;
   readonly ask: (question: string) => Promise<void>;
   readonly stop: () => Promise<void>;
+  /** Decide on what Q has prepared and is waiting for (CQ-Q-008). */
+  readonly approve: () => Promise<void>;
+  readonly decline: () => Promise<void>;
 };
 
 export type QConversationOptions = {
@@ -325,6 +330,35 @@ export function useQConversation(
     }
   }, []);
 
+  // A decision on the open run's proposal. The run resumes on the server
+  // after a yes and its remaining events are followed again from the
+  // cursor, so what the gate did arrives the same way the answer did.
+  const decide = useCallback(
+    async (decision: "APPROVE" | "REJECT") => {
+      const approval = runState.approval;
+      const open = openRun.current;
+      if (approval === null || open === null) {
+        return;
+      }
+      const result =
+        decision === "APPROVE"
+          ? await approveQApprovalAction(approval.approvalId)
+          : await rejectQApprovalAction(approval.approvalId);
+      if (!result.ok) {
+        setNotice(result.message);
+        return;
+      }
+      setRunState((current) => ({ ...current, approval: null }));
+      if (decision === "APPROVE") {
+        finished.current = false;
+        follow(open);
+      }
+    },
+    [follow, runState.approval],
+  );
+  const approve = useCallback(() => decide("APPROVE"), [decide]);
+  const decline = useCallback(() => decide("REJECT"), [decide]);
+
   return {
     state: { ...runState, messages: [...history, ...runState.messages] },
     pending,
@@ -337,5 +371,7 @@ export function useQConversation(
     conversationId: conversationIdState,
     ask,
     stop,
+    approve,
+    decline,
   };
 }

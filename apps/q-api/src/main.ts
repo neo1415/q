@@ -26,7 +26,11 @@ import {
   createPostgresSecurityEventWriter,
 } from "@capital-q/audit";
 import { createPostgresCapitalObjectiveQueryPort } from "@capital-q/capital";
-import { createPostgresCompanyQueryPort } from "@capital-q/companies";
+import {
+  createCompanyService,
+  createPostgresCompanyQueryPort,
+} from "@capital-q/companies";
+import { COMPANY_EVENTS } from "@capital-q/companies/events";
 import { createEventRegistry } from "@capital-q/contracts";
 import { createRequestDatabaseClient } from "@capital-q/database";
 import { createOutboxWriter } from "@capital-q/eventing";
@@ -109,6 +113,10 @@ import {
   composeQIntelligence,
   createProductionEmbeddingService,
 } from "./composition/q-intelligence.js";
+import {
+  createCompanyProfileUpdateAction,
+  createProfileUpdateBoard,
+} from "./composition/company-profile-action.js";
 import {
   createDiscoveryService,
   createPostgresDiscoveryRepository,
@@ -416,12 +424,34 @@ logger.info(
 // Room, connector or MCP executor exists yet, so nothing consequential can
 // be proposed or executed. When the first real CONFIRM_REQUIRED action
 // arrives, it registers here and gains no authority the gate does not check.
+// The companies context's own command surface, for the one action below.
+// Composed here exactly as the application API composes it: the same
+// service, the same `company.edit` check, the same outbox and audit.
+const companyService = createCompanyService({
+  sql: database.sql,
+  transactions: database.transactions,
+  authorization,
+  organisations: createPostgresOrganisationQueryPort({ sql: database.sql }),
+  // Only the companies context's own events can leave this writer.
+  outbox: createOutboxWriter({ registry: createEventRegistry(COMPANY_EVENTS) }),
+  audit: createPostgresMaterialActionAuditWriter(),
+});
+// A requested profile change travels from the answer seam to the proposer
+// on this board (ADR 0011); the Approval Engine does everything after.
+const profileBoard = createProfileUpdateBoard({ logger });
 const qActions = createQActionService({
   sql: database.sql,
   transactions: database.transactions,
   repositories: createPostgresQActionRepositories(),
   runtime: repositories,
-  registry: createQActionRegistry([]),
+  registry: createQActionRegistry([
+    createCompanyProfileUpdateAction({
+      profiles: companies,
+      service: companyService,
+      authorization,
+      logger,
+    }),
+  ]),
   authorization,
   audit: createPostgresMaterialActionAuditWriter(),
   securityEvents: createPostgresSecurityEventWriter({ sql: database.sql }),
@@ -430,7 +460,11 @@ const qActions = createQActionService({
   }),
   logger,
 });
-const qActionPort = createQActionPort({ service: qActions, logger });
+const qActionPort = createQActionPort({
+  service: qActions,
+  proposer: profileBoard,
+  logger,
+});
 
 // Q's intelligence (CQ-C5-R1). Authorised hybrid retrieval (CQ-RAG-004),
 // authorised Q Knowledge (CQ-KNW-002/003) and the Company Intelligence
@@ -466,6 +500,7 @@ const qIntelligence = composeQIntelligence({
   gateway: modelGateway,
   embeddings,
   statements: researchComposition.statements,
+  profileUpdates: profileBoard,
   // The same bus the run stream publishes from, so an answer reaches a
   // person as it is written rather than after it.
   deltas: liveDeltas,
@@ -589,6 +624,8 @@ const voiceTurn = createVoiceTurnHandler({
   board: voiceTurnBoard,
   welcome: welcomeHost,
   pronunciation,
+  // A spoken yes to a proposal is the same decision a tap records.
+  approvals: qActions,
   ...(presenceComposition === undefined
     ? {}
     : {

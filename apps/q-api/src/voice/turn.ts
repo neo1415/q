@@ -14,11 +14,13 @@ import {
 } from "@capital-q/api-client";
 import {
   CorrelationIdSchema,
+  QApprovalIdSchema,
   type CorrelationId,
   type OnboardingSessionView,
   type OnboardingUnderstanding,
   type QSubjectRef,
 } from "@capital-q/contracts";
+import type { QActionService } from "@capital-q/q-actions";
 import {
   looksLikeQuestionForQ,
   PAUSED_LINE,
@@ -112,6 +114,12 @@ export type VoiceTurnDependencies = {
   readonly pronunciation?: PronunciationTeacher | undefined;
   /** Starts a public presence read once the setup names a subject worth looking up. */
   readonly presence?: PresenceTrigger | undefined;
+  /**
+   * The Approval Engine's decisions (CQ-Q-008), for a proposal Q made in
+   * a spoken conversation: the person's yes or no is the same decision a
+   * tap on screen records, under the same actor.
+   */
+  readonly approvals?: Pick<QActionService, "approve" | "reject"> | undefined;
   /** The application API, for spoken interview turns; absent means Q conversations only. */
   readonly onboarding?:
     | { readonly apiBaseUrl: string; readonly fetch?: typeof fetch | undefined }
@@ -180,6 +188,12 @@ const AFFIRMATIVE =
 type VisibilitySubject =
   | { readonly kind: "COMPANY"; readonly id: string }
   | { readonly kind: "INVESTOR"; readonly id: string };
+
+/** A proposal Q made in this conversation and has not yet heard yes or no to. */
+const pendingApproval = new WeakMap<
+  VoiceSessionBinding,
+  { readonly approvalId: string; readonly summary: string | null }
+>();
 
 /** A visibility change Q has asked about and not yet heard yes or no to. */
 const pendingVisibility = new WeakMap<
@@ -587,6 +601,69 @@ export function createVoiceTurnHandler(
   };
 
   /** A question for Q: one run, modality VOICE, spoken as it streams. */
+  /**
+   * The person's yes or no to a proposal, recorded through the Approval
+   * Engine and, on yes, the run resumed so the gate executes it. Nothing
+   * is done here beyond the decision: the executor re-verifies authority,
+   * approval and payload on its own (CQ-Q-008).
+   */
+  const decideApproval = async (
+    binding: VoiceSessionBinding,
+    waiting: { readonly approvalId: string; readonly summary: string | null },
+    decision: "APPROVE" | "REJECT",
+    signal: AbortSignal,
+    speaker: VoiceSpeaker,
+  ): Promise<VoiceTurnOutcome> => {
+    const approvals = dependencies.approvals;
+    if (approvals === undefined) {
+      return { kind: "NOTHING" };
+    }
+    const correlationId = correlation();
+    let line: string;
+    try {
+      const approvalId = QApprovalIdSchema.parse(waiting.approvalId);
+      if (decision === "APPROVE") {
+        const result = await approvals.approve({
+          actor: binding.actor,
+          approvalId,
+          correlationId,
+        });
+        if (result.decided && orchestration !== undefined) {
+          void orchestration.orchestrator
+            .resume({
+              actor: binding.actor,
+              runId: result.action.runId,
+              correlationId,
+            })
+            .catch((error: unknown) => {
+              logger.error(
+                { err: error, qRunId: result.action.runId, correlationId },
+                "q run did not resume after a spoken approval",
+              );
+            });
+        }
+        line = "Done, that's going in now.";
+      } else {
+        await approvals.reject({
+          actor: binding.actor,
+          approvalId,
+          correlationId,
+        });
+        line = "Alright, nothing changes.";
+      }
+    } catch (error: unknown) {
+      logger.warn(
+        { err: error, qVoiceSessionId: binding.voiceSessionId, decision },
+        "a spoken approval decision was not recorded",
+      );
+      line =
+        "I couldn't record that just now. It's still on screen if you'd like to decide there.";
+    }
+    return (await speakLine(speaker, line, signal, binding))
+      ? { kind: "SPOKEN", path: "MOVE" }
+      : { kind: "INTERRUPTED", path: "MOVE" };
+  };
+
   const askQ = async (
     binding: VoiceSessionBinding,
     text: string,
@@ -645,6 +722,7 @@ export function createVoiceTurnHandler(
     let streamedDeltas = false;
     let spokenCharacters = 0;
     let saidResearch = false;
+    let proposedSummary: string | null = null;
     const record = await qStream.authorize(actor, runId, correlationId);
     async function* answer(): AsyncGenerator<string> {
       for await (const item of qStream.open({
@@ -690,8 +768,20 @@ export function createVoiceTurnHandler(
               ? event.data.clarification.question
               : `${event.data.clarification.question} ${joinOptions(event.data.clarification.options)}?`;
             break;
+          case "q.action.proposed":
+            // What Q would do, in the words the approver reads on screen.
+            proposedSummary = event.data.proposal.summary;
+            break;
           case "q.approval.required":
-            yield "I've prepared something that needs your approval; it's on screen.";
+            // Held until yes or no; the next thing the person says
+            // decides it, exactly as a tap would (CQ-Q-008).
+            pendingApproval.set(binding, {
+              approvalId: event.data.approvalId,
+              summary: proposedSummary,
+            });
+            yield proposedSummary === null
+              ? "I've prepared something that needs your approval. Shall I go ahead?"
+              : `${proposedSummary} Shall I go ahead?`;
             break;
           case "q.run.failed":
             terminal = true;
@@ -724,7 +814,6 @@ export function createVoiceTurnHandler(
             break;
           case "q.run.started":
           case "q.finding.available":
-          case "q.action.proposed":
             break;
         }
       }
@@ -1265,6 +1354,33 @@ export function createVoiceTurnHandler(
       return { kind: "NOTHING" };
     }
     rememberTranscript(binding, transcript);
+    // A proposal Q made, waiting for yes or no (CQ-Q-008, ADR 0011).
+    const approvalWaiting = pendingApproval.get(binding);
+    if (approvalWaiting !== undefined && dependencies.approvals !== undefined) {
+      if (AFFIRMATIVE.test(text)) {
+        pendingApproval.delete(binding);
+        return decideApproval(
+          binding,
+          approvalWaiting,
+          "APPROVE",
+          signal,
+          speaker,
+        );
+      }
+      if (declines(text)) {
+        pendingApproval.delete(binding);
+        return decideApproval(
+          binding,
+          approvalWaiting,
+          "REJECT",
+          signal,
+          speaker,
+        );
+      }
+      // Anything else: the proposal stays on screen, where it can still
+      // be decided; the conversation moves on.
+      pendingApproval.delete(binding);
+    }
     // A visibility question waiting for yes or no.
     const api = dependencies.onboarding;
     const awaiting = pendingVisibility.get(binding);
