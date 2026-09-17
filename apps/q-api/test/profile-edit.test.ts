@@ -84,6 +84,21 @@ describe("a spoken request to change your own details", () => {
     expect(spokenProfileEdit(`call me ${"a".repeat(200)}`)).toBeNull();
   });
 
+  it("takes the value from the sentence, not the rest of the paragraph", () => {
+    // Caught live during the first minute: this became a request to be
+    // called "Daniel. I run a company and we are raising".
+    const edit = spokenProfileEdit(
+      "My name is Daniel. I run a company and we are raising.",
+    );
+    expect(edit?.field).toBe("displayName");
+    expect(edit?.value).toBe("Daniel");
+
+    expect(
+      spokenProfileEdit("Change my website to vaultlyne.com. That's the one.")
+        ?.value,
+    ).toBe("https://vaultlyne.com");
+  });
+
   it("says nothing to ordinary conversation", () => {
     for (const said of [
       "I think our market is bigger than that",

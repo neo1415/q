@@ -1276,7 +1276,17 @@ export function createVoiceTurnHandler(
       }
       // Anything else moves on; they can ask again.
     }
-    const edit = spokenProfileEdit(text);
+    /**
+     * Not during the first minute.
+     *
+     * "My name is Daniel" is an introduction there, not a request to
+     * change a record, and the welcome host is already listening for it.
+     * Caught live: Q answered its own opening question with "I'll set what
+     * I call you to Daniel. Shall I?", which is a machine talking to
+     * itself.
+     */
+    const edit =
+      binding.thread.welcome === true ? null : spokenProfileEdit(text);
     if (edit !== null && api !== undefined) {
       pendingProfileEdit.set(binding, edit);
       return (await speakLine(speaker, profileEditQuestion(edit), signal))

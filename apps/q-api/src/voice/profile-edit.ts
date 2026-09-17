@@ -52,8 +52,24 @@ type Rule = {
 const TAIL =
   /[\s,.;!?]*(?:please|thanks|thank you|instead|now|for me|if you can|would you)?[\s,.;!?]*$/i;
 
+/**
+ * The value is what they said next, not the rest of the paragraph.
+ *
+ * Caught live: "My name is Daniel. I run a company and we are raising"
+ * became a request to be called "Daniel. I run a company and we are
+ * raising", because the capture ran to the end of the utterance. A value
+ * ends where the sentence does.
+ */
+function firstSentence(raw: string): string {
+  const end = /[.!?…]\s+\S/.exec(raw);
+  return end === null ? raw : raw.slice(0, end.index + 1);
+}
+
 function tidy(raw: string): string | null {
-  const value = raw.replace(TAIL, "").trim();
+  const value = firstSentence(raw)
+    .replace(TAIL, "")
+    .trim()
+    .replace(/[.,;:!?]+$/, "");
   if (value.length === 0 || value.length > VALUE_MAX) {
     return null;
   }
@@ -67,7 +83,7 @@ function tidy(raw: string): string | null {
  * refused rather than guessed at.
  */
 function tidyUrl(raw: string): string | null {
-  const spoken = raw
+  const spoken = firstSentence(raw)
     .replace(TAIL, "")
     .trim()
     .toLowerCase()
