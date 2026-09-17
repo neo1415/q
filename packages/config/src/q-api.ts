@@ -68,6 +68,10 @@ const qApiEnvSchema = z.object({
   // Whether the Speech Engines render inline audio tags ([laughs]); set by
   // voice:setup alongside the engine ids.
   Q_VOICE_EXPRESSIVE: z.enum(["true", "false"]).optional(),
+  // Q as an MCP server (doc 12 §34.2): a constrained façade over the tools
+  // the registry offers the authenticated person. Off unless a deployment
+  // says otherwise; nothing about Q's own behaviour depends on it.
+  Q_MCP_SERVER: z.enum(["enabled", "disabled"]).optional(),
 });
 
 /**
@@ -102,6 +106,11 @@ export type QApiVoiceConfig = {
 
 export type QApiPublicConfig = Readonly<Record<string, never>>;
 
+export type QApiConnectorsConfig = {
+  /** Whether the MCP server façade is mounted. */
+  readonly mcpServer: boolean;
+};
+
 export type QApiConfig = {
   readonly runtime: RuntimeConfig;
   readonly observability: ObservabilityConfig;
@@ -110,6 +119,7 @@ export type QApiConfig = {
   readonly supabaseAuth: SupabaseAuthConfig | undefined;
   readonly public: QApiPublicConfig;
   readonly voice: QApiVoiceConfig;
+  readonly connectors: QApiConnectorsConfig;
   readonly secrets: QApiSecrets;
 };
 
@@ -142,6 +152,7 @@ export function parseQApiConfig(env: EnvironmentInput): QApiConfig {
       ),
       publicUrl: parsed.Q_API_PUBLIC_URL?.replace(/\/$/, ""),
     },
+    connectors: { mcpServer: parsed.Q_MCP_SERVER === "enabled" },
     secrets: {
       modelProviders: toModelProviderSecrets(parsed),
       researchProviders: toResearchProviderSecrets(parsed),

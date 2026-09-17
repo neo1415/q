@@ -73,6 +73,42 @@ export const CompanyMaterialChangeSchema = z
   .strict();
 export type CompanyMaterialChange = z.infer<typeof CompanyMaterialChangeSchema>;
 
+const CITATION_LABEL = /^F[0-9]{1,3}$/;
+const CITATIONS_MAX = 8;
+
+/**
+ * The citation labels a model wrote, reduced to the ones that could
+ * resolve.
+ *
+ * The task asks for bare "F<n>" labels and mostly gets them. Live, a model
+ * that had just read PUBLIC WEB SOURCE entries wrote "S1", "[F3]", a
+ * domain name and once a whole sentence, and the entire answer — prose the
+ * person had already been read — was refused for a label the specialist
+ * would have dropped anyway. A citation that names nothing the model was
+ * shown resolves to nothing whether it is dropped before the schema or
+ * after it; dropping it here means a stray label costs a citation, never
+ * the answer. What survives is still only a well-formed label, checked
+ * against the render by the specialist as before.
+ */
+export function readCitationLabels(value: unknown): readonly string[] {
+  const items = Array.isArray(value)
+    ? value
+    : typeof value === "string"
+      ? [value]
+      : [];
+  const labels = items
+    .flatMap((item) => (typeof item === "string" ? item.split(/[,\s]+/) : []))
+    .map((item) =>
+      item
+        .trim()
+        .replace(/^[[(#"'`]+/, "")
+        .replace(/[\])"'`.;:]+$/, "")
+        .toUpperCase(),
+    )
+    .filter((item) => CITATION_LABEL.test(item));
+  return [...new Set(labels)].slice(0, CITATIONS_MAX);
+}
+
 /**
  * A finding as a model may state it in the Company Intelligence task.
  *
@@ -99,8 +135,10 @@ export const CompanyIntelligenceFindingSchema = z
     confidence: QConfidenceLevelSchema,
     /** Labels of the supplied facts this rests on, e.g. ["F3","F7"]. */
     citations: z
-      .array(z.string().regex(/^F[0-9]{1,3}$/))
-      .max(8)
+      .preprocess(
+        readCitationLabels,
+        z.array(z.string().regex(CITATION_LABEL)).max(CITATIONS_MAX),
+      )
       .default([]),
     /** Stated assumptions. Surfaced, never hidden (§63). */
     assumptions: z.array(ModelStatementSchema).max(5).default([]),

@@ -648,6 +648,19 @@ const { app, logger: appLogger } = createApp(
     orchestration: { orchestrator, autostart: Q_ORCHESTRATION_AUTOSTART },
     qActions,
     qStream: { service: qStream },
+    // Q as an MCP server, only where a deployment turned it on. The same
+    // registry and pipeline a run uses; a different modality, no more
+    // authority.
+    ...(config.connectors.mcpServer
+      ? {
+          mcp: {
+            firewall,
+            registry: qTools.registry,
+            tools: qTools.port,
+            logger,
+          },
+        }
+      : {}),
     ...(voiceProvider === undefined && deepgramProvider === undefined
       ? {}
       : {

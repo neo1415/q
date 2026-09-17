@@ -796,37 +796,67 @@ export function createModelGatewayQAnswer(
       const cutter = createSentenceCutter();
       let streamedText = "";
       let seenText = "";
+      /**
+       * The answer's prose as far as it has been read, sentences finished
+       * or not. Kept apart from what was published because it has one
+       * more use: when the object around it is refused after the person
+       * has already heard it (below), this is the answer they heard.
+       */
+      let seenAnswer = "";
       let firstSentence = true;
-      const onTextDelta =
-        deltas === undefined
-          ? undefined
-          : (fragment: string): void => {
-              seenText += fragment;
-              const fresh = partial.push(seenText);
-              if (fresh.length === 0) {
-                return;
-              }
-              for (const sentence of cutter.push(fresh)) {
-                const guarded = guardSentence(sentence, firstSentence);
-                firstSentence = false;
-                if (guarded === null || guarded.length === 0) {
-                  continue;
-                }
-                streamedText += `${guarded} `;
-                deltas.publish({
-                  runId: request.runId,
-                  tenantId: request.tenantId,
-                  messageId,
-                  text: `${guarded} `,
-                });
-              }
-            };
+      const onTextDelta = (fragment: string): void => {
+        seenText += fragment;
+        const fresh = partial.push(seenText);
+        if (fresh.length === 0) {
+          return;
+        }
+        seenAnswer += fresh;
+        for (const sentence of cutter.push(fresh)) {
+          const guarded = guardSentence(sentence, firstSentence);
+          firstSentence = false;
+          if (guarded === null || guarded.length === 0) {
+            continue;
+          }
+          streamedText += `${guarded} `;
+          deltas?.publish({
+            runId: request.runId,
+            tenantId: request.tenantId,
+            messageId,
+            text: `${guarded} `,
+          });
+        }
+      };
 
       const options: ModelGatewayExecuteOptions<CompanyAnalystV2Result> = {
         signal: request.signal,
         schema: CompanyAnalystV2ResultSchema,
-        ...(onTextDelta === undefined ? {} : { onTextDelta }),
+        onTextDelta,
       };
+
+      // The message and its durable completion event commit together
+      // (CQ-Q-009 §16-§18): the event carries the persisted message, so a
+      // client that missed every live delta converges on this text.
+      const persistAnswer = (content: string) =>
+        transactions.run(async (tx) => {
+          const stored = await repositories.messages.insert(tx, {
+            id: messageId,
+            tenantId: request.tenantId,
+            conversationId,
+            runId: request.runId,
+            role: "Q",
+            content,
+          });
+          await appendRunEvent(
+            repositories,
+            tx,
+            { id: request.runId, tenantId: request.tenantId },
+            {
+              type: "q.message.completed",
+              data: { message: toQMessage(stored) as QResponseMessage },
+            },
+          );
+          return stored;
+        });
       const toolCalls: QToolCallObservation[] = [];
       // Public sources this run read, for the one human-safe presentation
       // of a source in the answer (CQ-Q-VOICE-001 R3). Public fields only.
@@ -930,10 +960,7 @@ export function createModelGatewayQAnswer(
                   output: { kind: "TEXT" },
                   tools: offered.map((tool) => tool.definition),
                 },
-                {
-                  signal: request.signal,
-                  ...(onTextDelta === undefined ? {} : { onTextDelta }),
-                },
+                { signal: request.signal, onTextDelta },
               );
             } catch (error: unknown) {
               // Groq validates a model's tool call against the declared
@@ -1171,29 +1198,7 @@ export function createModelGatewayQAnswer(
             diagnosticCode: "MODEL_PROVIDER_UNAVAILABLE",
           };
         }
-        // The message and its durable completion event commit together
-        // (CQ-Q-009 §16-§18): the event carries the persisted message, so a
-        // client that missed every live delta converges on this text.
-        const message = await transactions.run(async (tx) => {
-          const stored = await repositories.messages.insert(tx, {
-            id: messageId,
-            tenantId: request.tenantId,
-            conversationId,
-            runId: request.runId,
-            role: "Q",
-            content,
-          });
-          await appendRunEvent(
-            repositories,
-            tx,
-            { id: request.runId, tenantId: request.tenantId },
-            {
-              type: "q.message.completed",
-              data: { message: toQMessage(stored) as QResponseMessage },
-            },
-          );
-          return stored;
-        });
+        const message = await persistAnswer(content);
         last = {
           result: analyst,
           providerCode: final.providerCode,
@@ -1246,6 +1251,52 @@ export function createModelGatewayQAnswer(
         };
       } catch (error: unknown) {
         if (isModelGatewayError(error)) {
+          /**
+           * The answer was heard; the object around it was refused.
+           *
+           * Live, a person asked about their company, Q read the answer
+           * out sentence by sentence, and then said it had hit a snag and
+           * asked them to ask again. The final object had failed its
+           * schema on a label in a citation list, a field the person never
+           * sees. Nothing said can be unsaid, and an answer that was
+           * delivered is not a failure: the prose that was read to them
+           * stands as the answer, through the same guards as any other,
+           * and the structured extras the schema refused are simply not
+           * recorded for this turn. Only the prose the reader saw with
+           * certainty is used: the whole answer when its closing quote was
+           * seen, otherwise the sentences that were actually published.
+           */
+          if (error.failureClass === "INVALID_MODEL_OUTPUT") {
+            const heard = partial.complete() ? seenAnswer : streamedText;
+            const salvaged = withoutRecommendationClaims(
+              citePublicSources(stripEmptyPromises(heard).text, publicSources),
+            )
+              .text.slice(0, ANSWER_LIMIT_CHARS)
+              .trim();
+            if (salvaged.length > 0) {
+              const message = await persistAnswer(salvaged);
+              logger?.warn(
+                {
+                  qRunId: request.runId,
+                  taskClass,
+                  promptBundleVersion: rendered.bundle.bundleVersion,
+                  routingPolicy: error.routingPolicyCode,
+                  answerComplete: partial.complete(),
+                  streamedCharacters: streamedText.length,
+                  answerCharacters: salvaged.length,
+                  toolCalls: toolCalls.length,
+                  modelCalls,
+                },
+                "the answer's structure was refused after its text had been read; the text stands as the answer",
+              );
+              return {
+                kind: "ANSWERED",
+                messageId: message.id,
+                modelPolicyVersion: error.routingPolicyCode ?? "unrouted",
+                promptBundleVersion: rendered.bundle.bundleVersion,
+              };
+            }
+          }
           logger?.warn(
             {
               qRunId: request.runId,

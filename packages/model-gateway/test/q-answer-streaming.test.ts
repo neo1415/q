@@ -58,7 +58,11 @@ function plan(): PermittedContextPlan {
   } as unknown as PermittedContextPlan;
 }
 
-function build(answer: string) {
+function build(
+  answer: string,
+  extras: Record<string, unknown> = {},
+  capture: { content?: string } = {},
+) {
   const messages: QConversationMessage[] = [
     {
       id: randomUUID(),
@@ -84,6 +88,7 @@ function build(answer: string) {
           responseShape: "CONCISE",
           insufficientEvidence: false,
           recommendation: null,
+          ...extras,
         },
       },
     ],
@@ -107,6 +112,7 @@ function build(answer: string) {
         if (input.id !== undefined) {
           stored.id = input.id;
         }
+        capture.content = input.content;
         const message = {
           ...messages[0],
           id: input.id ?? randomUUID(),
@@ -189,6 +195,29 @@ describe("an answer that arrives as it is written", () => {
     for (const delta of published) {
       expect(delta.messageId).toBe(outcome.messageId);
     }
+  });
+
+  it("keeps an answer that was heard when the object around it is refused", async () => {
+    // Live: the answer was read out sentence by sentence, then the final
+    // object failed its schema on a field the person never sees, and Q
+    // said it had hit a snag and to ask again. An answer that has been
+    // delivered is not a failure: the text stands, and is persisted as the
+    // message the stream converges on.
+    const stored: { content?: string } = {};
+    const { seam, request, published } = build(
+      "Paystack is a Nigerian payments company. Stripe acquired it in 2020. It serves many merchants.",
+      // Refused by the schema (strict): a field the task does not define.
+      { somethingTheSchemaRefuses: true },
+      stored,
+    );
+    const outcome = await seam.answer(request);
+    expect(outcome.kind).toBe("ANSWERED");
+    expect(published.length).toBeGreaterThan(0);
+    // The whole answer, last sentence included, because the reader saw
+    // the answer close before the object was refused.
+    expect(stored.content).toBe(
+      "Paystack is a Nigerian payments company. Stripe acquired it in 2020. It serves many merchants.",
+    );
   });
 
   it("puts a sentence through the guards before anybody hears it", async () => {

@@ -748,6 +748,44 @@ describe("a spoken question for Q", () => {
     expect(runtime.calls.cancelRun).toHaveLength(0);
   });
 
+  it("says nothing more when a run fails after its answer was spoken", async () => {
+    // Live: Q answered, then said it had hit a snag and to ask again. A
+    // failure after the answer has been heard is not the person's to act
+    // on; it is logged, and nothing follows the answer.
+    const runtime = fakeRuntime();
+    const handle = createVoiceTurnHandler({
+      qRuntime: runtime.service,
+      qStream: fakeStream([
+        event("q.message.delta", { messageId: "m1", text: "First point. " }),
+        event("q.message.delta", { messageId: "m1", text: "Second point. " }),
+        event("q.run.failed", {
+          status: "FAILED",
+          failure: {
+            code: "Q_UNAVAILABLE",
+            message: "I couldn't answer that right now. Please try again.",
+            retryable: true,
+          },
+        }),
+      ]),
+      logger,
+    });
+    const speaker = fakeSpeaker();
+    await handle(
+      binding({
+        conversationId: undefined,
+        subjects: undefined,
+        onboarding: undefined,
+      }),
+      [{ role: "user", content: "What is our runway?" }],
+      new AbortController().signal,
+      speaker,
+    );
+    const said = speaker.spoken.join(" ");
+    expect(said).toContain("First point.");
+    expect(said).toContain("Second point.");
+    expect(said).not.toMatch(/snag|ask (?:me|it) again|try it another way/i);
+  });
+
   it("does nothing for a transcript with no words from the person", async () => {
     const runtime = fakeRuntime();
     const handle = createVoiceTurnHandler({

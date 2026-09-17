@@ -1,0 +1,202 @@
+# Render blueprint for the three Node service deployables and the private
+# embedding runtime (ADR 0001; doc 21 §4-§16, §29, §65-§77).
+#
+# apps/web stays on Vercel (root directory apps/web) and is not here.
+#
+# Every secret is `sync: false`: the value is entered once in the Render
+# dashboard and never lives in this file or in Git. Names match
+# packages/config exactly; a variable this file does not list is one no
+# service reads. Region is Frankfurt because EU data residency is a
+# requirement, not a preference (ADR 0001).
+#
+# Private networking: Render addresses a service inside the account by its
+# name and port, with no dot in the host. That is what lets the embedding
+# runtime, which holds confidential document text while it embeds it,
+# satisfy packages/config's rule that it is never at a public address.
+
+services:
+  # ---------------------------------------------------------------------
+  # The embedding runtime: Text Embeddings Inference serving the one
+  # open-weight model every chunk was embedded under (CQ-RAG-002). A
+  # different model would search a space nothing was indexed in, so the
+  # model, revision and bounds here are the ones in
+  # infra/embeddings/docker-compose.yml. Private: no public URL exists.
+  # ---------------------------------------------------------------------
+  - type: pserv
+    name: capital-q-embeddings
+    runtime: image
+    region: frankfurt
+    # Warming the model up costs several gigabytes for a short burst; a
+    # smaller instance is killed silently during start.
+    plan: pro
+    image:
+      url: ghcr.io/huggingface/text-embeddings-inference:cpu-1.9
+    dockerCommand: >-
+      text-embeddings-router
+      --model-id Qwen/Qwen3-Embedding-0.6B
+      --revision 97b0c614be4d77ee51c0cef4e5f07c00f9eb65b3
+      --port 8080
+      --max-client-batch-size 16
+      --max-concurrent-requests 8
+      --max-batch-tokens 4096
+    disk:
+      # Weights persist across deploys instead of being downloaded each
+      # time; they are never copied into an application image.
+      name: capital-q-embedding-cache
+      mountPath: /data
+      sizeGB: 10
+    envVars:
+      - key: HUGGINGFACE_HUB_CACHE
+        value: /data
+
+  # ---------------------------------------------------------------------
+  # The application API.
+  # ---------------------------------------------------------------------
+  - type: web
+    name: capital-q-api
+    runtime: node
+    region: frankfurt
+    plan: starter
+    buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm turbo run build --filter=@capital-q/api...
+    startCommand: node apps/api/dist/main.js
+    healthCheckPath: /health/ready
+    envVars:
+      - key: NODE_VERSION
+        value: "24"
+      - key: NODE_ENV
+        value: production
+      - key: CAPITAL_Q_ENV
+        value: production
+      - key: REGION
+        value: eu-central
+      - key: LOG_LEVEL
+        value: info
+      # Session pooler for the service; direct connection for migrations.
+      - key: DATABASE_URL
+        sync: false
+      - key: DATABASE_CONNECTION_MODE
+        value: session_pooler
+      - key: DATABASE_PRIVILEGED_URL
+        sync: false
+      - key: DATABASE_MIGRATION_URL
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_PUBLISHABLE_KEY
+        sync: false
+      - key: SUPABASE_SECRET_KEY
+        sync: false
+      - key: CQ_WEB_ORIGIN
+        sync: false
+
+  # ---------------------------------------------------------------------
+  # The Q API. Its own public URL is what the speech provider calls back
+  # to (Q_API_PUBLIC_URL); the application API and the embedding runtime
+  # are reached privately by name.
+  # ---------------------------------------------------------------------
+  - type: web
+    name: capital-q-q-api
+    runtime: node
+    region: frankfurt
+    plan: standard
+    buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm turbo run build --filter=@capital-q/q-api...
+    startCommand: node apps/q-api/dist/main.js
+    healthCheckPath: /health/ready
+    envVars:
+      - key: NODE_VERSION
+        value: "24"
+      - key: NODE_ENV
+        value: production
+      - key: CAPITAL_Q_ENV
+        value: production
+      - key: REGION
+        value: eu-central
+      - key: LOG_LEVEL
+        value: info
+      - key: DATABASE_URL
+        sync: false
+      - key: DATABASE_CONNECTION_MODE
+        value: session_pooler
+      - key: DATABASE_PRIVILEGED_URL
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_PUBLISHABLE_KEY
+        sync: false
+      - key: CQ_API_URL
+        value: http://capital-q-api:10000
+      - key: Q_EMBEDDING_PROVIDER
+        value: local-tei
+      - key: Q_EMBEDDING_BASE_URL
+        value: http://capital-q-embeddings:8080
+      # Model providers (CQ-Q-005). Each optional; the gateway routes
+      # around an unconfigured one.
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: GROQ_API_KEY_2
+        sync: false
+      # Public-web research (CQ-Q-RESEARCH-001).
+      - key: TAVILY_API_KEY
+        sync: false
+      - key: BRIGHT_DATA_API_KEY
+        sync: false
+      - key: SERP_API_KEY
+        sync: false
+      # Voice (CQ-Q-VOICE-001). Q_API_PUBLIC_URL is this service's own
+      # https origin, entered once the service has one.
+      - key: DEEPGRAM_API_KEY
+        sync: false
+      - key: ELEVENLABS_API_KEY
+        sync: false
+      - key: ELEVENLABS_SPEECH_ENGINE_ID
+        sync: false
+      - key: ELEVENLABS_SPEECH_ENGINE_ID_MALE
+        sync: false
+      - key: Q_API_PUBLIC_URL
+        sync: false
+      - key: Q_VOICE_EXPRESSIVE
+        value: "false"
+
+  # ---------------------------------------------------------------------
+  # Background workers: outbox publishing and document processing. No
+  # public URL (doc 21, IDA-033).
+  # ---------------------------------------------------------------------
+  - type: worker
+    name: capital-q-workers
+    runtime: node
+    region: frankfurt
+    plan: starter
+    buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm turbo run build --filter=@capital-q/workers...
+    startCommand: node apps/workers/dist/main.js
+    envVars:
+      - key: NODE_VERSION
+        value: "24"
+      - key: NODE_ENV
+        value: production
+      - key: CAPITAL_Q_ENV
+        value: production
+      - key: REGION
+        value: eu-central
+      - key: LOG_LEVEL
+        value: info
+      - key: DATABASE_URL
+        sync: false
+      - key: DATABASE_CONNECTION_MODE
+        value: session_pooler
+      - key: DATABASE_PRIVILEGED_URL
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SECRET_KEY
+        sync: false
+      # The only value a hosted environment accepts. Document processing
+      # therefore waits on a malware scanner being composed; until then
+      # uploads are accepted and held, not parsed.
+      - key: CQ_MALWARE_POLICY
+        value: REQUIRE_CLEAN
+      - key: Q_EMBEDDING_PROVIDER
+        value: local-tei
+      - key: Q_EMBEDDING_BASE_URL
+        value: http://capital-q-embeddings:8080

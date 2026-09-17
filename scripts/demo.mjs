@@ -3,17 +3,33 @@
 /**
  * One command to demo Capital Q with Q's voice (CQ-Q-VOICE-001 rework):
  *
- *   pnpm demo
+ *   pnpm demo            against whatever .env.local names
+ *   pnpm demo --local    against the local Supabase stack, whatever
+ *                        .env.local names (the hosted values stay put)
  *
- * 1. Starts the local database if it is not running (supabase start).
- * 2. Opens an ngrok tunnel to the Q API so the Speech Engine can reach it,
+ * 1. Works out which Supabase the configuration points at. Every service
+ *    must agree: auth (SUPABASE_URL), the web app
+ *    (NEXT_PUBLIC_SUPABASE_URL) and the database (DATABASE_URL) are
+ *    either all the local stack or all one hosted project. A mix is
+ *    refused up front, because it fails later in ways that look like
+ *    everything else: a session the API cannot verify, a person the
+ *    database has never heard of. `--local` makes them agree by taking
+ *    every value from `supabase status`, without touching either file.
+ * 2. Starts the local database if it is wanted and not running.
+ * 3. Opens an ngrok tunnel to the Q API so the Speech Engine can reach it,
  *    and waits for the public hostname (never printed in full).
- * 3. Re-provisions the two Speech Engines against that hostname
+ * 4. Re-provisions the two Speech Engines against that hostname
  *    (pnpm voice:setup), because the hostname changes on every restart.
- * 4. Runs `pnpm dev` (web, api, q-api, workers) in the foreground.
+ * 5. Runs `pnpm dev` (web, api, q-api, workers) in the foreground.
  *
  * Stop with Ctrl+C; the tunnel is closed with it. The database is left
  * running. Nothing here prints a secret or a token.
+ *
+ * Run it from a terminal of your own. A stack started from inside another
+ * application's process tree (an editor's terminal, an assistant's shell)
+ * dies with that application: the Claude desktop app updated itself
+ * mid-demo and took web, api, q-api and workers with it, with nothing in
+ * this log to say so. `scripts/demo-detached.ps1` exists for that case.
  */
 import { spawn, spawnSync } from "node:child_process";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
@@ -42,15 +58,53 @@ function upsertEnv(key, value) {
   writeFileSync(file, lines.join("\n"));
 }
 
-/** Read one key from .env.local without printing it. */
-function envValue(key) {
-  const file = resolve(root, ".env.local");
+/** Read one key from an env file without printing it. */
+function fileValue(file, key) {
+  if (!existsSync(file)) return undefined;
   const match = new RegExp(`^${key}=(.*)$`, "m").exec(
     readFileSync(file, "utf8"),
   );
   return match === null
     ? undefined
     : match[1].trim().replace(/^["']|["']$/g, "");
+}
+
+/**
+ * The value a service will actually see: the shell wins over the file,
+ * exactly as dev-env.mjs and Next.js resolve it.
+ */
+function effective(key, file = resolve(root, ".env.local")) {
+  const shell = process.env[key];
+  if (shell !== undefined && shell.length > 0) return shell;
+  return fileValue(file, key);
+}
+
+/** Whether a URL names this machine's Supabase stack or a hosted project. */
+function supabaseTarget(url) {
+  if (url === undefined || url.length === 0) return "unset";
+  try {
+    const host = new URL(url).hostname;
+    return host === "127.0.0.1" || host === "localhost" || host === "::1"
+      ? "local"
+      : "hosted";
+  } catch {
+    return "unset";
+  }
+}
+
+/**
+ * What `supabase status` reports for the running local stack, as a map.
+ * Values are never printed; the keys are the CLI's own.
+ */
+function localStackEnv() {
+  const status = run("supabase", ["status", "-o", "env"], { quiet: true });
+  if (status.status !== 0) return null;
+  const out = {};
+  for (const line of String(status.stdout ?? "").split(/\r?\n/)) {
+    const match = /^([A-Z0-9_]+)=(.*)$/.exec(line.trim());
+    if (match) out[match[1]] = match[2].trim().replace(/^["']|["']$/g, "");
+  }
+  return out;
 }
 
 function envHas(key) {
@@ -99,32 +153,92 @@ async function main() {
     process.exit(1);
   }
 
-  // 1. Database. Google sign-in reads its credentials from the
-  // environment; without them the provider is declared but cannot work.
-  for (const key of [
-    "SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID",
-    "SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_SECRET",
+  const wantsLocal = process.argv.includes("--local");
+
+  // 1. Which Supabase. Google sign-in on the LOCAL stack reads its
+  // credentials from the environment at `supabase start`; without them the
+  // provider is declared but cannot work. The plain GOOGLE_* names are
+  // accepted as well, because that is what the Google console calls them
+  // and what a person pastes. (A hosted project takes them in its own
+  // dashboard; nothing here is sent anywhere.)
+  for (const [key, alias] of [
+    ["SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_ID"],
+    ["SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_SECRET", "GOOGLE_CLIENT_SECRET"],
   ]) {
-    const value = envValue(key);
+    const value = effective(key) ?? effective(alias);
     if (value !== undefined && value.length > 0) {
       process.env[key] = value;
-    } else if (process.env[key] === undefined) {
+    } else {
       process.env[key] = "unset";
       log(
-        `${key} is not in .env.local; Google sign-in will not work until it is.`,
+        `${key} (or ${alias}) is not in .env.local; Google sign-in on the local stack will not work until it is.`,
       );
     }
   }
-  const status = run("supabase", ["status"], { quiet: true });
-  if (status.status !== 0) {
-    log("starting the local database...");
-    const started = run("supabase", ["start"]);
-    if (started.status !== 0) {
-      log("the database did not start; see the output above.");
-      process.exit(1);
+
+  const webEnv = resolve(root, "apps/web/.env.local");
+  const targets = {
+    SUPABASE_URL: supabaseTarget(effective("SUPABASE_URL")),
+    NEXT_PUBLIC_SUPABASE_URL: supabaseTarget(
+      effective("NEXT_PUBLIC_SUPABASE_URL", webEnv),
+    ),
+    DATABASE_URL: supabaseTarget(effective("DATABASE_URL")),
+  };
+  const distinct = new Set(Object.values(targets));
+  let target = wantsLocal ? "local" : ([...distinct][0] ?? "unset");
+  if (!wantsLocal && (distinct.size > 1 || target === "unset")) {
+    log("the configuration points at more than one Supabase:");
+    for (const [key, where] of Object.entries(targets)) {
+      log(`  ${key.padEnd(26)} ${where}`);
+    }
+    log(
+      "Every service must use the same one. Either give DATABASE_URL (and DATABASE_MIGRATION_URL) the hosted project's connection strings and put the hosted URL and publishable key in apps/web/.env.local, or run `pnpm demo --local` to use the local stack for everything.",
+    );
+    process.exit(1);
+  }
+
+  if (target === "local") {
+    const status = run("supabase", ["status"], { quiet: true });
+    if (status.status !== 0) {
+      log("starting the local database...");
+      const started = run("supabase", ["start"]);
+      if (started.status !== 0) {
+        log("the database did not start; see the output above.");
+        process.exit(1);
+      }
+    } else {
+      log("database is running.");
+    }
+    if (wantsLocal) {
+      // Every Supabase value from the running stack, for this process and
+      // its children only. The files keep whatever they say.
+      const stack = localStackEnv();
+      if (stack === null) {
+        log("could not read the local stack's settings (supabase status).");
+        process.exit(1);
+      }
+      const mapping = {
+        SUPABASE_URL: "API_URL",
+        SUPABASE_PUBLISHABLE_KEY: "PUBLISHABLE_KEY",
+        SUPABASE_SECRET_KEY: "SECRET_KEY",
+        DATABASE_URL: "DB_URL",
+        NEXT_PUBLIC_SUPABASE_URL: "API_URL",
+        NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: "PUBLISHABLE_KEY",
+      };
+      for (const [key, from] of Object.entries(mapping)) {
+        const value = stack[from];
+        if (value === undefined || value.length === 0) {
+          log(`the local stack did not report ${from}; cannot run --local.`);
+          process.exit(1);
+        }
+        process.env[key] = value;
+      }
+      log("using the local Supabase stack for every service (--local).");
     }
   } else {
-    log("database is running.");
+    log(
+      "using the hosted Supabase project from .env.local; the local database is not started.",
+    );
   }
 
   // 2. Tunnel. Reuse a running one; otherwise open one.

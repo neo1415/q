@@ -10,6 +10,9 @@
   "scripts": {
     "dev": "turbo run dev",
     "demo": "node scripts/demo.mjs",
+    "demo:detached": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/demo-detached.ps1",
+    "demo:stop": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/demo-stop.ps1",
+    "db:push": "node scripts/db-push.mjs",
     "dev:bootstrap": "node scripts/dev-bootstrap.mjs",
     "build": "turbo run build",
     "typecheck": "turbo run typecheck && tsc --noEmit -p tsconfig.json",

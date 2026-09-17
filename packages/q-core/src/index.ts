@@ -149,6 +149,7 @@ export {
   CompanyIntelligenceFindingSchema,
   CompanyIntelligenceModelOutputSchema,
   CompanyMaterialChangeSchema,
+  readCitationLabels,
   type CompanyEvidenceCoverage,
   type CompanyIntelligenceDimension,
   type CompanyIntelligenceFinding,

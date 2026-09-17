@@ -40,6 +40,7 @@
     "@capital-q/q-research": "workspace:*",
     "@capital-q/q-runtime": "workspace:*",
     "@capital-q/q-specialists": "workspace:*",
+    "@capital-q/q-connectors": "workspace:*",
     "@capital-q/q-tools": "workspace:*",
     "@capital-q/security": "workspace:*",
     "@elevenlabs/elevenlabs-js": "2.68.0",

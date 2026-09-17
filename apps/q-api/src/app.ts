@@ -12,6 +12,7 @@ import {
 } from "@capital-q/observability";
 
 import { registerProblemHandling } from "./http/problem-handler.js";
+import { registerQMcpRoute, type QMcpRouteDependencies } from "./http/q-mcp.js";
 import {
   registerQApprovalRoutes,
   type QApprovalRoutesDependencies,
@@ -70,6 +71,13 @@ export type QApiModules = {
         readonly service: QEventRoutesDependencies["qStream"];
         readonly options?: QEventRoutesDependencies["options"];
       }
+    | undefined;
+  /**
+   * Q as an MCP server (doc 12 §34.2); absent means no MCP route. The
+   * composition root passes it only when configuration enables it.
+   */
+  readonly mcp?:
+    | Pick<QMcpRouteDependencies, "firewall" | "registry" | "tools" | "logger">
     | undefined;
   /** The realtime voice channel (CQ-Q-VOICE-001 C); absent means no voice routes. */
   readonly voice?:
@@ -261,6 +269,21 @@ export function createApp(
         logger: modules.voice.logger,
       });
     }
+  }
+
+  // The MCP façade (doc 12 §34.2). A host is a person with a session and an
+  // organisation, resolved server-side like every other caller.
+  if (modules.mcp !== undefined) {
+    if (security.resolver === undefined) {
+      throw new Error(
+        "q-api: the Q MCP route requires an actor context resolver",
+      );
+    }
+    registerQMcpRoute(app, {
+      authenticator: security.authenticator,
+      resolver: security.resolver,
+      ...modules.mcp,
+    });
   }
 
   // Liveness and readiness are split per doc 21 (74-77): liveness proves the

@@ -13,7 +13,13 @@
  * Does not own: models or providers (the Model Gateway projects these
  * definitions), prompts, the Context Firewall (whose plan every tool
  * obeys), approvals (CQ-Q-008), retrieval, Q knowledge, or any write.
- * There is no SQL tool, no arbitrary HTTP tool, no shell, no connector and no MCP; the only outbound capability is the bounded public-web research port (CQ-Q-RESEARCH-001), whose queries are composed from allowed words and whose reads are limited to URLs a search in the same run surfaced.
+ * There is no SQL tool, no arbitrary HTTP tool and no shell; the only
+ * outbound capability here is the bounded public-web research port
+ * (CQ-Q-RESEARCH-001), whose queries are composed from allowed words and
+ * whose reads are limited to URLs a search in the same run surfaced. An
+ * approved MCP server's tool enters this registry only as a definition
+ * of its own, with Capital Q's schemas and authorize step, through
+ * @capital-q/q-connectors.
  *
  *   tool offered   ≠ tool authorised ≠ tool executed
  *   tool result    ≠ canonical truth ≠ instruction

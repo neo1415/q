@@ -675,6 +675,17 @@ export function createVoiceTurnHandler(
             break;
           case "q.run.failed":
             terminal = true;
+            if (streamedDeltas) {
+              // The answer has been heard. A run that fails after that
+              // has failed at something the person never saw, and telling
+              // them Q hit a snag and to ask again, right after Q answered,
+              // reads as Q contradicting itself. The log has the reason.
+              logger.warn(
+                { qRunId: runId, failureCode: event.data.failure.code },
+                "run failed after its answer had been spoken; nothing more is said",
+              );
+              return;
+            }
             yield recoveryLine(event.data.failure.code);
             return;
           case "q.run.completed":

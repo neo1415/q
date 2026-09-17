@@ -1,0 +1,38 @@
+{
+  "name": "@capital-q/q-connectors",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Where Q's typed tools meet the outside protocols (doc 12 §34-§35): Q as an MCP client, where an approved remote tool becomes a source-controlled Capital Q tool with its own Zod input and output, its own authorize step and the Tool Registry's policy; Q as a constrained MCP server façade, where a compatible host reaches only the tools the registry offers the authenticated person, through the same execution pipeline; and the LangChain projection of the registry, so a graph node calls a Capital Q tool as data. No connector holds a credential in code, no remote tool is trusted because it answered, and nothing here bypasses authorization.",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "clean": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\""
+  },
+  "dependencies": {
+    "@capital-q/contracts": "workspace:*",
+    "@capital-q/observability": "workspace:*",
+    "@capital-q/q-runtime": "workspace:*",
+    "@capital-q/q-tools": "workspace:*",
+    "@capital-q/security": "workspace:*",
+    "@langchain/core": "1.2.9",
+    "@modelcontextprotocol/sdk": "1.30.0",
+    "zod": "4.5.4"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.3",
+    "typescript": "5.9.3"
+  }
+}

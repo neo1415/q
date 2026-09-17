@@ -772,6 +772,55 @@ line every five seconds saying how many audio frames left it and what the
 provider last said back, which is enough to tell the three causes apart
 next time.
 
+## O. The third demo: an answer, then an apology; and a stack that kept dying
+
+Two reports from the founder's next session, 2026-09-17, each with one
+cause.
+
+**O1. Q answered, then said it had hit a snag.** A question about the
+company was answered in full, streamed sentence by sentence, and then Q
+said "I've hit a snag on my side, ask again". The ledger shows why: the
+final structured object was refused by its schema on six citation labels
+(`companyFindings.N.citations.0:invalid_format`), a field nobody hears.
+The model, having just read PUBLIC WEB SOURCE entries, cited "S1"-style
+labels where the schema wants `F<n>`. A refusal after the answer had
+already been delivered ended the run as FAILED, and the voice turn spoke
+the recovery line for it. Three fixes, each sufficient on its own:
+
+- The gateway keeps an answer whose text was read before its object was
+  refused: the prose the reader saw goes through the same guards as any
+  answer and is persisted as the message, and the run completes. Only
+  the structured extras of that turn are not recorded.
+- Citation labels are normalised and the unresolvable ones dropped before
+  the schema sees them, which is what the specialist did with them after
+  the schema anyway. A stray label now costs a citation, never an answer.
+- The voice turn says nothing after a run fails once its answer has been
+  spoken; the failure is logged with its code.
+
+**O2. "The api keeps dying, everything keeps dying."** No service crashed.
+The Windows event log shows the Claude desktop app updating itself at
+10:24:42; the demo log ends at 10:24:42. Both stacks that "died" had been
+started from that app's shells and so lived inside its process tree. The
+launcher now has a detached start (`scripts/demo-detached.ps1`, through
+WMI, outside any caller's job object) and a stop, and the header of
+`scripts/demo.mjs` says to run it from a terminal of one's own.
+
+Two further things were found on the way. A packaged (MSIX) application
+sees its own AppData: pnpm's shim and corepack's cache installed from
+inside the app do not exist at those paths outside it, so the detached
+launcher maps them. And turbo's strict environment mode drops any variable
+turbo.json does not declare, which silently discarded `pnpm demo --local`'s
+overrides; the dev task now passes the environment through.
+
+**O3. One Supabase, not two.** While these were being fixed, `.env.local`
+came to name the hosted project for auth while the database and the web
+app still named the local stack; every service then failed differently.
+The launcher refuses that mix and says which variable is the odd one out.
+The direct connection host of the hosted project is IPv6-only and does not
+answer from this network; the session pooler does, and `pnpm db:push`
+uses whichever of the two connection strings is set. The push itself waits
+on a database password the project accepts.
+
 ## M. What this audit says to do next, in order
 
 1. **Prove the retrieval layer, not just the plan** (H2). The firewall's

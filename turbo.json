@@ -10,7 +10,14 @@
     },
     "dev": {
       "cache": false,
-      "persistent": true
+      "persistent": true,
+      // Turbo's strict mode hands a task only the variables turbo.json
+      // declares. `pnpm demo --local` overrides the Supabase variables in
+      // its own environment so the files can keep naming the hosted
+      // project; strict mode silently dropped them and every service read
+      // the file instead. Nothing here is cached, so passing the whole
+      // environment through costs nothing.
+      "envMode": "loose"
     },
     "clean": {
       "cache": false
