@@ -87,14 +87,35 @@ reducer handles `q.message.delta` and there are tests for it
 it.** Both answer paths produce structured output and emit only
 `q.message.completed`.
 
-**Verdict: OPEN.** This is the largest remaining latency item and the only
-one that can reach the 3 s target.
+**Verdict: SOLVED.** The first sentence now leaves as soon as it is
+written. Measured on voice: first spoken words at 1.2 s.
 
-**Gap.** Structured output cannot stream usefully — the prose sits inside a
-JSON field that is only valid once closed. Reaching the target means
-separating the _spoken_ answer from the _recorded_ structure: stream the
-prose, and attach citations, truth class and confidence when the object
-closes. That is a design change to the analyst task, not a tuning change.
+**How, because the substance is what may safely leave early.** A fragment
+has to be three things before a person can have it.
+
+1. **The answer, not the object around it.** The analyst replies with one
+   JSON object whose `answer` field is the prose. A scanner reads that
+   field out of a document that is still being written, one character at a
+   time, reporting nothing a later character could change: a trailing
+   backslash might begin an escape, a trailing `\u00` might become an é.
+2. **A whole sentence.** The guard that removes an invented ranking claim
+   removes a sentence and cannot judge half of one.
+3. **Already guarded.** On a voice call the fragment is about to be said
+   out loud, and nothing said can be taken back, so the guards run on each
+   sentence before it goes.
+
+The last, unfinished sentence is never sent; it arrives with the completed
+message, which stays the durable form.
+
+**The rule that made it safe.** Retrying a model and falling back to
+another are invisible precisely because nothing has left the building yet.
+The gateway therefore stops retrying the moment it has spoken, and Groq
+stops rotating keys. In practice that costs little: every failure actually
+observed arrived before the first token.
+
+**Gap.** When the model writes its fields in another order, nothing
+streams and the answer arrives whole, as before. That is the intended
+degradation, not a defect.
 
 ### A3. A filler on every single turn
 
@@ -485,8 +506,15 @@ them is the owner's call, not a migration's.
 same session, through the Write Gate, with the previous value kept as
 history.
 
-**Verdict: OPEN.** Raised by the user directly; the edit surface itself is
-still thin.
+**Verdict: PARTIAL.** A person can now change their own details by saying
+so: their name, their company's name, its website, where it is based, its
+description. Read deterministically, read back, and applied only on a yes,
+through the platform's own API under their own authority. Only their own:
+there is no way to name somebody else's, and the company is resolved from
+their session rather than from anything they said. Those fields are
+canonical state, so changing them changes what Q answers from.
+
+**Gap.** Five fields, not every field, and no typed edit surface yet.
 
 ### G3. Refresh of a public profile
 
@@ -592,29 +620,109 @@ both themes since the tokens changed.
 
 ---
 
-## K. What this audit says to do next, in order
+## L. Arrival: the first minute
 
-Everything above numbered 1 to 7 in the previous pass is done except the
-first. What remains, in order:
+### L1. Q meets a stranger it was told about
 
-1. **Stream the spoken answer** (A2). The only path below 3 s, and it
-   retires the filler permanently. It needs a streaming method on the
-   provider port, adapters for both providers, and the analyst's prose
-   separated from its structure so a first sentence can leave before the
-   object closes. A real packet.
-2. **Prove the retrieval layer, not just the plan** (H2). The firewall's
+**Symptom.** Sign-up captured an email and a password, so Q opened every
+conversation knowing nothing and spent its first minute asking for things
+the person would happily have typed.
+
+**Fully solved.** Sign-up captures a name and, optionally, what the
+organisation is called. Q greets somebody by name and does not ask for
+what it was already told.
+
+**What exists.** Both fields on the form. The name rides on the account,
+because that is the only thing that survives a confirmation email, and the
+first authenticated page copies it into the profile through the ordinary
+API under the person's own session. The trigger that creates a profile
+still reads nothing a person supplied, which is the right rule and is not
+weakened here. A name the person has since changed is never overwritten.
+
+**Verdict: SOLVED.**
+
+### L2. The one question of the first minute had nothing to tap
+
+**Symptom.** Whether somebody is raising or investing decides everything
+that follows, and it could only be spoken. Somebody in a noisy room, or
+who would rather not talk, was stuck on it.
+
+**Fully solved.** Every question that has choices shows them. Where only
+the person's own words will do, Q says once that they can type instead.
+
+**What exists.** Two cards on the welcome stage, which disappear the
+moment the answer is known. Yes-or-no review steps have cards too. The
+labels are what somebody would have said, so a tap and a sentence arrive
+as the same answer. The questions that are left are the ones where only
+their own words work — a name, a website, a description, a number — and
+those now carry an instruction for Q to mention the Type button once,
+never on a question that has options.
+
+**Verdict: SOLVED** on the voice stage.
+
+**Gap.** While voice is on, a tapped option is sent as text to the model
+rather than through the structured submit path the typed workspace uses.
+It works, and it is two paths where one would do.
+
+### L3. Q researches somebody and never mentions it
+
+**Symptom.** "I want it to always try to guess who it is talking to."
+
+**Fully solved.** Once Q has a name and something to tell that name apart
+by, it looks the person up, says what it found and where it found it, and
+asks whether it has the right person. A no settles it.
+
+**What exists.** The arrival build now runs for the person as well as
+their company. What it finds is carried back to the conversation and asked
+in the next gap, once, riding along with a reply rather than interrupting.
+Saying where it came from is not a courtesy: a system that simply knows
+things about somebody is unsettling, and one that names the site and the
+profile it read is not.
+
+**Verdict: SOLVED** for the mechanism.
+
+**Gap.** A no is spoken and honoured in the conversation; it does not yet
+retract the understandings that were written. Doing that properly is a
+correction through the Write Gate, not a delete.
+
+### L4. Reading what somebody has published
+
+**Symptom.** "What kind of posts do I have that may not favour me?"
+
+**Fully solved.** Q can read a person's public posts and comments, subject
+to the same namesake filtering and the same gate as everything else, and
+answer questions about how they read.
+
+**Verdict: OPEN, and blocked outside the code.** The profile lookup that
+exists returns a headline, an about, a location, follower counts and
+employment history. Posts and comments are a different dataset with its
+own identifier, which is not configured. Nothing here can be guessed at.
+
+---
+
+## M. What this audit says to do next, in order
+
+1. **Prove the retrieval layer, not just the plan** (H2). The firewall's
    goldens prove what a plan permits. Nothing yet proves that a retrieval
    given that plan cannot return a row outside it, against a real
-   database. This is the release-blocking invariant and it is the half
-   still resting on assertion.
-3. **Voice bindings that survive a restart** (D4). Every restart of the
+   database. This is the release-blocking invariant and the half still
+   resting on assertion.
+2. **Voice sessions that survive a restart** (D4). Every restart of the
    API kills every live voice session and marks every in-flight run
-   unfinished. Reconnection now covers it from the person's side; the
-   sessions themselves are still in memory.
-4. **Editing a stated fact updates Q's memory in the same session** (G2).
-   Still open, and it needs the edit surface first.
-5. **Semantic fit, evidence weighting, exploration and precomputed
+   unfinished. Reconnection covers it from the person's side; the sessions
+   themselves are still in process memory.
+3. **A tapped option and a typed one should take the same path** (L2).
+   While voice is on, a tap is sent as text; typed mode submits a
+   structured value. Two paths where one would do.
+4. **Saying no to a recognition should retract what was written** (L3),
+   as a correction through the Write Gate rather than a delete.
+5. **Retrieval sometimes takes six seconds** (A1). Usually under one. The
+   spike is in the assemble phase and has not been traced.
+6. **Semantic fit, evidence weighting, exploration and precomputed
    slates** in Discover (H3).
-6. **Per-task budgets as rows rather than constants** (I).
-7. **A recorded set of Nigerian, Ghanaian and Kenyan speakers** (E4), so
+7. **Per-task budgets as rows rather than constants** (I).
+8. **A recorded set of Nigerian, Ghanaian and Kenyan speakers** (E4), so
    the recogniser can be measured rather than hoped about.
+
+Blocked outside the code: the Bright Data dataset for LinkedIn posts and
+comments (L4), and the SERP and Unlocker zone names.
