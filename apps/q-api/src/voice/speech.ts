@@ -11,10 +11,128 @@
 /** A spoken turn stops here; the rest is on screen (§66). */
 export const SPOKEN_MAX_CHARS = 1_200;
 
+/**
+ * Money and big numbers, as a person says them.
+ *
+ * "200 000 000 NGN" was read aloud as "two zero zero zero zero zero zero
+ * zero zero N G N", because a synthesiser reads digit groups separated by
+ * spaces as separate numbers and an ISO code as letters. The record is
+ * right to hold the exact decimal and the ISO currency; the voice is wrong
+ * to say them that way. This turns a figure into the words somebody would
+ * use: two hundred million naira.
+ *
+ * Only for speech. The stored answer keeps the exact figure.
+ */
+const CURRENCY_WORDS: Readonly<Record<string, [string, string]>> = {
+  NGN: ["naira", "naira"],
+  USD: ["dollar", "dollars"],
+  GBP: ["pound", "pounds"],
+  EUR: ["euro", "euros"],
+  KES: ["Kenyan shilling", "Kenyan shillings"],
+  GHS: ["cedi", "cedis"],
+  ZAR: ["rand", "rand"],
+  UGX: ["Ugandan shilling", "Ugandan shillings"],
+  TZS: ["Tanzanian shilling", "Tanzanian shillings"],
+  RWF: ["Rwandan franc", "Rwandan francs"],
+  XOF: ["CFA franc", "CFA francs"],
+  EGP: ["Egyptian pound", "Egyptian pounds"],
+  CAD: ["Canadian dollar", "Canadian dollars"],
+  AUD: ["Australian dollar", "Australian dollars"],
+};
+
+const CURRENCY_SYMBOLS: Readonly<Record<string, string>> = {
+  $: "USD",
+  "\u20a6": "NGN",
+  "\u00a3": "GBP",
+  "\u20ac": "EUR",
+};
+
+/** A number with grouped digits: spaces, thin spaces or commas between groups. */
+const GROUPED_NUMBER =
+  /\d{1,3}(?:[ ,\u00a0\u202f]\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?/g;
+
+function compactNumber(digits: string): string {
+  const value = Number(digits.replace(/[ ,\u00a0\u202f]/g, ""));
+  if (!Number.isFinite(value)) {
+    return digits;
+  }
+  const units: readonly [number, string][] = [
+    [1e12, "trillion"],
+    [1e9, "billion"],
+    [1e6, "million"],
+    [1e3, "thousand"],
+  ];
+  for (const [size, word] of units) {
+    if (value >= size) {
+      const scaled = value / size;
+      // Two decimals at most, and none when they are zero: "two hundred
+      // million", "one point five million", "twelve thousand".
+      const shown = Number.isInteger(scaled)
+        ? String(scaled)
+        : String(Math.round(scaled * 100) / 100);
+      return `${shown} ${word}`;
+    }
+  }
+  return String(value);
+}
+
+export function spokenFigures(text: string): string {
+  let out = text;
+  // A code after the figure: "200 000 000 NGN", "1.5m USD".
+  out = out.replace(
+    new RegExp(
+      String.raw`(\d[\d ,\u00a0\u202f.]*\d|\d)\s*(?:([kmb])\b)?\s*\b(${Object.keys(CURRENCY_WORDS).join("|")})\b`,
+      "g",
+    ),
+    (_all: string, figure: string, suffix: string | undefined, code: string) =>
+      moneyWords(figure, suffix, code),
+  );
+  // A code or symbol before the figure: "NGN 200,000,000", "$1.5m".
+  out = out.replace(
+    new RegExp(
+      String.raw`\b(${Object.keys(CURRENCY_WORDS).join("|")})\s*(\d[\d ,\u00a0\u202f.]*\d|\d)\s*(?:([kmb])\b)?`,
+      "g",
+    ),
+    (_all: string, code: string, figure: string, suffix: string | undefined) =>
+      moneyWords(figure, suffix, code),
+  );
+  out = out.replace(
+    /([$\u20a6\u00a3\u20ac])\s*(\d[\d ,\u00a0\u202f.]*\d|\d)\s*(?:([kmb])\b)?/g,
+    (
+      _all: string,
+      symbol: string,
+      figure: string,
+      suffix: string | undefined,
+    ) => moneyWords(figure, suffix, CURRENCY_SYMBOLS[symbol] ?? "USD"),
+  );
+  // Any other grouped number: "60,000 merchants" → "60 thousand merchants"
+  // only when grouping is present; a plain "2020" is a year and stays.
+  out = out.replace(GROUPED_NUMBER, (match: string) =>
+    /[ ,\u00a0\u202f]/.test(match) ? compactNumber(match) : match,
+  );
+  return out;
+}
+
+function moneyWords(
+  figure: string,
+  suffix: string | undefined,
+  code: string,
+): string {
+  const multiplier =
+    suffix === "k" ? 1e3 : suffix === "m" ? 1e6 : suffix === "b" ? 1e9 : 1;
+  const value = Number(figure.replace(/[ ,\u00a0\u202f]/g, "")) * multiplier;
+  if (!Number.isFinite(value)) {
+    return `${figure} ${code}`;
+  }
+  const [one, many] = CURRENCY_WORDS[code] ?? [code, code];
+  const spoken = compactNumber(String(value));
+  return `${spoken} ${value === 1 ? one : many}`;
+}
+
 /** Markdown and machine punctuation → plain sentences. */
 export function speakable(text: string): string {
   return (
-    text
+    spokenFigures(text)
       // Headings, list bullets, block quotes.
       .replace(/^\s{0,3}#{1,6}\s+/gm, "")
       .replace(/^\s*[-*+]\s+/gm, "")

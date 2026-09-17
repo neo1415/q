@@ -112,9 +112,19 @@ export function createDeepgramVoiceProvider(
             version: "v2",
             model: "flux-general-en",
             keyterms: [...ASR_KEYWORDS],
-            // A person thinking mid-sentence is not a person done: wait for
-            // more confidence before ending the turn.
-            eot_threshold: 0.8,
+            // When a person has finished. The threshold is how sure the
+            // turn model must be; the timeout is how long it waits for
+            // that certainty before ending the turn anyway.
+            //
+            // It was 0.8 with the provider's default timeout of five
+            // seconds. A short utterance — "what's up?" — rarely reaches
+            // 0.8 on its own, so the turn ended only when the timeout did,
+            // and five seconds of silence sat in front of every reply
+            // before Q had even begun. The provider's own default is 0.7;
+            // three seconds is the longest a person reads as "listening"
+            // rather than "not working".
+            eot_threshold: 0.7,
+            eot_timeout_ms: 3_000,
           },
         },
         think: {

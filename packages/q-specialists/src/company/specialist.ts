@@ -44,6 +44,7 @@ import type {
   QSpecialistExecutionContext,
   QSpecialistProbe,
 } from "../contracts.js";
+import { isAboutSubjectCompany } from "./about-company.js";
 import { assembleCompanyContext, type LabelledFact } from "./assembly.js";
 import type {
   CompanyFinding,
@@ -302,11 +303,21 @@ export function createCompanyIntelligenceSpecialist(
         // question about fit or about a relationship. Neither is this.
         return false;
       }
-      return (
-        probe.capability === "ANSWER" ||
-        probe.capability === "INVESTIGATE" ||
-        probe.capability === "ASSESS"
-      );
+      if (
+        probe.capability !== "ANSWER" &&
+        probe.capability !== "INVESTIGATE" &&
+        probe.capability !== "ASSESS"
+      ) {
+        return false;
+      }
+      // Only a question that is about the company. A person who has a
+      // company is still a person: "what's up", "who runs Paystack" and
+      // "just search online" are not questions about their records, and
+      // answering them from their records is how every one of those got
+      // "that falls outside the scope of the company data I have". The
+      // conversational path has the tools, the research and ordinary
+      // knowledge, and reaches these same records when it needs them.
+      return isAboutSubjectCompany(probe.question);
     },
 
     investigate: async (

@@ -91,37 +91,54 @@ export function useVoiceInterview(
   // the person has to do anything.
   const reconnectAttempts = useRef(0);
   const talkRef = useRef<VoiceInterview["talk"] | null>(null);
+  /**
+   * One handler for a line ending, reachable from the transport's own
+   * "ended" and from the poll that notices the server has let a session
+   * go. Both are the same event to the person: the line is gone, and it
+   * should come back without them doing anything.
+   */
+  const ended = (reason: "ended" | "dropped" | "error"): void => {
+    const last = lastStart.current;
+    const again = talkRef.current;
+    if (reason === "ended" || last === null || again === null) {
+      reconnectAttempts.current = 0;
+      setActive(false);
+      events.onEnded?.(reason);
+      return;
+    }
+    const delay = RECONNECT_DELAYS_MS[reconnectAttempts.current];
+    if (delay === undefined) {
+      // Out of tries. Say so once, in Q's own words, and stop.
+      reconnectAttempts.current = 0;
+      setActive(false);
+      setNotice(GAVE_UP);
+      events.onEnded?.(reason);
+      return;
+    }
+    reconnectAttempts.current += 1;
+    setNotice("The line dropped. Picking it back up…");
+    // `talk` clears the notice as it starts and sets its own on failure.
+    window.setTimeout(() => {
+      void again({ thread: last.thread, firstMessage: undefined });
+    }, delay);
+  };
+  // The poll below needs the latest of these without re-subscribing on
+  // every render; a ref written in an effect, never during render.
+  const endedRef = useRef(ended);
+  useEffect(() => {
+    endedRef.current = ended;
+  });
   const client = useVoiceSession({
     ...events,
-    onEnded: (reason) => {
-      const last = lastStart.current;
-      const again = talkRef.current;
-      if (reason === "ended" || last === null || again === null) {
-        reconnectAttempts.current = 0;
-        setActive(false);
-        events.onEnded?.(reason);
-        return;
-      }
-      const delay = RECONNECT_DELAYS_MS[reconnectAttempts.current];
-      if (delay === undefined) {
-        // Out of tries. Say so once, in Q's own words, and stop.
-        reconnectAttempts.current = 0;
-        setActive(false);
-        setNotice(GAVE_UP);
-        events.onEnded?.(reason);
-        return;
-      }
-      reconnectAttempts.current += 1;
-      setNotice("The line dropped. Picking it back up…");
-      // `talk` clears the notice as it starts and sets its own on failure.
-      window.setTimeout(() => {
-        void again({ thread: last.thread, firstMessage: undefined });
-      }, delay);
-    },
+    onEnded: ended,
     onError: (message) => {
       setNotice(message);
       events.onError?.(message);
     },
+  });
+  const clientRef = useRef(client);
+  useEffect(() => {
+    clientRef.current = client;
   });
 
   const talk = useCallback<VoiceInterview["talk"]>(
@@ -195,6 +212,15 @@ export function useVoiceInterview(
             ? current
             : read.value,
         );
+      } else if (read.gone === true) {
+        // The server has let this session go while the socket is still
+        // open here. Nothing said into it will ever be answered, so the
+        // line is ended as dropped, which is what brings it back.
+        cancelled = true;
+        void clientRef.current.end().then(() => {
+          endedRef.current("dropped");
+        });
+        return;
       }
       timer = setTimeout(() => void tick(), TURN_POLL_MS);
     };

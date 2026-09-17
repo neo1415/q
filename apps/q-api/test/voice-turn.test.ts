@@ -561,7 +561,9 @@ describe("a spoken question for Q", () => {
     });
     // Spoken as the deltas arrived (one line), then the bridge back.
     expect(speaker.spoken).toEqual([
-      "Seed rounds in Nigeria typically run from $500k. Most close within a quarter.",
+      // Money is said the way a person says it: "$500k" was read aloud as
+      // a dollar sign, a number and a letter.
+      "Seed rounds in Nigeria typically run from 500 thousand dollars. Most close within a quarter.",
       "Back to where we were. What stage is the company at?",
     ]);
     expect(bound.thread.conversationId).toBe(CONVERSATION_ID);

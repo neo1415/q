@@ -105,6 +105,15 @@ export function registerVoiceThinkRoute(
         : "";
     const bound = token.length === 0 ? null : bindings.byThinkToken(token);
     if (bound === null) {
+      // Which it is matters: "no session" is a token for a binding that
+      // has been released or swept, and the speech provider keeps calling
+      // with it for a while after — that was three refused thinks in a
+      // second, and a person reading "Thinking" for good. Seen in a log,
+      // the difference is between a leaked socket and a genuine intruder.
+      request.log.warn(
+        { reason: "NO_BINDING_FOR_TOKEN", boundCount: bindings.size() },
+        "voice think refused",
+      );
       return reply.code(401).send({
         type: "about:blank",
         title: "Unauthorized",
@@ -117,6 +126,10 @@ export function registerVoiceThinkRoute(
         ? bindings.connect(bound.providerConversationId)
         : bound;
     if (binding === null) {
+      request.log.warn(
+        { reason: "CONNECT_WINDOW_ELAPSED_OR_REPRESENTED" },
+        "voice think refused",
+      );
       return reply.code(401).send({
         type: "about:blank",
         title: "Unauthorized",

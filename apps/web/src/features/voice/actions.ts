@@ -28,7 +28,16 @@ import { getSessionAccessToken } from "@/auth/session";
 
 export type VoiceActionResult<T> =
   | { readonly ok: true; readonly value: T }
-  | { readonly ok: false; readonly message: string };
+  | {
+      readonly ok: false;
+      readonly message: string;
+      /**
+       * The session this asked about no longer exists on the server. A
+       * caller still holding a socket for it is talking to nobody, and
+       * should come back on a fresh one rather than wait.
+       */
+      readonly gone?: true;
+    };
 
 const failure = (message: string): VoiceActionResult<never> => ({
   ok: false,
@@ -108,7 +117,18 @@ export async function readVoiceTurnAction(
       parsed.data,
     );
     return { ok: true, value };
-  } catch (error: unknown) {
+  } catch (error) {
+    // The one refusal that means something specific here: the server has
+    // let this session go. Seen live as a screen that read "Thinking"
+    // for good while the provider was refused three times a second.
+    if (error instanceof ApiProblemError && error.status === 404) {
+      return {
+        ok: false,
+        gone: true,
+        message:
+          "I lost the line there. Give me a second and I'll pick it back up.",
+      };
+    }
     return translate(error);
   }
 }

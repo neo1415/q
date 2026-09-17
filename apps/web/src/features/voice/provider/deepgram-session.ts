@@ -245,6 +245,12 @@ export function useDeepgramVoiceSession(
         try {
           microphone.stop();
           player.dispose();
+          // The socket too. Without this the provider's agent session
+          // stayed alive after the microphone had stopped, kept thinking
+          // against a binding the reconnect had already replaced, and was
+          // refused three times in a second — a dead session still trying
+          // to speak. Seen live.
+          session.disconnect();
         } catch {
           // Already gone.
         }

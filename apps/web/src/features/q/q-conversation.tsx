@@ -144,6 +144,19 @@ export function QConversationPanel({
     });
   }, [turns.length, spoken.length, q.state.partial?.text]);
 
+  /**
+   * A spoken line is shown only until the same words arrive as a stored
+   * turn. Every voice turn becomes a stored turn, so without this each
+   * thing the person said appeared twice: once from the transcript as
+   * they said it, once from the conversation when it was recorded.
+   */
+  const storedText = new Set(
+    turns.map((turn) => turn.text.trim().toLowerCase()),
+  );
+  const spokenOnly = spoken.filter(
+    (line) => !storedText.has(line.text.trim().toLowerCase()),
+  );
+
   const stage = workingLabel(q.state);
   // Suggestions are an on-ramp, not a feature: gone after the first turn.
   const showSuggestions =
@@ -175,9 +188,9 @@ export function QConversationPanel({
           </Button>
         </InlineNotice>
       ) : null}
-      {spoken.length > 0 ? (
+      {spokenOnly.length > 0 ? (
         <ol className="flex flex-col gap-4" aria-label="Spoken">
-          {spoken.map((line) => (
+          {spokenOnly.map((line) => (
             <li
               key={line.id}
               className={
