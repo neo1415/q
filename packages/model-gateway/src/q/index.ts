@@ -362,7 +362,24 @@ const GENERAL_KNOWLEDGE_NOTE =
  * company.
  */
 export const PROFILE_UPDATE_NOTE =
-  "If they ask in this message to change a field of their own company profile (name, legal name, website, founded date, HQ country or city, stage, short or full description), put it in profileUpdates: field, value in the field's own form, their exact words as quote; say it is ready for their approval. Never say it cannot be changed here, never say it was changed.";
+  "If they ask in this message to change a field of their own company profile (company name, legal name, website, founded date, HQ country or city, stage, short or full description) AND give the new value, put it in profileUpdates: field, value in the field's own form, their exact words as quote; say it is ready for their approval. No value given: ask for it, propose nothing. What YOU call THEM (their own name) is not a company field: never a profileUpdate; say they can tell you 'call me X' and you will. Never say the profile cannot be changed here, never say it was changed.";
+
+/**
+ * A reading that would clear a field is kept only when the person's own
+ * quoted words say so. Live, "change the name in my profile" with no new
+ * name became a proposal to clear the company's name: a value the model
+ * had to invent, and the one it invented was nothing. A missing value is
+ * a question for the person, never a change.
+ */
+export function clearsOnPurpose(update: {
+  readonly value: string | null;
+  readonly quote: string;
+}): boolean {
+  if (update.value !== null && update.value.trim().length > 0) return true;
+  return /\b(?:clear|remove|delete|blank|empty|take (?:it|that) off|get rid of)\b/i.test(
+    update.quote,
+  );
+}
 
 export function environmentNotesFor(
   facts: readonly AuthorisedFact[],
@@ -1259,8 +1276,10 @@ export function createModelGatewayQAnswer(
           .array(ProfileUpdateSchema)
           .safeParse(analyst.profileUpdates);
         const profileUpdates = readUpdates.success
-          ? readUpdates.data.filter((update) =>
-              said.includes(update.quote.toLowerCase()),
+          ? readUpdates.data.filter(
+              (update) =>
+                said.includes(update.quote.toLowerCase()) &&
+                clearsOnPurpose(update),
             )
           : [];
         const proposed =

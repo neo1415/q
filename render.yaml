@@ -26,9 +26,12 @@ services:
     name: capital-q-embeddings
     runtime: image
     region: frankfurt
-    # Warming the model up costs several gigabytes for a short burst; a
-    # smaller instance is killed silently during start.
-    plan: pro
+    # Starter by the owner's decision (2026-09-17). Warming this model up
+    # takes more memory than a starter instance has, so this service may
+    # not come up on it; q-api and workers degrade to lexical retrieval
+    # when the runtime is unreachable and nothing else stops. Raise the
+    # plan here when semantic retrieval is wanted in the hosted stack.
+    plan: starter
     image:
       url: ghcr.io/huggingface/text-embeddings-inference:cpu-1.9
     dockerCommand: >-
@@ -98,7 +101,7 @@ services:
     name: capital-q-q-api
     runtime: node
     region: frankfurt
-    plan: standard
+    plan: starter
     buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm turbo run build --filter=@capital-q/q-api...
     startCommand: node apps/q-api/dist/main.js
     healthCheckPath: /health/ready

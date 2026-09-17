@@ -38,6 +38,7 @@ import {
 import {
   budgetForTaskClass,
   PROFILE_UPDATE_NOTE,
+  clearsOnPurpose,
   type QProfileUpdateNotebook,
   type QUserStatementRecorder,
 } from "@capital-q/model-gateway/q";
@@ -718,8 +719,10 @@ export function createCompanyIntelligenceSpecialist(
         .array(ProfileUpdateSchema)
         .safeParse(analyst?.profileUpdates);
       const profileUpdates = readUpdates.success
-        ? readUpdates.data.filter((update) =>
-            askedFor.includes(update.quote.toLowerCase()),
+        ? readUpdates.data.filter(
+            (update) =>
+              askedFor.includes(update.quote.toLowerCase()) &&
+              clearsOnPurpose(update),
           )
         : [];
       const proposedChange =

@@ -239,6 +239,12 @@ describe("an answer that arrives as it is written", () => {
             value: "Payments",
             quote: "tell me about paystack",
           },
+          // No value and no word about clearing: a question, never a change.
+          {
+            field: "canonicalName",
+            value: null,
+            quote: "tell me about paystack",
+          },
         ],
       },
       capture,
