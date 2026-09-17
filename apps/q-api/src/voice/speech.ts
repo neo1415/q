@@ -91,7 +91,7 @@ export function spokenFigures(text: string): string {
   out = out.replace(
     new RegExp(
       String.raw`${FIGURE}\s*\b(${Object.keys(CURRENCY_WORDS).join("|")})\b`,
-      "g",
+      "gi",
     ),
     (_all: string, figure: string, suffix: string | undefined, code: string) =>
       moneyWords(figure, suffix, code),
@@ -100,13 +100,13 @@ export function spokenFigures(text: string): string {
   out = out.replace(
     new RegExp(
       String.raw`\b(${Object.keys(CURRENCY_WORDS).join("|")})\s*${FIGURE}`,
-      "g",
+      "gi",
     ),
     (_all: string, code: string, figure: string, suffix: string | undefined) =>
       moneyWords(figure, suffix, code),
   );
   out = out.replace(
-    new RegExp(String.raw`([$\u20a6\u00a3\u20ac])\s*${FIGURE}`, "g"),
+    new RegExp(String.raw`([$\u20a6\u00a3\u20ac])\s*${FIGURE}`, "gi"),
     (
       _all: string,
       symbol: string,

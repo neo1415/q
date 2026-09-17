@@ -23,6 +23,7 @@ import {
   type AnyQActionDefinition,
   type QActionProposer,
 } from "@capital-q/q-actions";
+import type { QActionPrepareContext } from "@capital-q/q-runtime";
 import {
   ActorContextSchema,
   capability,
@@ -252,29 +253,80 @@ type Noted = {
  * model's reading of the person's own words, already quote-checked, and
  * it is validated against the payload schema again on the way out.
  */
+/**
+ * What Q itself would like to put into a profile: a description read from
+ * the company's own public website, offered when the profile has none.
+ * Keyed by the person and proposed on their next run about that company,
+ * so it is approved the same way as anything else and never applied on
+ * Q's own say-so.
+ */
+export type ProfileSuggestion = {
+  readonly actorUserId: string;
+  readonly tenantId: string;
+  readonly companyId: string;
+  readonly updates: readonly QProfileUpdateReading[];
+};
+
+export type ProfileSuggestionBoard = {
+  readonly offer: (suggestion: ProfileSuggestion) => void;
+};
+
+/** How long a suggestion waits for the person's next run before it is forgotten. */
+const SUGGESTION_TTL_MS = 60 * 60 * 1000;
+
 export function createProfileUpdateBoard(
   options: {
     readonly logger?: Logger | undefined;
     readonly now?: (() => number) | undefined;
   } = {},
-): QProfileUpdateNotebook & QActionProposer {
+): QProfileUpdateNotebook & QActionProposer & ProfileSuggestionBoard {
   const now = options.now ?? (() => Date.now());
   const noted = new Map<string, Noted>();
+  const offered = new Map<
+    string,
+    ProfileSuggestion & { readonly at: number }
+  >();
   const sweep = () => {
     const cutoff = now() - READING_TTL_MS;
     for (const [runId, entry] of noted) {
       if (entry.at < cutoff) noted.delete(runId);
     }
+    const stale = now() - SUGGESTION_TTL_MS;
+    for (const [userId, entry] of offered) {
+      if (entry.at < stale) offered.delete(userId);
+    }
+  };
+  /** The reading for this run: what the person asked, else what Q offers. */
+  const take = (context: QActionPrepareContext): Noted | undefined => {
+    const asked = noted.get(context.runId);
+    if (asked !== undefined) {
+      noted.delete(context.runId);
+      return asked;
+    }
+    const suggestion = offered.get(context.actorUserId);
+    if (suggestion === undefined) return undefined;
+    const about = context.subjects.some(
+      (subject) =>
+        subject.kind === "COMPANY" &&
+        subject.companyId === suggestion.companyId,
+    );
+    if (!about) return undefined;
+    offered.delete(context.actorUserId);
+    return { ...suggestion, at: suggestion.at };
   };
   return {
     note: (entry) => {
       sweep();
       noted.set(entry.runId, { ...entry, at: now() });
     },
+    offer: (suggestion) => {
+      sweep();
+      // One offer per person at a time; a newer read replaces an older one.
+      offered.set(suggestion.actorUserId, { ...suggestion, at: now() });
+    },
     propose: (context) => {
-      const entry = noted.get(context.runId);
+      const entry = take(context);
       if (entry === undefined) return Promise.resolve(null);
-      noted.delete(context.runId);
       // Only for the company this run is about, and only in this tenant.
       const about = context.subjects.some(
         (subject) =>

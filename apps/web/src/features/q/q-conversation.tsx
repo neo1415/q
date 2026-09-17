@@ -191,6 +191,8 @@ export function QConversationPanel({
           voices={["FEMALE", "MALE"]}
           onChooseVoice={(choice) => void voice.chooseVoice(choice)}
           onEnd={() => void voice.end()}
+          // Talking is the main way in; the typed thread is where this goes.
+          endLabel="Go to chat"
           notice={voice.notice}
           onDismissNotice={voice.clearNotice}
           asking={voice.turn?.asking ?? null}

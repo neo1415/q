@@ -303,11 +303,9 @@ export function VisibilityScreen({ companyId }: VisibilityScreenProps) {
           <PreviewRow label="Description" value={preview.primaryDescription} />
         </dl>
         <div>
-          <Link
-            href="/onboarding/founder?review=1"
-            className={buttonClassName("quiet", "compact")}
-          >
-            Change what the profile says
+          {/* Changes are asked of Q in one's own words and approved (ADR 0011). */}
+          <Link href="/home" className={buttonClassName("quiet", "compact")}>
+            Ask Q to change it
           </Link>
         </div>
       </section>

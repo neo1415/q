@@ -80,7 +80,8 @@ export const INTERVIEW_CONDUCTOR_V1: PromptDefinition<
 > = {
   id: "INTERVIEW_CONDUCTOR",
   version: 1,
-  status: "ACTIVE",
+  // Superseded by v2: names are read back once, never spelled out.
+  status: "DEPRECATED",
   kind: "TASK",
   taskClass: "NORMAL_DIALOGUE",
   owner: "q-core",

@@ -66,10 +66,32 @@ export type PresenceFound = {
   readonly domains: readonly string[];
 };
 
+/** Where Q offers what a company's own website says about it, for the profile (ADR 0011). */
+export type ProfileSuggestionSink = {
+  readonly offer: (suggestion: {
+    readonly actorUserId: string;
+    readonly tenantId: string;
+    readonly companyId: string;
+    readonly updates: readonly {
+      readonly field: "shortDescription";
+      readonly value: string;
+      readonly quote: string;
+    }[];
+  }) => void;
+};
+
+/** The one profile fact the offer depends on: whether a short description exists. */
+export type ProfileShortDescriptionLookup = {
+  readonly shortDescriptionOf: (companyId: string) => Promise<string | null>;
+};
+
 export type PresenceTriggerDependencies = {
   readonly presence: PresenceService;
   /** Absent means companies only; a person is simply not looked up. */
   readonly people?: PersonNameLookup | undefined;
+  /** Absent means Q never offers a website's description into the profile. */
+  readonly profileSuggestions?: ProfileSuggestionSink | undefined;
+  readonly profiles?: ProfileShortDescriptionLookup | undefined;
   /** Told what was found about the person, so Q can check it is them. */
   readonly onPersonFound?: ((found: PresenceFound) => void) | undefined;
   readonly logger?: Logger | undefined;
@@ -132,6 +154,47 @@ export function createPresenceTrigger(
             statements: outcome.understandings.map((u) => u.statement),
             domains: outcome.domains,
           });
+        }
+        /**
+         * The company's own website said what it does; the profile says
+         * nothing. Q offers the sentence into the profile through the
+         * same proposal and approval as a change the person asked for:
+         * it is a suggestion until they say yes (ADR 0011).
+         */
+        if (
+          subjectType === "COMPANY" &&
+          outcome.status === "COMPLETED" &&
+          dependencies.profileSuggestions !== undefined &&
+          dependencies.profiles !== undefined
+        ) {
+          const said = outcome.understandings.find(
+            (u) =>
+              (u.key === "presence.what_they_do" ||
+                u.key === "presence.self_description") &&
+              u.statement.trim().length >= 20,
+          );
+          if (said !== undefined) {
+            const current =
+              await dependencies.profiles.shortDescriptionOf(subjectId);
+            if (current === null || current.trim().length === 0) {
+              dependencies.profileSuggestions.offer({
+                actorUserId: actor.userId,
+                tenantId: actor.tenantId,
+                companyId: subjectId,
+                updates: [
+                  {
+                    field: "shortDescription",
+                    value: said.statement.trim().slice(0, 280),
+                    quote: `their public website (${outcome.domains[0] ?? "the web"})`,
+                  },
+                ],
+              });
+              logger?.info(
+                { subjectType, domains: outcome.domains.length },
+                "a website's description was offered for the profile",
+              );
+            }
+          }
         }
       } catch (error: unknown) {
         logger?.warn(

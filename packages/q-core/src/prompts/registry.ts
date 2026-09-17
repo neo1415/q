@@ -16,6 +16,7 @@ import { FIT_EXPLANATION_V1 } from "./tasks/fit-explanation.v1.js";
 import { FOUNDER_ONBOARDING_EXTRACTION_V1 } from "./tasks/founder-onboarding-extraction.v1.js";
 import { FOUNDER_ONBOARDING_EXTRACTION_V2 } from "./tasks/founder-onboarding-extraction.v2.js";
 import { INTERVIEW_CONDUCTOR_V1 } from "./tasks/interview-conductor.v1.js";
+import { INTERVIEW_CONDUCTOR_V2 } from "./tasks/interview-conductor.v2.js";
 import { PRESENCE_READER_V1 } from "./tasks/presence-reader.v1.js";
 import { WELCOME_CONDUCTOR_V1 } from "./tasks/welcome-conductor.v1.js";
 import { INVESTOR_MANDATE_SYNTHESIS_V1 } from "./tasks/investor-mandate-synthesis.v1.js";
@@ -138,6 +139,7 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition<unknown, unknown>[] =
     FOUNDER_ONBOARDING_EXTRACTION_V1,
     FOUNDER_ONBOARDING_EXTRACTION_V2,
     INTERVIEW_CONDUCTOR_V1,
+    INTERVIEW_CONDUCTOR_V2,
     WELCOME_CONDUCTOR_V1,
     CLAIM_EXTRACTION_V1,
     INVESTOR_MANDATE_SYNTHESIS_V1,

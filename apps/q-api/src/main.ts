@@ -27,6 +27,7 @@ import {
 } from "@capital-q/audit";
 import { createPostgresCapitalObjectiveQueryPort } from "@capital-q/capital";
 import {
+  CompanyIdSchema,
   createCompanyService,
   createPostgresCompanyQueryPort,
 } from "@capital-q/companies";
@@ -631,6 +632,18 @@ const voiceTurn = createVoiceTurnHandler({
     : {
         presence: createPresenceTrigger({
           presence: presenceComposition.presence,
+          // What a company's own website says it does is offered into an
+          // empty short description, through the same approval as any
+          // change the person asks for (ADR 0011).
+          profileSuggestions: profileBoard,
+          profiles: {
+            shortDescriptionOf: async (companyId) =>
+              (
+                await companies.findCanonicalCompanyProfile(
+                  CompanyIdSchema.parse(companyId),
+                )
+              )?.shortDescription ?? null,
+          },
           // The name to look a person up by, read from their own profile
           // row. Their own only: the query is keyed on the acting user.
           people: {

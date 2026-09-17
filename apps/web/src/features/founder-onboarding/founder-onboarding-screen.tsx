@@ -112,18 +112,23 @@ export function FounderOnboardingScreen({
       <div className="mx-auto flex min-h-dvh w-full max-w-(--cq-layout-narrow) flex-col justify-center gap-6 px-4 py-10">
         <EmptyState
           title="Founder setup is complete."
-          description="Your company profile is in place. You can change what it says any time; investors don't see any of it until you choose to become discoverable."
+          description="Your company profile is in place. Tell Q what to change, in your own words, and approve it; investors don't see any of it until you choose to become discoverable."
           action={
             <div className="flex flex-wrap gap-2">
               <Link href="/home" className={buttonClassName("primary")}>
                 Go to Home
               </Link>
-              <Button
-                variant="secondary"
-                onClick={() => void actions.openStep("review")}
+              {/*
+               * A finished setup cannot be stepped back into: the review
+               * step belongs to an active session, and the button that
+               * tried did nothing. Changes go through Q now (ADR 0011).
+               */}
+              <Link
+                href="/company/visibility"
+                className={buttonClassName("secondary")}
               >
-                Change what the profile says
-              </Button>
+                See what investors will see
+              </Link>
             </div>
           }
         />

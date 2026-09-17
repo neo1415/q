@@ -622,7 +622,7 @@ describe("a spoken question for Q", () => {
     expect(runtime.calls.cancelRun).toHaveLength(0);
   });
 
-  it("offers a paused answer after the person's next subject, once it has finished (rework)", async () => {
+  it("drops a paused answer once the person has moved on to something else", async () => {
     const runtime = fakeRuntime();
     const controller = new AbortController();
     const handle = createVoiceTurnHandler({
@@ -656,7 +656,9 @@ describe("a spoken question for Q", () => {
       speaker,
     );
     await new Promise((resolve) => setTimeout(resolve, 20));
-    // A new question: answered first (a fresh run), then the paused answer.
+    // A new subject: answered on its own. What was cut is not appended
+    // (live it read as Q answering two things at once); "go on" is how a
+    // person asks for it, and after this it is gone.
     const next = await handle(
       bound,
       [{ role: "user", content: "Let me think" }],
@@ -664,9 +666,19 @@ describe("a spoken question for Q", () => {
       speaker,
     );
     expect(next).toEqual({ kind: "SPOKEN", path: "MOVE" });
-    expect(speaker.spoken.at(-1)).toBe(
-      "And to finish what I was saying earlier: Seed rounds run small. Most close fast.",
+    expect(speaker.spoken.join(" ")).not.toContain(
+      "to finish what I was saying",
     );
+    // With nothing held any more, "go on" is an ordinary sentence for Q
+    // (a fresh run), not a resumption of the dropped answer.
+    await handle(
+      bound,
+      [{ role: "user", content: "go on" }],
+      new AbortController().signal,
+      speaker,
+    );
+    expect(runtime.calls.createRun).toHaveLength(2);
+    expect(speaker.spoken.join(" ")).not.toMatch(/picking up|where I stopped/i);
   });
 
   it("says it is looking at public sources when the run reaches that stage, once (D §56)", async () => {
@@ -867,7 +879,9 @@ describe("a spoken question for Q", () => {
       "33333333-3333-4333-8333-333333333333",
     );
     expect(resumed).toHaveLength(1);
-    expect(yes.spoken.join(" ")).toMatch(/Done/);
+    // The fake run never reports its end, so Q says the yes is recorded
+    // and under way rather than claiming it is done.
+    expect(yes.spoken.join(" ")).toMatch(/yes is recorded|Done/);
     // A yes was the decision; no run was started for the word "yes".
     expect(runtime.calls.createRun).toHaveLength(1);
   });

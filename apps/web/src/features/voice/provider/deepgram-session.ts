@@ -221,10 +221,18 @@ export function useDeepgramVoiceSession(
       };
       session.on("user-started-speaking", () => {
         noteEvent("user-started-speaking");
-        if (!speakingRef.current) {
+        // "Speaking" is what the player is doing, not what the flag says:
+        // the flag drops a bounded time after the provider finishes
+        // sending, and a long answer is still coming out of the speaker
+        // well after that. Live, Q talked over the person to the end of
+        // its answer because the flag had already dropped.
+        const stillPlaying =
+          speakingRef.current || player.getRemainingPlaybackTime() > 0.1;
+        if (!stillPlaying) {
           setState("USER_SPEAKING");
           return;
         }
+        speakingRef.current = true;
         // Q is talking: cut playback for a sound that keeps going. The
         // window is short and the threshold low, because failing to stop
         // when a person speaks is far worse than stopping for a cough —

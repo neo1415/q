@@ -32,6 +32,7 @@ import {
 import { createCorrelationId, type Logger } from "@capital-q/observability";
 import type {
   QOrchestrator,
+  QRunRecord,
   QRunStreamService,
   QRuntimeService,
 } from "@capital-q/q-runtime";
@@ -182,7 +183,7 @@ const WELCOME_CHOICE = {
 };
 
 const AFFIRMATIVE =
-  /^(?:(?:yes|yep|yeah|sure|ok(?:ay)?|right|correct|exactly|perfect)[,.!\s]*)*(?:yes|yep|yeah|sure|ok(?:ay)?|right|correct|exactly|perfect|keep (?:these|those|them|it|all(?: of them)?)|(?:that'?s|those are|these are|they'?re) (?:right|correct|fine|good|it|the ones)|looks? (?:right|good|correct)|(?:all )?good|go (?:with|for) (?:these|those|them|that))[.!\s]*$/i;
+  /^(?:(?:yes|yep|yeah|sure|ok(?:ay)?|right|correct|exactly|perfect|please)[,.!\s]*)*(?:yes|yep|yeah|sure|ok(?:ay)?|right|correct|exactly|perfect|go ahead|go on|do it|do that|please do|proceed|confirm(?:ed)?|keep (?:these|those|them|it|all(?: of them)?)|(?:that'?s|those are|these are|they'?re) (?:right|correct|fine|good|it|the ones)|looks? (?:right|good|correct)|(?:all )?good|go (?:with|for) (?:these|those|them|that))[.!\s]*(?:please[.!\s]*)?$/i;
 
 /** Whose visibility a spoken change is about: a company, or an investor. */
 type VisibilitySubject =
@@ -365,6 +366,8 @@ export function isContinueCue(text: string): boolean {
 
 /** How long a resumed answer waits for a run that is still working. */
 const RESUME_WAIT_MS = 25_000;
+/** How long a spoken yes waits to hear that the gate executed, before saying it is under way. */
+const RUN_END_WAIT_MS = 15_000;
 
 /**
  * A look-up that found nothing, as models say so. Only the person's own
@@ -607,6 +610,41 @@ export function createVoiceTurnHandler(
    * is done here beyond the decision: the executor re-verifies authority,
    * approval and payload on its own (CQ-Q-008).
    */
+  /** How the run ended after a decision, or TIMEOUT when it is still going. */
+  const runEnd = async (
+    binding: VoiceSessionBinding,
+    runId: string,
+    correlationId: CorrelationId,
+    signal: AbortSignal,
+  ): Promise<"COMPLETED" | "FAILED" | "TIMEOUT"> => {
+    try {
+      const record = await qStream.authorize(
+        binding.actor,
+        runId as QRunRecord["id"],
+        correlationId,
+      );
+      const bounded = AbortSignal.any([
+        signal,
+        AbortSignal.timeout(RUN_END_WAIT_MS),
+      ]);
+      for await (const item of qStream.open({
+        run: record,
+        afterSequence: 0,
+        signal: bounded,
+      })) {
+        if (item.kind === "end") break;
+        if (item.event.type === "q.run.completed") return "COMPLETED";
+        if (item.event.type === "q.run.failed") return "FAILED";
+      }
+    } catch (error: unknown) {
+      logger.warn(
+        { err: error, qRunId: runId },
+        "could not follow the run after a spoken decision",
+      );
+    }
+    return "TIMEOUT";
+  };
+
   const decideApproval = async (
     binding: VoiceSessionBinding,
     waiting: { readonly approvalId: string; readonly summary: string | null },
@@ -642,7 +680,20 @@ export function createVoiceTurnHandler(
               );
             });
         }
-        line = "Done, that's going in now.";
+        // Say what happened, not what was asked: the gate re-verifies and
+        // executes on resume, and the run's end says whether it did.
+        const ended = await runEnd(
+          binding,
+          result.action.runId,
+          correlationId,
+          signal,
+        );
+        line =
+          ended === "COMPLETED"
+            ? "Done, that's in. What would you like to do next?"
+            : ended === "FAILED"
+              ? "I recorded your yes, but the change didn't go through. Ask me again in a moment, or change it from your company page."
+              : "Your yes is recorded and it's going in now.";
       } else {
         await approvals.reject({
           actor: binding.actor,
@@ -782,7 +833,12 @@ export function createVoiceTurnHandler(
             yield proposedSummary === null
               ? "I've prepared something that needs your approval. Shall I go ahead?"
               : `${proposedSummary} Shall I go ahead?`;
-            break;
+            // The run is paused for the person now; nothing more arrives
+            // until they decide. Waiting here held the think request
+            // open until its deadline, and the person read "Thinking"
+            // for a minute after Q had already asked (live, 2026-09-17).
+            terminal = true;
+            return;
           case "q.run.failed":
             terminal = true;
             if (streamedDeltas) {
@@ -1536,25 +1592,13 @@ export function createVoiceTurnHandler(
     } else {
       outcome = await askQ(binding, text, signal, speaker);
     }
-    // An answer that finished while the person talked about something
-    // else is offered once they are done, not dropped.
-    if (
-      paused?.kind === "ANSWER" &&
-      paused.done &&
-      outcome.kind === "SPOKEN" &&
-      !signal.aborted &&
-      held.get(binding) === paused
-    ) {
+    // An answer the person talked over is theirs to ask for ("go on"),
+    // not Q's to append. Live, a second question was answered and then
+    // followed by "and to finish what I was saying earlier", which read
+    // as Q answering two things at once. Once they have moved on, what
+    // was cut stays cut.
+    if (paused !== undefined && held.get(binding) === paused) {
       held.delete(binding);
-      const unsaid = notYetSaid(binding, unsaidPartOf(paused));
-      if (unsaid.length > 0) {
-        await speakLine(
-          speaker,
-          `And to finish what I was saying earlier: ${unsaid}`,
-          signal,
-          binding,
-        );
-      }
     }
     return outcome;
   };

@@ -26,6 +26,8 @@ export type VoiceStageProps = {
   readonly voices: readonly QVoiceChoice[];
   readonly onChooseVoice: (voice: QVoiceChoice) => void;
   readonly onEnd: () => void;
+  /** What leaving the stage is called where it is used: "End", "Go to chat". */
+  readonly endLabel?: string | undefined;
   readonly notice: string | null;
   readonly onDismissNotice: () => void;
   /** What Q is asking after its latest turn; options are offered only when Q chose to show them. */
@@ -132,6 +134,7 @@ export function VoiceStage({
   voices,
   onChooseVoice,
   onEnd,
+  endLabel = "End",
   notice,
   onDismissNotice,
   asking,
@@ -240,7 +243,7 @@ export function VoiceStage({
           ) : null}
           <button type="button" className="cq-stage-quiet" onClick={onEnd}>
             <X size={ICON_SIZE.compact} aria-hidden="true" />
-            End
+            {endLabel}
           </button>
         </div>
       </div>
