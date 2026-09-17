@@ -76,28 +76,37 @@ function compactNumber(digits: string): string {
   return String(value);
 }
 
+/**
+ * A figure and, when written, what scales it: "1.5m", "200 million",
+ * "250k", "2 billion". The space before the scale belongs to the scale,
+ * not to the figure: "\u20a6200 million" once became "200 nairamillion" because
+ * the figure's trailing space was eaten and "million" was left stuck to
+ * the currency word.
+ */
+const FIGURE = String.raw`(\d[\d ,\u00a0\u202f.]*\d|\d)(?:\s*(k|m|b|thousand|million|billion)\b)?`;
+
 export function spokenFigures(text: string): string {
   let out = text;
-  // A code after the figure: "200 000 000 NGN", "1.5m USD".
+  // A code after the figure: "200 000 000 NGN", "1.5m USD", "200 million NGN".
   out = out.replace(
     new RegExp(
-      String.raw`(\d[\d ,\u00a0\u202f.]*\d|\d)\s*(?:([kmb])\b)?\s*\b(${Object.keys(CURRENCY_WORDS).join("|")})\b`,
+      String.raw`${FIGURE}\s*\b(${Object.keys(CURRENCY_WORDS).join("|")})\b`,
       "g",
     ),
     (_all: string, figure: string, suffix: string | undefined, code: string) =>
       moneyWords(figure, suffix, code),
   );
-  // A code or symbol before the figure: "NGN 200,000,000", "$1.5m".
+  // A code or symbol before the figure: "NGN 200,000,000", "$1.5m", "\u20a6200 million".
   out = out.replace(
     new RegExp(
-      String.raw`\b(${Object.keys(CURRENCY_WORDS).join("|")})\s*(\d[\d ,\u00a0\u202f.]*\d|\d)\s*(?:([kmb])\b)?`,
+      String.raw`\b(${Object.keys(CURRENCY_WORDS).join("|")})\s*${FIGURE}`,
       "g",
     ),
     (_all: string, code: string, figure: string, suffix: string | undefined) =>
       moneyWords(figure, suffix, code),
   );
   out = out.replace(
-    /([$\u20a6\u00a3\u20ac])\s*(\d[\d ,\u00a0\u202f.]*\d|\d)\s*(?:([kmb])\b)?/g,
+    new RegExp(String.raw`([$\u20a6\u00a3\u20ac])\s*${FIGURE}`, "g"),
     (
       _all: string,
       symbol: string,
@@ -118,8 +127,15 @@ function moneyWords(
   suffix: string | undefined,
   code: string,
 ): string {
+  const scale = (suffix ?? "").toLowerCase();
   const multiplier =
-    suffix === "k" ? 1e3 : suffix === "m" ? 1e6 : suffix === "b" ? 1e9 : 1;
+    scale === "k" || scale === "thousand"
+      ? 1e3
+      : scale === "m" || scale === "million"
+        ? 1e6
+        : scale === "b" || scale === "billion"
+          ? 1e9
+          : 1;
   const value = Number(figure.replace(/[ ,\u00a0\u202f]/g, "")) * multiplier;
   if (!Number.isFinite(value)) {
     return `${figure} ${code}`;

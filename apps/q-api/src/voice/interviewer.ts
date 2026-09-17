@@ -150,16 +150,65 @@ const WARNINGS_BEFORE_HANDOFF = 2;
 const MAX_RECENT_TURNS = 12;
 const RECENT_TURN_MAX_CHARS = 600;
 
+/** The currency a person named while saying an amount, as the step's option key. */
+function currencyFromUtterance(utterance: string): string | null {
+  const said = utterance.toLowerCase();
+  if (/\bsingapore dollars?\b|\bsgd\b/.test(said)) return "sgd";
+  if (/\bdollars?\b|\busd\b|\bbucks\b/.test(said)) return "usd";
+  if (/\bnaira\b|\bngn\b/.test(said)) return "ngn";
+  if (/\bpounds?\b|\bsterling\b|\bgbp\b/.test(said)) return "gbp";
+  if (/\beuros?\b|\beur\b/.test(said)) return "eur";
+  if (/\bshillings?\b|\bkes\b/.test(said)) return "kes";
+  if (/\brand\b|\bzar\b/.test(said)) return "zar";
+  if (/\bdirhams?\b|\baed\b/.test(said)) return "aed";
+  if (/\brupees?\b|\binr\b/.test(said)) return "inr";
+  return null;
+}
+
+/** Where a document actually goes, said once when one is mentioned aloud. */
+const UPLOAD_LINE =
+  "Whenever you like, add the deck or model on screen from your company page; I'll carry on here.";
+
+/** What Q asks when an answer could not be placed against the step. */
+function clarificationFor(step: OnboardingStepManifest): string {
+  const c = step.configuration;
+  const prompt = c.prompt.replace(/[.?!]+$/, "");
+  switch (c.stepType) {
+    case "single_select":
+    case "multi_select": {
+      const labels = optionsOf(step)
+        .map((o) => o.label)
+        .slice(0, 7);
+      return `I couldn't place that. ${prompt}: ${labels.join(", ")}?`;
+    }
+    case "range":
+      return `Just the number, please: ${prompt.toLowerCase()}?`;
+    case "short_text":
+    case "long_text":
+    case "voice_text":
+    case "document_upload":
+    case "confirmation":
+    case "reference_select":
+      return `I didn't quite catch that. ${prompt}?`;
+  }
+}
+
 /**
  * What Q asks its own research tools when the person names a website,
  * company or person. The query is the person's words, bounded; the tools
  * decide what may leave the platform (CQ-Q-RESEARCH-001).
  */
+
 function lookupQuestion(
   kind: "WEBSITE" | "COMPANY" | "PERSON",
   query: string,
 ): string {
-  const subject = query.trim().slice(0, 200);
+  // A website said aloud ("salvage bridge dot com") becomes the address
+  // it names before it is looked up; the words themselves find nothing.
+  const subject =
+    kind === "WEBSITE"
+      ? spokenUrl(query).slice(0, 200)
+      : query.trim().slice(0, 200);
   if (/linkedin\.com\/(in|company)\//i.test(subject)) {
     return `Look up this public LinkedIn page with the profile lookup: ${subject}. Summarise in a few spoken sentences what it says about them (name, role or what the company does, where, size) as unverified public context for this interview, said as "their LinkedIn page says".`;
   }
@@ -299,7 +348,16 @@ function toOpenStep(
           .join(" "),
       };
     case "document_upload":
-      return { ...base, kind: "DOCUMENT", note: typeable(base.note) };
+      return {
+        ...base,
+        kind: "DOCUMENT",
+        note: [
+          base.note,
+          "An upload, not a question to press: ask once what they already have (a deck, a financial model, accounts) and put whatever they say in answers for this step, whether it is a document or 'nothing yet'. Never ask this step a second time.",
+        ]
+          .filter((n): n is string => n !== undefined)
+          .join(" "),
+      };
     case "reference_select": {
       if (c.resourceType === "TAXONOMY_NODE") {
         return { ...base, kind: "CATEGORIES", maxChoices: c.maxItems };
@@ -343,6 +401,112 @@ function isMaterial(stepKey: string): boolean {
   return MATERIAL_STEP_PATTERNS.some((pattern) => pattern.test(stepKey));
 }
 
+const NUMBER_WORDS: Readonly<Record<string, number>> = {
+  zero: 0,
+  one: 1,
+  two: 2,
+  three: 3,
+  four: 4,
+  five: 5,
+  six: 6,
+  seven: 7,
+  eight: 8,
+  nine: 9,
+  ten: 10,
+  eleven: 11,
+  twelve: 12,
+  thirteen: 13,
+  fourteen: 14,
+  fifteen: 15,
+  sixteen: 16,
+  seventeen: 17,
+  eighteen: 18,
+  nineteen: 19,
+  twenty: 20,
+  thirty: 30,
+  forty: 40,
+  fifty: 50,
+  sixty: 60,
+  seventy: 70,
+  eighty: 80,
+  ninety: 90,
+};
+const SCALE_WORDS: Readonly<Record<string, number>> = {
+  hundred: 100,
+  thousand: 1e3,
+  k: 1e3,
+  million: 1e6,
+  m: 1e6,
+  billion: 1e9,
+  b: 1e9,
+};
+
+/**
+ * A number as a person says it: "four", "twenty five", "three hundred
+ * million", "1.5 million", "300m". The recogniser writes small numbers
+ * as words as often as not, and "four" read as no number at all was a
+ * team-size question asked twice (2026-09-17). Digits and words may mix;
+ * a word that is none of these ends the reading.
+ */
+function spokenNumber(text: string): number | null {
+  const tokens = text
+    .toLowerCase()
+    .replace(/[,$€£₦]/g, "")
+    .replace(/-/g, " ")
+    .split(/\s+/)
+    .filter((t) => t.length > 0);
+  let total = 0;
+  let current = 0;
+  let sawNumber = false;
+  for (const token of tokens) {
+    if (/^\d+(?:\.\d+)?$/.test(token)) {
+      current += Number.parseFloat(token);
+      sawNumber = true;
+      continue;
+    }
+    const digitsWithScale = /^(\d+(?:\.\d+)?)([kmb])$/.exec(token);
+    if (digitsWithScale !== null) {
+      current += Number.parseFloat(digitsWithScale[1] ?? "0");
+      const scale = SCALE_WORDS[digitsWithScale[2] ?? ""] ?? 1;
+      total += current * scale;
+      current = 0;
+      sawNumber = true;
+      continue;
+    }
+    const word = NUMBER_WORDS[token];
+    if (word !== undefined) {
+      current += word;
+      sawNumber = true;
+      continue;
+    }
+    const scale = SCALE_WORDS[token];
+    if (scale !== undefined && sawNumber) {
+      if (scale === 100) {
+        current = (current === 0 ? 1 : current) * 100;
+      } else {
+        total += (current === 0 ? 1 : current) * scale;
+        current = 0;
+      }
+      continue;
+    }
+    if (
+      token === "and" ||
+      token === "a" ||
+      token === "about" ||
+      token === "just" ||
+      token === "around"
+    ) {
+      continue;
+    }
+    if (sawNumber) {
+      break;
+    }
+  }
+  if (!sawNumber) return null;
+  const value = total + current;
+  return Number.isFinite(value) ? value : null;
+}
+
 function asNumberString(value: unknown): string | null {
   if (typeof value === "number" && Number.isFinite(value)) {
     return String(value);
@@ -350,14 +514,27 @@ function asNumberString(value: unknown): string | null {
   if (typeof value !== "string") {
     return null;
   }
-  const cleaned = value.replace(/[,\s$€£₦]/g, "").toLowerCase();
-  const scaled = /^(-?\d+(?:\.\d+)?)([kmb])?$/.exec(cleaned);
-  if (scaled === null) {
-    return null;
-  }
-  const factor = { k: 1e3, m: 1e6, b: 1e9 }[scaled[2] ?? ""] ?? 1;
-  const number = Number.parseFloat(scaled[1] ?? "") * factor;
-  return Number.isFinite(number) ? String(number) : null;
+  const number = spokenNumber(value);
+  return number === null ? null : String(number);
+}
+
+/**
+ * A web address as a person says it: "savage bridge dot com", "www dot
+ * vaultlyne dot com", "https://x.io". Spoken words become the host, and a
+ * bare host gets the scheme the profile expects. Live, "Savage Bridge dot
+ * com" was recorded as the company's website, letter for letter.
+ */
+export function spokenUrl(text: string): string {
+  let host = text
+    .trim()
+    .toLowerCase()
+    .replace(/[.!?,;:]+$/g, "")
+    .replace(/\s*\b(?:dot|d0t)\b\s*/g, ".")
+    .replace(/\s+(?:slash)\s+/g, "/")
+    .replace(/^(?:https?:\/\/)?(?:www\.)?/, "")
+    .replace(/\s+/g, "");
+  host = host.replace(/\.{2,}/g, ".").replace(/^\.|\.$/g, "");
+  return host.length === 0 ? text.trim() : `https://${host}`;
 }
 
 /** A model reading → the step's own value, or null when it does not fit. */
@@ -367,14 +544,44 @@ function toResponseValue(
 ): OnboardingResponseValue | null {
   const c = step.configuration;
   const options = optionsOf(step);
+  /**
+   * The option a phrase names. Exact key or label first; then a label
+   * whose words are all in the phrase ("pitch deck" in "the pitch deck we
+   * have"); then a phrase that is plainly one of the catch-alls. Live, a
+   * model wrote "demo" for a step whose options are deck, model, accounts,
+   * profile, other and nothing yet, and the answer was dropped without a
+   * word, so the question came round again twice.
+   */
   const keyOf = (text: string): string | null => {
     const wanted = text.trim().toLowerCase();
-    const hit = options.find(
+    if (wanted.length === 0) return null;
+    const exact = options.find(
       (option) =>
         option.key.toLowerCase() === wanted ||
         option.label.toLowerCase() === wanted,
     );
-    return hit?.key ?? null;
+    if (exact !== undefined) return exact.key;
+    const words = (s: string) =>
+      s
+        .toLowerCase()
+        .split(/[^a-z0-9]+/)
+        .filter((w) => w.length > 0);
+    const phrase = new Set(words(wanted));
+    const byLabel = options.find((option) => {
+      const label = words(option.label);
+      return label.length > 0 && label.every((w) => phrase.has(w));
+    });
+    if (byLabel !== undefined) return byLabel.key;
+    if (
+      /\b(?:nothing|none|no|not yet|don't have|dont have|haven't)\b/.test(
+        wanted,
+      )
+    ) {
+      const none = options.find((o) => /^(?:nothing|none)/i.test(o.key));
+      if (none !== undefined) return none.key;
+    }
+    const other = options.find((o) => /^other$/i.test(o.key));
+    return other?.key ?? null;
   };
   switch (c.stepType) {
     case "single_select": {
@@ -405,12 +612,14 @@ function toResponseValue(
     case "short_text":
     case "long_text":
     case "voice_text": {
-      const text =
+      const spoken =
         typeof raw === "string"
           ? raw.trim()
           : Array.isArray(raw)
             ? raw.join(", ")
             : "";
+      // A website said aloud is words; the profile wants an address.
+      const text = /\.website$/.test(step.stepKey) ? spokenUrl(spoken) : spoken;
       const max = c.stepType === "short_text" ? c.maxLength : c.maxLength;
       if (text.length === 0 || text.length > max) return null;
       return { type: "TEXT", text };
@@ -741,6 +950,15 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
       }
 
       // 2. Answers in the person's words, validated against the step.
+      /** Answers the step refused: Q asks again plainly rather than "got it". */
+      const rejected: OnboardingStepManifest[] = [];
+      /**
+       * Upload steps answered in words. A voice cannot attach a file, and
+       * live the same "what do you already have?" was asked three times
+       * because each spoken answer went nowhere. The step is set aside
+       * here, and the person is told where the upload lives.
+       */
+      const spokenUploads: OnboardingStepManifest[] = [];
       for (const answer of result.answers) {
         const step = steps.get(answer.stepKey);
         const status = statuses.get(answer.stepKey);
@@ -750,8 +968,17 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
           status === "COMPLETED"
         )
           continue;
+        if (step.configuration.stepType === "document_upload") {
+          // Nothing said can be a document. What they have is noted in
+          // the reply; the step is settled below so it is not asked again.
+          spokenUploads.push(step);
+          continue;
+        }
         const value = toResponseValue(step, answer.value);
-        if (value === null) continue;
+        if (value === null) {
+          rejected.push(step);
+          continue;
+        }
         if (isMaterial(step.stepKey) || answer.confidence === "MEDIUM") {
           nextPending.push({
             stepKey: step.stepKey,
@@ -830,17 +1057,27 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
         }
       }
 
-      // 4. Skips, optional steps only.
-      for (const stepKey of result.skips) {
+      // 4. Skips, optional steps only; an upload answered aloud is one.
+      let deferredUpload = false;
+      const toSkip = [
+        ...result.skips,
+        ...spokenUploads.map((step) => step.stepKey),
+      ];
+      for (const stepKey of toSkip) {
         const step = steps.get(stepKey);
         const status = statuses.get(stepKey);
         if (
           step === undefined ||
           step.required ||
           status === undefined ||
-          status === "COMPLETED"
+          status === "COMPLETED" ||
+          status === "SKIPPED" ||
+          skipped.includes(stepKey)
         )
           continue;
+        if (step.configuration.stepType === "document_upload") {
+          deferredUpload = true;
+        }
         try {
           view = await skipOnboardingStep(
             input.session,
@@ -884,6 +1121,58 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
         result.intent === "NAVIGATE" ? result.navigate : null;
       if (navigate === "FORM") handoff = "FORM";
       let reply = result.reply;
+      /**
+       * The model says "got it" in the same breath as it hands over an
+       * answer, and it cannot know the step refused it. When one did, the
+       * acknowledgement is a lie and the question would come round again
+       * later as if never asked (live: "what do you already have" three
+       * times). So Q says what it could not place, and asks the one thing
+       * that settles it, in the step's own terms.
+       */
+      const unplaced = rejected.find(
+        (step) => !recorded.includes(step.stepKey),
+      );
+      if (unplaced !== undefined) {
+        reply = clarificationFor(unplaced);
+        result = { ...result, askNext: unplaced.stepKey };
+      }
+      if (deferredUpload) {
+        reply = `${reply.trim()} ${UPLOAD_LINE}`.trim();
+        if (
+          result.askNext !== null &&
+          steps.get(result.askNext)?.configuration.stepType ===
+            "document_upload"
+        ) {
+          result = { ...result, askNext: null };
+        }
+      }
+      /**
+       * A raise amount said with its currency answers the currency step
+       * too: "three hundred million dollars" was recorded as an amount and
+       * then asked what currency it was in.
+       */
+      const amountStep =
+        recorded.find((key) => /\.target_amount$/.test(key)) ??
+        nextPending.find((p) => /\.target_amount$/.test(p.stepKey))?.stepKey;
+      if (amountStep !== undefined) {
+        const currencyKey = amountStep.replace(/\.target_amount$/, ".currency");
+        const currencyStep = steps.get(currencyKey);
+        const spokenCurrency = currencyFromUtterance(input.utterance);
+        if (
+          currencyStep !== undefined &&
+          statuses.get(currencyKey) !== "COMPLETED" &&
+          spokenCurrency !== null &&
+          optionsOf(currencyStep).some((o) => o.key === spokenCurrency)
+        ) {
+          await commit(currencyKey, {
+            type: "SINGLE_SELECT",
+            optionKey: spokenCurrency,
+          });
+          if (result.askNext === currencyKey) {
+            result = { ...result, askNext: null };
+          }
+        }
+      }
       // 6. Nothing left to ask: the setup completes through the runtime's
       // own path and Q takes the person home.
       const stillRequired = view.progress.eligibleSteps.filter(

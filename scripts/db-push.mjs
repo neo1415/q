@@ -72,13 +72,27 @@ if (new URL(url).port === "6543") {
   process.exit(1);
 }
 
+// The CLI authenticates against the pooler only when TLS is asked for by
+// name; without `sslmode=require` it reports a wrong password for a right
+// one (seen 2026-09-17: the Node driver connected, the CLI did not).
+const target = new URL(url);
+if (!target.searchParams.has("sslmode")) {
+  target.searchParams.set("sslmode", "require");
+}
+
 const dryRun = process.argv.includes("--dry-run");
 console.log(
   `[db:push] ${dryRun ? "checking" : "applying"} migrations against …${host.slice(-24)}`,
 );
 const result = spawnSync(
   "supabase",
-  ["db", "push", "--db-url", url, ...(dryRun ? ["--dry-run"] : [])],
+  [
+    "db",
+    "push",
+    "--db-url",
+    target.toString(),
+    ...(dryRun ? ["--dry-run"] : []),
+  ],
   { cwd: root, stdio: "inherit", shell: process.platform === "win32" },
 );
 process.exit(result.status ?? 1);

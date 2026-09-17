@@ -46,10 +46,22 @@ describe("a promise with nothing behind it", () => {
     }
   });
 
-  it("leaves a promise that sits inside the answer rather than in front of it", () => {
+  it("leaves a promise that sits inside the answer rather than at either end", () => {
     const input =
-      "Their last filing is from 2024. Let me check whether a newer one exists.";
+      "Their last filing is from 2024. Let me check whether a newer one exists. The register lists two directors.";
     expect(stripEmptyPromises(input).text).toBe(input);
+  });
+
+  it("removes a closing promise, which nothing ever follows", () => {
+    // Live: an answer ended "Give me a moment to look that up." and the
+    // person waited for a lookup that was never going to happen.
+    const result = stripEmptyPromises(
+      "Funds active in early-stage insurtech include Ventures Platform and TLcom Capital. Give me a moment to look that up.",
+    );
+    expect(result.text).toBe(
+      "Funds active in early-stage insurtech include Ventures Platform and TLcom Capital.",
+    );
+    expect(result.removed).toEqual(["Give me a moment to look that up."]);
   });
 
   it("leaves an answer that is nothing but a promise, so the real failure stays visible", () => {

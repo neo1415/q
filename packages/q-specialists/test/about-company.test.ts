@@ -60,6 +60,11 @@ describe("whether a question is about the company in the conversation", () => {
       "how do we look to an investor",
       "what does the company do",
       "what's our business model",
+      // The person measuring themselves against somebody else: "me" on
+      // their own company's page is the company (live, 2026-09-17).
+      "hey, what sthe difference between me and paystack and what can i do to be as big as them",
+      "how do I compare to Flutterwave?",
+      "what can we do to grow faster than Moniepoint",
       // An analysis asked for outright is the specialist's whole purpose,
       // whatever the person calls their company.
       "Analyse Northstar.",

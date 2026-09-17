@@ -39,6 +39,7 @@ import {
   DEFAULT_COMMUNICATION_PROFILE,
   type PromptRegistry,
   renderPrompt,
+  isEmptyPromise,
   stripEmptyPromises,
   withoutRecommendationClaims,
 } from "@capital-q/q-core";
@@ -804,6 +805,24 @@ export function createModelGatewayQAnswer(
        */
       let seenAnswer = "";
       let firstSentence = true;
+      /**
+       * A sentence that only promises to act is held back until the next
+       * sentence shows it was not the last. Said at the end of an answer,
+       * "Give me a moment to look that up." is a promise nothing follows;
+       * the finished answer drops it, and so a listener must never have
+       * heard it. In the middle it is a sentence about a next step, and
+       * it is released the moment the answer goes on.
+       */
+      let heldPromise: string | null = null;
+      const publish = (text: string): void => {
+        streamedText += `${text} `;
+        deltas?.publish({
+          runId: request.runId,
+          tenantId: request.tenantId,
+          messageId,
+          text: `${text} `,
+        });
+      };
       const onTextDelta = (fragment: string): void => {
         seenText += fragment;
         const fresh = partial.push(seenText);
@@ -817,13 +836,15 @@ export function createModelGatewayQAnswer(
           if (guarded === null || guarded.length === 0) {
             continue;
           }
-          streamedText += `${guarded} `;
-          deltas?.publish({
-            runId: request.runId,
-            tenantId: request.tenantId,
-            messageId,
-            text: `${guarded} `,
-          });
+          if (heldPromise !== null) {
+            publish(heldPromise);
+            heldPromise = null;
+          }
+          if (isEmptyPromise(guarded)) {
+            heldPromise = guarded;
+            continue;
+          }
+          publish(guarded);
         }
       };
 

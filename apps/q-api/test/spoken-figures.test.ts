@@ -17,6 +17,16 @@ describe("figures, spoken", () => {
     expect(spokenFigures("NGN 200,000,000")).toBe("200 million naira");
   });
 
+  it("keeps a written scale word with its figure", () => {
+    // Live: "₦200 million" was read out as "200 nairamillion".
+    expect(spokenFigures("a ₦200 million convertible-note raise")).toBe(
+      "a 200 million naira convertible-note raise",
+    );
+    expect(spokenFigures("NGN 200 million")).toBe("200 million naira");
+    expect(spokenFigures("200 million NGN")).toBe("200 million naira");
+    expect(spokenFigures("$2 billion")).toBe("2 billion dollars");
+  });
+
   it("handles the ways models write money", () => {
     expect(spokenFigures("$1.5m")).toBe("1.5 million dollars");
     expect(spokenFigures("USD 250k")).toBe("250 thousand dollars");

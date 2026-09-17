@@ -44,8 +44,20 @@ export type PromiseStripResult = {
   readonly removed: readonly string[];
 };
 
+/** Whether a sentence is nothing but a promise to go and do something. */
+export function isEmptyPromise(sentence: string): boolean {
+  const trimmed = sentence.trim();
+  return PROMISE_SENTENCE.test(trimmed) && PROMISE_VERB.test(trimmed);
+}
+
 /**
- * Removes leading sentences that only promise to act.
+ * Removes leading and trailing sentences that only promise to act.
+ *
+ * Leading, because the answer that follows is the work. Trailing, because
+ * nothing follows at all: an answer that ends "Give me a moment to look
+ * that up." was heard live as Q announcing work it then never did, and
+ * the person waited. A promise in the middle of an answer stays; it is a
+ * sentence about a next step, with the rest of the answer around it.
  *
  * Never removes everything: an answer that is nothing but a promise is
  * left exactly as it is, because the failure there is that no answer was
@@ -54,17 +66,26 @@ export type PromiseStripResult = {
 export function stripEmptyPromises(text: string): PromiseStripResult {
   const sentences = sentencesOf(text);
   const removed: string[] = [];
-  let index = 0;
-  while (index < sentences.length - 1) {
-    const sentence = (sentences[index] ?? "").trim();
-    if (!PROMISE_SENTENCE.test(sentence) || !PROMISE_VERB.test(sentence)) {
+  let start = 0;
+  while (start < sentences.length - 1) {
+    const sentence = (sentences[start] ?? "").trim();
+    if (!isEmptyPromise(sentence)) {
       break;
     }
     removed.push(sentence);
-    index += 1;
+    start += 1;
+  }
+  let end = sentences.length;
+  while (end - 1 > start) {
+    const sentence = (sentences[end - 1] ?? "").trim();
+    if (!isEmptyPromise(sentence)) {
+      break;
+    }
+    removed.push(sentence);
+    end -= 1;
   }
   if (removed.length === 0) {
     return { text, removed: [] };
   }
-  return { text: sentences.slice(index).join("").trim(), removed };
+  return { text: sentences.slice(start, end).join("").trim(), removed };
 }

@@ -46,6 +46,12 @@ export type DeepgramVoiceProvider = {
     readonly voice: QVoiceChoice;
     readonly greeting: string | undefined;
     readonly thinkToken: string;
+    /**
+     * Names this person is likely to say that the recogniser has never
+     * heard: their organisation, their own name. "NEM Salvage" came back
+     * as "name salvage" until the recogniser was told the word existed.
+     */
+    readonly terms?: readonly string[] | undefined;
   }) => DeepgramAgentSettings;
 };
 
@@ -102,7 +108,7 @@ export function createDeepgramVoiceProvider(
       }
       return body.access_token;
     },
-    settingsFor: ({ voice, greeting, thinkToken }) => ({
+    settingsFor: ({ voice, greeting, thinkToken, terms }) => ({
       agent: {
         language: "en",
         ...(greeting === undefined ? {} : { greeting }),
@@ -111,7 +117,14 @@ export function createDeepgramVoiceProvider(
             type: "deepgram",
             version: "v2",
             model: "flux-general-en",
-            keyterms: [...ASR_KEYWORDS],
+            keyterms: [
+              ...new Set([
+                ...(terms ?? [])
+                  .map((term) => term.trim())
+                  .filter((term) => term.length >= 2 && term.length <= 60),
+                ...ASR_KEYWORDS,
+              ]),
+            ].slice(0, 100),
             // When a person has finished. The threshold is how sure the
             // turn model must be; the timeout is how long it waits for
             // that certainty before ending the turn anyway.

@@ -242,6 +242,12 @@ export function registerQVoiceRoutes(
             voice,
             greeting: firstMessage,
             thinkToken,
+            // The organisation they typed at sign-up: the one name in this
+            // conversation the recogniser could not know.
+            terms:
+              input.organisationHint === undefined
+                ? []
+                : [input.organisationHint],
           }),
         };
       } else if (elevenLabs !== undefined) {

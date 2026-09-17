@@ -34,6 +34,18 @@ const FIRST_PERSON_COMPANY = new RegExp(
 );
 
 /**
+ * The person measuring themselves against somebody: "the difference
+ * between me and Paystack", "how do I compare to Flutterwave", "what can I
+ * do to be as big as them". A founder on their own company's page who
+ * says "me" means the company; live, that question went to the
+ * conversational path, which knew of no company and said so.
+ */
+const FIRST_PERSON_COMPARISON = new RegExp(
+  String.raw`\b(?:between|compare|comparing|comparison|versus|vs\.?|against|like|unlike|similar to|different from|bigger than|as big as)\s+(?:me|us|myself|ourselves)\b|\b(?:me|us|i|we)\s+(?:and|vs\.?|versus|against|compared)\b[^.?!]*\b[a-z]|\b(?:what|how)\s+(?:can|could|should|do|would|will)\s+(?:i|we)\s+(?:do|need|get|grow|scale|raise|become|reach|compete|improve|stand)\b|\b(?:how|where)\s+do\s+i\s+(?:compare|stand|look|rank)\b`,
+  "i",
+);
+
+/**
  * An analysis asked for outright. "Analyse Northstar", "assess the
  * company", "run diligence". This is the specialist's whole purpose, and
  * a person on their own company's page asking for an analysis means their
@@ -106,7 +118,7 @@ export function readAboutCompany(question: string): AboutCompanyReading {
   if (OUTSIDE_WORLD.test(text) && !OWN_PUBLIC_PROFILE.test(text)) {
     return { about: false, reason: "OUTSIDE_WORLD" };
   }
-  if (FIRST_PERSON_COMPANY.test(text)) {
+  if (FIRST_PERSON_COMPANY.test(text) || FIRST_PERSON_COMPARISON.test(text)) {
     return { about: true, reason: "FIRST_PERSON" };
   }
   // Somebody else, by role or preposition, before anything else can claim

@@ -351,6 +351,15 @@ export function isContinueCue(text: string): boolean {
 
 /** How long a resumed answer waits for a run that is still working. */
 const RESUME_WAIT_MS = 25_000;
+
+/**
+ * A look-up that found nothing, as models say so. Only the person's own
+ * setup look-ups are read this way; a question they asked gets the answer
+ * it gets.
+ */
+const NOTHING_ONLINE =
+  /\b(?:no (?:verified|public|specific|official)\b|did(?: not|n't) return|could(?: not|n't) (?:find|locate|retrieve)|nothing (?:specific|much|relevant|was found)|not (?:able to )?(?:find|locate)|unable to (?:find|locate|retrieve|provide)|no (?:information|details|records?|results?)\b|cannot (?:provide|confirm)|can't (?:provide|confirm))/i;
+const NOTHING_ONLINE_LINE = "Not much comes up online yet, so let's carry on.";
 /** How long a paused answer keeps collecting after the person moved on. */
 const HELD_ANSWER_MAX_MS = 90_000;
 
@@ -583,6 +592,17 @@ export function createVoiceTurnHandler(
     text: string,
     signal: AbortSignal,
     speaker: VoiceSpeaker,
+    options: {
+      /**
+       * A look-up Q started on its own during the setup (a website, a
+       * name). What it finds is offered; what it does not find is not
+       * announced. Live, a new founder heard two sentences on how no
+       * verified records existed for their company and how no summary
+       * could be provided, when the honest thing was to carry on. The
+       * absence is logged for the operator; the person hears one line.
+       */
+      readonly lookup?: boolean | undefined;
+    } = {},
   ): Promise<VoiceTurnOutcome> => {
     const { actor, thread } = binding;
     const correlationId = correlation();
@@ -712,18 +732,41 @@ export function createVoiceTurnHandler(
 
     let spokenSoFar = "";
     try {
-      await speaker.speak(
-        withFiller(
-          tap(bySentence(answer(), signal), (part) => {
-            spokenSoFar += `${part} `;
-            rememberSpoken(binding, part);
-          }),
-          {
-            filler: fillerLine("THINKING"),
-            signal,
-          },
-        ),
-      );
+      if (options.lookup === true) {
+        // Gathered whole rather than streamed: whether there is anything
+        // to say is only known at the end.
+        const parts: string[] = [];
+        for await (const part of bySentence(answer(), signal)) {
+          parts.push(part);
+        }
+        const found = parts.join(" ").trim();
+        const line =
+          found.length === 0 || NOTHING_ONLINE.test(found)
+            ? NOTHING_ONLINE_LINE
+            : found;
+        if (line === NOTHING_ONLINE_LINE) {
+          logger.info(
+            { qRunId: runId, qVoiceSessionId: binding.voiceSessionId },
+            "a setup look-up found nothing to offer; the person was not told",
+          );
+        }
+        spokenSoFar = `${line} `;
+        rememberSpoken(binding, line);
+        await speaker.speak(line);
+      } else {
+        await speaker.speak(
+          withFiller(
+            tap(bySentence(answer(), signal), (part) => {
+              spokenSoFar += `${part} `;
+              rememberSpoken(binding, part);
+            }),
+            {
+              filler: fillerLine("THINKING"),
+              signal,
+            },
+          ),
+        );
+      }
     } finally {
       if (signal.aborted && !terminal) {
         // Barge-in pauses the answer; it does not throw it away. The run
@@ -834,6 +877,7 @@ export function createVoiceTurnHandler(
         (found) => {
           foundPerson.set(binding, found);
         },
+        { organisationName: binding.thread.organisationHint ?? null },
       );
       dependencies.board?.record(binding.voiceSessionId, {
         asking:
@@ -872,6 +916,7 @@ export function createVoiceTurnHandler(
           outcome.questionForQ,
           signal,
           speaker,
+          { lookup: outcome.intent === "LOOKUP" },
         );
         return asked;
       }

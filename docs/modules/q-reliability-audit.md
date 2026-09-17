@@ -821,6 +821,55 @@ answer from this network; the session pooler does, and `pnpm db:push`
 uses whichever of the two connection strings is set. The push itself waits
 on a database password the project accepts.
 
+## P. The third transcript: a founder's Home conversation and a new founder's setup
+
+Read from the two transcripts of 2026-09-17, most of it not reported, all
+of it visible.
+
+**P1. "The difference between me and Paystack."** Went to the
+conversational path, which held the company's scopes but no company facts,
+and answered that no records existed. "Me" on one's own company page is
+the company: first-person comparisons now route to the specialist.
+
+**P2. "200 nairamillion."** The spoken-figure rule ate the space between
+"₦200" and "million". A scale word now travels with its figure.
+
+**P3. Answers that end "Give me a moment to look that up."** A closing
+promise is now stripped from the finished answer and held back from the
+stream until a sentence follows it.
+
+**P4. Every sentence of the person shown twice.** The transcript line and
+the recorded turn differ in punctuation; they are now compared as words.
+
+**P5. "You cannot update Capital Q's records in our conversation."** Not
+fixed here. Q records what a person states about their own company as
+their claim already; the answer denied that. This needs the analyst
+prompt to say what Q can take down and where documents go, and the
+"what investors will see" fields need a path from Q's understanding to a
+confirmed profile value. Both are listed under M.
+
+**P6. The setup.** A website said aloud was recorded letter for letter
+("Savage Bridge dot com") and looked up as words; "four" was no number;
+"demo" fitted none of the upload step's options and the question came
+round three times; "three hundred million dollars" was followed by "what
+currency"; a look-up that found nothing was announced in two sentences;
+the person was never looked up because the company row did not exist
+yet; and a brand-new person was greeted with "Welcome back". Each is
+fixed deterministically in the interviewer, the presence trigger, the
+voice turn and the welcome page, with tests. An upload control on the
+voice stage itself is not built; the person is told where the upload
+lives and the step is not asked again.
+
+**P7. Mishearing.** The recogniser is now told the organisation the
+person typed at sign-up as a key term; "NEM Salvage" heard as "name
+salvage" is the recogniser not knowing the word. The company name from
+the interview and the person's own name should follow when a session can
+carry them.
+
+**P8. The model.** Dialogue runs on the small Gemini model because the
+larger one answered with 503s seventeen times in three hours on the free
+tier (migration 20260922). A smarter first choice needs a paid tier.
+
 ## M. What this audit says to do next, in order
 
 1. **Prove the retrieval layer, not just the plan** (H2). The firewall's

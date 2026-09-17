@@ -23,10 +23,16 @@ import { VoiceStage } from "../voice/voice-stage";
 export function WelcomeScreen({
   knownName,
   knownOrganisation = null,
+  returning = false,
 }: {
   readonly knownName: string | null;
   /** What they said their organisation was called at sign-up, if they did. */
   readonly knownOrganisation?: string | null | undefined;
+  /**
+   * Whether Capital Q had this person's name before this visit. A name
+   * typed at sign-up a minute ago is known, but the person is not back.
+   */
+  readonly returning?: boolean | undefined;
 }) {
   const router = useRouter();
   const voice = useVoiceInterview();
@@ -97,7 +103,11 @@ export function WelcomeScreen({
       <div className="flex flex-col items-center gap-2 text-center">
         <span className="cq-label text-white/60">Capital Q</span>
         <h1 className="text-balance text-2xl font-semibold text-white sm:text-3xl">
-          {knownName === null ? "Let's talk." : `Welcome back, ${knownName}.`}
+          {knownName === null
+            ? "Let's talk."
+            : returning
+              ? `Welcome back, ${knownName}.`
+              : `Welcome, ${knownName}.`}
         </h1>
         <p className="cq-body max-w-md text-white/60">
           Q will introduce itself and ask a couple of questions. You can talk,

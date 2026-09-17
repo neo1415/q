@@ -37,6 +37,9 @@ export default async function WelcomePage({
   }
   let knownName: string | null = null;
   let knownOrganisation: string | null = null;
+  // Back, as opposed to here for the first time: the profile already
+  // carried a name before this page load copied one across.
+  let returning = false;
   const accessToken = await getSessionAccessToken();
   if (accessToken !== null && config.apiBaseUrl !== undefined) {
     /**
@@ -56,6 +59,7 @@ export default async function WelcomePage({
     try {
       const me = await fetchMe({ baseUrl: config.apiBaseUrl, accessToken });
       knownName = me.user.displayName;
+      returning = knownName !== null;
       if (knownName === null && signedUpWith.displayName !== null) {
         await updateMe({
           baseUrl: config.apiBaseUrl,
@@ -73,6 +77,7 @@ export default async function WelcomePage({
     <WelcomeScreen
       knownName={knownName}
       knownOrganisation={knownOrganisation}
+      returning={returning}
     />
   );
 }

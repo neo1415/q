@@ -263,6 +263,7 @@ export {
 } from "./communication/plain-lines.js";
 
 export {
+  isEmptyPromise,
   stripEmptyPromises,
   type PromiseStripResult,
 } from "./communication/promises.js";

@@ -150,12 +150,30 @@ export function QConversationPanel({
    * thing the person said appeared twice: once from the transcript as
    * they said it, once from the conversation when it was recorded.
    */
-  const storedText = new Set(
-    turns.map((turn) => turn.text.trim().toLowerCase()),
-  );
-  const spokenOnly = spoken.filter(
-    (line) => !storedText.has(line.text.trim().toLowerCase()),
-  );
+  // Compared as words, not characters: the recogniser's transcript and
+  // the recorded turn differ in punctuation, casing and spacing, and a
+  // person's sentence shown twice for that was the most-noticed thing on
+  // this screen (2026-09-17).
+  const asWords = (text: string) =>
+    text
+      .toLowerCase()
+      .replace(/[^\p{L}\p{N}]+/gu, " ")
+      .trim();
+  const storedText = new Set(turns.map((turn) => asWords(turn.text)));
+  const seenSpoken = new Set<string>();
+  const spokenOnly = spoken.filter((line) => {
+    const words = asWords(line.text);
+    if (words.length === 0 || storedText.has(words)) {
+      return false;
+    }
+    // The same words twice from the transcript itself is one line.
+    const key = `${line.role}:${words}`;
+    if (seenSpoken.has(key)) {
+      return false;
+    }
+    seenSpoken.add(key);
+    return true;
+  });
 
   const stage = workingLabel(q.state);
   // Suggestions are an on-ramp, not a feature: gone after the first turn.

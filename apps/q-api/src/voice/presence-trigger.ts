@@ -85,6 +85,8 @@ export type PresenceTrigger = {
     view: OnboardingSessionView,
     /** Told what was found about the person, so Q can check it is them. */
     onFound?: (found: PresenceFound) => void,
+    /** What the person told Capital Q before the interview began. */
+    hints?: { readonly organisationName?: string | null | undefined },
   ) => void;
 };
 
@@ -140,21 +142,53 @@ export function createPresenceTrigger(
     })();
   };
 
-  return {
-    afterInterviewTurn: (actor, view, onFound) => {
-      const subject = view.session.subject;
-      if (subject === null || subject.type !== "COMPANY") return;
-      const name = firstText(view, FOUNDER_COMPANY_NAME);
-      if (name === null || name.length < 2) return;
-      const website = firstText(view, FOUNDER_WEBSITE);
+  /**
+   * One read per subject per process. The interview calls this after
+   * every turn; the presence service has its own memory of what it read,
+   * but a build it is still running must not be asked for again on the
+   * next sentence.
+   */
+  const started = new Set<string>();
+  const once = (subjectType: string, subjectId: string): boolean => {
+    const key = `${subjectType}:${subjectId}`;
+    if (started.has(key)) return false;
+    started.add(key);
+    return true;
+  };
 
-      start(
-        actor,
-        "COMPANY",
-        subject.id,
-        { name, websiteUrl: website, profileUrl: null, qualifier: null },
-        undefined,
-      );
+  return {
+    afterInterviewTurn: (actor, view, onFound, hints) => {
+      const subject = view.session.subject;
+      const interviewName = firstText(view, FOUNDER_COMPANY_NAME);
+      const website = firstText(view, FOUNDER_WEBSITE);
+      // What tells one person of that name from another: the company they
+      // named in the interview, or failing that the organisation they
+      // typed at sign-up. Public either way.
+      const qualifier =
+        interviewName !== null && interviewName.length >= 2
+          ? interviewName
+          : (hints?.organisationName ?? "").trim() || null;
+
+      if (
+        subject !== null &&
+        subject.type === "COMPANY" &&
+        interviewName !== null &&
+        interviewName.length >= 2 &&
+        once("COMPANY", subject.id)
+      ) {
+        start(
+          actor,
+          "COMPANY",
+          subject.id,
+          {
+            name: interviewName,
+            websiteUrl: website,
+            profileUrl: null,
+            qualifier: null,
+          },
+          undefined,
+        );
+      }
 
       /**
        * And the person themselves, which is the whole point of doing this
@@ -162,11 +196,14 @@ export function createPresenceTrigger(
        * they are known for. Their own row, never anybody else's; the
        * presence service refuses a subject the actor does not own.
        *
-       * Their company name is the qualifier, because it is the thing that
-       * tells one person of that name from another, and it is public.
+       * This does not wait for a company record to exist. Live, a new
+       * founder went through a whole interview and was never looked up,
+       * because the company row is created late in the setup and the
+       * lookup was tied to it. A name and a qualifier are enough.
        * Their company's website is not theirs and is not passed.
        */
-      if (people === undefined) return;
+      if (people === undefined || qualifier === null) return;
+      if (!once("PERSON", actor.userId)) return;
       void (async () => {
         try {
           const personName = await people.displayNameFor(actor);
@@ -179,7 +216,7 @@ export function createPresenceTrigger(
               name: personName.trim(),
               websiteUrl: null,
               profileUrl: null,
-              qualifier: name,
+              qualifier,
             },
             onFound ?? onPersonFound,
           );

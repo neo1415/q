@@ -224,6 +224,136 @@ describe("interviewer", () => {
     expect(prompt).not.toContain(BEARER);
   });
 
+  it("reads a number said in words, and a website said aloud as an address", async () => {
+    // Live: "four" was no number at all and the team-size question came
+    // round again; "Savage Bridge dot com" was recorded letter for letter.
+    const api = fakeApi(() =>
+      view({
+        progress: {
+          ...view().progress,
+          eligibleSteps: [
+            ...view().progress.eligibleSteps,
+            { stepKey: "F4.team_size", required: true, status: "PENDING" },
+            { stepKey: "F1.website", required: false, status: "PENDING" },
+          ],
+        },
+      }),
+    );
+    const gateway = queuedGateway([
+      {
+        ...base,
+        answers: [
+          {
+            stepKey: "F4.team_size",
+            value: "Yeah. Just four",
+            confidence: "HIGH",
+          },
+          {
+            stepKey: "F1.website",
+            value: "Savage Bridge dot com.",
+            confidence: "HIGH",
+          },
+        ],
+      },
+    ]);
+    const interviewer = createInterviewer({ gateway, logger });
+    const outcome = await interviewer.turn(
+      turnInput(api.fetchFake, "Yeah. Just four. Savage Bridge dot com."),
+    );
+    expect(outcome.recorded).toEqual(["F4.team_size", "F1.website"]);
+    const posted = api.requests
+      .filter((r) => r.method === "POST")
+      .map((r) => (r.body as { response: { value: unknown } }).response.value);
+    expect(posted).toEqual([
+      { type: "RANGE", value: "4" },
+      { type: "TEXT", text: "https://savagebridge.com" },
+    ]);
+  });
+
+  it("places an answer that names none of the options, and asks plainly when it cannot", async () => {
+    const api = fakeApi(() =>
+      view({
+        progress: {
+          ...view().progress,
+          eligibleSteps: [
+            ...view().progress.eligibleSteps,
+            { stepKey: "F2.materials", required: false, status: "PENDING" },
+          ],
+        },
+      }),
+    );
+    const gateway = queuedGateway([
+      {
+        ...base,
+        reply: "Got it. Where is the company based?",
+        askNext: "F1.country",
+        answers: [
+          {
+            stepKey: "F2.materials",
+            value: "demo and the website",
+            confidence: "HIGH",
+          },
+          { stepKey: "F1.stage", value: "unicorn", confidence: "HIGH" },
+        ],
+      },
+    ]);
+    const interviewer = createInterviewer({ gateway, logger });
+    const outcome = await interviewer.turn(
+      turnInput(api.fetchFake, "A demo and the website. Unicorn stage."),
+    );
+    // A document step cannot take a spoken answer: it is set aside so it
+    // is never asked again, and the person is told where the upload is.
+    expect(outcome.recorded).toEqual([]);
+    expect(outcome.skipped).toEqual(["F2.materials"]);
+    expect(api.requests.some((r) => r.url.includes("F2.materials"))).toBe(true);
+    expect(outcome.reply).toContain("on screen");
+    // "unicorn" fits nothing, so Q does not say "got it": it asks the one
+    // question that settles it, with the step's own options.
+    expect(outcome.reply).toMatch(/^I couldn't place that\./);
+    expect(outcome.reply).toContain("Seed");
+    expect(outcome.asking?.stepKey).toBe("F1.stage");
+  });
+
+  it("takes the currency from an amount said with it, instead of asking", async () => {
+    const api = fakeApi(() =>
+      view({
+        progress: {
+          ...view().progress,
+          eligibleSteps: [
+            ...view().progress.eligibleSteps,
+            { stepKey: "F6.currency", required: true, status: "PENDING" },
+          ],
+        },
+      }),
+    );
+    const gateway = queuedGateway([
+      {
+        ...base,
+        reply: "Three hundred million dollars, is that right?",
+        askNext: "F6.currency",
+        answers: [
+          {
+            stepKey: "F6.target_amount",
+            value: "300000000",
+            confidence: "HIGH",
+          },
+        ],
+      },
+    ]);
+    const interviewer = createInterviewer({ gateway, logger });
+    const outcome = await interviewer.turn(
+      turnInput(api.fetchFake, "Three hundred million dollars."),
+    );
+    // The amount itself is material and waits for a yes; the currency
+    // was said and needs no question of its own.
+    expect(outcome.recorded).toEqual(["F6.currency"]);
+    const currency = api.requests.find((r) => r.method === "POST");
+    expect(
+      (currency?.body as { response: { value: unknown } }).response.value,
+    ).toEqual({ type: "SINGLE_SELECT", optionKey: "usd" });
+    expect(outcome.asking?.stepKey).not.toBe("F6.currency");
+  });
+
   it("refuses an option that is not one of the step's, a completed step, and a step that does not exist", async () => {
     const api = fakeApi(() => view());
     const gateway = queuedGateway([
