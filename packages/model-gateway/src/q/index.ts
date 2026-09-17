@@ -35,10 +35,12 @@ import {
   citePublicSources,
   type AuthorisedFact,
   type PublicSourceLike,
-  type CompanyAnalystV3Result,
-  CompanyAnalystV3ResultSchema,
+  type CompanyAnalystV4Result,
+  CompanyAnalystV4ResultSchema,
+  DisplayNameRequestSchema,
+  NOTHING_REMEMBERED,
   ProfileUpdateSchema,
-  type CompanyAnalystV2Variables,
+  type CompanyAnalystV4Variables,
   createDefaultPromptRegistry,
   DEFAULT_COMMUNICATION_PROFILE,
   type PromptRegistry,
@@ -74,7 +76,7 @@ import { acceptStructuredOutput } from "../policy/structured.js";
  *   run → Context Firewall plan → authorised facts (port) → tools offered
  *   for this plan (port) → resolve bundle → render charter + task with
  *   untrusted fences → bounded tool loop through the gateway → validated
- *   CompanyAnalystV3Result → Q message + bundle version on the run
+ *   CompanyAnalystV4Result → Q message + bundle version on the run
  *
  * The tool loop: while tools are offered, the model is asked with a TEXT
  * output and may either propose tool calls or answer with the JSON the
@@ -313,7 +315,7 @@ const RESEARCH_NOTE_BRIEF =
  * company conversation, and the alternative was to drop one of them
  * whenever research is offered, which is most of the time.
  */
-export const ENVIRONMENT_NOTES_MAX_CHARS = 2_600;
+export const ENVIRONMENT_NOTES_MAX_CHARS = 2_900;
 
 export function subjectIdentifierNotes(
   subjects: readonly QSubjectRef[],
@@ -362,7 +364,14 @@ const GENERAL_KNOWLEDGE_NOTE =
  * company.
  */
 export const PROFILE_UPDATE_NOTE =
-  "If they ask in this message to change a field of their own company profile (company name, legal name, website, founded date, HQ country or city, stage, short or full description) AND give the new value, put it in profileUpdates: field, value in the field's own form, their exact words as quote; say it is ready for their approval. No value given: ask for it, propose nothing. What YOU call THEM (their own name) is not a company field: never a profileUpdate; say they can tell you 'call me X' and you will. Never say the profile cannot be changed here, never say it was changed.";
+  "If they ask in this message to change a field of their own company profile (company name, legal name, website, founded date, HQ country or city, stage, short or full description) AND give the new value, put it in profileUpdates: field, value in the field's own form, their exact words as quote; say it is ready for their approval. No value given: ask for it, propose nothing. What YOU call THEM (their own name) is not a company field: it goes in displayName, never in profileUpdates. Never say the profile cannot be changed here, never say it was changed.";
+
+/**
+ * The person's own name is theirs to change wherever they are, not only
+ * in a conversation about a company, so this note travels on every run.
+ */
+export const DISPLAY_NAME_NOTE =
+  "If they ask in this message to be called something else or to change their own name on Capital Q AND give the new name, put it in displayName with their exact words as quote and say it is ready for their approval; never say it was changed. No new name given: ask for it.";
 
 /**
  * A reading that would clear a field is kept only when the person's own
@@ -421,6 +430,7 @@ export function environmentNotesFor(
       ...(researchNote === null ? [] : [researchNote]),
       statementsNote,
       ...(aboutACompany ? [PROFILE_UPDATE_NOTE] : []),
+      DISPLAY_NAME_NOTE,
       "No scoring or ranking service is available; do not produce scores.",
     ].join(" ");
   // The charter variable is bounded; the research guidance is the part that
@@ -454,6 +464,39 @@ export type QProfileUpdateNotebook = {
     readonly companyId: string;
     readonly updates: readonly QProfileUpdateReading[];
   }) => void;
+  /**
+   * The person asked to be called something else (ADR 0011). Their own
+   * record, proposed for their own approval; absent means the reading is
+   * dropped and the answer says nothing about it.
+   */
+  readonly noteDisplayName?:
+    | ((entry: {
+        readonly runId: string;
+        readonly tenantId: string;
+        readonly userId: string;
+        readonly displayName: string;
+        readonly quote: string;
+      }) => void)
+    | undefined;
+};
+
+/**
+ * What Capital Q remembers about the person, for the prompt (ADR 0012).
+ *
+ * Text, already rendered and bounded, because the gateway has no business
+ * knowing how memory is shaped; the memory service owns retrieval, scope
+ * and rendering, and the prompt marks whatever arrives as untrusted. A
+ * failure to recall is an empty memory, never a failed answer.
+ */
+export type QMemoryRecall = {
+  readonly recall: (input: {
+    readonly actor: ActorContext;
+    readonly runId: string;
+    /** The conversation the run belongs to, when the caller knows it. */
+    readonly conversationId?: string | undefined;
+    readonly subjects: readonly QSubjectRef[];
+    readonly signal?: AbortSignal | undefined;
+  }) => Promise<string>;
 };
 
 export type QUserStatementRecorder = {
@@ -486,6 +529,8 @@ export type ModelGatewayQAnswerDependencies = {
    * approves, the owning context writes.
    */
   readonly profileUpdates?: QProfileUpdateNotebook | undefined;
+  /** What Capital Q remembers about the person (ADR 0012). Absent: nothing is. */
+  readonly memory?: QMemoryRecall | undefined;
   /**
    * Where the answer goes as it is written. Absent means it goes out only
    * when it is finished, which is what happened before and is still what
@@ -513,7 +558,7 @@ export type QToolCallObservation = {
 };
 
 export type QAnswerObservation = {
-  readonly result: CompanyAnalystV3Result;
+  readonly result: CompanyAnalystV4Result;
   readonly providerCode: string;
   readonly modelCode: string;
   readonly promptBundleVersion: string;
@@ -701,6 +746,37 @@ export function createModelGatewayQAnswer(
     }
   }
 
+  /**
+   * What is remembered, as bounded text; nothing when nothing is, or when
+   * recall fails. A memory that cannot be read costs this answer its past,
+   * never the answer itself.
+   */
+  async function recallMemory(
+    request: QAnswerRequest,
+    conversationId: string,
+  ): Promise<string> {
+    const port = dependencies.memory;
+    if (port === undefined) return NOTHING_REMEMBERED;
+    try {
+      const text = (
+        await port.recall({
+          actor: request.actor,
+          runId: request.runId,
+          conversationId,
+          subjects: request.subjects,
+          signal: request.signal,
+        })
+      ).trim();
+      return text.length === 0 ? NOTHING_REMEMBERED : text.slice(0, 4_000);
+    } catch (error: unknown) {
+      logger?.warn(
+        { err: error, qRunId: request.runId },
+        "memory was not recalled for this answer",
+      );
+      return NOTHING_REMEMBERED;
+    }
+  }
+
   return {
     lastObservation: () => last,
     answer: async (request: QAnswerRequest): Promise<QAnswerOutcome> => {
@@ -769,12 +845,14 @@ export function createModelGatewayQAnswer(
       };
       const offered = await tools.offer(toolContext);
       took("tools");
+      const memory = await recallMemory(request, conversationId);
+      took("memory");
       const offeredByName = new Map(
         offered.map((tool) => [tool.definition.name, tool] as const),
       );
 
       const variables: Omit<
-        CompanyAnalystV2Variables,
+        CompanyAnalystV4Variables,
         | "operatingMode"
         | "communicationProfile"
         | "communicationGuidance"
@@ -791,8 +869,9 @@ export function createModelGatewayQAnswer(
         institutionalNotes:
           assembled.institutionalNotes ??
           "Nothing was established in advance for this request.",
+        memory,
       };
-      const rendered = renderPrompt<CompanyAnalystV2Variables>(registry, {
+      const rendered = renderPrompt<CompanyAnalystV4Variables>(registry, {
         task: "COMPANY_ANALYST",
         operatingMode: operatingModeForCapability(request.capability),
         communicationProfile: profile,
@@ -909,9 +988,9 @@ export function createModelGatewayQAnswer(
         }
       };
 
-      const options: ModelGatewayExecuteOptions<CompanyAnalystV3Result> = {
+      const options: ModelGatewayExecuteOptions<CompanyAnalystV4Result> = {
         signal: request.signal,
-        schema: CompanyAnalystV3ResultSchema,
+        schema: CompanyAnalystV4ResultSchema,
         onTextDelta,
       };
 
@@ -1008,12 +1087,12 @@ export function createModelGatewayQAnswer(
           : [...rendered.messages, TOOLS_FIRST_NOTE];
 
       type AnswerResult = Awaited<
-        ReturnType<typeof gateway.execute<CompanyAnalystV3Result>>
+        ReturnType<typeof gateway.execute<CompanyAnalystV4Result>>
       >;
 
       try {
         let final: AnswerResult | undefined;
-        let analyst: CompanyAnalystV3Result | undefined;
+        let analyst: CompanyAnalystV4Result | undefined;
 
         if (offered.length > 0) {
           took("prepare");
@@ -1025,10 +1104,10 @@ export function createModelGatewayQAnswer(
           ) {
             modelCalls += 1;
             let result: Awaited<
-              ReturnType<typeof gateway.execute<CompanyAnalystV3Result>>
+              ReturnType<typeof gateway.execute<CompanyAnalystV4Result>>
             >;
             try {
-              result = await gateway.execute<CompanyAnalystV3Result>(
+              result = await gateway.execute<CompanyAnalystV4Result>(
                 {
                   ...base,
                   messages,
@@ -1083,7 +1162,7 @@ export function createModelGatewayQAnswer(
                */
               const accepted = acceptStructuredOutput(
                 result.output.text,
-                CompanyAnalystV3ResultSchema,
+                CompanyAnalystV4ResultSchema,
               );
               if (accepted.ok) {
                 final = result;
@@ -1205,7 +1284,7 @@ export function createModelGatewayQAnswer(
 
         if (analyst === undefined || final === undefined) {
           modelCalls += 1;
-          final = await gateway.execute<CompanyAnalystV3Result>(
+          final = await gateway.execute<CompanyAnalystV4Result>(
             { ...base, messages, output: rendered.output },
             options,
           );
@@ -1302,13 +1381,49 @@ export function createModelGatewayQAnswer(
             "profile change read from the person's words; handed to the proposer",
           );
         }
+        /**
+         * Their own name (ADR 0011). Read the same way: through the schema,
+         * quote in the message, and only where a proposer exists to carry
+         * it. One proposal per run: a company change already noted wins,
+         * and the name is asked for again next turn.
+         */
+        const readName = DisplayNameRequestSchema.nullable().safeParse(
+          analyst.displayName,
+        );
+        const displayName =
+          readName.success &&
+          readName.data !== null &&
+          said.includes(readName.data.quote.toLowerCase())
+            ? readName.data
+            : null;
+        const proposedName =
+          displayName !== null &&
+          !proposed &&
+          dependencies.profileUpdates?.noteDisplayName !== undefined;
+        if (proposedName && displayName !== null) {
+          dependencies.profileUpdates?.noteDisplayName?.({
+            runId: request.runId,
+            tenantId: request.tenantId,
+            userId: request.actorUserId,
+            displayName: displayName.value,
+            quote: displayName.quote,
+          });
+          logger?.info(
+            { qRunId: request.runId },
+            "a change to what Q calls the person was read; handed to the proposer",
+          );
+        }
         const content = [
           guarded.text,
           ...(proposed
             ? [
                 "I've prepared that change to your profile. Approve it and it goes in; decline and nothing changes.",
               ]
-            : []),
+            : proposedName
+              ? [
+                  "I've prepared that change to your name. Approve it and it goes in; decline and nothing changes.",
+                ]
+              : []),
           ...(recordedStatements.length === 0
             ? []
             : [

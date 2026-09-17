@@ -22,7 +22,7 @@ export const COMPANY_ANALYST_V3: PromptDefinition<
 > = {
   ...COMPANY_ANALYST_V2,
   version: 3,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   changeDescription:
     "ADR 0011: the structured result carries profileUpdates, a requested change to the person's own company profile, quoted from their words, for the Approval Engine to propose.",
   effectiveFrom: "2026-09-17",

@@ -35,7 +35,7 @@ export const INTERVIEW_CONDUCTOR_V2: PromptDefinition<
 > = {
   ...INTERVIEW_CONDUCTOR_V1,
   version: 2,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   changeDescription:
     "A name or address the person gives is read back once as they said it, never spelled out; a wrong hearing is asked for again, never guessed.",
   effectiveFrom: "2026-09-17",

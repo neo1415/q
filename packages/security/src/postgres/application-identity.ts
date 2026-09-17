@@ -33,6 +33,17 @@ export type ApplicationIdentityLookup = {
     principal: AuthenticatedPrincipal,
     displayName: string,
   ) => Promise<boolean>;
+  /**
+   * The same change keyed on the application user id, for a server-side
+   * caller acting under an approval the person gave (ADR 0011). The id
+   * must be the approver's own; the caller is responsible for that, and
+   * the Q action that uses this refuses any other. False when no active
+   * profile exists.
+   */
+  readonly updateDisplayNameOfUser?: (
+    userId: UserId,
+    displayName: string,
+  ) => Promise<boolean>;
 };
 
 const RowSchema = z.object({
@@ -70,6 +81,15 @@ export function createPostgresApplicationIdentityLookup(options: {
         userId: parsed.data.id,
         displayName: parsed.data.display_name,
       };
+    },
+    updateDisplayNameOfUser: async (userId, displayName) => {
+      const rows = await sql`
+        update identity.user_profiles
+           set display_name = ${displayName}, updated_at = now()
+         where id = ${userId}
+           and status = 'active'
+        returning id`;
+      return rows.length > 0;
     },
     updateDisplayName: async (principal, displayName) => {
       const rows = await sql`

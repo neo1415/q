@@ -74,6 +74,32 @@ export {
 export { COMPANY_ANALYST_V1 } from "./prompts/tasks/company-analyst.v1.js";
 export { INTERVIEW_CONDUCTOR_V1 } from "./prompts/tasks/interview-conductor.v1.js";
 export { INTERVIEW_CONDUCTOR_V2 } from "./prompts/tasks/interview-conductor.v2.js";
+export { INTERVIEW_CONDUCTOR_V3 } from "./prompts/tasks/interview-conductor.v3.js";
+export { DECISION_READER_V1 } from "./prompts/tasks/decision-reader.v1.js";
+export {
+  DECISION_READER_SCHEMA_NAME,
+  DECISION_READER_SCHEMA_VERSION,
+  DECISIONS,
+  DecisionReaderResultSchema,
+  DecisionReaderVariablesSchema,
+  type Decision,
+  type DecisionReaderResult,
+  type DecisionReaderVariables,
+} from "./prompts/schemas/decision-reader.js";
+export { MEMORY_EXTRACTOR_V1 } from "./prompts/tasks/memory-extractor.v1.js";
+export {
+  MEMORY_EXTRACT_TYPES,
+  MEMORY_EXTRACTOR_SCHEMA_NAME,
+  MEMORY_EXTRACTOR_SCHEMA_VERSION,
+  MEMORY_KEY_PATTERN,
+  MemoryExtractItemSchema,
+  MemoryExtractorResultSchema,
+  MemoryExtractorVariablesSchema,
+  type MemoryExtractItem,
+  type MemoryExtractType,
+  type MemoryExtractorResult,
+  type MemoryExtractorVariables,
+} from "./prompts/schemas/memory-extractor.js";
 export { WELCOME_CONDUCTOR_V1 } from "./prompts/tasks/welcome-conductor.v1.js";
 export { PRESENCE_READER_V1 } from "./prompts/tasks/presence-reader.v1.js";
 export {
@@ -103,6 +129,8 @@ export {
   InterviewOpenStepSchema,
   type InterviewConductorResult,
   type InterviewConductorVariables,
+  type InterviewConductorV3Variables,
+  InterviewConductorV3VariablesSchema,
   type InterviewOpenStep,
   INTERVIEW_DESTINATIONS,
   InterviewDestinationSchema,
@@ -110,6 +138,7 @@ export {
 } from "./prompts/schemas/interview-conductor.js";
 export { COMPANY_ANALYST_V2 } from "./prompts/tasks/company-analyst.v2.js";
 export { COMPANY_ANALYST_V3 } from "./prompts/tasks/company-analyst.v3.js";
+export { COMPANY_ANALYST_V4 } from "./prompts/tasks/company-analyst.v4.js";
 export { FOUNDER_ONBOARDING_EXTRACTION_V1 } from "./prompts/tasks/founder-onboarding-extraction.v1.js";
 export { FOUNDER_ONBOARDING_EXTRACTION_V2 } from "./prompts/tasks/founder-onboarding-extraction.v2.js";
 export { INVESTOR_MANDATE_SYNTHESIS_V1 } from "./prompts/tasks/investor-mandate-synthesis.v1.js";
@@ -138,6 +167,15 @@ export {
   CompanyAnalystV3ResultSchema,
   COMPANY_ANALYST_V3_SCHEMA_VERSION,
   type CompanyAnalystV3Result,
+  COMPANY_ANALYST_V4_SCHEMA_VERSION,
+  COMPANY_ANALYST_V4_UNTRUSTED,
+  CompanyAnalystV4ResultSchema,
+  CompanyAnalystV4VariablesSchema,
+  DisplayNameRequestSchema,
+  NOTHING_REMEMBERED,
+  type CompanyAnalystV4Result,
+  type CompanyAnalystV4Variables,
+  type DisplayNameRequest,
   ProfileUpdateSchema,
   type ProfileUpdate,
   CompanyAnalystV2VariablesSchema,

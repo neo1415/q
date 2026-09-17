@@ -886,6 +886,142 @@ describe("a spoken question for Q", () => {
     expect(runtime.calls.createRun).toHaveLength(1);
   });
 
+  it("reads 'Approved.' as the approval through the decision reader, and carries the rest of the reply on (ADR 0011)", async () => {
+    // Live: "Approved." matched no word list, fell through to a Q run,
+    // and Q said "your approval has been noted" with nothing approved.
+    const runtime = fakeRuntime();
+    const approvals = { approve: [] as unknown[], reject: [] as unknown[] };
+    const asked: string[] = [];
+    const handle = createVoiceTurnHandler({
+      qRuntime: runtime.service,
+      qStream: fakeStream([
+        event("q.action.proposed", {
+          proposal: {
+            proposalId: "p1",
+            summary: "Change what I call you to John.",
+          },
+        }),
+        event("q.approval.required", {
+          approvalId: "33333333-3333-4333-8333-333333333333",
+          proposalId: "p1",
+        }),
+      ]),
+      approvals: {
+        approve: (command: unknown) => {
+          approvals.approve.push(command);
+          return Promise.resolve({
+            decided: true,
+            action: { runId: RUN_ID },
+            view: {},
+          } as never);
+        },
+        reject: (command: unknown) => {
+          approvals.reject.push(command);
+          return Promise.resolve({} as never);
+        },
+      },
+      decisions: {
+        read: (input) => {
+          asked.push(input.question);
+          // A model's reading of "Approved. And what's the weather like?"
+          return Promise.resolve({
+            decision: "YES" as const,
+            remainder: "what's the weather like?",
+          });
+        },
+      },
+      logger,
+    });
+    const bound = binding({
+      conversationId: undefined,
+      subjects: undefined,
+      onboarding: undefined,
+    });
+    await handle(
+      bound,
+      [{ role: "user", content: "Call me John." }],
+      new AbortController().signal,
+      fakeSpeaker(),
+    );
+    const yes = fakeSpeaker();
+    await handle(
+      bound,
+      [
+        { role: "user", content: "Call me John." },
+        {
+          role: "agent",
+          content: "Change what I call you to John. Shall I go ahead?",
+        },
+        { role: "user", content: "Approved. And what's the weather like?" },
+      ],
+      new AbortController().signal,
+      yes,
+    );
+    expect(asked).toEqual([
+      "Change what I call you to John. Shall I go ahead?",
+    ]);
+    expect(approvals.approve).toHaveLength(1);
+    expect(yes.spoken.join(" ")).toMatch(/yes is recorded|Done/);
+    // The remainder became the next turn: a run of its own, after the yes.
+    expect(runtime.calls.createRun).toHaveLength(2);
+    expect(
+      (runtime.calls.createRun[1] as { input: { message: { text: string } } })
+        .input.message.text,
+    ).toBe("what's the weather like?");
+  });
+
+  it("leaves a proposal on screen when the reply is about something else", async () => {
+    const runtime = fakeRuntime();
+    const approvals = { approve: [] as unknown[], reject: [] as unknown[] };
+    const handle = createVoiceTurnHandler({
+      qRuntime: runtime.service,
+      qStream: fakeStream([
+        event("q.approval.required", {
+          approvalId: "33333333-3333-4333-8333-333333333333",
+          proposalId: "p1",
+        }),
+      ]),
+      approvals: {
+        approve: (command: unknown) => {
+          approvals.approve.push(command);
+          return Promise.resolve({} as never);
+        },
+        reject: (command: unknown) => {
+          approvals.reject.push(command);
+          return Promise.resolve({} as never);
+        },
+      },
+      decisions: {
+        read: () =>
+          Promise.resolve({ decision: "UNRELATED" as const, remainder: null }),
+      },
+      logger,
+    });
+    const bound = binding({
+      conversationId: undefined,
+      subjects: undefined,
+      onboarding: undefined,
+    });
+    await handle(
+      bound,
+      [{ role: "user", content: "Put our website as thevaultlyne.com" }],
+      new AbortController().signal,
+      fakeSpeaker(),
+    );
+    await handle(
+      bound,
+      [
+        { role: "user", content: "Put our website as thevaultlyne.com" },
+        { role: "agent", content: "Shall I go ahead?" },
+        { role: "user", content: "Hmm, what does that change exactly?" },
+      ],
+      new AbortController().signal,
+      fakeSpeaker(),
+    );
+    expect(approvals.approve).toHaveLength(0);
+    expect(approvals.reject).toHaveLength(0);
+  });
+
   it("does nothing for a transcript with no words from the person", async () => {
     const runtime = fakeRuntime();
     const handle = createVoiceTurnHandler({

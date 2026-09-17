@@ -138,6 +138,8 @@ import type { VoiceAttachment } from "./voice/provider.js";
 import { createDeepgramVoiceProvider } from "./voice/providers/deepgram.js";
 import { createElevenLabsVoiceProvider } from "./voice/providers/elevenlabs.js";
 import { createVoiceTurnHandler } from "./voice/turn.js";
+import { createDecisionReader } from "./voice/decision.js";
+import { createPersonProfileUpdateAction } from "./composition/person-profile-action.js";
 
 // Q configuration is loaded from its own schema, separate from the application
 // API even where the current fields coincide.
@@ -440,6 +442,7 @@ const companyService = createCompanyService({
 // A requested profile change travels from the answer seam to the proposer
 // on this board (ADR 0011); the Approval Engine does everything after.
 const profileBoard = createProfileUpdateBoard({ logger });
+const identity = createPostgresApplicationIdentityLookup({ sql: database.sql });
 const qActions = createQActionService({
   sql: database.sql,
   transactions: database.transactions,
@@ -450,6 +453,15 @@ const qActions = createQActionService({
       profiles: companies,
       service: companyService,
       authorization,
+      logger,
+    }),
+    // What Q calls the person: their own record, their own approval.
+    createPersonProfileUpdateAction({
+      people: {
+        updateDisplayName: ({ userId, displayName }) =>
+          identity.updateDisplayNameOfUser?.(userId, displayName) ??
+          Promise.resolve(false),
+      },
       logger,
     }),
   ]),
@@ -627,6 +639,8 @@ const voiceTurn = createVoiceTurnHandler({
   pronunciation,
   // A spoken yes to a proposal is the same decision a tap records.
   approvals: qActions,
+  // And whether it was a yes is read from their words (ADR 0011).
+  decisions: createDecisionReader({ gateway: modelGateway, logger }),
   ...(presenceComposition === undefined
     ? {}
     : {
@@ -691,7 +705,7 @@ const { app, logger: appLogger } = createApp(
       createSupabaseAccessTokenAuthenticator(supabaseAuth),
     ),
     resolver: createPostgresActorContextResolver({ sql: database.sql }),
-    identity: createPostgresApplicationIdentityLookup({ sql: database.sql }),
+    identity,
   },
   {
     qRuntime,

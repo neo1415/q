@@ -30,6 +30,11 @@ import {
   type AuthorizationService,
 } from "@capital-q/security";
 
+import {
+  PERSON_PROFILE_UPDATE,
+  PersonProfileUpdatePayloadSchema,
+} from "./person-profile-action.js";
+
 /**
  * The first real Q action: a change to the person's own company profile
  * (ADR 0011; CQ-Q-008).
@@ -243,6 +248,15 @@ type Noted = {
   readonly at: number;
 };
 
+/** A request to be called something else, per run (ADR 0011). */
+type NotedName = {
+  readonly tenantId: string;
+  readonly userId: string;
+  readonly displayName: string;
+  readonly quote: string;
+  readonly at: number;
+};
+
 /**
  * The hand-off between the answer seam and the action proposer, per run.
  *
@@ -282,6 +296,7 @@ export function createProfileUpdateBoard(
 ): QProfileUpdateNotebook & QActionProposer & ProfileSuggestionBoard {
   const now = options.now ?? (() => Date.now());
   const noted = new Map<string, Noted>();
+  const names = new Map<string, NotedName>();
   const offered = new Map<
     string,
     ProfileSuggestion & { readonly at: number }
@@ -290,6 +305,9 @@ export function createProfileUpdateBoard(
     const cutoff = now() - READING_TTL_MS;
     for (const [runId, entry] of noted) {
       if (entry.at < cutoff) noted.delete(runId);
+    }
+    for (const [runId, entry] of names) {
+      if (entry.at < cutoff) names.delete(runId);
     }
     const stale = now() - SUGGESTION_TTL_MS;
     for (const [userId, entry] of offered) {
@@ -319,12 +337,42 @@ export function createProfileUpdateBoard(
       sweep();
       noted.set(entry.runId, { ...entry, at: now() });
     },
+    noteDisplayName: (entry) => {
+      sweep();
+      names.set(entry.runId, { ...entry, at: now() });
+    },
     offer: (suggestion) => {
       sweep();
       // One offer per person at a time; a newer read replaces an older one.
       offered.set(suggestion.actorUserId, { ...suggestion, at: now() });
     },
     propose: (context) => {
+      // Their own name first: it needs no company and no organisation,
+      // and it is only ever proposed for the acting person in the tenant
+      // the reading came from.
+      const name = names.get(context.runId);
+      if (name !== undefined) {
+        names.delete(context.runId);
+        if (
+          name.userId === context.actorUserId &&
+          name.tenantId === context.plan.tenantId
+        ) {
+          const parsed = PersonProfileUpdatePayloadSchema.safeParse({
+            userId: context.actorUserId,
+            displayName: name.displayName,
+          });
+          if (parsed.success) {
+            return Promise.resolve({
+              actionType: PERSON_PROFILE_UPDATE,
+              payload: parsed.data,
+            });
+          }
+          options.logger?.info(
+            { qRunId: context.runId },
+            "a requested name did not fit a display name's shape",
+          );
+        }
+      }
       const entry = take(context);
       if (entry === undefined) return Promise.resolve(null);
       // Only for the company this run is about, and only in this tenant.

@@ -65,6 +65,7 @@ import {
 } from "./recognise.js";
 import type { PresenceTrigger } from "./presence-trigger.js";
 import type { PronunciationTeacher } from "./pronunciation.js";
+import type { DecisionReader, DecisionReading } from "./decision.js";
 import type { VoiceTurnBoard } from "./turn-board.js";
 import type { WelcomeHost } from "./welcome.js";
 import type { VoiceSpeaker, VoiceTranscriptTurn } from "./provider.js";
@@ -121,6 +122,12 @@ export type VoiceTurnDependencies = {
    * tap on screen records, under the same actor.
    */
   readonly approvals?: Pick<QActionService, "approve" | "reject"> | undefined;
+  /**
+   * Reads a reply to a closed question Q asked (ADR 0011): a yes, a no,
+   * or neither, from the person's words. Absent means the scripted
+   * reading below stands in, as it does when the model does not answer.
+   */
+  readonly decisions?: DecisionReader | undefined;
   /** The application API, for spoken interview turns; absent means Q conversations only. */
   readonly onboarding?:
     | { readonly apiBaseUrl: string; readonly fetch?: typeof fetch | undefined }
@@ -1404,33 +1411,92 @@ export function createVoiceTurnHandler(
       : { kind: "INTERRUPTED", path: "MOVE" };
   };
 
-  return async (binding, transcript, signal, speaker) => {
+  /**
+   * What the person's reply to Q's closed question means (ADR 0011). The
+   * model reads it; the scripted reading is the fallback when no reader
+   * is composed or the model does not answer in time.
+   */
+  const decide = async (
+    binding: VoiceSessionBinding,
+    question: string,
+    text: string,
+    signal: AbortSignal,
+  ): Promise<DecisionReading> => {
+    const reader = dependencies.decisions;
+    if (reader !== undefined) {
+      const read = await reader.read({
+        question,
+        utterance: text,
+        recentTurns: transcriptOf(binding)
+          .slice(0, -1)
+          .slice(-6)
+          .map((turn) => ({
+            role: turn.role === "person" ? ("USER" as const) : ("Q" as const),
+            text: turn.text,
+          })),
+        attribution: {
+          tenantId: binding.actor.tenantId,
+          userId: binding.actor.userId,
+          correlationId: createCorrelationId(),
+        },
+        signal,
+      });
+      if (read !== null) return read;
+    }
+    if (AFFIRMATIVE.test(text)) return { decision: "YES", remainder: null };
+    if (declines(text)) return { decision: "NO", remainder: null };
+    return { decision: "UNRELATED", remainder: null };
+  };
+
+  const handle: VoiceTurnHandler = async (
+    binding,
+    transcript,
+    signal,
+    speaker,
+  ) => {
     const text = latestUtterance(transcript);
     if (text === null || signal.aborted) {
       return { kind: "NOTHING" };
     }
     rememberTranscript(binding, transcript);
+    /**
+     * "Yes, and change the website too": the decision is taken, and the
+     * rest is the person's next turn, handled as if said on its own.
+     */
+    const carryOn = async (
+      read: DecisionReading,
+      outcome: VoiceTurnOutcome,
+    ): Promise<VoiceTurnOutcome> => {
+      if (read.remainder === null || outcome.kind !== "SPOKEN") return outcome;
+      const last = transcript.at(-1);
+      if (last === undefined) return outcome;
+      return handle(
+        binding,
+        [...transcript.slice(0, -1), { ...last, content: read.remainder }],
+        signal,
+        speaker,
+      );
+    };
     // A proposal Q made, waiting for yes or no (CQ-Q-008, ADR 0011).
     const approvalWaiting = pendingApproval.get(binding);
     if (approvalWaiting !== undefined && dependencies.approvals !== undefined) {
-      if (AFFIRMATIVE.test(text)) {
+      const read = await decide(
+        binding,
+        `${approvalWaiting.summary ?? "I've prepared something that needs your approval."} Shall I go ahead?`,
+        text,
+        signal,
+      );
+      if (read.decision !== "UNRELATED") {
         pendingApproval.delete(binding);
-        return decideApproval(
-          binding,
-          approvalWaiting,
-          "APPROVE",
-          signal,
-          speaker,
-        );
-      }
-      if (declines(text)) {
-        pendingApproval.delete(binding);
-        return decideApproval(
-          binding,
-          approvalWaiting,
-          "REJECT",
-          signal,
-          speaker,
+        return carryOn(
+          read,
+          await decideApproval(
+            binding,
+            approvalWaiting,
+            read.decision === "YES" ? "APPROVE" : "REJECT",
+            signal,
+            speaker,
+          ),
         );
       }
       // Anything else: the proposal stays on screen, where it can still
@@ -1446,19 +1512,27 @@ export function createVoiceTurnHandler(
         accessToken: binding.accessToken,
         ...(api.fetch === undefined ? {} : { fetch: api.fetch }),
       };
-      if (AFFIRMATIVE.test(text)) {
+      const read = await decide(
+        binding,
+        VISIBILITY_QUESTION[awaiting.subject.kind][awaiting.visibility],
+        text,
+        signal,
+      );
+      if (read.decision === "YES") {
         pendingVisibility.delete(binding);
-        return applyVisibility(binding, session, awaiting, signal, speaker);
+        return carryOn(
+          read,
+          await applyVisibility(binding, session, awaiting, signal, speaker),
+        );
       }
-      if (declines(text)) {
+      if (read.decision === "NO") {
         pendingVisibility.delete(binding);
-        return (await speakLine(
-          speaker,
-          "Alright, leaving it as it is.",
-          signal,
-        ))
-          ? { kind: "SPOKEN", path: "MOVE" }
-          : { kind: "INTERRUPTED", path: "MOVE" };
+        return carryOn(
+          read,
+          (await speakLine(speaker, "Alright, leaving it as it is.", signal))
+            ? { kind: "SPOKEN", path: "MOVE" }
+            : { kind: "INTERRUPTED", path: "MOVE" },
+        );
       }
       // Anything else moves on; the question can be asked again.
       pendingVisibility.delete(binding);
@@ -1466,17 +1540,29 @@ export function createVoiceTurnHandler(
     // "Is this you?", answered.
     if (awaitingRecognition.has(binding)) {
       awaitingRecognition.delete(binding);
-      if (declines(text)) {
+      const read = await decide(
+        binding,
+        "Is this you? I found someone by that name online.",
+        text,
+        signal,
+      );
+      if (read.decision === "NO") {
         // Their word settles it. Nothing found under a name that is not
         // theirs is theirs, and Q says so rather than quietly keeping it.
-        return (await speakLine(speaker, WRONG_PERSON_LINE, signal, binding))
-          ? { kind: "SPOKEN", path: "MOVE" }
-          : { kind: "INTERRUPTED", path: "MOVE" };
+        return carryOn(
+          read,
+          (await speakLine(speaker, WRONG_PERSON_LINE, signal, binding))
+            ? { kind: "SPOKEN", path: "MOVE" }
+            : { kind: "INTERRUPTED", path: "MOVE" },
+        );
       }
-      if (AFFIRMATIVE.test(text)) {
-        return (await speakLine(speaker, RIGHT_PERSON_LINE, signal, binding))
-          ? { kind: "SPOKEN", path: "MOVE" }
-          : { kind: "INTERRUPTED", path: "MOVE" };
+      if (read.decision === "YES") {
+        return carryOn(
+          read,
+          (await speakLine(speaker, RIGHT_PERSON_LINE, signal, binding))
+            ? { kind: "SPOKEN", path: "MOVE" }
+            : { kind: "INTERRUPTED", path: "MOVE" },
+        );
       }
       // Anything else is them carrying on; the question is not asked again.
     }
@@ -1490,17 +1576,31 @@ export function createVoiceTurnHandler(
         ...(api.fetch === undefined ? {} : { fetch: api.fetch }),
       };
       pendingProfileEdit.delete(binding);
-      if (AFFIRMATIVE.test(text)) {
-        return applyProfileEdit(binding, session, pendingEdit, signal, speaker);
+      const read = await decide(
+        binding,
+        profileEditQuestion(pendingEdit),
+        text,
+        signal,
+      );
+      if (read.decision === "YES") {
+        return carryOn(
+          read,
+          await applyProfileEdit(
+            binding,
+            session,
+            pendingEdit,
+            signal,
+            speaker,
+          ),
+        );
       }
-      if (declines(text)) {
-        return (await speakLine(
-          speaker,
-          "Alright, leaving it as it is.",
-          signal,
-        ))
-          ? { kind: "SPOKEN", path: "MOVE" }
-          : { kind: "INTERRUPTED", path: "MOVE" };
+      if (read.decision === "NO") {
+        return carryOn(
+          read,
+          (await speakLine(speaker, "Alright, leaving it as it is.", signal))
+            ? { kind: "SPOKEN", path: "MOVE" }
+            : { kind: "INTERRUPTED", path: "MOVE" },
+        );
       }
       // Anything else moves on; they can ask again.
     }
@@ -1602,4 +1702,5 @@ export function createVoiceTurnHandler(
     }
     return outcome;
   };
+  return handle;
 }

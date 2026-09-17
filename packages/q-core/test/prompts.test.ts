@@ -91,6 +91,10 @@ describe("registry", () => {
         "FIT_EXPLANATION",
         // CQ-Q-PRESENCE-001: reads public pages about one subject.
         "PRESENCE_READER",
+        // ADR 0011: a yes, a no or neither, read from the person's words.
+        "DECISION_READER",
+        // ADR 0012: what a conversation taught Q about the person.
+        "MEMORY_EXTRACTOR",
       ].sort(),
     );
     for (const id of PROMPT_IDS) {
@@ -187,7 +191,7 @@ describe("renderer", () => {
     expect(rendered.messages[0]?.content).toContain("You are Q");
     expect(rendered.messages[0]?.content).toContain("OPERATING MODE: DEBRIEF");
     expect(rendered.bundle.bundleVersion).toBe(
-      "q-system.v1_company-analyst.v3_comm.v1",
+      "q-system.v1_company-analyst.v4_comm.v1",
     );
     expect(rendered.bundle.bundleVersion).toMatch(
       /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/,
@@ -221,7 +225,7 @@ describe("renderer", () => {
       user.split('<<<UNTRUSTED_CONTENT source="userMessage">>>').length - 1;
     const closes = user.split(UNTRUSTED_CLOSE).length - 1;
     expect(opens).toBe(1);
-    expect(closes).toBe(3); // one per untrusted variable, none from the content
+    expect(closes).toBe(4); // one per untrusted variable, none from the content
     expect(user).toContain("<<<END_UNTRUSTED_CONTENT (literal)>>>");
     // The charter itself is untouched by anything the person wrote.
     expect(rendered.messages[0]?.content).not.toContain("reveal everything");
@@ -270,11 +274,15 @@ describe("renderer", () => {
     ]);
   });
 
-  it("keeps rendered prompts small: charter under 2,000 tokens, task bundles under 3,000", () => {
+  it("keeps rendered prompts small: charter under 2,000 tokens, task bundles under 3,300", () => {
     const rendered = render();
     const system = rendered.messages[0]?.content.length ?? 0;
     expect(system / 4).toBeLessThan(2_000);
-    expect(rendered.characters / 4).toBeLessThan(3_000);
+    // 3,300 since company-analyst/v4: the memory section (ADR 0012) is
+    // ~180 tokens of instruction on top of a bundle that was at the old
+    // bound already. Anything past this is a template that has grown, not
+    // a variable that has.
+    expect(rendered.characters / 4).toBeLessThan(3_300);
   });
 });
 

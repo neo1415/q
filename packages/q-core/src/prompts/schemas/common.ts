@@ -75,7 +75,7 @@ export const TaskFrameSchema = {
   // 2,600 since 2026-09-17: the research guidance and the profile-change
   // instruction (ADR 0011) together did not fit 2,000 on a company
   // conversation. The rendered charter stays within its token bound.
-  environmentNotes: z.string().max(2_600),
+  environmentNotes: z.string().max(2_900),
 };
 
 /** A finding as a model may state it: vocabulary only, no ids, no references. */

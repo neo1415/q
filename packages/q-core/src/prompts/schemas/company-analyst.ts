@@ -199,3 +199,55 @@ export type CompanyAnalystV3Result = z.infer<
   typeof CompanyAnalystV3ResultSchema
 >;
 export const COMPANY_ANALYST_V3_SCHEMA_VERSION = 3;
+
+/**
+ * What the person asked, in THIS message, to be called on Capital Q
+ * (ADR 0011): "call me John", "change my name from Daniel to Dan". Their
+ * own display name, never a company field. The quote is their words
+ * verbatim; the runtime checks it against the message and proposes
+ * nothing otherwise. Nothing is applied: it becomes a proposal they
+ * approve.
+ */
+export const DisplayNameRequestSchema = z
+  .object({
+    value: z.string().trim().min(1).max(80),
+    quote: z.string().trim().min(3).max(400),
+  })
+  .strict();
+export type DisplayNameRequest = z.infer<typeof DisplayNameRequestSchema>;
+
+/**
+ * v3's result plus the person's request to be called something else, and
+ * v2's variables plus what Capital Q remembers about them (ADR 0012).
+ */
+export const CompanyAnalystV4ResultSchema = CompanyAnalystV3ResultSchema.extend(
+  {
+    /** Only when the person, in THIS message, asks to be called something else. */
+    displayName: DisplayNameRequestSchema.nullable().default(null),
+  },
+).strict();
+export type CompanyAnalystV4Result = z.infer<
+  typeof CompanyAnalystV4ResultSchema
+>;
+export const COMPANY_ANALYST_V4_SCHEMA_VERSION = 4;
+
+export const NOTHING_REMEMBERED =
+  "Nothing is remembered about this person yet.";
+
+export const CompanyAnalystV4VariablesSchema =
+  CompanyAnalystV2VariablesSchema.extend({
+    /**
+     * What Capital Q remembers about this person and their earlier
+     * conversations, rendered by the memory service from their own
+     * recorded words. UNTRUSTED: it is what they told Capital Q.
+     */
+    memory: z.string().max(4_000).default(NOTHING_REMEMBERED),
+  }).strict();
+export type CompanyAnalystV4Variables = z.infer<
+  typeof CompanyAnalystV4VariablesSchema
+>;
+
+export const COMPANY_ANALYST_V4_UNTRUSTED = [
+  ...COMPANY_ANALYST_V2_UNTRUSTED,
+  "memory",
+] as const;

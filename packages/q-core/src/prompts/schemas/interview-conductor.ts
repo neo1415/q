@@ -155,6 +155,25 @@ export const INTERVIEW_CONDUCTOR_UNTRUSTED = [
   "utterance",
 ] as const;
 
+/**
+ * v3: v1's variables plus what Capital Q remembers about the person
+ * (ADR 0012): how they want to be addressed, how their names are said,
+ * what they corrected before. UNTRUSTED: rendered from their own
+ * recorded words, never from anything Q concluded.
+ */
+export const InterviewConductorV3VariablesSchema =
+  InterviewConductorVariablesSchema.extend({
+    memory: z.string().max(4_000).default(""),
+  }).strict();
+export type InterviewConductorV3Variables = z.infer<
+  typeof InterviewConductorV3VariablesSchema
+>;
+
+export const INTERVIEW_CONDUCTOR_V3_UNTRUSTED = [
+  ...INTERVIEW_CONDUCTOR_UNTRUSTED,
+  "memory",
+] as const;
+
 const AnswerValueSchema = z.union([
   z.string().max(2_000),
   z.array(z.string().max(120)).max(50),

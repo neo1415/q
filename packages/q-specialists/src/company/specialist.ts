@@ -16,15 +16,17 @@ import {
   createDefaultPromptRegistry,
   DEFAULT_COMMUNICATION_PROFILE,
   renderPrompt,
-  type CompanyAnalystV3Result,
-  type CompanyAnalystV2Variables,
+  type CompanyAnalystV4Result,
+  type CompanyAnalystV4Variables,
+  NOTHING_REMEMBERED,
   type CompanyIntelligenceDimension,
   type PromptRegistry,
   citePublicSources,
 } from "@capital-q/q-core";
 import {
-  CompanyAnalystV3ResultSchema,
+  CompanyAnalystV4ResultSchema,
   COMPANY_INTELLIGENCE_DIMENSIONS,
+  DisplayNameRequestSchema,
   ProfileUpdateSchema,
   isRecordableKnowledgeKey,
 } from "@capital-q/q-core";
@@ -38,7 +40,9 @@ import {
 import {
   budgetForTaskClass,
   PROFILE_UPDATE_NOTE,
+  DISPLAY_NAME_NOTE,
   clearsOnPurpose,
+  type QMemoryRecall,
   type QProfileUpdateNotebook,
   type QUserStatementRecorder,
 } from "@capital-q/model-gateway/q";
@@ -134,6 +138,8 @@ export type CompanyIntelligenceDependencies = {
   readonly statements?: QUserStatementRecorder | undefined;
   /** Where a requested profile change is noted for the action proposer (ADR 0011). */
   readonly profileUpdates?: QProfileUpdateNotebook | undefined;
+  /** What Capital Q remembers about the person (ADR 0012). Absent: nothing is. */
+  readonly memory?: QMemoryRecall | undefined;
   readonly registry?: PromptRegistry | undefined;
   /**
    * How the request's sensitivity is declared to the gateway. FROM_PLAN in
@@ -179,6 +185,8 @@ const STATEMENT_NOTE =
   "If the person states a fact about their own company in THIS message, put it in userStatements with their exact words as the quote; otherwise leave userStatements empty.";
 
 /** Said once when a change to the profile has been handed to the proposer (ADR 0011). */
+const PREPARED_NAME_LINE =
+  "I've prepared that change to your name. Approve it and it goes in; decline and nothing changes.";
 const PREPARED_CHANGE_LINE =
   "I've prepared that change to your profile. Approve it and it goes in; decline and nothing changes.";
 
@@ -198,9 +206,40 @@ export { citePublicSources } from "@capital-q/q-core";
  * (CQ-Q-RESEARCH-001 §21). Bounded; a failure records nothing and is a
  * log line, never an answer.
  */
+/**
+ * What is remembered about the person, as bounded text (ADR 0012). Nothing
+ * when nothing is, or when recall fails: an unread memory costs this
+ * answer its past, never the answer.
+ */
+async function recallMemory(
+  port: QMemoryRecall | undefined,
+  request: CompanyIntelligenceRequest,
+  context: QSpecialistExecutionContext,
+  logger: Logger | undefined,
+): Promise<string> {
+  if (port === undefined) return NOTHING_REMEMBERED;
+  try {
+    const text = (
+      await port.recall({
+        actor: context.actor,
+        runId: context.runId,
+        subjects: [{ kind: "COMPANY", companyId: request.company.companyId }],
+        signal: context.signal,
+      })
+    ).trim();
+    return text.length === 0 ? NOTHING_REMEMBERED : text.slice(0, 4_000);
+  } catch (error: unknown) {
+    logger?.warn(
+      { err: error, qRunId: context.runId },
+      "memory was not recalled for this investigation",
+    );
+    return NOTHING_REMEMBERED;
+  }
+}
+
 async function recordUserStatements(
   recorder: QUserStatementRecorder | undefined,
-  statements: CompanyAnalystV3Result["userStatements"],
+  statements: CompanyAnalystV4Result["userStatements"],
   request: CompanyIntelligenceRequest,
   context: QSpecialistExecutionContext,
   logger: Logger | undefined,
@@ -566,7 +605,7 @@ export function createCompanyIntelligenceSpecialist(
         research: researchRead,
       });
       const variables: Omit<
-        CompanyAnalystV2Variables,
+        CompanyAnalystV4Variables,
         | "operatingMode"
         | "communicationProfile"
         | "communicationGuidance"
@@ -578,8 +617,14 @@ export function createCompanyIntelligenceSpecialist(
         authorisedFacts: assembled.facts.map((fact) => fact.fact),
         subjectDescription: assembled.subjectDescription,
         institutionalNotes: notes,
+        memory: await recallMemory(
+          dependencies.memory,
+          request,
+          context,
+          logger,
+        ),
       };
-      const rendered = renderPrompt<CompanyAnalystV2Variables>(registry, {
+      const rendered = renderPrompt<CompanyAnalystV4Variables>(registry, {
         task: "COMPANY_ANALYST",
         operatingMode: OPERATING_MODE,
         communicationProfile: DEFAULT_COMMUNICATION_PROFILE,
@@ -589,6 +634,7 @@ export function createCompanyIntelligenceSpecialist(
             : `${String(assembled.facts.length)} authorised facts are supplied. No tools are available to you and no scoring service exists; do not produce scores.`,
           STATEMENT_NOTE,
           PROFILE_UPDATE_NOTE,
+          DISPLAY_NAME_NOTE,
           ...(researchRead !== null && researchRead.sources.length > 0
             ? [PUBLIC_RESEARCH_NOTE]
             : []),
@@ -601,10 +647,10 @@ export function createCompanyIntelligenceSpecialist(
         promptCharacters: rendered.characters,
       };
 
-      let analyst: CompanyAnalystV3Result | undefined;
+      let analyst: CompanyAnalystV4Result | undefined;
       let blocked: QSpecialistBlockedReason | null = null;
       try {
-        const result = await gateway.execute<CompanyAnalystV3Result>(
+        const result = await gateway.execute<CompanyAnalystV4Result>(
           {
             taskClass: "EVIDENCE_SYNTHESIS",
             budget: budgetForTaskClass("EVIDENCE_SYNTHESIS"),
@@ -625,7 +671,7 @@ export function createCompanyIntelligenceSpecialist(
               : { tenantPolicy: dependencies.tenantPolicy }),
           },
           {
-            schema: CompanyAnalystV3ResultSchema,
+            schema: CompanyAnalystV4ResultSchema,
             ...(context.signal === undefined ? {} : { signal: context.signal }),
           },
         );
@@ -743,6 +789,30 @@ export function createCompanyIntelligenceSpecialist(
           "profile change read from the person's words; handed to the proposer",
         );
         synthesis = [synthesis ?? "", PREPARED_CHANGE_LINE].join(" ").trim();
+      }
+      // ---- 6c. their own name, read the same way (ADR 0011) ---------------
+      const readName = DisplayNameRequestSchema.nullable().safeParse(
+        analyst?.displayName,
+      );
+      const displayName =
+        readName.success &&
+        readName.data !== null &&
+        askedFor.includes(readName.data.quote.toLowerCase())
+          ? readName.data
+          : null;
+      if (
+        displayName !== null &&
+        !proposedChange &&
+        dependencies.profileUpdates?.noteDisplayName !== undefined
+      ) {
+        dependencies.profileUpdates.noteDisplayName({
+          runId: context.runId,
+          tenantId: context.actor.tenantId,
+          userId: context.actor.userId,
+          displayName: displayName.value,
+          quote: displayName.quote,
+        });
+        synthesis = [synthesis ?? "", PREPARED_NAME_LINE].join(" ").trim();
       }
 
       const countsByType: Record<string, number> = {};

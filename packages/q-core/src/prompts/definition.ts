@@ -33,6 +33,8 @@ export const PROMPT_IDS = [
   "COMPANY_ANALYST",
   "FIT_EXPLANATION",
   "PRESENCE_READER",
+  "DECISION_READER",
+  "MEMORY_EXTRACTOR",
 ] as const;
 export type PromptId = (typeof PROMPT_IDS)[number];
 
@@ -47,6 +49,8 @@ export const PROMPT_SLUGS: Readonly<Record<PromptId, string>> = {
   COMPANY_ANALYST: "company-analyst",
   FIT_EXPLANATION: "fit-explanation",
   PRESENCE_READER: "presence-reader",
+  DECISION_READER: "decision-reader",
+  MEMORY_EXTRACTOR: "memory-extractor",
 };
 
 export type PromptKind = "CHARTER" | "TASK";
