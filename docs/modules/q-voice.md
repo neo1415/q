@@ -386,11 +386,16 @@ that the fuller review did not come through (`q-specialists/answer.ts`).
 
 ## Demo posture
 
-Migration `20260919090000_demo_gemini_posture.sql` raises the Google
-models' sensitivity ceiling to CONFIDENTIAL and adds them to every
-policy's fallback chain, so a demo is not gated by one provider's free-tier
-minute. The google provider review is unchanged (UNREVIEWED for
-confidential customer data). Revert the ceiling before real customer data.
+Migrations `20260919` and `20260921` once raised the Google models'
+ceiling and provider class so a demo was not gated by one provider's
+free-tier minute. Migration `20260926090000_restore_reviewed_google_posture.sql`
+reverted both: the gateway derives the ceiling from the provider's reviewed
+class, so the raise cleared confidential customer data for an unreviewed
+free tier in every environment (doc 13 §57.2, doc 15 §62), and config's
+deployment environment is not a security boundary. What remains of the
+demo intent is migration `20260920`: Gemini leads dialogue, synthesis and
+extraction wherever it is eligible (PUBLIC work), Groq follows and carries
+confidential material under zero retention.
 
 ## Local development
 

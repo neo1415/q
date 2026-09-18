@@ -182,6 +182,37 @@ describe("@capital-q/model-gateway against local PostgreSQL", () => {
     expect(google.calls).toHaveLength(1);
     expect(groq.calls).toHaveLength(2);
 
+    // NETWORK_VISIBLE is above PUBLIC: the unreviewed provider is refused
+    // before any call and the reviewed one serves, exactly as for INTERNAL.
+    const network = await gateway.execute({
+      ...base,
+      taskClass: "FAST_CLASSIFICATION",
+      sensitivity: "NETWORK_VISIBLE",
+    });
+    expect(network.providerCode).toBe("groq");
+    expect(network.route.candidates[0]).toMatchObject({
+      providerCode: "google",
+      reason: "SENSITIVITY_EXCEEDS_CEILING",
+    });
+    expect(google.calls).toHaveLength(1);
+    expect(groq.calls).toHaveLength(3);
+
+    // HIGHLY_CONFIDENTIAL: no reviewed class reaches it (CQ-C5-R2A), so the
+    // request is refused before any provider attempt.
+    let above: ModelGatewayError | undefined;
+    try {
+      await gateway.execute({
+        ...base,
+        taskClass: "NORMAL_DIALOGUE",
+        sensitivity: "HIGHLY_CONFIDENTIAL",
+      });
+    } catch (error: unknown) {
+      above = error instanceof ModelGatewayError ? error : undefined;
+    }
+    expect(above?.failureClass).toBe("POLICY_INELIGIBLE");
+    expect(google.calls).toHaveLength(1);
+    expect(groq.calls).toHaveLength(3);
+
     // RESTRICTED: nothing seeded is cleared for it, and no token is sent
     // anywhere. Approving a vendor for confidential work is not approving
     // it for everything.
@@ -197,7 +228,7 @@ describe("@capital-q/model-gateway against local PostgreSQL", () => {
     }
     expect(denied?.failureClass).toBe("POLICY_INELIGIBLE");
     expect(google.calls).toHaveLength(1);
-    expect(groq.calls).toHaveLength(2);
+    expect(groq.calls).toHaveLength(3);
 
     const rows = await db.sql<
       {
@@ -211,14 +242,17 @@ describe("@capital-q/model-gateway against local PostgreSQL", () => {
     >`select u.task_class, u.success, u.cost_usd::text as cost_usd, u.cost_basis, u.error_code, m.model_code
         from ai_ops.model_usage u join ai_ops.models m on m.id = u.model_id
        where u.q_run_id = ${runId} order by u.id`;
-    // Three ledger rows now: the public run, the INTERNAL run, and the
-    // CONFIDENTIAL run that Groq's reviewed zero-retention terms admit. The
-    // RESTRICTED attempt is refused before a provider is contacted, so it
-    // leaves no row — a refusal costs nothing and is not an execution.
+    // Four ledger rows now: the public run, the INTERNAL run, the
+    // CONFIDENTIAL run that Groq's reviewed zero-retention terms admit, and
+    // the NETWORK_VISIBLE classification Groq carried because Gemini's
+    // reviewed ceiling stops at PUBLIC. The RESTRICTED and HIGHLY_CONFIDENTIAL
+    // attempts are refused before a provider is contacted, so they leave no
+    // row — a refusal costs nothing and is not an execution.
     expect(rows.map((r) => [r.model_code, r.success, r.cost_basis])).toEqual([
       ["gemini-3.5-flash-lite", true, "PRICE_SNAPSHOT"],
       ["openai/gpt-oss-20b", true, "PRICE_SNAPSHOT"],
       ["openai/gpt-oss-120b", true, "PRICE_SNAPSHOT"],
+      ["openai/gpt-oss-20b", true, "PRICE_SNAPSHOT"],
     ]);
     expect(Number(rows[0]?.cost_usd)).toBeGreaterThan(0);
     // 40 in × 0.30 + 10 out × 2.50, per million.

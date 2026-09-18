@@ -38,8 +38,8 @@ select ok((select supports_zero_retention from ai_ops.providers where code = 'gr
   'groq zero data retention is recorded as enabled for this organisation');
 select results_eq(
   $$ select model_code from ai_ops.models order by model_code $$,
-  $$ values ('gemini-3.5-flash-lite'), ('gemini-3.8-flash'), ('openai/gpt-oss-120b'), ('openai/gpt-oss-20b') $$,
-  'the four verified model ids are seeded, exactly');
+  $$ values ('gemini-3.5-flash-lite'), ('gemini-3.8-flash'), ('openai/gpt-oss-120b'), ('openai/gpt-oss-20b'), ('qwen/qwen3.8-27b') $$,
+  'the five verified model ids are seeded, exactly (qwen/qwen3.8-27b joined Groq in 20260918)');
 select is((select count(*)::int from ai_ops.models where sensitivity_ceiling in ('HIGHLY_CONFIDENTIAL', 'RESTRICTED')), 0,
   'no model is cleared above CONFIDENTIAL: the strongest material never leaves through a vendor');
 select is(
@@ -55,7 +55,7 @@ select is((select sensitivity_ceiling from ai_ops.models where model_code = 'gem
   'unverified gemini is public-only');
 select is((select sensitivity_ceiling from ai_ops.models where model_code = 'openai/gpt-oss-120b'), 'CONFIDENTIAL',
   'groq carries confidential work under its reviewed zero-retention terms');
-select is((select count(*)::int from ai_ops.model_prices), 5, 'five price snapshots are seeded');
+select is((select count(*)::int from ai_ops.model_prices), 6, 'six price snapshots are seeded (one per model, plus the closed introductory gemini-3.8-flash price)');
 select is(
   (select effective_to from ai_ops.model_prices where id = 'a3000000-0000-4000-8000-000000000002'),
   '2027-01-01T00:00:00Z'::timestamptz,

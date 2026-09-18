@@ -79,6 +79,9 @@ path or leave the default 404-tolerant check.
 
 - Voice session bindings and interview state are process-local: one
   q-api instance only until a shared store exists.
-- Gemini's demo privacy posture (migrations 20260919-20260921) must be
-  reverted before real customer data.
+- Gemini runs under its reviewed posture again (migration 20260926 restored
+  UNREVIEWED / PUBLIC after the 20260919-20260921 demo raise): it leads
+  PUBLIC dialogue, synthesis and extraction; confidential customer work
+  routes to Groq under zero retention. A reviewed paid tier is the route to
+  a higher Gemini ceiling.
 - The research memory is process-local and six hours; a restart empties it.

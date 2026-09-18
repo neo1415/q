@@ -587,7 +587,7 @@ describe("Company Intelligence through the real Q path", () => {
   it("QCI-001 · produces an institutional overview through the real graph", async () => {
     const { status, reply } = await ask(
       "FOUNDER",
-      "Give me an institutional overview of Northstar.",
+      "Assess Northstar and give me an institutional overview.",
     );
     expect(status).toBe("COMPLETED");
     const result = answerSeam().lastResult();
@@ -762,7 +762,7 @@ describe("Company Intelligence through the real Q path", () => {
   it("QCI-013 · HARD: a disagreement is surfaced, never resolved", async () => {
     const { providerInput, reply } = await ask(
       "FOUNDER",
-      "What is Northstar's ARR?",
+      "Assess Northstar's ARR.",
     );
     const result = answerSeam().lastResult();
 
@@ -823,7 +823,7 @@ describe("Company Intelligence through the real Q path", () => {
   it("QCI-015 · a series is a series, and a change question compares recorded readings", async () => {
     const { providerInput } = await ask(
       "FOUNDER",
-      "What changed commercially since January?",
+      "Review what changed commercially since January.",
     );
     const result = answerSeam().lastResult();
 
@@ -847,7 +847,7 @@ describe("Company Intelligence through the real Q path", () => {
   it("QCI-016 · what Capital Q does not know stays unknown", async () => {
     const { reply } = await ask(
       "FOUNDER",
-      "What is Northstar's churn rate, and what don't we know?",
+      "Assess Northstar's churn rate, and what we don't know.",
     );
     const result = answerSeam().lastResult();
 
@@ -892,7 +892,7 @@ describe("Company Intelligence through the real Q path", () => {
 
     const unknowns = await ask(
       "FOUNDER",
-      "What don't we know?",
+      "Assess what we don't know.",
       "Retention is the material gap.",
       conversationId,
     );
@@ -904,7 +904,7 @@ describe("Company Intelligence through the real Q path", () => {
 
     const changed = await ask(
       "FOUNDER",
-      "What changed since January?",
+      "Review what changed since January.",
       "Recorded ARR moved between the January and August readings.",
       conversationId,
     );
