@@ -373,6 +373,22 @@ const MarketplaceRowSchema = CompanyRowSchema.pick({
 
 /** Bounded so eligibility over a candidate set stays one statement. */
 const MARKETPLACE_FACTS_BATCH_MAX = 500;
+/** A retrieval dimension is a bounded, id-ordered slice, never a scan. */
+const DISCOVERABLE_LIST_MAX = 500;
+
+function toMarketplaceFacts(row: unknown): CompanyMarketplaceFacts {
+  const p = MarketplaceRowSchema.parse(row);
+  return {
+    id: p.id,
+    tenantId: p.tenant_id,
+    organisationId: p.organisation_id,
+    companyStatus: p.company_status,
+    marketplaceVisibility: p.marketplace_visibility,
+    marketplaceReadinessState: p.marketplace_readiness_state,
+    currentStageCode: p.current_stage_code,
+    headquartersCountry: p.headquarters_country,
+  };
+}
 
 export function createPostgresCompanyMarketplaceQueryPort(options: {
   readonly sql: DatabaseExecutor;
@@ -397,19 +413,35 @@ export function createPostgresCompanyMarketplaceQueryPort(options: {
           from core.companies c
          where c.id = any(${[...companyIds]}::uuid[])
          order by c.id`;
-      return rows.map((row): CompanyMarketplaceFacts => {
-        const p = MarketplaceRowSchema.parse(row);
-        return {
-          id: p.id,
-          tenantId: p.tenant_id,
-          organisationId: p.organisation_id,
-          companyStatus: p.company_status,
-          marketplaceVisibility: p.marketplace_visibility,
-          marketplaceReadinessState: p.marketplace_readiness_state,
-          currentStageCode: p.current_stage_code,
-          headquartersCountry: p.headquarters_country,
-        };
-      });
+      return rows.map(toMarketplaceFacts);
+    },
+    listDiscoverableCompanies: async (input) => {
+      const stages = input.stageCodes;
+      const countries = input.headquartersCountries;
+      if (
+        (stages === null || stages.length === 0) &&
+        (countries === null || countries.length === 0)
+      ) {
+        // No dimension asked: nothing to list. A platform scan is not a query.
+        return [];
+      }
+      const limit = Math.max(1, Math.min(DISCOVERABLE_LIST_MAX, input.limit));
+      // companies_marketplace_stage_idx serves (visibility, stage); the
+      // country predicate walks the same visibility slice.
+      const rows = await sql`
+        select c.id, c.tenant_id, c.organisation_id, c.company_status,
+               c.marketplace_visibility, c.marketplace_readiness_state,
+               c.current_stage_code, c.headquarters_country
+          from core.companies c
+         where c.company_status = 'active'
+           and c.marketplace_visibility = any(${[...DISCOVERABLE_VISIBILITIES]}::text[])
+           and (${stages === null || stages.length === 0}::boolean
+                or c.current_stage_code = any(${[...(stages ?? [])]}::text[]))
+           and (${countries === null || countries.length === 0}::boolean
+                or c.headquarters_country = any(${[...(countries ?? [])]}::text[]))
+         order by c.id
+         limit ${limit}`;
+      return rows.map(toMarketplaceFacts);
     },
   };
 }

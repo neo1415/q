@@ -109,6 +109,21 @@ export function createPostgresTaxonomyAssignmentRepository(): TaxonomyAssignment
          order by v.code, n.canonical_code`;
       return rows.map(toAssignment);
     },
+    listCurrentByNodes: async (executor, subjectType, nodeIds, limit) => {
+      if (nodeIds.length === 0) {
+        return [];
+      }
+      // entity_assignments_node_idx (node_id, status) serves the probe.
+      const rows = await executor`
+        ${assignmentSelect(executor)}
+         where a.entity_type = ${subjectType}
+           and a.node_id = any(${[...nodeIds]}::uuid[])
+           and a.status = 'ACTIVE'
+           and a.valid_to is null
+         order by a.entity_id, a.node_id
+         limit ${Math.max(1, Math.min(2000, limit))}`;
+      return rows.map(toAssignment);
+    },
     listHistory: async (executor, tenantId, subject) => {
       const rows = await executor`
         ${assignmentSelect(executor)}

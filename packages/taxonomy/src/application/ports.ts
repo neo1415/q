@@ -127,6 +127,20 @@ export type TaxonomyAssignmentRepository = {
     tenantId: TenantId,
     subject: Pick<TaxonomySubjectDescriptor, "subjectType" | "subjectId">,
   ) => Promise<readonly TaxonomyEntityAssignment[]>;
+  /**
+   * Structured candidate retrieval (CQ-REC-002): ACTIVE assignments of
+   * subjects of one type under any of the nodes, across tenants — a
+   * discovery candidate lives in another tenant, and the classification
+   * itself is what discovery may read. Ids, codes and provenance only;
+   * never raw source text beyond what the assignment row already carries
+   * to its owner. Bounded and ordered by subject id, then node id.
+   */
+  readonly listCurrentByNodes: (
+    executor: DatabaseExecutor,
+    subjectType: TaxonomySubjectType,
+    nodeIds: readonly TaxonomyNodeId[],
+    limit: number,
+  ) => Promise<readonly TaxonomyEntityAssignment[]>;
   readonly insert: (
     tx: TransactionContext,
     input: NewTaxonomyAssignment,

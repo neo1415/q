@@ -316,6 +316,20 @@ export type CompanyMarketplaceQueryPort = {
   readonly findCanonicalMarketplaceFacts: (
     companyIds: readonly CompanyId[],
   ) => Promise<readonly CompanyMarketplaceFacts[]>;
+  /**
+   * Structured candidate retrieval (CQ-REC-002): active companies whose
+   * declared classification is network_visible or public_external and
+   * whose canonical stage or headquarters country is one of the codes.
+   * Either filter may be null (not applied); both null is refused, so no
+   * caller can list the platform. Bounded, ordered by id, cross-tenant by
+   * design: classification chooses candidates, disclosure and readiness
+   * decide each one downstream.
+   */
+  readonly listDiscoverableCompanies: (input: {
+    readonly stageCodes: readonly string[] | null;
+    readonly headquartersCountries: readonly string[] | null;
+    readonly limit: number;
+  }) => Promise<readonly CompanyMarketplaceFacts[]>;
 };
 
 /**

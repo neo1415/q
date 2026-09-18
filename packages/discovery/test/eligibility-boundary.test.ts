@@ -15,12 +15,21 @@ import { describe, expect, it } from "vitest";
 const here = dirname(fileURLToPath(import.meta.url));
 const packageRoot = join(here, "..");
 const eligibilityDir = join(packageRoot, "src", "eligibility");
-const adapterFile = join(
-  packageRoot,
-  "src",
-  "infrastructure",
-  "domain-port-eligibility-sources.ts",
-);
+const candidatesDir = join(packageRoot, "src", "candidates");
+const adapterFiles = [
+  join(
+    packageRoot,
+    "src",
+    "infrastructure",
+    "domain-port-eligibility-sources.ts",
+  ),
+  join(
+    packageRoot,
+    "src",
+    "infrastructure",
+    "domain-port-candidate-sources.ts",
+  ),
+];
 
 const FORBIDDEN_IMPORTS = [
   "@capital-q/q-knowledge",
@@ -68,10 +77,12 @@ function sourceFiles(): readonly {
   readonly path: string;
   readonly text: string;
 }[] {
-  const files = readdirSync(eligibilityDir)
-    .filter((name) => name.endsWith(".ts"))
-    .map((name) => join(eligibilityDir, name));
-  return [...files, adapterFile].map((path) => ({
+  const files = [eligibilityDir, candidatesDir].flatMap((dir) =>
+    readdirSync(dir)
+      .filter((name) => name.endsWith(".ts"))
+      .map((name) => join(dir, name)),
+  );
+  return [...files, ...adapterFiles].map((path) => ({
     path,
     text: readFileSync(path, "utf8"),
   }));

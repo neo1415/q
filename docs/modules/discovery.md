@@ -162,6 +162,76 @@ no real company is ELIGIBLE today. Locally, `pnpm dev:marketplace-ready`
 produces one legitimately ready synthetic company. Nothing in
 Recommendation decides readiness.
 
+## Structured candidate generation (CQ-REC-002)
+
+`src/candidates/` is Candidate Generator A (doc 19 §23), the structured
+mandate generator: `STRUCTURED_MANDATE`, version `structured-mandate.v1`.
+Candidate generation seeks recall; ranking (a later packet) buys
+precision. Nothing here scores, ranks, counts matches, calls a model or
+adds randomness.
+
+**Input scope.** The actor's own investor organisation and its single
+ACTIVE mandate, resolved through the same ports REC-001 uses. No ACTIVE
+mandate, or more than one, is the typed `NO_ACTIVE_MANDATE` result; a
+DRAFT is never read and there is no newest-by-date fallback. Positive
+intent is derived from the mandate alone (`deriveStructuredIntent`):
+
+| Dimension | Source of intent                                                                                                  | Company field                                                                                               | Reason code                                        |
+| --------- | ----------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- | -------------------------------------------------- |
+| STAGE     | positive `stage` constraints (EQ/IN name codes; NEQ/NOT_IN name the rest of the ladder) plus the min/max range    | `current_stage_code`                                                                                        | `STAGE_OVERLAP`                                    |
+| GEOGRAPHY | positive `geography.country` constraints (EQ/IN only; "anywhere but" narrows nothing)                             | `headquarters_country`                                                                                      | `GEOGRAPHY_OVERLAP`                                |
+| GEOGRAPHY | positive geography-vocabulary preference nodes, expanded to their reference descendants; `global` narrows nothing | ACTIVE geography classification                                                                             | `GEOGRAPHY_REGION_OVERLAP`                         |
+| TAXONOMY  | positive preference nodes in every other vocabulary, expanded to their reference descendants                      | ACTIVE classification, exact node or a descendant                                                           | `TAXONOMY_OVERLAP` / `TAXONOMY_DESCENDANT_OVERLAP` |
+| CHEQUE    | mandate cheque range                                                                                              | none: the capital objective is organisation-internal and its disclosure-safe projection is a later contract | never produced; the seam reports `NOT_COMPUTABLE`  |
+
+Positive means MUST, STRONG or NICE. AVOID never retrieves and never
+removes; HARD_EXCLUSION is REC-001's; a taxonomy preference counts only
+from a `user_selected` or `admin_curated` source; MANUAL_ONLY constraints
+are ignored. Descendant matching reuses the taxonomy query port's
+`listDescendants` (reference hierarchy, bounded depth), with its own
+reason code so an exact ask and an inherited one stay distinguishable.
+
+**Retrieval.** Each dimension runs independently through the owning
+contexts' ports (`createDomainCandidatePorts`, no SQL here): Companies
+`listDiscoverableCompanies` (active, network_visible or public_external,
+indexed on visibility + stage) and Taxonomy `listCurrentByNodes` (ACTIVE
+assignments under the asked nodes, `entity_assignments_node_idx`),
+intersected with the Companies discoverable projection so a private or
+closed company never enters the pool even as an id. Every retrieval is
+bounded (`CANDIDATE_DIMENSION_LIMIT` = 200) and ordered by canonical id.
+
+**Merge.** Hits are unioned and deduplicated by canonical company id
+(`mergeDimensionHits`): one candidate, every dimension and reason it
+earned, matched nodes as ids only, sorted, then ordered by company id and
+cut at `CANDIDATE_POOL_MAX` (200, the existing discovery budget). The
+order is reproducibility, not desirability. Never merged by name, slug,
+website or founder.
+
+**Eligibility.** The deduplicated pool goes to REC-001 in one batch. Only
+ELIGIBLE candidates leave; INELIGIBLE never do and UNDETERMINED is
+counted, not promoted. A structured unknown (no stage on the company) is
+not an eligibility unknown: the company is simply not found by that
+dimension, and another may find it — but a company REC-001 cannot decide
+is not rankable, whatever found it. Result: `StructuredCandidateResult`
+with generator id and version, the eligibility policy version, the
+recommendation context, the candidates with provenance and their
+eligibility result, and safe diagnostics (raw hits by dimension, raw,
+deduped, truncated, eligible, ineligible, undetermined, cheque seam
+status, duration).
+
+**Privacy.** The retrieval ports return ids, codes and matched node ids
+over declared mandate intent and discovery-classified canonical state.
+`eligibility-boundary.test.ts` now covers `src/candidates` and the
+candidate adapter; `candidates.integration.test.ts` inserts a founder-
+private memory item, a private conversation summary and a PUBLIC_WEB
+source carrying `REC002_PRIVATE_FOUNDER_CONTEXT_MUST_NOT_AFFECT_CANDIDATES`
+and proves ids, provenance and order do not move.
+
+**Deferred, on purpose.** Semantic retrieval and its merge (REC-003),
+feature computation and ranking, slates and the feed, portfolio,
+relationship, freshness and exploration generators, GateQ, and a cheque
+dimension once a disclosure-safe raise projection exists.
+
 ## Not built yet
 
 - Semantic fit over company descriptions (CQ-RAG exists; it is not wired
@@ -176,3 +246,6 @@ Recommendation decides readiness.
 - A closed or blocked relationship state. Network defines only
   DISCOVERED; when it defines more, `RELATIONSHIP_STATES_CLOSED_TO_DISCOVERY`
   names them and the policy version moves.
+- Semantic candidate generation (REC-003), ranking (REC-005) and
+  persisted slates (REC-006). The structured generator above is their
+  input, not a substitute.

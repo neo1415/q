@@ -143,4 +143,57 @@ export {
   type DomainEligibilityPortDependencies,
 } from "./infrastructure/domain-port-eligibility-sources.js";
 
+// Structured candidate generation (CQ-REC-002): recall before precision.
+export {
+  CANDIDATE_DIMENSION_LIMIT,
+  CANDIDATE_DIMENSIONS,
+  CANDIDATE_POOL_MAX,
+  CANDIDATE_REASON_CODES,
+  CandidateDiagnosticsSchema,
+  CandidateDimensionSchema,
+  CandidateProvenanceSchema,
+  CandidateReasonCodeSchema,
+  MatchedNodeSchema,
+  STRUCTURED_GENERATOR_ID,
+  STRUCTURED_GENERATOR_VERSION,
+  StructuredCandidateResultSchema,
+  StructuredCandidateSchema,
+  type CandidateDiagnostics,
+  type CandidateDimension,
+  type CandidateProvenance,
+  type CandidateReasonCode,
+  type MatchedNode,
+  type StructuredCandidate,
+  type StructuredCandidateResult,
+} from "./candidates/contracts.js";
+export {
+  deriveStructuredIntent,
+  GEOGRAPHY_VOCABULARY,
+  mergeDimensionHits,
+  UNRESTRICTED_GEOGRAPHY_CODE,
+  type DimensionHit,
+  type MergedCandidate,
+  type StructuredIntent,
+} from "./candidates/structured.js";
+export {
+  createNotComputableChequeRetrieval,
+  type ChequeStructuredRetrievalPort,
+  type CompanyStructuredRetrievalPort,
+  type DiscoverableCompanyRef,
+  type ExpandedPreferenceNode,
+  type StructuredRetrievalPorts,
+  type TaxonomyStructuredRetrievalPort,
+  type TaxonomySubjectHit,
+} from "./candidates/ports.js";
+export {
+  createStructuredCandidateService,
+  type GenerateStructuredCandidatesQuery,
+  type StructuredCandidateService,
+  type StructuredCandidateServiceDependencies,
+} from "./candidates/service.js";
+export {
+  createDomainCandidatePorts,
+  type DomainCandidatePortDependencies,
+} from "./infrastructure/domain-port-candidate-sources.js";
+
 export const PACKAGE_NAME = "@capital-q/discovery" as const;
