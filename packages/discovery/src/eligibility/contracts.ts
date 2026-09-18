@@ -28,8 +28,12 @@ import { z } from "zod";
  * Bumped whenever a criterion, its missing-data behaviour, a reason code or
  * the decision rule changes. Recorded on every result so a decision can be
  * reproduced from (canonical snapshot, mandate snapshot, policy version).
+ *
+ * v2: only declared company classifications (user_selected, admin_curated)
+ * answer a taxonomy hard exclusion. v1 let a Q inference or an extracted
+ * suggestion on an excluded node make a company INELIGIBLE.
  */
-export const ELIGIBILITY_POLICY_VERSION = "eligibility.v1" as const;
+export const ELIGIBILITY_POLICY_VERSION = "eligibility.v2" as const;
 
 /** Doc 19 §11. REC-001 evaluates INVESTOR_DISCOVER; the others are reserved. */
 export const RECOMMENDATION_MODES = [
@@ -93,7 +97,7 @@ export const ELIGIBILITY_CRITERIA = [
   "HARD_EXCLUSION_GEOGRAPHY",
   /** Declared HARD_EXCLUSION on a dimension canonical company state cannot answer yet. */
   "HARD_EXCLUSION_OTHER",
-  /** Cheque is a fit factor, never a hard gate in v1 (see policy). */
+  /** Cheque is a fit factor, never a hard gate (see policy). */
   "CHEQUE_COMPATIBILITY",
   /** A canonical relationship state that removes the pair from discovery. */
   "RELATIONSHIP_STANDING",

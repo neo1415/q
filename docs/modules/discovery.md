@@ -98,7 +98,7 @@ answer any other: no score, no rank, no probability, no prose.
 `UNDETERMINED` when a hard rule exists and the canonical fact it needs is
 absent. A FAIL outranks an UNKNOWN; an UNKNOWN never becomes a FAIL.
 Unknown is not mismatch. Every result carries
-`ELIGIBILITY_POLICY_VERSION` (`eligibility.v1`), the mandate id and
+`ELIGIBILITY_POLICY_VERSION` (`eligibility.v2`), the mandate id and
 version, the taxonomy versions when supplied, one `CriterionResult` per
 criterion in fixed order (`PASS | FAIL | UNKNOWN | NOT_APPLICABLE`) and
 sorted, stable reason codes. `evaluatedAt` is the only field two
@@ -106,19 +106,19 @@ evaluations of the same snapshot may differ in.
 
 **Criteria, in order, and where each fact comes from.**
 
-| Criterion                   | Source                                                                                                        | Missing data                                                                                                                   |
-| --------------------------- | ------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| `COMPANY_ACTIVE`            | Companies: `company_status`                                                                                   | —                                                                                                                              |
-| `MARKETPLACE_PARTICIPATION` | Companies: `marketplaceParticipationOf(marketplace_readiness_state)`                                          | `not_assessed` and unknown states are NOT_ELIGIBLE (fail closed)                                                               |
-| `COUNTERPART_DISTINCT`      | company organisation ≠ investor organisation                                                                  | —                                                                                                                              |
-| `INVESTOR_DISCOVERABILITY`  | Companies: visibility classification **and** Permissions: disclosure                                          | —                                                                                                                              |
-| `ACTIVE_MANDATE`            | Investors: the one ACTIVE mandate (or the pinned one, if the actor's)                                         | none → `NO_ACTIVE_MANDATE`; two → `ACTIVE_MANDATE_AMBIGUOUS`; DRAFT/CLOSED pinned → `MANDATE_NOT_ACTIVE` — all UNDETERMINED    |
-| `HARD_EXCLUSION_TAXONOMY`   | Investors: `isExclusion` preferences from `user_selected`/`admin_curated` vs Taxonomy: ACTIVE assignments     | nothing in the excluded node's vocabulary → `COMPANY_TAXONOMY_UNKNOWN`                                                         |
-| `HARD_EXCLUSION_STAGE`      | Investors: HARD_EXCLUSION `stage` constraint vs `current_stage_code`                                          | `COMPANY_STAGE_UNKNOWN`                                                                                                        |
-| `HARD_EXCLUSION_GEOGRAPHY`  | HARD_EXCLUSION `geography.country` vs `headquarters_country`                                                  | `COMPANY_GEOGRAPHY_UNKNOWN`                                                                                                    |
-| `HARD_EXCLUSION_OTHER`      | HARD_EXCLUSION on `red_flag`, `business.attribute`, `founder.business_attribute`, `sector`, `investment_role` | always `HARD_CRITERION_NOT_EVALUABLE`: no canonical company field answers these yet                                            |
-| `CHEQUE_COMPATIBILITY`      | —                                                                                                             | always NOT_APPLICABLE: cheque is a fit factor, never a hard gate in v1                                                         |
-| `RELATIONSHIP_STANDING`     | Network: `relationships.current_state`                                                                        | none/DISCOVERED pass; `RELATIONSHIP_STATES_CLOSED_TO_DISCOVERY` is empty in v1; any other state → `RELATIONSHIP_STATE_UNKNOWN` |
+| Criterion                   | Source                                                                                                                                         | Missing data                                                                                                                   |
+| --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `COMPANY_ACTIVE`            | Companies: `company_status`                                                                                                                    | —                                                                                                                              |
+| `MARKETPLACE_PARTICIPATION` | Companies: `marketplaceParticipationOf(marketplace_readiness_state)`                                                                           | `not_assessed` and unknown states are NOT_ELIGIBLE (fail closed)                                                               |
+| `COUNTERPART_DISTINCT`      | company organisation ≠ investor organisation                                                                                                   | —                                                                                                                              |
+| `INVESTOR_DISCOVERABILITY`  | Companies: visibility classification **and** Permissions: disclosure                                                                           | —                                                                                                                              |
+| `ACTIVE_MANDATE`            | Investors: the one ACTIVE mandate (or the pinned one, if the actor's)                                                                          | none → `NO_ACTIVE_MANDATE`; two → `ACTIVE_MANDATE_AMBIGUOUS`; DRAFT/CLOSED pinned → `MANDATE_NOT_ACTIVE` — all UNDETERMINED    |
+| `HARD_EXCLUSION_TAXONOMY`   | Investors: `isExclusion` preferences from `user_selected`/`admin_curated` vs Taxonomy: ACTIVE assignments from `user_selected`/`admin_curated` | nothing declared in the excluded node's vocabulary → `COMPANY_TAXONOMY_UNKNOWN`                                                |
+| `HARD_EXCLUSION_STAGE`      | Investors: HARD_EXCLUSION `stage` constraint vs `current_stage_code`                                                                           | `COMPANY_STAGE_UNKNOWN`                                                                                                        |
+| `HARD_EXCLUSION_GEOGRAPHY`  | HARD_EXCLUSION `geography.country` vs `headquarters_country`                                                                                   | `COMPANY_GEOGRAPHY_UNKNOWN`                                                                                                    |
+| `HARD_EXCLUSION_OTHER`      | HARD_EXCLUSION on `red_flag`, `business.attribute`, `founder.business_attribute`, `sector`, `investment_role`                                  | always `HARD_CRITERION_NOT_EVALUABLE`: no canonical company field answers these yet                                            |
+| `CHEQUE_COMPATIBILITY`      | —                                                                                                                                              | always NOT_APPLICABLE: cheque is a fit factor, never a hard gate in v1                                                         |
+| `RELATIONSHIP_STANDING`     | Network: `relationships.current_state`                                                                                                         | none/DISCOVERED pass; `RELATIONSHIP_STATES_CLOSED_TO_DISCOVERY` is empty in v1; any other state → `RELATIONSHIP_STATE_UNKNOWN` |
 
 For a HARD_EXCLUSION constraint the operator names the excluded set:
 `EQ`/`IN` exclude the listed codes ("never show Series B"); `NEQ`/`NOT_IN`
@@ -128,6 +128,21 @@ and never a rule. The investor's `min_cheque`/`max_cheque` carry no
 importance and an investor whose maximum is below a company's total round
 may fund part of it, so no cheque rule is invented — the criterion says so
 rather than staying silent.
+
+**Declared on both sides (`eligibility.v2`).** A taxonomy hard exclusion
+compares declared mandate exclusions with declared company
+classifications only (`DECLARED_TAXONOMY_SOURCES`: `user_selected`,
+`admin_curated`). A `q_inferred`, `document_extracted` or `integration`
+row is a candidate awaiting confirmation (ADR 0006 point 5): it neither
+excludes the company nor answers the vocabulary. A company whose only
+classifications in an excluded node's vocabulary are undeclared is
+UNKNOWN (`COMPANY_TAXONOMY_UNKNOWN`), so UNDETERMINED — never PASS, never
+FAIL. Confirming the suggestion (it becomes `user_selected`) is what makes
+it exclude. `eligibility.v1` counted every ACTIVE row, so a Q inference on
+an excluded node silently removed a company from an investor's
+discovery. The port still returns every row with its `source`; the pure
+policy decides which count, so the rule is versioned where the decision
+is.
 
 **What it cannot read.** `EligibilityPorts` has no port for Q memory,
 conversations, documents, evidence text, public research, embeddings,
@@ -165,7 +180,7 @@ Recommendation decides readiness.
 ## Structured candidate generation (CQ-REC-002)
 
 `src/candidates/` is Candidate Generator A (doc 19 §23), the structured
-mandate generator: `STRUCTURED_MANDATE`, version `structured-mandate.v1`.
+mandate generator: `STRUCTURED_MANDATE`, version `structured-mandate.v2`.
 Candidate generation seeks recall; ranking (a later packet) buys
 precision. Nothing here scores, ranks, counts matches, calls a model or
 adds randomness.
@@ -187,7 +202,11 @@ intent is derived from the mandate alone (`deriveStructuredIntent`):
 Positive means MUST, STRONG or NICE. AVOID never retrieves and never
 removes; HARD_EXCLUSION is REC-001's; a taxonomy preference counts only
 from a `user_selected` or `admin_curated` source; MANUAL_ONLY constraints
-are ignored. Descendant matching reuses the taxonomy query port's
+are ignored. The same holds on the company side (`structured-mandate.v2`):
+taxonomy and geography-region retrieval match only declared company
+classifications, filtered inside the Taxonomy query
+(`listCurrentByNodes(..., assignmentSources)`) so undeclared rows never
+consume the bound; v1 matched any provenance. Descendant matching reuses the taxonomy query port's
 `listDescendants` (reference hierarchy, bounded depth), with its own
 reason code so an exact ask and an inherited one stay distinguishable.
 
@@ -318,7 +337,7 @@ The governed, typed, versioned list of signals a ranker may read (doc 19
 REC-005. Nothing here weighs, scores, ranks or explains.
 
 - **Schema** `recommendation-features.v1` (`FEATURE_SCHEMA_VERSION`), separate
-  from `eligibility.v1`, `structured-mandate.v1`, `semantic-mandate.v1`, the
+  from `eligibility.v2`, `structured-mandate.v2`, `semantic-mandate.v1`, the
   representation versions and any ranking version. A ranker declares the
   schema it understands and asks `registry.featuresFor(mode)`; a snapshot is
   validated against the registry (`registry.validateSnapshot`), never

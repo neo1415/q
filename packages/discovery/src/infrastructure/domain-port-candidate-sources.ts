@@ -15,6 +15,7 @@ import {
   GEOGRAPHY_VOCABULARY,
   UNRESTRICTED_GEOGRAPHY_CODE,
 } from "../candidates/structured.js";
+import { DECLARED_TAXONOMY_SOURCES } from "../eligibility/policy.js";
 
 /**
  * Structured retrieval, assembled from the owning contexts' public ports.
@@ -66,11 +67,15 @@ export function createDomainCandidatePorts(
     },
     taxonomy: {
       subjectsByNodes: async (nodeIds, limit) => {
+        // Declared classifications only (structured-mandate.v2): a Q
+        // inference or an extracted suggestion is not what the company
+        // is, until a person confirms it (ADR 0006 point 5).
         const rows = await assignments.listCurrentByNodes(
           sql,
           "COMPANY",
           nodeIds.map((id) => TaxonomyNodeIdSchema.parse(id)),
           limit,
+          DECLARED_TAXONOMY_SOURCES,
         );
         if (rows.length === 0) return [];
         // A classification is not a discovery projection: intersect with

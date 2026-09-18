@@ -19,7 +19,7 @@ import type {
 } from "./ports.js";
 
 /**
- * Eligibility policy v1. Pure: snapshots in, decision out. Nothing here
+ * Eligibility policy v2. Pure: snapshots in, decision out. Nothing here
  * reads a database, calls a model, looks at a clock or knows what anybody
  * browsed, said to Q, uploaded or was found about on the public web.
  *
@@ -39,12 +39,20 @@ import type {
  * and AVOID is a soft negative; neither is evaluated here. Nothing observed
  * and nothing Q proposed can reach either place, and a taxonomy exclusion
  * is honoured only when its provenance is a person's own selection.
+ *
+ * The same holds for the company side (v2): only a declared classification
+ * says what a company is. A Q inference, an extracted suggestion or an
+ * integration row on an excluded node is a candidate awaiting confirmation
+ * (ADR 0006 point 5), so it neither excludes the company nor answers the
+ * question; a company with nothing declared in that vocabulary is UNKNOWN.
  */
 
 /**
- * Provenance a taxonomy exclusion must carry to count as declared. A
- * `q_inferred` or `document_extracted` row cannot hard-exclude even if it
- * were ever persisted with `isExclusion` (DECLARED ≠ Q_PROPOSED).
+ * Provenance a taxonomy row must carry to count as declared, on either
+ * side of a hard exclusion. A `q_inferred` or `document_extracted` mandate
+ * row cannot hard-exclude even if it were ever persisted with
+ * `isExclusion`, and a company classification with such a source cannot
+ * be hard-excluded by one (DECLARED ≠ Q_PROPOSED).
  */
 export const DECLARED_TAXONOMY_SOURCES = [
   "user_selected",
@@ -57,7 +65,7 @@ const GEOGRAPHY_DIMENSION = "geography.country";
 
 /**
  * Relationship states the Network context defines as removing the pair
- * from standard discovery. Empty in v1: the projector (CQ-NET-012) has
+ * from standard discovery. Empty so far: the projector (CQ-NET-012) has
  * defined only DISCOVERED so far, and nothing is inferred from Pass,
  * silence or disinterest. When Network defines an intentionally closed or
  * blocked state, it is added here and the policy version is bumped.
@@ -77,7 +85,10 @@ export type EligibilityEvaluationInput = {
   readonly investorOrganisationId: string;
   readonly mandate: ActiveMandateLookup;
   readonly company: CompanyEligibilityFacts;
-  /** ACTIVE classifications of the company; empty when nobody has classified it. */
+  /**
+   * ACTIVE classifications of the company, every provenance; empty when
+   * nobody has classified it. The policy reads the declared ones only.
+   */
   readonly classifications: readonly CompanyClassification[];
   /** The disclosure evaluator's answer for the acting investor. */
   readonly permittedToView: boolean;
@@ -181,16 +192,18 @@ function taxonomyCriterion(
   if (exclusions.length === 0) {
     return result("HARD_EXCLUSION_TAXONOMY", "NOT_APPLICABLE");
   }
-  const carried = new Set(classifications.map((c) => c.nodeId));
+  const declared = classifications.filter((c) =>
+    (DECLARED_TAXONOMY_SOURCES as readonly string[]).includes(c.source),
+  );
+  const carried = new Set(declared.map((c) => c.nodeId));
   if (exclusions.some((e) => carried.has(e.nodeId))) {
     return result("HARD_EXCLUSION_TAXONOMY", "FAIL", "EXPLICIT_HARD_EXCLUSION");
   }
   // A company classified in the excluded node's vocabulary, under another
-  // node, has said what it is. One with nothing in that vocabulary has not,
-  // and silence is not "not gambling".
-  const vocabulariesKnown = new Set(
-    classifications.map((c) => c.vocabularyCode),
-  );
+  // node, has said what it is. One with nothing declared in that
+  // vocabulary has not, and silence is not "not gambling" — nor is Q's
+  // guess, either way.
+  const vocabulariesKnown = new Set(declared.map((c) => c.vocabularyCode));
   const unanswered = exclusions.some(
     (e) => !vocabulariesKnown.has(e.vocabularyCode),
   );
@@ -342,7 +355,7 @@ export function evaluateHardEligibility(
   }
 
   // Cheque compatibility is a fit factor (REC-002+), never a hard gate in
-  // v1. The mandate's cheque range carries no importance and only
+  // this policy. The mandate's cheque range carries no importance and only
   // HARD_EXCLUSION makes a company ineligible; and an investor whose
   // maximum cheque is below a company's total round may still fund part
   // of it. No canonical field says what ticket a company seeks, so no rule

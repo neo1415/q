@@ -39,10 +39,15 @@ export type CompanyEligibilityFactsPort = {
   ) => Promise<readonly CompanyEligibilityFacts[]>;
 };
 
-/** One ACTIVE classification of a company: the node and its vocabulary. */
+/**
+ * One ACTIVE classification of a company: the node, its vocabulary and its
+ * provenance. The port returns every provenance; the policy decides which
+ * count (eligibility.v2: declared only).
+ */
 export type CompanyClassification = {
   readonly nodeId: string;
   readonly vocabularyCode: string;
+  readonly source: string;
 };
 
 export type CompanyClassificationsPort = {

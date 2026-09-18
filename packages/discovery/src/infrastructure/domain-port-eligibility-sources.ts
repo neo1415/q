@@ -130,6 +130,7 @@ export function createDomainEligibilityPorts(
               rows.map((r) => ({
                 nodeId: r.nodeId,
                 vocabularyCode: r.vocabularyCode,
+                source: r.assignmentSource,
               })),
             );
           }),

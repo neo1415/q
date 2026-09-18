@@ -343,6 +343,39 @@ describe("@capital-q/discovery hard eligibility against local PostgreSQL", () =>
     );
   });
 
+  it("eligibility.v2. a q_inferred classification on a hard-excluded node is not a FAIL; confirming it (user_selected) is", async () => {
+    await withWorld(
+      async ({
+        tx,
+        evaluate,
+        companyId,
+        tenantC,
+        mandateId,
+        investorActor,
+      }) => {
+        await tx.sql`insert into taxonomy.mandate_preferences (tenant_id, mandate_id, node_id, preference_strength, is_exclusion, source)
+        values (${investorActor.tenantId}, ${mandateId}, ${node("business_model", "marketplace")}, 'HARD_EXCLUSION', true, 'user_selected')`;
+        // The only business_model row is Q's inference, on the excluded node.
+        await tx.sql`insert into taxonomy.entity_assignments (tenant_id, entity_type, entity_id, node_id, assignment_source)
+        values (${tenantC}, 'COMPANY', ${companyId}, ${node("business_model", "marketplace")}, 'q_inferred')`;
+        const [inferred] = await evaluate([companyId]);
+        expect(inferred?.eligibilityPolicyVersion).toBe("eligibility.v2");
+        expect(inferred?.decision).toBe("UNDETERMINED");
+        expect(inferred?.reasonCodes).toEqual(["COMPANY_TAXONOMY_UNKNOWN"]);
+
+        // Confirmation supersedes the suggestion with a user_selected row,
+        // as the Taxonomy context's own workflow does.
+        await tx.sql`update taxonomy.entity_assignments set status = 'SUPERSEDED', valid_to = clock_timestamp()
+        where entity_id = ${companyId} and assignment_source = 'q_inferred' and status = 'ACTIVE'`;
+        await tx.sql`insert into taxonomy.entity_assignments (tenant_id, entity_type, entity_id, node_id, assignment_source)
+        values (${tenantC}, 'COMPANY', ${companyId}, ${node("business_model", "marketplace")}, 'user_selected')`;
+        const [confirmed] = await evaluate([companyId]);
+        expect(confirmed?.decision).toBe("INELIGIBLE");
+        expect(confirmed?.reasonCodes).toEqual(["EXPLICIT_HARD_EXCLUSION"]);
+      },
+    );
+  });
+
   it("F/G. a HARD_EXCLUSION stage rule: mismatch is INELIGIBLE, unknown stage is UNDETERMINED", async () => {
     await withWorld(
       async ({ tx, evaluate, companyId, mandateId, investorActor }) => {

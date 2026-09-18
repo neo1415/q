@@ -134,12 +134,17 @@ export type TaxonomyAssignmentRepository = {
    * itself is what discovery may read. Ids, codes and provenance only;
    * never raw source text beyond what the assignment row already carries
    * to its owner. Bounded and ordered by subject id, then node id.
+   *
+   * `assignmentSources`, when given, restricts the probe to those
+   * provenances inside the query, so rows of another provenance never
+   * consume the bound (CQ-REC-002 reads declared classifications only).
    */
   readonly listCurrentByNodes: (
     executor: DatabaseExecutor,
     subjectType: TaxonomySubjectType,
     nodeIds: readonly TaxonomyNodeId[],
     limit: number,
+    assignmentSources?: readonly TaxonomyAssignmentSource[],
   ) => Promise<readonly TaxonomyEntityAssignment[]>;
   readonly insert: (
     tx: TransactionContext,

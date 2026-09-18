@@ -104,7 +104,9 @@ function input(
     investorOrganisationId: INVESTOR,
     mandate: mandate(),
     company: company(),
-    classifications: [{ nodeId: PAYMENTS, vocabularyCode: "industry" }],
+    classifications: [
+      { nodeId: PAYMENTS, vocabularyCode: "industry", source: "user_selected" },
+    ],
     permittedToView: true,
     relationship: { kind: "NONE" },
     taxonomyVersion: { industry: 1 },
@@ -178,11 +180,138 @@ describe("eligibility policy v1 — golden scenarios", () => {
     const r = evaluateHardEligibility(
       input({
         mandate: mandate({ taxonomyPreferences: [taxonomyRule()] }),
-        classifications: [{ nodeId: GAMBLING, vocabularyCode: "industry" }],
+        classifications: [
+          {
+            nodeId: GAMBLING,
+            vocabularyCode: "industry",
+            source: "user_selected",
+          },
+        ],
       }),
     );
     expect(r.decision).toBe("INELIGIBLE");
     expect(r.reasonCodes).toEqual(["EXPLICIT_HARD_EXCLUSION"]);
+  });
+
+  describe("eligibility.v2: only a declared company classification answers a taxonomy hard exclusion", () => {
+    const UNDECLARED = [
+      "q_inferred",
+      "document_extracted",
+      "integration",
+    ] as const;
+
+    it("pins the policy version this behaviour belongs to", () => {
+      expect(ELIGIBILITY_POLICY_VERSION).toBe("eligibility.v2");
+    });
+
+    it("an undeclared classification on the excluded node, alone in the vocabulary → UNKNOWN, UNDETERMINED, never FAIL", () => {
+      for (const source of UNDECLARED) {
+        const r = evaluateHardEligibility(
+          input({
+            mandate: mandate({ taxonomyPreferences: [taxonomyRule()] }),
+            classifications: [
+              { nodeId: GAMBLING, vocabularyCode: "industry", source },
+            ],
+          }),
+        );
+        expect(r.decision, source).toBe("UNDETERMINED");
+        expect(outcomeOf(r, "HARD_EXCLUSION_TAXONOMY"), source).toEqual({
+          criterion: "HARD_EXCLUSION_TAXONOMY",
+          outcome: "UNKNOWN",
+          reasonCode: "COMPANY_TAXONOMY_UNKNOWN",
+          detail: null,
+        });
+        expect(r.reasonCodes, source).not.toContain("EXPLICIT_HARD_EXCLUSION");
+      }
+    });
+
+    it("the same node, user_selected or admin_curated → FAIL, INELIGIBLE", () => {
+      for (const source of DECLARED_TAXONOMY_SOURCES) {
+        const r = evaluateHardEligibility(
+          input({
+            mandate: mandate({ taxonomyPreferences: [taxonomyRule()] }),
+            classifications: [
+              { nodeId: GAMBLING, vocabularyCode: "industry", source },
+            ],
+          }),
+        );
+        expect(r.decision, source).toBe("INELIGIBLE");
+        expect(outcomeOf(r, "HARD_EXCLUSION_TAXONOMY")?.outcome, source).toBe(
+          "FAIL",
+        );
+        expect(r.reasonCodes, source).toEqual(["EXPLICIT_HARD_EXCLUSION"]);
+      }
+    });
+
+    it("an undeclared classification elsewhere in the vocabulary does not answer it either → UNKNOWN, never PASS", () => {
+      const r = evaluateHardEligibility(
+        input({
+          mandate: mandate({ taxonomyPreferences: [taxonomyRule()] }),
+          classifications: [
+            {
+              nodeId: PAYMENTS,
+              vocabularyCode: "industry",
+              source: "q_inferred",
+            },
+          ],
+        }),
+      );
+      expect(r.decision).toBe("UNDETERMINED");
+      expect(outcomeOf(r, "HARD_EXCLUSION_TAXONOMY")?.outcome).toBe("UNKNOWN");
+    });
+
+    it("a declared classification elsewhere answers the vocabulary; a Q inference on the excluded node does not override it → PASS", () => {
+      const r = evaluateHardEligibility(
+        input({
+          mandate: mandate({ taxonomyPreferences: [taxonomyRule()] }),
+          classifications: [
+            {
+              nodeId: PAYMENTS,
+              vocabularyCode: "industry",
+              source: "user_selected",
+            },
+            {
+              nodeId: GAMBLING,
+              vocabularyCode: "industry",
+              source: "q_inferred",
+            },
+          ],
+        }),
+      );
+      expect(r.decision).toBe("ELIGIBLE");
+      expect(outcomeOf(r, "HARD_EXCLUSION_TAXONOMY")?.outcome).toBe("PASS");
+    });
+
+    it("confirming the inference (it becomes user_selected) is what makes it exclude", () => {
+      const inferred = evaluateHardEligibility(
+        input({
+          mandate: mandate({ taxonomyPreferences: [taxonomyRule()] }),
+          classifications: [
+            {
+              nodeId: GAMBLING,
+              vocabularyCode: "industry",
+              source: "q_inferred",
+            },
+          ],
+        }),
+      );
+      const confirmed = evaluateHardEligibility(
+        input({
+          mandate: mandate({ taxonomyPreferences: [taxonomyRule()] }),
+          classifications: [
+            {
+              nodeId: GAMBLING,
+              vocabularyCode: "industry",
+              source: "user_selected",
+            },
+          ],
+        }),
+      );
+      expect([inferred.decision, confirmed.decision]).toEqual([
+        "UNDETERMINED",
+        "INELIGIBLE",
+      ]);
+    });
   });
 
   it("E. AVOID match only → NOT ineligible (taxonomy and constraint)", () => {
@@ -211,7 +340,13 @@ describe("eligibility policy v1 — golden scenarios", () => {
             }),
           ],
         }),
-        classifications: [{ nodeId: HARDWARE, vocabularyCode: "industry" }],
+        classifications: [
+          {
+            nodeId: HARDWARE,
+            vocabularyCode: "industry",
+            source: "user_selected",
+          },
+        ],
         company: company({ currentStageCode: "seed" }),
       }),
     );
@@ -342,7 +477,11 @@ describe("eligibility policy v1 — golden scenarios", () => {
       input({
         mandate: rule,
         classifications: [
-          { nodeId: PAYMENTS, vocabularyCode: "product_category" },
+          {
+            nodeId: PAYMENTS,
+            vocabularyCode: "product_category",
+            source: "user_selected",
+          },
         ],
       }),
     );
@@ -351,7 +490,13 @@ describe("eligibility policy v1 — golden scenarios", () => {
     const answered = evaluateHardEligibility(
       input({
         mandate: rule,
-        classifications: [{ nodeId: PAYMENTS, vocabularyCode: "industry" }],
+        classifications: [
+          {
+            nodeId: PAYMENTS,
+            vocabularyCode: "industry",
+            source: "user_selected",
+          },
+        ],
       }),
     );
     expect(answered.decision).toBe("ELIGIBLE");
@@ -408,7 +553,13 @@ describe("eligibility policy v1 — golden scenarios", () => {
           status: "DRAFT",
           taxonomyPreferences: [taxonomyRule()],
         }),
-        classifications: [{ nodeId: GAMBLING, vocabularyCode: "industry" }],
+        classifications: [
+          {
+            nodeId: GAMBLING,
+            vocabularyCode: "industry",
+            source: "user_selected",
+          },
+        ],
       }),
     );
     expect(draftPinned.decision).toBe("UNDETERMINED");
@@ -439,7 +590,13 @@ describe("eligibility policy v1 — golden scenarios", () => {
       const r = evaluateHardEligibility(
         input({
           mandate: mandate({ taxonomyPreferences: [taxonomyRule({ source })] }),
-          classifications: [{ nodeId: GAMBLING, vocabularyCode: "industry" }],
+          classifications: [
+            {
+              nodeId: GAMBLING,
+              vocabularyCode: "industry",
+              source: "user_selected",
+            },
+          ],
         }),
       );
       expect(r.decision, source).toBe("ELIGIBLE");

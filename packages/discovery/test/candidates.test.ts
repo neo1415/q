@@ -417,7 +417,11 @@ function eligibility(w: World): EligibilityService {
               currentStageCode: c.stage,
               headquartersCountry: c.country,
             },
-            classifications: c.nodes,
+            // The fake world's classifications are all a person's own.
+            classifications: c.nodes.map((n) => ({
+              ...n,
+              source: "user_selected",
+            })),
             permittedToView: c.permitted,
             relationship: { kind: "NONE" },
             taxonomyVersion: { industry: 1, geography: 1 },
@@ -432,7 +436,7 @@ function eligibility(w: World): EligibilityService {
           mode: "INVESTOR_DISCOVER",
           mandateId: active?.mandateId ?? null,
           taxonomyVersion: null,
-          eligibilityPolicyVersion: "eligibility.v1",
+          eligibilityPolicyVersion: "eligibility.v2",
         },
         results,
       });
@@ -861,14 +865,14 @@ describe("structured candidate service", () => {
     for (const c of r.candidates) {
       expect(c.provenance).toMatchObject({
         generatorId: "STRUCTURED_MANDATE",
-        generatorVersion: "structured-mandate.v1",
+        generatorVersion: "structured-mandate.v2",
         taxonomyVersion: { industry: 1, geography: 1 },
       });
       expect(c.provenance.reasonCodes.length).toBeGreaterThan(0);
       expect("score" in c).toBe(false);
       expect("rank" in c).toBe(false);
     }
-    expect(r.generatorVersion).toBe("structured-mandate.v1");
-    expect(r.eligibilityPolicyVersion).toBe("eligibility.v1");
+    expect(r.generatorVersion).toBe("structured-mandate.v2");
+    expect(r.eligibilityPolicyVersion).toBe("eligibility.v2");
   });
 });

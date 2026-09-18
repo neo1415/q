@@ -124,8 +124,26 @@ function world(overrides: Partial<World> = {}): World {
       ],
     ]),
     classifications: new Map([
-      [COMPANY, [{ nodeId: PAYMENTS, vocabularyCode: "industry" }]],
-      [COMPANY_PRIVATE, [{ nodeId: PAYMENTS, vocabularyCode: "industry" }]],
+      [
+        COMPANY,
+        [
+          {
+            nodeId: PAYMENTS,
+            vocabularyCode: "industry",
+            source: "user_selected",
+          },
+        ],
+      ],
+      [
+        COMPANY_PRIVATE,
+        [
+          {
+            nodeId: PAYMENTS,
+            vocabularyCode: "industry",
+            source: "user_selected",
+          },
+        ],
+      ],
     ]),
     mandates: new Map([
       [ACTIVE_MANDATE, active],
@@ -267,7 +285,7 @@ describe("eligibility service", () => {
       mode: "INVESTOR_DISCOVER",
       mandateId: ACTIVE_MANDATE,
       taxonomyVersion: { industry: 1 },
-      eligibilityPolicyVersion: "eligibility.v1",
+      eligibilityPolicyVersion: "eligibility.v2",
     });
     expect(results.map((r) => [r.companyId, r.decision])).toEqual([
       [COMPANY, "ELIGIBLE"],
@@ -393,7 +411,7 @@ describe("eligibility service", () => {
     // The legitimate path: the claim becomes a confirmed canonical
     // classification through the Taxonomy context's own workflow.
     w.classifications.set(COMPANY, [
-      { nodeId: GAMBLING, vocabularyCode: "industry" },
+      { nodeId: GAMBLING, vocabularyCode: "industry", source: "user_selected" },
     ]);
     const canonical = await decisionFor(w);
     expect(canonical.decision).toBe("INELIGIBLE");
@@ -500,7 +518,7 @@ describe("eligibility service", () => {
     const line = JSON.stringify(logs[0]);
     expect(logs[0]).toMatchObject({
       mode: "INVESTOR_DISCOVER",
-      eligibilityPolicyVersion: "eligibility.v1",
+      eligibilityPolicyVersion: "eligibility.v2",
       mandateVersion: 2,
       requested: 2,
       evaluated: 2,

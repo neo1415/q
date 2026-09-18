@@ -32,7 +32,7 @@ const id = (n: number) =>
   `55555555-0000-4000-8000-${String(n).padStart(12, "0")}`;
 
 const eligible = (companyId: string): EligibilityResult => ({
-  eligibilityPolicyVersion: "eligibility.v1",
+  eligibilityPolicyVersion: "eligibility.v2",
   mode: "INVESTOR_DISCOVER",
   companyId,
   investorOrganisationId: "11111111-0000-4000-8000-000000000013",
@@ -54,7 +54,7 @@ const structured = (n: number): StructuredCandidate => ({
   companyId: id(n),
   provenance: {
     generatorId: "STRUCTURED_MANDATE",
-    generatorVersion: "structured-mandate.v1",
+    generatorVersion: "structured-mandate.v2",
     matchedDimensions: ["STAGE"],
     reasonCodes: ["STAGE_OVERLAP"],
     matchedNodes: [],
@@ -141,15 +141,15 @@ describe("hybrid candidate service", () => {
     mode: "INVESTOR_DISCOVER" as const,
     mandateId: "33333333-0000-4000-8000-000000000031",
     taxonomyVersion: null,
-    eligibilityPolicyVersion: "eligibility.v1" as const,
+    eligibilityPolicyVersion: "eligibility.v2" as const,
   };
   const structuredService: StructuredCandidateService = {
     generate: () =>
       Promise.resolve({
         kind: "GENERATED",
         generatorId: "STRUCTURED_MANDATE",
-        generatorVersion: "structured-mandate.v1",
-        eligibilityPolicyVersion: "eligibility.v1",
+        generatorVersion: "structured-mandate.v2",
+        eligibilityPolicyVersion: "eligibility.v2",
         context,
         candidates: [structured(1), structured(2)],
         diagnostics: {
@@ -207,7 +207,7 @@ describe("hybrid candidate service", () => {
           kind: "GENERATED",
           generatorId: "SEMANTIC_MANDATE",
           generatorVersion: "semantic-mandate.v1",
-          eligibilityPolicyVersion: "eligibility.v1",
+          eligibilityPolicyVersion: "eligibility.v2",
           context,
           candidates: [semantic(2, 0.8), semantic(3, 0.6)],
           diagnostics: {

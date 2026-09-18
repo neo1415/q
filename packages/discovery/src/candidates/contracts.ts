@@ -34,10 +34,14 @@ export const STRUCTURED_GENERATOR_ID = "STRUCTURED_MANDATE" as const;
 
 /**
  * Bumped whenever a dimension's retrieval rule, a reason code, the merge
- * or the ordering changes. Distinct from eligibility.v1 and
+ * or the ordering changes. Distinct from the eligibility policy and
  * marketplace-readiness.v1: a different policy boundary.
+ *
+ * v2: taxonomy and geography-region retrieval match declared company
+ * classifications only (user_selected, admin_curated), as eligibility.v2
+ * and the feature registry already read them.
  */
-export const STRUCTURED_GENERATOR_VERSION = "structured-mandate.v1" as const;
+export const STRUCTURED_GENERATOR_VERSION = "structured-mandate.v2" as const;
 
 export const CANDIDATE_DIMENSIONS = [
   "STAGE",

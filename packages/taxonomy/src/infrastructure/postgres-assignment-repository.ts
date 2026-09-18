@@ -109,15 +109,24 @@ export function createPostgresTaxonomyAssignmentRepository(): TaxonomyAssignment
          order by v.code, n.canonical_code`;
       return rows.map(toAssignment);
     },
-    listCurrentByNodes: async (executor, subjectType, nodeIds, limit) => {
-      if (nodeIds.length === 0) {
+    listCurrentByNodes: async (
+      executor,
+      subjectType,
+      nodeIds,
+      limit,
+      assignmentSources,
+    ) => {
+      if (nodeIds.length === 0 || assignmentSources?.length === 0) {
         return [];
       }
+      const sources =
+        assignmentSources === undefined ? null : [...assignmentSources];
       // entity_assignments_node_idx (node_id, status) serves the probe.
       const rows = await executor`
         ${assignmentSelect(executor)}
          where a.entity_type = ${subjectType}
            and a.node_id = any(${[...nodeIds]}::uuid[])
+           and (${sources}::text[] is null or a.assignment_source = any(${sources}::text[]))
            and a.status = 'ACTIVE'
            and a.valid_to is null
          order by a.entity_id, a.node_id

@@ -514,7 +514,7 @@ describe("@capital-q/discovery structured candidates against local PostgreSQL", 
         "GEOGRAPHY_REGION_OVERLAP",
       ]);
       for (const c of r.candidates) {
-        expect(c.provenance.generatorVersion).toBe("structured-mandate.v1");
+        expect(c.provenance.generatorVersion).toBe("structured-mandate.v2");
         expect(c.provenance.taxonomyVersion).not.toBeNull();
         expect(c.eligibility.decision).toBe("ELIGIBLE");
       }
@@ -569,6 +569,42 @@ describe("@capital-q/discovery structured candidates against local PostgreSQL", 
       for (let i = 0; i < 3; i += 1) {
         expect(strip(await w.generate())).toEqual(before);
       }
+    });
+  });
+
+  it("v2. undeclared classifications neither exclude nor retrieve: a q_inferred hard-excluded node keeps the company; a q_inferred preferred region does not find it", async () => {
+    await withWorld(async (w) => {
+      const target = w.companies["TaxonomyOnly"];
+      if (target === undefined) throw new Error("fixture");
+      expect(labelsOf(w, await w.generate())).toContain("TaxonomyOnly");
+
+      // Q infers media & entertainment, which the investor hard-excludes.
+      // Its declared industry (fintech) answers the vocabulary: still ELIGIBLE.
+      await w.tx
+        .sql`insert into taxonomy.entity_assignments (tenant_id, entity_type, entity_id, node_id, assignment_source)
+        values (${target.tenantId}, 'COMPANY', ${target.id}, ${node("industry", "media_entertainment")}, 'q_inferred')`;
+      const inferred = generatedOf(await w.generate());
+      expect(inferred.eligibilityPolicyVersion).toBe("eligibility.v2");
+      expect(labelsOf(w, inferred)).toContain("TaxonomyOnly");
+
+      // RegionOnly's only route in is its declared west_africa row; its
+      // declared industry (logistics) keeps it ELIGIBLE throughout. The same
+      // node as a Q inference is not a retrieval signal.
+      const region = w.companies["RegionOnly"];
+      if (region === undefined) throw new Error("fixture");
+      const declared = generatedOf(await w.generate());
+      expect(labelsOf(w, declared)).toContain("RegionOnly");
+      await w.tx
+        .sql`update taxonomy.entity_assignments set status = 'SUPERSEDED', valid_to = clock_timestamp()
+        where entity_id = ${region.id} and node_id = ${node("geography", "west_africa")} and status = 'ACTIVE'`;
+      await w.tx
+        .sql`insert into taxonomy.entity_assignments (tenant_id, entity_type, entity_id, node_id, assignment_source)
+        values (${region.tenantId}, 'COMPANY', ${region.id}, ${node("geography", "west_africa")}, 'q_inferred')`;
+      const undeclared = generatedOf(await w.generate());
+      expect(labelsOf(w, undeclared)).not.toContain("RegionOnly");
+      expect(undeclared.diagnostics.rawHitsByDimension.GEOGRAPHY).toBe(
+        declared.diagnostics.rawHitsByDimension.GEOGRAPHY - 1,
+      );
     });
   });
 
