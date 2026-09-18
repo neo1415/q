@@ -530,7 +530,7 @@ describe("@capital-q/taxonomy against local PostgreSQL", () => {
         removedCount: 0,
       });
       const events = await tx.sql<{ payload: { data: unknown } }[]>`
-        select payload from events.outbox where payload ->> 'correlationId' = ${correlationId} and event_type = 'taxonomy.entity_assignments.changed'`;
+        select payload from events.outbox where payload ->> 'correlationId' = ${correlationId} and event_type = 'taxonomy.entity_assignments.changed' order by id`;
       expect(events).toHaveLength(5);
       expect(events[1]?.payload.data).toEqual({
         subjectType: "COMPANY",
