@@ -1798,3 +1798,48 @@ Verdict: **REC-002 FAIL — the full `pnpm test:integration` gate does not exit 
 Live local acceptance (real adapters, clean local Postgres, one ACTIVE mandate: seed · NG · fintech · West Africa; ten synthetic companies): raw hits STAGE 4, GEOGRAPHY 6 (5 country + 1 region), TAXONOMY 3, CHEQUE 0 = 13; deduplicated 8; eligible 5; ineligible 3 (hard-excluded, not marketplace-ready, unknown-stage company that cannot be marketplace-ready); undetermined 0; 135 ms. Rankable candidates and provenance: AllThree `GEOGRAPHY_OVERLAP, STAGE_OVERLAP, TAXONOMY_DESCENDANT_OVERLAP` (fintech → payments); GeographyOnly `GEOGRAPHY_OVERLAP`; TaxonomyOnly `TAXONOMY_OVERLAP`; StageOnly `STAGE_OVERLAP`; RegionOnly `GEOGRAPHY_REGION_OVERLAP` (west_africa). Query count per run: one per asked dimension (2), one hierarchy expansion per preference node (2), one node probe, one discoverable-facts intersection, one eligibility batch.
 
 Next: realign the eight Q/gateway tests with the approved provider posture (or run the suite with the demo posture reverted), fix the two-clock revocation race in permissions, re-run the gate, then commit REC-002 and begin CQ-REC-003.
+
+## Checkpoint — CQ-REC-002 gate-pending (2026-09-18)
+
+`65dcb052084d03e5826f810424419fa69929129d` "CQ-REC-002 checkpoint: structured candidates implemented, integration gate pending", pushed and verified equal to `origin/recovery/2026-09-12`. It is a remote backup of the implementation, explicitly not a PASS; it stays in history as gate-pending and was not amended, squashed or force-pushed.
+
+## Baseline reconciliation — CQ-REC-002R (2026-09-18)
+
+**Provider-policy root cause, classification C.** `20260921090000_demo_google_provider_posture.sql` relabelled the free Gemini tier `ENTERPRISE_CONTRACT` and `20260919` raised its model ceilings to `CONFIDENTIAL`, both "for demo traffic". The gateway derives a provider's justified ceiling from its privacy class (`providerJustifiedCeiling`), so the relabel cleared confidential customer material for an unreviewed free tier in every environment the migration reaches, hosted included. That contradicts doc 13 §57.2 and doc 15 §62 ("free is a cost property; confidential customer information requires an approved provider/endpoint"), and config's `DEPLOYMENT_ENVIRONMENTS` is documented as not a security boundary, so no environment-scoped eligibility can express the intent. The authorisation trail was a vault operator decision and a runbook note; no ADR or PADL amendment. The policy is corrected forward by `20260926090000_restore_reviewed_google_posture.sql` (google → `UNREVIEWED`, Gemini ceilings → `PUBLIC`, demo-posture metadata retained with `demo_posture=false`); the applied migrations are untouched. `20260920` (Gemini preferred for dialogue, synthesis and extraction) is kept: it is privacy-neutral and carries the demo intent wherever Gemini is eligible, which is PUBLIC work. A reviewed paid tier is the route to a higher ceiling, never a data relabel.
+
+**Provider privacy invariant held.** No hard eval or fixture moved a CONFIDENTIAL/HIGHLY_CONFIDENTIAL expectation onto Gemini; `QROUTE-001`/`QROUTE-002` and `PROVIDER_MISROUTING` are unchanged and pass under the restored posture. Demo eligibility is inferred from nothing (not email, host, filename or prompt wording). `provider-posture-matrix.test.ts` (fake providers only) asserts per sensitivity which provider may answer and which is never called: PUBLIC → unreviewed allowed; NETWORK_VISIBLE/INTERNAL → refused `SENSITIVITY_EXCEEDS_CEILING` before any call; CONFIDENTIAL → reviewed zero-retention only and an outage there does not broaden; HIGHLY_CONFIDENTIAL/RESTRICTED → `POLICY_INELIGIBLE`, zero calls; missing adapter → `PROVIDER_UNCONFIGURED`; rate limit falls back within policy; identical route across repeats. No new provider, account, key, billing or OAuth; zero live calls.
+
+**Fixture realignments, each with its basis.** Gateway `gateway-postgres.integration.test.ts` and orchestrator `answer-seam.integration.test.ts`: at PUBLIC, `normal_dialogue.v1` prefers `gemini-3.5-flash-lite` (`20260920`), so the public run is answered by the fake under the google code and the fallback under groq is asserted untouched; INTERNAL/CONFIDENTIAL stay on Groq; two rows added (NETWORK_VISIBLE classification → Groq with Gemini refused; HIGHLY_CONFIDENTIAL → `POLICY_INELIGIBLE`, ledger unchanged) and the usage ledger expects four executions. Orchestrator tools round: roles include the tools-first SYSTEM note (`1e1c4e1`, 2026-09-16). Company-intelligence evals QCI-001/002/006/007/017: prompts rephrased into the specialist's approved analysis-verb scope (`readAboutCompany`, 2026-09-16); expectations unchanged. pgTAP `320_ai_ops`: five model ids and six price snapshots since the qwen row (`20260918`, same provider class and ceiling basis); the google/Gemini privacy assertions there passed unchanged on the reset database.
+
+**Permissions two-clock race.** `created_at` was PostgreSQL's `now()` while expiry validation and `revoked_at` came from the injected `DisclosureClock`, so host/DB skew tripped `revocation_after_creation` under load. The grant now stamps `created_at` from the instant it validated expiry against (`NewDisclosurePolicy.createdAt`), the repository writes it, and status evaluation reads the same clock; the DB constraints remain as defence in depth. No sleeps, no tolerances, no client-supplied timestamp. `clock-determinism.test.ts` fixes the instants: revocation at the boundary is REVOKED and not before; expiry at the boundary is EXPIRED with no grace; host ahead or behind changes nothing; an expiry not after the grant instant is refused.
+
+Commits: `b426b51e105fbe5f826af0431891fe55f09eb4fb` (provider policy baseline reconciliation), `236e360ced49c4171b2a6234ffd88b6875e5b4cb` (permissions clock determinism), each pushed immediately and verified equal to `origin/recovery/2026-09-12`.
+
+## Postflight — CQ-REC-002R closeout of CQ-REC-002 (2026-09-18)
+
+Verdict: **REC-002 PASS — STRUCTURED CANDIDATE GENERATION IS HIGH-RECALL, PROVENANCE-AWARE AND ELIGIBILITY-GATED**
+
+All gates ran sequentially on a reset local database (`pnpm db:reset`) with no Capital Q service running.
+
+| Check                                                         | Result                                                                                                                |
+| ------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| `pnpm test:rls`                                               | 30 files, 856 tests, PASS (320_ai_ops 33/33)                                                                          |
+| `pnpm test:integration`                                       | 48 files: 47 pass, 1 skipped (Storage credentials); 449 pass, 5 skipped, 0 fail; exit 0                               |
+| `pnpm format:check`                                           | tracked files PASS; the only warnings are the untracked `graphify-out/` (exit 1 from those alone)                     |
+| `pnpm lint` (`NODE_OPTIONS=--max-old-space-size=8192`, alone) | exit 0, `--max-warnings=0`                                                                                            |
+| `pnpm typecheck`                                              | 76 tasks + root tsc, exit 0                                                                                           |
+| `pnpm test`                                                   | 207 files, 2685 tests, exit 0                                                                                         |
+| `pnpm build`                                                  | 41 tasks, exit 0                                                                                                      |
+| `pnpm db:lint`                                                | no schema errors                                                                                                      |
+| `pnpm q:eval:lint` / `pnpm q:eval:ci`                         | dataset lint PASS (29 cases, 15 graders); CI_CORE release gate PASS, 28 PASS / 1 WARN, no new hard failures, no spend |
+| `git diff --check`, secret scan, package cycle check          | clean; 41 workspace packages, 0 cycles; discovery consumed by q-tools, api, q-api only                                |
+| REC-002 regression                                            | discovery integration 13/13; discovery unit 72/72                                                                     |
+| Migration / external service / ENV / model calls              | one forward corrective migration (data only) / NONE / NONE / ZERO                                                     |
+
+Live candidate run (real adapters, reset local Postgres, same fixture world as the REC-002 postflight): raw STAGE 4, GEOGRAPHY 6, TAXONOMY 3, CHEQUE 0 = 13; deduplicated 8; eligible 5; ineligible 3; undetermined 0; 149 ms in the full run and 172 ms alone, against the 135 ms baseline — same counts and provenance (AllThree, GeographyOnly, TaxonomyOnly, StageOnly, RegionOnly), timing within local noise, no generator tuning.
+
+Git: `65dcb05` (gate-pending checkpoint, preserved) → `b426b51` → `236e360` → this closeout commit; each pushed on creation; HEAD equals `origin/recovery/2026-09-12` after each push.
+
+Known limitations: the hosted Supabase project still carries the demo posture until `20260925*` and `20260926` are pushed (`pnpm db:push`); the Storage integration tests need credentials and remain skipped; the cheque dimension stays `NOT_COMPUTABLE` pending a disclosure-safe raise projection.
+
+Next: CQ-REC-003 — STOP.
