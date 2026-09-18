@@ -61,7 +61,7 @@ describe("@capital-q/model-gateway against local PostgreSQL", () => {
     await db.close();
   });
 
-  it("loads the seeded catalog: two providers, four models, versioned prices, seven policies", async () => {
+  it("loads the seeded catalog: two providers, five models, versioned prices, seven policies", async () => {
     const snapshot = await loadModelCatalogSnapshot(db.sql, new Date());
     const catalog = indexCatalog(snapshot);
     expect(snapshot.providers.map((p) => p.code).sort()).toEqual([
@@ -73,6 +73,7 @@ describe("@capital-q/model-gateway against local PostgreSQL", () => {
       "gemini-3.8-flash",
       "openai/gpt-oss-120b",
       "openai/gpt-oss-20b",
+      "qwen/qwen3.8-27b",
     ]);
     expect(
       snapshot.routingPolicies.filter((p) => p.status === "ACTIVE"),

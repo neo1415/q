@@ -401,8 +401,12 @@ describe("@capital-q/q-runtime against local PostgreSQL", () => {
 
       const runs = await tx.sql<
         { id: string }[]
-      >`select id from q_runtime.runs where conversation_id = ${first.conversation.id} order by created_at`;
-      expect(runs.map((r) => r.id)).toEqual([first.run.id, second.run.id]);
+      >`select id from q_runtime.runs where conversation_id = ${first.conversation.id}`;
+      // Both runs are created inside one transaction, so they share
+      // `now()`; membership is the invariant, not a timestamp order.
+      expect(runs.map((r) => r.id).sort()).toEqual(
+        [first.run.id, second.run.id].sort(),
+      );
     });
   });
 
