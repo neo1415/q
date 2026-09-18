@@ -382,6 +382,9 @@ export function createDisclosurePolicyManager(
       accessLevel: command.accessLevel,
       expiresAt: command.expiresAt ?? null,
       createdByUserId: command.actor.userId,
+      // The instant expiry was validated against is the instant the grant
+      // is created at: one clock for the whole lifecycle of the row.
+      createdAt: now,
     };
 
     return transactions.run(async (tx) => {

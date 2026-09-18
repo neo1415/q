@@ -1331,10 +1331,12 @@ describe("@capital-q/permissions against local PostgreSQL", () => {
     await withWorld(
       async (world) => {
         const { tx, service, founderAlpha } = world;
-        // Seed an active policy directly (audit is broken in this world).
+        // Seed an active policy directly (audit is broken in this world),
+        // stamped from the same clock the service revokes with: the
+        // policy lifecycle has one clock, never the database's.
         const policyId = randomUUID();
-        await tx.sql`insert into permissions.disclosure_policies (id, tenant_id, owner_organisation_id, owner_user_id, resource_type, resource_id, scope_type, recipient_type, recipient_id, access_level, created_by_user_id)
-          values (${policyId}, ${world.tenantC}, ${world.orgAlpha}, ${founderAlpha.userId}, 'founder_profile', ${world.founderProfileId}, 'specifically_shared', 'ORGANISATION', ${world.orgApex}, 'view', ${founderAlpha.userId})`;
+        await tx.sql`insert into permissions.disclosure_policies (id, tenant_id, owner_organisation_id, owner_user_id, resource_type, resource_id, scope_type, recipient_type, recipient_id, access_level, created_by_user_id, created_at)
+          values (${policyId}, ${world.tenantC}, ${world.orgAlpha}, ${founderAlpha.userId}, 'founder_profile', ${world.founderProfileId}, 'specifically_shared', 'ORGANISATION', ${world.orgApex}, 'view', ${founderAlpha.userId}, ${world.clock.now()}::text::timestamptz)`;
         await expect(
           service.policies.revoke({
             actor: founderAlpha,

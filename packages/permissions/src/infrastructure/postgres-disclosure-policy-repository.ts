@@ -94,12 +94,14 @@ export function createPostgresDisclosurePolicyRepository(): DisclosurePolicyRepo
         const rows = await tx.sql`
           insert into permissions.disclosure_policies
             (id, tenant_id, owner_organisation_id, owner_user_id, resource_type, resource_id,
-             scope_type, recipient_type, recipient_id, access_level, expires_at, created_by_user_id)
+             scope_type, recipient_type, recipient_id, access_level, expires_at, created_by_user_id,
+             created_at)
           values
             (${policy.id}, ${policy.tenantId}, ${policy.ownerOrganisationId}, ${policy.ownerUserId},
              ${policy.resource.type}, ${policy.resource.id}, ${policy.scopeType},
              ${policy.recipient?.type ?? null}, ${policy.recipient?.id ?? null}, ${policy.accessLevel},
-             ${policy.expiresAt}::text::timestamptz, ${policy.createdByUserId})
+             ${policy.expiresAt}::text::timestamptz, ${policy.createdByUserId},
+             ${policy.createdAt}::text::timestamptz)
           returning id`;
         const inserted = z
           .object({ id: DisclosurePolicyIdSchema })

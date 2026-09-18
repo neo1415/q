@@ -68,6 +68,14 @@ export type NewDisclosurePolicy = {
   readonly accessLevel: DisclosureAccessLevel;
   readonly expiresAt: UtcTimestamp | null;
   readonly createdByUserId: UserId;
+  /**
+   * From the injected DisclosureClock — the same clock that validates
+   * expiry on grant, stamps revocation and evaluates status. A policy row
+   * never mixes an application instant with the database's own `now()`,
+   * so `revoked_at >= created_at` and `expires_at > created_at` hold
+   * whatever the skew between the host and PostgreSQL.
+   */
+  readonly createdAt: UtcTimestamp;
 };
 
 /**
