@@ -16,6 +16,8 @@ const here = dirname(fileURLToPath(import.meta.url));
 const packageRoot = join(here, "..");
 const eligibilityDir = join(packageRoot, "src", "eligibility");
 const candidatesDir = join(packageRoot, "src", "candidates");
+/** CQ-REC-004: the feature layer is held to the strictest list, like eligibility. */
+const featuresDir = join(packageRoot, "src", "features");
 const adapterFiles = [
   join(
     packageRoot,
@@ -29,7 +31,15 @@ const adapterFiles = [
     "infrastructure",
     "domain-port-candidate-sources.ts",
   ),
+  join(packageRoot, "src", "infrastructure", "domain-port-feature-sources.ts"),
 ];
+/** The feature snapshot store: SQL allowed, over its own table only. */
+const featureStoreFile = join(
+  packageRoot,
+  "src",
+  "infrastructure",
+  "postgres-feature-snapshot-store.ts",
+);
 
 const FORBIDDEN_IMPORTS = [
   "@capital-q/q-knowledge",
@@ -90,7 +100,7 @@ function sourceFiles(): readonly {
   readonly path: string;
   readonly text: string;
 }[] {
-  const files = [eligibilityDir, candidatesDir].flatMap((dir) =>
+  const files = [eligibilityDir, candidatesDir, featuresDir].flatMap((dir) =>
     readdirSync(dir)
       .filter((name) => name.endsWith(".ts"))
       .map((name) => join(dir, name)),
@@ -235,5 +245,40 @@ describe("semantic boundary (CQ-REC-003)", () => {
       expect(code, path).not.toMatch(/\bsql`/);
       expect(code, path).not.toMatch(/\bselect\s+[\w.*]+\s+from\b/i);
     }
+  });
+});
+
+describe("feature store boundary (CQ-REC-004)", () => {
+  it("imports nothing private and names no private store, provider or signal", () => {
+    const text = readFileSync(featureStoreFile, "utf8");
+    for (const forbidden of FORBIDDEN_IMPORTS) {
+      expect(text, `imports ${forbidden}`).not.toContain(`"${forbidden}`);
+    }
+    const code = text
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/\/\/.*$/gm, "")
+      .toLowerCase();
+    for (const token of FORBIDDEN_TOKENS) {
+      expect(code, `mentions ${token}`).not.toContain(token);
+    }
+  });
+
+  it("reads and writes recommendation.feature_snapshots and nothing else", () => {
+    const code = readFileSync(featureStoreFile, "utf8")
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/\/\/.*$/gm, "");
+    const tokens = code.replace(/[`(),;]/g, " ").split(/\s+/);
+    const tables = new Set<string>();
+    for (const [index, token] of tokens.entries()) {
+      const next = tokens[index + 1];
+      if (
+        /^(?:from|join|into|update)$/i.test(token) &&
+        next !== undefined &&
+        /^[a-z_]+\.[a-z_]+$/i.test(next)
+      ) {
+        tables.add(next.toLowerCase());
+      }
+    }
+    expect(tables).toEqual(new Set(["recommendation.feature_snapshots"]));
   });
 });

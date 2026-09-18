@@ -311,6 +311,84 @@ embedder, in-memory store, real REC-001 policy) and
 the live Qwen block runs when the TEI runtime answers and is skipped
 otherwise).
 
+## Recommendation feature registry and privacy firewall (CQ-REC-004)
+
+The governed, typed, versioned list of signals a ranker may read (doc 19
+§38–§42, §92, §111, §144–§147), and the only legitimate input surface for
+REC-005. Nothing here weighs, scores, ranks or explains.
+
+- **Schema** `recommendation-features.v1` (`FEATURE_SCHEMA_VERSION`), separate
+  from `eligibility.v1`, `structured-mandate.v1`, `semantic-mandate.v1`, the
+  representation versions and any ranking version. A ranker declares the
+  schema it understands and asks `registry.featuresFor(mode)`; a snapshot is
+  validated against the registry (`registry.validateSnapshot`), never
+  discovered by scanning rows.
+- **Definitions** (`RECOMMENDATION_FEATURES`, frozen, validated at module
+  load): id, version, group, data type, allowed contexts, source classes,
+  sensitivity (the canonical six-class vocabulary), missing policy,
+  description, and for categories/numbers the closed set or the range and
+  direction. Identity is meaning, not code location; a changed meaning is a
+  new version.
+
+| Feature                              | Type                                            | Sources                                             | Sensitivity  | Missing                                                                                                                     |
+| ------------------------------------ | ----------------------------------------------- | --------------------------------------------------- | ------------ | --------------------------------------------------------------------------------------------------------------------------- |
+| `eligibility.hard_gate` v1           | boolean                                         | ELIGIBILITY_RESULT                                  | INTERNAL     | a gate reference, always true for rankable input, never weighted                                                            |
+| `declared_fit.stage` v1              | MATCH / NO_MATCH                                | DECLARED_MANDATE + CANONICAL_COMPANY_STATE          | CONFIDENTIAL | MISSING when stage unknown; NOT_APPLICABLE without positive stage intent                                                    |
+| `declared_fit.geography` v1          | COUNTRY_MATCH / REGION_MATCH / NO_MATCH         | + CANONICAL_TAXONOMY + TAXONOMY_REFERENCE_HIERARCHY | CONFIDENTIAL | MISSING when country and geography classification unknown; NOT_APPLICABLE without intent or with only the unrestricted node |
+| `declared_fit.taxonomy` v1           | EXACT_OVERLAP / DESCENDANT_OVERLAP / NO_OVERLAP | DECLARED_MANDATE + CANONICAL_TAXONOMY + hierarchy   | CONFIDENTIAL | MISSING when the company has no declared classification in an asked vocabulary; Q-proposed rows never count                 |
+| `declared_fit.cheque` v1             | number [0, 1]                                   | DECLARED_MANDATE + CANONICAL_COMPANY_STATE          | CONFIDENTIAL | always MISSING (`CHEQUE_NOT_COMPUTABLE`): no discovery-safe raise projection exists                                         |
+| `semantic_fit.mandate_similarity` v1 | number [-1, 1]                                  | SEMANTIC_CANDIDATE_PROVENANCE                       | CONFIDENTIAL | MISSING (`SEMANTIC_NOT_RETRIEVED`) unless REC-003 retrieved the company; reused, never recomputed                           |
+
+Every V1 feature allows `INVESTOR_DISCOVER` only. Any other context fails
+closed (`FeatureContextNotAllowedError`), for the whole set and per feature.
+The missing policy of every V1 feature is `PRESERVE_MISSING`: a reader never
+imputes. Deferred groups — company state, evidence/confidence, portfolio,
+behaviour, relationship, freshness, exploration, exposure — have no
+definition and therefore no value, not a zero.
+
+- **Firewall.** Feature computation reads typed projections tagged with the
+  source class they are (`CANONICAL_COMPANY_STATE`, `CANONICAL_TAXONOMY`,
+  `TAXONOMY_REFERENCE_HIERARCHY`, the two candidate provenances, the
+  eligibility result, the ACTIVE mandate). A definition names the classes
+  it accepts; a projection of any other class yields MISSING with
+  `SOURCE_NOT_AUTHORISED` and a scope-violation count. The private classes
+  (Q memory, conversations, transcripts, documents, evidence, data room,
+  research, Q inference) are not in the vocabulary and cannot be named. The
+  boundary guard holds `src/features` and its adapters to the eligibility
+  list; the store adapter may touch `recommendation.feature_snapshots` only.
+- **Values** (`FeatureValue`): id, version, status PRESENT / MISSING /
+  NOT_APPLICABLE, typed value or null, bounded missing reason, contributing
+  source classes, sensitivity, bounded provenance (ids, codes, versions;
+  never text). Type-checked against the definition; JSON never coerces.
+- **Snapshots** (`RecommendationFeatureSnapshot`): context, mandate and
+  version, company and projection version, eligibility policy and
+  decision, candidate provenance (generator, representation and
+  configuration versions, reason codes), the values in registry order, the
+  artifact's sensitivity (its most sensitive value; mandate-derived values
+  are CONFIDENTIAL) and a sha256 fingerprint over the semantic inputs and
+  values — never `computedAt` or an id. Same inputs, same fingerprint.
+- **Service** (`createFeatureService`): refuses the context before any read,
+  resolves the ACTIVE mandate through REC-001's ports, refuses any candidate
+  that is not ELIGIBLE for this investor and mandate, reads company state
+  and declared taxonomy in one batch and the preference hierarchy once, and
+  computes purely. A candidate that is no longer discoverable gets no
+  snapshot. Six statements per run, none per feature or per candidate.
+- **Store** `recommendation.feature_snapshots` (migration `20260928090000`):
+  one CURRENT row per investor organisation, mandate, company, context and
+  schema version; identical fingerprint reused, changed fingerprint
+  supersedes; content immutable; cascades with its canonical rows; RLS on,
+  no policy, no browser grant; pgTAP `410_recommendation_features`. Rebuild
+  and event-driven invalidation are REC-006's.
+- **REC-005 seam.** The ranker consumes `ComputeFeaturesResult.snapshots`
+  (or the CURRENT rows) under `recommendation-features.v1`, binds weights in
+  its own versioned config, and never reaches around the service.
+
+Golden scenarios A–W live in `features.test.ts` (registry, pure policy,
+service over a fake world with founder-private markers in memory,
+conversation, document and research) and `features.integration.test.ts`
+(the real hybrid pool, the real store, markers in the real private tables,
+ACTIVE/DRAFT changes, an unauthorised context).
+
 ## Not built yet
 
 - Semantic _fit_ as a ranking factor (REC-004/REC-005). Semantic
@@ -325,7 +403,10 @@ otherwise).
 - A closed or blocked relationship state. Network defines only
   DISCOVERED; when it defines more, `RELATIONSHIP_STATES_CLOSED_TO_DISCOVERY`
   names them and the policy version moves.
-- Ranking (REC-005) and persisted slates (REC-006). The two generators
-  above and the hybrid pool are their input, not a substitute.
+- Ranking (REC-005) and persisted slates (REC-006). The feature snapshots
+  above are the ranker's only input; the generators and the hybrid pool
+  feed them.
+- Feature groups beyond eligibility, declared fit and semantic fit: no
+  definition, no value, no zero, until their source infrastructure exists.
 - An event-driven representation refresh worker; today `refreshCompanyRepresentations`
   is an explicit, idempotent call.

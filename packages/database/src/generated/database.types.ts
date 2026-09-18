@@ -4773,6 +4773,84 @@ export type Database = {
         }
         Relationships: []
       }
+      feature_snapshots: {
+        Row: {
+          candidate_provenance: Json
+          company_id: string
+          company_projection_version: number
+          company_tenant_id: string
+          computed_at: string
+          created_at: string
+          eligibility_decision: string
+          eligibility_policy_version: string
+          feature_schema_version: string
+          features: Json
+          fingerprint: string
+          id: string
+          investor_organisation_id: string
+          mandate_id: string
+          mandate_version: number
+          mode: string
+          semantic_generator_version: string | null
+          sensitivity: string
+          status: string
+          structured_generator_version: string | null
+          superseded_at: string | null
+          taxonomy_version: Json | null
+          tenant_id: string
+        }
+        Insert: {
+          candidate_provenance: Json
+          company_id: string
+          company_projection_version: number
+          company_tenant_id: string
+          computed_at: string
+          created_at?: string
+          eligibility_decision: string
+          eligibility_policy_version: string
+          feature_schema_version: string
+          features: Json
+          fingerprint: string
+          id?: string
+          investor_organisation_id: string
+          mandate_id: string
+          mandate_version: number
+          mode: string
+          semantic_generator_version?: string | null
+          sensitivity: string
+          status?: string
+          structured_generator_version?: string | null
+          superseded_at?: string | null
+          taxonomy_version?: Json | null
+          tenant_id: string
+        }
+        Update: {
+          candidate_provenance?: Json
+          company_id?: string
+          company_projection_version?: number
+          company_tenant_id?: string
+          computed_at?: string
+          created_at?: string
+          eligibility_decision?: string
+          eligibility_policy_version?: string
+          feature_schema_version?: string
+          features?: Json
+          fingerprint?: string
+          id?: string
+          investor_organisation_id?: string
+          mandate_id?: string
+          mandate_version?: number
+          mode?: string
+          semantic_generator_version?: string | null
+          sensitivity?: string
+          status?: string
+          structured_generator_version?: string | null
+          superseded_at?: string | null
+          taxonomy_version?: Json | null
+          tenant_id?: string
+        }
+        Relationships: []
+      }
       mandate_embeddings: {
         Row: {
           configuration_version: string

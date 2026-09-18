@@ -275,4 +275,87 @@ export {
   type HybridCandidateServiceDependencies,
 } from "./hybrid/service.js";
 
+// The recommendation feature registry and privacy firewall (CQ-REC-004):
+// the only legitimate input surface for a ranker.
+export {
+  FEATURE_DATA_TYPES,
+  FEATURE_GROUPS,
+  FEATURE_MISSING_POLICIES,
+  FEATURE_MISSING_REASONS,
+  FEATURE_ORDER,
+  FEATURE_SCHEMA_VERSION,
+  FEATURE_SNAPSHOT_VALUES_MAX,
+  FEATURE_SOURCE_CLASSES,
+  FEATURE_VALUE_STATUSES,
+  FeatureDataTypeSchema,
+  FeatureGroupSchema,
+  FeatureIdSchema,
+  FeatureMissingPolicySchema,
+  FeatureMissingReasonSchema,
+  FeatureProvenanceSchema,
+  FeatureSensitivitySchema,
+  FeatureSourceClassSchema,
+  FeatureValueSchema,
+  FeatureValueStatusSchema,
+  FeatureVersionSchema,
+  RECOMMENDATION_FEATURES,
+  RecommendationFeatureDefinitionSchema,
+  RecommendationFeatureSnapshotSchema,
+  SnapshotCandidateProvenanceSchema,
+  validateFeatureRegistry,
+  type FeatureDataType,
+  type FeatureGroup,
+  type FeatureMissingPolicy,
+  type FeatureMissingReason,
+  type FeatureProvenance,
+  type FeatureSensitivity,
+  type FeatureSourceClass,
+  type FeatureValue,
+  type FeatureValueStatus,
+  type RecommendationFeatureDefinition,
+  type RecommendationFeatureSnapshot,
+  type SnapshotCandidateProvenance,
+} from "./features/contracts.js";
+export {
+  checkValue,
+  computeFeatureValues,
+  createFeatureRegistry,
+  FeatureContextNotAllowedError,
+  snapshotFingerprint,
+  snapshotSensitivity,
+  toSnapshotCandidateProvenance,
+  type CandidateProvenanceProjection,
+  type CompanyStateProjection,
+  type CompanyTaxonomyProjection,
+  type ComputedFeature,
+  type FeatureInputs,
+  type FeatureRegistry,
+  type PreferenceHierarchyProjection,
+} from "./features/policy.js";
+export type {
+  CompanyFeatureProjection,
+  CompanyFeatureProjectionPort,
+  FeatureSnapshotStore,
+  PreferenceHierarchyPort,
+  StoredFeatureSnapshotRef,
+} from "./features/ports.js";
+export {
+  CandidateNotRankableError,
+  createFeatureService,
+  type ComputeFeaturesQuery,
+  type ComputeFeaturesResult,
+  type FeatureComputationDiagnostics,
+  type FeatureService,
+  type FeatureServiceDependencies,
+} from "./features/service.js";
+export {
+  createPostgresFeatureSnapshotStore,
+  readCurrentFeatureSnapshot,
+} from "./infrastructure/postgres-feature-snapshot-store.js";
+export {
+  createDomainFeaturePorts,
+  type DomainFeaturePortDependencies,
+  type DomainFeaturePorts,
+} from "./infrastructure/domain-port-feature-sources.js";
+
 export const PACKAGE_NAME = "@capital-q/discovery" as const;
