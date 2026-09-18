@@ -871,6 +871,35 @@ carry them.
 larger one answered with 503s seventeen times in three hours on the free
 tier (migration 20260922). A smarter first choice needs a paid tier.
 
+## Q. The fourth transcript: a name that could not change, a yes that was not heard, and a memory that did not exist
+
+**Symptoms, from the person's chair (2026-09-17).** Typed "change my name
+from Daniel" was refused; "Approved." aloud produced "Your approval has
+been noted" with nothing approved; a refresh emptied the conversation;
+one conversation per tab and no way back to another; nothing Q was told
+on one day survived to the next; the interview met the same founder as a
+stranger.
+
+**Fully solved.** A reply to Q's own question is read for what it means;
+the person's name is a Q action like any other change; a conversation is
+listed, titled, reopened from the URL with what was recorded and archived
+on request; what the person said about themselves, their company, their
+names and their preferences is remembered through a deterministic gate
+and reaches the next conversation and the next interview as untrusted
+memory; and all of it is proven by the checklist in
+`q-memory-conversations-audit.md`.
+
+**What exists.** ADR 0012 and everything it lists: `DECISION_READER`,
+`person.profile.update`, the conversations API and chats sidebar, the
+memory table, service, gate, extractor and learner, analyst v4 and
+conductor v3 with memory in.
+
+**Verdict: PARTIAL.** Every deterministic condition in the checklist is
+`SOLVED` by a unit, integration or RLS test. Three conditions wait on a
+live probe against the running stack (a spoken session landing in its
+conversation on screen; remembered names reaching the recogniser; a
+typed "call me John" going through the approval to the profile).
+
 ## M. What this audit says to do next, in order
 
 1. **Prove the retrieval layer, not just the plan** (H2). The firewall's

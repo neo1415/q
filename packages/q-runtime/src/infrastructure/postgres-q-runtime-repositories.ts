@@ -66,6 +66,10 @@ const ConversationRow = z.object({
   organisation_id: OrganisationIdSchema.nullable(),
   context_type: QConversationContextTypeSchema,
   subject_refs: QSubjectRefsSchema,
+  title: z.string().nullable(),
+  summary: z.string().nullable(),
+  summary_through: Timestamp.nullable(),
+  last_message_at: Timestamp.nullable(),
   created_at: Timestamp,
   archived_at: Timestamp.nullable(),
 });
@@ -79,6 +83,10 @@ function toConversation(row: unknown): QConversation {
     organisationId: r.organisation_id,
     contextType: r.context_type,
     subjects: r.subject_refs,
+    title: r.title,
+    summary: r.summary,
+    summaryThrough: r.summary_through,
+    lastMessageAt: r.last_message_at,
     createdAt: r.created_at,
     archivedAt: r.archived_at,
   };
@@ -188,7 +196,8 @@ const IdRow = z.object({ id: z.string().uuid() });
 function selectConversation(executor: DatabaseExecutor) {
   return executor`
     select c.id, c.tenant_id, c.user_id, c.organisation_id, c.context_type,
-           c.subject_refs, c.created_at, c.archived_at
+           c.subject_refs, c.title, c.summary, c.summary_through,
+           c.last_message_at, c.created_at, c.archived_at
       from q_runtime.conversations c`;
 }
 
@@ -285,6 +294,41 @@ export function createPostgresQRuntimeRepositories(): QRuntimeRepositories {
              set subject_refs = ${JSON.stringify(subjects)}::text::jsonb
            where id = ${conversationId} and tenant_id = ${tenantId}`;
       },
+      listForOwner: async (executor, tenantId, userId, page) => {
+        const before = page.before ?? null;
+        const rows = await executor`
+          ${selectConversation(executor)}
+           where c.tenant_id = ${tenantId}
+             and c.user_id = ${userId}
+             and c.archived_at is null
+             and (${before}::timestamptz is null
+                  or coalesce(c.last_message_at, c.created_at) < ${before}::timestamptz)
+           order by coalesce(c.last_message_at, c.created_at) desc, c.id desc
+           limit ${page.limit}`;
+        return rows.map(toConversation);
+      },
+      setDigest: async (tx, tenantId, conversationId, digest) => {
+        await tx.sql`
+          update q_runtime.conversations
+             set title = coalesce(${digest.title}, title),
+                 summary = ${digest.summary},
+                 summary_through = ${digest.summaryThrough}
+           where id = ${conversationId} and tenant_id = ${tenantId}`;
+      },
+      archiveForOwner: async (tx, tenantId, userId, conversationId) => {
+        await tx.sql`
+          update q_runtime.conversations
+             set archived_at = coalesce(archived_at, now())
+           where id = ${conversationId}
+             and tenant_id = ${tenantId}
+             and user_id = ${userId}`;
+        return findConversationForOwner(
+          tx.sql,
+          tenantId,
+          userId,
+          conversationId,
+        );
+      },
       findOwnership: async (executor, conversationId) => {
         const rows = await executor`
           select c.tenant_id, c.user_id
@@ -336,6 +380,21 @@ export function createPostgresQRuntimeRepositories(): QRuntimeRepositories {
           .object({ tenant_id: TenantIdSchema, actor_user_id: UserIdSchema })
           .parse(rows[0]);
         return { tenantId: r.tenant_id, actorUserId: r.actor_user_id };
+      },
+      findLatestForConversation: async (
+        executor,
+        tenantId,
+        userId,
+        conversationId,
+      ) => {
+        const rows = await executor`
+          ${selectRun(executor)}
+           where r.tenant_id = ${tenantId}
+             and r.actor_user_id = ${userId}
+             and r.conversation_id = ${conversationId}
+           order by r.created_at desc, r.id desc
+           limit 1`;
+        return rows.length === 0 ? null : toRun(rows[0]);
       },
       listNonTerminal: async (executor, limit) => {
         const rows = await executor`
@@ -418,6 +477,11 @@ export function createPostgresQRuntimeRepositories(): QRuntimeRepositories {
         if (created === null) {
           throw new Error("q message insert did not return a row");
         }
+        // The conversation's own clock, for listing it by activity.
+        await tx.sql`
+          update q_runtime.conversations
+             set last_message_at = greatest(coalesce(last_message_at, created_at), ${created.createdAt}::timestamptz)
+           where id = ${input.conversationId} and tenant_id = ${input.tenantId}`;
         return created;
       },
       findById: findMessageById,
@@ -428,6 +492,20 @@ export function createPostgresQRuntimeRepositories(): QRuntimeRepositories {
            order by m.created_at asc, m.id asc
            limit ${limit}`;
         return rows.map(toMessage);
+      },
+      listRecentForConversation: async (
+        executor,
+        tenantId,
+        conversationId,
+        limit,
+      ) => {
+        const rows = await executor`
+          ${selectMessage(executor)}
+           where m.tenant_id = ${tenantId}
+             and m.conversation_id = ${conversationId}
+           order by m.created_at desc, m.id desc
+           limit ${limit}`;
+        return rows.map(toMessage).reverse();
       },
       listRecentForConversationOfRun: async (
         executor,

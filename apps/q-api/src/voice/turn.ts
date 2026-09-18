@@ -15,6 +15,7 @@ import {
 import {
   CorrelationIdSchema,
   QApprovalIdSchema,
+  QConversationIdSchema,
   type CorrelationId,
   type OnboardingSessionView,
   type OnboardingUnderstanding,
@@ -758,6 +759,14 @@ export function createVoiceTurnHandler(
     });
     const runId = result.run.id;
     thread.conversationId = result.run.conversationId ?? undefined;
+    // The screen learns which conversation the spoken turns live in, so
+    // "Go to chat" opens exactly this thread and a refresh finds it.
+    if (thread.conversationId !== undefined) {
+      dependencies.board?.record(binding.voiceSessionId, {
+        ...dependencies.board.read(binding.voiceSessionId),
+        conversationId: QConversationIdSchema.parse(thread.conversationId),
+      });
+    }
     if (signal.aborted) {
       // The person spoke again before Q started: nothing to answer.
       void qRuntime

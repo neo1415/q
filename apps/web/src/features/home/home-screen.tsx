@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Suspense } from "react";
 
 import { loadWebServerConfig } from "@capital-q/config/web";
 import { buttonClassName } from "@capital-q/ui/button";
@@ -14,6 +15,7 @@ import {
   resolveUnfinishedSetup,
   type OwnContext,
 } from "@/features/q/context";
+import { ChatsList } from "@/features/q/chats-list";
 import {
   QConversationPanel,
   type QSurfaceContext,
@@ -118,10 +120,19 @@ export async function HomeScreen() {
 
       <div className="flex flex-col gap-8">
         <PageSection id="q" title="Ask Q" titleHidden>
-          <QConversationPanel
-            connected={qConnected}
-            context={surfaceContext(context)}
-          />
+          {/* Below the desktop breakpoint the sidebar is hidden, so the
+              chats list sits above the conversation instead. */}
+          <div className="mb-4 lg:hidden">
+            <Suspense fallback={null}>
+              <ChatsList variant="inline" />
+            </Suspense>
+          </div>
+          <Suspense fallback={null}>
+            <QConversationPanel
+              connected={qConnected}
+              context={surfaceContext(context)}
+            />
+          </Suspense>
         </PageSection>
 
         {unfinished !== null ? (

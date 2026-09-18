@@ -5,6 +5,7 @@ import {
   createModelGatewayQAnswer,
   type QProfileUpdateNotebook,
   type QUserStatementRecorder,
+  type QMemoryRecall,
 } from "@capital-q/model-gateway/q";
 import type { Logger } from "@capital-q/observability";
 import {
@@ -88,6 +89,8 @@ export type QIntelligenceDependencies = {
   readonly statements?: QUserStatementRecorder | undefined;
   /** Where a requested profile change is noted for the action proposer (ADR 0011). */
   readonly profileUpdates?: QProfileUpdateNotebook | undefined;
+  /** What Capital Q remembers about the person, for the prompts (ADR 0012). */
+  readonly memory?: QMemoryRecall | undefined;
   /**
    * Where an answer goes as it is written. Absent means it goes out only
    * when it is finished; the stored message and its completion event are
@@ -196,6 +199,9 @@ export function composeQIntelligence(
     ...(dependencies.profileUpdates === undefined
       ? {}
       : { profileUpdates: dependencies.profileUpdates }),
+    ...(dependencies.memory === undefined
+      ? {}
+      : { memory: dependencies.memory }),
     ...(dependencies.deltas === undefined
       ? {}
       : { deltas: dependencies.deltas }),
@@ -216,6 +222,9 @@ export function composeQIntelligence(
     ...(dependencies.profileUpdates === undefined
       ? {}
       : { profileUpdates: dependencies.profileUpdates }),
+    ...(dependencies.memory === undefined
+      ? {}
+      : { memory: dependencies.memory }),
     knowledge: createKnowledgeCompanyPort(knowledge),
     evidence: createRetrievalEvidencePort(retrievalService, logger),
     // The plan's ceiling, never a declaration made at composition time.

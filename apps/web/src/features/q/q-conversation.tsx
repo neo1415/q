@@ -1,7 +1,7 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { describeQStreamTransport } from "@capital-q/api-client";
 import { QConversationIdSchema } from "@capital-q/contracts";
@@ -22,7 +22,11 @@ import {
   turnsFrom,
   workingLabel,
 } from "./conversation";
-import { useQConversation } from "./use-q-conversation";
+import { Q_CONVERSATION_PARAM } from "./chats-list";
+import {
+  announceConversationsChanged,
+  useQConversation,
+} from "./use-q-conversation";
 
 type SpokenLine = {
   readonly id: string;
@@ -69,13 +73,29 @@ export function QConversationPanel({
   connected,
   context,
 }: QConversationPanelProps) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  // Which conversation this surface is in comes from the URL (ADR 0012),
+  // so a refresh, a link and the chats list all open the same thread. A
+  // conversation the server names for the first time is written back to
+  // the URL without a navigation, so nothing on screen is disturbed.
+  const conversationParam = searchParams.get(Q_CONVERSATION_PARAM);
+  const onConversation = useCallback(
+    (conversationId: string) => {
+      const next = new URLSearchParams(searchParams.toString());
+      next.set(Q_CONVERSATION_PARAM, conversationId);
+      window.history.replaceState(null, "", `/home?${next.toString()}`);
+    },
+    [searchParams],
+  );
   const q = useQConversation({
     companyId: context.companyId,
     investorOrganisationId: context.investorOrganisationId,
+    conversationId: conversationParam,
+    onConversation,
   });
   const turns = turnsFrom(q.state, q.pending);
   const endRef = useRef<HTMLDivElement>(null);
-  const router = useRouter();
 
   // Voice (CQ-Q-VOICE-001): the same Q conversation, spoken. The credential
   // is bound on the server to this person, this subject and the
@@ -117,6 +137,23 @@ export function QConversationPanel({
       firstMessage: "I'm listening. What would you like to know?",
     });
   };
+
+  // The spoken turns live in a conversation the server names; once it
+  // does, the screen is in that conversation too, so "Go to chat" and a
+  // refresh find what was said aloud.
+  const voiceConversationId = voice.turn?.conversationId;
+  useEffect(() => {
+    if (
+      voiceConversationId !== undefined &&
+      voiceConversationId !== conversationParam
+    ) {
+      onConversation(voiceConversationId);
+      announceConversationsChanged();
+      router.replace(
+        `/home?${Q_CONVERSATION_PARAM}=${encodeURIComponent(voiceConversationId)}`,
+      );
+    }
+  }, [voiceConversationId, conversationParam, onConversation, router]);
 
   // "Take me to my profile", said on Home: followed once Q has said so.
   const voiceEnd = voice.end;
@@ -178,7 +215,11 @@ export function QConversationPanel({
   const stage = workingLabel(q.state);
   // Suggestions are an on-ramp, not a feature: gone after the first turn.
   const showSuggestions =
-    connected && turns.length === 0 && !q.working && q.state.failure === null;
+    connected &&
+    turns.length === 0 &&
+    !q.working &&
+    !q.loading &&
+    q.state.failure === null;
 
   return (
     <div className="flex flex-col gap-4" data-q-workspace>
@@ -265,6 +306,12 @@ export function QConversationPanel({
           ))}
           <div ref={endRef} />
         </ol>
+      ) : null}
+
+      {q.loading && turns.length === 0 ? (
+        <p className="cq-body-sm text-(--cq-text-tertiary)">
+          Opening your conversation…
+        </p>
       ) : null}
 
       {q.working ? (

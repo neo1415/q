@@ -62,8 +62,22 @@ export type QConversation = {
   readonly organisationId: OrganisationId | null;
   readonly contextType: QConversationContextType;
   readonly subjects: readonly QSubjectRef[];
+  /** A few words naming it, once the memory extractor has run (ADR 0012). */
+  readonly title: string | null;
+  /** The conversation so far, rolled forward. Model-written working memory: untrusted text. */
+  readonly summary: string | null;
+  /** The newest message the summary covers. */
+  readonly summaryThrough: UtcTimestamp | null;
+  readonly lastMessageAt: UtcTimestamp | null;
   readonly createdAt: UtcTimestamp;
   readonly archivedAt: UtcTimestamp | null;
+};
+
+/** What the memory extractor writes back about a conversation. */
+export type QConversationDigest = {
+  readonly title: string | null;
+  readonly summary: string;
+  readonly summaryThrough: UtcTimestamp;
 };
 
 export type NewQConversation = {

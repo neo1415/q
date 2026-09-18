@@ -223,3 +223,52 @@ export {
   type RecordStatementOutcome,
   type StatementEvidencePort,
 } from "./q/statement-recorder.js";
+
+export {
+  LIVE_MEMORY_STATUSES,
+  MEMORY_CONTENT_MAX,
+  MEMORY_OWNER_CONTEXT_TYPES,
+  MEMORY_QUOTE_MAX,
+  MEMORY_STATUSES,
+  MEMORY_SUBJECT_TYPES,
+  MEMORY_TYPES,
+  MEMORY_WRITE_MODES,
+  MEMORY_WRITE_REASONS,
+  MemoryCandidateSchema,
+  MemoryItemSchema,
+  MemoryKeySchema,
+  MemoryOwnerContextTypeSchema,
+  MemoryStatusSchema,
+  MemorySubjectRefSchema,
+  MemoryTypeSchema,
+  MemoryWriteModeSchema,
+  type MemoryBundle,
+  type MemoryCandidate,
+  type MemoryItem,
+  type MemoryOwner,
+  type MemoryOwnerContextType,
+  type MemoryStatus,
+  type MemorySubjectRef,
+  type MemoryType,
+  type MemoryWriteMode,
+  type MemoryWriteReason,
+  type MemoryWriteResult,
+} from "./memory/contracts.js";
+export {
+  createPostgresMemoryRepository,
+  type MemoryRepository,
+  type NewMemoryItem,
+} from "./memory/postgres-memory-repository.js";
+export {
+  createMemoryService,
+  looksLikeSecret,
+  memoryContentHash,
+  personOwner,
+  type ForgetCommand,
+  type MemoryConversationDigestPort,
+  type MemoryService,
+  type MemoryServiceDependencies,
+  type RecallQuery,
+  type RememberCommand,
+} from "./memory/service.js";
+export { MEMORY_TEXT_MAX, renderMemoryBundle } from "./memory/render.js";

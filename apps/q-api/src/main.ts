@@ -101,7 +101,15 @@ import {
   createSelfUserQSubjectResolver,
   neverPause,
 } from "@capital-q/q-runtime";
-import { createAuthorizationService } from "@capital-q/security";
+import {
+  createMemoryService,
+  createPostgresMemoryRepository,
+} from "@capital-q/q-knowledge";
+import {
+  ActorContextSchema,
+  createAuthorizationService,
+  type ActorContext,
+} from "@capital-q/security";
 import {
   createPostgresActorContextResolver,
   createPostgresApplicationIdentityLookup,
@@ -140,6 +148,11 @@ import { createElevenLabsVoiceProvider } from "./voice/providers/elevenlabs.js";
 import { createVoiceTurnHandler } from "./voice/turn.js";
 import { createDecisionReader } from "./voice/decision.js";
 import { createPersonProfileUpdateAction } from "./composition/person-profile-action.js";
+import {
+  createConversationDigestPort,
+  createMemoryLearner,
+  withLearning,
+} from "./composition/memory-learner.js";
 
 // Q configuration is loaded from its own schema, separate from the application
 // API even where the current fields coincide.
@@ -505,6 +518,39 @@ void embeddings
   .catch((error: unknown) =>
     logger.warn({ err: error }, "embedding runtime not warmed"),
   );
+// What Q remembers about a person (ADR 0012): the memory service over
+// q_knowledge.memory_items, its write gate, and the learner that runs
+// after every run to propose memories and keep the conversation summary
+// current. Recall is composed into the prompts below; learning is hung on
+// the orchestrator further down.
+const displayNameFor = async (actor: ActorContext): Promise<string | null> => {
+  // A profile belongs to a person, not to a tenant: the predicate is the
+  // acting user's own id, so this can only ever read the caller's name.
+  const rows = await database.sql<
+    { display_name: string | null }[]
+  >`select p.display_name
+      from identity.user_profiles p
+     where p.id = ${actor.userId}
+       and p.status = 'active'
+     limit 1`;
+  return rows[0]?.display_name ?? null;
+};
+const memoryService = createMemoryService({
+  sql: database.sql,
+  transactions: database.transactions,
+  repository: createPostgresMemoryRepository(),
+  conversations: createConversationDigestPort(repositories, database.sql),
+  logger,
+});
+const memoryLearner = createMemoryLearner({
+  gateway: modelGateway,
+  memory: memoryService,
+  repositories,
+  sql: database.sql,
+  transactions: database.transactions,
+  people: { displayNameFor },
+  logger,
+});
 const qIntelligence = composeQIntelligence({
   sql: database.sql,
   transactions: database.transactions,
@@ -514,6 +560,7 @@ const qIntelligence = composeQIntelligence({
   embeddings,
   statements: researchComposition.statements,
   profileUpdates: profileBoard,
+  memory: memoryLearner.recall,
   // The same bus the run stream publishes from, so an answer reaches a
   // person as it is written rather than after it.
   deltas: liveDeltas,
@@ -535,17 +582,20 @@ const orchestrationRuntime = createQOrchestrationRuntime({
   ...runtimeDependencies,
   repositories,
 });
-const orchestrator = createLangGraphQOrchestrator({
-  runtime: orchestrationRuntime,
-  cancelRun: qRuntime.cancelRun,
-  checkpoints,
-  firewall,
-  retrieval: qIntelligence.retrieval,
-  answer: qIntelligence.answer,
-  actions: qActionPort,
-  pausePolicy: neverPause,
-  logger,
-});
+const orchestrator = withLearning(
+  createLangGraphQOrchestrator({
+    runtime: orchestrationRuntime,
+    cancelRun: qRuntime.cancelRun,
+    checkpoints,
+    firewall,
+    retrieval: qIntelligence.retrieval,
+    answer: qIntelligence.answer,
+    actions: qActionPort,
+    pausePolicy: neverPause,
+    logger,
+  }),
+  memoryLearner,
+);
 
 /**
  * The orchestration boundary. On: an accepted run is orchestrated at once
@@ -606,6 +656,19 @@ const interviewer = createInterviewer({
   logger,
   personality: config.voice.personality,
   expressive: config.voice.expressive,
+  // The interview meets the same person twice and knows it (ADR 0012).
+  memory: {
+    recallText: (attribution) =>
+      memoryLearner.recall.recall({
+        actor: ActorContextSchema.parse({
+          userId: attribution.userId,
+          tenantId: attribution.tenantId,
+          actorType: "HUMAN",
+        }),
+        runId: "interview",
+        subjects: [],
+      }),
+  },
 });
 const voiceTurnBoard = createVoiceTurnBoard();
 const welcomeHost = createWelcomeHost({
@@ -660,22 +723,7 @@ const voiceTurn = createVoiceTurnHandler({
           },
           // The name to look a person up by, read from their own profile
           // row. Their own only: the query is keyed on the acting user.
-          people: {
-            displayNameFor: async (actor) => {
-              // A profile belongs to a person, not to a tenant: the table
-              // has no tenant column because the same person can act in
-              // more than one. The predicate is the acting user's own id,
-              // so this can only ever read the caller's own name.
-              const rows = await database.sql<
-                { display_name: string | null }[]
-              >`select p.display_name
-                  from identity.user_profiles p
-                 where p.id = ${actor.userId}
-                   and p.status = 'active'
-                 limit 1`;
-              return rows[0]?.display_name ?? null;
-            },
-          },
+          people: { displayNameFor },
           logger,
         }),
       }),
@@ -737,6 +785,7 @@ const { app, logger: appLogger } = createApp(
             board: voiceTurnBoard,
             welcome: welcomeHost,
             turn: voiceTurn,
+            memory: { termsFor: memoryLearner.termsFor },
             logger,
           },
         }),

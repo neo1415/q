@@ -36,8 +36,8 @@ select has_table('q_knowledge', 'revisions', 'understandings have an append-only
 select has_table('q_knowledge', 'object_evidence', 'an understanding records the evidence it rests on');
 select has_table('q_knowledge', 'object_sources', 'and the sources behind that evidence');
 select has_table('q_knowledge', 'lineage', 'derived understandings record what they came from');
-select hasnt_table('q_knowledge', 'memory_items',
-  'no long-term memory feature was built here: KNW-002 is knowledge, not memory');
+select has_table('q_knowledge', 'memory_items',
+  'memory arrived with ADR 0012 as its own table: KNW-002 knowledge stays apart from it');
 
 select is((select count(*)::int from pg_policies where schemaname = 'q_knowledge'
             and tablename in ('objects','revisions','object_evidence','object_sources','lineage')), 0,

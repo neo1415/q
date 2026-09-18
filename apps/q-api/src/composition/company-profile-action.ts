@@ -293,7 +293,12 @@ export function createProfileUpdateBoard(
     readonly logger?: Logger | undefined;
     readonly now?: (() => number) | undefined;
   } = {},
-): QProfileUpdateNotebook & QActionProposer & ProfileSuggestionBoard {
+): QProfileUpdateNotebook & {
+  readonly noteDisplayName: NonNullable<
+    QProfileUpdateNotebook["noteDisplayName"]
+  >;
+} & QActionProposer &
+  ProfileSuggestionBoard {
   const now = options.now ?? (() => Date.now());
   const noted = new Map<string, Noted>();
   const names = new Map<string, NotedName>();

@@ -26,6 +26,7 @@ export {
   MessageSquare,
   Mic,
   MoreHorizontal,
+  Plus,
   Sparkle,
   Upload,
   Users,

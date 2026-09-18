@@ -12,6 +12,7 @@ import {
 } from "@capital-q/observability";
 
 import { registerProblemHandling } from "./http/problem-handler.js";
+import { registerQConversationRoutes } from "./http/q-conversations.js";
 import { registerQMcpRoute, type QMcpRouteDependencies } from "./http/q-mcp.js";
 import {
   registerQApprovalRoutes,
@@ -95,6 +96,7 @@ export type QApiModules = {
         | "board"
         | "welcome"
         | "deepgram"
+        | "memory"
       >)
     | undefined;
 };
@@ -197,6 +199,14 @@ export function createApp(
       identity: security.identity,
       qRuntime: modules.qRuntime,
       orchestration: modules.orchestration,
+    });
+    // A person's conversations (ADR 0012): the same owner rule, the
+    // same personal-context allowance, read back from the runtime.
+    registerQConversationRoutes(app, {
+      authenticator: security.authenticator,
+      resolver: security.resolver,
+      identity: security.identity,
+      qRuntime: modules.qRuntime,
     });
   }
 

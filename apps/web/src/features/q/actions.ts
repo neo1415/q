@@ -6,17 +6,22 @@ import {
   ApiProblemError,
   appendQRunMessage,
   approveQApproval,
+  archiveQConversation,
   cancelQRun,
   rejectQApproval,
   createQRun,
   getCurrentOnboardingSession,
+  getQConversation,
   getQRun,
+  listQConversations,
   type ApiSession,
 } from "@capital-q/api-client";
 import { loadWebServerConfig } from "@capital-q/config/web";
 import {
   Q_MESSAGE_TEXT_MAX_LENGTH,
   QConversationIdSchema,
+  type ListQConversationsResponse,
+  type QConversationDetail,
   type QRunSummary,
 } from "@capital-q/contracts";
 
@@ -316,4 +321,43 @@ export async function readQRunAction(
     return failure("I couldn't find that conversation.");
   }
   return run((session) => getQRun(session, runId.data));
+}
+
+/**
+ * A person's conversations with Q (ADR 0012). Owner-only on the Q API; a
+ * conversation that is not theirs is not found. The browser never keeps
+ * a copy: a refresh reads the list and the thread back from the server.
+ */
+export async function listQConversationsAction(
+  before?: string,
+): Promise<QActionResult<ListQConversationsResponse>> {
+  return run((session) =>
+    listQConversations(session, {
+      limit: 30,
+      ...(before === undefined ? {} : { before }),
+    }),
+  );
+}
+
+export async function readQConversationAction(
+  rawConversationId: string,
+): Promise<QActionResult<QConversationDetail>> {
+  const conversationId = QConversationIdSchema.safeParse(rawConversationId);
+  if (!conversationId.success) {
+    return failure("I couldn't find that conversation.");
+  }
+  return run((session) => getQConversation(session, conversationId.data));
+}
+
+export async function archiveQConversationAction(
+  rawConversationId: string,
+): Promise<QActionResult<null>> {
+  const conversationId = QConversationIdSchema.safeParse(rawConversationId);
+  if (!conversationId.success) {
+    return failure("I couldn't find that conversation.");
+  }
+  return run(async (session) => {
+    await archiveQConversation(session, conversationId.data);
+    return null;
+  });
 }

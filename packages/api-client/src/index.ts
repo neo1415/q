@@ -119,8 +119,11 @@ export {
 export {
   appendQRunMessage,
   approveQApproval,
+  archiveQConversation,
   cancelQRun,
   createQRun,
+  getQConversation,
+  listQConversations,
   createQVoiceSession,
   getQVoiceTurnState,
   getQApproval,

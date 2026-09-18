@@ -195,6 +195,11 @@ export const QVoiceTurnStateSchema = z
     /** FORM: the interview leaves the person with the form. CHAT: the voice ends and the typed thread stays. */
     handoff: z.enum(["FORM", "CHAT"]).nullable(),
     degraded: z.boolean(),
+    /**
+     * The Q conversation the spoken turns are recorded in, once one
+     * exists, so the screen can show and reopen it (ADR 0012).
+     */
+    conversationId: QConversationIdSchema.optional(),
   })
   .strict();
 export type QVoiceTurnState = z.infer<typeof QVoiceTurnStateSchema>;

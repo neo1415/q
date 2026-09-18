@@ -406,6 +406,77 @@ describe("@capital-q/q-runtime against local PostgreSQL", () => {
     });
   });
 
+  it("lists and reopens the owner's conversations, newest activity first, and hides them from everyone else (ADR 0012)", async () => {
+    await withWorld(
+      async ({ tx, service, adminA, memberA, adminB, companyA }) => {
+        const first = await service.createRun({
+          actor: adminA.actor,
+          input: request({
+            subjects: [{ kind: "COMPANY", companyId: companyA }],
+            message: { text: "How much runway does Apex have?" },
+          }),
+          idempotencyKey: "list-0001",
+          correlationId: CORRELATION(),
+        });
+        const second = await service.createRun({
+          actor: adminA.actor,
+          input: request({
+            subjects: [{ kind: "COMPANY", companyId: companyA }],
+            message: { text: "Compare Apex with Paystack." },
+          }),
+          idempotencyKey: "list-0002",
+          correlationId: CORRELATION(),
+        });
+        // Activity, not creation, orders the list: a turn in the first
+        // conversation brings it to the top.
+        await tx.sql`update q_runtime.conversations set last_message_at = now() + interval '1 minute' where id = ${first.conversation.id}`;
+
+        const listed = await service.listConversations({ actor: adminA.actor });
+        expect(listed.items.map((c) => c.conversationId)).toEqual([
+          first.conversation.id,
+          second.conversation.id,
+        ]);
+        // No title yet: the opening words stand in.
+        expect(listed.items[0]?.title).toBe("How much runway does Apex have?");
+        expect(listed.nextBefore).toBeUndefined();
+
+        const opened = await service.getConversation({
+          actor: adminA.actor,
+          conversationId: second.conversation.id,
+        });
+        expect(opened.detail.messages.map((m) => m.text)).toEqual([
+          "Compare Apex with Paystack.",
+        ]);
+        expect(opened.detail.latestRun?.runId).toBe(second.run.id);
+
+        // Another person in the same tenant, and another tenant: nothing.
+        expect(
+          (await service.listConversations({ actor: memberA.actor })).items,
+        ).toEqual([]);
+        expect(
+          (await service.listConversations({ actor: adminB.actor })).items,
+        ).toEqual([]);
+        await expect(
+          service.getConversation({
+            actor: memberA.actor,
+            conversationId: second.conversation.id,
+          }),
+        ).rejects.toBeInstanceOf(QConversationNotFoundError);
+
+        // Archived: gone from the list, still readable by its owner.
+        await service.archiveConversation({
+          actor: adminA.actor,
+          conversationId: second.conversation.id,
+        });
+        expect(
+          (await service.listConversations({ actor: adminA.actor })).items.map(
+            (c) => c.conversationId,
+          ),
+        ).toEqual([first.conversation.id]);
+      },
+    );
+  });
+
   it("changes the subject when a turn names a different one, and carries the new one on", async () => {
     await withWorld(async ({ service, adminA, companyA, companyA2 }) => {
       const first = await service.createRun({

@@ -102,3 +102,11 @@ ElevenLabs Speech Engines, if used, are re-pointed once with
 - A malware scanner for document processing.
 - A CI job that runs `pnpm db:push --dry-run` against the hosted project and
   fails when a migration is missing.
+
+## Migrations added after the first hosted push
+
+- `20260925090000_q_conversations_listing.sql` and
+  `20260925091000_q_memory_items.sql` (ADR 0012). Apply with `pnpm db:push`
+  against the hosted project before deploying a q-api that composes the
+  memory service; the service reads `q_knowledge.memory_items` on every
+  answer and the conversation routes read the new columns.

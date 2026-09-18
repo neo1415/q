@@ -455,3 +455,19 @@ export {
   type QResponseDepth,
   type QTone,
 } from "./communication.js";
+
+export {
+  ListQConversationsQuerySchema,
+  ListQConversationsResponseSchema,
+  Q_CONVERSATION_ARCHIVE_SUFFIX,
+  Q_CONVERSATION_MESSAGES_MAX,
+  Q_CONVERSATIONS_PAGE_MAX,
+  Q_CONVERSATIONS_PATH,
+  QConversationDetailSchema,
+  QConversationSummarySchema,
+  QConversationTitleSchema,
+  type ListQConversationsQuery,
+  type ListQConversationsResponse,
+  type QConversationDetail,
+  type QConversationSummary,
+} from "./conversation.js";

@@ -27,7 +27,7 @@ import {
   renderPrompt,
   InterviewConductorResultSchema,
   type InterviewConductorResult,
-  type InterviewConductorVariables,
+  type InterviewConductorV3Variables,
   type InterviewOpenStep,
   type PromptRegistry,
   personalityOf,
@@ -62,6 +62,19 @@ export type InterviewerDependencies = {
   readonly personality?: QPersonalityCode | undefined;
   /** True when the speech model renders inline audio tags ([laughs]). */
   readonly expressive?: boolean | undefined;
+  /**
+   * What Capital Q remembers about the person (ADR 0012), as bounded
+   * text for the prompt. Absent means the interview starts from nothing,
+   * as it did before.
+   */
+  readonly memory?:
+    | {
+        readonly recallText: (attribution: {
+          readonly tenantId: string;
+          readonly userId: string;
+        }) => Promise<string>;
+      }
+    | undefined;
 };
 
 export type InterviewTurnInput = {
@@ -666,6 +679,24 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
   // full, later ones steer back (the prompt reads the count).
   const tangentsBySession = new Map<string, number>();
   const personality = personalityOf(dependencies.personality);
+  /**
+   * What is remembered, for this turn. A failed recall is an empty
+   * memory; the interview goes on without its past rather than not at
+   * all.
+   */
+  const recallMemory = async (attribution: {
+    readonly tenantId: string;
+    readonly userId: string;
+  }): Promise<string> => {
+    const port = dependencies.memory;
+    if (port === undefined) return "";
+    try {
+      return (await port.recallText(attribution)).slice(0, 4_000);
+    } catch (error: unknown) {
+      logger.warn({ err: error }, "memory was not recalled for the interview");
+      return "";
+    }
+  };
   const expressive = dependencies.expressive ?? false;
 
   return {
@@ -734,7 +765,7 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
       );
 
       const variables: Omit<
-        InterviewConductorVariables,
+        InterviewConductorV3Variables,
         | "operatingMode"
         | "communicationProfile"
         | "communicationGuidance"
@@ -766,8 +797,9 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
           text: t.text.slice(0, RECENT_TURN_MAX_CHARS),
         })),
         utterance: input.utterance.slice(0, 2_000),
+        memory: await recallMemory(input.attribution),
       };
-      const rendered = renderPrompt<InterviewConductorVariables>(registry, {
+      const rendered = renderPrompt<InterviewConductorV3Variables>(registry, {
         task: "INTERVIEW_CONDUCTOR",
         charter: "Q_SYSTEM_VOICE",
         operatingMode: "ASSESSMENT",

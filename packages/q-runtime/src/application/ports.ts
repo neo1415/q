@@ -17,6 +17,7 @@ import type {
   NewQRun,
   NewQRunEvent,
   QConversation,
+  QConversationDigest,
   QConversationMessage,
   QRunEventRecord,
   QRunRecord,
@@ -67,6 +68,33 @@ export type QConversationRepository = {
     conversationId: QConversationId,
     subjects: readonly QSubjectRef[],
   ) => Promise<void>;
+  /**
+   * The owner's open conversations, newest activity first, bounded.
+   * `before` pages by last activity. Owner and tenant, always.
+   */
+  readonly listForOwner: (
+    executor: DatabaseExecutor,
+    tenantId: TenantId,
+    userId: UserId,
+    page: {
+      readonly limit: number;
+      readonly before?: UtcTimestamp | undefined;
+    },
+  ) => Promise<readonly QConversation[]>;
+  /** Other recent conversations of the owner, for cross-conversation memory: identifiers, titles and summaries only. */
+  readonly setDigest: (
+    tx: TransactionContext,
+    tenantId: TenantId,
+    conversationId: QConversationId,
+    digest: QConversationDigest,
+  ) => Promise<void>;
+  /** Archives the owner's conversation; idempotent; null when it is not theirs. */
+  readonly archiveForOwner: (
+    tx: TransactionContext,
+    tenantId: TenantId,
+    userId: UserId,
+    conversationId: QConversationId,
+  ) => Promise<QConversation | null>;
 };
 
 export type QRunTransition = {
@@ -112,6 +140,13 @@ export type QRunRepository = {
     executor: DatabaseExecutor,
     limit: number,
   ) => Promise<readonly QRunRecord[]>;
+  /** The newest run of a conversation, for reopening it where it stopped. Owner-scoped. */
+  readonly findLatestForConversation: (
+    executor: DatabaseExecutor,
+    tenantId: TenantId,
+    userId: UserId,
+    conversationId: QConversationId,
+  ) => Promise<QRunRecord | null>;
   /** Row lock for a lifecycle decision made from the current state. */
   readonly lockForActor: (
     tx: TransactionContext,
@@ -170,6 +205,13 @@ export type QConversationMessageRepository = {
     executor: DatabaseExecutor,
     tenantId: TenantId,
     runId: QRunId,
+    limit: number,
+  ) => Promise<readonly QConversationMessage[]>;
+  /** The most recent messages of a conversation, oldest first, bounded. Tenant-scoped; the caller has checked ownership. */
+  readonly listRecentForConversation: (
+    executor: DatabaseExecutor,
+    tenantId: TenantId,
+    conversationId: QConversationId,
     limit: number,
   ) => Promise<readonly QConversationMessage[]>;
 };

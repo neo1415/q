@@ -9,9 +9,13 @@ import {
   Q_APPROVAL_APPROVE_SUFFIX,
   Q_APPROVAL_REJECT_SUFFIX,
   Q_APPROVALS_PATH,
+  Q_CONVERSATION_ARCHIVE_SUFFIX,
+  Q_CONVERSATIONS_PATH,
   Q_RUN_CANCEL_SUFFIX,
   Q_RUN_MESSAGES_SUFFIX,
   Q_RUNS_PATH,
+  ListQConversationsResponseSchema,
+  QConversationDetailSchema,
   QApprovalViewSchema,
   QRunSummarySchema,
   type AppendQRunMessageRequest,
@@ -20,6 +24,7 @@ import {
   type RejectQApprovalRequest,
 } from "@capital-q/contracts";
 
+import { readProblemResponse } from "./problem.js";
 import { call, type ApiSession } from "./request.js";
 
 /**
@@ -160,4 +165,61 @@ export function createQVoiceSession(
     CreateQVoiceSessionResponseSchema,
     { body: input },
   );
+}
+
+const conversationPath = (conversationId: string) =>
+  `${Q_CONVERSATIONS_PATH}/${encodeURIComponent(conversationId)}`;
+
+/**
+ * A person's conversations with Q (ADR 0012). Owner-only on the server;
+ * a conversation that is not theirs is not found.
+ */
+
+/** `GET /v1/q/conversations?limit=&before=` — newest activity first. */
+export function listQConversations(
+  session: ApiSession,
+  page: { readonly limit?: number; readonly before?: string } = {},
+) {
+  const query = new URLSearchParams();
+  if (page.limit !== undefined) query.set("limit", String(page.limit));
+  if (page.before !== undefined) query.set("before", page.before);
+  const suffix = query.size === 0 ? "" : `?${query.toString()}`;
+  return call(
+    session,
+    "GET",
+    `${Q_CONVERSATIONS_PATH}${suffix}`,
+    ListQConversationsResponseSchema,
+  );
+}
+
+/** `GET /v1/q/conversations/:conversationId` — the recent turns and the latest run. */
+export function getQConversation(session: ApiSession, conversationId: string) {
+  return call(
+    session,
+    "GET",
+    conversationPath(conversationId),
+    QConversationDetailSchema,
+  );
+}
+
+/** `POST /v1/q/conversations/:conversationId/archive` — idempotent; 204. */
+export async function archiveQConversation(
+  session: ApiSession,
+  conversationId: string,
+): Promise<void> {
+  const doFetch = session.fetch ?? fetch;
+  const response = await doFetch(
+    `${session.baseUrl.replace(/\/$/, "")}${conversationPath(conversationId)}${Q_CONVERSATION_ARCHIVE_SUFFIX}`,
+    {
+      method: "POST",
+      headers: {
+        accept: "application/json",
+        authorization: `Bearer ${session.accessToken}`,
+      },
+      cache: "no-store",
+    },
+  );
+  if (!response.ok) {
+    throw await readProblemResponse(response);
+  }
 }

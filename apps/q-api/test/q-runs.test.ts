@@ -117,6 +117,9 @@ function fakeService(overrides: Partial<QRuntimeService> = {}) {
     getRun: [],
     appendMessage: [],
     cancelRun: [],
+    listConversations: [],
+    getConversation: [],
+    archiveConversation: [],
   };
   const service: QRuntimeService = {
     createRun: (command) => {
@@ -149,6 +152,9 @@ function fakeService(overrides: Partial<QRuntimeService> = {}) {
         summary: { ...SUMMARY, status: "CANCELLED", completedAt: NOW },
       });
     },
+    listConversations: () => Promise.reject(new Error("not under test")),
+    getConversation: () => Promise.reject(new Error("not under test")),
+    archiveConversation: () => Promise.reject(new Error("not under test")),
     ...overrides,
   };
   return { service, calls };

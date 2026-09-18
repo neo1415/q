@@ -33,6 +33,7 @@ import type {
 } from "./providers/deepgram.js";
 import type { VoiceTurnBoard } from "./turn-board.js";
 import type { WelcomeHost } from "./welcome.js";
+import type { ActorContext } from "@capital-q/security";
 import type { ApplicationIdentityLookup } from "@capital-q/security/postgres";
 
 /**
@@ -73,6 +74,10 @@ export type QVoiceRoutesDependencies = ActorContextDependencies & {
    * subject-bound threads resolve their organisation as everywhere else.
    */
   readonly identity?: ApplicationIdentityLookup | undefined;
+  /** Names this person taught Q to hear (ADR 0012), for the recogniser. */
+  readonly memory?:
+    | { readonly termsFor: (actor: ActorContext) => Promise<readonly string[]> }
+    | undefined;
 };
 
 export function registerQVoiceRoutes(
@@ -221,6 +226,16 @@ export function registerQVoiceRoutes(
             : "I'm listening. What would you like to look at?";
       }
 
+      // Names the person has taught Q to hear, before the recogniser
+      // hears them again. Best effort: no memory is an empty list.
+      let rememberedTerms: readonly string[] = [];
+      if (dependencies.memory !== undefined) {
+        try {
+          rememberedTerms = await dependencies.memory.termsFor(actor);
+        } catch (error: unknown) {
+          request.log.debug({ err: error }, "remembered terms unavailable");
+        }
+      }
       const issuedAt = now();
       const voiceSessionId = randomUUID();
       let credentials: {
@@ -244,10 +259,12 @@ export function registerQVoiceRoutes(
             thinkToken,
             // The organisation they typed at sign-up: the one name in this
             // conversation the recogniser could not know.
-            terms:
-              input.organisationHint === undefined
+            terms: [
+              ...(input.organisationHint === undefined
                 ? []
-                : [input.organisationHint],
+                : [input.organisationHint]),
+              ...rememberedTerms,
+            ],
           }),
         };
       } else if (elevenLabs !== undefined) {

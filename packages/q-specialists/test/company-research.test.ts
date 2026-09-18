@@ -10,7 +10,7 @@ import {
 } from "@capital-q/contracts";
 import type { ModelGateway } from "@capital-q/model-gateway";
 import type { QUserStatementRecorder } from "@capital-q/model-gateway/q";
-import type { CompanyAnalystV2Result } from "@capital-q/q-core";
+import type { CompanyAnalystV4Result } from "@capital-q/q-core";
 import type {
   QAnswerRequest,
   QConversationMessage,
@@ -83,8 +83,8 @@ function plan(): PermittedContextPlan {
 
 function analyst(
   answer: string,
-  extra: Partial<CompanyAnalystV2Result> = {},
-): CompanyAnalystV2Result {
+  extra: Partial<CompanyAnalystV4Result> = {},
+): CompanyAnalystV4Result {
   return {
     answer,
     responseShape: "CONCISE",
@@ -100,6 +100,7 @@ function analyst(
     materialChanges: [],
     userStatements: [],
     profileUpdates: [],
+    displayName: null,
     ...extra,
   };
 }
@@ -151,7 +152,7 @@ const RESEARCH_OK: CompanyResearchRead = {
 
 function harness(options: {
   readonly research?: CompanyResearchRead | undefined;
-  readonly analyst?: CompanyAnalystV2Result | undefined;
+  readonly analyst?: CompanyAnalystV4Result | undefined;
   readonly statements?: QUserStatementRecorder | undefined;
   readonly withoutResearchPort?: boolean | undefined;
 }) {

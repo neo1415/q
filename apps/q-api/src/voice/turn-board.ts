@@ -42,8 +42,16 @@ export function createVoiceTurnBoard(
   return {
     record: (voiceSessionId, state) => {
       prune();
-      const previous = board.get(voiceSessionId)?.state.sequence ?? 0;
-      const next: QVoiceTurnState = { ...state, sequence: previous + 1 };
+      const before = board.get(voiceSessionId)?.state;
+      const previous = before?.sequence ?? 0;
+      // The conversation, once known, stays known: a later turn that does
+      // not name it (a navigation, a hand-off) does not lose it.
+      const conversationId = state.conversationId ?? before?.conversationId;
+      const next: QVoiceTurnState = {
+        ...state,
+        ...(conversationId === undefined ? {} : { conversationId }),
+        sequence: previous + 1,
+      };
       board.set(voiceSessionId, { state: next, at: now() });
       return next;
     },

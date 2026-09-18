@@ -16,86 +16,46 @@ import {
   askQAction,
   cancelQRunAction,
   continueQRunAction,
-  readQRunAction,
+  readQConversationAction,
   rejectQApprovalAction,
 } from "./actions";
 import type { PendingTurn } from "./conversation";
 
 /**
- * One live Q conversation in the browser (CQ-C5-R1 §13-§16).
+ * One live Q conversation in the browser (CQ-C5-R1 §13-§16; ADR 0012).
  *
  * The order below is the Q API's, not this hook's invention:
  *
- *   create run (or append to the one still open) → connect to that run's
- *   event stream → reduce durable events and deltas → terminal event →
- *   the next question opens a new run in the SAME conversation
+ *   open a conversation (or none) → create run (or append to the one
+ *   still open) → connect to that run's event stream → reduce durable
+ *   events and deltas → terminal event → the next question opens a new
+ *   run in the SAME conversation
  *
- * Three things it deliberately does not do. It does not own the
- * conversation: the server does, every message here arrived as a durable
- * event, and a reload rebuilds from the server rather than from memory. It
- * does not invent a stage, a status or an answer. And it never touches the
- * Q API directly — the session token lives in an HttpOnly cookie, so writes
- * go through server actions and the stream through the web app's own
- * single-purpose route.
+ * The conversation is the server's. Which one this surface is in comes
+ * from the caller (the URL), and reopening it reads the recorded turns
+ * back from the Q API under the person's own session: nothing is cached
+ * in the browser, so what reappears after a refresh is what was said, and
+ * a conversation this person may no longer read simply does not open. A
+ * run still in flight when the page loads is followed from where it is.
  *
  * Why the two message lists: the stream reducer is per run, and correctly
  * refuses deltas once a run is terminal. A conversation outlives its runs,
  * so completed runs' messages move to `history` and the reducer starts
- * clean for the next one. Neither list is authoritative — both are what the
- * server sent.
+ * clean for the next one. Neither list is authoritative — both are what
+ * the server sent.
  */
 
 /** Where the browser reaches the Q event stream. Same origin, cookie-authenticated. */
 const STREAM_BASE_URL = "/api/q-stream";
 
-/**
- * Which runs this tab has been following, so a refresh reopens the whole
- * conversation rather than only its last exchange.
- *
- * Run ids, and nothing else. The turns themselves are never cached here: on
- * reload each run is read back from the Q API under the person's own
- * session, so what reappears is what the server recorded — not a browser's
- * account of it, which could outlive the access that produced it. A run this
- * person may no longer read simply does not come back.
- *
- * Why a list: a conversation is made of runs, one per question, and there is
- * no endpoint that reads a conversation whole. Remembering which runs
- * belonged to this exchange is the smallest thing that restores it honestly;
- * a conversation history product is a different piece of work.
- */
-const RUN_STORAGE_KEY = "cq.q.runs";
+/** Something changed in this person's conversations: the list should be read again. */
+export const Q_CONVERSATIONS_CHANGED_EVENT = "cq:q-conversations-changed";
 
-/** Bounded: a tab's working conversation, not an archive. */
-const REMEMBERED_RUNS_MAX = 20;
-
-function rememberRuns(runIds: readonly string[]): void {
+export function announceConversationsChanged(): void {
   try {
-    if (runIds.length === 0) {
-      window.localStorage.removeItem(RUN_STORAGE_KEY);
-    } else {
-      window.localStorage.setItem(
-        RUN_STORAGE_KEY,
-        JSON.stringify(runIds.slice(-REMEMBERED_RUNS_MAX)),
-      );
-    }
+    window.dispatchEvent(new CustomEvent(Q_CONVERSATIONS_CHANGED_EVENT));
   } catch {
-    // Storage can be unavailable or full. Losing the pointers costs a
-    // reopened conversation, never a lost one: the server still has it.
-  }
-}
-
-function rememberedRuns(): readonly string[] {
-  try {
-    const raw = window.localStorage.getItem(RUN_STORAGE_KEY);
-    if (raw === null) {
-      return [];
-    }
-    const parsed: unknown = JSON.parse(raw);
-    return Array.isArray(parsed)
-      ? parsed.filter((value): value is string => typeof value === "string")
-      : [];
-  } catch {
-    return [];
+    // Nothing listens, or no window: nothing to announce.
   }
 }
 
@@ -113,10 +73,12 @@ export type QConversation = {
   readonly transport: QStreamTransportStatus | null;
   /** True from submit until the run's stream ends. */
   readonly working: boolean;
+  /** True while the conversation named by the caller is being read back. */
+  readonly loading: boolean;
   /** Something that went wrong outside the stream. Plain wording only. */
   readonly notice: string | null;
   readonly runId: string | null;
-  /** The conversation this tab is in, once the server has named it. */
+  /** The conversation this surface is in, once the server has named it. */
   readonly conversationId: string | null;
   readonly ask: (question: string) => Promise<void>;
   readonly stop: () => Promise<void>;
@@ -130,6 +92,13 @@ export type QConversationOptions = {
   readonly companyId?: string | undefined;
   /** Or the investor organisation, for an investor. Never both. */
   readonly investorOrganisationId?: string | undefined;
+  /**
+   * The conversation to open, from the URL. Null opens nothing: the next
+   * question starts a new one, and `onConversation` says which.
+   */
+  readonly conversationId?: string | null | undefined;
+  /** The server named (or changed) the conversation this surface is in. */
+  readonly onConversation?: ((conversationId: string) => void) | undefined;
 };
 
 export function useQConversation(
@@ -144,19 +113,24 @@ export function useQConversation(
   /** A submit in flight: the run has been asked for but is not streaming yet. */
   const [submitting, setSubmitting] = useState(false);
   const [streaming, setStreaming] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [runId, setRunId] = useState<string | null>(null);
   const [conversationIdState, setConversationIdState] = useState<string | null>(
-    null,
+    options.conversationId ?? null,
   );
 
   const conversationId = useRef<string | null>(null);
+  /** The conversation id last taken from the caller, so a URL the hook itself wrote is not reopened. */
+  const opened = useRef<string | null | undefined>(undefined);
   const openRun = useRef<string | null>(null);
-  /** Every run of this conversation, oldest first. */
-  const runIds = useRef<readonly string[]>([]);
   /** Whether the open run has reached a terminal event. True when none is open. */
   const finished = useRef(true);
   const abort = useRef<AbortController | null>(null);
+  const onConversation = useRef(options.onConversation);
+  useEffect(() => {
+    onConversation.current = options.onConversation;
+  }, [options.onConversation]);
 
   useEffect(
     () => () => {
@@ -179,6 +153,9 @@ export function useQConversation(
         setRunState((current) => reduceQStream(current, event));
         if (isTerminalQStreamEvent(event)) {
           finished.current = true;
+          // A finished run may have named the conversation for the
+          // first time; the list is read again either way.
+          announceConversationsChanged();
         }
       },
     })
@@ -194,55 +171,84 @@ export function useQConversation(
       });
   }, []);
 
-  // Reopen the conversation this tab was in (sections 15, 44). Every run is
-  // read back from the server, so a refresh shows the turns that were
-  // actually recorded; a run this person may no longer read does not return,
-  // and its absence is simply a shorter conversation rather than an error.
+  const reset = useCallback(() => {
+    abort.current?.abort();
+    abort.current = null;
+    setRunState(createQStreamState());
+    setHistory([]);
+    setPending([]);
+    setTransport(null);
+    setStreaming(false);
+    setNotice(null);
+    setRunId(null);
+    openRun.current = null;
+    finished.current = true;
+  }, []);
+
+  // Open the conversation the caller named, or start clean when it named
+  // none. Every turn is read back from the server, so a refresh shows
+  // what was actually recorded; a run still in flight is followed from
+  // its cursor rather than reconstructed.
+  const wanted = options.conversationId ?? null;
   useEffect(() => {
-    const remembered = rememberedRuns();
-    if (remembered.length === 0) {
+    if (opened.current === wanted) {
+      return;
+    }
+    opened.current = wanted;
+    if (wanted !== null && wanted === conversationId.current) {
+      // Named by this hook a moment ago and written to the URL by the
+      // caller: already open, nothing to read back.
       return;
     }
     let cancelled = false;
-    void Promise.all(remembered.map((run) => readQRunAction(run))).then(
-      (results) => {
-        if (cancelled) {
+    // One microtask later, so the state changes belong to the open rather
+    // than to the render that scheduled it.
+    void Promise.resolve()
+      .then(() => {
+        if (cancelled) return null;
+        reset();
+        conversationId.current = wanted;
+        setConversationIdState(wanted);
+        if (wanted === null) return null;
+        setLoading(true);
+        return readQConversationAction(wanted);
+      })
+      .then((result) => {
+        if (cancelled || result === null) return;
+        if (!result.ok) {
+          // Not theirs, or gone: the surface starts clean and says so.
+          conversationId.current = null;
+          setConversationIdState(null);
+          setNotice(result.message);
           return;
         }
-        const readable = results.flatMap((result) =>
-          result.ok ? [result.value] : [],
-        );
-        const last = readable.at(-1);
-        if (last === undefined) {
-          rememberRuns([]);
-          return;
-        }
-        // Only the runs that came back are still worth remembering.
-        runIds.current = readable.map((run) => run.runId);
-        rememberRuns(runIds.current);
-        openRun.current = last.runId;
-        conversationId.current = last.conversationId ?? null;
-        setConversationIdState(conversationId.current);
-        setRunId(last.runId);
-        setHistory(readable.flatMap((run) => run.messages ?? []));
-        // A run still in flight keeps streaming; a finished one does not
-        // reconnect, because there is nothing further to receive.
-        const live = !FINISHED_STATUSES.has(last.status);
-        finished.current = !live;
+        const detail = result.value;
+        const latest = detail.latestRun;
+        const live = latest !== null && !FINISHED_STATUSES.has(latest.status);
         if (live) {
-          // Its own turns arrive again on the stream, so they are not also
-          // taken from the summary above.
+          // Its own turns arrive again on the stream, so they are not
+          // also taken from the recorded thread.
           setHistory(
-            readable.slice(0, -1).flatMap((run) => run.messages ?? []),
+            detail.messages.filter((message) => message.runId !== latest.runId),
           );
-          follow(last.runId);
+          openRun.current = latest.runId;
+          finished.current = false;
+          setRunId(latest.runId);
+          follow(latest.runId);
+        } else {
+          setHistory(detail.messages);
+          openRun.current = latest?.runId ?? null;
+          finished.current = true;
+          setRunId(latest?.runId ?? null);
         }
-      },
-    );
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
     return () => {
       cancelled = true;
     };
-  }, [follow]);
+  }, [wanted, follow, reset]);
 
   const ask = useCallback(
     async (question: string) => {
@@ -297,13 +303,19 @@ export function useQConversation(
         setHistory((current) => [...current, ...runState.messages]);
         setRunState(createQStreamState());
         finished.current = false;
-        conversationId.current =
-          started.value.conversationId ?? conversationId.current;
-        setConversationIdState(conversationId.current);
+        const named = started.value.conversationId ?? conversationId.current;
+        const isNew = named !== null && named !== conversationId.current;
+        conversationId.current = named;
+        setConversationIdState(named);
         openRun.current = started.value.runId;
-        runIds.current = [...runIds.current, started.value.runId];
         setRunId(started.value.runId);
-        rememberRuns(runIds.current);
+        if (isNew && named !== null) {
+          // The caller writes it to the URL; that change is ours, not a
+          // request to reopen.
+          opened.current = named;
+          onConversation.current?.(named);
+          announceConversationsChanged();
+        }
         follow(started.value.runId);
       } finally {
         setSubmitting(false);
@@ -366,6 +378,7 @@ export function useQConversation(
     // A run is "working" from the moment it is asked for until its stream
     // ends. Never inferred from elapsed time or the absence of text.
     working: submitting || streaming,
+    loading,
     notice,
     runId,
     conversationId: conversationIdState,

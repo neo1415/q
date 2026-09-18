@@ -34,6 +34,7 @@ export {
   type NewQRunEvent,
   type QConversation,
   type QConversationContextType,
+  type QConversationDigest,
   type QConversationMessage,
   type QRunEventRecord,
   type QRunRecord,
@@ -104,6 +105,15 @@ export type {
   CreateQRunResult,
 } from "./application/create-run.js";
 export type { GetQRunQuery, GetQRunResult } from "./application/get-run.js";
+export {
+  conversationTitle,
+  toQConversationSummary,
+  type ArchiveQConversationCommand,
+  type GetQConversationQuery,
+  type GetQConversationResult,
+  type ListQConversationsQuery,
+  type ListQConversationsResult,
+} from "./application/conversations.js";
 export type {
   AppendQRunMessageCommand,
   AppendQRunMessageResult,
