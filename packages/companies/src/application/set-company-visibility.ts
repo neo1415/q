@@ -22,6 +22,7 @@ import {
 } from "../domain/network-projection.js";
 import { companyVisibilityChangedEvent } from "../events/index.js";
 import type { CompanyServiceDependencies } from "./dependencies.js";
+import { reconcileMarketplaceReadinessInTransaction } from "./marketplace-readiness.js";
 
 const COMPANY_EDIT = capability("company.edit");
 const COMPANY_VISIBILITY_CHANGED = AuditActionTypeSchema.parse(
@@ -145,6 +146,28 @@ export function createSetCompanyVisibility(
           visibility: updated.marketplaceVisibility,
         }),
       );
+
+      // Withdrawing from the network removes a readiness prerequisite, so
+      // a ready company is reassessed in the same transaction and stops
+      // being represented as ready (CQ-MKT-001 §18). Publishing never
+      // makes a company ready by itself: that direction needs the
+      // founder to ask for an assessment, and the policy to agree.
+      if (
+        updated.marketplaceReadinessState === "marketplace_ready" &&
+        updated.marketplaceVisibility !== "network_visible"
+      ) {
+        const { company } = await reconcileMarketplaceReadinessInTransaction(
+          dependencies,
+          tx,
+          {
+            actor,
+            locked: updated,
+            correlationId: command.correlationId,
+            trigger: "VISIBILITY_WITHDRAWN",
+          },
+        );
+        return company;
+      }
 
       return updated;
     });

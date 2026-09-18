@@ -29,10 +29,14 @@ describe("marketplace participation (PADL #58)", () => {
     }
   });
 
-  it("the known vocabulary is exactly the two states the column documents", () => {
+  it("the known vocabulary is exactly the three states the readiness policy writes", () => {
     expect([...KNOWN_MARKETPLACE_READINESS_STATES]).toEqual([
       "not_assessed",
+      "requirements_outstanding",
       "marketplace_ready",
     ]);
+    expect(marketplaceParticipationOf("requirements_outstanding")).toBe(
+      "NOT_ELIGIBLE",
+    );
   });
 });

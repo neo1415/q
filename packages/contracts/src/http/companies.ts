@@ -55,6 +55,94 @@ export const MARKETPLACE_READINESS_NOT_ASSESSED = "not_assessed" as const;
  */
 export const MARKETPLACE_READINESS_MARKETPLACE_READY =
   "marketplace_ready" as const;
+/** Assessed under a readiness policy and found wanting; the assessment says what remains. */
+export const MARKETPLACE_READINESS_REQUIREMENTS_OUTSTANDING =
+  "requirements_outstanding" as const;
+/** The V1 vocabulary. Bounded text in the column; this is the set the policy writes. */
+export const MARKETPLACE_READINESS_STATES = [
+  MARKETPLACE_READINESS_NOT_ASSESSED,
+  MARKETPLACE_READINESS_REQUIREMENTS_OUTSTANDING,
+  MARKETPLACE_READINESS_MARKETPLACE_READY,
+] as const;
+export const MarketplaceReadinessStateValueSchema = z.enum(
+  MARKETPLACE_READINESS_STATES,
+);
+export type MarketplaceReadinessState = z.infer<
+  typeof MarketplaceReadinessStateValueSchema
+>;
+
+/**
+ * Marketplace readiness (PADL #57/#58; Product Specification, "Marketplace
+ * Readiness"; doc 10 F10/F11). A derived assessment over canonical
+ * requirements, never a switch: the founder asks for an assessment, the
+ * policy decides the state. Requirement ids are stable machine values;
+ * `description` is the plain-English sentence a person reads.
+ */
+export const COMPANY_MARKETPLACE_READINESS_SEGMENT =
+  "/marketplace-readiness" as const;
+export const COMPANY_MARKETPLACE_READINESS_ASSESS_SEGMENT =
+  "/marketplace-readiness/assess" as const;
+
+export const MARKETPLACE_READINESS_REQUIREMENTS = [
+  "COMPANY_ACTIVE",
+  "MINIMUM_COMPANY_PROFILE",
+  "DISCOVERY_VISIBILITY_CONFIRMED",
+  "FOUNDER_IDENTITY_VERIFIED",
+  "ORGANISATION_VERIFIED",
+  "REQUIRED_DOCUMENTATION",
+] as const;
+export const MarketplaceReadinessRequirementSchema = z.enum(
+  MARKETPLACE_READINESS_REQUIREMENTS,
+);
+export type MarketplaceReadinessRequirement = z.infer<
+  typeof MarketplaceReadinessRequirementSchema
+>;
+
+export const MARKETPLACE_READINESS_OUTCOMES = [
+  "SATISFIED",
+  "OUTSTANDING",
+  "UNKNOWN",
+  "NOT_APPLICABLE",
+] as const;
+export const MarketplaceReadinessOutcomeSchema = z.enum(
+  MARKETPLACE_READINESS_OUTCOMES,
+);
+export type MarketplaceReadinessOutcome = z.infer<
+  typeof MarketplaceReadinessOutcomeSchema
+>;
+
+export const MarketplaceReadinessRequirementResultSchema = z
+  .object({
+    requirement: MarketplaceReadinessRequirementSchema,
+    outcome: MarketplaceReadinessOutcomeSchema,
+    /** Plain English for the person; never an internal code or private content. */
+    description: z.string().min(1).max(300),
+  })
+  .strict();
+export type MarketplaceReadinessRequirementResult = z.infer<
+  typeof MarketplaceReadinessRequirementResultSchema
+>;
+
+export const MarketplaceReadinessAssessmentSchema = z
+  .object({
+    companyId: UuidSchema,
+    policyVersion: z.string().regex(/^marketplace-readiness\.v\d+$/),
+    state: MarketplaceReadinessStateValueSchema,
+    /**
+     * Whether Capital Q can verify identity and organisation today. False
+     * means the two verification requirements cannot be met by anyone yet,
+     * and the screen must say so rather than imply a step the person can take.
+     */
+    verificationAvailable: z.boolean(),
+    requirements: z
+      .array(MarketplaceReadinessRequirementResultSchema)
+      .length(MARKETPLACE_READINESS_REQUIREMENTS.length),
+    assessedAt: UtcTimestampSchema,
+  })
+  .strict();
+export type MarketplaceReadinessAssessment = z.infer<
+  typeof MarketplaceReadinessAssessmentSchema
+>;
 
 export const COMPANY_NAME_MAX_LENGTH = 200;
 export const COMPANY_CITY_MAX_LENGTH = 120;

@@ -1,8 +1,11 @@
 import {
   COMPANIES_PATH,
+  COMPANY_MARKETPLACE_READINESS_ASSESS_SEGMENT,
+  COMPANY_MARKETPLACE_READINESS_SEGMENT,
   COMPANY_NETWORK_PREVIEW_SEGMENT,
   COMPANY_VISIBILITY_SEGMENT,
   CompanyNetworkPreviewSchema,
+  MarketplaceReadinessAssessmentSchema,
   type SetCompanyVisibilityRequest,
   CompanyDtoSchema,
   IDEMPOTENCY_KEY_HEADER,
@@ -79,5 +82,31 @@ export function getCompanyNetworkPreview(
     "GET",
     `${COMPANIES_PATH}/${encodeURIComponent(companyId)}${COMPANY_NETWORK_PREVIEW_SEGMENT}`,
     CompanyNetworkPreviewSchema,
+  );
+}
+
+/** `GET /v1/companies/:companyId/marketplace-readiness` — the policy's answer now (CQ-MKT-001). */
+export function getMarketplaceReadiness(
+  session: ApiSession,
+  companyId: string,
+) {
+  return call(
+    session,
+    "GET",
+    `${COMPANIES_PATH}/${encodeURIComponent(companyId)}${COMPANY_MARKETPLACE_READINESS_SEGMENT}`,
+    MarketplaceReadinessAssessmentSchema,
+  );
+}
+
+/** `POST /v1/companies/:companyId/marketplace-readiness/assess` — ask for a reconciliation; no body, no state. */
+export function assessMarketplaceReadiness(
+  session: ApiSession,
+  companyId: string,
+) {
+  return call(
+    session,
+    "POST",
+    `${COMPANIES_PATH}/${encodeURIComponent(companyId)}${COMPANY_MARKETPLACE_READINESS_ASSESS_SEGMENT}`,
+    MarketplaceReadinessAssessmentSchema,
   );
 }

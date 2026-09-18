@@ -154,9 +154,12 @@ duration; never a company, a mandate value or a reason per company.
 
 **Not wired yet, on purpose.** The pre-REC slate above still gates on the
 visibility column alone. REC-002 routes candidates through this service,
-at which point marketplace readiness applies: today every company is
-`not_assessed`, so the readiness packet (marketplace activation) must
-write `marketplace_ready` before any company can be ELIGIBLE. Nothing in
+at which point marketplace readiness applies. The Companies context now
+owns that assessment (CQ-MKT-001, `docs/modules/companies.md`): a company
+is `marketplace_ready` only when its readiness policy says so, and in
+production that needs a Verification context that does not exist yet, so
+no real company is ELIGIBLE today. Locally, `pnpm dev:marketplace-ready`
+produces one legitimately ready synthetic company. Nothing in
 Recommendation decides readiness.
 
 ## Not built yet

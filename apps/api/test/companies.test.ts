@@ -10,6 +10,7 @@ import {
   type CompanyService,
 } from "@capital-q/companies";
 import { parseApiConfig } from "@capital-q/config/api";
+import type { MarketplaceReadinessAssessment } from "@capital-q/contracts";
 import {
   AuthorizationDeniedError,
   AuthUserIdSchema,
@@ -74,13 +75,58 @@ const COMPANY_A: Company = {
 
 const notUnderTest = () => Promise.reject(new Error("not under test"));
 
-function fakeService(overrides: Partial<CompanyService> = {}) {
-  const calls: { create: unknown[]; update: unknown[]; visibility: unknown[] } =
+const READINESS: MarketplaceReadinessAssessment = {
+  companyId: COMPANY,
+  policyVersion: "marketplace-readiness.v1",
+  state: "requirements_outstanding",
+  verificationAvailable: false,
+  requirements: [
     {
-      create: [],
-      update: [],
-      visibility: [],
-    };
+      requirement: "COMPANY_ACTIVE",
+      outcome: "SATISFIED",
+      description: "Active.",
+    },
+    {
+      requirement: "MINIMUM_COMPANY_PROFILE",
+      outcome: "OUTSTANDING",
+      description: "Profile incomplete.",
+    },
+    {
+      requirement: "DISCOVERY_VISIBILITY_CONFIRMED",
+      outcome: "OUTSTANDING",
+      description: "Not visible.",
+    },
+    {
+      requirement: "FOUNDER_IDENTITY_VERIFIED",
+      outcome: "OUTSTANDING",
+      description: "Not available.",
+    },
+    {
+      requirement: "ORGANISATION_VERIFIED",
+      outcome: "OUTSTANDING",
+      description: "Not available.",
+    },
+    {
+      requirement: "REQUIRED_DOCUMENTATION",
+      outcome: "NOT_APPLICABLE",
+      description: "None required.",
+    },
+  ],
+  assessedAt: "2026-09-18T09:00:00.000Z",
+};
+
+function fakeService(overrides: Partial<CompanyService> = {}) {
+  const calls: {
+    create: unknown[];
+    update: unknown[];
+    visibility: unknown[];
+    assess: unknown[];
+  } = {
+    create: [],
+    update: [],
+    visibility: [],
+    assess: [],
+  };
   const service: CompanyService = {
     createCompany: (command) => {
       calls.create.push(command);
@@ -98,6 +144,11 @@ function fakeService(overrides: Partial<CompanyService> = {}) {
         marketplaceVisibility: command.input.visibility,
         version: 2,
       });
+    },
+    getMarketplaceReadiness: () => Promise.resolve(READINESS),
+    assessMarketplaceReadiness: (command) => {
+      calls.assess.push(command);
+      return Promise.resolve(READINESS);
     },
     // Founder / team operations are covered by company-team.test.ts.
     getMyCompanyMembership: notUnderTest,
@@ -433,5 +484,85 @@ describe("company visibility (CQ-PRE-REC-001 §31-§35)", () => {
     );
     expect(body["networkVisible"]).toBe(false);
     await app.close();
+  });
+});
+
+describe("marketplace readiness (CQ-MKT-001)", () => {
+  it("reads the policy's assessment and returns it unchanged", async () => {
+    const { service, calls } = fakeService();
+    const app = buildApp({ principal: PRINCIPAL, context: CONTEXT, service });
+    const response = await app.inject({
+      method: "GET",
+      url: `/v1/companies/${COMPANY_A.id}/marketplace-readiness`,
+    });
+    expect(response.statusCode).toBe(200);
+    expect(
+      response.json<{ state: string; policyVersion: string }>(),
+    ).toMatchObject({
+      state: "requirements_outstanding",
+      policyVersion: "marketplace-readiness.v1",
+    });
+    expect(response.headers["cache-control"]).toBe("no-store");
+    expect(calls.assess).toHaveLength(0);
+    await app.close();
+  });
+
+  it("asks the service for a reconciliation with the actor and company only; a body naming a state is ignored", async () => {
+    const { service, calls } = fakeService();
+    const app = buildApp({ principal: PRINCIPAL, context: CONTEXT, service });
+    const response = await app.inject({
+      method: "POST",
+      url: `/v1/companies/${COMPANY_A.id}/marketplace-readiness/assess`,
+      payload: {
+        state: "marketplace_ready",
+        desiredState: "marketplace_ready",
+      },
+    });
+    expect(response.statusCode).toBe(200);
+    expect(calls.assess).toHaveLength(1);
+    expect(Object.keys(calls.assess[0] as object).sort()).toEqual([
+      "actor",
+      "companyId",
+      "correlationId",
+    ]);
+    expect(calls.assess[0]).toMatchObject({
+      actor: CONTEXT,
+      companyId: COMPANY,
+    });
+    await app.close();
+  });
+
+  it("requires a session and an organisation context, and maps a denied capability to 403", async () => {
+    const anonymous = buildApp({
+      principal: null,
+      service: fakeService().service,
+    });
+    expect(
+      (
+        await anonymous.inject({
+          method: "POST",
+          url: `/v1/companies/${COMPANY_A.id}/marketplace-readiness/assess`,
+        })
+      ).statusCode,
+    ).toBe(401);
+    await anonymous.close();
+
+    const denied = buildApp({
+      principal: PRINCIPAL,
+      context: CONTEXT,
+      service: fakeService({
+        assessMarketplaceReadiness: () =>
+          Promise.reject(new AuthorizationDeniedError("NO_MATCHING_GRANT")),
+      }).service,
+    });
+    expect(
+      (
+        await denied.inject({
+          method: "POST",
+          url: `/v1/companies/${COMPANY_A.id}/marketplace-readiness/assess`,
+        })
+      ).statusCode,
+    ).toBe(403);
+    await denied.close();
   });
 });

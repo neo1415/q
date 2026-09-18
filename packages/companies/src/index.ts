@@ -33,6 +33,26 @@ export {
   CompanyVersionConflictError,
 } from "./domain/errors.js";
 export {
+  describeRequirement,
+  evaluateMarketplaceReadiness,
+  MARKETPLACE_READINESS_POLICY_VERSION,
+  outstandingRequirementIds,
+  VERIFICATION_CLAIM_STANDINGS,
+  type MarketplaceReadinessEvaluation,
+  type MarketplaceReadinessSnapshot,
+  type MarketplaceVerificationFacts,
+  type VerificationClaimStanding,
+} from "./domain/marketplace-readiness.js";
+export {
+  createAssessMarketplaceReadiness,
+  createGetMarketplaceReadiness,
+  reconcileMarketplaceReadinessInTransaction,
+  type AssessMarketplaceReadinessCommand,
+  type GetMarketplaceReadinessQuery,
+  type MarketplaceReadinessReconciliation,
+} from "./application/marketplace-readiness.js";
+export { createUnavailableVerificationClaimsPort } from "./infrastructure/unavailable-verification-claims.js";
+export {
   KNOWN_MARKETPLACE_READINESS_STATES,
   MARKETPLACE_PARTICIPATION,
   marketplaceParticipationOf,
@@ -67,6 +87,7 @@ export {
   type CompanySearchQuery,
   type CompanyVisibilityFacts,
   type FounderProfileOwnershipFacts,
+  type VerificationClaimsPort,
   type NewCompany,
 } from "./application/ports.js";
 export type { CompanyServiceDependencies } from "./application/dependencies.js";

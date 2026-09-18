@@ -3,8 +3,11 @@ import type { OrganisationId, TenantId, UserId } from "@capital-q/security";
 
 import type {
   CompanyStatus,
+  MarketplaceReadinessState,
   MarketplaceVisibility,
 } from "@capital-q/contracts";
+
+import type { MarketplaceVerificationFacts } from "../domain/marketplace-readiness.js";
 
 import type {
   Company,
@@ -93,6 +96,21 @@ export type CompanyRepository = {
       readonly companyId: CompanyId;
       readonly expectedVersion: number;
       readonly visibility: MarketplaceVisibility;
+    },
+  ) => Promise<Company | null>;
+  /**
+   * Written only by the marketplace-readiness reconciliation, under the
+   * row lock, with the state the policy decided. No profile PATCH, no
+   * visibility change and no client field reaches this method.
+   */
+  readonly updateReadiness: (
+    tx: TransactionContext,
+    input: {
+      readonly tenantId: TenantId;
+      readonly organisationId: OrganisationId;
+      readonly companyId: CompanyId;
+      readonly expectedVersion: number;
+      readonly readinessState: MarketplaceReadinessState;
     },
   ) => Promise<Company | null>;
   /** Serialises slug allocation for one (tenant, base slug) until commit. */
@@ -298,6 +316,28 @@ export type CompanyMarketplaceQueryPort = {
   readonly findCanonicalMarketplaceFacts: (
     companyIds: readonly CompanyId[],
   ) => Promise<readonly CompanyMarketplaceFacts[]>;
+};
+
+/**
+ * The Verification seam readiness reads (doc 13 §24; PADL #147). Claims
+ * are specific — a founder's identity, the organisation's identity — and
+ * are answered by the Verification context's own query port when it
+ * exists. Until then the production adapter says "unavailable" and the
+ * only other implementation is a synthetic fixture that refuses to run
+ * anywhere but a local database. Nothing in this port can be satisfied by
+ * a document, a public page, Q, or the person themselves.
+ */
+export type VerificationClaimsPort = {
+  /** Recorded on every audited readiness transition so a synthetic answer can never pass as a real one. */
+  readonly sourceLabel:
+    | "VERIFICATION_UNAVAILABLE"
+    | "SYNTHETIC_LOCAL_FIXTURE"
+    | `VERIFICATION_${string}`;
+  readonly currentStandings: (subject: {
+    readonly tenantId: TenantId;
+    readonly organisationId: OrganisationId;
+    readonly companyId: CompanyId;
+  }) => Promise<MarketplaceVerificationFacts>;
 };
 
 /** Trusted ownership + classification of a founder profile. No content. */

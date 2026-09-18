@@ -9,10 +9,13 @@ import {
 } from "@capital-q/companies";
 import {
   COMPANIES_PATH,
+  COMPANY_MARKETPLACE_READINESS_ASSESS_SEGMENT,
+  COMPANY_MARKETPLACE_READINESS_SEGMENT,
   COMPANY_NETWORK_PREVIEW_SEGMENT,
   COMPANY_VISIBILITY_SEGMENT,
   CompanyDtoSchema,
   CompanyNetworkPreviewSchema,
+  MarketplaceReadinessAssessmentSchema,
   SetCompanyVisibilityRequestSchema,
   CorrelationIdSchema,
   CreateCompanyRequestSchema,
@@ -145,6 +148,36 @@ export function registerCompanyRoutes(
       });
       void reply.header("Cache-Control", "no-store");
       return CompanyDtoSchema.parse(toCompanyDto(company));
+    },
+  );
+
+  // Marketplace readiness (CQ-MKT-001): what the policy says now, without
+  // writing. The body-less POST asks for a reconciliation; there is no
+  // field in which a client could name a state.
+  app.get(
+    `${COMPANIES_PATH}/:companyId${COMPANY_MARKETPLACE_READINESS_SEGMENT}`,
+    { onRequest: withContext },
+    async (request, reply) => {
+      const assessment = await service.getMarketplaceReadiness({
+        actor: getActorContext(request),
+        companyId: companyIdParam(request),
+      });
+      void reply.header("Cache-Control", "no-store");
+      return MarketplaceReadinessAssessmentSchema.parse(assessment);
+    },
+  );
+
+  app.post(
+    `${COMPANIES_PATH}/:companyId${COMPANY_MARKETPLACE_READINESS_ASSESS_SEGMENT}`,
+    { onRequest: withContext },
+    async (request, reply) => {
+      const assessment = await service.assessMarketplaceReadiness({
+        actor: getActorContext(request),
+        companyId: companyIdParam(request),
+        correlationId: correlation(),
+      });
+      void reply.header("Cache-Control", "no-store");
+      return MarketplaceReadinessAssessmentSchema.parse(assessment);
     },
   );
 

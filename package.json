@@ -2,7 +2,7 @@
   "name": "capital-q",
   "private": true,
   "type": "module",
-  "description": "Capital Q — AI-native Investment Intelligence Operating System for private capital.",
+  "description": "Capital Q \u2014 AI-native Investment Intelligence Operating System for private capital.",
   "packageManager": "pnpm@11.25.0",
   "engines": {
     "node": ">=24.0.0 <25.0.0"
@@ -14,6 +14,7 @@
     "demo:stop": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/demo-stop.ps1",
     "db:push": "node scripts/db-push.mjs",
     "dev:bootstrap": "node scripts/dev-bootstrap.mjs",
+    "dev:marketplace-ready": "node scripts/dev-marketplace-ready.mjs",
     "build": "turbo run build",
     "typecheck": "turbo run typecheck && tsc --noEmit -p tsconfig.json",
     "lint": "eslint . --max-warnings=0",

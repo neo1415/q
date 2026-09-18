@@ -33,9 +33,11 @@ export {
 } from "./organisations.js";
 
 export {
+  assessMarketplaceReadiness,
   createCompany,
   getCompany,
   getCompanyNetworkPreview,
+  getMarketplaceReadiness,
   setCompanyVisibility,
   updateCompany,
 } from "./companies.js";

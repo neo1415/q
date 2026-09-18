@@ -2,22 +2,31 @@ import { createHash, randomUUID } from "node:crypto";
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { createPostgresMaterialActionAuditWriter } from "@capital-q/audit";
 import { createPostgresCapitalObjectiveQueryPort } from "@capital-q/capital";
 import {
+  CompanyIdSchema,
+  createCompanyService,
   createPostgresCompanyMarketplaceQueryPort,
   createPostgresCompanyQueryPort,
 } from "@capital-q/companies";
+import { createSyntheticVerificationClaimsPort } from "@capital-q/companies/dev";
+import { COMPANY_EVENTS } from "@capital-q/companies/events";
 import { parseDatabaseConfig } from "@capital-q/config/database";
+import { createEventRegistry, type CorrelationId } from "@capital-q/contracts";
 import {
   createRequestDatabaseClient,
   type RequestDatabase,
   type TransactionContext,
+  type TransactionManager,
 } from "@capital-q/database";
+import { createOutboxWriter } from "@capital-q/eventing";
 import {
   createPostgresInvestorMandateQueryPort,
   createPostgresInvestorOrganisationQueryPort,
   createPostgresInvestorOrganisationRepository,
 } from "@capital-q/investors";
+import { createPostgresOrganisationQueryPort } from "@capital-q/organisations";
 import {
   createPostgresRelationshipEventRepository,
   createPostgresRelationshipRepository,
@@ -31,7 +40,12 @@ import {
   createRelationshipPartyResolver,
   systemDisclosureClock,
 } from "@capital-q/permissions";
-import { ActorContextSchema, type ActorContext } from "@capital-q/security";
+import {
+  ActorContextSchema,
+  createAuthorizationService,
+  type ActorContext,
+} from "@capital-q/security";
+import { createPostgresAuthorizationPolicySource } from "@capital-q/security/postgres";
 import {
   createPostgresTaxonomyAssignmentRepository,
   referenceNode,
@@ -60,6 +74,7 @@ class Rollback extends Error {}
 type World = {
   readonly tx: TransactionContext;
   readonly investorActor: ActorContext;
+  readonly founderActor: ActorContext;
   readonly tenantC: string;
   readonly orgC: string;
   readonly founderUserId: string;
@@ -69,7 +84,24 @@ type World = {
   readonly evaluate: (
     companyIds: readonly string[],
   ) => Promise<readonly EligibilityResult[]>;
+  /** The Companies context's own service, with the local synthetic verification seam. */
+  readonly companiesWithSyntheticVerification: () => ReturnType<
+    typeof createCompanyService
+  >;
 };
+
+function nestedTransactions(tx: TransactionContext): TransactionManager {
+  return {
+    run: async (work) => {
+      const { value } = await tx.sql.savepoint(async (inner) => ({
+        value: await work({ sql: inner }),
+      }));
+      return value;
+    },
+  };
+}
+
+const CORRELATION = (): CorrelationId => `cor_${randomUUID()}`;
 
 const sha256 = (text: string) =>
   createHash("sha256").update(text).digest("hex");
@@ -129,6 +161,8 @@ describe("@capital-q/discovery hard eligibility against local PostgreSQL", () =>
       values (${membershipId}, ${tenantId}, ${organisationId}, ${profile.id})`;
     await tx.sql`insert into identity.membership_roles (membership_id, role_id)
       select ${membershipId}, r.id from permissions.roles r where r.code = 'organisation_admin'`;
+    // The company-side tenant has no marketplace verification seam in
+    // production; the synthetic one below is test-only.
     await tx.sql`insert into identity.user_active_contexts (user_id, membership_id) values (${profile.id}, ${membershipId})`;
     return { userId: profile.id, membershipId };
   }
@@ -143,8 +177,8 @@ describe("@capital-q/discovery hard eligibility against local PostgreSQL", () =>
     const founderMember = await insertMember(tx, tenantC, orgC);
 
     const companyId = randomUUID();
-    await sql`insert into core.companies (id, tenant_id, organisation_id, canonical_name, slug, current_stage_code, headquarters_country, marketplace_visibility, marketplace_readiness_state)
-      values (${companyId}, ${tenantC}, ${orgC}, 'Alpha Rails', ${`alpha-${companyId.slice(0, 8)}`}, 'seed', 'NG', 'network_visible', 'marketplace_ready')`;
+    await sql`insert into core.companies (id, tenant_id, organisation_id, canonical_name, slug, current_stage_code, headquarters_country, short_description, marketplace_visibility, marketplace_readiness_state)
+      values (${companyId}, ${tenantC}, ${orgC}, 'Alpha Rails', ${`alpha-${companyId.slice(0, 8)}`}, 'seed', 'NG', 'Rails for payments.', 'network_visible', 'marketplace_ready')`;
     await sql`insert into taxonomy.entity_assignments (tenant_id, entity_type, entity_id, node_id, assignment_source)
       values (${tenantC}, 'COMPANY', ${companyId}, ${node("industry", "payments")}, 'user_selected')`;
 
@@ -162,6 +196,31 @@ describe("@capital-q/discovery hard eligibility against local PostgreSQL", () =>
       membershipId: investorMember.membershipId,
       actorType: "HUMAN",
     });
+    const founderActor = ActorContextSchema.parse({
+      userId: founderMember.userId,
+      tenantId: tenantC,
+      organisationId: orgC,
+      membershipId: founderMember.membershipId,
+      actorType: "HUMAN",
+    });
+    const companiesWithSyntheticVerification = () =>
+      createCompanyService({
+        sql,
+        transactions: nestedTransactions(tx),
+        authorization: createAuthorizationService(
+          createPostgresAuthorizationPolicySource({ sql }),
+        ),
+        organisations: createPostgresOrganisationQueryPort({ sql }),
+        outbox: createOutboxWriter({
+          registry: createEventRegistry([...COMPANY_EVENTS]),
+        }),
+        audit: createPostgresMaterialActionAuditWriter(),
+        verification: createSyntheticVerificationClaimsPort({
+          environment: "test",
+          databaseUrl: TEST_DATABASE_URL,
+          verifiedCompanyIds: [companyId],
+        }),
+      });
 
     const companies = createPostgresCompanyQueryPort({ sql });
     const investors = createPostgresInvestorOrganisationQueryPort({ sql });
@@ -213,6 +272,8 @@ describe("@capital-q/discovery hard eligibility against local PostgreSQL", () =>
     return {
       tx,
       investorActor,
+      founderActor,
+      companiesWithSyntheticVerification,
       tenantC,
       orgC,
       founderUserId: founderMember.userId,
@@ -352,6 +413,74 @@ describe("@capital-q/discovery hard eligibility against local PostgreSQL", () =>
         values (${tenantC}, ${companyId}, ${investorOrgId})`;
         const [r] = await evaluate([companyId]);
         expect(r?.decision).toBe("ELIGIBLE");
+      },
+    );
+  });
+
+  it("MKT. readiness is the Companies context's answer: not_assessed and requirements_outstanding are rejected; a legitimately ready company passes that criterion while every other gate still applies", async () => {
+    await withWorld(
+      async ({
+        tx,
+        evaluate,
+        companyId,
+        founderActor,
+        companiesWithSyntheticVerification,
+      }) => {
+        const criterion = (r: EligibilityResult | undefined) =>
+          r?.criteria.find((c) => c.criterion === "MARKETPLACE_PARTICIPATION")
+            ?.outcome;
+
+        // The seed writes marketplace_ready directly; put the row back to
+        // where every real company starts and let the domain move it.
+        await tx.sql`update core.companies set marketplace_readiness_state = 'not_assessed' where id = ${companyId}`;
+        let [r] = await evaluate([companyId]);
+        expect(r?.decision).toBe("INELIGIBLE");
+        expect(criterion(r)).toBe("FAIL");
+
+        // Production seam: nothing is verified, so assessment lands on
+        // requirements_outstanding and eligibility still rejects.
+        const production = createCompanyService({
+          sql: tx.sql,
+          transactions: nestedTransactions(tx),
+          authorization: createAuthorizationService(
+            createPostgresAuthorizationPolicySource({ sql: tx.sql }),
+          ),
+          organisations: createPostgresOrganisationQueryPort({ sql: tx.sql }),
+          outbox: createOutboxWriter({
+            registry: createEventRegistry([...COMPANY_EVENTS]),
+          }),
+          audit: createPostgresMaterialActionAuditWriter(),
+        });
+        const outstanding = await production.assessMarketplaceReadiness({
+          actor: founderActor,
+          companyId: CompanyIdSchema.parse(companyId),
+          correlationId: CORRELATION(),
+        });
+        expect(outstanding.state).toBe("requirements_outstanding");
+        [r] = await evaluate([companyId]);
+        expect(r?.decision).toBe("INELIGIBLE");
+        expect(r?.reasonCodes).toEqual(["COMPANY_NOT_MARKETPLACE_ELIGIBLE"]);
+
+        // The local synthetic seam, through the same policy and audit.
+        const ready =
+          await companiesWithSyntheticVerification().assessMarketplaceReadiness(
+            {
+              actor: founderActor,
+              companyId: CompanyIdSchema.parse(companyId),
+              correlationId: CORRELATION(),
+            },
+          );
+        expect(ready.state).toBe("marketplace_ready");
+        [r] = await evaluate([companyId]);
+        expect(criterion(r)).toBe("PASS");
+        expect(r?.decision).toBe("ELIGIBLE");
+
+        // Marketplace ready ≠ automatically eligible: the other gates hold.
+        await tx.sql`update core.companies set company_status = 'closed' where id = ${companyId}`;
+        [r] = await evaluate([companyId]);
+        expect(criterion(r)).toBe("PASS");
+        expect(r?.decision).toBe("INELIGIBLE");
+        expect(r?.reasonCodes).toEqual(["COMPANY_NOT_ACTIVE"]);
       },
     );
   });

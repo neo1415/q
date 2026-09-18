@@ -123,14 +123,84 @@ being processed or of anything Q read.
   "what investors will see", so the preview cannot drift from the answer
   and nothing founder-private can appear in either: the projection reads
   only the declared profile fields.
-- Marketplace readiness is untouched by visibility and is not assessed by
-  anything here. The web surface (`/company/visibility`) says so plainly
-  rather than inventing an eligibility.
+- Marketplace readiness is a separate state (below). Publishing never
+  makes a company ready; withdrawing from the network takes readiness away
+  in the same transaction, because it was a prerequisite.
+
+## Marketplace readiness (CQ-MKT-001)
+
+PADL #57/#58 and the Product Specification separate platform access from
+marketplace participation. `marketplace_readiness_state` is the canonical
+answer to "may this company take part in investor discovery, and if not,
+what remains?", owned here and only read by Recommendation through
+`marketplaceParticipationOf`.
+
+**States.** `not_assessed` (every new company) →
+`requirements_outstanding` ⇄ `marketplace_ready`. Only the policy moves
+the state; there is no request, route, field or capability through which a
+founder, an investor, an administrator, Q or a browser names a state.
+
+**Policy `marketplace-readiness.v1`** (`domain/marketplace-readiness.ts`),
+pure over a canonical snapshot and the Verification seam:
+
+| Requirement                      | Rule                                                                          |
+| -------------------------------- | ----------------------------------------------------------------------------- |
+| `COMPANY_ACTIVE`                 | `company_status = active`                                                     |
+| `MINIMUM_COMPANY_PROFILE`        | name, a short or long description, a stage and a headquarters country         |
+| `DISCOVERY_VISIBILITY_CONFIRMED` | the founder's own F10 choice is `network_visible`; readiness never sets it    |
+| `FOUNDER_IDENTITY_VERIFIED`      | the Verification seam reports `VERIFIED`; EXPIRED and REVOKED are outstanding |
+| `ORGANISATION_VERIFIED`          | likewise                                                                      |
+| `REQUIRED_DOCUMENTATION`         | NOT_APPLICABLE: doc 10 lets a founder complete a credible path without a deck |
+
+Every requirement SATISFIED or NOT_APPLICABLE → `marketplace_ready`; any
+OUTSTANDING or UNKNOWN → `requirements_outstanding`. Same snapshot, same
+policy version, same assessment. The assessment carries the policy
+version, each requirement's outcome and a plain-English description from
+one wording table (`describeRequirement`), never a code or private content.
+Nothing about onboarding completion, a READY pitch, uploaded documents,
+Q memory, Q inference or public-web findings is an input, because the
+snapshot has no field for them.
+
+**Verification seam.** `VerificationClaimsPort` is claim-specific (founder
+identity, organisation identity) and carries a `sourceLabel` that every
+audited transition records. No Verification bounded context exists yet
+(doc 13 §24 specifies `evidence.verification_claims`; doc 25 §62/§137
+defer the provider while preserving the state contract), so the
+production adapter is `createUnavailableVerificationClaimsPort`: not
+available, nothing verified, not configurable. **No production company
+can become `marketplace_ready` today, and the screen says so.** There is
+no manual or administrator "mark verified" path: no such capability or
+role exists and none was invented.
+
+**Use cases.** `getMarketplaceReadiness` (`company.view`) evaluates and
+returns without writing. `assessMarketplaceReadiness` (`company.edit` on
+the exact company) locks the row, evaluates, and when the state differs
+writes it with a version bump, records `company.marketplace_readiness_changed`
+in the audit trail (policy version, trigger, previous and new state,
+outstanding requirement ids, verification source) and queues
+`core.company.marketplace_readiness_changed`@1 in the same transaction.
+`setCompanyVisibility` calls the same reconciliation with trigger
+`VISIBILITY_WITHDRAWN` when a ready company goes private.
+
+**Routes.** `GET /v1/companies/:id/marketplace-readiness` and
+`POST /v1/companies/:id/marketplace-readiness/assess` (no body). The
+founder's `/company/visibility` screen lists what is done and what is
+still needed in plain English, and when verification is unavailable says
+that no company is in investor recommendations today.
+
+**Local fixture.** `@capital-q/companies/dev` exports a synthetic seam that
+refuses to exist unless `CAPITAL_Q_ENV` is `local` or `test` and the
+database host is loopback, answers VERIFIED only for the company ids it
+was given, and labels every transition `SYNTHETIC_LOCAL_FIXTURE`.
+`pnpm dev:marketplace-ready` runs the real assessment for the dev founder's
+company with it, after the founder has chosen "visible to investors" in
+the UI — the script does not and will not make that choice. Test/dev
+fixture capability ≠ production verification capability.
 
 Invitations and member administration, founder claims/credential evidence,
 public founder presentation, business models,
 metrics, milestones, taxonomy assignments (CQ-TAX-001), capital objective
-(CQ-CAP-001), evidence and verification, marketplace activation
-(CQ-PERM-001 / readiness), discovery projection, recommendations, Q. Future
+(CQ-CAP-001), evidence and verification (the Verification bounded context, still to
+come), discovery projection, recommendations, Q. Future
 onboarding (CQ-ONB-002) creates and enriches this record; no temporary company
 model exists to migrate from.

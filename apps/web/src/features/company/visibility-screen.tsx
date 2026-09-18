@@ -3,12 +3,17 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
-import type { CompanyDto, CompanyNetworkPreview } from "@capital-q/contracts";
+import type {
+  CompanyDto,
+  CompanyNetworkPreview,
+  MarketplaceReadinessAssessment,
+} from "@capital-q/contracts";
 import { COUNTRY_OPTIONS, STAGE_OPTIONS } from "@capital-q/founder-onboarding";
 import { Button, buttonClassName } from "@capital-q/ui/button";
 import { EmptyState, InlineNotice, Skeleton } from "@capital-q/ui/states";
 
 import {
+  assessMarketplaceReadinessAction,
   loadVisibilityOverviewAction,
   setCompanyVisibilityAction,
 } from "./visibility-actions";
@@ -32,6 +37,7 @@ export type VisibilityScreenProps = {
 type Loaded = {
   readonly company: CompanyDto;
   readonly preview: CompanyNetworkPreview;
+  readonly readiness: MarketplaceReadinessAssessment | null;
 };
 
 // The labels investors read come from the same definition the founder
@@ -138,10 +144,31 @@ export function VisibilityScreen({ companyId }: VisibilityScreenProps) {
     );
   }
 
-  const { company, preview } = loaded;
+  const { company, preview, readiness } = loaded;
   const visible = preview.networkVisible;
-  const readinessAssessed =
-    company.marketplaceReadinessState !== "not_assessed";
+  const ready = company.marketplaceReadinessState === "marketplace_ready";
+  const outstanding =
+    readiness?.requirements.filter((r) => r.outcome === "OUTSTANDING") ?? [];
+
+  const checkReadiness = async () => {
+    setBusy(true);
+    setSaved(null);
+    try {
+      const result = await assessMarketplaceReadinessAction(companyId);
+      if (!result.ok) {
+        setError(result.message);
+        return;
+      }
+      setSaved(
+        result.value.state === "marketplace_ready"
+          ? "Your company meets the marketplace requirements."
+          : "Readiness checked. What remains is listed below.",
+      );
+      await load();
+    } finally {
+      setBusy(false);
+    }
+  };
 
   return (
     <div className="flex flex-col gap-8" data-visibility-screen>
@@ -255,11 +282,65 @@ export function VisibilityScreen({ companyId }: VisibilityScreenProps) {
             ? "Discoverable to investors: they can look your company up and ask Q about it."
             : "Not discoverable yet: investors cannot find your company until you make it visible."}
         </p>
+        <h3 className="cq-label text-(--cq-text-primary)">
+          Investor recommendations
+        </h3>
         <p className="cq-body max-w-(--cq-layout-narrow) text-(--cq-text-secondary)">
-          {readinessAssessed
-            ? "Marketplace readiness has been assessed."
-            : "Not in investor recommendations yet: readiness has not been assessed, so your company is not ranked for anyone. Being visible does not change that."}
+          {ready
+            ? "Your company meets the marketplace requirements and can be included in investor recommendations. Being visible and being recommended are separate: both are needed."
+            : "Not in investor recommendations yet. Being visible does not change that on its own; the marketplace requirements below decide it."}
         </p>
+        {readiness === null ? (
+          <p className="cq-caption text-(--cq-text-tertiary)">
+            Readiness couldn&apos;t be read just now.
+          </p>
+        ) : (
+          <ul
+            className="flex max-w-(--cq-layout-narrow) flex-col gap-2"
+            data-marketplace-requirements
+          >
+            {readiness.requirements
+              .filter((r) => r.outcome !== "NOT_APPLICABLE")
+              .map((r) => (
+                <li
+                  key={r.requirement}
+                  className="cq-body-sm flex gap-2 text-(--cq-text-secondary)"
+                  data-outcome={r.outcome}
+                >
+                  <span
+                    aria-hidden="true"
+                    className="cq-caption mt-0.5 w-5 shrink-0 text-(--cq-text-tertiary)"
+                  >
+                    {r.outcome === "SATISFIED" ? "Done" : "Next"}
+                  </span>
+                  <span>
+                    <span className="sr-only">
+                      {r.outcome === "SATISFIED" ? "Done: " : "Still needed: "}
+                    </span>
+                    {r.description}
+                  </span>
+                </li>
+              ))}
+          </ul>
+        )}
+        {readiness !== null && !readiness.verificationAvailable ? (
+          <p className="cq-caption max-w-(--cq-layout-narrow) text-(--cq-text-tertiary)">
+            Identity and organisation verification are not yet available on
+            Capital Q, so no company is in investor recommendations today.
+            Nothing here calls your company verified when it isn&apos;t.
+          </p>
+        ) : null}
+        <div className="flex flex-wrap gap-2">
+          <Button
+            variant="secondary"
+            disabled={busy}
+            onClick={() => void checkReadiness()}
+          >
+            {outstanding.length === 0 && ready
+              ? "Check readiness again"
+              : "Check readiness"}
+          </Button>
+        </div>
       </section>
 
       <section

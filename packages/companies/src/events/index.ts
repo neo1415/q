@@ -5,6 +5,7 @@ import { z } from "zod";
 import {
   defineEvent,
   EventIdSchema,
+  MarketplaceReadinessStateValueSchema,
   MarketplaceVisibilitySchema,
   UtcTimestampSchema,
   UuidSchema,
@@ -83,10 +84,31 @@ export const CompanyVisibilityChangedEvent = defineEvent({
     "An editor of the company chose who may see its declared profile. Consumers re-read the row; nothing here is a disclosure grant.",
 });
 
+export const CompanyMarketplaceReadinessChangedEvent = defineEvent({
+  name: "core.company.marketplace_readiness_changed",
+  version: 1,
+  owner: COMPANY_EVENT_OWNER,
+  producer: COMPANY_EVENT_PRODUCER,
+  consumers: ["@capital-q/discovery", "@capital-q/onboarding", "@capital-q/q"],
+  sensitivity: "INTERNAL",
+  replaySafety: "REPLAY_SAFE",
+  dataSchema: z
+    .object({
+      companyId: UuidSchema,
+      version: z.number().int().min(1),
+      readinessState: MarketplaceReadinessStateValueSchema,
+      policyVersion: z.string().regex(/^marketplace-readiness\.v\d+$/),
+    })
+    .strict(),
+  description:
+    "The readiness policy moved the company's marketplace readiness state. Consumers re-read the row; this is not a visibility grant and not a quality signal.",
+});
+
 export const COMPANY_PROFILE_EVENTS: readonly EventDefinition[] = [
   CompanyCreatedEvent,
   CompanyUpdatedEvent,
   CompanyVisibilityChangedEvent,
+  CompanyMarketplaceReadinessChangedEvent,
 ];
 
 type EnvelopeInput = {
@@ -172,5 +194,23 @@ export function companyVisibilityChangedEvent(
     companyId: input.companyId,
     version: input.version,
     visibility: input.visibility,
+  });
+}
+
+export function companyMarketplaceReadinessChangedEvent(
+  input: EnvelopeInput & {
+    readonly readinessState: z.infer<
+      typeof MarketplaceReadinessStateValueSchema
+    >;
+    readonly policyVersion: string;
+  },
+): CapitalQEvent<
+  z.infer<typeof CompanyMarketplaceReadinessChangedEvent.dataSchema>
+> {
+  return envelope(CompanyMarketplaceReadinessChangedEvent, input, {
+    companyId: input.companyId,
+    version: input.version,
+    readinessState: input.readinessState,
+    policyVersion: input.policyVersion,
   });
 }

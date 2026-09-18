@@ -1,6 +1,7 @@
 import {
   MARKETPLACE_READINESS_MARKETPLACE_READY,
   MARKETPLACE_READINESS_NOT_ASSESSED,
+  MARKETPLACE_READINESS_REQUIREMENTS_OUTSTANDING,
 } from "@capital-q/contracts";
 
 /**
@@ -27,6 +28,7 @@ export type MarketplaceParticipation =
 /** Readiness states this domain currently recognises. Bounded, never an enum. */
 export const KNOWN_MARKETPLACE_READINESS_STATES = [
   MARKETPLACE_READINESS_NOT_ASSESSED,
+  MARKETPLACE_READINESS_REQUIREMENTS_OUTSTANDING,
   MARKETPLACE_READINESS_MARKETPLACE_READY,
 ] as const;
 

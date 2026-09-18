@@ -34,8 +34,11 @@
     "zod": "4.5.4"
   },
   "devDependencies": {
+    "@capital-q/audit": "workspace:*",
     "@capital-q/capital": "workspace:*",
     "@capital-q/config": "workspace:*",
+    "@capital-q/eventing": "workspace:*",
+    "@capital-q/organisations": "workspace:*",
     "@types/node": "^24.13.3",
     "typescript": "5.9.3"
   }

@@ -474,6 +474,9 @@ importers:
       '@capital-q/audit':
         specifier: workspace:*
         version: link:../audit
+      '@capital-q/config':
+        specifier: workspace:*
+        version: link:../config
       '@capital-q/contracts':
         specifier: workspace:*
         version: link:../contracts
@@ -493,9 +496,6 @@ importers:
         specifier: 4.5.4
         version: 4.5.4
     devDependencies:
-      '@capital-q/config':
-        specifier: workspace:*
-        version: link:../config
       '@types/node':
         specifier: ^24.13.3
         version: 24.13.3
@@ -575,12 +575,21 @@ importers:
         specifier: 4.5.4
         version: 4.5.4
     devDependencies:
+      '@capital-q/audit':
+        specifier: workspace:*
+        version: link:../audit
       '@capital-q/capital':
         specifier: workspace:*
         version: link:../capital
       '@capital-q/config':
         specifier: workspace:*
         version: link:../config
+      '@capital-q/eventing':
+        specifier: workspace:*
+        version: link:../eventing
+      '@capital-q/organisations':
+        specifier: workspace:*
+        version: link:../organisations
       '@types/node':
         specifier: ^24.13.3
         version: 24.13.3

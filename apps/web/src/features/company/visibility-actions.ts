@@ -4,8 +4,10 @@ import { z } from "zod";
 
 import {
   ApiProblemError,
+  assessMarketplaceReadiness,
   getCompany,
   getCompanyNetworkPreview,
+  getMarketplaceReadiness,
   setCompanyVisibility,
   type ApiSession,
 } from "@capital-q/api-client";
@@ -14,6 +16,7 @@ import type {
   CompanyDto,
   CompanyNetworkPreview,
   CompanyVisibilityChoice,
+  MarketplaceReadinessAssessment,
 } from "@capital-q/contracts";
 
 import { getSessionAccessToken } from "@/auth/session";
@@ -83,6 +86,8 @@ function translate(error: unknown): VisibilityActionResult<never> {
 export type VisibilityOverview = {
   readonly company: CompanyDto;
   readonly preview: CompanyNetworkPreview;
+  /** The readiness policy's answer now; null when it could not be read. */
+  readonly readiness: MarketplaceReadinessAssessment | null;
 };
 
 export async function loadVisibilityOverviewAction(
@@ -97,11 +102,14 @@ export async function loadVisibilityOverviewAction(
     return { ok: false, message: "Please sign in again to continue." };
   }
   try {
-    const [company, preview] = await Promise.all([
+    const [company, preview, readiness] = await Promise.all([
       getCompany(current, companyId.data),
       getCompanyNetworkPreview(current, companyId.data),
+      // A read of the assessment never writes; a failure here must not
+      // take the visibility choice down with it.
+      getMarketplaceReadiness(current, companyId.data).catch(() => null),
     ]);
-    return { ok: true, value: { company, preview } };
+    return { ok: true, value: { company, preview, readiness } };
   } catch (error) {
     return translate(error);
   }
@@ -129,6 +137,32 @@ export async function setCompanyVisibilityAction(
       expectedVersion: expectedVersion.data,
     });
     return { ok: true, value: company };
+  } catch (error) {
+    return translate(error);
+  }
+}
+
+/**
+ * Ask the companies service to reconcile marketplace readiness
+ * (CQ-MKT-001). No state travels: the policy decides, and the founder
+ * only asks. The returned assessment is what the screen shows.
+ */
+export async function assessMarketplaceReadinessAction(
+  rawCompanyId: string,
+): Promise<VisibilityActionResult<MarketplaceReadinessAssessment>> {
+  const companyId = CompanyIdInput.safeParse(rawCompanyId);
+  if (!companyId.success) {
+    return { ok: false, message: "That company isn't available here." };
+  }
+  const current = await session();
+  if (current === null) {
+    return { ok: false, message: "Please sign in again to continue." };
+  }
+  try {
+    return {
+      ok: true,
+      value: await assessMarketplaceReadiness(current, companyId.data),
+    };
   } catch (error) {
     return translate(error);
   }

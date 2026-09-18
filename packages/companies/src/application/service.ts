@@ -1,3 +1,5 @@
+import type { MarketplaceReadinessAssessment } from "@capital-q/contracts";
+
 import type { Company } from "../contracts/index.js";
 import type {
   CompanyMember,
@@ -8,6 +10,13 @@ import {
   createPostgresCompanyCreationRequestStore,
   createPostgresCompanyRepository,
 } from "../infrastructure/postgres-company-repository.js";
+import { createUnavailableVerificationClaimsPort } from "../infrastructure/unavailable-verification-claims.js";
+import {
+  createAssessMarketplaceReadiness,
+  createGetMarketplaceReadiness,
+  type AssessMarketplaceReadinessCommand,
+  type GetMarketplaceReadinessQuery,
+} from "./marketplace-readiness.js";
 import {
   createPostgresCompanyMemberRepository,
   createPostgresCompanyTeamFactsRepository,
@@ -54,6 +63,14 @@ export type CompanyService = {
   readonly setCompanyVisibility: (
     command: SetCompanyVisibilityCommand,
   ) => Promise<Company>;
+  /** Marketplace readiness as the policy sees it now; reads nothing but canonical state. */
+  readonly getMarketplaceReadiness: (
+    query: GetMarketplaceReadinessQuery,
+  ) => Promise<MarketplaceReadinessAssessment>;
+  /** Reconcile the stored readiness state with the policy (CQ-MKT-001). */
+  readonly assessMarketplaceReadiness: (
+    command: AssessMarketplaceReadinessCommand,
+  ) => Promise<MarketplaceReadinessAssessment>;
   readonly getMyCompanyMembership: (
     query: GetMyCompanyMembershipQuery,
   ) => Promise<CompanyMember>;
@@ -76,10 +93,17 @@ export type CompanyService = {
 
 export type CompanyServiceOptions = Omit<
   CompanyServiceDependencies,
-  "repositories"
+  "repositories" | "verification"
 > & {
   readonly repositories?:
     CompanyServiceDependencies["repositories"] | undefined;
+  /**
+   * Omitted in every application: the production seam answers
+   * "unavailable" until a Verification context exists. Supplied only by
+   * tests and the local synthetic fixture.
+   */
+  readonly verification?:
+    CompanyServiceDependencies["verification"] | undefined;
 };
 
 export function createCompanyService(
@@ -87,6 +111,8 @@ export function createCompanyService(
 ): CompanyService {
   const dependencies: CompanyServiceDependencies = {
     ...options,
+    verification:
+      options.verification ?? createUnavailableVerificationClaimsPort(),
     repositories: options.repositories ?? {
       companies: createPostgresCompanyRepository(),
       creationRequests: createPostgresCompanyCreationRequestStore(),
@@ -101,6 +127,8 @@ export function createCompanyService(
     getCompany: createGetCompany(dependencies),
     updateCompany: createUpdateCompany(dependencies),
     setCompanyVisibility: createSetCompanyVisibility(dependencies),
+    getMarketplaceReadiness: createGetMarketplaceReadiness(dependencies),
+    assessMarketplaceReadiness: createAssessMarketplaceReadiness(dependencies),
     getMyCompanyMembership: createGetMyCompanyMembership(dependencies),
     upsertMyCompanyMembership: createUpsertMyCompanyMembership(dependencies),
     getMyFounderProfile: createGetMyFounderProfile(dependencies),
