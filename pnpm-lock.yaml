@@ -565,6 +565,9 @@ importers:
       '@capital-q/permissions':
         specifier: workspace:*
         version: link:../permissions
+      '@capital-q/q-embeddings':
+        specifier: workspace:*
+        version: link:../q-embeddings
       '@capital-q/security':
         specifier: workspace:*
         version: link:../security

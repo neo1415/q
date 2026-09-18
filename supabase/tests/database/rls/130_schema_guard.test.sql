@@ -32,7 +32,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 
 create temporary table guarded_schemas (schema_name text primary key) on commit drop;
-insert into guarded_schemas values ('identity'), ('permissions'), ('events'), ('audit'), ('core'), ('network'), ('taxonomy'), ('onboarding'), ('evidence'), ('media'), ('q_runtime'), ('ai_ops'), ('q_knowledge');
+insert into guarded_schemas values ('identity'), ('permissions'), ('events'), ('audit'), ('core'), ('network'), ('taxonomy'), ('onboarding'), ('evidence'), ('media'), ('q_runtime'), ('ai_ops'), ('q_knowledge'), ('recommendation');
 
 create temporary table rls_inventory (
   schema_name text not null,
@@ -134,6 +134,10 @@ insert into rls_inventory (schema_name, table_name, classification, authenticate
   ('q_knowledge', 'contradiction_members',  'INTERNAL_SERVER_ONLY', '{}'),
   ('q_knowledge', 'memory_items',           'INTERNAL_SERVER_ONLY', '{}'),
   ('q_knowledge', 'presence_builds',        'INTERNAL_SERVER_ONLY', '{}'),
+  ('recommendation', 'company_representations', 'INTERNAL_SERVER_ONLY', '{}'),
+  ('recommendation', 'mandate_representations', 'INTERNAL_SERVER_ONLY', '{}'),
+  ('recommendation', 'company_embeddings',      'INTERNAL_SERVER_ONLY', '{}'),
+  ('recommendation', 'mandate_embeddings',      'INTERNAL_SERVER_ONLY', '{}'),
   ('events', 'outbox',                     'INTERNAL_SERVER_ONLY', '{}'),
   ('audit', 'material_actions',            'INTERNAL_SERVER_ONLY', '{}'),
   ('audit', 'security_events',             'INTERNAL_SERVER_ONLY', '{}');

@@ -29,6 +29,7 @@
     "@capital-q/network": "workspace:*",
     "@capital-q/observability": "workspace:*",
     "@capital-q/permissions": "workspace:*",
+    "@capital-q/q-embeddings": "workspace:*",
     "@capital-q/security": "workspace:*",
     "@capital-q/taxonomy": "workspace:*",
     "zod": "4.5.4"

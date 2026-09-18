@@ -76,6 +76,7 @@ export {
   CompanySearchCursorError,
   type CompanyCreationRecord,
   type CompanyCreationRequestStore,
+  type CompanyInvestmentProfile,
   type CompanyMarketplaceFacts,
   type CompanyMarketplaceQueryPort,
   type CompanyProfileChanges,

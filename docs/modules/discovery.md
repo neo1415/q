@@ -232,10 +232,89 @@ feature computation and ranking, slates and the feed, portfolio,
 relationship, freshness and exploration generators, GateQ, and a cheque
 dimension once a disclosure-safe raise projection exists.
 
+## Semantic candidate generation (CQ-REC-003)
+
+Candidate Generator B (doc 19 §24–§26): the investor's ACTIVE mandate as a
+query vector against precomputed vectors over a purpose-approved company
+representation, through pgvector, into REC-001. It supplements the
+structured generator where exact taxonomy misses nuance; it replaces
+nothing, ranks nothing and enforces nothing.
+
+- **Generator** `SEMANTIC_MANDATE` / `semantic-mandate.v1`, in
+  `src/semantic/`. Same `CompanyId`, same eligibility result, same "ELIGIBLE
+  only, canonical id order" output shape as REC-002. Provenance carries a
+  cosine `similarity` in [-1, 1] and every version that could change it
+  (representation versions, embedding configuration, instruction versions).
+  The number is retrieval provenance for the ranker: never a percentage, a
+  probability, a match or a threshold. No similarity cut-off rejects a
+  company; top-K (`SEMANTIC_TOP_K` = 200, the structured dimension budget)
+  bounds retrieval.
+- **Company investment representation** `company-investment-representation.v1`
+  (`buildCompanyInvestmentRepresentation`): a deterministic labelled text —
+  `Company`, `Stage`, `Headquarters`, one line per canonical vocabulary,
+  `Summary` — built only from the fields the Discover slate already shows an
+  investor about a discoverable company (canonical name, short description,
+  stage, headquarters country, ACTIVE canonical classifications). The input
+  type has no field for memory, conversations, documents, evidence, research
+  or a Q summary, so none can be embedded; business model, customer type,
+  raise and traction are omitted because no canonical discovery-safe field
+  exists for them yet. Same snapshot, same version, same text and sha256.
+- **Investor representation** `investor-mandate-representation.v1`
+  (`buildInvestorMandateRepresentation`): mandate name, the declared
+  narrative (`raw_mandate_text`, investor-private), positive stage and
+  country intent and positive taxonomy preferences, exactly as
+  `deriveStructuredIntent` reads them. Hard exclusions and AVOID never enter
+  the text: a "never" is REC-001's, and a soft avoidance is not a retrieval
+  signal. Stored under the investor's tenant only; never joined into any
+  founder-facing projection.
+- **Embeddings** through `@capital-q/q-embeddings` unchanged: the local Qwen
+  runtime (`Qwen/Qwen3-Embedding-0.6B`, 1024 dimensions, L2 unit vectors),
+  documents without an instruction (`none-v1`), the mandate under the
+  registered `MANDATE_MATCHING` task (`capital-q-mandate-matching-v1`). No
+  hosted embedding provider, no Gemini, Groq, Tavily or ElevenLabs anywhere
+  in the path. The runtime being down is a typed `UNAVAILABLE` result — never
+  a zero, random or substitute vector.
+- **Storage** is the server-only `recommendation` schema (migration
+  `20260927090000`): `company_representations` and
+  `mandate_representations` (one CURRENT row per subject, purpose and
+  version; content immutable; superseded, never edited) and
+  `company_embeddings` / `mandate_embeddings` (pgvector `vector(1024)`, work
+  identity unique, immutable, cascade with their canonical row). RLS on, no
+  policy, no browser grant; pgTAP `400_recommendation_semantic`. Not
+  `q_knowledge.embeddings`: that store keys vectors to Q's private chunks.
+  Exact scan under a `(configuration_version, instruction_version)`
+  prefilter, as the q_knowledge store does at this volume; an approximate
+  index is a later, measured decision.
+- **Freshness** is `refreshCompanyRepresentations`: rebuild the text, compare
+  its sha256 with the CURRENT row, supersede and insert on change, reuse an
+  existing vector for identical content, embed the rest in one bounded
+  batch. A row version bump without a visible change is not a new
+  embedding. No worker yet: REC-004/REC-006 may automate the call from
+  company and classification events.
+- **Current discoverability wins**: the nearest-neighbour query joins
+  `core.companies` for `active` and `network_visible` / `public_external`
+  on every run, so a company that went private or closed never returns from
+  a stale vector; readiness, disclosure and exclusions are then REC-001's.
+- **Hybrid pool** `hybrid-candidate-pool.v1` (`src/hybrid/`): structured
+  UNION semantic by canonical id, both provenances kept, canonical order,
+  bounded by the pool budget. A semantic outage leaves the structured pool
+  exactly as generated and says so (`semanticUnavailable`).
+- **Boundary**: `eligibility-boundary.test.ts` scans `src/semantic`,
+  `src/hybrid` and the two adapters: the embedding boundary is the only
+  Q-side import allowed; no private store, generation provider or research
+  tool is named; only the store adapter contains SQL, and only over its own
+  schema and `core.companies`.
+
+Golden scenarios A–O live in `semantic.test.ts` (deterministic concept
+embedder, in-memory store, real REC-001 policy) and
+`semantic.integration.test.ts` (real adapters, real store, local PostgreSQL;
+the live Qwen block runs when the TEI runtime answers and is skipped
+otherwise).
+
 ## Not built yet
 
-- Semantic fit over company descriptions (CQ-RAG exists; it is not wired
-  into this path).
+- Semantic _fit_ as a ranking factor (REC-004/REC-005). Semantic
+  _retrieval_ exists above; its similarity is provenance, not a score.
 - Evidence and freshness as ranking signals.
 - Exploration and diversity.
 - Precomputed slates. Today each request ranks a bounded candidate set of
@@ -246,6 +325,7 @@ dimension once a disclosure-safe raise projection exists.
 - A closed or blocked relationship state. Network defines only
   DISCOVERED; when it defines more, `RELATIONSHIP_STATES_CLOSED_TO_DISCOVERY`
   names them and the policy version moves.
-- Semantic candidate generation (REC-003), ranking (REC-005) and
-  persisted slates (REC-006). The structured generator above is their
-  input, not a substitute.
+- Ranking (REC-005) and persisted slates (REC-006). The two generators
+  above and the hybrid pool are their input, not a substitute.
+- An event-driven representation refresh worker; today `refreshCompanyRepresentations`
+  is an explicit, idempotent call.

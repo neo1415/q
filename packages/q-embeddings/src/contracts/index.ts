@@ -164,7 +164,10 @@ export const QWEN3_EMBEDDING_CONFIGURATION: EmbeddingConfiguration =
  * What a piece of text is being embedded for. A document is embedded as it
  * is; a query is embedded with the instruction its task registers.
  */
-export const EMBEDDING_QUERY_TASKS = ["EVIDENCE_RETRIEVAL"] as const;
+export const EMBEDDING_QUERY_TASKS = [
+  "EVIDENCE_RETRIEVAL",
+  "MANDATE_MATCHING",
+] as const;
 export const EmbeddingQueryTaskSchema = z.enum(EMBEDDING_QUERY_TASKS);
 export type EmbeddingQueryTask = z.infer<typeof EmbeddingQueryTaskSchema>;
 
@@ -197,10 +200,25 @@ export const EVIDENCE_RETRIEVAL_INSTRUCTION: EmbeddingInstructionProfile = {
     "Given an investment intelligence question, retrieve document passages and company information that help answer it.",
 };
 
+/**
+ * The semantic candidate generator's query instruction (CQ-REC-003; doc 19
+ * §24). The investor's mandate is the query, a company's investment
+ * representation is the document, and the task is retrieval, not judgement:
+ * nothing here says what a good company is, only what is being looked for.
+ * Documents are embedded without an instruction, as the model asks.
+ */
+export const MANDATE_MATCHING_INSTRUCTION: EmbeddingInstructionProfile = {
+  task: "MANDATE_MATCHING",
+  instructionVersion: "capital-q-mandate-matching-v1",
+  instruction:
+    "Given an investor's investment mandate, retrieve company investment profiles relevant to that mandate.",
+};
+
 const INSTRUCTIONS: Readonly<
   Record<EmbeddingQueryTask, EmbeddingInstructionProfile>
 > = {
   EVIDENCE_RETRIEVAL: EVIDENCE_RETRIEVAL_INSTRUCTION,
+  MANDATE_MATCHING: MANDATE_MATCHING_INSTRUCTION,
 };
 
 export function instructionFor(

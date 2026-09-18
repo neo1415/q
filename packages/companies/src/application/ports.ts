@@ -312,10 +312,39 @@ export type CompanyMarketplaceFacts = {
  * (CQ-REC-001). Batch by construction so a candidate set is one query, not
  * one per company; unknown ids are simply absent.
  */
+/**
+ * The investor-visible investment profile of a discoverable company
+ * (CQ-REC-003; doc 19 §25). Exactly the canonical fields the Discover slate
+ * already shows an investor about a network_visible company — name, short
+ * description, stage, headquarters — plus the row version as a source
+ * fingerprint. Deliberately absent: the primary description (a founder
+ * profile field no investor projection reads), the capital objective,
+ * evidence, documents, Q memory, conversations and research: a port that
+ * cannot express them cannot embed them.
+ */
+export type CompanyInvestmentProfile = CompanyMarketplaceFacts & {
+  readonly canonicalName: string;
+  readonly shortDescription: string | null;
+  /** The canonical row version: changes whenever any profile field does. */
+  readonly version: number;
+};
+
 export type CompanyMarketplaceQueryPort = {
   readonly findCanonicalMarketplaceFacts: (
     companyIds: readonly CompanyId[],
   ) => Promise<readonly CompanyMarketplaceFacts[]>;
+  /**
+   * Investment profiles of active companies whose declared classification
+   * is network_visible or public_external, either the named ids (others
+   * are absent, a private company included) or, with null, a bounded,
+   * id-ordered slice of every discoverable company for representation
+   * refresh. Cross-tenant by design; readiness and disclosure decide each
+   * one downstream (REC-001).
+   */
+  readonly listDiscoverableInvestmentProfiles: (input: {
+    readonly companyIds: readonly CompanyId[] | null;
+    readonly limit: number;
+  }) => Promise<readonly CompanyInvestmentProfile[]>;
   /**
    * Structured candidate retrieval (CQ-REC-002): active companies whose
    * declared classification is network_visible or public_external and

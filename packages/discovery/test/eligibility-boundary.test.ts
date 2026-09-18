@@ -49,6 +49,19 @@ const FORBIDDEN_IMPORTS = [
   "@capital-q/q-presence",
 ];
 
+/**
+ * The semantic subtree (CQ-REC-003) may reach the embedding boundary and
+ * name its own store — that is its job — but nothing else on the list.
+ */
+const semanticDir = join(packageRoot, "src", "semantic");
+const hybridDir = join(packageRoot, "src", "hybrid");
+const semanticAdapterFiles = [
+  join(packageRoot, "src", "infrastructure", "domain-port-semantic-sources.ts"),
+  join(packageRoot, "src", "infrastructure", "postgres-semantic-store.ts"),
+];
+const SEMANTIC_ALLOWED_IMPORTS = ["@capital-q/q-embeddings"];
+const SEMANTIC_ALLOWED_TOKENS = ["embedding", "pgvector", "qwen"];
+
 const FORBIDDEN_TOKENS = [
   "memory_items",
   "q_knowledge",
@@ -88,6 +101,21 @@ function sourceFiles(): readonly {
   }));
 }
 
+function semanticSourceFiles(): readonly {
+  readonly path: string;
+  readonly text: string;
+}[] {
+  const files = [semanticDir, hybridDir].flatMap((dir) =>
+    readdirSync(dir)
+      .filter((name) => name.endsWith(".ts"))
+      .map((name) => join(dir, name)),
+  );
+  return [...files, ...semanticAdapterFiles].map((path) => ({
+    path,
+    text: readFileSync(path, "utf8"),
+  }));
+}
+
 describe("eligibility boundary", () => {
   it("imports nothing from Q, evidence, media, onboarding or model packages", () => {
     for (const { path, text } of sourceFiles()) {
@@ -122,14 +150,19 @@ describe("eligibility boundary", () => {
     }
   });
 
-  it("the package manifest depends on owning contexts only", () => {
+  it("the package manifest depends on owning contexts and the embedding boundary only", () => {
     const manifest = JSON.parse(
       readFileSync(join(packageRoot, "package.json"), "utf8"),
     ) as { dependencies: Record<string, string> };
     const names = Object.keys(manifest.dependencies);
     for (const forbidden of FORBIDDEN_IMPORTS) {
+      if (SEMANTIC_ALLOWED_IMPORTS.includes(forbidden)) continue;
       expect(names).not.toContain(forbidden);
     }
+    // The one Q-side package the semantic generator may use: the local
+    // embedding provider boundary, which holds no knowledge, memory,
+    // documents or conversations.
+    expect(names).toContain("@capital-q/q-embeddings");
     expect(names).toEqual(
       expect.arrayContaining([
         "@capital-q/companies",
@@ -139,5 +172,68 @@ describe("eligibility boundary", () => {
         "@capital-q/permissions",
       ]),
     );
+  });
+});
+
+describe("semantic boundary (CQ-REC-003)", () => {
+  it("reaches the embedding boundary and nothing else private", () => {
+    for (const { path, text } of semanticSourceFiles()) {
+      for (const forbidden of FORBIDDEN_IMPORTS) {
+        if (SEMANTIC_ALLOWED_IMPORTS.includes(forbidden)) continue;
+        expect(text, `${path} imports ${forbidden}`).not.toContain(
+          `"${forbidden}`,
+        );
+      }
+    }
+  });
+
+  it("names no private store, generation provider, research tool or behavioural signal in code", () => {
+    for (const { path, text } of semanticSourceFiles()) {
+      const code = text
+        .replace(/\/\*[\s\S]*?\*\//g, "")
+        .replace(/\/\/.*$/gm, "")
+        // The embedding port's own method name, not a document store.
+        .replace(/embedDocuments/g, "")
+        .toLowerCase();
+      for (const token of FORBIDDEN_TOKENS) {
+        if (SEMANTIC_ALLOWED_TOKENS.includes(token)) continue;
+        expect(code, `${path} mentions ${token}`).not.toContain(token);
+      }
+    }
+  });
+
+  it("only the recommendation store adapter contains SQL, and it reads only its own schema and core.companies", () => {
+    for (const { path, text } of semanticSourceFiles()) {
+      const code = text
+        .replace(/\/\*[\s\S]*?\*\//g, "")
+        .replace(/\/\/.*$/gm, "");
+      if (path.endsWith("postgres-semantic-store.ts")) {
+        // Every table named after FROM / JOIN / INTO / UPDATE in the file.
+        const tokens = code.replace(/[`(),;]/g, " ").split(/\s+/);
+        const tables: string[] = [];
+        for (const [index, token] of tokens.entries()) {
+          const next = tokens[index + 1];
+          if (
+            /^(?:from|join|into|update)$/i.test(token) &&
+            next !== undefined &&
+            /^[a-z_]+\.[a-z_]+$/i.test(next)
+          ) {
+            tables.push(next.toLowerCase());
+          }
+        }
+        expect(new Set(tables)).toEqual(
+          new Set([
+            "recommendation.company_representations",
+            "recommendation.company_embeddings",
+            "recommendation.mandate_representations",
+            "recommendation.mandate_embeddings",
+            "core.companies",
+          ]),
+        );
+        continue;
+      }
+      expect(code, path).not.toMatch(/\bsql`/);
+      expect(code, path).not.toMatch(/\bselect\s+[\w.*]+\s+from\b/i);
+    }
   });
 });

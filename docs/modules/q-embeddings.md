@@ -17,6 +17,15 @@ Sources: doc 14 §15 (embedding architecture, Qwen3 candidate), §115
 doc 15 §20-§21 (derived sensitivity), doc 16 (supply chain), doc 21
 (deployment), CQ-RAG-001 (the chunks this embeds).
 
+## Query tasks
+
+Two registered query instructions exist, one per retrieval flow:
+`EVIDENCE_RETRIEVAL` (`capital-q-evidence-retrieval-v1`, hybrid RAG over Q
+knowledge) and `MANDATE_MATCHING` (`capital-q-mandate-matching-v1`,
+CQ-REC-003: an investor mandate against company investment representations).
+Documents are embedded without an instruction in both flows. Neither
+instruction names a tenant, a permission, a persona or a policy.
+
 ## Free-first, and why it is also the private option
 
 Capital Q embeds confidential founder and investor material. A hosted

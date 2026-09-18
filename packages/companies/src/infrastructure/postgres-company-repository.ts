@@ -26,6 +26,7 @@ import {
   type CompanyCreationRecord,
   type CompanyCreationRequestStore,
   type CompanyProfileChanges,
+  type CompanyInvestmentProfile,
   type CompanyMarketplaceFacts,
   type CompanyMarketplaceQueryPort,
   type CompanyProfileFacts,
@@ -371,6 +372,24 @@ const MarketplaceRowSchema = CompanyRowSchema.pick({
   headquarters_country: true,
 });
 
+const InvestmentProfileRowSchema = MarketplaceRowSchema.extend(
+  CompanyRowSchema.pick({
+    canonical_name: true,
+    short_description: true,
+    version: true,
+  }).shape,
+);
+
+function toInvestmentProfile(row: unknown): CompanyInvestmentProfile {
+  const p = InvestmentProfileRowSchema.parse(row);
+  return {
+    ...toMarketplaceFacts(p),
+    canonicalName: p.canonical_name,
+    shortDescription: p.short_description,
+    version: p.version,
+  };
+}
+
 /** Bounded so eligibility over a candidate set stays one statement. */
 const MARKETPLACE_FACTS_BATCH_MAX = 500;
 /** A retrieval dimension is a bounded, id-ordered slice, never a scan. */
@@ -442,6 +461,32 @@ export function createPostgresCompanyMarketplaceQueryPort(options: {
          order by c.id
          limit ${limit}`;
       return rows.map(toMarketplaceFacts);
+    },
+    listDiscoverableInvestmentProfiles: async (input) => {
+      const ids = input.companyIds;
+      if (ids !== null && ids.length === 0) return [];
+      if (ids !== null && ids.length > MARKETPLACE_FACTS_BATCH_MAX) {
+        throw new RangeError(
+          `investment profile batch exceeds ${String(MARKETPLACE_FACTS_BATCH_MAX)} companies`,
+        );
+      }
+      const limit = Math.max(1, Math.min(DISCOVERABLE_LIST_MAX, input.limit));
+      // The visibility predicate is the projection's boundary: a company
+      // that is not discoverable has no investment profile here, whether
+      // or not its id was asked for. Only the columns an investor already
+      // sees on the Discover slate are selected.
+      const rows = await sql`
+        select c.id, c.tenant_id, c.organisation_id, c.company_status,
+               c.marketplace_visibility, c.marketplace_readiness_state,
+               c.current_stage_code, c.headquarters_country,
+               c.canonical_name, c.short_description, c.version
+          from core.companies c
+         where c.company_status = 'active'
+           and c.marketplace_visibility = any(${[...DISCOVERABLE_VISIBILITIES]}::text[])
+           and (${ids === null}::boolean or c.id = any(${[...(ids ?? [])]}::uuid[]))
+         order by c.id
+         limit ${limit}`;
+      return rows.map(toInvestmentProfile);
     },
   };
 }

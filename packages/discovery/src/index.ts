@@ -196,4 +196,83 @@ export {
   type DomainCandidatePortDependencies,
 } from "./infrastructure/domain-port-candidate-sources.js";
 
+// Semantic candidate generation (CQ-REC-003): supplements structured recall.
+export {
+  COMPANY_REPRESENTATION_VERSION,
+  INVESTOR_REPRESENTATION_VERSION,
+  REPRESENTATION_PURPOSE,
+  REPRESENTATION_REFRESH_LIMIT,
+  RepresentationRefreshReportSchema,
+  SEMANTIC_GENERATOR_ID,
+  SEMANTIC_GENERATOR_VERSION,
+  SEMANTIC_SIMILARITY_METRIC,
+  SEMANTIC_TOP_K,
+  SemanticCandidateResultSchema,
+  SemanticCandidateSchema,
+  SemanticDiagnosticsSchema,
+  SemanticProvenanceSchema,
+  type RepresentationRefreshReport,
+  type SemanticCandidate,
+  type SemanticCandidateResult,
+  type SemanticDiagnostics,
+  type SemanticProvenance,
+} from "./semantic/contracts.js";
+export {
+  buildCompanyInvestmentRepresentation,
+  buildInvestorMandateRepresentation,
+  REPRESENTATION_MAX_CHARACTERS,
+  type BuiltRepresentation,
+  type CompanyRepresentationInput,
+  type InvestorRepresentationInput,
+  type RepresentationClassification,
+} from "./semantic/representation.js";
+export type {
+  CompanyInvestmentFacts,
+  CompanyInvestmentFactsPort,
+  DescribedNode,
+  InvestorMandateNarrative,
+  InvestorMandateNarrativePort,
+  SemanticEmbedder,
+  SemanticNearestHit,
+  SemanticRepresentationStore,
+  StoredRepresentation,
+  VectorIdentity,
+  VocabularyDescriptionPort,
+} from "./semantic/ports.js";
+export {
+  createSemanticCandidateService,
+  type GenerateSemanticCandidatesQuery,
+  type RefreshCompanyRepresentationsInput,
+  type SemanticCandidateService,
+  type SemanticCandidateServiceDependencies,
+} from "./semantic/service.js";
+export {
+  createPostgresSemanticRepresentationStore,
+  fromVectorLiteral,
+  toVectorLiteral,
+} from "./infrastructure/postgres-semantic-store.js";
+export {
+  createDomainSemanticPorts,
+  type DomainSemanticPortDependencies,
+  type DomainSemanticPorts,
+} from "./infrastructure/domain-port-semantic-sources.js";
+
+// The hybrid pool: structured UNION semantic, one company, both provenances.
+export {
+  HYBRID_POOL_VERSION,
+  HybridCandidatePoolSchema,
+  HybridCandidateSchema,
+  HybridDiagnosticsSchema,
+  type HybridCandidate,
+  type HybridCandidatePool,
+  type HybridDiagnostics,
+} from "./hybrid/contracts.js";
+export { mergeCandidatePools } from "./hybrid/merge.js";
+export {
+  createHybridCandidateService,
+  type GenerateHybridCandidatesQuery,
+  type HybridCandidateService,
+  type HybridCandidateServiceDependencies,
+} from "./hybrid/service.js";
+
 export const PACKAGE_NAME = "@capital-q/discovery" as const;

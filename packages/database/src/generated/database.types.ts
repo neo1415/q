@@ -1083,6 +1083,7 @@ export type Database = {
           hq_country: string | null
           id: string
           investor_type: string
+          marketplace_visibility: string
           organisation_id: string
           public_description: string | null
           tenant_id: string
@@ -1098,6 +1099,7 @@ export type Database = {
           hq_country?: string | null
           id?: string
           investor_type: string
+          marketplace_visibility?: string
           organisation_id: string
           public_description?: string | null
           tenant_id: string
@@ -1113,6 +1115,7 @@ export type Database = {
           hq_country?: string | null
           id?: string
           investor_type?: string
+          marketplace_visibility?: string
           organisation_id?: string
           public_description?: string | null
           tenant_id?: string
@@ -3712,6 +3715,111 @@ export type Database = {
           },
         ]
       }
+      memory_items: {
+        Row: {
+          content: string
+          content_sha256: string
+          created_at: string
+          id: string
+          knowledge_object_id: string | null
+          last_used_at: string | null
+          memory_key: string
+          memory_type: string
+          owner_context_id: string
+          owner_context_type: string
+          quote: string | null
+          sensitivity_class: string
+          source_conversation_id: string | null
+          source_id: string | null
+          source_run_id: string | null
+          status: string
+          structured_value: Json
+          subject_id: string | null
+          subject_type: string | null
+          superseded_by: string | null
+          tenant_id: string
+          updated_at: string
+          use_count: number
+          valid_from: string
+          valid_to: string | null
+          visibility_scope: string
+          write_mode: string
+        }
+        Insert: {
+          content: string
+          content_sha256: string
+          created_at?: string
+          id?: string
+          knowledge_object_id?: string | null
+          last_used_at?: string | null
+          memory_key: string
+          memory_type: string
+          owner_context_id: string
+          owner_context_type: string
+          quote?: string | null
+          sensitivity_class?: string
+          source_conversation_id?: string | null
+          source_id?: string | null
+          source_run_id?: string | null
+          status: string
+          structured_value?: Json
+          subject_id?: string | null
+          subject_type?: string | null
+          superseded_by?: string | null
+          tenant_id: string
+          updated_at?: string
+          use_count?: number
+          valid_from?: string
+          valid_to?: string | null
+          visibility_scope?: string
+          write_mode: string
+        }
+        Update: {
+          content?: string
+          content_sha256?: string
+          created_at?: string
+          id?: string
+          knowledge_object_id?: string | null
+          last_used_at?: string | null
+          memory_key?: string
+          memory_type?: string
+          owner_context_id?: string
+          owner_context_type?: string
+          quote?: string | null
+          sensitivity_class?: string
+          source_conversation_id?: string | null
+          source_id?: string | null
+          source_run_id?: string | null
+          status?: string
+          structured_value?: Json
+          subject_id?: string | null
+          subject_type?: string | null
+          superseded_by?: string | null
+          tenant_id?: string
+          updated_at?: string
+          use_count?: number
+          valid_from?: string
+          valid_to?: string | null
+          visibility_scope?: string
+          write_mode?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "memory_items_knowledge_object_id_fkey"
+            columns: ["knowledge_object_id"]
+            isOneToOne: false
+            referencedRelation: "objects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "memory_items_superseded_by_fkey"
+            columns: ["superseded_by"]
+            isOneToOne: false
+            referencedRelation: "memory_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       object_evidence: {
         Row: {
           created_at: string
@@ -3873,6 +3981,48 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      presence_builds: {
+        Row: {
+          completed_at: string | null
+          correlation_id: string
+          failure_code: string | null
+          id: string
+          source_count: number
+          started_at: string
+          status: string
+          subject_id: string
+          subject_type: string
+          tenant_id: string
+          understanding_count: number
+        }
+        Insert: {
+          completed_at?: string | null
+          correlation_id: string
+          failure_code?: string | null
+          id?: string
+          source_count?: number
+          started_at?: string
+          status: string
+          subject_id: string
+          subject_type: string
+          tenant_id: string
+          understanding_count?: number
+        }
+        Update: {
+          completed_at?: string | null
+          correlation_id?: string
+          failure_code?: string | null
+          id?: string
+          source_count?: number
+          started_at?: string
+          status?: string
+          subject_id?: string
+          subject_type?: string
+          tenant_id?: string
+          understanding_count?: number
+        }
+        Relationships: []
       }
       revisions: {
         Row: {
@@ -4272,9 +4422,13 @@ export type Database = {
           context_type: string
           created_at: string
           id: string
+          last_message_at: string | null
           organisation_id: string | null
           subject_refs: Json
+          summary: string | null
+          summary_through: string | null
           tenant_id: string
+          title: string | null
           user_id: string
         }
         Insert: {
@@ -4282,9 +4436,13 @@ export type Database = {
           context_type: string
           created_at?: string
           id?: string
+          last_message_at?: string | null
           organisation_id?: string | null
           subject_refs?: Json
+          summary?: string | null
+          summary_through?: string | null
           tenant_id: string
+          title?: string | null
           user_id: string
         }
         Update: {
@@ -4292,9 +4450,13 @@ export type Database = {
           context_type?: string
           created_at?: string
           id?: string
+          last_message_at?: string | null
           organisation_id?: string | null
           subject_refs?: Json
+          summary?: string | null
+          summary_through?: string | null
           tenant_id?: string
+          title?: string | null
           user_id?: string
         }
         Relationships: []
@@ -4496,6 +4658,224 @@ export type Database = {
             referencedColumns: ["id", "tenant_id"]
           },
         ]
+      }
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      [_ in never]: never
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
+  recommendation: {
+    Tables: {
+      company_embeddings: {
+        Row: {
+          company_id: string
+          configuration_version: string
+          content_sha256: string
+          created_at: string
+          embedding: string
+          embedding_dimension: number
+          id: string
+          instruction_version: string
+          model_code: string
+          model_revision: string | null
+          provider_code: string
+          representation_id: string
+          tenant_id: string
+        }
+        Insert: {
+          company_id: string
+          configuration_version: string
+          content_sha256: string
+          created_at?: string
+          embedding: string
+          embedding_dimension: number
+          id?: string
+          instruction_version: string
+          model_code: string
+          model_revision?: string | null
+          provider_code: string
+          representation_id: string
+          tenant_id: string
+        }
+        Update: {
+          company_id?: string
+          configuration_version?: string
+          content_sha256?: string
+          created_at?: string
+          embedding?: string
+          embedding_dimension?: number
+          id?: string
+          instruction_version?: string
+          model_code?: string
+          model_revision?: string | null
+          provider_code?: string
+          representation_id?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "company_embeddings_representation_id_tenant_id_fkey"
+            columns: ["representation_id", "tenant_id"]
+            isOneToOne: false
+            referencedRelation: "company_representations"
+            referencedColumns: ["id", "tenant_id"]
+          },
+        ]
+      }
+      company_representations: {
+        Row: {
+          built_at: string
+          company_id: string
+          content: string
+          content_sha256: string
+          id: string
+          purpose: string
+          representation_version: string
+          source_fingerprint: string
+          status: string
+          superseded_at: string | null
+          tenant_id: string
+        }
+        Insert: {
+          built_at?: string
+          company_id: string
+          content: string
+          content_sha256: string
+          id?: string
+          purpose: string
+          representation_version: string
+          source_fingerprint: string
+          status?: string
+          superseded_at?: string | null
+          tenant_id: string
+        }
+        Update: {
+          built_at?: string
+          company_id?: string
+          content?: string
+          content_sha256?: string
+          id?: string
+          purpose?: string
+          representation_version?: string
+          source_fingerprint?: string
+          status?: string
+          superseded_at?: string | null
+          tenant_id?: string
+        }
+        Relationships: []
+      }
+      mandate_embeddings: {
+        Row: {
+          configuration_version: string
+          content_sha256: string
+          created_at: string
+          embedding: string
+          embedding_dimension: number
+          id: string
+          instruction_version: string
+          investor_organisation_id: string
+          model_code: string
+          model_revision: string | null
+          provider_code: string
+          representation_id: string
+          tenant_id: string
+        }
+        Insert: {
+          configuration_version: string
+          content_sha256: string
+          created_at?: string
+          embedding: string
+          embedding_dimension: number
+          id?: string
+          instruction_version: string
+          investor_organisation_id: string
+          model_code: string
+          model_revision?: string | null
+          provider_code: string
+          representation_id: string
+          tenant_id: string
+        }
+        Update: {
+          configuration_version?: string
+          content_sha256?: string
+          created_at?: string
+          embedding?: string
+          embedding_dimension?: number
+          id?: string
+          instruction_version?: string
+          investor_organisation_id?: string
+          model_code?: string
+          model_revision?: string | null
+          provider_code?: string
+          representation_id?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mandate_embeddings_representation_id_tenant_id_fkey"
+            columns: ["representation_id", "tenant_id"]
+            isOneToOne: false
+            referencedRelation: "mandate_representations"
+            referencedColumns: ["id", "tenant_id"]
+          },
+        ]
+      }
+      mandate_representations: {
+        Row: {
+          built_at: string
+          content: string
+          content_sha256: string
+          id: string
+          investor_organisation_id: string
+          mandate_id: string
+          mandate_version: number
+          purpose: string
+          representation_version: string
+          source_fingerprint: string
+          status: string
+          superseded_at: string | null
+          tenant_id: string
+        }
+        Insert: {
+          built_at?: string
+          content: string
+          content_sha256: string
+          id?: string
+          investor_organisation_id: string
+          mandate_id: string
+          mandate_version: number
+          purpose: string
+          representation_version: string
+          source_fingerprint: string
+          status?: string
+          superseded_at?: string | null
+          tenant_id: string
+        }
+        Update: {
+          built_at?: string
+          content?: string
+          content_sha256?: string
+          id?: string
+          investor_organisation_id?: string
+          mandate_id?: string
+          mandate_version?: number
+          purpose?: string
+          representation_version?: string
+          source_fingerprint?: string
+          status?: string
+          superseded_at?: string | null
+          tenant_id?: string
+        }
+        Relationships: []
       }
     }
     Views: {
@@ -5060,6 +5440,9 @@ export const Constants = {
     Enums: {},
   },
   q_runtime: {
+    Enums: {},
+  },
+  recommendation: {
     Enums: {},
   },
   taxonomy: {
