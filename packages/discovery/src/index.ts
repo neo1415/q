@@ -2,9 +2,10 @@
  * @capital-q/discovery — who an investor or a founder could reasonably
  * meet (doc 19).
  *
- * Owns: hard eligibility, candidate generation, declared hard exclusions,
- * explicit fit over declared fields, and one deterministic ranking with a
- * versioned weight set.
+ * Owns: hard eligibility (a versioned, tri-state, deterministic gate —
+ * CQ-REC-001), candidate generation, declared hard exclusions, explicit fit
+ * over declared fields, and one deterministic ranking with a versioned
+ * weight set.
  *
  * Does not own: canonical company or investor state, mandates, GateQ
  * rules, relationships, or any notion of interest. It writes nothing.
@@ -76,5 +77,70 @@ export {
 } from "./application/discover.js";
 
 export { createPostgresDiscoveryRepository } from "./infrastructure/postgres-discovery-repository.js";
+
+// Hard eligibility (CQ-REC-001): the gate before candidate generation.
+export {
+  CRITERION_OUTCOMES,
+  CriterionOutcomeSchema,
+  CriterionResultSchema,
+  ELIGIBILITY_BATCH_MAX,
+  ELIGIBILITY_CRITERIA,
+  ELIGIBILITY_DECISIONS,
+  ELIGIBILITY_POLICY_VERSION,
+  ELIGIBILITY_REASON_CODES,
+  ELIGIBILITY_SUPPORTED_MODES,
+  EligibilityCriterionSchema,
+  EligibilityDecisionSchema,
+  EligibilityReasonCodeSchema,
+  EligibilityResultSchema,
+  RECOMMENDATION_MODES,
+  RecommendationContextSchema,
+  RecommendationModeSchema,
+  type CriterionOutcome,
+  type CriterionResult,
+  type EligibilityCriterion,
+  type EligibilityDecision,
+  type EligibilityReasonCode,
+  type EligibilityResult,
+  type RecommendationContext,
+  type RecommendationMode,
+} from "./eligibility/contracts.js";
+export {
+  DECLARED_TAXONOMY_SOURCES,
+  evaluateHardEligibility,
+  RELATIONSHIP_STATES_CLOSED_TO_DISCOVERY,
+  type EligibilityEvaluationInput,
+} from "./eligibility/policy.js";
+export type {
+  ActiveMandateLookup,
+  CompanyClassification,
+  CompanyClassificationsPort,
+  CompanyEligibilityFacts,
+  CompanyEligibilityFactsPort,
+  DiscoverabilityPort,
+  EligibilityPorts,
+  InvestorMandatePort,
+  InvestorSubjectPort,
+  MandateHardConstraint,
+  MandateSnapshotForEligibility,
+  MandateTaxonomyRule,
+  RelationshipStanding,
+  RelationshipStandingPort,
+  TaxonomyVersionPort,
+} from "./eligibility/ports.js";
+export {
+  createEligibilityService,
+  EligibilityBatchTooLargeError,
+  InvestorSubjectNotResolvedError,
+  RecommendationModeUnsupportedError,
+  type EligibilityEvaluation,
+  type EligibilityService,
+  type EligibilityServiceDependencies,
+  type EvaluateEligibilityQuery,
+} from "./eligibility/service.js";
+export {
+  createDomainEligibilityPorts,
+  type DomainEligibilityPortDependencies,
+} from "./infrastructure/domain-port-eligibility-sources.js";
 
 export const PACKAGE_NAME = "@capital-q/discovery" as const;

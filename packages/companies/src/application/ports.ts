@@ -268,6 +268,38 @@ export type CompanyVisibilityFacts = {
   readonly marketplaceVisibility: MarketplaceVisibility;
 };
 
+/**
+ * What investor discovery is allowed to know about a company before any
+ * comparison happens: ownership, lifecycle, the two marketplace switches and
+ * the two canonical hard-criterion fields (stage, headquarters country).
+ * Permission-neutral and tenant-agnostic by design — a discovery candidate
+ * lives in another tenant — so the caller must still put every id through
+ * disclosure. No name, description, founder, financial, evidence, score, Q
+ * or memory content: a port that cannot express it cannot leak it.
+ */
+export type CompanyMarketplaceFacts = {
+  readonly id: CompanyId;
+  readonly tenantId: TenantId;
+  readonly organisationId: OrganisationId;
+  readonly companyStatus: CompanyStatus;
+  readonly marketplaceVisibility: MarketplaceVisibility;
+  /** Raw readiness state; read it through `marketplaceParticipationOf`. */
+  readonly marketplaceReadinessState: string;
+  readonly currentStageCode: string | null;
+  readonly headquartersCountry: string | null;
+};
+
+/**
+ * The read port the Recommendation context consumes for hard eligibility
+ * (CQ-REC-001). Batch by construction so a candidate set is one query, not
+ * one per company; unknown ids are simply absent.
+ */
+export type CompanyMarketplaceQueryPort = {
+  readonly findCanonicalMarketplaceFacts: (
+    companyIds: readonly CompanyId[],
+  ) => Promise<readonly CompanyMarketplaceFacts[]>;
+};
+
 /** Trusted ownership + classification of a founder profile. No content. */
 export type FounderProfileOwnershipFacts = {
   readonly id: FounderProfileId;

@@ -46,6 +46,15 @@ export const MarketplaceReadinessStateSchema = z
   .regex(/^[a-z][a-z0-9_]*$/)
   .max(64);
 export const MARKETPLACE_READINESS_NOT_ASSESSED = "not_assessed" as const;
+/**
+ * The one state that means "this company may participate in the investor
+ * marketplace" (PADL #58; Product Specification, Marketplace Readiness).
+ * Only the readiness engine writes it; nothing in this contract does.
+ * Every other value, including states a later packet adds, is read as not
+ * eligible until that packet says otherwise: discovery fails closed.
+ */
+export const MARKETPLACE_READINESS_MARKETPLACE_READY =
+  "marketplace_ready" as const;
 
 export const COMPANY_NAME_MAX_LENGTH = 200;
 export const COMPANY_CITY_MAX_LENGTH = 120;

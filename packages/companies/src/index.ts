@@ -33,6 +33,12 @@ export {
   CompanyVersionConflictError,
 } from "./domain/errors.js";
 export {
+  KNOWN_MARKETPLACE_READINESS_STATES,
+  MARKETPLACE_PARTICIPATION,
+  marketplaceParticipationOf,
+  type MarketplaceParticipation,
+} from "./domain/marketplace-participation.js";
+export {
   COMPANY_SLUG_FALLBACK,
   COMPANY_SLUG_MAX_LENGTH,
   COMPANY_SLUG_MAX_SUFFIX,
@@ -50,6 +56,8 @@ export {
   CompanySearchCursorError,
   type CompanyCreationRecord,
   type CompanyCreationRequestStore,
+  type CompanyMarketplaceFacts,
+  type CompanyMarketplaceQueryPort,
   type CompanyProfileChanges,
   type CompanyProfileFacts,
   type CompanyQueryPort,
@@ -85,6 +93,7 @@ export {
 
 export {
   createPostgresCompanyCreationRequestStore,
+  createPostgresCompanyMarketplaceQueryPort,
   createPostgresCompanyQueryPort,
   createPostgresCompanyRepository,
 } from "./infrastructure/postgres-company-repository.js";

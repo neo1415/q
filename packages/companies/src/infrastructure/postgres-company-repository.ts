@@ -26,6 +26,8 @@ import {
   type CompanyCreationRecord,
   type CompanyCreationRequestStore,
   type CompanyProfileChanges,
+  type CompanyMarketplaceFacts,
+  type CompanyMarketplaceQueryPort,
   type CompanyProfileFacts,
   type CompanyQueryPort,
   type CompanyRepository,
@@ -336,6 +338,60 @@ function toProfileFacts(row: unknown): CompanyProfileFacts {
     shortDescription: p.short_description,
     companyStatus: p.company_status,
     marketplaceVisibility: p.marketplace_visibility,
+  };
+}
+
+const MarketplaceRowSchema = CompanyRowSchema.pick({
+  id: true,
+  tenant_id: true,
+  organisation_id: true,
+  company_status: true,
+  marketplace_visibility: true,
+  marketplace_readiness_state: true,
+  current_stage_code: true,
+  headquarters_country: true,
+});
+
+/** Bounded so eligibility over a candidate set stays one statement. */
+const MARKETPLACE_FACTS_BATCH_MAX = 500;
+
+export function createPostgresCompanyMarketplaceQueryPort(options: {
+  readonly sql: DatabaseExecutor;
+}): CompanyMarketplaceQueryPort {
+  const { sql } = options;
+  return {
+    findCanonicalMarketplaceFacts: async (companyIds) => {
+      if (companyIds.length === 0) {
+        return [];
+      }
+      if (companyIds.length > MARKETPLACE_FACTS_BATCH_MAX) {
+        throw new RangeError(
+          `marketplace facts batch exceeds ${String(MARKETPLACE_FACTS_BATCH_MAX)} companies`,
+        );
+      }
+      // Deliberately no tenant predicate: discovery candidates are
+      // cross-tenant (ADR-001 network_visible). Disclosure decides each one.
+      const rows = await sql`
+        select c.id, c.tenant_id, c.organisation_id, c.company_status,
+               c.marketplace_visibility, c.marketplace_readiness_state,
+               c.current_stage_code, c.headquarters_country
+          from core.companies c
+         where c.id = any(${[...companyIds]}::uuid[])
+         order by c.id`;
+      return rows.map((row): CompanyMarketplaceFacts => {
+        const p = MarketplaceRowSchema.parse(row);
+        return {
+          id: p.id,
+          tenantId: p.tenant_id,
+          organisationId: p.organisation_id,
+          companyStatus: p.company_status,
+          marketplaceVisibility: p.marketplace_visibility,
+          marketplaceReadinessState: p.marketplace_readiness_state,
+          currentStageCode: p.current_stage_code,
+          headquartersCountry: p.headquarters_country,
+        };
+      });
+    },
   };
 }
 

@@ -79,6 +79,7 @@ export {
   CompanyDtoSchema,
   CompanyStatusSchema,
   CreateCompanyRequestSchema,
+  MARKETPLACE_READINESS_MARKETPLACE_READY,
   MARKETPLACE_READINESS_NOT_ASSESSED,
   MARKETPLACE_VISIBILITIES,
   MarketplaceReadinessStateSchema,
