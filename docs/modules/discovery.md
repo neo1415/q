@@ -408,6 +408,87 @@ conversation, document and research) and `features.integration.test.ts`
 (the real hybrid pool, the real store, markers in the real private tables,
 ACTIVE/DRAFT changes, an unauthorised context).
 
+## Deterministic V1 ranker (CQ-REC-005)
+
+The first implementation of doc 19 §108's `Ranker`: REC-004 feature
+snapshots in, an internal ordering out. Its only inputs are the snapshots
+and one ranking config; it reads no database, calls no model, draws no
+random number and reads no clock.
+
+- **Identity.** Ranker `DETERMINISTIC`, implementation `deterministic-ranker.v1`,
+  config `ranking-config.v1`, required feature schema
+  `recommendation-features.v1`, context `INVESTOR_DISCOVER` only. Three
+  separate versions; a result records all of them.
+- **`ranking-config.v1`** (`RANKING_CONFIG_V1`, deep-frozen, validated
+  against the registry at construction). Status `INITIAL_HEURISTIC_UNCALIBRATED`:
+  no ADR fixes weights and doc 19 §53 leaves exact scoring open until
+  outcome data exists, so v1 is the simplest transparent baseline.
+
+| Factor                               | Weight | Normalization                                            |
+| ------------------------------------ | ------ | -------------------------------------------------------- |
+| `declared_fit.stage` v1              | 1      | MATCH 1 · NO_MATCH 0                                     |
+| `declared_fit.geography` v1          | 1      | COUNTRY_MATCH 1 · REGION_MATCH 0.75 · NO_MATCH 0         |
+| `declared_fit.taxonomy` v1           | 1      | EXACT_OVERLAP 1 · DESCENDANT_OVERLAP 0.75 · NO_OVERLAP 0 |
+| `semantic_fit.mandate_similarity` v1 | 1      | (similarity + 1) / 2, clamped to [0, 1]                  |
+
+Inactive, accounted for explicitly: `eligibility.hard_gate` (GATE_ONLY,
+validated, never weighted) and `declared_fit.cheque` (NOT_COMPUTABLE).
+Thresholds: `minimumFit` unset. Tie-break: score descending, then
+canonical company id ascending; unscored after scored, by company id.
+Score precision 12 decimal places. Exploration and diversity: `NONE`
+(REC-009). Every registry feature allowed in the context must be either
+a factor or inactive, so a new feature can be neither silently scored
+nor silently ignored; a feature version change fails config validation.
+
+- **Score.** For the factors whose feature is PRESENT:
+  `Σ(normalized × weight) ÷ Σ(weight)`, in [0, 1]. MISSING and
+  NOT_APPLICABLE factors are excluded from the denominator, never zero.
+  With no present factor the candidate is unscored (`internalScore` null,
+  reason `NO_SCOREABLE_FEATURES`), never "poor". Coverage
+  (`availableWeight ÷ configuredWeight`) is a diagnostic, not a penalty.
+  The number orders one pool under one config; it is not a probability, a
+  quality score, readiness, or anything a user sees.
+- **Output** (`RankedCandidate`): rank, internal score or null, ranker /
+  config / schema versions, the snapshot fingerprint with mandate and
+  company projection versions, both candidate provenances, one
+  `FactorResult` per configured factor (value, normalized value, weight,
+  contribution, polarity POSITIVE / SOFT_MISMATCH / SIGNAL, reason code,
+  source classes) and bounded reason codes. Contributions sum to the score.
+  No prose, no mandate text, no private data.
+- **Refusal, fail closed** (`RankingInputError`): another context, tenant,
+  investor, mandate or mandate version; another company or a duplicate;
+  another feature schema; an unregistered, other-context or GateQ feature;
+  a feature version the config was not written for; an ineligible
+  decision or a false gate; content that no longer matches its
+  fingerprint (a tampered value or client-supplied score).
+- **Service** (`createRankingService`): one call ranks a pool — REC-004
+  snapshots (computed now, reused on an identical fingerprint), then the
+  ranker bound to the server's config. A caller names an actor, the mode,
+  optionally its own mandate and the pool; never a config, weight, score or
+  feature.
+- **Boundary.** The ranking subtree is held to the eligibility list, may
+  not import a domain context, the database or an infrastructure adapter,
+  and may not contain randomness, clock reads or popularity terms.
+- **REC-006 seam.** Persist `RankedCandidate[]` with its three versions and
+  snapshot fingerprints on a slate; rebuild when snapshots supersede.
+
+Golden cases A–R and GM-01..04 live in `ranking.test.ts`; the live local
+ranking over the full pipeline in `ranking.integration.test.ts`, with the
+reusable world in `test/support/recommendation-world.ts`.
+
+Upstream versions. The ranker also refuses a snapshot computed under a
+superseded eligibility policy (`ELIGIBILITY_POLICY_MISMATCH`) or candidate
+generator (`CANDIDATE_VERSION_MISMATCH`): a v1-era snapshot is
+self-consistent, so its fingerprint alone cannot reveal that it is stale.
+It currently requires `eligibility.v2` and `structured-mandate.v2`, where
+only declared company classifications decide exclusion and retrieval; a
+Q-inferred classification on an excluded node changes no ranking (proved
+in the integration privacy test).
+
+The legacy Discover slate (`domain/ranking.ts`, `DISCOVERY_RANKING_VERSION`)
+still serves the current UI with its own weights; REC-006 moves the slate
+onto this pipeline.
+
 ## Not built yet
 
 - Semantic _fit_ as a ranking factor (REC-004/REC-005). Semantic
@@ -422,9 +503,8 @@ ACTIVE/DRAFT changes, an unauthorised context).
 - A closed or blocked relationship state. Network defines only
   DISCOVERED; when it defines more, `RELATIONSHIP_STATES_CLOSED_TO_DISCOVERY`
   names them and the policy version moves.
-- Ranking (REC-005) and persisted slates (REC-006). The feature snapshots
-  above are the ranker's only input; the generators and the hybrid pool
-  feed them.
+- Persisted slates, the background worker and cursor feed (REC-006).
+  The ranker above returns an in-memory ordering; nothing persists it yet.
 - Feature groups beyond eligibility, declared fit and semantic fit: no
   definition, no value, no zero, until their source infrastructure exists.
 - An event-driven representation refresh worker; today `refreshCompanyRepresentations`

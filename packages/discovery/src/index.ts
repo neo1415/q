@@ -358,4 +358,60 @@ export {
   type DomainFeaturePorts,
 } from "./infrastructure/domain-port-feature-sources.js";
 
+// The deterministic V1 ranker (CQ-REC-005): feature snapshots in, an
+// internal ordering out. Not a probability, not a quality score, not public.
+export {
+  FACTOR_POLARITIES,
+  FactorPolaritySchema,
+  InactiveFeatureSchema,
+  NormalizationSchema,
+  RANKING_CONFIG_STATUSES,
+  RANKING_CONFIG_V1,
+  RANKING_CONFIGS,
+  RANKING_REASON_CODES,
+  RankingConfigError,
+  RankingConfigSchema,
+  RankingFactorSchema,
+  RankingReasonCodeSchema,
+  validateRankingConfig,
+  validateRankingConfigs,
+  type FactorPolarity,
+  type Normalization,
+  type RankingConfig,
+  type RankingFactor,
+  type RankingReasonCode,
+} from "./ranking/config.js";
+export {
+  FACTOR_OUTCOMES,
+  FactorOutcomeSchema,
+  FactorResultSchema,
+  RANKER_ID,
+  RANKER_VERSION,
+  RANKING_INPUT_ERRORS,
+  RankedCandidateSchema,
+  RankingDiagnosticsSchema,
+  RankingInputError,
+  type FactorResult,
+  type RankedCandidate,
+  type RankingDiagnostics,
+  type RankingInputErrorCode,
+} from "./ranking/contracts.js";
+export {
+  createDeterministicRanker,
+  normalizeFactorValue,
+  rankSnapshots,
+  scoreSnapshot,
+  validateRankingInput,
+  type EnrichedCandidate,
+  type Ranker,
+  type RankingContext,
+} from "./ranking/ranker.js";
+export {
+  createRankingService,
+  type RankCandidatesQuery,
+  type RankCandidatesResult,
+  type RankingRunDiagnostics,
+  type RankingService,
+} from "./ranking/service.js";
+
 export const PACKAGE_NAME = "@capital-q/discovery" as const;

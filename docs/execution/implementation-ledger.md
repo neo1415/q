@@ -1951,3 +1951,32 @@ Files: `packages/discovery/src/eligibility/{contracts,policy,ports}.ts`, `src/ca
 | `pnpm typecheck` / `pnpm test` / `pnpm build`              | 76 tasks / 212 files, 2791 tests / 41 tasks                                                                             |
 
 Gates ran on a working tree that also held the uncommitted CQ-REC-005 ranker (whose `ranking.test.ts` literal was bumped in place and is not part of this commit).
+
+## Postflight — CQ-REC-005 deterministic V1 ranker (2026-09-19)
+
+Verdict: **REC-005 PASS — V1 RANKING IS DETERMINISTIC, VERSIONED, FEATURE-GOVERNED AND REPRODUCIBLE**
+
+Sequencing: verified in isolation against CQ-REC-004 and preserved as the non-PASS checkpoint `e0745531dcc9d9735aff0e546c23364e467a50a0` on `scratch/rec005-v1-checkpoint`; the eligibility.v2 / structured-mandate.v2 fix (`d0893d4`) landed first; the checkpoint was applied onto it with `cherry-pick -n` and reconciled against the landed semantics.
+
+Reconciliation, not string replacement: the ranker source held no version literals (it reads the constants). The gap the v2 bump exposed was real: a snapshot computed under `eligibility.v1` or `structured-mandate.v1` is self-consistent, so its fingerprint could not reveal it was stale. The ranker now refuses it (`ELIGIBILITY_POLICY_MISMATCH`, `CANDIDATE_VERSION_MISMATCH`), with a unit test on a re-fingerprinted v1-era snapshot. Test fixtures bind to `ELIGIBILITY_POLICY_VERSION`, `STRUCTURED_GENERATOR_VERSION` and `SEMANTIC_GENERATOR_VERSION` instead of literals. The integration privacy test restores the `q_inferred` classification on the hard-excluded node that had to be dropped under v1; under v2 it changes no score, factor, reason or position.
+
+Architecture: ranker `DETERMINISTIC` / `deterministic-ranker.v1`; config `ranking-config.v1` (`INITIAL_HEURISTIC_UNCALIBRATED`); required feature schema `recommendation-features.v1`; required upstream `eligibility.v2`, `structured-mandate.v2`, `semantic-mandate.v1`; context `INVESTOR_DISCOVER`; migration NONE.
+
+ranking-config.v1: `declared_fit.stage` v1 weight 1 (MATCH 1, NO_MATCH 0) · `declared_fit.geography` v1 weight 1 (COUNTRY_MATCH 1, REGION_MATCH 0.75, NO_MATCH 0) · `declared_fit.taxonomy` v1 weight 1 (EXACT_OVERLAP 1, DESCENDANT_OVERLAP 0.75, NO_OVERLAP 0) · `semantic_fit.mandate_similarity` v1 weight 1 ((s + 1) / 2, clamped [0, 1]). Inactive: `eligibility.hard_gate` GATE_ONLY, `declared_fit.cheque` NOT_COMPUTABLE. MISSING / NOT_APPLICABLE excluded from the denominator. `minimumFit` null. Tie-break score desc, company id asc; unscored after, by company id. Precision 12. Exploration / diversity NONE.
+
+| Check                                                       | Result                                                                                 |
+| ----------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| `pnpm db:reset` / `db:lint` / `db:types` / `db:types:check` | PASS / no schema errors / regenerated / clean                                          |
+| `pnpm test:rls`                                             | 32 files, 912 tests, PASS                                                              |
+| `pnpm test:integration`                                     | 51 files: 50 pass, 1 skipped (Storage); 465 pass, 5 skipped, 0 fail                    |
+| `pnpm format:check` / `pnpm lint`                           | tracked PASS / exit 0 (both exclude `graphify-out/` and the `.claude/` agent worktree) |
+| `pnpm typecheck` / `pnpm test` / `pnpm build`               | 76 tasks + root / 212 files, 2792 tests / 41 tasks                                     |
+| `pnpm q:eval:lint` / `q:eval:ci`                            | PASS / release gate PASS, no new hard failures                                         |
+| `git diff --check`, cycles, secret scan                     | clean; 41 packages, 0 cycles; none                                                     |
+| REC-001/002/003/004 regression                              | live runs unchanged (13/8/5/3/0; semantic; features 18 values, 6 statements)           |
+
+Live ranking (reset local DB, full pipeline): #1 KoboLogistics 0.9778 (4 present) · #2 Bakehouse 0.6667 (3 present, semantic missing) · #3 LagosFreight 0.4744 · #4 PetPal 0.3333 (semantic missing) · #5 Haulr 0.2429 (semantic-only candidate; declared fit known and mismatched). Ranker DB queries 0, provider calls 0, rank 3.7 ms; 200 synthetic candidates ranked with no I/O (12–98 ms across runs).
+
+Q preservation: interviewer, prompts, small-talk, Tavily, voice, provider policy and routing unchanged. Known follow-ups: DEMO_PROVIDER_ROUTING_FOLLOWUP OPEN; HOSTED_MIGRATIONS_PENDING YES (20260925–20260928).
+
+Next: CQ-REC-006 — Slate Persistence / Background Worker. STOP.

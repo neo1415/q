@@ -18,6 +18,8 @@ const eligibilityDir = join(packageRoot, "src", "eligibility");
 const candidatesDir = join(packageRoot, "src", "candidates");
 /** CQ-REC-004: the feature layer is held to the strictest list, like eligibility. */
 const featuresDir = join(packageRoot, "src", "features");
+/** CQ-REC-005: the ranker reads feature snapshots only; same strict list. */
+const rankingDir = join(packageRoot, "src", "ranking");
 const adapterFiles = [
   join(
     packageRoot,
@@ -100,7 +102,12 @@ function sourceFiles(): readonly {
   readonly path: string;
   readonly text: string;
 }[] {
-  const files = [eligibilityDir, candidatesDir, featuresDir].flatMap((dir) =>
+  const files = [
+    eligibilityDir,
+    candidatesDir,
+    featuresDir,
+    rankingDir,
+  ].flatMap((dir) =>
     readdirSync(dir)
       .filter((name) => name.endsWith(".ts"))
       .map((name) => join(dir, name)),
@@ -280,5 +287,53 @@ describe("feature store boundary (CQ-REC-004)", () => {
       }
     }
     expect(tables).toEqual(new Set(["recommendation.feature_snapshots"]));
+  });
+});
+
+describe("ranking boundary (CQ-REC-005)", () => {
+  const rankingFiles = () =>
+    readdirSync(rankingDir)
+      .filter((name) => name.endsWith(".ts"))
+      .map((name) => ({
+        path: join(rankingDir, name),
+        text: readFileSync(join(rankingDir, name), "utf8"),
+      }));
+
+  it("imports no domain context, database or port: its only inputs are feature snapshots and a config", () => {
+    for (const { path, text } of rankingFiles()) {
+      for (const pkg of [
+        "@capital-q/companies",
+        "@capital-q/investors",
+        "@capital-q/taxonomy",
+        "@capital-q/database",
+        "@capital-q/network",
+        "@capital-q/permissions",
+        "@capital-q/capital",
+      ]) {
+        expect(text, `${path} imports ${pkg}`).not.toContain(`"${pkg}`);
+      }
+      for (const local of [
+        "../infrastructure/",
+        "../candidates/",
+        "../semantic/",
+        "../eligibility/ports",
+      ]) {
+        expect(text, `${path} imports ${local}`).not.toContain(local);
+      }
+    }
+  });
+
+  it("holds no randomness, clock-derived value or popularity signal in code", () => {
+    for (const { path, text } of rankingFiles()) {
+      const code = text
+        .replace(/\/\*[\s\S]*?\*\//g, "")
+        .replace(/\/\/.*$/gm, "");
+      expect(code, path).not.toMatch(
+        /Math\.random|randomUUID|crypto\.random|new Date\(|Date\.now/,
+      );
+      expect(code.toLowerCase(), path).not.toMatch(
+        /views?_count|popular|impression|investiq|watch_time/,
+      );
+    }
   });
 });
