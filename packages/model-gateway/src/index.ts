@@ -92,6 +92,12 @@ export {
   type ProviderHealthOptions,
 } from "./policy/health.js";
 export {
+  createSyntheticDemoRoutingAllowance,
+  SyntheticDemoRoutingRefusedError,
+  type SyntheticDemoRoutingAllowance,
+  type SyntheticDemoRoutingOptions,
+} from "./policy/synthetic-demo.js";
+export {
   acceptStructuredOutput,
   type StructuredOutcome,
 } from "./policy/structured.js";

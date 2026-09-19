@@ -8,6 +8,7 @@ import {
   type ModelBudget,
   type ModelFailureClass,
   type ModelMessage,
+  type ModelDataPosture,
   type ModelSensitivity,
   type ModelTextTaskClass,
   type ModelToolCall,
@@ -542,6 +543,15 @@ export type ModelGatewayQAnswerDependencies = {
   /** The Tool Registry's port (CQ-Q-007). Absent: no tool is offered. */
   readonly tools?: QToolPort | undefined;
   readonly sensitivity?: QAnswerSensitivityPolicy | undefined;
+  /**
+   * What KIND of material this composition handles (doc 15 §62). Omitted
+   * means REAL_CUSTOMER. A composition sets SYNTHETIC_DEMO only where it
+   * can vouch that every founder, investor and company it will ever see
+   * was invented for a demonstration; the gateway then honours it only
+   * against its own attestation, so setting it alone widens nothing.
+   * Distinct from `sensitivity`, which stays truthful either way.
+   */
+  readonly dataPosture?: ModelDataPosture | undefined;
   readonly communication?: QCommunicationProfilePort | undefined;
   /** Narrows provider eligibility for this composition; never widens it. */
   readonly tenantPolicy?: TenantModelPolicy | undefined;
@@ -719,6 +729,8 @@ export function createModelGatewayQAnswer(
   const context = dependencies.context ?? noAuthorisedContext;
   const tools = dependencies.tools ?? createUnconfiguredQTools();
   const sensitivityPolicy = dependencies.sensitivity ?? { kind: "FROM_PLAN" };
+  const dataPosture: ModelDataPosture =
+    dependencies.dataPosture ?? "REAL_CUSTOMER";
   const communication =
     dependencies.communication ??
     fixedCommunicationProfile(DEFAULT_COMMUNICATION_PROFILE);
@@ -894,6 +906,7 @@ export function createModelGatewayQAnswer(
       const base = {
         taskClass,
         sensitivity,
+        dataPosture,
         budget,
         attribution: {
           tenantId: request.tenantId,

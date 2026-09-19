@@ -83,6 +83,7 @@ import { modelProviderConfigStatus } from "@capital-q/config/model-providers";
 import {
   createModelGateway,
   createModelProviderRegistry,
+  createSyntheticDemoRoutingAllowance,
   createPostgresModelCatalog,
   createPostgresModelUsageRepository,
   createProcessLocalProviderHealth,
@@ -189,11 +190,26 @@ if (providerSecrets.groq !== undefined) {
   );
 }
 
+/**
+ * Doc 15 §62: free/shared inference may be used aggressively for synthetic
+ * data and development, while confidential customer information still
+ * requires an approved provider. This is the attestation that this
+ * deployment holds the former — an operator opt-in, checked again against
+ * the environment and the database before it counts for anything. Null
+ * everywhere a real customer is served, which is what makes a
+ * SYNTHETIC_DEMO posture inert there.
+ */
+const syntheticDemo = createSyntheticDemoRoutingAllowance({
+  operatorEnabled: providerSecrets.syntheticDemoRouting,
+  environment: config.runtime.deploymentEnvironment,
+  databaseUrl: databaseConfig.secrets.url,
+});
 const modelGateway = createModelGateway({
   catalog: createPostgresModelCatalog({ sql: database.sql }),
   registry: createModelProviderRegistry(modelProviders),
   usage: createPostgresModelUsageRepository({ sql: database.sql }),
   health: createProcessLocalProviderHealth(),
+  syntheticDemo,
   logger,
 });
 

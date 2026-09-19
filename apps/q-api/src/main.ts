@@ -52,6 +52,7 @@ import { Q_VOICE_THINK_PATH, Q_VOICE_WS_PATH } from "@capital-q/contracts";
 import {
   createModelGateway,
   createModelProviderRegistry,
+  createSyntheticDemoRoutingAllowance,
   createPostgresModelCatalog,
   createPostgresModelUsageRepository,
   createProcessLocalProviderHealth,
@@ -338,11 +339,26 @@ if (providerSecrets.groq !== undefined) {
     }),
   );
 }
+/**
+ * Doc 15 §62: free/shared inference may be used aggressively for synthetic
+ * data and development, while confidential customer information still
+ * requires an approved provider. This is the attestation that this
+ * deployment holds the former — an operator opt-in, checked again against
+ * the environment and the database before it counts for anything. Null
+ * everywhere a real customer is served, which is what makes a
+ * SYNTHETIC_DEMO posture inert there.
+ */
+const syntheticDemo = createSyntheticDemoRoutingAllowance({
+  operatorEnabled: providerSecrets.syntheticDemoRouting,
+  environment: config.runtime.deploymentEnvironment,
+  databaseUrl: loadDatabaseConfig().secrets.url,
+});
 const modelGateway = createModelGateway({
   catalog: createPostgresModelCatalog({ sql: database.sql }),
   registry: createModelProviderRegistry(providers),
   usage: createPostgresModelUsageRepository({ sql: database.sql }),
   health: createProcessLocalProviderHealth(),
+  syntheticDemo,
   logger,
 });
 logger.info(
@@ -552,6 +568,9 @@ const memoryLearner = createMemoryLearner({
   logger,
 });
 const qIntelligence = composeQIntelligence({
+  // The attestation is the claim about the data; where it holds, every
+  // founder, investor and company this process will see was invented.
+  dataPosture: syntheticDemo === null ? "REAL_CUSTOMER" : "SYNTHETIC_DEMO",
   sql: database.sql,
   transactions: database.transactions,
   repositories,

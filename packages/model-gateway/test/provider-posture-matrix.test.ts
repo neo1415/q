@@ -24,6 +24,12 @@ import { request, testCatalog } from "./fixtures.js";
  * called. No environment flag, demo switch or test filename changes a
  * row: the posture is the catalogue, and the catalogue is data under
  * migration.
+ *
+ * Every row here is REAL_CUSTOMER material, which is the default and the
+ * only posture a request can have without a server attestation. The one
+ * case that reads a row differently — attested synthetic demo material,
+ * doc 15 §62 — is a separate matrix in `synthetic-demo-routing.test.ts`,
+ * and it cannot reach these rows: no test here supplies an allowance.
  */
 
 const noSleep = () => Promise.resolve();

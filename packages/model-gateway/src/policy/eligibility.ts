@@ -12,6 +12,7 @@ import {
   type TenantModelPolicy,
 } from "@capital-q/contracts";
 
+import type { SyntheticDemoRoutingAllowance } from "./synthetic-demo.js";
 import {
   effectivePrice,
   isModelEffective,
@@ -198,6 +199,12 @@ export type EligibilityInput = {
   readonly requiredCapabilities: readonly ModelCapability[];
   readonly estimatedInputTokens: number;
   readonly tenantPolicy: TenantModelPolicy | undefined;
+  /**
+   * Present only where a composition root attested this deployment's
+   * material is synthetic (doc 15 §62). Absent — the ordinary case — the
+   * request's posture is ignored entirely and the reviewed ceilings decide.
+   */
+  readonly syntheticDemo?: SyntheticDemoRoutingAllowance | null | undefined;
   readonly now: Date;
 };
 
@@ -211,6 +218,11 @@ export function planRoute(
   policy: RoutingPolicyRecord,
 ): RoutePlan {
   const { catalog, request } = input;
+  // Both halves are required: the request declares, the deployment attests.
+  // Either alone decides nothing.
+  const synthetic =
+    request.dataPosture === "SYNTHETIC_DEMO" &&
+    input.syntheticDemo?.permitted === true;
   const modelIds = [...policy.preferredModels, ...policy.fallbackModels];
   const decisions: ModelCandidateDecision[] = [];
   const eligible: EligibleCandidate[] = [];
@@ -268,18 +280,31 @@ export function planRoute(
     // own ceiling is checked first so its refusal is the one recorded when
     // both would refuse — "this model is not for this data" is the more
     // specific fact.
-    if (!sensitivityAtMost(request.sensitivity, model.sensitivityCeiling)) {
-      decide("SENSITIVITY_EXCEEDS_CEILING");
-      return;
-    }
-    if (
-      !sensitivityAtMost(
-        request.sensitivity,
-        providerJustifiedCeiling(provider),
-      )
-    ) {
-      decide("PROVIDER_POLICY_INSUFFICIENT");
-      return;
+    //
+    // Both limits exist to protect a customer's material. Where the server
+    // has attested there is none — invented companies in a demo deployment
+    // — doc 15 §62 is the governing rule rather than the ceiling: free and
+    // shared inference may be used aggressively for synthetic data and
+    // development. The declared sensitivity is untouched and still travels
+    // with the request; only the question changes, from "may this vendor
+    // hold this class of customer data" to "is there a customer here at
+    // all". `synthetic` is false for every request that does not declare
+    // the posture and for every deployment without an attestation, so this
+    // is inert in production by construction.
+    if (!synthetic) {
+      if (!sensitivityAtMost(request.sensitivity, model.sensitivityCeiling)) {
+        decide("SENSITIVITY_EXCEEDS_CEILING");
+        return;
+      }
+      if (
+        !sensitivityAtMost(
+          request.sensitivity,
+          providerJustifiedCeiling(provider),
+        )
+      ) {
+        decide("PROVIDER_POLICY_INSUFFICIENT");
+        return;
+      }
     }
     if (!tenantAllows(input.tenantPolicy, provider.code)) {
       decide("TENANT_POLICY_DENIES_PROVIDER");
@@ -341,7 +366,7 @@ export function planRoute(
       decide("COST_EXCEEDS_CEILING");
       return;
     }
-    decide("ELIGIBLE");
+    decide(synthetic ? "ELIGIBLE_SYNTHETIC_DEMO" : "ELIGIBLE");
     eligible.push({
       candidateIndex,
       provider,

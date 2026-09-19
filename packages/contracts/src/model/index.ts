@@ -84,6 +84,35 @@ export function sensitivityAtMost(
   return MODEL_SENSITIVITY_RANK[sensitivity] <= MODEL_SENSITIVITY_RANK[ceiling];
 }
 
+/**
+ * What KIND of material a request carries. Orthogonal to sensitivity, and
+ * deliberately not a sensitivity class (doc 15 §62).
+ *
+ *   sensitivity  how protected this material is, if it is somebody's
+ *   data posture  whose material it is at all
+ *
+ * REAL_CUSTOMER is the default and the only posture that may ever be
+ * assumed: a request says nothing about its posture and it is treated as a
+ * customer's. SYNTHETIC_DEMO asserts that every input was invented for a
+ * demonstration — no customer, no subject, nobody to protect — which is
+ * the case doc 15 §62 names when it says free/shared inference may be used
+ * aggressively for "synthetic data" and "development" while confidential
+ * customer information still requires an approved provider.
+ *
+ * The declaration alone grants nothing. The gateway honours it only
+ * against a server-side attestation it was constructed with (see
+ * `SyntheticDemoRoutingAllowance`), so a forged or stray declaration —
+ * from a browser, a tool payload or a copied composition — changes no
+ * route. The declared sensitivity is never rewritten: it stays on the
+ * request, the ledger and the trace, and the routing reason records that
+ * the posture, not the sensitivity, is what admitted the provider. Neither
+ * value is ever sent to a provider: both stay server-side, on the request,
+ * the route record and the trace.
+ */
+export const MODEL_DATA_POSTURES = ["REAL_CUSTOMER", "SYNTHETIC_DEMO"] as const;
+export const ModelDataPostureSchema = z.enum(MODEL_DATA_POSTURES);
+export type ModelDataPosture = z.infer<typeof ModelDataPostureSchema>;
+
 /** Capability attributes a model may carry (doc 12 §24.2). */
 export const MODEL_CAPABILITIES = [
   "TEXT_GENERATION",
@@ -452,6 +481,12 @@ export const ModelGatewayRequestSchema = z
     taskClass: ModelTextTaskClassSchema,
     /** The strongest class of anything in `messages`. Declared by the caller, who assembled them. */
     sensitivity: ModelSensitivitySchema,
+    /**
+     * Whose material `messages` hold. Omitted means REAL_CUSTOMER: a
+     * request never becomes demo material by saying nothing. Honoured only
+     * with a server-side attestation; see `ModelDataPosture`.
+     */
+    dataPosture: ModelDataPostureSchema.default("REAL_CUSTOMER"),
     messages: z.array(ModelMessageSchema).min(1).max(MODEL_MESSAGES_MAX),
     output: ModelOutputSpecSchema,
     /**
@@ -581,6 +616,14 @@ export const MODEL_ELIGIBILITY_REASONS = [
   "LATENCY_ABOVE_TARGET",
   "COST_EXCEEDS_CEILING",
   "PRICE_UNKNOWN",
+  /**
+   * Eligible, but only because the request is attested synthetic demo
+   * material (doc 15 §62): the provider's reviewed terms would not carry
+   * this sensitivity if a customer's data were in it. Distinct from
+   * ELIGIBLE so a route record, a log line and an auditor can all tell
+   * the two apart without inferring it from anything.
+   */
+  "ELIGIBLE_SYNTHETIC_DEMO",
 ] as const;
 export const ModelEligibilityReasonSchema = z.enum(MODEL_ELIGIBILITY_REASONS);
 export type ModelEligibilityReason = z.infer<

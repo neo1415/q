@@ -7,6 +7,7 @@ import {
   type QUserStatementRecorder,
   type QMemoryRecall,
 } from "@capital-q/model-gateway/q";
+import type { ModelDataPosture } from "@capital-q/contracts";
 import type { Logger } from "@capital-q/observability";
 import {
   createEmbeddingService,
@@ -77,6 +78,15 @@ export type QIntelligenceDependencies = {
   /** The Safe Read tools, already composed. Canonical state is read through them. */
   readonly tools: QToolPort;
   readonly gateway: ModelGateway;
+  /**
+   * What kind of material this deployment holds (doc 15 §62). Omitted
+   * means REAL_CUSTOMER, which is every deployment that serves anybody.
+   * A demo deployment that has attested its data is invented passes
+   * SYNTHETIC_DEMO so free inference can carry the demo, exactly as §62
+   * permits; the gateway still checks its own attestation before the
+   * posture changes any route.
+   */
+  readonly dataPosture?: ModelDataPosture | undefined;
   /**
    * Query embeddings. Absent retrieves lexically and reports the
    * degradation; it never reaches for a paid embedding API instead.
@@ -205,6 +215,9 @@ export function composeQIntelligence(
     ...(dependencies.deltas === undefined
       ? {}
       : { deltas: dependencies.deltas }),
+    ...(dependencies.dataPosture === undefined
+      ? {}
+      : { dataPosture: dependencies.dataPosture }),
     ...(logger === undefined ? {} : { logger }),
   });
 

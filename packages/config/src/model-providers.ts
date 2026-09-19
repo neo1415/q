@@ -57,7 +57,24 @@ const apiKey = z
   .min(16, "expected a provider API key")
   .max(512, "expected a provider API key");
 
+/**
+ * The operator's opt-in for synthetic-demo model routing (doc 15 §62,
+ * CQ-REC-007). Off unless set to `true`. Setting it is a claim about the
+ * DATA this deployment holds — that every founder, investor and company in
+ * it was invented for a demonstration — and the claim is checked again,
+ * against the environment and the database, by
+ * `createSyntheticDemoRoutingAllowance`, which refuses to build an
+ * allowance anywhere it cannot hold. Parsing it here grants nothing.
+ */
+const syntheticDemoRouting = z
+  .preprocess(
+    (value) => (value === undefined || value === "" ? "false" : value),
+    z.enum(["true", "false"]),
+  )
+  .transform((value) => value === "true");
+
 export const modelProviderEnvShape = {
+  CQ_SYNTHETIC_DEMO_ROUTING: syntheticDemoRouting,
   GEMINI_API_KEY: apiKey.optional(),
   GROQ_API_KEY: apiKey.optional(),
   // Further GroqCloud keys. The adapter rotates to the next one when a key
@@ -68,6 +85,12 @@ export const modelProviderEnvShape = {
 };
 
 export type ModelProviderSecrets = {
+  /**
+   * The operator asked this deployment to route attested synthetic demo
+   * material by doc 15 §62. Not a secret and not authority: the gateway
+   * honours it only through an allowance that re-checks the deployment.
+   */
+  readonly syntheticDemoRouting: boolean;
   /** Google Gemini Developer API; absent means the adapter is not configured. */
   readonly google: ProviderCredential | undefined;
   /** GroqCloud; absent means the adapter is not configured. */
@@ -77,6 +100,7 @@ export type ModelProviderSecrets = {
 };
 
 export type ModelProviderConfigStatus = {
+  readonly syntheticDemoRouting: boolean;
   readonly google: "configured" | "unconfigured";
   readonly groq: "configured" | "unconfigured";
   /** How many GroqCloud keys rotate; never which. */
@@ -84,6 +108,7 @@ export type ModelProviderConfigStatus = {
 };
 
 export function toModelProviderSecrets(parsed: {
+  readonly CQ_SYNTHETIC_DEMO_ROUTING?: boolean | undefined;
   readonly GEMINI_API_KEY?: string | undefined;
   readonly GROQ_API_KEY?: string | undefined;
   readonly GROQ_API_KEY_2?: string | undefined;
@@ -99,6 +124,7 @@ export function toModelProviderSecrets(parsed: {
     .filter((key): key is string => key !== undefined)
     .map((key) => new ProviderCredential(key));
   return {
+    syntheticDemoRouting: parsed.CQ_SYNTHETIC_DEMO_ROUTING ?? false,
     google:
       parsed.GEMINI_API_KEY === undefined
         ? undefined
@@ -113,6 +139,7 @@ export function modelProviderConfigStatus(
   secrets: ModelProviderSecrets,
 ): ModelProviderConfigStatus {
   return {
+    syntheticDemoRouting: secrets.syntheticDemoRouting,
     google: secrets.google === undefined ? "unconfigured" : "configured",
     groq: secrets.groq === undefined ? "unconfigured" : "configured",
     groqKeys: secrets.groqKeys.length,

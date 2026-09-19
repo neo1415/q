@@ -31,6 +31,7 @@ import {
   type TenantModelPolicyPort,
 } from "./ports.js";
 import { estimateInputTokens, priceUsage } from "./policy/cost.js";
+import type { SyntheticDemoRoutingAllowance } from "./policy/synthetic-demo.js";
 import {
   planRoute,
   selectRoutingPolicy,
@@ -65,6 +66,12 @@ export type ModelGatewayDependencies = {
   readonly usage: ModelUsageRepository;
   readonly health?: ProviderHealthPort | undefined;
   readonly tenantPolicies?: TenantModelPolicyPort | undefined;
+  /**
+   * Attestation that this deployment's material is synthetic demo data
+   * (doc 15 §62). Absent everywhere a real customer is served, which is
+   * what makes a SYNTHETIC_DEMO posture inert there.
+   */
+  readonly syntheticDemo?: SyntheticDemoRoutingAllowance | null | undefined;
   readonly clock?: ModelClock | undefined;
   readonly logger?: Logger | undefined;
   /** Injectable for deterministic tests; production waits for real. */
@@ -536,6 +543,7 @@ export function createModelGateway(
         attributes: {
           "q.model.task_class": request.taskClass,
           "q.model.sensitivity": request.sensitivity,
+          "q.model.data_posture": request.dataPosture,
           "q.run_id": request.attribution.qRunId ?? "",
           "q.tenant_id": request.attribution.tenantId,
         },
@@ -608,6 +616,7 @@ export function createModelGateway(
           request.tools,
         ),
         tenantPolicy,
+        syntheticDemo: dependencies.syntheticDemo,
         now,
       },
       policy,
@@ -745,6 +754,7 @@ export function createModelGateway(
               provider: candidate.provider.code,
               model: candidate.model.modelCode,
               routingPolicy: policy.code,
+              dataPosture: request.dataPosture,
               attempts: attempts.length,
               fallbackUsed,
               latencyMs: result.latencyMs,

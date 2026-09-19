@@ -36,6 +36,9 @@ describe("model provider configuration", () => {
   it("treats each provider as optional and reports presence by name only", () => {
     const none = parseQApiConfig(base);
     expect(modelProviderConfigStatus(none.secrets.modelProviders)).toEqual({
+      // Synthetic-demo routing is off unless an operator asks for it: a
+      // deployment never starts out believing its data is invented.
+      syntheticDemoRouting: false,
       google: "unconfigured",
       groq: "unconfigured",
       groqKeys: 0,
@@ -43,6 +46,7 @@ describe("model provider configuration", () => {
 
     const groqOnly = parseQApiConfig({ ...base, GROQ_API_KEY: GROQ });
     expect(modelProviderConfigStatus(groqOnly.secrets.modelProviders)).toEqual({
+      syntheticDemoRouting: false,
       google: "unconfigured",
       groq: "configured",
       groqKeys: 1,
