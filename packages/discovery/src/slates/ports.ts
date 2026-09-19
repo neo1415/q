@@ -90,6 +90,10 @@ export type SlateRepository = {
     readonly tenantId: string;
     readonly investorOrganisationId: string;
   }) => Promise<readonly RecommendationSlate[]>;
+  /** Every CURRENT slate, oldest publication first, bounded: the broad fan-out. */
+  readonly listCurrent: (
+    limit: number,
+  ) => Promise<readonly RecommendationSlate[]>;
   /** Items after a rank, in rank order, bounded. */
   readonly pageItems: (input: {
     readonly slateId: string;

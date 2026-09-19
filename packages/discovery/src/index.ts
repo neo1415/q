@@ -107,6 +107,7 @@ export {
 } from "./eligibility/contracts.js";
 export {
   DECLARED_TAXONOMY_SOURCES,
+  DISCOVERABLE_VISIBILITIES,
   evaluateHardEligibility,
   RELATIONSHIP_STATES_CLOSED_TO_DISCOVERY,
   type EligibilityEvaluationInput,
@@ -483,5 +484,29 @@ export {
   type RecommendationPipeline,
   type RecommendationPipelineDependencies,
 } from "./infrastructure/recommendation-pipeline.js";
+
+export {
+  RECOMMENDATION_REFRESH_DEAD_LETTER_QUEUE,
+  RECOMMENDATION_REFRESH_QUEUE,
+  REFRESH_RECOMMENDATION_SLATE_JOB_DATA,
+  RefreshRecommendationSlateJob,
+  type RefreshRecommendationSlateJobData,
+} from "./jobs/index.js";
+export {
+  createRefreshRequester,
+  createSlateInvalidationService,
+  INVALIDATION_FAN_OUT_MAX,
+  REFRESH_TRIGGER_EVENTS,
+  refreshDirectiveFor,
+  sendRefreshJob,
+  type InvalidationOutcome,
+  type RefreshJobInput,
+  type RefreshDirective,
+  type RefreshQueue,
+  type RefreshRequester,
+  type RequestRefreshInput,
+  type RequestRefreshResult,
+  type SlateInvalidationService,
+} from "./slates/refresh.js";
 
 export const PACKAGE_NAME = "@capital-q/discovery" as const;

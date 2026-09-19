@@ -75,7 +75,7 @@ export const RELATIONSHIP_STATES_CLOSED_TO_DISCOVERY: readonly string[] = [];
 /** Relationship states this policy understands as open. */
 const RELATIONSHIP_STATES_OPEN: readonly string[] = ["DISCOVERED"];
 
-const DISCOVERABLE_VISIBILITIES: readonly string[] = [
+export const DISCOVERABLE_VISIBILITIES: readonly string[] = [
   "network_visible",
   "public_external",
 ];

@@ -16,7 +16,10 @@
  * makes a hostile document a data problem instead of a credential problem.
  */
 
+import { createPostgresCapitalObjectiveQueryPort } from "@capital-q/capital";
+import { createPostgresCompanyQueryPort } from "@capital-q/companies";
 import { loadDatabaseConfig } from "@capital-q/config/database";
+import { loadEmbeddingConfig } from "@capital-q/config/embeddings";
 import { loadWorkerConfig } from "@capital-q/config/workers";
 import { CONTRACTS_VERSION } from "@capital-q/contracts";
 import { createRequestDatabaseClient } from "@capital-q/database";
@@ -25,6 +28,15 @@ import {
   createOutboxRetryPolicy,
   createPgmqEventDispatcher,
 } from "@capital-q/eventing/publisher";
+import {
+  createRecommendationPipeline,
+  createRefreshRequester,
+  createSlateInvalidationService,
+  RECOMMENDATION_REFRESH_DEAD_LETTER_QUEUE,
+  RECOMMENDATION_REFRESH_QUEUE,
+  refreshDirectiveFor,
+  RefreshRecommendationSlateJob,
+} from "@capital-q/discovery";
 import { createOutboxWriter, DOMAIN_EVENTS_QUEUE } from "@capital-q/eventing";
 import {
   createDocumentProcessingService,
@@ -39,6 +51,28 @@ import {
   createMandateReview,
   createMandateSynthesis,
 } from "@capital-q/investor-onboarding";
+import {
+  createPostgresInvestorMandateQueryPort,
+  createPostgresInvestorOrganisationQueryPort,
+} from "@capital-q/investors";
+import {
+  createPostgresRelationshipEventRepository,
+  createPostgresRelationshipRepository,
+  type RelationshipQueryPort,
+} from "@capital-q/network";
+import {
+  createDefaultDisclosureResolvers,
+  createDisclosureAccessService,
+  createDisclosureResourceResolverRegistry,
+  createPostgresDisclosurePolicyRepository,
+  createRelationshipPartyResolver,
+  systemDisclosureClock,
+} from "@capital-q/permissions";
+import {
+  createEmbeddingService,
+  createLocalTeiEmbeddingProvider,
+  QWEN3_EMBEDDING_CONFIGURATION,
+} from "@capital-q/q-embeddings";
 import {
   createPostgresTaxonomyLexicalSearchRepository,
   createPostgresTaxonomyReferenceRepository,
@@ -78,6 +112,8 @@ import { createDomainEventHandler } from "./events/document-processing-handler.j
 import { createProductionEventRegistry } from "./event-registry.js";
 import { createOutboxPublisherRunner } from "./outbox-runner.js";
 import { createParserSandbox } from "./parser/sandbox.js";
+import { createPostgresBuildPrincipalResolver } from "./recommendations/build-principal.js";
+import { createRecommendationRefreshHandler } from "./recommendations/refresh-handler.js";
 import { EXTRACTION_PARSER_LIMITS } from "./parser/limits.js";
 import {
   createPgmqQueueClient,
@@ -274,6 +310,111 @@ logger.info(
   "founder onboarding review composed",
 );
 
+/**
+ * Persisted recommendation slates (CQ-REC-006). The same pipeline
+ * composition the API serves from, over the same disclosure evaluator the
+ * Q service uses. The embedding runtime is the local one q-api reads
+ * (Q_EMBEDDING_*): when it cannot be reached, the semantic generator
+ * degrades and the slate says so; nothing here calls a hosted model.
+ * Domain events become invalidations and coalesced refresh requests; the
+ * refresh queue turns those into builds.
+ */
+const relationshipRepository = createPostgresRelationshipRepository();
+const relationshipEventRepository = createPostgresRelationshipEventRepository();
+const relationships: RelationshipQueryPort = {
+  getById: (relationshipId) =>
+    relationshipRepository.findById(database.sql, relationshipId),
+  findByParties: (companyId, investorOrganisationId) =>
+    relationshipRepository.findByParties(
+      database.sql,
+      companyId,
+      investorOrganisationId,
+    ),
+  listEvents: (relationshipId, page = {}) =>
+    relationshipEventRepository.listByRelationship(
+      database.sql,
+      relationshipId,
+      {
+        afterSequence: page.afterSequence,
+        limit: page.limit ?? 100,
+      },
+    ),
+  getEventById: (relationshipEventId) =>
+    relationshipEventRepository.findById(database.sql, relationshipEventId),
+};
+const disclosurePorts = {
+  companies: createPostgresCompanyQueryPort({ sql: database.sql }),
+  investors: createPostgresInvestorOrganisationQueryPort({ sql: database.sql }),
+  mandates: createPostgresInvestorMandateQueryPort({ sql: database.sql }),
+  capital: createPostgresCapitalObjectiveQueryPort({ sql: database.sql }),
+  relationships,
+};
+const disclosure = createDisclosureAccessService({
+  sql: database.sql,
+  policies: createPostgresDisclosurePolicyRepository(),
+  resolvers: createDisclosureResourceResolverRegistry(
+    createDefaultDisclosureResolvers(disclosurePorts),
+  ),
+  relationshipParties: createRelationshipPartyResolver(disclosurePorts),
+  clock: systemDisclosureClock,
+});
+const embeddingConfig = loadEmbeddingConfig();
+const recommendations = createRecommendationPipeline({
+  sql: database.sql,
+  transactions: database.transactions,
+  disclosure,
+  embedder: createEmbeddingService({
+    provider: createLocalTeiEmbeddingProvider({
+      baseUrl: embeddingConfig.baseUrl,
+      configuration: {
+        ...QWEN3_EMBEDDING_CONFIGURATION,
+        maxBatchItems: embeddingConfig.maxBatchItems,
+      },
+      timeoutMs: embeddingConfig.timeoutMs,
+    }),
+  }),
+  logger,
+});
+const refreshRequester = createRefreshRequester({
+  requests: recommendations.refreshRequests,
+  queue: queues,
+  logger,
+});
+const slateInvalidation = createSlateInvalidationService({
+  slates: recommendations.slates,
+  requester: refreshRequester,
+  logger,
+});
+// Two builds at a time per process: each is a bounded pipeline run over
+// the investor's pool. Queue identity and cadence are code constants.
+const RECOMMENDATION_REFRESH_BATCH_SIZE = 2;
+const RECOMMENDATION_REFRESH_POLL_INTERVAL_MS = 2_000;
+const recommendationRefresh = createQueueRunner({
+  queue: RECOMMENDATION_REFRESH_QUEUE,
+  deadLetterQueue: RECOMMENDATION_REFRESH_DEAD_LETTER_QUEUE,
+  client: queues,
+  handle: createRecommendationRefreshHandler({
+    builder: recommendations.builder,
+    requests: recommendations.refreshRequests,
+    principals: createPostgresBuildPrincipalResolver({ sql: database.sql }),
+    queue: queues,
+    logger,
+  }),
+  batchSize: RECOMMENDATION_REFRESH_BATCH_SIZE,
+  pollIntervalMs: RECOMMENDATION_REFRESH_POLL_INTERVAL_MS,
+  visibilityTimeoutSeconds:
+    RefreshRecommendationSlateJob.retryPolicy.visibilityTimeoutSeconds,
+  maxAttempts: RefreshRecommendationSlateJob.retryPolicy.maxAttempts,
+  backoff: {
+    initialDelaySeconds:
+      RefreshRecommendationSlateJob.retryPolicy.backoff.initialDelaySeconds,
+    maxDelaySeconds:
+      RefreshRecommendationSlateJob.retryPolicy.backoff.maxDelaySeconds ?? 600,
+    jitter: RefreshRecommendationSlateJob.retryPolicy.backoff.jitter ?? true,
+  },
+  logger,
+});
+
 const documentEvents = createQueueRunner({
   queue: DOMAIN_EVENTS_QUEUE,
   client: queues,
@@ -283,6 +424,13 @@ const documentEvents = createQueueRunner({
     pipelineVersion: config.documents.pipelineVersion,
     ...(founderReview === undefined ? {} : { founderReview }),
     ...(mandateReview === undefined ? {} : { mandateReview }),
+    recommendations: {
+      onEvent: (event) =>
+        slateInvalidation.apply(refreshDirectiveFor(event), {
+          correlationId: event.correlationId,
+          causationId: `cau_${event.id}`,
+        }),
+    },
     logger,
   }),
   batchSize: config.documents.batchSize,
@@ -383,6 +531,7 @@ logger.info({ contracts: CONTRACTS_VERSION }, "worker runtime started");
 await Promise.all([
   runner.run(shutdownController.signal),
   documentEvents.run(shutdownController.signal),
+  recommendationRefresh.run(shutdownController.signal),
   ...(documents === undefined
     ? []
     : [documents.run(shutdownController.signal)]),

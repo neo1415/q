@@ -110,6 +110,22 @@ export type DocumentProcessingHandlerOptions = {
         readonly onUtterance: UtteranceReader;
       }
     | undefined;
+  /**
+   * Persisted recommendation slates (CQ-REC-006): every domain event is
+   * offered to the invalidation service, which decides whether it names a
+   * slate at all. Identifiers only; the slates and their keys are read
+   * from the database, never from the message.
+   */
+  readonly recommendations?:
+    | {
+        readonly onEvent: (
+          event: CapitalQEvent<unknown>,
+        ) => Promise<{
+          readonly invalidated: number;
+          readonly enqueued: number;
+        }>;
+      }
+    | undefined;
   readonly logger: RunnerLogger;
 };
 
@@ -151,7 +167,14 @@ type DocumentReadyData = {
 export function createDomainEventHandler(
   options: DocumentProcessingHandlerOptions,
 ): (message: QueueMessage) => Promise<MessageOutcome> {
-  const { registry, queues, founderReview, mandateReview, logger } = options;
+  const {
+    registry,
+    queues,
+    founderReview,
+    mandateReview,
+    recommendations,
+    logger,
+  } = options;
 
   return async (message) => {
     const parsed = registry.parse(message.message);
@@ -166,6 +189,19 @@ export function createDomainEventHandler(
     }
 
     const event: CapitalQEvent<unknown> = parsed.message;
+    if (recommendations !== undefined) {
+      // Lifecycle and queue writes only, idempotent under redelivery: an
+      // invalidated slate stays invalidated and a pending request coalesces.
+      try {
+        await recommendations.onEvent(event);
+      } catch (error: unknown) {
+        logger.warn(
+          { err: error, msgId: message.msgId, eventId: event.id },
+          "recommendation slate refresh failed; retrying",
+        );
+        return { kind: "RETRY", errorCode: "RECOMMENDATION_REFRESH_FAILED" };
+      }
+    }
     if (event.type === RESPONSE_COMMITTED_EVENT) {
       const committed = event.data as ResponseCommittedData;
       // Each journey's reading decides for itself whether the step is one

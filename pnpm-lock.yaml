@@ -332,6 +332,9 @@ importers:
       '@capital-q/database':
         specifier: workspace:*
         version: link:../../packages/database
+      '@capital-q/discovery':
+        specifier: workspace:*
+        version: link:../../packages/discovery
       '@capital-q/eventing':
         specifier: workspace:*
         version: link:../../packages/eventing
@@ -365,9 +368,15 @@ importers:
       '@capital-q/permissions':
         specifier: workspace:*
         version: link:../../packages/permissions
+      '@capital-q/q-embeddings':
+        specifier: workspace:*
+        version: link:../../packages/q-embeddings
       '@capital-q/q-knowledge':
         specifier: workspace:*
         version: link:../../packages/q-knowledge
+      '@capital-q/security':
+        specifier: workspace:*
+        version: link:../../packages/security
       '@capital-q/taxonomy':
         specifier: workspace:*
         version: link:../../packages/taxonomy
@@ -378,9 +387,6 @@ importers:
         specifier: 4.5.4
         version: 4.5.4
     devDependencies:
-      '@capital-q/security':
-        specifier: workspace:*
-        version: link:../../packages/security
       '@types/node':
         specifier: ^24.13.3
         version: 24.13.3

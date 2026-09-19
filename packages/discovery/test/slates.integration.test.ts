@@ -435,8 +435,12 @@ describe("@capital-q/discovery slate store against local PostgreSQL", () => {
           })
         ).map((s) => s.id),
       ).toEqual([slate.id]);
+      expect((await h.repo.listCurrent(10)).map((s) => s.id)).toEqual([
+        slate.id,
+      ]);
       await h.repo.invalidate(slate.id, "MANDATE_CLOSED", T2);
       expect(await h.repo.findCurrentContaining(kobo)).toEqual([]);
+      expect(await h.repo.listCurrent(10)).toEqual([]);
     });
   });
 

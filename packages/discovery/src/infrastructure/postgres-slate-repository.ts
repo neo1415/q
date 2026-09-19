@@ -317,6 +317,15 @@ export function createPostgresSlateRepository(options: {
       return rows.map(toSlate);
     },
 
+    listCurrent: async (limit) => {
+      const rows = await sql`
+        select * from recommendation.slates
+         where status = 'CURRENT'
+         order by published_at, id
+         limit ${Math.max(1, Math.trunc(limit))}`;
+      return rows.map(toSlate);
+    },
+
     pageItems: async (input) => {
       const limit = Math.max(1, Math.trunc(input.limit));
       const rows = await sql`
