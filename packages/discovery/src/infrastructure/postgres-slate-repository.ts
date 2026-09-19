@@ -326,6 +326,14 @@ export function createPostgresSlateRepository(options: {
       return rows.map(toSlate);
     },
 
+    findItem: async (slateId, companyId) => {
+      const rows = await sql`
+        select * from recommendation.slate_items
+         where slate_id = ${slateId} and company_id = ${companyId}`;
+      const [first] = rows;
+      return first === undefined ? null : toItem(first);
+    },
+
     pageItems: async (input) => {
       const limit = Math.max(1, Math.trunc(input.limit));
       const rows = await sql`

@@ -94,6 +94,11 @@ export type SlateRepository = {
   readonly listCurrent: (
     limit: number,
   ) => Promise<readonly RecommendationSlate[]>;
+  /** One item of a slate by company, for explaining it. Null when absent. */
+  readonly findItem: (
+    slateId: string,
+    companyId: string,
+  ) => Promise<RecommendationItem | null>;
   /** Items after a rank, in rank order, bounded. */
   readonly pageItems: (input: {
     readonly slateId: string;

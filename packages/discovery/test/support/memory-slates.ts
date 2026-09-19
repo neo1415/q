@@ -174,6 +174,12 @@ export function memorySlates(options: { readonly failPublish?: boolean } = {}) {
           .map((r) => r.slate)
           .slice(0, limit),
       ),
+    findItem: (slateId, companyId) =>
+      Promise.resolve(
+        (rows.get(slateId)?.items ?? []).find(
+          (i) => i.companyId === companyId,
+        ) ?? null,
+      ),
     pageItems: (input) =>
       Promise.resolve(
         (rows.get(input.slateId)?.items ?? [])

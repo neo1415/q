@@ -352,6 +352,7 @@ export {
 export {
   createPostgresFeatureSnapshotStore,
   readCurrentFeatureSnapshot,
+  readFeatureSnapshotById,
 } from "./infrastructure/postgres-feature-snapshot-store.js";
 export {
   createDomainFeaturePorts,
@@ -527,5 +528,38 @@ export {
   type RequestRefreshResult,
   type SlateInvalidationService,
 } from "./slates/refresh.js";
+
+// Recommendation explanations (CQ-REC-007): why an investor is seeing a
+// company, derived from the factors that produced the ordering.
+export {
+  EXPLANATION_DIMENSIONS,
+  EXPLANATION_OUTCOMES,
+  EXPLANATION_REFUSALS,
+  EXPLANATION_VERSION,
+  ExplanationDimensionSchema,
+  ExplanationFactorSchema,
+  ExplanationOutcomeSchema,
+  ExplanationRefusalSchema,
+  RecommendationExplanationSchema,
+  type ExplainResult,
+  type ExplanationDimension,
+  type ExplanationFactor,
+  type ExplanationOutcome,
+  type ExplanationRefusal,
+  type RecommendationExplanation,
+} from "./explanations/contracts.js";
+export {
+  deterministicSummary,
+  rankingVersionLabel,
+  toExplanationFactors,
+  type ExplanationBuckets,
+} from "./explanations/policy.js";
+export {
+  createRecommendationExplanationService,
+  type ExplainRecommendationQuery,
+  type ExplanationSnapshotPort,
+  type RecommendationExplanationDependencies,
+  type RecommendationExplanationService,
+} from "./explanations/service.js";
 
 export const PACKAGE_NAME = "@capital-q/discovery" as const;

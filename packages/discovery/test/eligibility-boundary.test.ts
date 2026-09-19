@@ -403,3 +403,45 @@ describe("slate boundary (CQ-REC-006)", () => {
     expect(code).not.toMatch(/\.unsafe\(/);
   });
 });
+
+describe("explanation boundary (CQ-REC-007)", () => {
+  const explanationsDir = join(packageRoot, "src", "explanations");
+  const explanationFiles = () =>
+    readdirSync(explanationsDir)
+      .filter((name) => name.endsWith(".ts"))
+      .map((name) => ({
+        path: join(explanationsDir, name),
+        text: readFileSync(join(explanationsDir, name), "utf8"),
+      }));
+
+  it("imports nothing private, names no private signal, and contains no SQL", () => {
+    for (const { path, text } of explanationFiles()) {
+      for (const forbidden of FORBIDDEN_IMPORTS) {
+        expect(text, `${path} imports ${forbidden}`).not.toContain(
+          `"${forbidden}`,
+        );
+      }
+      const code = text
+        .replace(/\/\*[\s\S]*?\*\//g, "")
+        .replace(/\/\/.*$/gm, "")
+        .toLowerCase();
+      for (const token of FORBIDDEN_TOKENS) {
+        expect(code, `${path} mentions ${token}`).not.toContain(token);
+      }
+      expect(text, path).not.toMatch(/\bsql`|\.unsafe\(/);
+    }
+  });
+
+  it("reaches no model: a natural-language layer is composed above it, never imported into it", () => {
+    for (const { path, text } of explanationFiles()) {
+      for (const forbidden of [
+        "@capital-q/model-gateway",
+        "@capital-q/q-core",
+        "@google/genai",
+        "groq-sdk",
+      ]) {
+        expect(text, `${path} imports ${forbidden}`).not.toContain(forbidden);
+      }
+    }
+  });
+});

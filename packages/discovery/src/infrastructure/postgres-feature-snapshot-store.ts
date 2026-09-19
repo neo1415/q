@@ -104,29 +104,9 @@ export function createPostgresFeatureSnapshotStore(options: {
 }
 
 /** Reads one CURRENT snapshot back through the contract; for tests and diagnostics. */
-export async function readCurrentFeatureSnapshot(
-  sql: DatabaseExecutor,
-  input: {
-    readonly investorOrganisationId: string;
-    readonly mandateId: string;
-    readonly companyId: string;
-    readonly mode: string;
-  },
-): Promise<RecommendationFeatureSnapshot | null> {
-  const rows = await sql`
-    select s.tenant_id, s.investor_organisation_id, s.mandate_id, s.mandate_version, s.company_id,
-           s.company_tenant_id, s.company_projection_version, s.mode, s.feature_schema_version,
-           s.eligibility_policy_version, s.eligibility_decision, s.structured_generator_version,
-           s.semantic_generator_version, s.taxonomy_version, s.candidate_provenance, s.sensitivity,
-           s.features, s.fingerprint, s.computed_at
-      from recommendation.feature_snapshots s
-     where s.investor_organisation_id = ${input.investorOrganisationId}
-       and s.mandate_id = ${input.mandateId}
-       and s.company_id = ${input.companyId}
-       and s.mode = ${input.mode}
-       and s.status = 'CURRENT'`;
-  const [row] = rows;
-  if (row === undefined) return null;
+/** One snapshot row to the contract. Shared by both readers below. */
+function toSnapshot(row: unknown): RecommendationFeatureSnapshot | null {
+  if (row === undefined || row === null) return null;
   const r = z
     .object({
       tenant_id: z.string().uuid(),
@@ -176,4 +156,49 @@ export async function readCurrentFeatureSnapshot(
         ? r.computed_at.toISOString()
         : r.computed_at,
   });
+}
+
+/**
+ * The exact snapshot an artifact was built from, by id (CQ-REC-007).
+ * Snapshots are immutable and superseded rather than deleted, so a slate
+ * item can always name the one it was ranked from, which is what lets an
+ * old recommendation be explained by the inputs it actually had.
+ */
+export async function readFeatureSnapshotById(
+  sql: DatabaseExecutor,
+  snapshotId: string,
+): Promise<RecommendationFeatureSnapshot | null> {
+  const rows = await sql`
+    select s.tenant_id, s.investor_organisation_id, s.mandate_id, s.mandate_version, s.company_id,
+           s.company_tenant_id, s.company_projection_version, s.mode, s.feature_schema_version,
+           s.eligibility_policy_version, s.eligibility_decision, s.structured_generator_version,
+           s.semantic_generator_version, s.taxonomy_version, s.candidate_provenance, s.sensitivity,
+           s.features, s.fingerprint, s.computed_at
+      from recommendation.feature_snapshots s
+     where s.id = ${snapshotId}`;
+  return toSnapshot(rows[0]);
+}
+
+export async function readCurrentFeatureSnapshot(
+  sql: DatabaseExecutor,
+  input: {
+    readonly investorOrganisationId: string;
+    readonly mandateId: string;
+    readonly companyId: string;
+    readonly mode: string;
+  },
+): Promise<RecommendationFeatureSnapshot | null> {
+  const rows = await sql`
+    select s.tenant_id, s.investor_organisation_id, s.mandate_id, s.mandate_version, s.company_id,
+           s.company_tenant_id, s.company_projection_version, s.mode, s.feature_schema_version,
+           s.eligibility_policy_version, s.eligibility_decision, s.structured_generator_version,
+           s.semantic_generator_version, s.taxonomy_version, s.candidate_provenance, s.sensitivity,
+           s.features, s.fingerprint, s.computed_at
+      from recommendation.feature_snapshots s
+     where s.investor_organisation_id = ${input.investorOrganisationId}
+       and s.mandate_id = ${input.mandateId}
+       and s.company_id = ${input.companyId}
+       and s.mode = ${input.mode}
+       and s.status = 'CURRENT'`;
+  return toSnapshot(rows[0]);
 }
