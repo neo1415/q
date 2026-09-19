@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { TransactionManager } from "@capital-q/database";
-import type { ActorContext } from "@capital-q/security";
+import { ActorContextSchema, type ActorContext } from "@capital-q/security";
 
 import type { CandidateDiagnostics } from "../src/candidates/contracts.js";
 import {
@@ -56,13 +56,13 @@ const id = (n: number) =>
   `44444444-0000-4000-8000-${String(n).padStart(12, "0")}`;
 const fp = (c: string) => c.repeat(64);
 
-const actor: ActorContext = {
+const actor: ActorContext = ActorContextSchema.parse({
   userId: "11111111-0000-4000-8000-000000000003",
   tenantId: TENANT,
   organisationId: ORG,
   membershipId: "11111111-0000-4000-8000-000000000004",
   actorType: "HUMAN",
-};
+});
 
 const eligible = (companyId: string): EligibilityResult => ({
   eligibilityPolicyVersion: "eligibility.v2",
@@ -98,7 +98,7 @@ const candidate = (n: number): HybridCandidate => ({
 });
 
 const structuredDiagnostics: CandidateDiagnostics = {
-  rawHitsByDimension: { STAGE: 3 },
+  rawHitsByDimension: { STAGE: 3, GEOGRAPHY: 0, TAXONOMY: 0, CHEQUE: 0 },
   rawHits: 3,
   deduped: 3,
   truncated: false,
@@ -627,13 +627,12 @@ describe("slate builder (CQ-REC-006)", () => {
   it(`${MARKER}: text outside the contract never reaches a slate or its fingerprint`, async () => {
     const clean = await scenario().builder.build(query);
     const tainted = scenario({
-      pool: {
-        ...pool(THREE),
-        candidates: THREE.map((c) => ({
+      pool: pool(
+        THREE.map((c): HybridCandidate => ({
           ...c,
           eligibility: { ...c.eligibility, reasonCodes: [] },
         })),
-      },
+      ),
     });
     const withMarker = await tainted.builder.build(query);
     expect(withMarker.kind).toBe("PUBLISHED");

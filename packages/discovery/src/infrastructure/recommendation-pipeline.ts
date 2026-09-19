@@ -201,7 +201,12 @@ export function createSlateReadPipeline(
   const requester =
     queue === undefined
       ? undefined
-      : createRefreshRequester({ requests: refreshRequests, queue, clock, logger });
+      : createRefreshRequester({
+          requests: refreshRequests,
+          queue,
+          clock,
+          logger,
+        });
   const reader = createSlateReadService({
     ports: eligibilityPorts,
     eligibility,

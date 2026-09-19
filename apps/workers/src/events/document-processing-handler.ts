@@ -118,9 +118,7 @@ export type DocumentProcessingHandlerOptions = {
    */
   readonly recommendations?:
     | {
-        readonly onEvent: (
-          event: CapitalQEvent<unknown>,
-        ) => Promise<{
+        readonly onEvent: (event: CapitalQEvent<unknown>) => Promise<{
           readonly invalidated: number;
           readonly enqueued: number;
         }>;

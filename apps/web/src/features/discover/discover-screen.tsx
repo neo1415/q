@@ -43,6 +43,10 @@ const NOTE_TEXT: Readonly<Record<DiscoveryNoteDto, string>> = {
     "Nobody has made themselves discoverable yet. This fills as people choose to be found.",
   RANKED_ON_DECLARED_PROFILE_ONLY:
     "Ordered by what each investor has declared publicly. An investor's mandate is theirs and is never read to rank this list.",
+  RECOMMENDATIONS_REFRESHING:
+    "Your recommendations are being prepared. Check back in a moment.",
+  SLATE_RESTARTED:
+    "Your recommendations were refreshed while you were browsing, so this list starts again from the top.",
 };
 
 function Reasons({

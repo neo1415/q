@@ -83,8 +83,7 @@ export type ApiModules = {
   readonly companies?: CompanyRoutesDependencies["companies"] | undefined;
   readonly investors?: InvestorRoutesDependencies["investors"] | undefined;
   readonly discovery?:
-    | Pick<DiscoveryRoutesDependencies, "discovery" | "slates">
-    | undefined;
+    Pick<DiscoveryRoutesDependencies, "discovery" | "slates"> | undefined;
   readonly capital?: CapitalRoutesDependencies["capital"] | undefined;
   readonly taxonomy?: TaxonomyRoutesDependencies["taxonomy"] | undefined;
   readonly onboarding?: OnboardingRoutesDependencies["onboarding"] | undefined;

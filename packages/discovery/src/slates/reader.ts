@@ -248,7 +248,9 @@ export function createSlateReadService(
           items: [],
           notes: [
             ...notes,
-            ...(afterRank === 0 ? (["NO_DISCOVERABLE_COUNTERPARTS"] as const) : []),
+            ...(afterRank === 0
+              ? (["NO_DISCOVERABLE_COUNTERPARTS"] as const)
+              : []),
           ],
           nextCursor,
         };

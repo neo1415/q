@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import type { ActorContext } from "@capital-q/security";
+import { ActorContextSchema, type ActorContext } from "@capital-q/security";
 
 import {
   ELIGIBILITY_CRITERIA,
@@ -50,13 +50,13 @@ const id = (n: number) =>
   `44444444-0000-4000-8000-${String(n).padStart(12, "0")}`;
 const NOW = new Date("2026-09-19T12:00:00.000Z");
 
-const actor: ActorContext = {
+const actor: ActorContext = ActorContextSchema.parse({
   userId: "11111111-0000-4000-8000-000000000003",
   tenantId: TENANT,
   organisationId: ORG,
   membershipId: "11111111-0000-4000-8000-000000000004",
   actorType: "HUMAN",
-};
+});
 const KEY: SlateKey = {
   tenantId: TENANT,
   investorOrganisationId: INVESTOR,

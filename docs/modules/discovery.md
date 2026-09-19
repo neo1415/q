@@ -486,8 +486,113 @@ Q-inferred classification on an excluded node changes no ranking (proved
 in the integration privacy test).
 
 The legacy Discover slate (`domain/ranking.ts`, `DISCOVERY_RANKING_VERSION`)
-still serves the current UI with its own weights; REC-006 moves the slate
-onto this pipeline.
+still serves the founder side; the investor side is served from persisted
+slates built on this pipeline (REC-006, below).
+
+## Persisted recommendation slates and background refresh (CQ-REC-006)
+
+Doc 19 §62–§65 and doc 20 §76–§81 made concrete: the ranker's in-memory
+ordering becomes a durable, versioned, immutable slate that a worker
+builds and the API serves by cursor. A slate is derived infrastructure:
+never company or investor truth, never a relationship, never an interest.
+
+- **Store** (migration `20260929090000_recommendation_slates.sql`, schema
+  `recommendation`, RLS on, no policy, no browser grant).
+  `slates`: one row per pipeline run for one investor organisation,
+  ACTIVE mandate and context, with every version that produced it
+  (`eligibility_policy_version`, `structured_generator_version`,
+  `semantic_generator_version` or null when degraded,
+  `feature_schema_version`, `ranker_version`, `ranking_config_version`,
+  `taxonomy_version`), a sha256 `generation_fingerprint`, bounded
+  `diagnostics` counts, and the lifecycle `BUILDING → CURRENT | FAILED`,
+  `CURRENT → SUPERSEDED | INVALIDATED | EXPIRED` enforced by trigger.
+  Partial unique indexes keep one CURRENT and one BUILDING per key.
+  Identity, versions and (once published) content are immutable.
+  `slate_items`: rank, internal score in [0, 1] or null, REC-005 reason
+  codes, the exact `feature_snapshot_id` ranked (RESTRICT) and the
+  candidate provenance; unique per (slate, rank) and (slate, company);
+  insertable only while BUILDING, never updated. `refresh_requests`: one
+  coalescing claim row per key with a monotonic `request_sequence`,
+  `claimed_sequence`, priority and bounded reason. Queues
+  `recommendation-refresh` / `recommendation-refresh-dead` (pgmq).
+- **Builder** (`createSlateBuilder`): resolves the investor and ACTIVE
+  mandate, runs the hybrid pool, ranks the ELIGIBLE candidates, verifies
+  each ranked candidate against its stored CURRENT feature snapshot by
+  fingerprint, derives the generation fingerprint from the key, every
+  version and the ranked items' snapshot fingerprints (never a time, an
+  id or a count), and stops when the unexpired CURRENT slate already has
+  it. Otherwise BUILDING → items → one transaction that flips the new
+  slate to CURRENT and the previous CURRENT to SUPERSEDED under row locks.
+  A degraded semantic run is a structured-only slate with a null semantic
+  version and its own fingerprint. Any failure after the claim leaves a
+  FAILED row under a bounded code and the served slate untouched; a
+  concurrent build stands down. Policy `slate-policy.v1`: TTL 24 h, page
+  10 default / 20 max, pool 200, semantic top-K 200.
+- **Refresh and invalidation** (`refreshDirectiveFor`,
+  `createSlateInvalidationService`, `createRefreshRequester`). Domain
+  events map to a directive: mandate activated → HIGH rebuild; a
+  `HARD_EXCLUSION` change → invalidate `MANDATE_HARD_CHANGED`, HIGH; other
+  mandate edits → NORMAL; mandate closed → invalidate, no rebuild; a
+  company withdrawn from discovery or the marketplace, or a revoked
+  company disclosure → invalidate the slates that serve it
+  (`VISIBILITY_CHANGED`, `MARKETPLACE_DISABLED`, `SECURITY_RESTRICTION`),
+  HIGH; profile, taxonomy, relationship and newly discoverable changes →
+  NORMAL over the containing slates or a bounded (500) fan-out to every
+  CURRENT slate. Invalidation moves lifecycle only. The requester upserts
+  the claim row and sends one bounded job
+  (`recommendation.slate.refresh`: identifiers, reason, priority,
+  sequence; nothing of the mandate) per real change, always for HIGH.
+- **Worker** (`apps/workers`): the `recommendation-refresh` consumer claims
+  the row (nothing pending → done), resolves the build principal — the
+  mandate's creator as an active member of the investor organisation,
+  because the disclosure evaluator denies every non-human principal — runs
+  the builder, completes the row and sends one more message when a request
+  landed mid-build. Outcomes: DONE; RETRY for an in-progress build, a
+  store race or an outage; PERMANENT for a ranker refusal, no member or an
+  invalid job. The domain-event consumer offers every validated event to
+  the invalidation. One composition (`createRecommendationPipeline`) over
+  the same disclosure evaluator q-api uses and the local embedding
+  runtime.
+- **Reader** (`createSlateReadService`, `GET /v1/discovery/companies`):
+  the servable slate is CURRENT, or SUPERSEDED while inside its expiry so
+  a client mid-scroll keeps one ordering; a page is the items after the
+  cursor's rank, re-checked for this actor by REC-001 in one batch —
+  what is no longer ELIGIBLE is withheld, never replaced — joined to the
+  declared cards. The cursor is an opaque `(slate, rank)` position, never
+  authority: a forged, stale or another investor's cursor is refused
+  alike (400, no hint); an invalidated or expired slate restarts from the
+  current one with `SLATE_RESTARTED`; no servable slate returns an empty
+  page, asks for a rebuild and says `RECOMMENDATIONS_REFRESHING`; an empty
+  slate is a valid answer. The DTO carries `slateId`, the card and
+  declared-alignment `reasonCodes`; the internal score, snapshot,
+  provenance and missingness codes never leave the store. Explanations
+  are REC-007's.
+- **Privacy.** Q memory, conversations, documents, private sources and Q
+  inferences are not inputs: adding them changes no fingerprint and
+  appears in no row (`REC006_PRIVATE_FOUNDER_DATA_MUST_NOT_CHANGE_SLATE`,
+  proved live). The slate subtree is held to the eligibility list and
+  contains no SQL; the store adapter reads and writes its three tables
+  and nothing else.
+- **Cost.** A page of two is served in ~30 executor calls: a fixed cost
+  (investor organisation and mandate read by the reader and again by the
+  eligibility service, the slate, the page, taxonomy versions, disclosure
+  policies, the cards) plus the REC-001 ports' own reads, which batch per
+  company tenant and per relationship pair. Batching those across tenants
+  and pairs is a REC-001 port follow-up, not a slate concern.
+- **Known limits (V1).** The founder side (`/v1/discovery/investors`)
+  still reads the deterministic visibility slate. A build principal is a
+  person, so a person-specific grant seen at build time is re-checked at
+  read time for the requester, but a company disclosed only to a member
+  other than the mandate's creator does not enter the slate until the
+  organisation-level principal exists. New discoverable companies join
+  slates on the fan-out or at expiry. No scheduled rebuild yet: expiry is
+  served as "refreshing" and the next page asks for one.
+
+Tests: `slates.test.ts` (builder over fakes), `slates-refresh.test.ts`,
+`slates-reader.test.ts`, `slates.integration.test.ts` (store, builder,
+reader on local PostgreSQL), `slates-acceptance.integration.test.ts`
+(§92 end to end), pgTAP `420_recommendation_slates`, worker
+`recommendation-refresh.test.ts`, api `discovery.test.ts`.
 
 ## Not built yet
 
@@ -495,16 +600,15 @@ onto this pipeline.
   _retrieval_ exists above; its similarity is provenance, not a score.
 - Evidence and freshness as ranking signals.
 - Exploration and diversity.
-- Precomputed slates. Today each request ranks a bounded candidate set of
-  200 live; that is well within budget at this size and will not be at the
-  next one.
 - GateQ. Discovery answers "who could you meet"; whether a founder may
   reach an investor is a different question with its own rules.
 - A closed or blocked relationship state. Network defines only
   DISCOVERED; when it defines more, `RELATIONSHIP_STATES_CLOSED_TO_DISCOVERY`
   names them and the policy version moves.
-- Persisted slates, the background worker and cursor feed (REC-006).
-  The ranker above returns an in-memory ordering; nothing persists it yet.
+- Explanations on the feed (REC-007): a page carries declared-alignment
+  codes, never prose.
+- Interactions (REC-008), exploration and diversity (REC-009), a
+  scheduled slate rebuild and an organisation-level build principal.
 - Feature groups beyond eligibility, declared fit and semantic fit: no
   definition, no value, no zero, until their source infrastructure exists.
 - An event-driven representation refresh worker; today `refreshCompanyRepresentations`

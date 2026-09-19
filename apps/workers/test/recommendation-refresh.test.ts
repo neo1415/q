@@ -15,7 +15,12 @@ import {
   type SlateKey,
 } from "@capital-q/discovery";
 import { INVESTOR_EVENTS } from "@capital-q/investors/events";
-import type { ActorContext } from "@capital-q/security";
+import {
+  MembershipIdSchema,
+  OrganisationIdSchema,
+  UserIdSchema,
+  type ActorContext,
+} from "@capital-q/security";
 
 import { createDomainEventHandler } from "../src/events/document-processing-handler.js";
 import type { QueueClient, QueueMessage } from "../src/queue/pgmq.js";
@@ -41,10 +46,14 @@ const KEY: SlateKey = {
   mode: "INVESTOR_DISCOVER",
 };
 const ACTOR: ActorContext = {
-  userId: "11111111-0000-4000-8000-000000000003",
+  userId: UserIdSchema.parse("11111111-0000-4000-8000-000000000003"),
   tenantId: TENANT_A,
-  organisationId: "11111111-0000-4000-8000-000000000002",
-  membershipId: "11111111-0000-4000-8000-000000000004",
+  organisationId: OrganisationIdSchema.parse(
+    "11111111-0000-4000-8000-000000000002",
+  ),
+  membershipId: MembershipIdSchema.parse(
+    "11111111-0000-4000-8000-000000000004",
+  ),
   actorType: "HUMAN",
 };
 
