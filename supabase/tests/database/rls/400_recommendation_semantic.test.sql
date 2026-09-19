@@ -36,8 +36,8 @@ select is((select format_type(atttypid, atttypmod) from pg_attribute
             where attrelid = 'recommendation.company_embeddings'::regclass and attname = 'embedding'),
   'vector(1024)', 'company vectors are native pgvector at the configured dimension');
 select is((select count(*)::int from pg_class c join pg_namespace n on n.oid = c.relnamespace
-            where n.nspname = 'recommendation' and c.relkind = 'r' and c.relrowsecurity), 5,
-  'every recommendation table has RLS enabled (four semantic tables and the feature snapshot store)');
+            where n.nspname = 'recommendation' and c.relkind = 'r' and c.relrowsecurity), 8,
+  'every recommendation table has RLS enabled (four semantic tables, the feature snapshot store, slates, slate items and refresh requests)');
 select is((select count(*)::int from pg_policies where schemaname = 'recommendation'), 0,
   'and no policy: the schema is server-internal, never browser-reachable');
 

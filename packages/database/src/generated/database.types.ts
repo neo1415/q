@@ -4955,6 +4955,215 @@ export type Database = {
         }
         Relationships: []
       }
+      refresh_requests: {
+        Row: {
+          attempts: number
+          claimed_at: string | null
+          claimed_sequence: number | null
+          completed_at: string | null
+          id: string
+          investor_organisation_id: string
+          last_error_code: string | null
+          mandate_id: string
+          mode: string
+          priority: string
+          reason: string
+          request_sequence: number
+          requested_at: string
+          status: string
+          tenant_id: string
+        }
+        Insert: {
+          attempts?: number
+          claimed_at?: string | null
+          claimed_sequence?: number | null
+          completed_at?: string | null
+          id?: string
+          investor_organisation_id: string
+          last_error_code?: string | null
+          mandate_id: string
+          mode: string
+          priority?: string
+          reason: string
+          request_sequence?: number
+          requested_at?: string
+          status?: string
+          tenant_id: string
+        }
+        Update: {
+          attempts?: number
+          claimed_at?: string | null
+          claimed_sequence?: number | null
+          completed_at?: string | null
+          id?: string
+          investor_organisation_id?: string
+          last_error_code?: string | null
+          mandate_id?: string
+          mode?: string
+          priority?: string
+          reason?: string
+          request_sequence?: number
+          requested_at?: string
+          status?: string
+          tenant_id?: string
+        }
+        Relationships: []
+      }
+      slate_items: {
+        Row: {
+          candidate_provenance: Json
+          company_id: string
+          company_tenant_id: string
+          created_at: string
+          feature_snapshot_fingerprint: string
+          feature_snapshot_id: string
+          id: string
+          internal_score: number | null
+          rank: number
+          reason_codes: string[]
+          slate_id: string
+          tenant_id: string
+        }
+        Insert: {
+          candidate_provenance: Json
+          company_id: string
+          company_tenant_id: string
+          created_at?: string
+          feature_snapshot_fingerprint: string
+          feature_snapshot_id: string
+          id?: string
+          internal_score?: number | null
+          rank: number
+          reason_codes?: string[]
+          slate_id: string
+          tenant_id: string
+        }
+        Update: {
+          candidate_provenance?: Json
+          company_id?: string
+          company_tenant_id?: string
+          created_at?: string
+          feature_snapshot_fingerprint?: string
+          feature_snapshot_id?: string
+          id?: string
+          internal_score?: number | null
+          rank?: number
+          reason_codes?: string[]
+          slate_id?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "slate_items_feature_snapshot_id_fkey"
+            columns: ["feature_snapshot_id"]
+            isOneToOne: false
+            referencedRelation: "feature_snapshots"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "slate_items_slate_id_tenant_id_fkey"
+            columns: ["slate_id", "tenant_id"]
+            isOneToOne: false
+            referencedRelation: "slates"
+            referencedColumns: ["id", "tenant_id"]
+          },
+        ]
+      }
+      slates: {
+        Row: {
+          created_at: string
+          diagnostics: Json
+          eligibility_policy_version: string
+          expires_at: string | null
+          failure_code: string | null
+          feature_schema_version: string
+          generated_at: string
+          generation_fingerprint: string | null
+          id: string
+          invalidated_at: string | null
+          invalidation_reason: string | null
+          investor_organisation_id: string
+          item_count: number
+          mandate_id: string
+          mandate_version: number
+          mode: string
+          published_at: string | null
+          ranker_version: string
+          ranking_config_version: string
+          semantic_generator_version: string | null
+          status: string
+          structured_generator_version: string
+          superseded_at: string | null
+          supersedes_slate_id: string | null
+          taxonomy_version: Json | null
+          tenant_id: string
+        }
+        Insert: {
+          created_at?: string
+          diagnostics?: Json
+          eligibility_policy_version: string
+          expires_at?: string | null
+          failure_code?: string | null
+          feature_schema_version: string
+          generated_at?: string
+          generation_fingerprint?: string | null
+          id?: string
+          invalidated_at?: string | null
+          invalidation_reason?: string | null
+          investor_organisation_id: string
+          item_count?: number
+          mandate_id: string
+          mandate_version: number
+          mode: string
+          published_at?: string | null
+          ranker_version: string
+          ranking_config_version: string
+          semantic_generator_version?: string | null
+          status?: string
+          structured_generator_version: string
+          superseded_at?: string | null
+          supersedes_slate_id?: string | null
+          taxonomy_version?: Json | null
+          tenant_id: string
+        }
+        Update: {
+          created_at?: string
+          diagnostics?: Json
+          eligibility_policy_version?: string
+          expires_at?: string | null
+          failure_code?: string | null
+          feature_schema_version?: string
+          generated_at?: string
+          generation_fingerprint?: string | null
+          id?: string
+          invalidated_at?: string | null
+          invalidation_reason?: string | null
+          investor_organisation_id?: string
+          item_count?: number
+          mandate_id?: string
+          mandate_version?: number
+          mode?: string
+          published_at?: string | null
+          ranker_version?: string
+          ranking_config_version?: string
+          semantic_generator_version?: string | null
+          status?: string
+          structured_generator_version?: string
+          superseded_at?: string | null
+          supersedes_slate_id?: string | null
+          taxonomy_version?: Json | null
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "slates_supersedes_slate_id_fkey"
+            columns: ["supersedes_slate_id"]
+            isOneToOne: false
+            referencedRelation: "slates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never

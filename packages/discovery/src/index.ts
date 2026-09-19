@@ -414,4 +414,56 @@ export {
   type RankingService,
 } from "./ranking/service.js";
 
+// Persisted recommendation slates (CQ-REC-006): the durable, versioned,
+// immutable output of one pipeline run, served by cursor.
+export {
+  decodeSlateCursor,
+  encodeSlateCursor,
+  NewRecommendationItemSchema,
+  RecommendationItemIdSchema,
+  RecommendationItemSchema,
+  RecommendationSlateSchema,
+  REFRESH_PRIORITIES,
+  REFRESH_REASONS,
+  REFRESH_REQUEST_STATUSES,
+  RefreshPrioritySchema,
+  RefreshReasonSchema,
+  RefreshRequestStatusSchema,
+  SLATE_INVALIDATION_REASONS,
+  SLATE_POLICY_V1,
+  SLATE_STATUSES,
+  SlateCursorSchema,
+  SlateDiagnosticsSchema,
+  SlateIdSchema,
+  SlateInvalidationReasonSchema,
+  SlatePolicySchema,
+  SlateStatusSchema,
+  SlateVersionsSchema,
+  type NewRecommendationItem,
+  type RecommendationItem,
+  type RecommendationSlate,
+  type RefreshPriority,
+  type RefreshReason,
+  type RefreshRequestStatus,
+  type SlateCursor,
+  type SlateDiagnostics,
+  type SlateInvalidationReason,
+  type SlatePolicy,
+  type SlateStatus,
+  type SlateVersions,
+} from "./slates/contracts.js";
+export {
+  SlateBuildInProgressError,
+  type BeginBuildInput,
+  type PublishInput,
+  type RefreshRequest,
+  type RefreshRequestStore,
+  type SlateKey,
+  type SlateRepository,
+} from "./slates/ports.js";
+export {
+  createPostgresRefreshRequestStore,
+  createPostgresSlateRepository,
+} from "./infrastructure/postgres-slate-repository.js";
+
 export const PACKAGE_NAME = "@capital-q/discovery" as const;

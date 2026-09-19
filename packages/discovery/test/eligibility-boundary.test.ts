@@ -337,3 +337,69 @@ describe("ranking boundary (CQ-REC-005)", () => {
     }
   });
 });
+
+describe("slate boundary (CQ-REC-006)", () => {
+  const slatesDir = join(packageRoot, "src", "slates");
+  const slateStoreFile = join(
+    packageRoot,
+    "src",
+    "infrastructure",
+    "postgres-slate-repository.ts",
+  );
+  const slateFiles = () =>
+    readdirSync(slatesDir)
+      .filter((name) => name.endsWith(".ts"))
+      .map((name) => ({
+        path: join(slatesDir, name),
+        text: readFileSync(join(slatesDir, name), "utf8"),
+      }));
+
+  it("the slate layer imports nothing private, names no private signal and contains no SQL", () => {
+    for (const { path, text } of [
+      ...slateFiles(),
+      { path: slateStoreFile, text: readFileSync(slateStoreFile, "utf8") },
+    ]) {
+      for (const forbidden of FORBIDDEN_IMPORTS) {
+        expect(text, `${path} imports ${forbidden}`).not.toContain(
+          `"${forbidden}`,
+        );
+      }
+      const code = text
+        .replace(/\/\*[\s\S]*?\*\//g, "")
+        .replace(/\/\/.*$/gm, "")
+        .toLowerCase();
+      for (const token of FORBIDDEN_TOKENS) {
+        expect(code, `${path} mentions ${token}`).not.toContain(token);
+      }
+    }
+    for (const { path, text } of slateFiles()) {
+      expect(text, path).not.toMatch(/\bsql`|\bsql\s*\(|\.unsafe\(/);
+    }
+  });
+
+  it("the slate store reads and writes its own three tables and nothing else", () => {
+    const code = readFileSync(slateStoreFile, "utf8")
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/\/\/.*$/gm, "");
+    const tokens = code.replace(/[`(),;]/g, " ").split(/\s+/);
+    const tables = new Set<string>();
+    for (const [index, token] of tokens.entries()) {
+      const next = tokens[index + 1];
+      if (
+        /^(?:from|join|into|update)$/i.test(token) &&
+        next !== undefined &&
+        /^[a-z_]+\.[a-z_]+$/i.test(next)
+      ) {
+        tables.add(next.toLowerCase());
+      }
+    }
+    expect(tables).toEqual(
+      new Set([
+        "recommendation.slates",
+        "recommendation.slate_items",
+        "recommendation.refresh_requests",
+      ]),
+    );
+    expect(code).not.toMatch(/\.unsafe\(/);
+  });
+});

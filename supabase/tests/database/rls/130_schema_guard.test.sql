@@ -139,6 +139,9 @@ insert into rls_inventory (schema_name, table_name, classification, authenticate
   ('recommendation', 'company_embeddings',      'INTERNAL_SERVER_ONLY', '{}'),
   ('recommendation', 'mandate_embeddings',      'INTERNAL_SERVER_ONLY', '{}'),
   ('recommendation', 'feature_snapshots',       'INTERNAL_SERVER_ONLY', '{}'),
+  ('recommendation', 'slates',                  'INTERNAL_SERVER_ONLY', '{}'),
+  ('recommendation', 'slate_items',             'INTERNAL_SERVER_ONLY', '{}'),
+  ('recommendation', 'refresh_requests',        'INTERNAL_SERVER_ONLY', '{}'),
   ('events', 'outbox',                     'INTERNAL_SERVER_ONLY', '{}'),
   ('audit', 'material_actions',            'INTERNAL_SERVER_ONLY', '{}'),
   ('audit', 'security_events',             'INTERNAL_SERVER_ONLY', '{}');
