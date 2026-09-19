@@ -30,6 +30,7 @@ import {
 } from "../src/slates/ports.js";
 import {
   conceptEmbedder,
+  node,
   seedRecommendationWorld,
   TEST_DATABASE_URL,
   type CompanyFixture,
@@ -525,6 +526,177 @@ describe("@capital-q/discovery slate store against local PostgreSQL", () => {
         reopened: false,
       });
       expect((await h.requests.findByKey(h.key))?.status).toBe("DONE");
+    });
+  });
+});
+
+const MARKER = "REC006_PRIVATE_FOUNDER_DATA_MUST_NOT_CHANGE_SLATE";
+
+const BUILD_MANDATE = {
+  ...MANDATE,
+  exclusions: [["industry", "media_entertainment"]],
+} as const;
+
+describe("@capital-q/discovery slate builder over the live local pipeline", () => {
+  let db: RequestDatabase;
+
+  beforeAll(() => {
+    db = createRequestDatabaseClient(
+      parseDatabaseConfig({
+        NODE_ENV: "test",
+        CAPITAL_Q_ENV: "local",
+        DATABASE_URL: TEST_DATABASE_URL,
+        DATABASE_POOL_MAX: "2",
+        DATABASE_CONNECT_TIMEOUT_SECONDS: "5",
+      }),
+    );
+  });
+
+  afterAll(async () => {
+    await db.close();
+  });
+
+  async function withWorld(
+    work: (world: RecommendationWorld) => Promise<void>,
+  ) {
+    let completed = false;
+    try {
+      await db.transactions.run(async (tx) => {
+        await work(
+          await seedRecommendationWorld(tx, {
+            mandate: BUILD_MANDATE,
+            companies: COMPANIES,
+            embedder: conceptEmbedder(),
+          }),
+        );
+        completed = true;
+        throw new Rollback();
+      });
+    } catch (error) {
+      if (!(error instanceof Rollback)) throw error;
+    }
+    expect(completed).toBe(true);
+  }
+
+  const build = async (w: RecommendationWorld) =>
+    w.pipeline.builder.build({
+      actor: w.investorActor,
+      mode: "INVESTOR_DISCOVER",
+    });
+
+  it("builds, publishes and reproduces: same rows, same fingerprint, no second slate; private founder data changes nothing", async () => {
+    await withWorld(async (w) => {
+      const first = await build(w);
+      expect(first.kind).toBe("PUBLISHED");
+      if (first.kind !== "PUBLISHED") return;
+      expect(first.slate.status).toBe("CURRENT");
+      expect(first.slate.itemCount).toBe(COMPANIES.length);
+      expect(first.slate.eligibilityPolicyVersion).toBe(
+        ELIGIBILITY_POLICY_VERSION,
+      );
+      expect(first.slate.semanticGeneratorVersion).toBe(
+        SEMANTIC_GENERATOR_VERSION,
+      );
+      expect(first.slate.rankerVersion).toBe(RANKER_VERSION);
+      expect(first.slate.rankingConfigVersion).toBe(RANKING_CONFIG_V1.version);
+      expect(first.slate.taxonomyVersion).not.toBeNull();
+      const items = await w.pipeline.slates.pageItems({
+        slateId: first.slate.id,
+        afterRank: 0,
+        limit: 50,
+      });
+      expect(items.map((i) => i.rank)).toEqual([1, 2, 3]);
+      expect(w.labelOf(items[0]?.companyId ?? "")).toBe("KoboLogistics");
+      // Every item names the CURRENT snapshot the ranker scored.
+      const stored = await w.tx.sql<{ id: string; fingerprint: string }[]>`
+        select id, fingerprint from recommendation.feature_snapshots
+         where mandate_id = ${w.mandateId} and status = 'CURRENT'`;
+      for (const item of items) {
+        const match = stored.find((s) => s.id === item.featureSnapshotId);
+        expect(match?.fingerprint).toBe(item.featureSnapshotFingerprint);
+      }
+
+      // Reproducible: the same inputs are a no-op.
+      const again = await build(w);
+      expect(again.kind).toBe("UNCHANGED");
+      if (again.kind !== "UNCHANGED") return;
+      expect(again.slate.id).toBe(first.slate.id);
+      expect(again.fingerprint).toBe(first.fingerprint);
+
+      // Private founder data: Q memory, a conversation, a data room deck,
+      // a private source and a Q inference on an excluded node. None of
+      // it is an input, so the fingerprint cannot move.
+      const target = w.companies["KoboLogistics"];
+      if (target === undefined) throw new Error("fixture");
+      await w.tx.sql`insert into q_knowledge.memory_items
+        (tenant_id, owner_context_type, owner_context_id, subject_type, subject_id, memory_type, memory_key, content, content_sha256, write_mode, visibility_scope, sensitivity_class, status)
+        values (${target.tenantId}, 'company', ${target.id}, 'COMPANY', ${target.id}, 'fact', 'rec6.churn', ${`${MARKER}: largest customer may churn`}, ${"c".repeat(64)}, 'Q_PROPOSED', 'founder_private', 'CONFIDENTIAL', 'active')`;
+      await w.tx
+        .sql`insert into q_runtime.conversations (tenant_id, user_id, organisation_id, context_type, summary)
+        values (${target.tenantId}, ${target.founder.userId}, ${target.organisationId}, 'ORGANISATION', ${`${MARKER}: voice interview summary`})`;
+      await w.tx
+        .sql`insert into evidence.documents (tenant_id, company_id, owner_organisation_id, document_type, title, visibility_scope, sensitivity_class, created_by_user_id)
+        values (${target.tenantId}, ${target.id}, ${target.organisationId}, 'PITCH_DECK', ${`${MARKER}: data room deck`.slice(0, 200)}, 'founder_private', 'RESTRICTED', ${target.founder.userId})`;
+      await w.tx
+        .sql`insert into evidence.sources (tenant_id, source_type, subject_type, subject_id, title, source_url, visibility_scope, sensitivity_class)
+        values (${target.tenantId}, 'PUBLIC_WEB', 'COMPANY', ${target.id}, ${`${MARKER}: article`.slice(0, 200)}, 'https://example.test/rec6', 'founder_private', 'CONFIDENTIAL')`;
+      await w.tx
+        .sql`insert into taxonomy.entity_assignments (tenant_id, entity_type, entity_id, node_id, assignment_source)
+        values (${target.tenantId}, 'COMPANY', ${target.id}, ${node("industry", "media_entertainment")}, 'q_inferred')`;
+      const after = await build(w);
+      expect(after.kind).toBe("UNCHANGED");
+      if (after.kind !== "UNCHANGED") return;
+      expect(after.fingerprint).toBe(first.fingerprint);
+      const rows = await w.tx.sql`
+        select s.*, i.* from recommendation.slates s
+          left join recommendation.slate_items i on i.slate_id = s.id
+         where s.mandate_id = ${w.mandateId}`;
+      expect(rows.length).toBe(COMPANIES.length);
+      expect(JSON.stringify(rows)).not.toContain(MARKER);
+      expect(JSON.stringify(first)).not.toContain(MARKER);
+    });
+  });
+
+  it("an ACTIVE mandate change publishes a new slate that supersedes the old one atomically; a DRAFT change does not", async () => {
+    await withWorld(async (w) => {
+      const first = await build(w);
+      if (first.kind !== "PUBLISHED") throw new Error(first.kind);
+      await w.tx
+        .sql`update core.investor_mandates set raw_mandate_text = 'Draft: series A only' where id = ${w.draftId}`;
+      expect((await build(w)).kind).toBe("UNCHANGED");
+
+      // A declared preference change on the ACTIVE mandate: new snapshots,
+      // new fingerprints, new slate.
+      await w.tx
+        .sql`insert into taxonomy.mandate_preferences (tenant_id, mandate_id, node_id, preference_strength, is_exclusion, source)
+        values (${w.investorActor.tenantId}, ${w.mandateId}, ${node("industry", "ecommerce")}, 'STRONG', false, 'user_selected')`;
+      await w.tx
+        .sql`update core.investor_mandates set version = version + 1 where id = ${w.mandateId}`;
+      const second = await build(w);
+      expect(second.kind).toBe("PUBLISHED");
+      if (second.kind !== "PUBLISHED") return;
+      expect(second.fingerprint).not.toBe(first.fingerprint);
+      expect(second.supersededSlateId).toBe(first.slate.id);
+      expect(second.slate.mandateVersion).toBe(first.slate.mandateVersion + 1);
+      const history = await w.pipeline.slates.listHistory(
+        {
+          tenantId: w.investorActor.tenantId,
+          investorOrganisationId: w.investorOrgId,
+          mandateId: w.mandateId,
+          mode: "INVESTOR_DISCOVER",
+        },
+        10,
+      );
+      expect(history.map((s) => s.status)).toEqual(["CURRENT", "SUPERSEDED"]);
+      expect(
+        (
+          await w.pipeline.slates.pageItems({
+            slateId: first.slate.id,
+            afterRank: 0,
+            limit: 10,
+          })
+        ).length,
+      ).toBe(COMPANIES.length);
     });
   });
 });

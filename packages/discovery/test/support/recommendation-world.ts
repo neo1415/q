@@ -5,7 +5,6 @@ import { createPostgresCapitalObjectiveQueryPort } from "@capital-q/capital";
 import {
   CompanyIdSchema,
   createCompanyService,
-  createPostgresCompanyMarketplaceQueryPort,
   createPostgresCompanyQueryPort,
 } from "@capital-q/companies";
 import { createSyntheticVerificationClaimsPort } from "@capital-q/companies/dev";
@@ -18,9 +17,7 @@ import type {
 import { createOutboxWriter } from "@capital-q/eventing";
 import {
   createPostgresInvestorMandateQueryPort,
-  createPostgresInvestorMandateRepository,
   createPostgresInvestorOrganisationQueryPort,
-  createPostgresInvestorOrganisationRepository,
 } from "@capital-q/investors";
 import {
   createPostgresRelationshipEventRepository,
@@ -49,31 +46,15 @@ import {
   type ActorContext,
 } from "@capital-q/security";
 import { createPostgresAuthorizationPolicySource } from "@capital-q/security/postgres";
-import {
-  createPostgresTaxonomyAssignmentRepository,
-  createPostgresTaxonomyReferenceRepository,
-  createTaxonomyQueryPort,
-  normalizeTaxonomyAlias,
-  referenceNode,
-} from "@capital-q/taxonomy";
+import { referenceNode } from "@capital-q/taxonomy";
 
-import { createStructuredCandidateService } from "../../src/candidates/service.js";
-import { createEligibilityService } from "../../src/eligibility/service.js";
-import { createFeatureRegistry } from "../../src/features/policy.js";
-import {
-  createFeatureService,
-  type FeatureService,
-} from "../../src/features/service.js";
+import type { FeatureService } from "../../src/features/service.js";
 import type { HybridCandidate } from "../../src/hybrid/contracts.js";
-import { createHybridCandidateService } from "../../src/hybrid/service.js";
-import { createDomainCandidatePorts } from "../../src/infrastructure/domain-port-candidate-sources.js";
-import { createDomainEligibilityPorts } from "../../src/infrastructure/domain-port-eligibility-sources.js";
-import { createDomainFeaturePorts } from "../../src/infrastructure/domain-port-feature-sources.js";
-import { createDomainSemanticPorts } from "../../src/infrastructure/domain-port-semantic-sources.js";
-import { createPostgresFeatureSnapshotStore } from "../../src/infrastructure/postgres-feature-snapshot-store.js";
-import { createPostgresSemanticRepresentationStore } from "../../src/infrastructure/postgres-semantic-store.js";
+import {
+  createRecommendationPipeline,
+  type RecommendationPipeline,
+} from "../../src/infrastructure/recommendation-pipeline.js";
 import type { SemanticEmbedder } from "../../src/semantic/ports.js";
-import { createSemanticCandidateService } from "../../src/semantic/service.js";
 
 /**
  * One synthetic recommendation world over the real owning-context adapters
@@ -256,6 +237,7 @@ export type RecommendationWorld = {
   readonly draftId: string;
   readonly companies: Readonly<Record<string, SeededCompany>>;
   readonly features: FeatureService;
+  readonly pipeline: RecommendationPipeline;
   readonly labelOf: (companyId: string) => string;
   /** The REC-002 + REC-003 hybrid pool for the investor's ACTIVE mandate. */
   readonly pool: (topK: number) => Promise<readonly HybridCandidate[]>;
@@ -399,7 +381,6 @@ export async function seedRecommendationWorld(
   }
 
   const companiesPort = createPostgresCompanyQueryPort({ sql });
-  const marketplace = createPostgresCompanyMarketplaceQueryPort({ sql });
   const investors = createPostgresInvestorOrganisationQueryPort({ sql });
   const mandates = createPostgresInvestorMandateQueryPort({ sql });
   const capital = createPostgresCapitalObjectiveQueryPort({ sql });
@@ -432,67 +413,16 @@ export async function seedRecommendationWorld(
     relationshipParties: createRelationshipPartyResolver(disclosurePorts),
     clock: systemDisclosureClock,
   });
-  const assignments = createPostgresTaxonomyAssignmentRepository();
-  const taxonomy = createTaxonomyQueryPort({
+  // One composition for the whole pipeline, the same one the worker and
+  // the API use; the world only adds the disclosure evaluator it built.
+  const pipeline = createRecommendationPipeline({
     sql,
-    reference: createPostgresTaxonomyReferenceRepository(),
-    normalizeAlias: normalizeTaxonomyAlias,
-  });
-  const eligibilityPorts = createDomainEligibilityPorts({
-    sql,
-    companies: marketplace,
-    assignments,
-    mandates,
-    investorOrganisations: createPostgresInvestorOrganisationRepository(),
-    relationships,
+    transactions: nestedTransactions(tx),
     disclosure,
-    taxonomy,
-  });
-  const eligibility = createEligibilityService({
-    ports: eligibilityPorts,
+    embedder: input.embedder,
     clock: () => new Date("2026-09-18T12:00:00.000Z"),
   });
-  const semanticPorts = createDomainSemanticPorts({
-    sql,
-    companies: marketplace,
-    assignments,
-    taxonomy,
-    mandates: createPostgresInvestorMandateRepository(),
-  });
-  const semantic = createSemanticCandidateService({
-    ports: eligibilityPorts,
-    facts: semanticPorts.facts,
-    narratives: semanticPorts.narratives,
-    vocabulary: semanticPorts.vocabulary,
-    store: createPostgresSemanticRepresentationStore({ sql }),
-    embeddings: input.embedder,
-    eligibility,
-  });
-  const structured = createStructuredCandidateService({
-    ports: eligibilityPorts,
-    retrieval: createDomainCandidatePorts({
-      sql,
-      companies: marketplace,
-      assignments,
-      taxonomy,
-    }),
-    eligibility,
-  });
-  const hybrid = createHybridCandidateService({ structured, semantic });
-  const featurePorts = createDomainFeaturePorts({
-    sql,
-    companies: marketplace,
-    assignments,
-    taxonomy,
-  });
-  const features = createFeatureService({
-    registry: createFeatureRegistry(),
-    ports: eligibilityPorts,
-    companies: featurePorts.companies,
-    hierarchy: featurePorts.hierarchy,
-    store: createPostgresFeatureSnapshotStore({ sql }),
-    clock: () => new Date("2026-09-18T12:00:00.000Z"),
-  });
+  const { features, hybrid, semantic } = pipeline;
   await semantic.refreshCompanyRepresentations();
 
   const labelById = new Map(
@@ -506,6 +436,7 @@ export async function seedRecommendationWorld(
     draftId,
     companies,
     features,
+    pipeline,
     labelOf: (companyId) => labelById.get(companyId) ?? companyId,
     pool: async (topK) => {
       const pool = await hybrid.generate({ actor: investorActor, topK });

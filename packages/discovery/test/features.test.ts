@@ -874,7 +874,11 @@ function memoryStore() {
               (r) =>
                 [
                   r.companyId,
-                  { id: r.id, fingerprint: r.fingerprint },
+                  {
+                    id: r.id,
+                    companyTenantId: r.snapshot.companyTenantId,
+                    fingerprint: r.fingerprint,
+                  },
                 ] as const,
             ),
         ),
@@ -893,7 +897,11 @@ function memoryStore() {
           status: "CURRENT",
           snapshot: s,
         });
-        return { id, fingerprint: s.fingerprint };
+        return {
+          id,
+          companyTenantId: s.companyTenantId,
+          fingerprint: s.fingerprint,
+        };
       });
       return Promise.resolve(refs);
     },

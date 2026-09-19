@@ -39,6 +39,8 @@ export type PreferenceHierarchyPort = {
 
 export type StoredFeatureSnapshotRef = {
   readonly id: string;
+  /** The company's own tenant: a slate item references the company under it. */
+  readonly companyTenantId: string;
   readonly fingerprint: string;
 };
 

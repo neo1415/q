@@ -23,6 +23,7 @@ import type {
 const RefRowSchema = z.object({
   id: z.string().uuid(),
   company_id: z.string().uuid(),
+  company_tenant_id: z.string().uuid(),
   fingerprint: z.string().regex(/^[0-9a-f]{64}$/),
 });
 
@@ -34,7 +35,7 @@ export function createPostgresFeatureSnapshotStore(options: {
     currentFor: async (input) => {
       if (input.companyIds.length === 0) return new Map();
       const rows = await sql`
-        select s.id, s.company_id, s.fingerprint
+        select s.id, s.company_id, s.company_tenant_id, s.fingerprint
           from recommendation.feature_snapshots s
          where s.tenant_id = ${input.tenantId}
            and s.investor_organisation_id = ${input.investorOrganisationId}
@@ -46,7 +47,11 @@ export function createPostgresFeatureSnapshotStore(options: {
       const out = new Map<string, StoredFeatureSnapshotRef>();
       for (const row of rows) {
         const r = RefRowSchema.parse(row);
-        out.set(r.company_id, { id: r.id, fingerprint: r.fingerprint });
+        out.set(r.company_id, {
+          id: r.id,
+          companyTenantId: r.company_tenant_id,
+          fingerprint: r.fingerprint,
+        });
       }
       return out;
     },
@@ -82,12 +87,16 @@ export function createPostgresFeatureSnapshotStore(options: {
              ${s.context.taxonomyVersion === null ? null : sql.json(s.context.taxonomyVersion)},
              ${sql.json(s.candidateProvenance)}, ${s.sensitivity}, ${sql.json(features)}, ${s.fingerprint},
              ${s.computedAt}::text::timestamptz)
-          returning id, company_id, fingerprint`;
+          returning id, company_id, company_tenant_id, fingerprint`;
         const [first] = rows;
         if (first === undefined)
           throw new Error("feature snapshot insert returned no row");
         const r = RefRowSchema.parse(first);
-        refs.push({ id: r.id, fingerprint: r.fingerprint });
+        refs.push({
+          id: r.id,
+          companyTenantId: r.company_tenant_id,
+          fingerprint: r.fingerprint,
+        });
       }
       return refs;
     },

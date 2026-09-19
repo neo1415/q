@@ -466,4 +466,22 @@ export {
   createPostgresSlateRepository,
 } from "./infrastructure/postgres-slate-repository.js";
 
+export {
+  createSlateBuilder,
+  SLATE_BUILD_FAILURE_CODES,
+  SLATE_FINGERPRINT_VERSION,
+  slateFingerprint,
+  SlateBuildError,
+  type BuildSlateQuery,
+  type BuildSlateResult,
+  type SlateBuildFailureCode,
+  type SlateBuilder,
+  type SlateBuilderDependencies,
+} from "./slates/builder.js";
+export {
+  createRecommendationPipeline,
+  type RecommendationPipeline,
+  type RecommendationPipelineDependencies,
+} from "./infrastructure/recommendation-pipeline.js";
+
 export const PACKAGE_NAME = "@capital-q/discovery" as const;
