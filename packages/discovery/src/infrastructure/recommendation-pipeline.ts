@@ -52,10 +52,20 @@ import {
 import { createSlateBuilder, type SlateBuilder } from "../slates/builder.js";
 import type { SlatePolicy } from "../slates/contracts.js";
 import type { RefreshRequestStore, SlateRepository } from "../slates/ports.js";
+import {
+  createSlateReadService,
+  type SlateReadService,
+} from "../slates/reader.js";
+import {
+  createRefreshRequester,
+  type RefreshQueue,
+  type RefreshRequester,
+} from "../slates/refresh.js";
 import { createDomainCandidatePorts } from "./domain-port-candidate-sources.js";
 import { createDomainEligibilityPorts } from "./domain-port-eligibility-sources.js";
 import { createDomainFeaturePorts } from "./domain-port-feature-sources.js";
 import { createDomainSemanticPorts } from "./domain-port-semantic-sources.js";
+import { createPostgresCompanyCardPort } from "./postgres-discovery-repository.js";
 import { createPostgresFeatureSnapshotStore } from "./postgres-feature-snapshot-store.js";
 import { createPostgresSemanticRepresentationStore } from "./postgres-semantic-store.js";
 import {
@@ -100,12 +110,14 @@ export type RecommendationPipeline = {
   readonly builder: SlateBuilder;
 };
 
-export function createRecommendationPipeline(
-  dependencies: RecommendationPipelineDependencies,
-): RecommendationPipeline {
-  const { sql, transactions, disclosure, embedder, policy, clock, logger } =
-    dependencies;
-
+/** The REC-001 half every process needs: ports and the eligibility service. */
+function composeEligibility(input: {
+  readonly sql: DatabaseExecutor;
+  readonly disclosure: DisclosureAccessService;
+  readonly clock?: (() => Date) | undefined;
+  readonly logger?: Logger | undefined;
+}) {
+  const { sql, disclosure, clock, logger } = input;
   const marketplace = createPostgresCompanyMarketplaceQueryPort({ sql });
   const mandates = createPostgresInvestorMandateQueryPort({ sql });
   const assignments = createPostgresTaxonomyAssignmentRepository();
@@ -132,7 +144,6 @@ export function createRecommendationPipeline(
       }),
     getEventById: (id) => relationshipEventRepository.findById(sql, id),
   };
-
   const eligibilityPorts = createDomainEligibilityPorts({
     sql,
     companies: marketplace,
@@ -148,6 +159,77 @@ export function createRecommendationPipeline(
     clock,
     logger,
   });
+  return { marketplace, assignments, taxonomy, eligibilityPorts, eligibility };
+}
+
+export type SlateReadPipelineDependencies = {
+  readonly sql: DatabaseExecutor;
+  readonly disclosure: DisclosureAccessService;
+  /** When present, a page with no servable slate asks the queue for a rebuild. */
+  readonly queue?: RefreshQueue | undefined;
+  readonly policy?: SlatePolicy | undefined;
+  readonly clock?: (() => Date) | undefined;
+  readonly logger?: Logger | undefined;
+};
+
+export type SlateReadPipeline = {
+  readonly eligibilityPorts: EligibilityPorts;
+  readonly eligibility: EligibilityService;
+  readonly slates: SlateRepository;
+  readonly refreshRequests: RefreshRequestStore;
+  readonly requester: RefreshRequester | undefined;
+  readonly reader: SlateReadService;
+};
+
+/**
+ * What a process that only serves slates needs: REC-001 for the read-time
+ * guard, the slate store and the reader. No generator, no ranker, no
+ * embedding boundary: the API never builds.
+ */
+export function createSlateReadPipeline(
+  dependencies: SlateReadPipelineDependencies,
+): SlateReadPipeline {
+  const { sql, disclosure, queue, policy, clock, logger } = dependencies;
+  const { eligibilityPorts, eligibility } = composeEligibility({
+    sql,
+    disclosure,
+    clock,
+    logger,
+  });
+  const slates = createPostgresSlateRepository({ sql });
+  const refreshRequests = createPostgresRefreshRequestStore({ sql });
+  const requester =
+    queue === undefined
+      ? undefined
+      : createRefreshRequester({ requests: refreshRequests, queue, clock, logger });
+  const reader = createSlateReadService({
+    ports: eligibilityPorts,
+    eligibility,
+    slates,
+    cards: createPostgresCompanyCardPort({ sql }),
+    requester,
+    policy,
+    clock,
+    logger,
+  });
+  return {
+    eligibilityPorts,
+    eligibility,
+    slates,
+    refreshRequests,
+    requester,
+    reader,
+  };
+}
+
+export function createRecommendationPipeline(
+  dependencies: RecommendationPipelineDependencies,
+): RecommendationPipeline {
+  const { sql, transactions, disclosure, embedder, policy, clock, logger } =
+    dependencies;
+
+  const { marketplace, assignments, taxonomy, eligibilityPorts, eligibility } =
+    composeEligibility({ sql, disclosure, clock, logger });
 
   const semanticPorts = createDomainSemanticPorts({
     sql,

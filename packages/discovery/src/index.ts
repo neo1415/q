@@ -457,6 +457,8 @@ export {
   SlateBuildInProgressError,
   type BeginBuildInput,
   type PublishInput,
+  type CompanyCard,
+  type CompanyCardPort,
   type RefreshRequest,
   type RefreshRequestStore,
   type SlateKey,
@@ -481,9 +483,26 @@ export {
 } from "./slates/builder.js";
 export {
   createRecommendationPipeline,
+  createSlateReadPipeline,
   type RecommendationPipeline,
   type RecommendationPipelineDependencies,
+  type SlateReadPipeline,
+  type SlateReadPipelineDependencies,
 } from "./infrastructure/recommendation-pipeline.js";
+export {
+  createSlateReadService,
+  PUBLIC_REASON_CODES,
+  SLATE_PAGE_NOTES,
+  SlateCursorRejectedError,
+  type PageCompaniesQuery,
+  type SlatePage,
+  type SlatePageItem,
+  type SlatePageNote,
+  type SlateReadService,
+  type SlateReadServiceDependencies,
+} from "./slates/reader.js";
+export { createPostgresRefreshQueue } from "./infrastructure/postgres-refresh-queue.js";
+export { createPostgresCompanyCardPort } from "./infrastructure/postgres-discovery-repository.js";
 
 export {
   RECOMMENDATION_REFRESH_DEAD_LETTER_QUEUE,

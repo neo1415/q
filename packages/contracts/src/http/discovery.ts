@@ -36,6 +36,10 @@ export const DiscoveryNoteDtoSchema = z.enum([
   "MANDATE_HAS_NO_PREFERENCES",
   "NO_DISCOVERABLE_COUNTERPARTS",
   "RANKED_ON_DECLARED_PROFILE_ONLY",
+  /** No servable persisted slate yet; a rebuild has been requested (CQ-REC-006). */
+  "RECOMMENDATIONS_REFRESHING",
+  /** The cursor's slate is no longer servable; this page starts the current one. */
+  "SLATE_RESTARTED",
 ]);
 export type DiscoveryNoteDto = z.infer<typeof DiscoveryNoteDtoSchema>;
 
@@ -48,6 +52,11 @@ export const DiscoveredCompanyDtoSchema = z
     currentStageCode: z.string().nullable(),
     shortDescription: z.string().nullable(),
     reasons: z.array(DiscoveryReasonDtoSchema).max(8),
+    /**
+     * Declared-alignment codes from the persisted slate (CQ-REC-006):
+     * machine-readable, bounded, never a score. Explanations are REC-007's.
+     */
+    reasonCodes: z.array(z.string().max(64)).max(8),
   })
   .strict();
 export type DiscoveredCompanyDto = z.infer<typeof DiscoveredCompanyDtoSchema>;
@@ -68,6 +77,8 @@ export type DiscoveredInvestorDto = z.infer<typeof DiscoveredInvestorDtoSchema>;
 
 export const DiscoveryCompanySlateDtoSchema = z
   .object({
+    /** The persisted slate this page came from; null while none is servable. */
+    slateId: UuidSchema.nullable(),
     /** Which ranking produced this slate, so a result can be reproduced. */
     rankingVersion: z.string().max(64),
     items: z.array(DiscoveredCompanyDtoSchema),

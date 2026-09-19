@@ -106,6 +106,23 @@ export type SlateRepository = {
   ) => Promise<readonly RecommendationSlate[]>;
 };
 
+/** A company's declared card: the network projection's fields, no more. */
+export type CompanyCard = {
+  readonly companyId: string;
+  readonly canonicalName: string;
+  readonly websiteUrl: string | null;
+  readonly headquartersCountry: string | null;
+  readonly currentStageCode: string | null;
+  readonly shortDescription: string | null;
+};
+
+/** Batch read of declared cards for a page; absent ids are simply absent. */
+export type CompanyCardPort = {
+  readonly cardsByIds: (
+    companyIds: readonly string[],
+  ) => Promise<ReadonlyMap<string, CompanyCard>>;
+};
+
 export type RefreshRequest = {
   readonly id: string;
   readonly tenantId: string;

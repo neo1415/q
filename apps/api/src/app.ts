@@ -82,7 +82,9 @@ export type ApiModules = {
     OrganisationRoutesDependencies["organisations"] | undefined;
   readonly companies?: CompanyRoutesDependencies["companies"] | undefined;
   readonly investors?: InvestorRoutesDependencies["investors"] | undefined;
-  readonly discovery?: DiscoveryRoutesDependencies["discovery"] | undefined;
+  readonly discovery?:
+    | Pick<DiscoveryRoutesDependencies, "discovery" | "slates">
+    | undefined;
   readonly capital?: CapitalRoutesDependencies["capital"] | undefined;
   readonly taxonomy?: TaxonomyRoutesDependencies["taxonomy"] | undefined;
   readonly onboarding?: OnboardingRoutesDependencies["onboarding"] | undefined;
@@ -189,7 +191,8 @@ export function createApp(
     registerDiscoveryRoutes(app, {
       authenticator: security.authenticator,
       resolver: security.resolver,
-      discovery: modules.discovery,
+      discovery: modules.discovery.discovery,
+      slates: modules.discovery.slates,
     });
   }
 

@@ -6,7 +6,7 @@ import {
   DiscoveryCompanySlateDtoSchema,
   DiscoveryInvestorSlateDtoSchema,
 } from "@capital-q/contracts";
-import type { DiscoveryService } from "@capital-q/discovery";
+import type { DiscoveryService, SlateReadService } from "@capital-q/discovery";
 
 import {
   getActorContext,
@@ -26,6 +26,8 @@ import {
 
 export type DiscoveryRoutesDependencies = ActorContextDependencies & {
   readonly discovery: DiscoveryService;
+  /** Persisted recommendation slates (CQ-REC-006): the companies feed. */
+  readonly slates: SlateReadService;
 };
 
 type PageQuery = {
@@ -55,25 +57,39 @@ export function registerDiscoveryRoutes(
 ): void {
   const withContext = requireActorContextHook(dependencies);
   const service = dependencies.discovery;
+  const slates = dependencies.slates;
 
+  // The investor's feed comes from the persisted, precomputed slate
+  // (CQ-REC-006): a page after a cursor, re-checked for this actor at read
+  // time. Nothing internal reaches the wire: the reader hands over the
+  // declared card and bounded alignment codes, and nothing else exists on
+  // the DTO to carry a score, a snapshot or a mandate field.
   app.get(
     DISCOVERY_COMPANIES_PATH,
     { onRequest: withContext },
     async (request, reply) => {
       const page = pageOf(request);
-      const slate = await service.discoverCompanies({
+      const served = await slates.pageCompanies({
         actor: getActorContext(request),
         limit: page.limit,
         cursor: page.cursor,
       });
       void reply.header("Cache-Control", "no-store");
       return DiscoveryCompanySlateDtoSchema.parse({
-        rankingVersion: slate.rankingVersion,
-        // The rank stays server-side: it reproduces a slate, it does not
-        // describe a company.
-        items: slate.items.map(({ rank: _rank, ...item }) => item),
-        notes: slate.notes,
-        nextCursor: slate.nextCursor,
+        slateId: served.slateId,
+        rankingVersion: served.rankingVersion,
+        items: served.items.map((item) => ({
+          companyId: item.companyId,
+          canonicalName: item.canonicalName,
+          websiteUrl: item.websiteUrl,
+          headquartersCountry: item.headquartersCountry,
+          currentStageCode: item.currentStageCode,
+          shortDescription: item.shortDescription,
+          reasons: [],
+          reasonCodes: item.reasonCodes,
+        })),
+        notes: served.notes,
+        nextCursor: served.nextCursor,
       });
     },
   );

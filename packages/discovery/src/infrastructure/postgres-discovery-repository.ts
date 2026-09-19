@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import type { DatabaseExecutor } from "@capital-q/database";
 
+import type { CompanyCard, CompanyCardPort } from "../slates/ports.js";
 import type {
   CandidateCompany,
   CandidateInvestor,
@@ -250,6 +251,55 @@ export function createPostgresDiscoveryRepository(options: {
         maxStageCode: mandate.data.max_stage_code,
         preferences,
       };
+    },
+  };
+}
+
+const CardRow = z.object({
+  id: z.string().uuid(),
+  canonical_name: z.string(),
+  website_url: z.string().nullable(),
+  headquarters_country: z.string().nullable(),
+  current_stage_code: z.string().nullable(),
+  short_description: z.string().nullable(),
+});
+
+/**
+ * Declared cards for a page of persisted recommendations (CQ-REC-006):
+ * one statement per page over the same columns the pre-REC slate showed.
+ * Discoverability is not decided here — the read-time eligibility guard
+ * has already spoken — only the row's declared fields are read.
+ */
+export function createPostgresCompanyCardPort(options: {
+  readonly sql: DatabaseExecutor;
+}): CompanyCardPort {
+  const { sql } = options;
+  return {
+    cardsByIds: async (companyIds) => {
+      const out = new Map<string, CompanyCard>();
+      if (companyIds.length === 0) return out;
+      const rows = await sql`
+        select c.id,
+               c.canonical_name,
+               c.website_url,
+               c.headquarters_country,
+               c.current_stage_code,
+               c.short_description
+          from core.companies c
+         where c.company_status = 'active'
+           and c.id = any(${[...companyIds]}::uuid[])`;
+      for (const raw of rows) {
+        const row = CardRow.parse(raw);
+        out.set(row.id, {
+          companyId: row.id,
+          canonicalName: row.canonical_name,
+          websiteUrl: row.website_url,
+          headquartersCountry: row.headquarters_country,
+          currentStageCode: row.current_stage_code,
+          shortDescription: row.short_description,
+        });
+      }
+      return out;
     },
   };
 }

@@ -40,6 +40,7 @@ import {
   OrganisationVersionConflictError,
 } from "@capital-q/organisations";
 import type { DocumentUploadFailureCode } from "@capital-q/contracts";
+import { SlateCursorRejectedError } from "@capital-q/discovery";
 import {
   ClaimNotFoundError,
   ClaimRevisionConflictError,
@@ -194,6 +195,17 @@ function toProblem(
   }
 
   if (error instanceof ActorContextRequiredError) {
+    return createProblemDetails({
+      code: "INVALID_REQUEST",
+      requestId,
+      detail: error.message,
+    });
+  }
+
+  // A cursor is a position this server issued for this actor, never
+  // authority: anything else is a bad request, with no hint of whose
+  // slate it might have been (CQ-REC-006).
+  if (error instanceof SlateCursorRejectedError) {
     return createProblemDetails({
       code: "INVALID_REQUEST",
       requestId,

@@ -30,16 +30,35 @@ import {
 import {
   createDiscoveryService,
   createPostgresDiscoveryRepository,
+  createPostgresRefreshQueue,
+  createSlateReadPipeline,
 } from "@capital-q/discovery";
-import { createCapitalService } from "@capital-q/capital";
+import {
+  createCapitalService,
+  createPostgresCapitalObjectiveQueryPort,
+} from "@capital-q/capital";
 import {
   createCompanyService,
   createPostgresCompanyQueryPort,
 } from "@capital-q/companies";
 import {
   createInvestorService,
+  createPostgresInvestorMandateQueryPort,
   createPostgresInvestorOrganisationQueryPort,
 } from "@capital-q/investors";
+import {
+  createPostgresRelationshipEventRepository,
+  createPostgresRelationshipRepository,
+  type RelationshipQueryPort,
+} from "@capital-q/network";
+import {
+  createDefaultDisclosureResolvers,
+  createDisclosureAccessService,
+  createDisclosureResourceResolverRegistry,
+  createPostgresDisclosurePolicyRepository,
+  createRelationshipPartyResolver,
+  systemDisclosureClock,
+} from "@capital-q/permissions";
 import {
   createOrganisationService,
   createPostgresOrganisationQueryPort,
@@ -292,17 +311,63 @@ const media = createMediaService({
   audit,
 });
 
-// Discovery (doc 19): one deterministic slate for both sides, over the
-// declared visibility columns. It writes nothing and reads no behaviour.
+// Discovery (doc 19): the founder side still reads the deterministic
+// visibility slate; the investor side is served from persisted
+// recommendation slates (CQ-REC-006) behind a read-time REC-001 guard over
+// the same disclosure evaluator the Q service uses. The API never builds a
+// slate: a page with nothing servable asks the refresh queue for one.
 const discovery = createDiscoveryService({
   repository: createPostgresDiscoveryRepository({ sql: database.sql }),
+});
+const relationshipRepository = createPostgresRelationshipRepository();
+const relationshipEventRepository = createPostgresRelationshipEventRepository();
+const relationships: RelationshipQueryPort = {
+  getById: (relationshipId) =>
+    relationshipRepository.findById(database.sql, relationshipId),
+  findByParties: (companyId, investorOrganisationId) =>
+    relationshipRepository.findByParties(
+      database.sql,
+      companyId,
+      investorOrganisationId,
+    ),
+  listEvents: (relationshipId, page = {}) =>
+    relationshipEventRepository.listByRelationship(
+      database.sql,
+      relationshipId,
+      {
+        afterSequence: page.afterSequence,
+        limit: page.limit ?? 100,
+      },
+    ),
+  getEventById: (relationshipEventId) =>
+    relationshipEventRepository.findById(database.sql, relationshipEventId),
+};
+const disclosurePorts = {
+  companies: createPostgresCompanyQueryPort({ sql: database.sql }),
+  investors: createPostgresInvestorOrganisationQueryPort({ sql: database.sql }),
+  mandates: createPostgresInvestorMandateQueryPort({ sql: database.sql }),
+  capital: createPostgresCapitalObjectiveQueryPort({ sql: database.sql }),
+  relationships,
+};
+const slates = createSlateReadPipeline({
+  sql: database.sql,
+  disclosure: createDisclosureAccessService({
+    sql: database.sql,
+    policies: createPostgresDisclosurePolicyRepository(),
+    resolvers: createDisclosureResourceResolverRegistry(
+      createDefaultDisclosureResolvers(disclosurePorts),
+    ),
+    relationshipParties: createRelationshipPartyResolver(disclosurePorts),
+    clock: systemDisclosureClock,
+  }),
+  queue: createPostgresRefreshQueue({ sql: database.sql }),
 });
 
 const { app, logger } = createApp(config, security, {
   organisations,
   companies,
   investors,
-  discovery,
+  discovery: { discovery, slates: slates.reader },
   capital,
   taxonomy: {
     query: taxonomy.query,

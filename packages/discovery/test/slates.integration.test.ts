@@ -11,6 +11,7 @@ import {
 import { STRUCTURED_GENERATOR_VERSION } from "../src/candidates/contracts.js";
 import { ELIGIBILITY_POLICY_VERSION } from "../src/eligibility/contracts.js";
 import { FEATURE_SCHEMA_VERSION } from "../src/features/contracts.js";
+import { createPostgresCompanyCardPort } from "../src/infrastructure/postgres-discovery-repository.js";
 import {
   createPostgresRefreshRequestStore,
   createPostgresSlateRepository,
@@ -28,6 +29,10 @@ import {
   SlateBuildInProgressError,
   type SlateKey,
 } from "../src/slates/ports.js";
+import {
+  createSlateReadService,
+  SlateCursorRejectedError,
+} from "../src/slates/reader.js";
 import {
   conceptEmbedder,
   node,
@@ -701,6 +706,185 @@ describe("@capital-q/discovery slate builder over the live local pipeline", () =
           })
         ).length,
       ).toBe(COMPANIES.length);
+    });
+  });
+});
+
+describe("@capital-q/discovery slate reader over the live local pipeline", () => {
+  let db: RequestDatabase;
+
+  beforeAll(() => {
+    db = createRequestDatabaseClient(
+      parseDatabaseConfig({
+        NODE_ENV: "test",
+        CAPITAL_Q_ENV: "local",
+        DATABASE_URL: TEST_DATABASE_URL,
+        DATABASE_POOL_MAX: "2",
+        DATABASE_CONNECT_TIMEOUT_SECONDS: "5",
+      }),
+    );
+  });
+
+  afterAll(async () => {
+    await db.close();
+  });
+
+  /** Counts statements issued through the transaction's executor. */
+  type Statements = {
+    readonly count: () => number;
+    /** Leading words of every statement, for the tally in the report. */
+    readonly seen: string[];
+  };
+  function counting(tx: TransactionContext): {
+    readonly tx: TransactionContext;
+    readonly statements: Statements;
+  } {
+    const seen: string[] = [];
+    const sql = new Proxy(tx.sql, {
+      apply: (target, thisArg, args: unknown[]): unknown => {
+        const head = args[0];
+        const first =
+          typeof head === "object" && head !== null && 0 in head
+            ? (head as Record<number, unknown>)[0]
+            : undefined;
+        seen.push(
+          (typeof first === "string" ? first : "?")
+            .replace(/\s+/g, " ")
+            .trim()
+            .slice(0, 48),
+        );
+        return Reflect.apply(target, thisArg, args) as unknown;
+      },
+    });
+    return { tx: { sql }, statements: { count: () => seen.length, seen } };
+  }
+
+  async function withWorld(
+    work: (world: RecommendationWorld, statements: Statements) => Promise<void>,
+  ) {
+    let completed = false;
+    try {
+      await db.transactions.run(async (raw) => {
+        const counted = counting(raw);
+        await work(
+          await seedRecommendationWorld(counted.tx, {
+            mandate: BUILD_MANDATE,
+            companies: COMPANIES,
+            embedder: conceptEmbedder(),
+          }),
+          counted.statements,
+        );
+        completed = true;
+        throw new Rollback();
+      });
+    } catch (error) {
+      if (!(error instanceof Rollback)) throw error;
+    }
+    expect(completed).toBe(true);
+  }
+
+  const reader = (w: RecommendationWorld) =>
+    createSlateReadService({
+      ports: w.pipeline.eligibilityPorts,
+      eligibility: w.pipeline.eligibility,
+      slates: w.pipeline.slates,
+      cards: createPostgresCompanyCardPort({ sql: w.tx.sql }),
+      clock: () => new Date("2026-09-18T12:00:00.000Z"),
+    });
+
+  it("serves the built slate by cursor with the live REC-001 guard, in a bounded number of statements; a withdrawn company is withheld from an unchanged slate", async () => {
+    await withWorld(async (w, statements) => {
+      const built = await w.pipeline.builder.build({
+        actor: w.investorActor,
+        mode: "INVESTOR_DISCOVER",
+      });
+      if (built.kind !== "PUBLISHED") throw new Error(built.kind);
+      const read = reader(w);
+
+      const before = statements.count();
+      const first = await read.pageCompanies({
+        actor: w.investorActor,
+        limit: 2,
+      });
+      const firstPageStatements = statements.count() - before;
+      const perItem = statements.seen
+        .slice(before)
+        .filter((s) => /^select (a\.id|r\.id)/.test(s)).length;
+      expect(first.slateId).toBe(built.slate.id);
+      expect(first.items.map((i) => w.labelOf(i.companyId))).toEqual([
+        "KoboLogistics",
+        "Bakehouse",
+      ]);
+      expect(first.items[0]?.reasonCodes).toContain("STAGE_ALIGNED");
+      expect(first.items[0]?.canonicalName).toBe("KoboLogistics");
+      expect(first.nextCursor).not.toBeNull();
+      // A fixed cost (the actor's investor organisation and mandate, read
+      // by the reader and again by the eligibility service; the slate; the
+      // page; taxonomy versions; disclosure policies; the cards) plus the
+      // REC-001 ports' own reads, which batch per tenant and per
+      // relationship pair rather than per feature. Template fragments are
+      // counted too, so the bound is generous; the number is reported.
+      expect(firstPageStatements).toBeLessThanOrEqual(20 + 6 * 2);
+      expect(perItem).toBeLessThanOrEqual(2 * 2);
+      console.info(
+        `[REC-006] first page of 2 served in ${firstPageStatements} executor calls (${perItem} per-pair/per-tenant)`,
+      );
+      const text = JSON.stringify(first);
+      for (const forbidden of [
+        "internalScore",
+        "featureSnapshot",
+        "candidateProvenance",
+        "fingerprint",
+      ]) {
+        expect(text).not.toContain(forbidden);
+      }
+
+      const second = await read.pageCompanies({
+        actor: w.investorActor,
+        limit: 2,
+        cursor: first.nextCursor,
+      });
+      expect(second.slateId).toBe(built.slate.id);
+      expect(second.items.map((i) => w.labelOf(i.companyId))).toEqual([
+        "PetPal",
+      ]);
+      expect(second.nextCursor).toBeNull();
+
+      // The company withdraws from discovery after the slate was built:
+      // the slate still lists it, the page does not.
+      const kobo = w.companies["KoboLogistics"];
+      if (kobo === undefined) throw new Error("fixture");
+      await w.tx
+        .sql`update core.companies set marketplace_visibility = 'organisation_private' where id = ${kobo.id}`;
+      const guarded = await read.pageCompanies({
+        actor: w.investorActor,
+        limit: 2,
+      });
+      expect(guarded.slateId).toBe(built.slate.id);
+      expect(guarded.items.map((i) => w.labelOf(i.companyId))).toEqual([
+        "Bakehouse",
+      ]);
+      expect(
+        (
+          await w.pipeline.slates.pageItems({
+            slateId: built.slate.id,
+            afterRank: 0,
+            limit: 1,
+          })
+        )[0]?.companyId,
+      ).toBe(kobo.id);
+
+      // A founder holds no investor organisation: never a page, and never
+      // a hint that the cursor named a real slate.
+      const founderView = await read.pageCompanies({
+        actor: kobo.founder,
+        limit: 2,
+      });
+      expect(founderView.slateId).toBeNull();
+      expect(founderView.notes).toEqual(["NO_ACTIVE_MANDATE"]);
+      await expect(
+        read.pageCompanies({ actor: w.investorActor, cursor: "forged" }),
+      ).rejects.toBeInstanceOf(SlateCursorRejectedError);
     });
   });
 });

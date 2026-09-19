@@ -344,7 +344,11 @@ export function createPostgresSlateRepository(options: {
            and investor_organisation_id = ${key.investorOrganisationId}
            and mandate_id = ${key.mandateId}
            and mode = ${key.mode}
-         order by generated_at desc, id desc
+         order by
+           case status when 'CURRENT' then 0 when 'BUILDING' then 1 else 2 end,
+           generated_at desc,
+           published_at desc nulls last,
+           id desc
          limit ${Math.max(1, Math.trunc(limit))}`;
       return rows.map(toSlate);
     },
