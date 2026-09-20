@@ -6,9 +6,9 @@ import { defineConfig } from "vitest/config";
 /**
  * How many worker processes may fork at once (CQ-TEST-FLAKE-001).
  *
- * Vitest defaults to `availableParallelism() - 1`, which on an 8-core
- * Windows host means seven processes forking together, each booting the
- * runner and -- for the `.tsx` suites -- jsdom as well. Waiting for a
+ * A non-watch run defaults to `availableParallelism() - 1`, which on an
+ * 8-core Windows host means seven processes forking together, each booting
+ * the runner and -- for the `.tsx` suites -- jsdom as well. Waiting for a
  * worker to say "started" has a hard-coded 60s budget inside Vitest
  * (`START_TIMEOUT` in `cli-api`; there is no option for it), and on a busy
  * machine with a few GB free that budget was being missed. The run then
@@ -19,9 +19,11 @@ import { defineConfig } from "vitest/config";
  * rather than the symptom: no serial execution, no longer timeouts, no
  * retries, no weakened assertions. It is expressed against the host's own
  * parallelism so a larger machine still gets more workers, and floored at
- * two so the suite never silently becomes serial.
+ * two so the suite never silently becomes serial. Half is not an arbitrary
+ * fraction: it is the count Vitest itself picks for watch mode, where it
+ * expects to share the machine.
  */
-const MAX_FORKS = Math.max(2, Math.floor(availableParallelism() / 2));
+const MAX_WORKERS = Math.max(2, Math.floor(availableParallelism() / 2));
 
 /**
  * Capital Q deterministic test runner (ERA-057, TEO-001).
@@ -91,9 +93,12 @@ export default defineConfig({
     // passes (TEO-062; doc 24, 237).
     retry: 0,
 
-    // See MAX_FORKS above. Files still run in parallel, in isolated
+    // See MAX_WORKERS above. Files still run in parallel, in isolated
     // processes; there are simply fewer of them starting at once.
-    poolOptions: { forks: { maxForks: MAX_FORKS } },
+    // `maxWorkers` is the Vitest 4 spelling: `poolOptions.forks.maxForks`
+    // is accepted, warned about and then ignored, which looks exactly like
+    // a fix that worked.
+    maxWorkers: MAX_WORKERS,
 
     reporters: ["default"],
   },
