@@ -13,6 +13,10 @@ import {
 
 import { registerProblemHandling } from "./http/problem-handler.js";
 import { registerQConversationRoutes } from "./http/q-conversations.js";
+import {
+  registerRecommendationExplanationRoutes,
+  type RecommendationExplanationRoutesDependencies,
+} from "./http/recommendation-explanations.js";
 import { registerQMcpRoute, type QMcpRouteDependencies } from "./http/q-mcp.js";
 import {
   registerQApprovalRoutes,
@@ -61,6 +65,13 @@ export type QApiSecurityDependencies = {
  * without a database.
  */
 export type QApiModules = {
+  /**
+   * Why an investor is seeing a company (CQ-REC-007). It lives here
+   * rather than beside the slate itself because the natural-language
+   * half is Q, and a person asking "why" is asking Q.
+   */
+  readonly recommendationExplanations?:
+    RecommendationExplanationRoutesDependencies["explanations"] | undefined;
   readonly qRuntime?: QRunRoutesDependencies["qRuntime"] | undefined;
   /** The orchestration boundary; absent means runs are only persisted. */
   readonly orchestration?: QRunRoutesDependencies["orchestration"];
@@ -207,6 +218,19 @@ export function createApp(
       resolver: security.resolver,
       identity: security.identity,
       qRuntime: modules.qRuntime,
+    });
+  }
+
+  if (modules.recommendationExplanations !== undefined) {
+    if (security.resolver === undefined) {
+      throw new Error(
+        "q-api: recommendation explanations require an actor context resolver",
+      );
+    }
+    registerRecommendationExplanationRoutes(app, {
+      authenticator: security.authenticator,
+      resolver: security.resolver,
+      explanations: modules.recommendationExplanations,
     });
   }
 

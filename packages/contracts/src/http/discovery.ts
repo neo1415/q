@@ -101,3 +101,59 @@ export const DiscoveryInvestorSlateDtoSchema = z
 export type DiscoveryInvestorSlateDto = z.infer<
   typeof DiscoveryInvestorSlateDtoSchema
 >;
+
+// ---------------------------------------------------------------------------
+// Why an investor is seeing a company (CQ-REC-007; doc 19 §57, §65).
+// ---------------------------------------------------------------------------
+
+/**
+ * `GET /v1/discovery/slates/:slateId/companies/:companyId/explanation`.
+ *
+ * One recommendation, explained by the factors that produced it. The path
+ * names a slate and a company because an explanation belongs to the
+ * ordering it came from, not to a company in general — and because an old
+ * recommendation must be explained by the ranking that produced it.
+ * Neither id is authority: the server resolves the actor's own investor
+ * organisation and answers NOT_FOUND for anybody else's slate.
+ */
+export const DISCOVERY_EXPLANATION_PATH =
+  "/v1/discovery/slates/:slateId/companies/:companyId/explanation" as const;
+
+export const ExplanationFactorDtoSchema = z
+  .object({
+    /** STAGE, GEOGRAPHY, TAXONOMY, SEMANTIC, CHEQUE. */
+    dimension: z.string().max(32),
+    /** MATCH, PARTIAL, MISMATCH, UNKNOWN, NOT_APPLICABLE. */
+    outcome: z.string().max(32),
+    /** Plain English, bounded, safe to show. */
+    label: z.string().max(160),
+    /** The ranker's own bounded code. Machine-readable, never a score. */
+    reasonCode: z.string().max(64),
+  })
+  .strict();
+export type ExplanationFactorDto = z.infer<typeof ExplanationFactorDtoSchema>;
+
+export const RecommendationExplanationDtoSchema = z
+  .object({
+    slateId: UuidSchema,
+    companyId: UuidSchema,
+    /** Position in the reader's own slate. A place in a list, not a verdict. */
+    rank: z.number().int().min(1),
+    /** Q's phrasing when it was available, the deterministic wording otherwise. */
+    summary: z.string().max(1200),
+    matchedFactors: z.array(ExplanationFactorDtoSchema).max(8),
+    mismatchedFactors: z.array(ExplanationFactorDtoSchema).max(8),
+    uncertainties: z.array(ExplanationFactorDtoSchema).max(8),
+    /** The ranking that produced this item, so an explanation is reproducible. */
+    generatedFromRankingVersion: z.string().max(128),
+    /**
+     * DETERMINISTIC or Q_SYNTHESIZED. The factors are the same either way;
+     * this says only who chose the words, so a reader is never told a model
+     * decided something it did not.
+     */
+    source: z.enum(["DETERMINISTIC", "Q_SYNTHESIZED"]),
+  })
+  .strict();
+export type RecommendationExplanationDto = z.infer<
+  typeof RecommendationExplanationDtoSchema
+>;

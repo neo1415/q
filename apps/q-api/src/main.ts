@@ -62,6 +62,7 @@ import { createGoogleModelProvider } from "@capital-q/model-gateway/providers/go
 import { createGroqModelProvider } from "@capital-q/model-gateway/providers/groq";
 import { createLogger, createTelemetryRuntime } from "@capital-q/observability";
 import { createPostgresOrganisationQueryPort } from "@capital-q/organisations";
+import { createRecommendationNarrator } from "@capital-q/q-specialists";
 import {
   actorPrincipal,
   createDefaultDisclosureResolvers,
@@ -129,7 +130,11 @@ import {
 } from "./composition/company-profile-action.js";
 import {
   createDiscoveryService,
+  createPostgresCompanyCardPort,
   createPostgresDiscoveryRepository,
+  createRecommendationExplanationService,
+  createSlateReadPipeline,
+  readFeatureSnapshotById,
 } from "@capital-q/discovery";
 
 import { composePresence } from "./composition/presence.js";
@@ -765,6 +770,37 @@ logger.info(
   "voice channel composed",
 );
 
+/**
+ * Why an investor is seeing a company (CQ-REC-007). The facts come from the
+ * recommendation context, replayed from the item's own feature snapshot
+ * under the ranking version its slate recorded. Q is offered the same
+ * facts and may phrase them; if it cannot be reached, or says something
+ * the factors do not support, the deterministic wording is what ships.
+ *
+ * It is composed here, in the Q service, because a person asking "why" is
+ * asking Q — and because this is where the Model Gateway already lives.
+ */
+const slateRead = createSlateReadPipeline({
+  sql: database.sql,
+  disclosure,
+  logger,
+});
+const recommendationExplanations = createRecommendationExplanationService({
+  ports: slateRead.eligibilityPorts,
+  slates: slateRead.slates,
+  snapshots: { byId: (id) => readFeatureSnapshotById(database.sql, id) },
+  cards: createPostgresCompanyCardPort({ sql: database.sql }),
+  narrator: createRecommendationNarrator({
+    gateway: modelGateway,
+    // Doc 15 §62: where the server attested the data is invented, the
+    // free model may carry the demo. Elsewhere this is REAL_CUSTOMER and
+    // the reviewed ceilings decide, exactly as before.
+    dataPosture: syntheticDemo === null ? "REAL_CUSTOMER" : "SYNTHETIC_DEMO",
+    logger,
+  }),
+  logger,
+});
+
 const { app, logger: appLogger } = createApp(
   config,
   {
@@ -776,6 +812,7 @@ const { app, logger: appLogger } = createApp(
   },
   {
     qRuntime,
+    recommendationExplanations,
     orchestration: { orchestrator, autostart: Q_ORCHESTRATION_AUTOSTART },
     qActions,
     qStream: { service: qStream },

@@ -555,6 +555,7 @@ export {
 
 export {
   DISCOVERY_COMPANIES_PATH,
+  DISCOVERY_EXPLANATION_PATH,
   DISCOVERY_INVESTORS_PATH,
   DiscoveredCompanyDtoSchema,
   DiscoveredInvestorDtoSchema,
@@ -562,10 +563,14 @@ export {
   DiscoveryInvestorSlateDtoSchema,
   DiscoveryNoteDtoSchema,
   DiscoveryReasonDtoSchema,
+  ExplanationFactorDtoSchema,
+  RecommendationExplanationDtoSchema,
   type DiscoveredCompanyDto,
   type DiscoveredInvestorDto,
   type DiscoveryCompanySlateDto,
   type DiscoveryInvestorSlateDto,
   type DiscoveryNoteDto,
   type DiscoveryReasonDto,
+  type ExplanationFactorDto,
+  type RecommendationExplanationDto,
 } from "./discovery.js";
