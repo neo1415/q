@@ -2661,3 +2661,212 @@ through one member's eyes" — is **CLOSED** by this packet. Items 3–13 are
 unchanged. Item 15 (`node --watch` on `packages/*/dist`) is unchanged.
 
 Next: CQ-REC-009 — Diversity / Exploration. Not started.
+
+## CQ-TEST-FLAKE-001 — CLOSED (2026-09-20)
+
+Reopened by CQ-PERM-ORG-VIEW-001 with a concrete cause. Closed here with a
+concrete fix.
+
+A non-watch run defaults to `availableParallelism() - 1` workers, so an
+8-core Windows host forks seven at once, each booting the runner and — for
+the `.tsx` suites — jsdom. Waiting for a worker to report "started" has a
+hard-coded 60s budget (`START_TIMEOUT` in Vitest's `cli-api`; no option
+exposes it), and on a busy machine with a few GB free that budget was
+missed. The run then reported unhandled errors for files that never ran,
+which reads like a test failure and is not one.
+
+`vitest.config.ts` now sets `maxWorkers` to half the host's parallelism,
+floored at two — four here, which is also the count Vitest itself picks
+for watch mode, where it expects to share the machine. No serial
+execution, no longer timeouts, no retries, no weakened assertions.
+
+**A correction worth recording.** The first attempt set
+`poolOptions.forks.maxForks`, which Vitest 4 accepts, warns about and then
+ignores. The two green runs that followed it proved only that the machine
+was idle, and the deprecation line was in both logs unread. `165bc52`
+claimed the closure; `2d1331e` corrected the option and deferred the
+proof. The lesson is the cheap one: a config key that is merely accepted
+is not a key that works, and a warning in a log that was skimmed for the
+summary line is a warning that was not read.
+
+Proved after REC-009 landed, on the same host, back to back:
+
+| Run | Files | Tests | Exit | Startup timeouts | Duration |
+| --- | ----- | ----- | ---- | ---------------- | -------- |
+| 1   | 234   | 3006  | 0    | 0                | 136.5s   |
+| 2   | 234   | 3006  | 0    | 0                | 146.5s   |
+
+For comparison, unbounded on this host: 292s with four start-up failures,
+then 144s clean. Bounding costs nothing measurable, because less
+contention is also less thrashing.
+
+## CQ-PERM-ORG-VIEW-001 — CLOSED
+
+Recorded above; nothing in REC-009 reopened it. REC-009 consumes
+`interaction_state`, which is keyed by investor organisation, through a
+port that carries no user and no membership.
+
+## CQ-REC-009 — bounded diversity and exploration (2026-09-20)
+
+Starting SHA `fea92d6`. No migration, no schema change, no ranking change.
+
+### The stage
+
+Between REC-005's order and REC-006's persisted slate. It is a
+**permutation** of the ranked list, and that is the load-bearing property:
+exploration cannot introduce an ineligible company because there is
+nowhere inside the stage for a company to come from, and suppression
+cannot drop one because the output is the input reordered. Doc 19's rule
+that safety outranks diversity is therefore arithmetic rather than a rule
+anyone has to enforce.
+
+It reads no database, calls no model, draws no random number and reads no
+clock — the instant recency is measured against arrives as an argument —
+so `rerank` is a **synchronous** pure function and could not have reached a
+provider even if something wanted it to. Doc 19 §190 asks for a seed only
+where randomness exists; none does, so there is nothing to persist in
+order to reproduce an order.
+
+|                      |                                                                            |
+| -------------------- | -------------------------------------------------------------------------- |
+| Reranker             | `BOUNDED_DETERMINISTIC` / `bounded-reranker.v1`                            |
+| Policy               | `exploration-policy.v1`, `INITIAL_HEURISTIC_UNCALIBRATED`                  |
+| Context              | `INVESTOR_DISCOVER` only; refuses a base order from another ranker version |
+| Window / cluster cap | 10 / 3                                                                     |
+| Relevance floor      | 0.15 of REC-005's internal score                                           |
+| Movement cap         | 20 ranks                                                                   |
+| Recently seen        | 24 h                                                                       |
+| Exploration          | 1 slot per window, to a company never shown                                |
+
+Two phases, each with its own stated bound. First suppression: a passed
+company goes behind every unsuppressed candidate, in its own order,
+demoted and never banned. Then a bounded greedy: the best remaining
+candidate takes each position unless its cluster already fills the page or
+the organisation saw it very recently, and some other candidate _within
+the relevance floor_ fixes that. If nothing within the floor does, the
+best candidate takes the position anyway.
+
+### What it may read, and why that is a shape
+
+`RerankSignals` is three fields — `exposed`, `lastSeenAt`, `passed` — and
+none of them is a number. REC-008's state carries an impression count, a
+save flag, a save time, a last pass reason and a last interaction time;
+`createInteractionRerankSignals` drops all of it. Whether an organisation
+has seen a company is a fact about exposure; _how many times_ is a
+magnitude, and a magnitude in a reordering stage is a popularity signal
+however carefully it is named. Save is absent for that reason and one
+more: it is an investor's own bookmark and must never move a company, for
+them or for anyone else.
+
+The one company-side attribute is the cluster, and it is really the
+investor's: the set of `preferredNodeId`s — nodes on their own mandate —
+that REC-002 matched, hashed so the key cannot leak a taxonomy into a log
+line. A company the structured generator did not find has **no** cluster,
+never a bad one, and an unknown cluster is never capped, never penalised
+and never counted against anything.
+
+### Pass, Save, and the two together
+
+| State        | Proactive recommendation      | Saved list |
+| ------------ | ----------------------------- | ---------- |
+| saved        | unchanged — Save never boosts | present    |
+| passed       | suppressed to the tail        | absent     |
+| saved+passed | suppressed to the tail        | present    |
+
+`PASS_REINTRODUCTION_REASONS` names three; `PROVABLE_PASS_REINTRODUCTION_REASONS`
+is **empty**, because nothing can currently prove one. `interaction_state`
+records that a pass happened and when, not the mandate version it was made
+under, and no surface issues a reset. A changed `updated_at` is not a
+material update — a typo fix would resurface everything an investor had
+dismissed — so a passed company stays suppressed, the mechanism stays
+typed and tested, and an unrecognised reason is refused rather than
+ignored.
+
+### No migration, and why none was needed
+
+A slate item stores REC-009's position and REC-005's score. The base rank
+is recoverable **exactly** from the stored scores under REC-005's own
+tie-break (score descending, then canonical company id), which a test
+asserts, so no `base_rank` column exists. Reason codes went into the
+existing `reason_codes` array — a `text[]` with only a length check — with
+the two code sets disjoint and separately exported so a consumer
+partitions them by membership. The policy version rides in the generation
+fingerprint and in the `diagnostics` jsonb, so a policy change rebuilds
+rather than serving an order nobody would compute again. Hosted migrations
+remain **20260925–20260930**; `db:push` was not run.
+
+### Targeted tests
+
+`rerank.test.ts` (29) proves the reordering: determinism over five
+repetitions, the permutation property, the score carried untouched, the
+base rank recoverable, the relevance floor refusing and permitting the
+same swap on one changed number, the movement bound, unknown clusters
+never capped, cold start not penalised, forty-seven impressions and one
+being the same fact, recency as a nudge and not a ban, one exploration
+slot per window and none when the unexposed candidate is below the floor,
+pass suppression and its typed reintroduction, Save changing nothing, and
+an all-zero policy returning REC-005's order — which is how "the algorithm
+holds no constant of its own" is checked rather than asserted.
+
+`rerank-service.test.ts` (10) proves the seam: the cluster derives only
+from the investor's own matched mandate nodes and is opaque, the signals
+port is asked exactly once for exactly this organisation, another
+organisation's rows change nothing, one read per build at 200 candidates,
+and the adapter dropping the count and the save flag.
+
+Four new cases in `eligibility-boundary.test.ts` hold it structurally: no
+private import, no SQL, no model, no import of the ranking config or the
+ranker, and no field on `RerankSignals` that could hold a magnitude.
+
+`slates.test.ts` now builds through the **real** rerank service rather
+than a stub, so a future change that moved items would surface in REC-006's
+own goldens.
+
+### Performance
+
+200 candidates: single-digit milliseconds, asserted under 30ms with two
+orders of magnitude of headroom. One batched read per build regardless of
+pool size, so there is no N+1 to find.
+
+### Gates — CQ-REC-009
+
+| Gate                                | Result                                                                                                     |
+| ----------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| `pnpm test` ×2 (entry gate + final) | 234 files, 3006 tests, exit 0 both times, no startup timeouts (was 232 / 2963)                             |
+| `pnpm typecheck`                    | 76 tasks, exit 0                                                                                           |
+| `pnpm format:check`                 | every tracked file passes; the warnings are untracked `graphify-out/`                                      |
+| `pnpm lint`                         | exit 0                                                                                                     |
+| `pnpm build`                        | 41 tasks, exit 0                                                                                           |
+| `pnpm test:integration`             | 53 pass + 1 skipped; 484 pass + 5 skipped — unchanged                                                      |
+| `pnpm q:eval:lint` / `q:eval:ci`    | PASS, 39 cases / 16 graders; no regression, nothing added                                                  |
+| Dependency direction                | no package depends on an app; the rerank subtree imports one workspace package, `@capital-q/observability` |
+| Secret scan / `git diff --check`    | clean                                                                                                      |
+| `pnpm demo:status`                  | READY, four components, synthetic-demo routing ON                                                          |
+
+DB gates were not run: no migration, no schema change, no RLS change.
+
+### Known limits (V1)
+
+- **One diversity dimension.** Taxonomy is the only company-side attribute
+  available downstream. `headquartersCountry` and `currentStageCode` are
+  read by REC-001 and not carried past it, so geography and stage would
+  need a change to REC-001's contract rather than a rerank one — a
+  deliberate deferral, not an oversight.
+- **Hand-set numbers.** No outcome data calibrates the window, the cap,
+  the floor or the recency horizon; doc 19 §53 leaves them open until it
+  exists, and the policy says so in its status.
+- **A semantic-only candidate escapes the cluster cap**, because it has no
+  matched mandate nodes and unknown must not become a penalty.
+- **No propensity logging.** Exploration is a deterministic slot, not a
+  probabilistic policy, so there are no action probabilities — which doc 19
+  §2450 notes a contextual bandit would later require.
+
+### Debt
+
+Item 16 (`vitest-pool` start-up timeouts) is **CLOSED** by the concurrency
+bound above. Item 15, `CQ-DEV-WATCH-SCOPE-001` — `node --watch` restarting
+the dev services when a file under `packages/*/dist` is merely read —
+remains **OPEN**, class 3, and **must be fixed before an external GateQ
+demo**. REC-009 does not touch that system and does not close it.
+
+Next: CQ-GATE-001 — GateQ Core. Not started.
