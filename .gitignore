@@ -59,3 +59,4 @@ models/
 
 # Local demo launcher output
 demo.log
+.demo-stopped

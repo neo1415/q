@@ -13,7 +13,24 @@
 #
 # WMI's Win32_Process.Create starts a process as a child of the WMI host,
 # outside any caller's job object, so the stack survives whatever started
-# it. Two things do not carry across on their own and are carried here:
+# it. That handles a job closing; it does not handle the other way a shell
+# kills its children. An interrupt is delivered to a process GROUP, and a
+# process created this way still joined the caller's. On 2026-09-20 the
+# stack died seconds after launch and left `demo.log` holding two bytes,
+# "^C" -- cmd.exe echoing the interrupt it was sent while the launching
+# shell was being interrupted. CREATE_NEW_PROCESS_GROUP puts the stack at
+# the root of its own group, and Windows disables Ctrl+C for a new group,
+# so the interrupt has nowhere to travel.
+#
+# DETACHED_PROCESS looks like the stronger answer and is the wrong one. It
+# was measured: with it set, cmd.exe still runs and its own redirect still
+# writes, but a node child of cmd writes NOTHING. The result is a stack
+# that appears to start and a log file of zero bytes -- the same silence
+# this script exists to end, arrived at from the other direction. The group
+# flag alone is what is wanted, and the console it keeps is what carries
+# the output.
+#
+# Two things do not carry across on their own and are carried here:
 #
 #  - PATH. The new process gets the registry's, not this shell's.
 #  - Files the app cannot see. A packaged (MSIX) application such as the
@@ -34,7 +51,13 @@ param([Parameter(ValueFromRemainingArguments = $true)][string[]] $DemoArgs)
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
 $log = Join-Path $root "demo.log"
-$extra = if ($DemoArgs) { " " + ($DemoArgs -join " ") } else { "" }
+# pnpm forwards the `--` that separated its own arguments from ours, and
+# passing it on would make `pnpm demo` treat the rest as a package filter.
+$forwarded = @($DemoArgs | Where-Object { $_ -ne "--" })
+$extra = if ($forwarded) { " " + ($forwarded -join " ") } else { "" }
+
+# Whatever happens next, it is no longer "stopped on purpose".
+Remove-Item (Join-Path $root ".demo-stopped") -ErrorAction SilentlyContinue
 
 # The package's real AppData, when this shell runs inside a packaged app.
 $virtual = Get-ChildItem (Join-Path $env:LOCALAPPDATA "Packages") -Directory -ErrorAction SilentlyContinue |
@@ -84,12 +107,18 @@ $lines += "cd /d `"$root`""
 $lines += "pnpm demo$extra > `"$log`" 2>&1"
 $lines | Set-Content -Path $launcher -Encoding ASCII
 
+# CREATE_NEW_PROCESS_GROUP (0x200). Not DETACHED_PROCESS: see above.
+$startup = New-CimInstance -ClassName Win32_ProcessStartup -ClientOnly -Property @{
+  CreateFlags = [uint32] 0x200
+}
 $result = Invoke-CimMethod -ClassName Win32_Process -MethodName Create -Arguments @{
-  CommandLine      = "cmd.exe /c `"$launcher`""
-  CurrentDirectory = $root
+  CommandLine             = "cmd.exe /c `"$launcher`""
+  CurrentDirectory        = $root
+  ProcessStartupInformation = $startup
 }
 if ($result.ReturnValue -ne 0) {
   throw "could not start the demo stack (Win32_Process.Create returned $($result.ReturnValue))"
 }
 Write-Host "[demo] started detached (pid $($result.ProcessId)); output in demo.log"
+Write-Host "[demo] is it up? pnpm demo:status   (or wait for it: pnpm demo:status -- 240)"
 Write-Host "[demo] follow it with: Get-Content demo.log -Wait -Tail 20"
