@@ -12,6 +12,8 @@ import type { FeatureSnapshotStore } from "../features/ports.js";
 import type { HybridCandidateService } from "../hybrid/service.js";
 import { RANKER_VERSION, RankingInputError } from "../ranking/contracts.js";
 import type { RankingService } from "../ranking/service.js";
+import { RerankInputError } from "../rerank/contracts.js";
+import type { RerankService } from "../rerank/service.js";
 import { SEMANTIC_GENERATOR_VERSION } from "../semantic/contracts.js";
 import {
   NewRecommendationItemSchema,
@@ -33,14 +35,18 @@ import {
  * The slate builder (CQ-REC-006 Checkpoint B): one pipeline run, persisted.
  *
  *   ACTIVE mandate → REC-002 ∪ REC-003 pool → REC-004 snapshots → REC-005
- *   order → items → fingerprint → (unchanged: stop) → BUILDING → items →
- *   publish, superseding the previous CURRENT slate in one transaction.
+ *   order → REC-009 bounded reorder → items → fingerprint → (unchanged:
+ *   stop) → BUILDING → items → publish, superseding the previous CURRENT
+ *   slate in one transaction.
  *
- * The builder adds nothing to the ordering: every item is a ranked
- * candidate, its rank, its internal score, its reason codes and the exact
- * feature snapshot REC-005 ranked, verified by fingerprint against the
- * store. Same inputs, same fingerprint, no new slate. A failure after the
- * claim leaves a FAILED row and the served slate untouched.
+ * The builder still decides nothing about order itself: every item is a
+ * ranked candidate with REC-005's internal score untouched, its reason
+ * codes, and the exact feature snapshot REC-005 ranked, verified by
+ * fingerprint against the store. REC-009 permutes that list within stated
+ * bounds and says why each item moved; it can neither add a company nor
+ * drop one, because its output is a permutation of its input. Same
+ * inputs, same fingerprint, no new slate. A failure after the claim leaves
+ * a FAILED row and the served slate untouched.
  */
 
 export const SLATE_FINGERPRINT_VERSION = "slate-fingerprint.v1" as const;
@@ -49,6 +55,7 @@ export const SLATE_BUILD_FAILURE_CODES = [
   "SNAPSHOT_MISSING",
   "FINGERPRINT_MISMATCH",
   "RANKER_REFUSED",
+  "RERANKER_REFUSED",
   "PUBLISH_FAILED",
   "BUILD_ERROR",
 ] as const;
@@ -97,6 +104,8 @@ export type SlateBuilderDependencies = {
   >;
   readonly hybrid: HybridCandidateService;
   readonly ranking: RankingService;
+  /** REC-009. Required: a build that silently skipped it would serve a different order. */
+  readonly rerank: RerankService;
   readonly snapshots: FeatureSnapshotStore;
   readonly slates: SlateRepository;
   readonly transactions: TransactionManager;
@@ -136,6 +145,13 @@ export function slateFingerprint(input: {
   readonly key: SlateKey;
   readonly mandateVersion: number;
   readonly versions: SlateVersions;
+  /**
+   * REC-009's policy. It is not one of `versions` because those are
+   * columns and this is not; it belongs in the identity all the same,
+   * because a policy change produces an order the old fingerprint would
+   * otherwise claim was still current.
+   */
+  readonly rerankPolicyVersion: string;
   readonly items: readonly Pick<
     NewRecommendationItem,
     "companyId" | "rank" | "featureSnapshotFingerprint"
@@ -149,6 +165,7 @@ export function slateFingerprint(input: {
     mandateVersion: input.mandateVersion,
     mode: input.key.mode,
     versions: input.versions,
+    rerankPolicyVersion: input.rerankPolicyVersion,
     items: input.items.map((i) => [
       i.companyId,
       i.rank,
@@ -161,14 +178,23 @@ export function slateFingerprint(input: {
 function failureCodeOf(error: unknown): SlateBuildFailureCode {
   if (error instanceof SlateBuildError) return error.code;
   if (error instanceof RankingInputError) return "RANKER_REFUSED";
+  if (error instanceof RerankInputError) return "RERANKER_REFUSED";
   return "BUILD_ERROR";
 }
 
 export function createSlateBuilder(
   dependencies: SlateBuilderDependencies,
 ): SlateBuilder {
-  const { ports, hybrid, ranking, snapshots, slates, transactions, logger } =
-    dependencies;
+  const {
+    ports,
+    hybrid,
+    ranking,
+    rerank,
+    snapshots,
+    slates,
+    transactions,
+    logger,
+  } = dependencies;
   const policy = dependencies.policy ?? SLATE_POLICY_V1;
   const clock = dependencies.clock ?? (() => new Date());
   const meter = getMeter("@capital-q/discovery");
@@ -237,6 +263,29 @@ export function createSlateBuilder(
         }
         const ranked = rankedResult.ranked;
 
+        // REC-009. The build's own instant is what recency is measured
+        // against, so the slate and the question "had they just seen it"
+        // agree on when this happened.
+        const generatedAt = clock();
+        const reordered = await rerank.rerankPool({
+          tenantId: key.tenantId,
+          investorOrganisationId: key.investorOrganisationId,
+          mandateId: key.mandateId,
+          mandateVersion: mandate.version,
+          mode: key.mode,
+          ranked: ranked.map((r) => ({
+            companyId: r.companyId,
+            rank: r.rank,
+            internalScore: r.internalScore,
+          })),
+          pool: eligible,
+          evaluatedAt: generatedAt.toISOString(),
+          rankerVersion: RANKER_VERSION,
+        });
+        const rankedById = new Map(
+          ranked.map((r) => [r.companyId, r] as const),
+        );
+
         // Every item names the stored snapshot it was ranked from, and the
         // store must agree on the fingerprint: an item never points at a
         // snapshot other than the one REC-005 scored.
@@ -248,31 +297,50 @@ export function createSlateBuilder(
           featureSchemaVersion: FEATURE_SCHEMA_VERSION,
           companyIds: ranked.map((r) => r.companyId),
         });
-        const items: NewRecommendationItem[] = ranked.map((r) => {
-          const ref = refs.get(r.companyId);
-          if (ref === undefined) {
-            throw new SlateBuildError(
-              "SNAPSHOT_MISSING",
-              "a ranked candidate has no current feature snapshot",
-            );
-          }
-          if (ref.fingerprint !== r.featureSnapshot.fingerprint) {
-            throw new SlateBuildError(
-              "FINGERPRINT_MISMATCH",
-              "the stored feature snapshot is not the one that was ranked",
-            );
-          }
-          return NewRecommendationItemSchema.parse({
-            companyId: r.companyId,
-            companyTenantId: ref.companyTenantId,
-            rank: r.rank,
-            internalScore: r.internalScore,
-            reasonCodes: r.reasonCodes,
-            featureSnapshotId: ref.id,
-            featureSnapshotFingerprint: ref.fingerprint,
-            candidateProvenance: r.candidateProvenance,
-          });
-        });
+        const items: NewRecommendationItem[] = reordered.candidates.map(
+          (rc) => {
+            const r = rankedById.get(rc.companyId);
+            if (r === undefined) {
+              // A reorder is a permutation; anything else is a defect here,
+              // not something to serve.
+              throw new SlateBuildError(
+                "BUILD_ERROR",
+                "the reordered slate names a company the ranker did not",
+              );
+            }
+            const ref = refs.get(rc.companyId);
+            if (ref === undefined) {
+              throw new SlateBuildError(
+                "SNAPSHOT_MISSING",
+                "a ranked candidate has no current feature snapshot",
+              );
+            }
+            if (ref.fingerprint !== r.featureSnapshot.fingerprint) {
+              throw new SlateBuildError(
+                "FINGERPRINT_MISMATCH",
+                "the stored feature snapshot is not the one that was ranked",
+              );
+            }
+            return NewRecommendationItemSchema.parse({
+              companyId: rc.companyId,
+              companyTenantId: ref.companyTenantId,
+              // REC-009's position; REC-005's score, unchanged beside it. The
+              // base rank is not stored because it is recoverable exactly
+              // from the stored scores under REC-005's own tie-break.
+              rank: rc.rank,
+              internalScore: r.internalScore,
+              // Reordering codes first: they are the few, and a pool with an
+              // unusually wide set of scoring codes must not push out the
+              // record of why an item moved.
+              reasonCodes: [
+                ...new Set([...rc.rerankReasonCodes, ...r.reasonCodes]),
+              ].slice(0, 32),
+              featureSnapshotId: ref.id,
+              featureSnapshotFingerprint: ref.fingerprint,
+              candidateProvenance: r.candidateProvenance,
+            });
+          },
+        );
 
         const versions = SlateVersionsSchema.parse({
           eligibilityPolicyVersion: ELIGIBILITY_POLICY_VERSION,
@@ -293,10 +361,11 @@ export function createSlateBuilder(
           key,
           mandateVersion: mandate.version,
           versions,
+          rerankPolicyVersion: reordered.rerankPolicyVersion,
           items,
         });
 
-        const now = clock();
+        const now = generatedAt;
         const current = await slates.findCurrent(key);
         if (
           current !== null &&
@@ -341,6 +410,10 @@ export function createSlateBuilder(
             rankedResult.diagnostics.features.reused,
           ranked: ranked.length,
           scored: rankedResult.diagnostics.scored,
+          rerankPolicyVersion: reordered.rerankPolicyVersion,
+          reranked: reordered.diagnostics.moved,
+          rerankSuppressed: reordered.diagnostics.suppressed,
+          rerankExplorationSlots: reordered.diagnostics.explorationSlots,
           buildDurationMs,
         };
         const publishedAt = clock();

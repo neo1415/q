@@ -446,6 +446,87 @@ describe("explanation boundary (CQ-REC-007)", () => {
   });
 });
 
+describe("rerank boundary (CQ-REC-009)", () => {
+  const rerankDir = join(packageRoot, "src", "rerank");
+  const rerankFiles = () =>
+    readdirSync(rerankDir)
+      .filter((name) => name.endsWith(".ts"))
+      .map((name) => ({
+        path: join(rerankDir, name),
+        text: readFileSync(join(rerankDir, name), "utf8"),
+      }));
+
+  /** Same reasoning as the interaction subtree: this layer reads exposure. */
+  const PRIVACY_TOKENS = FORBIDDEN_TOKENS.filter(
+    (token) => token !== "impression" && token !== "watch_time",
+  );
+
+  it("imports nothing private, names no private signal, and contains no SQL", () => {
+    for (const { path, text } of rerankFiles()) {
+      for (const forbidden of FORBIDDEN_IMPORTS) {
+        expect(text, `${path} imports ${forbidden}`).not.toContain(
+          `"${forbidden}`,
+        );
+      }
+      const code = text
+        .replace(/\/\*[\s\S]*?\*\//g, "")
+        .replace(/\/\/.*$/gm, "")
+        .toLowerCase();
+      for (const token of PRIVACY_TOKENS) {
+        expect(code, `${path} mentions ${token}`).not.toContain(token);
+      }
+      expect(text, path).not.toMatch(/\bsql`|\.unsafe\(/);
+    }
+  });
+
+  it("cannot reach a weight or recompute a score: REC-005 is not editable from here", () => {
+    // It may name the ranker's VERSION -- refusing an order it was not
+    // written for is the point -- but the config and the ranker itself are
+    // out of reach, so there is no path by which a reordering stage could
+    // change what REC-005 decided.
+    for (const { path, text } of rerankFiles()) {
+      expect(text, `${path} imports the ranking config`).not.toContain(
+        "ranking/config.js",
+      );
+      expect(text, `${path} imports the ranker`).not.toContain(
+        "ranking/ranker.js",
+      );
+    }
+  });
+
+  it("reaches no model and no provider: reordering is arithmetic", () => {
+    for (const { path, text } of rerankFiles()) {
+      for (const forbidden of [
+        "@capital-q/model-gateway",
+        "@capital-q/q-core",
+        "@google/genai",
+        "groq-sdk",
+      ]) {
+        expect(text, `${path} imports ${forbidden}`).not.toContain(forbidden);
+      }
+    }
+  });
+
+  it("holds no magnitude of engagement: the port has nowhere to put one", () => {
+    // The guarantee behind "popularity cannot raise fit" is structural.
+    // RerankSignals is three fields and none of them is a number, so a
+    // count could not be read here even by a caller that wanted to.
+    const ports = readFileSync(join(rerankDir, "ports.ts"), "utf8");
+    for (const forbidden of [
+      "impressionCount",
+      "saveCount",
+      "watchSeconds",
+      "viewCount",
+      "saved",
+      "popularity",
+    ]) {
+      expect(ports, `RerankSignals exposes ${forbidden}`).not.toMatch(
+        new RegExp(`readonly ${forbidden}\b`),
+      );
+    }
+  });
+});
+
 describe("interaction boundary (CQ-REC-008)", () => {
   const interactionsDir = join(packageRoot, "src", "interactions");
   const interactionFiles = () =>

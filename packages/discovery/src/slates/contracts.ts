@@ -12,6 +12,7 @@ import {
 } from "../features/contracts.js";
 import { RANKING_REASON_CODES } from "../ranking/config.js";
 import { RANKER_VERSION } from "../ranking/contracts.js";
+import { RERANK_REASON_CODES } from "../rerank/contracts.js";
 import { SEMANTIC_GENERATOR_VERSION } from "../semantic/contracts.js";
 
 /**
@@ -103,6 +104,17 @@ export const SlateDiagnosticsSchema = z
     featureSnapshots: z.number().int().min(0),
     ranked: z.number().int().min(0),
     scored: z.number().int().min(0),
+    /**
+     * REC-009's reordering policy, and what it did. The version lives here
+     * rather than in a column because `diagnostics` is already the build's
+     * own record of itself and adding a column would be a migration for a
+     * string; the fingerprint carries it too, so a policy change rebuilds
+     * rather than serving an order nobody would compute again.
+     */
+    rerankPolicyVersion: z.string().min(1).max(64).optional(),
+    reranked: z.number().int().min(0).optional(),
+    rerankSuppressed: z.number().int().min(0).optional(),
+    rerankExplorationSlots: z.number().int().min(0).optional(),
     buildDurationMs: z.number().int().min(0),
   })
   .strict();
@@ -151,7 +163,16 @@ export const RecommendationItemSchema = z
     rank: z.number().int().min(1),
     /** REC-005 internal ordering score; null when unscored. Never public. */
     internalScore: z.number().finite().min(0).max(1).nullable(),
-    reasonCodes: z.array(z.enum(RANKING_REASON_CODES)).max(32),
+    /**
+     * Why the item is here and why it is at this position: REC-005's
+     * scoring codes and, when the item did not stay where REC-005 put it,
+     * REC-009's reordering codes. The two sets are disjoint and separately
+     * exported, so a consumer can partition them by membership rather than
+     * by parsing a name.
+     */
+    reasonCodes: z
+      .array(z.enum([...RANKING_REASON_CODES, ...RERANK_REASON_CODES]))
+      .max(32),
     featureSnapshotId: UuidSchema,
     featureSnapshotFingerprint: z.string().regex(/^[0-9a-f]{64}$/),
     candidateProvenance: SnapshotCandidateProvenanceSchema,

@@ -472,6 +472,47 @@ export {
   createPostgresSlateRepository,
 } from "./infrastructure/postgres-slate-repository.js";
 
+// CQ-REC-009 -- bounded diversity and exploration.
+export {
+  RERANK_REASON_CODES,
+  RERANK_INPUT_ERRORS,
+  RerankInputError,
+  RERANKER_ID,
+  RERANKER_VERSION,
+  type RerankDiagnostics,
+  type RerankFacts,
+  type RerankInputErrorCode,
+  type RerankReasonCode,
+  type RerankedCandidate,
+} from "./rerank/contracts.js";
+export {
+  EXPLORATION_POLICY_V1,
+  PASS_REINTRODUCTION_REASONS,
+  PROVABLE_PASS_REINTRODUCTION_REASONS,
+  RERANK_POLICY_STATUSES,
+  type PassReintroductionReason,
+  type RerankPolicy,
+} from "./rerank/policy.js";
+export {
+  type PassReintroductionPort,
+  type RerankSignals,
+  type RerankSignalsPort,
+} from "./rerank/ports.js";
+export {
+  createReranker,
+  type BaseRankedCandidate,
+  type Reranker,
+  type RerankInput,
+  type RerankResult,
+} from "./rerank/reranker.js";
+export {
+  clusterKeyFor,
+  createRerankService,
+  type RerankPoolQuery,
+  type RerankService,
+} from "./rerank/service.js";
+export { createInteractionRerankSignals } from "./infrastructure/interaction-rerank-signals.js";
+
 export {
   createSlateBuilder,
   SLATE_BUILD_FAILURE_CODES,

@@ -44,6 +44,8 @@ import {
   createRankingService,
   type RankingService,
 } from "../ranking/service.js";
+import { createReranker } from "../rerank/reranker.js";
+import { createRerankService, type RerankService } from "../rerank/service.js";
 import type { SemanticEmbedder } from "../semantic/ports.js";
 import {
   createSemanticCandidateService,
@@ -66,7 +68,9 @@ import { createDomainEligibilityPorts } from "./domain-port-eligibility-sources.
 import { createDomainFeaturePorts } from "./domain-port-feature-sources.js";
 import { createDomainSemanticPorts } from "./domain-port-semantic-sources.js";
 import { createPostgresCompanyCardPort } from "./postgres-discovery-repository.js";
+import { createInteractionRerankSignals } from "./interaction-rerank-signals.js";
 import { createPostgresFeatureSnapshotStore } from "./postgres-feature-snapshot-store.js";
+import { createPostgresInteractionRepository } from "./postgres-interaction-repository.js";
 import { createPostgresSemanticRepresentationStore } from "./postgres-semantic-store.js";
 import {
   createPostgresRefreshRequestStore,
@@ -107,6 +111,7 @@ export type RecommendationPipeline = {
   readonly snapshots: FeatureSnapshotStore;
   readonly slates: SlateRepository;
   readonly refreshRequests: RefreshRequestStore;
+  readonly rerank: RerankService;
   readonly builder: SlateBuilder;
 };
 
@@ -293,10 +298,22 @@ export function createRecommendationPipeline(
 
   const slates = createPostgresSlateRepository({ sql });
   const refreshRequests = createPostgresRefreshRequestStore({ sql });
+  // REC-009 reorders what REC-005 ranked. Its only new read is this
+  // organisation's own bounded interaction signals, narrowed by the
+  // adapter to three facts; no reintroduction source exists yet, so a
+  // passed company stays suppressed (CQ-REC-009 §12).
+  const rerank = createRerankService({
+    reranker: createReranker(),
+    signals: createInteractionRerankSignals({
+      repository: createPostgresInteractionRepository({ sql }),
+    }),
+    logger,
+  });
   const builder = createSlateBuilder({
     ports: eligibilityPorts,
     hybrid,
     ranking,
+    rerank,
     snapshots,
     slates,
     transactions,
@@ -316,6 +333,7 @@ export function createRecommendationPipeline(
     snapshots,
     slates,
     refreshRequests,
+    rerank,
     builder,
   };
 }

@@ -435,8 +435,9 @@ Inactive, accounted for explicitly: `eligibility.hard_gate` (GATE_ONLY,
 validated, never weighted) and `declared_fit.cheque` (NOT_COMPUTABLE).
 Thresholds: `minimumFit` unset. Tie-break: score descending, then
 canonical company id ascending; unscored after scored, by company id.
-Score precision 12 decimal places. Exploration and diversity: `NONE`
-(REC-009). Every registry feature allowed in the context must be either
+Score precision 12 decimal places. Exploration and diversity: `NONE` here,
+because REC-009 is a separate stage over this one's output rather than a
+term in its score. Every registry feature allowed in the context must be either
 a factor or inactive, so a new feature can be neither silently scored
 nor silently ignored; a feature version change fails config validation.
 
@@ -689,7 +690,6 @@ traffic instead of being skipped at the ceiling.
 - Semantic _fit_ as a ranking factor (REC-004/REC-005). Semantic
   _retrieval_ exists above; its similarity is provenance, not a score.
 - Evidence and freshness as ranking signals.
-- Exploration and diversity.
 - GateQ. Discovery answers "who could you meet"; whether a founder may
   reach an investor is a different question with its own rules.
 - A closed or blocked relationship state. Network defines only
@@ -699,8 +699,10 @@ traffic instead of being skipped at the ceiling.
   their own path; the conversational guard still strips recommendation
   claims from the chat answer.
 - Comparing two recommendations ("why is this above that one").
-- Interactions (REC-008), exploration and diversity (REC-009), a
-  scheduled slate rebuild and an organisation-level build principal.
+- A scheduled slate rebuild.
+- A source that can prove a passed company should be offered again: a
+  reset command, or the mandate version a pass was made under (REC-009
+  §12). The seam is typed; the evidence is not there yet.
 - Feature groups beyond eligibility, declared fit and semantic fit: no
   definition, no value, no zero, until their source infrastructure exists.
 - An event-driven representation refresh worker; today `refreshCompanyRepresentations`
@@ -866,3 +868,118 @@ does not have to rediscover it:
 - **Exposure is still not popularity.** No global counters exist and none
   may be added; exposure is per organisation, and early visibility must
   never buy permanent advantage.
+
+REC-009 was built to this and consumes less of it than it was allowed:
+exposure as a boolean and an instant, and the pass flag. Strength class,
+watch milestones, Ask-Q and Save reach it through no field at all.
+
+## Bounded diversity and exploration (CQ-REC-009)
+
+Doc 19 §81's problem, concretely: a page of twelve companies that are all
+the one thing the investor said they were interested in. REC-009 is the
+stage between REC-005's order and REC-006's persisted slate that fixes
+that without doing damage.
+
+It is a **permutation**, and that is the load-bearing property. It cannot
+introduce a company because there is nowhere inside it for one to come
+from, and it cannot drop one because the output is the input reordered.
+"Exploration can never reintroduce an ineligible company" is therefore not
+a rule anyone has to enforce; it is arithmetic. It also reads no database,
+calls no model, draws no random number and reads no clock — the instant
+recency is measured against arrives as an argument — so `rerank` is a
+synchronous pure function and could not have called a provider even if
+something wanted it to.
+
+- **Identity.** Reranker `BOUNDED_DETERMINISTIC`, implementation
+  `bounded-reranker.v1`, policy `exploration-policy.v1`, status
+  `INITIAL_HEURISTIC_UNCALIBRATED`, context `INVESTOR_DISCOVER` only. It
+  refuses a base order produced by a ranker version it was not written
+  for.
+- **`exploration-policy.v1`** (`EXPLORATION_POLICY_V1`, deep-frozen,
+  validated at construction). Every number lives there; the algorithm
+  holds none, which a test proves by running it under an all-zero policy
+  and getting REC-005's order back untouched.
+
+| Knob                     | v1     | What it means                                                                 |
+| ------------------------ | ------ | ----------------------------------------------------------------------------- |
+| `window`                 | 10     | The page size: concentration is something felt on a page                      |
+| `maxSameClusterInWindow` | 3      | Three of a kind per page, not twelve                                          |
+| `maxScoreDistance`       | 0.15   | The relevance floor: nothing moves past a candidate scored this much higher   |
+| `maxPromotion`           | 20     | A stated cap on rank distance, so movement is bounded and not merely emergent |
+| `recentlySeenWindowMs`   | 24 h   | How recently an impression makes a company "just seen"                        |
+| exploration              | 1 slot | The last position of each window, offered to a company never shown            |
+
+**Two phases, each with its own bound.** First, suppression: a company
+this organisation passed goes behind every unsuppressed candidate, in its
+own order — demoted, never dropped and never banned. Then a bounded greedy
+over the rest: at each position, the best remaining candidate takes it
+unless its cluster already fills the page, or the organisation saw it very
+recently, and some other candidate _within the relevance floor_ fixes
+that. If nothing within the floor does, the best candidate takes the
+position anyway. Doc 19 §82 decided this: relevance is never traded for a
+diversity quota.
+
+**The cluster is the investor's own taxonomy, not the company's.** It is
+the set of `preferredNodeId`s — nodes on the mandate — that REC-002 matched,
+hashed so the key cannot leak a mandate's taxonomy into a log line. Two
+companies share a cluster when they answer the same declared preference,
+which is the granularity the concentration problem is about. A company the
+structured generator did not find has no cluster, and an unknown cluster is
+never capped, never penalised and never counted against anything.
+
+**What it may read, and why that is a shape rather than a rule.**
+`RerankSignals` is three fields — `exposed`, `lastSeenAt`, `passed` — and
+none of them is a number. REC-008's state carries an impression count, a
+save flag, a save time, a last pass reason and a last interaction time;
+the adapter drops all of it. Whether an organisation has seen a company is
+a fact about exposure; _how many times_ is a magnitude, and a magnitude in
+a reordering stage is a popularity signal however carefully it is named.
+Save is absent for the same reason and one more: it is an investor's own
+bookmark and must never move a company, for them or for anyone else.
+
+**Save and Pass together**, which REC-008 showed can both be true:
+
+| State        | Proactive recommendation      | Saved list |
+| ------------ | ----------------------------- | ---------- |
+| saved        | unchanged — Save never boosts | present    |
+| passed       | suppressed to the tail        | absent     |
+| saved+passed | suppressed to the tail        | present    |
+
+Pass decides what the slate does; Save decides what the Saved list holds.
+Neither action is deleted and neither overrides the other.
+
+**Reintroduction after a pass.** `PASS_REINTRODUCTION_REASONS` names three
+— `EXPLICIT_PASS_RESET`, `MANDATE_VERSION_CHANGED`, `MATERIAL_COMPANY_UPDATE`
+— and `PROVABLE_PASS_REINTRODUCTION_REASONS` is **empty**, because nothing
+in the system can currently prove one: `interaction_state` records that a
+pass happened and when, not the mandate version it was made under, and no
+surface issues a reset. A changed `updated_at` is not a material update; a
+typo fix would resurface everything an investor had dismissed. So a passed
+company stays suppressed, the mechanism is typed and tested, and an
+unrecognised reason is refused rather than ignored.
+
+- **Reason codes.** `DIVERSITY_ADJUSTMENT`, `RECENTLY_SEEN_SUPPRESSION`,
+  `PASS_SUPPRESSION`, `PASS_REINTRODUCED`, `EXPLORATION_SLOT`, reported in
+  one fixed order and stored on the slate item beside REC-005's scoring
+  codes. The two sets are disjoint and separately exported, so a consumer
+  partitions them by membership rather than by parsing a name. They are
+  inputs REC-007 may one day be given, not sentences.
+- **REC-005 is untouched.** `ranking-config.v1`,
+  `recommendation-features.v1` and the weights are unchanged; the reranker
+  cannot import the config or the ranker at all, which the boundary test
+  asserts. A slate item stores REC-009's position and REC-005's score, and
+  the base rank is recoverable exactly from the stored scores under
+  REC-005's own tie-break — which is why no column was added.
+- **No migration.** The policy version rides in the generation fingerprint
+  and the `diagnostics` jsonb, so a policy change rebuilds rather than
+  serving an order nobody would compute again.
+- **Cost.** One batched read per build, whatever the pool size. Two
+  hundred candidates reorder in single-digit milliseconds.
+- **Known limits (V1).** Diversity has one dimension, because taxonomy is
+  the only company-side attribute available downstream — geography and
+  stage are read by REC-001 and not carried past it, and adding a read for
+  them is a change to REC-001's contract rather than a rerank concern. The
+  numbers are hand-set: no outcome data calibrates them, and doc 19 §53
+  leaves them open until it exists. Exploration is a bounded slot rather
+  than a policy with propensity logging; contextual bandits (doc 19 §2450)
+  would need action probabilities this deliberately does not produce.

@@ -29,6 +29,12 @@ import type {
   RankCandidatesResult,
   RankingService,
 } from "../src/ranking/service.js";
+import { EXPLORATION_POLICY_V1 } from "../src/rerank/policy.js";
+import { createReranker } from "../src/rerank/reranker.js";
+import {
+  createRerankService,
+  type RerankService,
+} from "../src/rerank/service.js";
 import {
   createSlateBuilder,
   slateFingerprint,
@@ -309,7 +315,21 @@ type Scenario = {
   readonly investor?: boolean;
   readonly failPublish?: boolean;
   readonly now?: () => Date;
+  readonly rerank?: RerankService;
 };
+
+/**
+ * REC-009 as the builder really runs it, over an investor with no history
+ * at all. Nothing is passed and nothing has been seen, so the reordering
+ * is the identity and these cases keep asserting REC-005's order; the
+ * point of using the real service rather than a stub is that a change to
+ * REC-009 that DID move things would show up here.
+ */
+const realRerank = (): RerankService =>
+  createRerankService({
+    reranker: createReranker(),
+    signals: { forCompanies: () => Promise.resolve(new Map()) },
+  });
 
 const THREE = [candidate(1), candidate(2), candidate(3)];
 const RANKED_THREE = [
@@ -331,6 +351,7 @@ function scenario(s: Scenario = {}) {
     ports: ports(s.lookup, s.investor),
     hybrid,
     ranking,
+    rerank: s.rerank ?? realRerank(),
     snapshots: s.snapshots ?? refsFor(ranked),
     slates: store.repo,
     transactions,
@@ -433,6 +454,7 @@ describe("slate builder (CQ-REC-006)", () => {
         rankedCandidate(id(1), 2, fp("a"), 0.7),
         rankedCandidate(id(3), 3, fp("c"), null),
       ]),
+      rerank: realRerank(),
       slates: store.repo,
       transactions,
       clock: () => new Date("2026-09-19T11:00:00.000Z"),
@@ -479,6 +501,7 @@ describe("slate builder (CQ-REC-006)", () => {
           fingerprint: fp("f"),
         },
       }),
+      rerank: realRerank(),
       slates: store.repo,
       transactions,
       clock: () => new Date("2026-09-19T11:00:00.000Z"),
@@ -594,32 +617,38 @@ describe("slate builder (CQ-REC-006)", () => {
       { companyId: id(1), rank: 1, featureSnapshotFingerprint: fp("a") },
       { companyId: id(2), rank: 2, featureSnapshotFingerprint: fp("b") },
     ];
-    const a = slateFingerprint({ key, mandateVersion: 1, versions, items });
+    const rerankPolicyVersion = EXPLORATION_POLICY_V1.version;
+    const base = { key, mandateVersion: 1, versions, rerankPolicyVersion };
+    const a = slateFingerprint({ ...base, items });
     const b = slateFingerprint({
-      key,
-      mandateVersion: 1,
+      ...base,
       versions: { ...versions, taxonomyVersion: { geography: 1, industry: 2 } },
       items: items.map((i) => ({ ...i })),
     });
     expect(a).toBe(b);
     expect(a).toMatch(/^[0-9a-f]{64}$/);
-    expect(
-      slateFingerprint({ key, mandateVersion: 2, versions, items }),
-    ).not.toBe(a);
+    expect(slateFingerprint({ ...base, mandateVersion: 2, items })).not.toBe(a);
     expect(
       slateFingerprint({
-        key,
-        mandateVersion: 1,
+        ...base,
         versions: { ...versions, semanticGeneratorVersion: null },
         items,
       }),
     ).not.toBe(a);
     expect(
       slateFingerprint({
-        key,
-        mandateVersion: 1,
-        versions,
+        ...base,
         items: [...items].reverse().map((i, n) => ({ ...i, rank: n + 1 })),
+      }),
+    ).not.toBe(a);
+    // A reordering policy change is a different slate, or an old order
+    // would go on being served as though nobody would compute it
+    // differently (CQ-REC-009).
+    expect(
+      slateFingerprint({
+        ...base,
+        rerankPolicyVersion: "exploration-policy.v2",
+        items,
       }),
     ).not.toBe(a);
   });
