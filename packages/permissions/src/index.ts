@@ -27,6 +27,7 @@
 export {
   accessLevelSatisfies,
   actorPrincipal,
+  organisationPrincipal,
   ANONYMOUS_PRINCIPAL,
   DISCLOSURE_ACCESS_LEVELS,
   DISCLOSURE_POLICY_STATUSES,

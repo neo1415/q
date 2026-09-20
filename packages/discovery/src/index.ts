@@ -138,6 +138,8 @@ export {
   type EligibilityService,
   type EligibilityServiceDependencies,
   type EvaluateEligibilityQuery,
+  RECOMMENDATION_VIEWPOINTS,
+  type RecommendationViewpoint,
 } from "./eligibility/service.js";
 export {
   createDomainEligibilityPorts,

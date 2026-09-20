@@ -18,13 +18,18 @@ import {
  * Who a background build acts as (CQ-REC-006 Checkpoint C; audited in
  * CQ-REC-007R D).
  *
- * The recommendation pipeline evaluates eligibility for an actor: the
- * disclosure evaluator answers "may this principal view this company", and
- * it answers DENY for every non-human principal. A slate belongs to an
- * investor organisation, so the worker builds it as a human member of that
- * organisation. The read path re-evaluates REC-001 for the actual
- * requesting actor on every page and withholds rather than substitutes, so
- * a grant this principal holds and the reader does not is never served on.
+ * A slate belongs to an investor organisation, and the pipeline still
+ * needs an actor: it is how the organisation and the mandate are resolved,
+ * and it is the audit subject for the work. So the worker builds as a
+ * human member of that organisation.
+ *
+ * What that actor is NOT, since CQ-PERM-ORG-VIEW-001, is the disclosure
+ * principal. Candidate generation asks the evaluator as the organisation
+ * (`viewpoint: "INVESTOR_ORGANISATION"`), so which member the resolver
+ * returned cannot change what the slate may contain. Execution authority
+ * and disclosure authority are separate, and only the first of them is
+ * decided here. The read path re-evaluates REC-001 for the actual
+ * requesting actor on every page and withholds rather than substitutes.
  *
  * Nothing here is authority: the resolved context is the same shape the
  * API resolves from a session, built from the same rows.
@@ -41,16 +46,13 @@ import {
  * of contents. Failing that, the longest-standing active member is used,
  * ordered by (joined_at, id) so the same rows always give the same answer.
  *
- * What this does NOT fix, and is not the place to: a `specifically_shared`
- * grant can name a USER or a MEMBERSHIP, so one member's view can be
- * strictly wider than another's, and a slate keyed by organisation is
- * therefore assembled through one person's eyes. Nobody is over-served --
- * the read-time guard sees to that -- but the slate can hold items most of
- * the organisation will never be shown, and which member built it can
- * change what it contains. "What is an organisation's view of a shared
- * artefact" is a permissions-contract question that cannot be answered
- * inside the recommendation context, and it is owned by
- * CQ-PERM-ORG-VIEW-001, which blocks Wave 7.
+ * Preferring the creator used to matter for more than steadiness: a
+ * `specifically_shared` grant can name a USER or a MEMBERSHIP, so one
+ * member's view is sometimes strictly wider than another's, and a slate
+ * assembled through one person's eyes changed with whoever built it.
+ * CQ-PERM-ORG-VIEW-001 answered that where it belonged, in the permissions
+ * module: the organisation asks as itself, which is strictly narrower than
+ * any member. So this choice is now provenance and audit only.
  */
 
 /** Enough to find a member; an organisation with more than this has one in here. */
@@ -64,11 +66,10 @@ export type BuildMembership = {
 /**
  * The rule, on its own so it can be stated and tested without a database.
  *
- * Prefer the creator: the slate has been built through their view all
- * along, and changing principal changes what it may contain. Otherwise the
- * first of the active members, which the query returns oldest-first, so
- * the same rows always give the same answer. Nobody active at all is the
- * one honest null.
+ * Prefer the creator: they are the mandate's own member, so attribution
+ * stays where it began. Otherwise the first of the active members, which
+ * the query returns oldest-first, so the same rows always give the same
+ * answer. Nobody active at all is the one honest null.
  */
 export function chooseBuildMembership<T extends BuildMembership>(
   creator: T | null,

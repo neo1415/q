@@ -14,9 +14,10 @@ import type { RelationshipQueryPort } from "@capital-q/network";
 import {
   actorPrincipal,
   DISCLOSURE_BATCH_MAX,
+  organisationPrincipal,
   type DisclosureAccessService,
 } from "@capital-q/permissions";
-import { TenantIdSchema } from "@capital-q/security";
+import { OrganisationIdSchema, TenantIdSchema } from "@capital-q/security";
 import type {
   TaxonomyAssignmentRepository,
   TaxonomyQueryPort,
@@ -186,9 +187,25 @@ export function createDomainEligibilityPorts(
     },
 
     discoverability: {
-      permittedToView: async (actor, companyIds) => {
+      permittedToView: async (viewpoint, companyIds) => {
         const out = new Map<string, boolean>();
-        const principal = actorPrincipal(actor);
+        if (
+          viewpoint.kind === "INVESTOR_ORGANISATION" &&
+          viewpoint.organisationId === undefined
+        ) {
+          // No organisation resolved, so the organisation may see nothing.
+          for (const id of companyIds) out.set(id, false);
+          return out;
+        }
+        const principal =
+          viewpoint.kind === "ACTOR"
+            ? actorPrincipal(viewpoint.actor)
+            : organisationPrincipal({
+                tenantId: TenantIdSchema.parse(viewpoint.tenantId),
+                organisationId: OrganisationIdSchema.parse(
+                  viewpoint.organisationId,
+                ),
+              });
         for (let i = 0; i < companyIds.length; i += DISCLOSURE_BATCH_MAX) {
           const slice = companyIds.slice(i, i + DISCLOSURE_BATCH_MAX);
           const decisions = await disclosure.evaluateMany(

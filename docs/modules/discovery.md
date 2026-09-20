@@ -794,3 +794,75 @@ mandate. A founder cannot see who watched, for how long, or when.
 - No pass reset command. Doc 19 §67 lists "investor resets pass" as a
   reintroduction trigger; the state keeps `passed_at` so one can be added
   additively when a surface needs it.
+
+## Organisation-safe recommendation authority (CQ-PERM-ORG-VIEW-001)
+
+A slate belongs to an Investor Organisation. Every member reads the same
+rows, so what goes into it must not depend on which member built it.
+
+The pipeline had exactly one person-scoped read. Eligibility asks the
+disclosure evaluator `permittedToView`, and it asked as whichever human
+the worker's `BuildPrincipalResolver` returned — the mandate's creator,
+or, once they left, the longest-standing active member. Every other
+eligibility port is already organisation-scoped or unscoped: company facts
+and classifications take ids, the mandate is read for the investor
+organisation, relationship standings are between organisations.
+
+So eligibility now takes a **viewpoint**:
+
+| viewpoint               | used by                                       |
+| ----------------------- | --------------------------------------------- |
+| `ACTOR` (the default)   | the slate reader, the interaction action path |
+| `INVESTOR_ORGANISATION` | structured and semantic candidate generation  |
+
+An omitted viewpoint is `ACTOR`: a caller that forgets to say gets the
+narrower, per-person question, never the organisation's. The actor is
+still required under both — it is how the investor organisation and the
+mandate are resolved, and it remains the audit subject. Only the
+disclosure question changes.
+
+Discovery does not know what a principal is. The viewpoint is a Discovery
+word; the infrastructure adapter translates it into the permissions
+module's `actorPrincipal` or `organisationPrincipal`, and an organisation
+viewpoint that resolves to no organisation answers false for every
+company rather than falling back to anyone. Permissions remains the owning
+authority: no permission SQL, and no second framework, lives here.
+
+**What this does and does not change.** No ranking change: REC-005 weights,
+`ranking-config.v1` and `recommendation-features.v1` are untouched, and no
+migration was needed — the organisation principal is expressible in the
+existing `disclosure_policies` recipient model, which already has an
+`ORGANISATION` recipient type. What changes is that a `specifically_shared`
+grant naming one member no longer puts a company in their organisation's
+candidate pool. Nobody was ever over-served — the reader re-evaluates
+REC-001 per actor and withholds — but the pool itself is now the
+organisation's, and rebuilding under a different member yields the same
+one.
+
+### What REC-009 may consume
+
+REC-009 reads exposure and decides what to show next, which turns these
+rows from a record into an input. The boundary, settled here so REC-009
+does not have to rediscover it:
+
+- **Organisation-level exposure is admissible.** `interaction_state` is
+  keyed `(tenant_id, investor_organisation_id, company_id)` and its
+  companies came through an organisation-scoped eligibility evaluation, so
+  "this organisation has been shown this company" is now a statement the
+  whole organisation could have made. Before this packet it was not.
+- **Actor identity stays on the event and never becomes a mandate.**
+  `interaction_events` keeps `actor_user_id`; "member A watched C" must
+  never be read as "organisation O has declared interest in C". Declared
+  mandate and observed behaviour remain separate axes, and only CQ-NET-010
+  creates relationship state.
+- **Strength class is a class.** `ATTENTION`, `CONSIDERATION`,
+  `CONTEXTUAL_DECISION`, `INTENT` are not ordered, summed or multiplied by
+  anything downstream.
+- **Nothing person-private is an input.** A member's own Q context, their
+  personal documents and any `specifically_shared` grant addressed to them
+  are outside the organisation viewpoint by construction, so they cannot
+  enter exposure, diversity or exploration. If REC-009 ever needs one, that
+  is a new packet with a new grant, not a widening of this one.
+- **Exposure is still not popularity.** No global counters exist and none
+  may be added; exposure is per organisation, and early visibility must
+  never buy permanent advantage.

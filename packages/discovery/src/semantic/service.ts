@@ -522,6 +522,13 @@ export function createSemanticCandidateService(
           ? { results: [] as const }
           : await eligibility.evaluate({
               actor: query.actor,
+              // The pool belongs to the organisation's mandate, and the
+              // slate it feeds is read by every member, so the disclosure
+              // question is asked as the organisation (CQ-PERM-ORG-VIEW-001).
+              // The actor still resolves the organisation and the mandate
+              // and is still the audit subject; only their personal access
+              // stops here.
+              viewpoint: "INVESTOR_ORGANISATION",
               mode: "INVESTOR_DISCOVER",
               mandateId: mandate.mandateId,
               companyIds: hits.map((h) => h.companyId),

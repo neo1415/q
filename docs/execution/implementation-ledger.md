@@ -2510,3 +2510,154 @@ grant. Applied locally by `db:reset`. **HOSTED_MIGRATIONS_PENDING is now
 20260925–20260930**; this packet did not run `db:push`.
 
 Next: CQ-REC-009 — Diversity / Exploration. Not started.
+
+## CQ-PERM-ORG-VIEW-001 — organisation-safe recommendation authority (2026-09-20)
+
+Starting SHA `8ac5141`. No migration, no schema change, no product behaviour
+change.
+
+### What the defect actually was
+
+Traced rather than assumed, because the recorded note could have been
+either a live leak or a structural one. Every port hard eligibility reads
+from is already organisation-scoped or unscoped: company facts and
+classifications take ids, the mandate is read for the investor
+organisation, relationship standings are between organisations. **Exactly
+one read was person-scoped** — `DiscoverabilityPort.permittedToView`,
+which asks the disclosure evaluator "may this principal view this
+company", and it asked as whichever human `BuildPrincipalResolver`
+returned.
+
+The honest finding, which changes how this packet should be read: the
+person-specific grant **could not change slate membership today**. REC-001
+requires both halves — a `network_visible`/`public_external` classification
+_and_ `permittedToView` — and a company classified below that is excluded
+by the classification half whatever any grant says. A `specifically_shared`
+grant on an already network-visible company is the only shape that would
+have differed, and nothing in the product issues one. So this is
+**preventive structural hardening**, not the closing of an exploitable
+leak. It still had to be closed before REC-009, because REC-009 turns slate
+membership into an input rather than a record.
+
+Answers to §4, for the record:
+
+| Question                                                         | Answer                                                                                                |
+| ---------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| A. What principal builds an organisation slate?                  | A human member — the mandate's creator, else the longest-standing active member (REC-007R Finding 1). |
+| B. What if the creator's membership is disabled?                 | The build continues under another active member. Only an organisation with no active member fails.    |
+| C. Can A's person-specific grant affect a slate B consumes?      | Structurally yes before this packet; not observably, because the classification half blocks it.       |
+| D. Can A's interactions influence organisation state B receives? | Interaction rows carry `actor_user_id`; nothing in REC-008 aggregates them into organisation policy.  |
+| E. Did an organisation-level disclosure principal already exist? | No. `DisclosurePrincipal` was ANONYMOUS \| ACTOR.                                                     |
+
+### What was built
+
+`@capital-q/permissions` gained a third principal, `ORGANISATION`, carrying
+a tenant and an organisation id and nothing else. It is **not a privilege
+level**: it answers strictly less than any member of the same organisation.
+`personal_private` can never match it; `specifically_shared` reaches it only
+through a grant naming the `ORGANISATION` itself, so a share addressed to a
+`USER` or a `MEMBERSHIP` returns `WRONG_RECIPIENT`; `organisation_private`,
+`founder_private` and `investor_private` match on `ownerOrganisationId`
+alone, never `ownerUserId`; `relationship_shared` answers identically either
+way, because relationship parties are organisations already.
+
+There is deliberately no membership list in the evaluation. "Can any member
+see it" is the union of everyone's access, which is the thing being
+avoided; "can every member see it" would let one colleague's absence change
+what the institution knows.
+
+Discovery consumes it through a typed viewpoint and never learns what a
+principal is. `EvaluateEligibilityQuery.viewpoint` is `ACTOR` (the default)
+or `INVESTOR_ORGANISATION`; the infrastructure adapter translates it into
+`actorPrincipal` or `organisationPrincipal`, and an organisation viewpoint
+that resolves to no organisation answers false for every company rather
+than falling back to anyone. Structured and semantic candidate generation
+pass `INVESTOR_ORGANISATION`; the slate reader and the interaction action
+path keep `ACTOR`, because withholding per person and acting on a company
+are that person's own business.
+
+No fake service user, no service membership, no permission SQL in
+Discovery, no second framework. Execution authority and disclosure
+authority are now separate things: the worker still resolves a human actor
+for audit and attribution, and that actor no longer decides what may be
+seen.
+
+### Security tests (§12)
+
+| #    | Proven by                                                                                                                                                                                                                           |
+| ---- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1    | `apps/workers/test/build-principal.test.ts` (creator inactive → another member builds) plus `organisation-view.test.ts` "same answer from a different member".                                                                      |
+| 2    | `organisation-view.test.ts` — asked as member A the private company is eligible; asked as the organisation it is not.                                                                                                               |
+| 3    | Q-private material is `personal_private` or the member's own conversation; `evaluator.test.ts` "never sees a Person's own material, even its own member's".                                                                         |
+| 4    | `evaluator.test.ts` — a share addressed to a USER or a MEMBERSHIP is not inherited; the organisation answers `WRONG_RECIPIENT`.                                                                                                     |
+| 5, 6 | Unchanged and re-run: REC-008 keeps `actor_user_id` on every row and no path aggregates it into declared policy.                                                                                                                    |
+| 7    | The reader re-evaluates REC-001 per actor and withholds; REC-008's action path does the same before recording.                                                                                                                      |
+| 8    | `evaluator.test.ts` "another tenant's private material stays denied"; the viewpoint's tenant is the actor's resolved tenant.                                                                                                        |
+| 9,10 | `evaluator.test.ts` sweep: the organisation answers no more than its widest member for any scope. `organisation-view.test.ts` — an actor outside the organisation resolves to no investor subject and the evaluator is never asked. |
+| 11   | Full unit and integration suites, green.                                                                                                                                                                                            |
+
+The sweep matters more than any single case: it asserts the property
+rather than an example. So does the mutation check — reverting the
+viewpoint translation in `eligibility/service.ts` fails three of the six
+new discovery tests, so they are not vacuous. The pre-existing fake at
+`eligibility-service.test.ts` ignored its first argument and would have
+passed either way; it is now named `_viewpoint` and says why it is blind.
+
+### REC-009 seam (§13)
+
+Written into `docs/modules/discovery.md`. In short: organisation-level
+exposure from `interaction_state` is admissible **because** its companies
+now came through an organisation-scoped evaluation — before this packet it
+was not; actor identity stays on the event and never becomes a declared
+mandate; strength class stays a class; nothing person-private can be an
+input, by construction rather than by rule; and exposure is still not
+popularity.
+
+### Gates — CQ-PERM-ORG-VIEW-001
+
+| Gate                             | Result                                                                               |
+| -------------------------------- | ------------------------------------------------------------------------------------ |
+| Targeted: permissions, discovery | 21 files, 306 tests, PASS                                                            |
+| Targeted: REC-006 worker paths   | `build-principal` + `recommendation-refresh`, 2 files, 11 tests, PASS                |
+| `pnpm typecheck`                 | 76 tasks, exit 0                                                                     |
+| `pnpm format:check`              | every tracked file passes; the 297 warnings are untracked `graphify-out/`            |
+| `pnpm lint`                      | exit 0                                                                               |
+| `pnpm test`                      | 232 files, 2963 tests, exit 0 (was 231 / 2948)                                       |
+| `pnpm build`                     | 41 tasks, exit 0                                                                     |
+| `pnpm test:integration`          | 54 files: 53 pass, 1 skipped; 484 pass, 5 skipped — unchanged                        |
+| `pnpm q:eval:lint` / `q:eval:ci` | PASS, 39 cases / 16 graders; exit 0, no regression, nothing added                    |
+| Dependency direction             | 37 workspace packages; none depends on an app; permissions does not import discovery |
+| Secret scan / `git diff --check` | clean on every changed file                                                          |
+
+DB gates were not run: no migration, no schema change, and `db:types:check`
+has nothing to regenerate. Hosted migrations remain **20260925–20260930**
+and `db:push` was not run.
+
+**One honest note on the unit gate.** The first `pnpm test` run reported
+2948 passing tests and 4 errors: `vitest-pool` failed to start forks
+workers for four jsdom component files (`packages/ui/q-composer`,
+`packages/ui/choice-and-money`, `apps/web/mobile-navigation`,
+`apps/web/network-status`) — none of them touched by this packet. Run
+directly they pass in 9.5s, 4 files / 15 tests. The cause is vitest's
+`START_TIMEOUT`, a hard-coded 60s constant in `cli-api` with no config
+knob: on a saturated machine, forking a jsdom worker can exceed it. The
+second run was green in one pass at half the wall-clock (144s against
+292s). No test was retried and no assertion was weakened — the four files
+never ran at all the first time. This is the same signature entry gate 0B
+saw once and closed as non-reproducible, so **CQ-TEST-FLAKE-001 is
+reopened, class 3**, with a concrete cause and a concrete lever: capping
+`poolOptions.forks.maxForks` in the root vitest config. That is a
+repository-wide testing decision and does not belong in a permissions
+packet.
+
+### Debt
+
+| #   | Item                                                                                                                                     | Class | Owner packet      | Deadline boundary  | Why it is safe until then                                                                                                                                                                       |
+| --- | ---------------------------------------------------------------------------------------------------------------------------------------- | ----- | ----------------- | ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 16  | `vitest-pool` can exceed its hard-coded 60s worker `START_TIMEOUT` when many jsdom workers fork at once, reporting files that never ran. | **3** | CQ-TEST-FLAKE-001 | Before CI is wired | Local only and visible: the run reports errors rather than passing quietly, and the affected files pass deterministically when run. Capping `maxForks` would remove it at some wall-clock cost. |
+
+Item 2 of the REC-007R sweep — "an organisation-shared slate is assembled
+through one member's eyes" — is **CLOSED** by this packet. Items 3–13 are
+unchanged. Item 15 (`node --watch` on `packages/*/dist`) is unchanged.
+
+Next: CQ-REC-009 — Diversity / Exploration. Not started.

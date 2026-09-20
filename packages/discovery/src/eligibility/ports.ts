@@ -122,13 +122,35 @@ export type InvestorSubjectPort = {
   ) => Promise<{ readonly investorOrganisationId: string } | null>;
 };
 
+/**
+ * Whose question the disclosure evaluator is being asked
+ * (CQ-PERM-ORG-VIEW-001).
+ *
+ * A person reading their own feed asks as themselves. Work that produces an
+ * artefact the whole investor organisation reads asks as the organisation,
+ * because otherwise what the organisation knows would depend on which
+ * member happened to run the job — and one member's personal grant would
+ * quietly become everybody's.
+ *
+ * The organisation viewpoint carries no user and no membership, so there is
+ * nothing for a person's access to enter through.
+ */
+export type DiscoverabilityViewpoint =
+  | { readonly kind: "ACTOR"; readonly actor: ActorContext }
+  | {
+      readonly kind: "INVESTOR_ORGANISATION";
+      readonly tenantId: string;
+      /** Undefined resolves to nothing: the viewpoint fails closed. */
+      readonly organisationId: string | undefined;
+    };
+
 export type DiscoverabilityPort = {
   /**
-   * The disclosure evaluator's word for each company, for this actor, at
-   * `view`. True means ALLOW. Classification alone is never enough.
+   * The disclosure evaluator's word for each company, for this viewpoint,
+   * at `view`. True means ALLOW. Classification alone is never enough.
    */
   readonly permittedToView: (
-    actor: ActorContext,
+    viewpoint: DiscoverabilityViewpoint,
     companyIds: readonly string[],
   ) => Promise<ReadonlyMap<string, boolean>>;
 };

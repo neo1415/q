@@ -33,7 +33,7 @@ a disclosure ALLOW.
 | `investor_private`     | the investor-side owning organisation; never a founder counterparty because a relationship exists                     |
 | `relationship_shared`  | the two exact canonical parties of one named relationship, each in its own tenant                                     |
 | `specifically_shared`  | the explicit recipient: USER, MEMBERSHIP, ORGANISATION or RELATIONSHIP                                                |
-| `network_visible`      | any authenticated human Capital Q context; never anonymous                                                            |
+| `network_visible`      | any authenticated Capital Q context: a human actor, or an organisation asked as itself; never anonymous               |
 | `public_external`      | anyone, including anonymous; a projection still decides how                                                           |
 
 Scopes are predicates, not a ladder. `public`, `owner_private`, `private`
@@ -41,6 +41,43 @@ and `shared` do not exist. Non-human principals (Q, SYSTEM,
 CONNECTED_SYSTEM) are denied outright: zero ambient authority. Database
 privilege is never permission: the evaluator does not know which role ran
 the query.
+
+## Principals: who the question is asked for
+
+`DisclosurePrincipal` has three shapes, and the difference between the last
+two is the difference between a person and the institution they work for.
+
+| principal      | the question it asks                                  |
+| -------------- | ----------------------------------------------------- |
+| `ANONYMOUS`    | what may be shown with no identity at all             |
+| `ACTOR`        | what this one person, in this membership, may see     |
+| `ORGANISATION` | what this organisation may see **as** an organisation |
+
+`ORGANISATION` (CQ-PERM-ORG-VIEW-001) exists because some artefacts belong
+to an organisation rather than to whoever produced them — a recommendation
+slate is one, and every member reads the same rows. Computing such a thing
+through one member's eyes makes its contents depend on which colleague
+happened to run the job, and quietly promotes that member's personal access
+into something the whole organisation is served from.
+
+It is **not a privilege level.** It answers strictly less than any member of
+the same organisation, and two scopes carry the whole point:
+`personal_private` can never match it, because a Person's own material is
+not the organisation's; and `specifically_shared` reaches it only through a
+grant whose recipient is the `ORGANISATION` itself — a share addressed to a
+`USER` or a `MEMBERSHIP` stays that person's and returns `WRONG_RECIPIENT`.
+`relationship_shared` answers identically either way, because relationship
+parties are organisations already. There is deliberately no membership list
+in the evaluation: "can any member see it" would be the union of everyone's
+access, which is the thing this exists to avoid, and "can every member see
+it" would let one colleague's absence change what the institution knows.
+
+The organisation principal carries a tenant and an organisation id and
+nothing else, so there is no field through which a person's identity could
+widen the answer. Execution authority is separate and unaffected: a
+privileged worker still runs the job as a resolved human actor, for audit
+and attribution, while the disclosure question is asked as the
+organisation.
 
 ## Intrinsic scope vs explicit policy
 

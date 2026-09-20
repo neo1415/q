@@ -50,12 +50,37 @@ export class EligibilityBatchTooLargeError extends RangeError {
   }
 }
 
+/**
+ * Whose disclosure authority this evaluation runs under
+ * (CQ-PERM-ORG-VIEW-001).
+ *
+ * `ACTOR` is the default and is what a person reading their own feed, or
+ * acting on a company, must use: it is their access, and the answer may
+ * legitimately differ from a colleague's.
+ *
+ * `INVESTOR_ORGANISATION` is for work whose output the whole organisation
+ * reads — building a slate, computing the features it is ranked from. It
+ * asks what the organisation may see AS an organisation, so the result does
+ * not depend on which member ran it and cannot inherit one member's
+ * personal grant. The actor is still required: it is how the organisation
+ * and the mandate are resolved, and it is still the audit subject. Only the
+ * disclosure question changes.
+ */
+export const RECOMMENDATION_VIEWPOINTS = [
+  "ACTOR",
+  "INVESTOR_ORGANISATION",
+] as const;
+export type RecommendationViewpoint =
+  (typeof RECOMMENDATION_VIEWPOINTS)[number];
+
 export type EvaluateEligibilityQuery = {
   readonly actor: ActorContext;
   readonly mode?: RecommendationMode | undefined;
   /** Pins one of the actor's own mandates; otherwise the single ACTIVE one is used. */
   readonly mandateId?: string | null | undefined;
   readonly companyIds: readonly string[];
+  /** Defaults to ACTOR: an omitted viewpoint never widens anything. */
+  readonly viewpoint?: RecommendationViewpoint | undefined;
 };
 
 export type EligibilityEvaluation = {
@@ -159,7 +184,18 @@ export function createEligibilityService(
             return { companyId: id, tenantId: f?.tenantId ?? "" };
           }),
         ),
-        ports.discoverability.permittedToView(query.actor, known),
+        ports.discoverability.permittedToView(
+          query.viewpoint === "INVESTOR_ORGANISATION"
+            ? {
+                kind: "INVESTOR_ORGANISATION",
+                tenantId: query.actor.tenantId,
+                // The organisation the server resolved this actor into, not
+                // anything they claimed. Their personal identity stops here.
+                organisationId: query.actor.organisationId,
+              }
+            : { kind: "ACTOR", actor: query.actor },
+          known,
+        ),
         ports.relationships.standings(investorOrganisationId, known),
       ]);
 

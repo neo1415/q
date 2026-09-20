@@ -12,6 +12,8 @@ import {
 } from "@capital-q/contracts";
 import {
   ActorContextSchema,
+  OrganisationIdSchema,
+  TenantIdSchema,
   type ActorContext,
   type OrganisationId,
   type TenantId,
@@ -247,22 +249,65 @@ export function isPolicyActiveAt(
 // ---------------------------------------------------------------------------
 
 /**
- * Who a disclosure question is asked for. ANONYMOUS is a legitimate
- * principal (only public_external can answer it). An ACTOR carries the
- * server-resolved ActorContext; a client-supplied identity is never one.
+ * Who a disclosure question is asked for.
+ *
+ * ANONYMOUS is a legitimate principal (only public_external can answer it).
+ * An ACTOR carries the server-resolved ActorContext; a client-supplied
+ * identity is never one.
+ *
+ * ORGANISATION asks a different question, and the difference is the point:
+ * *what may this organisation see, as an organisation* — not what any
+ * particular member of it happens to see. It is what an organisation-owned
+ * artefact must be computed from, because a member's personal grant is that
+ * member's, and an artefact the whole organisation reads must not be built
+ * from one person's extra access (CQ-PERM-ORG-VIEW-001).
+ *
+ * It is NOT a privilege level. It answers strictly less than any member of
+ * that organisation: no `personal_private`, and a `specifically_shared`
+ * grant reaches it only when the grant names the organisation itself.
  */
 export const DisclosurePrincipalSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("ANONYMOUS") }).strict(),
   z.object({ kind: z.literal("ACTOR"), actor: ActorContextSchema }).strict(),
+  z
+    .object({
+      kind: z.literal("ORGANISATION"),
+      tenantId: TenantIdSchema,
+      organisationId: OrganisationIdSchema,
+    })
+    .strict(),
 ]);
 export type DisclosurePrincipal =
   | { readonly kind: "ANONYMOUS" }
-  | { readonly kind: "ACTOR"; readonly actor: ActorContext };
+  | { readonly kind: "ACTOR"; readonly actor: ActorContext }
+  | {
+      readonly kind: "ORGANISATION";
+      readonly tenantId: TenantId;
+      readonly organisationId: OrganisationId;
+    };
 
 export const ANONYMOUS_PRINCIPAL: DisclosurePrincipal = { kind: "ANONYMOUS" };
 
 export function actorPrincipal(actor: ActorContext): DisclosurePrincipal {
   return { kind: "ACTOR", actor };
+}
+
+/**
+ * The organisation itself, asked as an organisation.
+ *
+ * For work owned by an organisation rather than by whoever happens to run
+ * it: no member's identity is supplied, so no member's identity can widen
+ * the answer.
+ */
+export function organisationPrincipal(input: {
+  readonly tenantId: TenantId;
+  readonly organisationId: OrganisationId;
+}): DisclosurePrincipal {
+  return {
+    kind: "ORGANISATION",
+    tenantId: input.tenantId,
+    organisationId: input.organisationId,
+  };
 }
 
 export { UtcTimestampSchema, type UtcTimestamp };

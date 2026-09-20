@@ -11,6 +11,7 @@ import {
 import {
   actorPrincipal,
   ANONYMOUS_PRINCIPAL,
+  organisationPrincipal,
   DisclosurePolicyIdSchema,
   type DisclosureAccessLevel,
   type DisclosurePolicy,
@@ -562,5 +563,138 @@ describe("deny by default and ambient authority (§38, §77, §137-138, §142)",
     expect(evaluateDisclosureMany(requests)).toEqual(
       requests.map(evaluateDisclosure),
     );
+  });
+});
+
+/**
+ * The organisation asked as an organisation (CQ-PERM-ORG-VIEW-001).
+ *
+ * Every row here is the same question asked two ways — once as a member,
+ * once as the organisation that member belongs to — because the property
+ * worth holding is not "the organisation can see things" but "the
+ * organisation sees strictly less than any of its members, and never more".
+ */
+describe("the ORGANISATION disclosure principal", () => {
+  const apexOrganisation = organisationPrincipal({
+    tenantId: TENANT_I,
+    organisationId: ORG_APEX,
+  });
+
+  it("sees network-visible material, like anyone authenticated", () => {
+    const resource = descriptor({ intrinsicScope: "network_visible" });
+    expect(evaluate(apexOrganisation, resource).outcome).toBe("ALLOW");
+    expect(evaluate(apex, resource).outcome).toBe("ALLOW");
+  });
+
+  it("sees its own organisation-private material", () => {
+    const own = descriptor({
+      tenantId: TENANT_I,
+      ownerOrganisationId: ORG_APEX,
+      intrinsicScope: "organisation_private",
+    });
+    const decision = evaluate(apexOrganisation, own);
+    expect(decision.outcome).toBe("ALLOW");
+    expect(decision.reasonCode).toBe("SAME_ORGANISATION");
+  });
+
+  it("never sees a Person's own material, even its own member's", () => {
+    // The scope this principal exists for. A colleague cannot see it
+    // either, and the organisation is not a super-colleague.
+    const personal = descriptor({
+      tenantId: TENANT_I,
+      ownerOrganisationId: undefined,
+      ownerUserId: APEX_REP,
+      intrinsicScope: "personal_private",
+    });
+    expect(evaluate(apex, personal).outcome).toBe("ALLOW");
+    expect(evaluate(apexOrganisation, personal).outcome).toBe("DENY");
+  });
+
+  it("does not inherit a share addressed to one of its members", () => {
+    // The defect this packet closes, stated at the level it is decided.
+    // A grant naming a person is that person's; it does not become
+    // institutional knowledge by being useful.
+    const shared = descriptor({ intrinsicScope: "organisation_private" });
+    const toTheMember = [policy({ recipient: { type: "USER", id: APEX_REP } })];
+    expect(evaluate(apex, shared, toTheMember).outcome).toBe("ALLOW");
+    const asOrganisation = evaluate(apexOrganisation, shared, toTheMember);
+    expect(asOrganisation.outcome).toBe("DENY");
+    expect(asOrganisation.reasonCode).toBe("WRONG_RECIPIENT");
+  });
+
+  it("does not inherit a share addressed to one of its memberships", () => {
+    const shared = descriptor({ intrinsicScope: "organisation_private" });
+    const toTheMembership = [
+      policy({ recipient: { type: "MEMBERSHIP", id: MEMBERSHIP_APEX } }),
+    ];
+    expect(evaluate(apex, shared, toTheMembership).outcome).toBe("ALLOW");
+    expect(evaluate(apexOrganisation, shared, toTheMembership).outcome).toBe(
+      "DENY",
+    );
+  });
+
+  it("does see a share addressed to the organisation itself", () => {
+    const shared = descriptor({ intrinsicScope: "organisation_private" });
+    const toTheOrganisation = [
+      policy({ recipient: { type: "ORGANISATION", id: ORG_APEX } }),
+    ];
+    const decision = evaluate(apexOrganisation, shared, toTheOrganisation);
+    expect(decision.outcome).toBe("ALLOW");
+    expect(decision.reasonCode).toBe("EXPLICIT_RECIPIENT");
+  });
+
+  it("is a party to its own relationships, exactly as its members are", () => {
+    const relationshipMaterial = descriptor({
+      intrinsicScope: "relationship_shared",
+      relationshipId: RELATIONSHIP_A_APEX,
+    });
+    expect(evaluate(apex, relationshipMaterial).outcome).toBe("ALLOW");
+    expect(evaluate(apexOrganisation, relationshipMaterial).outcome).toBe(
+      "ALLOW",
+    );
+    // And not to somebody else's.
+    const elsewhere = descriptor({
+      intrinsicScope: "relationship_shared",
+      relationshipId: RELATIONSHIP_A_HORIZON,
+    });
+    expect(evaluate(apexOrganisation, elsewhere).outcome).toBe("DENY");
+  });
+
+  it("is not a privilege: another tenant's private material stays denied", () => {
+    const foreign = descriptor({
+      tenantId: TENANT_C,
+      ownerOrganisationId: ORG_ALPHA,
+      intrinsicScope: "organisation_private",
+    });
+    expect(evaluate(apexOrganisation, foreign).outcome).toBe("DENY");
+  });
+
+  it("answers no more than its widest member for any scope", () => {
+    // The invariant, swept rather than argued: for every scope, an ALLOW
+    // as the organisation implies an ALLOW as a member of it.
+    const scopes: readonly DisclosureScope[] = [
+      "public_external",
+      "network_visible",
+      "organisation_private",
+      "investor_private",
+      "founder_private",
+      "personal_private",
+      "relationship_shared",
+      "specifically_shared",
+    ];
+    for (const scope of scopes) {
+      const resource = descriptor({
+        tenantId: TENANT_I,
+        ownerOrganisationId: ORG_APEX,
+        ownerUserId: APEX_REP,
+        intrinsicScope: scope,
+        relationshipId: RELATIONSHIP_A_APEX,
+      });
+      const asOrganisation = evaluate(apexOrganisation, resource);
+      if (asOrganisation.outcome !== "ALLOW") continue;
+      expect(evaluate(apex, resource).outcome, `${scope} as a member`).toBe(
+        "ALLOW",
+      );
+    }
   });
 });

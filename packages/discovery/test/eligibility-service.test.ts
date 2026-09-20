@@ -230,7 +230,9 @@ function ports(w: World): EligibilityPorts {
       },
     },
     discoverability: {
-      permittedToView: (_actor, ids) =>
+      // Viewpoint-blind on purpose: these cases are about the policy, and
+      // organisation-view.test.ts is where the viewpoint itself is proven.
+      permittedToView: (_viewpoint, ids) =>
         Promise.resolve(
           new Map(ids.map((id) => [id, w.disclosure.get(id) === true])),
         ),
