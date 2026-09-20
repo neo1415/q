@@ -2354,3 +2354,159 @@ and no repository write — it exists on the gateway request, its span and its
 served log, and nowhere in canonical Company or Investor truth.
 
 Debt item 14 from REC-007R E is therefore **CLOSED**.
+
+## Debt review — CQ-REC-008 E (2026-09-30)
+
+### Closed by this packet
+
+**Item 1, class 1 — the unit gate.** Entry gate 0B ran the full suite three
+times sequentially from a clean tree with the demo stack stopped: 3/3 exit
+0, 225 files, 2893 tests each. Not reproducible, and no code was changed to
+chase it. `CQ-TEST-FLAKE-001` is **CLOSED** as non-reproducible, with the
+one observed occurrence explained: vitest worker start-up timeouts while
+the demo stack ran alongside the suite and the dev watchers were still
+scoped to every loaded file, both of which REC-007R C removed.
+
+**Item 14, class 3 — worker extraction posture.** Closed by entry gate 0C.
+Worker `STRUCTURED_EXTRACTION` now declares `SYNTHETIC_DEMO` where the
+deployment holds the attestation, proven live at
+`provider google, model gemini-3.5-flash-lite, attempts 1, no fallback`.
+
+### CQ-PERM-ORG-VIEW-001 — status, and a correction to its recorded reason
+
+**Status: OPEN. Boundary unchanged: MUST COMPLETE BEFORE WAVE 7.**
+
+The reason recorded in REC-007R D needs correcting rather than repeating.
+It said Wave 7 was the boundary "because Wave 7 adds interaction events
+over slate items, and an append-only record of somebody acting on an item
+their organisation cannot see is not correctable afterwards." REC-008 has
+now added exactly those events, so that sentence has to be re-examined
+instead of carried forward unchanged.
+
+What REC-008 actually records makes the risk _smaller_, not larger. Every
+interaction row carries `actor_user_id` as well as
+`investor_organisation_id`, so an event is never "organisation Y engaged
+with company Z" — it is "person X, of organisation Y, acted on Z at rank N
+of slate S". A later reader that needs to know whether the rest of Y could
+see Z can ask, because the actor is on the row. The ambiguity the note
+feared would be uncorrectable is, in fact, recorded.
+
+What has NOT changed is the underlying question, and the boundary still
+holds for a different and better-stated reason: **REC-009 consumes these
+events.** Exploration and diversity will read exposure and decide what to
+show next, and at that point "this organisation has seen this company"
+becomes an input rather than a record. An input computed from a slate
+assembled through one member's wider view would personalise a whole
+organisation's feed on evidence most of it never had. That is the thing
+that must not ship, and it ships in Wave 7.
+
+No cross-member exposure exists today: the read path re-evaluates REC-001
+per actor and withholds, and REC-008's own action path runs the same
+evaluation before recording anything. The present cost remains spent slots
+and short pages.
+
+### Everything else
+
+Items 3–13 from the REC-007R sweep are unchanged, and none moved class.
+For the record: item 4 (hosted migrations) now reads **20260925–20260930**,
+because REC-008 adds `20260930090000_recommendation_interactions.sql`.
+It is applied locally by `db:reset` and has NOT been pushed to the hosted
+project; this packet does not run `db:push`.
+
+## Acceptance — CQ-REC-008 (2026-09-30)
+
+`pnpm demo:journey` now carries the interaction sequence, so the acceptance
+is a command rather than a description. Fresh database, stack restarted,
+fresh synthetic identities, every step through a public HTTP path.
+
+```
+ok  both services answered as themselves
+ok  founder completed onboarding, company discoverable and marketplace-ready
+ok  investor completed onboarding
+ok  a slate was built and served            slate 99914903-b7c8-496d-a806-481cd5f05308
+ok  the investor was told why               1 matched, 0 not, 3 unknown
+ok  exposure and attention recorded         4 of 4
+ok  a retry is recognised rather than counted twice   first false, retry true
+ok  no client route can create Interest     HTTP 422
+ok  the investor saved a company            HTTP 200
+ok  a pass is recorded, and leaves the save alone     saved true, passed true
+ok  still saved after the feed is read again
+ok  the saved list is identities only       ["companyIds"]
+```
+
+The history it left, read back from the database:
+
+| Interaction                 | Strength class      | From a slate | Position |
+| --------------------------- | ------------------- | ------------ | -------- |
+| IMPRESSION                  | ATTENTION           | yes          | 1        |
+| WATCH_MILESTONE (COMPLETED) | ATTENTION           | yes          | 1        |
+| ASK_Q                       | CONSIDERATION       | yes          | 1        |
+| PROFILE_OPEN                | ATTENTION           | yes          | 1        |
+| PROFILE_OPEN                | ATTENTION           | yes          | 1        |
+| SAVE                        | CONSIDERATION       | yes          | 1        |
+| PASS (TIMING)               | CONTEXTUAL_DECISION | yes          | 1        |
+
+Seven rows for eight requests: the retried `PROFILE_OPEN` is one row, and
+the API told the client so. `impression_count` is 1, which is the number of
+impressions that happened rather than the number of times one was reported.
+
+What did NOT happen, asserted against the database after the run:
+
+| Claim                                           | Result                                                       |
+| ----------------------------------------------- | ------------------------------------------------------------ |
+| Watching to the end created interest            | `INTEREST_OBSERVED` rows: **0**                              |
+| An interaction created relationship state       | `network.relationship_events`: **0**                         |
+| Observed behaviour rewrote the declared mandate | mandate still `ACTIVE`; no interaction path writes one       |
+| Ranking changed                                 | slates still `deterministic-ranker.v1` / `ranking-config.v1` |
+| Private text was persisted                      | events with non-empty metadata: **0**                        |
+| Exposure became popularity                      | popularity columns on `core.companies`: **0**                |
+
+Save and pass are both true on the same company, which is the sharper test
+of the two being independent flags: passing something does not un-save it,
+and neither is a judgement about the company. The two-company case --
+passing one leaves the other alone -- is proven in the interaction
+integration and service suites, where a second company costs nothing to
+seed; the live fixture has one discoverable company because a second
+founder needs its account's active organisation to follow the company its
+journey creates, which is an onboarding concern rather than this packet's.
+
+One thing the acceptance found and the fixture now works around: running
+`dev:marketplace-ready` LOADS `packages/companies/dist`, and on Windows
+`node --watch` treats a read of a watched file as a change, so the api
+restarts underneath the journey. Answering once is therefore not the same
+as being up, and both the journey and the acceptance script now wait for
+three consecutive healthy answers before trusting the stack. It is the
+same spurious-watch behaviour REC-007R C diagnosed for `node_modules`,
+surviving in `packages/*/dist`, and it is recorded below rather than fixed
+here.
+
+### New debt from this packet
+
+| #   | Item                                                                                                                                                                                                                                         | Class | Owner packet           | Deadline boundary       | Why it is safe until then                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| --- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----- | ---------------------- | ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 15  | `node --watch` restarts the dev services when a watched file under `packages/*/dist` is merely READ, not written. Any script that loads a package's dist -- `dev:marketplace-ready` does -- restarts the api underneath whatever is running. | **3** | CQ-DEV-WATCH-SCOPE-001 | Before an external demo | Development only: the built services (`pnpm start`) watch nothing, so nothing a customer touches is affected. It costs a restart mid-fixture, which the journey and the acceptance script now wait out by requiring three consecutive healthy answers. REC-007R C removed the same behaviour for `node_modules`; narrowing the watch to source rather than `dist` would remove the rest, at the cost of not restarting on a package rebuild. |
+
+### Gates — CQ-REC-008
+
+| Gate                                           | Result                                                                        |
+| ---------------------------------------------- | ----------------------------------------------------------------------------- |
+| `pnpm db:reset` / `db:lint` / `db:types:check` | PASS / no schema errors / clean (types regenerated and committed in A)        |
+| `pnpm test:rls`                                | 34 files, 982 tests, PASS (was 33 / 952)                                      |
+| `pnpm test:integration`                        | 54 files: 53 pass, 1 skipped; 484 pass, 5 skipped (was 53 / 473)              |
+| `pnpm format:check`                            | every tracked file passes; the 295 warnings are untracked `graphify-out/`     |
+| `pnpm lint`                                    | exit 0, unmodified                                                            |
+| `pnpm typecheck`                               | 76 tasks, exit 0                                                              |
+| `pnpm test`                                    | 231 files, 2948 tests, exit 0, green in one pass (was 225 / 2893)             |
+| `pnpm build`                                   | exit 0                                                                        |
+| `pnpm q:eval:lint` / `q:eval:ci`               | PASS, 39 cases / 16 graders / exit 0, no regression, nothing added or changed |
+| Cycles / dependency direction                  | 42 workspace packages; no package depends on an app                           |
+| Secret scan / `git diff --check`               | clean on every changed file                                                   |
+| `pnpm demo:status`                             | READY, four components, synthetic-demo routing ON                             |
+
+Migration impact: `20260930090000_recommendation_interactions.sql` adds
+`recommendation.interaction_events` and `interaction_state`, one trigger,
+two partial unique indexes, four ordinary indexes; RLS on, no policy, no
+grant. Applied locally by `db:reset`. **HOSTED_MIGRATIONS_PENDING is now
+20260925–20260930**; this packet did not run `db:push`.
+
+Next: CQ-REC-009 — Diversity / Exploration. Not started.

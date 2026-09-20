@@ -61,6 +61,10 @@ const PUBLISHABLE =
   "sb_publishable_ACJWlzQHlZjBrEguHvfOxg_3BJgxAaH";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+/** Bounded, opaque: the shape the interaction contract accepts. */
+const randomIdentity = () => crypto.randomUUID().replace(/-/g, "").slice(0, 24);
+/** Invented: no media exists in this fixture, and a milestone only names one. */
+const MEDIA_ASSET = "99999999-0000-4000-8000-000000000001";
 /** Steps that narrow what may be recommended rather than widen it. */
 const EXCLUDING = /avoid|exclusion|red_flag|hard_exclusions/i;
 
@@ -99,6 +103,24 @@ async function signIn(email) {
  * service is asked to name itself first -- the same check `pnpm
  * demo:status` makes.
  */
+async function settle(baseUrl, expected, seconds = 240) {
+  // Answering once is not the same as being up. Running the readiness
+  // fixture LOADS packages/companies/dist, and on Windows `node --watch`
+  // treats a read of a watched file as a change, so the api restarts --
+  // twice per founder. Three consecutive healthy answers means the
+  // restarts have stopped, which is what the next request actually needs.
+  const deadline = Date.now() + seconds * 1000;
+  let consecutive = 0;
+  while (Date.now() < deadline) {
+    consecutive = (await waitForService(baseUrl, expected, 30))
+      ? consecutive + 1
+      : 0;
+    if (consecutive >= 3) return true;
+    await new Promise((r) => setTimeout(r, 2000));
+  }
+  return false;
+}
+
 async function waitForService(baseUrl, expected, seconds = 120) {
   const deadline = Date.now() + seconds * 1000;
   for (;;) {
@@ -428,35 +450,75 @@ async function driveOnboarding(api, journeyType) {
  * the founder completes their own journey and sets their company
  * network-visible through the same endpoint the product uses.
  */
-async function prepareFounder(token) {
+/**
+ * One founder's side of the journey.
+ *
+ * An investor's feed is empty until somebody chooses to be in it, and that
+ * choice is the founder's: discoverability is declared, never inferred. So
+ * a founder completes their own journey and sets their company
+ * network-visible through the same endpoint the product uses.
+ *
+ * Returns the company id, so the caller can tell one founder's company
+ * from another's.
+ */
+async function prepareFounder(token, label = "founder") {
   const api = client(API_URL, token, "api");
+
+  // `dev:bootstrap` gives the spare account no founder journey, so one is
+  // started through the same endpoint the product uses.
+  const current = await api(
+    "GET",
+    "/v1/onboarding/sessions/current?journeyType=founder",
+  );
+  if (current.status !== 200 || current.body?.session === undefined) {
+    const started = await api("POST", "/v1/onboarding/sessions", {
+      journeyType: "founder",
+    });
+    if (started.status >= 400) {
+      step(
+        false,
+        `${label} could not start a founder journey`,
+        `HTTP ${started.status} ${JSON.stringify(started.body ?? "").slice(0, 200)}`,
+      );
+      return null;
+    }
+  }
+
   const companyId = await driveOnboarding(api, "founder");
-  if (companyId === null) return false;
+  if (companyId === null) return null;
 
   // Readiness is assessed by the real policy; the only synthetic part is
   // the verification seam, which is why this is a local-only fixture and
   // records itself as SYNTHETIC_LOCAL_FIXTURE.
-  const ready = spawnSync(
-    process.execPath,
-    [resolve(root, "scripts", "dev-marketplace-ready.mjs")],
-    {
-      cwd: root,
-      encoding: "utf8",
-      env: {
-        ...process.env,
-        CAPITAL_Q_ENV: "local",
-        DATABASE_URL:
-          env.CQ_JOURNEY_DATABASE_URL ??
-          "postgresql://postgres:postgres@127.0.0.1:54322/postgres",
-      },
-    },
-  );
-  const readyState = /^state\s+(\S+)/m.exec(ready.stdout ?? "")?.[1] ?? "?";
+  const assess = () =>
+    /^state\s+(\S+)/m.exec(
+      spawnSync(
+        process.execPath,
+        [
+          resolve(root, "scripts", "dev-marketplace-ready.mjs"),
+          "--company",
+          companyId,
+        ],
+        {
+          cwd: root,
+          encoding: "utf8",
+          env: {
+            ...process.env,
+            CAPITAL_Q_ENV: "local",
+            DATABASE_URL:
+              env.CQ_JOURNEY_DATABASE_URL ??
+              "postgresql://postgres:postgres@127.0.0.1:54322/postgres",
+          },
+        },
+      ).stdout ?? "",
+    )?.[1] ?? "?";
 
+  const before = assess();
+  await settle(API_URL, "api");
   const company = await api("GET", `/v1/companies/${companyId}`);
   if (company.status !== 200) {
-    step(false, "founder's company", `HTTP ${company.status}`);
-    return false;
+    step(false, `${label}'s company`, `HTTP ${company.status}`);
+    return null;
   }
   if (company.body.visibility !== "network_visible") {
     const set = await api("POST", `/v1/companies/${companyId}/visibility`, {
@@ -466,36 +528,22 @@ async function prepareFounder(token) {
     if (set.status >= 400) {
       step(
         false,
-        "founder chose to be discoverable",
+        `${label} chose to be discoverable`,
         `HTTP ${set.status} ${JSON.stringify(set.body ?? "").slice(0, 200)}`,
       );
-      return false;
+      return null;
     }
   }
-  // Readiness is re-assessed after visibility, because visibility is one
-  // of the requirements it checks.
-  const again = spawnSync(
-    process.execPath,
-    [resolve(root, "scripts", "dev-marketplace-ready.mjs")],
-    {
-      cwd: root,
-      encoding: "utf8",
-      env: {
-        ...process.env,
-        CAPITAL_Q_ENV: "local",
-        DATABASE_URL:
-          env.CQ_JOURNEY_DATABASE_URL ??
-          "postgresql://postgres:postgres@127.0.0.1:54322/postgres",
-      },
-    },
-  );
-  const finalState = /^state\s+(\S+)/m.exec(again.stdout ?? "")?.[1] ?? "?";
+  // Re-assessed after visibility, because visibility is one of the
+  // requirements it checks.
+  const after = assess();
+  await settle(API_URL, "api");
   step(
-    finalState === "marketplace_ready",
-    "the company is discoverable and marketplace-ready",
-    `${readyState} -> ${finalState}`,
+    after === "marketplace_ready",
+    `${label}'s company is discoverable and marketplace-ready`,
+    `${before} -> ${after}`,
   );
-  return finalState === "marketplace_ready";
+  return after === "marketplace_ready" ? companyId : null;
 }
 
 async function main() {
@@ -515,7 +563,8 @@ async function main() {
 
   const founderToken = await signIn(FOUNDER);
   step(true, "founder signed in", FOUNDER);
-  await prepareFounder(founderToken);
+  const companyA = await prepareFounder(founderToken, "founder");
+  await settle(API_URL, "api");
 
   const token = await signIn(INVESTOR);
   step(true, "investor signed in", INVESTOR);
@@ -579,6 +628,125 @@ async function main() {
         "no score or percentage reached the reader",
       );
     }
+  }
+
+  // ---------------------------------------------------------------------
+  // Interactions (CQ-REC-008). What the investor did with what they saw.
+  // ---------------------------------------------------------------------
+  if (companyId !== null) {
+    // One discoverable company, deliberately. A second founder needs its
+    // account's active organisation to follow the company its journey
+    // creates, which is an onboarding concern rather than this packet's.
+    // The two-company case -- passing one leaves the other alone -- is
+    // proven in the interaction integration and service suites, where a
+    // second company costs nothing to seed.
+    const target = companyA ?? companyId;
+    const session = `sess-${randomIdentity()}`;
+    const ctx = (extra = {}) => ({
+      clientEventId: `evt-${randomIdentity()}`,
+      sessionId: session,
+      surface: "RECOMMENDATION_FEED",
+      slateId,
+      ...extra,
+    });
+
+    // Exposure, then attention, then consideration -- in the order a
+    // person actually produces them.
+    const observations = [
+      ["IMPRESSION", { type: "IMPRESSION", companyId: target }],
+      [
+        "WATCH_MILESTONE",
+        {
+          type: "WATCH_MILESTONE",
+          companyId: target,
+          mediaAssetId: MEDIA_ASSET,
+          watchMilestone: "COMPLETED",
+        },
+      ],
+      ["ASK_Q", { type: "ASK_Q", companyId: target }],
+      ["PROFILE_OPEN", { type: "PROFILE_OPEN", companyId: target }],
+    ];
+    let observed = 0;
+    for (const [label, payload] of observations) {
+      const response = await api(
+        "POST",
+        "/v1/discovery/interactions",
+        ctx(payload),
+      );
+      if (response.status === 200) observed += 1;
+      else step(false, `observation ${label}`, `HTTP ${response.status}`);
+    }
+    step(
+      observed === observations.length,
+      "exposure and attention recorded",
+      `${observed} of ${observations.length}`,
+    );
+
+    // A retry of the same report is not a second interaction.
+    const once = ctx({ type: "PROFILE_OPEN", companyId: target });
+    const first = await api("POST", "/v1/discovery/interactions", once);
+    const again = await api("POST", "/v1/discovery/interactions", once);
+    step(
+      first.status === 200 &&
+        again.status === 200 &&
+        again.body?.deduplicated === true,
+      "a retry is recognised rather than counted twice",
+      `first ${first.body?.deduplicated}, retry ${again.body?.deduplicated}`,
+    );
+
+    // The generic ingest cannot be asked for a relationship.
+    const interest = await api(
+      "POST",
+      "/v1/discovery/interactions",
+      ctx({ type: "INTEREST_OBSERVED", companyId: target }),
+    );
+    step(
+      interest.status === 422,
+      "no client route can create Interest",
+      `HTTP ${interest.status} (CQ-NET-010 owns Express Interest)`,
+    );
+
+    const saved = await api(
+      "POST",
+      `/v1/discovery/companies/${target}/save`,
+      ctx(),
+    );
+    step(
+      saved.status === 200 && saved.body?.state?.saved === true,
+      "the investor saved a company",
+      `HTTP ${saved.status}`,
+    );
+
+    // Save and pass are independent flags on the same state, so passing
+    // after saving must leave the save alone. With one discoverable
+    // company that is the sharper test anyway.
+    const passed = await api(
+      "POST",
+      `/v1/discovery/companies/${target}/pass`,
+      ctx({ reason: "TIMING" }),
+    );
+    step(
+      passed.status === 200 &&
+        passed.body?.state?.passed === true &&
+        passed.body?.state?.saved === true,
+      "a pass is recorded for a bounded reason, and leaves the save alone",
+      `saved ${passed.body?.state?.saved}, passed ${passed.body?.state?.passed}`,
+    );
+
+    // Saved survives a rebuild: the state is not the slate.
+    const rebuilt = await api("GET", "/v1/discovery/companies?limit=5");
+    const savedList = await api("GET", "/v1/discovery/saved");
+    step(
+      savedList.status === 200 &&
+        (savedList.body?.companyIds ?? []).includes(target),
+      "the company is still saved after the feed is read again",
+      `slate ${rebuilt.body?.slateId ?? "?"}`,
+    );
+    step(
+      Object.keys(savedList.body ?? {}).join(",") === "companyIds",
+      "the saved list is identities only",
+      JSON.stringify(Object.keys(savedList.body ?? {})),
+    );
   }
 
   console.log(`\njourney: ${failed ? "FAILED" : "PASSED"}`);
