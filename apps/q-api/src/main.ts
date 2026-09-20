@@ -32,7 +32,10 @@ import {
   createPostgresCompanyQueryPort,
 } from "@capital-q/companies";
 import { COMPANY_EVENTS } from "@capital-q/companies/events";
-import { createEventRegistry } from "@capital-q/contracts";
+import {
+  createEventRegistry,
+  type ModelDataPosture,
+} from "@capital-q/contracts";
 import { createRequestDatabaseClient } from "@capital-q/database";
 import { createOutboxWriter } from "@capital-q/eventing";
 import { createPostgresDocumentQueryPort } from "@capital-q/evidence";
@@ -359,6 +362,18 @@ const syntheticDemo = createSyntheticDemoRoutingAllowance({
   environment: config.runtime.deploymentEnvironment,
   databaseUrl: loadDatabaseConfig().secrets.url,
 });
+
+/**
+ * What kind of material this service handles (doc 15 section 62).
+ *
+ * Named once rather than spelled out at each call site: it is the same
+ * question every time, and four copies of a ternary is four chances to get
+ * one of them backwards. Null attestation means REAL_CUSTOMER, which is
+ * what every deployment serving a real person gets.
+ */
+const demoDataPosture: ModelDataPosture =
+  syntheticDemo === null ? "REAL_CUSTOMER" : "SYNTHETIC_DEMO";
+
 const modelGateway = createModelGateway({
   catalog: createPostgresModelCatalog({ sql: database.sql }),
   registry: createModelProviderRegistry(providers),
@@ -396,6 +411,7 @@ const presenceComposition = composePresence({
   sql: database.sql,
   evidence: researchComposition.evidence,
   gateway: modelGateway,
+  dataPosture: demoDataPosture,
   gate: researchComposition.gate,
   ...(researchComposition.research === undefined
     ? {}
@@ -445,7 +461,7 @@ const recommendationExplanations = createRecommendationExplanationService({
     // Doc 15 §62: where the server attested the data is invented, the
     // free model may carry the demo. Elsewhere this is REAL_CUSTOMER and
     // the reviewed ceilings decide, exactly as before.
-    dataPosture: syntheticDemo === null ? "REAL_CUSTOMER" : "SYNTHETIC_DEMO",
+    dataPosture: demoDataPosture,
     logger,
   }),
   logger,
@@ -618,6 +634,7 @@ const memoryService = createMemoryService({
 });
 const memoryLearner = createMemoryLearner({
   gateway: modelGateway,
+  dataPosture: demoDataPosture,
   memory: memoryService,
   repositories,
   sql: database.sql,
@@ -628,7 +645,7 @@ const memoryLearner = createMemoryLearner({
 const qIntelligence = composeQIntelligence({
   // The attestation is the claim about the data; where it holds, every
   // founder, investor and company this process will see was invented.
-  dataPosture: syntheticDemo === null ? "REAL_CUSTOMER" : "SYNTHETIC_DEMO",
+  dataPosture: demoDataPosture,
   sql: database.sql,
   transactions: database.transactions,
   repositories,

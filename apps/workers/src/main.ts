@@ -21,7 +21,7 @@ import { createPostgresCompanyQueryPort } from "@capital-q/companies";
 import { loadDatabaseConfig } from "@capital-q/config/database";
 import { loadEmbeddingConfig } from "@capital-q/config/embeddings";
 import { loadWorkerConfig } from "@capital-q/config/workers";
-import { CONTRACTS_VERSION } from "@capital-q/contracts";
+import { CONTRACTS_VERSION, type ModelDataPosture } from "@capital-q/contracts";
 import { createRequestDatabaseClient } from "@capital-q/database";
 import {
   createOutboxPublisher,
@@ -204,6 +204,21 @@ const syntheticDemo = createSyntheticDemoRoutingAllowance({
   environment: config.runtime.deploymentEnvironment,
   databaseUrl: databaseConfig.secrets.url,
 });
+/**
+ * What kind of material this worker handles (CQ-REC-008 entry gate).
+ *
+ * REC-007 gave the gateway an attestation and the Q answer path a posture,
+ * and left every worker request declaring nothing — which means
+ * REAL_CUSTOMER, which means a demo full of invented founders was still
+ * pushing document extraction through the reviewed provider and its free
+ * tier. The attestation already proves the whole deployment is synthetic:
+ * an operator opted in, the environment is local or test, and the database
+ * is loopback. Nothing about an individual job decides this, because
+ * nothing about an individual job could be trusted to.
+ */
+const demoDataPosture: ModelDataPosture =
+  syntheticDemo === null ? "REAL_CUSTOMER" : "SYNTHETIC_DEMO";
+
 const modelGateway = createModelGateway({
   catalog: createPostgresModelCatalog({ sql: database.sql }),
   registry: createModelProviderRegistry(modelProviders),
@@ -248,6 +263,12 @@ const founderReview =
             execute: (request, options) =>
               modelGateway.execute(request as never, options as never),
           },
+          // Doc 15 §62. A founder's documents are declared CONFIDENTIAL and
+          // stay so; what this says is whether the founder is real. The
+          // attestation above is what decides, and it is null wherever a
+          // real person is served — so this is REAL_CUSTOMER everywhere
+          // except a local demo whose companies were invented.
+          dataPosture: demoDataPosture,
           // One place decides what a task class may cost and how long it may
           // take; a caller inventing its own budget would be a second,
           // quieter answer to a question the gateway already governs.
@@ -287,6 +308,7 @@ const mandateReview =
             execute: (request, options) =>
               modelGateway.execute(request as never, options as never),
           },
+          dataPosture: demoDataPosture,
           budget: budgetForTaskClass("STRUCTURED_EXTRACTION"),
           logger,
         }),

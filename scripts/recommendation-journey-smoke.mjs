@@ -116,10 +116,19 @@ async function waitForService(baseUrl, expected, seconds = 120) {
   }
 }
 
+/**
+ * One call, and one retry when the answer was not really the service's.
+ *
+ * A dev stack restarts whenever a package is rebuilt, and another project
+ * listens on these ports. During the gap a request either fails to connect
+ * or is answered by somebody else with a plausible 404 -- neither is the
+ * product's answer. Both are retried once, after the service has named
+ * itself again. Every write carries an idempotency key and the session
+ * version it was based on, so asking twice is safe.
+ */
 function client(baseUrl, token, serviceName) {
-  return async (method, path, body) => {
-    if (env.CQ_JOURNEY_DEBUG) console.log(`  -> ${method} ${baseUrl}${path}`);
-    const response = await fetch(`${baseUrl}${path}`, {
+  const send = (method, path, body) =>
+    fetch(`${baseUrl}${path}`, {
       method,
       headers: {
         authorization: `Bearer ${token}`,
@@ -128,42 +137,36 @@ function client(baseUrl, token, serviceName) {
       },
       ...(body === undefined ? {} : { body: JSON.stringify(body) }),
     });
-    // A 404 is the shape a foreign listener answers with, so it is
-    // checked rather than believed. Every write here carries an
-    // idempotency key and an expected version, so asking again is safe.
-    if (response.status === 404 && serviceName !== undefined) {
-      const ours = await waitForService(baseUrl, serviceName, 120);
-      if (ours) {
-        const retry = await fetch(`${baseUrl}${path}`, {
-          method,
-          headers: {
-            authorization: `Bearer ${token}`,
-            "content-type": "application/json",
-            ...(method === "GET"
-              ? {}
-              : { "idempotency-key": crypto.randomUUID() }),
-          },
-          ...(body === undefined ? {} : { body: JSON.stringify(body) }),
-        });
-        const retryText = await retry.text();
-        let retryParsed;
-        try {
-          retryParsed = retryText.length > 0 ? JSON.parse(retryText) : null;
-        } catch {
-          retryParsed = null;
-        }
-        return { status: retry.status, body: retryParsed };
-      }
-    }
+
+  const read = async (response) => {
     const text = await response.text();
-    let parsed;
     try {
-      parsed = text.length > 0 ? JSON.parse(text) : null;
+      return {
+        status: response.status,
+        body: text.length > 0 ? JSON.parse(text) : null,
+      };
     } catch {
       // A non-JSON body is an answer too: the caller reads the status.
-      parsed = null;
+      return { status: response.status, body: null };
     }
-    return { status: response.status, body: parsed };
+  };
+
+  return async (method, path, body) => {
+    if (env.CQ_JOURNEY_DEBUG) console.log(`  -> ${method} ${baseUrl}${path}`);
+    let response = null;
+    try {
+      response = await send(method, path, body);
+      if (response.status !== 404 || serviceName === undefined) {
+        return read(response);
+      }
+    } catch (error) {
+      if (serviceName === undefined) throw error;
+    }
+    // Either nothing answered, or something answered that may not be ours.
+    if (!(await waitForService(baseUrl, serviceName, 120))) {
+      return { status: response?.status ?? 0, body: null };
+    }
+    return read(await send(method, path, body));
   };
 }
 

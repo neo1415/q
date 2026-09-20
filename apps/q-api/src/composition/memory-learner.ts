@@ -3,6 +3,7 @@ import {
   QRunIdSchema,
   UtcTimestampSchema,
   type QSubjectRef,
+  type ModelDataPosture,
 } from "@capital-q/contracts";
 import type { DatabaseExecutor, TransactionManager } from "@capital-q/database";
 import {
@@ -53,6 +54,8 @@ import type { ActorContext } from "@capital-q/security";
 
 export type MemoryLearnerDependencies = {
   readonly gateway: ModelGateway;
+  /** Doc 15 section 62; set by a composition root holding an attestation. */
+  readonly dataPosture?: ModelDataPosture | undefined;
   readonly memory: MemoryService;
   readonly repositories: Pick<
     QRuntimeRepositories,
@@ -230,6 +233,9 @@ export function createMemoryLearner(
         {
           taskClass: "STRUCTURED_EXTRACTION",
           sensitivity: "CONFIDENTIAL",
+          ...(dependencies.dataPosture === undefined
+            ? {}
+            : { dataPosture: dependencies.dataPosture }),
           budget: EXTRACTION_BUDGET,
           messages: [...rendered.messages],
           output: rendered.output,

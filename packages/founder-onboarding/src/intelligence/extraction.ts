@@ -10,6 +10,7 @@ import {
   type FounderSourcePassage,
   type PromptRegistry,
 } from "@capital-q/q-core";
+import type { ModelDataPosture } from "@capital-q/contracts";
 import type { TenantId, UserId } from "@capital-q/security";
 
 import type {
@@ -86,6 +87,7 @@ export type FounderExtractionGateway = {
     request: {
       readonly taskClass: "STRUCTURED_EXTRACTION";
       readonly sensitivity: string;
+      readonly dataPosture?: ModelDataPosture | undefined;
       readonly budget: unknown;
       readonly messages: unknown;
       readonly output: unknown;
@@ -120,6 +122,16 @@ export type FounderExtractionDependencies = {
    * than worked around (§37, §45).
    */
   readonly sensitivity?: string | undefined;
+  /**
+   * What KIND of material this composition handles (doc 15 section 62).
+   * Set by a composition root that holds a synthetic-demo attestation;
+   * omitted means REAL_CUSTOMER, which is what every deployment serving a
+   * real person gets. It is orthogonal to `sensitivity`: the declared
+   * sensitivity still travels with the request, and nothing here widens a
+   * provider's reviewed ceiling for a customer's data.
+   */
+  readonly dataPosture?: ModelDataPosture | undefined;
+
   readonly budget?: unknown;
   readonly logger?: Logger | undefined;
 };
@@ -238,6 +250,9 @@ export function createFounderExtraction(
           {
             taskClass: "STRUCTURED_EXTRACTION",
             sensitivity: dependencies.sensitivity ?? "CONFIDENTIAL",
+            ...(dependencies.dataPosture === undefined
+              ? {}
+              : { dataPosture: dependencies.dataPosture }),
             budget: dependencies.budget,
             messages: [...rendered.messages],
             output: rendered.output,

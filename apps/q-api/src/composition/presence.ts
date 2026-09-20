@@ -1,6 +1,10 @@
 import { randomUUID } from "node:crypto";
 
-import { CorrelationIdSchema, type CorrelationId } from "@capital-q/contracts";
+import {
+  CorrelationIdSchema,
+  type CorrelationId,
+  type ModelDataPosture,
+} from "@capital-q/contracts";
 import type { DatabaseExecutor } from "@capital-q/database";
 import {
   EvidenceSourceIdSchema,
@@ -256,6 +260,8 @@ export function createPresenceEvidencePort(
 /** The model that reads the pages. It proposes; the gate decides. */
 export function createPresenceReaderPort(dependencies: {
   readonly gateway: ModelGateway;
+  /** Doc 15 section 62; set by a composition root holding an attestation. */
+  readonly dataPosture?: ModelDataPosture | undefined;
   readonly logger?: Logger | undefined;
 }): PresenceReaderPort {
   const registry = createDefaultPromptRegistry();
@@ -292,6 +298,9 @@ export function createPresenceReaderPort(dependencies: {
           {
             taskClass: "STRUCTURED_EXTRACTION",
             budget: PRESENCE_BUDGET,
+            ...(dependencies.dataPosture === undefined
+              ? {}
+              : { dataPosture: dependencies.dataPosture }),
             // Public pages about a subject this organisation owns. Nothing
             // confidential is in the prompt, and nothing may be added to it.
             sensitivity: "INTERNAL",
@@ -385,6 +394,7 @@ export function composePresence(dependencies: {
   readonly sql: DatabaseExecutor;
   readonly evidence: EvidenceService;
   readonly gateway: ModelGateway;
+  readonly dataPosture?: ModelDataPosture | undefined;
   readonly gate: KnowledgeWriteGate;
   readonly research?: PublicWebResearchService | undefined;
   readonly profiles?: PublicProfileLookupProvider | undefined;
@@ -406,6 +416,9 @@ export function composePresence(dependencies: {
       evidence: createPresenceEvidencePort(dependencies.evidence),
       reader: createPresenceReaderPort({
         gateway: dependencies.gateway,
+        ...(dependencies.dataPosture === undefined
+          ? {}
+          : { dataPosture: dependencies.dataPosture }),
         ...(logger === undefined ? {} : { logger }),
       }),
       knowledge: createPresenceKnowledgePort({

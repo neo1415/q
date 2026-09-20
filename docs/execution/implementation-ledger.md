@@ -2260,3 +2260,97 @@ about which worker material is genuinely invented, not a wiring omission.
 | #   | Item                                                                                                                                      | Class | Owner packet              | Deadline boundary       | Why it is safe until then                                                                                                                                                                                                                                           |
 | --- | ----------------------------------------------------------------------------------------------------------------------------------------- | ----- | ------------------------- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 14  | The workers' extraction path never declares a data posture, so it routes as REAL_CUSTOMER and remains subject to Groq's free-tier limits. | **3** | CQ-REC-WORKER-POSTURE-001 | Before an external demo | Correct, not broken: an undeclared posture means "somebody's data", which is the safe default. It costs demo throughput on the founder document path, not correctness, and the decision it needs is which worker material a server can honestly attest is invented. |
+
+## Entry gates — CQ-REC-008 (2026-09-20)
+
+Three gates ran before any REC-008 feature code.
+
+### 0A — the REC-005 scratch artefacts: CLOSED
+
+`origin/scratch/rec005-v1-checkpoint` was already gone; the local branch
+remained at `e0745531dcc9d9735aff0e546c23364e467a50a0`, and its worktree had
+been removed in REC-007R E.
+
+It was inspected rather than assumed. `e074553` is not an ancestor of
+`recovery/2026-09-12` and carries one commit the branch did not share, so
+its CONTENT was diffed against current HEAD for every path it touched.
+`packages/discovery/src/ranking/config.ts` is byte-identical. Across the
+whole of `src`, exactly one line exists on the scratch branch and not on
+recovery — `import type { RecommendationContext }`, an import the current
+ranker no longer needs. The only test assertions unique to it pin
+`structured-mandate.v1` and `eligibility.v1`, both superseded by v2. Fully
+represented, so the local branch was deleted and `git fetch --prune` run;
+`git branch -vv` and `git branch -r` show it gone. `recovery/2026-09-12`
+untouched.
+
+### 0B — full unit-suite reliability: CLOSED
+
+REC-007R E recorded a class-1 item: the suite had passed in its final run
+but had not been reliably green in one pass. Three sequential runs from the
+same clean tree, demo stack stopped, nothing else running:
+
+| Run | Files | Tests | Exit | Duration |
+| --- | ----- | ----- | ---- | -------- |
+| 1   | 225   | 2893  | 0    | 167s     |
+| 2   | 225   | 2893  | 0    | 132s     |
+| 3   | 225   | 2893  | 0    | 150s     |
+
+Not reproducible, and no code was changed to chase it. The single observed
+occurrence was two vitest worker start-up timeouts — `Failed to start forks
+worker`, `Timeout waiting for worker to respond` — on
+`packages/ui/test/choice-and-money.test.tsx` during REC-007R B, while the
+demo stack was running alongside the suite and the dev watchers were still
+scoped to every loaded file. Both conditions are gone: REC-007R C scoped the
+watchers, and the project's own convention is to run gates with the stack
+stopped. No assertion was weakened, no timeout raised, no test retried or
+skipped.
+
+**UNIT_GATE_RELIABILITY: CLOSED** — non-reproducible over 3/3 under the
+documented condition.
+
+### 0C — synthetic-demo posture for extraction workers: CLOSED
+
+REC-007 gave the gateway an attestation and the Q answer path a posture, and
+left every other request declaring nothing. Nothing is REAL_CUSTOMER, so a
+demo full of invented founders was still pushing document extraction through
+the reviewed provider and its free tier — the cost problem REC-007 existed
+to solve, surviving in the path that does the most model work.
+
+Diagnosed rather than guessed. The request is built in
+`packages/founder-onboarding/src/intelligence/extraction.ts` and
+`packages/investor-onboarding/src/intelligence/synthesis.ts`, both of which
+declare `sensitivity: CONFIDENTIAL` and no posture; the worker's composition
+root built the allowance and passed it to the gateway, where it sat inert
+because a posture is per request. Two further sites were in the same state
+and are fixed with it: q-api's memory learner and presence reader.
+
+The posture comes from the composition root and nowhere else. It is the same
+REC-007 attestation — an operator opt-in, `CAPITAL_Q_ENV` local or test, a
+loopback database — and no second policy was introduced. Nothing about an
+individual job decides it, because nothing about an individual job could be
+trusted to: the request type these seams accept has no field for it, and a
+forged field on a caller's request is not read.
+
+Ten tests. Six route through the real gateway against a catalogue mutated so
+the unreviewed provider is PREFERRED for `STRUCTURED_EXTRACTION` — because
+the seeded `structured_extraction.v1` is, listing `gemini-3.5-flash-lite`
+ahead of the Groq models, and a fixture that quietly preferred the reviewed
+provider would have passed whatever the posture did. Four cover the seam:
+the posture is declared when the root supplies it, omitted when it does not,
+and unchanged by anything on the caller's request.
+
+Live, on the demo stack with the operator flag on:
+
+```
+service workers  taskClass STRUCTURED_EXTRACTION  provider google
+model gemini-3.5-flash-lite  routingPolicy structured_extraction.v1
+dataPosture SYNTHETIC_DEMO  attempts 1  fallbackUsed false  2805 ms
+```
+
+Before this change the same work logged `provider groq, dataPosture
+REAL_CUSTOMER`. The declared sensitivity is CONFIDENTIAL in both, and no
+`ai_ops` row, migration or ceiling moved. The posture reaches no migration
+and no repository write — it exists on the gateway request, its span and its
+served log, and nowhere in canonical Company or Investor truth.
+
+Debt item 14 from REC-007R E is therefore **CLOSED**.
