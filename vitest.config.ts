@@ -1,6 +1,27 @@
+import { availableParallelism } from "node:os";
 import { fileURLToPath } from "node:url";
 
 import { defineConfig } from "vitest/config";
+
+/**
+ * How many worker processes may fork at once (CQ-TEST-FLAKE-001).
+ *
+ * Vitest defaults to `availableParallelism() - 1`, which on an 8-core
+ * Windows host means seven processes forking together, each booting the
+ * runner and -- for the `.tsx` suites -- jsdom as well. Waiting for a
+ * worker to say "started" has a hard-coded 60s budget inside Vitest
+ * (`START_TIMEOUT` in `cli-api`; there is no option for it), and on a busy
+ * machine with a few GB free that budget was being missed. The run then
+ * reports an unhandled error for files that never ran at all, which reads
+ * like a test failure and is not one.
+ *
+ * Halving the fork count is the smallest fix that addresses the cause
+ * rather than the symptom: no serial execution, no longer timeouts, no
+ * retries, no weakened assertions. It is expressed against the host's own
+ * parallelism so a larger machine still gets more workers, and floored at
+ * two so the suite never silently becomes serial.
+ */
+const MAX_FORKS = Math.max(2, Math.floor(availableParallelism() / 2));
 
 /**
  * Capital Q deterministic test runner (ERA-057, TEO-001).
@@ -69,6 +90,10 @@ export default defineConfig({
     // A flaky deterministic test is a defect, not something to retry until it
     // passes (TEO-062; doc 24, 237).
     retry: 0,
+
+    // See MAX_FORKS above. Files still run in parallel, in isolated
+    // processes; there are simply fewer of them starting at once.
+    poolOptions: { forks: { maxForks: MAX_FORKS } },
 
     reporters: ["default"],
   },
