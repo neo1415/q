@@ -445,3 +445,79 @@ describe("explanation boundary (CQ-REC-007)", () => {
     }
   });
 });
+
+describe("interaction boundary (CQ-REC-008)", () => {
+  const interactionsDir = join(packageRoot, "src", "interactions");
+  const interactionFiles = () =>
+    readdirSync(interactionsDir)
+      .filter((name) => name.endsWith(".ts"))
+      .map((name) => ({
+        path: join(interactionsDir, name),
+        text: readFileSync(join(interactionsDir, name), "utf8"),
+      }));
+
+  /**
+   * `impression` and `watch_time` are in the shared list because the
+   * RANKING layers must never read behaviour — that is REC-005's invariant
+   * and the reason those two were added. This subtree IS behaviour, so they
+   * are its vocabulary rather than a leak. Every privacy token still
+   * applies here, and the ranking blocks above still enforce the full list.
+   */
+  const PRIVACY_TOKENS = FORBIDDEN_TOKENS.filter(
+    (token) => token !== "impression" && token !== "watch_time",
+  );
+
+  it("imports nothing private, names no private signal, and contains no SQL", () => {
+    for (const { path, text } of interactionFiles()) {
+      for (const forbidden of FORBIDDEN_IMPORTS) {
+        expect(text, `${path} imports ${forbidden}`).not.toContain(
+          `"${forbidden}`,
+        );
+      }
+      const code = text
+        .replace(/\/\*[\s\S]*?\*\//g, "")
+        .replace(/\/\/.*$/gm, "")
+        .toLowerCase();
+      for (const token of PRIVACY_TOKENS) {
+        expect(code, `${path} mentions ${token}`).not.toContain(token);
+      }
+      expect(text, path).not.toMatch(/\bsql`|\.unsafe\(/);
+    }
+  });
+
+  it("W: recording an interaction reaches no model", () => {
+    // Putting an LLM in an event-ingestion path would make the cheapest
+    // thing in the product the most expensive, and would make a retry
+    // storm a spending event.
+    for (const { path, text } of interactionFiles()) {
+      for (const forbidden of [
+        "@capital-q/model-gateway",
+        "@capital-q/q-core",
+        "@google/genai",
+        "groq-sdk",
+      ]) {
+        expect(text, `${path} imports ${forbidden}`).not.toContain(forbidden);
+      }
+    }
+  });
+
+  it("names no ranking input: behaviour does not reach REC-005 in this packet", () => {
+    // REC-008 records; a later, versioned feature schema may consume. A
+    // reference to the ranker or its config here is how silent
+    // personalisation would begin.
+    for (const { path, text } of interactionFiles()) {
+      const code = text
+        .replace(/\/\*[\s\S]*?\*\//g, "")
+        .replace(/\/\/.*$/gm, "");
+      for (const token of [
+        "scoreSnapshot",
+        "RANKING_CONFIG",
+        "createDeterministicRanker",
+      ]) {
+        expect(code, `${path} reaches ranking through ${token}`).not.toContain(
+          token,
+        );
+      }
+    }
+  });
+});

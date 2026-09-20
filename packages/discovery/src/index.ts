@@ -549,6 +549,40 @@ export {
   type RecommendationExplanation,
 } from "./explanations/contracts.js";
 export {
+  INTERACTION_STRENGTH_CLASSES,
+  INTERACTION_SURFACES,
+  INTERACTION_TYPES,
+  INTERACTION_VERSION,
+  InteractionEventSchema,
+  InteractionStateSchema,
+  InteractionTypeSchema,
+  PASS_REASONS,
+  WATCH_MILESTONES,
+  type InteractionEvent,
+  type InteractionExposure,
+  type InteractionRefusal,
+  type InteractionState,
+  type InteractionStrengthClass,
+  type InteractionSurface,
+  type InteractionType,
+  type PassReason,
+  type RecordInteractionResult,
+  type WatchMilestone,
+} from "./interactions/contracts.js";
+export {
+  isClientWritable,
+  isObservation,
+  strengthClassFor,
+} from "./interactions/policy.js";
+export type {
+  InteractionCompanyPort,
+  InteractionExposurePort,
+  InteractionRepository,
+  NewInteractionEvent,
+} from "./interactions/ports.js";
+export { createPostgresInteractionRepository } from "./infrastructure/postgres-interaction-repository.js";
+
+export {
   createCurrentSlateExplanationService,
   type CurrentSlateExplanationDependencies,
   type CurrentSlateExplanationService,

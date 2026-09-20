@@ -4851,6 +4851,143 @@ export type Database = {
         }
         Relationships: []
       }
+      interaction_events: {
+        Row: {
+          actor_user_id: string
+          client_event_id: string
+          company_id: string
+          company_tenant_id: string
+          id: string
+          interaction_type: string
+          interaction_version: string
+          investor_organisation_id: string
+          media_asset_id: string | null
+          metadata: Json
+          occurred_at: string
+          pass_reason: string | null
+          position: number | null
+          ranker_version: string | null
+          ranking_config_version: string | null
+          recorded_at: string
+          session_id: string | null
+          slate_id: string | null
+          slate_item_id: string | null
+          strength_class: string
+          surface: string
+          tenant_id: string
+          watch_milestone: string | null
+        }
+        Insert: {
+          actor_user_id: string
+          client_event_id: string
+          company_id: string
+          company_tenant_id: string
+          id?: string
+          interaction_type: string
+          interaction_version: string
+          investor_organisation_id: string
+          media_asset_id?: string | null
+          metadata?: Json
+          occurred_at: string
+          pass_reason?: string | null
+          position?: number | null
+          ranker_version?: string | null
+          ranking_config_version?: string | null
+          recorded_at?: string
+          session_id?: string | null
+          slate_id?: string | null
+          slate_item_id?: string | null
+          strength_class: string
+          surface: string
+          tenant_id: string
+          watch_milestone?: string | null
+        }
+        Update: {
+          actor_user_id?: string
+          client_event_id?: string
+          company_id?: string
+          company_tenant_id?: string
+          id?: string
+          interaction_type?: string
+          interaction_version?: string
+          investor_organisation_id?: string
+          media_asset_id?: string | null
+          metadata?: Json
+          occurred_at?: string
+          pass_reason?: string | null
+          position?: number | null
+          ranker_version?: string | null
+          ranking_config_version?: string | null
+          recorded_at?: string
+          session_id?: string | null
+          slate_id?: string | null
+          slate_item_id?: string | null
+          strength_class?: string
+          surface?: string
+          tenant_id?: string
+          watch_milestone?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "interaction_events_slate_id_tenant_id_fkey"
+            columns: ["slate_id", "tenant_id"]
+            isOneToOne: false
+            referencedRelation: "slates"
+            referencedColumns: ["id", "tenant_id"]
+          },
+        ]
+      }
+      interaction_state: {
+        Row: {
+          applied_sequence: number
+          company_id: string
+          company_tenant_id: string
+          impression_count: number
+          investor_organisation_id: string
+          last_impression_at: string | null
+          last_interaction_at: string | null
+          last_pass_reason: string | null
+          passed: boolean
+          passed_at: string | null
+          saved: boolean
+          saved_at: string | null
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          applied_sequence?: number
+          company_id: string
+          company_tenant_id: string
+          impression_count?: number
+          investor_organisation_id: string
+          last_impression_at?: string | null
+          last_interaction_at?: string | null
+          last_pass_reason?: string | null
+          passed?: boolean
+          passed_at?: string | null
+          saved?: boolean
+          saved_at?: string | null
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          applied_sequence?: number
+          company_id?: string
+          company_tenant_id?: string
+          impression_count?: number
+          investor_organisation_id?: string
+          last_impression_at?: string | null
+          last_interaction_at?: string | null
+          last_pass_reason?: string | null
+          passed?: boolean
+          passed_at?: string | null
+          saved?: boolean
+          saved_at?: string | null
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       mandate_embeddings: {
         Row: {
           configuration_version: string
