@@ -705,3 +705,92 @@ traffic instead of being skipped at the ceiling.
   definition, no value, no zero, until their source infrastructure exists.
 - An event-driven representation refresh worker; today `refreshCompanyRepresentations`
   is an explicit, idempotent call.
+
+## Recommendation interactions (CQ-REC-008)
+
+`recommendation.interaction_events` records what an investor did with a
+recommendation; `recommendation.interaction_state` is a derived projection
+of it for reads that cannot afford the history. Both are server-only: RLS
+on, no policy, no browser grant, and a founder of a watched company reads
+neither.
+
+Eight types, in two kinds. **Observations** — `IMPRESSION`,
+`WATCH_MILESTONE`, `PROFILE_OPEN`, `ASK_Q` — are reports about what
+somebody saw. **Decisions** — `SAVE`, `UNSAVE`, `PASS` — change durable
+state the person meets again. `INTEREST_OBSERVED` is neither: it is the
+seam for a future canonical Network event, and no client route may write
+it, because Express Interest creates relationship state and CQ-NET-010
+owns it.
+
+Every type carries a strength class (doc 19 §66): `ATTENTION`,
+`CONSIDERATION`, `CONTEXTUAL_DECISION`, `INTENT`. It is a class and never
+a number. Nothing orders it, nothing multiplies it, and REC-005 does not
+read it — `ranking-config.v1` and `recommendation-features.v1` are
+untouched by this packet, so observed behaviour can only reach ranking
+through a governed feature-schema version.
+
+What a caller may say, and what the server decides:
+
+| The client supplies                           | The server resolves                                              |
+| --------------------------------------------- | ---------------------------------------------------------------- |
+| company, surface, the slate it was looking at | the actor's investor organisation                                |
+| a client event id, for idempotency            | the slate item, its rank, the ranker and ranking-config versions |
+| a session id, optionally                      | the company's tenant                                             |
+| a pass reason, optionally                     | the time the interaction was recorded                            |
+
+A client event id grants no authority. It is unique per **actor**, so one
+person's id can never occupy another's identity, and two partial unique
+indexes make a retry harmless even when it invents a fresh one: one
+impression per person, per slate, per company, per session; one milestone
+per playback. The same company in a _new_ slate is a new, legitimate
+impression — that is the difference between deduplicating a retry and
+deleting a fact.
+
+### Impression emission
+
+An item existing in the DOM is not an impression (doc 20 §71). A server
+cannot prove viewport geometry and this one does not pretend to: an
+impression exists because a client deliberately reported one, and the
+contract has no field a virtualised or preloaded row could fill by
+existing.
+
+The rule the feed surface must implement (WEB-020/023 owns it):
+
+```
+report an impression when the item has been
+  at least ~50% visible
+  for at least ~500ms
+```
+
+Tune experimentally. **A preloaded or off-screen item must never report
+one** — that is what turns exposure accounting into noise, and the whole
+point of recording position and ranking version is that a later packet can
+correct for position bias rather than conclude that the top of the list is
+simply better.
+
+### Watch
+
+Milestones only: `STARTED`, `P25`, `P50`, `P75`, `COMPLETED`. There is no
+progress field, because one would invite an event per animation frame.
+`STARTED` means playback began, not that a poster rendered; `COMPLETED`
+comes from playback progress, never from an error or an auto-advance
+(doc 20 §72–§73).
+
+Watching to the end is attention. It is not interest, it does not create a
+relationship, it does not save anything, and it does not widen a declared
+mandate. A founder cannot see who watched, for how long, or when.
+
+### What is deliberately absent
+
+- No `total_views`, `popularity_score` or `save_count` on a company.
+  Exposure must never become a loop where early visibility buys permanent
+  advantage.
+- No question, answer, prompt, transcript or free-text note. An `ASK_Q`
+  row records that Q was asked about a company; the conversation belongs
+  to the Q runtime.
+- No propensity or selection probability. Serving is deterministic today,
+  and recording a probability nobody measured would poison the evaluation
+  it is meant to support. REC-009 owns exploration.
+- No pass reset command. Doc 19 §67 lists "investor resets pass" as a
+  reintroduction trigger; the state keeps `passed_at` so one can be added
+  additively when a surface needs it.
