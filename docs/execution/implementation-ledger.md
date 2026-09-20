@@ -2870,3 +2870,111 @@ remains **OPEN**, class 3, and **must be fixed before an external GateQ
 demo**. REC-009 does not touch that system and does not close it.
 
 Next: CQ-GATE-001 — GateQ Core. Not started.
+
+## CQ-REC-009R — pass suppression semantics closeout (2026-09-20)
+
+Starting SHA `d04f3c7`. No migration, no schema change.
+
+### What was actually wrong
+
+REC-009's postflight said "Pass suppresses to the tail — demoted, never
+dropped", and treated that as suppression. Tracing the serving path says
+it is not:
+
+| Question                                                | Answer                                                                                                                                                          |
+| ------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A. Is a passed company retained in the persisted slate? | **Yes** — REC-009 demotes it to the tail and `insertItems` writes it.                                                                                           |
+| B. Can the reader eventually return it?                 | **Yes.** `pageItems` walks ranks in order and the only read-time guard was REC-001, which knows nothing about interactions. Paging to the tail served it again. |
+| C. Was there already a read-time filter?                | **No.** `PASS_SUPPRESSION` is absent from `PUBLIC_REASON_CODES`, so the code was stripped from the response — the item was not.                                 |
+| D. Is the historical slate/item retained?               | **Yes**, and it must stay so: items are immutable and insert-only.                                                                                              |
+
+There is a second, sharper problem that tail demotion could never have
+fixed: a slate is built at most once per TTL, so a pass recorded _after_ a
+build is not in that build at all. Ordering at build time cannot express a
+decision made later.
+
+### The correction
+
+Suppression moved to where REC-001's guard already is — read time, in the
+same batch:
+
+```
+page items → REC-001 re-evaluated now  ─┐
+           → passes read now           ─┴→ withheld, never substituted
+```
+
+The slate keeps the item, so the ordering stays reproducible and the
+history stays auditable; the page does not offer it. Nothing is deleted,
+nothing is marked bad, no mandate is mutated and no global exclusion is
+created. REC-009's tail demotion stays, because it is still the right
+_ordering_ — it keeps the slate a complete permutation and puts suppressed
+items where they cost the fewest slots — it is simply no longer mistaken
+for suppression.
+
+`suppressedFromProactiveDiscovery` is the one rule, used by the build and
+the read so they cannot disagree. They differ in exactly one place, on
+purpose: an unrecognised reintroduction reason makes the build refuse
+outright and the read fail closed. A build can stop and be retried; a feed
+page cannot, and a 500 is a worse answer than one missing company.
+
+`ProactiveSuppressionPort` carries the mandate id and version, which is
+what `MANDATE_VERSION_CHANGED` would one day compare against. Nothing
+implements the reintroduction port, so every passed company stays
+suppressed — the honest V1 answer, unchanged from REC-009.
+
+### Tests
+
+Seven new reader cases: paging all the way to the end never returns the
+passed company; the slate still lists it at the rank it was built with;
+the page is shorter rather than substituted; a reset that clears the pass
+and a reset supplied as a reason both restore serving; a mandate change or
+a company edit reintroduce nothing because nothing can prove either; an
+unrecognised reason suppresses instead of erroring the page; and the
+suppression query is asked only about this page, for this organisation.
+Removing the filter fails four of them.
+
+One interaction-service case: a company that was saved and then passed
+stays in Saved.
+
+One end-to-end integration case against the local database: the investor
+passes, the next page drops the company, the slate row and the `PASS`
+event are both still there, and after a save the company is in the saved
+list and still not in the feed.
+
+### Gates — CQ-REC-009R
+
+| Gate                                                | Result                                         |
+| --------------------------------------------------- | ---------------------------------------------- |
+| `pnpm typecheck`                                    | exit 0                                         |
+| `pnpm lint`                                         | exit 0                                         |
+| `pnpm format:check`                                 | every tracked file passes                      |
+| `pnpm test`                                         | 234 files, 3014 tests, exit 0 (was 234 / 3006) |
+| `pnpm build`                                        | exit 0                                         |
+| `pnpm test:integration`                             | 53 pass + 1 skipped; 484 pass + 5 skipped      |
+| `pnpm q:eval:lint` / `q:eval:ci`                    | PASS, 39 cases / 16 graders, no regression     |
+| Dependency direction / secrets / `git diff --check` | clean                                          |
+| `pnpm demo:status`                                  | READY, four components                         |
+
+DB gates not run: no migration, no schema change, no RLS change.
+
+**One gate needed a second run, and why.** The first `pnpm test:integration`
+reported all 484 tests passing but exited 1 on two unhandled rejections —
+`Cannot use a pool after calling end on the pool` — from
+`apps/q-api/test/q-events.integration.test.ts`, an SSE suite unrelated to
+this packet. Run alone it passes 9/9 cleanly in 27s. The variable was the
+demo stack: this was the first integration run with it up, and with it
+stopped the gate is exit 0 with no errors. The underlying shape is a real
+latent defect — a stream test that leaves a request pending across pool
+shutdown is a race whenever the machine is loaded — recorded below rather
+than fixed inside a pass-suppression closeout.
+
+### Debt
+
+| #   | Item                                                                                                                                                                                                                                                              | Class | Owner packet             | Deadline boundary  | Why it is safe until then                                                                                                                                                                                            |
+| --- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----- | ------------------------ | ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 17  | `apps/q-api/test/q-events.integration.test.ts` can leave a query pending when the pool closes, producing unhandled rejections that fail the integration gate while every test passes. Reproducible only under load — here, with the demo stack running alongside. | **3** | CQ-TEST-SSE-TEARDOWN-001 | Before CI is wired | Test-harness teardown only; no product path opens a stream across a pool shutdown. It fails loudly rather than passing quietly, and the gate is green with the stack stopped, which is the documented way to run it. |
+
+`CQ-DEV-WATCH-SCOPE-001` remains **OPEN** and still must be fixed before an
+external GateQ demo.
+
+Next: CQ-GATE-001 — GateQ Core. Not started.
