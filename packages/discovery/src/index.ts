@@ -570,6 +570,13 @@ export {
   type WatchMilestone,
 } from "./interactions/contracts.js";
 export {
+  createInteractionSignalService,
+  type InteractionCommand,
+  type InteractionOutcome,
+  type InteractionSignalDependencies,
+  type InteractionSignalService,
+} from "./interactions/service.js";
+export {
   isClientWritable,
   isObservation,
   strengthClassFor,
