@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import type { ActorContext } from "@capital-q/security";
+import { ActorContextSchema, type ActorContext } from "@capital-q/security";
 
 import {
   createRecommendationExplanationService,
@@ -46,13 +46,13 @@ const COMPANY = "44444444-0000-4000-8000-000000000001";
 const COMPANY_TENANT = "22222222-0000-4000-8000-000000000001";
 const SNAPSHOT_ID = "66666666-0000-4000-8000-000000000001";
 
-const actor: ActorContext = {
+const actor: ActorContext = ActorContextSchema.parse({
   userId: "11111111-0000-4000-8000-000000000003",
   tenantId: TENANT,
   organisationId: ORG,
   membershipId: "11111111-0000-4000-8000-000000000004",
   actorType: "HUMAN",
-};
+});
 
 const KEY: SlateKey = {
   tenantId: TENANT,

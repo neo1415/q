@@ -594,6 +594,96 @@ reader on local PostgreSQL), `slates-acceptance.integration.test.ts`
 (§92 end to end), pgTAP `420_recommendation_slates`, worker
 `recommendation-refresh.test.ts`, api `discovery.test.ts`.
 
+## Recommendation explanations (CQ-REC-007)
+
+Doc 19 §2.2 makes explainability mandatory: every significant
+recommendation must answer why it was shown, which criteria matched,
+which did not, and what remains uncertain. §58 fixes the order —
+deterministic explanation first, Q's wording second, and the explanation
+still works when Q does not.
+
+- **Contract** (§57). `RecommendationExplanation { summary,
+matchedFactors, mismatchedFactors, uncertainties,
+generatedFromRankingVersion }`, plus `slateId`, `companyId`, `rank` and
+  `source` (DETERMINISTIC | Q_SYNTHESIZED). Each `ExplanationFactor` is a
+  dimension (STAGE, GEOGRAPHY, TAXONOMY, SEMANTIC, CHEQUE), an outcome
+  (MATCH, PARTIAL, MISMATCH, UNKNOWN, NOT_APPLICABLE), a bounded plain
+  English label, and the ranker's own reason code as the audit link back.
+- **A replay, not a second opinion.** The service loads the slate item,
+  fetches the feature snapshot **by the id the item stored**, refuses if
+  that snapshot's fingerprint has moved, looks the ranking config up by
+  the **slate's** recorded version, and runs REC-005's own
+  `scoreSnapshot`. The factors are therefore the ones that produced the
+  ordering, and there is no second scoring implementation to drift. A
+  slate built under a config this build no longer carries is refused
+  rather than explained with today's weights (§55, §189).
+- **Three buckets, kept apart** (§92). Missing evidence is an uncertainty,
+  never a mismatch, and the label distinguishes "this company has not
+  stated its stage" from "your mandate does not name one" — different
+  facts, neither a shortcoming. The hard eligibility gate is omitted
+  rather than restated as a merit: every item in a slate passed it.
+- **No arithmetic reaches a reader** (§56). The deterministic summary is
+  composed from the bucket nouns and contains no digit at all, so "87%
+  match" is unreachable by construction; the internal score, weights,
+  contributions and similarity stay in the store.
+- **Q's layer** (§59). `createRecommendationNarrator` (q-specialists) is
+  the first consumer of `FIT_EXPLANATION_V1`, the q-core prompt that has
+  been ACTIVE and hash-pinned since CQ-Q-006 with no caller. It receives
+  the factor labels, the company's own declared one-liner and a neutral
+  line about the investor's criteria — no snapshot, no mandate, no score.
+  Its answer is used only if `groundingFailure` passes it: an invented
+  overall label, any digit or quantity word, a dimension the ranker never
+  scored, or an unknown restated as a match all send the caller back to
+  the deterministic wording. So does an outage, a rate limit, an
+  exhausted route or a refused schema. Discovery holds the port; the
+  narrator is bound above it, and discovery still imports no model
+  gateway and no q-core.
+- **Surface.** `GET /v1/discovery/slates/:slateId/companies/:companyId/explanation`,
+  served by q-api because the natural-language half is Q and the Model
+  Gateway lives there. Neither identifier is authority; all three refusals
+  (not yours or not there, snapshot gone, ranking version unavailable)
+  return one indistinguishable 404.
+- **Known limits (V1).** The explanation is a standalone surface rather
+  than a turn in the Q conversation: `recommendation-guard.ts` still
+  strips recommendation claims from the conversational answer path, and
+  turning that guard into "cites factors the ranker produced" belongs with
+  the conversational integration, not here (§34). Comparisons between two
+  recommendations, and interaction signals, are REC-008/REC-009.
+
+## Synthetic-demo model routing (CQ-REC-007 A)
+
+Doc 15 §62: _"Free" is a cost property. It is not a privacy
+classification._ Free/shared inference may be used aggressively for
+public data, **synthetic data** and **development**, while confidential
+customer information requires an approved provider. The Model Gateway
+could express only the second half — it knows a request's sensitivity and
+a provider's reviewed ceiling, and treats every request as somebody's
+data — so a demo deployment full of invented companies could reach only
+the reviewed provider, and stalled on its free-tier limits.
+
+`ModelDataPosture` (REAL_CUSTOMER | SYNTHETIC_DEMO) is a request field
+orthogonal to sensitivity and never a substitute for it: sensitivity
+stays truthful on the request, the route record and the trace, and
+neither value is ever sent to a provider. Two conditions are required and
+neither is sufficient alone — the request declares the posture, and the
+process holds a `SyntheticDemoRoutingAllowance`. The allowance is an
+operator opt-in (`CQ_SYNTHETIC_DEMO_ROUTING`, off by default) re-checked
+against `CAPITAL_Q_ENV` local/test and a loopback database, refusing
+loudly at startup anywhere the claim cannot hold; migration 20260926 is
+explicit that no permission decision may depend on environment alone, and
+it does not here. No HTTP DTO carries the posture, so a browser cannot
+declare one, and without an allowance a declaration changes nothing.
+
+When both hold, `planRoute` skips the two privacy ceilings and records
+the candidate as `ELIGIBLE_SYNTHETIC_DEMO` rather than `ELIGIBLE`, so a
+route record, a log line and an auditor can tell which rule admitted the
+provider. No `ai_ops` row moves: google stays UNREVIEWED and the Gemini
+ceilings stay PUBLIC, as pgTAP 320 asserts, and no migration was needed.
+Because every task class has exactly one RESTRICTED-class policy row, the
+preference migrations 20260920/20260922 already set — Gemini-lite first
+for dialogue, extraction and synthesis, Groq behind — now applies to demo
+traffic instead of being skipped at the ceiling.
+
 ## Not built yet
 
 - Semantic _fit_ as a ranking factor (REC-004/REC-005). Semantic
@@ -605,8 +695,10 @@ reader on local PostgreSQL), `slates-acceptance.integration.test.ts`
 - A closed or blocked relationship state. Network defines only
   DISCOVERED; when it defines more, `RELATIONSHIP_STATES_CLOSED_TO_DISCOVERY`
   names them and the policy version moves.
-- Explanations on the feed (REC-007): a page carries declared-alignment
-  codes, never prose.
+- Explanations as a turn in the Q conversation. REC-007 serves them on
+  their own path; the conversational guard still strips recommendation
+  claims from the chat answer.
+- Comparing two recommendations ("why is this above that one").
 - Interactions (REC-008), exploration and diversity (REC-009), a
   scheduled slate rebuild and an organisation-level build principal.
 - Feature groups beyond eligibility, declared fit and semantic fit: no
