@@ -242,6 +242,16 @@ export function createPostgresMembershipRepository(): MembershipRepository {
          limit 1`;
       return rows.length === 0 ? null : toMembershipView(rows[0]);
     },
+
+    listActiveForOrganisation: async (executor, organisationId, limit) => {
+      const rows = await executor`
+        ${membershipViewSelect(executor)}
+         where m.organisation_id = ${organisationId}
+           and m.membership_status = 'active'
+         order by m.joined_at, m.id
+         limit ${limit}`;
+      return rows.map(toMembershipView);
+    },
   };
 }
 

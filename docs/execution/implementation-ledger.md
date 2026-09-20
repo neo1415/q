@@ -2047,3 +2047,81 @@ Security/privacy: real CONFIDENTIAL, HIGHLY_CONFIDENTIAL and RESTRICTED customer
 Known limitations: `QEXPL-*` Q eval cases were NOT added — the grounding and privacy properties are covered by deterministic unit tests (9 explanation, 9 narrator/grounding, 4 route, 12 provider matrix) instead; adding them needs a new ROUTING scenario in the eval runner and a new entry in the closed 11-value hard-invariant enum, which is a wider change than this packet warrants. The conversational "why" still passes through `recommendation-guard.ts`, which strips recommendation claims from the chat answer path; REC-007 serves explanations on their own surface and §34 scopes it to the first "why". Comparing two recommendations is not built. The investor description sent to the model is a neutral line rather than their mandate wording. Q interviewer, prompts, small-talk, Tavily, voice, memory and provider policy: untouched.
 
 Next: CQ-REC-008 — Recommendation Interaction Events. STOP.
+
+## Audit — CQ-REC-007R D: the REC-006 build principal (2026-09-20)
+
+REC-006 C gave background slate builds a principal: the mandate's creator,
+provided they still held an active membership. The audit asked whether that
+is correct, a small defect, or a permissions-contract question too large for
+the recommendation context. It is two findings, one of each of the last two.
+
+**Verified first, because both findings depend on it.** The read path does
+re-evaluate. `createSlateReadPipeline` runs REC-001 for the _actual_
+requesting actor on every page, keeps only `ELIGIBLE` companies and leaves a
+shorter page rather than substituting — `packages/discovery/src/slates/reader.ts`,
+"the read-time guard: REC-001 for this actor, now, in one batch". So whatever
+the build principal could see, a reader is never served a company they
+themselves may not see. **No leak, and no finding of one.**
+
+### Finding 1 — classification B, FIXED IN THIS CHECKPOINT
+
+One person was a single point of failure for their whole organisation. When
+the mandate creator's membership ended, `resolve` returned null, and
+`refresh-handler.ts` treats that as `PERMANENT` with `NO_BUILD_PRINCIPAL` —
+a dead letter, not a retry. That mandate's slate then never rebuilt again,
+going stale and expiring, while other active members of the same
+organisation sat there perfectly able to build it. People leave
+organisations; this is not hypothetical, and it is silent.
+
+Fixed: the creator is still preferred — the slate has been built through
+their view all along and changing principal can change what it contains —
+and failing that the longest-standing active member is used.
+`MembershipRepository.listActiveForOrganisation` orders by `(joined_at, id)`,
+so the same rows always give the same answer and a rebuild does not depend
+on who happens to turn up. Null is now returned only when the organisation
+has no active member at all, which is the one case where there is genuinely
+nobody to build as. `chooseBuildMembership` states the rule on its own and is
+unit-tested without a database.
+
+### Finding 2 — classification C, blocking packet CQ-PERM-ORG-VIEW-001
+
+A slate is keyed by `(tenant, investor organisation, mandate, mode)` and is
+therefore an organisation-shared artefact. It is assembled through one
+person's eyes, and one person's eyes are not the organisation's:
+`permissions.disclosure_policies.recipient_type` admits `USER` and
+`MEMBERSHIP`, so a `specifically_shared` grant can name an individual, and
+one member's view can be strictly wider than another's.
+
+The consequence is not a leak — the read-time guard settles that — but it is
+not nothing:
+
+- a slate can hold items most of the organisation will never be shown, so
+  those slots are spent and every other member gets a shorter page;
+- which member built it can change what it contains, so a slate is not
+  reproducible from its key alone, which doc 19 §189 asks of ranking;
+- Finding 1's fallback makes this visible rather than causing it: the
+  principal can now change when a membership ends.
+
+"What is an organisation's view of a shared artefact?" cannot be answered
+inside the recommendation context — it is a disclosure-evaluation question
+about whether an organisation-scoped evaluation exists at all, distinct from
+the union or the intersection of its members' views. It is therefore its own
+packet.
+
+```
+CQ-PERM-ORG-VIEW-001   BLOCKED (blocks Wave 7)
+```
+
+Scope: define an organisation-scoped disclosure evaluation in
+`@capital-q/permissions`, decide explicitly whether an organisation-shared
+artefact is built on the intersection of its members' views (nobody sees a
+slot they cannot use) or on an organisation-only evaluation that ignores
+person-scoped grants entirely; record which principal or evaluation produced
+each slate so its contents are attributable; and make REC-006's builder use
+it. Deadline boundary: **before Wave 7**, because Wave 7 adds interaction
+events over slate items, and an event recording that somebody acted on an
+item most of their organisation cannot see would put the ambiguity into the
+append-only record where it cannot be corrected. Safe to defer until then
+because no cross-member exposure exists today: the read path already
+withholds per actor, and the only present cost is wasted slots and short
+pages.
