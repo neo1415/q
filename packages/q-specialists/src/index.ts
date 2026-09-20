@@ -111,3 +111,17 @@ export {
 } from "./answer.js";
 
 export const PACKAGE_NAME = "@capital-q/q-specialists" as const;
+
+// Recommendation explanations in Q's voice (CQ-REC-007 C). The facts come
+// from the recommendation model; this only phrases them.
+export {
+  createRecommendationNarrator,
+  groundingFailure,
+  NARRATION_UNAVAILABLE_REASONS,
+  type NarratableFactor,
+  type NarrationUnavailableReason,
+  type RecommendationNarration,
+  type RecommendationNarrationRequest,
+  type RecommendationNarrator,
+  type RecommendationNarratorDependencies,
+} from "./recommendation/narrator.js";

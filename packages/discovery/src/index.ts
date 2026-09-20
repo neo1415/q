@@ -557,6 +557,7 @@ export {
 export {
   createRecommendationExplanationService,
   type ExplainRecommendationQuery,
+  type ExplanationNarrator,
   type ExplanationSnapshotPort,
   type RecommendationExplanationDependencies,
   type RecommendationExplanationService,

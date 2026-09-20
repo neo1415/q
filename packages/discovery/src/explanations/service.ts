@@ -5,11 +5,12 @@ import type { EligibilityPorts } from "../eligibility/ports.js";
 import type { RecommendationFeatureSnapshot } from "../features/contracts.js";
 import { RANKING_CONFIGS, type RankingConfig } from "../ranking/config.js";
 import { scoreSnapshot } from "../ranking/ranker.js";
-import type { SlateRepository } from "../slates/ports.js";
+import type { CompanyCardPort, SlateRepository } from "../slates/ports.js";
 import {
   EXPLANATION_VERSION,
   RecommendationExplanationSchema,
   type ExplainResult,
+  type ExplanationFactor,
 } from "./contracts.js";
 import {
   deterministicSummary,
@@ -46,10 +47,34 @@ export type ExplanationSnapshotPort = {
   ) => Promise<RecommendationFeatureSnapshot | null>;
 };
 
+/**
+ * Q's phrasing layer, behind a port (doc 19 §58–§59). Discovery states the
+ * facts; something above it may say them better. The port returns a
+ * summary or nothing, never an error — because an explanation that depends
+ * on a model being reachable is not an explanation.
+ */
+export type ExplanationNarrator = {
+  readonly narrate: (input: {
+    readonly tenantId: string;
+    readonly userId: string;
+    readonly correlationId: string;
+    readonly companyDescription: string;
+    readonly investorDescription: string;
+    readonly matchedFactors: readonly ExplanationFactor[];
+    readonly mismatchedFactors: readonly ExplanationFactor[];
+    readonly uncertainties: readonly ExplanationFactor[];
+  }) => Promise<
+    | { readonly kind: "NARRATED"; readonly summary: string }
+    | { readonly kind: "UNAVAILABLE" }
+  >;
+};
+
 export type ExplainRecommendationQuery = {
   readonly actor: ActorContext;
   readonly slateId: string;
   readonly companyId: string;
+  /** Ties a narration call to the request that asked for it. */
+  readonly correlationId?: string | undefined;
 };
 
 export type RecommendationExplanationService = {
@@ -62,6 +87,10 @@ export type RecommendationExplanationDependencies = {
   readonly ports: Pick<EligibilityPorts, "investorSubject">;
   readonly slates: SlateRepository;
   readonly snapshots: ExplanationSnapshotPort;
+  /** Declared company cards, for the one line a narration may quote. */
+  readonly cards?: CompanyCardPort | undefined;
+  /** Absent means every explanation is the deterministic one. */
+  readonly narrator?: ExplanationNarrator | undefined;
   /** The configs this build carries; a slate naming another is refused. */
   readonly configs?: readonly RankingConfig[] | undefined;
   readonly logger?: Logger | undefined;
@@ -70,7 +99,7 @@ export type RecommendationExplanationDependencies = {
 export function createRecommendationExplanationService(
   dependencies: RecommendationExplanationDependencies,
 ): RecommendationExplanationService {
-  const { ports, slates, snapshots, logger } = dependencies;
+  const { ports, slates, snapshots, cards, narrator, logger } = dependencies;
   const configs = dependencies.configs ?? RANKING_CONFIGS;
   const meter = getMeter("@capital-q/discovery");
   const metrics = {
@@ -126,12 +155,38 @@ export function createRecommendationExplanationService(
       const { factors } = scoreSnapshot(config, snapshot);
       const buckets = toExplanationFactors(factors);
 
+      // Q may phrase the same facts more naturally. It is asked only after
+      // the deterministic explanation exists, it is given the bounded
+      // factor labels and one declared line about the company, and its
+      // answer is used only if it comes back. Nothing below can change a
+      // factor: the arrays are already fixed.
+      let summary = deterministicSummary(buckets);
+      let source: "DETERMINISTIC" | "Q_SYNTHESIZED" = "DETERMINISTIC";
+      if (narrator !== undefined) {
+        const card = await cards?.cardsByIds([item.companyId]);
+        const narration = await narrator.narrate({
+          tenantId: query.actor.tenantId,
+          userId: query.actor.userId,
+          correlationId: query.correlationId ?? `cor_${slate.id}`,
+          companyDescription: card?.get(item.companyId)?.shortDescription ?? "",
+          investorDescription:
+            "the criteria this investor's own mandate declares",
+          matchedFactors: buckets.matchedFactors,
+          mismatchedFactors: buckets.mismatchedFactors,
+          uncertainties: buckets.uncertainties,
+        });
+        if (narration.kind === "NARRATED") {
+          summary = narration.summary;
+          source = "Q_SYNTHESIZED";
+        }
+      }
+
       const explanation = RecommendationExplanationSchema.parse({
         explanationVersion: EXPLANATION_VERSION,
         slateId: slate.id,
         companyId: item.companyId,
         rank: item.rank,
-        summary: deterministicSummary(buckets),
+        summary,
         matchedFactors: buckets.matchedFactors,
         mismatchedFactors: buckets.mismatchedFactors,
         uncertainties: buckets.uncertainties,
@@ -139,10 +194,10 @@ export function createRecommendationExplanationService(
           rankerVersion: slate.rankerVersion,
           rankingConfigVersion: slate.rankingConfigVersion,
         }),
-        source: "DETERMINISTIC",
+        source,
       });
 
-      metrics.explained.add(1, { source: "DETERMINISTIC" });
+      metrics.explained.add(1, { source });
       // Counts and versions only: no label, no summary, no company name.
       logger?.debug(
         {
