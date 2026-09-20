@@ -2179,3 +2179,84 @@ a second candidate tsconfig root to typescript-eslint. The worktree was
 clean and its HEAD was already an ancestor of this branch, so removing it
 was safe; the branch `claude/pensive-yonath-873730` is left in place, which
 keeps those commits reachable.
+
+## Acceptance — CQ-REC-007R (2026-09-20)
+
+Local environment reset, `CQ_SYNTHETIC_DEMO_ROUTING=true` set in
+`.env.local` (the operator opt-in; the allowance still checked the
+environment and that the database was loopback), stack restarted, and the
+key journey run twice from a clean database with fresh synthetic
+identities. No row was written by hand and no table was touched.
+
+`pnpm demo:journey` (`scripts/recommendation-journey-smoke.mjs`) drives it
+through public paths only: sign-in, the onboarding runtime, the company
+visibility endpoint, the discovery feed and the explanation endpoint. The
+one non-public step is `dev:marketplace-ready`, the documented local
+fixture whose only synthetic part is the verification seam, which records
+itself as `SYNTHETIC_LOCAL_FIXTURE`.
+
+| Run | Company    | Investor organisation | Slate      | Result |
+| --- | ---------- | --------------------- | ---------- | ------ |
+| 1   | `0d6511ae` | `7b45209e`            | `2c291a3c` | PASSED |
+| 2   | `4e7afd70` | `592b3e42`            | `ecf9c67e` | PASSED |
+
+Each run: founder completed onboarding (21 answered, 2 skipped) and chose
+to be discoverable, readiness moved `requirements_outstanding ->
+marketplace_ready`, the investor completed onboarding (23 answered, 8
+skipped), a slate was built and served, and the investor was told why --
+1 matched, 0 not matched, 3 unknown, from
+`deterministic-ranker.v1/ranking-config.v1`, with no digit, percentage or
+score anywhere in the reader-facing text.
+
+**Which provider carried it.** The narration for the explanation:
+
+```
+service q-api  taskClass NORMAL_DIALOGUE  provider google
+model gemini-3.5-flash-lite  dataPosture SYNTHETIC_DEMO
+attempts 1  fallbackUsed false  1930 ms
+```
+
+That is doc 15 section 62 in the live demo path rather than in a fixture:
+attested synthetic material carried by the free tier, with Gemini's
+reviewed PUBLIC ceiling untouched.
+
+**Provider failure, measured in three stages** rather than asserted.
+
+1. `GEMINI_API_KEY` invalidated, stack restarted. The explanation still
+   arrived, `source: Q_SYNTHESIZED`, served by `groq/openai/gpt-oss-120b`
+   with `attempts 2, fallbackUsed true` and the posture intact. Falling
+   back to the reviewed provider never broadens exposure.
+2. `GROQ_API_KEY` and `GROQ_API_KEY_2` invalidated as well, stack
+   restarted. `HTTP 200`, `source: DETERMINISTIC`, the same 1/0/3 factors
+   and the same ranking version, and a readable summary: _"Stage matches
+   what your mandate names. Geography, sector and what the business does
+   are not established from the information used to rank."_ The service
+   logged `failureClass: AUTHENTICATION` and no provider error text. Doc
+   19 section 58: if Q is unavailable, the explanation still works.
+3. Keys restored from a backup taken before the test, stack restarted,
+   `pnpm demo:status` READY with synthetic-demo routing ON.
+
+| Gate                    | Result                                                                       |
+| ----------------------- | ---------------------------------------------------------------------------- |
+| `pnpm format:check`     | every tracked file passes; 295 warnings, all under untracked `graphify-out/` |
+| `pnpm lint`             | exit 0, unmodified, for the first time in this packet                        |
+| `pnpm typecheck`        | 76 tasks, exit 0                                                             |
+| `pnpm test`             | 225 files, 2893 tests, exit 0, green in one pass                             |
+| `pnpm build`            | 41 tasks, exit 0                                                             |
+| `pnpm test:rls`         | 33 files, 952 tests, PASS                                                    |
+| `pnpm test:integration` | 52 passed / 1 skipped, 473 passed / 5 skipped                                |
+| `pnpm q:eval:lint`      | PASS, 39 cases, 16 graders                                                   |
+| `pnpm q:eval:ci`        | exit 0, no failures, no regression against the re-recorded baseline          |
+| `pnpm demo:status`      | READY, four components, routing reported                                     |
+
+Observed and added to the debt table rather than changed here: the
+workers' `STRUCTURED_EXTRACTION` work still runs as `REAL_CUSTOMER` on
+groq. The posture is per request, and `apps/workers` builds the allowance
+but declares the posture on no request, so founder extraction is still
+subject to the reviewed provider's free-tier limits. REC-007 scoped the
+posture to the Q answer path and the narrator; extending it is a decision
+about which worker material is genuinely invented, not a wiring omission.
+
+| #   | Item                                                                                                                                      | Class | Owner packet              | Deadline boundary       | Why it is safe until then                                                                                                                                                                                                                                           |
+| --- | ----------------------------------------------------------------------------------------------------------------------------------------- | ----- | ------------------------- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 14  | The workers' extraction path never declares a data posture, so it routes as REAL_CUSTOMER and remains subject to Groq's free-tier limits. | **3** | CQ-REC-WORKER-POSTURE-001 | Before an external demo | Correct, not broken: an undeclared posture means "somebody's data", which is the safe default. It costs demo throughput on the founder document path, not correctness, and the decision it needs is which worker material a server can honestly attest is invented. |
