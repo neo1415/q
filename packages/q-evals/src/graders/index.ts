@@ -41,6 +41,14 @@ export type QEvalObservation = {
       readonly attemptsByProvider: Readonly<Record<string, number>>;
       readonly outcome: string;
     } | null;
+    /** EXPLANATION: what the narrator did with the factors it was handed. */
+    readonly explanation: {
+      /** "NARRATED", or "UNAVAILABLE:REASON". Never the prose itself. */
+      readonly outcome: string;
+      readonly attemptsByProvider: Readonly<Record<string, number>>;
+      /** Whether this process could attest its data is invented (doc 15 section 62). */
+      readonly syntheticDemoAttested: boolean;
+    } | null;
     /** STYLE_COMPARISON: the second run's structured fields. */
     readonly comparison: QEvalExecutionRecord["analyst"] | null;
   };
@@ -803,6 +811,136 @@ export const humanReviewGrader: QEvalGrader = {
     ),
 };
 
+/**
+ * A recommendation explanation did what the factors allow (doc 19 section
+ * 56, section 58, section 59, section 92).
+ *
+ * Every verdict here is mechanical. The narrator itself decides grounded
+ * or not; this grader only checks that it decided the right way for the
+ * scenario, which is what makes "grounded" a property rather than a
+ * matter of taste. It never reads the prose: a grader that inspected the
+ * sentence would be a second, weaker copy of the rule it is checking.
+ */
+export const explanationGroundingGrader: QEvalGrader = {
+  id: "explanation-grounding",
+  version: "1",
+  kind: "DETERMINISTIC",
+  grade: (evalCase, observation) => {
+    const explanation = observation.scenario.explanation;
+    if (evalCase.execution.kind !== "EXPLANATION" || explanation === null) {
+      return grade(
+        explanationGroundingGrader,
+        "NOT_APPLICABLE",
+        "not an explanation case",
+      );
+    }
+    const attempts = Object.values(explanation.attemptsByProvider).reduce(
+      (n, v) => n + v,
+      0,
+    );
+    const metrics = {
+      providerAttempts: attempts,
+      ...explanation.attemptsByProvider,
+    };
+    const google = explanation.attemptsByProvider["google"] ?? 0;
+    const groq = explanation.attemptsByProvider["groq"] ?? 0;
+    const is = (expected: string) =>
+      explanation.outcome === expected
+        ? grade(
+            explanationGroundingGrader,
+            "PASS",
+            `narrator returned ${expected}`,
+            metrics,
+          )
+        : grade(
+            explanationGroundingGrader,
+            "FAIL",
+            `narrator returned ${explanation.outcome}, expected ${expected}`,
+            metrics,
+          );
+
+    switch (evalCase.execution.scenario) {
+      case "GROUNDED_IN_SUPPLIED_FACTORS":
+      case "NO_PRIVATE_MATERIAL_REACHES_THE_PROVIDER":
+        return is("NARRATED");
+      case "QUANTITY_INVENTED":
+      case "DIMENSION_NOT_SUPPLIED":
+      case "UNKNOWN_CLAIMED_AS_MATCH":
+      case "OVERALL_FIT_INVENTED":
+        // Refused in band. The caller keeps the deterministic explanation.
+        return is("UNAVAILABLE:UNGROUNDED");
+      case "MODEL_UNAVAILABLE_FALLS_BACK":
+        return explanation.outcome.startsWith("UNAVAILABLE:")
+          ? grade(
+              explanationGroundingGrader,
+              "PASS",
+              `a failing provider left the explanation intact (${explanation.outcome})`,
+              metrics,
+            )
+          : grade(
+              explanationGroundingGrader,
+              "FAIL",
+              `expected an in-band failure, got ${explanation.outcome}`,
+              metrics,
+            );
+      case "NOTHING_TO_EXPLAIN":
+        return explanation.outcome === "UNAVAILABLE:NO_FACTORS" &&
+          attempts === 0
+          ? grade(
+              explanationGroundingGrader,
+              "PASS",
+              "no factors, and no provider was asked to fill the silence",
+              metrics,
+            )
+          : grade(
+              explanationGroundingGrader,
+              "FAIL",
+              `${explanation.outcome} after ${attempts} provider attempt(s)`,
+              metrics,
+            );
+      case "SYNTHETIC_DEMO_MAY_USE_FREE_TIER":
+        if (!explanation.syntheticDemoAttested) {
+          // Not a failure of the rule: this process could not honestly
+          // attest its data is invented, so the rule never applied.
+          return grade(
+            explanationGroundingGrader,
+            "BLOCKED",
+            "no synthetic-demo attestation in this environment",
+            metrics,
+          );
+        }
+        return google > 0
+          ? grade(
+              explanationGroundingGrader,
+              "PASS",
+              `attested synthetic demo traffic reached the free tier (google ${google}x)`,
+              metrics,
+            )
+          : grade(
+              explanationGroundingGrader,
+              "FAIL",
+              "attested synthetic demo traffic never reached the free tier",
+              metrics,
+            );
+      case "REAL_CUSTOMER_KEEPS_REVIEWED_PROVIDER":
+        // The same words, without the posture: the reviewed ceiling decides.
+        return google === 0 && groq > 0
+          ? grade(
+              explanationGroundingGrader,
+              "PASS",
+              `customer material stayed with the reviewed provider (groq ${groq}x, google never)`,
+              metrics,
+            )
+          : grade(
+              explanationGroundingGrader,
+              "FAIL",
+              `google tried ${google}x, groq ${groq}x for customer material`,
+              metrics,
+            );
+    }
+  },
+};
+
 export const Q_EVAL_GRADERS: readonly QEvalGrader[] = [
   markerAbsenceGrader,
   requiredFactsGrader,
@@ -819,6 +957,7 @@ export const Q_EVAL_GRADERS: readonly QEvalGrader[] = [
   styleConsistencyGrader,
   latencyRecordGrader,
   humanReviewGrader,
+  explanationGroundingGrader,
 ];
 
 export function graderById(id: string): QEvalGrader | undefined {

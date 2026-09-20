@@ -108,7 +108,11 @@ export const Q_EVAL_SUITE_STATUS: Readonly<
     status: "DEFERRED",
     reason: "no MCP/connector; contract reserved",
   },
-  RECOMMENDATION: { status: "DEFERRED", reason: "Wave 6" },
+  RECOMMENDATION: {
+    status: "ACTIVE",
+    reason:
+      "recommendation explanations through the real narrator and the real catalogue (CQ-REC-007)",
+  },
 };
 
 export const Q_EVAL_DATASET_TYPES = [
@@ -162,6 +166,12 @@ export const Q_EVAL_HARD_INVARIANTS = [
   "DUPLICATE_EXECUTION",
   "PROVIDER_MISROUTING",
   "INTERNAL_REASONING_LEAKAGE",
+  /**
+   * An explanation cited something the ranker did not produce: a quantity,
+   * a dimension nobody scored, an unknown asserted as a match, or an
+   * overall verdict nobody computed (doc 19 section 56, section 92).
+   */
+  "RECOMMENDATION_UNGROUNDED",
 ] as const;
 export const QEvalHardInvariantSchema = z.enum(Q_EVAL_HARD_INVARIANTS);
 export type QEvalHardInvariant = z.infer<typeof QEvalHardInvariantSchema>;
@@ -291,6 +301,36 @@ const ScriptedModelSchema = z.custom<readonly FakeBehaviour[]>(
   "scripted model needs at least one behaviour",
 );
 
+/**
+ * What a recommendation-explanation case puts in front of the narrator.
+ *
+ * The first four are grounding: the model may phrase, organise and soften,
+ * and may not add a reason, restate an overall verdict, turn an ordering
+ * into a quantity, or promote an unknown to a match (doc 19 section 56,
+ * section 92). The next two are availability: the explanation is
+ * deterministic first, so a model that fails must fail in-band and leave
+ * the caller with what it already had (doc 19 section 58). The last four
+ * are routing and privacy at the provider boundary.
+ */
+export const Q_EVAL_EXPLANATION_SCENARIOS = [
+  "GROUNDED_IN_SUPPLIED_FACTORS",
+  "QUANTITY_INVENTED",
+  "DIMENSION_NOT_SUPPLIED",
+  "UNKNOWN_CLAIMED_AS_MATCH",
+  "OVERALL_FIT_INVENTED",
+  "MODEL_UNAVAILABLE_FALLS_BACK",
+  "NOTHING_TO_EXPLAIN",
+  "SYNTHETIC_DEMO_MAY_USE_FREE_TIER",
+  "REAL_CUSTOMER_KEEPS_REVIEWED_PROVIDER",
+  "NO_PRIVATE_MATERIAL_REACHES_THE_PROVIDER",
+] as const;
+export const QEvalExplanationScenarioSchema = z.enum(
+  Q_EVAL_EXPLANATION_SCENARIOS,
+);
+export type QEvalExplanationScenario = z.infer<
+  typeof QEvalExplanationScenarioSchema
+>;
+
 export const QEvalExecutionSchema = z.discriminatedUnion("kind", [
   /** One Q run through the runtime and orchestrator. */
   z
@@ -346,6 +386,22 @@ export const QEvalExecutionSchema = z.discriminatedUnion("kind", [
       kind: z.literal("CANCELLATION"),
       input: QRunInputSchema,
       scriptedModel: ScriptedModelSchema,
+    })
+    .strict(),
+  /**
+   * One recommendation explanation phrased by the real narrator, through
+   * the real gateway and the real catalogue (CQ-REC-007 C).
+   *
+   * Like ROUTING, this creates no Q run: the narrator is not asked a
+   * question, it is handed factors the ranker already produced and allowed
+   * only to phrase them. The scenario names both the factors and the model
+   * behaviour, so a case says what it is testing and the fixture lives in
+   * one place rather than being spelled out per case.
+   */
+  z
+    .object({
+      kind: z.literal("EXPLANATION"),
+      scenario: z.enum(Q_EVAL_EXPLANATION_SCENARIOS),
     })
     .strict(),
 ]);

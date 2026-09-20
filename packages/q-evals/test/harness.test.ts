@@ -111,6 +111,7 @@ function observation(
       streamConverged: null,
       providerCallsAfterCancel: null,
       routing: null,
+      explanation: null,
       comparison: null,
     },
     ...overrides,
@@ -214,7 +215,6 @@ describe("datasets", () => {
       "Q_RETRIEVAL",
       "Q_MEMORY",
       "Q_VOICE",
-      "RECOMMENDATION",
       "Q_CONNECTOR",
       "Q_TEMPORAL",
     ] as const) {
@@ -223,6 +223,20 @@ describe("datasets", () => {
         Q_EVAL_DATASETS.flatMap((d) => d.cases).some((c) => c.suite === suite),
       ).toBe(false);
     }
+  });
+
+  it("activates RECOMMENDATION only because it now has cases", () => {
+    // It was DEFERRED ("Wave 6") until CQ-REC-007 gave it something real to
+    // run. Activating a suite the datasets do not cover would claim
+    // coverage that does not exist, so the status and the cases are
+    // asserted together.
+    const cases = Q_EVAL_DATASETS.flatMap((d) => d.cases);
+    expect(Q_EVAL_SUITE_STATUS.RECOMMENDATION.status).toBe("ACTIVE");
+    const recommendation = cases.filter((c) => c.suite === "RECOMMENDATION");
+    expect(recommendation).toHaveLength(10);
+    expect(
+      recommendation.every((c) => c.execution.kind === "EXPLANATION"),
+    ).toBe(true);
   });
 
   it("defines profiles: deterministic ones with the scripted model, live as opt-in, staging and scheduled as contracts", () => {
@@ -238,7 +252,7 @@ describe("datasets", () => {
     expect(fast).not.toContain("QSTREAM-001");
     expect(fast).toContain("QPERM-001");
     expect(datasetsForProfile("CI_CORE").flatMap((d) => d.cases)).toHaveLength(
-      29,
+      39,
     );
   });
 });
