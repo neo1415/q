@@ -280,6 +280,7 @@ export {
   RECOMMENDATION_UNAVAILABLE_MESSAGE,
   withoutRecommendationClaims,
   type GuardedAnswer,
+  type RecommendationGrounds,
 } from "./communication/recommendation-guard.js";
 export {
   asksForPublicResearch,

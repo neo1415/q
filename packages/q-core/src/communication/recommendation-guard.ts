@@ -1,11 +1,27 @@
 /**
- * The recommendation-explanation guard (CQ-Q-023).
+ * The recommendation-explanation guard (CQ-Q-023, reconciled in
+ * CQ-REC-007R B).
  *
- * Capital Q has no deterministic recommendation factor model. There is no
- * versioned feature snapshot, no ranking configuration, no reason-code
- * catalogue and no slate — Wave 6 owns all of it. Until it exists, the
- * question "why was this recommended to me?" has no true answer, and any
- * sentence that answers it was invented.
+ * When this was written Capital Q had no deterministic recommendation
+ * factor model, so the question "why was this recommended to me?" had no
+ * true answer and every sentence answering it was invented. Wave 6 built
+ * the missing half: a versioned feature snapshot, a versioned ranking
+ * config, a reason-code catalogue and a slate, and REC-007 B replays
+ * exactly those to say which criteria matched, which did not, and which
+ * could not be established.
+ *
+ * So the guard does what its last paragraph always said it would: it is
+ * now the check that an explanation cites factors the ranker actually
+ * produced. Given those factors it permits the explanation; given none it
+ * behaves exactly as before, which is the behaviour of every caller that
+ * has not been handed any — the company specialist, a turn where the
+ * recommendation tool was never called, a deployment with no slates.
+ *
+ * What the factors never license is arithmetic. REC-005 produces no
+ * percentage, no score a person may see, no position in a distribution,
+ * and the explanation contract carries none, so those families stay
+ * forbidden whatever the ranker returned (doc 19 §56). Being able to
+ * explain a recommendation is not permission to quantify it.
  *
  * COMPANY_ANALYST v2 already forbids scores, fit, probabilities and peer
  * benchmarks in plain terms, and CQ-Q-020's finding validation drops
@@ -48,8 +64,12 @@ export const RECOMMENDATION_UNAVAILABLE_MESSAGE =
  * does. The patterns target the assertion, not the vocabulary, because a
  * filter on vocabulary would delete honest answers about a company's sector
  * or an investor's own stated criteria.
+ *
+ * These are the ones no factor can ever support: a quantity, a position in
+ * an ordering, a place in a distribution. Nothing the ranker returns is any
+ * of those, so grounds do not unlock them.
  */
-const RECOMMENDATION_CLAIM_PATTERNS: readonly RegExp[] = [
+const UNGROUNDABLE_CLAIM_PATTERNS: readonly RegExp[] = [
   // A fit or match as a quantity, in any of the ways a model writes one.
   /\b\d{1,3}\s*%\s*(?:fit|match|aligned|alignment)\b/i,
   /\b(?:fit|match|alignment)\s*(?:score|rating)\b/i,
@@ -59,13 +79,6 @@ const RECOMMENDATION_CLAIM_PATTERNS: readonly RegExp[] = [
   // The same claim with the noun first: "investor fit is strong".
   /\b(?:fit|match|alignment)\s+(?:is|looks|seems)\s+(?:strong|excellent|poor|weak|high|low|good|bad)\b/i,
   /\bfits?\s+your\s+mandate\s+(?:well|strongly|closely|perfectly)\b/i,
-
-  // Why this was shown. The claim that a recommendation happened at all.
-  /\b(?:recommended|surfaced|shown|suggested|matched)\s+(?:to|for)\s+you\b/i,
-  /\bcapital\s*q\s+(?:recommended|surfaced|suggested|matched|selected|chose)\b/i,
-  /\bwhy\s+(?:we|capital\s*q|q)\s+(?:matched|recommended|surfaced|showed)\b/i,
-  /\b(?:you\s+were|this\s+(?:was|company\s+was))\s+(?:recommended|surfaced|shown|suggested|matched)\b/i,
-  /\b(?:appears|appeared)\s+in\s+your\s+(?:feed|recommendations)\b/i,
 
   // A position in an ordering nobody computed.
   /\branked?\s+(?:#\s*)?(?:\d+|first|second|third|top|above|below|higher|lower)\b/i,
@@ -84,11 +97,58 @@ const RECOMMENDATION_CLAIM_PATTERNS: readonly RegExp[] = [
   /\b(?:compares?|compared)\s+(?:favourably|favorably|poorly)\b/i,
 ];
 
-/** Whether one sentence asserts a recommendation Capital Q has not made. */
-export function claimsRecommendationExplanation(sentence: string): boolean {
-  return RECOMMENDATION_CLAIM_PATTERNS.some((pattern) =>
-    pattern.test(sentence),
+/**
+ * The claim that a recommendation happened at all.
+ *
+ * This family, and only this family, is what the factor model answers. A
+ * turn holding real factors may say a company was surfaced and why; a turn
+ * holding none may not, because then nobody decided it.
+ */
+const SHOWN_TO_YOU_PATTERNS: readonly RegExp[] = [
+  /\b(?:recommended|surfaced|shown|suggested|matched)\s+(?:to|for)\s+you\b/i,
+  /\bcapital\s*q\s+(?:recommended|surfaced|suggested|matched|selected|chose)\b/i,
+  /\bwhy\s+(?:we|capital\s*q|q)\s+(?:matched|recommended|surfaced|showed)\b/i,
+  /\b(?:you\s+were|this\s+(?:was|company\s+was))\s+(?:recommended|surfaced|shown|suggested|matched)\b/i,
+  /\b(?:appears|appeared)\s+in\s+your\s+(?:feed|recommendations)\b/i,
+];
+
+/**
+ * What the ranking engine actually produced for this turn.
+ *
+ * Only the dimensions it scored, named as REC-007 B names them. Not the
+ * prose, and deliberately not the scores: this decides whether Capital Q
+ * is entitled to say a recommendation happened, not what it may say about
+ * how strong one is.
+ */
+export type RecommendationGrounds = {
+  readonly dimensions: readonly string[];
+};
+
+function grounded(grounds: RecommendationGrounds | null | undefined): boolean {
+  return (
+    grounds !== null && grounds !== undefined && grounds.dimensions.length > 0
   );
+}
+
+/**
+ * Whether one sentence asserts a recommendation Capital Q cannot support.
+ *
+ * Without grounds that is any of the four families, as before. With them,
+ * explaining that something was surfaced is a supported claim -- the
+ * ranker did surface it, and said why -- while quantities, orderings and
+ * distributions remain unsupported, because no factor produces one.
+ */
+export function claimsRecommendationExplanation(
+  sentence: string,
+  grounds?: RecommendationGrounds | null,
+): boolean {
+  if (UNGROUNDABLE_CLAIM_PATTERNS.some((pattern) => pattern.test(sentence))) {
+    return true;
+  }
+  if (grounded(grounds)) {
+    return false;
+  }
+  return SHOWN_TO_YOU_PATTERNS.some((pattern) => pattern.test(sentence));
 }
 
 /**
@@ -116,16 +176,28 @@ export type GuardedAnswer = {
  * answered only with invented reasons leaves Capital Q with nothing to say,
  * and saying that is better than silence or a trimmed fragment.
  */
-export function withoutRecommendationClaims(answer: string): GuardedAnswer {
+export function withoutRecommendationClaims(
+  answer: string,
+  grounds?: RecommendationGrounds | null,
+): GuardedAnswer {
   const parts = sentences(answer);
-  const kept = parts.filter((part) => !claimsRecommendationExplanation(part));
+  const kept = parts.filter(
+    (part) => !claimsRecommendationExplanation(part, grounds),
+  );
   const removed = parts.length - kept.length;
   if (removed === 0) {
     return { text: answer, removed: 0 };
   }
   const text = kept.join(" ").trim();
+  // With grounds in hand the fallback would be a lie -- Capital Q *can*
+  // explain this one -- but an answer made only of forbidden arithmetic
+  // still leaves nothing to show, so the caller falls back to the
+  // deterministic explanation it already has rather than to this message.
   return {
-    text: text.length === 0 ? RECOMMENDATION_UNAVAILABLE_MESSAGE : text,
+    text:
+      text.length === 0 && !grounded(grounds)
+        ? RECOMMENDATION_UNAVAILABLE_MESSAGE
+        : text,
     removed,
   };
 }

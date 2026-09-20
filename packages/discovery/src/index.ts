@@ -549,6 +549,12 @@ export {
   type RecommendationExplanation,
 } from "./explanations/contracts.js";
 export {
+  createCurrentSlateExplanationService,
+  type CurrentSlateExplanationDependencies,
+  type CurrentSlateExplanationService,
+  type ExplainCurrentRecommendationQuery,
+} from "./explanations/current.js";
+export {
   deterministicSummary,
   rankingVersionLabel,
   toExplanationFactors,

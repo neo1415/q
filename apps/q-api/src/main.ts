@@ -131,6 +131,7 @@ import {
 import {
   createDiscoveryService,
   createPostgresCompanyCardPort,
+  createCurrentSlateExplanationService,
   createPostgresDiscoveryRepository,
   createRecommendationExplanationService,
   createSlateReadPipeline,
@@ -419,6 +420,53 @@ logger.info(
   "public research composed",
 );
 
+/**
+ * Why an investor is seeing a company (CQ-REC-007). The facts come from the
+ * recommendation context, replayed from the item's own feature snapshot
+ * under the ranking version its slate recorded. Q is offered the same
+ * facts and may phrase them; if it cannot be reached, or says something
+ * the factors do not support, the deterministic wording is what ships.
+ *
+ * It is composed here, in the Q service, because a person asking "why" is
+ * asking Q — and because this is where the Model Gateway already lives.
+ */
+const slateRead = createSlateReadPipeline({
+  sql: database.sql,
+  disclosure,
+  logger,
+});
+const recommendationExplanations = createRecommendationExplanationService({
+  ports: slateRead.eligibilityPorts,
+  slates: slateRead.slates,
+  snapshots: { byId: (id) => readFeatureSnapshotById(database.sql, id) },
+  cards: createPostgresCompanyCardPort({ sql: database.sql }),
+  narrator: createRecommendationNarrator({
+    gateway: modelGateway,
+    // Doc 15 §62: where the server attested the data is invented, the
+    // free model may carry the demo. Elsewhere this is REAL_CUSTOMER and
+    // the reviewed ceilings decide, exactly as before.
+    dataPosture: syntheticDemo === null ? "REAL_CUSTOMER" : "SYNTHETIC_DEMO",
+    logger,
+  }),
+  logger,
+});
+
+/**
+ * The same explanation, reachable from a conversation (CQ-REC-007R B).
+ *
+ * The HTTP route is handed the slate the surface was showing. A person
+ * asking Q has no slate in their hand, so it is resolved from their own
+ * investor organisation — and a model is never given a field to put one
+ * in. Same service, same snapshot, same ranking version: one explanation
+ * engine with two ways in, rather than two engines that will disagree.
+ */
+const currentSlateExplanations = createCurrentSlateExplanationService({
+  ports: slateRead.eligibilityPorts,
+  slates: slateRead.slates,
+  explanations: recommendationExplanations,
+  logger,
+});
+
 // The Tool Registry (CQ-Q-007): four SAFE_READ tools over the same public
 // query ports and the same two authorities the firewall uses, plus the two
 // bounded public-web research tools when a research provider is composed.
@@ -440,6 +488,11 @@ const qTools = createQTools({
     discovery: createDiscoveryService({
       repository: createPostgresDiscoveryRepository({ sql: database.sql }),
     }),
+    // Why a company is in this person's recommendations, from the
+    // recommendation context itself. Without it Q explains nothing about
+    // ranking, which is correct rather than degraded: the alternative is a
+    // model reasoning about fit on its own (doc 19 §59).
+    recommendationExplanations: currentSlateExplanations,
     ...(researchComposition.research === undefined
       ? {}
       : { research: researchComposition.research }),
@@ -769,37 +822,6 @@ logger.info(
   },
   "voice channel composed",
 );
-
-/**
- * Why an investor is seeing a company (CQ-REC-007). The facts come from the
- * recommendation context, replayed from the item's own feature snapshot
- * under the ranking version its slate recorded. Q is offered the same
- * facts and may phrase them; if it cannot be reached, or says something
- * the factors do not support, the deterministic wording is what ships.
- *
- * It is composed here, in the Q service, because a person asking "why" is
- * asking Q — and because this is where the Model Gateway already lives.
- */
-const slateRead = createSlateReadPipeline({
-  sql: database.sql,
-  disclosure,
-  logger,
-});
-const recommendationExplanations = createRecommendationExplanationService({
-  ports: slateRead.eligibilityPorts,
-  slates: slateRead.slates,
-  snapshots: { byId: (id) => readFeatureSnapshotById(database.sql, id) },
-  cards: createPostgresCompanyCardPort({ sql: database.sql }),
-  narrator: createRecommendationNarrator({
-    gateway: modelGateway,
-    // Doc 15 §62: where the server attested the data is invented, the
-    // free model may carry the demo. Elsewhere this is REAL_CUSTOMER and
-    // the reviewed ceilings decide, exactly as before.
-    dataPosture: syntheticDemo === null ? "REAL_CUSTOMER" : "SYNTHETIC_DEMO",
-    logger,
-  }),
-  logger,
-});
 
 const { app, logger: appLogger } = createApp(
   config,

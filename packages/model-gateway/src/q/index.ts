@@ -49,6 +49,7 @@ import {
   isEmptyPromise,
   stripEmptyPromises,
   withoutRecommendationClaims,
+  type RecommendationGrounds,
 } from "@capital-q/q-core";
 import {
   appendRunEvent,
@@ -650,14 +651,18 @@ export function fetchedForYouMessage(
  * only a promise, so it is asked at the opening with a second sentence
  * that is not going anywhere.
  */
-function guardSentence(sentence: string, first: boolean): string | null {
+function guardSentence(
+  sentence: string,
+  first: boolean,
+  grounds: RecommendationGrounds | null,
+): string | null {
   const withoutPromise = first
     ? stripEmptyPromises(`${sentence} .`).text.replace(/\s*\.$/, "")
     : sentence;
   if (withoutPromise.trim().length === 0) {
     return null;
   }
-  const guarded = withoutRecommendationClaims(withoutPromise);
+  const guarded = withoutRecommendationClaims(withoutPromise, grounds);
   const text = guarded.text.trim();
   return text.length === 0 ? null : text;
 }
@@ -984,7 +989,14 @@ export function createModelGatewayQAnswer(
         }
         seenAnswer += fresh;
         for (const sentence of cutter.push(fresh)) {
-          const guarded = guardSentence(sentence, firstSentence);
+          // The tool loop has already run, so the grounds -- if the
+          // model asked for them -- are known before the first sentence
+          // is published.
+          const guarded = guardSentence(
+            sentence,
+            firstSentence,
+            recommendationGrounds,
+          );
           firstSentence = false;
           if (guarded === null || guarded.length === 0) {
             continue;
@@ -1059,6 +1071,35 @@ export function createModelGatewayQAnswer(
           (data.companies?.length ?? 0) +
           (data.investors?.length ?? 0);
         if (found === 0) platformLookupFoundNothing = true;
+      };
+
+      // What the ranking engine produced for this turn, if the model asked
+      // (CQ-REC-007R B). It is the recommendation guard's licence: with
+      // these dimensions in hand, saying a company was surfaced and why is
+      // a supported claim, and without them it is an invented one. Read
+      // from the tool's own result, never from the model's words -- the
+      // whole point is that the model does not get to decide whether a
+      // recommendation happened.
+      let recommendationGrounds: RecommendationGrounds | null = null;
+      const noteRecommendationGrounds = (outcome: QToolCallOutcome): void => {
+        if (!outcome.result.ok) return;
+        if (outcome.toolName !== "recommendation.explanation") return;
+        const data = outcome.result.data as {
+          status?: string;
+          matched?: readonly { dimension?: string }[];
+          notMatched?: readonly { dimension?: string }[];
+          unknown?: readonly { dimension?: string }[];
+        };
+        if (data.status !== "EXPLAINED") return;
+        const dimensions = [
+          ...(data.matched ?? []),
+          ...(data.notMatched ?? []),
+          ...(data.unknown ?? []),
+        ]
+          .map((factor) => factor.dimension)
+          .filter((d): d is string => typeof d === "string" && d.length > 0);
+        if (dimensions.length === 0) return;
+        recommendationGrounds = { dimensions };
       };
 
       const collectSources = (outcome: QToolCallOutcome): void => {
@@ -1229,6 +1270,7 @@ export function createModelGatewayQAnswer(
               });
               collectSources(outcome);
               notePlatformLookup(outcome);
+              noteRecommendationGrounds(outcome);
               results.push(toolResultMessage(call, outcome));
             }
             messages = [...messages, assistant, ...results];
@@ -1332,6 +1374,7 @@ export function createModelGatewayQAnswer(
         }
         const guarded = withoutRecommendationClaims(
           citePublicSources(promises.text, publicSources),
+          recommendationGrounds,
         );
         if (guarded.removed > 0) {
           logger?.warn(
@@ -1528,6 +1571,7 @@ export function createModelGatewayQAnswer(
             const heard = partial.complete() ? seenAnswer : streamedText;
             const salvaged = withoutRecommendationClaims(
               citePublicSources(stripEmptyPromises(heard).text, publicSources),
+              recommendationGrounds,
             )
               .text.slice(0, ANSWER_LIMIT_CHARS)
               .trim();

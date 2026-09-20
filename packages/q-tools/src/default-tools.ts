@@ -12,6 +12,7 @@ import { createGetInvestorMandateTool } from "./tools/get-investor-mandate.js";
 import { createLookupPublicProfileTool } from "./tools/lookup-public-profile.js";
 import { createResearchPublicWebTool } from "./tools/research-public-web.js";
 import { createDiscoverySlateTool } from "./tools/discovery-slate.js";
+import { createRecommendationExplanationTool } from "./tools/recommendation-explanation.js";
 import { createSearchCompaniesTool } from "./tools/search-companies.js";
 
 /**
@@ -30,6 +31,9 @@ export function createDefaultQTools(
     createGetInvestorMandateTool(ports),
     createSearchCompaniesTool(ports),
     ...(ports.discovery === undefined ? [] : [createDiscoverySlateTool(ports)]),
+    ...(ports.recommendationExplanations === undefined
+      ? []
+      : [createRecommendationExplanationTool(ports)]),
     ...(research === undefined
       ? []
       : [

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { ActorContextSchema, type ActorContext } from "@capital-q/security";
 
+import { createCurrentSlateExplanationService } from "../src/explanations/current.js";
 import {
   createRecommendationExplanationService,
   type ExplanationSnapshotPort,
@@ -486,5 +487,93 @@ describe("recommendation explanation service (CQ-REC-007)", () => {
         companyId: COMPANY,
       }),
     ).toEqual({ kind: "REFUSED", refusal: "RANKING_VERSION_UNAVAILABLE" });
+  });
+});
+
+/**
+ * The same explanation reached from a conversation (CQ-REC-007R B).
+ *
+ * A person asking Q "why am I seeing this?" has no slate id, so one is
+ * resolved from their own investor organisation. The properties worth
+ * testing are the ones that would let that resolution become a hole: it
+ * must never widen who can see what, and it must not invent an
+ * explanation for a company Capital Q did not recommend.
+ */
+describe("explaining the current slate (CQ-REC-007R B)", () => {
+  const currentFor = (
+    h: Awaited<ReturnType<typeof harness>>,
+    investorOrganisationId: string | null,
+  ) =>
+    createCurrentSlateExplanationService({
+      ports: {
+        investorSubject: {
+          investorOrganisationFor: () =>
+            Promise.resolve(
+              investorOrganisationId === null
+                ? null
+                : { investorOrganisationId },
+            ),
+        },
+      },
+      slates: h.store.repo,
+      explanations: h.service,
+    });
+
+  it("finds the person's own current slate from a company id alone", async () => {
+    const h = await harness();
+    const result = await currentFor(h, INVESTOR).explainCurrent({
+      actor,
+      companyId: COMPANY,
+    });
+    expect(result.kind).toBe("EXPLAINED");
+    if (result.kind !== "EXPLAINED") return;
+    // The same explanation the HTTP route would have produced for the
+    // slate it was handed: one engine, two ways in.
+    const direct = await h.service.explain({
+      actor,
+      slateId: h.slateId,
+      companyId: COMPANY,
+    });
+    expect(direct).toEqual(result);
+  });
+
+  it("never reads another investor's slate to answer the question", async () => {
+    // The slate belongs to INVESTOR; the person asking resolves to
+    // OTHER_INVESTOR. There is nothing of theirs to explain, and the
+    // answer is indistinguishable from a company that was never ranked.
+    const h = await harness();
+    expect(
+      await currentFor(h, OTHER_INVESTOR).explainCurrent({
+        actor,
+        companyId: COMPANY,
+      }),
+    ).toEqual({ kind: "REFUSED", refusal: "NOT_FOUND" });
+  });
+
+  it("refuses a founder, who has no slate of their own", async () => {
+    const h = await harness();
+    expect(
+      await currentFor(h, null).explainCurrent({ actor, companyId: COMPANY }),
+    ).toEqual({ kind: "REFUSED", refusal: "NOT_FOUND" });
+  });
+
+  it("does not invent an explanation for a company it never recommended", async () => {
+    const h = await harness();
+    expect(
+      await currentFor(h, INVESTOR).explainCurrent({
+        actor,
+        companyId: "44444444-0000-4000-8000-00000000dead",
+      }),
+    ).toEqual({ kind: "REFUSED", refusal: "NOT_FOUND" });
+  });
+
+  it("fails safely when the item's snapshot has gone, rather than explaining without one", async () => {
+    const h = await harness({ snapshot: null });
+    expect(
+      await currentFor(h, INVESTOR).explainCurrent({
+        actor,
+        companyId: COMPANY,
+      }),
+    ).toEqual({ kind: "REFUSED", refusal: "SNAPSHOT_UNAVAILABLE" });
   });
 });

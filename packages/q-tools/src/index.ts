@@ -104,6 +104,15 @@ export {
   type DiscoverySlateOutput,
 } from "./tools/discovery-slate.js";
 
+export {
+  createRecommendationExplanationTool,
+  RECOMMENDATION_EXPLANATION,
+  RecommendationExplanationInputSchema,
+  RecommendationExplanationOutputSchema,
+  type RecommendationExplanationInput,
+  type RecommendationExplanationOutput,
+} from "./tools/recommendation-explanation.js";
+
 export const PACKAGE_NAME = "@capital-q/q-tools" as const;
 export {
   createExtractPublicWebTool,

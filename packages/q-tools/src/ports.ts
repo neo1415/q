@@ -1,6 +1,9 @@
 import type { CapitalObjectiveQueryPort } from "@capital-q/capital";
 import type { CompanyQueryPort } from "@capital-q/companies";
-import type { DiscoveryService } from "@capital-q/discovery";
+import type {
+  CurrentSlateExplanationService,
+  DiscoveryService,
+} from "@capital-q/discovery";
 import type {
   InvestorMandateQueryPort,
   InvestorOrganisationQueryPort,
@@ -32,6 +35,13 @@ export type QToolPorts = {
   readonly disclosure: DisclosureAccessService;
   /** Discovery (doc 19). Absent means the slate tool reports it is unavailable. */
   readonly discovery?: DiscoveryService | undefined;
+  /**
+   * Why a company is in this person's recommendations (CQ-REC-007R B).
+   * Optional: absent, the tool is not offered and Q explains nothing about
+   * ranking -- which is the correct behaviour, not a degraded one.
+   */
+  readonly recommendationExplanations?:
+    CurrentSlateExplanationService | undefined;
   readonly research?: PublicWebResearchService | undefined;
   /** Public LinkedIn pages by URL; absent means the lookup tool does not exist. */
   readonly profiles?: PublicProfileLookupProvider | undefined;
