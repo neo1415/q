@@ -9,6 +9,7 @@ import {
 import type { EligibilityService } from "../src/eligibility/service.js";
 import { FEATURE_SCHEMA_VERSION } from "../src/features/contracts.js";
 import { RANKER_VERSION } from "../src/ranking/contracts.js";
+import { createProactiveSuppression } from "../src/rerank/suppression.js";
 import {
   decodeSlateCursor,
   encodeSlateCursor,
@@ -159,11 +160,16 @@ function harness(
     readonly cards?: readonly string[];
     readonly investor?: boolean;
     readonly mandate?: "FOUND" | "NONE";
+    /** Companies this organisation has passed on (CQ-REC-009R). */
+    readonly passed?: readonly string[];
+    /** A proven reason to offer one of them again; nothing produces one in V1. */
+    readonly reintroduce?: Readonly<Record<string, string>>;
   } = {},
 ) {
   const store = memorySlates();
   let now = NOW;
   const evaluated: string[][] = [];
+  const suppressionAsked: string[][] = [];
   const eligibility: EligibilityService = {
     evaluate: (query) => {
       evaluated.push([...query.companyIds]);
@@ -259,9 +265,46 @@ function harness(
         ),
     },
   };
+  // The real rule over a fake store of interaction state, so what the
+  // reader withholds is decided by the same code the build uses.
+  const passed = new Set(options.passed ?? []);
+  const suppression = createProactiveSuppression({
+    signals: {
+      forCompanies: (q) => {
+        suppressionAsked.push([...q.companyIds]);
+        return Promise.resolve(
+          new Map(
+            q.companyIds.map((companyId) => [
+              companyId,
+              {
+                exposed: true,
+                lastSeenAt: null,
+                passed: passed.has(companyId),
+              },
+            ]),
+          ),
+        );
+      },
+    },
+    ...(options.reintroduce === undefined
+      ? {}
+      : {
+          reintroductions: {
+            reasonsFor: (q) =>
+              Promise.resolve(
+                new Map(
+                  q.companyIds
+                    .filter((c) => options.reintroduce?.[c] !== undefined)
+                    .map((c) => [c, options.reintroduce?.[c] ?? ""]),
+                ),
+              ),
+          },
+        }),
+  });
   const reader = createSlateReadService({
     ports,
     eligibility,
+    suppression,
     slates: store.repo,
     cards,
     requester: options.requester === false ? undefined : requester,
@@ -271,6 +314,7 @@ function harness(
     store,
     reader,
     evaluated,
+    suppressionAsked,
     requested,
     setNow: (next: Date) => {
       now = next;
@@ -486,5 +530,118 @@ describe("slate reader (CQ-REC-006)", () => {
       "NO_ACTIVE_MANDATE",
     ]);
     expect(noMandate.requested).toEqual([]);
+  });
+});
+
+/**
+ * Pass suppression at serving time (CQ-REC-009R).
+ *
+ * REC-009 demotes a passed company to the tail of the slate, which keeps
+ * the slate a complete, reproducible permutation. A tail is still
+ * reachable, so demotion alone was ordering rather than suppression. These
+ * cases are about the difference.
+ */
+describe("a company this organisation passed on", () => {
+  it("3: is never served, including after every higher item is exhausted", async () => {
+    const h = harness({ passed: [id(3)] });
+    await publish(h.store, KEY, 5);
+    const seen: string[] = [];
+    let cursor: string | null | undefined;
+    // Page all the way to the end, which is exactly the route by which a
+    // tail-demoted company used to come back.
+    for (let page = 0; page < 10; page += 1) {
+      const result = await h.reader.pageCompanies({ actor, limit: 2, cursor });
+      seen.push(...result.items.map((i) => i.companyId));
+      cursor = result.nextCursor;
+      if (cursor === null) break;
+    }
+    expect(seen).toEqual([id(1), id(2), id(4), id(5)]);
+    expect(seen).not.toContain(id(3));
+  });
+
+  it("4: stays in the slate, so the ordering and the history are intact", async () => {
+    const h = harness({ passed: [id(3)] });
+    const slate = await publish(h.store, KEY, 5);
+    await h.reader.pageCompanies({ actor, limit: 10 });
+    // The withholding is a serving decision. Nothing was deleted, and the
+    // stored slate still reproduces the order it was built with.
+    const items = await h.store.repo.pageItems({
+      slateId: slate.id,
+      afterRank: 0,
+      limit: 50,
+    });
+    expect(items.map((i) => i.companyId)).toEqual([
+      id(1),
+      id(2),
+      id(3),
+      id(4),
+      id(5),
+    ]);
+    expect(items.find((i) => i.companyId === id(3))?.rank).toBe(3);
+  });
+
+  it("leaves a shorter page rather than a substitute", async () => {
+    // The same rule REC-001's guard follows: what is withheld is withheld,
+    // and pulling the next item forward would make the page's contents
+    // depend on what was hidden.
+    const h = harness({ passed: [id(1)] });
+    await publish(h.store, KEY, 5);
+    const page = await h.reader.pageCompanies({ actor, limit: 2 });
+    expect(page.items.map((i) => i.companyId)).toEqual([id(2)]);
+    expect(page.nextCursor).not.toBeNull();
+  });
+
+  it("6: an explicit reset makes it servable again", async () => {
+    // Two shapes of the same thing. A reset that clears the pass leaves
+    // nothing to suppress; a reset recorded as a reason is one the policy
+    // accepts. Neither exists as a command yet -- this is the mechanism,
+    // proved, waiting for a surface.
+    const cleared = harness({ passed: [] });
+    await publish(cleared.store, KEY, 3);
+    expect(
+      (await cleared.reader.pageCompanies({ actor, limit: 10 })).items.map(
+        (i) => i.companyId,
+      ),
+    ).toEqual([id(1), id(2), id(3)]);
+
+    const reasoned = harness({
+      passed: [id(2)],
+      reintroduce: { [id(2)]: "EXPLICIT_PASS_RESET" },
+    });
+    await publish(reasoned.store, KEY, 3);
+    expect(
+      (await reasoned.reader.pageCompanies({ actor, limit: 10 })).items.map(
+        (i) => i.companyId,
+      ),
+    ).toEqual([id(1), id(2), id(3)]);
+  });
+
+  it("7 and 8: a mandate change or a company edit does not reintroduce it on its own", async () => {
+    // Nothing in the system produces either reason today, so the honest
+    // behaviour is that neither happens. When a source exists it supplies
+    // the reason; it does not get inferred here.
+    const h = harness({ passed: [id(2)] });
+    await publish(h.store, KEY, 3);
+    const page = await h.reader.pageCompanies({ actor, limit: 10 });
+    expect(page.items.map((i) => i.companyId)).toEqual([id(1), id(3)]);
+  });
+
+  it("an unrecognised reason suppresses rather than erroring the page", async () => {
+    // Fail closed. A build can stop and be retried; a feed page cannot,
+    // and a 500 would be a worse answer than one missing company.
+    const h = harness({
+      passed: [id(2)],
+      reintroduce: { [id(2)]: "I_CHANGED_MY_MIND" },
+    });
+    await publish(h.store, KEY, 3);
+    const page = await h.reader.pageCompanies({ actor, limit: 10 });
+    expect(page.items.map((i) => i.companyId)).toEqual([id(1), id(3)]);
+  });
+
+  it("9: it is asked only about this page, for this organisation", async () => {
+    const h = harness({ passed: [] });
+    await publish(h.store, KEY, 5);
+    await h.reader.pageCompanies({ actor, limit: 2 });
+    expect(h.suppressionAsked).toEqual([[id(1), id(2)]]);
   });
 });

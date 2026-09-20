@@ -511,6 +511,11 @@ export {
   type RerankPoolQuery,
   type RerankService,
 } from "./rerank/service.js";
+export {
+  createProactiveSuppression,
+  suppressedFromProactiveDiscovery,
+  type ProactiveSuppressionPort,
+} from "./rerank/suppression.js";
 export { createInteractionRerankSignals } from "./infrastructure/interaction-rerank-signals.js";
 
 export {

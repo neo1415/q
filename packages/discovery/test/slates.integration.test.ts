@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { parseDatabaseConfig } from "@capital-q/config/database";
@@ -12,6 +14,7 @@ import { STRUCTURED_GENERATOR_VERSION } from "../src/candidates/contracts.js";
 import { ELIGIBILITY_POLICY_VERSION } from "../src/eligibility/contracts.js";
 import { FEATURE_SCHEMA_VERSION } from "../src/features/contracts.js";
 import { createPostgresCompanyCardPort } from "../src/infrastructure/postgres-discovery-repository.js";
+import { createPostgresInteractionRepository } from "../src/infrastructure/postgres-interaction-repository.js";
 import {
   createPostgresRefreshRequestStore,
   createPostgresSlateRepository,
@@ -787,6 +790,7 @@ describe("@capital-q/discovery slate reader over the live local pipeline", () =>
     createSlateReadService({
       ports: w.pipeline.eligibilityPorts,
       eligibility: w.pipeline.eligibility,
+      suppression: w.pipeline.suppression,
       slates: w.pipeline.slates,
       cards: createPostgresCompanyCardPort({ sql: w.tx.sql }),
       clock: () => new Date("2026-09-18T12:00:00.000Z"),
@@ -873,6 +877,92 @@ describe("@capital-q/discovery slate reader over the live local pipeline", () =>
           })
         )[0]?.companyId,
       ).toBe(kobo.id);
+
+      // REC-009R: the investor passes on Bakehouse. The slate still lists
+      // it -- the ordering stays reproducible and the history auditable --
+      // and no page offers it again, including the one that would have
+      // reached it.
+      const bakehouse = w.companies["Bakehouse"];
+      if (bakehouse === undefined) throw new Error("fixture");
+      const interactions = createPostgresInteractionRepository({
+        sql: w.tx.sql,
+      });
+      const passEvent = await interactions.append({
+        tenantId: w.investorActor.tenantId,
+        actorUserId: w.investorActor.userId,
+        investorOrganisationId: w.investorOrgId,
+        companyId: bakehouse.id,
+        companyTenantId: bakehouse.tenantId,
+        interactionType: "PASS",
+        surface: "RECOMMENDATION_FEED",
+        exposure: null,
+        mediaAssetId: null,
+        watchMilestone: null,
+        passReason: "STAGE",
+        clientEventId: `evt-${randomUUID()}`,
+        sessionId: null,
+        occurredAt: "2026-09-18T11:00:00.000Z",
+      });
+      await interactions.project(passEvent.event);
+
+      const afterPass = await read.pageCompanies({
+        actor: w.investorActor,
+        limit: 10,
+      });
+      expect(afterPass.items.map((i) => w.labelOf(i.companyId))).toEqual([
+        "PetPal",
+      ]);
+      // Still in the slate, at the rank it was built with, and the event
+      // that suppressed it is still there too.
+      const stored = await w.pipeline.slates.pageItems({
+        slateId: built.slate.id,
+        afterRank: 0,
+        limit: 50,
+      });
+      expect(stored.map((i) => w.labelOf(i.companyId))).toEqual([
+        "KoboLogistics",
+        "Bakehouse",
+        "PetPal",
+      ]);
+      const history = await interactions.historyForCompany({
+        tenantId: w.investorActor.tenantId,
+        investorOrganisationId: w.investorOrgId,
+        companyId: bakehouse.id,
+        limit: 10,
+      });
+      expect(history.map((e) => e.interactionType)).toEqual(["PASS"]);
+
+      // A save on the same company keeps it in Saved while it stays out of
+      // the feed: the two surfaces answer different questions.
+      const saveEvent = await interactions.append({
+        tenantId: w.investorActor.tenantId,
+        actorUserId: w.investorActor.userId,
+        investorOrganisationId: w.investorOrgId,
+        companyId: bakehouse.id,
+        companyTenantId: bakehouse.tenantId,
+        interactionType: "SAVE",
+        surface: "RECOMMENDATION_FEED",
+        exposure: null,
+        mediaAssetId: null,
+        watchMilestone: null,
+        passReason: null,
+        clientEventId: `evt-${randomUUID()}`,
+        sessionId: null,
+        occurredAt: "2026-09-18T11:30:00.000Z",
+      });
+      await interactions.project(saveEvent.event);
+      expect(
+        await interactions.savedCompanyIds({
+          tenantId: w.investorActor.tenantId,
+          investorOrganisationId: w.investorOrgId,
+          limit: 10,
+        }),
+      ).toEqual([bakehouse.id]);
+      expect(
+        (
+          await read.pageCompanies({ actor: w.investorActor, limit: 10 })
+        ).items.map((i) => w.labelOf(i.companyId)),
+      ).toEqual(["PetPal"]);
 
       // A founder holds no investor organisation: never a page, and never
       // a hint that the cursor named a real slate.

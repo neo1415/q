@@ -161,6 +161,7 @@ describe("CQ-REC-006 live acceptance (local stack)", () => {
       const reader = createSlateReadService({
         ports: w.pipeline.eligibilityPorts,
         eligibility: w.pipeline.eligibility,
+        suppression: w.pipeline.suppression,
         slates: w.pipeline.slates,
         cards: createPostgresCompanyCardPort({ sql }),
         requester,

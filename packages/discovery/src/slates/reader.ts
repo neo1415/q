@@ -5,6 +5,7 @@ import type { ActorContext } from "@capital-q/security";
 import type { EligibilityPorts } from "../eligibility/ports.js";
 import type { EligibilityService } from "../eligibility/service.js";
 import { RANKING_CONFIG_V1 } from "../ranking/config.js";
+import type { ProactiveSuppressionPort } from "../rerank/suppression.js";
 import {
   decodeSlateCursor,
   encodeSlateCursor,
@@ -28,6 +29,7 @@ import type { RefreshRequester } from "./refresh.js";
  *   actor → investor organisation + ACTIVE mandate → the CURRENT slate
  *   → one page of items after the cursor's rank
  *   → the read-time safety guard: REC-001 re-evaluated for this actor, now
+ *   → pass suppression: what this organisation has dismissed (REC-009R)
  *   → the companies' declared cards → the page, with a continuation key
  *
  * A cursor is a position, never authority: every page re-resolves the
@@ -36,6 +38,13 @@ import type { RefreshRequester } from "./refresh.js";
  * an hour ago is an ordering; whether the company may be shown is decided
  * now. Nothing internal reaches the page: no score, no snapshot, no
  * provenance, no mandate field.
+ *
+ * Both withholdings work the same way and for the same reason. A slate is
+ * built at most once per TTL, so anything that can change in between —
+ * a revoked grant, a company leaving the marketplace, an investor passing
+ * on something — has to be checked here or it is checked too late. A
+ * withheld company leaves a shorter page and is never replaced, because
+ * substituting would make the page's contents depend on what was hidden.
  */
 
 /** Reason codes a page may carry: declared alignment, never missingness. */
@@ -93,6 +102,12 @@ export class SlateCursorRejectedError extends Error {
 export type SlateReadServiceDependencies = {
   readonly ports: Pick<EligibilityPorts, "investorSubject" | "mandates">;
   readonly eligibility: EligibilityService;
+  /**
+   * REC-009R. Required: a reader composed without it would serve companies
+   * this organisation has already dismissed, which is precisely the defect
+   * it exists to close.
+   */
+  readonly suppression: ProactiveSuppressionPort;
   readonly slates: SlateRepository;
   readonly cards: CompanyCardPort;
   /** When present, a missing or expired slate asks for a rebuild. */
@@ -115,7 +130,8 @@ function servable(slate: RecommendationSlate, now: Date): boolean {
 export function createSlateReadService(
   dependencies: SlateReadServiceDependencies,
 ): SlateReadService {
-  const { ports, eligibility, slates, cards, requester, logger } = dependencies;
+  const { ports, eligibility, suppression, slates, cards, requester, logger } =
+    dependencies;
   const policy = dependencies.policy ?? SLATE_POLICY_V1;
   const clock = dependencies.clock ?? (() => new Date());
   const meter = getMeter("@capital-q/discovery");
@@ -256,21 +272,37 @@ export function createSlateReadService(
         };
       }
 
-      // The read-time guard: REC-001 for this actor, now, in one batch.
+      // The read-time guards: REC-001 for this actor, and what this
+      // organisation has passed on, both now and both in one batch.
       // Withheld companies leave a shorter page, never a substitute.
       const companyIds = pageItems.map((i) => i.companyId);
-      const evaluation = await eligibility.evaluate({
-        actor: query.actor,
-        mode: MODE,
-        mandateId: key.mandateId,
-        companyIds,
-      });
+      const [evaluation, suppressedIds] = await Promise.all([
+        eligibility.evaluate({
+          actor: query.actor,
+          mode: MODE,
+          mandateId: key.mandateId,
+          companyIds,
+        }),
+        suppression.suppressedCompanyIds({
+          tenantId: key.tenantId,
+          investorOrganisationId: key.investorOrganisationId,
+          mandateId: key.mandateId,
+          mandateVersion: lookup.mandate.version,
+          companyIds,
+        }),
+      ]);
       const eligibleIds = new Set(
         evaluation.results
           .filter((r) => r.decision === "ELIGIBLE")
           .map((r) => r.companyId),
       );
-      const shown = pageItems.filter((i) => eligibleIds.has(i.companyId));
+      // A passed company stays in the slate, so the ordering remains
+      // reproducible and the history remains auditable; it simply is not
+      // offered again. The tail of a slate is still reachable, which is
+      // why demotion alone was not suppression (REC-009R).
+      const shown = pageItems.filter(
+        (i) => eligibleIds.has(i.companyId) && !suppressedIds.has(i.companyId),
+      );
       const cardById = await cards.cardsByIds(shown.map((i) => i.companyId));
       const items: SlatePageItem[] = [];
       for (const item of shown) {
@@ -296,6 +328,7 @@ export function createSlateReadService(
           fetched: pageItems.length,
           served: items.length,
           withheld: pageItems.length - items.length,
+          suppressed: suppressedIds.size,
           restarted: notes.includes("SLATE_RESTARTED"),
         },
         "recommendation slate page served",

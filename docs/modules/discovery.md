@@ -911,7 +911,10 @@ something wanted it to.
 
 **Two phases, each with its own bound.** First, suppression: a company
 this organisation passed goes behind every unsuppressed candidate, in its
-own order — demoted, never dropped and never banned. Then a bounded greedy
+own order — demoted, never dropped and never banned. Demotion orders the
+slate; it is **not** what keeps a passed company out of a page, because a
+tail is still reachable and a pass recorded after the build is not in the
+build at all. The reader does that, below. Then a bounded greedy
 over the rest: at each position, the best remaining candidate takes it
 unless its cluster already fills the page, or the organisation saw it very
 recently, and some other candidate _within the relevance floor_ fixes
@@ -945,8 +948,27 @@ bookmark and must never move a company, for them or for anyone else.
 | passed       | suppressed to the tail        | absent     |
 | saved+passed | suppressed to the tail        | present    |
 
-Pass decides what the slate does; Save decides what the Saved list holds.
-Neither action is deleted and neither overrides the other.
+Pass decides what the feed offers; Save decides what the Saved list
+holds. Neither action is deleted and neither overrides the other.
+
+**Where suppression actually happens (CQ-REC-009R).** At read time, beside
+REC-001's guard, in the same batch:
+
+```
+page items → REC-001 re-evaluated now  ─┐
+           → passes read now           ─┴→ withheld, never substituted
+```
+
+Both guards exist for the same reason. A slate is built at most once per
+TTL, so anything that can change in between — a revoked grant, a company
+leaving the marketplace, an investor passing on something — has to be
+checked at serving or it is checked too late. The slate keeps the item, so
+the ordering stays reproducible and the history stays auditable; the page
+simply does not offer it. `suppressedFromProactiveDiscovery` is the single
+rule both the build and the read use, so they cannot disagree — except in
+how they treat an unrecognised reintroduction reason, where the build
+refuses outright and the read fails closed, because a build can stop and
+be retried and a feed page cannot.
 
 **Reintroduction after a pass.** `PASS_REINTRODUCTION_REASONS` names three
 — `EXPLICIT_PASS_RESET`, `MANDATE_VERSION_CHANGED`, `MATERIAL_COMPANY_UPDATE`

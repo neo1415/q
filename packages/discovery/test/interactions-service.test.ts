@@ -414,6 +414,32 @@ describe("recording an interaction", () => {
     expect(ids).toEqual([COMPANY]);
   });
 
+  it("REC-009R: a saved company that was also passed stays in Saved", async () => {
+    // The two are independent, and each governs a different surface.
+    // Pass keeps it out of proactive discovery (the reader proves that);
+    // Save keeps it reachable, which is the whole point of having saved
+    // it. Neither action is deleted by the other.
+    const h = await harness();
+    expect(
+      (await h.service.decide("SAVE", command({ slateId: h.slateId }))).kind,
+    ).toBe("RECORDED");
+    expect(
+      (
+        await h.service.decide(
+          "PASS",
+          command({ slateId: h.slateId, clientEventId: "evt-000000000002" }),
+        )
+      ).kind,
+    ).toBe("RECORDED");
+
+    const state = h.interactions.state.get(`${INVESTOR}:${COMPANY}`);
+    expect(state?.saved).toBe(true);
+    expect(state?.passed).toBe(true);
+    expect(await h.service.savedCompanyIds({ actor, limit: 10 })).toEqual([
+      COMPANY,
+    ]);
+  });
+
   it("K: a pass reason is stored only when one was given, and only on a pass", async () => {
     const h = await harness();
     const passed = await h.service.decide(

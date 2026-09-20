@@ -46,6 +46,10 @@ import {
 } from "../ranking/service.js";
 import { createReranker } from "../rerank/reranker.js";
 import { createRerankService, type RerankService } from "../rerank/service.js";
+import {
+  createProactiveSuppression,
+  type ProactiveSuppressionPort,
+} from "../rerank/suppression.js";
 import type { SemanticEmbedder } from "../semantic/ports.js";
 import {
   createSemanticCandidateService,
@@ -112,6 +116,7 @@ export type RecommendationPipeline = {
   readonly slates: SlateRepository;
   readonly refreshRequests: RefreshRequestStore;
   readonly rerank: RerankService;
+  readonly suppression: ProactiveSuppressionPort;
   readonly builder: SlateBuilder;
 };
 
@@ -183,6 +188,7 @@ export type SlateReadPipeline = {
   readonly slates: SlateRepository;
   readonly refreshRequests: RefreshRequestStore;
   readonly requester: RefreshRequester | undefined;
+  readonly suppression: ProactiveSuppressionPort;
   readonly reader: SlateReadService;
 };
 
@@ -212,9 +218,19 @@ export function createSlateReadPipeline(
           clock,
           logger,
         });
+  // REC-009R: what this organisation passed on is checked when the page is
+  // served, not when the slate was built, because a pass can happen at any
+  // point in between. No reintroduction source exists, so a passed company
+  // stays suppressed.
+  const suppression = createProactiveSuppression({
+    signals: createInteractionRerankSignals({
+      repository: createPostgresInteractionRepository({ sql }),
+    }),
+  });
   const reader = createSlateReadService({
     ports: eligibilityPorts,
     eligibility,
+    suppression,
     slates,
     cards: createPostgresCompanyCardPort({ sql }),
     requester,
@@ -228,6 +244,7 @@ export function createSlateReadPipeline(
     slates,
     refreshRequests,
     requester,
+    suppression,
     reader,
   };
 }
@@ -302,13 +319,17 @@ export function createRecommendationPipeline(
   // organisation's own bounded interaction signals, narrowed by the
   // adapter to three facts; no reintroduction source exists yet, so a
   // passed company stays suppressed (CQ-REC-009 §12).
+  const signals = createInteractionRerankSignals({
+    repository: createPostgresInteractionRepository({ sql }),
+  });
   const rerank = createRerankService({
     reranker: createReranker(),
-    signals: createInteractionRerankSignals({
-      repository: createPostgresInteractionRepository({ sql }),
-    }),
+    signals,
     logger,
   });
+  // REC-009R: the same state, asked at serving time. Demotion to the tail
+  // orders a slate; only this keeps a passed company out of a page.
+  const suppression = createProactiveSuppression({ signals });
   const builder = createSlateBuilder({
     ports: eligibilityPorts,
     hybrid,
@@ -334,6 +355,7 @@ export function createRecommendationPipeline(
     slates,
     refreshRequests,
     rerank,
+    suppression,
     builder,
   };
 }
