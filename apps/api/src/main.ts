@@ -31,6 +31,8 @@ import {
   createDiscoveryService,
   createPostgresDiscoveryRepository,
   createPostgresRefreshQueue,
+  createInteractionSignalService,
+  createPostgresInteractionRepository,
   createSlateReadPipeline,
 } from "@capital-q/discovery";
 import {
@@ -363,11 +365,27 @@ const slates = createSlateReadPipeline({
   queue: createPostgresRefreshQueue({ sql: database.sql }),
 });
 
+/**
+ * What an investor did with a recommendation (CQ-REC-008).
+ *
+ * It borrows the read pipeline's own eligibility ports and slate
+ * repository, deliberately: the check that decides whether a company may
+ * still be acted on is the same REC-001 evaluation the feed runs on every
+ * page, and a second copy of that rule would be a second answer to the
+ * same question.
+ */
+const interactions = createInteractionSignalService({
+  ports: slates.eligibilityPorts,
+  eligibility: slates.eligibility,
+  slates: slates.slates,
+  repository: createPostgresInteractionRepository({ sql: database.sql }),
+});
+
 const { app, logger } = createApp(config, security, {
   organisations,
   companies,
   investors,
-  discovery: { discovery, slates: slates.reader },
+  discovery: { discovery, slates: slates.reader, interactions },
   capital,
   taxonomy: {
     query: taxonomy.query,

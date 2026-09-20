@@ -29,6 +29,10 @@ import {
   type MediaRoutesDependencies,
 } from "./http/media.js";
 import {
+  registerRecommendationInteractionRoutes,
+  type RecommendationInteractionRoutesDependencies,
+} from "./http/recommendation-interactions.js";
+import {
   registerDiscoveryRoutes,
   type DiscoveryRoutesDependencies,
 } from "./http/discovery.js";
@@ -83,7 +87,13 @@ export type ApiModules = {
   readonly companies?: CompanyRoutesDependencies["companies"] | undefined;
   readonly investors?: InvestorRoutesDependencies["investors"] | undefined;
   readonly discovery?:
-    Pick<DiscoveryRoutesDependencies, "discovery" | "slates"> | undefined;
+    | (Pick<DiscoveryRoutesDependencies, "discovery" | "slates"> & {
+        /** CQ-REC-008. Absent: the feed reads, and nothing records. */
+        readonly interactions?:
+          | RecommendationInteractionRoutesDependencies["interactions"]
+          | undefined;
+      })
+    | undefined;
   readonly capital?: CapitalRoutesDependencies["capital"] | undefined;
   readonly taxonomy?: TaxonomyRoutesDependencies["taxonomy"] | undefined;
   readonly onboarding?: OnboardingRoutesDependencies["onboarding"] | undefined;
@@ -193,6 +203,13 @@ export function createApp(
       discovery: modules.discovery.discovery,
       slates: modules.discovery.slates,
     });
+    if (modules.discovery.interactions !== undefined) {
+      registerRecommendationInteractionRoutes(app, {
+        authenticator: security.authenticator,
+        resolver: security.resolver,
+        interactions: modules.discovery.interactions,
+      });
+    }
   }
 
   if (modules.capital !== undefined) {

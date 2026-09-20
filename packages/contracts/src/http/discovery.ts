@@ -157,3 +157,146 @@ export const RecommendationExplanationDtoSchema = z
 export type RecommendationExplanationDto = z.infer<
   typeof RecommendationExplanationDtoSchema
 >;
+
+/**
+ * Recommendation interactions (CQ-REC-008; doc 19 §66–§69).
+ *
+ * Two shapes, because two things are happening. A decision — save, unsave,
+ * pass — is an explicit command on a named company, and the URL says which
+ * one so that no request can change its own meaning. An observation is
+ * bounded telemetry: the client reports what it saw, and the `type` enum
+ * here admits only the four kinds it is allowed to report.
+ *
+ * There is deliberately no `POST /interactions { type, tenantId,
+ * investorOrganisationId, rank }`. A single endpoint taking an open type
+ * and the caller's own context is how an analytics dump becomes an
+ * authorisation hole: the server resolves who this is, which organisation
+ * it belongs to, what rank the item held and which ranking version
+ * produced it, and a client that could name any of those could name better
+ * ones.
+ */
+
+export const DISCOVERY_INTERACTIONS_PATH =
+  "/v1/discovery/interactions" as const;
+export const DISCOVERY_SAVED_PATH = "/v1/discovery/saved" as const;
+/** `POST /v1/discovery/companies/:companyId/{save|unsave|pass}`. */
+export const DISCOVERY_COMPANY_SAVE_PATH =
+  "/v1/discovery/companies/:companyId/save" as const;
+export const DISCOVERY_COMPANY_UNSAVE_PATH =
+  "/v1/discovery/companies/:companyId/unsave" as const;
+export const DISCOVERY_COMPANY_PASS_PATH =
+  "/v1/discovery/companies/:companyId/pass" as const;
+
+/** Bounded, opaque, never a device fingerprint. */
+const InteractionOpaqueIdSchema = z.string().regex(/^[A-Za-z0-9_:-]{8,64}$/);
+
+/**
+ * What every interaction request may carry.
+ *
+ * `slateId` is the slate the person was looking at — the server checks it
+ * is theirs and reads the rank from it. There is no `position`, no
+ * `rankingConfigVersion`, no `investorOrganisationId` and no `tenantId`,
+ * because those are the server's answers and a field for them would be a
+ * field to forge.
+ */
+const InteractionContextDtoSchema = {
+  clientEventId: InteractionOpaqueIdSchema,
+  sessionId: InteractionOpaqueIdSchema.optional(),
+  slateId: UuidSchema.optional(),
+  surface: z.enum([
+    "RECOMMENDATION_FEED",
+    "COMPANY_PROFILE",
+    "SAVED_LIST",
+    "SEARCH",
+    "Q_CONVERSATION",
+  ]),
+} as const;
+
+/**
+ * The only interaction types a client may report.
+ *
+ * SAVE, UNSAVE and PASS are absent because they are commands with their
+ * own paths. INTEREST_OBSERVED is absent because Express Interest creates
+ * relationship state and CQ-NET-010 owns it — a recommendation route that
+ * could write it would be a second, quieter way to start a relationship.
+ */
+export const ObservedInteractionTypeDtoSchema = z.enum([
+  "IMPRESSION",
+  "WATCH_MILESTONE",
+  "PROFILE_OPEN",
+  "ASK_Q",
+]);
+export type ObservedInteractionTypeDto = z.infer<
+  typeof ObservedInteractionTypeDtoSchema
+>;
+
+export const RecordInteractionRequestSchema = z
+  .object({
+    ...InteractionContextDtoSchema,
+    type: ObservedInteractionTypeDtoSchema,
+    companyId: UuidSchema,
+    mediaAssetId: UuidSchema.optional(),
+    watchMilestone: z
+      .enum(["STARTED", "P25", "P50", "P75", "COMPLETED"])
+      .optional(),
+  })
+  .strict();
+export type RecordInteractionRequest = z.infer<
+  typeof RecordInteractionRequestSchema
+>;
+
+export const SaveCompanyRequestSchema = z
+  .object({ ...InteractionContextDtoSchema })
+  .strict();
+export type SaveCompanyRequest = z.infer<typeof SaveCompanyRequestSchema>;
+
+export const PassCompanyRequestSchema = z
+  .object({
+    ...InteractionContextDtoSchema,
+    /** Optional, always. Doc 17: no feedback modal after every pass. */
+    reason: z
+      .enum([
+        "NOT_NOW",
+        "STAGE",
+        "SECTOR",
+        "GEOGRAPHY",
+        "TRACTION",
+        "RAISE",
+        "TIMING",
+        "OTHER",
+      ])
+      .optional(),
+  })
+  .strict();
+export type PassCompanyRequest = z.infer<typeof PassCompanyRequestSchema>;
+
+/**
+ * What an interaction returns.
+ *
+ * `deduplicated` tells a client its retry was recognised, so it need not
+ * guess. No internal score, no rank and no ranking version: the caller
+ * told us where they were, and telling them back what the server resolved
+ * would hand them the vocabulary to forge it next time.
+ */
+export const InteractionRecordedDtoSchema = z
+  .object({
+    recorded: z.literal(true),
+    deduplicated: z.boolean(),
+    state: z
+      .object({
+        saved: z.boolean(),
+        passed: z.boolean(),
+      })
+      .strict()
+      .nullable(),
+  })
+  .strict();
+export type InteractionRecordedDto = z.infer<
+  typeof InteractionRecordedDtoSchema
+>;
+
+/** The Saved section: identities only; the reader re-checks disclosure. */
+export const SavedCompaniesDtoSchema = z
+  .object({ companyIds: z.array(UuidSchema).max(200) })
+  .strict();
+export type SavedCompaniesDto = z.infer<typeof SavedCompaniesDtoSchema>;
