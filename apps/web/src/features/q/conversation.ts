@@ -79,6 +79,7 @@ export type QTurnObjectBlock = Extract<
       | "COMPARISON"
       | "CLARIFICATION_REQUEST"
       | "ACTION_PROPOSAL"
+      | "ARTIFACT_REFERENCE"
       | "UI_INTENT";
   }
 >;
@@ -96,6 +97,9 @@ function objectBlocksOf(
       case "COMPARISON":
       case "CLARIFICATION_REQUEST":
       case "ACTION_PROPOSAL":
+      // Something Q composed, which is the most actionable thing an
+      // answer can carry: it is a document somebody opens.
+      case "ARTIFACT_REFERENCE":
         return true;
       case "UI_INTENT":
         // SHOW_EVIDENCE carries the same references an evidence block

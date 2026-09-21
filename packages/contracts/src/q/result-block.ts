@@ -2,6 +2,8 @@ import { z } from "zod";
 
 import { UuidSchema } from "../common/ids.js";
 import { QActionProposalSchema } from "./action.js";
+import { QArtifactStatusSchema, QArtifactTypeSchema } from "./artifact.js";
+import { QArtifactIdSchema } from "./ids.js";
 import { QUncertainConfidenceLevelSchema } from "./confidence.js";
 import { QEvidenceRefsSchema } from "./evidence-ref.js";
 import { QPublicFindingSchema } from "./finding.js";
@@ -41,6 +43,7 @@ export const Q_RESULT_BLOCK_KINDS = [
   "UNCERTAINTY",
   "CLARIFICATION_REQUEST",
   "ACTION_PROPOSAL",
+  "ARTIFACT_REFERENCE",
   "UI_INTENT",
 ] as const;
 
@@ -167,6 +170,24 @@ export const QActionProposalBlockSchema = z
   })
   .strict();
 
+/**
+ * Something Q composed, referred to from the answer that composed it.
+ *
+ * A reference and a label, like every other reference block: enough to
+ * render a card and open it, never the content. The status is here because
+ * a card for an artifact still being prepared has to say so, and the
+ * browser must not have to guess from an absence.
+ */
+export const QArtifactReferenceBlockSchema = z
+  .object({
+    kind: z.literal("ARTIFACT_REFERENCE"),
+    artifactId: QArtifactIdSchema,
+    type: QArtifactTypeSchema,
+    status: QArtifactStatusSchema,
+    title: z.string().trim().min(1).max(160),
+  })
+  .strict();
+
 export const QUiIntentBlockSchema = z
   .object({ kind: z.literal("UI_INTENT"), intent: QUiIntentSchema })
   .strict();
@@ -181,6 +202,7 @@ export const QResultBlockSchema = z.discriminatedUnion("kind", [
   QUncertaintyBlockSchema,
   QClarificationRequestBlockSchema,
   QActionProposalBlockSchema,
+  QArtifactReferenceBlockSchema,
   QUiIntentBlockSchema,
 ]);
 

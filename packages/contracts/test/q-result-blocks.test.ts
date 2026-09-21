@@ -88,6 +88,13 @@ const BLOCK_FIXTURES: Readonly<Record<string, unknown>> = {
     options: ["Apex Robotics", "Apex Health"],
   },
   ACTION_PROPOSAL: { kind: "ACTION_PROPOSAL", proposal },
+  ARTIFACT_REFERENCE: {
+    kind: "ARTIFACT_REFERENCE",
+    artifactId: UUID_2,
+    type: "INVESTMENT_BRIEF",
+    status: "READY",
+    title: "Investment brief",
+  },
   UI_INTENT: {
     kind: "UI_INTENT",
     intent: { kind: "OPEN_COMPANY", companyId: UUID },

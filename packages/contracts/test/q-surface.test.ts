@@ -128,6 +128,13 @@ const completedRun = {
         createdAt: NOW,
       },
     },
+    {
+      kind: "ARTIFACT_REFERENCE",
+      artifactId: UUID_2,
+      type: "INVESTMENT_BRIEF",
+      status: "READY",
+      title: "Investment brief",
+    },
     { kind: "UI_INTENT", intent: { kind: "OPEN_COMPANY", companyId: UUID } },
   ],
   createdAt: NOW,
@@ -263,6 +270,8 @@ describe("type-level guarantees", () => {
           return block.question;
         case "ACTION_PROPOSAL":
           return block.proposal.proposalId;
+        case "ARTIFACT_REFERENCE":
+          return block.artifactId;
         case "UI_INTENT":
           return block.intent.kind;
         default: {
