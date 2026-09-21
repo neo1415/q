@@ -11,6 +11,10 @@ import { QStateIndicator } from "@capital-q/ui/q-state";
 import { InlineNotice } from "@capital-q/ui/states";
 import type { ContextScope } from "@capital-q/ui/tokens";
 
+import {
+  materialUploadCompleteAction,
+  materialUploadTargetAction,
+} from "../onboarding-kit/material-actions";
 import { destinationPath } from "../voice/destinations";
 import { useFollowTurn } from "../voice/use-follow-turn";
 import { useVoiceInterview } from "../voice/use-voice-interview";
@@ -102,6 +106,61 @@ export function QConversationPanel({
   // conversation this tab is already in; what is said either way is one
   // thread. Spoken lines are shown as they are transcribed.
   const [spoken, setSpoken] = useState<readonly SpokenLine[]>([]);
+
+  /**
+   * Attaching a document to this conversation (QX-001 §5).
+   *
+   * The same three-step Evidence upload onboarding uses: ask permission,
+   * put the bytes straight into private storage from the browser, let the
+   * server verify what actually landed. Nothing new, and the bytes never
+   * pass through the application server.
+   *
+   * It appears only for a founder with a company, because that is the
+   * only subject Evidence can own a document against today. An investor
+   * sees no control rather than one that refuses — the packet's rule
+   * about dead buttons, and the honest thing besides.
+   */
+  const [attachments, setAttachments] = useState<readonly string[]>([]);
+  const attach = async (file: File) => {
+    const companyId = context.companyId;
+    if (companyId === undefined) return;
+    setAttachments((current) => [...current, `${file.name} · uploading`]);
+    const target = await materialUploadTargetAction({
+      companyId,
+      documentType: "UNCLASSIFIED",
+      filename: file.name,
+      mimeType: file.type,
+      sizeBytes: file.size,
+    });
+    const settle = (note: string) => {
+      setAttachments((current) =>
+        current.map((entry) =>
+          entry === `${file.name} · uploading`
+            ? `${file.name} · ${note}`
+            : entry,
+        ),
+      );
+    };
+    if (!target.ok) {
+      settle(target.message);
+      return;
+    }
+    const put = await fetch(target.value.url, {
+      method: target.value.method,
+      headers: target.value.headers,
+      body: file,
+    });
+    if (!put.ok) {
+      // The bytes did not land; the session is left unfinished rather
+      // than completed over nothing.
+      settle("could not be uploaded");
+      return;
+    }
+    const completed = await materialUploadCompleteAction(
+      target.value.uploadSessionId,
+    );
+    settle(completed.ok ? "attached" : completed.message);
+  };
   const voice = useVoiceInterview({
     onLine: (line) => {
       setSpoken((current) => [
@@ -300,7 +359,10 @@ export function QConversationPanel({
                   </p>
                 </>
               ) : (
-                <QAnswer turn={turn} />
+                <QAnswer
+                  turn={turn}
+                  onAsk={(question) => void q.ask(question)}
+                />
               )}
             </li>
           ))}
@@ -416,6 +478,10 @@ export function QConversationPanel({
           onVoice={
             connected && !voice.active ? () => void talkWithQ() : undefined
           }
+          attachments={attachments}
+          {...(connected && context.companyId !== undefined
+            ? { onAttach: attach, attachLabel: "Attach a document" }
+            : {})}
           {...(connected
             ? {
                 onSubmit: voice.active

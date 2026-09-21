@@ -10,7 +10,7 @@ import {
 
 import { IconButton } from "../components/button.js";
 import { InlineNotice } from "../components/states.js";
-import { ArrowUp, ICON_SIZE, Mic } from "../icons/index.js";
+import { ArrowUp, ICON_SIZE, Mic, Plus } from "../icons/index.js";
 import { cx } from "../primitives/class-names.js";
 import type { ContextScope } from "../tokens/index.js";
 import { ContextIndicator } from "./context-indicator.js";
@@ -24,7 +24,12 @@ import { QMark } from "./q-mark.js";
  * composer says plainly that nothing was sent; it never fabricates an
  * answer, a stage or a "thinking" animation. The microphone appears only
  * when a surface wires `onVoice` to a real capability: a dead microphone
- * is worse than none.
+ * is worse than none, and the same is true of the attach control.
+ *
+ * Typing, talking and attaching are one surface rather than three
+ * (QX-001 §5). Each is a way of saying something to Q in the same
+ * conversation, so they sit on the same row and none of them starts a
+ * separate history.
  */
 
 export const Q_COMPOSER_PLACEHOLDER =
@@ -44,6 +49,16 @@ export type QComposerProps = {
   /** Talk with Q instead: present only where voice is wired. */
   readonly onVoice?: (() => void) | undefined;
   readonly voiceLabel?: string | undefined;
+  /**
+   * Attach a file to this conversation: present only where a surface can
+   * actually accept one. On Home that means a founder with a company, and
+   * nobody else sees the control rather than seeing one that refuses.
+   */
+  readonly onAttach?: ((file: File) => void | Promise<void>) | undefined;
+  readonly attachLabel?: string | undefined;
+  /** What is attached or attaching, in the surface's own words. */
+  readonly attachments?: readonly string[] | undefined;
+  readonly attachAccept?: string | undefined;
 };
 
 export function QComposer({
@@ -57,6 +72,10 @@ export function QComposer({
   placeholder = Q_COMPOSER_PLACEHOLDER,
   onVoice,
   voiceLabel = "Talk with Q",
+  onAttach,
+  attachLabel = "Attach a document",
+  attachments = [],
+  attachAccept,
 }: QComposerProps) {
   const generatedId = useId();
   const inputId = id ?? `q-composer-${generatedId}`;
@@ -64,6 +83,7 @@ export function QComposer({
   const [notice, setNotice] = useState<"unavailable" | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   const trimmed = value.trim();
   const canSubmit = trimmed.length > 0 && !disabled && !submitting;
@@ -154,6 +174,44 @@ export function QComposer({
       <div className="flex items-center justify-between gap-3">
         <ContextIndicator scope={contextScope} detail={contextDetail} />
         <div className="flex items-center gap-1">
+          {onAttach !== undefined ? (
+            <>
+              <input
+                ref={fileRef}
+                type="file"
+                className="sr-only"
+                tabIndex={-1}
+                aria-hidden="true"
+                {...(attachAccept === undefined
+                  ? {}
+                  : { accept: attachAccept })}
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  // The input is cleared either way, so choosing the same
+                  // file twice still fires.
+                  event.target.value = "";
+                  if (file !== undefined) {
+                    void onAttach(file);
+                  }
+                }}
+              />
+              <IconButton
+                type="button"
+                variant="quiet"
+                aria-label={attachLabel}
+                title={attachLabel}
+                disabled={disabled}
+                onClick={() => fileRef.current?.click()}
+                data-q-attach
+              >
+                <Plus
+                  aria-hidden="true"
+                  size={ICON_SIZE.prominent}
+                  strokeWidth={2}
+                />
+              </IconButton>
+            </>
+          ) : null}
           {onVoice !== undefined ? (
             <IconButton
               type="button"
@@ -185,6 +243,22 @@ export function QComposer({
           </IconButton>
         </div>
       </div>
+      {attachments.length > 0 ? (
+        <ul
+          aria-label="Attached"
+          className="flex flex-wrap gap-2"
+          data-q-attachments
+        >
+          {attachments.map((attachment) => (
+            <li
+              key={attachment}
+              className="cq-caption rounded-md bg-(--cq-surface-sunken) px-2 py-1 text-(--cq-text-secondary)"
+            >
+              {attachment}
+            </li>
+          ))}
+        </ul>
+      ) : null}
       {notice === "unavailable" ? (
         <InlineNotice
           tone="info"

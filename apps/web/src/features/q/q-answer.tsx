@@ -2,6 +2,7 @@ import { Q_CONFIDENCE_LABELS, type QFindingType } from "@capital-q/contracts";
 import { QMark } from "@capital-q/ui/q-mark";
 
 import type { QTurn } from "./conversation";
+import { QResultBlocks } from "./q-result-blocks";
 
 /**
  * Q's answer on Home, laid out to be read rather than scrolled
@@ -32,8 +33,11 @@ function sources(count: number): string {
 
 export function QAnswer({
   turn,
+  onAsk,
 }: {
   readonly turn: Extract<QTurn, { kind: "Q" }>;
+  /** Continue in this thread from something Q referred to (QX-001 §9). */
+  readonly onAsk?: ((question: string) => void) | undefined;
 }) {
   const hasDetail = turn.findings.length > 0 || turn.uncertainties.length > 0;
   return (
@@ -101,6 +105,9 @@ export function QAnswer({
           Based on {sources(turn.sourceCount)} on record.
         </span>
       ) : null}
+      {/* The part of the answer you can act on. Prose above stays prose;
+          a card is for an object with an action (QX-001 §10). */}
+      <QResultBlocks blocks={turn.blocks} onAsk={onAsk} />
     </div>
   );
 }

@@ -48,7 +48,70 @@ export type QTurn =
       readonly findings: readonly QTurnFinding[];
       /** What Q could not settle, and what would settle it. */
       readonly uncertainties: readonly QTurnUncertainty[];
+      /**
+       * The objects the answer referred to, in the server's own order
+       * (QX-001 §8): a company or investor, a comparison, a question
+       * back, a proposed action, a navigation it suggests.
+       *
+       * Everything an evidence reference carries is deliberately absent.
+       * A reference is only ids, and whether a person may see the
+       * document behind one is disclosure's decision at render time, not
+       * something this projection may pre-empt (§18) -- so evidence
+       * arrives as `sourceCount` above and an identifier never crosses
+       * into the browser's model of the conversation.
+       */
+      readonly blocks: readonly QTurnObjectBlock[];
     };
+
+/**
+ * The block kinds a turn carries as objects.
+ *
+ * TEXT, FINDING and UNCERTAINTY are already projected into prose and
+ * lists above; EVIDENCE is projected into a count. What is left is what
+ * a person can act on, and it is the only thing the renderer receives.
+ */
+export type QTurnObjectBlock = Extract<
+  QResultBlock,
+  {
+    kind:
+      | "COMPANY_REFERENCE"
+      | "INVESTOR_REFERENCE"
+      | "COMPARISON"
+      | "CLARIFICATION_REQUEST"
+      | "ACTION_PROPOSAL"
+      | "UI_INTENT";
+  }
+>;
+
+function objectBlocksOf(
+  blocks: readonly QResultBlock[] | undefined,
+): readonly QTurnObjectBlock[] {
+  if (blocks === undefined) {
+    return [];
+  }
+  return blocks.filter((block): block is QTurnObjectBlock => {
+    switch (block.kind) {
+      case "COMPANY_REFERENCE":
+      case "INVESTOR_REFERENCE":
+      case "COMPARISON":
+      case "CLARIFICATION_REQUEST":
+      case "ACTION_PROPOSAL":
+        return true;
+      case "UI_INTENT":
+        // SHOW_EVIDENCE carries the same references an evidence block
+        // does, so it is dropped for the same reason. There is no
+        // evidence surface to send anybody to yet either.
+        return block.intent.kind !== "SHOW_EVIDENCE";
+      // Already projected into prose, a list or a count above. EVIDENCE
+      // in particular must not pass: a reference is only identifiers.
+      case "TEXT":
+      case "EVIDENCE":
+      case "FINDING":
+      case "UNCERTAINTY":
+        return false;
+    }
+  });
+}
 
 export type QTurnFinding = {
   readonly id: string;
@@ -186,6 +249,7 @@ export function turnsFrom(
         sourceCount: sourceCountOf(message.blocks),
         findings: findingsOf(message.blocks),
         uncertainties: uncertaintiesOf(message.blocks),
+        blocks: objectBlocksOf(message.blocks),
       },
     });
   }
@@ -230,6 +294,10 @@ export function turnsFrom(
       sourceCount: 0,
       findings: [],
       uncertainties: [],
+      // A partial answer has no blocks: they arrive with the persisted
+      // message, and a card that appears then rearranges is worse than a
+      // card that arrives once.
+      blocks: [],
     });
   }
 
