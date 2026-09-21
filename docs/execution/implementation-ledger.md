@@ -3164,3 +3164,156 @@ Neither blocks GateQ Core and neither is resolved here.
 
 Next: CQ-GATE-002 — Application / Guest Session / Intake + Adaptive Q
 Interview. Not started.
+
+## CQ-GATE-002 / CQ-GATE-002R — the GateQ applicant surface (2026-09-21)
+
+GATE-002 shipped its foundations and stopped short of the surface a
+stranger touches; GATE-002R finished that and was told explicitly not to
+redesign what already passed. What follows covers both.
+
+A person with no Capital Q account opens an application at a published
+gateway, is interviewed by Q, closes the tab, comes back two days later,
+and submits. No account, no Supabase user, no membership, no synthetic
+actor anywhere in the path.
+
+### What holds it together
+
+| Separation                              | Where it is enforced                                                |
+| --------------------------------------- | ------------------------------------------------------------------- |
+| guest session ≠ membership ≠ capability | a bearer credential naming one application; no actor is ever built  |
+| applicant said it ≠ verified fact       | provenance per fact; APPLICANT_PROVIDED is not evidence             |
+| model proposal ≠ recorded fact          | a closed dimension contract validates every proposal before a write |
+| model sentence ≠ qualification          | GATE-001 recomputes after the turn's facts are recorded             |
+| criterion label ≠ criterion config      | the private configuration never enters a prompt                     |
+| unknown ≠ zero                          | UNKNOWN is a recorded value with its own provenance                 |
+| application ≠ canonical Company         | a separate subject kind; no Company is created                      |
+| draft ≠ submitted                       | submission is the disclosure boundary and is immutable after        |
+
+The policy an application is judged under is frozen at creation. An
+investor who tightens their criteria on Tuesday does not retroactively
+reject the founder who started on Monday.
+
+### The public routes
+
+Four anonymous routes under `/v1/gateq/apply`, with no context hook. No
+request schema anywhere has a field for a tenant, an investor
+organisation, a gateway version, a company id or a qualification outcome:
+a field a browser fills is a field a browser can forge.
+
+Every refusal is the same 404. Forged, expired, revoked and
+valid-but-somebody-else's credentials are one answer; so are an unknown,
+unpublished, closed and malformed gateway id. An endpoint that tells them
+apart answers questions nobody asked.
+
+A retry is the same turn. The session remembers the last client turn id
+and the reply it produced, so a double-tapped send on a flaky connection
+returns what the applicant already saw rather than paying for a second
+model call and recording the same sentence twice.
+
+### What the live model found
+
+The QGATE suite was run against a real provider, and it showed three
+things a scripted model never would:
+
+1. Asked which countries the investor accepts, Q answered "any company
+   headquartered in an African country is eligible". Nothing private
+   leaked — the configuration is not in the prompt — but it invented an
+   eligibility rule and told a founder to act on it. A false rule is worse
+   than a refusal: it invites the wrong people and turns the right ones
+   away.
+2. On that same turn it recorded a country the applicant never gave,
+   because it read a question as an answer.
+3. The opening turn — an empty utterance — was read as an answer and
+   replied to with "Which country are you based in?", which is a form
+   introducing itself.
+
+All three were prompt failures and all three are fixed. After the fix the
+same live cases read like a person: "We work with Meridian Seed Partners,
+who run seed cheques into African fintech and read every application
+themselves. Can you tell me a bit about what you are building?"
+
+The suite also exposed a lying diagnostic: a proposal discarded because
+the turn was small talk was not counted as rejected, so a log said
+"rejected: 0" for a turn where a model tried to write a fact during
+sabotage.
+
+### Gates — CQ-GATE-002R (demo stack stopped, database reset)
+
+| Gate                             | Result                                                                  |
+| -------------------------------- | ----------------------------------------------------------------------- |
+| `pnpm db:reset` / `db:lint`      | 20261003090000 applied / no schema errors                               |
+| `pnpm db:types:check`            | clean after regeneration (two new session columns)                      |
+| `pnpm test:rls`                  | 36 files, 1035 tests, PASS (was 35 / 1010)                              |
+| `pnpm test:integration`          | 53 pass + 1 skipped; 484 pass + 5 skipped, exit 0                       |
+| `pnpm format:check`              | every tracked file passes (295 offenders are untracked `graphify-out/`) |
+| `pnpm lint`                      | exit 0                                                                  |
+| `pnpm typecheck`                 | 80/80                                                                   |
+| `pnpm test`                      | 240 files, 3123 tests, exit 0 (was 237 / 3070)                          |
+| `pnpm build`                     | 43/43                                                                   |
+| `pnpm q:eval:lint`               | PASS, 57 cases / 18 graders (was 39 / 16)                               |
+| `pnpm q:eval:ci`                 | release gate PASS, exit 0, no regression                                |
+| QGATE profile                    | 18/18, exit 0, 6 flagged for human review                               |
+| LIVE_MODEL, GateQ cases          | run against a real provider; findings above                             |
+| Dependency direction             | no package depends on an app                                            |
+| Secret scan / `git diff --check` | clean                                                                   |
+| `pnpm demo:status`               | READY, four components (`--local`; see below)                           |
+
+### Providers
+
+The API now composes a model gateway, because the applicant interview is a
+conversation. No new provider, account, API key or billing: it reuses the
+same `GEMINI_API_KEY` / `GROQ_API_KEY` the workers and q-api already read.
+With no provider configured the applicant surface does not register at
+all — a closed front door rather than a broken one.
+
+### Known limits
+
+- **The guest document path is not implemented.** Evidence's
+  `createDocument` requires an `ActorContext` with an active organisation
+  and a capability check, and `ownedSubject()` matches the subject against
+  that organisation. An applicant has neither, and minting a synthetic
+  user to satisfy it would break the invariant that no fake Supabase user
+  is ever created. Closing it needs an Evidence-owned decision about guest
+  authority — a guest principal in its authority model, or a trusted
+  non-actor creation entry point — with the draft-privacy consequences
+  that follow. Reported rather than worked around.
+- A live turn said "I read your application and I am genuinely glad you
+  sent it" — a claim about a past action Q cannot make. No grader catches
+  it mechanically; the case is human-review and it is recorded here rather
+  than quietly passed.
+- Live eligibility in QGATE is deliberately narrow. A case asserting which
+  dimensions one ambiguous sentence yields, or which intent label a model
+  puts on it, is an exact property of the validator against a scripted
+  model and merely a reading against a real one. Those stay deterministic.
+- The applicant routes carry the contract's own size and shape bounds and
+  the app's limits; a dedicated per-credential rate limit is still open.
+- Hosted migrations pending: **20260925 through 20261003**. `db:push` was
+  not run, per the packet.
+- The demo stack needed `pnpm demo --local`: the checked-in environment
+  points `SUPABASE_URL` and `DATABASE_URL` at the hosted project while
+  `apps/web/.env.local` still points at the local one, and the launcher
+  refuses a split configuration. Pre-existing, unrelated to this packet.
+- Circular-import scan reports five, all pre-existing barrel
+  self-references in other packages' built `.d.ts` output. None introduced
+  here.
+
+### Open debt, unchanged by this packet
+
+| Item                                                                                                                                                            | Class | Boundary                                    |
+| --------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----- | ------------------------------------------- |
+| `CQ-DEV-WATCH-SCOPE-001` — `node --watch` restarts dev services when a file under `packages/*/dist` is merely read                                              | 3     | **before an external or public GateQ demo** |
+| `CQ-TEST-SSE-TEARDOWN-001` — the q-api SSE integration test can leave a query pending across pool shutdown, failing the gate under load while every test passes | 3     | **no later than the pre-Wave-7 closure**    |
+
+### Commits
+
+| Checkpoint | SHA       | What                                               |
+| ---------- | --------- | -------------------------------------------------- |
+| A          | `dcc242d` | secure resumable guest applications                |
+| B          | `41f603e` | the model-led interview brain (partial)            |
+| C          | `8673997` | the public application API                         |
+| D          | `0039e78` | the QGATE suite, and the live findings it produced |
+| E          | `c587506` | regenerated database types; gates closed           |
+
+Next: CQ-GATE-003 — the investor's view of inbound applications. Not
+started. The guest document path above must be resolved first or
+explicitly deferred.
