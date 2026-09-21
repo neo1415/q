@@ -3461,3 +3461,128 @@ rate limit and the epistemic wording are closed.
 
 Next: QX-001 — Q-Centric Home / Surface. GATE-003 remains blocked on the
 Evidence authority decision above.
+
+## QX-001 — Home as a unified Q surface (2026-09-21)
+
+The first packet of the Q Experience Completion Wave. Home was a page
+heading, a boxed chat and three dashboard sections; it is now Q.
+
+### What changed
+
+The conversation occupies the screen and the composer is what your eye
+lands on. Everything else has to earn its place underneath, and what earns
+it is a setup left part-way, the control over who can see you, and — for
+somebody Capital Q knows nothing about yet — which side of the table they
+are on. No counter reading zero, no empty activity feed, no "0 matches".
+
+**One input.** Typing, talking and attaching sit on the same row of the
+same composer. The attach control runs the same three-step Evidence
+upload onboarding already uses — ask permission, bytes straight from the
+browser into private storage, server verifies what landed — and appears
+only for a founder with a company, because that is the only subject
+Evidence can own a document against today. An investor sees no control
+rather than one that refuses.
+
+**Voice is a mode, not a product.** Entering and leaving the voice stage
+keeps the conversation id, the turns and the context; Q does not restart
+because the display changed. Proved live below.
+
+**Deep chat stays separate.** One deliberate Chats control on Home opens
+the same conversations and the same runs. There is no second chat
+implementation and the transcript does not dominate Home.
+
+### Structured results
+
+A reusable card shell now renders the object blocks of an answer with
+typed actions: `COMPANY_REFERENCE`, `INVESTOR_REFERENCE`, `COMPARISON`,
+`CLARIFICATION_REQUEST`, `ACTION_PROPOSAL`, `UI_INTENT`. Prose, findings,
+uncertainties and the source count stay prose and lists — a rounded
+rectangle is for an object with an action, not a paragraph with a border.
+
+Two honest limits, both reported rather than papered over:
+
+- **The runtime attaches no result blocks at all today.** `toQMessage`
+  builds text-only messages, so nothing currently renders. That is the
+  correct amount of nothing; the shell lights up the day a specialist
+  attaches its first block, with no further change here.
+- **No UI intent has a surface to point at.** There is no company detail
+  page and no comparison view, so an intent with no route is ignored
+  rather than shipped as a link to a 404 — the same rule the spoken
+  destination map already follows.
+
+QX-003 extends this shell for generated artifacts rather than inventing a
+second card language beside it.
+
+### An invariant the tests caught
+
+Carrying blocks through verbatim re-introduced evidence identifiers into
+the browser's model of a conversation. A reference is only identifiers,
+and whether somebody may see the document behind one is disclosure's
+decision at render time. Evidence stays a count, `SHOW_EVIDENCE` is
+dropped with it, and `apps/web/test/q-result-blocks.test.ts` pins both.
+
+### Persona choice
+
+A radio group, not two links dressed as cards. Arrow keys move within it,
+the selected card says "selected" in words as well as by its outline, and
+the button names the role it will continue as. Selection and navigation
+are separate because reading both options before committing is the point
+of showing them together. Canonical Founder and Investor semantics are
+unchanged and no third persona was invented.
+
+### Live UX smoke (local stack, synthetic accounts)
+
+|                                          |                                                                                                                      |
+| ---------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| A · founder types, answers, voice, back  | PASS — conversation `9be65d4a` unchanged across the voice stage and back; turns preserved                            |
+| B · Chats → reopen → second message      | PASS — two answers in the same conversation                                                                          |
+| C · investor Home, "What is my mandate?" | PASS — answered from authorised investor context: no mandate is configured, rather than an invented one              |
+| D · structured result card               | **NOT OBSERVED** — the runtime emits no blocks, so there was nothing to render. Shell and projection are unit-tested |
+| E · 375px                                | PASS — no horizontal overflow; composer, attach, mic and send all reachable                                          |
+
+Q's answers were honest about having nothing on record in both A and C,
+which is the behaviour the product depends on and the reason neither was
+dressed up.
+
+The microphone is blocked in the test browser. The failure showed as one
+plain sentence with a Dismiss and Home intact underneath — no provider
+name, no stack, no enum — which is the error behaviour §17 asks for.
+
+### Verification
+
+| Gate                                        | Result                      |
+| ------------------------------------------- | --------------------------- |
+| web + ui tests                              | 16 files, 204 tests, exit 0 |
+| `@capital-q/web` typecheck                  | exit 0                      |
+| `@capital-q/web` build                      | exit 0                      |
+| eslint, web + ui                            | exit 0                      |
+| `git diff --check` / secret scan / boundary | clean                       |
+| `pnpm demo:status`                          | READY, four components      |
+
+No new provider, account, API key, environment variable or migration. No
+model call was added to render Home: the page reads server-resolved
+context and nothing else.
+
+### Deferred, as scoped
+
+QX-002 research-assisted onboarding · QX-003 artifact persistence and
+viewer · QX-004 deck and document generation · GateQ investor dashboard ·
+media feed.
+
+### Open debt, carried
+
+| Item                                                                                                               | Class | Boundary                                    |
+| ------------------------------------------------------------------------------------------------------------------ | ----- | ------------------------------------------- |
+| `CQ-GATE-EVIDENCE-GUEST-001` — a GateQ applicant cannot use the Evidence pipeline                                  | 2     | **before GATE-003**                         |
+| `CQ-DEV-WATCH-SCOPE-001` — `node --watch` restarts dev services when a file under `packages/*/dist` is merely read | 3     | **before an external or public GateQ demo** |
+| `CQ-TEST-SSE-TEARDOWN-001` — the q-api SSE integration test can leave a query pending across pool shutdown         | 3     | **no later than the pre-Wave-7 closure**    |
+
+None is closed by this packet.
+
+### Commits
+
+| SHA       | What                                                                          |
+| --------- | ----------------------------------------------------------------------------- |
+| `ffcf1a3` | Home as a Q-first surface, one composer, the result-card shell, persona cards |
+
+Next: QX-002 — Research-Assisted Onboarding.
