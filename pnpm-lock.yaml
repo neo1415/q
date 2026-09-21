@@ -1280,6 +1280,12 @@ importers:
       '@capital-q/evidence':
         specifier: workspace:*
         version: link:../evidence
+      '@capital-q/gateq':
+        specifier: workspace:*
+        version: link:../gateq
+      '@capital-q/gateq-intake':
+        specifier: workspace:*
+        version: link:../gateq-intake
       '@capital-q/investors':
         specifier: workspace:*
         version: link:../investors

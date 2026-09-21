@@ -39,6 +39,7 @@ import {
   type QEvalWorld,
   type QEvalWorldOptions,
 } from "../fixtures/world.js";
+import { driveGateQInterview } from "./gateq-interview.js";
 import { graderById, type QEvalObservation } from "../graders/index.js";
 
 /**
@@ -240,7 +241,7 @@ async function runCase(
           graderVersion: "1",
           kind: "DETERMINISTIC",
           verdict: "FAIL",
-          detail: `runner error: ${error instanceof Error ? error.name : typeof error}`,
+          detail: `runner error: ${error instanceof Error ? `${error.name}: ${error.message}` : typeof error}`,
         },
       ],
     };
@@ -340,7 +341,62 @@ async function execute(
       return executeRouting(world, evalCase);
     case "EXPLANATION":
       return executeExplanation(world, evalCase);
+    case "GATEQ_INTERVIEW":
+      return executeGateQInterview(world, evalCase, keepAnswers);
   }
+}
+
+/**
+ * One GateQ applicant turn, through the real interviewer (CQ-GATE-002R
+ * §13).
+ *
+ * No run, no database, no intake service: the interviewer is handed a
+ * gateway, a frozen policy and GATE-001's answer, and may only propose.
+ * The reply is kept for the marker graders and for a person to read; it
+ * never reaches a baseline.
+ */
+async function executeGateQInterview(
+  world: QEvalWorld,
+  evalCase: QEvalCase,
+  keepAnswers: boolean,
+): Promise<QEvalObservation> {
+  const before = snapshot(world);
+  const startedAt = Date.now();
+  const { observation, reply } = await driveGateQInterview(world, evalCase);
+  const calls = world.recorder.calls();
+  return {
+    record: {
+      ...emptyRecord(world),
+      runCreation: "REFUSED",
+      latencyMs: Date.now() - startedAt,
+      providerAttempts: calls.length,
+      failedAttempts: observation.unavailable ? calls.length : 0,
+      answerCharacters: reply?.length ?? null,
+      // Kept only when a person asked to read the turns. The marker
+      // graders read `answerText` below either way; this is the copy that
+      // reaches the report a reviewer opens.
+      answerText: keepAnswers ? (reply?.slice(0, 8000) ?? null) : null,
+    },
+    providerCalls: calls,
+    answerText: reply,
+    analyst: null,
+    events: [],
+    logLines: world.logLines.slice(before.logCursor),
+    scenario: {
+      approvalsCreated: 0,
+      executionsBefore: before.executions,
+      executionsAfter: world.executions(),
+      gateOutcome: null,
+      approvalStatusAfter: null,
+      streamSequences: null,
+      streamConverged: null,
+      providerCallsAfterCancel: null,
+      routing: null,
+      explanation: null,
+      comparison: null,
+      gateq: observation,
+    },
+  };
 }
 
 type RunOutcome = {
@@ -359,7 +415,11 @@ async function driveRun(
   presetOverride?: "BALANCED" | "DIRECT",
 ): Promise<RunOutcome> {
   const execution = evalCase.execution;
-  if (execution.kind === "ROUTING" || execution.kind === "EXPLANATION") {
+  if (
+    execution.kind === "ROUTING" ||
+    execution.kind === "EXPLANATION" ||
+    execution.kind === "GATEQ_INTERVIEW"
+  ) {
     throw new Error("not a run");
   }
   const input = execution.input;
@@ -596,6 +656,7 @@ async function executeRun(
       routing: null,
       explanation: null,
       comparison,
+      gateq: null,
     },
   };
 }
@@ -720,6 +781,7 @@ async function executeActionGate(
       routing: null,
       explanation: null,
       comparison: null,
+      gateq: null,
     },
   };
 }
@@ -810,6 +872,7 @@ async function executeRouting(
       routing: { attemptsByProvider, outcome },
       explanation: null,
       comparison: null,
+      gateq: null,
     },
   };
 }
@@ -989,6 +1052,7 @@ async function executeExplanation(
         syntheticDemoAttested: world.syntheticDemo !== null,
       },
       comparison: null,
+      gateq: null,
     },
   };
 }

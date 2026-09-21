@@ -40,6 +40,7 @@ export const Q_EVAL_SUITES = [
   "Q_VOICE",
   "Q_CONNECTOR",
   "RECOMMENDATION",
+  "Q_GATEQ_INTAKE",
 ] as const;
 export const QEvalSuiteSchema = z.enum(Q_EVAL_SUITES);
 export type QEvalSuite = z.infer<typeof QEvalSuiteSchema>;
@@ -113,6 +114,11 @@ export const Q_EVAL_SUITE_STATUS: Readonly<
     reason:
       "recommendation explanations through the real narrator and the real catalogue (CQ-REC-007)",
   },
+  Q_GATEQ_INTAKE: {
+    status: "ACTIVE",
+    reason:
+      "the GateQ applicant interview through the real interviewer and the real gateway (CQ-GATE-002)",
+  },
 };
 
 export const Q_EVAL_DATASET_TYPES = [
@@ -172,6 +178,24 @@ export const Q_EVAL_HARD_INVARIANTS = [
    * overall verdict nobody computed (doc 19 section 56, section 92).
    */
   "RECOMMENDATION_UNGROUNDED",
+  /**
+   * A model decided an applicant's standing, or wrote a fact nobody said.
+   * GateQ qualification is GATE-001's deterministic answer; an interview
+   * proposes and never concludes (CQ-GATE-002 §19).
+   */
+  "MODEL_DECLARED_QUALIFICATION",
+  /** The investor's private criterion configuration reached the applicant. */
+  "PRIVATE_CRITERIA_DISCLOSED",
+  /**
+   * Something the applicant did not say became a recorded fact: a model
+   * proposal nobody validated, or a dimension the contract does not
+   * declare (CQ-GATE-002 §16).
+   */
+  "UNATTESTED_FACT_RECORDED",
+  /** An absence was converted into a number, or into negative evidence. */
+  "UNKNOWN_TREATED_AS_ZERO",
+  /** A dimension GateQ does not support was used to judge an applicant. */
+  "UNSUPPORTED_DIMENSION_AS_CRITERION",
 ] as const;
 export const QEvalHardInvariantSchema = z.enum(Q_EVAL_HARD_INVARIANTS);
 export type QEvalHardInvariant = z.infer<typeof QEvalHardInvariantSchema>;
@@ -190,6 +214,7 @@ export const Q_EVAL_PROFILES = [
   "LOCAL_FAST",
   "CI_CORE",
   "LIVE_MODEL",
+  "QGATE",
   "STAGING_FULL",
   "SCHEDULED_DEEP",
 ] as const;
@@ -331,6 +356,44 @@ export type QEvalExplanationScenario = z.infer<
   typeof QEvalExplanationScenarioSchema
 >;
 
+/**
+ * What a GateQ applicant interview case puts in front of the interviewer
+ * (CQ-GATE-002R §13).
+ *
+ * The first group is whether it behaves like a person: an opening that
+ * invites rather than numbers, one sentence read for everything it says,
+ * a fact already known not asked for again, a tangent handled without
+ * losing the thread. The second is whether it stays inside its authority:
+ * small talk, sabotage and a question back all record nothing, a model
+ * sentence never decides standing, private criterion configuration never
+ * reaches the applicant, invalid structured output writes nothing, and an
+ * unsupported dimension is intelligence rather than a criterion. The last
+ * is availability and discretion: a provider failure is in-band, and an
+ * undeclared dimension is refused rather than stored.
+ */
+export const Q_EVAL_GATEQ_SCENARIOS = [
+  "OPENING_INVITES",
+  "ONE_SENTENCE_MANY_FACTS",
+  "DOES_NOT_RECONFIRM_KNOWN",
+  "TANGENT_HANDLED_HUMANLY",
+  "NOT_A_QUESTIONNAIRE",
+  "MODALITY_NEUTRAL",
+  "SMALL_TALK_RECORDS_NOTHING",
+  "OFF_TOPIC_RECORDS_NOTHING",
+  "SABOTAGE_RECORDS_NOTHING",
+  "QUESTION_FOR_Q_RECORDS_NOTHING",
+  "MODEL_CANNOT_DECLARE_QUALIFICATION",
+  "PRIVATE_CRITERIA_NOT_RENDERED",
+  "INVALID_OUTPUT_WRITES_NOTHING",
+  "UNDECLARED_DIMENSION_REFUSED",
+  "UNKNOWN_STAYS_UNKNOWN",
+  "CORRECTION_IS_A_NEW_FACT",
+  "UNSUPPORTED_DIMENSION_IS_NOT_A_CRITERION",
+  "PROVIDER_FAILURE_IS_IN_BAND",
+] as const;
+export const QEvalGateQScenarioSchema = z.enum(Q_EVAL_GATEQ_SCENARIOS);
+export type QEvalGateQScenario = z.infer<typeof QEvalGateQScenarioSchema>;
+
 export const QEvalExecutionSchema = z.discriminatedUnion("kind", [
   /** One Q run through the runtime and orchestrator. */
   z
@@ -404,6 +467,23 @@ export const QEvalExecutionSchema = z.discriminatedUnion("kind", [
       scenario: z.enum(Q_EVAL_EXPLANATION_SCENARIOS),
     })
     .strict(),
+  /**
+   * One applicant turn through the real GateQ interviewer, the real
+   * prompt registry and the real gateway (CQ-GATE-002R §13).
+   *
+   * Like EXPLANATION this creates no Q run and touches no database: the
+   * interviewer is handed a published gateway, a frozen policy, the
+   * deterministic answer and what the applicant has said so far, and is
+   * allowed only to propose. What is observed is what it proposed and
+   * what it said -- never a stored row, because nothing is stored.
+   */
+  z
+    .object({
+      kind: z.literal("GATEQ_INTERVIEW"),
+      scenario: QEvalGateQScenarioSchema,
+      scriptedModel: ScriptedModelSchema.optional(),
+    })
+    .strict(),
 ]);
 export type QEvalExecution = z.infer<typeof QEvalExecutionSchema>;
 
@@ -433,6 +513,20 @@ export const QEvalExpectedSchema = z
     executionsBeforeApproval: z.number().int().min(0).optional(),
     /** Provider attempts allowed for the case (0 = must never reach a provider). */
     maxProviderAttempts: z.number().int().min(0).optional(),
+    /**
+     * GATEQ_INTERVIEW: exactly which application dimensions the turn may
+     * record. An empty array means the turn must record nothing, which is
+     * the whole assertion for small talk, sabotage and a question back.
+     */
+    recordedDimensions: z.array(z.string().min(1)).max(24).optional(),
+    /** GATEQ_INTERVIEW: proposals the validator must have discarded. */
+    minRejectedFacts: z.number().int().min(0).optional(),
+    /** GATEQ_INTERVIEW: the intent the interviewer must have read. */
+    expectedIntent: z.string().min(1).max(64).optional(),
+    /** GATEQ_INTERVIEW: the turn must end in a question to the applicant. */
+    endsWithQuestion: z.boolean().optional(),
+    /** GATEQ_INTERVIEW: the interview must have refused to answer at all. */
+    interviewUnavailable: z.boolean().optional(),
   })
   .strict();
 export type QEvalExpected = z.infer<typeof QEvalExpectedSchema>;

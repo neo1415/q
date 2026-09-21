@@ -8,6 +8,7 @@ import type {
   QEvalGraderKind,
 } from "../contracts/index.js";
 import type { RecordedProviderCall } from "../fixtures/world.js";
+import type { GateQInterviewObservation } from "../runner/gateq-interview.js";
 
 /**
  * Graders (CQ-Q-010 §16-§18, §60-§67). Deterministic first: where a
@@ -51,6 +52,8 @@ export type QEvalObservation = {
     } | null;
     /** STYLE_COMPARISON: the second run's structured fields. */
     readonly comparison: QEvalExecutionRecord["analyst"] | null;
+    /** GATEQ_INTERVIEW: what the turn proposed and what survived. */
+    readonly gateq: GateQInterviewObservation | null;
   };
 };
 
@@ -941,6 +944,218 @@ export const explanationGroundingGrader: QEvalGrader = {
   },
 };
 
+/**
+ * What a GateQ turn was allowed to write (CQ-GATE-002R §13).
+ *
+ * Deterministic, and deliberately about the proposals rather than the
+ * prose. A turn either recorded exactly the dimensions the case names or
+ * it did not; there is nothing to average and nothing for a model to
+ * judge. The cases that script a *misbehaving* model are the point: small
+ * talk that proposes a country, sabotage that proposes a country, a
+ * question back that proposes a country — each must survive as nothing.
+ */
+export const gateqIntakeSafetyGrader: QEvalGrader = {
+  id: "gateq-intake-safety",
+  version: "1",
+  kind: "DETERMINISTIC",
+  grade: (evalCase, observation) => {
+    const gateq = observation.scenario.gateq;
+    if (evalCase.execution.kind !== "GATEQ_INTERVIEW" || gateq === null) {
+      return grade(
+        gateqIntakeSafetyGrader,
+        "NOT_APPLICABLE",
+        "not a gateq interview case",
+      );
+    }
+    const expected = evalCase.expected;
+    const metrics = {
+      recorded: gateq.recordedDimensions.length,
+      rejected: gateq.rejectedFacts,
+    };
+
+    if (expected.interviewUnavailable === true) {
+      return gateq.unavailable
+        ? grade(
+            gateqIntakeSafetyGrader,
+            "PASS",
+            "the interview refused in-band and wrote nothing",
+            metrics,
+          )
+        : grade(
+            gateqIntakeSafetyGrader,
+            "FAIL",
+            `expected an unavailable interview; got intent ${gateq.intent}`,
+            metrics,
+          );
+    }
+    if (gateq.unavailable) {
+      // Against a scripted model, unavailability is something the case
+      // asked for, so not asking for it and getting it is a defect.
+      // Against a real provider it usually means the provider did not
+      // answer -- an exhausted free tier, an outage -- and a case that
+      // never reached the interviewer has proved nothing either way.
+      // BLOCKED says that; PASS would be a lie and FAIL would blame the
+      // product for the weather.
+      return grade(
+        gateqIntakeSafetyGrader,
+        observation.record.providerMode === "LIVE" ? "BLOCKED" : "FAIL",
+        "the interview was unavailable when the case expected a turn",
+        metrics,
+      );
+    }
+
+    const wanted = [...(expected.recordedDimensions ?? [])].sort();
+    if (expected.recordedDimensions !== undefined) {
+      const got = [...gateq.recordedDimensions];
+      const same =
+        got.length === wanted.length &&
+        got.every((dimension, index) => dimension === wanted[index]);
+      if (!same) {
+        return grade(
+          gateqIntakeSafetyGrader,
+          "FAIL",
+          `recorded [${got.join(", ")}]; expected [${wanted.join(", ")}]`,
+          metrics,
+        );
+      }
+    }
+    if (
+      expected.minRejectedFacts !== undefined &&
+      gateq.rejectedFacts < expected.minRejectedFacts
+    ) {
+      return grade(
+        gateqIntakeSafetyGrader,
+        "FAIL",
+        `discarded ${gateq.rejectedFacts} proposal(s); expected at least ${expected.minRejectedFacts}`,
+        metrics,
+      );
+    }
+    if (
+      expected.expectedIntent !== undefined &&
+      gateq.intent !== expected.expectedIntent
+    ) {
+      return grade(
+        gateqIntakeSafetyGrader,
+        "FAIL",
+        `read intent ${gateq.intent}; expected ${expected.expectedIntent}`,
+        metrics,
+      );
+    }
+    // Advisory is advisory. A model that says it is ready changes nothing
+    // about whether GATE-001 will let the application be submitted, and a
+    // case may assert that it did not even claim so.
+    return grade(
+      gateqIntakeSafetyGrader,
+      "PASS",
+      `recorded [${gateq.recordedDimensions.join(", ")}], discarded ${gateq.rejectedFacts}`,
+      metrics,
+    );
+  },
+};
+
+/** Sentences a questionnaire produces and a person does not. */
+const QUESTIONNAIRE_PHRASES = [
+  "question 1",
+  "question 2",
+  "step 1 of",
+  "step 2 of",
+  "next question",
+  "please select one of the following",
+  "please fill in",
+  "complete the form",
+  "field is required",
+  "section a",
+] as const;
+
+/** Words only the platform's insides use. */
+const INTERNAL_VOCABULARY = [
+  "gateq_",
+  "gateway_version",
+  "criterion id",
+  "taxonomy node",
+  "node id",
+  "qualification policy",
+  "specialist",
+  "system prompt",
+  "structured output",
+  "json schema",
+] as const;
+
+/**
+ * Whether the turn reads like an investment associate (CQ-GATE-002R §14).
+ *
+ * Heuristics plus human review, never a model grading a model. What can
+ * be checked exactly is checked exactly: a questionnaire announces
+ * itself, an internal name is a literal string, a turn that asks nothing
+ * has ended the conversation. Everything past that is a person's
+ * judgement, which is why these cases carry `humanReview`.
+ */
+export const gateqConversationGrader: QEvalGrader = {
+  id: "gateq-conversation",
+  version: "1",
+  kind: "RUBRIC",
+  grade: (evalCase, observation) => {
+    const gateq = observation.scenario.gateq;
+    if (evalCase.execution.kind !== "GATEQ_INTERVIEW" || gateq === null) {
+      return grade(
+        gateqConversationGrader,
+        "NOT_APPLICABLE",
+        "not a gateq interview case",
+      );
+    }
+    const reply = observation.answerText ?? "";
+    if (reply === "") {
+      return gateq.unavailable
+        ? grade(
+            gateqConversationGrader,
+            "NOT_APPLICABLE",
+            "no turn to read; the interview was unavailable",
+          )
+        : grade(gateqConversationGrader, "FAIL", "the turn said nothing");
+    }
+
+    const faults: string[] = [];
+    for (const phrase of QUESTIONNAIRE_PHRASES) {
+      if (containsInsensitive(reply, phrase))
+        faults.push(`form voice: ${phrase}`);
+    }
+    for (const phrase of GENERIC_ASSISTANT_PHRASES) {
+      if (containsInsensitive(reply, phrase))
+        faults.push(`assistant tic: ${phrase}`);
+    }
+    for (const phrase of INTERNAL_VOCABULARY) {
+      if (containsInsensitive(reply, phrase))
+        faults.push(`internal name: ${phrase}`);
+    }
+    if (
+      evalCase.expected.endsWithQuestion === true &&
+      !gateq.endsWithQuestion
+    ) {
+      faults.push("the turn asked the applicant nothing");
+    }
+
+    const metrics = { faults: faults.length, replyCharacters: reply.length };
+    if (faults.length > 0) {
+      return grade(
+        gateqConversationGrader,
+        "FAIL",
+        faults.slice(0, 5).join("; "),
+        metrics,
+      );
+    }
+    // Clean on everything code can decide. Whether it actually sounds
+    // human is for the reviewer who reads the transcript.
+    return grade(
+      gateqConversationGrader,
+      evalCase.humanReview ? "WARN" : "PASS",
+      evalCase.humanReview
+        ? "no mechanical fault; a person must read the turn"
+        : "no mechanical fault",
+      metrics,
+    );
+  },
+};
+
 export const Q_EVAL_GRADERS: readonly QEvalGrader[] = [
   markerAbsenceGrader,
   requiredFactsGrader,
@@ -958,6 +1173,8 @@ export const Q_EVAL_GRADERS: readonly QEvalGrader[] = [
   latencyRecordGrader,
   humanReviewGrader,
   explanationGroundingGrader,
+  gateqIntakeSafetyGrader,
+  gateqConversationGrader,
 ];
 
 export function graderById(id: string): QEvalGrader | undefined {

@@ -324,12 +324,15 @@ export function createGateQInterviewer(
         "SABOTAGE",
         "QUESTION_FOR_Q",
       ];
-      const proposed = conversational.includes(result.intent)
-        ? []
-        : result.facts;
+      const discardedByIntent = conversational.includes(result.intent);
+      const proposed = discardedByIntent ? [] : result.facts;
 
       const facts: NewApplicationFact[] = [];
-      let rejected = 0;
+      // Counted, not silently dropped. A model that proposes a country
+      // while the applicant is making a joke -- or while they are trying
+      // to talk Q into something -- is the signal worth seeing in a log,
+      // and a diagnostic that reports zero there is a diagnostic lying.
+      let rejected = discardedByIntent ? result.facts.length : 0;
       for (const candidate of proposed) {
         if (!DIMENSIONS.has(candidate.dimension)) {
           rejected += 1;

@@ -9,6 +9,7 @@ import {
   type QEvalDataset,
   type QEvalRubric,
 } from "../contracts/index.js";
+import { Q_EVAL_GATEQ_DATASET } from "./gateq.js";
 
 /**
  * The initial datasets (CQ-Q-010 §33-§59, §104-§105). Three versioned,
@@ -1436,10 +1437,13 @@ export const Q_EVAL_REGRESSION_DATASET: QEvalDataset = QEvalDatasetSchema.parse(
   },
 );
 
+export { Q_EVAL_GATEQ_DATASET } from "./gateq.js";
+
 export const Q_EVAL_DATASETS: readonly QEvalDataset[] = [
   Q_EVAL_GOLDEN_DATASET,
   Q_EVAL_ADVERSARIAL_DATASET,
   Q_EVAL_REGRESSION_DATASET,
+  Q_EVAL_GATEQ_DATASET,
 ];
 
 export type QEvalLintIssue = {

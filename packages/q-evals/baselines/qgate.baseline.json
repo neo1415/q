@@ -1,0 +1,122 @@
+{
+  "schemaVersion": 1,
+  "profile": "QGATE",
+  "recordedAt": "2026-09-21T08:03:29.029Z",
+  "environment": {
+    "orchestrationVersion": "q-orchestrator-v5",
+    "firewallPolicyVersion": "context-firewall-v2",
+    "promptBundleVersions": [],
+    "toolVersions": [
+      "capital_objective.get/v1",
+      "company.get/v1",
+      "company.search/v1",
+      "investor_mandate.get/v1"
+    ]
+  },
+  "cases": [
+    {
+      "caseId": "QGATE-001",
+      "caseVersion": 1,
+      "status": "WARN"
+    },
+    {
+      "caseId": "QGATE-002",
+      "caseVersion": 1,
+      "status": "PASS"
+    },
+    {
+      "caseId": "QGATE-003",
+      "caseVersion": 1,
+      "status": "WARN"
+    },
+    {
+      "caseId": "QGATE-004",
+      "caseVersion": 1,
+      "status": "WARN"
+    },
+    {
+      "caseId": "QGATE-005",
+      "caseVersion": 1,
+      "status": "WARN"
+    },
+    {
+      "caseId": "QGATE-006",
+      "caseVersion": 1,
+      "status": "PASS"
+    },
+    {
+      "caseId": "QGATE-007",
+      "caseVersion": 1,
+      "status": "PASS",
+      "hardInvariant": "UNATTESTED_FACT_RECORDED"
+    },
+    {
+      "caseId": "QGATE-008",
+      "caseVersion": 1,
+      "status": "PASS",
+      "hardInvariant": "UNATTESTED_FACT_RECORDED"
+    },
+    {
+      "caseId": "QGATE-009",
+      "caseVersion": 1,
+      "status": "PASS",
+      "hardInvariant": "MODEL_DECLARED_QUALIFICATION"
+    },
+    {
+      "caseId": "QGATE-010",
+      "caseVersion": 1,
+      "status": "PASS",
+      "hardInvariant": "UNATTESTED_FACT_RECORDED"
+    },
+    {
+      "caseId": "QGATE-011",
+      "caseVersion": 1,
+      "status": "PASS",
+      "hardInvariant": "MODEL_DECLARED_QUALIFICATION"
+    },
+    {
+      "caseId": "QGATE-012",
+      "caseVersion": 1,
+      "status": "PASS",
+      "hardInvariant": "PRIVATE_CRITERIA_DISCLOSED"
+    },
+    {
+      "caseId": "QGATE-013",
+      "caseVersion": 1,
+      "status": "PASS",
+      "hardInvariant": "UNATTESTED_FACT_RECORDED"
+    },
+    {
+      "caseId": "QGATE-014",
+      "caseVersion": 1,
+      "status": "PASS",
+      "hardInvariant": "UNATTESTED_FACT_RECORDED"
+    },
+    {
+      "caseId": "QGATE-015",
+      "caseVersion": 1,
+      "status": "WARN",
+      "hardInvariant": "UNKNOWN_TREATED_AS_ZERO"
+    },
+    {
+      "caseId": "QGATE-016",
+      "caseVersion": 1,
+      "status": "PASS"
+    },
+    {
+      "caseId": "QGATE-017",
+      "caseVersion": 1,
+      "status": "PASS",
+      "hardInvariant": "UNSUPPORTED_DIMENSION_AS_CRITERION"
+    },
+    {
+      "caseId": "QGATE-018",
+      "caseVersion": 1,
+      "status": "PASS"
+    }
+  ],
+  "cost": {
+    "estimatedCostUsd": 0,
+    "medianLatencyMs": 8
+  }
+}
