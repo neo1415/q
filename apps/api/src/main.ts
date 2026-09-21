@@ -41,6 +41,7 @@ import {
 } from "@capital-q/capital";
 import {
   createCompanyService,
+  createPostgresCompanyMarketplaceQueryPort,
   createPostgresCompanyQueryPort,
 } from "@capital-q/companies";
 import {
@@ -65,6 +66,17 @@ import {
   createOrganisationService,
   createPostgresOrganisationQueryPort,
 } from "@capital-q/organisations";
+import {
+  createGateQService,
+  createPostgresGatewayPolicyPort,
+  createPostgresGatewayRepository,
+  createPostgresGatewayVersionRepository,
+} from "@capital-q/gateq";
+
+import {
+  createGateQCompanyProjectionPort,
+  createGateQOrganisationDisplayPort,
+} from "./gateq/company-projection.js";
 import { createAuthorizationService } from "@capital-q/security";
 import {
   createCompanyOnboardingSubjectResolver,
@@ -85,7 +97,11 @@ import {
   createMediaOwnerResolverRegistry,
   createMediaService,
 } from "@capital-q/media";
-import { createTaxonomyService } from "@capital-q/taxonomy";
+import {
+  createPostgresTaxonomyAssignmentRepository,
+  createPostgresTaxonomyReferenceRepository,
+  createTaxonomyService,
+} from "@capital-q/taxonomy";
 import {
   createPostgresActiveOrganisationContextStore,
   createPostgresActorContextResolver,
@@ -189,6 +205,34 @@ const taxonomy = createTaxonomyService({
   logger: createLogger(apiServiceIdentity(config), {
     level: config.observability.logLevel,
   }),
+});
+
+// GateQ (CQ-GATE-001): the investor organisation's inbound gateway. It owns
+// gateways, versions and criteria and nothing else -- the company
+// projection it qualifies against is assembled here, from the owning
+// contexts' own query ports, and carries three declared facts and one
+// declared raise. No document, no conversation, no Q inference reaches it.
+const gateq = createGateQService({
+  gateways: createPostgresGatewayRepository({ sql: database.sql }),
+  versions: createPostgresGatewayVersionRepository({ sql: database.sql }),
+  policies: createPostgresGatewayPolicyPort({ sql: database.sql }),
+  companies: createGateQCompanyProjectionPort({
+    sql: database.sql,
+    companies: createPostgresCompanyMarketplaceQueryPort({
+      sql: database.sql,
+    }),
+    assignments: createPostgresTaxonomyAssignmentRepository(),
+    reference: createPostgresTaxonomyReferenceRepository(),
+    capital: createPostgresCapitalObjectiveQueryPort({ sql: database.sql }),
+  }),
+  organisations: createGateQOrganisationDisplayPort({
+    investors: createPostgresInvestorOrganisationQueryPort({
+      sql: database.sql,
+    }),
+  }),
+  authorization,
+  transactions: database.transactions,
+  audit,
 });
 
 // Onboarding owns journey state only. The Founder integration registers the
@@ -386,6 +430,7 @@ const { app, logger } = createApp(config, security, {
   companies,
   investors,
   discovery: { discovery, slates: slates.reader, interactions },
+  gateq,
   capital,
   taxonomy: {
     query: taxonomy.query,

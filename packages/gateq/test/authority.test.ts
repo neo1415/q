@@ -254,14 +254,14 @@ function world() {
         if (actor.tenantId !== resource.tenantId) {
           throw new Denied("another tenant");
         }
-        const adminOf = admins.get(actor.userId);
-        if (adminOf === resource.organisationId) return Promise.resolve(true);
-        const memberOf = members.get(actor.userId);
+        const owner =
+          resource.kind === "TENANT" ? undefined : resource.organisationId;
+        if (admins.get(actor.userId) === owner) return Promise.resolve();
         if (
-          memberOf === resource.organisationId &&
+          members.get(actor.userId) === owner &&
           input.capability === "investor.gateway.view"
         ) {
-          return Promise.resolve(true);
+          return Promise.resolve();
         }
         throw new Denied(String(input.capability));
       },

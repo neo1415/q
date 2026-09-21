@@ -37,6 +37,10 @@ import {
   type DiscoveryRoutesDependencies,
 } from "./http/discovery.js";
 import {
+  registerGateQRoutes,
+  type GateQRoutesDependencies,
+} from "./http/gateq.js";
+import {
   registerInvestorRoutes,
   type InvestorRoutesDependencies,
 } from "./http/investors.js";
@@ -95,6 +99,8 @@ export type ApiModules = {
       })
     | undefined;
   readonly capital?: CapitalRoutesDependencies["capital"] | undefined;
+  /** CQ-GATE-001: the investor organisation's inbound gateway. */
+  readonly gateq?: GateQRoutesDependencies["gateq"] | undefined;
   readonly taxonomy?: TaxonomyRoutesDependencies["taxonomy"] | undefined;
   readonly onboarding?: OnboardingRoutesDependencies["onboarding"] | undefined;
   readonly evidence?: DocumentRoutesDependencies["evidence"] | undefined;
@@ -210,6 +216,17 @@ export function createApp(
         interactions: modules.discovery.interactions,
       });
     }
+  }
+
+  // GateQ (CQ-GATE-001): the organisation's front door. Its own prefix,
+  // because a gateway belongs to neither the company nor the discovery
+  // context, and its public route is the one anonymous surface here.
+  if (modules.gateq !== undefined) {
+    registerGateQRoutes(app, {
+      authenticator: security.authenticator,
+      resolver: security.resolver,
+      gateq: modules.gateq,
+    });
   }
 
   if (modules.capital !== undefined) {

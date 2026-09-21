@@ -7,7 +7,12 @@ import {
 } from "@capital-q/audit";
 import type { TransactionManager } from "@capital-q/database";
 import type { Logger } from "@capital-q/observability";
-import { capability, type ActorContext } from "@capital-q/security";
+import {
+  capability,
+  ResourceScopeSchema,
+  type ActorContext,
+  type AuthorizationService,
+} from "@capital-q/security";
 
 import {
   GatewayIdSchema,
@@ -84,19 +89,12 @@ export class CompanyProjectionUnavailableError extends Error {
   }
 }
 
-type Authorization = {
-  readonly requireCapability: (input: {
-    readonly actor: ActorContext;
-    readonly capability: ReturnType<typeof capability>;
-    readonly resource: {
-      readonly kind: "RESOURCE";
-      readonly tenantId: string;
-      readonly organisationId: string;
-      readonly resourceType: string;
-      readonly resourceId: string;
-    };
-  }) => Promise<unknown>;
-};
+/**
+ * Only the one method GateQ uses. Narrowing it here means a test double is
+ * a two-line object rather than a whole policy engine, and it says plainly
+ * that this context asks a question and never answers one.
+ */
+type Authorization = Pick<AuthorizationService, "requireCapability">;
 
 export type GateQDependencies = {
   readonly gateways: GatewayRepository;
@@ -202,13 +200,13 @@ export function createGateQService(
     await authorization.requireCapability({
       actor,
       capability: required,
-      resource: {
+      resource: ResourceScopeSchema.parse({
         kind: "RESOURCE",
         tenantId: gateway.tenantId,
         organisationId: gateway.organisationId,
         resourceType: "investor_gateway",
         resourceId: gateway.id,
-      },
+      }),
     });
     return gateway;
   };
@@ -243,13 +241,13 @@ export function createGateQService(
       await authorization.requireCapability({
         actor,
         capability: GATEWAY_CREATE,
-        resource: {
+        resource: ResourceScopeSchema.parse({
           kind: "RESOURCE",
           tenantId: actor.tenantId,
           organisationId: command.organisationId,
           resourceType: "investor_organisation",
           resourceId: command.investorOrganisationId,
-        },
+        }),
       });
       return transactions.run(async (tx) => {
         const gateway = await gateways.create(tx, {
@@ -277,13 +275,13 @@ export function createGateQService(
       await authorization.requireCapability({
         actor: command.actor,
         capability: GATEWAY_VIEW,
-        resource: {
+        resource: ResourceScopeSchema.parse({
           kind: "RESOURCE",
           tenantId: command.actor.tenantId,
           organisationId: command.organisationId,
           resourceType: "investor_organisation",
           resourceId: command.investorOrganisationId,
-        },
+        }),
       });
       return gateways.listForInvestorOrganisation({
         tenantId: command.actor.tenantId,

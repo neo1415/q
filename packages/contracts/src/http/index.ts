@@ -591,3 +591,37 @@ export {
   type ExplanationFactorDto,
   type RecommendationExplanationDto,
 } from "./discovery.js";
+
+// CQ-GATE-001 -- GateQ: the organisation's inbound gateway, and the one
+// anonymous projection of a published one.
+export {
+  CreateGatewayRequestSchema,
+  CriterionRequirednessDtoSchema,
+  CriterionTypeDtoSchema,
+  GATEQ_GATEWAY_PATH,
+  GATEQ_GATEWAY_PUBLISH_PATH,
+  GATEQ_GATEWAY_QUALIFY_PATH,
+  GATEQ_GATEWAY_VERSION_PATH,
+  GATEQ_GATEWAY_VERSIONS_PATH,
+  GATEQ_GATEWAYS_PATH,
+  GATEQ_PUBLIC_GATEWAY_PATH,
+  GatewayCriterionInputSchema,
+  GatewayDraftCriterionSchema,
+  GatewayDraftRequestSchema,
+  GatewayDtoSchema,
+  GatewayInboundModeDtoSchema,
+  GatewayPolicyDtoSchema,
+  GatewayVersionDtoSchema,
+  PublicGatewayDtoSchema,
+  QualificationCriterionDtoSchema,
+  QualificationResultDtoSchema,
+  QualifyCompanyRequestSchema,
+  type CreateGatewayRequest,
+  type GatewayDraftRequest,
+  type GatewayDto,
+  type GatewayInboundModeDto,
+  type GatewayPolicyDto,
+  type GatewayVersionDto,
+  type PublicGatewayDto,
+  type QualificationResultDto,
+} from "./gateq.js";
