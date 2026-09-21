@@ -38,6 +38,14 @@
  * preview's — a bare path prefix used to match both, because
  * `...\\Desktop\\q` is a prefix of `...\\Desktop\\q-preview`.
  *
+ * **A different host name**, which is the one nobody expects. A browser
+ * scopes cookies by host and ignores the port, so `localhost:3000` and
+ * `localhost:3100` share one cookie jar: signing into development signs
+ * you out of the preview, and a stale refresh token from one produces
+ * "Invalid Refresh Token" in the other. The preview is therefore served
+ * at `127.0.0.1` while development keeps `localhost`. Same machine,
+ * different origin, separate sessions.
+ *
  * Nothing here prints a secret. Keys come from the preview stack itself.
  */
 import { spawnSync } from "node:child_process";
@@ -258,7 +266,7 @@ function banner(commit) {
   const line = "=".repeat(53);
   console.log(`\n${line}`);
   console.log("CAPITAL Q TESTER STACK READY");
-  console.log(`OPEN: http://localhost:${String(PORTS.web)}`);
+  console.log(`OPEN: http://127.0.0.1:${String(PORTS.web)}`);
   console.log(`COMMIT: ${commit}`);
   console.log(`${line}\n`);
 }
@@ -269,8 +277,15 @@ async function report() {
   console.log("");
   console.log(`Commit:    ${commit ?? "(no preview worktree)"}`);
   console.log(
-    `Web:       http://localhost:${String(PORTS.web)}   ${states.web ? "READY" : "down"}`,
+    `Web:       http://127.0.0.1:${String(PORTS.web)}   ${states.web ? "READY" : "down"}`,
   );
+  console.log(
+    "           (127.0.0.1, not localhost: a browser shares cookies across",
+  );
+  console.log(
+    "            ports on one host, so localhost would share development's",
+  );
+  console.log("            session and sign the tester out.)");
   console.log(
     `API:       http://127.0.0.1:${String(PORTS.api)}   ${states.api ? "READY" : "down"}`,
   );

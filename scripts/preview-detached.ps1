@@ -77,20 +77,36 @@ foreach ($line in Get-Content $EnvFile) {
   }
 }
 
+# One log per service, not one shared file. Windows gives the first
+# redirect an exclusive handle, so four services appending to one path
+# meant the first to start ran and the other three died before writing a
+# word -- a stack that looked half-broken with an empty explanation.
+$logDir = Split-Path -Parent $LogFile
+$logFor = { param($name) Join-Path $logDir ("preview-" + $name + ".log") }
+
+# Absolute script paths, so each command line names the preview worktree.
+# That is what `preview:stop` matches on: a bare `node dist/main.js` with
+# the directory set by `cd` carries nothing to distinguish it from a
+# development service, and stopping the preview would have missed it.
 $launcher = Join-Path $env:TEMP "capital-q-preview.cmd"
 $lines = @("@echo off", "set `"PATH=$path`"")
 if ($corepackHome) { $lines += "set `"COREPACK_HOME=$corepackHome`"" }
 $lines += "set COREPACK_ENABLE_DOWNLOAD_PROMPT=0"
 $lines += $sets
 $lines += "cd /d `"$Worktree`""
-# Four services, each on its own preview port, all writing to one log.
-$lines += "start `"cq-preview-api`" /b cmd /c `"cd /d $Worktree\apps\api && set PORT=$ApiPort && node dist/main.js >> `"$LogFile`" 2>&1`""
-$lines += "start `"cq-preview-qapi`" /b cmd /c `"cd /d $Worktree\apps\q-api && set PORT=$QApiPort && node dist/main.js >> `"$LogFile`" 2>&1`""
-$lines += "start `"cq-preview-workers`" /b cmd /c `"cd /d $Worktree\apps\workers && node dist/main.js >> `"$LogFile`" 2>&1`""
-$lines += "start `"cq-preview-web`" /b cmd /c `"cd /d $Worktree\apps\web && pnpm exec next start -p $WebPort >> `"$LogFile`" 2>&1`""
+$apiLog = & $logFor "api"
+$qapiLog = & $logFor "q-api"
+$workersLog = & $logFor "workers"
+$webLog = & $logFor "web"
+$lines += "start `"cq-preview-api`" /b cmd /c `"set PORT=$ApiPort && node `"$Worktree\apps\api\dist\main.js`" > `"$apiLog`" 2>&1`""
+$lines += "start `"cq-preview-qapi`" /b cmd /c `"set PORT=$QApiPort && node `"$Worktree\apps\q-api\dist\main.js`" > `"$qapiLog`" 2>&1`""
+$lines += "start `"cq-preview-workers`" /b cmd /c `"node `"$Worktree\apps\workers\dist\main.js`" > `"$workersLog`" 2>&1`""
+$lines += "start `"cq-preview-web`" /b cmd /c `"cd /d `"$Worktree\apps\web`" && node `"$Worktree\apps\web\node_modules\next\dist\bin\next`" start -p $WebPort > `"$webLog`" 2>&1`""
 $lines | Set-Content -Path $launcher -Encoding ASCII
 
-Remove-Item $LogFile -ErrorAction SilentlyContinue
+foreach ($name in @("api", "q-api", "workers", "web")) {
+  Remove-Item (& $logFor $name) -ErrorAction SilentlyContinue
+}
 
 # CREATE_NEW_PROCESS_GROUP (0x200), not DETACHED_PROCESS: the group flag is
 # what stops a Ctrl+C in the launching shell reaching the preview, and the
@@ -106,4 +122,4 @@ $result = Invoke-CimMethod -ClassName Win32_Process -MethodName Create -Argument
 if ($result.ReturnValue -ne 0) {
   throw "could not start the preview (Win32_Process.Create returned $($result.ReturnValue))"
 }
-Write-Host "[preview] started detached (pid $($result.ProcessId)); output in $LogFile"
+Write-Host "[preview] started detached (pid $($result.ProcessId)); logs in $logDir"
