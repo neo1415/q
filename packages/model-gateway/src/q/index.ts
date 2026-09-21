@@ -70,6 +70,12 @@ import { isModelGatewayError } from "../errors.js";
 import { createPartialAnswerReader } from "../policy/partial-answer.js";
 import type { ModelGateway, ModelGatewayExecuteOptions } from "../gateway.js";
 import { acceptStructuredOutput } from "../policy/structured.js";
+import { analystResultBlocks } from "./result-blocks.js";
+
+export {
+  analystResultBlocks,
+  type AnalystResultLike,
+} from "./result-blocks.js";
 
 /**
  * The Q answer seam over the Prompt Registry, the Tool Registry and the
@@ -1022,7 +1028,18 @@ export function createModelGatewayQAnswer(
       // The message and its durable completion event commit together
       // (CQ-Q-009 §16-§18): the event carries the persisted message, so a
       // client that missed every live delta converges on this text.
-      const persistAnswer = (content: string) =>
+      const persistAnswer = (
+        content: string,
+        /**
+         * What the analyst produced beside the prose, as blocks
+         * (QX-002/003 §C). Carried on the durable completion event, which
+         * is the event a client converges on and the one it replays after
+         * a reconnect. The message store stays plain text on purpose: an
+         * unbounded column there is where a provider's whole response
+         * object would eventually land.
+         */
+        blocks?: QResponseMessage["blocks"],
+      ) =>
         transactions.run(async (tx) => {
           const stored = await repositories.messages.insert(tx, {
             id: messageId,
@@ -1038,7 +1055,12 @@ export function createModelGatewayQAnswer(
             { id: request.runId, tenantId: request.tenantId },
             {
               type: "q.message.completed",
-              data: { message: toQMessage(stored) as QResponseMessage },
+              data: {
+                message: {
+                  ...(toQMessage(stored) as QResponseMessage),
+                  ...(blocks === undefined ? {} : { blocks }),
+                },
+              },
             },
           );
           return stored;
@@ -1499,7 +1521,16 @@ export function createModelGatewayQAnswer(
             diagnosticCode: "MODEL_PROVIDER_UNAVAILABLE",
           };
         }
-        const message = await persistAnswer(content);
+        const message = await persistAnswer(
+          content,
+          analystResultBlocks({
+            result: analyst,
+            // The run's own authorised subjects, never anything the model
+            // named: a reference is caused by what the server allowed this
+            // run to be about.
+            subjects: request.subjects,
+          }),
+        );
         last = {
           result: analyst,
           providerCode: final.providerCode,

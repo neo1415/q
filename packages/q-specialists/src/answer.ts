@@ -17,6 +17,7 @@ import type {
   CompanyIntelligenceResult,
 } from "./company/contracts.js";
 import { asksAboutGaps } from "./company/dimensions.js";
+import { analystResultBlocks } from "@capital-q/model-gateway/q";
 
 /**
  * How a specialist reaches Q (CQ-Q-020 §11, §53, §56, §91).
@@ -259,7 +260,31 @@ export function createSpecialistQAnswer(
           { id: request.runId, tenantId: request.tenantId },
           {
             type: "q.message.completed",
-            data: { message: toQMessage(stored) as QResponseMessage },
+            data: {
+              message: {
+                ...(toQMessage(stored) as QResponseMessage),
+                // What the specialist already found, as blocks a client
+                // can act on (QX-002/003 §C). The same projection the
+                // conversational seam uses, so one answer does not carry
+                // a different shape depending on which brain produced it.
+                ...(() => {
+                  const blocks = analystResultBlocks({
+                    result: {
+                      findings: result.findings,
+                      // Two authorised statements that disagree, stated
+                      // as one sentence. The specialist never chooses
+                      // between them and neither does this.
+                      contradictions: result.contradictions.map(
+                        (contradiction) =>
+                          contradiction.statements.join(" — and — "),
+                      ),
+                    },
+                    subjects: request.subjects,
+                  });
+                  return blocks === undefined ? {} : { blocks };
+                })(),
+              },
+            },
           },
         );
         return stored;
