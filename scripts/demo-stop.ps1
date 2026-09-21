@@ -14,9 +14,16 @@
 # turbo still holds that file open and writes its own exit lines after this
 # script has finished, and the next launch truncates it. A separate file is
 # written once, by whoever acted, and read by whoever asks.
+#
+# The match is on this worktree and nothing beside it (QX-DEV-001 §0.8).
+# A bare path prefix is a trap on Windows: the tester's preview lives at
+# `..\q-preview`, and `C:\...\Desktop\q` is a prefix of
+# `C:\...\Desktop\q-preview`, so stopping development would have taken
+# the preview with it every time. Requiring a separator (or the end of the
+# path) after the root is what makes "this repository" mean this one.
 $ErrorActionPreference = "SilentlyContinue"
 $root = (Split-Path -Parent $PSScriptRoot).TrimEnd("\")
-$pattern = [regex]::Escape($root)
+$pattern = [regex]::Escape($root) + '(?=[\\/"''\s]|$)'
 
 $mine = Get-CimInstance Win32_Process | Where-Object {
   ($_.Name -match '^(node|ngrok|pnpm|cmd)\.exe$') -and
