@@ -7,16 +7,34 @@ export const metadata: Metadata = { title: "Home" };
 /**
  * Home is one person's Q, never a cached page.
  *
- * Without this it is statically rendered, and the conversation panel
- * reads the open conversation from the URL with `useSearchParams` — which
- * suspends during a static render and fell back to `null`. The effect was
- * precise and baffling: `/home` worked, `/home?c=<id>` showed the page
- * furniture and no Q at all, so reopening a conversation from Chats lost
- * the entire thread rather than just its cards. It resolves per request
- * because everything on it already does.
+ * Without this it is statically rendered, and a client component reading
+ * the URL suspends during a static render and falls back to null. The
+ * effect was precise and baffling: `/home` worked, `/home?c=<id>` showed
+ * the page furniture and no Q at all.
  */
 export const dynamic = "force-dynamic";
 
-export default function HomePage() {
-  return <HomeScreen />;
+export default async function HomePage({
+  searchParams,
+}: {
+  readonly searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  /**
+   * Which conversation is open, read on the server (QX-003A).
+   *
+   * It used to be read in the browser with `useSearchParams`, and that
+   * was the whole of the history bug. The hook hydrated correctly — the
+   * action returned the turns, the merge worked, the projection produced
+   * them — and then the panel remounted as the parameter resolved, so
+   * the instance holding the restored conversation was thrown away and
+   * the one on screen had never fetched anything. Two instances, and the
+   * wrong one won.
+   *
+   * The page already renders per request and already has the parameter.
+   * Passing it down means the panel is mounted once, with the answer.
+   */
+  const params = await searchParams;
+  const raw = params["c"];
+  const conversationId = typeof raw === "string" && raw.length > 0 ? raw : null;
+  return <HomeScreen conversationId={conversationId} />;
 }

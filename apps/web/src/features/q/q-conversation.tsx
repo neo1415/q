@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { describeQStreamTransport } from "@capital-q/api-client";
@@ -71,27 +71,36 @@ export type QConversationPanelProps = {
   /** False when this build has no Q API configured. */
   readonly connected: boolean;
   readonly context: QSurfaceContext;
+  /**
+   * The conversation the URL names, resolved on the server (QX-003A).
+   *
+   * Read here rather than with `useSearchParams` because reading it in
+   * the browser remounted this component as the parameter resolved: the
+   * instance that had hydrated the conversation was discarded and the
+   * one left on screen had fetched nothing. The turns were restored
+   * correctly and thrown away.
+   */
+  readonly conversationId?: string | null | undefined;
 };
 
 export function QConversationPanel({
   connected,
   context,
+  conversationId: openConversationId = null,
 }: QConversationPanelProps) {
   const router = useRouter();
-  const searchParams = useSearchParams();
   // Which conversation this surface is in comes from the URL (ADR 0012),
   // so a refresh, a link and the chats list all open the same thread. A
   // conversation the server names for the first time is written back to
   // the URL without a navigation, so nothing on screen is disturbed.
-  const conversationParam = searchParams.get(Q_CONVERSATION_PARAM);
-  const onConversation = useCallback(
-    (conversationId: string) => {
-      const next = new URLSearchParams(searchParams.toString());
-      next.set(Q_CONVERSATION_PARAM, conversationId);
-      window.history.replaceState(null, "", `/home?${next.toString()}`);
-    },
-    [searchParams],
-  );
+  const conversationParam = openConversationId;
+  const onConversation = useCallback((conversationId: string) => {
+    // Written back without a navigation, so naming a conversation for
+    // the first time does not disturb anything on screen.
+    const next = new URLSearchParams(window.location.search);
+    next.set(Q_CONVERSATION_PARAM, conversationId);
+    window.history.replaceState(null, "", `/home?${next.toString()}`);
+  }, []);
   const q = useQConversation({
     companyId: context.companyId,
     investorOrganisationId: context.investorOrganisationId,
@@ -281,7 +290,15 @@ export function QConversationPanel({
     q.state.failure === null;
 
   return (
-    <div className="flex flex-col gap-4" data-q-workspace>
+    <div
+      className="flex flex-col gap-4"
+      data-q-workspace
+      // How many turns are on screen. A test hook rather than decoration:
+      // "the conversation reopened" is otherwise only assertable by
+      // counting rendered children, which changes whenever the answer
+      // layout does.
+      data-q-turns={String(turns.length)}
+    >
       {voice.active ? (
         // Talking with Q on Home is the same stage as the interview: the
         // screen is Q, wherever the conversation started.

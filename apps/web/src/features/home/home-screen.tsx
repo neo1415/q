@@ -89,7 +89,12 @@ function openingLine(context: OwnContext): string {
   }
 }
 
-export async function HomeScreen() {
+export async function HomeScreen({
+  conversationId = null,
+}: {
+  /** The conversation the URL names, resolved on the server. */
+  readonly conversationId?: string | null | undefined;
+} = {}) {
   const qConnected = loadWebServerConfig().qApiBaseUrl !== undefined;
   // Which subject Q's questions are about, if Capital Q knows of one. A
   // server fact, resolved once per render and never asked of the browser.
@@ -129,6 +134,7 @@ export async function HomeScreen() {
           <QConversationPanel
             connected={qConnected}
             context={surfaceContext(context)}
+            conversationId={conversationId}
           />
         </Suspense>
       </section>
