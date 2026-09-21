@@ -2978,3 +2978,189 @@ than fixed inside a pass-suppression closeout.
 external GateQ demo.
 
 Next: CQ-GATE-001 — GateQ Core. Not started.
+
+## CQ-GATE-001 — GateQ Core (2026-09-21)
+
+Starting SHA `61b2a28`. New `gateq` schema, one additive migration, no
+change to any existing table.
+
+### Architecture
+
+`@capital-q/gateq` owns gateways, their versions and their criteria, and
+nothing else. Its entire workspace dependency set is `audit`, `contracts`,
+`database`, `observability`, `security` — no Companies, no Investors, no
+Taxonomy, no Discovery, no Q. A test asserts that, which is also how
+"changing the investor mandate cannot rewrite a published gateway" is
+proved: there is no path.
+
+|                        |                                                          |
+| ---------------------- | -------------------------------------------------------- |
+| Engine                 | `gateq-qualification.v1`                                 |
+| Gateway modes          | `CLOSED`, `QUALIFIED`, `OPEN`                            |
+| Qualification outcomes | `QUALIFIED`, `NOT_QUALIFIED`, `INSUFFICIENT_INFORMATION` |
+| Access decisions       | `MAY_APPLY`, `MAY_NOT_APPLY`, `NEEDS_INFORMATION`        |
+| Version lifecycle      | `DRAFT` → `PUBLISHED` → `SUPERSEDED` / `ARCHIVED`        |
+
+Three concepts kept apart deliberately. The mode is the door; the outcome
+is the fit; the access decision follows from both. A company can be a
+perfect fit at a closed door, and an OPEN gateway admits one that is not
+qualified — which is why collapsing any two of them would be wrong.
+
+The engine is one pure function: no database, no model, no random number,
+no clock. It computes **no score**. A weighted threshold here would be a
+second ranker with none of REC-005's governance or calibration, and doc 19
+§53 leaves scoring open until outcome data exists.
+
+### Supported criteria
+
+| Dimension                                                                          | Status          | Source                                                                                                                                                                                              |
+| ---------------------------------------------------------------------------------- | --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Taxonomy (industry, business model, technology, customer type, impact, regulatory) | **SUPPORTED**   | canonical node ids with ancestor matching                                                                                                                                                           |
+| Geography                                                                          | **SUPPORTED**   | `core.companies.headquarters_country`                                                                                                                                                               |
+| Stage                                                                              | **SUPPORTED**   | `core.companies.current_stage_code`                                                                                                                                                                 |
+| Business model                                                                     | **SUPPORTED**   | it is a taxonomy vocabulary, not a separate axis                                                                                                                                                    |
+| Raise size                                                                         | **SUPPORTED**   | the open capital objective's target                                                                                                                                                                 |
+| Cheque compatibility                                                               | **SUPPORTED**   | gateway-configured cheque range against the same target                                                                                                                                             |
+| Hard exclusions                                                                    | **SUPPORTED**   | `EXCLUDED_TAXONOMY`, proof required                                                                                                                                                                 |
+| Revenue                                                                            | **UNSUPPORTED** | no canonical revenue exists; financials are document-derived evidence with their own truth class and disclosure scope, and reading one here would make an unverified extraction into inbound policy |
+| Traction                                                                           | **UNSUPPORTED** | no canonical measure; every candidate signal is narrative, Q inference or observed platform behaviour, none of which is declared company truth                                                      |
+| Readiness / InvestIQ                                                               | **UNSUPPORTED** | `marketplace_readiness_state` is a lifecycle state, not an assessment, and no governed InvestIQ projection exists; readiness is also a separate axis from fit                                       |
+
+The three unsupported dimensions are **absent from the criterion union**
+rather than present and permanently UNKNOWN, each carrying its reason in
+`UNSUPPORTED_CRITERION_DIMENSIONS`. A gateway therefore cannot publish a
+policy Capital Q could never answer, and "no unsupported criterion
+silently becomes a pass or a fail" is true by construction. The database
+check constraint refuses the types too.
+
+**Cheque compatibility is now real.** REC-001 recorded this
+`NOT_COMPUTABLE` and wrote down the correct rule it could not use: the
+investor's _minimum_ cheque fitting inside the company's round, never the
+maximum covering it, which would reject every syndicated raise. GateQ is
+the other direction — the company is applying and its raise is part of
+what it brings — so both sides are authoritative here. A different
+currency is UNKNOWN: an exchange rate is a number nobody in this system is
+authorised to choose, and a converted amount would be indistinguishable
+from a declared one.
+
+### Unknown is never a mismatch
+
+The invariant most of the goldens are about. Missing taxonomy, country,
+stage or raise each produce UNKNOWN with its own reason code, never
+NO_MATCH and never zero. A required UNKNOWN yields
+`INSUFFICIENT_INFORMATION` and `NEEDS_INFORMATION` — a question with a next
+step, which GATE-002's interview will ask — while a required NO_MATCH
+refuses. An exclusion needs proof: an unclassified company is never
+excluded, because an inferred exclusion is indistinguishable from a
+rejection nobody decided.
+
+### Versioning and authority
+
+A version is a row, not an overwritten column. Publishing is an explicit
+act with its own capability, an author and a time; editing a draft cannot
+move the public door; and a stored qualification result names the exact
+version that produced it. Two invariants belong to the database rather
+than the code: `gateway_versions_one_published_idx` allows one published
+version per gateway, and a trigger makes a published version immutable
+except for its own lifecycle — its criteria too, because somebody was
+already judged against them.
+
+Authority is read from the gateway's owning organisation, never from a
+request body and never from who created it. `organisation_admin` holds
+create, view, edit and publish; `organisation_member` holds view only.
+The creator is provenance: they may leave, and their colleagues carry on.
+
+### Public projection
+
+One anonymous route, `GET /v1/gateq/public/{publicId}`, and the
+projection is a **whitelist built from named parts** rather than a
+redaction — a redaction is a list of things somebody remembered to delete,
+and the failure mode is silent. It carries the gateway's own public
+wording, its mode, and the _kinds_ of thing it asks about with the
+investor's own labels. Never a node id, a country list, a member, a
+mandate, a draft or an internal identifier.
+
+The public id is 128 bits of randomness in Crockford base32 with a `gq_`
+prefix. Enumeration safety is the requirement: a sequential id or a
+name-derived slug would let anyone walk the list of investors accepting
+applications. A CLOSED gateway is visible and says it is closed (§20); a
+404 would tell a founder the link was wrong rather than that the door was
+shut.
+
+**One thing the tests found.** A malformed public id was answering 422,
+which tells a caller their guess was the wrong _shape_ — the first thing
+somebody enumerating would want to know. Unknown, unpublished, disabled
+and malformed are now one 404, and a malformed id never reaches the
+service.
+
+### Migration
+
+`20261001090000_gateq_core.sql`: schema `gateq`, three tables, two
+triggers, four capabilities and their role grants. RLS on all three, **no
+policy, no browser grant** — which sectors an investor will look at is
+commercially sensitive, and the public sees one controlled projection
+through the API rather than a table. `db:types` now includes the `gateq`
+schema.
+
+**HOSTED_MIGRATIONS_PENDING is now 20260925–20261001**; this packet did
+not run `db:push`.
+
+### Gates — CQ-GATE-001
+
+| Gate                                           | Result                                                                                         |
+| ---------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| `pnpm db:reset` / `db:lint` / `db:types:check` | exit 0 / no findings / clean                                                                   |
+| `pnpm test:rls`                                | 35 files, 1010 tests, PASS (was 34 / 982)                                                      |
+| `pnpm test:integration`                        | 53 pass + 1 skipped; 484 pass + 5 skipped — unchanged                                          |
+| `pnpm format:check`                            | every tracked file passes                                                                      |
+| `pnpm lint`                                    | exit 0                                                                                         |
+| `pnpm typecheck`                               | exit 0                                                                                         |
+| `pnpm test`                                    | 237 files, 3070 tests, exit 0 (was 234 / 3014)                                                 |
+| `pnpm build`                                   | exit 0                                                                                         |
+| `pnpm q:eval:lint` / `q:eval:ci`               | PASS, 39 cases / 16 graders, no regression                                                     |
+| Dependency direction                           | no package depends on an app; gateq imports five infrastructure packages and no domain context |
+| Secret scan / `git diff --check`               | clean                                                                                          |
+| `pnpm demo:status`                             | READY, four components                                                                         |
+
+### Performance
+
+A representative V1 policy — seven criteria across all six types, against
+a company with three classifications — qualifies in **5 microseconds**,
+measured over 20 000 runs. No N+1: the engine takes one bounded projection,
+and the projection is assembled from a fixed number of reads plus one
+ancestor lookup per distinct assigned node, which is a handful per company
+and does not grow with anything else.
+
+### Providers
+
+No model, no provider, no new service, account, API key, OAuth or billing,
+and no new environment variable. Qualification is arithmetic over declared
+data.
+
+### Known limits (V1)
+
+- Three dimensions the Product Specification names are not configurable,
+  with the reasons above. Adding one is a criterion-type version bump, not
+  a widening of this one.
+- The public route has no rate limit of its own beyond the app's. Opaque
+  128-bit ids make enumeration impractical rather than impossible; a
+  dedicated limit belongs with the public application surface in
+  GATE-DEMO-001.
+- Geography is the company's declared headquarters country rather than the
+  `geography` taxonomy vocabulary, because mapping countries onto nodes
+  would be a mapping nobody has authored. It is the same field REC-001
+  uses.
+- No gateway UI. GATE-002 and GATE-003 own the applicant and investor
+  surfaces.
+
+### Open debt, unchanged by this packet
+
+| Item                                                                                                                                                            | Class | Boundary                                    |
+| --------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----- | ------------------------------------------- |
+| `CQ-DEV-WATCH-SCOPE-001` — `node --watch` restarts dev services when a file under `packages/*/dist` is merely read                                              | 3     | **before an external or public GateQ demo** |
+| `CQ-TEST-SSE-TEARDOWN-001` — the q-api SSE integration test can leave a query pending across pool shutdown, failing the gate under load while every test passes | 3     | **no later than the pre-Wave-7 closure**    |
+
+Neither blocks GateQ Core and neither is resolved here.
+
+Next: CQ-GATE-002 — Application / Guest Session / Intake + Adaptive Q
+Interview. Not started.
