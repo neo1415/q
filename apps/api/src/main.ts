@@ -72,11 +72,36 @@ import {
   createPostgresGatewayRepository,
   createPostgresGatewayVersionRepository,
 } from "@capital-q/gateq";
+import {
+  createConversationService,
+  createGateQInterviewer,
+  createIntakeService,
+  createPostgresApplicationDocumentRepository,
+  createPostgresApplicationFactRepository,
+  createPostgresApplicationRepository,
+  createPostgresApplicationSessionRepository,
+  createPostgresApplicationSubmissionRepository,
+} from "@capital-q/gateq-intake";
+import {
+  createModelGateway,
+  createModelProviderRegistry,
+  createPostgresModelCatalog,
+  createPostgresModelUsageRepository,
+  createProcessLocalProviderHealth,
+  createSyntheticDemoRoutingAllowance,
+  type ModelProvider,
+} from "@capital-q/model-gateway";
+import { createGoogleModelProvider } from "@capital-q/model-gateway/providers/google";
+import { createGroqModelProvider } from "@capital-q/model-gateway/providers/groq";
 
 import {
   createGateQCompanyProjectionPort,
   createGateQOrganisationDisplayPort,
 } from "./gateq/company-projection.js";
+import {
+  createIntakeBoundPolicyPort,
+  createIntakeTaxonomyPort,
+} from "./gateq/intake-ports.js";
 import { createAuthorizationService } from "@capital-q/security";
 import {
   createCompanyOnboardingSubjectResolver,
@@ -126,7 +151,8 @@ await telemetry.start();
 // One pool per process, request-class access: never the privileged or
 // migration credential. Holding it is not authority; every route still passes
 // through ActorContext and AuthorizationService.
-const database = createRequestDatabaseClient(loadDatabaseConfig());
+const databaseConfig = loadDatabaseConfig();
+const database = createRequestDatabaseClient(databaseConfig);
 
 const security = {
   authenticator: createSupabaseRequestAuthenticator(
@@ -212,9 +238,20 @@ const taxonomy = createTaxonomyService({
 // projection it qualifies against is assembled here, from the owning
 // contexts' own query ports, and carries three declared facts and one
 // declared raise. No document, no conversation, no Q inference reaches it.
+const gateqGateways = createPostgresGatewayRepository({ sql: database.sql });
+const gateqVersions = createPostgresGatewayVersionRepository({
+  sql: database.sql,
+});
+// The policy an application is frozen to, which is not always the one
+// published now. Shared by intake and the conversation above it.
+const gateqIntakePolicies = createIntakeBoundPolicyPort({
+  gateways: gateqGateways,
+  versions: gateqVersions,
+});
+
 const gateq = createGateQService({
-  gateways: createPostgresGatewayRepository({ sql: database.sql }),
-  versions: createPostgresGatewayVersionRepository({ sql: database.sql }),
+  gateways: gateqGateways,
+  versions: gateqVersions,
   policies: createPostgresGatewayPolicyPort({ sql: database.sql }),
   companies: createGateQCompanyProjectionPort({
     sql: database.sql,
@@ -234,6 +271,110 @@ const gateq = createGateQService({
   transactions: database.transactions,
   audit,
 });
+
+/**
+ * GateQ intake (CQ-GATE-002): the applicant side of the same front door.
+ *
+ * A stranger with no Capital Q account opens an application at a published
+ * gateway, is interviewed by Q, leaves, comes back and submits. Nothing
+ * below hands that stranger an actor, an organisation or a capability —
+ * their whole authority is a bearer credential naming one application.
+ *
+ * The interview needs a model, so the applicant surface registers only
+ * when a provider is configured. With none, the front door is closed
+ * rather than broken: gateway configuration still works, and an applicant
+ * gets a 404 instead of a half-working conversation.
+ */
+const gateqProviderSecrets = config.secrets.modelProviders;
+const gateqModelProviders: ModelProvider[] = [];
+if (gateqProviderSecrets.google !== undefined) {
+  gateqModelProviders.push(
+    createGoogleModelProvider({
+      apiKey: gateqProviderSecrets.google.reveal(),
+    }),
+  );
+}
+if (gateqProviderSecrets.groq !== undefined) {
+  gateqModelProviders.push(
+    createGroqModelProvider({
+      apiKey: gateqProviderSecrets.groq.reveal(),
+      additionalApiKeys: gateqProviderSecrets.groqKeys
+        .slice(1)
+        .map((key) => key.reveal()),
+    }),
+  );
+}
+
+const gateqApply =
+  gateqModelProviders.length === 0
+    ? undefined
+    : (() => {
+        const intake = createIntakeService({
+          applications: createPostgresApplicationRepository({
+            sql: database.sql,
+          }),
+          sessions: createPostgresApplicationSessionRepository({
+            sql: database.sql,
+          }),
+          facts: createPostgresApplicationFactRepository({
+            sql: database.sql,
+          }),
+          submissions: createPostgresApplicationSubmissionRepository({
+            sql: database.sql,
+          }),
+          documents: createPostgresApplicationDocumentRepository({
+            sql: database.sql,
+          }),
+          policies: gateqIntakePolicies,
+          taxonomy: createIntakeTaxonomyPort({
+            sql: database.sql,
+            candidates: taxonomy.classification.candidates,
+            reference: createPostgresTaxonomyReferenceRepository(),
+          }),
+          transactions: database.transactions,
+          logger: createLogger(apiServiceIdentity(config), {
+            level: config.observability.logLevel,
+          }),
+        });
+        const conversation = createConversationService({
+          intake,
+          interviewer: createGateQInterviewer({
+            gateway: createModelGateway({
+              catalog: createPostgresModelCatalog({ sql: database.sql }),
+              registry: createModelProviderRegistry(gateqModelProviders),
+              usage: createPostgresModelUsageRepository({ sql: database.sql }),
+              health: createProcessLocalProviderHealth(),
+              // Doc 15 §62: an attestation about the whole deployment,
+              // re-checked against environment and database. Never
+              // something a request, a header or a hostname can claim.
+              syntheticDemo: createSyntheticDemoRoutingAllowance({
+                operatorEnabled: gateqProviderSecrets.syntheticDemoRouting,
+                environment: config.runtime.deploymentEnvironment,
+                databaseUrl: databaseConfig.secrets.url,
+              }),
+              logger: createLogger(apiServiceIdentity(config), {
+                level: config.observability.logLevel,
+              }),
+            }),
+          }),
+          policies: gateqIntakePolicies,
+          publicGatewayFor: async (gatewayId) => {
+            const gateway = await gateqGateways.findById(
+              gatewayId as Parameters<typeof gateqGateways.findById>[0],
+            );
+            return gateway === null
+              ? null
+              : gateq.publicGateway(gateway.publicId);
+          },
+          turnMemory: createPostgresApplicationSessionRepository({
+            sql: database.sql,
+          }),
+          logger: createLogger(apiServiceIdentity(config), {
+            level: config.observability.logLevel,
+          }),
+        });
+        return { intake, conversation };
+      })();
 
 // Onboarding owns journey state only. The Founder integration registers the
 // write-target handlers and step-context providers for Founder Definition v1;
@@ -431,6 +572,7 @@ const { app, logger } = createApp(config, security, {
   investors,
   discovery: { discovery, slates: slates.reader, interactions },
   gateq,
+  gateqApply,
   capital,
   taxonomy: {
     query: taxonomy.query,

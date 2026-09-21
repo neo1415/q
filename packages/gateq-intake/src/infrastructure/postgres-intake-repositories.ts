@@ -83,6 +83,11 @@ const SessionRow = z.object({
   created_at: z.unknown(),
 });
 
+const TurnMemoryRow = z.object({
+  last_turn_id: z.string().nullable(),
+  last_turn_reply: z.string().nullable(),
+});
+
 function toSession(row: unknown): ApplicationSession {
   const r = SessionRow.parse(row);
   return ApplicationSessionSchema.parse({
@@ -211,6 +216,35 @@ export function createPostgresApplicationSessionRepository(options: {
         update gateq.application_sessions
            set last_seen_at = ${at}
          where id = ${id}`;
+    },
+
+    lastTurn: async (sessionId) => {
+      const rows = await sql`
+        select last_turn_id, last_turn_reply
+          from gateq.application_sessions
+         where id = ${sessionId}
+         limit 1`;
+      const row = rows[0];
+      if (row === undefined) return null;
+      const parsed = TurnMemoryRow.parse(row);
+      if (parsed.last_turn_id === null || parsed.last_turn_reply === null) {
+        return null;
+      }
+      return {
+        clientTurnId: parsed.last_turn_id,
+        reply: parsed.last_turn_reply,
+      };
+    },
+
+    rememberTurn: async (input) => {
+      // Kept on the session rather than in a turns table: a retry only ever
+      // repeats the turn immediately before it, so one slot is the whole
+      // requirement and the transcript stays where the transcript lives.
+      await sql`
+        update gateq.application_sessions
+           set last_turn_id = ${input.clientTurnId},
+               last_turn_reply = ${input.reply}
+         where id = ${input.sessionId}`;
     },
 
     revokeForApplication: async (tx, applicationId, at) => {

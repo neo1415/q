@@ -130,9 +130,27 @@ describe("per-service isolation", () => {
     // The API carries the document upload limit as public operational value
     // and the storage credential as a secret that is absent unless configured.
     const api = parseApiConfig(EMPTY_ENV);
-    expect(Object.keys(api.public)).toEqual(["documentUploadMaxBytes"]);
+    expect(Object.keys(api.public).sort()).toEqual([
+      "documentUploadMaxBytes",
+      "modelProviders",
+    ]);
     expect(api.public.documentUploadMaxBytes).toBe(26214400);
     expect(api.secrets.supabaseSecretKey).toBeUndefined();
+    // The GateQ interview's inference credentials (CQ-GATE-002): absent
+    // unless configured, and the public area carries only whether each
+    // adapter exists -- never what it holds.
+    expect(api.public.modelProviders).toEqual({
+      syntheticDemoRouting: false,
+      google: "unconfigured",
+      groq: "unconfigured",
+      groqKeys: 0,
+    });
+    expect(api.secrets.modelProviders).toEqual({
+      syntheticDemoRouting: false,
+      google: undefined,
+      groq: undefined,
+      groqKeys: [],
+    });
     // The web app's public area holds exactly the two browser-safe Supabase
     // values and nothing secret.
     const web = parseWebServerConfig(WEB_ENV);

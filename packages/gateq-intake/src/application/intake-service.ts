@@ -12,6 +12,7 @@ import {
   NewApplicationFactSchema,
   SessionTokenSchema,
   type Application,
+  type ApplicationFact,
   type ApplicationView,
   type NewApplicationFact,
   type SessionToken,
@@ -91,6 +92,8 @@ export type IntakeService = {
   }) => Promise<void>;
   /** The deterministic answer under the application's own frozen policy. */
   readonly qualification: (token: string) => Promise<QualificationResult>;
+  /** Current facts, for the interview layer above. Never leaves the server. */
+  readonly factsFor: (token: string) => Promise<readonly ApplicationFact[]>;
   readonly submit: (input: {
     readonly token: string;
     readonly clientRequestId: string;
@@ -328,6 +331,11 @@ export function createIntakeService(
     qualification: async (token) => {
       const { application } = await authorise(token);
       return qualificationFor(application);
+    },
+
+    factsFor: async (token) => {
+      const { application } = await authorise(token);
+      return facts.currentFor(application.id);
     },
 
     submit: async (input) => {

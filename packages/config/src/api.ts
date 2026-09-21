@@ -12,6 +12,13 @@ import {
   type RuntimeConfig,
 } from "./common.js";
 import {
+  modelProviderConfigStatus,
+  modelProviderEnvShape,
+  toModelProviderSecrets,
+  type ModelProviderConfigStatus,
+  type ModelProviderSecrets,
+} from "./model-providers.js";
+import {
   supabaseAuthEnvShape,
   supabaseSecretKeySchema,
   toSupabaseAuthConfig,
@@ -43,6 +50,11 @@ const apiEnvSchema = z.object({
     .min(1024)
     .max(52428800)
     .default(26214400),
+  // Inference credentials (CQ-GATE-002). The API serves the GateQ
+  // applicant interview, which is a model-backed conversation. Optional:
+  // with no provider configured the applicant surface does not register at
+  // all, which is a closed front door rather than a broken one.
+  ...modelProviderEnvShape,
 });
 
 /**
@@ -52,11 +64,15 @@ const apiEnvSchema = z.object({
 export type ApiSecrets = {
   /** Privileged Supabase key for private document storage. */
   readonly supabaseSecretKey: string | undefined;
+  /** Inference credentials for the GateQ applicant interview. */
+  readonly modelProviders: ModelProviderSecrets;
 };
 
 /** Non-secret operational values safe to expose in diagnostics. */
 export type ApiPublicConfig = {
   readonly documentUploadMaxBytes: number;
+  /** Which providers are configured. Names and booleans, never keys. */
+  readonly modelProviders: ModelProviderConfigStatus;
 };
 
 export type ApiConfig = {
@@ -85,8 +101,14 @@ export function parseApiConfig(env: EnvironmentInput): ApiConfig {
             SUPABASE_PUBLISHABLE_KEY: parsed.SUPABASE_PUBLISHABLE_KEY,
           })
         : undefined,
-    public: { documentUploadMaxBytes: parsed.CQ_DOCUMENT_UPLOAD_MAX_BYTES },
-    secrets: { supabaseSecretKey: parsed.SUPABASE_SECRET_KEY },
+    public: {
+      documentUploadMaxBytes: parsed.CQ_DOCUMENT_UPLOAD_MAX_BYTES,
+      modelProviders: modelProviderConfigStatus(toModelProviderSecrets(parsed)),
+    },
+    secrets: {
+      supabaseSecretKey: parsed.SUPABASE_SECRET_KEY,
+      modelProviders: toModelProviderSecrets(parsed),
+    },
   };
 }
 

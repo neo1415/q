@@ -35,6 +35,12 @@ export {
 } from "./domain/session-credential.js";
 
 export {
+  createConversationService,
+  type ApplicantTurnResult,
+  type ConversationDependencies,
+  type ConversationService,
+} from "./application/conversation-service.js";
+export {
   createGateQInterviewer,
   InterviewUnavailableError,
   type GateQInterviewer,

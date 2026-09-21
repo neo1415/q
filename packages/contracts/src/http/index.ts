@@ -625,3 +625,25 @@ export {
   type PublicGatewayDto,
   type QualificationResultDto,
 } from "./gateq.js";
+
+// CQ-GATE-002 -- the public applicant surface: anonymous, credential-scoped.
+export {
+  ApplicationFactDtoSchema,
+  ApplicationSummaryDtoSchema,
+  ApplicationTurnRequestSchema,
+  ApplicationTurnResponseSchema,
+  GATEQ_APPLY_SESSION_PATH,
+  GATEQ_APPLY_START_PATH,
+  GATEQ_APPLY_SUBMIT_PATH,
+  GATEQ_APPLY_TURN_PATH,
+  GATEQ_SESSION_HEADER,
+  GATEQ_TURN_MAX_CHARS,
+  StartApplicationRequestSchema,
+  StartApplicationResponseSchema,
+  SubmitApplicationRequestSchema,
+  SubmitApplicationResponseSchema,
+  type ApplicationSummaryDto,
+  type ApplicationTurnRequest,
+  type ApplicationTurnResponse,
+  type StartApplicationRequest,
+} from "./gateq-intake.js";

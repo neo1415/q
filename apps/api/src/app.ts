@@ -37,6 +37,10 @@ import {
   type DiscoveryRoutesDependencies,
 } from "./http/discovery.js";
 import {
+  registerGateQApplyRoutes,
+  type GateQApplyRoutesDependencies,
+} from "./http/gateq-apply.js";
+import {
   registerGateQRoutes,
   type GateQRoutesDependencies,
 } from "./http/gateq.js";
@@ -101,6 +105,8 @@ export type ApiModules = {
   readonly capital?: CapitalRoutesDependencies["capital"] | undefined;
   /** CQ-GATE-001: the investor organisation's inbound gateway. */
   readonly gateq?: GateQRoutesDependencies["gateq"] | undefined;
+  /** CQ-GATE-002: the public applicant surface. Anonymous by design. */
+  readonly gateqApply?: GateQApplyRoutesDependencies | undefined;
   readonly taxonomy?: TaxonomyRoutesDependencies["taxonomy"] | undefined;
   readonly onboarding?: OnboardingRoutesDependencies["onboarding"] | undefined;
   readonly evidence?: DocumentRoutesDependencies["evidence"] | undefined;
@@ -227,6 +233,13 @@ export function createApp(
       resolver: security.resolver,
       gateq: modules.gateq,
     });
+  }
+
+  // The applicant side (CQ-GATE-002). Registered separately from the
+  // configuration routes because it carries no actor at all: a stranger
+  // holding a link is the whole audience.
+  if (modules.gateqApply !== undefined) {
+    registerGateQApplyRoutes(app, modules.gateqApply);
   }
 
   if (modules.capital !== undefined) {

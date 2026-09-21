@@ -57,6 +57,22 @@ export type ApplicationSessionRepository = {
     readonly storedHash: string;
   } | null>;
   readonly touch: (id: string, at: string) => Promise<void>;
+  /**
+   * The last turn this session processed, so a retry is the same turn.
+   *
+   * A flaky mobile connection retries; a double-tapped send arrives twice.
+   * Without this, each one is another model call the organisation pays for
+   * and another chance to record the same sentence as two facts.
+   */
+  readonly lastTurn: (sessionId: string) => Promise<{
+    readonly clientTurnId: string;
+    readonly reply: string;
+  } | null>;
+  readonly rememberTurn: (input: {
+    readonly sessionId: string;
+    readonly clientTurnId: string;
+    readonly reply: string;
+  }) => Promise<void>;
   readonly revokeForApplication: (
     tx: TransactionContext,
     applicationId: ApplicationId,

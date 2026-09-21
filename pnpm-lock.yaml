@@ -80,6 +80,9 @@ importers:
       '@capital-q/gateq':
         specifier: workspace:*
         version: link:../../packages/gateq
+      '@capital-q/gateq-intake':
+        specifier: workspace:*
+        version: link:../../packages/gateq-intake
       '@capital-q/investor-onboarding':
         specifier: workspace:*
         version: link:../../packages/investor-onboarding
@@ -89,6 +92,9 @@ importers:
       '@capital-q/media':
         specifier: workspace:*
         version: link:../../packages/media
+      '@capital-q/model-gateway':
+        specifier: workspace:*
+        version: link:../../packages/model-gateway
       '@capital-q/network':
         specifier: workspace:*
         version: link:../../packages/network
