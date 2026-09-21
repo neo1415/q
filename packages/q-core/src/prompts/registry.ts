@@ -18,6 +18,7 @@ import { MEMORY_EXTRACTOR_V1 } from "./tasks/memory-extractor.v1.js";
 import { FIT_EXPLANATION_V1 } from "./tasks/fit-explanation.v1.js";
 import { FOUNDER_ONBOARDING_EXTRACTION_V1 } from "./tasks/founder-onboarding-extraction.v1.js";
 import { FOUNDER_ONBOARDING_EXTRACTION_V2 } from "./tasks/founder-onboarding-extraction.v2.js";
+import { GATEQ_INTERVIEWER_V1 } from "./tasks/gateq-interviewer.v1.js";
 import { INTERVIEW_CONDUCTOR_V1 } from "./tasks/interview-conductor.v1.js";
 import { INTERVIEW_CONDUCTOR_V2 } from "./tasks/interview-conductor.v2.js";
 import { INTERVIEW_CONDUCTOR_V3 } from "./tasks/interview-conductor.v3.js";
@@ -157,6 +158,7 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition<unknown, unknown>[] =
     PRESENCE_READER_V1,
     DECISION_READER_V1,
     MEMORY_EXTRACTOR_V1,
+    GATEQ_INTERVIEWER_V1,
   ];
 
 /** The production registry: the source-controlled definitions above. */

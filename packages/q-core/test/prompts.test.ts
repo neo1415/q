@@ -95,6 +95,8 @@ describe("registry", () => {
         "DECISION_READER",
         // ADR 0012: what a conversation taught Q about the person.
         "MEMORY_EXTRACTOR",
+        // CQ-GATE-002: Q interviewing somebody applying to a gateway.
+        "GATEQ_INTERVIEWER",
       ].sort(),
     );
     for (const id of PROMPT_IDS) {

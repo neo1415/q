@@ -72,6 +72,24 @@ export {
   type QPersonalityCode,
 } from "./personality.js";
 export { COMPANY_ANALYST_V1 } from "./prompts/tasks/company-analyst.v1.js";
+export { GATEQ_INTERVIEWER_V1 } from "./prompts/tasks/gateq-interviewer.v1.js";
+export {
+  GATEQ_INTERVIEWER_SCHEMA_NAME,
+  GATEQ_INTERVIEWER_SCHEMA_VERSION,
+  GATEQ_INTERVIEWER_UNTRUSTED,
+  GATEQ_TURN_INTENTS,
+  GateQDimensionSchema,
+  GateQInterviewerResultSchema,
+  GateQInterviewerVariablesSchema,
+  GateQProposedFactSchema,
+  GateQProposedValueSchema,
+  GateQTurnIntentSchema,
+  type GateQInterviewerResult,
+  type GateQInterviewerVariables,
+  type GateQProposedFact,
+  type GateQProposedValue,
+  type GateQTurnIntent,
+} from "./prompts/schemas/gateq-interviewer.js";
 export { INTERVIEW_CONDUCTOR_V1 } from "./prompts/tasks/interview-conductor.v1.js";
 export { INTERVIEW_CONDUCTOR_V2 } from "./prompts/tasks/interview-conductor.v2.js";
 export { INTERVIEW_CONDUCTOR_V3 } from "./prompts/tasks/interview-conductor.v3.js";

@@ -35,6 +35,20 @@ export {
 } from "./domain/session-credential.js";
 
 export {
+  createGateQInterviewer,
+  InterviewUnavailableError,
+  type GateQInterviewer,
+  type InterviewChannel,
+  type InterviewerDependencies,
+  type InterviewTurnInput,
+  type InterviewTurnOutcome,
+} from "./application/interviewer.js";
+export {
+  contradictionsIn,
+  questionNeedsFor,
+  type QuestionNeed,
+} from "./application/question-needs.js";
+export {
   createIntakeService,
   type GuestContext,
   type IntakeDependencies,

@@ -35,6 +35,8 @@ export const PROMPT_IDS = [
   "PRESENCE_READER",
   "DECISION_READER",
   "MEMORY_EXTRACTOR",
+  /** CQ-GATE-002: Q interviewing somebody applying to a gateway. */
+  "GATEQ_INTERVIEWER",
 ] as const;
 export type PromptId = (typeof PROMPT_IDS)[number];
 
@@ -51,6 +53,7 @@ export const PROMPT_SLUGS: Readonly<Record<PromptId, string>> = {
   PRESENCE_READER: "presence-reader",
   DECISION_READER: "decision-reader",
   MEMORY_EXTRACTOR: "memory-extractor",
+  GATEQ_INTERVIEWER: "gateq-interviewer",
 };
 
 export type PromptKind = "CHARTER" | "TASK";
