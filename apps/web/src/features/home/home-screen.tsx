@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { Suspense } from "react";
 
 import { loadWebServerConfig } from "@capital-q/config/web";
 import { buttonClassName } from "@capital-q/ui/button";
@@ -124,19 +123,33 @@ export async function HomeScreen({
             {openingLine(context)}
           </p>
           {/* Deep chat lives one deliberate control away, never spread
-              across Home (QX-001 §7). Same conversations, same runs. */}
-          <Suspense fallback={null}>
-            <ChatsList variant="inline" />
-          </Suspense>
+              across Home (QX-001 §7). Same conversations, same runs.
+              Told which conversation is open rather than reading the URL,
+              so it needs no boundary — see the note on the panel below. */}
+          <ChatsList variant="inline" active={conversationId} />
         </div>
 
-        <Suspense fallback={null}>
-          <QConversationPanel
-            connected={qConnected}
-            context={surfaceContext(context)}
-            conversationId={conversationId}
-          />
-        </Suspense>
+        {/*
+          Deliberately not inside a Suspense boundary (QX-003A).
+
+          Nothing here is async: the panel is a client component and the
+          conversation it opens is already resolved above. A boundary was
+          needed only while the panel read the parameter with
+          `useSearchParams`, and it outlived that read.
+
+          It is not free. React streams a boundary's content into a hidden
+          holder and reveals it on a `requestAnimationFrame`, which never
+          fires while the tab is hidden. Home's whole Q surface therefore
+          stayed blank in a background tab — and in any automated browser
+          whose page is not visible, which is what made this bug look for
+          a long time like history that hydrated and was then destroyed.
+          In the shell it is parsed in place and hydrates with the root.
+        */}
+        <QConversationPanel
+          connected={qConnected}
+          context={surfaceContext(context)}
+          conversationId={conversationId}
+        />
       </section>
 
       {context.kind === "NONE" ? (

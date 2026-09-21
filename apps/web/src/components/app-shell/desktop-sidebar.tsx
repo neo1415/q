@@ -10,7 +10,7 @@ import { ContextIndicator } from "@capital-q/ui/context-indicator";
 import { ICON_SIZE, ICON_STROKE } from "@capital-q/ui/icons";
 import { QMark } from "@capital-q/ui/q-mark";
 
-import { ChatsList } from "@/features/q/chats-list";
+import { ChatsListForRoute } from "@/features/q/chats-list";
 
 import type { ShellContext } from "./app-shell";
 import {
@@ -61,7 +61,7 @@ export function DesktopSidebar({
 
       {/* The person's conversations with Q, collapsible (ADR 0012). */}
       <Suspense fallback={null}>
-        <ChatsList variant="sidebar" />
+        <ChatsListForRoute variant="sidebar" />
       </Suspense>
 
       <div className="mt-6 flex flex-col gap-3 border-t border-(--cq-border-subtle) px-5 pt-5">

@@ -194,6 +194,23 @@ export function useQConversation(
     if (opened.current === wanted) {
       return;
     }
+    /**
+     * What this effect had opened before, so an abandoned open can be
+     * taken back (QX-003A).
+     *
+     * The mark below says "this conversation is open". It is set before
+     * the read it guards, which is correct only if the read then happens.
+     * When the effect is cleaned up first the read never lands, and a
+     * second invocation used to find the conversation already marked open
+     * and return early — leaving the surface empty for the rest of the
+     * page's life, with a successful read, a correct merge and no error
+     * anywhere to show for it.
+     *
+     * React's development double-invoke is the reliable way to produce
+     * that second invocation, but it is not the only one: any remount of
+     * this surface does the same thing in any build.
+     */
+    const previously = opened.current;
     opened.current = wanted;
     if (wanted !== null && wanted === conversationId.current) {
       // Named by this hook a moment ago and written to the URL by the
@@ -201,6 +218,8 @@ export function useQConversation(
       return;
     }
     let cancelled = false;
+    /** True until the open has run; a cleanup before that abandons it. */
+    let opening = true;
     // One microtask later, so the state changes belong to the open rather
     // than to the render that scheduled it.
     void Promise.resolve()
@@ -243,10 +262,16 @@ export function useQConversation(
         }
       })
       .finally(() => {
+        opening = false;
         if (!cancelled) setLoading(false);
       });
     return () => {
       cancelled = true;
+      if (opening) {
+        // Abandoned before it opened anything: the mark would otherwise
+        // claim a conversation is open that was never read.
+        opened.current = previously;
+      }
     };
   }, [wanted, follow, reset]);
 

@@ -60,14 +60,22 @@ function whenLabel(iso: string): string {
 
 export function ChatsList({
   variant = "sidebar",
+  active = null,
 }: {
   readonly variant?: "sidebar" | "inline";
+  /**
+   * The conversation currently open, or null when none is.
+   *
+   * Taken as a prop rather than read from the URL here (QX-003A). A
+   * caller that already knows it — Home resolves it on the server — can
+   * then render this list in the page shell. Reading it here would make
+   * every caller suspend, and React reveals a suspended boundary's
+   * content on a `requestAnimationFrame` that never fires while the tab
+   * is hidden, so the list simply never appeared in a background tab.
+   */
+  readonly active?: string | null;
 }) {
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
   const router = useRouter();
-  const active =
-    pathname === "/home" ? searchParams.get(Q_CONVERSATION_PARAM) : null;
   const [items, setItems] = useState<readonly QConversationSummary[] | null>(
     null,
   );
@@ -222,5 +230,31 @@ export function ChatsList({
         </div>
       )}
     </section>
+  );
+}
+
+/**
+ * The same list, for a caller that cannot be told which conversation is
+ * open (QX-003A).
+ *
+ * The desktop sidebar is rendered by a layout, and a layout has no
+ * `searchParams`, so this reads the URL. That makes it suspend, so it
+ * needs a Suspense boundary around it — and inherits the background-tab
+ * reveal delay described above. Home does not use this: it is told.
+ */
+export function ChatsListForRoute({
+  variant = "sidebar",
+}: {
+  readonly variant?: "sidebar" | "inline";
+}) {
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  return (
+    <ChatsList
+      variant={variant}
+      active={
+        pathname === "/home" ? searchParams.get(Q_CONVERSATION_PARAM) : null
+      }
+    />
   );
 }
