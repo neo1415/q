@@ -54,14 +54,25 @@ describe("the two roles", () => {
     );
   });
 
-  it("commit nothing until the person commits it", () => {
+  it("commit nothing when somebody is only looking", () => {
+    // Arrowing between the options is reading, not deciding. This is the
+    // half of the radio-group behaviour worth keeping: a keyboard user
+    // must be able to hear both options without being taken to one.
+    push.mockClear();
     render(<PersonaCards />);
-    // Selecting is reading, not deciding.
-    fireEvent.click(screen.getAllByRole("radio")[1] as HTMLElement);
+    fireEvent.keyDown(screen.getByRole("radiogroup"), { key: "ArrowRight" });
+    fireEvent.keyDown(screen.getByRole("radiogroup"), { key: "ArrowLeft" });
     expect(push).not.toHaveBeenCalled();
-    expect(
-      screen.getByRole("button", { name: "Continue as investor" }),
-    ).toBeTruthy();
+  });
+
+  it("go when a card is clicked, because a card is a thing you click", () => {
+    // The first version only marked the card "selected" and waited for a
+    // second press. People clicked the big obvious card and nothing
+    // happened, which is the whole reason this test exists.
+    push.mockClear();
+    render(<PersonaCards />);
+    fireEvent.click(screen.getAllByRole("radio")[1] as HTMLElement);
+    expect(push).toHaveBeenCalledWith("/onboarding/investor");
   });
 });
 

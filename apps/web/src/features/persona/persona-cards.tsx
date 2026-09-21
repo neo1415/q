@@ -13,12 +13,18 @@ import { Button } from "@capital-q/ui/button";
  * here invents a third, and choosing one starts the same setup the plain
  * links used to.
  *
- * It is a radio group rather than two links dressed as cards. A person
- * arrows between the options, the selected one is announced as selected,
- * and the button says which role it will continue as — which a pair of
- * divs with click handlers cannot do. Selection and navigation are
- * separate on purpose: reading both options before committing is the
- * entire point of showing them together.
+ * A click chooses. That sounds obvious and the first version got it
+ * wrong: selecting and continuing were separate steps, so clicking a
+ * large, obviously-clickable card only marked it "selected" and left
+ * people waiting for something to happen. Reading both options before
+ * committing is what having them side by side already achieves; it does
+ * not need a second button to enforce it.
+ *
+ * Keyboard keeps the radio-group behaviour, because there it is the
+ * behaviour people expect: arrows move between the options without
+ * choosing, and Enter or Space on the focused card goes. That is why
+ * these are buttons in a radiogroup rather than two links — a link would
+ * navigate on arrow-focus and a div would do neither.
  *
  * One component, used on Home and at first run, so the question Q asks
  * aloud and the cards on screen can never drift into two different
@@ -64,11 +70,12 @@ export function PersonaCards({
 
   const chosen = PERSONAS.find((persona) => persona.id === selected);
 
-  const go = () => {
-    if (chosen === undefined) return;
+  const go = (id: PersonaId) => {
+    const persona = PERSONAS.find((candidate) => candidate.id === id);
+    if (persona === undefined || going) return;
     setGoing(true);
-    onChoose?.(chosen.id);
-    router.push(chosen.href);
+    onChoose?.(persona.id);
+    router.push(persona.href);
   };
 
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
@@ -125,8 +132,12 @@ export function PersonaCards({
               // inside it.
               tabIndex={isSelected ? 0 : -1}
               autoFocus={autoFocus && isSelected}
-              onClick={() => setSelected(persona.id)}
-              onDoubleClick={go}
+              // Choose and go. Arrow keys still move without choosing,
+              // so nothing is committed by simply looking.
+              onClick={() => {
+                setSelected(persona.id);
+                go(persona.id);
+              }}
               data-persona={persona.id}
               className={[
                 "flex flex-col gap-2 rounded-lg border p-5 text-left transition-colors duration-(--cq-motion-fast)",
@@ -152,8 +163,16 @@ export function PersonaCards({
           );
         })}
       </div>
+      {/* Kept for the person who arrowed to an option and wants a
+          visible thing to press. A click on the card itself already
+          goes, so this is a second door rather than the only one. */}
       <div>
-        <Button onClick={go} disabled={going}>
+        <Button
+          onClick={() => {
+            go(selected);
+          }}
+          disabled={going}
+        >
           {chosen === undefined
             ? "Continue"
             : `Continue as ${chosen.role.toLowerCase()}`}
