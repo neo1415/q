@@ -51,7 +51,11 @@ import {
 import { modelProviderConfigStatus } from "@capital-q/config/model-providers";
 import { researchProviderConfigStatus } from "@capital-q/config/research-providers";
 import { speechProviderConfigStatus } from "@capital-q/config/speech-providers";
-import { Q_VOICE_THINK_PATH, Q_VOICE_WS_PATH } from "@capital-q/contracts";
+import {
+  Q_VOICE_SPEECH_PATH,
+  Q_VOICE_THINK_PATH,
+  Q_VOICE_WS_PATH,
+} from "@capital-q/contracts";
 import {
   createModelGateway,
   createModelProviderRegistry,
@@ -154,6 +158,7 @@ import { createVoiceTurnBoard } from "./voice/turn-board.js";
 import { createWelcomeHost } from "./voice/welcome.js";
 import type { VoiceAttachment } from "./voice/provider.js";
 import { createDeepgramVoiceProvider } from "./voice/providers/deepgram.js";
+import { createDeepgramSpeechSynthesis } from "./voice/providers/deepgram-speak.js";
 import { createElevenLabsVoiceProvider } from "./voice/providers/elevenlabs.js";
 import { createVoiceTurnHandler } from "./voice/turn.js";
 import { createDecisionReader } from "./voice/decision.js";
@@ -742,6 +747,21 @@ const deepgramProvider =
           thinkPath: Q_VOICE_THINK_PATH,
         })
     : undefined;
+/**
+ * Q reading a line aloud (Q-FIRST-RUN-TTS-001).
+ *
+ * Composed from the Deepgram key alone. Deliberately not conditional on
+ * `Q_API_PUBLIC_URL` or on a realtime transport: those exist because the
+ * Voice Agent has to call this server back, and nothing calls back for
+ * one-way synthesis. That is why first-run speech works on the preview
+ * stack, which has no tunnel of its own.
+ */
+const speechSynthesis =
+  speechSecrets.deepgram === undefined
+    ? undefined
+    : createDeepgramSpeechSynthesis({
+        apiKey: speechSecrets.deepgram.reveal(),
+      });
 const voiceBindings = createVoiceSessionBindings();
 // Q conducting the interview: one model-driven turn per utterance, every
 // reading validated and recorded through the onboarding runtime.
@@ -868,12 +888,15 @@ const { app, logger: appLogger } = createApp(
           },
         }
       : {}),
-    ...(voiceProvider === undefined && deepgramProvider === undefined
+    ...(voiceProvider === undefined &&
+    deepgramProvider === undefined &&
+    speechSynthesis === undefined
       ? {}
       : {
           voice: {
             provider: voiceProvider,
             deepgram: deepgramProvider,
+            speech: speechSynthesis,
             bindings: voiceBindings,
             interviewer,
             apiBaseUrl: config.voice.apiBaseUrl,
@@ -906,6 +929,12 @@ if (deepgramProvider !== undefined) {
   appLogger.info(
     { thinkPath: Q_VOICE_THINK_PATH, voices: deepgramProvider.voices },
     "voice transport: deepgram",
+  );
+}
+if (speechSynthesis !== undefined) {
+  appLogger.info(
+    { path: Q_VOICE_SPEECH_PATH, voices: speechSynthesis.voices },
+    `one-way speech: ${speechSynthesis.name}`,
   );
 }
 if (voiceProvider !== undefined) {

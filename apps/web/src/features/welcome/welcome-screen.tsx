@@ -1,11 +1,12 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { PersonaCards } from "../persona/persona-cards";
 import { destinationPath } from "../voice/destinations";
 import { useFollowTurn } from "../voice/use-follow-turn";
+import { useQSpeech } from "../voice/use-q-speech";
 import { useVoiceInterview } from "../voice/use-voice-interview";
 import { VoiceStage } from "../voice/voice-stage";
 
@@ -20,10 +21,12 @@ import { VoiceStage } from "../voice/voice-stage";
  * Three things this gets right that the previous arrival did not.
  *
  * **Reading Q never needs a microphone.** The introduction is text on the
- * screen from the moment the page loads. Talking with Q is a two-way
+ * screen from the moment the page loads. Q also says it aloud, through
+ * one-way synthesis on the server, which needs nothing from the browser
+ * but a speaker (Q-FIRST-RUN-TTS-001). Talking *with* Q is a two-way
  * session and genuinely needs the microphone, so it is an offer and never
- * a gate: a person who declines, or whose browser blocks it, reads the
- * same introduction and continues to the same onboarding.
+ * a gate: a person who declines, or whose browser blocks it, reads and
+ * hears the same introduction and continues to the same onboarding.
  *
  * **Q does not start interrogating anybody.** Nothing is asked until the
  * person presses Start. An introduction that immediately becomes a
@@ -71,7 +74,39 @@ export function WelcomeScreen({
 }) {
   const router = useRouter();
   const voice = useVoiceInterview();
+  const speech = useQSpeech();
   const [started, setStarted] = useState(false);
+
+  const lines = introduction(knownName);
+  const spoken = lines.join(" ");
+
+  /**
+   * Q says the introduction once, on arrival.
+   *
+   * Not for somebody who is back: a greeting replayed on every visit stops
+   * being a greeting. Not while the two-way stage is open either, because
+   * Q is already talking there. If the browser will not start audio
+   * without a gesture, `useQSpeech` says so and the offer below appears —
+   * nothing here waits on any of it, and Start is reachable throughout.
+   */
+  const said = useRef(false);
+  const say = speech.say;
+  useEffect(() => {
+    if (returning || voice.active || said.current) {
+      return;
+    }
+    said.current = true;
+    void say(spoken);
+  }, [returning, voice.active, say, spoken]);
+
+  // Two Qs talking over each other is worse than either alone: the
+  // introduction stops when the two-way stage opens.
+  const stopSpeaking = speech.stop;
+  useEffect(() => {
+    if (voice.active) {
+      stopSpeaking();
+    }
+  }, [voice.active, stopSpeaking]);
 
   const begin = async () => {
     await voice.talk({
@@ -118,8 +153,6 @@ export function WelcomeScreen({
       />
     );
   }
-
-  const lines = introduction(knownName);
 
   return (
     <div
@@ -174,6 +207,36 @@ export function WelcomeScreen({
             </button>
           </div>
         ) : null}
+
+        {/*
+          Hearing Q, as a control rather than as something that happens to
+          you. "Hear Q" appears only when the browser actually refused to
+          start audio on its own; the rest of the time this is a mute
+          toggle, and a failed synthesis shows nothing at all.
+        */}
+        <div className="flex items-center gap-3" data-q-speech={speech.status}>
+          {speech.status === "blocked" ? (
+            <button
+              type="button"
+              className="cq-stage-quiet"
+              onClick={speech.play}
+              data-q-speech-play
+            >
+              Hear Q
+            </button>
+          ) : null}
+          {speech.status === "unavailable" ? null : (
+            <button
+              type="button"
+              className="cq-stage-quiet"
+              onClick={speech.toggleMuted}
+              aria-pressed={speech.muted}
+              data-q-speech-mute
+            >
+              {speech.muted ? "Unmute Q" : "Mute Q"}
+            </button>
+          )}
+        </div>
 
         {started ? (
           // Q's first question, with both answers on screen. The cards are

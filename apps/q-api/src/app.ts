@@ -107,6 +107,8 @@ export type QApiModules = {
         | "board"
         | "welcome"
         | "deepgram"
+        | "speech"
+        | "speechThrottle"
         | "memory"
       >)
     | undefined;
@@ -289,6 +291,8 @@ export function createApp(
       board: modules.voice.board,
       welcome: modules.voice.welcome,
       deepgram: modules.voice.deepgram,
+      speech: modules.voice.speech,
+      speechThrottle: modules.voice.speechThrottle,
       now: modules.voice.now,
     });
     if (

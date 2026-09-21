@@ -2,10 +2,12 @@ import { randomBytes, randomUUID } from "node:crypto";
 
 import type { FastifyInstance } from "fastify";
 import {
+  CreateQSpeechRequestSchema,
   CreateQVoiceSessionRequestSchema,
   CreateQVoiceSessionResponseSchema,
   parseContract,
   Q_VOICE_SESSIONS_PATH,
+  Q_VOICE_SPEECH_PATH,
   Q_VOICE_TURN_PATH,
   QVoiceTurnStateSchema,
 } from "@capital-q/contracts";
@@ -31,6 +33,12 @@ import type {
   DeepgramAgentSettings,
   DeepgramVoiceProvider,
 } from "./providers/deepgram.js";
+import {
+  SpeechSynthesisError,
+  createSpeechThrottle,
+  type SpeechSynthesisPort,
+  type SpeechThrottle,
+} from "./synthesis.js";
 import type { VoiceTurnBoard } from "./turn-board.js";
 import type { WelcomeHost } from "./welcome.js";
 import type { ActorContext } from "@capital-q/security";
@@ -67,6 +75,10 @@ export type QVoiceRoutesDependencies = ActorContextDependencies & {
   readonly board?: VoiceTurnBoard | undefined;
   /** Q's first minute with a new person. */
   readonly welcome?: WelcomeHost | undefined;
+  /** One-way synthesis, when composed: Q reads a line, nothing listens. */
+  readonly speech?: SpeechSynthesisPort | undefined;
+  /** How often one person may ask for that; composed here so a test can drive it. */
+  readonly speechThrottle?: SpeechThrottle | undefined;
   readonly now?: (() => number) | undefined;
   /**
    * When present, a person with no organisation yet may still talk with Q
@@ -94,6 +106,10 @@ export function registerQVoiceRoutes(
   const started = meter.createCounter("q.voice.session.issued", {
     description: "Voice session credentials issued, by voice",
   });
+  const spokenLines = meter.createCounter("q.voice.speech.synthesised", {
+    description: "One-way spoken lines synthesised, by voice",
+  });
+  const throttle = dependencies.speechThrottle ?? createSpeechThrottle();
 
   // What Q is asking after its latest spoken turn: the owner's own
   // session only; anyone else sees the same 404 as a session that does
@@ -122,6 +138,80 @@ export function registerQVoiceRoutes(
         degraded: false,
       };
       return reply.code(200).send(QVoiceTurnStateSchema.parse(state));
+    },
+  );
+
+  /**
+   * `POST /v1/q/voice/speech` — Q reads one line aloud
+   * (Q-FIRST-RUN-TTS-001).
+   *
+   * A normal protected request that happens to answer with audio. It
+   * opens nothing, binds nothing and records nothing: there is no
+   * session, no thread, no conversation and no microphone anywhere in
+   * this path, which is the entire reason it exists separately from the
+   * voice session above.
+   *
+   * The body is the strict public contract, so the text is bounded before
+   * a provider is addressed, and the allowance is charged against the
+   * server-resolved actor rather than anything the caller chose. What
+   * comes back is bytes and a media type. What never does is the
+   * provider's name, status or complaint.
+   */
+  app.post(
+    Q_VOICE_SPEECH_PATH,
+    { onRequest: withContext },
+    async (request, reply) => {
+      const speech = dependencies.speech;
+      if (speech === undefined) {
+        return reply.code(404).send({
+          type: "about:blank",
+          title: "Not Found",
+          status: 404,
+          detail: "Q can't speak on this build.",
+        });
+      }
+      const actor = getActorContext(request);
+      const input = parseContract(
+        CreateQSpeechRequestSchema,
+        request.body ?? {},
+        "The speech request is not valid.",
+      );
+      if (!throttle.charge(`${actor.tenantId}:${actor.userId}`)) {
+        return reply.code(429).send({
+          type: "about:blank",
+          title: "Too Many Requests",
+          status: 429,
+          detail: "That is more speech than Q will read out just now.",
+        });
+      }
+      const voice = speech.voices.includes(input.voice)
+        ? input.voice
+        : "FEMALE";
+      try {
+        const spoken = await speech.synthesise({ text: input.text, voice });
+        spokenLines.add(1, { voice });
+        return (
+          reply
+            .code(200)
+            .header("content-type", spoken.mediaType)
+            // Audio of whatever this person asked to hear, under their own
+            // session: never a shared cache's to keep.
+            .header("cache-control", "no-store")
+            .send(Buffer.from(spoken.audio))
+        );
+      } catch (error) {
+        if (error instanceof SpeechSynthesisError) {
+          // Hearing Q is an offer, and a refused offer is not an error a
+          // person has to do anything about. The screen keeps the words.
+          return reply.code(503).send({
+            type: "about:blank",
+            title: "Service Unavailable",
+            status: 503,
+            detail: "Q can't speak right now.",
+          });
+        }
+        throw error;
+      }
     },
   );
 

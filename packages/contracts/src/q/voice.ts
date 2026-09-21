@@ -42,6 +42,58 @@ export const Q_VOICE_CHOICES = ["FEMALE", "MALE"] as const;
 export type QVoiceChoice = (typeof Q_VOICE_CHOICES)[number];
 export const QVoiceChoiceSchema = z.enum(Q_VOICE_CHOICES);
 
+/**
+ * `POST /v1/q/voice/speech` — Q says one line, and nothing listens
+ * (Q-FIRST-RUN-TTS-001).
+ *
+ * One-way synthesis, deliberately separate from a voice session. A
+ * session is a conversation: it opens a microphone, recognises speech,
+ * detects turns and can be interrupted. Hearing Q read the words already
+ * on the screen needs none of that, and asking somebody for a microphone
+ * in order to play them audio is the kind of permission prompt that
+ * teaches people to refuse every prompt.
+ *
+ * So this is not a session, does not create one, and carries no thread:
+ * text in, audio out, no conversation on either side.
+ */
+export const Q_VOICE_SPEECH_PATH = "/v1/q/voice/speech" as const;
+
+/**
+ * The longest line Q will synthesise in one request.
+ *
+ * Short on purpose. What this is for is a greeting or a line of copy
+ * already visible on the screen, not reading a document aloud: a spoken
+ * answer is bounded elsewhere too (`SPOKEN_MAX_CHARS`). A caller is
+ * authenticated, so this is not the only thing standing between the
+ * product and a synthesis bill — but it is the one that makes the cost of
+ * a single request knowable.
+ */
+export const Q_SPEECH_MAX_CHARS = 600;
+
+/** What the browser may ask to hear, and nothing else. */
+export const CreateQSpeechRequestSchema = z
+  .object({
+    /**
+     * The words to say. Text, not markup and not a template: whatever is
+     * sent is what is synthesised, so it is bounded and validated here
+     * rather than trusted because of where it came from.
+     */
+    text: z.string().trim().min(1).max(Q_SPEECH_MAX_CHARS),
+    voice: QVoiceChoiceSchema.default("FEMALE"),
+  })
+  .strict();
+export type CreateQSpeechRequest = z.infer<typeof CreateQSpeechRequestSchema>;
+
+/**
+ * What the browser will play. One format, so a response that is anything
+ * else is a provider changing its mind rather than something to hand to
+ * an audio element.
+ */
+export const Q_SPEECH_MEDIA_TYPE = "audio/mpeg" as const;
+
+/** Beyond this, the audio is not what was asked for. Bounded playback, bounded memory. */
+export const Q_SPEECH_MAX_BYTES = 2 * 1024 * 1024;
+
 export const OnboardingJourneyTypeForVoiceSchema = z.enum([
   "founder",
   "investor",
