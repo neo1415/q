@@ -16,7 +16,7 @@ import {
   QConversationPanel,
   type QSurfaceContext,
 } from "@/features/q/q-conversation";
-import { PersonaCards } from "./persona-cards";
+import { PersonaCards } from "@/features/persona/persona-cards";
 
 /**
  * Home is Q (QX-001 §4; doc 17 §60-§63).

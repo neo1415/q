@@ -3,22 +3,57 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { PersonaCards } from "../persona/persona-cards";
 import { destinationPath } from "../voice/destinations";
 import { useFollowTurn } from "../voice/use-follow-turn";
 import { useVoiceInterview } from "../voice/use-voice-interview";
 import { VoiceStage } from "../voice/voice-stage";
 
 /**
- * Arrival (CQ-Q-VOICE-001 rework): the first minute with Q.
+ * The first minute with Q (QX-002 §A1-§A7).
  *
- * A quiet field with the Q mark; one tap (the browser needs a gesture
- * before it will open a microphone or play sound); then Q speaks first,
- * introduces itself, asks what to call the person and works out from
- * whatever they say whether they are here to raise or to invest. When the
- * server's turn state names an interview, the screen goes there with the
- * voice still on. Nothing here decides anything: Q proposes, the server
- * records the name and the setup under the person's own authority.
+ * Q introduces itself, the person decides when to start, and then Q asks
+ * the one question that decides everything after it — with both answers
+ * on screen as real options rather than as a hope that somebody types the
+ * right sentence.
+ *
+ * Three things this gets right that the previous arrival did not.
+ *
+ * **Reading Q never needs a microphone.** The introduction is text on the
+ * screen from the moment the page loads. Talking with Q is a two-way
+ * session and genuinely needs the microphone, so it is an offer and never
+ * a gate: a person who declines, or whose browser blocks it, reads the
+ * same introduction and continues to the same onboarding.
+ *
+ * **Q does not start interrogating anybody.** Nothing is asked until the
+ * person presses Start. An introduction that immediately becomes a
+ * question is not an introduction.
+ *
+ * **The choice is visible.** "What do you want to do?" with no options is
+ * a prompt, not a product. Both roles are on screen, selectable by
+ * keyboard, and remain there while Q is speaking — so answering aloud and
+ * answering with a click are the same choice, not two different flows.
+ *
+ * Nothing here decides identity. Choosing a card navigates to that
+ * onboarding path, and the canonical role is established there under the
+ * person's own authority, exactly as it was before.
  */
+
+/**
+ * What Q says first.
+ *
+ * Bounded product copy rather than a model call: this is the first thing
+ * anybody reads, it must be identical every time, and rendering a page
+ * must not wait on a provider. The name is the only thing that varies,
+ * and only when Capital Q already has one.
+ */
+function introduction(knownName: string | null): readonly string[] {
+  return [
+    knownName === null ? "Hi, I'm Q." : `Hi ${knownName}, I'm Q.`,
+    "I'll help you understand where you are, prepare what you need, and move through the capital process without making you repeat yourself.",
+    "I work from whatever you already have. You can talk to me or type — whichever you prefer.",
+  ];
+}
 
 export function WelcomeScreen({
   knownName,
@@ -36,9 +71,9 @@ export function WelcomeScreen({
 }) {
   const router = useRouter();
   const voice = useVoiceInterview();
-  const [begun, setBegun] = useState(false);
+  const [started, setStarted] = useState(false);
+
   const begin = async () => {
-    setBegun(true);
     await voice.talk({
       thread: {
         welcome: true,
@@ -72,8 +107,8 @@ export function WelcomeScreen({
         onChooseVoice={(choice) => void voice.chooseVoice(choice)}
         onEnd={() => {
           void voice.end();
-          router.push("/home");
         }}
+        endLabel="Back"
         notice={voice.notice}
         onDismissNotice={voice.clearNotice}
         asking={turn?.asking ?? null}
@@ -84,65 +119,119 @@ export function WelcomeScreen({
     );
   }
 
+  const lines = introduction(knownName);
+
   return (
     <div
-      className="cq-stage fixed inset-0 z-50 flex flex-col items-center justify-center gap-8 px-6 text-white"
+      className="cq-stage fixed inset-0 z-50 overflow-y-auto px-6 py-10 text-white"
       data-q-welcome
     >
-      <div className="relative flex h-56 w-56 items-center justify-center">
+      <div className="mx-auto flex min-h-full max-w-2xl flex-col items-center justify-center gap-8">
+        <div className="relative flex h-40 w-40 items-center justify-center">
+          <div
+            aria-hidden="true"
+            className="cq-stage-halo-listening cq-welcome-breathe absolute inset-0 rounded-full blur-2xl"
+          />
+          <div className="cq-stage-core relative flex h-28 w-28 items-center justify-center rounded-full">
+            <span className="cq-stage-mark select-none text-5xl font-semibold tracking-tight">
+              Q
+            </span>
+          </div>
+        </div>
+
+        {/* Q's introduction, readable without a microphone, a provider or
+            a permission prompt. */}
         <div
-          aria-hidden="true"
-          className="cq-stage-halo-listening cq-welcome-breathe absolute inset-0 rounded-full blur-2xl"
-        />
-        <div className="cq-stage-core relative flex h-36 w-36 items-center justify-center rounded-full">
-          <span className="cq-stage-mark select-none text-6xl font-semibold tracking-tight">
-            Q
+          className="flex flex-col items-center gap-3 text-center"
+          data-q-intro
+        >
+          <span className="cq-label text-white/60">
+            {returning ? "Capital Q" : "Welcome to Capital Q"}
           </span>
+          {lines.map((line, index) => (
+            <p
+              key={line}
+              className={
+                index === 0
+                  ? "text-balance text-2xl font-semibold text-white sm:text-3xl"
+                  : "cq-body max-w-xl text-white/70"
+              }
+            >
+              {line}
+            </p>
+          ))}
         </div>
-      </div>
-      <div className="flex flex-col items-center gap-2 text-center">
-        <span className="cq-label text-white/60">Capital Q</span>
-        <h1 className="text-balance text-2xl font-semibold text-white sm:text-3xl">
-          {knownName === null
-            ? "Let's talk."
-            : returning
-              ? `Welcome back, ${knownName}.`
-              : `Welcome, ${knownName}.`}
-        </h1>
-        <p className="cq-body max-w-md text-white/60">
-          Q will introduce itself and ask a couple of questions. You can talk,
-          or type if you’d rather.
-        </p>
-      </div>
-      {voice.notice !== null ? (
-        <div className="flex items-center gap-3 rounded-xl bg-white/10 px-4 py-3">
-          <span className="cq-body text-white/85">{voice.notice}</span>
-          <button
-            type="button"
-            className="cq-stage-quiet"
-            onClick={voice.clearNotice}
-          >
-            Dismiss
-          </button>
-        </div>
-      ) : null}
-      <div className="flex flex-col items-center gap-3">
-        <button
-          type="button"
-          className="cq-stage-primary px-8"
-          disabled={begun && voice.notice === null}
-          onClick={() => void begin()}
-          data-q-welcome-begin
-        >
-          {begun && voice.notice === null ? "Connecting" : "Tap to begin"}
-        </button>
-        <button
-          type="button"
-          className="cq-stage-quiet"
-          onClick={() => router.push("/home")}
-        >
-          Skip for now
-        </button>
+
+        {voice.notice !== null ? (
+          <div className="flex items-center gap-3 rounded-xl bg-white/10 px-4 py-3">
+            <span className="cq-body text-white/85">{voice.notice}</span>
+            <button
+              type="button"
+              className="cq-stage-quiet"
+              onClick={voice.clearNotice}
+            >
+              Dismiss
+            </button>
+          </div>
+        ) : null}
+
+        {started ? (
+          // Q's first question, with both answers on screen. The cards are
+          // the same component Home uses, so the choice reads the same
+          // wherever it is offered.
+          <div className="flex w-full flex-col gap-5" data-q-role-question>
+            <p className="cq-body text-center text-white/80">
+              Are you here to raise capital, or to invest it?
+            </p>
+            <div className="cq-stage-panel rounded-xl bg-white/5 p-4">
+              <PersonaCards
+                autoFocus
+                onChoose={() => {
+                  // Leaving for onboarding: Q stops talking here rather
+                  // than following the person into the next screen.
+                  if (voice.active) void voice.end();
+                }}
+              />
+            </div>
+            <div className="flex justify-center">
+              <button
+                type="button"
+                className="cq-stage-quiet"
+                onClick={() => void begin()}
+              >
+                Or tell Q in your own words
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="flex flex-col items-center gap-3">
+            <button
+              type="button"
+              className="cq-stage-primary px-8"
+              onClick={() => setStarted(true)}
+              data-q-welcome-begin
+            >
+              Start
+            </button>
+            {/* Hearing Q is an offer. A two-way conversation needs the
+                microphone; reading this page never does. */}
+            <button
+              type="button"
+              className="cq-stage-quiet"
+              onClick={() => void begin()}
+              data-q-welcome-hear
+            >
+              Talk with Q instead
+            </button>
+            <button
+              type="button"
+              className="cq-stage-quiet"
+              onClick={() => router.push("/home")}
+            >
+              Skip for now
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

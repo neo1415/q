@@ -6,7 +6,7 @@ import { useRef, useState, type KeyboardEvent } from "react";
 import { Button } from "@capital-q/ui/button";
 
 /**
- * Which side of the table you are on (QX-001 §12).
+ * Which side of the table you are on (QX-001 §12; QX-002 §A5).
  *
  * Two roles, because Capital Q has two. Founder and Investor are the
  * canonical identities the rest of the product already turns on; nothing
@@ -15,33 +15,48 @@ import { Button } from "@capital-q/ui/button";
  *
  * It is a radio group rather than two links dressed as cards. A person
  * arrows between the options, the selected one is announced as selected,
- * and Enter continues — which a pair of divs with click handlers cannot
- * do. Selection and navigation are separate on purpose: reading both
- * options before committing is the entire point of showing them together.
+ * and the button says which role it will continue as — which a pair of
+ * divs with click handlers cannot do. Selection and navigation are
+ * separate on purpose: reading both options before committing is the
+ * entire point of showing them together.
+ *
+ * One component, used on Home and at first run, so the question Q asks
+ * aloud and the cards on screen can never drift into two different
+ * vocabularies for the same choice.
  */
 
-const PERSONAS = [
+export const PERSONAS = [
   {
     id: "founder",
-    lede: "I'm raising capital",
+    lede: "Raising capital",
     role: "Founder",
-    description:
-      "Share what you already have. Q assesses readiness, fills the gaps with you and prepares you for the right investors.",
+    description: "Prepare, improve and raise.",
     href: "/onboarding/founder",
   },
   {
     id: "investor",
-    lede: "I deploy capital",
+    lede: "Investing",
     role: "Investor",
-    description:
-      "Describe your mandate. Q builds a relevant, explainable view of opportunities and keeps it current.",
+    description: "Discover, evaluate and manage inbound.",
     href: "/onboarding/investor",
   },
 ] as const;
 
-type PersonaId = (typeof PERSONAS)[number]["id"];
+export type PersonaId = (typeof PERSONAS)[number]["id"];
 
-export function PersonaCards() {
+export function PersonaCards({
+  autoFocus = false,
+  onChoose,
+}: {
+  /** First run puts the choice in front of the person; Home does not. */
+  readonly autoFocus?: boolean | undefined;
+  /**
+   * Told which role was chosen, before the navigation. First run uses it
+   * to stop Q talking; nothing here decides identity — the onboarding
+   * path the person lands on does, under their own authority.
+   */
+  readonly onChoose?: ((persona: PersonaId) => void) | undefined;
+} = {}) {
   const router = useRouter();
   const [selected, setSelected] = useState<PersonaId>("founder");
   const [going, setGoing] = useState(false);
@@ -52,6 +67,7 @@ export function PersonaCards() {
   const go = () => {
     if (chosen === undefined) return;
     setGoing(true);
+    onChoose?.(chosen.id);
     router.push(chosen.href);
   };
 
@@ -108,6 +124,7 @@ export function PersonaCards() {
               // One stop in the tab order for the whole group, then arrows
               // inside it.
               tabIndex={isSelected ? 0 : -1}
+              autoFocus={autoFocus && isSelected}
               onClick={() => setSelected(persona.id)}
               onDoubleClick={go}
               data-persona={persona.id}
