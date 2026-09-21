@@ -113,6 +113,7 @@ function observation(
       routing: null,
       explanation: null,
       comparison: null,
+      gateq: null,
     },
     ...overrides,
   };

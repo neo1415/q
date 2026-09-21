@@ -2154,6 +2154,8 @@ export type Database = {
           expires_at: string
           id: string
           last_seen_at: string | null
+          last_turn_id: string | null
+          last_turn_reply: string | null
           revoked_at: string | null
           tenant_id: string
           token_hash: string
@@ -2164,6 +2166,8 @@ export type Database = {
           expires_at: string
           id?: string
           last_seen_at?: string | null
+          last_turn_id?: string | null
+          last_turn_reply?: string | null
           revoked_at?: string | null
           tenant_id: string
           token_hash: string
@@ -2174,6 +2178,8 @@ export type Database = {
           expires_at?: string
           id?: string
           last_seen_at?: string | null
+          last_turn_id?: string | null
+          last_turn_reply?: string | null
           revoked_at?: string | null
           tenant_id?: string
           token_hash?: string

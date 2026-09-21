@@ -3,7 +3,6 @@ import type { Logger } from "@capital-q/observability";
 
 import {
   IntakeRefusedError,
-  type ApplicationDimension,
   type ApplicationView,
 } from "../contracts/index.js";
 import type { GateQInterviewer, InterviewChannel } from "./interviewer.js";
@@ -199,9 +198,7 @@ export function createConversationService(
         // The model is told how far off the application the conversation
         // has drifted; it decides how much of a person to be about it.
         tangents: 0,
-        askedAlready: view.facts.map(
-          (fact) => fact.dimension as ApplicationDimension,
-        ),
+        askedAlready: view.facts.map((fact) => fact.dimension),
         attribution: {
           tenantId: guest.application.tenantId,
           correlationId: input.correlationId,

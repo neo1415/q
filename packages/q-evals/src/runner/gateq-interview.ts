@@ -215,10 +215,7 @@ type Turn = {
   readonly script: readonly FakeBehaviour[];
 };
 
-const KNOWN_COUNTRY = fact("company.country", {
-  kind: "CODE",
-  code: "NG",
-} as ApplicationFact["value"]);
+const KNOWN_COUNTRY = fact("company.country", { kind: "CODE", code: "NG" });
 
 /**
  * What each scenario puts in front of the interviewer.

@@ -194,6 +194,10 @@ function world(initial: GatewayPolicy): World {
         sessionRows.set(session.tokenHash, row);
         return Promise.resolve(row);
       },
+      // Intake never reads or writes a turn: the conversation layer above
+      // it does. A double that answers here would be pretending otherwise.
+      lastTurn: () => Promise.resolve(null),
+      rememberTurn: () => Promise.reject(new Error("not intake's to write")),
       findByTokenHash: (tokenHash) => {
         const row = sessionRows.get(tokenHash);
         return Promise.resolve(
