@@ -3317,3 +3317,147 @@ all — a closed front door rather than a broken one.
 Next: CQ-GATE-003 — the investor's view of inbound applications. Not
 started. The guest document path above must be resolved first or
 explicitly deferred.
+
+## CQ-GATE-002S — guest evidence, public abuse and epistemic wording (2026-09-21)
+
+Three completed-scope defects were left by GATE-002R. Two are closed here.
+The third is reported rather than improvised, and it is the one that
+blocks GATE-003.
+
+### Per-credential limits — CLOSED
+
+The applicant surface is the only anonymous write path in the product and
+a conversational one: every turn spends somebody else's model budget.
+GATE-002R bounded the shape of a request and not how often it arrives.
+
+Allowances are per session and per operation. A founder hammering their
+own session exhausts their own turn budget and nobody else's — there is
+deliberately no global counter a single script could trip for everybody —
+and spending every turn does not spend the submit allowance, or a long
+conversation could not be finished.
+
+Writing it exposed a defect in the first version of this very change:
+charging before verifying meant a forged credential could fill the bucket
+table and learn a 429, which tells an attacker the endpoint counted them.
+A credential earns a quota by being real. Verification comes first, the
+key is the server-issued session id rather than anything derived from the
+secret, and a forgery gets the same 404 every forgery has always got.
+
+A spent allowance is the one guest refusal that is not a 404. Telling an
+honest founder their application had vanished, when only their turn
+budget ran out, would be a lie that costs them the application.
+
+In process, on purpose: no Redis, no new service, no new credential. Each
+API instance holds its own counters — weaker than a shared limiter, far
+stronger than none. A distributed one is a real thing to want and is not
+this packet.
+
+### Grounded source claims — CLOSED
+
+A live provider told an applicant "I read your application and I am
+genuinely glad you sent it" on a turn where nothing of the kind had been
+supplied. Nothing leaked and nothing was mis-recorded; it simply was not
+true, and an applicant believes a claim about what was read.
+
+A prompt rule alone could not fix it, because the model had no way to tell
+what it was handed from what it was not. It is now told, as a fact derived
+from the turn's own input rather than declared beside it: what the gateway
+published, whether an application record was loaded, how much the
+applicant has said, how many values came from documents of theirs that
+were actually read, and that nothing came from the public web. It may
+claim to have read only what is on that list.
+
+Graded on provenance, not vocabulary. The same sentence passes when the
+deck was given to the turn and fails when it was not, because banning the
+words would be worse than the defect: Q should say it went through the
+deck when it went through the deck.
+
+Against a live provider:
+
+|                         |                                                                                                                                                              |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| before                  | "I read your application and I am genuinely glad you sent it."                                                                                               |
+| after, nothing supplied | "I haven't seen any documents from you yet. Could you resend them?"                                                                                          |
+| after, deck supplied    | "I just landed here with the three details from your docs: KoboLogistics in Nigeria, raising two million dollars. I haven't gone through anything else yet." |
+
+QGATE-019's FAIL path is proved in a grader test rather than in the
+dataset. Against a scripted model the reply is whatever the script says,
+so scripting the false claim would have proved the grader reads strings
+and nothing about Q; the eval case is the regression guard against a real
+model, and the grader test is the guard on the guard.
+
+### Guest Evidence — OPEN, and it blocks GATE-003
+
+`evidence.documents` requires `owner_organisation_id` and
+`created_by_user_id`, both `NOT NULL` with foreign keys to
+`identity.tenant_organisations` and `identity.user_profiles`.
+`evidence.document_versions` requires `uploaded_by_user_id` the same way,
+inside an immutability trigger. A GateQ guest has no user profile and no
+organisation, so there is no value those three columns can take that the
+packet's own constraints permit — a synthetic user, a synthetic person or
+a synthetic membership is exactly what is forbidden.
+
+Making them optional is not a subject-registry addition. It is a change to
+the ownership and attribution model of every document row: 116 references
+across 19 Evidence files, plus the storage-key derivation, the audit actor
+and the document domain event payload. Draft privacy currently hangs off
+`owner_organisation_id` and `visibility_scope`, so it moves with them.
+
+Widening `subject_type` to include `GATEQ_APPLICATION` is the easy half
+and has a precedent — `20260924090000_presence_subjects.sql` did exactly
+that for `PERSON` and `INVESTOR_ORGANISATION`. It is also not the blocker.
+
+The two real options, both Evidence's to choose:
+
+1. a guest principal in Evidence's own authority model, with the three
+   identity columns becoming optional under a check constraint that
+   requires either a member actor or a bound application; or
+2. a trusted non-actor creation entry point beside
+   `DocumentProcessingService`, owning the same attribution question.
+
+Neither is a small change and neither should be improvised inside a
+closeout packet.
+
+### Gates — CQ-GATE-002S (demo stack stopped)
+
+| Gate                             | Result                                            |
+| -------------------------------- | ------------------------------------------------- |
+| `pnpm lint`                      | exit 0                                            |
+| `pnpm typecheck`                 | 80/80                                             |
+| `pnpm test`                      | 242 files, 3138 tests, exit 0 (was 240 / 3123)    |
+| `pnpm build`                     | 43/43                                             |
+| `pnpm q:eval:lint`               | PASS, 59 cases / 19 graders (was 57 / 18)         |
+| `pnpm q:eval:ci`                 | release gate PASS, exit 0                         |
+| QGATE profile                    | 20/20, exit 0 (was 18/18)                         |
+| LIVE_MODEL, grounding cases      | run against a real provider; transcript above     |
+| `pnpm test:integration`          | 53 pass + 1 skipped; 484 pass + 5 skipped, exit 0 |
+| Dependency direction             | no package depends on an app                      |
+| Secret scan / `git diff --check` | clean                                             |
+| `pnpm demo:status`               | READY, four components (`--local`)                |
+
+No migration and no RLS change, so the database gates were not re-run;
+the GATE-002R baseline stands.
+
+### Resources
+
+No new service, account, API key, OAuth, billing or environment variable.
+
+### Open debt
+
+| Item                                                                                                                                                            | Class | Boundary                                    |
+| --------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----- | ------------------------------------------- |
+| `CQ-DEV-WATCH-SCOPE-001` — `node --watch` restarts dev services when a file under `packages/*/dist` is merely read                                              | 3     | **before an external or public GateQ demo** |
+| `CQ-TEST-SSE-TEARDOWN-001` — the q-api SSE integration test can leave a query pending across pool shutdown, failing the gate under load while every test passes | 3     | **no later than the pre-Wave-7 closure**    |
+| `CQ-GATE-EVIDENCE-GUEST-001` — a GateQ applicant cannot use the Evidence pipeline; Evidence's document identity requires a user profile and an organisation     | 2     | **before GATE-003**                         |
+
+GATE-002 completed-scope debt: **`CQ-GATE-EVIDENCE-GUEST-001` only.** The
+rate limit and the epistemic wording are closed.
+
+### Commits
+
+| SHA       | What                                                             |
+| --------- | ---------------------------------------------------------------- |
+| `ba82f7d` | per-credential limits, grounded source claims, the blocker named |
+
+Next: QX-001 — Q-Centric Home / Surface. GATE-003 remains blocked on the
+Evidence authority decision above.
