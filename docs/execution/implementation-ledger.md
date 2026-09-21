@@ -3586,3 +3586,151 @@ None is closed by this packet.
 | `ffcf1a3` | Home as a Q-first surface, one composer, the result-card shell, persona cards |
 
 Next: QX-002 — Research-Assisted Onboarding.
+
+## QX-002/003 — PARTIAL: first-run Q and real structured results (2026-09-21)
+
+Two of four checkpoints. A and C are done and pushed; B and D were not
+started. The packet's own time guard says to stop at a coherent boundary
+rather than run a six-hour session, and this is that boundary.
+
+### A — first run is a voice-led, option-driven Q introduction · DONE
+
+Arrival was a dark screen, a "Tap to begin" that immediately demanded the
+microphone, and — if you got through it — a conversation with no visible
+options.
+
+**Reading Q never needs a microphone.** The introduction is text from the
+moment the page loads. Talking is a two-way session and genuinely needs
+the microphone, so it sits beside Start as an offer rather than in front
+of it as a gate.
+
+**Q does not start interrogating anybody.** Nothing is asked until Start
+is pressed. An introduction that is immediately a question is not an
+introduction.
+
+**The choice is visible.** After Start, Q asks whether you are here to
+raise capital or invest it, and both answers are on screen as the same
+persona cards Home uses — one component, so the question Q asks and the
+cards you click cannot drift into two vocabularies. Answering in your own
+words is still one control away. A returning founder or investor skips
+all of it; the page already redirects them to Home.
+
+Nothing here decides identity: a card navigates to that onboarding path
+and the canonical role is established there under the person's own
+authority.
+
+Actual first words: _"Hi Dev Member, I'm Q. I'll help you understand where
+you are, prepare what you need, and move through the capital process
+without making you repeat yourself."_
+
+**Limit, stated rather than implied.** Capital Q has no standalone speech
+endpoint, so Q's voice is the two-way session. "Hear Q without a
+microphone" is not buildable without adding one, and this packet adds no
+provider. What is guaranteed is the weaker, honest thing: the microphone
+is never required to read Q's introduction or to finish onboarding.
+
+### C — real structured results, end to end · DONE
+
+This closes QX-001's remaining caveat. The renderer existed and nothing
+rendered, because the runtime's messages were text-only.
+
+The structure was already there — the analyst schema has said since it was
+written that "the rest is structure the runtime can check and later
+surface as result blocks" — and nothing surfaced it. Findings, gaps,
+contradictions and clarifying questions were produced on every run and
+dropped. They now travel as blocks on the durable `q.message.completed`
+event.
+
+Two seams, not one: the conversational gateway and the Company
+Intelligence specialist each persist their own answer, and patching only
+the first would have meant one answer carrying a different shape
+depending on which brain produced it.
+
+What the projection will not do:
+
+- invent anything — a run with no findings produces no finding blocks;
+- reference a subject the model named rather than one the server
+  authorised the run against;
+- read an unrecognised label as a stronger one — an unreadable claim is a
+  `USER_CLAIM` with `SELF_REPORTED` evidence, never a fact;
+- carry an evidence identifier, which remains disclosure's decision at
+  render time (the QX-001 finding stands).
+
+Uncertainty says which kind it is: missing evidence becomes
+`INSUFFICIENT_EVIDENCE`, a contradiction becomes `CONFLICTING_EVIDENCE`.
+
+Live, founder Home, "Review my company.": one `COMPANY_REFERENCE` card
+reading "Company / Ask Q about it" with a working action, and the finding
+rendered as _"Fact · Canonical name: Northstar Logistics (dev) · Moderate
+confidence"_.
+
+**Limit:** the message store is plain text by design — its own comment
+warns that an unbounded column there is where a provider's whole response
+object would end up — so blocks live on the run event. They survive a
+reconnect and a replay; reopening an old conversation from history shows
+its text without its cards until a bounded, migrated column exists.
+Logged below.
+
+### B — research-assisted onboarding · NOT STARTED
+
+Surveyed, not built. The ground is better than expected and none of it
+needs a new provider:
+
+- `@capital-q/q-research` already owns a provider-neutral research port
+  with a Tavily adapter, outbound egress control over what words may
+  leave, public-URL safety, bounded instruction-scanned excerpts, and
+  deterministic comparison notes against a subject's recorded identity;
+- `@capital-q/q-presence` already owns the order in which the public web
+  is read _at arrival_, the excerpts handed to a model, and the
+  understandings proposed through the Knowledge Write Gate;
+- `PUBLIC_WEB` is already a source type in Evidence with provenance.
+
+What is missing is the wiring: neither onboarding package references
+research today, so nothing fires when a name and an organisation become
+known, and nothing suppresses a later question because a candidate was
+already confirmed. That is an integration across both onboarding flows
+plus the no-repeat semantics, and it is the whole of B.
+
+### D — Q artifact foundation · NOT STARTED
+
+Not surveyed beyond confirming no artifact domain exists. D is a new
+bounded context with persistence, versioning, RLS, an API surface, a
+result-block type, a web card, a viewer and an edit path. C was taken
+first because D's artifact card is a result block and would not have
+rendered without it.
+
+### Verification
+
+| Gate                                                  | Result                      |
+| ----------------------------------------------------- | --------------------------- |
+| web tests                                             | 13 files, 185 tests, exit 0 |
+| model-gateway tests                                   | 18 files, 143 tests, exit 0 |
+| affected packages (model-gateway, q-specialists, web) | 37 files, 415 tests, exit 0 |
+| typecheck, web + model-gateway + q-specialists        | exit 0                      |
+| eslint, the same three                                | exit 0                      |
+| `git diff --check` / secret scan                      | clean                       |
+| `pnpm demo:status`                                    | READY, four components      |
+
+No new provider, account, API key, environment variable or migration. No
+combined final confidence pass was run, because two of the four
+checkpoints did not happen — it belongs with the packet that finishes
+them.
+
+### Open debt
+
+| Item                                                                                                                                  | Class | Boundary                                    |
+| ------------------------------------------------------------------------------------------------------------------------------------- | ----- | ------------------------------------------- |
+| `CQ-GATE-EVIDENCE-GUEST-001` — a GateQ applicant cannot use the Evidence pipeline                                                     | 2     | **before GATE-003**                         |
+| `CQ-DEV-WATCH-SCOPE-001` — `node --watch` restarts dev services when a file under `packages/*/dist` is merely read                    | 3     | **before an external or public GateQ demo** |
+| `CQ-TEST-SSE-TEARDOWN-001` — the q-api SSE integration test can leave a query pending across pool shutdown                            | 3     | **no later than the pre-Wave-7 closure**    |
+| `CQ-Q-BLOCKS-HISTORY-001` — result blocks live on the run event, so a conversation reopened from history shows text without its cards | 3     | **with the packet that persists them**      |
+
+### Commits
+
+| SHA       | What                                                      |
+| --------- | --------------------------------------------------------- |
+| `827a5b1` | QX-002A — first run is a voice-led Q introduction         |
+| `207543d` | QX-002C — real structured results from runtime to browser |
+
+Next: QX-002B (research-assisted onboarding) and QX-003 (artifacts)
+remain outstanding, then QX-004 — Pitch Deck Studio.
