@@ -179,8 +179,9 @@ select is((select count(*)::int from information_schema.columns
               and column_name in ('mandate_id', 'min_cheque', 'max_cheque', 'revenue', 'readiness_score', 'rank_score')), 0,
   'no mandate column, no score column: GateQ policy is not the investor mandate and is not a ranker');
 
-select is((select count(*)::int from information_schema.tables where table_schema = 'gateq'), 3,
-  'three tables and no more');
+select is((select count(*)::int from information_schema.tables where table_schema = 'gateq'
+            and table_name in ('gateways', 'gateway_versions', 'gateway_criteria')), 3,
+  'the gateway is three tables: identity, versions, criteria');
 
 select * from finish();
 rollback;

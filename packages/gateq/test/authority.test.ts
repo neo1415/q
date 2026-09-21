@@ -237,8 +237,11 @@ function world() {
     companies: {
       projectionFor: (query) =>
         Promise.resolve({
-          companyId: query.companyId,
-          tenantId: query.tenantId,
+          subject: {
+            kind: "COMPANY",
+            companyId: query.companyId,
+            tenantId: query.tenantId,
+          },
           classifications: [],
           headquartersCountry: "NG",
           currentStageCode: "seed",

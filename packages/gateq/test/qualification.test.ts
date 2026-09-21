@@ -112,8 +112,11 @@ function company(
   overrides: Partial<CompanyQualificationProjection> = {},
 ): CompanyQualificationProjection {
   return {
-    companyId: COMPANY,
-    tenantId: "22222222-0000-4000-8000-000000000001",
+    subject: {
+      kind: "COMPANY",
+      companyId: COMPANY,
+      tenantId: "22222222-0000-4000-8000-000000000001",
+    },
     classifications: [
       {
         vocabularyCode: "industry",
@@ -531,7 +534,7 @@ describe("what qualification is not", () => {
       [
         "access",
         "accessReasonCode",
-        "companyId",
+        "subject",
         "criteria",
         "evaluatedAt",
         "gatewayId",
@@ -553,11 +556,10 @@ describe("what qualification is not", () => {
     const projection = company();
     expect(Object.keys(projection).sort()).toEqual([
       "classifications",
-      "companyId",
       "currentStageCode",
       "headquartersCountry",
       "raise",
-      "tenantId",
+      "subject",
     ]);
     const smuggled = {
       ...projection,

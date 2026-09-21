@@ -2064,6 +2064,232 @@ export type Database = {
   }
   gateq: {
     Tables: {
+      application_documents: {
+        Row: {
+          application_id: string
+          attached_at: string
+          document_id: string
+          id: string
+          tenant_id: string
+        }
+        Insert: {
+          application_id: string
+          attached_at?: string
+          document_id: string
+          id?: string
+          tenant_id: string
+        }
+        Update: {
+          application_id?: string
+          attached_at?: string
+          document_id?: string
+          id?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "application_documents_application_id_fkey"
+            columns: ["application_id"]
+            isOneToOne: false
+            referencedRelation: "applications"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      application_facts: {
+        Row: {
+          application_id: string
+          dimension: string
+          id: string
+          provenance: string
+          recorded_at: string
+          superseded_at: string | null
+          superseded_by: string | null
+          tenant_id: string
+          value: Json
+        }
+        Insert: {
+          application_id: string
+          dimension: string
+          id?: string
+          provenance: string
+          recorded_at?: string
+          superseded_at?: string | null
+          superseded_by?: string | null
+          tenant_id: string
+          value: Json
+        }
+        Update: {
+          application_id?: string
+          dimension?: string
+          id?: string
+          provenance?: string
+          recorded_at?: string
+          superseded_at?: string | null
+          superseded_by?: string | null
+          tenant_id?: string
+          value?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "application_facts_application_id_fkey"
+            columns: ["application_id"]
+            isOneToOne: false
+            referencedRelation: "applications"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "application_facts_superseded_by_fkey"
+            columns: ["superseded_by"]
+            isOneToOne: false
+            referencedRelation: "application_facts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      application_sessions: {
+        Row: {
+          application_id: string
+          created_at: string
+          expires_at: string
+          id: string
+          last_seen_at: string | null
+          revoked_at: string | null
+          tenant_id: string
+          token_hash: string
+        }
+        Insert: {
+          application_id: string
+          created_at?: string
+          expires_at: string
+          id?: string
+          last_seen_at?: string | null
+          revoked_at?: string | null
+          tenant_id: string
+          token_hash: string
+        }
+        Update: {
+          application_id?: string
+          created_at?: string
+          expires_at?: string
+          id?: string
+          last_seen_at?: string | null
+          revoked_at?: string | null
+          tenant_id?: string
+          token_hash?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "application_sessions_application_id_fkey"
+            columns: ["application_id"]
+            isOneToOne: false
+            referencedRelation: "applications"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      application_submissions: {
+        Row: {
+          application_id: string
+          client_request_id: string
+          gateway_version_id: string
+          id: string
+          qualification: Json
+          snapshot: Json
+          submitted_at: string
+          tenant_id: string
+        }
+        Insert: {
+          application_id: string
+          client_request_id: string
+          gateway_version_id: string
+          id?: string
+          qualification: Json
+          snapshot: Json
+          submitted_at?: string
+          tenant_id: string
+        }
+        Update: {
+          application_id?: string
+          client_request_id?: string
+          gateway_version_id?: string
+          id?: string
+          qualification?: Json
+          snapshot?: Json
+          submitted_at?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "application_submissions_application_id_fkey"
+            columns: ["application_id"]
+            isOneToOne: true
+            referencedRelation: "applications"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "application_submissions_gateway_version_id_fkey"
+            columns: ["gateway_version_id"]
+            isOneToOne: false
+            referencedRelation: "gateway_versions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      applications: {
+        Row: {
+          created_at: string
+          declared_name: string | null
+          gateway_id: string
+          gateway_version_id: string
+          id: string
+          public_reference: string
+          status: string
+          submitted_at: string | null
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          declared_name?: string | null
+          gateway_id: string
+          gateway_version_id: string
+          id?: string
+          public_reference: string
+          status?: string
+          submitted_at?: string | null
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          declared_name?: string | null
+          gateway_id?: string
+          gateway_version_id?: string
+          id?: string
+          public_reference?: string
+          status?: string
+          submitted_at?: string | null
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "applications_gateway_id_fkey"
+            columns: ["gateway_id"]
+            isOneToOne: false
+            referencedRelation: "gateways"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "applications_gateway_version_id_fkey"
+            columns: ["gateway_version_id"]
+            isOneToOne: false
+            referencedRelation: "gateway_versions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       gateway_criteria: {
         Row: {
           config: Json

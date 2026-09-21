@@ -2,7 +2,7 @@ import {
   CRITERION_REASON_CODES,
   type AccessDecision,
   type AccessReasonCode,
-  type CompanyQualificationProjection,
+  type QualificationSubjectProjection,
   type CriterionConfig,
   type CriterionReasonCode,
   type CriterionResult,
@@ -50,7 +50,7 @@ type Verdict = {
 
 function taxonomyVerdict(
   config: Extract<CriterionConfig, { type: "TAXONOMY" }>,
-  projection: CompanyQualificationProjection,
+  projection: QualificationSubjectProjection,
 ): Verdict {
   const inVocabulary = projection.classifications.filter(
     (c) => c.vocabularyCode === config.vocabularyCode,
@@ -96,7 +96,7 @@ function taxonomyVerdict(
 
 function exclusionVerdict(
   config: Extract<CriterionConfig, { type: "EXCLUDED_TAXONOMY" }>,
-  projection: CompanyQualificationProjection,
+  projection: QualificationSubjectProjection,
 ): Verdict {
   const inVocabulary = projection.classifications.filter(
     (c) => c.vocabularyCode === config.vocabularyCode,
@@ -132,7 +132,7 @@ function exclusionVerdict(
 
 function raiseVerdict(
   config: Extract<CriterionConfig, { type: "RAISE_SIZE" }>,
-  projection: CompanyQualificationProjection,
+  projection: QualificationSubjectProjection,
 ): Verdict {
   const raise = projection.raise;
   if (raise === null) {
@@ -193,7 +193,7 @@ function raiseVerdict(
  */
 function chequeVerdict(
   config: Extract<CriterionConfig, { type: "CHEQUE_COMPATIBILITY" }>,
-  projection: CompanyQualificationProjection,
+  projection: QualificationSubjectProjection,
 ): Verdict {
   const raise = projection.raise;
   if (raise === null) {
@@ -225,7 +225,7 @@ function chequeVerdict(
 
 function verdictFor(
   criterion: GatewayCriterion,
-  projection: CompanyQualificationProjection,
+  projection: QualificationSubjectProjection,
 ): Verdict {
   const config = criterion.config;
   switch (config.type) {
@@ -280,7 +280,7 @@ function verdictFor(
 
 export type QualifyInput = {
   readonly policy: GatewayPolicy;
-  readonly projection: CompanyQualificationProjection;
+  readonly projection: QualificationSubjectProjection;
   /** Supplied, never read: the engine holds no clock. */
   readonly evaluatedAt: string;
 };
@@ -375,7 +375,7 @@ export function qualify(input: QualifyInput): QualificationResult {
     gatewayVersionId: policy.version.id,
     gatewayVersionNumber: policy.version.versionNumber,
     qualificationPolicyVersion: policy.version.qualificationPolicyVersion,
-    companyId: projection.companyId,
+    subject: projection.subject,
     inboundMode: mode,
     outcome,
     access,

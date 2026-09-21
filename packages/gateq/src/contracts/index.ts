@@ -382,10 +382,37 @@ export type PublicGateway = z.infer<typeof PublicGatewaySchema>;
  * Every field is nullable, and null means nobody has said. It never means
  * zero and it never means no.
  */
-export const CompanyQualificationProjectionSchema = z
+/**
+ * Whose facts these are (CQ-GATE-002 §24).
+ *
+ * The same deterministic engine judges a canonical Company and an
+ * anonymous application, and the discriminator is how it does that without
+ * either pretending to be the other. An application is a stranger's
+ * account of themselves; a company is Capital Q's canonical record. They
+ * are measured against the same published policy and they are not the same
+ * kind of thing, so the projection says which it is holding.
+ */
+export const QualificationSubjectSchema = z.discriminatedUnion("kind", [
+  z
+    .object({
+      kind: z.literal("COMPANY"),
+      companyId: z.string().uuid(),
+      tenantId: z.string().uuid(),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal("GATEQ_APPLICATION"),
+      applicationId: z.string().uuid(),
+      tenantId: z.string().uuid(),
+    })
+    .strict(),
+]);
+export type QualificationSubject = z.infer<typeof QualificationSubjectSchema>;
+
+export const QualificationSubjectProjectionSchema = z
   .object({
-    companyId: z.string().uuid(),
-    tenantId: z.string().uuid(),
+    subject: QualificationSubjectSchema,
     /** ACTIVE canonical classifications: node id with its vocabulary. */
     classifications: z
       .array(
@@ -416,9 +443,14 @@ export const CompanyQualificationProjectionSchema = z
       .nullable(),
   })
   .strict();
-export type CompanyQualificationProjection = z.infer<
-  typeof CompanyQualificationProjectionSchema
+export type QualificationSubjectProjection = z.infer<
+  typeof QualificationSubjectProjectionSchema
 >;
+
+/** The canonical-company case, named for the callers that only ever hold one. */
+export type CompanyQualificationProjection = QualificationSubjectProjection & {
+  readonly subject: Extract<QualificationSubject, { kind: "COMPANY" }>;
+};
 
 // ---------------------------------------------------------------------------
 // Results
@@ -517,7 +549,8 @@ export const QualificationResultSchema = z
     /** The exact published policy this was decided under; never "current". */
     gatewayVersionNumber: z.number().int().min(1),
     qualificationPolicyVersion: z.string().min(1).max(64),
-    companyId: z.string().uuid(),
+    /** Whose facts were judged: a canonical company, or an application. */
+    subject: QualificationSubjectSchema,
     inboundMode: GatewayInboundModeSchema,
     outcome: QualificationOutcomeSchema,
     access: AccessDecisionSchema,

@@ -84,8 +84,11 @@ export function createGateQCompanyProjectionPort(dependencies: {
       );
 
       const projection: CompanyQualificationProjection = {
-        companyId: company.id,
-        tenantId: company.tenantId,
+        subject: {
+          kind: "COMPANY",
+          companyId: company.id,
+          tenantId: company.tenantId,
+        },
         classifications: current.map((assignment) => ({
           vocabularyCode: assignment.vocabularyCode,
           nodeId: assignment.nodeId,
