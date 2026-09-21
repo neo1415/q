@@ -75,6 +75,7 @@ import {
 import {
   createConversationService,
   createGateQInterviewer,
+  createGuestThrottle,
   createIntakeService,
   createPostgresApplicationDocumentRepository,
   createPostgresApplicationFactRepository,
@@ -373,7 +374,10 @@ const gateqApply =
             level: config.observability.logLevel,
           }),
         });
-        return { intake, conversation };
+        // One instance's counters (CQ-GATE-002S §8). Weaker than a shared
+        // limiter and far stronger than none; a distributed one is a real
+        // thing to want and not this packet.
+        return { intake, conversation, throttle: createGuestThrottle() };
       })();
 
 // Onboarding owns journey state only. The Founder integration registers the

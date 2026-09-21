@@ -41,6 +41,7 @@ import {
 } from "@capital-q/organisations";
 import type { DocumentUploadFailureCode } from "@capital-q/contracts";
 import { SlateCursorRejectedError } from "@capital-q/discovery";
+import { IntakeRefusedError } from "@capital-q/gateq-intake";
 import {
   ClaimNotFoundError,
   ClaimRevisionConflictError,
@@ -205,6 +206,18 @@ function toProblem(
   // A cursor is a position this server issued for this actor, never
   // authority: anything else is a bad request, with no hint of whose
   // slate it might have been (CQ-REC-006).
+  // A GateQ guest that has spent its allowance (CQ-GATE-002S §8). Every
+  // other intake refusal is already a 404 at the route, so this is the
+  // only one that arrives here. The response names no credential, no
+  // application and no quota: an honest applicant needs to know to wait,
+  // and a script must learn nothing about where the edges are.
+  if (
+    error instanceof IntakeRefusedError &&
+    error.refusal === "TOO_MANY_REQUESTS"
+  ) {
+    return createProblemDetails({ code: "RATE_LIMITED", requestId });
+  }
+
   if (error instanceof SlateCursorRejectedError) {
     return createProblemDetails({
       code: "INVALID_REQUEST",

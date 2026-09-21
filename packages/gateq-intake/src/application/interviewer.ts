@@ -212,6 +212,37 @@ export function createGateQInterviewer(
   const registry = dependencies.registry ?? createDefaultPromptRegistry();
   const personality = personalityOf(dependencies.personality ?? "UPBEAT");
 
+  /**
+   * What was actually put in front of Q for this turn (CQ-GATE-002S §9).
+   *
+   * Derived from the input rather than declared beside it, so it cannot
+   * drift from what was really supplied: if the list says a deck was
+   * provided, a deck was provided. A live model claimed to have read an
+   * application on a turn where none had been supplied, and a prompt rule
+   * alone could not have stopped it — the model had no way to tell what
+   * it was handed from what it was not.
+   */
+  const contextAvailableFor = (input: InterviewTurnInput): string => {
+    const application = input.application;
+    const lines = [
+      "the gateway's public description: yes",
+      `this conversation so far: ${input.recentTurns.length === 0 ? "nothing before this turn" : "yes"}`,
+      `the application's own record: ${application === undefined ? "no" : "yes"}`,
+      `what they have told us, by topic: ${
+        application === undefined || application.facts.length === 0
+          ? "nothing yet"
+          : `${application.facts.filter((f) => f.supersededAt === null).length} items`
+      }`,
+      `documents of theirs that were read for you: ${
+        application === undefined || application.documentProposals.length === 0
+          ? "none"
+          : `${application.documentProposals.length} values from their documents`
+      }`,
+      "anything from the public web: no",
+    ];
+    return lines.join("\n");
+  };
+
   return {
     turn: async (input) => {
       const application = input.application;
@@ -265,6 +296,7 @@ export function createGateQInterviewer(
                 .join("\n"),
         utterance: input.utterance.slice(0, 4000),
         tangents: Math.min(99, Math.max(0, input.tangents)),
+        contextAvailable: contextAvailableFor(input),
       };
       const rendered = renderPrompt(registry, {
         task: "GATEQ_INTERVIEWER",

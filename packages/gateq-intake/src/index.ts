@@ -27,6 +27,14 @@ export {
   type ResolvedClassification,
 } from "./domain/projection.js";
 export {
+  createGuestThrottle,
+  GATEQ_GUEST_OPERATIONS,
+  GATEQ_GUEST_QUOTAS,
+  type GateQGuestOperation,
+  type GuestQuota,
+  type GuestThrottle,
+} from "./domain/throttle.js";
+export {
   generateApplicationReference,
   hashSessionToken,
   issueSessionToken,

@@ -18,6 +18,8 @@ import {
   IntakeRefusedError,
   type ApplicantTurnResult,
   type ConversationService,
+  type GateQGuestOperation,
+  type GuestThrottle,
   type IntakeService,
 } from "@capital-q/gateq-intake";
 import { randomUUID } from "node:crypto";
@@ -54,6 +56,12 @@ import { randomUUID } from "node:crypto";
 export type GateQApplyRoutesDependencies = {
   readonly intake: IntakeService;
   readonly conversation: ConversationService;
+  /**
+   * How much one credential may do (CQ-GATE-002S §8). Absent, the routes
+   * serve unthrottled, which is what GATE-002R shipped and what this
+   * closes; the composition root always supplies one.
+   */
+  readonly throttle?: GuestThrottle | undefined;
 };
 
 /**
@@ -104,18 +112,60 @@ export function registerGateQApplyRoutes(
   app: FastifyInstance,
   dependencies: GateQApplyRoutesDependencies,
 ): void {
-  const { intake, conversation } = dependencies;
+  const { intake, conversation, throttle } = dependencies;
 
   /** One answer for every way a guest request can be wrong. */
   const refuse = (
     error: unknown,
     reply: { callNotFound: () => void },
   ): undefined => {
-    if (error instanceof IntakeRefusedError) {
+    // A spent allowance is the one refusal that is not a 404. Telling an
+    // honest founder their application had vanished, when it is simply
+    // their turn budget that ran out, would be a lie that costs them the
+    // application. It goes to the central problem handler, which owns the
+    // public wording.
+    if (
+      error instanceof IntakeRefusedError &&
+      error.refusal !== "TOO_MANY_REQUESTS"
+    ) {
       reply.callNotFound();
       return undefined;
     }
     throw error;
+  };
+
+  /**
+   * Verify the credential, then charge this operation to the session it
+   * names.
+   *
+   * The order is the security property, and getting it backwards was a
+   * real defect here: charging first meant a forged token could fill the
+   * bucket table and learn a 429, which tells an attacker the endpoint
+   * counted them. A credential earns a quota by being real. An
+   * unverifiable one is refused exactly as it always was, costs nothing,
+   * and leaves no trace to probe.
+   *
+   * Keyed on the session id, which is server-issued and not derived from
+   * the secret at all, so nothing replayable as a session ever reaches a
+   * counter, a log line or a metric label.
+   *
+   * Throwing TOO_MANY_REQUESTS rather than calling `callNotFound` is
+   * deliberate: a 404 would tell an honest founder their application had
+   * vanished when only their turn budget ran out. The problem handler
+   * turns it into a plain 429 that names nobody.
+   */
+  const charge = async (
+    credential: string,
+    operation: GateQGuestOperation,
+  ): Promise<void> => {
+    if (throttle === undefined) return;
+    // Throws IntakeRefusedError for anything forged, expired or revoked,
+    // which the caller already turns into the same 404 as every other way
+    // a guest request can be wrong.
+    const guest = await intake.authorise(credential);
+    if (!throttle.charge({ sessionId: guest.sessionId, operation })) {
+      throw new IntakeRefusedError("TOO_MANY_REQUESTS");
+    }
   };
 
   app.post(GATEQ_APPLY_START_PATH, async (request, reply) => {
@@ -149,7 +199,9 @@ export function registerGateQApplyRoutes(
 
   app.get(GATEQ_APPLY_SESSION_PATH, async (request, reply) => {
     try {
-      const summary = await conversation.summary(credential(request));
+      const token = credential(request);
+      await charge(token, "RESUME");
+      const summary = await conversation.summary(token);
       void reply.header("Cache-Control", "no-store");
       return summaryDto(summary);
     } catch (error: unknown) {
@@ -163,9 +215,13 @@ export function registerGateQApplyRoutes(
       request.body,
       "The message is not valid.",
     );
+    const token = credential(request);
     try {
+      // Before the model call, not after it: a refused turn must cost
+      // nothing but the request that made it.
+      await charge(token, "TURN");
       const outcome = await conversation.turn({
-        token: credential(request),
+        token,
         message: input.message,
         clientTurnId: input.clientTurnId,
         ...(input.channel === undefined ? {} : { channel: input.channel }),
@@ -190,6 +246,7 @@ export function registerGateQApplyRoutes(
     );
     const token = credential(request);
     try {
+      await charge(token, "SUBMIT");
       const submitted = await intake.submit({
         token,
         clientRequestId: input.clientRequestId,

@@ -10,9 +10,13 @@ import {
   GATEQ_TURN_MAX_CHARS,
 } from "@capital-q/contracts";
 import {
+  createGuestThrottle,
+  GATEQ_GUEST_QUOTAS,
   IntakeRefusedError,
+  issueSessionToken,
   type ApplicantTurnResult,
   type ConversationService,
+  type GuestThrottle,
   type IntakeService,
 } from "@capital-q/gateq-intake";
 
@@ -65,6 +69,8 @@ function buildApp(options: {
   readonly refuse?: boolean;
   readonly result?: ApplicantTurnResult;
   readonly submitDeduplicated?: boolean;
+  readonly throttle?: GuestThrottle | undefined;
+  readonly anyToken?: boolean;
 }): { readonly app: FastifyInstance; readonly recorded: Recorded } {
   const recorded: Recorded = { starts: [], turns: [], submits: [] };
   const deny = () => {
@@ -73,6 +79,17 @@ function buildApp(options: {
   const result = options.result ?? RESULT;
 
   const intake = {
+    // `charge` verifies before it counts, so the double must refuse an
+    // unrecognised credential here exactly as the real service does --
+    // otherwise a forged token would appear to earn a quota.
+    authorise: (token: string) => {
+      if (options.refuse === true) deny();
+      if (options.anyToken !== true && token !== TOKEN) deny();
+      return Promise.resolve({
+        sessionId: `session-${token.slice(-8)}`,
+        application: {},
+      });
+    },
     start: (input: { gatewayPublicId: string }) => {
       recorded.starts.push(input.gatewayPublicId);
       if (options.refuse === true) deny();
@@ -103,7 +120,8 @@ function buildApp(options: {
       // The real service authorises the credential before anything else,
       // so the double refuses an unrecognised one rather than pretending
       // the route is what stops it.
-      if (options.refuse === true || input.token !== TOKEN) deny();
+      if (options.refuse === true) deny();
+      if (options.anyToken !== true && input.token !== TOKEN) deny();
       recorded.turns.push({
         token: input.token,
         message: input.message,
@@ -112,7 +130,8 @@ function buildApp(options: {
       return Promise.resolve(result);
     },
     summary: (token) => {
-      if (options.refuse === true || token !== TOKEN) deny();
+      if (options.refuse === true) deny();
+      if (options.anyToken !== true && token !== TOKEN) deny();
       return Promise.resolve(result);
     },
   };
@@ -126,7 +145,11 @@ function buildApp(options: {
     identities: { lookup: () => Promise.resolve(null) },
   };
   const { app } = createApp(parseApiConfig({ NODE_ENV: "test" }), security, {
-    gateqApply: { intake, conversation },
+    gateqApply: {
+      intake,
+      conversation,
+      ...(options.throttle === undefined ? {} : { throttle: options.throttle }),
+    },
   });
   return { app, recorded };
 }
@@ -406,5 +429,105 @@ describe("submission", () => {
     });
     expect(response.statusCode).toBe(422);
     expect(recorded.submits).toEqual([]);
+  });
+});
+
+describe("what one credential may do", () => {
+  const turn = (app: FastifyInstance, token: string) =>
+    app.inject({
+      method: "POST",
+      url: GATEQ_APPLY_TURN_PATH,
+      headers: bearer(token),
+      payload: { message: "We are in Lagos.", clientTurnId: "turn-000000001" },
+    });
+
+  it("8: spends that credential's allowance and nobody else's", async () => {
+    // The property that matters. A public conversational endpoint with one
+    // global counter is a denial-of-service tool pointed at every other
+    // applicant: one script, and nobody can finish an application.
+    const { app } = buildApp({
+      throttle: createGuestThrottle(),
+      anyToken: true,
+    });
+    const guestA = issueSessionToken();
+    const guestB = issueSessionToken();
+
+    for (let i = 0; i < GATEQ_GUEST_QUOTAS.TURN.limit; i += 1) {
+      expect((await turn(app, guestA)).statusCode).toBe(200);
+    }
+    const limited = await turn(app, guestA);
+    expect(limited.statusCode).toBe(429);
+
+    // Guest B has touched nothing and is unaffected.
+    expect((await turn(app, guestB)).statusCode).toBe(200);
+  });
+
+  it("8: says to come back later, not that the application vanished", async () => {
+    // A 404 here would tell an honest founder their work was gone when
+    // only their turn budget ran out.
+    const { app } = buildApp({
+      throttle: createGuestThrottle(),
+      anyToken: true,
+    });
+    const guest = issueSessionToken();
+    for (let i = 0; i < GATEQ_GUEST_QUOTAS.TURN.limit; i += 1) {
+      await turn(app, guest);
+    }
+    const response = await turn(app, guest);
+    expect(response.statusCode).toBe(429);
+    const body = response.json<Record<string, unknown>>();
+    expect(String(body["title"])).toContain("Too many requests");
+    // Nothing about the credential, the quota or where the edge is.
+    const text = JSON.stringify(body);
+    expect(text).not.toContain(guest);
+    expect(text.toLowerCase()).not.toContain("quota");
+    expect(text).not.toContain(String(GATEQ_GUEST_QUOTAS.TURN.limit));
+  });
+
+  it("8: the raw credential never reaches the response on any path", async () => {
+    const { app } = buildApp({
+      throttle: createGuestThrottle(),
+      anyToken: true,
+    });
+    const guest = issueSessionToken();
+    for (let i = 0; i < GATEQ_GUEST_QUOTAS.TURN.limit + 1; i += 1) {
+      const response = await turn(app, guest);
+      expect(response.body).not.toContain(guest);
+    }
+  });
+
+  it("8: a forged credential buys no quota and is still one 404", async () => {
+    const throttle = createGuestThrottle();
+    const { app } = buildApp({ throttle });
+    const forged = issueSessionToken();
+
+    // Well past the turn allowance, on a credential that does not verify.
+    for (let i = 0; i < GATEQ_GUEST_QUOTAS.TURN.limit + 5; i += 1) {
+      const response = await turn(app, forged);
+      // The same refusal every real forgery gets; never a 429, which would
+      // confirm the shape of the credential was at least plausible.
+      expect(response.statusCode).toBe(404);
+    }
+    // And a real guest's allowance is untouched by any of it.
+    const real = buildApp({ throttle, anyToken: true });
+    expect((await turn(real.app, issueSessionToken())).statusCode).toBe(200);
+  });
+
+  it("8: submitting is its own allowance, so a long conversation can finish", async () => {
+    const { app } = buildApp({
+      throttle: createGuestThrottle(),
+      anyToken: true,
+    });
+    const guest = issueSessionToken();
+    for (let i = 0; i < GATEQ_GUEST_QUOTAS.TURN.limit + 1; i += 1) {
+      await turn(app, guest);
+    }
+    const submitted = await app.inject({
+      method: "POST",
+      url: GATEQ_APPLY_SUBMIT_PATH,
+      headers: bearer(guest),
+      payload: { clientRequestId: "req-000000001" },
+    });
+    expect(submitted.statusCode).toBe(200);
   });
 });

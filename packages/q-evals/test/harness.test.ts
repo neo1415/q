@@ -253,13 +253,13 @@ describe("datasets", () => {
     expect(fast).not.toContain("QSTREAM-001");
     expect(fast).toContain("QPERM-001");
     expect(datasetsForProfile("CI_CORE").flatMap((d) => d.cases)).toHaveLength(
-      57,
+      59,
     );
     // QGATE is the GateQ applicant interview on its own, so a change to
     // the interview can be run in seconds without the whole Q gate.
     expect(Q_EVAL_PROFILE_DEFINITIONS.QGATE.providerMode).toBe("FAKE");
     const gate = datasetsForProfile("QGATE").flatMap((d) => d.cases);
-    expect(gate).toHaveLength(18);
+    expect(gate).toHaveLength(20);
     expect(gate.every((c) => c.suite === "Q_GATEQ_INTAKE")).toBe(true);
     // And it is in the release gate too: a suite nobody runs is not a gate.
     expect(

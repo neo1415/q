@@ -275,6 +275,12 @@ export const INTAKE_REFUSALS = [
   "GATEWAY_NOT_ACCEPTING",
   "ALREADY_SUBMITTED",
   "NOT_READY_TO_SUBMIT",
+  /**
+   * This credential has spent its allowance for this operation
+   * (CQ-GATE-002S §8). One guest's own quota, never a global one: a
+   * founder who exhausts theirs must not throttle anybody else.
+   */
+  "TOO_MANY_REQUESTS",
 ] as const;
 export const IntakeRefusalSchema = z.enum(INTAKE_REFUSALS);
 export type IntakeRefusal = z.infer<typeof IntakeRefusalSchema>;

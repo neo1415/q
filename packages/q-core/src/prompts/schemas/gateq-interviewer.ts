@@ -188,6 +188,21 @@ export const GateQInterviewerVariablesSchema = z
     tangents: z.number().int().min(0).max(99),
     /** Whether an application exists yet, or this is the public concierge. */
     stage: z.enum(["PUBLIC", "APPLICATION"]),
+    /**
+     * What was actually put in front of Q for this turn (CQ-GATE-002S §9).
+     *
+     * Not decoration. A live model told an applicant "I read your
+     * application" on a turn where nothing of the kind had been supplied,
+     * and no amount of prompt politeness fixes that: a model cannot tell
+     * what it was given from what it was not unless it is told. This is
+     * the difference between "I have what you told me here", "I read your
+     * deck" and "I found this publicly", stated as facts rather than left
+     * to inference.
+     *
+     * It describes availability only. Nothing about retrieval mechanics
+     * reaches the applicant, and nothing here is a permission.
+     */
+    contextAvailable: z.string().max(1200),
   })
   .strict();
 export type GateQInterviewerVariables = z.infer<
