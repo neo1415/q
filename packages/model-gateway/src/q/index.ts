@@ -1048,6 +1048,10 @@ export function createModelGatewayQAnswer(
             runId: request.runId,
             role: "Q",
             content,
+            // Stored as well as streamed (CQ-Q-BLOCKS-HISTORY-001). The
+            // event is what a live client converges on; this is what a
+            // refresh, a reopened conversation and the chats list read.
+            ...(blocks === undefined ? {} : { blocks }),
           });
           await appendRunEvent(
             repositories,

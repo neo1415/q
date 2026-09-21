@@ -15,6 +15,7 @@ import {
   QSubjectRefsSchema,
   QVisibleStageSchema,
   UtcTimestampSchema,
+  QResultBlocksSchema,
 } from "@capital-q/contracts";
 import type { DatabaseExecutor, TransactionContext } from "@capital-q/database";
 import {
@@ -149,6 +150,20 @@ const MessageRow = z.object({
   role: QMessageRoleSchema,
   content: z.string(),
   content_type: z.literal("TEXT"),
+  /**
+   * Re-validated on read, not trusted because it is in our own table
+   * (CQ-Q-BLOCKS-HISTORY-001). A row written by an older build, or by
+   * anything that ever bypassed the write path, must not become a
+   * structured object a client renders and acts on. A payload the public
+   * contract refuses is dropped and the answer is served as prose, which
+   * is the safe direction to fail in.
+   */
+  result_blocks: z
+    .unknown()
+    .nullable()
+    .transform((value) =>
+      value === null ? undefined : QResultBlocksSchema.safeParse(value).data,
+    ),
   created_at: Timestamp,
 });
 
@@ -162,6 +177,7 @@ function toMessage(row: unknown): QConversationMessage {
     role: r.role,
     content: r.content,
     contentType: r.content_type,
+    ...(r.result_blocks === undefined ? {} : { blocks: r.result_blocks }),
     createdAt: r.created_at,
   };
 }
@@ -215,7 +231,7 @@ function selectRun(executor: DatabaseExecutor) {
 function selectMessage(executor: DatabaseExecutor) {
   return executor`
     select m.id, m.tenant_id, m.conversation_id, m.run_id, m.role, m.content,
-           m.content_type, m.created_at
+           m.content_type, m.result_blocks, m.created_at
       from q_runtime.conversation_messages m`;
 }
 
@@ -461,12 +477,21 @@ export function createPostgresQRuntimeRepositories(): QRuntimeRepositories {
 
     messages: {
       insert: async (tx, input) => {
+        // Parsed before it is written, never after. The public contract
+        // is the allowlist: anything it cannot express -- internal state,
+        // a provider payload, a private evidence reference -- cannot
+        // reach this column at all.
+        const blocks =
+          input.blocks === undefined || input.blocks.length === 0
+            ? null
+            : (QResultBlocksSchema.safeParse(input.blocks).data ?? null);
         const rows = await tx.sql`
           insert into q_runtime.conversation_messages
-            (id, tenant_id, conversation_id, run_id, role, content)
+            (id, tenant_id, conversation_id, run_id, role, content, result_blocks)
           values (coalesce(${input.id ?? null}::uuid, gen_random_uuid()),
                   ${input.tenantId}, ${input.conversationId}, ${input.runId},
-                  ${input.role}, ${input.content})
+                  ${input.role}, ${input.content},
+                  ${blocks === null ? null : JSON.stringify(blocks)}::text::jsonb)
           returning id`;
         const { id } = IdRow.parse(rows[0]);
         const created = await findMessageById(

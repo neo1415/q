@@ -24,6 +24,7 @@ import {
   type QSubjectRef,
   type QVisibleStage,
   type UtcTimestamp,
+  type QResultBlock,
 } from "@capital-q/contracts";
 import type { OrganisationId, TenantId, UserId } from "@capital-q/security";
 
@@ -133,6 +134,17 @@ export type QConversationMessage = {
   readonly role: QMessageRole;
   readonly content: string;
   readonly contentType: "TEXT";
+  /**
+   * The objects Q's answer referred to (CQ-Q-BLOCKS-HISTORY-001).
+   *
+   * Exactly what the browser received live, so reopening a conversation
+   * shows the same cards rather than the prose alone. Parsed through the
+   * public contract on the way in and on the way out: a block that does
+   * not satisfy it is not stored and not served, which is what keeps
+   * internal state, a provider payload and a private evidence reference
+   * out of history by construction rather than by review.
+   */
+  readonly blocks?: readonly QResultBlock[] | undefined;
   readonly createdAt: UtcTimestamp;
 };
 
@@ -148,6 +160,8 @@ export type NewQConversationMessage = {
   readonly runId: QRunId;
   readonly role: QMessageRole;
   readonly content: string;
+  /** Q's own turns only; a person's turn is what they typed. */
+  readonly blocks?: readonly QResultBlock[] | undefined;
 };
 
 export type QRunEventRecord = {
@@ -192,6 +206,56 @@ export function toQRunHandle(run: QRunRecord): QRunHandle {
   });
 }
 
+/**
+ * The blocks a stored answer may hand back to a client
+ * (CQ-Q-BLOCKS-HISTORY-001 §A5).
+ *
+ * An evidence reference is only identifiers, and whether a reader may see
+ * the document behind one is disclosure's decision at render time — never
+ * something a message projection may pre-empt. That rule was already
+ * enforced, but only in the browser's own projection, which meant one
+ * client remembering to filter was the whole of the protection. Making
+ * history durable would have made that the wrong place for it: a row read
+ * by anything else would have carried the identifiers straight out.
+ *
+ * So it is enforced here, where every client reads through. A block that
+ * carries evidence references is dropped and the rest of the answer is
+ * served; the count a reader is entitled to already travels with the
+ * findings.
+ */
+function disclosable(
+  blocks: readonly QResultBlock[] | undefined,
+): readonly QResultBlock[] {
+  if (blocks === undefined) return [];
+  return blocks.filter((block) => {
+    switch (block.kind) {
+      case "EVIDENCE":
+        return false;
+      case "UI_INTENT":
+        // The same references under another name.
+        return block.intent.kind !== "SHOW_EVIDENCE";
+      case "FINDING":
+        // A finding's own references are equally not the browser's to
+        // hold. The projection that produces them already sends an empty
+        // list; a row that somehow holds otherwise is dropped rather
+        // than trimmed, because a half-stripped finding is a finding
+        // somebody stopped checking.
+        return block.finding.evidenceRefs.length === 0;
+      // Prose and objects. None of them carries an evidence identifier,
+      // and each is listed rather than defaulted so that adding a block
+      // kind forces somebody to decide what history may hand back.
+      case "TEXT":
+      case "COMPANY_REFERENCE":
+      case "INVESTOR_REFERENCE":
+      case "COMPARISON":
+      case "UNCERTAINTY":
+      case "CLARIFICATION_REQUEST":
+      case "ACTION_PROPOSAL":
+        return true;
+    }
+  });
+}
+
 export function toQMessage(message: QConversationMessage): QMessage {
   return QMessageSchema.parse(
     message.role === "USER"
@@ -207,6 +271,12 @@ export function toQMessage(message: QConversationMessage): QMessage {
           runId: message.runId,
           role: "Q",
           text: message.content,
+          // Restored from the store, re-validated on read and filtered to
+          // what a reader may actually be handed.
+          ...(() => {
+            const blocks = disclosable(message.blocks);
+            return blocks.length === 0 ? {} : { blocks };
+          })(),
           createdAt: message.createdAt,
         },
   );

@@ -4766,6 +4766,7 @@ export type Database = {
           created_at: string
           id: string
           provider_message_ref: string | null
+          result_blocks: Json | null
           role: string
           run_id: string
           tenant_id: string
@@ -4777,6 +4778,7 @@ export type Database = {
           created_at?: string
           id?: string
           provider_message_ref?: string | null
+          result_blocks?: Json | null
           role: string
           run_id: string
           tenant_id: string
@@ -4788,6 +4790,7 @@ export type Database = {
           created_at?: string
           id?: string
           provider_message_ref?: string | null
+          result_blocks?: Json | null
           role?: string
           run_id?: string
           tenant_id?: string

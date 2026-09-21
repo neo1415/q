@@ -246,6 +246,17 @@ export function createSpecialistQAnswer(
       // The message and its durable completion event commit together
       // (CQ-Q-009 §16-§18), so a client that missed every live delta
       // converges on this text.
+      // One projection, used for the event and for the row, so a reopened
+      // conversation shows exactly what the live one did.
+      const blocks = analystResultBlocks({
+        result: {
+          findings: result.findings,
+          contradictions: result.contradictions.map((contradiction) =>
+            contradiction.statements.join(" — and — "),
+          ),
+        },
+        subjects: request.subjects,
+      });
       const message = await transactions.run(async (tx) => {
         const stored = await repositories.messages.insert(tx, {
           tenantId: request.tenantId,
@@ -253,6 +264,7 @@ export function createSpecialistQAnswer(
           runId: request.runId,
           role: "Q",
           content,
+          ...(blocks === undefined ? {} : { blocks }),
         });
         await appendRunEvent(
           repositories,
@@ -267,22 +279,7 @@ export function createSpecialistQAnswer(
                 // can act on (QX-002/003 §C). The same projection the
                 // conversational seam uses, so one answer does not carry
                 // a different shape depending on which brain produced it.
-                ...(() => {
-                  const blocks = analystResultBlocks({
-                    result: {
-                      findings: result.findings,
-                      // Two authorised statements that disagree, stated
-                      // as one sentence. The specialist never chooses
-                      // between them and neither does this.
-                      contradictions: result.contradictions.map(
-                        (contradiction) =>
-                          contradiction.statements.join(" — and — "),
-                      ),
-                    },
-                    subjects: request.subjects,
-                  });
-                  return blocks === undefined ? {} : { blocks };
-                })(),
+                ...(blocks === undefined ? {} : { blocks }),
               },
             },
           },
