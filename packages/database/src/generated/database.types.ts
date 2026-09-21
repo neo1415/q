@@ -2062,6 +2062,167 @@ export type Database = {
       [_ in never]: never
     }
   }
+  gateq: {
+    Tables: {
+      gateway_criteria: {
+        Row: {
+          config: Json
+          created_at: string
+          criterion_type: string
+          id: string
+          label: string
+          position: number
+          requiredness: string
+          tenant_id: string
+          version_id: string
+        }
+        Insert: {
+          config: Json
+          created_at?: string
+          criterion_type: string
+          id?: string
+          label: string
+          position: number
+          requiredness: string
+          tenant_id: string
+          version_id: string
+        }
+        Update: {
+          config?: Json
+          created_at?: string
+          criterion_type?: string
+          id?: string
+          label?: string
+          position?: number
+          requiredness?: string
+          tenant_id?: string
+          version_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gateway_criteria_version_id_fkey"
+            columns: ["version_id"]
+            isOneToOne: false
+            referencedRelation: "gateway_versions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      gateway_versions: {
+        Row: {
+          created_at: string
+          created_by_user_id: string
+          gateway_id: string
+          id: string
+          inbound_mode: string
+          public_description: string | null
+          public_title: string
+          published_at: string | null
+          published_by_user_id: string | null
+          qualification_policy_version: string
+          status: string
+          superseded_at: string | null
+          tenant_id: string
+          updated_at: string
+          version_number: number
+        }
+        Insert: {
+          created_at?: string
+          created_by_user_id: string
+          gateway_id: string
+          id?: string
+          inbound_mode: string
+          public_description?: string | null
+          public_title: string
+          published_at?: string | null
+          published_by_user_id?: string | null
+          qualification_policy_version: string
+          status?: string
+          superseded_at?: string | null
+          tenant_id: string
+          updated_at?: string
+          version_number: number
+        }
+        Update: {
+          created_at?: string
+          created_by_user_id?: string
+          gateway_id?: string
+          id?: string
+          inbound_mode?: string
+          public_description?: string | null
+          public_title?: string
+          published_at?: string | null
+          published_by_user_id?: string | null
+          qualification_policy_version?: string
+          status?: string
+          superseded_at?: string | null
+          tenant_id?: string
+          updated_at?: string
+          version_number?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gateway_versions_gateway_id_fkey"
+            columns: ["gateway_id"]
+            isOneToOne: false
+            referencedRelation: "gateways"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      gateways: {
+        Row: {
+          created_at: string
+          created_by_user_id: string
+          id: string
+          investor_organisation_id: string
+          name: string
+          organisation_id: string
+          public_id: string
+          status: string
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by_user_id: string
+          id?: string
+          investor_organisation_id: string
+          name: string
+          organisation_id: string
+          public_id: string
+          status?: string
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by_user_id?: string
+          id?: string
+          investor_organisation_id?: string
+          name?: string
+          organisation_id?: string
+          public_id?: string
+          status?: string
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      [_ in never]: never
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   identity: {
     Tables: {
       membership_roles: {
@@ -5843,6 +6004,9 @@ export const Constants = {
     Enums: {},
   },
   evidence: {
+    Enums: {},
+  },
+  gateq: {
     Enums: {},
   },
   identity: {
