@@ -88,38 +88,52 @@ $logFor = { param($name) Join-Path $logDir ("preview-" + $name + ".log") }
 # That is what `preview:stop` matches on: a bare `node dist/main.js` with
 # the directory set by `cd` carries nothing to distinguish it from a
 # development service, and stopping the preview would have missed it.
-$launcher = Join-Path $env:TEMP "capital-q-preview.cmd"
-$lines = @("@echo off", "set `"PATH=$path`"")
-if ($corepackHome) { $lines += "set `"COREPACK_HOME=$corepackHome`"" }
-$lines += "set COREPACK_ENABLE_DOWNLOAD_PROMPT=0"
-$lines += $sets
-$lines += "cd /d `"$Worktree`""
-$apiLog = & $logFor "api"
-$qapiLog = & $logFor "q-api"
-$workersLog = & $logFor "workers"
-$webLog = & $logFor "web"
-$lines += "start `"cq-preview-api`" /b cmd /c `"set PORT=$ApiPort && node `"$Worktree\apps\api\dist\main.js`" > `"$apiLog`" 2>&1`""
-$lines += "start `"cq-preview-qapi`" /b cmd /c `"set PORT=$QApiPort && node `"$Worktree\apps\q-api\dist\main.js`" > `"$qapiLog`" 2>&1`""
-$lines += "start `"cq-preview-workers`" /b cmd /c `"node `"$Worktree\apps\workers\dist\main.js`" > `"$workersLog`" 2>&1`""
-$lines += "start `"cq-preview-web`" /b cmd /c `"cd /d `"$Worktree\apps\web`" && node `"$Worktree\apps\web\node_modules\next\dist\bin\next`" start -p $WebPort > `"$webLog`" 2>&1`""
-$lines | Set-Content -Path $launcher -Encoding ASCII
-
-foreach ($name in @("api", "q-api", "workers", "web")) {
-  Remove-Item (& $logFor $name) -ErrorAction SilentlyContinue
-}
-
-# CREATE_NEW_PROCESS_GROUP (0x200), not DETACHED_PROCESS: the group flag is
-# what stops a Ctrl+C in the launching shell reaching the preview, and the
-# console it keeps is what carries the redirect.
+# One detached process per service, not one script that spawns four.
+#
+# `start /b` from a single command file looked right and lost a race: the
+# parent script exits as soon as it has issued the four, and whichever
+# service had not finished binding died with it. The API survived because
+# it bound first, so the stack came up one-quarter working with three
+# empty logs and nothing to explain them. Each service now gets its own
+# console and its own lifetime.
 $startup = New-CimInstance -ClassName Win32_ProcessStartup -ClientOnly -Property @{
   CreateFlags = [uint32] 0x200
 }
-$result = Invoke-CimMethod -ClassName Win32_Process -MethodName Create -Arguments @{
-  CommandLine               = "cmd.exe /c `"$launcher`""
-  CurrentDirectory          = $Worktree
-  ProcessStartupInformation = $startup
+
+$services = @(
+  @{ Name = "api"; Port = $ApiPort; Script = "apps\api\dist\main.js"; Cwd = $Worktree },
+  @{ Name = "q-api"; Port = $QApiPort; Script = "apps\q-api\dist\main.js"; Cwd = $Worktree },
+  @{ Name = "workers"; Port = $null; Script = "apps\workers\dist\main.js"; Cwd = $Worktree },
+  @{ Name = "web"; Port = $null; Script = $null; Cwd = (Join-Path $Worktree "apps\web") }
+)
+
+$started = @()
+foreach ($service in $services) {
+  $log = & $logFor $service.Name
+  $launcher = Join-Path $env:TEMP ("capital-q-preview-" + $service.Name + ".cmd")
+  $lines = @("@echo off", "set `"PATH=$path`"")
+  if ($corepackHome) { $lines += "set `"COREPACK_HOME=$corepackHome`"" }
+  $lines += "set COREPACK_ENABLE_DOWNLOAD_PROMPT=0"
+  $lines += $sets
+  if ($service.Port) { $lines += ("set PORT=" + $service.Port) }
+  $lines += "cd /d `"$($service.Cwd)`""
+  if ($service.Name -eq "web") {
+    $next = Join-Path $Worktree "apps\web\node_modules\next\dist\bin\next"
+    $lines += "node `"$next`" start -p $WebPort > `"$log`" 2>&1"
+  } else {
+    $lines += "node `"$(Join-Path $Worktree $service.Script)`" > `"$log`" 2>&1"
+  }
+  $lines | Set-Content -Path $launcher -Encoding ASCII
+
+  $result = Invoke-CimMethod -ClassName Win32_Process -MethodName Create -Arguments @{
+    CommandLine               = "cmd.exe /c `"$launcher`""
+    CurrentDirectory          = $service.Cwd
+    ProcessStartupInformation = $startup
+  }
+  if ($result.ReturnValue -ne 0) {
+    throw "could not start preview $($service.Name) (Win32_Process.Create returned $($result.ReturnValue))"
+  }
+  $started += $service.Name
 }
-if ($result.ReturnValue -ne 0) {
-  throw "could not start the preview (Win32_Process.Create returned $($result.ReturnValue))"
-}
-Write-Host "[preview] started detached (pid $($result.ProcessId)); logs in $logDir"
+
+Write-Host "[preview] started $($started -join ', '); logs in $logDir"
