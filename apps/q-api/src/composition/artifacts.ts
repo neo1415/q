@@ -132,7 +132,7 @@ export function createQArtifacts(dependencies: {
             qRunId: input.runId,
             // Its own correlation id: a plan identifier is not one, and
             // labelling a model call with it would make the trace lie.
-            correlationId: createCorrelationId() as never,
+            correlationId: createCorrelationId(),
           },
           ...(input.signal === undefined ? {} : { signal: input.signal }),
         });

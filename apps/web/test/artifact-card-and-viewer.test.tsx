@@ -22,8 +22,9 @@ import { QArtifactIdSchema, type QArtifactDetail } from "@capital-q/contracts";
  * text and refuses all of them.
  */
 
-const readQArtifactAction = vi.fn();
-const readQArtifactVersionAction = vi.fn();
+const readQArtifactAction = vi.fn<(id: string) => Promise<unknown>>();
+const readQArtifactVersionAction =
+  vi.fn<(id: string, version: number) => Promise<unknown>>();
 
 vi.mock("../src/features/q/actions", () => ({
   readQArtifactAction: (id: string) => readQArtifactAction(id),

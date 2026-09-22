@@ -89,7 +89,7 @@ async function q(token, method, path, body) {
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
   });
   const text = await response.text();
-  let parsed = null;
+  let parsed;
   try {
     parsed = text.length === 0 ? null : JSON.parse(text);
   } catch {
