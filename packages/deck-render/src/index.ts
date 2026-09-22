@@ -1,0 +1,44 @@
+/**
+ * Deck rendering (QX-004 §5, §6, §7).
+ *
+ * One deterministic layout over a composed deck, inspected for the faults
+ * a slide can have, and drawn from that same layout as SVG, PPTX and PDF.
+ *
+ * Invariants: nothing here decides what a deck says — no number, label or
+ * ordering originates in this package; every renderer reads the same
+ * computed geometry, so three outputs cannot disagree about what fits; and
+ * a fault is a property of the layout rather than something spotted in a
+ * picture afterwards.
+ */
+export {
+  layOutDeck,
+  measure,
+  wrap,
+  type ChartBar,
+  type ChartBox,
+  type LaidOutBox,
+  type LaidOutDeck,
+  type LaidOutSlide,
+  type RuleBox,
+  type TextBox,
+} from "./layout.js";
+
+export {
+  contrastRatio,
+  inspectDeck,
+  DECK_FAULTS,
+  type DeckFault,
+  type DeckIssue,
+} from "./inspect.js";
+
+export { deckToSvg, slideToSvg } from "./svg.js";
+export { deckToPptx } from "./pptx.js";
+export { deckToPdf } from "./pdf.js";
+
+export {
+  themeFor,
+  MARGIN,
+  SLIDE_HEIGHT,
+  SLIDE_WIDTH,
+  type DeckTheme,
+} from "./theme.js";
