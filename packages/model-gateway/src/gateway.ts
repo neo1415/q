@@ -468,10 +468,15 @@ export function createModelGateway(
           metrics.rateLimits.add(1, labels);
         }
         if (failureClass === undefined) {
-          health.recordSuccess(provider.code, clock.now());
+          health.recordSuccess(
+            provider.code,
+            candidate.model.modelCode,
+            clock.now(),
+          );
         } else {
           health.recordFailure(
             provider.code,
+            candidate.model.modelCode,
             failureClass,
             clock.now(),
             latencyMs,

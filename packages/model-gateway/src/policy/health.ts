@@ -1,4 +1,5 @@
 import type {
+  ModelCode,
   ModelFailureClass,
   ModelProviderCode,
 } from "@capital-q/contracts";
@@ -8,11 +9,19 @@ import type { ProviderHealthPort, ProviderHealthState } from "../ports.js";
 /**
  * Minimal, process-local provider health (doc 21 §92; packet §46).
  *
- * A provider that has failed with an availability class three times
- * within a minute is skipped for thirty seconds. That is all: no shared
- * state, no service discovery, no Redis, and — deliberately — no way for
- * this to make a provider eligible. It can only make an eligible provider
- * temporarily un-chosen, and a security decision never reads it.
+ * One provider's ONE MODEL that has failed with an availability class
+ * three times within a minute is skipped for thirty seconds. That is all:
+ * no shared state, no service discovery, no Redis, and — deliberately —
+ * no way for this to make anything eligible. It can only make an eligible
+ * model temporarily un-chosen, and a security decision never reads it.
+ *
+ * Keyed by provider and model together, because a model being overloaded
+ * says nothing about a sibling on the same account. Hosted, 2026-09-22:
+ * `gemini-3.5-flash-lite` answered 503 three times, the whole of `google`
+ * was taken out with it, and `gemini-3.8-flash` — eligible, and quite
+ * possibly well — went too. Every provider was then either rate-limited
+ * or shut off, the interview had no route at all, and the conversation
+ * ended there.
  */
 
 const AVAILABILITY_FAILURES: ReadonlySet<ModelFailureClass> = new Set([
@@ -58,11 +67,17 @@ export function createProcessLocalProviderHealth(
   const failureThreshold = options.failureThreshold ?? 3;
   const windowMs = options.windowMs ?? 60_000;
   const openForMs = options.openForMs ?? 30_000;
-  const failures = new Map<ModelProviderCode, number[]>();
-  const openUntil = new Map<ModelProviderCode, number>();
+  const failures = new Map<string, number[]>();
+  const openUntil = new Map<string, number>();
+  const keyOf = (code: ModelProviderCode, model: ModelCode): string =>
+    `${code}\u0000${model}`;
 
-  const state = (code: ModelProviderCode, at: Date): ProviderHealthState => {
-    const until = openUntil.get(code);
+  const state = (
+    code: ModelProviderCode,
+    model: ModelCode,
+    at: Date,
+  ): ProviderHealthState => {
+    const until = openUntil.get(keyOf(code, model));
     if (until !== undefined && until > at.getTime()) {
       return "TEMPORARILY_FAILING";
     }
@@ -71,7 +86,7 @@ export function createProcessLocalProviderHealth(
 
   return {
     state,
-    recordFailure: (code, failureClass, at, elapsedMs) => {
+    recordFailure: (code, model, failureClass, at, elapsedMs) => {
       if (!AVAILABILITY_FAILURES.has(failureClass)) {
         return;
       }
@@ -83,20 +98,22 @@ export function createProcessLocalProviderHealth(
       ) {
         return;
       }
+      const key = keyOf(code, model);
       const now = at.getTime();
-      const recent = (failures.get(code) ?? []).filter(
+      const recent = (failures.get(key) ?? []).filter(
         (t) => now - t <= windowMs,
       );
       recent.push(now);
-      failures.set(code, recent);
+      failures.set(key, recent);
       if (recent.length >= failureThreshold) {
-        openUntil.set(code, now + openForMs);
-        failures.set(code, []);
+        openUntil.set(key, now + openForMs);
+        failures.set(key, []);
       }
     },
-    recordSuccess: (code) => {
-      failures.delete(code);
-      openUntil.delete(code);
+    recordSuccess: (code, model) => {
+      const key = keyOf(code, model);
+      failures.delete(key);
+      openUntil.delete(key);
     },
   };
 }

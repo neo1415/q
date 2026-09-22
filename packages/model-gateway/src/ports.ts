@@ -173,9 +173,23 @@ export const noTenantModelPolicy: TenantModelPolicyPort = {
 export type ProviderHealthState = "HEALTHY" | "TEMPORARILY_FAILING";
 
 export type ProviderHealthPort = {
-  readonly state: (code: ModelProviderCode, at: Date) => ProviderHealthState;
+  /**
+   * Whether this provider's MODEL should be skipped for the moment.
+   *
+   * Keyed by both, because a model being overloaded says nothing about
+   * a sibling on the same account. Hosted, 2026-09-22:
+   * `gemini-3.5-flash-lite` answered 503, the whole of `google` was taken
+   * out, and `gemini-3.8-flash` — which was eligible and quite possibly
+   * well — went with it. The interview had no route left at all.
+   */
+  readonly state: (
+    code: ModelProviderCode,
+    model: ModelCode,
+    at: Date,
+  ) => ProviderHealthState;
   readonly recordFailure: (
     code: ModelProviderCode,
+    model: ModelCode,
     failureClass: ModelFailureClass,
     at: Date,
     /**
@@ -185,7 +199,11 @@ export type ProviderHealthPort = {
      */
     elapsedMs?: number | undefined,
   ) => void;
-  readonly recordSuccess: (code: ModelProviderCode, at: Date) => void;
+  readonly recordSuccess: (
+    code: ModelProviderCode,
+    model: ModelCode,
+    at: Date,
+  ) => void;
 };
 
 export type ModelClock = { readonly now: () => Date };

@@ -260,7 +260,8 @@ export function planRoute(
       return;
     }
     if (
-      input.health.state(provider.code, input.now) === "TEMPORARILY_FAILING"
+      input.health.state(provider.code, model.modelCode, input.now) ===
+      "TEMPORARILY_FAILING"
     ) {
       decide("PROVIDER_TEMPORARILY_FAILING");
       return;
