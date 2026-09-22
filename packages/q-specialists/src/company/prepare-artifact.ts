@@ -42,18 +42,34 @@ type HistoryLike = readonly {
   readonly blocks?: readonly QResultBlock[] | undefined;
 }[];
 
-/** The most recent artifact Q put in front of this person, if any. */
-export function latestArtifactIn(history: HistoryLike): string | null {
+/**
+ * The most recent document Q put in front of this person, if any.
+ *
+ * Returned as the card rather than the id because the title is what the
+ * prompt needs: a model asked to read "make the executive summary
+ * shorter" cannot tell that it is a request to change a document unless
+ * it knows a document is open. That fact is the server's, taken from
+ * their own conversation, and it is supplied rather than guessed.
+ */
+export function latestArtifactCardIn(history: HistoryLike): {
+  readonly artifactId: string;
+  readonly title: string;
+} | null {
   for (let index = history.length - 1; index >= 0; index -= 1) {
     const blocks = history[index]?.blocks ?? [];
     for (let at = blocks.length - 1; at >= 0; at -= 1) {
       const block = blocks[at];
       if (block !== undefined && block.kind === "ARTIFACT_REFERENCE") {
-        return block.artifactId;
+        return { artifactId: block.artifactId, title: block.title };
       }
     }
   }
   return null;
+}
+
+/** Just the identifier, for a caller that only needs to know which one. */
+export function latestArtifactIn(history: HistoryLike): string | null {
+  return latestArtifactCardIn(history)?.artifactId ?? null;
 }
 
 /**
@@ -87,6 +103,8 @@ export async function prepareOrReviseArtifact(input: {
   readonly request: QAnswerRequest;
   readonly company: QSubjectRef;
   readonly companyName: string;
+  /** The person's own message, as the instruction of last resort. */
+  readonly saidVerbatim: string;
   readonly result: CompanyIntelligenceResult;
   readonly history: HistoryLike;
   readonly logger?: Logger | undefined;
@@ -96,6 +114,11 @@ export async function prepareOrReviseArtifact(input: {
   if (ask === null) {
     return null;
   }
+  // Their own words when the model put the change in the quote and left
+  // the field empty. Acting on an empty instruction is not something to
+  // attempt, and a revision with no instruction is not a revision.
+  const instruction =
+    ask.instruction.length > 0 ? ask.instruction : input.saidVerbatim;
   const companyName = companyNameFrom(result, input.companyName);
   const base = composeInvestmentBrief({ companyName, result });
   if (base === null) {
@@ -124,7 +147,7 @@ export async function prepareOrReviseArtifact(input: {
               summary: current.summary,
               content: current.content,
             },
-            instruction: ask.instruction,
+            instruction,
             grounding,
             sensitivity: request.plan.maxSensitivity,
             attribution: {
@@ -140,7 +163,7 @@ export async function prepareOrReviseArtifact(input: {
             permittedContextPlan: request.plan,
             qRunId: request.runId,
             artifactId: target,
-            instruction: ask.instruction,
+            instruction,
             content: revised,
           });
         }

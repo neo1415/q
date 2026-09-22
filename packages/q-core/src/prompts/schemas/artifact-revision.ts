@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { TaskFrameSchema } from "./common.js";
+
 /**
  * Rewriting a document Q already composed (QX-003F; ADR 0013).
  *
@@ -19,6 +21,10 @@ export const ARTIFACT_REVISION_BODY_MAX = 6_000;
 
 export const ArtifactRevisionVariablesSchema = z
   .object({
+    // Every task prompt carries the charter frame; the renderer merges it
+    // in before validating, so a schema that omits it rejects its own
+    // render.
+    ...TaskFrameSchema,
     /** The person's own words for what should change. UNTRUSTED. */
     instruction: z.string().trim().min(1).max(2_000),
     /** The document as it stands, heading by heading. UNTRUSTED. */

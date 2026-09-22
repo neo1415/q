@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { describeQStreamTransport } from "@capital-q/api-client";
+import { cx } from "@capital-q/ui";
 import { QConversationIdSchema } from "@capital-q/contracts";
 import { Button } from "@capital-q/ui/button";
 import { QComposer } from "@capital-q/ui/q-composer";
@@ -19,6 +20,7 @@ import { destinationPath } from "../voice/destinations";
 import { useFollowTurn } from "../voice/use-follow-turn";
 import { useVoiceInterview } from "../voice/use-voice-interview";
 import { VoiceStage } from "../voice/voice-stage";
+import { ArtifactViewer } from "./artifact-viewer";
 import { QAnswer } from "./q-answer";
 import {
   failureMessage,
@@ -109,6 +111,22 @@ export function QConversationPanel({
   });
   const turns = turnsFrom(q.state, q.pending);
   const endRef = useRef<HTMLDivElement>(null);
+
+  /**
+   * The document on screen beside Q, if any (QX-003E).
+   *
+   * Kept here rather than in a route so the conversation stays mounted
+   * and reachable: "Edit with Q" is the next sentence in the same thread,
+   * not a navigation away and back. Below the desktop breakpoint the
+   * viewer takes the column instead, with its own way back.
+   */
+  const [openArtifact, setOpenArtifact] = useState<string | null>(null);
+  const showArtifact = useCallback((artifactId: string) => {
+    setOpenArtifact(artifactId);
+  }, []);
+  const closeArtifact = useCallback(() => {
+    setOpenArtifact(null);
+  }, []);
 
   // Voice (CQ-Q-VOICE-001): the same Q conversation, spoken. The credential
   // is bound on the server to this person, this subject and the
@@ -291,225 +309,247 @@ export function QConversationPanel({
 
   return (
     <div
-      className="flex flex-col gap-4"
-      data-q-workspace
-      // How many turns are on screen. A test hook rather than decoration:
-      // "the conversation reopened" is otherwise only assertable by
-      // counting rendered children, which changes whenever the answer
-      // layout does.
-      data-q-turns={String(turns.length)}
+      className="flex flex-col gap-4 lg:flex-row lg:items-start lg:gap-6"
+      data-q-surface-split
     >
-      {voice.active ? (
-        // Talking with Q on Home is the same stage as the interview: the
-        // screen is Q, wherever the conversation started.
-        <VoiceStage
-          client={voice.client}
-          voice={voice.voice}
-          voices={["FEMALE", "MALE"]}
-          onChooseVoice={(choice) => void voice.chooseVoice(choice)}
-          onEnd={() => void voice.end()}
-          // Talking is the main way in; the typed thread is where this goes.
-          endLabel="Go to chat"
-          notice={voice.notice}
-          onDismissNotice={voice.clearNotice}
-          asking={voice.turn?.asking ?? null}
-          onSay={(text) => voice.client.sendText(text)}
-          onUseForm={undefined}
-          progress={[]}
-        />
-      ) : null}
-      {!voice.active && voice.notice !== null ? (
-        <InlineNotice tone="warning" title={voice.notice}>
-          <Button size="compact" variant="quiet" onClick={voice.clearNotice}>
-            Dismiss
-          </Button>
-        </InlineNotice>
-      ) : null}
-      {spokenOnly.length > 0 ? (
-        <ol className="flex flex-col gap-4" aria-label="Spoken">
-          {spokenOnly.map((line) => (
-            <li
-              key={line.id}
-              className={
-                line.role === "user"
-                  ? "flex flex-col items-end gap-1"
-                  : "flex flex-col gap-1"
-              }
-            >
-              <span className="cq-label text-(--cq-text-tertiary)">
-                {line.role === "user" ? "You" : "Q"}
-              </span>
-              <p
+      <div
+        className={cx(
+          "flex min-w-0 flex-1 flex-col gap-4",
+          // On a narrow screen the document takes the column rather than
+          // squeezing beside the conversation; "Back to Q" brings this
+          // back, and the conversation is never unmounted, so nothing it
+          // was holding is lost.
+          openArtifact === null ? "" : "hidden lg:flex",
+        )}
+        data-q-workspace
+        // How many turns are on screen. A test hook rather than decoration:
+        // "the conversation reopened" is otherwise only assertable by
+        // counting rendered children, which changes whenever the answer
+        // layout does.
+        data-q-turns={String(turns.length)}
+      >
+        {voice.active ? (
+          // Talking with Q on Home is the same stage as the interview: the
+          // screen is Q, wherever the conversation started.
+          <VoiceStage
+            client={voice.client}
+            voice={voice.voice}
+            voices={["FEMALE", "MALE"]}
+            onChooseVoice={(choice) => void voice.chooseVoice(choice)}
+            onEnd={() => void voice.end()}
+            // Talking is the main way in; the typed thread is where this goes.
+            endLabel="Go to chat"
+            notice={voice.notice}
+            onDismissNotice={voice.clearNotice}
+            asking={voice.turn?.asking ?? null}
+            onSay={(text) => voice.client.sendText(text)}
+            onUseForm={undefined}
+            progress={[]}
+          />
+        ) : null}
+        {!voice.active && voice.notice !== null ? (
+          <InlineNotice tone="warning" title={voice.notice}>
+            <Button size="compact" variant="quiet" onClick={voice.clearNotice}>
+              Dismiss
+            </Button>
+          </InlineNotice>
+        ) : null}
+        {spokenOnly.length > 0 ? (
+          <ol className="flex flex-col gap-4" aria-label="Spoken">
+            {spokenOnly.map((line) => (
+              <li
+                key={line.id}
                 className={
                   line.role === "user"
-                    ? "cq-body max-w-(--cq-layout-narrow) rounded-lg bg-(--cq-surface-sunken) px-3 py-2 text-(--cq-text-primary)"
-                    : "cq-body max-w-(--cq-layout-narrow) whitespace-pre-wrap text-(--cq-text-primary)"
+                    ? "flex flex-col items-end gap-1"
+                    : "flex flex-col gap-1"
                 }
               >
-                {line.text}
-              </p>
-            </li>
-          ))}
-        </ol>
-      ) : null}
-      {turns.length > 0 ? (
-        <ol className="flex flex-col gap-4" aria-live="polite">
-          {turns.map((turn) => (
-            <li
-              key={turn.id}
-              className={
-                turn.kind === "PERSON"
-                  ? "flex flex-col items-end gap-1"
-                  : "flex flex-col gap-1"
-              }
-            >
-              {turn.kind === "PERSON" ? (
-                <>
-                  <span className="cq-label text-(--cq-text-tertiary)">
-                    You
-                  </span>
-                  <p
-                    className="cq-body max-w-(--cq-layout-narrow) rounded-lg bg-(--cq-surface-sunken) px-3 py-2 text-(--cq-text-primary)"
-                    data-unconfirmed={turn.unconfirmed ? "true" : undefined}
-                  >
-                    {turn.text}
-                  </p>
-                </>
-              ) : (
-                <QAnswer
-                  turn={turn}
-                  onAsk={(question) => void q.ask(question)}
-                />
-              )}
-            </li>
-          ))}
-          <div ref={endRef} />
-        </ol>
-      ) : null}
-
-      {q.loading && turns.length === 0 ? (
-        <p className="cq-body-sm text-(--cq-text-tertiary)">
-          Opening your conversation…
-        </p>
-      ) : null}
-
-      {q.working ? (
-        <div className="flex items-center justify-between gap-3">
-          <QStateIndicator state="WORKING" detail={stage} />
-          <Button
-            variant="secondary"
-            size="compact"
-            onClick={() => void q.stop()}
-          >
-            Stop
-          </Button>
-        </div>
-      ) : null}
-
-      {q.transport === "RECONNECTING" ? (
-        <InlineNotice tone="info" title={describeQStreamTransport(q.transport)}>
-          Your conversation is saved. This is the connection, not the answer.
-        </InlineNotice>
-      ) : null}
-
-      {q.state.failure !== null ? (
-        <InlineNotice tone="warning" title="Q couldn't finish that">
-          {failureMessage(q.state.failure)} {recoveryHint(q.state.failure)}
-        </InlineNotice>
-      ) : null}
-
-      {q.state.approval !== null
-        ? (() => {
-            // What Q has prepared and is waiting on (CQ-Q-008, ADR 0011).
-            // The summary and preview are the server's own words for the
-            // exact payload the decision binds to; nothing here rewrites
-            // them. One yes applies it; one no leaves everything as it was.
-            const approval = q.state.approval;
-            const proposal = q.state.proposals.find(
-              (candidate) => candidate.proposalId === approval.proposalId,
-            );
-            return (
-              <InlineNotice
-                tone="info"
-                title={
-                  proposal?.summary ??
-                  "Q has prepared something for you to approve."
+                <span className="cq-label text-(--cq-text-tertiary)">
+                  {line.role === "user" ? "You" : "Q"}
+                </span>
+                <p
+                  className={
+                    line.role === "user"
+                      ? "cq-body max-w-(--cq-layout-narrow) rounded-lg bg-(--cq-surface-sunken) px-3 py-2 text-(--cq-text-primary)"
+                      : "cq-body max-w-(--cq-layout-narrow) whitespace-pre-wrap text-(--cq-text-primary)"
+                  }
+                >
+                  {line.text}
+                </p>
+              </li>
+            ))}
+          </ol>
+        ) : null}
+        {turns.length > 0 ? (
+          <ol className="flex flex-col gap-4" aria-live="polite">
+            {turns.map((turn) => (
+              <li
+                key={turn.id}
+                className={
+                  turn.kind === "PERSON"
+                    ? "flex flex-col items-end gap-1"
+                    : "flex flex-col gap-1"
                 }
               >
-                <div className="flex flex-col gap-3" data-q-approval>
-                  {proposal?.preview !== undefined ? (
-                    <pre className="cq-body whitespace-pre-wrap font-sans">
-                      {proposal.preview}
-                    </pre>
-                  ) : null}
-                  <div className="flex flex-wrap gap-2">
-                    <Button size="compact" onClick={() => void q.approve()}>
-                      Approve
-                    </Button>
-                    <Button
-                      size="compact"
-                      variant="secondary"
-                      onClick={() => void q.decline()}
+                {turn.kind === "PERSON" ? (
+                  <>
+                    <span className="cq-label text-(--cq-text-tertiary)">
+                      You
+                    </span>
+                    <p
+                      className="cq-body max-w-(--cq-layout-narrow) rounded-lg bg-(--cq-surface-sunken) px-3 py-2 text-(--cq-text-primary)"
+                      data-unconfirmed={turn.unconfirmed ? "true" : undefined}
                     >
-                      Decline
-                    </Button>
+                      {turn.text}
+                    </p>
+                  </>
+                ) : (
+                  <QAnswer
+                    turn={turn}
+                    onAsk={(question) => void q.ask(question)}
+                    onOpenArtifact={showArtifact}
+                  />
+                )}
+              </li>
+            ))}
+            <div ref={endRef} />
+          </ol>
+        ) : null}
+
+        {q.loading && turns.length === 0 ? (
+          <p className="cq-body-sm text-(--cq-text-tertiary)">
+            Opening your conversation…
+          </p>
+        ) : null}
+
+        {q.working ? (
+          <div className="flex items-center justify-between gap-3">
+            <QStateIndicator state="WORKING" detail={stage} />
+            <Button
+              variant="secondary"
+              size="compact"
+              onClick={() => void q.stop()}
+            >
+              Stop
+            </Button>
+          </div>
+        ) : null}
+
+        {q.transport === "RECONNECTING" ? (
+          <InlineNotice
+            tone="info"
+            title={describeQStreamTransport(q.transport)}
+          >
+            Your conversation is saved. This is the connection, not the answer.
+          </InlineNotice>
+        ) : null}
+
+        {q.state.failure !== null ? (
+          <InlineNotice tone="warning" title="Q couldn't finish that">
+            {failureMessage(q.state.failure)} {recoveryHint(q.state.failure)}
+          </InlineNotice>
+        ) : null}
+
+        {q.state.approval !== null
+          ? (() => {
+              // What Q has prepared and is waiting on (CQ-Q-008, ADR 0011).
+              // The summary and preview are the server's own words for the
+              // exact payload the decision binds to; nothing here rewrites
+              // them. One yes applies it; one no leaves everything as it was.
+              const approval = q.state.approval;
+              const proposal = q.state.proposals.find(
+                (candidate) => candidate.proposalId === approval.proposalId,
+              );
+              return (
+                <InlineNotice
+                  tone="info"
+                  title={
+                    proposal?.summary ??
+                    "Q has prepared something for you to approve."
+                  }
+                >
+                  <div className="flex flex-col gap-3" data-q-approval>
+                    {proposal?.preview !== undefined ? (
+                      <pre className="cq-body whitespace-pre-wrap font-sans">
+                        {proposal.preview}
+                      </pre>
+                    ) : null}
+                    <div className="flex flex-wrap gap-2">
+                      <Button size="compact" onClick={() => void q.approve()}>
+                        Approve
+                      </Button>
+                      <Button
+                        size="compact"
+                        variant="secondary"
+                        onClick={() => void q.decline()}
+                      >
+                        Decline
+                      </Button>
+                    </div>
                   </div>
-                </div>
-              </InlineNotice>
-            );
-          })()
-        : null}
+                </InlineNotice>
+              );
+            })()
+          : null}
 
-      {q.notice !== null && q.state.failure === null ? (
-        <InlineNotice tone="warning" title="That didn't go through">
-          {q.notice}
-        </InlineNotice>
-      ) : null}
+        {q.notice !== null && q.state.failure === null ? (
+          <InlineNotice tone="warning" title="That didn't go through">
+            {q.notice}
+          </InlineNotice>
+        ) : null}
 
-      {showSuggestions ? (
-        <ul
-          aria-label="Suggested questions"
-          className="flex flex-wrap gap-2"
-          data-q-suggestions
-        >
-          {context.suggestions.map((suggestion) => (
-            <li key={suggestion}>
-              <Button
-                variant="secondary"
-                size="compact"
-                onClick={() => void q.ask(suggestion)}
-              >
-                {suggestion}
-              </Button>
-            </li>
-          ))}
-        </ul>
-      ) : null}
+        {showSuggestions ? (
+          <ul
+            aria-label="Suggested questions"
+            className="flex flex-wrap gap-2"
+            data-q-suggestions
+          >
+            {context.suggestions.map((suggestion) => (
+              <li key={suggestion}>
+                <Button
+                  variant="secondary"
+                  size="compact"
+                  onClick={() => void q.ask(suggestion)}
+                >
+                  {suggestion}
+                </Button>
+              </li>
+            ))}
+          </ul>
+        ) : null}
 
-      <div className="cq-q-composer-dock">
-        <QComposer
-          id="home-q"
-          contextScope={context.scope}
-          contextDetail={context.label}
-          disabled={q.working}
-          onVoice={
-            connected && !voice.active ? () => void talkWithQ() : undefined
-          }
-          attachments={attachments}
-          {...(connected && context.companyId !== undefined
-            ? { onAttach: attach, attachLabel: "Attach a document" }
-            : {})}
-          {...(connected
-            ? {
-                onSubmit: voice.active
-                  ? (text: string) => {
-                      voice.client.sendText(text);
-                    }
-                  : q.ask,
-              }
-            : {})}
-        />
+        <div className="cq-q-composer-dock">
+          <QComposer
+            id="home-q"
+            contextScope={context.scope}
+            contextDetail={context.label}
+            disabled={q.working}
+            onVoice={
+              connected && !voice.active ? () => void talkWithQ() : undefined
+            }
+            attachments={attachments}
+            {...(connected && context.companyId !== undefined
+              ? { onAttach: attach, attachLabel: "Attach a document" }
+              : {})}
+            {...(connected
+              ? {
+                  onSubmit: voice.active
+                    ? (text: string) => {
+                        voice.client.sendText(text);
+                      }
+                    : q.ask,
+                }
+              : {})}
+          />
+        </div>
       </div>
+
+      {openArtifact === null ? null : (
+        <div className="flex min-w-0 flex-1 flex-col lg:sticky lg:top-6 lg:max-h-[calc(100vh-6rem)]">
+          <ArtifactViewer artifactId={openArtifact} onClose={closeArtifact} />
+        </div>
+      )}
     </div>
   );
 }

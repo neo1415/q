@@ -140,9 +140,15 @@ export type QResultBlocksProps = {
   readonly blocks: readonly QTurnObjectBlock[];
   /** Ask Q something about one of these objects, in the same thread. */
   readonly onAsk?: ((question: string) => void) | undefined;
+  /** Open what Q composed. Absent on a surface with no viewer. */
+  readonly onOpenArtifact?: ((artifactId: string) => void) | undefined;
 };
 
-export function QResultBlocks({ blocks, onAsk }: QResultBlocksProps) {
+export function QResultBlocks({
+  blocks,
+  onAsk,
+  onOpenArtifact,
+}: QResultBlocksProps) {
   // Prose, findings, uncertainties and the source count are the answer's
   // own; an evidence identifier never reaches this component at all. What
   // arrives here is the part a person can act on.
@@ -303,6 +309,70 @@ export function QResultBlocks({ blocks, onAsk }: QResultBlocksProps) {
                 </p>
               </QResultCard>
             );
+
+          case "ARTIFACT_REFERENCE": {
+            /**
+             * Something Q composed (QX-003E).
+             *
+             * The status is on the card because "prepared" and "still
+             * being prepared" are different things to somebody about to
+             * send a document to an investor, and an absence would make
+             * them guess. There is no download control: no bytes exist,
+             * and a button that produces none is worse than no button.
+             */
+            const ready = block.status === "READY";
+            return (
+              <QResultCard
+                key={key}
+                label={
+                  block.type === "INVESTMENT_BRIEF"
+                    ? "Investment brief"
+                    : "Document"
+                }
+                title={block.title}
+                actions={
+                  <>
+                    {ready && onOpenArtifact !== undefined ? (
+                      <button
+                        type="button"
+                        className={buttonClassName("secondary", "compact")}
+                        onClick={() => {
+                          onOpenArtifact(block.artifactId);
+                        }}
+                        data-q-artifact-open={block.artifactId}
+                      >
+                        View
+                      </button>
+                    ) : null}
+                    {ready && onAsk !== undefined ? (
+                      <button
+                        type="button"
+                        className={buttonClassName("quiet", "compact")}
+                        onClick={() => {
+                          // A normal question in the same thread: the
+                          // revision is composed and written by the same
+                          // authorised path any other answer takes.
+                          onAsk(
+                            "Edit this document with me — what would you change first?",
+                          );
+                        }}
+                      >
+                        Edit with Q
+                      </button>
+                    ) : null}
+                  </>
+                }
+              >
+                <p className="cq-body-sm text-(--cq-text-secondary)">
+                  {block.status === "READY"
+                    ? "A private draft in your workspace. Nothing has been shared or sent."
+                    : block.status === "PREPARING"
+                      ? "Q is still preparing this."
+                      : "Q couldn't finish preparing this one."}
+                </p>
+              </QResultCard>
+            );
+          }
 
           case "UI_INTENT": {
             const href = intentHref(block.intent);

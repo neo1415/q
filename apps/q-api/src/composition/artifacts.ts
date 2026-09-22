@@ -1,6 +1,6 @@
 import type { DatabaseExecutor, TransactionManager } from "@capital-q/database";
 import type { ModelGateway } from "@capital-q/model-gateway";
-import type { Logger } from "@capital-q/observability";
+import { createCorrelationId, type Logger } from "@capital-q/observability";
 import {
   createArtifactService,
   createPostgresArtifactRepository,
@@ -8,9 +8,11 @@ import {
 } from "@capital-q/q-artifacts";
 import {
   createBriefReviser,
+  latestArtifactIn,
   type ArtifactPreparation,
   type ArtifactPreparationPort,
 } from "@capital-q/q-specialists";
+import type { QArtifactReviser } from "@capital-q/model-gateway/q";
 
 /**
  * The artifact context, composed (QX-003D; ADR 0013).
@@ -30,6 +32,15 @@ import {
 export type QArtifactsComposition = {
   readonly service: ArtifactService;
   readonly preparation: ArtifactPreparation;
+  /**
+   * The same capability for the conversational seam (QX-003F).
+   *
+   * "Make the executive summary shorter" is a question about wording, not
+   * a company investigation, so it is answered on the conversational path
+   * — and somebody should not have to phrase a change as an analysis
+   * request to be understood.
+   */
+  readonly reviser: QArtifactReviser;
 };
 
 export function createQArtifacts(dependencies: {
@@ -81,16 +92,64 @@ export function createQArtifacts(dependencies: {
     },
   };
 
+  const reviser = createBriefReviser({
+    gateway: dependencies.gateway,
+    ...(dependencies.logger === undefined
+      ? {}
+      : { logger: dependencies.logger }),
+  });
+
   return {
     service,
+    reviser: {
+      reviseFromConversation: async (input) => {
+        // Which document they mean comes from their own conversation's
+        // cards, never from anything a model said.
+        const artifactId = latestArtifactIn(input.history);
+        if (artifactId === null) return null;
+        const detail = await service
+          .read(input.actor, artifactId)
+          .catch(() => null);
+        const current = detail?.current;
+        if (current === undefined) return null;
+        const revised = await reviser.revise({
+          base: {
+            title: current.title,
+            summary: current.summary,
+            content: current.content,
+          },
+          instruction: input.instruction,
+          // What the document already carries is what a revision may
+          // restate; nothing else is in scope for a rewrite.
+          grounding: current.content.sections.flatMap((section) => [
+            section.body,
+            ...section.findings.map((finding) => finding.statement),
+          ]),
+          sensitivity: input.plan.maxSensitivity,
+          attribution: {
+            tenantId: input.actor.tenantId,
+            userId: input.actor.userId,
+            qRunId: input.runId,
+            // Its own correlation id: a plan identifier is not one, and
+            // labelling a model call with it would make the trace lie.
+            correlationId: createCorrelationId() as never,
+          },
+          ...(input.signal === undefined ? {} : { signal: input.signal }),
+        });
+        const written = await service.reviseArtifact({
+          actorContext: input.actor,
+          permittedContextPlan: input.plan,
+          qRunId: input.runId,
+          artifactId,
+          instruction: input.instruction,
+          content: revised,
+        });
+        return written.artifact;
+      },
+    },
     preparation: {
       port,
-      reviser: createBriefReviser({
-        gateway: dependencies.gateway,
-        ...(dependencies.logger === undefined
-          ? {}
-          : { logger: dependencies.logger }),
-      }),
+      reviser,
     },
   };
 }

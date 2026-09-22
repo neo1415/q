@@ -34,10 +34,12 @@ function sources(count: number): string {
 export function QAnswer({
   turn,
   onAsk,
+  onOpenArtifact,
 }: {
   readonly turn: Extract<QTurn, { kind: "Q" }>;
   /** Continue in this thread from something Q referred to (QX-001 §9). */
   readonly onAsk?: ((question: string) => void) | undefined;
+  readonly onOpenArtifact?: ((artifactId: string) => void) | undefined;
 }) {
   const hasDetail = turn.findings.length > 0 || turn.uncertainties.length > 0;
   return (
@@ -107,7 +109,11 @@ export function QAnswer({
       ) : null}
       {/* The part of the answer you can act on. Prose above stays prose;
           a card is for an object with an action (QX-001 §10). */}
-      <QResultBlocks blocks={turn.blocks} onAsk={onAsk} />
+      <QResultBlocks
+        blocks={turn.blocks}
+        onAsk={onAsk}
+        onOpenArtifact={onOpenArtifact}
+      />
     </div>
   );
 }

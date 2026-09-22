@@ -47,6 +47,12 @@ export type CompanyIntelligenceRequest = {
    * later period reaches the answer (§65, §81).
    */
   readonly asOf?: Date | undefined;
+  /**
+   * A document Q already prepared in this conversation, when there is
+   * one. Its title goes in front of the model so that "make the summary
+   * shorter" can be read as a request to change it (QX-003F).
+   */
+  readonly openDocument?: OpenDocument | undefined;
 };
 
 /** One dimension's evidential standing. No percentage, ever (§40). */
@@ -84,6 +90,18 @@ export type CompanyContradictionFinding = {
   readonly dimension: CompanyIntelligenceDimension;
   readonly statements: readonly string[];
   readonly evidenceRefs: readonly QEvidenceRef[];
+};
+
+/**
+ * A document Q already prepared in this conversation.
+ *
+ * Supplied by the answer seam from the person's own recent turns. The
+ * specialist puts the title in front of the model so a request to change
+ * it can be read as one; it is a fact about the conversation, never a
+ * grant and never something a model may name for itself.
+ */
+export type OpenDocument = {
+  readonly title: string;
 };
 
 export type CompanyIntelligenceResult = {

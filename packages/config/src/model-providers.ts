@@ -17,6 +17,8 @@ import { z } from "zod";
 
 export const MODEL_PROVIDER_ENV_NAMES = [
   "GEMINI_API_KEY",
+  "GEMINI_API_KEY_2",
+  "GEMINI_API_KEY2",
   "GROQ_API_KEY",
 ] as const;
 
@@ -76,6 +78,12 @@ const syntheticDemoRouting = z
 export const modelProviderEnvShape = {
   CQ_SYNTHETIC_DEMO_ROUTING: syntheticDemoRouting,
   GEMINI_API_KEY: apiKey.optional(),
+  // Further Gemini keys. The adapter rotates to the next one when a key
+  // is rate-limited, so one exhausted free tier does not stop Q. Both
+  // spellings are accepted because the second key was already in use
+  // without the underscore before this was configurable.
+  GEMINI_API_KEY_2: apiKey.optional(),
+  GEMINI_API_KEY2: apiKey.optional(),
   GROQ_API_KEY: apiKey.optional(),
   // Further GroqCloud keys. The adapter rotates to the next one when a key
   // is rate-limited, so one exhausted free tier does not stop Q.
@@ -93,6 +101,8 @@ export type ModelProviderSecrets = {
   readonly syntheticDemoRouting: boolean;
   /** Google Gemini Developer API; absent means the adapter is not configured. */
   readonly google: ProviderCredential | undefined;
+  /** Every Gemini key in order, the first being `google`; empty when unconfigured. */
+  readonly googleKeys: readonly ProviderCredential[];
   /** GroqCloud; absent means the adapter is not configured. */
   readonly groq: ProviderCredential | undefined;
   /** Every GroqCloud key in order, the first being `groq`; empty when unconfigured. */
@@ -102,6 +112,8 @@ export type ModelProviderSecrets = {
 export type ModelProviderConfigStatus = {
   readonly syntheticDemoRouting: boolean;
   readonly google: "configured" | "unconfigured";
+  /** How many Gemini keys rotate; never which. */
+  readonly googleKeys: number;
   readonly groq: "configured" | "unconfigured";
   /** How many GroqCloud keys rotate; never which. */
   readonly groqKeys: number;
@@ -110,6 +122,8 @@ export type ModelProviderConfigStatus = {
 export function toModelProviderSecrets(parsed: {
   readonly CQ_SYNTHETIC_DEMO_ROUTING?: boolean | undefined;
   readonly GEMINI_API_KEY?: string | undefined;
+  readonly GEMINI_API_KEY_2?: string | undefined;
+  readonly GEMINI_API_KEY2?: string | undefined;
   readonly GROQ_API_KEY?: string | undefined;
   readonly GROQ_API_KEY_2?: string | undefined;
   readonly GROQ_API_KEY_3?: string | undefined;
@@ -123,12 +137,16 @@ export function toModelProviderSecrets(parsed: {
   ]
     .filter((key): key is string => key !== undefined)
     .map((key) => new ProviderCredential(key));
+  const googleKeys = [
+    parsed.GEMINI_API_KEY,
+    parsed.GEMINI_API_KEY_2 ?? parsed.GEMINI_API_KEY2,
+  ]
+    .filter((key): key is string => key !== undefined)
+    .map((key) => new ProviderCredential(key));
   return {
     syntheticDemoRouting: parsed.CQ_SYNTHETIC_DEMO_ROUTING ?? false,
-    google:
-      parsed.GEMINI_API_KEY === undefined
-        ? undefined
-        : new ProviderCredential(parsed.GEMINI_API_KEY),
+    google: googleKeys[0],
+    googleKeys,
     groq: groqKeys[0],
     groqKeys,
   };
@@ -142,6 +160,7 @@ export function modelProviderConfigStatus(
     syntheticDemoRouting: secrets.syntheticDemoRouting,
     google: secrets.google === undefined ? "unconfigured" : "configured",
     groq: secrets.groq === undefined ? "unconfigured" : "configured",
+    googleKeys: secrets.googleKeys.length,
     groqKeys: secrets.groqKeys.length,
   };
 }

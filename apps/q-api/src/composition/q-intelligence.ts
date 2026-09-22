@@ -3,6 +3,7 @@ import type { DatabaseExecutor, TransactionManager } from "@capital-q/database";
 import type { ModelGateway } from "@capital-q/model-gateway";
 import {
   createModelGatewayQAnswer,
+  type QArtifactReviser,
   type QProfileUpdateNotebook,
   type QUserStatementRecorder,
   type QMemoryRecall,
@@ -113,6 +114,12 @@ export type QIntelligenceDependencies = {
    * (ADR 0013). Absent leaves the answer seam exactly as it was.
    */
   readonly artifacts?: ArtifactPreparation | undefined;
+  /**
+   * Changing a document from the conversational path (QX-003F): "make the
+   * executive summary shorter" is about wording, not a company
+   * investigation, so it never reaches the specialist seam.
+   */
+  readonly artifactReviser?: QArtifactReviser | undefined;
   readonly logger?: Logger | undefined;
 };
 
@@ -224,6 +231,9 @@ export function composeQIntelligence(
     ...(dependencies.dataPosture === undefined
       ? {}
       : { dataPosture: dependencies.dataPosture }),
+    ...(dependencies.artifactReviser === undefined
+      ? {}
+      : { artifacts: dependencies.artifactReviser }),
     ...(logger === undefined ? {} : { logger }),
   });
 
@@ -232,6 +242,11 @@ export function composeQIntelligence(
   // it does not support goes to the conversational path unchanged.
   const specialist = createCompanyIntelligenceSpecialist({
     gateway,
+    // The same attestation the conversational seam already carries: where
+    // the server says the data was invented, the free route may serve it.
+    ...(dependencies.dataPosture === undefined
+      ? {}
+      : { dataPosture: dependencies.dataPosture }),
     canonical: createToolCanonicalPort(tools, logger),
     // Public-web research through the same registry (CQ-Q-RESEARCH-001):
     // present whether or not a provider is composed — the registry says

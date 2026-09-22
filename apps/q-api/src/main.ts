@@ -341,7 +341,12 @@ const providerSecrets = config.secrets.modelProviders;
 const providers: ModelProvider[] = [];
 if (providerSecrets.google !== undefined) {
   providers.push(
-    createGoogleModelProvider({ apiKey: providerSecrets.google.reveal() }),
+    createGoogleModelProvider({
+      apiKey: providerSecrets.google.reveal(),
+      additionalApiKeys: providerSecrets.googleKeys
+        .slice(1)
+        .map((key) => key.reveal()),
+    }),
   );
 }
 if (providerSecrets.groq !== undefined) {
@@ -678,6 +683,7 @@ const qIntelligence = composeQIntelligence({
   // person as it is written rather than after it.
   deltas: liveDeltas,
   artifacts: qArtifacts.preparation,
+  artifactReviser: qArtifacts.reviser,
   logger,
 });
 logger.info(

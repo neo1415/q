@@ -51,6 +51,16 @@ export const GOOGLE_PROVIDER_CODE = "google" as const;
 
 export type GoogleModelProviderOptions = {
   readonly apiKey: string;
+  /**
+   * Further Gemini keys, tried in turn when one is rate-limited.
+   *
+   * The same shape the GroqCloud adapter already has, and for the same
+   * reason: a free tier that is spent should move Q to the next key
+   * rather than stop it. A key is set aside only for a rate limit —
+   * every other failure is the request's, and trying it again on another
+   * key would just spend that one too.
+   */
+  readonly additionalApiKeys?: readonly string[] | undefined;
 };
 
 /**
@@ -391,10 +401,70 @@ export function schemaForGemini(node: unknown): unknown {
   return node;
 }
 
+/** How long a rate-limited key is set aside when the provider says nothing. */
+const KEY_COOLDOWN_MS = 60_000;
+
 export function createGoogleModelProvider(
   options: GoogleModelProviderOptions,
 ): ModelProvider {
-  const client = new GoogleGenAI({ apiKey: options.apiKey });
+  const clients = [options.apiKey, ...(options.additionalApiKeys ?? [])].map(
+    (apiKey) => new GoogleGenAI({ apiKey }),
+  );
+  /** Per key: when it may be tried again. Index into `clients`. */
+  const blockedUntil = clients.map(() => 0);
+  let cursor = 0;
+
+  /** Keys to try for one request: from the cursor, unblocked first. */
+  const keyOrder = (now: number): number[] => {
+    const all = clients.map((_, index) => (cursor + index) % clients.length);
+    const until = (index: number) => blockedUntil[index] ?? 0;
+    return [
+      ...all.filter((index) => until(index) <= now),
+      ...all.filter((index) => until(index) > now),
+    ];
+  };
+
+  /**
+   * Run one call against the keys in turn.
+   *
+   * `spoke` is whether anything has already been streamed to the person:
+   * once a word has left, the same answer cannot be started again on
+   * another key, so the failure stands.
+   */
+  const withKey = async <T>(
+    run: (client: GoogleGenAI) => Promise<T>,
+    spoke: () => boolean,
+  ): Promise<T> => {
+    let lastFailure: ModelProviderFailure | undefined;
+    for (const index of keyOrder(Date.now())) {
+      const client = clients[index];
+      if (client === undefined) continue;
+      try {
+        const value = await run(client);
+        cursor = index;
+        return value;
+      } catch (error: unknown) {
+        const failure = normalizeError(error);
+        if (
+          spoke() ||
+          failure.failureClass !== "RATE_LIMIT" ||
+          clients.length === 1
+        ) {
+          throw failure;
+        }
+        // This key is spent for now; the next one takes the same request.
+        blockedUntil[index] = Date.now() + KEY_COOLDOWN_MS;
+        lastFailure = failure;
+      }
+    }
+    throw (
+      lastFailure ??
+      new ModelProviderFailure("gemini request failed", {
+        failureClass: "TRANSIENT",
+        providerCode: GOOGLE_PROVIDER_CODE,
+      })
+    );
+  };
 
   return {
     code: GOOGLE_PROVIDER_CODE,
@@ -455,12 +525,10 @@ export function createGoogleModelProvider(
        * the machinery.
        */
       if (context.onTextDelta === undefined) {
-        let response: GenerateContentResponse;
-        try {
-          response = await client.models.generateContent(params);
-        } catch (error: unknown) {
-          throw normalizeError(error);
-        }
+        const response: GenerateContentResponse = await withKey(
+          (client) => client.models.generateContent(params),
+          () => false,
+        );
         const toolCalls = toolCallsOf(response);
         const text = textOf(response);
         return finished(request, response, text, toolCalls);
@@ -474,23 +542,30 @@ export function createGoogleModelProvider(
       // ours: two chunks each holding their first part would otherwise
       // both be "gen_0".
       let callsSoFar = 0;
-      try {
-        const stream = await client.models.generateContentStream(params);
-        for await (const chunk of stream) {
-          last = chunk;
-          const fragment = textOf(chunk);
-          if (fragment.length > 0) {
-            text += fragment;
-            context.onTextDelta(fragment);
+      let spoke = false;
+      // Captured before the closure: the narrowing from the check above
+      // does not survive into a callback.
+      const onTextDelta = context.onTextDelta;
+      await withKey(
+        async (client) => {
+          const stream = await client.models.generateContentStream(params);
+          for await (const chunk of stream) {
+            last = chunk;
+            const fragment = textOf(chunk);
+            if (fragment.length > 0) {
+              text += fragment;
+              spoke = true;
+              onTextDelta(fragment);
+            }
+            for (const call of toolCallsOf(chunk, callsSoFar)) {
+              toolCalls.push(call);
+              callsSoFar += 1;
+            }
           }
-          for (const call of toolCallsOf(chunk, callsSoFar)) {
-            toolCalls.push(call);
-            callsSoFar += 1;
-          }
-        }
-      } catch (error: unknown) {
-        throw normalizeError(error);
-      }
+          return null;
+        },
+        () => spoke,
+      );
       if (last === undefined) {
         throw new ModelProviderFailure("gemini streamed nothing at all", {
           failureClass: "INVALID_MODEL_OUTPUT",

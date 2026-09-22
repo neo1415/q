@@ -106,6 +106,7 @@ describe("per-service isolation", () => {
         syntheticDemoRouting: false,
         google: undefined,
         groq: undefined,
+        googleKeys: [],
         groqKeys: [],
       },
       // The research provider (CQ-Q-RESEARCH-001) has the same defined home.
@@ -124,6 +125,7 @@ describe("per-service isolation", () => {
         syntheticDemoRouting: false,
         google: undefined,
         groq: undefined,
+        googleKeys: [],
         groqKeys: [],
       },
     });
@@ -142,12 +144,14 @@ describe("per-service isolation", () => {
     expect(api.public.modelProviders).toEqual({
       syntheticDemoRouting: false,
       google: "unconfigured",
+      googleKeys: 0,
       groq: "unconfigured",
       groqKeys: 0,
     });
     expect(api.secrets.modelProviders).toEqual({
       syntheticDemoRouting: false,
       google: undefined,
+      googleKeys: [],
       groq: undefined,
       groqKeys: [],
     });

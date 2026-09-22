@@ -11,6 +11,8 @@ import {
   rejectQApproval,
   createQRun,
   getCurrentOnboardingSession,
+  getQArtifact,
+  getQArtifactVersion,
   getQConversation,
   getQRun,
   listQConversations,
@@ -21,6 +23,7 @@ import {
   Q_MESSAGE_TEXT_MAX_LENGTH,
   QConversationIdSchema,
   type ListQConversationsResponse,
+  type QArtifactDetail,
   type QConversationDetail,
   type QRunSummary,
 } from "@capital-q/contracts";
@@ -360,4 +363,38 @@ export async function archiveQConversationAction(
     await archiveQConversation(session, conversationId.data);
     return null;
   });
+}
+
+/**
+ * Reading what Q composed (QX-003E).
+ *
+ * Authority is the session cookie, verified here, forwarded server to
+ * server. Knowing an artifact id is not permission to read it: the Q API
+ * resolves the actor for itself and answers "not found" for anything that
+ * is not theirs, so a card in an old message stops working the moment the
+ * person loses access to the company it is about.
+ */
+export async function readQArtifactAction(
+  rawArtifactId: string,
+): Promise<QActionResult<QArtifactDetail>> {
+  const artifactId = z.string().uuid().safeParse(rawArtifactId);
+  if (!artifactId.success) {
+    return failure("I couldn't find that document.");
+  }
+  return run((session) => getQArtifact(session, artifactId.data));
+}
+
+/** One earlier version of it, shown as it was written. */
+export async function readQArtifactVersionAction(
+  rawArtifactId: string,
+  rawVersion: number,
+): Promise<QActionResult<QArtifactDetail>> {
+  const artifactId = z.string().uuid().safeParse(rawArtifactId);
+  const version = z.number().int().min(1).max(10_000).safeParse(rawVersion);
+  if (!artifactId.success || !version.success) {
+    return failure("I couldn't find that version.");
+  }
+  return run((session) =>
+    getQArtifactVersion(session, artifactId.data, version.data),
+  );
 }

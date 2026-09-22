@@ -59,6 +59,12 @@ import {
 } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 
+import {
+  ensurePreviewAccounts,
+  PREVIEW_ACCOUNT_PASSWORD,
+  PREVIEW_ACCOUNTS,
+} from "./preview-accounts.mjs";
+
 const root = resolve(
   new URL("..", import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, "$1"),
 );
@@ -298,6 +304,17 @@ async function report() {
   console.log(
     "Voice:     shares development's tunnel; see the ledger for the constraint",
   );
+  // Whether somebody can sign in, never who or with what. `pnpm
+  // preview:accounts` prints the details, because asking for them is the
+  // moment to show them.
+  // Whether somebody can sign in, never who or with what. `pnpm
+  // preview:accounts` prints the details, because asking for them is the
+  // moment to show them.
+  console.log(
+    `Users:     synthetic Founder / Investor: ${
+      states.api ? "READY (pnpm preview:accounts)" : "unknown (API down)"
+    }`,
+  );
   console.log("");
   return states.web && states.api && states.qApi;
 }
@@ -430,6 +447,21 @@ async function bringUp({ reset }) {
 
   log("waiting for the preview to answer...");
   const up = await waitForHealth(180);
+  if (up) {
+    // The reset took auth.users with it and the repository seed creates
+    // none, so the tester's accounts go back before the stack is handed
+    // over. It needs the API, so it waits for health first.
+    const seeded = ensurePreviewAccounts({
+      stack,
+      apiUrl: `http://127.0.0.1:${String(PORTS.api)}`,
+      dataDir: DATA,
+    });
+    log(
+      seeded.ok
+        ? "synthetic preview accounts: READY (pnpm preview:accounts)"
+        : `synthetic preview accounts: NOT SEEDED (${seeded.reason})`,
+    );
+  }
   await report();
   if (!up) {
     log(`not all services are up; see ${join(DATA, "preview.log")}`);
@@ -456,7 +488,24 @@ switch (command) {
   case "status":
     process.exit((await report()) ? 0 : 1);
     break;
+  case "accounts": {
+    // Explicitly asked for, so explicitly printed. Nothing else in this
+    // script ever writes a password to a console or a log.
+    console.log("");
+    console.log(
+      `Preview sign-in at http://127.0.0.1:${String(PORTS.web)}/auth/sign-in`,
+    );
+    console.log("(synthetic accounts; this machine only)");
+    for (const account of PREVIEW_ACCOUNTS) {
+      console.log(`  ${account.label.padEnd(10)} ${account.email}`);
+    }
+    console.log(`  password   ${PREVIEW_ACCOUNT_PASSWORD}`);
+    console.log("");
+    break;
+  }
   default:
-    log(`unknown command "${command}"; use start, status, update or stop.`);
+    log(
+      `unknown command "${command}"; use start, status, update, accounts or stop.`,
+    );
     process.exit(1);
 }

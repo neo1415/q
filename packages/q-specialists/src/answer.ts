@@ -22,6 +22,7 @@ import type {
 } from "./company/contracts.js";
 import { asksAboutGaps } from "./company/dimensions.js";
 import {
+  latestArtifactCardIn,
   prepareOrReviseArtifact,
   type ArtifactPreparation,
 } from "./company/prepare-artifact.js";
@@ -209,6 +210,12 @@ export function createSpecialistQAnswer(
           ...(asksAboutGaps(latest.content)
             ? { focus: ["GAPS"] as const }
             : {}),
+          // Their own conversation's most recent document, so a request
+          // to change it reads as one.
+          ...(() => {
+            const card = latestArtifactCardIn(history);
+            return card === null ? {} : { openDocument: { title: card.title } };
+          })(),
         },
         {
           actor: request.actor,
@@ -279,6 +286,7 @@ export function createSpecialistQAnswer(
               request,
               company,
               companyName: "your company",
+              saidVerbatim: latest.content,
               result,
               history,
               ...(logger === undefined ? {} : { logger }),

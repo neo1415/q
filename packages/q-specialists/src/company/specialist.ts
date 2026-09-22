@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { z } from "zod";
 
 import type {
+  ModelDataPosture,
   ModelSensitivity,
   QFindingId,
   QOperatingMode,
@@ -141,6 +142,22 @@ export type CompanyIntelligenceDependencies = {
   /** What Capital Q remembers about the person (ADR 0012). Absent: nothing is. */
   readonly memory?: QMemoryRecall | undefined;
   readonly registry?: PromptRegistry | undefined;
+  /**
+   * What the server attests about this run's data (doc 15 §62).
+   *
+   * Absent means REAL_CUSTOMER, which is the safe default and what every
+   * deployment gets unless a composition says otherwise. The
+   * conversational seam has carried this since the demo posture existed;
+   * the specialist did not, so its EVIDENCE_SYNTHESIS calls could only
+   * ever reach an approved provider — correct for real data, and the
+   * reason a local demo stopped dead whenever one free tier was spent.
+   *
+   * Declaring it here decides nothing on its own: the gateway grants the
+   * synthetic route only when the deployment independently attests it
+   * too, which it does only in a local or test environment against a
+   * loopback database with an operator opt-in.
+   */
+  readonly dataPosture?: ModelDataPosture | undefined;
   /**
    * How the request's sensitivity is declared to the gateway. FROM_PLAN in
    * production: the plan's ceiling is the strongest class this run may
@@ -646,6 +663,15 @@ export function createCompanyIntelligenceSpecialist(
           assembled.facts.length === 0
             ? "No authorised facts about this company are available in this context. Say so plainly; do not answer from general knowledge."
             : `${String(assembled.facts.length)} authorised facts are supplied. No tools are available to you and no scoring service exists; do not produce scores.`,
+          // First, and stated as a fact about their conversation rather
+          // than as advice: a model that does not know a document exists
+          // reads "make the summary shorter" as being about its own
+          // answer, says it has done it, and nothing is written (QX-003F).
+          ...(request.openDocument === undefined
+            ? []
+            : [
+                `THIS PERSON ALREADY HAS A DOCUMENT: "${request.openDocument.title}". Any request in THIS message to change it — shorter, longer, less promotional, reworded, a section dropped or expanded — MUST set artifactRequest with kind REVISE, their exact words as quote, and what they want changed in instruction. You cannot change the document yourself and must never say you have; setting the field is how it happens.`,
+              ]),
           STATEMENT_NOTE,
           PROFILE_UPDATE_NOTE,
           DISPLAY_NAME_NOTE,
@@ -683,6 +709,9 @@ export function createCompanyIntelligenceSpecialist(
             ...(dependencies.tenantPolicy === undefined
               ? {}
               : { tenantPolicy: dependencies.tenantPolicy }),
+            ...(dependencies.dataPosture === undefined
+              ? {}
+              : { dataPosture: dependencies.dataPosture }),
           },
           {
             schema: CompanyAnalystV5ResultSchema,
@@ -907,12 +936,19 @@ export function createCompanyIntelligenceSpecialist(
         recordedStatements,
         // Only ever what the model read from THIS message, and only when
         // their own words carry it: an unquoted request is not a request.
-        artifactRequest:
-          analyst?.artifactRequest !== undefined &&
-          analyst.artifactRequest !== null &&
-          quotedFromMessage(analyst.artifactRequest.quote, request.question)
-            ? analyst.artifactRequest
-            : null,
+        artifactRequest: (() => {
+          const read = analyst?.artifactRequest ?? null;
+          if (read === null) return null;
+          const quoted = quotedFromMessage(read.quote, request.question);
+          if (!quoted) {
+            logger?.warn(
+              { qRunId: context.runId, kind: read.kind },
+              "artifact request dropped: the quote is not in the message",
+            );
+            return null;
+          }
+          return read;
+        })(),
         telemetry,
       });
     },

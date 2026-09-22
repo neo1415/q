@@ -13,6 +13,8 @@ import {
   type ModelTextTaskClass,
   type ModelToolCall,
   type PermittedContextPlan,
+  type QArtifactSummary,
+  type QResultBlock,
   type QCapability,
   type QCommunicationProfile,
   type QFailureDiagnosticCode,
@@ -36,8 +38,8 @@ import {
   citePublicSources,
   type AuthorisedFact,
   type PublicSourceLike,
-  type CompanyAnalystV4Result,
-  CompanyAnalystV4ResultSchema,
+  type CompanyAnalystV5Result,
+  CompanyAnalystV5ResultSchema,
   DisplayNameRequestSchema,
   NOTHING_REMEMBERED,
   ProfileUpdateSchema,
@@ -84,7 +86,7 @@ export {
  *   run → Context Firewall plan → authorised facts (port) → tools offered
  *   for this plan (port) → resolve bundle → render charter + task with
  *   untrusted fences → bounded tool loop through the gateway → validated
- *   CompanyAnalystV4Result → Q message + bundle version on the run
+ *   CompanyAnalystV5Result → Q message + bundle version on the run
  *
  * The tool loop: while tools are offered, the model is asked with a TEXT
  * output and may either propose tool calls or answer with the JSON the
@@ -402,7 +404,16 @@ export function environmentNotesFor(
   facts: readonly AuthorisedFact[],
   tools: readonly QOfferedTool[] = [],
   subjects: readonly QSubjectRef[] = [],
-  options: { readonly generalKnowledge?: boolean } = {},
+  options: {
+    readonly generalKnowledge?: boolean;
+    /**
+     * A document Q already prepared in this conversation (QX-003F). Its
+     * title goes in front of the model so that "make the summary shorter"
+     * reads as a request to change it. A fact about their own
+     * conversation, supplied by the server, never named by a model.
+     */
+    readonly openDocumentTitle?: string | undefined;
+  } = {},
 ): string {
   const factsNote =
     facts.length > 0
@@ -431,6 +442,16 @@ export function environmentNotesFor(
   const aboutACompany = subjects.some((subject) => subject.kind === "COMPANY");
   const compose = (researchNote: string | null): string =>
     [
+      // First, because this list is hard-truncated at
+      // ENVIRONMENT_NOTES_MAX_CHARS and anything near the end is simply
+      // cut. A model that does not know a document exists reads "make the
+      // summary shorter" as being about its own answer, says it has done
+      // it, and nothing is written (QX-003F).
+      ...(options.openDocumentTitle === undefined
+        ? []
+        : [
+            `THIS PERSON ALREADY HAS A DOCUMENT: "${options.openDocumentTitle}". Any request in THIS message to change it — shorter, longer, less promotional, reworded, a section dropped or expanded — MUST set artifactRequest with kind REVISE, their exact words as quote, and what they want changed in instruction. You cannot change the document yourself and must never say you have; setting the field is how it happens.`,
+          ]),
       factsNote,
       ...(tools.length === 0 ? [] : [subjectIdentifierNotes(subjects)]),
       toolsNote,
@@ -463,6 +484,36 @@ export type QProfileUpdateReading = {
   readonly field: CompanyEditableField;
   readonly value: string | null;
   readonly quote: string;
+};
+
+/**
+ * Changing a document Q already prepared (QX-003F; ADR 0013).
+ *
+ * A port, because this seam composes prose and must not hold a
+ * repository: the composition root supplies an adapter over the artifact
+ * application service, which re-derives authority from the run's own
+ * plan. Absent on a build with no artifact context, and then a request to
+ * change a document is answered without one.
+ *
+ * It lives here as well as on the specialist seam because a revision is
+ * not a company investigation. "Make the executive summary shorter" is a
+ * question about wording, so it routes to the conversational path — and
+ * the person should not have to phrase it as an analysis request to be
+ * understood.
+ */
+export type QArtifactReviser = {
+  readonly reviseFromConversation: (input: {
+    readonly actor: ActorContext;
+    readonly plan: PermittedContextPlan;
+    readonly runId: string;
+    /** The person's own words for what should change. */
+    readonly instruction: string;
+    /** Their own recent turns, for resolving which document they mean. */
+    readonly history: readonly {
+      readonly blocks?: readonly QResultBlock[] | undefined;
+    }[];
+    readonly signal?: AbortSignal | undefined;
+  }) => Promise<QArtifactSummary | null>;
 };
 
 export type QProfileUpdateNotebook = {
@@ -537,6 +588,8 @@ export type ModelGatewayQAnswerDependencies = {
    * approves, the owning context writes.
    */
   readonly profileUpdates?: QProfileUpdateNotebook | undefined;
+  /** Changing a document Q already prepared (ADR 0013). */
+  readonly artifacts?: QArtifactReviser | undefined;
   /** What Capital Q remembers about the person (ADR 0012). Absent: nothing is. */
   readonly memory?: QMemoryRecall | undefined;
   /**
@@ -575,7 +628,7 @@ export type QToolCallObservation = {
 };
 
 export type QAnswerObservation = {
-  readonly result: CompanyAnalystV4Result;
+  readonly result: CompanyAnalystV5Result;
   readonly providerCode: string;
   readonly modelCode: string;
   readonly promptBundleVersion: string;
@@ -844,6 +897,19 @@ export function createModelGatewayQAnswer(
           64,
         );
       const conversationId = history[0]?.conversationId;
+      /**
+       * The most recent document Q put in front of this person, from
+       * their own turns. Used only to tell the model one exists; which
+       * artifact a revision touches is resolved server-side again.
+       */
+      const openDocumentTitle = (() => {
+        for (let index = history.length - 1; index >= 0; index -= 1) {
+          for (const block of history[index]?.blocks ?? []) {
+            if (block.kind === "ARTIFACT_REFERENCE") return block.title;
+          }
+        }
+        return undefined;
+      })();
       const latest = [...history].reverse().find((m) => m.role === "USER");
       if (conversationId === undefined || latest === undefined) {
         return { kind: "FAILED", diagnosticCode: "INTERNAL_ERROR" };
@@ -908,6 +974,7 @@ export function createModelGatewayQAnswer(
             generalKnowledge: plan.scopes.some(
               (scope) => scope.kind === "GENERAL_MODEL_KNOWLEDGE",
             ),
+            ...(openDocumentTitle === undefined ? {} : { openDocumentTitle }),
           },
         ),
         variables,
@@ -1019,9 +1086,9 @@ export function createModelGatewayQAnswer(
         }
       };
 
-      const options: ModelGatewayExecuteOptions<CompanyAnalystV4Result> = {
+      const options: ModelGatewayExecuteOptions<CompanyAnalystV5Result> = {
         signal: request.signal,
-        schema: CompanyAnalystV4ResultSchema,
+        schema: CompanyAnalystV5ResultSchema,
         onTextDelta,
       };
 
@@ -1167,12 +1234,12 @@ export function createModelGatewayQAnswer(
           : [...rendered.messages, TOOLS_FIRST_NOTE];
 
       type AnswerResult = Awaited<
-        ReturnType<typeof gateway.execute<CompanyAnalystV4Result>>
+        ReturnType<typeof gateway.execute<CompanyAnalystV5Result>>
       >;
 
       try {
         let final: AnswerResult | undefined;
-        let analyst: CompanyAnalystV4Result | undefined;
+        let analyst: CompanyAnalystV5Result | undefined;
 
         if (offered.length > 0) {
           took("prepare");
@@ -1184,10 +1251,10 @@ export function createModelGatewayQAnswer(
           ) {
             modelCalls += 1;
             let result: Awaited<
-              ReturnType<typeof gateway.execute<CompanyAnalystV4Result>>
+              ReturnType<typeof gateway.execute<CompanyAnalystV5Result>>
             >;
             try {
-              result = await gateway.execute<CompanyAnalystV4Result>(
+              result = await gateway.execute<CompanyAnalystV5Result>(
                 {
                   ...base,
                   messages,
@@ -1242,7 +1309,7 @@ export function createModelGatewayQAnswer(
                */
               const accepted = acceptStructuredOutput(
                 result.output.text,
-                CompanyAnalystV4ResultSchema,
+                CompanyAnalystV5ResultSchema,
               );
               if (accepted.ok) {
                 final = result;
@@ -1365,7 +1432,7 @@ export function createModelGatewayQAnswer(
 
         if (analyst === undefined || final === undefined) {
           modelCalls += 1;
-          final = await gateway.execute<CompanyAnalystV4Result>(
+          final = await gateway.execute<CompanyAnalystV5Result>(
             { ...base, messages, output: rendered.output },
             options,
           );
@@ -1525,15 +1592,78 @@ export function createModelGatewayQAnswer(
             diagnosticCode: "MODEL_PROVIDER_UNAVAILABLE",
           };
         }
+        /**
+         * A change to a document Q already prepared (QX-003F; ADR 0013).
+         *
+         * Read from the same closed schema field the specialist seam
+         * reads, checked against the person's own words, and acted on by
+         * the artifact application service — which finds the document
+         * from this conversation's own cards and re-authorises it. A
+         * model that filled the field has asked, not acted.
+         */
+        const askedForArtifact =
+          analyst.artifactRequest !== null &&
+          analyst.artifactRequest !== undefined &&
+          said.includes(analyst.artifactRequest.quote.toLowerCase())
+            ? analyst.artifactRequest
+            : null;
+        const revisedArtifact =
+          askedForArtifact === null ||
+          askedForArtifact.kind !== "REVISE" ||
+          dependencies.artifacts === undefined
+            ? null
+            : await dependencies.artifacts
+                .reviseFromConversation({
+                  actor: request.actor,
+                  plan: request.plan,
+                  runId: request.runId,
+                  // Their own words when the model put the change in the
+                  // quote and left the field empty. Acting on an empty
+                  // instruction is not something to attempt.
+                  instruction:
+                    askedForArtifact.instruction.length > 0
+                      ? askedForArtifact.instruction
+                      : latest.content,
+                  history,
+                  ...(request.signal === undefined
+                    ? {}
+                    : { signal: request.signal }),
+                })
+                .catch((error: unknown) => {
+                  // A document that could not be changed must not take
+                  // the answer down with it, but it must not be silent
+                  // either: this is the only place the failure is visible.
+                  logger?.warn(
+                    { qRunId: request.runId, err: error },
+                    "artifact revision did not complete",
+                  );
+                  return null;
+                });
+        const analystBlocks = analystResultBlocks({
+          result: analyst,
+          // The run's own authorised subjects, never anything the model
+          // named: a reference is caused by what the server allowed this
+          // run to be about.
+          subjects: request.subjects,
+        });
         const message = await persistAnswer(
-          content,
-          analystResultBlocks({
-            result: analyst,
-            // The run's own authorised subjects, never anything the model
-            // named: a reference is caused by what the server allowed this
-            // run to be about.
-            subjects: request.subjects,
-          }),
+          revisedArtifact === null
+            ? content
+            : `${content}
+
+I've updated **${revisedArtifact.title}** — that's version ${String(revisedArtifact.currentVersion)}. The previous version is still there, and nothing has been shared or sent.`,
+          revisedArtifact === null
+            ? analystBlocks
+            : [
+                ...(analystBlocks ?? []),
+                {
+                  kind: "ARTIFACT_REFERENCE" as const,
+                  artifactId: revisedArtifact.artifactId,
+                  type: revisedArtifact.type,
+                  status: revisedArtifact.status,
+                  title: revisedArtifact.title,
+                },
+              ],
         );
         last = {
           result: analyst,

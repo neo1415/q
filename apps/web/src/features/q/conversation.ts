@@ -79,6 +79,7 @@ export type QTurnObjectBlock = Extract<
       | "COMPARISON"
       | "CLARIFICATION_REQUEST"
       | "ACTION_PROPOSAL"
+      | "ARTIFACT_REFERENCE"
       | "UI_INTENT";
   }
 >;
@@ -96,18 +97,13 @@ function objectBlocksOf(
       case "COMPARISON":
       case "CLARIFICATION_REQUEST":
       case "ACTION_PROPOSAL":
+      case "ARTIFACT_REFERENCE":
         return true;
       case "UI_INTENT":
         // SHOW_EVIDENCE carries the same references an evidence block
         // does, so it is dropped for the same reason. There is no
         // evidence surface to send anybody to yet either.
         return block.intent.kind !== "SHOW_EVIDENCE";
-      // Something Q composed. Withheld until there is a viewer to open
-      // it in (QX-003E): a card whose only control goes nowhere is worse
-      // than no card, and the contract carries the kind so the domain
-      // and the surface can land in separate checkpoints.
-      case "ARTIFACT_REFERENCE":
-        return false;
       // Already projected into prose, a list or a count above. EVIDENCE
       // in particular must not pass: a reference is only identifiers.
       case "TEXT":

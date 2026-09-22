@@ -1,4 +1,8 @@
 import {
+  ListQArtifactsResponseSchema,
+  QArtifactDetailSchema,
+  Q_ARTIFACTS_PATH,
+  Q_ARTIFACT_VERSIONS_SUFFIX,
   AppendQRunMessageResponseSchema,
   CreateQRunResponseSchema,
   CreateQVoiceSessionResponseSchema,
@@ -222,4 +226,53 @@ export async function archiveQConversation(
   if (!response.ok) {
     throw await readProblemResponse(response);
   }
+}
+
+const artifactPath = (artifactId: string) =>
+  `${Q_ARTIFACTS_PATH}/${encodeURIComponent(artifactId)}`;
+
+/**
+ * What Q composed (QX-003E). Owner-only on the server: an artifact that
+ * is not this person's is not found, and knowing its id changes nothing.
+ */
+
+/** `GET /v1/q/artifacts?limit=&before=&subjectId=` — newest first. */
+export function listQArtifacts(
+  session: ApiSession,
+  page: {
+    readonly limit?: number;
+    readonly before?: string;
+    readonly subjectId?: string;
+  } = {},
+) {
+  const query = new URLSearchParams();
+  if (page.limit !== undefined) query.set("limit", String(page.limit));
+  if (page.before !== undefined) query.set("before", page.before);
+  if (page.subjectId !== undefined) query.set("subjectId", page.subjectId);
+  const suffix = query.size === 0 ? "" : `?${query.toString()}`;
+  return call(
+    session,
+    "GET",
+    `${Q_ARTIFACTS_PATH}${suffix}`,
+    ListQArtifactsResponseSchema,
+  );
+}
+
+/** `GET /v1/q/artifacts/:artifactId` — the current version and the history. */
+export function getQArtifact(session: ApiSession, artifactId: string) {
+  return call(session, "GET", artifactPath(artifactId), QArtifactDetailSchema);
+}
+
+/** `GET /v1/q/artifacts/:artifactId/versions/:version` — one earlier version. */
+export function getQArtifactVersion(
+  session: ApiSession,
+  artifactId: string,
+  version: number,
+) {
+  return call(
+    session,
+    "GET",
+    `${artifactPath(artifactId)}${Q_ARTIFACT_VERSIONS_SUFFIX}/${String(version)}`,
+    QArtifactDetailSchema,
+  );
 }

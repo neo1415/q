@@ -26,9 +26,14 @@ const base = {
 };
 
 describe("model provider configuration", () => {
-  it("names exactly the two V1 variables", () => {
+  it("names the provider variables, rotation keys included", () => {
     expect([...MODEL_PROVIDER_ENV_NAMES]).toEqual([
       "GEMINI_API_KEY",
+      // A second Gemini key, so an exhausted free tier moves Q to the
+      // next one instead of stopping it. Both spellings are accepted
+      // because one was already in use without the underscore.
+      "GEMINI_API_KEY_2",
+      "GEMINI_API_KEY2",
       "GROQ_API_KEY",
     ]);
   });
@@ -40,6 +45,7 @@ describe("model provider configuration", () => {
       // deployment never starts out believing its data is invented.
       syntheticDemoRouting: false,
       google: "unconfigured",
+      googleKeys: 0,
       groq: "unconfigured",
       groqKeys: 0,
     });
@@ -48,6 +54,7 @@ describe("model provider configuration", () => {
     expect(modelProviderConfigStatus(groqOnly.secrets.modelProviders)).toEqual({
       syntheticDemoRouting: false,
       google: "unconfigured",
+      googleKeys: 0,
       groq: "configured",
       groqKeys: 1,
     });
