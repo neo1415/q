@@ -134,6 +134,11 @@ export {
 } from "./company/investment-brief.js";
 
 export {
+  composePitchDeck,
+  type ComposedPitchDeck,
+} from "./company/pitch-deck.js";
+
+export {
   createBriefReviser,
   type BriefReviser,
 } from "./company/brief-reviser.js";

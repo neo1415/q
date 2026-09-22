@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { DecimalStringSchema } from "../common/decimal.js";
 import { UuidSchema } from "../common/ids.js";
 import { UtcTimestampSchema } from "../common/time.js";
 import { QArtifactIdSchema, QRunIdSchema } from "./ids.js";
@@ -92,6 +93,180 @@ export const QArtifactSectionSchema = z
 export type QArtifactSection = z.infer<typeof QArtifactSectionSchema>;
 
 /**
+ * A deck, as the thing Q composes rather than the thing a renderer draws
+ * (QX-004 §2.1, §3.3, §6).
+ *
+ * The same invariant governs it as governs a brief: a deck is derived
+ * material. A slide saying a company has forty customers does not make
+ * that a fact about the company. What is new here is that a deck says
+ * things with shape as well as with sentences — a layout, a chart — and
+ * both are content, chosen by Q and stored, never decided by whatever
+ * renders it. Two renderers (a viewer, a PPTX writer) must be able to
+ * produce the same deck, so neither may invent a number, a label or an
+ * ordering that is not written down here.
+ */
+export const Q_SLIDE_LAYOUTS = [
+  /** One line, large. An opening or a closing. */
+  "TITLE",
+  /** A single claim, with room around it. */
+  "STATEMENT",
+  /** A heading and a short list. */
+  "BULLETS",
+  /** Two short lists side by side (problem/solution, before/after). */
+  "TWO_COLUMN",
+  /** A chart with a heading and at most a line of framing. */
+  "CHART",
+  /** Somebody's words, attributed. */
+  "QUOTE",
+] as const;
+export type QSlideLayout = (typeof Q_SLIDE_LAYOUTS)[number];
+export const QSlideLayoutSchema = z.enum(Q_SLIDE_LAYOUTS);
+
+/**
+ * What a chart is allowed to be.
+ *
+ * Deliberately few, and deliberately deterministic: these are the shapes
+ * a set of labelled numbers can be drawn as without a model deciding
+ * anything at render time. A chart Q cannot express in one of them is a
+ * chart Q does not draw, and the numbers stay in the prose.
+ */
+export const Q_CHART_KINDS = ["BAR", "COLUMN", "LINE", "DONUT"] as const;
+export type QChartKind = (typeof Q_CHART_KINDS)[number];
+export const QChartKindSchema = z.enum(Q_CHART_KINDS);
+
+export const Q_CHART_POINTS_MAX = 12;
+
+/**
+ * One labelled number on a chart.
+ *
+ * The value is a decimal string, never a float: what Q read was "1.4" or
+ * "38", and turning that into an IEEE double on the way in loses the
+ * thing a reader would check. The unit is carried on the chart rather
+ * than baked into each label, so an axis and a datum stay consistent.
+ */
+export const QChartPointSchema = z
+  .object({
+    label: z.string().trim().min(1).max(60),
+    value: DecimalStringSchema,
+  })
+  .strict();
+export type QChartPoint = z.infer<typeof QChartPointSchema>;
+
+/**
+ * A chart, with the reason it is allowed to exist.
+ *
+ * `grounding` is not decoration. QX-004 §4 requires every material number
+ * to trace to something somebody said, something canonical, or authorised
+ * evidence, and a chart is the easiest place in a deck to put a number
+ * nobody ever gave. So a chart carries, in its own words, where its
+ * numbers came from; a chart that cannot say is not composed, and the
+ * slide is laid out without one.
+ */
+export const QChartSchema = z
+  .object({
+    kind: QChartKindSchema,
+    /** What the numbers measure. Written on the chart, not inferred from it. */
+    measure: z.string().trim().min(1).max(80),
+    /** "USD" for money, "customers", "%", … Written beside the values. */
+    unit: z.string().trim().min(1).max(24),
+    points: z.array(QChartPointSchema).min(2).max(Q_CHART_POINTS_MAX),
+    /** Where these numbers came from, in a sentence a reader can check. */
+    grounding: z.string().trim().min(1).max(300),
+  })
+  .strict();
+export type QChart = z.infer<typeof QChartSchema>;
+
+export const Q_SLIDE_BULLETS_MAX = 6;
+export const Q_SLIDE_BULLET_MAX = 180;
+export const Q_DECK_SLIDES_MAX = 24;
+
+/** One slide. Its grounding lives in the matching section; this is its shape. */
+export const QSlideSchema = z
+  .object({
+    layout: QSlideLayoutSchema,
+    title: z.string().trim().min(1).max(Q_ARTIFACT_TITLE_MAX),
+    /** One line under the title, where the layout has room for one. */
+    subtitle: z.string().trim().min(1).max(240).optional(),
+    bullets: z
+      .array(z.string().trim().min(1).max(Q_SLIDE_BULLET_MAX))
+      .max(Q_SLIDE_BULLETS_MAX)
+      .default([]),
+    /** The second column of a TWO_COLUMN slide; empty for every other layout. */
+    bulletsRight: z
+      .array(z.string().trim().min(1).max(Q_SLIDE_BULLET_MAX))
+      .max(Q_SLIDE_BULLETS_MAX)
+      .default([]),
+    chart: QChartSchema.optional(),
+    /** Attribution for a QUOTE. */
+    attribution: z.string().trim().min(1).max(120).optional(),
+    /**
+     * What the founder would say over this slide. Theirs to read, never
+     * shown on the slide, and never Q's reasoning about how it composed
+     * it — a speaker note is content like any other.
+     */
+    note: z.string().trim().min(1).max(1_000).optional(),
+    /**
+     * The section this slide's grounding lives in. A slide shows a claim;
+     * the section behind it shows what the claim rests on, with each
+     * finding's own truth class and evidence status intact.
+     */
+    section: z
+      .number()
+      .int()
+      .min(0)
+      .max(Q_ARTIFACT_SECTIONS_MAX - 1),
+  })
+  .strict();
+export type QSlide = z.infer<typeof QSlideSchema>;
+
+/**
+ * How the deck should look, as a direction rather than a template.
+ *
+ * Three named directions because a founder can choose between three and
+ * cannot choose between a hundred, and because the alternative — letting
+ * a model emit colours and sizes per deck — produces exactly the generic
+ * AI slide this packet exists to avoid. The architecture is not locked to
+ * three: the value is reference data, and a renderer that has not heard
+ * of a direction falls back to the institutional one.
+ */
+export const Q_VISUAL_DIRECTIONS = [
+  "MINIMAL_INSTITUTIONAL",
+  "DARK_TECHNICAL",
+  "WARM_GROWTH",
+] as const;
+export type QVisualDirection = (typeof Q_VISUAL_DIRECTIONS)[number];
+export const QVisualDirectionSchema = z
+  .string()
+  .trim()
+  .regex(/^[A-Z][A-Z0-9_]{2,31}$/, "expected a visual direction code");
+
+export const QDeckSchema = z
+  .object({
+    slides: z.array(QSlideSchema).min(1).max(Q_DECK_SLIDES_MAX),
+    direction: QVisualDirectionSchema.default("MINIMAL_INSTITUTIONAL"),
+    /**
+     * A brand colour the founder gave, as content: it describes their
+     * company, it travels into a PPTX and a PDF, and it is not a design
+     * token. Absent is the common case and a perfectly good deck — the
+     * direction decides.
+     */
+    accent: z
+      .string()
+      .trim()
+      .regex(/^#[0-9a-fA-F]{6}$/, "expected a hex colour")
+      .optional(),
+    /**
+     * Set when the mark on the deck is something Q drew rather than the
+     * company's own. A deck-only draft is not a brand, and saying so is
+     * the difference between a placeholder and a quiet rewrite of
+     * somebody's identity (QX-004 §3.2).
+     */
+    markIsDraft: z.boolean().default(false),
+  })
+  .strict();
+export type QDeck = z.infer<typeof QDeckSchema>;
+
+/**
  * The whole of one version's content.
  *
  * Bounded on every axis, and expressible only in these members. That is
@@ -112,6 +287,14 @@ export const QArtifactContentSchema = z
      * see the shape of the gap at a glance. Unknown stays unknown.
      */
     gaps: z.array(z.string().trim().min(1).max(300)).max(24).default([]),
+    /**
+     * Present when this artifact is a deck. The sections stay where they
+     * are and stay authoritative for grounding: every slide names the
+     * section it rests on, so one reader looking at slides and another
+     * looking at what is behind them are reading the same artifact rather
+     * than two that drifted apart.
+     */
+    deck: QDeckSchema.optional(),
   })
   .strict();
 export type QArtifactContent = z.infer<typeof QArtifactContentSchema>;
