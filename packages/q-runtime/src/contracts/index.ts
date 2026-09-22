@@ -244,6 +244,9 @@ function disclosable(
       // Prose and objects. None of them carries an evidence identifier,
       // and each is listed rather than defaulted so that adding a block
       // kind forces somebody to decide what history may hand back.
+      // ARTIFACT_REFERENCE among them: it names something Q composed and
+      // grants nothing, because knowing an identifier has never been
+      // permission to see what it names.
       case "TEXT":
       case "COMPANY_REFERENCE":
       case "INVESTOR_REFERENCE":
@@ -251,6 +254,7 @@ function disclosable(
       case "UNCERTAINTY":
       case "CLARIFICATION_REQUEST":
       case "ACTION_PROPOSAL":
+      case "ARTIFACT_REFERENCE":
         return true;
     }
   });

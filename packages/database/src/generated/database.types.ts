@@ -349,6 +349,120 @@ export type Database = {
       [_ in never]: never
     }
   }
+  artifacts: {
+    Tables: {
+      artifact_versions: {
+        Row: {
+          artifact_id: string
+          composed_by_run_id: string | null
+          content: Json
+          created_at: string
+          created_by_user_id: string
+          id: string
+          instruction: string | null
+          summary: string
+          tenant_id: string
+          title: string
+          version: number
+        }
+        Insert: {
+          artifact_id: string
+          composed_by_run_id?: string | null
+          content: Json
+          created_at?: string
+          created_by_user_id: string
+          id?: string
+          instruction?: string | null
+          summary: string
+          tenant_id: string
+          title: string
+          version: number
+        }
+        Update: {
+          artifact_id?: string
+          composed_by_run_id?: string | null
+          content?: Json
+          created_at?: string
+          created_by_user_id?: string
+          id?: string
+          instruction?: string | null
+          summary?: string
+          tenant_id?: string
+          title?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "artifact_versions_artifact_id_fkey"
+            columns: ["artifact_id"]
+            isOneToOne: false
+            referencedRelation: "artifacts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      artifacts: {
+        Row: {
+          archived_at: string | null
+          company_id: string | null
+          created_at: string
+          created_by_user_id: string
+          current_version: number
+          id: string
+          investor_organisation_id: string | null
+          organisation_id: string
+          status: string
+          tenant_id: string
+          type: string
+          updated_at: string
+          visibility_scope: string
+        }
+        Insert: {
+          archived_at?: string | null
+          company_id?: string | null
+          created_at?: string
+          created_by_user_id: string
+          current_version?: number
+          id?: string
+          investor_organisation_id?: string | null
+          organisation_id: string
+          status?: string
+          tenant_id: string
+          type: string
+          updated_at?: string
+          visibility_scope?: string
+        }
+        Update: {
+          archived_at?: string | null
+          company_id?: string | null
+          created_at?: string
+          created_by_user_id?: string
+          current_version?: number
+          id?: string
+          investor_organisation_id?: string | null
+          organisation_id?: string
+          status?: string
+          tenant_id?: string
+          type?: string
+          updated_at?: string
+          visibility_scope?: string
+        }
+        Relationships: []
+      }
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      [_ in never]: never
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   audit: {
     Tables: {
       material_actions: {
@@ -6227,6 +6341,9 @@ export type CompositeTypes<
 
 export const Constants = {
   ai_ops: {
+    Enums: {},
+  },
+  artifacts: {
     Enums: {},
   },
   audit: {

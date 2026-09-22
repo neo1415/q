@@ -95,7 +95,9 @@ function port(
 }
 
 function mp3Response(body: Uint8Array = AUDIO): Response {
-  return new Response(body, {
+  // Through a Blob rather than the bytes directly: `Response` accepts a
+  // view at runtime, but the DOM types only admit one via BlobPart.
+  return new Response(new Blob([body], { type: "audio/mpeg" }), {
     status: 200,
     headers: { "content-type": "audio/mpeg" },
   });
