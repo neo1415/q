@@ -606,7 +606,12 @@ describe("interviewer", () => {
       turnInput(api.fetchFake, "We're at seed"),
     );
     expect(outcome.degraded).toBe(true);
-    expect(outcome.reply).toContain("What stage is the company at?");
+    // This used to assert that the fallback repeated the current step's
+    // prompt, and that is exactly what made hosted Q unusable: the label
+    // came back after every failure while the person kept answering into
+    // nothing (QX-004 §0.4). A failure is now said once and asks nothing.
+    expect(outcome.reply).not.toContain("What stage is the company at?");
+    expect(outcome.asking).toBeNull();
     expect(outcome.reply).not.toContain("secret");
     expect(api.requests.filter((r) => r.method === "POST")).toHaveLength(0);
   });

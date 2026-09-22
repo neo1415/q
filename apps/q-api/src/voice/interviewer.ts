@@ -10,6 +10,7 @@ import {
   type ApiSession,
 } from "@capital-q/api-client";
 import type {
+  ModelDataPosture,
   OnboardingResponseValue,
   OnboardingSessionView,
 } from "@capital-q/contracts";
@@ -62,6 +63,16 @@ export type InterviewerDependencies = {
   readonly personality?: QPersonalityCode | undefined;
   /** True when the speech model renders inline audio tags ([laughs]). */
   readonly expressive?: boolean | undefined;
+  /**
+   * What the deployment attests about this material (doc 15 §62).
+   *
+   * Absent means REAL_CUSTOMER, which is the safe default. Where the
+   * deployment has attested its material is invented, the free route is
+   * eligible — and without that, a staging interview at CONFIDENTIAL had
+   * no eligible model at all once one provider was spent, which is what
+   * produced the scripted loop QX-004 §0 exists to end.
+   */
+  readonly dataPosture?: ModelDataPosture | undefined;
   /**
    * What Capital Q remembers about the person (ADR 0012), as bounded
    * text for the prompt. Absent means the interview starts from nothing,
@@ -675,6 +686,15 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
   const pendingFor = (sessionId: string) =>
     pendingBySession.get(sessionId) ?? [];
   const warningsBySession = new Map<string, number>();
+  /**
+   * Consecutive turns this session could not reach a model (QX-004 §0.4).
+   *
+   * Bounded degradation needs to know it is the second time. The first
+   * failure is worth an apology; repeating the current question after
+   * every failure is the loop that made hosted Q unusable — the person
+   * answers, the answer is thrown away, the same words come back.
+   */
+  const degradedBySession = new Map<string, number>();
   // Asides since the last recorded answer: the first two are answered in
   // full, later ones steer back (the prompt reads the count).
   const tangentsBySession = new Map<string, number>();
@@ -704,6 +724,7 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
     forget: (sessionId: string) => {
       pendingBySession.delete(sessionId);
       warningsBySession.delete(sessionId);
+      degradedBySession.delete(sessionId);
       tangentsBySession.delete(sessionId);
     },
 
@@ -826,11 +847,17 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
         const response = await gateway.execute<InterviewConductorResult>(
           {
             taskClass: "NORMAL_DIALOGUE",
+            // The declared sensitivity is untouched: an interview turn is
+            // CONFIDENTIAL whoever it is about. Only the posture beside it
+            // says whether there is a customer here at all.
             sensitivity: "CONFIDENTIAL",
             budget: DIALOGUE_BUDGET,
             messages: [...rendered.messages],
             output: rendered.output,
             attribution: input.attribution,
+            ...(dependencies.dataPosture === undefined
+              ? {}
+              : { dataPosture: dependencies.dataPosture }),
           },
           {
             schema: InterviewConductorResultSchema,
@@ -865,12 +892,27 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
         );
       }
       if (result === undefined) {
-        const current = view.currentStep;
+        /**
+         * No model route, or the provider refused (QX-004 §0.4).
+         *
+         * What this used to do was repeat the current step's prompt, which
+         * is a bare field label rather than a question — "Your firm" — and
+         * it did so after every failure. The person answered, the answer
+         * went nowhere because nothing had read it, and the same label came
+         * back. Hosted Q spent a whole conversation doing that.
+         *
+         * So: say it once, plainly, and stop pretending the interview is
+         * advancing. Nothing is recorded, nothing is asked, and the step
+         * they were on is still the step they are on when it recovers.
+         */
+        const failures =
+          (degradedBySession.get(input.onboardingSessionId) ?? 0) + 1;
+        degradedBySession.set(input.onboardingSessionId, failures);
         return {
           reply:
-            current === null
-              ? "I'm having trouble thinking just now. Give me a moment and try again."
-              : `I'm having trouble thinking just now. Let's keep going: ${current.prompt}`,
+            failures === 1
+              ? "I'm having trouble reaching my reasoning service right now, so I haven't taken that in properly. Nothing you've told me is lost — say that again in a moment and I'll pick it up."
+              : "Still can't reach it, I'm afraid. Everything you've already told me is saved; give it a minute and try again.",
           intent: "UNCLEAR",
           asking: null,
           recorded: [],
@@ -885,9 +927,13 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
         };
       }
 
+      degradedBySession.delete(input.onboardingSessionId);
+
       const recorded: string[] = [];
       const skipped: string[] = [];
       const nextPending: Pending[] = [];
+      /** Steps the model meant to record that the runtime would not take. */
+      const unsaved: string[] = [];
       const commit = async (
         stepKey: string,
         value: OnboardingResponseValue,
@@ -910,6 +956,7 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
             { err: error, stepKey },
             "interview answer was not accepted",
           );
+          unsaved.push(stepKey);
           return false;
         }
       };
@@ -1243,6 +1290,24 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
           : lookup !== null
             ? lookupQuestion(lookup.kind, lookup.query)
             : null;
+
+      /**
+       * Q may not say it saved something the runtime refused (QX-004 §0.5).
+       *
+       * The reply is the model's prose and the commits are the runtime's
+       * result; nothing connected them, so a rejected answer could still
+       * be read back as "got it". The model's words are not evidence that
+       * anything happened. Where a commit was refused the person is told
+       * so plainly, in place of whatever the model believed.
+       */
+      if (unsaved.length > 0 && recorded.length === 0) {
+        reply =
+          "I couldn't save that just now — it hasn't gone in. Could you say it once more?";
+        result = { ...result, askNext: null };
+      } else if (unsaved.length > 0) {
+        reply =
+          `${reply.trim()} One thing didn't save — I'll ask about it again in a moment.`.trim();
+      }
 
       const askStep =
         result.askNext === null ? undefined : steps.get(result.askNext);

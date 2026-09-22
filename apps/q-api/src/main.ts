@@ -372,6 +372,11 @@ const syntheticDemo = createSyntheticDemoRoutingAllowance({
   operatorEnabled: providerSecrets.syntheticDemoRouting,
   environment: config.runtime.deploymentEnvironment,
   databaseUrl: loadDatabaseConfig().secrets.url,
+  hostedAttested: providerSecrets.syntheticDemoAttested,
+  ...(providerSecrets.syntheticDemoProjectRef === undefined
+    ? {}
+    : { syntheticProjectRef: providerSecrets.syntheticDemoProjectRef }),
+  supabaseUrl: config.public.supabaseUrl,
 });
 
 /**
@@ -788,6 +793,12 @@ const voiceBindings = createVoiceSessionBindings();
 // reading validated and recorded through the onboarding runtime.
 const interviewer = createInterviewer({
   gateway: modelGateway,
+  // Doc 15 §62: where the deployment attested the material is invented,
+  // the free route may carry the interview. Elsewhere this is
+  // REAL_CUSTOMER and the reviewed ceilings decide, exactly as before.
+  // Without it a staging interview had no eligible route the moment one
+  // provider was spent, which is the whole of the QX-004 §0 defect.
+  dataPosture: demoDataPosture,
   logger,
   personality: config.voice.personality,
   expressive: config.voice.expressive,

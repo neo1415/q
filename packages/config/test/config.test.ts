@@ -104,6 +104,8 @@ describe("per-service isolation", () => {
     expect(qApi.secrets).toEqual({
       modelProviders: {
         syntheticDemoRouting: false,
+      syntheticDemoAttested: false,
+      syntheticDemoProjectRef: undefined,
         google: undefined,
         groq: undefined,
         googleKeys: [],
@@ -123,6 +125,8 @@ describe("per-service isolation", () => {
       supabaseSecretKey: undefined,
       modelProviders: {
         syntheticDemoRouting: false,
+      syntheticDemoAttested: false,
+      syntheticDemoProjectRef: undefined,
         google: undefined,
         groq: undefined,
         googleKeys: [],
@@ -150,6 +154,8 @@ describe("per-service isolation", () => {
     });
     expect(api.secrets.modelProviders).toEqual({
       syntheticDemoRouting: false,
+      syntheticDemoAttested: false,
+      syntheticDemoProjectRef: undefined,
       google: undefined,
       googleKeys: [],
       groq: undefined,

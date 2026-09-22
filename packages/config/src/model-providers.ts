@@ -77,6 +77,21 @@ const syntheticDemoRouting = z
 
 export const modelProviderEnvShape = {
   CQ_SYNTHETIC_DEMO_ROUTING: syntheticDemoRouting,
+  /**
+   * The deployment's own statement that everything it holds was invented
+   * (QX-004 §0.3). Server-only: no HTTP contract carries it and no browser
+   * can set it. Meaningless without the routing opt-in beside it, refused
+   * outright in preview and production, and in staging it must name the
+   * synthetic Supabase project below.
+   */
+  CAPITAL_Q_SYNTHETIC_DEMO_ATTESTED: syntheticDemoRouting,
+  /** The Supabase project that attestation is about; must be the one in use. */
+  CAPITAL_Q_SYNTHETIC_SUPABASE_PROJECT_REF: z
+    .string()
+    .trim()
+    .min(16)
+    .max(64)
+    .optional(),
   GEMINI_API_KEY: apiKey.optional(),
   // Further Gemini keys. The adapter rotates to the next one when a key
   // is rate-limited, so one exhausted free tier does not stop Q. Both
@@ -99,6 +114,10 @@ export type ModelProviderSecrets = {
    * honours it only through an allowance that re-checks the deployment.
    */
   readonly syntheticDemoRouting: boolean;
+  /** The deployment attests its material is invented (QX-004 §0.3). */
+  readonly syntheticDemoAttested: boolean;
+  /** The Supabase project that attestation names, if any. */
+  readonly syntheticDemoProjectRef: string | undefined;
   /** Google Gemini Developer API; absent means the adapter is not configured. */
   readonly google: ProviderCredential | undefined;
   /** Every Gemini key in order, the first being `google`; empty when unconfigured. */
@@ -121,6 +140,8 @@ export type ModelProviderConfigStatus = {
 
 export function toModelProviderSecrets(parsed: {
   readonly CQ_SYNTHETIC_DEMO_ROUTING?: boolean | undefined;
+  readonly CAPITAL_Q_SYNTHETIC_DEMO_ATTESTED?: boolean | undefined;
+  readonly CAPITAL_Q_SYNTHETIC_SUPABASE_PROJECT_REF?: string | undefined;
   readonly GEMINI_API_KEY?: string | undefined;
   readonly GEMINI_API_KEY_2?: string | undefined;
   readonly GEMINI_API_KEY2?: string | undefined;
@@ -145,6 +166,8 @@ export function toModelProviderSecrets(parsed: {
     .map((key) => new ProviderCredential(key));
   return {
     syntheticDemoRouting: parsed.CQ_SYNTHETIC_DEMO_ROUTING ?? false,
+    syntheticDemoAttested: parsed.CAPITAL_Q_SYNTHETIC_DEMO_ATTESTED ?? false,
+    syntheticDemoProjectRef: parsed.CAPITAL_Q_SYNTHETIC_SUPABASE_PROJECT_REF,
     google: googleKeys[0],
     googleKeys,
     groq: groqKeys[0],

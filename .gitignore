@@ -60,3 +60,5 @@ models/
 # Local demo launcher output
 demo.log
 .demo-stopped
+# `next dev` output when the web app runs against the hosted backend
+web.log
