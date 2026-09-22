@@ -2,7 +2,7 @@
   "name": "capital-q",
   "private": true,
   "type": "module",
-  "description": "Capital Q \u2014 AI-native Investment Intelligence Operating System for private capital.",
+  "description": "Capital Q — AI-native Investment Intelligence Operating System for private capital.",
   "packageManager": "pnpm@11.25.0",
   "engines": {
     "node": ">=24.0.0 <25.0.0"
@@ -23,6 +23,9 @@
     "dev:bootstrap": "node scripts/dev-bootstrap.mjs",
     "dev:marketplace-ready": "node scripts/dev-marketplace-ready.mjs",
     "build": "turbo run build",
+    "deploy:build:api": "turbo run build --filter=@capital-q/api...",
+    "deploy:build:q-api": "turbo run build --filter=@capital-q/q-api...",
+    "deploy:build:workers": "turbo run build --filter=@capital-q/workers...",
     "typecheck": "turbo run typecheck && tsc --noEmit -p tsconfig.json",
     "lint": "eslint . --max-warnings=0",
     "lint:fix": "eslint . --fix",
@@ -81,6 +84,7 @@
     "eslint-config-next": "16.3.4",
     "eslint-config-prettier": "10.1.8",
     "prettier": "3.9.6",
+    "railway": "^3.11.0",
     "supabase": "2.116.0",
     "turbo": "^2.10.12",
     "typescript": "5.9.3",

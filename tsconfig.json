@@ -9,6 +9,10 @@
     "lib": ["DOM", "DOM.Iterable", "ES2023"]
   },
   "include": [
+    // Railway deployment configuration (ADR 0014). Included so the authoring
+    // file is typechecked and lintable like everything else, rather than being
+    // an unchecked TypeScript file the Railway CLI evaluates.
+    ".railway/*.ts",
     "vitest.config.ts",
     "vitest.integration.config.ts",
     "vitest.live-model.config.ts",

@@ -1,3 +1,14 @@
+# SUPERSEDED by ADR 0014 — do not apply this blueprint.
+#
+# Capital Q's Node services run on Railway (`.railway/railway.ts`,
+# docs/deployment/staging.md). This file is kept as the record of the ADR 0001
+# attempt, which never deployed: it stopped at Render's Deploy step on an
+# account billing failure. It stays accurate enough to resume from if Render is
+# ever chosen again, with one known error noted in ADR 0014 — it sets
+# CQ_WEB_ORIGIN on the API service, and only apps/web reads that variable.
+#
+# Original header follows.
+#
 # Render blueprint for the three Node service deployables and the private
 # embedding runtime (ADR 0001; doc 21 §4-§16, §29, §65-§77).
 #

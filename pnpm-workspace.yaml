@@ -10,6 +10,11 @@ allowBuilds:
   # @google/genai's "prepare" is a maintainer step and protobufjs's postinstall
   # only prints a notice; neither is needed at runtime (CQ-Q-005).
   "@google/genai": false
+  # esbuild arrives under `railway`, the SDK the Railway CLI needs in order to
+  # evaluate .railway/railway.ts (ADR 0014). Its postinstall only resolves a
+  # platform binary nothing here invokes; `railway config plan` is verified
+  # working with this build denied.
+  esbuild: false
   protobufjs: false
   unrs-resolver: false
 minimumReleaseAgeExclude:
