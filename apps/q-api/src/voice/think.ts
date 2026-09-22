@@ -176,11 +176,20 @@ export function registerVoiceThinkRoute(
     let open = true;
     let wroteContent = false;
     let timedOut = false;
-    const write = (text: string) => {
+    /**
+     * Write to the stream. `force` is for the deadline's own sentence.
+     *
+     * Once the deadline has spoken, the turn's late words are not wanted:
+     * they would arrive after Q has moved on. But the flag that stops
+     * them used to stop the deadline's own line too, because it was set
+     * before that line was written — so a turn that ran long said "One
+     * moment." and then nothing at all, and the person sat looking at a
+     * dead line (hosted, 2026-09-22). The deadline now writes past its
+     * own guard, and only the turn's late words are dropped.
+     */
+    const write = (text: string, force = false) => {
       if (!open || controller.signal.aborted) return;
-      // Once the deadline has spoken, the turn's own late words are not
-      // wanted: they would arrive after Q has already moved on.
-      if (timedOut) return;
+      if (timedOut && !force) return;
       wroteContent = true;
       raw.write(chunk(id, { content: text }, null));
     };
@@ -196,7 +205,13 @@ export function registerVoiceThinkRoute(
       }
     }, KEEP_ALIVE_MS);
     const beat = setTimeout(() => {
-      if (!wroteContent) write(SLOW_TURN_BEAT);
+      // A beat is a beat, not a sentence Q said: it ends in a space so the
+      // answer that follows does not arrive as "One moment.African fintech"
+      // (hosted, 2026-09-22), and `wroteContent` stays false so a turn that
+      // then runs out of time is told it ran out rather than cut short.
+      if (!wroteContent && open && !controller.signal.aborted) {
+        raw.write(chunk(id, { content: `${SLOW_TURN_BEAT} ` }, null));
+      }
     }, SLOW_TURN_BEAT_MS);
     // Our own deadline, ahead of the provider's. The line is written
     // before the turn is cancelled, because cancelling closes writing.
@@ -204,8 +219,9 @@ export function registerVoiceThinkRoute(
       if (!open || controller.signal.aborted) {
         return;
       }
+      const line = wroteContent ? TURN_CUT_SHORT : TURN_TOO_LONG;
       timedOut = true;
-      write(wroteContent ? TURN_CUT_SHORT : TURN_TOO_LONG);
+      write(line, true);
       controller.abort();
     }, TURN_DEADLINE_MS);
     const speaker: VoiceSpeaker = {

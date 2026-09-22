@@ -199,11 +199,29 @@ type Pending = {
   readonly spoken: string;
 };
 
+/**
+ * What one spoken interview turn may spend.
+ *
+ * The timings are set by the route above this one, not by the model: the
+ * think endpoint ends a turn at twenty seconds so that the person hears a
+ * sentence from Q rather than the speech provider's own line dying. An
+ * attempt allowed forty-five seconds could therefore never pay off — it
+ * was simply cancelled, and hosted that is what happened to every turn a
+ * slow generation landed on (2026-09-22): Gemini answered in about a
+ * second most of the time and in sixteen sometimes, and the sixteens took
+ * the whole turn with them.
+ *
+ * Twelve seconds leaves room for the interview's own round trips on
+ * either side and for one fall to the next route inside the deadline.
+ * Two attempts rather than four for the same reason: a dialogue turn that
+ * needs four has already lost the person, and the honest degradation
+ * above is better than a fourth try nobody waits for.
+ */
 const DIALOGUE_BUDGET = {
-  maxAttempts: 4,
+  maxAttempts: 2,
   maxEstimatedCostUsd: 0.1,
   maxOutputTokens: 2_048,
-  attemptTimeoutMs: 45_000,
+  attemptTimeoutMs: 12_000,
 } as const;
 
 /** Steps whose values are always read back before they are recorded (A §13). */

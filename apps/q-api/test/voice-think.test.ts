@@ -1,5 +1,5 @@
 import Fastify from "fastify";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { createLogger } from "@capital-q/observability";
 
@@ -120,6 +120,47 @@ describe("the think route", () => {
     expect(body.trim().endsWith("data: [DONE]")).toBe(true);
     expect(bound.connectedAt).toBe(1);
     await server.close();
+  });
+
+  it("says so when a turn runs out of time, instead of leaving a beat and silence", async () => {
+    // Hosted, 2026-09-22. A turn that passed six seconds got the beat
+    // ("One moment."), and a turn that then passed twenty got nothing at
+    // all: the deadline set the flag that suppresses a turn's late words
+    // before writing its own sentence, so it suppressed itself. The
+    // person was left looking at a line that had stopped.
+    vi.useFakeTimers();
+    try {
+      const bound = binding("secret-think-token");
+      const turn: VoiceTurnHandler = (_b, _t, signal) =>
+        new Promise((resolve) => {
+          signal.addEventListener("abort", () =>
+            resolve({ kind: "INTERRUPTED", path: "Q" }),
+          );
+        });
+      const server = await app(turn, bound);
+      const pending = server.inject({
+        method: "POST",
+        url: "/v1/q/voice/think",
+        headers: { authorization: "Bearer secret-think-token" },
+        payload: {
+          model: "capital-q",
+          stream: true,
+          messages: [{ role: "user", content: "Zino Aviation." }],
+        },
+      });
+      await vi.advanceTimersByTimeAsync(25_000);
+      const response = await pending;
+      const body = response.body;
+      // The beat, with the space that keeps it from running into whatever
+      // follows it.
+      expect(body).toContain('"content":"One moment. "');
+      // And then a sentence the person can answer, rather than nothing.
+      expect(body).toContain("taking longer than I want to keep you waiting");
+      expect(body.trim().endsWith("data: [DONE]")).toBe(true);
+      await server.close();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("refuses a request without the session's bearer, before any turn runs", async () => {
