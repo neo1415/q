@@ -51,6 +51,7 @@
     "test:live-model": "node scripts/live-model-tests.mjs",
     "q:smoke": "node scripts/q-smoke.mjs",
     "interview:hosted": "node scripts/hosted-interview-smoke.mjs",
+    "deck:sample": "node scripts/deck-sample.mjs",
     "artifact:journey": "node scripts/artifact-journey-smoke.mjs",
     "artifact:revise": "node scripts/artifact-revision-smoke.mjs",
     "q:stream-smoke": "node scripts/q-stream-smoke.mjs",
