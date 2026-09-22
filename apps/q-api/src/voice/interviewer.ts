@@ -130,6 +130,13 @@ export type InterviewTurnOutcome = {
   readonly skipped: readonly string[];
   /** A question for Q, when the person asked one (a lookup becomes one). */
   readonly questionForQ: string | null;
+  /**
+   * The subject Q is going to look up unprompted, when this turn started
+   * one (QX-004 §1.1, §1.2). Nobody asked for it, so what it does not
+   * find is not announced — the caller reads this to treat the run as a
+   * look-up rather than an answer.
+   */
+  readonly researching: string | null;
   /** Where the person asked to be taken, validated against the fixed list. */
   readonly navigate: InterviewDestination | null;
   /** Set when Q has stopped conducting and leaves the person with the form. */
@@ -143,6 +150,46 @@ export type InterviewTurnOutcome = {
   /** True when the model could not be reached and Q spoke a fallback line. */
   readonly degraded: boolean;
 };
+
+/**
+ * What Q is sent to find out about a subject it has just learned the name
+ * of, and how it should come back with it (QX-004 §1.1, §1.2, §1.4, §1.8).
+ *
+ * Three things this asks for that a plain research prompt does not:
+ *
+ * **Only what an investment conversation needs.** A founder's company and
+ * an investor's organisation have different relevant facts, and neither
+ * includes the person's private life. Person is not Organisation.
+ *
+ * **A source, named once.** So that "where did you get that?" has a true
+ * answer, without every sentence carrying a URL.
+ *
+ * **A question at the end.** Nobody asked for this, and what comes back
+ * is a stranger's web page: it is offered for the person to confirm or
+ * correct, never read out as though Capital Q now knows it.
+ */
+function proactiveLookupQuestion(input: {
+  readonly journeyType: "founder" | "investor";
+  readonly subject: string;
+  readonly website: string | null;
+}): string {
+  const subject = input.subject.trim().slice(0, 200);
+  const where =
+    input.website === null
+      ? `the company "${subject}"`
+      : `the public website ${spokenUrl(input.website).slice(0, 200)}`;
+  const wanted =
+    input.journeyType === "founder"
+      ? "what it does and for whom, its product, how it makes money, where it operates, any funding or milestones it has announced, and any customers or partners it names"
+      : "what it invests in — stage, sectors, geography, cheque size where it is published — its stated thesis, and any fund or programme and portfolio companies it names";
+  return [
+    `Look ${input.website === null ? "up" : "at"} ${where} on the public web.`,
+    `Report ${wanted}.`,
+    'Say it in two or three spoken sentences as unverified public context for this interview, naming the source once ("their site says", "their Crunchbase page says").',
+    "Then ask whether that is the right one, so they can confirm or correct it.",
+    "Nothing you find is a fact about them until they confirm it.",
+  ].join(" ");
+}
 
 /** Pending confirmations per onboarding session; conversational, in memory. */
 type Pending = {
@@ -886,6 +933,7 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
             recorded: [],
             skipped: [],
             questionForQ: null,
+            researching: null,
             navigate: null,
             handoff: null,
             pronounce: null,
@@ -926,6 +974,7 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
           recorded: [],
           skipped: [],
           questionForQ: null,
+          researching: null,
           navigate: null,
           handoff: null,
           pronounce: null,
@@ -1340,10 +1389,11 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
         subjectName !== null && !alreadyResearched.has(subjectName)
           ? {
               subject: subjectName,
-              question:
-                website === null
-                  ? lookupQuestion("COMPANY", subjectName)
-                  : lookupQuestion("WEBSITE", website),
+              question: proactiveLookupQuestion({
+                journeyType: input.journeyType,
+                subject: subjectName,
+                website,
+              }),
             }
           : null;
 
@@ -1353,7 +1403,11 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
           : lookup !== null
             ? lookupQuestion(lookup.kind, lookup.query)
             : (proactive?.question ?? null);
-      if (proactive !== null && questionForQ === proactive.question) {
+      const researching =
+        proactive !== null && questionForQ === proactive.question
+          ? proactive.subject
+          : null;
+      if (researching !== null && proactive !== null) {
         alreadyResearched.add(proactive.subject);
         researchedBySession.set(input.onboardingSessionId, alreadyResearched);
       }
@@ -1394,6 +1448,7 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
         recorded,
         skipped,
         questionForQ,
+        researching,
         navigate,
         handoff,
         pronounce:

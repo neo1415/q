@@ -353,6 +353,60 @@ describe("a spoken interview answer", () => {
     expect(runtime.calls.createRun).toHaveLength(0);
   });
 
+  it("takes a name offered mid-interview as a tangent, not as a profile change to approve (QX-004 §0.6)", async () => {
+    // Hosted, 2026-09-22: asked what kind of investor they were, the
+    // person said "Oh, right. My name is Joe", and Q abandoned its own
+    // unanswered question to ask "I'll set what I call you to Joe. Shall
+    // I?". The name matcher was intercepting the turn before the
+    // interviewer — which is the right thing on a free conversation and
+    // the wrong thing while somebody is being interviewed.
+    const said: string[] = [];
+    const fetchFake: typeof fetch = (input, init) => {
+      const url =
+        typeof input === "string"
+          ? input
+          : input instanceof URL
+            ? input.toString()
+            : input.url;
+      if (url.endsWith("/say")) {
+        said.push(url);
+        const body: SayOnboardingResponse = {
+          view: view(),
+          understood: {
+            kind: "UNCLEAR",
+            stepKey: "F1.stage",
+            proposed: 0,
+          },
+        };
+        return Promise.resolve(Response.json(body));
+      }
+      return Promise.resolve(Response.json(view()));
+    };
+    const runtime = fakeRuntime();
+    const handle = createVoiceTurnHandler({
+      qRuntime: runtime.service,
+      qStream: fakeStream([]),
+      onboarding: { apiBaseUrl: "http://api.test", fetch: fetchFake },
+      logger,
+    });
+    const speaker = fakeSpeaker();
+    await handle(
+      binding({
+        conversationId: undefined,
+        subjects: undefined,
+        onboarding: { sessionId: SESSION_ID, journeyType: "founder" },
+      }),
+      [{ role: "user", content: "Oh, right. My name is Joe." }],
+      new AbortController().signal,
+      speaker,
+    );
+    const spoken = speaker.spoken.join(" ");
+    expect(spoken).not.toContain("Shall I?");
+    expect(spoken).not.toContain("what I call you");
+    // It went to the interview, which is what was conducting.
+    expect(said.length).toBeGreaterThan(0);
+  });
+
   it("pauses and resumes from the session, without touching the runtime", async () => {
     let says = 0;
     const fetchFake: typeof fetch = (input, init) => {

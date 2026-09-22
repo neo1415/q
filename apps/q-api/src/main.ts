@@ -719,8 +719,15 @@ logger.info(
 // QOrchestrator port; its checkpoints go to q_runtime.checkpoint* over the
 // same request-class credential, whose URL is resolved here and handed to
 // the store only.
+const checkpointDatabase = loadDatabaseConfig();
 const checkpoints = createPostgresQCheckpointStore({
-  connectionString: resolveDatabaseUrl(loadDatabaseConfig(), "REQUEST"),
+  connectionString: resolveDatabaseUrl(checkpointDatabase, "REQUEST"),
+  // A second pool against the same server: it takes a share of the same
+  // budget rather than the driver's default, because what runs out is the
+  // database's client limit, not this process's.
+  poolMax: Math.max(1, Math.floor(checkpointDatabase.poolMax / 2)),
+  connectTimeoutSeconds: checkpointDatabase.connectTimeoutSeconds,
+  idleTimeoutSeconds: checkpointDatabase.idleTimeoutSeconds,
 });
 const orchestrationRuntime = createQOrchestrationRuntime({
   ...runtimeDependencies,

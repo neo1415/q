@@ -1077,7 +1077,12 @@ export function createVoiceTurnHandler(
           outcome.questionForQ,
           signal,
           speaker,
-          { lookup: outcome.intent === "LOOKUP" },
+          {
+            // A look-up nobody asked for is held to the same rule as one
+            // the model requested: what it finds is offered, what it does
+            // not find is not announced (QX-004 §1.6).
+            lookup: outcome.intent === "LOOKUP" || outcome.researching !== null,
+          },
         );
         return asked;
       }
@@ -1614,16 +1619,26 @@ export function createVoiceTurnHandler(
       // Anything else moves on; they can ask again.
     }
     /**
-     * Not during the first minute.
+     * Not while somebody else is conducting the conversation.
      *
-     * "My name is Daniel" is an introduction there, not a request to
-     * change a record, and the welcome host is already listening for it.
-     * Caught live: Q answered its own opening question with "I'll set what
-     * I call you to Daniel. Shall I?", which is a machine talking to
-     * itself.
+     * "My name is Daniel" is an introduction during the first minute, not
+     * a request to change a record, and the welcome host is already
+     * listening for it. Caught live: Q answered its own opening question
+     * with "I'll set what I call you to Daniel. Shall I?", which is a
+     * machine talking to itself.
+     *
+     * The same is true inside an interview, and it read worse there
+     * (hosted, 2026-09-22): asked what kind of investor they were, the
+     * person said "Oh, right. My name is Joe", and Q abandoned its own
+     * unanswered question to ask permission to write down a name. A name
+     * offered mid-interview is a tangent — the interviewer takes it and
+     * comes back to what it was asking, which is what a person does
+     * (QX-004 §0.6).
      */
     const edit =
-      binding.thread.welcome === true ? null : spokenProfileEdit(text);
+      binding.thread.welcome === true || binding.thread.onboarding !== undefined
+        ? null
+        : spokenProfileEdit(text);
     if (edit !== null && api !== undefined) {
       pendingProfileEdit.set(binding, edit);
       return (await speakLine(speaker, profileEditQuestion(edit), signal))
