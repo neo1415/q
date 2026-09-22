@@ -402,6 +402,25 @@ logger.info(
   { modelProviders: modelProviderConfigStatus(providerSecrets) },
   "model gateway composed",
 );
+/**
+ * Whether this deployment attested its material is invented, and on what
+ * grounds (ADR 0014).
+ *
+ * The allowance has carried these conditions for the startup log since it
+ * was written and nothing logged them, so the one security-relevant fact
+ * about a deployment's routing was invisible until a request failed. The
+ * conditions are names, never values: which environment, which project,
+ * never a key.
+ */
+logger.info(
+  {
+    dataPosture: demoDataPosture,
+    attestation: syntheticDemo?.attestation ?? null,
+  },
+  syntheticDemo === null
+    ? "no synthetic-demo attestation: every request is a customer's"
+    : "synthetic-demo attestation accepted",
+);
 
 // Controlled public-web research (CQ-Q-RESEARCH-001): the provider exists
 // only when its key is configured, its outbound queries are composed from
