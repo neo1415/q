@@ -26,7 +26,7 @@ import {
   createDefaultPromptRegistry,
   DEFAULT_COMMUNICATION_PROFILE,
   renderPrompt,
-  InterviewConductorResultSchema,
+  InterviewConductorV4ResultSchema,
   type InterviewConductorResult,
   type InterviewConductorV3Variables,
   type InterviewOpenStep,
@@ -189,6 +189,65 @@ function proactiveLookupQuestion(input: {
     "Then ask whether that is the right one, so they can confirm or correct it.",
     "Nothing you find is a fact about them until they confirm it.",
   ].join(" ");
+}
+
+/**
+ * The choices on the step somebody is standing on, in a sentence
+ * (QX-004 core gate §8).
+ *
+ * Written from the step's own options, which is where they already are.
+ * Asked "what sectors and product areas are there?", the interview was
+ * sending the question away to be researched — thirty seconds of silence,
+ * and then the same field asked again. It was holding the answer the
+ * whole time.
+ */
+function optionsSentence(view: OnboardingSessionView): string | null {
+  // Read from the step the session is actually on, not from the journey
+  // catalogue: what this person can choose right now is a property of
+  // their session, and it is the thing they asked about.
+  const presentation = view.currentStep?.presentation;
+  const options =
+    presentation !== undefined &&
+    presentation !== null &&
+    "options" in presentation
+      ? presentation.options
+      : [];
+  if (options.length === 0) return null;
+  const labels = options.map((option) => option.label.trim()).filter(Boolean);
+  if (labels.length === 0) return null;
+  const shown = labels.slice(0, 12);
+  const list =
+    shown.length === 1
+      ? shown[0]
+      : `${shown.slice(0, -1).join(", ")} and ${shown[shown.length - 1]}`;
+  const more =
+    labels.length > shown.length
+      ? `, and ${String(labels.length - shown.length)} more on screen`
+      : "";
+  return `${String(list)}${more}.`;
+}
+
+/**
+ * How far along the interview is, in a sentence.
+ *
+ * Counted from the session's own progress. "Where are we so far?" is an
+ * ordinary thing to ask halfway through a form, and the honest answer is
+ * arithmetic — not something to look up, and not a reason to re-ask the
+ * field they were on.
+ */
+function progressSentence(view: OnboardingSessionView): string {
+  const eligible = view.progress.eligibleSteps;
+  const done = eligible.filter((step) => step.status === "COMPLETED").length;
+  const left = Math.max(0, eligible.length - done);
+  const current = view.currentStep?.prompt?.trim() ?? "";
+  const where =
+    current.length === 0
+      ? ""
+      : ` We are on this one: ${current.replace(/\?+$/, "")}.`;
+  if (done === 0) {
+    return `We have not recorded anything yet — there are ${String(left)} to go.${where}`;
+  }
+  return `${String(done)} of ${String(eligible.length)} answered, ${String(left)} to go.${where}`;
 }
 
 /** Pending confirmations per onboarding session; conversational, in memory. */
@@ -933,7 +992,7 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
               : { dataPosture: dependencies.dataPosture }),
           },
           {
-            schema: InterviewConductorResultSchema,
+            schema: InterviewConductorV4ResultSchema,
             ...(input.signal === undefined ? {} : { signal: input.signal }),
           },
         );
@@ -1433,12 +1492,33 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
             }
           : null;
 
+      /**
+       * A question the interview can answer itself (QX-004 core gate §8).
+       *
+       * The model said which of the two they meant; the sentence is
+       * written here, from the step and the session. It never becomes a
+       * question for Q, so it costs no run and arrives even when every
+       * provider is down — which is exactly when somebody is most likely
+       * to be asking where they have got to.
+       */
+      const fromState =
+        result.answerFromState === "OPTIONS"
+          ? optionsSentence(view)
+          : result.answerFromState === "PROGRESS"
+            ? progressSentence(view)
+            : null;
+      if (fromState !== null) {
+        reply = `${reply.trim()} ${fromState}`.trim();
+      }
+
       const questionForQ =
-        result.intent === "QUESTION_FOR_Q"
-          ? result.questionForQ
-          : lookup !== null
-            ? lookupQuestion(lookup.kind, lookup.query)
-            : (proactive?.question ?? null);
+        fromState !== null
+          ? null
+          : result.intent === "QUESTION_FOR_Q"
+            ? result.questionForQ
+            : lookup !== null
+              ? lookupQuestion(lookup.kind, lookup.query)
+              : (proactive?.question ?? null);
       const researching =
         proactive !== null && questionForQ === proactive.question
           ? proactive.subject

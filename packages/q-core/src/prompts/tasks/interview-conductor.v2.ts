@@ -1,6 +1,6 @@
 import type { PromptDefinition } from "../definition.js";
 import type {
-  InterviewConductorResult,
+  InterviewConductorV3Result,
   InterviewConductorVariables,
 } from "../schemas/interview-conductor.js";
 import { INTERVIEW_CONDUCTOR_V1 } from "./interview-conductor.v1.js";
@@ -31,7 +31,7 @@ if (!INTERVIEW_CONDUCTOR_V1.template.includes(V1_RULE)) {
 
 export const INTERVIEW_CONDUCTOR_V2: PromptDefinition<
   InterviewConductorVariables,
-  InterviewConductorResult
+  InterviewConductorV3Result
 > = {
   ...INTERVIEW_CONDUCTOR_V1,
   version: 2,

@@ -2,7 +2,7 @@ import type { PromptDefinition } from "../definition.js";
 import {
   INTERVIEW_CONDUCTOR_V3_UNTRUSTED,
   InterviewConductorV3VariablesSchema,
-  type InterviewConductorResult,
+  type InterviewConductorV3Result,
   type InterviewConductorV3Variables,
 } from "../schemas/interview-conductor.js";
 import { INTERVIEW_CONDUCTOR_V2 } from "./interview-conductor.v2.js";
@@ -29,11 +29,14 @@ if (!INTERVIEW_CONDUCTOR_V2.template.includes(ANCHOR)) {
 
 export const INTERVIEW_CONDUCTOR_V3: PromptDefinition<
   InterviewConductorV3Variables,
-  InterviewConductorResult
+  InterviewConductorV3Result
 > = {
   ...INTERVIEW_CONDUCTOR_V2,
   version: 3,
-  status: "ACTIVE",
+  // Deprecated by v4, which answers a question about the step's own
+  // options or about progress from the session rather than sending it
+  // away. Retired, never removed.
+  status: "DEPRECATED",
   changeDescription:
     "ADR 0012: what Capital Q remembers about the person (address, pronunciations, corrections, stated facts) is rendered into the interview as untrusted memory.",
   effectiveFrom: "2026-09-17",

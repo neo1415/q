@@ -25,6 +25,7 @@ import { GATEQ_INTERVIEWER_V1 } from "./tasks/gateq-interviewer.v1.js";
 import { INTERVIEW_CONDUCTOR_V1 } from "./tasks/interview-conductor.v1.js";
 import { INTERVIEW_CONDUCTOR_V2 } from "./tasks/interview-conductor.v2.js";
 import { INTERVIEW_CONDUCTOR_V3 } from "./tasks/interview-conductor.v3.js";
+import { INTERVIEW_CONDUCTOR_V4 } from "./tasks/interview-conductor.v4.js";
 import { PRESENCE_READER_V1 } from "./tasks/presence-reader.v1.js";
 import { WELCOME_CONDUCTOR_V1 } from "./tasks/welcome-conductor.v1.js";
 import { INVESTOR_MANDATE_SYNTHESIS_V1 } from "./tasks/investor-mandate-synthesis.v1.js";
@@ -149,6 +150,7 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition<unknown, unknown>[] =
     INTERVIEW_CONDUCTOR_V1,
     INTERVIEW_CONDUCTOR_V2,
     INTERVIEW_CONDUCTOR_V3,
+    INTERVIEW_CONDUCTOR_V4,
     WELCOME_CONDUCTOR_V1,
     CLAIM_EXTRACTION_V1,
     INVESTOR_MANDATE_SYNTHESIS_V1,

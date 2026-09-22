@@ -5,7 +5,7 @@ import {
   INTERVIEW_CONDUCTOR_UNTRUSTED,
   InterviewConductorResultSchema,
   InterviewConductorVariablesSchema,
-  type InterviewConductorResult,
+  type InterviewConductorV3Result,
   type InterviewConductorVariables,
 } from "../schemas/interview-conductor.js";
 
@@ -76,7 +76,7 @@ Respond with a single JSON object matching the InterviewConductorResult schema.`
 
 export const INTERVIEW_CONDUCTOR_V1: PromptDefinition<
   InterviewConductorVariables,
-  InterviewConductorResult
+  InterviewConductorV3Result
 > = {
   id: "INTERVIEW_CONDUCTOR",
   version: 1,

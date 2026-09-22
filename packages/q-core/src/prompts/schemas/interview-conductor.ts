@@ -24,6 +24,7 @@ import {
 
 export const INTERVIEW_CONDUCTOR_SCHEMA_NAME = "InterviewConductorResult";
 export const INTERVIEW_CONDUCTOR_SCHEMA_VERSION = 3;
+export const INTERVIEW_CONDUCTOR_V4_SCHEMA_VERSION = 4;
 
 const StepKey = z.string().min(1).max(64);
 
@@ -255,6 +256,37 @@ export const InterviewConductorResultSchema = z
       .nullable(),
   })
   .strict();
-export type InterviewConductorResult = z.infer<
+export type InterviewConductorV3Result = z.infer<
   typeof InterviewConductorResultSchema
 >;
+
+/**
+ * v3's result plus where the answer to a question already is
+ * (QX-004 core gate §8).
+ *
+ * A separate schema rather than a field added to v1-v3's, because a
+ * published prompt version is immutable: a run recorded against
+ * `interview-conductor/v3` must stay explainable by exactly the schema it
+ * ran under.
+ *
+ * "What sectors are there?" and "where are we so far?" are ordinary
+ * things a person asks halfway through a form, and both were being sent
+ * away to be researched — thirty seconds of silence, and then the field
+ * asked again as though nothing had been said. Neither needs looking up.
+ * The options are on the step and the progress is on the session, so the
+ * model says WHICH of the two they meant and the runtime writes the
+ * answer from the authoritative state.
+ *
+ * That is the ADR 0011 split exactly: reading what somebody meant is the
+ * model's, and saying what is true is not.
+ */
+export const InterviewConductorV4ResultSchema =
+  InterviewConductorResultSchema.extend({
+    answerFromState: z.enum(["OPTIONS", "PROGRESS"]).nullable().default(null),
+  }).strict();
+export type InterviewConductorV4Result = z.infer<
+  typeof InterviewConductorV4ResultSchema
+>;
+
+/** What the runtime works with: the newest shape. */
+export type InterviewConductorResult = InterviewConductorV4Result;
