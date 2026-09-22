@@ -248,6 +248,47 @@ describe("QX-004 §0.4 · Q with no model route", () => {
   });
 });
 
+describe("QX-004 core gate §5 · Q may not narrate a save it never made", () => {
+  it("replaces an acknowledgement when the model took nothing in at all", async () => {
+    // Live, 2026-09-22: "Zino Aviation, got it." — and the session
+    // recorded no organisation name, because the model's structured
+    // answer carried none. Nothing was refused, so the guard for a
+    // REFUSED commit had nothing to catch; the acknowledgement was
+    // simply untrue, and the step came round again later as if never
+    // asked.
+    const fetchFake = api({ acceptWrites: true });
+    const interviewer = createInterviewer({
+      gateway: gatewayReturning({
+        ...answered,
+        reply: "Zino Aviation, got it.",
+        // An ANSWER that carries no answer: nothing to commit, nothing to
+        // read back, nothing set aside.
+        answers: [],
+      }),
+      logger,
+    });
+
+    const result = await interviewer.turn(turn(fetchFake, "Zino Aviation."));
+    expect(result.recorded).toEqual([]);
+    expect(result.reply).not.toContain("got it");
+    expect(result.reply.toLowerCase()).toContain("didn't catch that");
+    // And it asks the step again rather than leaving the person to find
+    // out later that it never went in.
+    expect(result.asking?.stepKey).toBe("F1.stage");
+  });
+
+  it("leaves a real acknowledgement alone", async () => {
+    const fetchFake = api({ acceptWrites: true });
+    const interviewer = createInterviewer({
+      gateway: gatewayReturning(answered),
+      logger,
+    });
+    const result = await interviewer.turn(turn(fetchFake, "Seed."));
+    expect(result.recorded).toContain("F1.stage");
+    expect(result.reply).toContain("Seed");
+  });
+});
+
 describe("QX-004 §0.5 · Q may not narrate a save that failed", () => {
   it("replaces the model's confirmation when the runtime refused the answer", async () => {
     const fetchFake = api({ acceptWrites: false });

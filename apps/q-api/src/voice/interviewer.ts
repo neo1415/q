@@ -240,10 +240,13 @@ function progressSentence(view: OnboardingSessionView): string {
   const done = eligible.filter((step) => step.status === "COMPLETED").length;
   const left = Math.max(0, eligible.length - done);
   const current = view.currentStep?.prompt?.trim() ?? "";
-  const where =
-    current.length === 0
-      ? ""
-      : ` We are on this one: ${current.replace(/\?+$/, "")}.`;
+  // Only when the step's prompt is actually a question. Some are bare
+  // labels — "Your firm" — and reading one out is the exact thing that
+  // made the live transcript unusable. A person who asks where they are
+  // is better served by the count alone than by a label read at them.
+  const where = /\?$/.test(current)
+    ? ` We are on this one: ${current.replace(/\?+$/, "")}.`
+    : "";
   if (done === 0) {
     return `We have not recorded anything yet — there are ${String(left)} to go.${where}`;
   }
@@ -1366,6 +1369,49 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
       if (unplaced !== undefined) {
         reply = clarificationFor(unplaced);
         result = { ...result, askNext: unplaced.stepKey };
+      } else if (
+        (result.intent === "ANSWER" || result.intent === "CORRECTION") &&
+        recorded.length === 0 &&
+        nextPending.length === 0 &&
+        skipped.length === 0 &&
+        rejected.length === 0
+      ) {
+        /**
+         * The model answered as though it had taken something in, and the
+         * runtime has nothing to show for it (QX-004 core gate §5).
+         *
+         * Live, 2026-09-22: "Zino Aviation, got it." — and the session
+         * recorded no organisation name, because the model's structured
+         * answer carried none. Nothing was refused, so the guard above
+         * had nothing to catch; the acknowledgement was simply untrue,
+         * and the step came round again later as if never asked.
+         *
+         * Decided from the model's own closed fields and the runtime's
+         * own result, never from reading its prose: an ANSWER that
+         * produced no commit, no confirmation to read back and no skip
+         * did not happen. Q says so, and asks the step again in the
+         * step's own terms rather than leaving the person to discover it.
+         */
+        const current =
+          view.currentStep === undefined || view.currentStep === null
+            ? undefined
+            : steps.get(view.currentStep.stepKey);
+        logger.warn(
+          {
+            journey: input.journeyType,
+            stepKey: view.currentStep?.stepKey,
+            intent: result.intent,
+          },
+          "the model acknowledged an answer the runtime did not record",
+        );
+        reply =
+          current === undefined
+            ? "Sorry — I didn't catch that well enough to write it down. Could you say it once more?"
+            : `Sorry — I didn't catch that well enough to write it down. ${clarificationFor(current)}`;
+        result =
+          current === undefined
+            ? { ...result, askNext: null }
+            : { ...result, askNext: current.stepKey };
       }
       if (deferredUpload) {
         reply = `${reply.trim()} ${UPLOAD_LINE}`.trim();
