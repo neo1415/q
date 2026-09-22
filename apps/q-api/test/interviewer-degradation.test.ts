@@ -207,8 +207,17 @@ describe("QX-004 §0.4 · Q with no model route", () => {
     // And nothing is asked, so the surface does not pretend to advance.
     expect(first.asking).toBeNull();
     expect(first.recorded).toEqual([]);
-    // It is honest about what happened and reassuring about what is kept.
-    expect(first.reply.toLowerCase()).toContain("trouble reaching");
+    // It is honest about what happened, and — QX-004 §5 — it does not
+    // reassure them about a thing that was not saved. The first version
+    // of this line said "nothing you've told me is lost" while the
+    // browser was showing "Capital Q couldn't save that".
+    expect(first.reply.toLowerCase()).toContain("can't reach");
+    expect(first.reply.toLowerCase()).toContain("hasn't been saved");
+    expect(first.reply.toLowerCase()).not.toContain("nothing you");
+    expect(first.reply.toLowerCase()).not.toContain("is saved;");
+    // What it may stand behind is what this turn actually read back: the
+    // one answer already on the session.
+    expect(first.reply).toContain("The one answer you have given me is on");
 
     const second = await interviewer.turn(turn(fetchFake, "Zino Aviation"));
     expect(second.degraded).toBe(true);

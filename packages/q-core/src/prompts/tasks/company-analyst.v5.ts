@@ -44,7 +44,10 @@ export const COMPANY_ANALYST_V5: PromptDefinition<
 > = {
   ...COMPANY_ANALYST_V4,
   version: 5,
-  status: "ACTIVE",
+  // Deprecated by v6, which reads a request for slides as well as for
+  // prose. Retired, never removed: a run recorded against v5 stays
+  // explainable by the exact template and schema it ran under.
+  status: "DEPRECATED",
   changeDescription:
     "ADR 0013: the structured result carries artifactRequest, a request to prepare or revise a document about the company, which the answer seam validates and the artifact application service persists. The model reads the request; it does not write.",
   effectiveFrom: "2026-09-22",

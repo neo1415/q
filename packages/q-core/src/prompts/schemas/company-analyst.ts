@@ -279,6 +279,65 @@ export type CompanyAnalystV5Result = z.infer<
 >;
 export const COMPANY_ANALYST_V5_SCHEMA_VERSION = 5;
 
+/**
+ * v5's request, widened to the kinds QX-004 composes.
+ *
+ * A separate schema rather than an edit to v5's, because a published
+ * prompt version is immutable: a run recorded against `company-analyst/v5`
+ * must still be explainable by exactly the schema it ran under, and a
+ * silently widened one would make that history a guess.
+ *
+ * The type stays a closed set here even though an artifact type is
+ * reference data elsewhere. The two are different questions: storing and
+ * returning a type this build has never heard of must work, and letting a
+ * model name a type this build has no composer for must not — it would be
+ * a request nothing could answer.
+ */
+export const ARTIFACT_REQUEST_TYPES = [
+  "INVESTMENT_BRIEF",
+  "PITCH_DECK",
+] as const;
+
+/**
+ * How a founder said their deck should look, when they said.
+ *
+ * Named choices, because the alternative — a model emitting colours and
+ * sizes per deck — is how every generated deck ends up looking like every
+ * other one. Null is the common case and a perfectly good deck.
+ */
+export const ARTIFACT_VISUAL_DIRECTIONS = [
+  "MINIMAL_INSTITUTIONAL",
+  "DARK_TECHNICAL",
+  "WARM_GROWTH",
+] as const;
+
+export const ArtifactRequestV2Schema = z
+  .object({
+    kind: z.enum(ARTIFACT_REQUEST_KINDS),
+    artifactType: z.enum(ARTIFACT_REQUEST_TYPES),
+    /** What they want, in their words. Empty when they simply asked for one. */
+    instruction: z.string().trim().max(2_000).default(""),
+    /** Only when they said how it should look; the composer decides otherwise. */
+    visualDirection: z
+      .enum(ARTIFACT_VISUAL_DIRECTIONS)
+      .nullable()
+      .default(null),
+    quote: z.string().trim().min(3).max(400),
+  })
+  .strict();
+export type ArtifactRequestV2 = z.infer<typeof ArtifactRequestV2Schema>;
+
+/** v5's result, with the widened request (QX-004 §2, §3). */
+export const CompanyAnalystV6ResultSchema = CompanyAnalystV4ResultSchema.extend(
+  {
+    artifactRequest: ArtifactRequestV2Schema.nullable().default(null),
+  },
+).strict();
+export type CompanyAnalystV6Result = z.infer<
+  typeof CompanyAnalystV6ResultSchema
+>;
+export const COMPANY_ANALYST_V6_SCHEMA_VERSION = 6;
+
 export const NOTHING_REMEMBERED =
   "Nothing is remembered about this person yet.";
 

@@ -10,6 +10,7 @@ import type { ArtifactPreparationPort } from "./artifact-port.js";
 import type { BriefReviser } from "./brief-reviser.js";
 import type { CompanyIntelligenceResult } from "./contracts.js";
 import { composeInvestmentBrief } from "./investment-brief.js";
+import { composePitchDeck } from "./pitch-deck.js";
 
 /**
  * Preparing the document somebody asked for (QX-003D/F; ADR 0013).
@@ -120,7 +121,25 @@ export async function prepareOrReviseArtifact(input: {
   const instruction =
     ask.instruction.length > 0 ? ask.instruction : input.saidVerbatim;
   const companyName = companyNameFrom(result, input.companyName);
-  const base = composeInvestmentBrief({ companyName, result });
+  /**
+   * Which composer, chosen by what they asked for.
+   *
+   * Both read the same findings the specialist produced under the run's
+   * authorised plan; what differs is the shape. A deck that cannot be
+   * composed falls back to nothing rather than to a brief: somebody who
+   * asked for slides and received an essay has not been helped, and has
+   * not been told why.
+   */
+  const base =
+    ask.artifactType === "PITCH_DECK"
+      ? composePitchDeck({
+          companyName,
+          result,
+          ...(ask.visualDirection === null
+            ? {}
+            : { direction: ask.visualDirection }),
+        })
+      : composeInvestmentBrief({ companyName, result });
   if (base === null) {
     // Nothing on record but gaps. A document saying only "unknown" is
     // worse than being told the record is too thin to write one from.

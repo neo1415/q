@@ -164,8 +164,11 @@ export type CompanyIntelligenceResult = {
    */
   readonly artifactRequest: {
     readonly kind: "PREPARE" | "REVISE";
-    readonly artifactType: "INVESTMENT_BRIEF";
+    readonly artifactType: "INVESTMENT_BRIEF" | "PITCH_DECK";
     readonly instruction: string;
+    /** How they said it should look, when they said. Null is the common case. */
+    readonly visualDirection:
+      "MINIMAL_INSTITUTIONAL" | "DARK_TECHNICAL" | "WARM_GROWTH" | null;
     readonly quote: string;
   } | null;
   /** Safe operational record for traces, evals and the developer smoke. */

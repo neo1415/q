@@ -27,6 +27,13 @@ const PLAIN_ERRORS = {
   generic: "I lost the line there. Give me a second and I'll pick it back up.",
 } as const;
 
+/**
+ * How long an injected message may wait for its echo before it is
+ * forgotten. Long enough for a slow provider, short enough that it cannot
+ * silence something the person types later in the conversation.
+ */
+const INJECTED_TTL_MS = 30_000;
+
 const INPUT_SAMPLE_RATE = 16_000;
 const OUTPUT_SAMPLE_RATE = 24_000;
 
@@ -71,6 +78,22 @@ export function useDeepgramVoiceSession(
   const speakingRef = useRef(false);
   const lastAudioAtRef = useRef(0);
   const lastUserTextAtRef = useRef(0);
+  /**
+   * Text this browser put into the session itself, waiting for the
+   * provider to say it back.
+   *
+   * A typed message is shown the moment it is sent, because a person who
+   * presses enter should see their words immediately rather than after a
+   * round trip. The provider then reports the same message as part of the
+   * conversation, and both landed in the transcript: every typed turn
+   * appeared twice (live, 2026-09-22).
+   *
+   * Matched on the words rather than on a window of time, because a
+   * window cannot tell an echo from somebody genuinely saying "are you
+   * there?" twice — and dropping a real second turn is a worse bug than
+   * the one it fixes.
+   */
+  const injectedRef = useRef<{ text: string; at: number }[]>([]);
 
   const teardown = useCallback(() => {
     const live = liveRef.current;
@@ -119,6 +142,7 @@ export function useDeepgramVoiceSession(
       }
       teardown();
       setTranscript([]);
+      injectedRef.current = [];
       setState("CONNECTING");
       speakingRef.current = false;
 
@@ -188,6 +212,17 @@ export function useDeepgramVoiceSession(
         if (role === "user") {
           lastUserTextAtRef.current = Date.now();
           if (message.content.trim() === CONTINUE_SIGNAL) return;
+          // Our own injected message coming back. It is already on screen;
+          // adding it again is the duplicate turn.
+          const echoed = message.content.trim();
+          const waiting = injectedRef.current.findIndex(
+            (item) => item.text === echoed,
+          );
+          if (waiting !== -1) {
+            injectedRef.current.splice(waiting, 1);
+            setState("THINKING");
+            return;
+          }
         }
         addLine(role, message.content);
         if (role === "user") setState("THINKING");
@@ -378,6 +413,16 @@ export function useDeepgramVoiceSession(
       const live = liveRef.current;
       if (trimmed.length === 0 || live === null) return;
       live.session.injectUserMessage(trimmed);
+      // Bounded, and stale entries dropped: an injection the provider
+      // never echoes must not sit here waiting to swallow a real turn
+      // somebody types later.
+      const now = Date.now();
+      injectedRef.current = [
+        ...injectedRef.current.filter(
+          (item) => now - item.at < INJECTED_TTL_MS,
+        ),
+        { text: trimmed, at: now },
+      ].slice(-8);
       addLine("user", trimmed);
       setState("THINKING");
     },

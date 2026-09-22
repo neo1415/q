@@ -22,6 +22,30 @@ const AVAILABILITY_FAILURES: ReadonlySet<ModelFailureClass> = new Set([
   "TRANSIENT",
 ]);
 
+/**
+ * How long an attempt must have run before its timeout says anything
+ * about the provider.
+ *
+ * A timeout is two different events wearing one name. One is a provider
+ * that has stopped answering. The other is a caller whose own budget was
+ * shorter than this model's tail, which is news about the caller.
+ *
+ * Hosted, 2026-09-22: a spoken interview turn was given a twelve-second
+ * model budget so that the turn could finish inside the voice route's own
+ * twenty-second deadline. Gemini answers that turn in about a second
+ * almost always and in sixteen occasionally. Three of the slow ones inside
+ * a minute read as three availability failures, the breaker opened, and a
+ * provider that was working perfectly well was taken out of rotation for
+ * every task class — leaving the interview with no eligible route at all
+ * while the only other provider was rate-limited. The conversation ended
+ * there.
+ *
+ * So a timeout counts only when the caller waited at least this long. It
+ * is deliberately below any budget a person is waiting on and above the
+ * budgets that exist because a person is.
+ */
+const TIMEOUT_MEANS_UNHEALTHY_AFTER_MS = 20_000;
+
 export type ProviderHealthOptions = {
   readonly failureThreshold?: number | undefined;
   readonly windowMs?: number | undefined;
@@ -47,8 +71,16 @@ export function createProcessLocalProviderHealth(
 
   return {
     state,
-    recordFailure: (code, failureClass, at) => {
+    recordFailure: (code, failureClass, at, elapsedMs) => {
       if (!AVAILABILITY_FAILURES.has(failureClass)) {
+        return;
+      }
+      // Our own short budget expiring is not the provider's news.
+      if (
+        failureClass === "TIMEOUT" &&
+        elapsedMs !== undefined &&
+        elapsedMs < TIMEOUT_MEANS_UNHEALTHY_AFTER_MS
+      ) {
         return;
       }
       const now = at.getTime();

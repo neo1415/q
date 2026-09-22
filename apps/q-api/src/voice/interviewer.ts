@@ -978,15 +978,33 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
          * So: say it once, plainly, and stop pretending the interview is
          * advancing. Nothing is recorded, nothing is asked, and the step
          * they were on is still the step they are on when it recovers.
+         *
+         * And it does not reassure them about their answer, because their
+         * answer was not saved — that is what a failed turn means. The
+         * first version of this line said "nothing you've told me is
+         * lost", which is a claim about persistence that the runtime had
+         * not made, and the browser said "Capital Q couldn't save that"
+         * two lines later (live, 2026-09-22). Q may say a thing was kept
+         * only where the runtime says so. Here it says the opposite, so
+         * the words do too: what they just said did not go in, and what
+         * they answered earlier is still on the record, which this turn
+         * has read and can stand behind.
          */
         const failures =
           (degradedBySession.get(input.onboardingSessionId) ?? 0) + 1;
         degradedBySession.set(input.onboardingSessionId, failures);
+        const kept = view.responses.length;
+        const earlier =
+          kept === 0
+            ? ""
+            : kept === 1
+              ? " The one answer you have given me is on the record."
+              : ` The ${String(kept)} answers you have given me are on the record.`;
         return {
           reply:
             failures === 1
-              ? "I'm having trouble reaching my reasoning service right now, so I haven't taken that in properly. Nothing you've told me is lost — say that again in a moment and I'll pick it up."
-              : "Still can't reach it, I'm afraid. Everything you've already told me is saved; give it a minute and try again.",
+              ? `I can't reach my reasoning service just now, so I haven't taken that in — it hasn't been saved.${earlier} Say it again in a moment and I'll pick it up.`
+              : `Still can't reach it, I'm afraid, so that one hasn't gone in either.${earlier} Give it a minute and try again.`,
           intent: "UNCLEAR",
           asking: null,
           recorded: [],

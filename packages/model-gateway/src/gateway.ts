@@ -470,7 +470,12 @@ export function createModelGateway(
         if (failureClass === undefined) {
           health.recordSuccess(provider.code, clock.now());
         } else {
-          health.recordFailure(provider.code, failureClass, clock.now());
+          health.recordFailure(
+            provider.code,
+            failureClass,
+            clock.now(),
+            latencyMs,
+          );
         }
         span.setAttribute("q.model.result", result);
         span.setAttribute("q.model.latency_ms", latencyMs);

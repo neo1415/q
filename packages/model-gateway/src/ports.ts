@@ -178,6 +178,12 @@ export type ProviderHealthPort = {
     code: ModelProviderCode,
     failureClass: ModelFailureClass,
     at: Date,
+    /**
+     * How long the attempt actually ran. A timeout is only evidence about
+     * a provider when the caller waited long enough for it to be — see
+     * `createProcessLocalProviderHealth`.
+     */
+    elapsedMs?: number | undefined,
   ) => void;
   readonly recordSuccess: (code: ModelProviderCode, at: Date) => void;
 };

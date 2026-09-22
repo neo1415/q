@@ -17,7 +17,7 @@ import {
   createDefaultPromptRegistry,
   DEFAULT_COMMUNICATION_PROFILE,
   renderPrompt,
-  type CompanyAnalystV5Result,
+  type CompanyAnalystV6Result,
   type CompanyAnalystV5Variables,
   NOTHING_REMEMBERED,
   type CompanyIntelligenceDimension,
@@ -25,7 +25,7 @@ import {
   citePublicSources,
 } from "@capital-q/q-core";
 import {
-  CompanyAnalystV5ResultSchema,
+  CompanyAnalystV6ResultSchema,
   COMPANY_INTELLIGENCE_DIMENSIONS,
   DisplayNameRequestSchema,
   ProfileUpdateSchema,
@@ -256,7 +256,7 @@ async function recallMemory(
 
 async function recordUserStatements(
   recorder: QUserStatementRecorder | undefined,
-  statements: CompanyAnalystV5Result["userStatements"],
+  statements: CompanyAnalystV6Result["userStatements"],
   request: CompanyIntelligenceRequest,
   context: QSpecialistExecutionContext,
   logger: Logger | undefined,
@@ -687,10 +687,10 @@ export function createCompanyIntelligenceSpecialist(
         promptCharacters: rendered.characters,
       };
 
-      let analyst: CompanyAnalystV5Result | undefined;
+      let analyst: CompanyAnalystV6Result | undefined;
       let blocked: QSpecialistBlockedReason | null = null;
       try {
-        const result = await gateway.execute<CompanyAnalystV5Result>(
+        const result = await gateway.execute<CompanyAnalystV6Result>(
           {
             taskClass: "EVIDENCE_SYNTHESIS",
             budget: budgetForTaskClass("EVIDENCE_SYNTHESIS"),
@@ -714,7 +714,7 @@ export function createCompanyIntelligenceSpecialist(
               : { dataPosture: dependencies.dataPosture }),
           },
           {
-            schema: CompanyAnalystV5ResultSchema,
+            schema: CompanyAnalystV6ResultSchema,
             ...(context.signal === undefined ? {} : { signal: context.signal }),
           },
         );
