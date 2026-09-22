@@ -738,6 +738,16 @@ export function createVoiceTurnHandler(
        * absence is logged for the operator; the person hears one line.
        */
       readonly lookup?: boolean | undefined;
+      /**
+       * Nobody asked for this one; the runtime started it because it now
+       * knows what the conversation is about (QX-004 §1.1, §1.6). A
+       * requested look-up that finds nothing says so, because somebody is
+       * waiting for an answer. An unrequested one says nothing at all: a
+       * person who has just told Q their company's name should not hear
+       * that little comes up about it, still less that Q hit a snag on a
+       * search they never asked for (live, 2026-09-22).
+       */
+      readonly proactive?: boolean | undefined;
     } = {},
   ): Promise<VoiceTurnOutcome> => {
     const { actor, thread } = binding;
@@ -786,6 +796,14 @@ export function createVoiceTurnHandler(
     }
 
     let terminal = false;
+    /**
+     * The run ended in failure. Only interesting for a look-up nobody
+     * asked for: a person who has just said their company's name should
+     * not hear Q apologise for a search they never requested (live,
+     * 2026-09-22 — "Checking the public web on that. I've hit a snag on
+     * my side."). The operator has the log; the person hears nothing.
+     */
+    let runFailed = false;
     let streamedDeltas = false;
     let spokenCharacters = 0;
     let saidResearch = false;
@@ -857,6 +875,7 @@ export function createVoiceTurnHandler(
             return;
           case "q.run.failed":
             terminal = true;
+            runFailed = true;
             if (streamedDeltas) {
               // The answer has been heard. A run that fails after that
               // has failed at something the person never saw, and telling
@@ -901,19 +920,28 @@ export function createVoiceTurnHandler(
           parts.push(part);
         }
         const found = parts.join(" ").trim();
-        const line =
-          found.length === 0 || NOTHING_ONLINE.test(found)
-            ? NOTHING_ONLINE_LINE
-            : found;
-        if (line === NOTHING_ONLINE_LINE) {
+        const nothing =
+          runFailed || found.length === 0 || NOTHING_ONLINE.test(found);
+        const line = nothing
+          ? options.proactive === true
+            ? ""
+            : NOTHING_ONLINE_LINE
+          : found;
+        if (nothing) {
           logger.info(
-            { qRunId: runId, qVoiceSessionId: binding.voiceSessionId },
-            "a setup look-up found nothing to offer; the person was not told",
+            {
+              qRunId: runId,
+              qVoiceSessionId: binding.voiceSessionId,
+              runFailed,
+            },
+            "a setup look-up had nothing to offer; the person was not told",
           );
         }
-        spokenSoFar = `${line} `;
-        rememberSpoken(binding, line);
-        await speaker.speak(line);
+        if (line.length > 0) {
+          spokenSoFar = `${line} `;
+          rememberSpoken(binding, line);
+          await speaker.speak(line);
+        }
       } else {
         await speaker.speak(
           withFiller(
@@ -1082,6 +1110,7 @@ export function createVoiceTurnHandler(
             // the model requested: what it finds is offered, what it does
             // not find is not announced (QX-004 §1.6).
             lookup: outcome.intent === "LOOKUP" || outcome.researching !== null,
+            proactive: outcome.researching !== null,
           },
         );
         return asked;
