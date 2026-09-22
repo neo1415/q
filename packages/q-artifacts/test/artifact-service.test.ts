@@ -1,10 +1,13 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import type {
   TransactionContext,
   TransactionManager,
 } from "@capital-q/database";
-import type { QArtifactContent } from "@capital-q/contracts";
+import type {
+  PermittedContextPlan,
+  QArtifactContent,
+} from "@capital-q/contracts";
 import {
   MembershipIdSchema,
   OrganisationIdSchema,
@@ -14,15 +17,15 @@ import {
 } from "@capital-q/security";
 
 import {
-  ArtifactCompositionFailedError,
+  ArtifactAuthorityError,
   ArtifactNotFoundError,
   ArtifactNotRevisableError,
   canRevise,
   createArtifactService,
   nextVersion,
   parseContent,
-  type ArtifactComposer,
   type ArtifactRepository,
+  type ComposedArtifact,
   type StoredArtifact,
   type StoredArtifactVersion,
 } from "../src/index.js";
@@ -188,29 +191,66 @@ const transactions: TransactionManager = {
   run: (work) => work({ sql: undefined as never } as TransactionContext),
 };
 
-function composer(overrides: Partial<ArtifactComposer> = {}): ArtifactComposer {
+const COMPANY = "f0000000-0000-4000-8000-000000000001";
+const RUN = "f0000000-0000-4000-8000-000000000009";
+const FUTURE = "2099-01-01T00:00:00.000Z";
+
+/**
+ * The Context Firewall's own decision, as the answer seam would pass it.
+ *
+ * Every test that changes a field here is asking the same question: does
+ * the service take the caller's word for authority, or re-derive it? It
+ * must re-derive it, because the caller is one refactor away from being
+ * wrong and the plan is the only thing the firewall actually decided.
+ */
+function plan(overrides: Record<string, unknown> = {}): PermittedContextPlan {
   return {
-    type: "INVESTMENT_BRIEF",
-    compose: ({ previous, instruction }) =>
-      Promise.resolve({
-        title: previous === undefined ? "Investment brief" : "Investment brief",
-        summary:
-          previous === undefined
-            ? "What the record supports."
-            : `Revised: ${instruction ?? ""}`,
-        content: content(
-          previous === undefined ? "First composition." : "Second composition.",
-        ),
-      }),
+    contractVersion: 1,
+    policyVersion: 1,
+    planId: "f0000000-0000-4000-8000-00000000000a",
+    fingerprint: "0".repeat(64),
+    runId: RUN,
+    tenantId: ACTOR.tenantId,
+    actor: { userId: ACTOR.userId, organisationId: ACTOR.organisationId },
+    purpose: {
+      capability: "COMPANY_INTELLIGENCE",
+      taskClass: "EVIDENCE_SYNTHESIS",
+    },
+    subjects: [{ kind: "COMPANY", companyId: COMPANY }],
+    scopes: [],
+    denied: [],
+    maxSensitivity: "INTERNAL",
+    allowedLayers: [],
+    combinationConstraints: [],
+    evaluatedAt: "2026-09-22T00:00:00.000Z",
+    revalidateAfter: FUTURE,
+    revalidateOnResume: true,
     ...overrides,
+  } as unknown as PermittedContextPlan;
+}
+
+function composed(body: string): ComposedArtifact {
+  return {
+    title: "Investment brief",
+    summary: "What the record supports.",
+    content: content(body),
   };
 }
 
-function service(
-  repository: ArtifactRepository,
-  composers: readonly ArtifactComposer[] = [composer()],
-) {
-  return createArtifactService({ repository, transactions, composers });
+function service(repository: ArtifactRepository) {
+  return createArtifactService({ repository, transactions });
+}
+
+function prepareInput(overrides: Record<string, unknown> = {}) {
+  return {
+    actorContext: ACTOR,
+    permittedContextPlan: plan(),
+    qRunId: RUN,
+    subject: { kind: "COMPANY" as const, companyId: COMPANY },
+    artifactType: "INVESTMENT_BRIEF",
+    content: composed("First composition."),
+    ...overrides,
+  } as Parameters<ReturnType<typeof service>["prepareArtifact"]>[0];
 }
 
 describe("QX-003C · the version rules", () => {
@@ -256,16 +296,10 @@ describe("QX-003C · the version rules", () => {
   });
 });
 
-describe("QX-003C · preparing one", () => {
-  it("composes a first version and leaves the artifact ready to read", async () => {
+describe("QX-003D · preparing one", () => {
+  it("writes a first version and leaves the artifact ready to read", async () => {
     const { repository } = inMemoryRepository();
-    const detail = await service(repository).prepare({
-      actor: ACTOR,
-      type: "INVESTMENT_BRIEF",
-      companyId: "f0000000-0000-4000-8000-000000000001",
-      investorOrganisationId: null,
-      instruction: null,
-    });
+    const detail = await service(repository).prepareArtifact(prepareInput());
 
     expect(detail.artifact.status).toBe("READY");
     expect(detail.artifact.currentVersion).toBe(1);
@@ -275,43 +309,98 @@ describe("QX-003C · preparing one", () => {
     );
     expect(detail.artifact.subject).toEqual({
       kind: "COMPANY",
-      companyId: "f0000000-0000-4000-8000-000000000001",
+      companyId: COMPANY,
     });
+    // Attribution is the run's, so a sentence can be traced to the work
+    // that produced it.
+    expect(detail.current?.composedByRunId).toBe(RUN);
     expect(detail.history).toHaveLength(1);
   });
 
-  it("leaves a visible failed artifact when Q could not compose it", async () => {
+  it("owns the artifact to the actor's organisation, whatever it was handed", async () => {
     const { repository, artifacts } = inMemoryRepository();
-    const failing = composer({
-      compose: () => Promise.reject(new Error("the model refused")),
-    });
-    await expect(
-      service(repository, [failing]).prepare({
-        actor: ACTOR,
-        type: "INVESTMENT_BRIEF",
-        companyId: null,
-        investorOrganisationId: null,
-        instruction: null,
-      }),
-    ).rejects.toBeInstanceOf(ArtifactCompositionFailedError);
-
-    // Not a vanished artifact: one that says what happened.
+    await service(repository).prepareArtifact(prepareInput());
     const [stored] = [...artifacts.values()];
-    expect(stored?.status).toBe("FAILED");
-    expect(stored?.currentVersion).toBe(0);
+    expect(stored?.organisationId).toBe(ACTOR.organisationId);
+    expect(stored?.tenantId).toBe(ACTOR.tenantId);
+    expect(stored?.visibilityScope).toBe("organisation_private");
   });
+});
 
-  it("refuses a kind of artifact this build does not compose", async () => {
+describe("QX-003D · authority is re-derived, never accepted", () => {
+  it("refuses a plan belonging to another run", async () => {
     const { repository } = inMemoryRepository();
     await expect(
-      service(repository).prepare({
-        actor: ACTOR,
-        type: "PITCH_DECK",
-        companyId: null,
-        investorOrganisationId: null,
-        instruction: null,
-      }),
-    ).rejects.toBeInstanceOf(ArtifactNotFoundError);
+      service(repository).prepareArtifact(
+        prepareInput({ qRunId: "f0000000-0000-4000-8000-00000000000b" }),
+      ),
+    ).rejects.toBeInstanceOf(ArtifactAuthorityError);
+  });
+
+  it("refuses a plan belonging to another tenant or another person", async () => {
+    const { repository } = inMemoryRepository();
+    const subject = service(repository);
+    await expect(
+      subject.prepareArtifact(
+        prepareInput({
+          permittedContextPlan: plan({
+            tenantId: "c0000000-0000-4000-8000-000000000002",
+          }),
+        }),
+      ),
+    ).rejects.toBeInstanceOf(ArtifactAuthorityError);
+    await expect(
+      subject.prepareArtifact(
+        prepareInput({
+          permittedContextPlan: plan({
+            actor: {
+              userId: "b0000000-0000-4000-8000-000000000002",
+              organisationId: ACTOR.organisationId,
+            },
+          }),
+        }),
+      ),
+    ).rejects.toBeInstanceOf(ArtifactAuthorityError);
+  });
+
+  it("refuses a subject the Context Firewall never authorised", async () => {
+    const { repository, artifacts } = inMemoryRepository();
+    // The plan is for one company; the caller asks about another.
+    await expect(
+      service(repository).prepareArtifact(
+        prepareInput({
+          subject: {
+            kind: "COMPANY",
+            companyId: "f0000000-0000-4000-8000-0000000000ff",
+          },
+        }),
+      ),
+    ).rejects.toBeInstanceOf(ArtifactAuthorityError);
+    // And nothing was created on the way to refusing.
+    expect(artifacts.size).toBe(0);
+  });
+
+  it("refuses a plan that has gone stale", async () => {
+    const { repository } = inMemoryRepository();
+    await expect(
+      service(repository).prepareArtifact(
+        prepareInput({
+          permittedContextPlan: plan({
+            revalidateAfter: "2020-01-01T00:00:00.000Z",
+          }),
+        }),
+      ),
+    ).rejects.toBeInstanceOf(ArtifactAuthorityError);
+  });
+
+  it("refuses somebody with no organisation to own it", async () => {
+    const { repository } = inMemoryRepository();
+    const personal = { ...ACTOR, organisationId: undefined };
+    await expect(
+      service(repository).prepareArtifact(
+        prepareInput({ actorContext: personal }),
+      ),
+    ).rejects.toBeInstanceOf(ArtifactAuthorityError);
   });
 });
 
@@ -319,19 +408,16 @@ describe("QX-003F · Edit with Q", () => {
   it("appends a second version and leaves the first exactly as it was", async () => {
     const { repository } = inMemoryRepository();
     const subject = service(repository);
-    const first = await subject.prepare({
-      actor: ACTOR,
-      type: "INVESTMENT_BRIEF",
-      companyId: null,
-      investorOrganisationId: null,
-      instruction: null,
-    });
+    const first = await subject.prepareArtifact(prepareInput());
     const artifactId = first.artifact.artifactId;
 
-    const second = await subject.revise({
-      actor: ACTOR,
+    const second = await subject.reviseArtifact({
+      actorContext: ACTOR,
+      permittedContextPlan: plan(),
+      qRunId: RUN,
       artifactId,
       instruction: "Say more about the team.",
+      content: composed("Second composition."),
     });
 
     expect(second.artifact.currentVersion).toBe(2);
@@ -352,106 +438,85 @@ describe("QX-003F · Edit with Q", () => {
   it("takes the next free number rather than overwriting a version that landed first", async () => {
     const { repository, versions } = inMemoryRepository();
     const subject = service(repository);
-    const first = await subject.prepare({
-      actor: ACTOR,
-      type: "INVESTMENT_BRIEF",
-      companyId: null,
-      investorOrganisationId: null,
-      instruction: null,
-    });
+    const first = await subject.prepareArtifact(prepareInput());
     const artifactId = first.artifact.artifactId;
 
-    // Somebody else's revision lands while this one is being composed.
-    const racing = composer({
-      compose: async (input) => {
-        await repository.appendVersion(
-          { sql: undefined as never },
-          {
-            artifactId,
-            tenantId: ACTOR.tenantId,
-            version: 2,
-            title: "Theirs",
-            summary: "Landed first.",
-            content: content("Theirs."),
-            instruction: "their change",
-            composedByRunId: null,
-            createdByUserId: ACTOR.userId,
-          },
-        );
-        return {
-          title: "Mine",
-          summary: "Composed second.",
-          content: content(`Mine: ${input.instruction ?? ""}`),
-        };
+    // Somebody else's revision lands while this one was being composed.
+    await repository.appendVersion(
+      { sql: undefined as never },
+      {
+        artifactId,
+        tenantId: ACTOR.tenantId,
+        version: 2,
+        title: "Theirs",
+        summary: "Landed first.",
+        content: content("Theirs."),
+        instruction: "their change",
+        composedByRunId: null,
+        createdByUserId: ACTOR.userId,
       },
-    });
+    );
 
-    const mine = await service(repository, [racing]).revise({
-      actor: ACTOR,
+    const mine = await subject.reviseArtifact({
+      actorContext: ACTOR,
+      permittedContextPlan: plan(),
+      qRunId: RUN,
       artifactId,
       instruction: "my change",
+      content: composed("Mine."),
     });
 
     expect(mine.artifact.currentVersion).toBe(3);
-    // Theirs is untouched and still readable.
-    const theirs = versions.find((v) => v.version === 2);
+    const theirs = versions.find((entry) => entry.version === 2);
     expect(theirs?.title).toBe("Theirs");
-    expect(versions.map((v) => v.version)).toEqual([1, 2, 3]);
+    expect(versions.map((entry) => entry.version)).toEqual([1, 2, 3]);
+  });
+
+  it("refuses to revise an artifact that is not this person's", async () => {
+    const { repository } = inMemoryRepository();
+    const subject = service(repository);
+    const mine = await subject.prepareArtifact(prepareInput());
+    const stranger = {
+      ...ACTOR,
+      tenantId: TenantIdSchema.parse("c0000000-0000-4000-8000-000000000002"),
+    };
+    await expect(
+      subject.reviseArtifact({
+        actorContext: stranger,
+        permittedContextPlan: plan({ tenantId: stranger.tenantId }),
+        qRunId: RUN,
+        artifactId: mine.artifact.artifactId,
+        instruction: "change somebody else's brief",
+        content: composed("Not yours."),
+      }),
+    ).rejects.toBeInstanceOf(ArtifactNotFoundError);
   });
 
   it("refuses to revise something with nothing to revise", async () => {
     const { repository, artifacts } = inMemoryRepository();
-    const failing = composer({
-      compose: () => Promise.reject(new Error("the model refused")),
-    });
-    const subject = service(repository, [failing]);
-    await expect(
-      subject.prepare({
-        actor: ACTOR,
+    const subject = service(repository);
+    const artifact = await repository.create(
+      { sql: undefined as never } as TransactionContext,
+      {
+        tenantId: ACTOR.tenantId,
+        organisationId: ACTOR.organisationId ?? "",
         type: "INVESTMENT_BRIEF",
-        companyId: null,
+        companyId: COMPANY,
         investorOrganisationId: null,
-        instruction: null,
-      }),
-    ).rejects.toBeInstanceOf(ArtifactCompositionFailedError);
-    const [stored] = [...artifacts.values()];
-
+        createdByUserId: ACTOR.userId,
+      },
+    );
+    expect(artifacts.size).toBe(1);
     await expect(
-      subject.revise({
-        actor: ACTOR,
-        artifactId: stored?.id ?? "",
+      subject.reviseArtifact({
+        actorContext: ACTOR,
+        permittedContextPlan: plan(),
+        qRunId: RUN,
+        artifactId: artifact.id,
         instruction: "try again",
+        content: composed("Nothing to revise."),
       }),
     ).rejects.toBeInstanceOf(ArtifactNotRevisableError);
-  });
-
-  it("keeps the version it has when a revision cannot be composed", async () => {
-    const { repository } = inMemoryRepository();
-    const flaky = composer();
-    const subject = service(repository, [flaky]);
-    const first = await subject.prepare({
-      actor: ACTOR,
-      type: "INVESTMENT_BRIEF",
-      companyId: null,
-      investorOrganisationId: null,
-      instruction: null,
-    });
-
-    vi.spyOn(flaky, "compose").mockRejectedValueOnce(new Error("refused"));
-    await expect(
-      subject.revise({
-        actor: ACTOR,
-        artifactId: first.artifact.artifactId,
-        instruction: "change it",
-      }),
-    ).rejects.toBeInstanceOf(ArtifactCompositionFailedError);
-
-    // A revision that failed has damaged nothing: V1 is still current and
-    // the artifact is still READY, not FAILED.
-    const after = await subject.read(ACTOR, first.artifact.artifactId);
-    expect(after.artifact.status).toBe("READY");
-    expect(after.artifact.currentVersion).toBe(1);
-    expect(after.current?.content.sections[0]?.body).toBe("First composition.");
   });
 });
 
@@ -459,15 +524,9 @@ describe("QX-003C · reading somebody else's", () => {
   it("is the same answer as reading one that does not exist", async () => {
     const { repository } = inMemoryRepository();
     const subject = service(repository);
-    const mine = await subject.prepare({
-      actor: ACTOR,
-      type: "INVESTMENT_BRIEF",
-      companyId: null,
-      investorOrganisationId: null,
-      instruction: null,
-    });
+    const mine = await subject.prepareArtifact(prepareInput());
 
-    const stranger: ActorContext = {
+    const stranger = {
       ...ACTOR,
       tenantId: TenantIdSchema.parse("c0000000-0000-4000-8000-000000000002"),
     };
@@ -476,13 +535,6 @@ describe("QX-003C · reading somebody else's", () => {
     ).rejects.toBeInstanceOf(ArtifactNotFoundError);
     await expect(
       subject.read(stranger, "a90000000-0000-4000-8000-000000000009"),
-    ).rejects.toBeInstanceOf(ArtifactNotFoundError);
-    await expect(
-      subject.revise({
-        actor: stranger,
-        artifactId: mine.artifact.artifactId,
-        instruction: "change somebody else's brief",
-      }),
     ).rejects.toBeInstanceOf(ArtifactNotFoundError);
     expect(await subject.list(stranger, { limit: 20 })).toEqual({ items: [] });
   });

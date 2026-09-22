@@ -125,3 +125,22 @@ export {
   type RecommendationNarrator,
   type RecommendationNarratorDependencies,
 } from "./recommendation/narrator.js";
+
+export {
+  applyRevisedBodies,
+  composeInvestmentBrief,
+  inventsFigures,
+  type ComposedInvestmentBrief,
+} from "./company/investment-brief.js";
+
+export {
+  createBriefReviser,
+  type BriefReviser,
+} from "./company/brief-reviser.js";
+
+export type { ArtifactPreparationPort } from "./company/artifact-port.js";
+export {
+  latestArtifactIn,
+  prepareOrReviseArtifact,
+  type ArtifactPreparation,
+} from "./company/prepare-artifact.js";

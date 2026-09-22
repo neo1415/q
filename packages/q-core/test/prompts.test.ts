@@ -97,6 +97,8 @@ describe("registry", () => {
         "MEMORY_EXTRACTOR",
         // CQ-GATE-002: Q interviewing somebody applying to a gateway.
         "GATEQ_INTERVIEWER",
+        // ADR 0013: rewriting the prose of a document Q already composed.
+        "ARTIFACT_REVISION",
       ].sort(),
     );
     for (const id of PROMPT_IDS) {
@@ -193,7 +195,7 @@ describe("renderer", () => {
     expect(rendered.messages[0]?.content).toContain("You are Q");
     expect(rendered.messages[0]?.content).toContain("OPERATING MODE: DEBRIEF");
     expect(rendered.bundle.bundleVersion).toBe(
-      "q-system.v1_company-analyst.v4_comm.v1",
+      "q-system.v1_company-analyst.v5_comm.v1",
     );
     expect(rendered.bundle.bundleVersion).toMatch(
       /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/,

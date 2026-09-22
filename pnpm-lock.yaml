@@ -186,6 +186,9 @@ importers:
       '@capital-q/q-actions':
         specifier: workspace:*
         version: link:../../packages/q-actions
+      '@capital-q/q-artifacts':
+        specifier: workspace:*
+        version: link:../../packages/q-artifacts
       '@capital-q/q-connectors':
         specifier: workspace:*
         version: link:../../packages/q-connectors

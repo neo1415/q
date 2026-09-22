@@ -131,6 +131,7 @@ import {
   composeQIntelligence,
   createProductionEmbeddingService,
 } from "./composition/q-intelligence.js";
+import { createQArtifacts } from "./composition/artifacts.js";
 import {
   createCompanyProfileUpdateAction,
   createProfileUpdateBoard,
@@ -647,6 +648,19 @@ const memoryLearner = createMemoryLearner({
   people: { displayNameFor },
   logger,
 });
+/**
+ * The artifact context (QX-003D; ADR 0013).
+ *
+ * Composed before the intelligence path, because the answer seam takes
+ * the preparation port: a person who asks Q for a brief gets one written
+ * inside their own run, under that run's own authorised plan.
+ */
+const qArtifacts = createQArtifacts({
+  sql: database.sql,
+  transactions: database.transactions,
+  gateway: modelGateway,
+  logger,
+});
 const qIntelligence = composeQIntelligence({
   // The attestation is the claim about the data; where it holds, every
   // founder, investor and company this process will see was invented.
@@ -663,6 +677,7 @@ const qIntelligence = composeQIntelligence({
   // The same bus the run stream publishes from, so an answer reaches a
   // person as it is written rather than after it.
   deltas: liveDeltas,
+  artifacts: qArtifacts.preparation,
   logger,
 });
 logger.info(
@@ -871,6 +886,7 @@ const { app, logger: appLogger } = createApp(
   },
   {
     qRuntime,
+    artifacts: qArtifacts.service,
     recommendationExplanations,
     orchestration: { orchestrator, autostart: Q_ORCHESTRATION_AUTOSTART },
     qActions,

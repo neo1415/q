@@ -4,7 +4,10 @@ import type { ActorContext } from "@capital-q/security";
 import type {
   ListQArtifactsQuery,
   ListQArtifactsResponse,
+  PermittedContextPlan,
   QArtifactDetail,
+  QArtifactSummary,
+  QSubjectRef,
 } from "@capital-q/contracts";
 
 import {
@@ -15,24 +18,35 @@ import {
   toSummary,
   type StoredArtifact,
 } from "../domain/artifact.js";
-import type {
-  ArtifactComposer,
-  ArtifactRepository,
-  ComposedArtifact,
-} from "./ports.js";
+import type { ArtifactRepository, ComposedArtifact } from "./ports.js";
 
 /**
- * Preparing, reading and revising what Q composed (QX-003C, QX-003F).
+ * Preparing, reading and revising what Q composed (QX-003C-F; ADR 0013).
  *
- * Three things this is careful about.
+ * This is the trusted persistence boundary, and it is the only one. A
+ * specialist composes and hands the content here; a model never reaches
+ * this file; no tool can call it, because the Tool Registry admits nothing
+ * that writes. Persisting a private draft is Prepare, so no approval is
+ * required — and nothing here publishes, shares or sends anything, which
+ * is where approval would be.
  *
- * **An artifact exists before its content does.** Composition takes as
- * long as a model takes. The row is written first, in its own
- * transaction, so the answer that mentions it can carry a real identifier
- * and a person who closes the tab has something to come back to. If
- * composition then fails, the artifact says FAILED rather than
- * disappearing — an artifact that vanishes looks like one that was never
- * asked for.
+ * What makes it trusted is that it re-derives every piece of authority
+ * from the run's own authorised plan rather than from its arguments:
+ *
+ *   - the plan must belong to this actor, this tenant and this run;
+ *   - the subject must be one the Context Firewall already authorised;
+ *   - the plan must not have gone stale;
+ *   - the owner is the actor's organisation, never a field anybody passed.
+ *
+ * A caller that gets any of that wrong is refused rather than trusted,
+ * because the alternative is an artifact owned by whoever asked nicely.
+ *
+ * Three further properties:
+ *
+ * **An artifact exists before its content does.** The row is written
+ * first, in its own transaction, so the answer that mentions it can carry
+ * a real identifier and a person who closes the tab has something to come
+ * back to.
  *
  * **A revision is an append.** The previous version stays exactly as it
  * was, because somebody who sent a brief to an investor last week needs to
@@ -65,14 +79,54 @@ export class ArtifactCompositionFailedError extends Error {
   }
 }
 
+/**
+ * The caller's authority did not survive re-derivation.
+ *
+ * Deliberately one error for every way that can happen — a plan for
+ * another run, another actor, another tenant, a subject the firewall never
+ * authorised, or a plan that has gone stale. A caller learning which of
+ * those it was would be learning something about somebody else's context.
+ */
+export class ArtifactAuthorityError extends Error {
+  constructor() {
+    super("That is not something you can prepare here.");
+    this.name = "ArtifactAuthorityError";
+  }
+}
+
+/** What preparation needs, and nothing a browser or a model could choose. */
+export type PrepareArtifactInput = {
+  /** Server-resolved, from the verified session. */
+  readonly actorContext: ActorContext;
+  /** The Context Firewall's own decision for this run. Never hand-built. */
+  readonly permittedContextPlan: PermittedContextPlan;
+  readonly qRunId: string;
+  /** Must be one the plan already authorises. */
+  readonly subject: QSubjectRef;
+  readonly artifactType: string;
+  /** Already composed, under that plan, by something that cannot write. */
+  readonly content: ComposedArtifact;
+};
+
+export type ReviseArtifactInput = {
+  readonly actorContext: ActorContext;
+  readonly permittedContextPlan: PermittedContextPlan;
+  readonly qRunId: string;
+  readonly artifactId: string;
+  /** The person's own words for what should change. */
+  readonly instruction: string;
+  readonly content: ComposedArtifact;
+};
+
 export type ArtifactService = {
-  readonly prepare: (input: {
-    readonly actor: ActorContext;
-    readonly type: string;
-    readonly companyId: string | null;
-    readonly investorOrganisationId: string | null;
-    readonly instruction: string | null;
-  }) => Promise<QArtifactDetail>;
+  /** Create the artifact and its first version. A Prepare operation. */
+  readonly prepareArtifact: (
+    input: PrepareArtifactInput,
+  ) => Promise<QArtifactDetail>;
+  /** Append a version. The previous one is untouched. */
+  readonly reviseArtifact: (
+    input: ReviseArtifactInput,
+  ) => Promise<QArtifactDetail>;
   readonly read: (
     actor: ActorContext,
     artifactId: string,
@@ -86,32 +140,74 @@ export type ArtifactService = {
     actor: ActorContext,
     query: ListQArtifactsQuery,
   ) => Promise<ListQArtifactsResponse>;
-  readonly revise: (input: {
-    readonly actor: ActorContext;
-    readonly artifactId: string;
-    readonly instruction: string;
-  }) => Promise<QArtifactDetail>;
+  /** The public summary, for a caller that only needs a card. */
+  readonly summarise: (
+    actor: ActorContext,
+    artifactId: string,
+  ) => Promise<QArtifactSummary>;
 };
 
 /** How many times a losing race is retried before giving up. */
 const APPEND_ATTEMPTS = 3;
 
+function sameSubject(a: QSubjectRef, b: QSubjectRef): boolean {
+  return JSON.stringify(a) === JSON.stringify(b);
+}
+
 export function createArtifactService(dependencies: {
   readonly repository: ArtifactRepository;
   readonly transactions: TransactionManager;
-  readonly composers: readonly ArtifactComposer[];
+  readonly now?: (() => Date) | undefined;
   readonly logger?: Logger | undefined;
 }): ArtifactService {
-  const { repository, transactions, composers } = dependencies;
+  const { repository, transactions } = dependencies;
+  const now = dependencies.now ?? (() => new Date());
 
-  const composerFor = (type: string): ArtifactComposer => {
-    const composer = composers.find((candidate) => candidate.type === type);
-    if (composer === undefined) {
-      // A type nobody can compose is not a 500: it is a request for
-      // something this build does not make.
-      throw new ArtifactNotFoundError();
+  /**
+   * Re-derive the caller's authority from the plan, or refuse.
+   *
+   * The arguments say what to do; the plan says what may be done. Where
+   * they disagree the plan wins, and where the plan itself does not belong
+   * to this actor, tenant or run there is nothing to disagree with.
+   */
+  const authorise = (input: {
+    readonly actorContext: ActorContext;
+    readonly permittedContextPlan: PermittedContextPlan;
+    readonly qRunId: string;
+    readonly subject?: QSubjectRef | undefined;
+  }): string => {
+    const plan = input.permittedContextPlan;
+    const actor = input.actorContext;
+    const organisationId = actor.organisationId;
+    if (organisationId === undefined) {
+      // An artifact belongs to an organisation. Somebody with none has no
+      // workspace to own one, which is a refusal rather than a null owner.
+      throw new ArtifactAuthorityError();
     }
-    return composer;
+    if (
+      plan.runId !== input.qRunId ||
+      plan.tenantId !== actor.tenantId ||
+      plan.actor.userId !== actor.userId ||
+      (plan.actor.organisationId !== undefined &&
+        plan.actor.organisationId !== organisationId)
+    ) {
+      throw new ArtifactAuthorityError();
+    }
+    // A plan is a decision at a moment, and this one has passed.
+    if (Date.parse(plan.revalidateAfter) <= now().getTime()) {
+      throw new ArtifactAuthorityError();
+    }
+    if (
+      input.subject !== undefined &&
+      !plan.subjects.some((authorised) =>
+        sameSubject(authorised, input.subject as QSubjectRef),
+      )
+    ) {
+      // The firewall never authorised this subject for this run, so
+      // neither does anything downstream of it.
+      throw new ArtifactAuthorityError();
+    }
+    return organisationId;
   };
 
   const detailOf = async (
@@ -142,6 +238,7 @@ export function createArtifactService(dependencies: {
     readonly artifact: StoredArtifact;
     readonly composed: ComposedArtifact;
     readonly instruction: string | null;
+    readonly runId: string;
   }) => {
     let current = input.artifact.currentVersion;
     for (let attempt = 0; attempt < APPEND_ATTEMPTS; attempt += 1) {
@@ -156,7 +253,7 @@ export function createArtifactService(dependencies: {
           // place before it becomes a stored row.
           content: parseContent(input.composed.content),
           instruction: input.instruction,
-          composedByRunId: input.composed.composedByRunId ?? null,
+          composedByRunId: input.runId,
           createdByUserId: input.actor.userId,
         });
         if (version !== null) {
@@ -173,58 +270,100 @@ export function createArtifactService(dependencies: {
       }
       current = moved.currentVersion;
     }
+    // Three losses in a row is contention this cannot resolve by trying
+    // harder. Nothing was overwritten, which is the property that matters.
     throw new ArtifactCompositionFailedError();
   };
 
   return {
-    prepare: async ({
-      actor,
-      type,
-      companyId,
-      investorOrganisationId,
-      instruction,
-    }) => {
-      const composer = composerFor(type);
-      // The row first, in its own transaction, so it survives whatever
-      // composition does next.
+    prepareArtifact: async (input) => {
+      const organisationId = authorise(input);
+      const subject = input.subject;
       const artifact = await transactions.run((tx) =>
         repository.create(tx, {
-          tenantId: actor.tenantId,
-          organisationId: actor.organisationId ?? "",
-          type,
-          companyId,
-          investorOrganisationId,
-          createdByUserId: actor.userId,
+          tenantId: input.actorContext.tenantId,
+          // The owner is the actor's own organisation. Never an argument.
+          organisationId,
+          type: input.artifactType,
+          companyId: subject.kind === "COMPANY" ? subject.companyId : null,
+          investorOrganisationId:
+            subject.kind === "INVESTOR_ORGANISATION"
+              ? subject.investorOrganisationId
+              : null,
+          createdByUserId: input.actorContext.userId,
         }),
       );
 
-      let composed: ComposedArtifact;
       try {
-        composed = await composer.compose({
-          actor,
-          companyId,
-          investorOrganisationId,
-          instruction,
+        await append({
+          actor: input.actorContext,
+          artifact,
+          composed: input.content,
+          instruction: null,
+          runId: input.qRunId,
         });
       } catch (error) {
-        // Visible failure, not a vanished artifact.
+        // Visible failure, not a vanished artifact: one that says what
+        // happened is honest, and one that disappears looks like one
+        // nobody asked for.
         await transactions.run((tx) =>
           repository.setStatus(tx, artifact.id, "FAILED"),
         );
         dependencies.logger?.warn(
-          { artifactId: artifact.id, type },
-          "artifact composition failed",
+          { artifactId: artifact.id, type: input.artifactType },
+          "artifact preparation failed",
         );
-        if (error instanceof ArtifactNotFoundError) throw error;
-        throw new ArtifactCompositionFailedError();
+        throw error;
       }
 
-      await append({ actor, artifact, composed, instruction });
-      const settled = await repository.findById(actor, artifact.id);
+      const settled = await repository.findById(
+        input.actorContext,
+        artifact.id,
+      );
       if (settled === null) {
         throw new ArtifactNotFoundError();
       }
-      return detailOf(actor, settled);
+      return detailOf(input.actorContext, settled);
+    },
+
+    reviseArtifact: async (input) => {
+      const artifact = await repository.findById(
+        input.actorContext,
+        input.artifactId,
+      );
+      if (artifact === null) {
+        throw new ArtifactNotFoundError();
+      }
+      // The subject is the artifact's own, so a revision cannot be used to
+      // reach a company this run was never authorised for.
+      const subject: QSubjectRef | undefined =
+        artifact.companyId !== null
+          ? { kind: "COMPANY", companyId: artifact.companyId }
+          : artifact.investorOrganisationId !== null
+            ? {
+                kind: "INVESTOR_ORGANISATION",
+                investorOrganisationId: artifact.investorOrganisationId,
+              }
+            : undefined;
+      authorise({ ...input, subject });
+      if (!canRevise(artifact)) {
+        throw new ArtifactNotRevisableError();
+      }
+      await append({
+        actor: input.actorContext,
+        artifact,
+        composed: input.content,
+        instruction: input.instruction,
+        runId: input.qRunId,
+      });
+      const settled = await repository.findById(
+        input.actorContext,
+        input.artifactId,
+      );
+      if (settled === null) {
+        throw new ArtifactNotFoundError();
+      }
+      return detailOf(input.actorContext, settled);
     },
 
     read: async (actor, artifactId) => {
@@ -248,6 +387,22 @@ export function createArtifactService(dependencies: {
       // The artifact, shown at the version that was asked for: reading V1
       // of something now on V2 shows V1's content and the whole history.
       return toDetail(artifact, stored, history);
+    },
+
+    summarise: async (actor, artifactId) => {
+      const artifact = await repository.findById(actor, artifactId);
+      if (artifact === null) {
+        throw new ArtifactNotFoundError();
+      }
+      const current =
+        artifact.currentVersion === 0
+          ? null
+          : await repository.findVersion(
+              actor,
+              artifactId,
+              artifact.currentVersion,
+            );
+      return toSummary(artifact, current);
     },
 
     list: async (actor, query) => {
@@ -279,55 +434,6 @@ export function createArtifactService(dependencies: {
           ? { nextBefore: last.updatedAt }
           : {}),
       };
-    },
-
-    revise: async ({ actor, artifactId, instruction }) => {
-      const artifact = await repository.findById(actor, artifactId);
-      if (artifact === null) {
-        throw new ArtifactNotFoundError();
-      }
-      if (!canRevise(artifact)) {
-        throw new ArtifactNotRevisableError();
-      }
-      const previous = await repository.findVersion(
-        actor,
-        artifactId,
-        artifact.currentVersion,
-      );
-      if (previous === null) {
-        throw new ArtifactNotRevisableError();
-      }
-      const composer = composerFor(artifact.type);
-      let composed: ComposedArtifact;
-      try {
-        composed = await composer.compose({
-          actor,
-          companyId: artifact.companyId,
-          investorOrganisationId: artifact.investorOrganisationId,
-          instruction,
-          previous: {
-            title: previous.title,
-            summary: previous.summary,
-            content: previous.content,
-          },
-        });
-      } catch {
-        // The artifact stays READY at the version it already has: a
-        // revision that could not be composed has not damaged anything,
-        // and saying FAILED here would hide a version that is fine.
-        dependencies.logger?.warn(
-          { artifactId, type: artifact.type },
-          "artifact revision failed",
-        );
-        throw new ArtifactCompositionFailedError();
-      }
-
-      await append({ actor, artifact, composed, instruction });
-      const settled = await repository.findById(actor, artifactId);
-      if (settled === null) {
-        throw new ArtifactNotFoundError();
-      }
-      return detailOf(actor, settled);
     },
   };
 }

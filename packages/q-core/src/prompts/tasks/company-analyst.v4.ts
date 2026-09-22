@@ -43,7 +43,7 @@ export const COMPANY_ANALYST_V4: PromptDefinition<
 > = {
   ...COMPANY_ANALYST_V3,
   version: 4,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   changeDescription:
     "ADR 0012: what Capital Q remembers about the person is rendered into the prompt as untrusted memory; ADR 0011: the structured result carries displayName, a request to be called something else, for the Approval Engine to propose.",
   effectiveFrom: "2026-09-17",

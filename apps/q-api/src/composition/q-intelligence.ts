@@ -38,6 +38,7 @@ import {
   createRetrievalEvidencePort,
   createSpecialistQAnswer,
   createToolCanonicalPort,
+  type ArtifactPreparation,
 } from "@capital-q/q-specialists";
 
 /**
@@ -107,6 +108,11 @@ export type QIntelligenceDependencies = {
    * the same either way.
    */
   readonly deltas?: QLiveDeltaBus | undefined;
+  /**
+   * Preparing a document, when the artifact context is composed
+   * (ADR 0013). Absent leaves the answer seam exactly as it was.
+   */
+  readonly artifacts?: ArtifactPreparation | undefined;
   readonly logger?: Logger | undefined;
 };
 
@@ -251,6 +257,9 @@ export function composeQIntelligence(
     repositories,
     sql,
     transactions,
+    ...(dependencies.artifacts === undefined
+      ? {}
+      : { artifacts: dependencies.artifacts }),
     ...(logger === undefined ? {} : { logger }),
   });
 

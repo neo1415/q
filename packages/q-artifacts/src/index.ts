@@ -25,17 +25,19 @@ export {
 } from "./domain/artifact.js";
 
 export type {
-  ArtifactComposer,
   ArtifactRepository,
   ComposedArtifact,
 } from "./application/ports.js";
 
 export {
+  ArtifactAuthorityError,
   ArtifactCompositionFailedError,
   ArtifactNotFoundError,
   ArtifactNotRevisableError,
   createArtifactService,
   type ArtifactService,
+  type PrepareArtifactInput,
+  type ReviseArtifactInput,
 } from "./application/service.js";
 
 export { createPostgresArtifactRepository } from "./infrastructure/postgres-artifact-repository.js";

@@ -13,6 +13,8 @@ import {
 
 import { registerProblemHandling } from "./http/problem-handler.js";
 import { registerQConversationRoutes } from "./http/q-conversations.js";
+import { registerQArtifactRoutes } from "./http/q-artifacts.js";
+import type { ArtifactService } from "@capital-q/q-artifacts";
 import {
   registerRecommendationExplanationRoutes,
   type RecommendationExplanationRoutesDependencies,
@@ -73,6 +75,8 @@ export type QApiModules = {
   readonly recommendationExplanations?:
     RecommendationExplanationRoutesDependencies["explanations"] | undefined;
   readonly qRuntime?: QRunRoutesDependencies["qRuntime"] | undefined;
+  /** Reading what Q composed, when the artifact context is composed (ADR 0013). */
+  readonly artifacts?: ArtifactService | undefined;
   /** The orchestration boundary; absent means runs are only persisted. */
   readonly orchestration?: QRunRoutesDependencies["orchestration"];
   /** The Approval Engine (CQ-Q-008); absent means no approval routes. */
@@ -220,6 +224,22 @@ export function createApp(
       resolver: security.resolver,
       identity: security.identity,
       qRuntime: modules.qRuntime,
+    });
+  }
+
+  // Reading what Q composed (QX-003E). Read-only on purpose: preparing
+  // and revising happen inside a Q run, under that run's own plan.
+  if (modules.artifacts !== undefined) {
+    if (security.resolver === undefined) {
+      throw new Error(
+        "q-api: the Q artifact routes require an actor context resolver",
+      );
+    }
+    registerQArtifactRoutes(app, {
+      authenticator: security.authenticator,
+      resolver: security.resolver,
+      identity: security.identity,
+      artifacts: modules.artifacts,
     });
   }
 

@@ -535,6 +535,7 @@ describe("specialist answer seam", () => {
             synthesis: "Thank you — I have that now.",
             research: { status: "OK", sourceCount: 1, comparisonCount: 0 },
             recordedStatements: ["Kenya was only a pilot and ended last year"],
+            artifactRequest: null,
             telemetry: {
               specialistId: "company-intelligence",
               specialistVersion: "v1",

@@ -16,15 +16,15 @@ import {
   createDefaultPromptRegistry,
   DEFAULT_COMMUNICATION_PROFILE,
   renderPrompt,
-  type CompanyAnalystV4Result,
-  type CompanyAnalystV4Variables,
+  type CompanyAnalystV5Result,
+  type CompanyAnalystV5Variables,
   NOTHING_REMEMBERED,
   type CompanyIntelligenceDimension,
   type PromptRegistry,
   citePublicSources,
 } from "@capital-q/q-core";
 import {
-  CompanyAnalystV4ResultSchema,
+  CompanyAnalystV5ResultSchema,
   COMPANY_INTELLIGENCE_DIMENSIONS,
   DisplayNameRequestSchema,
   ProfileUpdateSchema,
@@ -239,7 +239,7 @@ async function recallMemory(
 
 async function recordUserStatements(
   recorder: QUserStatementRecorder | undefined,
-  statements: CompanyAnalystV4Result["userStatements"],
+  statements: CompanyAnalystV5Result["userStatements"],
   request: CompanyIntelligenceRequest,
   context: QSpecialistExecutionContext,
   logger: Logger | undefined,
@@ -310,8 +310,22 @@ function blockedResult(
     synthesis: null,
     research: null,
     recordedStatements: [],
+    artifactRequest: null,
     telemetry,
   };
+}
+
+/**
+ * Whether the model's quote is really in the person's message.
+ *
+ * The same check the conversational seam applies to a profile update, and
+ * for the same reason: a reading the person's own words do not carry is a
+ * reading nobody made. A request to prepare a document that cannot be
+ * quoted back is dropped rather than acted on, so a model cannot cause an
+ * artifact to exist by deciding one would be useful.
+ */
+function quotedFromMessage(quote: string, message: string): boolean {
+  return message.toLowerCase().includes(quote.toLowerCase());
 }
 
 export function createCompanyIntelligenceSpecialist(
@@ -605,7 +619,7 @@ export function createCompanyIntelligenceSpecialist(
         research: researchRead,
       });
       const variables: Omit<
-        CompanyAnalystV4Variables,
+        CompanyAnalystV5Variables,
         | "operatingMode"
         | "communicationProfile"
         | "communicationGuidance"
@@ -624,7 +638,7 @@ export function createCompanyIntelligenceSpecialist(
           logger,
         ),
       };
-      const rendered = renderPrompt<CompanyAnalystV4Variables>(registry, {
+      const rendered = renderPrompt<CompanyAnalystV5Variables>(registry, {
         task: "COMPANY_ANALYST",
         operatingMode: OPERATING_MODE,
         communicationProfile: DEFAULT_COMMUNICATION_PROFILE,
@@ -647,10 +661,10 @@ export function createCompanyIntelligenceSpecialist(
         promptCharacters: rendered.characters,
       };
 
-      let analyst: CompanyAnalystV4Result | undefined;
+      let analyst: CompanyAnalystV5Result | undefined;
       let blocked: QSpecialistBlockedReason | null = null;
       try {
-        const result = await gateway.execute<CompanyAnalystV4Result>(
+        const result = await gateway.execute<CompanyAnalystV5Result>(
           {
             taskClass: "EVIDENCE_SYNTHESIS",
             budget: budgetForTaskClass("EVIDENCE_SYNTHESIS"),
@@ -671,7 +685,7 @@ export function createCompanyIntelligenceSpecialist(
               : { tenantPolicy: dependencies.tenantPolicy }),
           },
           {
-            schema: CompanyAnalystV4ResultSchema,
+            schema: CompanyAnalystV5ResultSchema,
             ...(context.signal === undefined ? {} : { signal: context.signal }),
           },
         );
@@ -891,6 +905,14 @@ export function createCompanyIntelligenceSpecialist(
                 comparisonCount: researchRead.comparison.length,
               },
         recordedStatements,
+        // Only ever what the model read from THIS message, and only when
+        // their own words carry it: an unquoted request is not a request.
+        artifactRequest:
+          analyst?.artifactRequest !== undefined &&
+          analyst.artifactRequest !== null &&
+          quotedFromMessage(analyst.artifactRequest.quote, request.question)
+            ? analyst.artifactRequest
+            : null,
         telemetry,
       });
     },

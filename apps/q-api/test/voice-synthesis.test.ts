@@ -54,7 +54,8 @@ const CONTEXT: ActorContext = {
   actorType: "HUMAN",
 };
 
-const AUDIO = new Uint8Array([0xff, 0xfb, 0x90, 0x00, 0x01, 0x02]);
+const AUDIO = new Uint8Array(new ArrayBuffer(6));
+AUDIO.set([0xff, 0xfb, 0x90, 0x00, 0x01, 0x02]);
 
 function buildApp(
   speech: SpeechSynthesisPort | undefined,
@@ -97,7 +98,9 @@ function port(
 function mp3Response(body: Uint8Array = AUDIO): Response {
   // Through a Blob rather than the bytes directly: `Response` accepts a
   // view at runtime, but the DOM types only admit one via BlobPart.
-  return new Response(new Blob([body], { type: "audio/mpeg" }), {
+  const bytes = new Uint8Array(new ArrayBuffer(body.byteLength));
+  bytes.set(body);
+  return new Response(new Blob([bytes], { type: "audio/mpeg" }), {
     status: 200,
     headers: { "content-type": "audio/mpeg" },
   });

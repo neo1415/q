@@ -135,6 +135,21 @@ export type CompanyIntelligenceResult = {
    * acknowledge. Empty when nothing was recorded.
    */
   readonly recordedStatements: readonly string[];
+  /**
+   * What the person asked Q to prepare or change in this message, read
+   * into the analyst's closed schema (ADR 0011, ADR 0013).
+   *
+   * A reading, never an act. The specialist composes and does not write;
+   * the answer seam checks the quote against the message, takes the
+   * subject from the run's own plan and asks the artifact application
+   * service to persist. Null when they asked for no such thing.
+   */
+  readonly artifactRequest: {
+    readonly kind: "PREPARE" | "REVISE";
+    readonly artifactType: "INVESTMENT_BRIEF";
+    readonly instruction: string;
+    readonly quote: string;
+  } | null;
   /** Safe operational record for traces, evals and the developer smoke. */
   readonly telemetry: CompanyIntelligenceTelemetry;
 };

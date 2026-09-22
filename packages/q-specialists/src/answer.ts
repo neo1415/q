@@ -1,4 +1,8 @@
-import type { QResponseMessage, QVisibleStage } from "@capital-q/contracts";
+import type {
+  QResponseMessage,
+  QResultBlock,
+  QVisibleStage,
+} from "@capital-q/contracts";
 import { withoutRecommendationClaims } from "@capital-q/q-core";
 import type { DatabaseExecutor, TransactionManager } from "@capital-q/database";
 import type { Logger } from "@capital-q/observability";
@@ -17,6 +21,10 @@ import type {
   CompanyIntelligenceResult,
 } from "./company/contracts.js";
 import { asksAboutGaps } from "./company/dimensions.js";
+import {
+  prepareOrReviseArtifact,
+  type ArtifactPreparation,
+} from "./company/prepare-artifact.js";
 import { analystResultBlocks } from "@capital-q/model-gateway/q";
 
 /**
@@ -49,6 +57,13 @@ export type SpecialistQAnswerDependencies = {
   readonly repositories: QRuntimeRepositories;
   readonly sql: DatabaseExecutor;
   readonly transactions: TransactionManager;
+  /**
+   * Preparing a document, when this composition offers it (ADR 0013).
+   *
+   * Absent on a build with no artifact context, and then a person asking
+   * for a brief is answered without one rather than told a lie about why.
+   */
+  readonly artifacts?: ArtifactPreparation | undefined;
   readonly logger?: Logger | undefined;
 };
 
@@ -118,8 +133,15 @@ function synthesisFromFindings(result: CompanyIntelligenceResult): string {
 export function createSpecialistQAnswer(
   dependencies: SpecialistQAnswerDependencies,
 ): SpecialistQAnswer {
-  const { specialist, delegate, repositories, sql, transactions, logger } =
-    dependencies;
+  const {
+    specialist,
+    delegate,
+    repositories,
+    sql,
+    transactions,
+    artifacts,
+    logger,
+  } = dependencies;
   let last: CompanyIntelligenceResult | null = null;
 
   /** Approved progress only; best effort, never a reason to fail the answer. */
@@ -236,7 +258,40 @@ export function createSpecialistQAnswer(
               .join(
                 "; ",
               )}. Capital Q records it as what you told me, not as verified fact; say so if it needs correcting.`;
-      const content = `${guarded.text}${acknowledgement}`
+      /**
+       * Preparing the document they asked for (QX-003D/F; ADR 0013).
+       *
+       * Everything before this composed; this persists, and it does so
+       * through the artifact application service, which re-derives
+       * authority from the run's own plan. The model read the request into
+       * a closed schema field and the specialist checked it against their
+       * own words; nothing here asks a model whether to write.
+       *
+       * A failure is not a failed answer. The findings still stand and the
+       * person still reads them; they are told the document did not come
+       * through, which is true and actionable, rather than shown an error.
+       */
+      const prepared =
+        artifacts === undefined || result.artifactRequest === null
+          ? null
+          : await prepareOrReviseArtifact({
+              artifacts,
+              request,
+              company,
+              companyName: "your company",
+              result,
+              history,
+              ...(logger === undefined ? {} : { logger }),
+            });
+      const documentNote =
+        prepared !== null
+          ? prepared.currentVersion <= 1
+            ? `\n\nI've prepared **${prepared.title}** from what's on record. It's a private draft in your workspace — nothing has been shared or sent.`
+            : `\n\nI've updated **${prepared.title}** — that's version ${String(prepared.currentVersion)}. The previous version is still there, and nothing has been shared or sent.`
+          : result.artifactRequest === null || artifacts === undefined
+            ? ""
+            : "\n\nI couldn't put that document together just now. What's above is what the record supports; ask again in a moment and I'll try the document again.";
+      const content = `${guarded.text}${acknowledgement}${documentNote}`
         .slice(0, ANSWER_LIMIT_CHARS)
         .trim();
       if (content.length === 0) {
@@ -248,7 +303,7 @@ export function createSpecialistQAnswer(
       // converges on this text.
       // One projection, used for the event and for the row, so a reopened
       // conversation shows exactly what the live one did.
-      const blocks = analystResultBlocks({
+      const analystBlocks = analystResultBlocks({
         result: {
           findings: result.findings,
           contradictions: result.contradictions.map((contradiction) =>
@@ -257,6 +312,22 @@ export function createSpecialistQAnswer(
         },
         subjects: request.subjects,
       });
+
+      const blocks: QResultBlock[] | undefined =
+        prepared === null
+          ? analystBlocks === undefined
+            ? undefined
+            : [...analystBlocks]
+          : [
+              ...(analystBlocks ?? []),
+              {
+                kind: "ARTIFACT_REFERENCE" as const,
+                artifactId: prepared.artifactId,
+                type: prepared.type,
+                status: prepared.status,
+                title: prepared.title,
+              },
+            ];
       const message = await transactions.run(async (tx) => {
         const stored = await repositories.messages.insert(tx, {
           tenantId: request.tenantId,

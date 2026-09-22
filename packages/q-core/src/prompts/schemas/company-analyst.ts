@@ -231,6 +231,54 @@ export type CompanyAnalystV4Result = z.infer<
 >;
 export const COMPANY_ANALYST_V4_SCHEMA_VERSION = 4;
 
+/**
+ * What the person asked Q to prepare or change, in THIS message
+ * (ADR 0011, ADR 0013).
+ *
+ * "Prepare a short investment brief on my company" is PREPARE; "make the
+ * executive summary shorter and less promotional", said while a brief is
+ * open, is REVISE. Read as meaning rather than matched as words: a person
+ * who says "could you put together something I can send round" is asking
+ * for the same thing.
+ *
+ * `instruction` is the person's own steer in their own words, and it is
+ * never an instruction to the system: it reaches the composer as a bounded
+ * string of what they want said differently, not as authority over what
+ * may be read. The artifact to revise is resolved by the server from the
+ * conversation, never named here — a model that could name one could name
+ * somebody else's.
+ */
+export const ARTIFACT_REQUEST_KINDS = ["PREPARE", "REVISE"] as const;
+export const ArtifactRequestSchema = z
+  .object({
+    kind: z.enum(ARTIFACT_REQUEST_KINDS),
+    /** The only kind this build composes. Reference data, not an enum. */
+    artifactType: z.literal("INVESTMENT_BRIEF"),
+    /** What they want, in their words. Empty when they simply asked for one. */
+    instruction: z.string().trim().max(2_000).default(""),
+    quote: z.string().trim().min(3).max(400),
+  })
+  .strict();
+export type ArtifactRequest = z.infer<typeof ArtifactRequestSchema>;
+
+/**
+ * v4's result plus what the person asked Q to prepare (ADR 0013).
+ *
+ * Nothing here persists anything. The field is a reading; the answer seam
+ * validates the quote against the message, resolves the subject from the
+ * run's own authorised plan, and only then asks the artifact service to
+ * write. A model that fills this field has asked, not acted.
+ */
+export const CompanyAnalystV5ResultSchema = CompanyAnalystV4ResultSchema.extend(
+  {
+    artifactRequest: ArtifactRequestSchema.nullable().default(null),
+  },
+).strict();
+export type CompanyAnalystV5Result = z.infer<
+  typeof CompanyAnalystV5ResultSchema
+>;
+export const COMPANY_ANALYST_V5_SCHEMA_VERSION = 5;
+
 export const NOTHING_REMEMBERED =
   "Nothing is remembered about this person yet.";
 
@@ -251,3 +299,7 @@ export const COMPANY_ANALYST_V4_UNTRUSTED = [
   ...COMPANY_ANALYST_V2_UNTRUSTED,
   "memory",
 ] as const;
+
+export const CompanyAnalystV5VariablesSchema = CompanyAnalystV4VariablesSchema;
+export type CompanyAnalystV5Variables = CompanyAnalystV4Variables;
+export const COMPANY_ANALYST_V5_UNTRUSTED = COMPANY_ANALYST_V4_UNTRUSTED;

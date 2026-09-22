@@ -157,6 +157,19 @@ export {
 export { COMPANY_ANALYST_V2 } from "./prompts/tasks/company-analyst.v2.js";
 export { COMPANY_ANALYST_V3 } from "./prompts/tasks/company-analyst.v3.js";
 export { COMPANY_ANALYST_V4 } from "./prompts/tasks/company-analyst.v4.js";
+export { COMPANY_ANALYST_V5 } from "./prompts/tasks/company-analyst.v5.js";
+export { ARTIFACT_REVISION_V1 } from "./prompts/tasks/artifact-revision.v1.js";
+export {
+  ARTIFACT_REVISION_BODY_MAX,
+  ARTIFACT_REVISION_SCHEMA_NAME,
+  ARTIFACT_REVISION_SCHEMA_VERSION,
+  ARTIFACT_REVISION_SECTIONS_MAX,
+  ARTIFACT_REVISION_UNTRUSTED,
+  ArtifactRevisionResultSchema,
+  ArtifactRevisionVariablesSchema,
+  type ArtifactRevisionResult,
+  type ArtifactRevisionVariables,
+} from "./prompts/schemas/artifact-revision.js";
 export { FOUNDER_ONBOARDING_EXTRACTION_V1 } from "./prompts/tasks/founder-onboarding-extraction.v1.js";
 export { FOUNDER_ONBOARDING_EXTRACTION_V2 } from "./prompts/tasks/founder-onboarding-extraction.v2.js";
 export { INVESTOR_MANDATE_SYNTHESIS_V1 } from "./prompts/tasks/investor-mandate-synthesis.v1.js";
@@ -187,6 +200,15 @@ export {
   type CompanyAnalystV3Result,
   COMPANY_ANALYST_V4_SCHEMA_VERSION,
   COMPANY_ANALYST_V4_UNTRUSTED,
+  COMPANY_ANALYST_V5_SCHEMA_VERSION,
+  COMPANY_ANALYST_V5_UNTRUSTED,
+  ARTIFACT_REQUEST_KINDS,
+  ArtifactRequestSchema,
+  CompanyAnalystV5ResultSchema,
+  CompanyAnalystV5VariablesSchema,
+  type ArtifactRequest,
+  type CompanyAnalystV5Result,
+  type CompanyAnalystV5Variables,
   CompanyAnalystV4ResultSchema,
   CompanyAnalystV4VariablesSchema,
   DisplayNameRequestSchema,
