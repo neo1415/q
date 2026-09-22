@@ -695,6 +695,13 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
    * answers, the answer is thrown away, the same words come back.
    */
   const degradedBySession = new Map<string, number>();
+  /**
+   * Subjects this session has already been sent to look up (QX-004 §1.1,
+   * §1.2). One proactive lookup per subject: research is bounded, it costs
+   * somebody's budget, and a person who has already heard what the public
+   * web says about their company does not need to hear it again.
+   */
+  const researchedBySession = new Map<string, Set<string>>();
   // Asides since the last recorded answer: the first two are answered in
   // full, later ones steer back (the prompt reads the count).
   const tangentsBySession = new Map<string, number>();
@@ -725,6 +732,7 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
       pendingBySession.delete(sessionId);
       warningsBySession.delete(sessionId);
       degradedBySession.delete(sessionId);
+      researchedBySession.delete(sessionId);
       tangentsBySession.delete(sessionId);
     },
 
@@ -1284,12 +1292,71 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
         result.intent === "LOOKUP" && result.lookup !== null
           ? result.lookup
           : null;
+      /**
+       * The subject this journey is about, once it is named (QX-004 §1.1,
+       * §1.2).
+       *
+       * A founder's company, or an investor's organisation — never the
+       * person. Read from what the runtime has actually recorded, so a
+       * value the model proposed and nobody confirmed does not send
+       * anything out of Capital Q.
+       */
+      const subjectName = (() => {
+        const key =
+          input.journeyType === "founder"
+            ? "F1.company_name"
+            : "I0.organisation_name";
+        const recordedValue = view.responses.find((r) => r.stepKey === key);
+        if (recordedValue === undefined) return null;
+        const step = steps.get(key);
+        const described = describeValue(step, recordedValue.value).trim();
+        return described.length === 0 ? null : described;
+      })();
+      const website = (() => {
+        if (input.journeyType !== "founder") return null;
+        const recordedValue = view.responses.find(
+          (r) => r.stepKey === "F1.website",
+        );
+        if (recordedValue === undefined) return null;
+        const step = steps.get("F1.website");
+        const described = describeValue(step, recordedValue.value).trim();
+        return described.length === 0 ? null : described;
+      })();
+
+      /**
+       * Look the subject up once, as soon as it is known.
+       *
+       * Reusing the lookup path the model already has rather than adding a
+       * second way out: the same tools, the same egress policy, the same
+       * treatment of a page's text as data. What comes back is spoken as
+       * unverified public context and confirmed by the person before
+       * anything is recorded — a search result is provenance, never truth.
+       *
+       * It never displaces a question the person actually asked.
+       */
+      const alreadyResearched =
+        researchedBySession.get(input.onboardingSessionId) ?? new Set<string>();
+      const proactive =
+        subjectName !== null && !alreadyResearched.has(subjectName)
+          ? {
+              subject: subjectName,
+              question:
+                website === null
+                  ? lookupQuestion("COMPANY", subjectName)
+                  : lookupQuestion("WEBSITE", website),
+            }
+          : null;
+
       const questionForQ =
         result.intent === "QUESTION_FOR_Q"
           ? result.questionForQ
           : lookup !== null
             ? lookupQuestion(lookup.kind, lookup.query)
-            : null;
+            : (proactive?.question ?? null);
+      if (proactive !== null && questionForQ === proactive.question) {
+        alreadyResearched.add(proactive.subject);
+        researchedBySession.set(input.onboardingSessionId, alreadyResearched);
+      }
 
       /**
        * Q may not say it saved something the runtime refused (QX-004 §0.5).
