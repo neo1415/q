@@ -302,10 +302,11 @@ describe("QX-004 §0.5 · Q may not narrate a save that failed", () => {
     // runtime.
     expect(result.recorded).toEqual([]);
     expect(result.reply).not.toContain("got it");
-    expect(result.reply.toLowerCase()).toContain("didn't go in");
-    // And they are asked the step again, in its own terms. Telling
-    // somebody whose value was refused to "say it once more" invites the
-    // same words back, which is how a refusal becomes a loop.
+    // Q says it will come back to the refused value rather than "that
+    // didn't go in": the earlier phrasing named the loss and then re-asked
+    // the very step that had just been refused, which is how a refusal
+    // becomes a loop. It now returns to the question the session is on.
+    expect(result.reply.toLowerCase()).toContain("come back");
     expect(result.asking?.stepKey).toBe("F1.stage");
     expect(result.reply.toLowerCase()).toContain("stage");
   });
