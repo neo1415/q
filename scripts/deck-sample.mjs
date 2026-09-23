@@ -1,4 +1,4 @@
-/* eslint-disable no-console -- a developer CLI that says where it put the files */
+/* global process, console */
 /**
  * Write a sample deck (QX-004 §5, §6, §7).
  *
