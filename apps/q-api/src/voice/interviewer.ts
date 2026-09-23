@@ -311,14 +311,34 @@ function progressSentence(
   const eligible = view.progress.eligibleSteps;
   const done = eligible.filter((step) => step.status === "COMPLETED");
   const left = Math.max(0, eligible.length - done.length);
-  const current = view.currentStep?.prompt?.trim() ?? "";
-  // Only when the step's prompt is actually a question. Some are bare
-  // labels — "Your firm" — and reading one out is the exact thing that
-  // made the live transcript unusable. A person who asks where they are
-  // is better served by the count alone than by a label read at them.
-  const where = /\?$/.test(current)
-    ? ` We are on this one: ${current.replace(/\?+$/, "")}.`
-    : "";
+  /**
+   * Where they are, said the way Q would ask it.
+   *
+   * Through `askLabel` rather than the step's raw prompt, because the
+   * raw prompt is sometimes the platform's own vocabulary — live, this
+   * sentence ended "We are on this one: Which mandate are we defining",
+   * which is the exact internal term Q is not allowed to say. One place
+   * decides how a step is named to a person, and this is a caller of
+   * it, not an exception to it.
+   */
+  const currentStepManifest =
+    view.currentStep === null || view.currentStep === undefined
+      ? undefined
+      : steps.get(view.currentStep.stepKey);
+  const current = (
+    currentStepManifest === undefined
+      ? (view.currentStep?.prompt ?? "")
+      : askLabel(currentStepManifest)
+  ).trim();
+  // Only when the step's own prompt is actually a question. Some are
+  // bare labels — "Your firm" — and reading one out is the exact thing
+  // that made the live transcript unusable. A person who asks where they
+  // are is better served by the count alone than by a label read at them.
+  const asksSomething = /\?$/.test(view.currentStep?.prompt?.trim() ?? "");
+  const where =
+    asksSomething && current.length > 0
+      ? ` We are on this one: ${current.replace(/\?+$/, "")}.`
+      : "";
   if (done.length === 0) {
     return `Nothing is on your record yet — there are ${String(left)} to go.${where}`;
   }
@@ -337,7 +357,24 @@ function progressSentence(
     .map((step) => {
       const recorded = view.responses.find((r) => r.stepKey === step.stepKey);
       if (recorded === undefined) return null;
-      const label = steps.get(step.stepKey)?.configuration.prompt.trim();
+      /**
+       * A reference the platform resolved is not something they
+       * answered.
+       *
+       * Live, this line read "Are we setting up your main investment
+       * strategy, or a different one: 1 recorded" — a count of rows,
+       * offered to a person as an account of their own progress, for a
+       * choice the platform made on their behalf because there was only
+       * one. Nothing about it belongs in an answer to "where are we?".
+       */
+      if (
+        recorded.value.type === "RESOURCE_REFERENCE" &&
+        recorded.value.resourceType !== "TAXONOMY_NODE"
+      ) {
+        return null;
+      }
+      const manifest = steps.get(step.stepKey);
+      const label = manifest === undefined ? undefined : askLabel(manifest);
       const value = describeValue(
         steps.get(step.stepKey),
         recorded.value,

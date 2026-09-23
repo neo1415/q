@@ -151,6 +151,69 @@ describe("the platform's own vocabulary stays inside the platform", () => {
     expect(outcome.asking?.stepKey).not.toBe("I1.mandate_context");
   });
 
+  it("keeps internal vocabulary out of a progress answer", async () => {
+    /**
+     * Found in a real local conversation: asked "where are we so far?",
+     * Q answered with the count and then "We are on this one: Which
+     * mandate are we defining." The progress sentence is composed by the
+     * runtime from the step's raw prompt, so it walked straight past the
+     * rule the rest of the interview follows. One place names a step to
+     * a person, and this is a caller of it.
+     */
+    const world = investorSession({
+      currentStepKey: "I1.mandate_context",
+      recorded: {
+        "I0.investor_type": "family_office",
+        "I0.organisation_name": "Zino",
+      },
+      mandates: { candidates: [], suggested: null },
+    });
+    const interviewer = createInterviewer({
+      gateway: gateway({
+        ...base,
+        intent: "QUESTION_FOR_Q",
+        reply: "Here's where we are.",
+        answerFromState: "PROGRESS",
+      }),
+      logger,
+    });
+
+    const outcome = await interviewer.turn(turn(world, "where are we so far?"));
+
+    expect(outcome.reply).toContain("2 of 35 answered");
+    expect(outcome.reply).not.toMatch(/mandate/i);
+    expect(outcome.reply).toContain("main investment strategy");
+  });
+
+  it("does not report a reference the platform resolved as their progress", async () => {
+    // Live: "Are we setting up your main investment strategy, or a
+    // different one: 1 recorded" — a row count, offered to a person as
+    // an account of their own progress, for a choice they never made.
+    const world = investorSession({
+      currentStepKey: "I2.stages",
+      recorded: {
+        "I0.investor_type": "family_office",
+        "I0.organisation_name": "Zino",
+        "I1.mandate_context": "55555555-5555-4555-8555-000000000001",
+      },
+    });
+    const interviewer = createInterviewer({
+      gateway: gateway({
+        ...base,
+        intent: "QUESTION_FOR_Q",
+        reply: "Here's where we are.",
+        answerFromState: "PROGRESS",
+      }),
+      logger,
+    });
+
+    const outcome = await interviewer.turn(turn(world, "where are we?"));
+
+    expect(outcome.reply).toContain("Zino");
+    expect(outcome.reply).not.toContain("1 recorded");
+    expect(outcome.reply).not.toMatch(/investment strategy:/i);
+  });
+
   it("asks in plain words when there is a genuine choice to make", async () => {
     const world = investorSession({
       currentStepKey: "I1.mandate_context",
