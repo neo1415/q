@@ -16,6 +16,8 @@
   --cq-surface-raised: oklch(1 0 0);
   --cq-surface-subtle: oklch(0.965 0.005 92);
   --cq-surface-strong: oklch(0.925 0.007 92);
+  /* Below the canvas: a person's own message, a well an answer sits in. */
+  --cq-surface-sunken: oklch(0.955 0.005 92);
 
   --cq-text-primary: oklch(0.19 0.012 258);
   --cq-text-secondary: oklch(0.43 0.012 258);
@@ -42,8 +44,17 @@
 
   --cq-focus-ring: var(--cq-accent);
   --cq-overlay: oklch(0.19 0.012 258 / 0.42);
-  --cq-shadow-overlay: 0 12px 32px -8px oklch(0.19 0.012 258 / 0.28);
+
+  /*
+   * Shadows communicate elevation only (doc 18 §27): xs for a resting
+   * composer or dossier, sm for a popover/menu, overlay for sheets and
+   * dialogs. Ordinary panels and cards take a border and no shadow.
+   */
   --cq-shadow-xs: 0 1px 2px oklch(0.19 0.012 258 / 0.06);
+  --cq-shadow-sm:
+    0 1px 2px oklch(0.19 0.012 258 / 0.06),
+    0 4px 12px -4px oklch(0.19 0.012 258 / 0.1);
+  --cq-shadow-overlay: 0 12px 32px -8px oklch(0.19 0.012 258 / 0.28);
 
   /* Radius (doc 18 §25). Pills are for chips and statuses only. */
   --cq-radius-xs: 4px;
@@ -68,6 +79,8 @@
   --cq-layout-content: 1040px;
   --cq-layout-reading: 760px;
   --cq-layout-narrow: 600px;
+  /* Page edge padding (doc 18 §§23–24): 16 mobile, 24 tablet, 32 desktop. */
+  --cq-page-gutter: 16px;
 
   /* Application shell metrics; the shell reserves this space for real. */
   --cq-header-height: 52px;
@@ -78,11 +91,44 @@
   --cq-safe-left: env(safe-area-inset-left, 0px);
   --cq-safe-right: env(safe-area-inset-right, 0px);
 
-  /* Motion: ordinary interactions complete in 90–280 ms. */
-  --cq-motion-fast: 120ms;
-  --cq-motion-base: 180ms;
-  --cq-motion-slow: 260ms;
-  --cq-ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+  /*
+   * Motion (doc 18 §§118–121). Ordinary interactions complete within
+   * 90–280 ms; only spatial moves (a sheet, a drawer) take 360 ms, and
+   * nothing in the core application exceeds 400 ms. Amplitude stays small:
+   * 2–4 px for control feedback, 8–16 px for content arriving.
+   */
+  --cq-motion-instant: 90ms;
+  --cq-motion-fast: 140ms;
+  --cq-motion-base: 200ms;
+  --cq-motion-emphasis: 280ms;
+  --cq-motion-slow: 360ms;
+  --cq-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --cq-ease-exit: cubic-bezier(0.4, 0, 1, 1);
+
+  /*
+   * Q's voice stage: one night in either theme (CQ-Q-VOICE-001). The stage
+   * is a calm inverted field, never a glow: Q's presence is the mark, its
+   * state label and a waveform, and these tokens are all the stage reads.
+   */
+  --cq-stage-canvas: oklch(0.17 0.02 262);
+  --cq-stage-surface: oklch(1 0 0 / 0.06);
+  --cq-stage-surface-strong: oklch(1 0 0 / 0.12);
+  --cq-stage-border: oklch(1 0 0 / 0.14);
+  --cq-stage-text: oklch(0.98 0.004 92);
+  --cq-stage-text-muted: oklch(1 0 0 / 0.62);
+  --cq-stage-accent: oklch(0.76 0.14 258);
+}
+
+@media (min-width: 640px) {
+  :root {
+    --cq-page-gutter: 24px;
+  }
+}
+
+@media (min-width: 1024px) {
+  :root {
+    --cq-page-gutter: 32px;
+  }
 }
 
 /* Dark: structurally viable now; appearance controls arrive later. */
@@ -94,6 +140,7 @@
     --cq-surface-raised: oklch(0.22 0.011 258);
     --cq-surface-subtle: oklch(0.24 0.01 258);
     --cq-surface-strong: oklch(0.3 0.01 258);
+    --cq-surface-sunken: oklch(0.14 0.01 258);
     --cq-text-primary: oklch(0.95 0.005 92);
     --cq-text-secondary: oklch(0.75 0.008 258);
     --cq-text-tertiary: oklch(0.61 0.008 258);
@@ -111,6 +158,10 @@
     --cq-danger: oklch(0.7 0.16 27);
     --cq-danger-soft: oklch(0.28 0.06 27);
     --cq-overlay: oklch(0.1 0.01 258 / 0.6);
+    --cq-shadow-xs: 0 1px 2px oklch(0.05 0.01 258 / 0.4);
+    --cq-shadow-sm:
+      0 1px 2px oklch(0.05 0.01 258 / 0.4),
+      0 4px 12px -4px oklch(0.05 0.01 258 / 0.5);
     --cq-shadow-overlay: 0 12px 32px -8px oklch(0.05 0.01 258 / 0.7);
   }
 }
@@ -122,6 +173,7 @@
   --cq-surface-raised: oklch(0.22 0.011 258);
   --cq-surface-subtle: oklch(0.24 0.01 258);
   --cq-surface-strong: oklch(0.3 0.01 258);
+  --cq-surface-sunken: oklch(0.14 0.01 258);
   --cq-text-primary: oklch(0.95 0.005 92);
   --cq-text-secondary: oklch(0.75 0.008 258);
   --cq-text-tertiary: oklch(0.61 0.008 258);
@@ -139,6 +191,10 @@
   --cq-danger: oklch(0.7 0.16 27);
   --cq-danger-soft: oklch(0.28 0.06 27);
   --cq-overlay: oklch(0.1 0.01 258 / 0.6);
+  --cq-shadow-xs: 0 1px 2px oklch(0.05 0.01 258 / 0.4);
+  --cq-shadow-sm:
+    0 1px 2px oklch(0.05 0.01 258 / 0.4),
+    0 4px 12px -4px oklch(0.05 0.01 258 / 0.5);
   --cq-shadow-overlay: 0 12px 32px -8px oklch(0.05 0.01 258 / 0.7);
 }
 
@@ -190,6 +246,12 @@
     line-height: 1.3;
     font-weight: 600;
   }
+  /* An item title inside a list or panel: a company in Discover, a fact group. */
+  .cq-title-sm {
+    font-size: 17px;
+    line-height: 1.35;
+    font-weight: 600;
+  }
   .cq-body-lg {
     font-size: 17px;
     line-height: 1.55;
@@ -215,6 +277,62 @@
     font-variant-numeric: tabular-nums;
   }
 
+  /*
+   * Q prose and evidence reading (doc 18 §§19, 102): an open, document-like
+   * measure of ~62–78 characters. Never a chat bubble, never stretched
+   * across the workspace.
+   */
+  .cq-prose {
+    max-width: 70ch;
+    line-height: 1.6;
+  }
+  .cq-prose > * + * {
+    margin-top: 0.75em;
+  }
+  .cq-prose strong {
+    font-weight: 600;
+  }
+
+  /*
+   * The dossier panel (doc 18 §§26–29): one bordered surface for a discrete
+   * object -- a company, a mandate, an approval, a snapshot -- with rows
+   * divided by hairlines rather than nested cards. No shadow at rest.
+   */
+  .cq-panel {
+    border: 1px solid var(--cq-border-subtle);
+    border-radius: var(--cq-radius-lg);
+    background-color: var(--cq-surface);
+  }
+  .cq-panel-header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 14px 20px 12px;
+    border-bottom: 1px solid var(--cq-border-subtle);
+  }
+  .cq-panel-body {
+    padding: 16px 20px;
+  }
+  .cq-panel-rows > * + * {
+    border-top: 1px solid var(--cq-border-subtle);
+  }
+
+  /*
+   * A quiet status line: provenance, freshness, scope, or what Q is doing.
+   * Caption size, tertiary colour, an icon or the Q mark for meaning. It
+   * never carries an alert tone; a state that needs attention is a notice.
+   */
+  .cq-status-line {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 20px;
+    font-size: 12px;
+    line-height: 1.35;
+    color: var(--cq-text-tertiary);
+  }
+
   @media (min-width: 768px) {
     .cq-display {
       font-size: 40px;
@@ -228,9 +346,31 @@
     .cq-title-md {
       font-size: 21px;
     }
+    .cq-title-sm {
+      font-size: 18px;
+    }
     .cq-body {
       font-size: 15px;
     }
+  }
+
+  /*
+   * Content arriving (doc 18 §121): 8–16 px rise, opacity, one emphasis
+   * beat. For a step, an answer block, a panel that was not there before.
+   * Stilled by the global reduced-motion rule.
+   */
+  @keyframes cq-arrive {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  .cq-arrive {
+    animation: cq-arrive var(--cq-motion-emphasis) var(--cq-ease) both;
   }
 
   /* Q working rhythm: three dots, opacity only, static under reduced motion. */

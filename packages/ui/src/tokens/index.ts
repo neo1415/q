@@ -15,6 +15,22 @@ export const THEME_COLORS = {
   },
 } as const;
 
+/**
+ * Motion timing in seconds, for the rare script-driven animation (Web
+ * Animations API, a future Motion for React) that cannot read a custom
+ * property. Mirrors `--cq-motion-*` and `--cq-ease*` in tokens.css exactly;
+ * CSS transitions read the tokens directly and never these.
+ */
+export const MOTION = {
+  instant: 0.09,
+  fast: 0.14,
+  base: 0.2,
+  emphasis: 0.28,
+  slow: 0.36,
+} as const;
+export const EASE_STANDARD = [0.22, 1, 0.36, 1] as const;
+export const EASE_EXIT = [0.4, 0, 1, 1] as const;
+
 /** Semantic z-layers; the CSS custom properties are the source of truth. */
 export const Z_LAYERS = [
   "base",
