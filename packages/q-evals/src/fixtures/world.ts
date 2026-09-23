@@ -714,10 +714,11 @@ export async function createQEvalWorld(
   // gets a fresh one, so a case's result is its own.
   let providerHealth = createProcessLocalProviderHealth();
   const health: ProviderHealthPort = {
-    state: (code, at) => providerHealth.state(code, at),
-    recordFailure: (code, failureClass, at) =>
-      providerHealth.recordFailure(code, failureClass, at),
-    recordSuccess: (code, at) => providerHealth.recordSuccess(code, at),
+    state: (code, model, at) => providerHealth.state(code, model, at),
+    recordFailure: (code, model, failureClass, at, elapsedMs) =>
+      providerHealth.recordFailure(code, model, failureClass, at, elapsedMs),
+    recordSuccess: (code, model, at) =>
+      providerHealth.recordSuccess(code, model, at),
   };
 
   const gateway = createModelGateway({

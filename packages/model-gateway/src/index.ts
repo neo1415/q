@@ -122,3 +122,9 @@ export {
 } from "./infrastructure/postgres-usage.js";
 
 export const PACKAGE_NAME = "@capital-q/model-gateway" as const;
+
+export {
+  withTestRouting,
+  TestRoutingRefusedError,
+  type TestRoutingOptions,
+} from "./policy/test-route.js";

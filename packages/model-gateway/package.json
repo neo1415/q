@@ -24,6 +24,10 @@
     "./extraction": {
       "types": "./dist/extraction/claim-proposer.d.ts",
       "default": "./dist/extraction/claim-proposer.js"
+    },
+    "./providers/openai": {
+      "types": "./dist/providers/openai.d.ts",
+      "default": "./dist/providers/openai.js"
     }
   },
   "main": "./dist/index.js",
@@ -47,6 +51,7 @@
     "@capital-q/security": "workspace:*",
     "@google/genai": "2.21.0",
     "groq-sdk": "1.6.0",
+    "openai": "7.21.0",
     "zod": "4.5.4"
   },
   "devDependencies": {

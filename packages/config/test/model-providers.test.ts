@@ -48,6 +48,8 @@ describe("model provider configuration", () => {
       googleKeys: 0,
       groq: "unconfigured",
       groqKeys: 0,
+      openai: "unconfigured",
+      testProvider: undefined,
     });
 
     const groqOnly = parseQApiConfig({ ...base, GROQ_API_KEY: GROQ });
@@ -57,6 +59,8 @@ describe("model provider configuration", () => {
       googleKeys: 0,
       groq: "configured",
       groqKeys: 1,
+      openai: "unconfigured",
+      testProvider: undefined,
     });
     expect(groqOnly.secrets.modelProviders.google).toBeUndefined();
     expect(groqOnly.secrets.modelProviders.groq?.reveal()).toBe(GROQ);

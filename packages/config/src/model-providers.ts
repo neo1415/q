@@ -105,6 +105,25 @@ export const modelProviderEnvShape = {
   GROQ_API_KEY_2: apiKey.optional(),
   GROQ_API_KEY_3: apiKey.optional(),
   GROQ_API_KEY_4: apiKey.optional(),
+  /**
+   * OpenAI, for diagnosis only (QX-004 core gate).
+   *
+   * No routing policy names it. It is reachable only through the
+   * server-side test route, which refuses to exist outside a local or
+   * test environment and without the synthetic-demo attestation. The
+   * account holds a few dollars; the adapter runs one model and refuses
+   * every other.
+   */
+  OPENAI_API_KEY: apiKey.optional(),
+  // Both spellings, as the Gemini keys already are: the key was in use
+  // under this name before it was configurable.
+  OPEN_AI_API_KEY: apiKey.optional(),
+  /**
+   * Put one provider's models first, for a deployment that is diagnosing
+   * rather than serving. Named by code (`openai`). Absent is the ordinary
+   * case and the production one.
+   */
+  CQ_TEST_MODEL_PROVIDER: z.string().trim().max(32).optional(),
 };
 
 export type ModelProviderSecrets = {
@@ -126,10 +145,17 @@ export type ModelProviderSecrets = {
   readonly groq: ProviderCredential | undefined;
   /** Every GroqCloud key in order, the first being `groq`; empty when unconfigured. */
   readonly groqKeys: readonly ProviderCredential[];
+  /** OpenAI, diagnostic only; absent means the adapter is not configured. */
+  readonly openai: ProviderCredential | undefined;
+  /** Which provider a diagnosing deployment asked to try first, if any. */
+  readonly testProviderCode: string | undefined;
 };
 
 export type ModelProviderConfigStatus = {
   readonly syntheticDemoRouting: boolean;
+  readonly openai: "configured" | "unconfigured";
+  /** Named only when a deployment asked to diagnose; never in production. */
+  readonly testProvider: string | undefined;
   readonly google: "configured" | "unconfigured";
   /** How many Gemini keys rotate; never which. */
   readonly googleKeys: number;
@@ -149,6 +175,9 @@ export function toModelProviderSecrets(parsed: {
   readonly GROQ_API_KEY_2?: string | undefined;
   readonly GROQ_API_KEY_3?: string | undefined;
   readonly GROQ_API_KEY_4?: string | undefined;
+  readonly OPENAI_API_KEY?: string | undefined;
+  readonly OPEN_AI_API_KEY?: string | undefined;
+  readonly CQ_TEST_MODEL_PROVIDER?: string | undefined;
 }): ModelProviderSecrets {
   const groqKeys = [
     parsed.GROQ_API_KEY,
@@ -172,6 +201,11 @@ export function toModelProviderSecrets(parsed: {
     googleKeys,
     groq: groqKeys[0],
     groqKeys,
+    openai: ((key) =>
+      key === undefined ? undefined : new ProviderCredential(key))(
+      parsed.OPENAI_API_KEY ?? parsed.OPEN_AI_API_KEY,
+    ),
+    testProviderCode: parsed.CQ_TEST_MODEL_PROVIDER,
   };
 }
 
@@ -185,5 +219,7 @@ export function modelProviderConfigStatus(
     groq: secrets.groq === undefined ? "unconfigured" : "configured",
     googleKeys: secrets.googleKeys.length,
     groqKeys: secrets.groqKeys.length,
+    openai: secrets.openai === undefined ? "unconfigured" : "configured",
+    testProvider: secrets.testProviderCode,
   };
 }

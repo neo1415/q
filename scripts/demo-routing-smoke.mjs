@@ -89,13 +89,28 @@ const { loadDatabaseConfig } = await import(
   pathToFileURL(resolve(root, "packages/config/dist/database.js")).href
 );
 
+/**
+ * `--gemini-only` leaves Groq out of the registry entirely.
+ *
+ * Not a ceiling change and not a policy change: the adapter is simply
+ * not configured, which is what a spent free tier looks like from the
+ * gateway's side. It is how the demo's real question gets answered in
+ * seconds rather than after a deployment — can this conversation run on
+ * Gemini alone?
+ */
+const geminiOnly = process.argv.includes("--gemini-only");
+const googleProvider =
+  process.env.GEMINI_API_KEY === undefined
+    ? undefined
+    : createGoogleModelProvider({
+        apiKey: process.env.GEMINI_API_KEY,
+        additionalApiKeys: [process.env.GEMINI_API_KEY2].filter(
+          (key) => key !== undefined,
+        ),
+      });
 const providers = [];
-if (process.env.GEMINI_API_KEY !== undefined) {
-  providers.push(
-    createGoogleModelProvider({ apiKey: process.env.GEMINI_API_KEY }),
-  );
-}
-if (process.env.GROQ_API_KEY !== undefined) {
+if (googleProvider !== undefined) providers.push(googleProvider);
+if (!geminiOnly && process.env.GROQ_API_KEY !== undefined) {
   providers.push(createGroqModelProvider({ apiKey: process.env.GROQ_API_KEY }));
 }
 if (providers.length === 0) {
@@ -178,6 +193,77 @@ async function run(dataPosture) {
   console.log("");
 }
 
-await run("SYNTHETIC_DEMO");
-await run("REAL_CUSTOMER");
+/**
+ * Each configured Gemini model, asked directly.
+ *
+ * Hosted, `gemini-3.5-flash-lite` answered 503 and the circuit breaker —
+ * keyed by provider — took `gemini-3.8-flash` down with it, leaving the
+ * interview no route at all. Health is now keyed by provider AND model,
+ * and the unit tests hold that. What they cannot say is whether each
+ * model is actually answering today, so this asks the vendor, one model
+ * at a time, through the same adapter the gateway uses.
+ */
+async function askEachGoogleModel() {
+  if (googleProvider === undefined) {
+    console.log("gemini: no key configured\n");
+    return;
+  }
+  const catalogue = await createPostgresModelCatalog({
+    sql: database.sql,
+  }).load();
+  const google = catalogue.providers.find((p) => p.code === "google");
+  const models = catalogue.models
+    .filter(
+      (model) =>
+        model.providerId === google?.id &&
+        model.status === "ACTIVE" &&
+        model.modelType === "TEXT_GENERATION",
+    )
+    .map((model) => model.modelCode);
+  for (const modelCode of [...new Set(models)]) {
+    const started = Date.now();
+    const controller = new AbortController();
+    const stop = setTimeout(() => controller.abort(), 30_000);
+    try {
+      const result = await googleProvider.generate(
+        {
+          modelCode,
+          messages: [{ role: "USER", content: PROMPT }],
+          output: { kind: "TEXT" },
+          tools: [],
+          maxOutputTokens: 256,
+          temperature: 0.2,
+          reasoning: "NONE",
+        },
+        {
+          signal: controller.signal,
+          attemptTimeoutMs: 30_000,
+          attempt: 1,
+          correlationId: `cor_${randomUUID()}`,
+        },
+      );
+      console.log(
+        `gemini  ${modelCode.padEnd(26)} answered  ${String(Date.now() - started).padStart(6)} ms  ${String(result.text).slice(0, 60).replace(/\s+/g, " ")}`,
+      );
+    } catch (error) {
+      console.log(
+        `gemini  ${modelCode.padEnd(26)} ${String(error.failureClass ?? error.name).padEnd(9)} ${String(Date.now() - started).padStart(6)} ms  ${String(error.message ?? "").slice(0, 80)}`,
+      );
+    } finally {
+      clearTimeout(stop);
+    }
+  }
+  console.log("");
+}
+
+if (geminiOnly) {
+  console.log(
+    "groq: not configured for this run (a spent free tier looks the same)\n",
+  );
+  await run("SYNTHETIC_DEMO");
+  await askEachGoogleModel();
+} else {
+  await run("SYNTHETIC_DEMO");
+  await run("REAL_CUSTOMER");
+}
 await database.close();

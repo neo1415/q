@@ -197,7 +197,7 @@ export type ProviderHealthPort = {
      * a provider when the caller waited long enough for it to be — see
      * `createProcessLocalProviderHealth`.
      */
-    elapsedMs?: number | undefined,
+    elapsedMs?: number  ,
   ) => void;
   readonly recordSuccess: (
     code: ModelProviderCode,

@@ -404,6 +404,24 @@ export function schemaForGemini(node: unknown): unknown {
 /** How long a rate-limited key is set aside when the provider says nothing. */
 const KEY_COOLDOWN_MS = 60_000;
 
+/** Gemini refuses a request deadline below this and returns HTTP 400. */
+export const GEMINI_MIN_DEADLINE_MS = 10_000;
+
+/**
+ * The deadline to send Gemini for a caller who will wait `budgetMs`.
+ *
+ * Floored, because Gemini refuses anything under ten seconds outright —
+ * "Manually set deadline 8s is too short. Minimum allowed deadline is
+ * 10s", HTTP 400, every call. A caller with a shorter budget is not
+ * asking for something invalid; it is asking to stop waiting sooner, and
+ * the abort signal is what enforces that. Sending a number the vendor
+ * rejects turns a short budget into a broken conversation, which is what
+ * it did (local, 2026-09-22).
+ */
+export function geminiDeadlineMs(budgetMs: number): number {
+  return Math.max(GEMINI_MIN_DEADLINE_MS, budgetMs);
+}
+
 export function createGoogleModelProvider(
   options: GoogleModelProviderOptions,
 ): ModelProvider {
@@ -483,8 +501,11 @@ export function createGoogleModelProvider(
       const config: GenerateContentConfig = {
         abortSignal: context.signal,
         // The gateway owns retry and its own timeout; the SDK gets one shot.
+        //
+        // Floored: see geminiDeadlineMs. The abort signal above is what
+        // actually enforces a caller's shorter budget.
         httpOptions: {
-          timeout: context.attemptTimeoutMs,
+          timeout: geminiDeadlineMs(context.attemptTimeoutMs),
           retryOptions: { attempts: 1 },
         },
         maxOutputTokens: request.maxOutputTokens,
