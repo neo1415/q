@@ -385,6 +385,7 @@ describe("createPlaybackAuthorization", () => {
       mediaAssetId: MEDIA_ASSET_ID,
       token: "eyJ.synthetic.token",
       playbackUrl: `https://${SUBDOMAIN}/eyJ.synthetic.token/manifest/video.m3u8`,
+      posterUrl: `https://${SUBDOMAIN}/eyJ.synthetic.token/thumbnails/thumbnail.jpg`,
       expiresAt: "2026-09-23T12:10:00.000Z",
     });
     expect(double.calls[0]?.url).toBe(
@@ -440,6 +441,7 @@ describe("createPlaybackAuthorization", () => {
     expect(authorization).toEqual({
       mediaAssetId: MEDIA_ASSET_ID,
       playbackUrl: `https://${SUBDOMAIN}/${UID}/manifest/video.m3u8`,
+      posterUrl: `https://${SUBDOMAIN}/${UID}/thumbnails/thumbnail.jpg`,
       expiresAt: "2026-09-23T12:10:00.000Z",
     });
   });

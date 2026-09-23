@@ -145,6 +145,8 @@ export const PlaybackAuthorizationSchema = z
     /** Opaque provider grant, if the provider issues one. */
     token: z.string().min(1).optional(),
     playbackUrl: z.string().url(),
+    /** The poster frame, under the same grant, when the provider serves one. */
+    posterUrl: z.string().url().optional(),
     expiresAt: z.string(),
   })
   .strict();

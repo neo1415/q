@@ -1,5 +1,9 @@
 import type { DatabaseExecutor, TransactionContext } from "@capital-q/database";
-import type { OrganisationId, TenantId } from "@capital-q/security";
+import type {
+  ActorContext,
+  OrganisationId,
+  TenantId,
+} from "@capital-q/security";
 
 import type {
   CaptionState,
@@ -143,6 +147,30 @@ export type CompanyPitchQueryPort = {
 
 export type MediaRepositories = {
   readonly mediaAssets: MediaAssetRepository;
+};
+
+/**
+ * May this actor, who does not own the company, view its pitch right now
+ * (CQ-MEDIA-011)?
+ *
+ * Media does not decide that. Discoverability is the Recommendation
+ * context's REC-001 rule — the company is active and network-visible, the
+ * disclosure evaluator admits this viewer, no hard exclusion stands — and
+ * this port is how the composition root hands that exact evaluation in,
+ * so playback cannot drift from what the feed shows. Null is the only
+ * refusal, and it is indistinguishable from a company that never existed.
+ *
+ * The company's tenant comes back with the answer because the viewer is in
+ * another tenant, and every media read is tenant-scoped by construction.
+ */
+export type PitchViewerAccessPort = {
+  readonly resolveViewableCompany: (
+    actor: ActorContext,
+    companyId: string,
+  ) => Promise<{
+    readonly tenantId: TenantId;
+    readonly ownerOrganisationId: OrganisationId;
+  } | null>;
 };
 
 export type { OrganisationId };

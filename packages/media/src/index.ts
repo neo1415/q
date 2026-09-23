@@ -45,6 +45,7 @@ export {
   isReady,
   isTerminal,
   isUnusable,
+  transitionPath,
 } from "./domain/lifecycle.js";
 export {
   createCompanyMediaOwnerResolver,
@@ -64,7 +65,16 @@ export type {
   CompanyPitchQueryPort,
   MediaAssetRepository,
   MediaRepositories,
+  PitchViewerAccessPort,
 } from "./application/ports.js";
+export {
+  aspectRatioOf,
+  type AuthorisePlaybackQuery,
+  type CreateUploadSessionCommand,
+  type PlaybackGrant,
+  type SyncMediaAssetCommand,
+  type UploadSessionResult,
+} from "./application/upload-use-cases.js";
 export {
   CreateCompanyPitchInputSchema,
   type CompanyPitchResult,
@@ -85,6 +95,7 @@ export {
 } from "./application/lifecycle-use-cases.js";
 export {
   createMediaService,
+  NO_PITCH_VIEWERS,
   type MediaService,
   type MediaServiceOptions,
 } from "./application/service.js";

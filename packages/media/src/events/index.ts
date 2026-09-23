@@ -95,10 +95,37 @@ export const MediaAssetDeletedEvent = defineEvent({
     "A media asset was deleted. Application visibility ends; provider deletion and any derived material are handled under their own policies.",
 });
 
+/**
+ * The lifecycle moved (CQ-MEDIA-011). One event for every legal step,
+ * carrying both ends, rather than a `ready` and a `failed` and a
+ * `processing` that each consumer would have to reassemble into a
+ * sequence. A READY here means the provider said so and Capital Q's
+ * lifecycle accepted it; it still does not mean discoverable or approved.
+ */
+export const MediaAssetStatusChangedEvent = defineEvent({
+  name: "media.asset.status_changed",
+  version: 1,
+  owner: MEDIA_EVENT_OWNER,
+  producer: MEDIA_EVENT_PRODUCER,
+  consumers: CONSUMERS,
+  sensitivity: "INTERNAL",
+  replaySafety: "REPLAY_SAFE",
+  dataSchema: z
+    .object({
+      ...ownership,
+      previousStatus: MediaStatusSchema,
+      status: MediaStatusSchema,
+    })
+    .strict(),
+  description:
+    "A media asset moved one step along Capital Q's lifecycle, as observed from the provider. Carries no provider identifier, upload target or playback material.",
+});
+
 export const MEDIA_EVENTS: readonly EventDefinition[] = [
   MediaAssetCreatedEvent,
   MediaAssetReplacedEvent,
   MediaAssetDeletedEvent,
+  MediaAssetStatusChangedEvent,
 ];
 
 type Context = {
@@ -155,6 +182,19 @@ export function mediaAssetReplacedEvent(
     MediaAssetReplacedEvent,
     context,
     { type: "media_asset", id: data.mediaAssetId, version: 1 },
+    data,
+  );
+}
+
+export function mediaAssetStatusChangedEvent(
+  context: Context,
+  assetVersion: number,
+  data: z.infer<typeof MediaAssetStatusChangedEvent.dataSchema>,
+) {
+  return envelope(
+    MediaAssetStatusChangedEvent,
+    context,
+    { type: "media_asset", id: data.mediaAssetId, version: assetVersion },
     data,
   );
 }

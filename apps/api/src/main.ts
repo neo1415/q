@@ -40,6 +40,7 @@ import {
   createPostgresCapitalObjectiveQueryPort,
 } from "@capital-q/capital";
 import {
+  CompanyIdSchema,
   createCompanyService,
   createPostgresCompanyMarketplaceQueryPort,
   createPostgresCompanyQueryPort,
@@ -511,20 +512,6 @@ const videoProvider =
                 pem: cloudflareStream.signingKey.pem.reveal(),
               },
       });
-const media = createMediaService({
-  sql: database.sql,
-  transactions: database.transactions,
-  authorization,
-  owners: createMediaOwnerResolverRegistry([
-    createCompanyMediaOwnerResolver(
-      createPostgresCompanyQueryPort({ sql: database.sql }),
-    ),
-  ]),
-  outbox,
-  audit,
-  videoProvider,
-});
-
 // Discovery (doc 19): the founder side still reads the deterministic
 // visibility slate; the investor side is served from persisted
 // recommendation slates (CQ-REC-006) behind a read-time REC-001 guard over
@@ -591,6 +578,69 @@ const interactions = createInteractionSignalService({
   eligibility: slates.eligibility,
   slates: slates.slates,
   repository: createPostgresInteractionRepository({ sql: database.sql }),
+});
+
+// Pitch media. Composed after discovery because a viewer's right to play
+// a pitch (CQ-MEDIA-011) is the same REC-001 evaluation the feed runs on
+// every page and the interaction service runs on every save: the actor's
+// own investor organisation, its ACTIVE mandate, and the company eligible
+// for it now. The company's tenant comes from the marketplace facts, never
+// from the request. Media itself decides nothing about discoverability.
+const marketplaceFacts = createPostgresCompanyMarketplaceQueryPort({
+  sql: database.sql,
+});
+const media = createMediaService({
+  sql: database.sql,
+  transactions: database.transactions,
+  authorization,
+  owners: createMediaOwnerResolverRegistry([
+    createCompanyMediaOwnerResolver(
+      createPostgresCompanyQueryPort({ sql: database.sql }),
+    ),
+  ]),
+  outbox,
+  audit,
+  videoProvider,
+  viewers: {
+    resolveViewableCompany: async (actor, companyId) => {
+      const investor =
+        await slates.eligibilityPorts.investorSubject.investorOrganisationFor(
+          actor,
+        );
+      if (investor === null) return null;
+      const mandate = await slates.eligibilityPorts.mandates.activeMandate({
+        tenantId: actor.tenantId,
+        investorOrganisationId: investor.investorOrganisationId,
+        mandateId: null,
+      });
+      if (mandate.kind !== "FOUND" || mandate.mandate.status !== "ACTIVE") {
+        return null;
+      }
+      const parsedCompanyId = CompanyIdSchema.safeParse(companyId);
+      if (!parsedCompanyId.success) return null;
+      const evaluation = await slates.eligibility.evaluate({
+        actor,
+        mode: "INVESTOR_DISCOVER",
+        mandateId: mandate.mandate.mandateId,
+        companyIds: [parsedCompanyId.data],
+      });
+      const eligible = evaluation.results.some(
+        (result) =>
+          result.companyId === parsedCompanyId.data &&
+          result.decision === "ELIGIBLE",
+      );
+      if (!eligible) return null;
+      const [facts] = await marketplaceFacts.findCanonicalMarketplaceFacts([
+        parsedCompanyId.data,
+      ]);
+      return facts === undefined
+        ? null
+        : {
+            tenantId: facts.tenantId,
+            ownerOrganisationId: facts.organisationId,
+          };
+    },
+  },
 });
 
 const { app, logger } = createApp(config, security, {

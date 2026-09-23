@@ -320,6 +320,219 @@ describe("GET /v1/companies/:companyId/pitch", () => {
   });
 });
 
+// The direct upload flow (CQ-MEDIA-011). The service is a double, so what
+// is proven here is the HTTP boundary: the DTOs carry exactly the contract
+// fields, the version the client saw reaches the service and nothing else
+// does, the provider's identifier never appears in any answer, and an
+// unconfigured provider is said plainly.
+describe("POST /v1/companies/:companyId/pitch/:mediaAssetId/{upload-session,sync,playback}", () => {
+  const assetUrl = `${pitchUrl}/${ASSET_ID}`;
+  const UPLOAD_URL = "https://upload.provider.example/one-time-target";
+
+  it("reserves an upload with the version the client saw and returns the contract DTO", async () => {
+    const commands: unknown[] = [];
+    const { service } = fakeService({
+      createUploadSession: (command: unknown) => {
+        commands.push(command);
+        return Promise.resolve({
+          asset: {
+            ...ASSET,
+            status: "UPLOAD_PENDING",
+            provider: "CLOUDFLARE_STREAM",
+            version: 3,
+          },
+          session: {
+            providerAssetId: PROVIDER_SECRET,
+            uploadMode: "DIRECT",
+            uploadUrl: UPLOAD_URL,
+            expiresAt: "2026-09-06T09:30:00.000Z",
+          },
+          maxDurationSeconds: 180,
+        });
+      },
+    });
+    const app = buildApp({ principal: PRINCIPAL, context: CONTEXT, service });
+    const response = await app.inject({
+      method: "POST",
+      url: `${assetUrl}/upload-session`,
+      payload: { expectedVersion: 1 },
+    });
+    expect(response.statusCode).toBe(201);
+    expect(response.headers["cache-control"]).toBe("no-store");
+    const body = response.json<{
+      mediaAssetId: string;
+      uploadMode: string;
+      uploadUrl: string;
+      expiresAt: string;
+      maxDurationSeconds: number;
+      pitch: { status: string; version: number };
+    }>();
+    expect(body).toMatchObject({
+      mediaAssetId: ASSET_ID,
+      uploadMode: "DIRECT",
+      uploadUrl: UPLOAD_URL,
+      expiresAt: "2026-09-06T09:30:00.000Z",
+      maxDurationSeconds: 180,
+      pitch: { status: "UPLOAD_PENDING", version: 3 },
+    });
+    expect(response.payload).not.toContain(PROVIDER_SECRET);
+    expect(commands[0]).toMatchObject({
+      companyId: COMPANY,
+      mediaAssetId: ASSET_ID,
+      expectedVersion: 1,
+    });
+    // Nothing else the body could carry reaches the service.
+    expect(Object.keys(commands[0] as object).sort()).toEqual([
+      "actor",
+      "companyId",
+      "correlationId",
+      "expectedVersion",
+      "mediaAssetId",
+    ]);
+    await app.close();
+  });
+
+  it("refuses an upload request that names anything but the version", async () => {
+    const { service } = fakeService();
+    const app = buildApp({ principal: PRINCIPAL, context: CONTEXT, service });
+    for (const payload of [
+      {},
+      { expectedVersion: 1, maxDurationSeconds: 3600 },
+      { expectedVersion: 1, requireSignedPlayback: false },
+      { expectedVersion: "1" },
+    ]) {
+      const response = await app.inject({
+        method: "POST",
+        url: `${assetUrl}/upload-session`,
+        payload,
+      });
+      expect(response.statusCode).toBe(422);
+    }
+    await app.close();
+  });
+
+  it("syncs idempotently and answers with the asset as it now is", async () => {
+    let syncs = 0;
+    const { service } = fakeService({
+      syncMediaAsset: () => {
+        syncs += 1;
+        return Promise.resolve({ ...ASSET, status: "PROCESSING", version: 4 });
+      },
+    });
+    const app = buildApp({ principal: PRINCIPAL, context: CONTEXT, service });
+    for (const attempt of [1, 2]) {
+      const response = await app.inject({
+        method: "POST",
+        url: `${assetUrl}/sync`,
+        payload: {},
+      });
+      expect(response.statusCode, `attempt ${String(attempt)}`).toBe(200);
+      expect(response.json<{ pitch: { status: string } }>().pitch.status).toBe(
+        "PROCESSING",
+      );
+      expect(response.payload).not.toContain(PROVIDER_SECRET);
+    }
+    expect(syncs).toBe(2);
+    await app.close();
+  });
+
+  it("mints a playback authorization with no provider identifier and no token field", async () => {
+    const { service } = fakeService({
+      authorisePlayback: () =>
+        Promise.resolve({
+          asset: { ...ASSET, status: "READY" },
+          authorization: {
+            mediaAssetId: ASSET.id,
+            token: "SIGNED-TOKEN-VALUE",
+            playbackUrl:
+              "https://edge.provider.example/SIGNED-TOKEN-VALUE/manifest/video.m3u8",
+            posterUrl:
+              "https://edge.provider.example/SIGNED-TOKEN-VALUE/thumbnails/thumbnail.jpg",
+            expiresAt: "2026-09-06T09:15:00.000Z",
+          },
+        }),
+    });
+    const app = buildApp({ principal: PRINCIPAL, context: CONTEXT, service });
+    const response = await app.inject({
+      method: "POST",
+      url: `${assetUrl}/playback`,
+      payload: {},
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.headers["cache-control"]).toBe("no-store");
+    expect(response.json()).toEqual({
+      mediaAssetId: ASSET_ID,
+      playbackUrl:
+        "https://edge.provider.example/SIGNED-TOKEN-VALUE/manifest/video.m3u8",
+      posterUrl:
+        "https://edge.provider.example/SIGNED-TOKEN-VALUE/thumbnails/thumbnail.jpg",
+      expiresAt: "2026-09-06T09:15:00.000Z",
+    });
+    expect(response.payload).not.toContain(PROVIDER_SECRET);
+    expect(response.payload).not.toContain('"token"');
+    await app.close();
+  });
+
+  it("answers a refused viewer and an unconfigured provider each in its own honest way", async () => {
+    const { service: refused } = fakeService({
+      authorisePlayback: () => Promise.reject(new MediaAssetNotFoundError()),
+    });
+    const refusedApp = buildApp({
+      principal: PRINCIPAL,
+      context: CONTEXT,
+      service: refused,
+    });
+    const notFound = await refusedApp.inject({
+      method: "POST",
+      url: `${assetUrl}/playback`,
+      payload: {},
+    });
+    expect(notFound.statusCode).toBe(404);
+    await refusedApp.close();
+
+    const { service: unconfigured } = fakeService({
+      createUploadSession: () =>
+        Promise.reject(
+          new MediaProviderNotConfiguredError("upload", [
+            "CLOUDFLARE_ACCOUNT_ID",
+            "CLOUDFLARE_STREAM_API_TOKEN",
+          ]),
+        ),
+    });
+    const unconfiguredApp = buildApp({
+      principal: PRINCIPAL,
+      context: CONTEXT,
+      service: unconfigured,
+    });
+    const closed = await unconfiguredApp.inject({
+      method: "POST",
+      url: `${assetUrl}/upload-session`,
+      payload: { expectedVersion: 1 },
+    });
+    expect(closed.statusCode).toBe(503);
+    expect(closed.json<{ code: string; detail?: string }>()).toMatchObject({
+      code: "PROVIDER_UNAVAILABLE",
+      detail:
+        "MEDIA_PROVIDER_NOT_CONFIGURED: No video provider is configured for upload: set CLOUDFLARE_ACCOUNT_ID, CLOUDFLARE_STREAM_API_TOKEN.",
+    });
+    await unconfiguredApp.close();
+  });
+
+  it("refuses all three without a session", async () => {
+    const { service } = fakeService();
+    const app = buildApp({ principal: null, service });
+    for (const suffix of ["upload-session", "sync", "playback"]) {
+      const response = await app.inject({
+        method: "POST",
+        url: `${assetUrl}/${suffix}`,
+        payload: suffix === "upload-session" ? { expectedVersion: 1 } : {},
+      });
+      expect(response.statusCode, suffix).toBe(401);
+    }
+    await app.close();
+  });
+});
+
 describe("DELETE /v1/companies/:companyId/pitch/:mediaAssetId", () => {
   it("removes the pitch from the product and reports the deleted record", async () => {
     const { service, calls } = fakeService();

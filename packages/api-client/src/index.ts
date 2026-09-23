@@ -112,10 +112,13 @@ export {
 } from "./documents.js";
 
 export {
+  authorisePitchPlayback,
   createPitchMediaAsset,
+  createPitchUploadSession,
   deletePitchMediaAsset,
   getCompanyPitch,
   listCompanyMedia,
+  syncPitch,
 } from "./media.js";
 
 export {

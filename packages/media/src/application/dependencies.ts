@@ -5,7 +5,7 @@ import type { AuthorizationService } from "@capital-q/security";
 
 import type { VideoProvider } from "../contracts/provider.js";
 import type { MediaOwnerResolverRegistry } from "../domain/owners.js";
-import type { MediaRepositories } from "./ports.js";
+import type { MediaRepositories, PitchViewerAccessPort } from "./ports.js";
 
 /**
  * Everything a media use case needs, injected.
@@ -25,4 +25,10 @@ export type MediaServiceDependencies = {
   readonly audit: MaterialActionAuditWriter;
   readonly repositories: MediaRepositories;
   readonly videoProvider: VideoProvider;
+  /**
+   * Who, other than the owner, may view a pitch (CQ-MEDIA-011). The
+   * Recommendation context's discoverability rule, handed in by the
+   * composition root; a deployment that composes none admits no viewer.
+   */
+  readonly viewers: PitchViewerAccessPort;
 };

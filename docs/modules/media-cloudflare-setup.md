@@ -124,8 +124,37 @@ the vendor to 200 MB, which a 3-minute pitch fits comfortably.
 Both are mapped to problems in `apps/api/src/http/media.ts`
 (`mediaProviderProblem`), scoped to the media routes.
 
+## The direct upload flow (CQ-MEDIA-011)
+
+Three `POST`s under `/v1/companies/:companyId/pitch/:mediaAssetId`, all in
+`apps/api/src/http/media.ts`, backed by `packages/media/src/application/upload-use-cases.ts`.
+No provider call happens inside a transaction: the vendor is asked first with
+nothing locked, and its answer is applied under a row lock against the version
+that was read.
+
+| Route             | Who                                         | Does                                                                                                                                                                                                                                      | Answers                                                                        |
+| ----------------- | ------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| `/upload-session` | owner, `media.create`                       | Body `{ expectedVersion }` only. Requires status `CREATED` with no provider asset. Reserves a one-time target (180 s allowance, adapter expiry, signed unless policy is `PUBLIC`), stores the uid, moves `CREATED → UPLOAD_PENDING`.      | `201 MediaUploadSessionDto` — the one-time `uploadUrl`, never the uid.         |
+| `/sync`           | owner, `media.create`                       | Reads the provider, walks every legal lifecycle step to the reported state (`transitionPath`), records duration/dimensions/aspect ratio/poster reference. Idempotent; a move the lifecycle forbids is ignored, not forced.                | `200 { pitch }`                                                                |
+| `/playback`       | owner (`media.view`) or discoverable viewer | Owner: any `READY` pitch of their own. Viewer: `READY` + moderation `ALLOWED` + policy not `PRIVATE` **and** the company eligible for them by the Recommendation context's REC-001 rule (`PitchViewerAccessPort`, composed in `main.ts`). | `200 PlaybackAuthorizationDto` — a minted URL, no token field, no provider id. |
+
+Refusals on the viewer path are all `404`; the owner asking to play a pitch
+that is not `READY` gets `400 INVALID_REQUEST`. A second `/upload-session` on
+an asset that already holds a target is `400`: the one-time URL cannot be
+re-issued, so a lost URL means replacing the pitch.
+
+Each applied step emits `media.asset.status_changed` (previous and new
+status) through the outbox; reservation and sync are audited as
+`media.asset.upload_reserved` and `media.asset.synced` (states and the
+vendor's failure code only — never the target, the uid or a token).
+
+No schema change was needed: the uid lives in `provider_asset_id`, the
+target's expiry is the provider's (a vendor 404 on sync becomes `EXPIRED`
+where the lifecycle allows it), and signed playback derives from
+`playback_policy` at reservation time.
+
 ## Not in this packet
 
-The direct-upload HTTP flow (CQ-MEDIA-011), webhook ingestion
-(CQ-MEDIA-012), captions and the feed player. Nothing here registers a route
-a browser can call to start an upload.
+Webhook ingestion (CQ-MEDIA-012), captions, the feed player and the founder
+upload UI. The live path against this account still ends at the 413 plan
+blocker above: nothing here has been observed to complete a real upload.

@@ -198,9 +198,12 @@ export function classifyCloudflareStatus(status: number): MediaProviderFailure {
   return "UNAVAILABLE";
 }
 
-/** A playback URL host on the vendor's edge. Never proxied, never stored. */
+/** Playback URLs on the vendor's edge. Never proxied, never stored. */
 function manifestUrl(subdomain: string, tokenOrUid: string): string {
   return `https://${subdomain}/${tokenOrUid}/manifest/video.m3u8`;
+}
+function posterUrl(subdomain: string, tokenOrUid: string): string {
+  return `https://${subdomain}/${tokenOrUid}/thumbnails/thumbnail.jpg`;
 }
 
 const base64url = (value: string | Buffer): string =>
@@ -471,6 +474,7 @@ export function createCloudflareStreamVideoProvider(
       return {
         mediaAssetId: authorization.mediaAssetId,
         playbackUrl: manifestUrl(subdomain, authorization.providerAssetId),
+        posterUrl: posterUrl(subdomain, authorization.providerAssetId),
         expiresAt,
       };
     }
@@ -499,6 +503,7 @@ export function createCloudflareStreamVideoProvider(
       mediaAssetId: authorization.mediaAssetId,
       token,
       playbackUrl: manifestUrl(subdomain, token),
+      posterUrl: posterUrl(subdomain, token),
       expiresAt,
     };
   }

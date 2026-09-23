@@ -4,9 +4,17 @@ import {
   COMPANY_PITCH_SUFFIX,
   CorrelationIdSchema,
   CreateCompanyPitchRequestSchema,
+  CreateMediaUploadSessionRequestSchema,
   createProblemDetails,
+  MEDIA_PLAYBACK_SUFFIX,
+  MEDIA_SYNC_SUFFIX,
+  MEDIA_UPLOAD_SESSION_SUFFIX,
+  MediaUploadSessionDtoSchema,
   parseContract,
+  PlaybackAuthorizationDtoSchema,
   PROBLEM_CONTENT_TYPE,
+  SyncMediaAssetRequestSchema,
+  SyncMediaAssetResponseSchema,
   UuidSchema,
   type CorrelationId,
   type MediaAssetDto,
@@ -231,6 +239,94 @@ function registerPitchRoutes(
       return reply
         .header("Cache-Control", "no-store")
         .send({ pitch: payload(asset) });
+    },
+  );
+
+  // The direct upload flow (CQ-MEDIA-011). Three POSTs on one asset, each
+  // answering with a contract DTO that carries no provider identifier: the
+  // one-time upload target and the minted playback URL are the only
+  // provider-shaped things a client ever sees, and both are the server's
+  // to issue.
+
+  // Reserve. The body names the version the client saw and nothing else:
+  // duration allowance, expiry and signed playback are the server's terms.
+  app.post(
+    `${pitch}/:mediaAssetId${MEDIA_UPLOAD_SESSION_SUFFIX}`,
+    { onRequest: withContext },
+    async (request, reply) => {
+      const actor = getActorContext(request);
+      const input = parseContract(
+        CreateMediaUploadSessionRequestSchema,
+        request.body ?? {},
+        "The upload request is not valid.",
+      );
+      const result = await service.createUploadSession({
+        actor,
+        companyId: companyIdParam(request),
+        mediaAssetId: mediaAssetIdParam(request),
+        expectedVersion: input.expectedVersion,
+        correlationId: correlation(),
+      });
+      return reply
+        .code(201)
+        .header("Cache-Control", "no-store")
+        .send(
+          MediaUploadSessionDtoSchema.parse({
+            mediaAssetId: result.asset.id,
+            uploadMode: result.session.uploadMode,
+            uploadUrl: result.session.uploadUrl,
+            expiresAt: result.session.expiresAt,
+            maxDurationSeconds: result.maxDurationSeconds,
+            pitch: payload(result.asset),
+          }),
+        );
+    },
+  );
+
+  // Sync. Idempotent: the same answer however often it is asked, and the
+  // lifecycle refuses any move the provider's answer cannot justify.
+  app.post(
+    `${pitch}/:mediaAssetId${MEDIA_SYNC_SUFFIX}`,
+    { onRequest: withContext },
+    async (request, reply) => {
+      const actor = getActorContext(request);
+      parseContract(
+        SyncMediaAssetRequestSchema,
+        request.body ?? {},
+        "The sync request is not valid.",
+      );
+      const asset = await service.syncMediaAsset({
+        actor,
+        companyId: companyIdParam(request),
+        mediaAssetId: mediaAssetIdParam(request),
+        correlationId: correlation(),
+      });
+      return reply
+        .header("Cache-Control", "no-store")
+        .send(SyncMediaAssetResponseSchema.parse({ pitch: payload(asset) }));
+    },
+  );
+
+  // Playback. Per viewer, short-lived, decided here every time. A provider
+  // UID is not access control, which is why it is not in the answer.
+  app.post(
+    `${pitch}/:mediaAssetId${MEDIA_PLAYBACK_SUFFIX}`,
+    { onRequest: withContext },
+    async (request, reply) => {
+      const actor = getActorContext(request);
+      const grant = await service.authorisePlayback({
+        actor,
+        companyId: companyIdParam(request),
+        mediaAssetId: mediaAssetIdParam(request),
+      });
+      return reply.header("Cache-Control", "no-store").send(
+        PlaybackAuthorizationDtoSchema.parse({
+          mediaAssetId: grant.asset.id,
+          playbackUrl: grant.authorization.playbackUrl,
+          posterUrl: grant.authorization.posterUrl ?? null,
+          expiresAt: grant.authorization.expiresAt,
+        }),
+      );
     },
   );
 }
