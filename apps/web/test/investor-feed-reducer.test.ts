@@ -43,6 +43,7 @@ function company(n: number): DiscoveredCompanyDto {
     shortDescription: null,
     reasons: [],
     reasonCodes: [],
+    pitch: null,
   };
 }
 
