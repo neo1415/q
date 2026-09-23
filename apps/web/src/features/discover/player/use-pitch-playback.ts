@@ -32,7 +32,12 @@ import {
 /** `window.matchMedia`, injectable so the preference can be asserted. */
 export function prefersReducedMotion(): boolean {
   try {
-    if (typeof window === "undefined" || !("matchMedia" in window)) {
+    // `typeof` and not `in`: a host can expose `matchMedia` as a property
+    // that is not callable (jsdom does), and `in` says yes to that.
+    if (
+      typeof window === "undefined" ||
+      typeof window.matchMedia !== "function"
+    ) {
       return false;
     }
     return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -225,7 +230,10 @@ export function usePitchPlayback(
 }
 
 function subscribeToReducedMotion(onChange: () => void): () => void {
-  if (typeof window === "undefined" || !("matchMedia" in window)) {
+  if (
+    typeof window === "undefined" ||
+    typeof window.matchMedia !== "function"
+  ) {
     return () => undefined;
   }
   const query = window.matchMedia("(prefers-reduced-motion: reduce)");

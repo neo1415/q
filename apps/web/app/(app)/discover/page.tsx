@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
-import { discoverCompanies, discoverInvestors } from "@capital-q/api-client";
+import { discoverInvestors } from "@capital-q/api-client";
 import { buttonClassName } from "@capital-q/ui/button";
 import { EmptyState } from "@capital-q/ui/states";
 
@@ -9,10 +9,8 @@ import {
   PageContainer,
   PageHeader,
 } from "@/components/app-shell/page-container";
-import {
-  DiscoverCompanies,
-  DiscoverInvestors,
-} from "@/features/discover/discover-screen";
+import { DiscoverInvestors } from "@/features/discover/discover-screen";
+import { InvestorFeedScreen } from "@/features/discover/investor-feed-screen";
 import { apiSession, resolveOwnContext } from "@/features/q/context";
 
 export const metadata: Metadata = { title: "Discover" };
@@ -52,21 +50,19 @@ export default async function DiscoverPage() {
   }
 
   if (context.kind === "INVESTOR") {
-    const slate = await discoverCompanies(session).catch(() => null);
+    /*
+      An investor gets the feed: one card at a time, one player, position
+      kept across a visit to a company. The slate is not fetched here --
+      the controller owns loading so that paging, position and the preload
+      budget have a single owner (CQ-WEB-020/021).
+    */
     return (
       <PageContainer>
         <PageHeader
           title="Discover"
           description="Companies that chose to be discoverable, ordered against the mandate you declared."
         />
-        {slate === null ? (
-          <EmptyState
-            title="Discover couldn't load."
-            description="Nothing is wrong with your mandate. Try again in a moment."
-          />
-        ) : (
-          <DiscoverCompanies items={slate.items} notes={slate.notes} />
-        )}
+        <InvestorFeedScreen />
       </PageContainer>
     );
   }

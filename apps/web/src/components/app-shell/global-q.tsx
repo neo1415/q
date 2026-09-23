@@ -78,6 +78,22 @@ export function GlobalQProvider({
   );
 }
 
+/**
+ * Open Q beside the page, from the page.
+ *
+ * `QPageSubject` says what Q is looking at; this says when to show it. A
+ * surface that offers its own "Ask Q" — a Discover card, a profile —
+ * needs both, and neither grants anything: the subject is still resolved
+ * and authorised again by the Q API on every run.
+ */
+export function useGlobalQ(): {
+  readonly open: boolean;
+  readonly setOpen: (open: boolean) => void;
+} {
+  const { open, setOpen } = useContext(GlobalQContext);
+  return { open, setOpen };
+}
+
 const QUIET_ROUTES = ["/home"];
 
 export function GlobalQTrigger({

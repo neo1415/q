@@ -45,13 +45,30 @@ export default defineConfig({
   // Component tests are TSX; opt into the automatic React runtime.
   oxc: { jsx: { runtime: "automatic" } },
   resolve: {
-    alias: {
+    alias: [
       // See tests/support/server-only.ts. The guard stays in the build; the
       // runner is simply not a browser bundle.
-      "server-only": fileURLToPath(
-        new URL("./tests/support/server-only.ts", import.meta.url),
-      ),
-    },
+      {
+        find: "server-only",
+        replacement: fileURLToPath(
+          new URL("./tests/support/server-only.ts", import.meta.url),
+        ),
+      },
+      /**
+       * `@/` is apps/web's own path alias (its tsconfig `paths`), used by
+       * fifteen feature modules. The runner has to resolve it the way the
+       * bundler does, or a component test fails on an import rather than on
+       * anything it was written to check.
+       *
+       * Anchored to `@/` with the trailing slash on purpose: a bare `@`
+       * alias is a prefix match and would also swallow every
+       * `@capital-q/*` workspace import.
+       */
+      {
+        find: /^@\//,
+        replacement: `${fileURLToPath(new URL("./apps/web/src", import.meta.url))}/`,
+      },
+    ],
   },
   test: {
     // Testing Library auto-cleans between tests when the globals exist.
