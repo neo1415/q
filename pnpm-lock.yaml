@@ -386,12 +386,21 @@ importers:
       '@capital-q/permissions':
         specifier: workspace:*
         version: link:../../packages/permissions
+      '@capital-q/q-core':
+        specifier: workspace:*
+        version: link:../../packages/q-core
       '@capital-q/q-embeddings':
         specifier: workspace:*
         version: link:../../packages/q-embeddings
       '@capital-q/q-knowledge':
         specifier: workspace:*
         version: link:../../packages/q-knowledge
+      '@capital-q/q-presence':
+        specifier: workspace:*
+        version: link:../../packages/q-presence
+      '@capital-q/q-research':
+        specifier: workspace:*
+        version: link:../../packages/q-research
       '@capital-q/security':
         specifier: workspace:*
         version: link:../../packages/security

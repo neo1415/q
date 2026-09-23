@@ -111,6 +111,22 @@ export type DocumentProcessingHandlerOptions = {
       }
     | undefined;
   /**
+   * Public presence research (CQ-C2), when this deployment can reach the
+   * public web. Fire-and-forget: called, never awaited, on every committed
+   * response regardless of whether the founder or mandate reading above
+   * also handled it. Absent means no research provider is configured and a
+   * typed session behaves exactly as it did before this packet.
+   */
+  readonly presenceResearch?:
+    | {
+        readonly onResponseCommitted: (event: {
+          readonly sessionId: string;
+          readonly stepKey: string;
+          readonly responseId: string;
+        }) => void;
+      }
+    | undefined;
+  /**
    * Persisted recommendation slates (CQ-REC-006): every domain event is
    * offered to the invalidation service, which decides whether it names a
    * slate at all. Identifiers only; the slates and their keys are read
@@ -170,6 +186,7 @@ export function createDomainEventHandler(
     queues,
     founderReview,
     mandateReview,
+    presenceResearch,
     recommendations,
     logger,
   } = options;
@@ -202,6 +219,15 @@ export function createDomainEventHandler(
     }
     if (event.type === RESPONSE_COMMITTED_EVENT) {
       const committed = event.data as ResponseCommittedData;
+      // Fire-and-forget, deliberately not part of the try/catch below: a
+      // research run that fails, times out or finds nothing must never
+      // turn this message into a retry, and it never blocks the founder or
+      // mandate reading that follows it.
+      presenceResearch?.onResponseCommitted({
+        sessionId: committed.sessionId,
+        stepKey: committed.stepKey,
+        responseId: committed.responseId,
+      });
       // Each journey's reading decides for itself whether the step is one
       // of its narrative steps; a session belongs to exactly one of them.
       const readers = [

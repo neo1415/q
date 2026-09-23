@@ -16,10 +16,17 @@
  * makes a hostile document a data problem instead of a credential problem.
  */
 
+import { z } from "zod";
+
 import { createPostgresCapitalObjectiveQueryPort } from "@capital-q/capital";
 import { createPostgresCompanyQueryPort } from "@capital-q/companies";
 import { loadDatabaseConfig } from "@capital-q/config/database";
 import { loadEmbeddingConfig } from "@capital-q/config/embeddings";
+import {
+  researchProviderEnvShape,
+  researchProviderConfigStatus,
+  toResearchProviderSecrets,
+} from "@capital-q/config/research-providers";
 import { loadWorkerConfig } from "@capital-q/config/workers";
 import { CONTRACTS_VERSION, type ModelDataPosture } from "@capital-q/contracts";
 import { createRequestDatabaseClient } from "@capital-q/database";
@@ -113,6 +120,8 @@ import { createDomainEventHandler } from "./events/document-processing-handler.j
 import { createProductionEventRegistry } from "./event-registry.js";
 import { createOutboxPublisherRunner } from "./outbox-runner.js";
 import { createParserSandbox } from "./parser/sandbox.js";
+import { composeWorkerPresence } from "./presence/composition.js";
+import { createPresenceResearchDispatch } from "./presence/dispatch.js";
 import { createPostgresBuildPrincipalResolver } from "./recommendations/build-principal.js";
 import { createRecommendationRefreshHandler } from "./recommendations/refresh-handler.js";
 import { EXTRACTION_PARSER_LIMITS } from "./parser/limits.js";
@@ -349,6 +358,64 @@ logger.info(
 );
 
 /**
+ * Public presence research (CQ-C2), dispatched off the same
+ * `onboarding.response.committed` event the founder and mandate readings
+ * above already consume.
+ *
+ * Before this packet, `@capital-q/q-presence` was reachable only from the
+ * voice turn (`apps/q-api/src/voice/turn.ts`): a live request with an actor
+ * already resolved and a place to hang a detached read off. A typed
+ * session commits the very same event and never got one. The event fires
+ * regardless of transport, so composing presence a second time here — off
+ * the worker's own domain-event consumer rather than a request — closes
+ * that gap without touching the interviewer, the voice trigger, or a
+ * single prompt.
+ *
+ * Research provider keys (`TAVILY_API_KEY`, `BRIGHT_DATA_*`, `SERP_API_KEY`)
+ * are q-api's own config surface (`@capital-q/config/research-providers`);
+ * the worker deployable never had one; this reads the same env vars through
+ * that package's own validated shape rather than inventing a second one.
+ * Absent research keys, or no model provider to read a page with, mean
+ * this composes to nothing and a typed session behaves exactly as before.
+ */
+const researchProviderSecrets = toResearchProviderSecrets(
+  z.object(researchProviderEnvShape).parse(process.env),
+);
+const presenceEvidenceRepositories = createPostgresEvidenceRepositories();
+const presenceComposition =
+  modelProviders.length === 0
+    ? undefined
+    : composeWorkerPresence({
+        sql: database.sql,
+        transactions: database.transactions,
+        evidence: presenceEvidenceRepositories,
+        gateway: modelGateway,
+        dataPosture: demoDataPosture,
+        researchSecrets: researchProviderSecrets,
+        logger,
+      });
+const presenceResearch =
+  presenceComposition === undefined
+    ? undefined
+    : createPresenceResearchDispatch({
+        sql: database.sql,
+        presence: presenceComposition.presence,
+        sessions: createPostgresOnboardingSessionRepository(),
+        responses: createPostgresOnboardingResponseRepository(),
+        suggestions: createPostgresOnboardingSuggestionRepository(),
+        createSuggestion: (command) =>
+          onboarding.internal.createSuggestion(command as never),
+        logger,
+      });
+logger.info(
+  {
+    researchProviders: researchProviderConfigStatus(researchProviderSecrets),
+    presenceResearch: presenceResearch === undefined ? "disabled" : "composed",
+  },
+  "public presence research composed",
+);
+
+/**
  * Persisted recommendation slates (CQ-REC-006). The same pipeline
  * composition the API serves from, over the same disclosure evaluator the
  * Q service uses. The embedding runtime is the local one q-api reads
@@ -462,6 +529,7 @@ const documentEvents = createQueueRunner({
     pipelineVersion: config.documents.pipelineVersion,
     ...(founderReview === undefined ? {} : { founderReview }),
     ...(mandateReview === undefined ? {} : { mandateReview }),
+    ...(presenceResearch === undefined ? {} : { presenceResearch }),
     recommendations: {
       onEvent: (event) =>
         slateInvalidation.apply(refreshDirectiveFor(event), {
