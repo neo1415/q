@@ -297,12 +297,28 @@ export function QOnboardingWorkspace({
    * the step Q asked about, and the definition's prompt otherwise -- a
    * fresh screen, a step reached by tapping, a journey resumed.
    */
+  /**
+   * The mandate step is resolved by Q without asking (QX-004 A): when an
+   * investor has one mandate, Q picks it and moves on. But the session
+   * can sit on that step between turns, and its label -- "Which mandate
+   * are we defining?" -- is an implementation term nobody should read.
+   * While the session is there, Q's last sentence stays on screen.
+   */
+  const silentStep =
+    prompt !== null && /\.mandate_context$/.test(prompt.stepKey);
   const questionText =
     prompt === null
       ? null
-      : qQuestion !== null && qQuestion.stepKey === prompt.stepKey
+      : qQuestion !== null &&
+          (qQuestion.stepKey === prompt.stepKey || silentStep)
         ? qQuestion.text
-        : prompt.text;
+        : silentStep
+          ? null
+          : prompt.text;
+
+  /** What is put on screen as Q's question; nothing at all on a silent step. */
+  const liveQuestion: string | null =
+    questionText ?? (silentStep ? null : (prompt?.text ?? null));
 
   /** The thread so far, as the interviewer reads it. Words, never authority. */
   const recentTurns = useCallback(
@@ -647,7 +663,9 @@ export function QOnboardingWorkspace({
       // The question Q was asking joins the thread with its answer, so the
       // exchange reads back as one; the live prompt below then moves on.
       if (prompt !== null) {
-        push("Q", questionText ?? prompt.text);
+        if (liveQuestion !== null) {
+          push("Q", liveQuestion);
+        }
       }
       push("PERSON", trimmed);
       settleReading();
@@ -727,7 +745,7 @@ export function QOnboardingWorkspace({
     },
     [
       prompt,
-      questionText,
+      liveQuestion,
       push,
       recentTurns,
       vocabulary,
@@ -761,7 +779,9 @@ export function QOnboardingWorkspace({
         await say(chip.say);
         return;
       }
-      push("Q", questionText ?? prompt.text);
+      if (liveQuestion !== null) {
+        push("Q", liveQuestion);
+      }
       push("PERSON", spoken ?? chip.label);
       settleReading();
       setNarrowedTo(null);
@@ -775,7 +795,7 @@ export function QOnboardingWorkspace({
     },
     [
       prompt,
-      questionText,
+      liveQuestion,
       say,
       push,
       settleReading,
@@ -801,7 +821,9 @@ export function QOnboardingWorkspace({
       voiceSendText(chosen.map((chip) => chip.label).join(", "));
       return;
     }
-    push("Q", questionText ?? prompt.text);
+    if (liveQuestion !== null) {
+      push("Q", liveQuestion);
+    }
     push("PERSON", chosen.map((chip) => chip.label).join(", "));
     settleReading();
     const ok = await actions.submitValue({ stepKey: prompt.stepKey, value });
@@ -809,7 +831,7 @@ export function QOnboardingWorkspace({
       push("Q", acknowledgeValue(prompt.stepKey, value, vocabulary));
     }
   }, [
-    questionText,
+    liveQuestion,
     prompt,
     picks,
     push,
@@ -864,7 +886,9 @@ export function QOnboardingWorkspace({
       voiceSendText("Keep these");
       return;
     }
-    push("Q", questionText ?? prompt.text);
+    if (liveQuestion !== null) {
+      push("Q", liveQuestion);
+    }
     push("PERSON", spoken);
     settleReading();
     let ok: boolean;
@@ -888,7 +912,7 @@ export function QOnboardingWorkspace({
       voiceSendText("Let's continue.");
     }
   }, [
-    questionText,
+    liveQuestion,
     prompt,
     keptTaxonomy,
     taxonomy,
@@ -1001,7 +1025,7 @@ export function QOnboardingWorkspace({
         ...(conversationId === undefined ? {} : { conversationId }),
       },
       firstMessage:
-        prompt === null || isFinal ? undefined : (questionText ?? prompt.text),
+        prompt === null || isFinal ? undefined : (liveQuestion ?? undefined),
     });
   };
 
@@ -1216,12 +1240,8 @@ export function QOnboardingWorkspace({
         {stage === null ? null : (
           <QLine id="reading-stage" kind="Q" text={stage} />
         )}
-        {prompt !== null && !isFinal && !askingQ ? (
-          <QLine
-            id={`prompt:${prompt.stepKey}`}
-            kind="Q"
-            text={questionText ?? prompt.text}
-          />
+        {prompt !== null && !isFinal && !askingQ && liveQuestion !== null ? (
+          <QLine id={`prompt:${prompt.stepKey}`} kind="Q" text={liveQuestion} />
         ) : null}
         <div ref={endRef} />
       </ol>
@@ -1328,7 +1348,7 @@ export function QOnboardingWorkspace({
               <div
                 className="flex flex-wrap items-center gap-2"
                 role="group"
-                aria-label={questionText ?? prompt.text}
+                aria-label={liveQuestion ?? prompt.text}
               >
                 {visibleChips.map((chip) => (
                   <ChoiceChip
@@ -1500,7 +1520,9 @@ export function QOnboardingWorkspace({
                     voiceSendText("Skip this one");
                     return;
                   }
-                  push("Q", questionText ?? prompt.text);
+                  if (liveQuestion !== null) {
+                    push("Q", liveQuestion);
+                  }
                   push("PERSON", "Skip this one");
                   settleReading();
                   void actions.skip();
