@@ -55,7 +55,8 @@ export const INTERVIEW_CONDUCTOR_V5: PromptDefinition<
 > = {
   ...INTERVIEW_CONDUCTOR_V4,
   version: 5,
-  status: "ACTIVE",
+  // Superseded by v6: a value waiting for yes is decided, not said again.
+  status: "DEPRECATED",
   changeDescription:
     "QX-004 core gate: the model no longer writes the name of a company, firm or organisation — it writes a placeholder and the runtime substitutes the recorded value — and it may not call anything saved, recorded or covered unless it is in KNOWN ANSWERS. Written after an investor whose firm is Zino Aviation was greeted about the Zinoevation mandate, and after Q reported two answers as held against a session that held none.",
   effectiveFrom: "2026-09-22",

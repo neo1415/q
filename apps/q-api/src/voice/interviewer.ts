@@ -9,10 +9,11 @@ import {
   submitOnboardingResponse,
   type ApiSession,
 } from "@capital-q/api-client";
-import type {
-  ModelDataPosture,
-  OnboardingResponseValue,
-  OnboardingSessionView,
+import {
+  canonicalJsonStringify,
+  type ModelDataPosture,
+  type OnboardingResponseValue,
+  type OnboardingSessionView,
 } from "@capital-q/contracts";
 import { FOUNDER_DEFINITION_V2 } from "@capital-q/founder-onboarding";
 import { INVESTOR_DEFINITION_V1 } from "@capital-q/investor-onboarding";
@@ -1501,6 +1502,29 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
         }
       };
 
+      /**
+       * What the model decided this turn, in step keys.
+       *
+       * A turn that records nothing is the hardest thing to diagnose from
+       * a transcript alone: the reply reads fine and the session is empty,
+       * and there is no way to tell a model that answered nothing from a
+       * runtime that refused everything. Keys and decisions only -- the
+       * values themselves are the person's, and a log is not where they
+       * belong.
+       */
+      logger.debug(
+        {
+          intent: result.intent,
+          answering: result.answers.map((a) => a.stepKey),
+          confirming: result.confirmations.map(
+            (c) => `${c.stepKey}:${c.decision}`,
+          ),
+          holding: pending.map((p) => p.stepKey),
+          skipping: result.skips ?? [],
+        },
+        "interview conductor read the turn",
+      );
+
       // 1. Decisions on what Q read back last time, and on document proposals.
       for (const decision of result.confirmations) {
         const held = pending.find((p) => p.stepKey === decision.stepKey);
@@ -2073,15 +2097,47 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
         const refusedStep = unsaved
           .map((stepKey) => steps.get(stepKey))
           .find((step) => step !== undefined);
+        /**
+         * A prerequisite Q cannot put on screen yet.
+         *
+         * The investor journey refuses anything in I2 until a mandate is
+         * chosen, and the mandate step is a choice among drafts the view
+         * only carries while that step is the current one — so `ask` is
+         * empty even though the service named the step perfectly well.
+         * Before this, that fell through to "That one didn't go in" plus
+         * the refused step's own question, which is the loop the comment
+         * above warns about: the person answers it again, the same
+         * prerequisite refuses it again (local, 2026-09-23: a cheque
+         * range and then the stages behind it, both lost this way).
+         *
+         * So the prerequisite is named from the step's own prompt, and
+         * what Q asks next is the question it was already on. The refused
+         * step is never what Q returns to: asking for a thing that cannot
+         * be saved yet is asking to be told it twice.
+         */
+        const neededQuestion =
+          ask?.question ??
+          (neededStep === undefined ? undefined : questionFor(neededStep));
+        const current =
+          view.currentStep === null
+            ? undefined
+            : steps.get(view.currentStep.stepKey);
         reply =
-          ask !== undefined && ask !== null
-            ? `Before I can save ${about}, I need one thing first. ${ask.question}`
+          neededQuestion !== undefined
+            ? ask !== undefined && ask !== null
+              ? `Before I can save ${about}, I need one thing first. ${neededQuestion}`
+              : `I'll come back to ${about} — there's something the setup wants first. ${current === undefined ? neededQuestion : questionFor(current)}`
             : refusedStep === undefined
               ? "I couldn't save that just now — it hasn't gone in. Could you say it once more?"
               : `That one didn't go in. ${questionFor(refusedStep)}`;
         result = {
           ...result,
-          askNext: needed ?? refusedStep?.stepKey ?? null,
+          askNext:
+            ask !== undefined && ask !== null
+              ? (needed ?? null)
+              : neededQuestion !== undefined
+                ? (view.currentStep?.stepKey ?? needed ?? null)
+                : (refusedStep?.stepKey ?? null),
         };
       } else if (unsaved.length > 0) {
         reply =
@@ -2128,7 +2184,20 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
         // hundred and fifty") replaces the candidate rather than adding
         // one, and it needs reading back exactly as the first value did —
         // it is the one that would otherwise be written unseen.
-        return before === undefined || before.spoken !== item.spoken;
+        //
+        // By value, not by the sentence describing it. A model asked about
+        // a held cheque will sometimes restate it rather than decide it,
+        // and "50000" one turn and "£50,000" the next is the same money.
+        // Comparing the prose made every restatement look like a
+        // correction, so Q read the same figure back turn after turn,
+        // never committed it, and dropped whatever else was said in the
+        // meantime (local, 2026-09-23: "pre-seed and seed, mostly in the
+        // UK" went nowhere twice).
+        return (
+          before === undefined ||
+          canonicalJsonStringify(before.value) !==
+            canonicalJsonStringify(item.value)
+        );
       });
       if (heldNow !== undefined && fromState === null) {
         const heldStep = steps.get(heldNow.stepKey);

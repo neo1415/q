@@ -313,3 +313,44 @@ describe("a material value waits for a yes", () => {
     );
   });
 });
+
+describe("a held value the model restates instead of deciding", () => {
+  it("is not read back again, and the turn belongs to what was actually said", async () => {
+    /**
+     * The loop, in three turns (local, 2026-09-23).
+     *
+     * A cheque range was held. Asked to decide it, the model put the same
+     * figures in `answers` again rather than in `confirmations` -- and
+     * because the runtime compared the sentence describing a held value
+     * rather than the value, "500000" and "£500,000" looked like a
+     * correction. So Q read the figure back, turn after turn, never
+     * committed it, and dropped whatever else was said in the meantime.
+     *
+     * A restatement is not a decision. It changes nothing, so it earns no
+     * second read-back, and the sentence in front of Q is the one that
+     * gets answered.
+     */
+    const { fetchFake, written } = api();
+    const interviewer = createInterviewer({
+      gateway: gateway(proposes("500000"), {
+        ...base,
+        reply: "Lagos, got it. What does the company do?",
+        // The same money, said differently. Not a correction.
+        answers: [
+          { stepKey: "F6.target_amount", value: "500000", confidence: "HIGH" },
+        ],
+      }),
+      logger,
+    });
+
+    const held = await interviewer.turn(turn(fetchFake, "Half a million."));
+    expect(held.reply).toContain("500000");
+
+    const next = await interviewer.turn(turn(fetchFake, "We're in Lagos."));
+    // Still unconfirmed, so still unwritten: a restatement is not a yes.
+    expect(written).toEqual([]);
+    // And Q does not spend a second turn asking the same question.
+    expect(next.reply).not.toContain("Is that right?");
+    expect(next.reply).toContain("Lagos");
+  });
+});
