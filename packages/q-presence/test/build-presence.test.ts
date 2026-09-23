@@ -174,14 +174,34 @@ describe("a public presence build", () => {
       // What was written, in its own words, so the caller can say it back
       // to the subject and ask whether it has the right person. Only ever
       // what the gate accepted, and only ever the subject's own.
+      //
+      // Each one carries the page it rests on. Without that a caller can
+      // repeat what Q believes and cannot say where it came from, which is
+      // the difference between a citation and a rumour.
       understandings: [
         {
           key: "presence.what_they_do",
           statement: "Their site says they connect legacy insurance systems.",
+          sources: [
+            {
+              evidenceSourceId: "source-1",
+              url: "https://a.example/one",
+              title: "Vaultlyne",
+              retrievedAt: "2026-09-16T08:00:00.000Z",
+            },
+          ],
         },
         {
           key: "presence.location",
           statement: "A 2025 article places them in Lagos.",
+          sources: [
+            {
+              evidenceSourceId: "source-2",
+              url: "https://b.example/two",
+              title: "Vaultlyne",
+              retrievedAt: "2026-09-16T08:00:00.000Z",
+            },
+          ],
         },
       ],
       domains: [],

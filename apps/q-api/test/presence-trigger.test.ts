@@ -23,9 +23,17 @@ const ACTOR = {
 
 const COMPANY_ID = "44444444-4444-4444-8444-444444444444";
 
-function view(responses: Record<string, string>): OnboardingSessionView {
+const INVESTOR_ORGANISATION_ID = "55555555-5555-4555-8555-555555555555";
+
+function view(
+  responses: Record<string, string>,
+  subject: { type: string; id: string } = {
+    type: "COMPANY",
+    id: COMPANY_ID,
+  },
+): OnboardingSessionView {
   return {
-    session: { subject: { type: "COMPANY", id: COMPANY_ID } },
+    session: { subject },
     responses: Object.entries(responses).map(([stepKey, value]) => ({
       stepKey,
       value,
@@ -126,6 +134,42 @@ describe("what Capital Q looks up when somebody arrives", () => {
     trigger.afterInterviewTurn(ACTOR, view({ "F1.company_name": "A" }));
     await settle();
     expect(builds).toEqual([]);
+  });
+
+  /**
+   * An investor's organisation was never looked up.
+   *
+   * The session binds to an INVESTOR_ORGANISATION and the investor journey
+   * records the name on `I0.organisation_name`, but the only branch that
+   * could start a build tested for the founder's `F1.company_name` and for
+   * a COMPANY subject. So an investor could name their firm, and have
+   * already typed it at registration, and Capital Q would still read
+   * nothing about it.
+   */
+  it("looks up an investor's own organisation from the step that journey uses", async () => {
+    const { builds, trigger } = build({ personName: "Ada Okafor" });
+    trigger.afterInterviewTurn(
+      ACTOR,
+      view(
+        { "I0.organisation_name": "Zino Aviation" },
+        { type: "INVESTOR_ORGANISATION", id: INVESTOR_ORGANISATION_ID },
+      ),
+    );
+    await settle();
+
+    expect(builds).toHaveLength(2);
+    expect(builds[0]).toEqual({
+      subjectType: "INVESTOR_ORGANISATION",
+      subjectId: INVESTOR_ORGANISATION_ID,
+      name: "Zino Aviation",
+      qualifier: null,
+      // The investor journey has no website step, so nothing is invented.
+      websiteUrl: null,
+    });
+    expect(builds[1]).toMatchObject({
+      subjectType: "PERSON",
+      qualifier: "Zino Aviation",
+    });
   });
 
   it("never fails a turn when a build throws", async () => {

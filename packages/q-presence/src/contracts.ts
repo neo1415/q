@@ -138,6 +138,39 @@ export function isRankingEligiblePresenceKey(key: PresenceKey): boolean {
   return !PRESENCE_KEYS_EXCLUDED_FROM_RANKING.includes(key);
 }
 
+/**
+ * Where one finding came from, carried with the finding itself.
+ *
+ * The build always knew this — it registered the page as evidence before a
+ * model was allowed to read it — but the outcome used to report only a
+ * statement and a flat list of domains for the whole build. A caller could
+ * therefore say "Q found something" and could not say which page said it.
+ * That is the difference between a citation and a rumour, and a candidate
+ * offered to a person without one is an opinion wearing evidence's clothes.
+ */
+export type PresenceFindingSource = {
+  /** The evidence row the page was recorded as; how a suggestion cites it. */
+  readonly evidenceSourceId: string;
+  readonly url: string;
+  readonly title: string | null;
+  /** When the page was read. ISO 8601 UTC, from the research provider. */
+  readonly retrievedAt: string;
+};
+
+/**
+ * One understanding the build came to hold, with its provenance.
+ *
+ * Never truth. Q's reading of a public page, carried as Q_INFERENCE with
+ * the page cited; whether a person later confirms or corrects it is a
+ * separate axis recorded where the candidate is resolved, not here.
+ */
+export type PresenceFinding = {
+  readonly key: PresenceKey;
+  readonly statement: string;
+  /** At least one: the Write Gate refuses an uncited proposal. */
+  readonly sources: readonly PresenceFindingSource[];
+};
+
 /** What a build did, for the caller that asked for it. */
 export type PresenceOutcome =
   | {
@@ -154,10 +187,7 @@ export type PresenceOutcome =
        * is the whole reason for looking somebody up at arrival. Bounded,
        * and only ever what the Write Gate accepted.
        */
-      readonly understandings: readonly {
-        readonly key: string;
-        readonly statement: string;
-      }[];
+      readonly understandings: readonly PresenceFinding[];
       /** The domains the understandings came from, for saying where. */
       readonly domains: readonly string[];
     }

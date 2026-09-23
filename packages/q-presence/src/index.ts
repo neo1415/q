@@ -31,12 +31,26 @@ export {
   PresenceSubjectTypeSchema,
   type PresenceBuild,
   type PresenceBuildStatus,
+  type PresenceFinding,
+  type PresenceFindingSource,
   type PresenceIdentity,
   type PresenceKey,
   type PresenceOutcome,
   type PresenceSubject,
   type PresenceSubjectType,
 } from "./contracts.js";
+
+export {
+  MANDATE_STEPS_NEVER_INFERRED,
+  PRESENCE_ABSENCE_CODES,
+  presenceCandidates,
+  type PresenceAbsence,
+  type PresenceAbsenceCode,
+  type PresenceCandidate,
+  type PresenceCandidateInput,
+  type PresenceCandidateReading,
+  type PresenceCandidateSaying,
+} from "./domain/candidates.js";
 
 export type {
   PresenceBuildLog,

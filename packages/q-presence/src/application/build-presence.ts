@@ -9,6 +9,7 @@ import {
   PRESENCE_REFRESH_AFTER_MS,
   PresenceIdentitySchema,
   PresenceSubjectSchema,
+  type PresenceFinding,
   type PresenceIdentity,
   type PresenceOutcome,
   type PresenceSubject,
@@ -148,7 +149,7 @@ export function createPresenceService(
       let sourceCount = 0;
       let understandingCount = 0;
       /** What was written, in its own words, for saying back to the subject. */
-      const accepted: { key: string; statement: string }[] = [];
+      const accepted: PresenceFinding[] = [];
 
       try {
         // ---- 1. the public web, every read at once ---------------------
@@ -307,6 +308,16 @@ export function createPresenceService(
                 accepted.push({
                   key: proposal.key,
                   statement: proposal.statement,
+                  // The pages this rests on, carried with it. The build has
+                  // had them since it registered the evidence; dropping them
+                  // here was what left every downstream caller unable to say
+                  // where a finding came from.
+                  sources: cited.map((entry) => ({
+                    evidenceSourceId: entry.sourceId,
+                    url: entry.source.url,
+                    title: entry.source.title,
+                    retrievedAt: entry.source.retrievedAt,
+                  })),
                 });
               }
             }

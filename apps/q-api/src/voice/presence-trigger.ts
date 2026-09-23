@@ -19,6 +19,26 @@ import type { ActorContext } from "@capital-q/security";
 
 const FOUNDER_COMPANY_NAME = "F1.company_name";
 const FOUNDER_WEBSITE = "F1.website";
+const INVESTOR_ORGANISATION_NAME = "I0.organisation_name";
+
+/**
+ * Which step names the subject, for the subject this session is about.
+ *
+ * A session binds to a company or to an investor organisation, and the two
+ * journeys ask for that name on different steps. Only the founder's step
+ * was ever read, so an investor's organisation was never looked up at all:
+ * the name was sitting in the session (and in their registration) and the
+ * one branch that could have used it tested for a step the investor
+ * journey does not have.
+ */
+function subjectNameStepFor(subjectType: "COMPANY" | "INVESTOR_ORGANISATION"): {
+  readonly nameStep: string;
+  readonly websiteStep: string | null;
+} {
+  return subjectType === "COMPANY"
+    ? { nameStep: FOUNDER_COMPANY_NAME, websiteStep: FOUNDER_WEBSITE }
+    : { nameStep: INVESTOR_ORGANISATION_NAME, websiteStep: null };
+}
 
 function firstText(
   view: OnboardingSessionView,
@@ -120,7 +140,7 @@ export function createPresenceTrigger(
   /** One build, detached, never able to delay or fail a turn. */
   const start = (
     actor: ActorContext,
-    subjectType: "COMPANY" | "PERSON",
+    subjectType: "COMPANY" | "INVESTOR_ORGANISATION" | "PERSON",
     subjectId: string,
     identity: {
       readonly name: string;
@@ -222,11 +242,16 @@ export function createPresenceTrigger(
   return {
     afterInterviewTurn: (actor, view, onFound, hints) => {
       const subject = view.session.subject;
-      const interviewName = firstText(view, FOUNDER_COMPANY_NAME);
-      const website = firstText(view, FOUNDER_WEBSITE);
-      // What tells one person of that name from another: the company they
-      // named in the interview, or failing that the organisation they
-      // typed at sign-up. Public either way.
+      const steps = subject === null ? null : subjectNameStepFor(subject.type);
+      const interviewName =
+        steps === null ? null : firstText(view, steps.nameStep);
+      const website =
+        steps === null || steps.websiteStep === null
+          ? null
+          : firstText(view, steps.websiteStep);
+      // What tells one person of that name from another: the organisation
+      // they named in the interview, or failing that the one they typed at
+      // sign-up. Public either way.
       const qualifier =
         interviewName !== null && interviewName.length >= 2
           ? interviewName
@@ -234,14 +259,13 @@ export function createPresenceTrigger(
 
       if (
         subject !== null &&
-        subject.type === "COMPANY" &&
         interviewName !== null &&
         interviewName.length >= 2 &&
-        once("COMPANY", subject.id)
+        once(subject.type, subject.id)
       ) {
         start(
           actor,
-          "COMPANY",
+          subject.type,
           subject.id,
           {
             name: interviewName,
