@@ -223,3 +223,35 @@ export const PitchSummaryDtoSchema = z
   })
   .strict();
 export type PitchSummaryDto = z.infer<typeof PitchSummaryDtoSchema>;
+
+/*
+ * The founder's decision (CQ-MEDIA-013). Commercial authority over their
+ * own pitch is theirs: whether investors may be granted playback. Whether
+ * the pitch is allowed on the platform at all is Capital Q's (moderation)
+ * and has no client route.
+ */
+
+export const MEDIA_PLAYBACK_POLICY_SUFFIX = "/playback-policy" as const;
+
+/** What an owner may choose. PUBLIC is deliberately absent: doc 20 §34 is a product decision no packet has made. */
+export const OWNER_PLAYBACK_POLICIES = ["AUTHORISED", "PRIVATE"] as const;
+export const OwnerPlaybackPolicySchema = z.enum(OWNER_PLAYBACK_POLICIES);
+export type OwnerPlaybackPolicy = z.infer<typeof OwnerPlaybackPolicySchema>;
+
+/** `POST .../pitch/:mediaAssetId/playback-policy` — reversible, consequential, versioned. */
+export const SetPitchPlaybackPolicyRequestSchema = z
+  .object({
+    playbackPolicy: OwnerPlaybackPolicySchema,
+    expectedVersion: ResourceVersionSchema,
+  })
+  .strict();
+export type SetPitchPlaybackPolicyRequest = z.infer<
+  typeof SetPitchPlaybackPolicyRequestSchema
+>;
+
+export const SetPitchPlaybackPolicyResponseSchema = z
+  .object({ pitch: MediaAssetDtoSchema })
+  .strict();
+export type SetPitchPlaybackPolicyResponse = z.infer<
+  typeof SetPitchPlaybackPolicyResponseSchema
+>;
