@@ -2,8 +2,11 @@ import type { ReactNode } from "react";
 
 import type { ContextScope } from "@capital-q/ui/tokens";
 
+import { NO_SUBJECT, type QSubject } from "@/features/q/q-subject";
+
 import { AppHeader } from "./app-header";
 import { DesktopSidebar } from "./desktop-sidebar";
+import { GlobalQProvider } from "./global-q";
 import { MobileNavigation } from "./mobile-navigation";
 import { NetworkStatus } from "./network-status";
 
@@ -30,27 +33,35 @@ const UNSET: ShellContext = { scope: "unset" };
 export function AppShell({
   children,
   context = UNSET,
+  subject = NO_SUBJECT,
+  qConnected = false,
 }: {
   readonly children: ReactNode;
   readonly context?: ShellContext | undefined;
+  /** What Q looks at from any page: the person's own subject, server-resolved. */
+  readonly subject?: QSubject | undefined;
+  /** False when this build has no Q API. */
+  readonly qConnected?: boolean | undefined;
 }) {
   return (
-    <div className="cq-shell">
-      <a
-        href="#main"
-        className="sr-only z-(--cq-z-toast) rounded-md bg-(--cq-surface-raised) px-4 py-3 cq-body-sm font-medium text-(--cq-text-primary) shadow-(--cq-shadow-overlay) focus:not-sr-only focus:fixed focus:top-3 focus:left-3"
-      >
-        Skip to content
-      </a>
-      <DesktopSidebar context={context} />
-      <div className="cq-shell-body">
-        <AppHeader context={context} />
-        <NetworkStatus />
-        <main id="main" className="cq-shell-main">
-          {children}
-        </main>
-        <MobileNavigation />
+    <GlobalQProvider subject={subject} connected={qConnected}>
+      <div className="cq-shell">
+        <a
+          href="#main"
+          className="sr-only z-(--cq-z-toast) rounded-md bg-(--cq-surface-raised) px-4 py-3 cq-body-sm font-medium text-(--cq-text-primary) shadow-(--cq-shadow-overlay) focus:not-sr-only focus:fixed focus:top-3 focus:left-3"
+        >
+          Skip to content
+        </a>
+        <DesktopSidebar context={context} />
+        <div className="cq-shell-body">
+          <AppHeader context={context} />
+          <NetworkStatus />
+          <main id="main" className="cq-shell-main">
+            {children}
+          </main>
+          <MobileNavigation />
+        </div>
       </div>
-    </div>
+    </GlobalQProvider>
   );
 }

@@ -5,14 +5,13 @@ import { usePathname } from "next/navigation";
 import { Suspense } from "react";
 
 import { cx } from "@capital-q/ui";
-import { buttonClassName } from "@capital-q/ui/button";
 import { ContextIndicator } from "@capital-q/ui/context-indicator";
 import { ICON_SIZE, ICON_STROKE } from "@capital-q/ui/icons";
-import { QMark } from "@capital-q/ui/q-mark";
 
 import { ChatsListForRoute } from "@/features/q/chats-list";
 
 import type { ShellContext } from "./app-shell";
+import { GlobalQTrigger } from "./global-q";
 import {
   isActiveRoute,
   PRIMARY_NAVIGATION,
@@ -75,17 +74,7 @@ export function DesktopSidebar({
       </div>
 
       <div className="px-3 pt-6">
-        <Link
-          href="/home#q"
-          className={buttonClassName(
-            "secondary",
-            "regular",
-            "w-full justify-start",
-          )}
-        >
-          <QMark size="sm" />
-          Ask Q
-        </Link>
+        <GlobalQTrigger variant="sidebar" />
       </div>
 
       <div className="mt-auto border-t border-(--cq-border-subtle) px-3 py-3">

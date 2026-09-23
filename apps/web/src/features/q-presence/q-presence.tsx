@@ -112,8 +112,14 @@ export function QPresence({
     const dpr = Math.min(3, window.devicePixelRatio || 1);
     canvas.width = Math.round(px * dpr);
     canvas.height = Math.round(px * dpr);
-    const radius = px * 0.36;
-    const dot = Math.max(0.9, Math.min(2.4, px / 95));
+    const radius = px * 0.34;
+    // Small presences (the chrome) need heavier, brighter points to read
+    // at all; the stage size can afford a finer grain.
+    const small = px < 64;
+    const dot = small
+      ? Math.max(1.1, px / 24)
+      : Math.max(1.2, Math.min(2.4, px / 95));
+    const alphaBoost = small ? 1.6 : 1;
     const formation = createFormation(particleCount(px), radius);
     formationRef.current = formation;
 
@@ -162,15 +168,16 @@ export function QPresence({
       const upper = accent;
       for (const particle of formation.particles) {
         const r = dot * (0.75 + particle.seed * 0.5);
+        const alpha = Math.min(1, particle.alpha * alphaBoost);
         if (a < 1 && lower.length > 0) {
-          context.globalAlpha = particle.alpha * (1 - a);
+          context.globalAlpha = alpha * (1 - a);
           context.fillStyle = lower;
           context.beginPath();
           context.arc(particle.x, particle.y, r, 0, Math.PI * 2);
           context.fill();
         }
         if (a > 0 && upper.length > 0) {
-          context.globalAlpha = particle.alpha * a;
+          context.globalAlpha = alpha * a;
           context.fillStyle = upper;
           context.beginPath();
           context.arc(particle.x, particle.y, r, 0, Math.PI * 2);

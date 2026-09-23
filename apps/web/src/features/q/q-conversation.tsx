@@ -24,6 +24,7 @@ import { ArtifactViewer } from "./artifact-viewer";
 import { QAnswer } from "./q-answer";
 import { QHistorySheet } from "./q-history-sheet";
 import { QStage } from "./q-stage";
+import { spokenNotYetStored, type SpokenLine } from "./spoken";
 import {
   failureMessage,
   recoveryHint,
@@ -36,12 +37,6 @@ import {
   announceConversationsChanged,
   useQConversation,
 } from "./use-q-conversation";
-
-type SpokenLine = {
-  readonly id: string;
-  readonly role: "user" | "q";
-  readonly text: string;
-};
 
 /**
  * Q, in the browser (CQ-C5-R1 §13-§19; CQ-PRE-REC-001 §12-§13), voice
@@ -315,36 +310,11 @@ export function QConversationPanel({
     });
   }, [turns.length, spoken.length, q.state.partial?.text]);
 
-  /**
-   * A spoken line is shown only until the same words arrive as a stored
-   * turn. Every voice turn becomes a stored turn, so without this each
-   * thing the person said appeared twice: once from the transcript as
-   * they said it, once from the conversation when it was recorded.
-   */
-  // Compared as words, not characters: the recogniser's transcript and
-  // the recorded turn differ in punctuation, casing and spacing, and a
-  // person's sentence shown twice for that was the most-noticed thing on
-  // this screen (2026-09-17).
-  const asWords = (text: string) =>
-    text
-      .toLowerCase()
-      .replace(/[^\p{L}\p{N}]+/gu, " ")
-      .trim();
-  const storedText = new Set(turns.map((turn) => asWords(turn.text)));
-  const seenSpoken = new Set<string>();
-  const spokenOnly = spoken.filter((line) => {
-    const words = asWords(line.text);
-    if (words.length === 0 || storedText.has(words)) {
-      return false;
-    }
-    // The same words twice from the transcript itself is one line.
-    const key = `${line.role}:${words}`;
-    if (seenSpoken.has(key)) {
-      return false;
-    }
-    seenSpoken.add(key);
-    return true;
-  });
+  // Spoken lines only until the same words are stored (see ./spoken).
+  const spokenOnly = spokenNotYetStored(
+    spoken,
+    turns.map((turn) => turn.text),
+  );
 
   const stage = workingLabel(q.state);
   // Suggestions are an on-ramp, not a feature: gone after the first turn.

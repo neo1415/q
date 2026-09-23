@@ -1,8 +1,11 @@
 import type { ReactNode } from "react";
 
+import { loadWebServerConfig } from "@capital-q/config/web";
+
 import { requireSessionUser } from "@/auth/session";
 import { AppShell, type ShellContext } from "@/components/app-shell/app-shell";
 import { resolveOwnContext } from "@/features/q/context";
+import type { QSubject } from "@/features/q/q-subject";
 
 // Session-bound HTML is rendered per request and never prerendered or
 // shared-cached (doc 15 s9.4).
@@ -31,5 +34,27 @@ export default async function ApplicationLayout({
       : context.kind === "INVESTOR"
         ? { scope: "investor_private", label: context.label ?? undefined }
         : { scope: "unset" };
-  return <AppShell context={shell}>{children}</AppShell>;
+  // The same resolution, as the subject Q looks at from any page.
+  const subject: QSubject =
+    context.kind === "FOUNDER"
+      ? {
+          kind: "COMPANY",
+          companyId: context.companyId,
+          label: context.label ?? undefined,
+          scope: "founder_private",
+        }
+      : context.kind === "INVESTOR"
+        ? {
+            kind: "INVESTOR_ORGANISATION",
+            investorOrganisationId: context.investorOrganisationId,
+            label: context.label ?? undefined,
+            scope: "investor_private",
+          }
+        : { kind: "NONE", scope: "unset" };
+  const qConnected = loadWebServerConfig().qApiBaseUrl !== undefined;
+  return (
+    <AppShell context={shell} subject={subject} qConnected={qConnected}>
+      {children}
+    </AppShell>
+  );
 }

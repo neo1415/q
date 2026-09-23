@@ -1,0 +1,335 @@
+"use client";
+
+import Link from "next/link";
+import { useEffect, useRef, useState } from "react";
+
+import { QConversationIdSchema } from "@capital-q/contracts";
+import { cx } from "@capital-q/ui";
+import { Button, IconButton } from "@capital-q/ui/button";
+import { ContextIndicator } from "@capital-q/ui/context-indicator";
+import { ICON_SIZE, ICON_STROKE, Mic } from "@capital-q/ui/icons";
+import { QComposer } from "@capital-q/ui/q-composer";
+import { InlineNotice } from "@capital-q/ui/states";
+import { Tooltip } from "@capital-q/ui/tooltip";
+
+import { presenceStateFromVoice, type QPresenceState } from "../q-presence";
+import { QPresence } from "../q-presence";
+import { VOICE_STATE_LABELS } from "../voice/session";
+import { useVoiceInterview } from "../voice/use-voice-interview";
+import { Q_CONVERSATION_PARAM } from "./chats-list";
+import { failureMessage, recoveryHint, turnsFrom } from "./conversation";
+import { QAnswer } from "./q-answer";
+import { MicOffIcon, StopIcon } from "./q-control-icons";
+import type { QSubject } from "./q-subject";
+import { spokenNotYetStored, type SpokenLine } from "./spoken";
+import { useQConversation } from "./use-q-conversation";
+
+/**
+ * Q from anywhere: the same conversation runtime as Home, in a sheet,
+ * about whatever the page is looking at.
+ *
+ * The subject is the page's declaration or the person's own, handed in
+ * by the shell; it is an input the Q API resolves and authorises again,
+ * never a grant. The conversation the server names is kept only while
+ * the sheet is open, and "Open in Home" carries it to the full surface
+ * — one thread, wherever it was started. Voice and typing share it here
+ * exactly as they do on Home.
+ */
+
+export function QSheetConversation({
+  subject,
+  connected,
+  onActivity,
+}: {
+  readonly subject: QSubject;
+  readonly connected: boolean;
+  /** What Q is doing, for the presence in the chrome. */
+  readonly onActivity?: ((state: QPresenceState) => void) | undefined;
+}) {
+  const [conversationId, setConversationId] = useState<string | null>(null);
+  const companyId = subject.kind === "COMPANY" ? subject.companyId : undefined;
+  const investorOrganisationId =
+    subject.kind === "INVESTOR_ORGANISATION"
+      ? subject.investorOrganisationId
+      : undefined;
+  const q = useQConversation({
+    companyId,
+    investorOrganisationId,
+    conversationId,
+    onConversation: setConversationId,
+  });
+  const turns = turnsFrom(q.state, q.pending);
+  const endRef = useRef<HTMLDivElement>(null);
+
+  const [spoken, setSpoken] = useState<readonly SpokenLine[]>([]);
+  const voice = useVoiceInterview({
+    onLine: (line) => {
+      setSpoken((current) => [
+        ...current,
+        { id: line.id, role: line.role, text: line.text },
+      ]);
+    },
+  });
+  // The spoken turns live in a conversation the server names; once it
+  // does, this sheet is in that conversation too. Adjusted during render,
+  // as React asks, so the hook below sees it on the same pass.
+  const voiceConversationId = voice.turn?.conversationId;
+  if (
+    voiceConversationId !== undefined &&
+    voiceConversationId !== conversationId
+  ) {
+    setConversationId(voiceConversationId);
+  }
+  // The line ends with the sheet; a microphone left open behind a closed
+  // panel is exactly the thing a person would not expect.
+  const endVoice = voice.end;
+  useEffect(() => () => void endVoice(), [endVoice]);
+
+  const talk = async () => {
+    const named = QConversationIdSchema.safeParse(
+      q.conversationId ?? undefined,
+    ).data;
+    await voice.talk({
+      thread: {
+        ...(companyId !== undefined
+          ? { subjects: [{ kind: "COMPANY" as const, companyId }] }
+          : investorOrganisationId !== undefined
+            ? {
+                subjects: [
+                  {
+                    kind: "INVESTOR_ORGANISATION" as const,
+                    investorOrganisationId,
+                  },
+                ],
+              }
+            : {}),
+        ...(named === undefined ? {} : { conversationId: named }),
+      },
+      firstMessage: "I'm listening. What would you like to know?",
+    });
+  };
+
+  const presenceState: QPresenceState = voice.active
+    ? presenceStateFromVoice(voice.client.state)
+    : q.working
+      ? "THINKING"
+      : q.state.failure !== null
+        ? "ERROR"
+        : "IDLE";
+  useEffect(() => {
+    onActivity?.(presenceState);
+  }, [presenceState, onActivity]);
+  const presenceLabel = voice.active
+    ? voice.client.muted
+      ? "Muted"
+      : VOICE_STATE_LABELS[voice.client.state]
+    : q.working
+      ? "Thinking"
+      : q.state.failure !== null
+        ? "Couldn't finish that"
+        : "Ready";
+
+  useEffect(() => {
+    endRef.current?.scrollIntoView({ block: "nearest" });
+  }, [turns.length, spoken.length, q.state.partial?.text]);
+
+  const spokenOnly = spokenNotYetStored(
+    spoken,
+    turns.map((turn) => turn.text),
+  );
+  const openInHome =
+    q.conversationId === null
+      ? "/home"
+      : `/home?${Q_CONVERSATION_PARAM}=${encodeURIComponent(q.conversationId)}`;
+
+  return (
+    <div className="flex min-h-full flex-col gap-4" data-q-sheet>
+      <div className="flex items-center gap-4">
+        <QPresence
+          state={presenceState}
+          size="md"
+          inputLevel={voice.client.inputLevel}
+          outputLevel={voice.client.outputLevel}
+        />
+        <div className="flex min-w-0 flex-1 flex-col gap-1">
+          <span className="cq-label text-(--cq-text-primary)" role="status">
+            {presenceLabel}
+          </span>
+          <ContextIndicator
+            scope={subject.scope}
+            detail={subject.kind === "NONE" ? undefined : subject.label}
+          />
+        </div>
+        {connected ? (
+          <Tooltip content={voice.active ? "End voice" : "Talk with Q"}>
+            <IconButton
+              aria-label={voice.active ? "End voice" : "Talk with Q"}
+              variant={voice.active ? "secondary" : "primary"}
+              className="rounded-full"
+              onClick={
+                voice.active ? () => void voice.end() : () => void talk()
+              }
+              data-q-control={voice.active ? "end" : "talk"}
+            >
+              {voice.active ? (
+                <StopIcon aria-hidden="true" size={ICON_SIZE.prominent} />
+              ) : (
+                <Mic
+                  aria-hidden="true"
+                  size={ICON_SIZE.prominent}
+                  strokeWidth={ICON_STROKE}
+                />
+              )}
+            </IconButton>
+          </Tooltip>
+        ) : null}
+        {voice.active ? (
+          <Tooltip
+            content={
+              voice.client.muted ? "Unmute microphone" : "Mute microphone"
+            }
+          >
+            <IconButton
+              aria-label={
+                voice.client.muted ? "Unmute microphone" : "Mute microphone"
+              }
+              variant="quiet"
+              className={cx(
+                "rounded-full",
+                voice.client.muted ? "bg-(--cq-accent-soft)" : "",
+              )}
+              aria-pressed={voice.client.muted}
+              onClick={() => voice.client.setMuted(!voice.client.muted)}
+              data-q-control="mute"
+            >
+              {voice.client.muted ? (
+                <MicOffIcon aria-hidden="true" size={ICON_SIZE.prominent} />
+              ) : (
+                <Mic
+                  aria-hidden="true"
+                  size={ICON_SIZE.prominent}
+                  strokeWidth={ICON_STROKE}
+                />
+              )}
+            </IconButton>
+          </Tooltip>
+        ) : null}
+      </div>
+
+      {voice.notice !== null ? (
+        <InlineNotice tone="warning" title={voice.notice}>
+          <Button size="compact" variant="quiet" onClick={voice.clearNotice}>
+            Dismiss
+          </Button>
+        </InlineNotice>
+      ) : null}
+
+      <div className="flex min-h-0 flex-1 flex-col gap-4">
+        {turns.length === 0 && spokenOnly.length === 0 && !q.working ? (
+          <p className="cq-body-sm text-(--cq-text-secondary)">
+            {subject.kind === "NONE"
+              ? "Ask Q anything about what you're looking at."
+              : `Ask Q about ${subject.label ?? "this"} — what it says, what is missing, what to do next.`}
+          </p>
+        ) : null}
+        {spokenOnly.length > 0 ? (
+          <ol className="flex flex-col gap-3" aria-label="Spoken">
+            {spokenOnly.map((line) => (
+              <li
+                key={line.id}
+                className={
+                  line.role === "user"
+                    ? "flex flex-col items-end gap-1"
+                    : "flex flex-col gap-1"
+                }
+              >
+                <span className="cq-label text-(--cq-text-tertiary)">
+                  {line.role === "user" ? "You" : "Q"}
+                </span>
+                <p
+                  className={
+                    line.role === "user"
+                      ? "cq-body-sm rounded-lg bg-(--cq-surface-subtle) px-3 py-2 text-(--cq-text-primary)"
+                      : "cq-body-sm whitespace-pre-wrap text-(--cq-text-primary)"
+                  }
+                >
+                  {line.text}
+                </p>
+              </li>
+            ))}
+          </ol>
+        ) : null}
+        {turns.length > 0 ? (
+          <ol className="flex flex-col gap-3" aria-live="polite">
+            {turns.map((turn) => (
+              <li
+                key={turn.id}
+                className={
+                  turn.kind === "PERSON"
+                    ? "flex flex-col items-end gap-1"
+                    : "flex flex-col gap-1"
+                }
+              >
+                {turn.kind === "PERSON" ? (
+                  <>
+                    <span className="cq-label text-(--cq-text-tertiary)">
+                      You
+                    </span>
+                    <p className="cq-body-sm rounded-lg bg-(--cq-surface-subtle) px-3 py-2 text-(--cq-text-primary)">
+                      {turn.text}
+                    </p>
+                  </>
+                ) : (
+                  <QAnswer
+                    turn={turn}
+                    onAsk={(question) => void q.ask(question)}
+                  />
+                )}
+              </li>
+            ))}
+            <div ref={endRef} />
+          </ol>
+        ) : null}
+        {q.state.failure !== null ? (
+          <InlineNotice tone="warning" title="Q couldn't finish that">
+            {failureMessage(q.state.failure)} {recoveryHint(q.state.failure)}
+          </InlineNotice>
+        ) : null}
+        {q.notice !== null && q.state.failure === null ? (
+          <InlineNotice tone="warning" title="That didn't go through">
+            {q.notice}
+          </InlineNotice>
+        ) : null}
+      </div>
+
+      <div className="sticky bottom-0 flex flex-col gap-2 bg-(--cq-surface-raised) pt-2">
+        <QComposer
+          id="shell-q"
+          contextScope={subject.scope}
+          contextDetail={subject.kind === "NONE" ? undefined : subject.label}
+          disabled={q.working}
+          placeholder={
+            voice.active ? "Type instead — Q hears this too" : "Ask Q"
+          }
+          {...(connected
+            ? {
+                onSubmit: voice.active
+                  ? (text: string) => {
+                      voice.client.sendText(text);
+                    }
+                  : q.ask,
+              }
+            : {})}
+        />
+        <div className="flex justify-end">
+          <Link
+            href={openInHome}
+            className="cq-caption text-(--cq-text-secondary) underline-offset-2 hover:underline"
+          >
+            Open in Home
+          </Link>
+        </div>
+      </div>
+    </div>
+  );
+}

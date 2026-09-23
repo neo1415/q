@@ -3,6 +3,7 @@ import Link from "next/link";
 import { ContextIndicator } from "@capital-q/ui/context-indicator";
 
 import type { ShellContext } from "./app-shell";
+import { GlobalQTrigger } from "./global-q";
 
 /**
  * Compact mobile top bar: wordmark and the current context. Hidden on
@@ -18,7 +19,10 @@ export function AppHeader({ context }: { readonly context: ShellContext }) {
         >
           Capital Q
         </Link>
-        <ContextIndicator scope={context.scope} detail={context.label} />
+        <div className="flex min-w-0 items-center gap-2">
+          <ContextIndicator scope={context.scope} detail={context.label} />
+          <GlobalQTrigger variant="header" />
+        </div>
       </div>
     </header>
   );
