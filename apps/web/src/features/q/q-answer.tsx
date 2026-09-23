@@ -41,21 +41,14 @@ export function QAnswer({
   readonly onAsk?: ((question: string) => void) | undefined;
   readonly onOpenArtifact?: ((artifactId: string) => void) | undefined;
 }) {
-  const hasDetail = turn.findings.length > 0 || turn.uncertainties.length > 0;
   return (
     <div
-      className={
-        hasDetail
-          ? "cq-q-answer cq-q-answer-read flex max-w-(--cq-layout-narrow) flex-col gap-4"
-          : "cq-q-answer flex max-w-(--cq-layout-narrow) flex-col gap-2"
-      }
+      className="cq-q-answer flex max-w-(--cq-layout-reading) flex-col gap-4"
       data-q-answer={turn.streaming ? "streaming" : "settled"}
     >
-      <div className="flex items-center gap-2">
-        <QMark size="sm" state={turn.streaming ? "WORKING" : "IDLE"} />
-        <span className="cq-label text-(--cq-text-tertiary)">Q</span>
-      </div>
-      <p className="cq-body whitespace-pre-wrap text-(--cq-text-primary)">
+      {/* One Q, once: the mark is the label. */}
+      <QMark size="sm" state={turn.streaming ? "WORKING" : "IDLE"} />
+      <p className="cq-body cq-prose whitespace-pre-wrap text-(--cq-text-primary)">
         {turn.text}
       </p>
       {turn.findings.length > 0 ? (

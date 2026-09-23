@@ -10,7 +10,6 @@ import {
   resolveUnfinishedSetup,
   type OwnContext,
 } from "@/features/q/context";
-import { ChatsList } from "@/features/q/chats-list";
 import {
   QConversationPanel,
   type QSurfaceContext,
@@ -118,16 +117,12 @@ export async function HomeScreen({
         className="flex flex-col gap-5"
         data-q-surface
       >
-        <div className="flex flex-wrap items-baseline justify-between gap-3">
-          <p className="cq-body max-w-(--cq-layout-narrow) text-(--cq-text-secondary)">
-            {openingLine(context)}
-          </p>
-          {/* Deep chat lives one deliberate control away, never spread
-              across Home (QX-001 §7). Same conversations, same runs.
-              Told which conversation is open rather than reading the URL,
-              so it needs no boundary — see the note on the panel below. */}
-          <ChatsList variant="inline" active={conversationId} />
-        </div>
+        {/* Previous conversations live in the sidebar on desktop and behind
+            the history control on the Q surface everywhere (QX-001 §7;
+            design/visual-debt.md P0): never a list above the composer. */}
+        <p className="cq-body mx-auto w-full max-w-(--cq-layout-reading) text-center text-(--cq-text-secondary)">
+          {openingLine(context)}
+        </p>
 
         {/*
           Deliberately not inside a Suspense boundary (QX-003A).

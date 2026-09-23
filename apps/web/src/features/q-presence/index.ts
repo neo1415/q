@@ -6,3 +6,4 @@ export {
   presenceStateFromVoice,
 } from "./presence-state";
 export type { QPresenceState } from "./presence-state";
+export { useStagePresenceSize } from "./use-presence-size";

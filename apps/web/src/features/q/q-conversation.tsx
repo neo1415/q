@@ -385,7 +385,12 @@ export function QConversationPanel({
     >
       <div
         className={cx(
+          // The thread reads at reading measure, centred, until a document
+          // opens beside it and the two share the workspace.
           "flex min-w-0 flex-1 flex-col gap-4",
+          openArtifact === null
+            ? "mx-auto w-full max-w-(--cq-layout-reading)"
+            : "",
           // On a narrow screen the document takes the column rather than
           // squeezing beside the conversation; "Back to Q" brings this
           // back, and the conversation is never unmounted, so nothing it
@@ -473,8 +478,8 @@ export function QConversationPanel({
                 <p
                   className={
                     line.role === "user"
-                      ? "cq-body max-w-(--cq-layout-narrow) rounded-lg bg-(--cq-surface-sunken) px-3 py-2 text-(--cq-text-primary)"
-                      : "cq-body max-w-(--cq-layout-narrow) whitespace-pre-wrap text-(--cq-text-primary)"
+                      ? "cq-body max-w-(--cq-layout-narrow) rounded-md bg-(--cq-surface-sunken) px-3 py-2 text-(--cq-text-primary)"
+                      : "cq-body cq-prose whitespace-pre-wrap text-(--cq-text-primary)"
                   }
                 >
                   {line.text}
@@ -500,7 +505,7 @@ export function QConversationPanel({
                       You
                     </span>
                     <p
-                      className="cq-body max-w-(--cq-layout-narrow) rounded-lg bg-(--cq-surface-sunken) px-3 py-2 text-(--cq-text-primary)"
+                      className="cq-body max-w-(--cq-layout-narrow) rounded-md bg-(--cq-surface-sunken) px-3 py-2 text-(--cq-text-primary)"
                       data-unconfirmed={turn.unconfirmed ? "true" : undefined}
                     >
                       {turn.text}
@@ -526,9 +531,10 @@ export function QConversationPanel({
         ) : null}
 
         {q.working ? (
-          <div className="flex items-center justify-end gap-3">
+          <div className="flex items-center justify-between gap-3">
+            <span className="cq-status-line">{stage ?? "Working on it"}</span>
             <Button
-              variant="secondary"
+              variant="quiet"
               size="compact"
               onClick={() => void q.stop()}
             >

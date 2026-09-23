@@ -9,6 +9,7 @@ import { useFollowTurn } from "../voice/use-follow-turn";
 import { useQSpeech } from "../voice/use-q-speech";
 import { useVoiceInterview } from "../voice/use-voice-interview";
 import { VoiceStage } from "../voice/voice-stage";
+import { QPresence, useStagePresenceSize } from "../q-presence";
 
 /**
  * The first minute with Q (QX-002 §A1-§A7).
@@ -76,6 +77,7 @@ export function WelcomeScreen({
   const voice = useVoiceInterview();
   const speech = useQSpeech();
   const [started, setStarted] = useState(false);
+  const presenceSize = useStagePresenceSize();
 
   const lines = introduction(knownName);
   const spoken = lines.join(" ");
@@ -156,21 +158,22 @@ export function WelcomeScreen({
 
   return (
     <div
-      className="cq-stage fixed inset-0 z-50 overflow-y-auto px-6 py-10 text-white"
+      className="cq-stage fixed inset-0 z-(--cq-z-modal) overflow-y-auto px-6 py-10 text-(--cq-text-primary)"
       data-q-welcome
     >
       <div className="mx-auto flex min-h-full max-w-2xl flex-col items-center justify-center gap-8">
-        <div className="relative flex h-40 w-40 items-center justify-center">
-          <div
-            aria-hidden="true"
-            className="cq-stage-halo-listening cq-welcome-breathe absolute inset-0 rounded-full blur-2xl"
-          />
-          <div className="cq-stage-core relative flex h-28 w-28 items-center justify-center rounded-full">
-            <span className="cq-stage-mark select-none text-5xl font-semibold tracking-tight">
-              Q
-            </span>
-          </div>
-        </div>
+        {/* Q's presence: speaking while the introduction is read aloud,
+            thinking while it is fetched, otherwise still. */}
+        <QPresence
+          state={
+            speech.status === "speaking"
+              ? "SPEAKING"
+              : speech.status === "loading"
+                ? "THINKING"
+                : "IDLE"
+          }
+          size={presenceSize}
+        />
 
         {/* Q's introduction, readable without a microphone, a provider or
             a permission prompt. */}
@@ -178,7 +181,7 @@ export function WelcomeScreen({
           className="flex flex-col items-center gap-3 text-center"
           data-q-intro
         >
-          <span className="cq-label text-white/60">
+          <span className="cq-label text-(--cq-text-secondary)">
             {returning ? "Capital Q" : "Welcome to Capital Q"}
           </span>
           {lines.map((line, index) => (
@@ -186,8 +189,8 @@ export function WelcomeScreen({
               key={line}
               className={
                 index === 0
-                  ? "text-balance text-2xl font-semibold text-white sm:text-3xl"
-                  : "cq-body max-w-xl text-white/70"
+                  ? "cq-title-lg text-balance text-(--cq-text-primary)"
+                  : "cq-body cq-prose text-(--cq-text-secondary)"
               }
             >
               {line}
@@ -196,8 +199,10 @@ export function WelcomeScreen({
         </div>
 
         {voice.notice !== null ? (
-          <div className="flex items-center gap-3 rounded-xl bg-white/10 px-4 py-3">
-            <span className="cq-body text-white/85">{voice.notice}</span>
+          <div className="flex items-center gap-3 rounded-md border border-(--cq-border-subtle) bg-(--cq-surface) px-4 py-3">
+            <span className="cq-body text-(--cq-text-primary)">
+              {voice.notice}
+            </span>
             <button
               type="button"
               className="cq-stage-quiet"
@@ -243,10 +248,10 @@ export function WelcomeScreen({
           // the same component Home uses, so the choice reads the same
           // wherever it is offered.
           <div className="flex w-full flex-col gap-5" data-q-role-question>
-            <p className="cq-body text-center text-white/80">
+            <p className="cq-body text-center text-(--cq-text-secondary)">
               Are you here to raise capital, or to invest it?
             </p>
-            <div className="cq-stage-panel rounded-xl bg-white/5 p-4">
+            <div className="rounded-lg border border-(--cq-border-subtle) bg-(--cq-surface) p-4">
               <PersonaCards
                 autoFocus
                 onChoose={() => {

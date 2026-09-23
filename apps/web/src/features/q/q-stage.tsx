@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 import type { QVoiceChoice, QVoiceTurnState } from "@capital-q/contracts";
 import { cx } from "@capital-q/ui";
@@ -13,7 +13,11 @@ import {
 } from "@capital-q/ui/popover";
 import { Tooltip } from "@capital-q/ui/tooltip";
 
-import { QPresence, type QPresenceState } from "../q-presence";
+import {
+  QPresence,
+  useStagePresenceSize,
+  type QPresenceState,
+} from "../q-presence";
 import {
   DownloadIcon,
   HistoryIcon,
@@ -69,19 +73,6 @@ const VOICE_LABELS: Readonly<Record<QVoiceChoice, string>> = {
   FEMALE: "Female",
   MALE: "Male",
 };
-
-/** The presence grows with the screen; read after mount to keep hydration honest. */
-function usePresenceSize(): 160 | 224 {
-  const [size, setSize] = useState<160 | 224>(160);
-  useEffect(() => {
-    const query = window.matchMedia("(min-width: 1024px)");
-    const apply = () => setSize(query.matches ? 224 : 160);
-    apply();
-    query.addEventListener("change", apply);
-    return () => query.removeEventListener("change", apply);
-  }, []);
-  return size;
-}
 
 function Control({
   label,
@@ -141,7 +132,7 @@ export function QStage({
   onSay,
   className,
 }: QStageProps) {
-  const size = usePresenceSize();
+  const size = useStagePresenceSize();
   const [picks, setPicks] = useState<readonly string[]>([]);
   // A new step means fresh picks.
   const stepKey = asking?.stepKey ?? null;

@@ -102,23 +102,6 @@
     background: linear-gradient(to bottom, transparent, var(--cq-canvas) 28%);
   }
 
-  /*
-   * Q's presence while it thinks (CQ-Q-VOICE-001 D §46-§47): the ring
-   * breathes in opacity only. The global reduced-motion rule stills it.
-   */
-  @keyframes cq-presence-breathe {
-    0%,
-    100% {
-      opacity: 0.55;
-    }
-    50% {
-      opacity: 1;
-    }
-  }
-  .cq-presence-thinking {
-    animation: cq-presence-breathe 1.8s var(--cq-ease) infinite;
-  }
-
   /* A form step arrives the way a sheet does: a short rise and settle. */
   @keyframes cq-step-in {
     from {
@@ -191,91 +174,45 @@
   }
 
   /*
-   * Q's answer on Home: prose first; a detailed reading (findings, open
-   * questions) sits on a faint wash that fades out, so it reads as one
-   * piece rather than a stack of cards. Hairlines separate findings.
+   * Q's answer on Home: open, document-like prose at reading measure, with
+   * findings divided by hairlines. No wash and no card: an answer is read,
+   * not boxed. It arrives with the one content beat the brief allows.
    */
   .cq-q-answer {
-    animation: cq-step-in 360ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
-  }
-  .cq-q-answer-read {
-    padding: 16px 18px 14px;
-    margin-inline: -18px;
-    border-radius: 16px;
-    background: linear-gradient(
-      180deg,
-      var(--cq-surface-subtle) 0%,
-      transparent 100%
-    );
+    animation: cq-arrive var(--cq-motion-emphasis) var(--cq-ease) both;
   }
   .cq-q-answer-findings > div + div {
     border-top: 1px solid var(--cq-border-subtle);
   }
-  @media (max-width: 640px) {
-    .cq-q-answer-read {
-      margin-inline: 0;
-      padding-inline: 14px;
-    }
-  }
 
   /*
-   * The voice stage (CQ-Q-VOICE-001 rework): a dark, quiet field with Q at
-   * its centre. Fixed colours on purpose — the stage is the same night in
-   * either theme. Motion is amplitude-driven in script and stilled by the
-   * global reduced-motion rule.
+   * The voice stage (CQ-Q-VOICE-001 rework): one calm inverted field, the
+   * same night in either theme, painted with the stage tokens alone. The
+   * semantic tokens are re-pointed at them inside the stage, so the shared
+   * controls, the composer and Q's presence render on it unchanged and no
+   * component carries a literal colour or alpha.
    */
   .cq-stage {
-    background: radial-gradient(
-      120% 80% at 50% 0%,
-      oklch(0.32 0.09 262) 0%,
-      oklch(0.19 0.05 262) 42%,
-      oklch(0.12 0.02 262) 100%
-    );
+    background: var(--cq-stage-canvas);
+    color: var(--cq-stage-text);
     color-scheme: dark;
-  }
-  .cq-stage-core {
-    background: radial-gradient(
-      circle at 35% 30%,
-      oklch(0.88 0.06 258) 0%,
-      oklch(0.66 0.16 258) 55%,
-      oklch(0.5 0.17 258) 100%
-    );
-    box-shadow:
-      0 0 0 1px oklch(1 0 0 / 0.14) inset,
-      0 20px 60px -20px oklch(0.6 0.18 258 / 0.7);
-  }
-  .cq-stage-mark {
-    color: oklch(0.99 0 0);
-    text-shadow: 0 2px 18px oklch(0.3 0.1 258 / 0.5);
-  }
-  .cq-stage-halo-listening {
-    background: radial-gradient(
-      circle,
-      oklch(0.62 0.16 258 / 0.55),
-      transparent 65%
-    );
-  }
-  .cq-stage-halo-speaking {
-    background: radial-gradient(
-      circle,
-      oklch(0.78 0.14 258 / 0.75),
-      transparent 68%
-    );
-  }
-  .cq-stage-halo-thinking {
-    background: radial-gradient(
-      circle,
-      oklch(0.7 0.1 300 / 0.55),
-      transparent 65%
-    );
-    animation: cq-presence-breathe 1.8s var(--cq-ease) infinite;
-  }
-  .cq-stage-halo-error {
-    background: radial-gradient(
-      circle,
-      oklch(0.6 0.15 25 / 0.5),
-      transparent 65%
-    );
+    --cq-canvas: var(--cq-stage-canvas);
+    --cq-surface: var(--cq-stage-surface);
+    --cq-surface-raised: var(--cq-stage-surface);
+    --cq-surface-subtle: var(--cq-stage-surface-strong);
+    --cq-surface-strong: var(--cq-stage-surface-strong);
+    --cq-surface-sunken: var(--cq-stage-surface);
+    --cq-border: var(--cq-stage-border);
+    --cq-border-subtle: var(--cq-stage-border);
+    --cq-border-strong: var(--cq-stage-text-muted);
+    --cq-text-primary: var(--cq-stage-text);
+    --cq-text-secondary: var(--cq-stage-text-muted);
+    --cq-text-tertiary: var(--cq-stage-text-muted);
+    --cq-text-inverse: var(--cq-stage-canvas);
+    --cq-accent: var(--cq-stage-accent);
+    --cq-accent-hover: var(--cq-stage-text);
+    --cq-accent-soft: var(--cq-stage-surface-strong);
+    --cq-shadow-xs: none;
   }
   .cq-stage-said {
     text-wrap: balance;
@@ -290,104 +227,104 @@
     gap: 6px;
   }
   .cq-stage-quiet {
-    border-radius: 999px;
-    padding: 6px 12px;
+    min-height: 36px;
+    border-radius: var(--cq-radius-md);
+    padding: 0 12px;
     font: inherit;
     font-size: 13px;
-    color: oklch(1 0 0 / 0.65);
+    color: var(--cq-stage-text-muted);
     background: transparent;
     border: 1px solid transparent;
     cursor: pointer;
     transition:
-      color var(--cq-motion-fast),
-      background-color var(--cq-motion-fast);
+      color var(--cq-motion-fast) var(--cq-ease),
+      background-color var(--cq-motion-fast) var(--cq-ease);
   }
   .cq-stage-quiet:hover,
   .cq-stage-quiet:focus-visible {
-    color: oklch(1 0 0);
-    background: oklch(1 0 0 / 0.08);
+    color: var(--cq-stage-text);
+    background: var(--cq-stage-surface);
     outline: none;
   }
   .cq-stage-control {
     min-height: 44px;
-    border-radius: 999px;
-    padding: 0 18px;
+    border-radius: var(--cq-radius-md);
+    padding: 0 16px;
     font: inherit;
     font-size: 14px;
     font-weight: 500;
-    color: oklch(1 0 0 / 0.85);
-    background: oklch(1 0 0 / 0.08);
-    border: 1px solid oklch(1 0 0 / 0.12);
+    color: var(--cq-stage-text);
+    background: var(--cq-stage-surface);
+    border: 1px solid var(--cq-stage-border);
     cursor: pointer;
     transition:
-      background-color var(--cq-motion-fast),
-      border-color var(--cq-motion-fast);
+      background-color var(--cq-motion-fast) var(--cq-ease),
+      border-color var(--cq-motion-fast) var(--cq-ease);
   }
   .cq-stage-control:hover,
   .cq-stage-control:focus-visible {
-    background: oklch(1 0 0 / 0.14);
+    background: var(--cq-stage-surface-strong);
     outline: none;
   }
   .cq-stage-control:disabled {
-    opacity: 0.4;
+    opacity: 0.5;
     cursor: default;
   }
   .cq-stage-control.is-active {
-    background: oklch(1 0 0 / 0.92);
-    color: oklch(0.2 0.03 262);
+    background: var(--cq-stage-text);
+    color: var(--cq-stage-canvas);
     border-color: transparent;
   }
   .cq-stage-option {
     min-height: 44px;
-    border-radius: 14px;
-    padding: 0 18px;
+    border-radius: var(--cq-radius-md);
+    padding: 0 16px;
     font: inherit;
     font-size: 15px;
-    color: oklch(1 0 0 / 0.92);
-    background: oklch(1 0 0 / 0.07);
-    border: 1px solid oklch(1 0 0 / 0.16);
+    color: var(--cq-stage-text);
+    background: var(--cq-stage-surface);
+    border: 1px solid var(--cq-stage-border);
     cursor: pointer;
     transition:
-      background-color var(--cq-motion-fast),
-      border-color var(--cq-motion-fast),
-      transform var(--cq-motion-fast);
+      background-color var(--cq-motion-fast) var(--cq-ease),
+      border-color var(--cq-motion-fast) var(--cq-ease);
   }
   .cq-stage-option:hover,
   .cq-stage-option:focus-visible {
-    background: oklch(1 0 0 / 0.14);
-    border-color: oklch(1 0 0 / 0.3);
+    background: var(--cq-stage-surface-strong);
+    border-color: var(--cq-stage-text-muted);
     outline: none;
   }
   .cq-stage-option.is-selected {
-    background: oklch(0.72 0.15 258 / 0.35);
-    border-color: oklch(0.78 0.14 258);
+    background: var(--cq-stage-surface-strong);
+    border-color: var(--cq-stage-accent);
   }
   .cq-stage-primary {
     min-height: 44px;
-    border-radius: 999px;
+    border-radius: var(--cq-radius-md);
     padding: 0 20px;
     font: inherit;
     font-size: 14px;
     font-weight: 600;
-    color: oklch(0.2 0.03 262);
-    background: oklch(0.97 0.01 258);
+    color: var(--cq-stage-canvas);
+    background: var(--cq-stage-text);
     border: none;
     cursor: pointer;
   }
   .cq-stage-input {
     flex: 1 1 auto;
     min-height: 44px;
-    border-radius: 999px;
-    padding: 0 18px;
+    border-radius: var(--cq-radius-md);
+    padding: 0 16px;
     font: inherit;
     font-size: 15px;
-    color: oklch(1 0 0);
-    background: oklch(1 0 0 / 0.08);
-    border: 1px solid oklch(1 0 0 / 0.18);
+    color: var(--cq-stage-text);
+    background: var(--cq-stage-surface);
+    border: 1px solid var(--cq-stage-border);
     outline: none;
   }
   .cq-stage-input:focus {
-    border-color: oklch(0.78 0.14 258);
+    border-color: var(--cq-stage-accent);
   }
 
   .cq-bottom-nav {
