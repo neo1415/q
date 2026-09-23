@@ -131,6 +131,14 @@ export default defineRailway(() => {
       ...databaseEnv,
       ...modelProviderEnv,
       PORT: "3001",
+      /**
+       * The one Q interviewer (QX-004 core gate). The conversational
+       * onboarding turn is delegated to q-api rather than answered by a
+       * second implementation here, and without this the route closes:
+       * every typed turn comes back PROVIDER_UNAVAILABLE and nothing is
+       * recorded. Reached privately; it never leaves Railway's network.
+       */
+      CQ_Q_API_URL: "http://capital-qq-api.railway.internal:3002",
       SUPABASE_URL: preserve(),
       SUPABASE_PUBLISHABLE_KEY: preserve(),
       // Privileged storage credential: without it the document upload

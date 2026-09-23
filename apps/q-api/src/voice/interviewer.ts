@@ -2089,20 +2089,6 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
             ? "that"
             : `that (${held.replace(/\?+$/, "").toLowerCase()})`;
         /**
-         * Two kinds of refusal, and they need different answers.
-         *
-         * One is a prerequisite: the journey wants another step first, and
-         * it names it, so Q asks that. The other is the value itself —
-         * a maximum below the typical, a number out of range — where
-         * there is nothing else to ask and the thing to do is ask the same
-         * step again. Saying "could you say it once more" to somebody
-         * whose value was rejected on its merits invites them to say the
-         * same number again, which is a loop.
-         */
-        const refusedStep = unsaved
-          .map((stepKey) => steps.get(stepKey))
-          .find((step) => step !== undefined);
-        /**
          * A prerequisite Q cannot put on screen yet.
          *
          * The investor journey refuses anything in I2 until a mandate is
@@ -2123,26 +2109,39 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
         const neededQuestion =
           ask?.question ??
           (neededStep === undefined ? undefined : questionFor(neededStep));
+        /**
+         * Where Q goes when it cannot ask for the prerequisite.
+         *
+         * Not every refusal names a step. The founder journey answers "an
+         * active organisation context is required" — true, and there is no
+         * step key in it, because the organisation is made by an earlier
+         * step's write target rather than being a step of its own. Falling
+         * back to the refused step's own question is the worst available
+         * move: it is the one question guaranteed to be refused again, and
+         * local on 2026-09-23 it was, four turns running, with "That one
+         * didn't go in" in front of it each time.
+         *
+         * The session already knows what comes next, and the journey owns
+         * that order. So Q goes back to the question it was on and never
+         * to the step that was just refused.
+         */
         const current =
           view.currentStep === null
             ? undefined
             : steps.get(view.currentStep.stepKey);
+        const resume = neededQuestion ?? (current && questionFor(current));
         reply =
-          neededQuestion !== undefined
-            ? ask !== undefined && ask !== null
-              ? `Before I can save ${about}, I need one thing first. ${neededQuestion}`
-              : `I'll come back to ${about} — there's something the setup wants first. ${current === undefined ? neededQuestion : questionFor(current)}`
-            : refusedStep === undefined
-              ? "I couldn't save that just now — it hasn't gone in. Could you say it once more?"
-              : `That one didn't go in. ${questionFor(refusedStep)}`;
+          ask !== undefined && ask !== null
+            ? `Before I can save ${about}, I need one thing first. ${neededQuestion ?? ask.question}`
+            : resume !== undefined
+              ? `I'll come back to ${about} — there's something the setup wants first. ${current === undefined ? resume : questionFor(current)}`
+              : "I couldn't save that just now — it hasn't gone in. Let's come back to it.";
         result = {
           ...result,
           askNext:
             ask !== undefined && ask !== null
               ? (needed ?? null)
-              : neededQuestion !== undefined
-                ? (view.currentStep?.stepKey ?? needed ?? null)
-                : (refusedStep?.stepKey ?? null),
+              : (view.currentStep?.stepKey ?? needed ?? null),
         };
       } else if (unsaved.length > 0) {
         reply =
