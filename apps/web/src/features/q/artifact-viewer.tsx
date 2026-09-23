@@ -20,6 +20,16 @@ import { readQArtifactAction, readQArtifactVersionAction } from "./actions";
  * reachable and "Edit with Q" is one sentence away rather than one
  * navigation. On a narrow one it takes the screen, with a plain way back.
  *
+ * A deck is the same document with slides (QX-004 §5-§7). The slides are
+ * drawn by the Q API from the stored version and arrive as SVG, so the
+ * picture on this screen and the file the founder sends come from one
+ * layout; drawing them again in React would be a second opinion about
+ * what fits. They are shown in an `img`, which cannot run script, because
+ * markup assembled on a server and injected into this page would be the
+ * wrong place to rely on an escape function being complete. The sections
+ * stay below the slides: a slide is what an investor sees, and the
+ * section under it is what that slide is standing on.
+ *
  * Nothing internal appears here. No tenant, no organisation, no run id,
  * no prompt, no provider, no storage path — the artifact id is in the DOM
  * only as a test hook, and it grants nothing: every read re-resolves
@@ -42,7 +52,30 @@ function whenLabel(iso: string): string {
 }
 
 function typeLabel(type: string): string {
-  return type === "INVESTMENT_BRIEF" ? "Investment brief" : "Document";
+  if (type === "INVESTMENT_BRIEF") return "Investment brief";
+  if (type === "PITCH_DECK") return "Investor deck";
+  return "Document";
+}
+
+/**
+ * Where the browser asks for a drawing of this deck.
+ *
+ * One narrow server route, because the Q API's token is in an HttpOnly
+ * cookie and no script here can read it. The version travels with the
+ * request: somebody looking at V1 downloads V1.
+ */
+function deckUrl(
+  artifactId: string,
+  format: "slides" | "pptx" | "pdf",
+  version: number | null,
+): string {
+  const query = version === null ? "" : `?version=${String(version)}`;
+  return `/api/q-artifact/${encodeURIComponent(artifactId)}/${format}${query}`;
+}
+
+/** An SVG slide the browser can show without being allowed to run it. */
+function slideSource(svg: string): string {
+  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
 }
 
 export function ArtifactViewer({ artifactId, onClose }: ArtifactViewerProps) {
@@ -51,6 +84,18 @@ export function ArtifactViewer({ artifactId, onClose }: ArtifactViewerProps) {
   const [loading, setLoading] = useState(true);
   /** Which version is on screen; null means whatever is current. */
   const [showing, setShowing] = useState<number | null>(null);
+  /**
+   * The drawn slides, and which version they are of.
+   *
+   * The version travels with them so a drawing that arrives late, or one
+   * left over from the version before, is never shown against a different
+   * version's prose: somebody reading V1 and looking at V2's slides would
+   * be reading two documents at once.
+   */
+  const [drawn, setDrawn] = useState<{
+    readonly version: number;
+    readonly slides: readonly string[];
+  } | null>(null);
 
   const load = useCallback(
     async (version: number | null) => {
@@ -85,6 +130,47 @@ export function ArtifactViewer({ artifactId, onClose }: ArtifactViewerProps) {
   }, [load, showing]);
 
   const current = detail?.current;
+  const isDeck = current?.content.deck !== undefined;
+  const version = current?.version ?? null;
+
+  useEffect(() => {
+    if (!isDeck || version === null) {
+      return;
+    }
+    const controller = new AbortController();
+    void (async () => {
+      try {
+        const response = await fetch(deckUrl(artifactId, "slides", version), {
+          signal: controller.signal,
+        });
+        if (!response.ok) {
+          // The document is readable and the prose is already on screen; a
+          // drawing that did not arrive is not a reason to hide it.
+          return;
+        }
+        const body: unknown = await response.json();
+        const slides =
+          typeof body === "object" && body !== null && "slides" in body
+            ? body.slides
+            : null;
+        if (
+          Array.isArray(slides) &&
+          slides.every((s) => typeof s === "string")
+        ) {
+          setDrawn({ version, slides });
+        }
+      } catch {
+        // Aborted, offline, or something that was not JSON. The prose
+        // stands on its own.
+      }
+    })();
+    return () => {
+      controller.abort();
+    };
+  }, [artifactId, isDeck, version]);
+
+  const slides =
+    drawn !== null && drawn.version === version ? drawn.slides : null;
 
   return (
     <aside
@@ -163,8 +249,62 @@ export function ArtifactViewer({ artifactId, onClose }: ArtifactViewerProps) {
         </nav>
       ) : null}
 
+      {isDeck && version !== null ? (
+        <div
+          className="flex flex-wrap items-center gap-2"
+          data-q-artifact-export
+        >
+          <span className="cq-label text-(--cq-text-tertiary)">Download</span>
+          {/*
+            A plain link, so the browser downloads it the way it downloads
+            anything: the session cookie travels on its own, nothing is
+            held in memory here, and the file's name is the one the server
+            put on it.
+          */}
+          <a
+            className={buttonClassName("secondary", "compact")}
+            href={deckUrl(artifactId, "pptx", version)}
+            data-q-artifact-download="pptx"
+          >
+            PowerPoint
+          </a>
+          <a
+            className={buttonClassName("secondary", "compact")}
+            href={deckUrl(artifactId, "pdf", version)}
+            data-q-artifact-download="pdf"
+          >
+            PDF
+          </a>
+        </div>
+      ) : null}
+
+      {slides === null ? null : (
+        <div className="flex flex-col gap-3" data-q-artifact-slides>
+          {slides.map((svg, index) => (
+            // A data-URI SVG drawn per request: there is nothing for an
+            // image optimiser to fetch, resize or cache, so `next/image`
+            // would add a loader in front of bytes that are already here.
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              // Slides have no identity of their own; their order is what
+              // they are, and the layout is deterministic.
+              key={index}
+              src={slideSource(svg)}
+              alt={`Slide ${String(index + 1)}`}
+              className="w-full rounded-md border border-(--cq-border-subtle)"
+              data-q-artifact-slide={String(index + 1)}
+            />
+          ))}
+        </div>
+      )}
+
       {current === undefined ? null : (
         <article className="flex flex-col gap-5" data-q-artifact-body>
+          {isDeck && current.content.sections.length > 0 ? (
+            <h3 className="cq-label text-(--cq-text-tertiary)">
+              What each slide rests on
+            </h3>
+          ) : null}
           {current.content.sections.map((section) => (
             <section key={section.heading} className="flex flex-col gap-2">
               <h3 className="cq-title-sm text-(--cq-text-primary)">

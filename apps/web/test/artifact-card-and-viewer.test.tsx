@@ -251,3 +251,143 @@ describe("QX-003E · the viewer", () => {
     expect(onClose).toHaveBeenCalled();
   });
 });
+
+/**
+ * QX-004 · a deck a founder can take with them.
+ *
+ * The composer, the store and this viewer all existed and nothing joined
+ * them to the renderer, so a deck could be read on this screen and could
+ * not leave the building. What is pinned here is the part a person feels:
+ * the slides are drawn by the server rather than by React, and the two
+ * download links point at the version actually on screen — somebody
+ * looking at V1 who downloads V2 has sent the wrong slides.
+ */
+function deckDetail(version: number): QArtifactDetail {
+  return {
+    artifact: {
+      artifactId: ARTIFACT,
+      type: "PITCH_DECK",
+      status: "READY",
+      title: "Northstar Logistics — investor deck",
+      summary: "Composed from what the record supports.",
+      currentVersion: 2,
+      createdAt: "2026-09-22T09:00:00.000Z",
+      updatedAt: "2026-09-22T10:00:00.000Z",
+    },
+    current: {
+      artifactId: ARTIFACT,
+      version,
+      title: "Northstar Logistics — investor deck",
+      summary: "Composed from what the record supports.",
+      content: {
+        sections: [
+          { heading: "What we do", body: "They move freight.", findings: [] },
+        ],
+        gaps: ["Financial performance and runway"],
+        deck: {
+          direction: "MINIMAL_INSTITUTIONAL",
+          markIsDraft: false,
+          slides: [
+            {
+              layout: "TITLE",
+              title: "Northstar Logistics",
+              bullets: [],
+              bulletsRight: [],
+              section: 0,
+            },
+          ],
+        },
+      },
+    },
+    history: [
+      {
+        version: 1,
+        title: "Northstar Logistics — investor deck",
+        createdAt: "2026-09-22T09:00:00.000Z",
+      },
+      {
+        version: 2,
+        title: "Northstar Logistics — investor deck",
+        createdAt: "2026-09-22T10:00:00.000Z",
+      },
+    ],
+  } as unknown as QArtifactDetail;
+}
+
+describe("QX-004 · the deck in the viewer", () => {
+  const SVG =
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 540"></svg>';
+  let asked: string[] = [];
+
+  beforeEach(() => {
+    asked = [];
+    readQArtifactAction.mockResolvedValue({ ok: true, value: deckDetail(2) });
+    readQArtifactVersionAction.mockResolvedValue({
+      ok: true,
+      value: deckDetail(1),
+    });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((url: string) => {
+        asked.push(url);
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ slides: [SVG] }),
+        } as Response);
+      }),
+    );
+  });
+
+  it("shows the slides the server drew, and calls the thing a deck", async () => {
+    render(<ArtifactViewer artifactId={ARTIFACT} onClose={vi.fn()} />);
+    const slide = await screen.findByAltText("Slide 1");
+    // Drawn on the server and shown in an img, which cannot run script.
+    expect(slide.getAttribute("src")).toContain("data:image/svg+xml");
+    expect(asked).toEqual([`/api/q-artifact/${ARTIFACT}/slides?version=2`]);
+    expect(screen.getByText("Investor deck")).toBeTruthy();
+    // The prose stays: a slide is a claim, the section is what it rests on.
+    expect(screen.getByText("They move freight.")).toBeTruthy();
+  });
+
+  it("offers PowerPoint and PDF for the version actually on screen", async () => {
+    render(<ArtifactViewer artifactId={ARTIFACT} onClose={vi.fn()} />);
+    await screen.findByAltText("Slide 1");
+    expect(screen.getByText("PowerPoint").getAttribute("href")).toBe(
+      `/api/q-artifact/${ARTIFACT}/pptx?version=2`,
+    );
+
+    await userEvent.click(screen.getByText("V1"));
+    await waitFor(() => {
+      expect(screen.getByText("PDF").getAttribute("href")).toBe(
+        `/api/q-artifact/${ARTIFACT}/pdf?version=1`,
+      );
+    });
+  });
+
+  it("still shows the document when the drawing does not arrive", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => Promise.reject(new Error("offline"))),
+    );
+    render(<ArtifactViewer artifactId={ARTIFACT} onClose={vi.fn()} />);
+    await waitFor(() => {
+      expect(screen.getByText("They move freight.")).toBeTruthy();
+    });
+    expect(screen.queryByAltText("Slide 1")).toBeNull();
+  });
+
+  it("offers no download on a document that has no slides", async () => {
+    readQArtifactAction.mockResolvedValue({
+      ok: true,
+      value: detail(2, "Short and plain."),
+    });
+    render(<ArtifactViewer artifactId={ARTIFACT} onClose={vi.fn()} />);
+    await waitFor(() => {
+      expect(screen.getByText("Short and plain.")).toBeTruthy();
+    });
+    // A button to nowhere is worse than the absence of one: a brief has
+    // no slides, so there is nothing to write a PPTX from.
+    expect(screen.queryByText("PowerPoint")).toBeNull();
+    expect(asked).toEqual([]);
+  });
+});
