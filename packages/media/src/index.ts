@@ -63,6 +63,7 @@ export {
 export type { MediaServiceDependencies } from "./application/dependencies.js";
 export type {
   CompanyPitchQueryPort,
+  DiscoverablePitchQueryPort,
   MediaAssetRepository,
   MediaRepositories,
   PitchViewerAccessPort,
@@ -102,6 +103,7 @@ export {
 
 export {
   createPostgresCompanyPitchQueryPort,
+  createPostgresDiscoverablePitchQueryPort,
   createPostgresMediaAssetRepository,
   createPostgresMediaRepositories,
 } from "./infrastructure/postgres-media-repository.js";

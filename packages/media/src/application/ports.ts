@@ -8,6 +8,7 @@ import type {
 import type {
   CaptionState,
   CompanyPitch,
+  DiscoverablePitch,
   MediaAsset,
   MediaAssetId,
   MediaOwnerType,
@@ -143,6 +144,24 @@ export type CompanyPitchQueryPort = {
     tenantId: TenantId,
     companyId: string,
   ) => Promise<CompanyPitch | null>;
+};
+
+/**
+ * The feed's read port (CQ-MEDIA-012; doc 20 §74, §78).
+ *
+ * Batched and cross-tenant by design: the feed page names companies from
+ * many tenants, and the reader that assembled the page has already decided
+ * this viewer may see every one of them. What comes back is therefore
+ * bounded to what is publishable — a pitch that is not READY, not ALLOWED
+ * or PRIVATE is simply absent, indistinguishable from a company with no
+ * pitch — and carries nothing that grants playback. Discovery never reads
+ * media tables; this is the whole of what it may ask.
+ */
+export type DiscoverablePitchQueryPort = {
+  /** One query per call. Refuses more than DISCOVERABLE_PITCH_BATCH_MAX ids. */
+  readonly findDiscoverablePitches: (
+    companyIds: readonly string[],
+  ) => Promise<ReadonlyMap<string, DiscoverablePitch>>;
 };
 
 export type MediaRepositories = {

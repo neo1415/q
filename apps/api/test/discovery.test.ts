@@ -10,6 +10,10 @@ import {
   type SlatePage,
   type SlateReadService,
 } from "@capital-q/discovery";
+import type {
+  DiscoverablePitch,
+  DiscoverablePitchQueryPort,
+} from "@capital-q/media";
 import {
   AuthUserIdSchema,
   MembershipIdSchema,
@@ -56,6 +60,7 @@ const discovery: DiscoveryService = {
 function buildApp(options: {
   readonly principal: AuthenticatedPrincipal | null;
   readonly page: SlatePage | Error;
+  readonly pitches?: DiscoverablePitchQueryPort | undefined;
 }): { readonly app: FastifyInstance; readonly queries: PageCompaniesQuery[] } {
   const queries: PageCompaniesQuery[] = [];
   const slates: SlateReadService = {
@@ -75,7 +80,11 @@ function buildApp(options: {
     identities: { lookup: () => Promise.resolve(null) },
   };
   const { app } = createApp(parseApiConfig({ NODE_ENV: "test" }), security, {
-    discovery: { discovery, slates },
+    discovery: {
+      discovery,
+      slates,
+      ...(options.pitches === undefined ? {} : { pitches: options.pitches }),
+    },
   });
   return { app, queries };
 }
@@ -182,6 +191,154 @@ describe("GET /v1/discovery/companies (persisted slates)", () => {
     });
     expect(response.statusCode).toBe(401);
     expect(queries).toEqual([]);
+    await app.close();
+  });
+});
+
+// CQ-MEDIA-012: the feed item carries its company's publishable pitch. The
+// media port is a double; what is proven here is the boundary: one batched
+// call with exactly the page's company ids, the DTO's pitch shape and
+// nothing more, null for a company the port did not return, and no call at
+// all for an empty page.
+describe("GET /v1/discovery/companies — the feed item's pitch", () => {
+  const OTHER = "44444444-0000-4000-8000-000000000002";
+  const FOREIGN = "44444444-0000-4000-8000-000000000003";
+  const MEDIA_ASSET = "f0000000-0000-4000-8000-000000000001";
+
+  const first = PAGE.items[0];
+  if (first === undefined) throw new Error("fixture");
+  const twoItemPage: SlatePage = {
+    ...PAGE,
+    items: [
+      first,
+      {
+        companyId: OTHER,
+        canonicalName: "Other Co",
+        websiteUrl: null,
+        headquartersCountry: null,
+        currentStageCode: null,
+        shortDescription: null,
+        reasonCodes: [],
+      },
+    ],
+  };
+
+  function fakePitches(answer: ReadonlyMap<string, DiscoverablePitch>): {
+    readonly port: DiscoverablePitchQueryPort;
+    readonly calls: string[][];
+  } {
+    const calls: string[][] = [];
+    const port: DiscoverablePitchQueryPort = {
+      findDiscoverablePitches: (companyIds) => {
+        calls.push([...companyIds]);
+        return Promise.resolve(answer);
+      },
+    };
+    return { port, calls };
+  }
+
+  it("asks the media port once for the page's companies and places each pitch on its item", async () => {
+    const { port, calls } = fakePitches(
+      new Map<string, DiscoverablePitch>([
+        [
+          COMPANY,
+          {
+            mediaAssetId: MEDIA_ASSET as DiscoverablePitch["mediaAssetId"],
+            companyId: COMPANY,
+            aspectRatio: "9:16",
+            durationSeconds: 87,
+            captionState: "NOT_REQUESTED",
+          },
+        ],
+        // The port answers for a company that is not on this page: the
+        // route places nothing it was not asked about.
+        [
+          FOREIGN,
+          {
+            mediaAssetId:
+              "f0000000-0000-4000-8000-000000000009" as DiscoverablePitch["mediaAssetId"],
+            companyId: FOREIGN,
+            aspectRatio: null,
+            durationSeconds: null,
+            captionState: "NOT_REQUESTED",
+          },
+        ],
+      ]),
+    );
+    const { app } = buildApp({
+      principal: PRINCIPAL,
+      page: twoItemPage,
+      pitches: port,
+    });
+    const response = await app.inject({
+      method: "GET",
+      url: DISCOVERY_COMPANIES_PATH,
+    });
+    expect(response.statusCode).toBe(200);
+    expect(calls).toEqual([[COMPANY, OTHER]]);
+    const body = response.json<{
+      items: { companyId: string; pitch: unknown }[];
+    }>();
+    expect(body.items.map((item) => item.companyId)).toEqual([COMPANY, OTHER]);
+    // Exactly the contract's four fields: no companyId echo, no status, no
+    // provider id, no URL.
+    expect(body.items[0]?.pitch).toEqual({
+      mediaAssetId: MEDIA_ASSET,
+      aspectRatio: "9:16",
+      durationSeconds: 87,
+      captionState: "NOT_REQUESTED",
+    });
+    expect(body.items[1]?.pitch).toBeNull();
+    expect(response.payload).not.toContain(FOREIGN);
+    await app.close();
+  });
+
+  it("leaves every pitch null when the port returns nothing, and asks nothing for an empty page", async () => {
+    const empty = fakePitches(new Map());
+    const { app } = buildApp({
+      principal: PRINCIPAL,
+      page: twoItemPage,
+      pitches: empty.port,
+    });
+    const response = await app.inject({
+      method: "GET",
+      url: DISCOVERY_COMPANIES_PATH,
+    });
+    expect(
+      response
+        .json<{ items: { pitch: unknown }[] }>()
+        .items.map((item) => item.pitch),
+    ).toEqual([null, null]);
+    expect(empty.calls).toHaveLength(1);
+    await app.close();
+
+    const untouched = fakePitches(new Map());
+    const { app: emptyApp } = buildApp({
+      principal: PRINCIPAL,
+      page: { ...PAGE, items: [], nextCursor: null },
+      pitches: untouched.port,
+    });
+    const none = await emptyApp.inject({
+      method: "GET",
+      url: DISCOVERY_COMPANIES_PATH,
+    });
+    expect(none.statusCode).toBe(200);
+    expect(untouched.calls).toHaveLength(0);
+    await emptyApp.close();
+  });
+
+  it("is a feed without video when no port is composed", async () => {
+    const { app } = buildApp({ principal: PRINCIPAL, page: twoItemPage });
+    const response = await app.inject({
+      method: "GET",
+      url: DISCOVERY_COMPANIES_PATH,
+    });
+    expect(response.statusCode).toBe(200);
+    expect(
+      response
+        .json<{ items: { pitch: unknown }[] }>()
+        .items.map((item) => item.pitch),
+    ).toEqual([null, null]);
     await app.close();
   });
 });

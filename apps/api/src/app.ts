@@ -101,6 +101,8 @@ export type ApiModules = {
         readonly interactions?:
           | RecommendationInteractionRoutesDependencies["interactions"]
           | undefined;
+        /** CQ-MEDIA-012. Absent: every feed item's pitch is null. */
+        readonly pitches?: DiscoveryRoutesDependencies["pitches"] | undefined;
       })
     | undefined;
   readonly capital?: CapitalRoutesDependencies["capital"] | undefined;
@@ -215,6 +217,7 @@ export function createApp(
       resolver: security.resolver,
       discovery: modules.discovery.discovery,
       slates: modules.discovery.slates,
+      pitches: modules.discovery.pitches,
     });
     if (modules.discovery.interactions !== undefined) {
       registerRecommendationInteractionRoutes(app, {

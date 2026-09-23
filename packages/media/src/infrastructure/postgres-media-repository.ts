@@ -10,6 +10,7 @@ import {
 
 import type {
   CompanyPitchQueryPort,
+  DiscoverablePitchQueryPort,
   MediaAssetRepository,
   MediaRepositories,
 } from "../application/ports.js";
@@ -22,7 +23,10 @@ import {
   MediaStatusSchema,
   ModerationStatusSchema,
   PlaybackPolicySchema,
+  DISCOVERABLE_PITCH_BATCH_MAX,
   toCompanyPitch,
+  toDiscoverablePitch,
+  type DiscoverablePitch,
   TranscriptStateSchema,
   type MediaAsset,
 } from "../contracts/index.js";
@@ -319,6 +323,49 @@ export function createPostgresCompanyPitchQueryPort(options: {
         "FOUNDER_PITCH",
       );
       return asset === null ? null : toCompanyPitch(asset);
+    },
+  };
+}
+
+/**
+ * The feed's batched read (CQ-MEDIA-012). One query for a page of
+ * companies, every publishability condition in the predicate, and the
+ * rows passed through `toDiscoverablePitch` all the same — so the SQL and
+ * the one rule written in code can never quietly disagree. Cross-tenant by
+ * design; see the port for why that is safe here and nowhere else.
+ */
+export function createPostgresDiscoverablePitchQueryPort(options: {
+  readonly sql: DatabaseExecutor;
+}): DiscoverablePitchQueryPort {
+  return {
+    findDiscoverablePitches: async (companyIds) => {
+      const ids = [...new Set(companyIds)];
+      if (ids.length > DISCOVERABLE_PITCH_BATCH_MAX) {
+        throw new RangeError(
+          `discoverable pitch lookup exceeds ${String(DISCOVERABLE_PITCH_BATCH_MAX)} companies`,
+        );
+      }
+      const pitches = new Map<string, DiscoverablePitch>();
+      if (ids.length === 0) {
+        return pitches;
+      }
+      const rows = await options.sql`
+        ${select(options.sql)}
+         where m.owner_type = 'COMPANY'
+           and m.owner_id = any(${ids}::uuid[])
+           and m.purpose = 'FOUNDER_PITCH'
+           and m.deleted_at is null
+           and m.superseded_at is null
+           and m.status = 'READY'
+           and m.moderation_status = 'ALLOWED'
+           and m.playback_policy <> 'PRIVATE'`;
+      for (const row of rows) {
+        const pitch = toDiscoverablePitch(toAsset(row));
+        if (pitch !== null) {
+          pitches.set(pitch.companyId, pitch);
+        }
+      }
+      return pitches;
     },
   };
 }

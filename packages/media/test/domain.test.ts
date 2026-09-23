@@ -16,6 +16,7 @@ import {
   MediaTechnicalMetadataSchema,
   PlaybackAuthorizationRequestSchema,
   toCompanyPitch,
+  toDiscoverablePitch,
   toMediaAssetDto,
   CreateVideoUploadSessionSchema,
   type CompanyPitch,
@@ -288,5 +289,57 @@ describe("the boundary copy of the vocabulary", () => {
     expect(wire["PLAYBACK_POLICIES"]).toEqual(PLAYBACK_POLICIES);
     expect(wire["MODERATION_STATUSES"]).toEqual(MODERATION_STATUSES);
     expect(wire["DERIVED_TEXT_STATES"]).toEqual(DERIVED_TEXT_STATES);
+  });
+});
+
+// CQ-MEDIA-012: the one rule for "may this pitch appear on a feed item",
+// and the shape it appears as. The batched SQL read applies the same
+// predicate; this is the reference it is checked against.
+describe("toDiscoverablePitch", () => {
+  const publishable = (overrides: Partial<MediaAsset> = {}): MediaAsset =>
+    asset({
+      status: "READY",
+      moderationStatus: "ALLOWED",
+      playbackPolicy: "AUTHORISED",
+      readyAt: "2026-09-06T09:05:00.000Z",
+      durationSeconds: 87,
+      aspectRatio: "9:16",
+      captionState: "AVAILABLE",
+      providerAssetId: "cf-uid-private",
+      provider: "CLOUDFLARE_STREAM",
+      thumbnailReference: "cf-uid-private/thumbnails/thumbnail.jpg",
+      ...overrides,
+    });
+
+  it("carries exactly the feed's fields for a publishable pitch, and nothing that grants playback", () => {
+    const pitch = toDiscoverablePitch(publishable());
+    expect(pitch).toEqual({
+      mediaAssetId: publishable().id,
+      companyId: publishable().ownerId,
+      aspectRatio: "9:16",
+      durationSeconds: 87,
+      captionState: "AVAILABLE",
+    });
+    expect(JSON.stringify(pitch)).not.toContain("cf-uid-private");
+  });
+
+  it.each<[string, Partial<MediaAsset>]>([
+    ["not READY", { status: "PROCESSING", readyAt: null }],
+    ["not moderation-ALLOWED", { moderationStatus: "NOT_REVIEWED" }],
+    ["BLOCKED", { moderationStatus: "BLOCKED" }],
+    ["PRIVATE", { playbackPolicy: "PRIVATE" }],
+    ["deleted", { status: "DELETED", deletedAt: "2026-09-06T10:00:00.000Z" }],
+    ["superseded", { supersededAt: "2026-09-06T10:00:00.000Z" }],
+    ["not a founder pitch", { purpose: "COMPANY_PRODUCT_DEMO" }],
+  ])("is absent when the pitch is %s", (_label, overrides) => {
+    expect(toDiscoverablePitch(publishable(overrides))).toBeNull();
+  });
+
+  it("keeps unknown facts unknown", () => {
+    expect(
+      toDiscoverablePitch(
+        publishable({ durationSeconds: null, aspectRatio: null }),
+      ),
+    ).toMatchObject({ durationSeconds: null, aspectRatio: null });
   });
 });

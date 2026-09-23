@@ -31,6 +31,7 @@ import {
   createMediaOwnerResolverRegistry,
   createMediaService,
   createPostgresCompanyPitchQueryPort,
+  createPostgresDiscoverablePitchQueryPort,
   MediaAssetNotFoundError,
   MediaOwnerNotFoundError,
   MediaReplacementConflictError,
@@ -731,6 +732,134 @@ describe("@capital-q/media against local PostgreSQL", () => {
           world.companyA,
         ),
       ).toBeNull();
+    });
+  });
+
+  // CQ-MEDIA-012: the feed's batched read. One query for many companies
+  // across tenants, and only what is publishable comes back.
+  it("answers the feed's batched pitch read with publishable pitches only, across tenants", async () => {
+    await withWorld(async (world) => {
+      const port = createPostgresDiscoverablePitchQueryPort({
+        sql: world.tx.sql,
+      });
+      expect(
+        (await port.findDiscoverablePitches([world.companyA, world.companyB]))
+          .size,
+      ).toBe(0);
+
+      const LIFECYCLE = [
+        "UPLOAD_PENDING",
+        "UPLOADING",
+        "PROCESSING",
+        "READY",
+      ] as const;
+
+      // Company A: a READY, ALLOWED, AUTHORISED pitch — publishable.
+      const a = await world.service.createCompanyPitch({
+        actor: world.adminA,
+        companyId: world.companyA,
+        input: {},
+        correlationId: CORRELATION(),
+      });
+      await world.service.attachProviderAsset({
+        tenantId: world.tenantA,
+        mediaAssetId: a.asset.id,
+        provider: "CLOUDFLARE_STREAM",
+        providerAssetId: PRIVATE_MARKER,
+      });
+      for (const status of LIFECYCLE) {
+        await world.service.transitionMediaStatus({
+          tenantId: world.tenantA,
+          mediaAssetId: a.asset.id,
+          status,
+        });
+      }
+      await world.service.recordProviderMetadata({
+        tenantId: world.tenantA,
+        mediaAssetId: a.asset.id,
+        metadata: { durationSeconds: 87, aspectRatio: "9:16" },
+      });
+      await world.service.setMediaStates({
+        tenantId: world.tenantA,
+        mediaAssetId: a.asset.id,
+        moderationStatus: "ALLOWED",
+        playbackPolicy: "AUTHORISED",
+      });
+
+      // Company B, in the other tenant: READY but still PRIVATE and
+      // unreviewed — not publishable, so absent.
+      const b = await world.service.createCompanyPitch({
+        actor: world.adminB,
+        companyId: world.companyB,
+        input: {},
+        correlationId: CORRELATION(),
+      });
+      await world.service.attachProviderAsset({
+        tenantId: world.tenantB,
+        mediaAssetId: b.asset.id,
+        provider: "CLOUDFLARE_STREAM",
+        providerAssetId: `${PRIVATE_MARKER}-b`,
+      });
+      for (const status of LIFECYCLE) {
+        await world.service.transitionMediaStatus({
+          tenantId: world.tenantB,
+          mediaAssetId: b.asset.id,
+          status,
+        });
+      }
+
+      const pitches = await port.findDiscoverablePitches([
+        world.companyA,
+        world.companyB,
+        randomUUID(),
+      ]);
+      expect([...pitches.keys()]).toEqual([world.companyA]);
+      expect(pitches.get(world.companyA)).toEqual({
+        mediaAssetId: a.asset.id,
+        companyId: world.companyA,
+        aspectRatio: "9:16",
+        durationSeconds: 87,
+        captionState: "NOT_REQUESTED",
+      });
+      expect(JSON.stringify([...pitches.values()])).not.toContain(
+        PRIVATE_MARKER,
+      );
+
+      // Once B is allowed and widened it appears too — cross-tenant, one
+      // query, nothing about either tenant in the ask.
+      await world.service.setMediaStates({
+        tenantId: world.tenantB,
+        mediaAssetId: b.asset.id,
+        moderationStatus: "ALLOWED",
+        playbackPolicy: "AUTHORISED",
+      });
+      expect(
+        [
+          ...(
+            await port.findDiscoverablePitches([world.companyA, world.companyB])
+          ).keys(),
+        ].sort(),
+      ).toEqual([world.companyA, world.companyB].sort());
+
+      // Replacing A's pitch supersedes it: the CREATED successor is not
+      // publishable, so A drops out rather than showing a stale pitch.
+      await world.service.createCompanyPitch({
+        actor: world.adminA,
+        companyId: world.companyA,
+        input: { replacesMediaAssetId: a.asset.id },
+        correlationId: CORRELATION(),
+      });
+      expect(
+        (await port.findDiscoverablePitches([world.companyA])).has(
+          world.companyA,
+        ),
+      ).toBe(false);
+
+      await expect(
+        port.findDiscoverablePitches(
+          Array.from({ length: 201 }, () => randomUUID()),
+        ),
+      ).rejects.toBeInstanceOf(RangeError);
     });
   });
 

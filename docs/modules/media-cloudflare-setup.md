@@ -36,32 +36,21 @@ to the adapter.
   `CLOUDFLARE_STREAM_CUSTOMER_SUBDOMAIN`, `CLOUDFLARE_STREAM_SIGNING_KEY_ID`,
   `CLOUDFLARE_STREAM_SIGNING_KEY_PEM`.
 
-So on this machine the adapter is composed and talks to the real API, but two
-account-side gaps remain:
+So on this machine the adapter is composed and talks to the real API. The
+account's Stream subscription was enabled on 2026-09-23 and the full leg was
+proven through the merged adapter: reservation → a 33,832-byte WebM POSTed to
+`upload.cloudflarestream.com` → `PROCESSING` → `READY` → delete. (Before the
+subscription, `POST …/stream/direct_upload` answered HTTP 413 code 10011,
+"Storage capacity exceeded … allocated 0 minutes"; the adapter surfaced that
+as `MediaProviderError { failure: "REJECTED", status: 413 }` and never as a
+success.)
 
-1. **Setup blocker for upload — no Stream allocation.** A live
-   `POST /accounts/{id}/stream/direct_upload` (60-second reservation,
-   5-minute expiry) answered **HTTP 413** with vendor code **10011**,
-   "Storage capacity exceeded … allocated 0 minutes", and
-   `GET /accounts/{id}/stream/storage-usage` reports
-   `totalStorageMinutesLimit: 0`, `videoCount: 0`. Stream is not subscribed on
-   this account. Fix: Cloudflare dashboard → Stream → enable the subscription
-   (billed per 1,000 minutes stored and per 1,000 minutes delivered); no code
-   or variable changes. Until then the adapter surfaces every reservation as
-   `MediaProviderError { failure: "REJECTED", status: 413, providerCode:
-"10011" }`, and over HTTP as `503 PROVIDER_UNAVAILABLE` — never as a
-   success.
-2. **Setup blocker for playback — no customer subdomain.** Playback
-   authorization refuses with `MEDIA_PROVIDER_NOT_CONFIGURED` naming
-   `CLOUDFLARE_STREAM_CUSTOMER_SUBDOMAIN`. Read it from Stream → Settings →
-   "Customer subdomain" and set it. Local signing is optional: without a
-   signing key the adapter asks Cloudflare's token endpoint for each playback
-   token under the API token, which works but costs one vendor call per
-   playback.
-
-Asset status and deletion were exercised live and behave as documented (a
-never-created id reads as `EXPIRED` / `ASSET_NOT_FOUND`; deleting it is
-idempotent).
+One gap remains — **playback**: `CLOUDFLARE_STREAM_CUSTOMER_SUBDOMAIN` is
+absent, so playback authorization refuses with `MEDIA_PROVIDER_NOT_CONFIGURED`
+naming it. Read it from Stream → Settings → "Customer subdomain" and set it.
+Local signing is optional: without a signing key the adapter asks Cloudflare's
+token endpoint for each playback token under the API token, which works but
+costs one vendor call per playback.
 
 ## Degradation when unset
 

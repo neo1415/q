@@ -124,6 +124,7 @@ import {
   createCompanyMediaOwnerResolver,
   createMediaOwnerResolverRegistry,
   createMediaService,
+  createPostgresDiscoverablePitchQueryPort,
   createUnconfiguredVideoProvider,
 } from "@capital-q/media";
 import {
@@ -647,7 +648,14 @@ const { app, logger } = createApp(config, security, {
   organisations,
   companies,
   investors,
-  discovery: { discovery, slates: slates.reader, interactions },
+  discovery: {
+    discovery,
+    slates: slates.reader,
+    interactions,
+    // The feed's one batched pitch read per page (CQ-MEDIA-012), through
+    // the Media context's port: discovery never touches media tables.
+    pitches: createPostgresDiscoverablePitchQueryPort({ sql: database.sql }),
+  },
   gateq,
   gateqApply,
   capital,

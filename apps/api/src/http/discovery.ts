@@ -7,6 +7,10 @@ import {
   DiscoveryInvestorSlateDtoSchema,
 } from "@capital-q/contracts";
 import type { DiscoveryService, SlateReadService } from "@capital-q/discovery";
+import type {
+  DiscoverablePitch,
+  DiscoverablePitchQueryPort,
+} from "@capital-q/media";
 
 import {
   getActorContext,
@@ -28,6 +32,12 @@ export type DiscoveryRoutesDependencies = ActorContextDependencies & {
   readonly discovery: DiscoveryService;
   /** Persisted recommendation slates (CQ-REC-006): the companies feed. */
   readonly slates: SlateReadService;
+  /**
+   * The Media context's feed read (CQ-MEDIA-012): which of a page's
+   * companies have a publishable pitch. Absent, every item's pitch is null
+   * — a feed without video is still a feed (doc 20 §137).
+   */
+  readonly pitches?: DiscoverablePitchQueryPort | undefined;
 };
 
 type PageQuery = {
@@ -74,20 +84,42 @@ export function registerDiscoveryRoutes(
         limit: page.limit,
         cursor: page.cursor,
       });
+      // One batched read for the whole page, after the reader has decided
+      // which companies this viewer may see (doc 20 §78). Only a
+      // publishable pitch comes back, and it carries no provider id and no
+      // URL: the client asks `/playback` for each item it activates.
+      const pitches =
+        dependencies.pitches === undefined || served.items.length === 0
+          ? new Map<string, DiscoverablePitch>()
+          : await dependencies.pitches.findDiscoverablePitches(
+              served.items.map((item) => item.companyId),
+            );
       void reply.header("Cache-Control", "no-store");
       return DiscoveryCompanySlateDtoSchema.parse({
         slateId: served.slateId,
         rankingVersion: served.rankingVersion,
-        items: served.items.map((item) => ({
-          companyId: item.companyId,
-          canonicalName: item.canonicalName,
-          websiteUrl: item.websiteUrl,
-          headquartersCountry: item.headquartersCountry,
-          currentStageCode: item.currentStageCode,
-          shortDescription: item.shortDescription,
-          reasons: [],
-          reasonCodes: item.reasonCodes,
-        })),
+        items: served.items.map((item) => {
+          const pitch = pitches.get(item.companyId);
+          return {
+            companyId: item.companyId,
+            canonicalName: item.canonicalName,
+            websiteUrl: item.websiteUrl,
+            headquartersCountry: item.headquartersCountry,
+            currentStageCode: item.currentStageCode,
+            shortDescription: item.shortDescription,
+            reasons: [],
+            reasonCodes: item.reasonCodes,
+            pitch:
+              pitch === undefined
+                ? null
+                : {
+                    mediaAssetId: pitch.mediaAssetId,
+                    aspectRatio: pitch.aspectRatio,
+                    durationSeconds: pitch.durationSeconds,
+                    captionState: pitch.captionState,
+                  },
+          };
+        }),
         notes: served.notes,
         nextCursor: served.nextCursor,
       });

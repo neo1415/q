@@ -347,3 +347,49 @@ export function isPitchPlayable(pitch: CompanyPitch): boolean {
     pitch.playbackPolicy !== "PRIVATE"
   );
 }
+
+/**
+ * What a feed item may carry about a company's pitch (CQ-MEDIA-012; doc 20
+ * §77). Exactly the fields a player needs to lay out a slot before it asks
+ * for playback, and nothing that grants playback: no provider identifier,
+ * no URL, no poster reference, no status — a pitch is either here, and
+ * therefore publishable, or absent.
+ */
+export type DiscoverablePitch = {
+  readonly mediaAssetId: MediaAssetId;
+  readonly companyId: string;
+  readonly aspectRatio: string | null;
+  readonly durationSeconds: number | null;
+  readonly captionState: CaptionState;
+};
+
+/**
+ * The publishable view of one asset, or null. The single rule for "may
+ * this pitch appear on a feed item": the current founder pitch, READY,
+ * moderation ALLOWED, policy not PRIVATE. The batched read applies the
+ * same predicate in SQL; this is the one place it is written down in code,
+ * and the SQL is checked against it.
+ */
+export function toDiscoverablePitch(
+  asset: MediaAsset,
+): DiscoverablePitch | null {
+  if (
+    asset.ownerType !== "COMPANY" ||
+    asset.purpose !== "FOUNDER_PITCH" ||
+    asset.deletedAt !== null ||
+    asset.supersededAt !== null ||
+    !isPitchPlayable(toCompanyPitch(asset))
+  ) {
+    return null;
+  }
+  return {
+    mediaAssetId: asset.id,
+    companyId: asset.ownerId,
+    aspectRatio: asset.aspectRatio,
+    durationSeconds: asset.durationSeconds,
+    captionState: asset.captionState,
+  };
+}
+
+/** Companies per batched pitch lookup. A feed page is 5–10; this is a bound, not a target. */
+export const DISCOVERABLE_PITCH_BATCH_MAX = 200;
