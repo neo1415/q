@@ -621,7 +621,22 @@ const MATERIAL_STEP_PATTERNS = [
 const MAX_OPEN_STEPS = 40;
 /** Open steps beyond the current few carry a shortened options list. */
 const FULL_OPTIONS_STEPS = 3;
-const SHORT_OPTIONS = 10;
+const SHORT_OPTIONS = 6;
+/**
+ * Beyond this many open steps, a step is rendered as its question and its
+ * key alone -- no options, no note.
+ *
+ * Every step stays listed, because hearing the whole sentence means the
+ * model must be able to place a volunteered answer against a step it was
+ * not asked about. But an investor journey has thirty-odd open steps, and
+ * listing each with ten labelled options rendered ~30,000 characters
+ * (~8,300 tokens) a turn: over the 8,000-token per-request limit of the
+ * free-tier fallback model, which refused every turn with 413, so that
+ * when the primary provider timed out there was no route left at all.
+ * A far step's question is enough to recognise a candidate; the value is
+ * validated by the owning service whatever the model saw.
+ */
+const OPTIONS_STEPS = 8;
 /** Warnings before Q leaves the person with the form. */
 const WARNINGS_BEFORE_HANDOFF = 2;
 const MAX_RECENT_TURNS = 12;
@@ -690,6 +705,32 @@ function askLabel(step: OnboardingStepManifest): string {
     /\?+$/,
     "",
   );
+}
+
+/**
+ * The question Q asks when a runtime-composed line has to ask a step
+ * again (a refusal, an unclear turn).
+ *
+ * `questionFor` reads the step's own prompt, and for the organisation
+ * step that prompt is a label -- "Your firm" -- which is the cold ask this
+ * whole gate exists to remove. When the person told us their organisation
+ * at registration, the runtime asks the way Q would, offering that name as
+ * a candidate; otherwise the step's question stands.
+ */
+function askAgain(
+  step: OnboardingStepManifest,
+  input: {
+    readonly signup?: { readonly organisationName: string | null } | undefined;
+  },
+): string {
+  const registered = input.signup?.organisationName ?? null;
+  if (
+    registered !== null &&
+    /\.(organisation_name|company_name)$/.test(step.stepKey)
+  ) {
+    return `Are we setting things up as ${registered}, or do you go by another name?`;
+  }
+  return questionFor(step);
 }
 
 function questionFor(step: OnboardingStepManifest): string {
@@ -1780,10 +1821,14 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
       const compact = (open: InterviewOpenStep): InterviewOpenStep => {
         if (openSteps.length < FULL_OPTIONS_STEPS) return open;
         const { note: _note, ...rest } = open;
-        if (
-          rest.options === undefined ||
-          rest.options.length <= SHORT_OPTIONS
-        ) {
+        if (rest.options === undefined) {
+          return rest;
+        }
+        if (openSteps.length >= OPTIONS_STEPS) {
+          const { options, ...bare } = rest;
+          return { ...bare, moreOptions: options.length };
+        }
+        if (rest.options.length <= SHORT_OPTIONS) {
           return rest;
         }
         return {
@@ -2647,7 +2692,7 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
         reply =
           current === undefined
             ? "Sorry — I didn't catch that well enough to write it down. Could you say it once more?"
-            : `Sorry — I didn't catch that well enough to write it down. ${questionFor(current)}`;
+            : `Sorry — I didn't catch that well enough to write it down. ${askAgain(current, input)}`;
         result =
           current === undefined
             ? { ...result, askNext: null }
@@ -2940,7 +2985,7 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
           ask !== undefined && ask !== null
             ? `Before I can save ${about}, I need one thing first. ${neededQuestion ?? ask.question}`
             : resume !== undefined
-              ? `I'll come back to ${about} — there's something the setup wants first. ${current === undefined ? resume : questionFor(current)}`
+              ? `I'll come back to ${about} — there's something the setup wants first. ${current === undefined ? resume : askAgain(current, input)}`
               : "I couldn't save that just now — it hasn't gone in. Let's come back to it.";
         result = {
           ...result,
