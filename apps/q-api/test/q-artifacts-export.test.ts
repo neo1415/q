@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 
 import { parseQApiConfig } from "@capital-q/config/q-api";
-import type { QArtifactDetail } from "@capital-q/contracts";
+import type { QArtifactDetail,
+  QRunIdSchema,
+} from "@capital-q/contracts";
 import {
   ArtifactNotFoundError,
   type ArtifactService,
@@ -52,7 +54,7 @@ const CONTEXT: ActorContext = {
 };
 
 const ARTIFACT = "11111111-0000-4000-8000-000000000001";
-const RUN = "22222222-0000-4000-8000-000000000001";
+const RUN = QRunIdSchema.parse("22222222-0000-4000-8000-000000000001");
 const NOW = "2026-09-23T10:00:00.000Z";
 
 function detail(withDeck: boolean): QArtifactDetail {

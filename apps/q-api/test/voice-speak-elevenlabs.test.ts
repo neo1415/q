@@ -477,7 +477,7 @@ describe("the ElevenLabs one-way synthesiser", () => {
     const huge = createElevenLabsSpeechSynthesis({
       apiKey: KEY,
       maxBytes: 4,
-      fetch: mp3Response,
+      fetch: () => Promise.resolve(mp3Response()),
     });
     await expect(
       huge.synthesise({ text: "Hi.", voice: "FEMALE" }),
