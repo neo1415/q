@@ -403,6 +403,10 @@ export function QConversationPanel({
         // counting rendered children, which changes whenever the answer
         // layout does.
         data-q-turns={String(turns.length)}
+        // The raw voice state, for the same reason: "Q was interrupted"
+        // is not otherwise visible, since the presence shows it as
+        // listening — which is what Q is then doing.
+        data-q-voice={voice.active ? voice.client.state : undefined}
       >
         <QStage
           state={presenceState}
