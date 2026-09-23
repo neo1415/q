@@ -317,6 +317,7 @@ describe("a spoken interview answer", () => {
           // without Q's words and the spoken line is composed from what
           // the runtime understood (QX-004 core gate: one Q).
           reply: null,
+          navigate: null,
           degraded: false,
         };
         return Promise.resolve(Response.json(body));
@@ -390,6 +391,7 @@ describe("a spoken interview answer", () => {
           // without Q's words and the spoken line is composed from what
           // the runtime understood (QX-004 core gate: one Q).
           reply: null,
+          navigate: null,
           degraded: false,
         };
         return Promise.resolve(Response.json(body));
