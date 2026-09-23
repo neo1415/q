@@ -389,6 +389,7 @@ export function registerOnboardingRoutes(
         view: after,
         understood: null,
         reply: turn.reply,
+        navigate: turn.navigate,
         degraded: turn.degraded,
       });
     },

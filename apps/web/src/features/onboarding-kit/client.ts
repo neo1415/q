@@ -84,6 +84,8 @@ export type OnboardingClient<TView, TResponse> = {
         readonly understood: OnboardingUnderstanding | null;
         /** What Q said, shown as given. Never parsed to learn what was recorded. */
         readonly reply: string | null;
+        /** Where Q is taking the person, if anywhere; "FORM" hands over to the form. */
+        readonly navigate: string | null;
       }>)
     | undefined;
   /** Deterministic taxonomy candidates for the user's own text. Never assigned here. */

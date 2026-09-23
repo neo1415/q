@@ -15,6 +15,7 @@ import {
   QConversationIdSchema,
   type OnboardingResponseValue,
   type OnboardingUnderstanding,
+  QVoiceDestinationSchema,
 } from "@capital-q/contracts";
 import { Button } from "@capital-q/ui/button";
 import { ChoiceChip } from "@capital-q/ui/chip";
@@ -698,6 +699,27 @@ export function QOnboardingWorkspace({
         );
         handleUnderstanding(turn.understood);
       }
+      // Q may take the person somewhere from a typed turn exactly as it
+      // does from a spoken one (QX-004 D): the same destination map, the
+      // same hand-over to the form. Before this a typed "open Discover"
+      // reached this seam and went nowhere.
+      if (turn.navigate === "FORM") {
+        const editor =
+          prompt === null ? undefined : vocabulary.editorFor(prompt.stepKey);
+        if (editor !== undefined) {
+          onEdit(editor);
+        }
+      } else {
+        // The wire carries a bounded string; the destination map takes
+        // the enum. An unknown value navigates nowhere, deliberately.
+        const destination = QVoiceDestinationSchema.safeParse(turn.navigate);
+        const path = destination.success
+          ? destinationPath(destination.data)
+          : null;
+        if (path !== null) {
+          router.push(path);
+        }
+      }
       if (turn.understood?.kind === "ANSWERED" && narrativeStep) {
         setReading(true);
         setReadingPolls(0);
@@ -708,6 +730,9 @@ export function QOnboardingWorkspace({
       questionText,
       push,
       recentTurns,
+      vocabulary,
+      onEdit,
+      router,
       settleReading,
       askQ,
       handleUnderstanding,

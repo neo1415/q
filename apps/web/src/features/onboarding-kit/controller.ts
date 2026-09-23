@@ -41,6 +41,8 @@ export type SaveStatus = "idle" | "saving" | "saved" | "failed";
 export type OnboardingTurn = {
   readonly understood: OnboardingUnderstanding | null;
   readonly reply: string | null;
+  /** Where Q is taking the person, if anywhere; "FORM" hands over to the form. */
+  readonly navigate: string | null;
 };
 
 export type OnboardingState<TView> = {
@@ -362,14 +364,22 @@ export function useOnboardingJourney<
         try {
           const outcome = await say({ text, recentTurns });
           setSession(outcome.view);
-          return { understood: outcome.understood, reply: outcome.reply };
+          return {
+            understood: outcome.understood,
+            reply: outcome.reply,
+            navigate: outcome.navigate,
+          };
         } catch {
           return null;
         }
       }
       const ok = await run(async () => {
         const outcome = await say({ text, recentTurns });
-        turn = { understood: outcome.understood, reply: outcome.reply };
+        turn = {
+          understood: outcome.understood,
+          reply: outcome.reply,
+          navigate: outcome.navigate,
+        };
         return outcome.view;
       }, true);
       return ok ? turn : null;

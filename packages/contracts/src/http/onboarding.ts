@@ -776,6 +776,13 @@ export const SayOnboardingResponseSchema = z
      * Null when no interviewer was reachable for this turn.
      */
     reply: z.string().max(4000).nullable(),
+    /**
+     * Where Q is taking the person, if anywhere (QX-004 D: one capability,
+     * two modalities). A spoken "open Discover" already navigates; a typed
+     * one reached this seam and was dropped here. Same values as the
+     * interview turn's `navigate`; "FORM" hands over to the form.
+     */
+    navigate: z.string().max(40).nullable(),
     /** True when Q answered without a model and said so plainly. */
     degraded: z.boolean(),
   })

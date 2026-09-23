@@ -514,6 +514,7 @@ export function createRuntimeClient<
                 view: await present(remember(outcome.view)),
                 understood: outcome.understood,
                 reply: outcome.reply,
+                navigate: outcome.navigate,
               };
             }),
         }),
