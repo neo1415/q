@@ -261,6 +261,10 @@ export function toSuggestionView(
     targetField: suggestion.targetField,
     suggestedValue: suggestion.suggestedValue,
     confidence: suggestion.confidence,
+    sourceRefs: suggestion.sourceRefs.map((ref) => ({
+      sourceType: ref.sourceType,
+      sourceId: ref.sourceId,
+    })),
     status: suggestion.status,
     createdAt: suggestion.createdAt,
   };

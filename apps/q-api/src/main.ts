@@ -65,6 +65,7 @@ import {
   createProcessLocalProviderHealth,
   type ModelProvider,
 } from "@capital-q/model-gateway";
+import { withTestRouting } from "@capital-q/model-gateway";
 import { createGoogleModelProvider } from "@capital-q/model-gateway/providers/google";
 import { createGroqModelProvider } from "@capital-q/model-gateway/providers/groq";
 import { createLogger, createTelemetryRuntime } from "@capital-q/observability";
@@ -395,8 +396,29 @@ const syntheticDemo = createSyntheticDemoRoutingAllowance({
 const demoDataPosture: ModelDataPosture =
   syntheticDemo === null ? "REAL_CUSTOMER" : "SYNTHETIC_DEMO";
 
+/**
+ * The diagnostic route, when a local or test deployment names one
+ * (QX-004 core gate).
+ *
+ * `withTestRouting` puts one provider's models first in every routing
+ * policy and refuses loudly anywhere it could touch a real person. It had
+ * only ever been applied by the interview smoke harness: this server read
+ * CQ_TEST_MODEL_PROVIDER into its config, logged it as composed, and never
+ * routed a single call through it -- so every local acceptance run was
+ * still at the mercy of two free tiers. Absent, the catalogue is returned
+ * unchanged, which is the ordinary case and the production one.
+ */
+const modelCatalog = withTestRouting(
+  createPostgresModelCatalog({ sql: database.sql }),
+  {
+    providerCode: providerSecrets.testProviderCode,
+    environment: config.runtime.deploymentEnvironment,
+    syntheticDemoPermitted: syntheticDemo !== null,
+  },
+);
+
 const modelGateway = createModelGateway({
-  catalog: createPostgresModelCatalog({ sql: database.sql }),
+  catalog: modelCatalog,
   registry: createModelProviderRegistry(providers),
   usage: createPostgresModelUsageRepository({ sql: database.sql }),
   health: createProcessLocalProviderHealth(),

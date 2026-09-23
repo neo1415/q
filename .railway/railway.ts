@@ -206,6 +206,13 @@ export default defineRailway(() => {
       SUPABASE_URL: preserve(),
       SUPABASE_SECRET_KEY: preserve(),
       CQ_MALWARE_POLICY: "REQUIRE_CLEAN",
+      // Public research now runs here (QX-004 C): a committed company or
+      // organisation name starts a presence build off the commit event,
+      // and its findings become onboarding suggestions. Same keys q-api
+      // holds; server-side only.
+      TAVILY_API_KEY: preserve(),
+      BRIGHT_DATA_API_KEY: preserve(),
+      SERP_API_KEY: preserve(),
     },
   });
 

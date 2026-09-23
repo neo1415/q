@@ -636,6 +636,24 @@ export const OnboardingSuggestionViewSchema = z.object({
   confidence: z.string().nullable(),
   status: OnboardingSuggestionStatusSchema,
   createdAt: UtcTimestampSchema,
+  /**
+   * Where the suggestion came from (QX-004 C): the evidence rows it cites,
+   * by type and id. A candidate from public research carries the page it
+   * was read from; one from the person's own document carries that
+   * document. Empty for a suggestion nothing cites. The domain has always
+   * held this; the wire dropped it, so no screen could say "from where".
+   */
+  sourceRefs: z
+    .array(
+      z
+        .object({
+          sourceType: z.string().max(64),
+          sourceId: z.string().max(200),
+        })
+        .strict(),
+    )
+    .max(20)
+    .default([]),
 });
 export type OnboardingSuggestionView = z.infer<
   typeof OnboardingSuggestionViewSchema

@@ -499,6 +499,7 @@ describe("taxonomyProposal", () => {
             },
             confidence: "0.9",
             status: "PENDING",
+            sourceRefs: [],
             createdAt: "2026-09-13T10:02:00.000Z",
           },
         ],
