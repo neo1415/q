@@ -5,6 +5,8 @@ import {
   QOperatingModeSchema,
 } from "@capital-q/contracts";
 
+import { ConversationTurnReadingSchema } from "../../conversation/reading.js";
+
 /**
  * INTERVIEW_CONDUCTOR — Q conducting the onboarding interview
  * (CQ-Q-VOICE-001 rework: Q leads, the person talks).
@@ -408,5 +410,56 @@ export type InterviewConductorV5Result = z.infer<
   typeof InterviewConductorV5ResultSchema
 >;
 
+/**
+ * v6 result: v5's, plus one reading of the whole turn (CQ-QX-005).
+ *
+ * `intent` and `answers` say what the model took from the words. What
+ * they never said is what the turn WAS — an answer, a question for Q, a
+ * correction, a choice made by pointing at the screen, a sentence whose
+ * meaning no option holds — and without that the runtime treated every
+ * turn as an attempt to answer the question in hand, and every turn that
+ * did not as a failure to hear. `reading` is the conversation core's
+ * closed vocabulary for that (`conversation/reading.ts`); the runtime's
+ * deterministic reducer decides what each kind may do, and only an
+ * ANSWER or an explicit CORRECTION may write.
+ *
+ * Nullable with a null default so that a run recorded against an older
+ * version, or a test double written for one, still parses: the runtime
+ * derives a conservative reading from `intent` when none is given.
+ */
+export const INTERVIEW_CONDUCTOR_V6_SCHEMA_VERSION = 6;
+
+export const InterviewConductorV6ResultSchema =
+  InterviewConductorV5ResultSchema.extend({
+    reading: ConversationTurnReadingSchema.nullable().default(null),
+  }).strict();
+export type InterviewConductorV6Result = z.infer<
+  typeof InterviewConductorV6ResultSchema
+>;
+
+/**
+ * v8 variables: v4's, plus what the conversation core knows about the
+ * exchange that the session does not.
+ *
+ * `asked` is the question Q put on screen last with its options
+ * NUMBERED, so that "the last four" and "the second one" can be read as
+ * positions in that list and resolved by code. `conversation` is the
+ * platform's own account of the exchange — a question of theirs being
+ * answered, where to resume, a suggestion awaiting a yes, meaning held
+ * beside a field, which subsystem is down — rendered as trusted text.
+ */
+export const InterviewConductorV8VariablesSchema =
+  InterviewConductorV4VariablesSchema.extend({
+    asked: z.string().max(2_000).default(""),
+    conversation: z.string().max(2_000).default(""),
+  }).strict();
+export type InterviewConductorV8Variables = z.infer<
+  typeof InterviewConductorV8VariablesSchema
+>;
+
+export const INTERVIEW_CONDUCTOR_V8_UNTRUSTED = [
+  ...INTERVIEW_CONDUCTOR_V4_UNTRUSTED,
+] as const;
+
 /** What the runtime works with: the newest shape. */
-export type InterviewConductorResult = InterviewConductorV5Result;
+export type InterviewConductorResult = InterviewConductorV6Result;

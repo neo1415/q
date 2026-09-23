@@ -106,7 +106,9 @@ export const INTERVIEW_CONDUCTOR_V7: PromptDefinition<
 > = {
   ...INTERVIEW_CONDUCTOR_V6,
   version: 7,
-  status: "ACTIVE",
+  // Superseded by v8: every turn carries a reading of what it was, and a
+  // question to Q is answered rather than treated as a failed answer.
+  status: "DEPRECATED",
   changeDescription:
     "Workstream A: every turn is read against every open step rather than the current one, an answer volunteered before its step is recorded rather than dropped, no restriction is a reading of its own, a figure with no scale is asked about rather than guessed, confirmation is reserved for what the platform decides it must hold, and Q speaks figures and questions in plain words rather than digits and internal vocabulary.",
   effectiveFrom: "2026-09-23",

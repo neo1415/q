@@ -97,6 +97,7 @@ export { INTERVIEW_CONDUCTOR_V4 } from "./prompts/tasks/interview-conductor.v4.j
 export { INTERVIEW_CONDUCTOR_V5 } from "./prompts/tasks/interview-conductor.v5.js";
 export { INTERVIEW_CONDUCTOR_V6 } from "./prompts/tasks/interview-conductor.v6.js";
 export { INTERVIEW_CONDUCTOR_V7 } from "./prompts/tasks/interview-conductor.v7.js";
+export { INTERVIEW_CONDUCTOR_V8 } from "./prompts/tasks/interview-conductor.v8.js";
 export { DECISION_READER_V1 } from "./prompts/tasks/decision-reader.v1.js";
 export {
   DECISION_READER_SCHEMA_NAME,
@@ -148,11 +149,17 @@ export {
   INTERVIEW_CONDUCTOR_SCHEMA_VERSION,
   INTERVIEW_CONDUCTOR_V4_SCHEMA_VERSION,
   INTERVIEW_CONDUCTOR_V5_SCHEMA_VERSION,
+  INTERVIEW_CONDUCTOR_V6_SCHEMA_VERSION,
+  INTERVIEW_CONDUCTOR_V8_UNTRUSTED,
   AnswerClaritySchema,
   type AnswerClarity,
   InterviewConductorResultSchema,
   InterviewConductorV4ResultSchema,
   InterviewConductorV5ResultSchema,
+  InterviewConductorV6ResultSchema,
+  InterviewConductorV8VariablesSchema,
+  type InterviewConductorV6Result,
+  type InterviewConductorV8Variables,
   InterviewConductorVariablesSchema,
   InterviewOpenStepSchema,
   type InterviewConductorResult,
@@ -403,3 +410,5 @@ export {
 } from "./fixtures/index.js";
 
 export const PACKAGE_NAME = "@capital-q/q-core" as const;
+
+export * from "./conversation/index.js";
