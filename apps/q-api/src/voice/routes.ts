@@ -369,10 +369,16 @@ export function registerQVoiceRoutes(
       // conversation, not something to log as a failure or to let bubble
       // out of this handler.
       audio.on("error", (error: NodeJS.ErrnoException) => {
-        if (gone.signal.aborted || error.code === "ERR_STREAM_PREMATURE_CLOSE") {
+        if (
+          gone.signal.aborted ||
+          error.code === "ERR_STREAM_PREMATURE_CLOSE"
+        ) {
           return;
         }
-        request.log.warn({ err: error }, "voice speak relay stream ended early");
+        request.log.warn(
+          { err: error },
+          "voice speak relay stream ended early",
+        );
       });
       gone.signal.addEventListener("abort", () => audio.destroy(), {
         once: true,
