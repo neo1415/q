@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { UuidSchema } from "../common/ids.js";
+import { DerivedTextStateSchema } from "./media.js";
 
 /**
  * `GET /v1/discovery/companies` and `/v1/discovery/investors` (doc 19).
@@ -57,6 +58,24 @@ export const DiscoveredCompanyDtoSchema = z
      * machine-readable, bounded, never a score. Explanations are REC-007's.
      */
     reasonCodes: z.array(z.string().max(64)).max(8),
+    /**
+     * The company's current pitch as the feed may show it (doc 20); null
+     * when there is none or it is not playable. Only a READY, moderation-
+     * ALLOWED, non-PRIVATE pitch is ever placed here, and the item carries
+     * no provider id and no URL: the client asks `/playback` for each item
+     * it activates. Defaults to null so slates built before pitches
+     * existed still parse.
+     */
+    pitch: z
+      .object({
+        mediaAssetId: UuidSchema,
+        aspectRatio: z.string().nullable(),
+        durationSeconds: z.number().int().nullable(),
+        captionState: DerivedTextStateSchema,
+      })
+      .strict()
+      .nullable()
+      .default(null),
   })
   .strict();
 export type DiscoveredCompanyDto = z.infer<typeof DiscoveredCompanyDtoSchema>;

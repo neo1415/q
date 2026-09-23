@@ -121,6 +121,7 @@ describe("GET /v1/discovery/companies (persisted slates)", () => {
           shortDescription: "Logistics workflow SaaS.",
           reasons: [],
           reasonCodes: ["STAGE_ALIGNED", "TAXONOMY_EXACT"],
+          pitch: null,
         },
       ],
       notes: [],

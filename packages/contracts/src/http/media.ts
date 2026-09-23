@@ -132,3 +132,77 @@ export const CreateCompanyPitchResponseSchema = z
 export type CreateCompanyPitchResponse = z.infer<
   typeof CreateCompanyPitchResponseSchema
 >;
+
+/*
+ * Upload, sync and playback (CQ-MEDIA-010/011). These are the routes the
+ * header above said would come later. Each is scoped to one asset under
+ * the company's pitch path: `/pitch/:mediaAssetId` + suffix.
+ *
+ * The provider stays invisible: no route returns a provider identifier,
+ * and playback carries no separate token field — whatever authorises the
+ * viewer is embedded in the URL the server minted for them.
+ */
+
+export const MEDIA_UPLOAD_SESSION_SUFFIX = "/upload-session" as const;
+export const MEDIA_SYNC_SUFFIX = "/sync" as const;
+export const MEDIA_PLAYBACK_SUFFIX = "/playback" as const;
+
+export const UPLOAD_MODES = ["DIRECT", "RESUMABLE"] as const;
+export const UploadModeSchema = z.enum(UPLOAD_MODES);
+
+/**
+ * `POST .../pitch/:mediaAssetId/upload-session` — the server reserves a
+ * one-time upload target with the provider. The client sends the version
+ * it saw so a stale tab cannot reopen an upload on an asset that moved on.
+ */
+export const CreateMediaUploadSessionRequestSchema = z
+  .object({ expectedVersion: ResourceVersionSchema })
+  .strict();
+export type CreateMediaUploadSessionRequest = z.infer<
+  typeof CreateMediaUploadSessionRequestSchema
+>;
+
+export const MediaUploadSessionDtoSchema = z
+  .object({
+    mediaAssetId: UuidSchema,
+    uploadMode: UploadModeSchema,
+    /** One-time target on the provider's edge: bytes go browser → CDN, never through the API. */
+    uploadUrl: z.string().url(),
+    expiresAt: UtcTimestampSchema,
+    /** The server's reservation; the client may not exceed it. */
+    maxDurationSeconds: z.number().int().min(1).max(3600),
+    pitch: MediaAssetDtoSchema,
+  })
+  .strict();
+export type MediaUploadSessionDto = z.infer<typeof MediaUploadSessionDtoSchema>;
+
+/**
+ * `POST .../pitch/:mediaAssetId/sync` — idempotent "look at the provider
+ * and move the lifecycle". Empty body; the answer is the asset as it now is.
+ */
+export const SyncMediaAssetRequestSchema = z.object({}).strict();
+export type SyncMediaAssetRequest = z.infer<typeof SyncMediaAssetRequestSchema>;
+
+export const SyncMediaAssetResponseSchema = z
+  .object({ pitch: MediaAssetDtoSchema })
+  .strict();
+export type SyncMediaAssetResponse = z.infer<
+  typeof SyncMediaAssetResponseSchema
+>;
+
+/**
+ * `POST .../pitch/:mediaAssetId/playback` — per-viewer and short-lived. A
+ * provider UID is not access control (doc 20): the viewer is authorised
+ * here, server-side, every time.
+ */
+export const PlaybackAuthorizationDtoSchema = z
+  .object({
+    mediaAssetId: UuidSchema,
+    playbackUrl: z.string().url(),
+    posterUrl: z.string().url().nullable(),
+    expiresAt: UtcTimestampSchema,
+  })
+  .strict();
+export type PlaybackAuthorizationDto = z.infer<
+  typeof PlaybackAuthorizationDtoSchema
+>;
