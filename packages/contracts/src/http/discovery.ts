@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 import { UuidSchema } from "../common/ids.js";
-import { DerivedTextStateSchema } from "./media.js";
+import { PitchSummaryDtoSchema } from "./media.js";
 
 /**
  * `GET /v1/discovery/companies` and `/v1/discovery/investors` (doc 19).
@@ -66,16 +66,7 @@ export const DiscoveredCompanyDtoSchema = z
      * it activates. Defaults to null so slates built before pitches
      * existed still parse.
      */
-    pitch: z
-      .object({
-        mediaAssetId: UuidSchema,
-        aspectRatio: z.string().nullable(),
-        durationSeconds: z.number().int().nullable(),
-        captionState: DerivedTextStateSchema,
-      })
-      .strict()
-      .nullable()
-      .default(null),
+    pitch: PitchSummaryDtoSchema.nullable().default(null),
   })
   .strict();
 export type DiscoveredCompanyDto = z.infer<typeof DiscoveredCompanyDtoSchema>;

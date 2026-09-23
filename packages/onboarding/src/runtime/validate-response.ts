@@ -352,6 +352,7 @@ export function validateOnboardingResponse(
     responseType: expected,
     value,
     rawText: value.type === "TEXT" ? value.text : null,
+    note: input.note ?? null,
     sourceModality,
   };
 }

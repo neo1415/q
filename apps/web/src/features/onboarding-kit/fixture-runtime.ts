@@ -455,6 +455,7 @@ export function createFixtureRuntime(
             responseType: value.type,
             value,
             sourceModality: value.type === "TEXT" ? "TYPED_TEXT" : "SELECTION",
+            note: null,
             createdAt: STARTED_AT,
           } as const);
     };

@@ -206,3 +206,20 @@ export const PlaybackAuthorizationDtoSchema = z
 export type PlaybackAuthorizationDto = z.infer<
   typeof PlaybackAuthorizationDtoSchema
 >;
+
+/**
+ * A company's current pitch as another surface may show it: a feed item,
+ * the founder's own company, the network preview an investor opens. Null
+ * when none is publishable (READY, moderation ALLOWED, policy not
+ * PRIVATE). It carries no provider id and no URL: whoever activates it
+ * asks `/playback`, and is authorised there.
+ */
+export const PitchSummaryDtoSchema = z
+  .object({
+    mediaAssetId: UuidSchema,
+    aspectRatio: z.string().nullable(),
+    durationSeconds: z.number().int().nullable(),
+    captionState: DerivedTextStateSchema,
+  })
+  .strict();
+export type PitchSummaryDto = z.infer<typeof PitchSummaryDtoSchema>;

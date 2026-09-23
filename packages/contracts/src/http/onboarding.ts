@@ -253,6 +253,12 @@ export const OnboardingResponseInputSchema = z
   .object({
     value: OnboardingResponseValueSchema,
     sourceModality: OnboardingClientSourceModalitySchema.optional(),
+    /**
+     * The person's own meaning where the options could not hold it
+     * (CQ-QX-005): prose for people and for Q's reading of them, never a
+     * filter or a mandate value.
+     */
+    note: z.string().trim().min(1).max(500).optional(),
   })
   .strict();
 export type OnboardingResponseInput = z.infer<
@@ -601,6 +607,8 @@ export const OnboardingResponseViewSchema = z.object({
   responseType: OnboardingResponseTypeSchema,
   value: OnboardingResponseValueSchema,
   sourceModality: OnboardingSourceModalitySchema,
+  /** See `OnboardingResponseInputSchema.note`. Null when the options held everything. */
+  note: z.string().max(500).nullable().default(null),
   createdAt: UtcTimestampSchema,
 });
 export type OnboardingResponseView = z.infer<
@@ -801,6 +809,13 @@ export const SayOnboardingResponseSchema = z
      * interview turn's `navigate`; "FORM" hands over to the form.
      */
     navigate: z.string().max(40).nullable(),
+    /**
+     * What Q is looking into for this person, when the turn asked for a
+     * real-world example or public facts (CQ-QX-005). Same value as the
+     * interview turn's `researching`; a typed surface starts the same Q run
+     * a spoken one would. Null when nothing is being researched.
+     */
+    researching: z.string().max(200).nullable().default(null),
     /** True when Q answered without a model and said so plainly. */
     degraded: z.boolean(),
   })

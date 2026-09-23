@@ -277,6 +277,7 @@ const ResponseRow = z.object({
   response_type: OnboardingResponseTypeSchema,
   response_jsonb: OnboardingResponseValueSchema,
   raw_text: z.string().nullable(),
+  note: z.string().nullable(),
   source_modality: OnboardingSourceModalitySchema,
   created_at: Timestamp,
   superseded_by_response_id: OnboardingResponseIdSchema.nullable(),
@@ -291,6 +292,7 @@ function toResponse(row: unknown): OnboardingResponse {
     responseType: r.response_type,
     value: r.response_jsonb,
     rawText: r.raw_text,
+    note: r.note,
     sourceModality: r.source_modality,
     createdAt: r.created_at,
     supersededByResponseId: r.superseded_by_response_id,
@@ -300,7 +302,7 @@ function toResponse(row: unknown): OnboardingResponse {
 function responseSelect(executor: DatabaseExecutor) {
   return executor`
     select r.id, r.session_id, r.step_key, r.response_type, r.response_jsonb, r.raw_text,
-           r.source_modality, r.created_at, r.superseded_by_response_id
+           r.note, r.source_modality, r.created_at, r.superseded_by_response_id
       from onboarding.responses r`;
 }
 
@@ -329,11 +331,11 @@ export function createPostgresOnboardingResponseRepository(): OnboardingResponse
       const { response } = input;
       const rows = await tx.sql`
         insert into onboarding.responses
-          (id, session_id, step_key, response_type, response_jsonb, raw_text, source_modality)
+          (id, session_id, step_key, response_type, response_jsonb, raw_text, note, source_modality)
         values
           (${input.responseId}, ${input.sessionId}, ${response.stepKey}, ${response.responseType},
-           ${JSON.stringify(response.value)}::text::jsonb, ${response.rawText}, ${response.sourceModality})
-        returning id, session_id, step_key, response_type, response_jsonb, raw_text, source_modality,
+           ${JSON.stringify(response.value)}::text::jsonb, ${response.rawText}, ${response.note}, ${response.sourceModality})
+        returning id, session_id, step_key, response_type, response_jsonb, raw_text, note, source_modality,
                   created_at, superseded_by_response_id`;
       return toResponse(rows[0]);
     },

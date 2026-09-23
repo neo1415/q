@@ -4,6 +4,7 @@ import { CountryCodeSchema } from "../common/geography.js";
 import { UuidSchema } from "../common/ids.js";
 import { UtcTimestampSchema } from "../common/time.js";
 import { ResourceVersionSchema } from "../common/version.js";
+import { PitchSummaryDtoSchema } from "./media.js";
 
 /**
  * `/v1/companies` -- the canonical Company profile contract.
@@ -259,6 +260,8 @@ export const CompanyDtoSchema = z.object({
   companyStatus: CompanyStatusSchema,
   marketplaceVisibility: MarketplaceVisibilitySchema,
   marketplaceReadinessState: MarketplaceReadinessStateSchema,
+  /** The founder's current publishable pitch; see `PitchSummaryDtoSchema`. */
+  pitch: PitchSummaryDtoSchema.nullable().default(null),
   version: ResourceVersionSchema,
   createdAt: UtcTimestampSchema,
   updatedAt: UtcTimestampSchema,
@@ -315,6 +318,8 @@ export const CompanyNetworkPreviewSchema = z
     companyStatus: CompanyStatusSchema,
     /** True when investors across the network can currently reach this profile. */
     networkVisible: z.boolean(),
+    /** The pitch an investor may play here; see `PitchSummaryDtoSchema`. */
+    pitch: PitchSummaryDtoSchema.nullable().default(null),
   })
   .strict();
 export type CompanyNetworkPreview = z.infer<typeof CompanyNetworkPreviewSchema>;

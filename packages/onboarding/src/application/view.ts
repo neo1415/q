@@ -220,6 +220,7 @@ export function toResponseView(
     responseType: response.responseType,
     value: response.value,
     sourceModality: response.sourceModality,
+    note: response.note,
     createdAt: response.createdAt,
   };
 }

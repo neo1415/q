@@ -195,6 +195,8 @@ export type OnboardingResponse = {
   readonly value: OnboardingResponseValue;
   /** What the user actually typed or said, for text responses only. */
   readonly rawText: string | null;
+  /** The person's own meaning where the options could not hold it; never a filter. */
+  readonly note: string | null;
   readonly sourceModality: OnboardingSourceModality;
   readonly createdAt: UtcTimestamp;
   readonly supersededByResponseId: OnboardingResponseId | null;
@@ -206,6 +208,7 @@ export type ValidatedOnboardingResponse = {
   readonly responseType: OnboardingResponseType;
   readonly value: OnboardingResponseValue;
   readonly rawText: string | null;
+  readonly note: string | null;
   readonly sourceModality: OnboardingSourceModality;
 };
 

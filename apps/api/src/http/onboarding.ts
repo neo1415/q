@@ -390,6 +390,7 @@ export function registerOnboardingRoutes(
         understood: null,
         reply: turn.reply,
         navigate: turn.navigate,
+        researching: turn.researching,
         degraded: turn.degraded,
       });
     },
