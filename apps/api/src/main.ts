@@ -644,6 +644,10 @@ const media = createMediaService({
   },
 });
 
+const discoverablePitches = createPostgresDiscoverablePitchQueryPort({
+  sql: database.sql,
+});
+
 const { app, logger } = createApp(config, security, {
   organisations,
   companies,
@@ -654,8 +658,11 @@ const { app, logger } = createApp(config, security, {
     interactions,
     // The feed's one batched pitch read per page (CQ-MEDIA-012), through
     // the Media context's port: discovery never touches media tables.
-    pitches: createPostgresDiscoverablePitchQueryPort({ sql: database.sql }),
+    pitches: discoverablePitches,
   },
+  // The same port answers the founder's own view and network preview, so
+  // "what investors will see" is what the feed shows.
+  companyPitches: discoverablePitches,
   gateq,
   gateqApply,
   capital,

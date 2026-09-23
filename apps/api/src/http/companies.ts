@@ -24,7 +24,9 @@ import {
   parseContract,
   UpdateCompanyRequestSchema,
   type CorrelationId,
+  type PitchSummaryDto,
 } from "@capital-q/contracts";
+import type { DiscoverablePitchQueryPort } from "@capital-q/media";
 import { createCorrelationId } from "@capital-q/observability";
 
 import {
@@ -43,7 +45,39 @@ import {
 
 export type CompanyRoutesDependencies = ActorContextDependencies & {
   readonly companies: CompanyService;
+  /**
+   * The Media context's feed read (CQ-MEDIA-012): the pitch investors can
+   * play, if any. The same port and the same rule the feed item uses, so a
+   * founder's "what investors will see" cannot disagree with what they see.
+   * Absent, every `pitch` is null.
+   */
+  readonly pitches?: DiscoverablePitchQueryPort | undefined;
 };
+
+/**
+ * The publishable pitch of one company, in the contract's shape. One
+ * bounded call; a company with no publishable pitch — none, processing,
+ * private, blocked — is null, and nothing here says which.
+ */
+async function pitchSummaryOf(
+  pitches: DiscoverablePitchQueryPort | undefined,
+  companyId: string,
+): Promise<PitchSummaryDto | null> {
+  if (pitches === undefined) {
+    return null;
+  }
+  const pitch = (await pitches.findDiscoverablePitches([companyId])).get(
+    companyId,
+  );
+  return pitch === undefined
+    ? null
+    : {
+        mediaAssetId: pitch.mediaAssetId,
+        aspectRatio: pitch.aspectRatio,
+        durationSeconds: pitch.durationSeconds,
+        captionState: pitch.captionState,
+      };
+}
 
 function correlation(): CorrelationId {
   return CorrelationIdSchema.parse(createCorrelationId());
@@ -106,7 +140,10 @@ export function registerCompanyRoutes(
         companyId: companyIdParam(request),
       });
       void reply.header("Cache-Control", "no-store");
-      return CompanyDtoSchema.parse(toCompanyDto(company));
+      return CompanyDtoSchema.parse({
+        ...toCompanyDto(company),
+        pitch: await pitchSummaryOf(dependencies.pitches, company.id),
+      });
     },
   );
 
@@ -126,7 +163,10 @@ export function registerCompanyRoutes(
         correlationId: correlation(),
       });
       void reply.header("Cache-Control", "no-store");
-      return CompanyDtoSchema.parse(toCompanyDto(company));
+      return CompanyDtoSchema.parse({
+        ...toCompanyDto(company),
+        pitch: await pitchSummaryOf(dependencies.pitches, company.id),
+      });
     },
   );
   // Who may see the declared profile (CQ-PRE-REC-001 §31-§35). An
@@ -147,7 +187,10 @@ export function registerCompanyRoutes(
         correlationId: correlation(),
       });
       void reply.header("Cache-Control", "no-store");
-      return CompanyDtoSchema.parse(toCompanyDto(company));
+      return CompanyDtoSchema.parse({
+        ...toCompanyDto(company),
+        pitch: await pitchSummaryOf(dependencies.pitches, company.id),
+      });
     },
   );
 
@@ -197,6 +240,7 @@ export function registerCompanyRoutes(
       return CompanyNetworkPreviewSchema.parse({
         ...projectCompanyForNetwork(company),
         networkVisible: isNetworkVisible(company.marketplaceVisibility),
+        pitch: await pitchSummaryOf(dependencies.pitches, company.id),
       });
     },
   );
