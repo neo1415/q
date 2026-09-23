@@ -19,16 +19,23 @@ describe("the prompt lock", () => {
     "is rewritten from the registry when asked",
     () => {
       const registry = createPromptRegistry(PROMPT_DEFINITIONS);
-      const entries = Object.fromEntries(
+      // Typed rather than inferred: `Object.fromEntries` widens to `any`,
+      // which then spreads through the whole file this writes.
+      const entries: Record<string, string> = Object.fromEntries(
         registry
           .list()
-          .map((record) => [record.versionId, record.contentHash])
-          .sort(([a], [b]) => String(a).localeCompare(String(b))),
+          .map((record): readonly [string, string] => [
+            record.versionId,
+            record.contentHash,
+          ])
+          .sort(([a], [b]) => a.localeCompare(b)),
       );
       const path = resolve(import.meta.dirname, "..", "prompts.lock.json");
       const existing: unknown = JSON.parse(readFileSync(path, "utf8"));
-      const next = {
-        ...(typeof existing === "object" && existing !== null ? existing : {}),
+      const next: Record<string, unknown> = {
+        ...(typeof existing === "object" && existing !== null
+          ? (existing as Record<string, unknown>)
+          : {}),
         entries,
       };
       writeFileSync(path, `${JSON.stringify(next, null, 2)}\n`, "utf8");

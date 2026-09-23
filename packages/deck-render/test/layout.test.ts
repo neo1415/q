@@ -41,7 +41,7 @@ function slide(overrides: Partial<QSlide> = {}): QSlide {
     bulletsRight: [],
     section: 1,
     ...overrides,
-  } as QSlide;
+  };
 }
 
 function deck(overrides: Partial<QDeck> = {}): QDeck {
@@ -60,7 +60,7 @@ function deck(overrides: Partial<QDeck> = {}): QDeck {
     direction: "MINIMAL_INSTITUTIONAL",
     markIsDraft: false,
     ...overrides,
-  } as QDeck;
+  };
 }
 
 describe("QX-004 §5 · a deck knows when it is broken", () => {

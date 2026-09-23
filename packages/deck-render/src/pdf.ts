@@ -28,7 +28,7 @@ import type { LaidOutDeck, TextBox } from "./layout.js";
  * render is a founder with no deck.
  */
 
-const WIN_ANSI_SAFE = /[^ -~ -ÿ]/g;
+const WIN_ANSI_SAFE = /[^ -~\u00a0-\u00ff]/g;
 
 /** What pdf-lib's standard fonts can draw, with the rest made harmless. */
 function drawable(text: string): string {

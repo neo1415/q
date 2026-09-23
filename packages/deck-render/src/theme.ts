@@ -14,8 +14,6 @@
  * rather than squeezed.
  */
 
-import type { QVisualDirection } from "@capital-q/contracts";
-
 /** 16:9 at 96dpi in points: the size PowerPoint and a PDF page agree on. */
 export const SLIDE_WIDTH = 960;
 export const SLIDE_HEIGHT = 540;
@@ -96,8 +94,11 @@ const BY_DIRECTION: Readonly<Record<string, DeckTheme>> = {
  * and an older renderer must still draw a newer deck.
  */
 export function themeFor(
-  direction: QVisualDirection | string | undefined,
-  accent?: string | undefined,
+  // Widened to `string` on purpose, not narrowed to QVisualDirection: an
+  // older renderer must still draw a newer deck, and an unknown direction
+  // falls through to the institutional default below rather than failing.
+  direction: string | undefined,
+  accent?: string,
 ): DeckTheme {
   const base = BY_DIRECTION[direction ?? ""] ?? INSTITUTIONAL;
   return accent === undefined ? base : { ...base, accent };

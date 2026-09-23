@@ -65,7 +65,7 @@ const deck: QDeck = {
   ],
   direction: "MINIMAL_INSTITUTIONAL",
   markIsDraft: false,
-} as QDeck;
+};
 
 describe("QX-004 §7 · the files are real", () => {
   it("writes a PowerPoint whose slides are editable text, not a picture", async () => {
@@ -144,7 +144,7 @@ describe("QX-004 §7 · the files are real", () => {
           section: 0,
         },
       ],
-    } as QDeck);
+    });
     const bytes = await deckToPdf(withEmDash, { title: "t" });
     const reopened = await PDFDocument.load(bytes);
     expect(reopened.getPageCount()).toBe(1);
