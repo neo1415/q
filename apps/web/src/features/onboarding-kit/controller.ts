@@ -351,6 +351,22 @@ export function useOnboardingJourney<
         return null;
       }
       let turn: OnboardingTurn | null = null;
+      /**
+       * An opening turn is Q asking itself what to ask (QX-004 core gate:
+       * one Q). Nothing is being saved and nothing of the person's is at
+       * stake, so a Q that cannot answer must not take the screen down
+       * with it: the step's own prompt is a worse question than Q's, and
+       * a great deal better than "Investor setup couldn't load."
+       */
+      if (text.length === 0) {
+        try {
+          const outcome = await say({ text, recentTurns });
+          setSession(outcome.view);
+          return { understood: outcome.understood, reply: outcome.reply };
+        } catch {
+          return null;
+        }
+      }
       const ok = await run(async () => {
         const outcome = await say({ text, recentTurns });
         turn = { understood: outcome.understood, reply: outcome.reply };

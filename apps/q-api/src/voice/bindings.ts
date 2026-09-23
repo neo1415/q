@@ -67,6 +67,8 @@ export type VoiceSessionBindings = {
   byVoiceSessionId(voiceSessionId: string): VoiceSessionBinding | null;
   /** The binding whose think secret this is (connected or not). */
   byThinkToken(thinkToken: string): VoiceSessionBinding | null;
+  /** First eight characters of each held think token, for diagnosis only. */
+  fingerprints(): readonly string[];
   /** Release every binding this person holds: one voice session at a time. */
   releaseFor(userId: string): void;
   release(providerConversationId: string): void;
@@ -140,6 +142,14 @@ export function createVoiceSessionBindings(
       }
       binding.connectedAt = now();
       return binding;
+    },
+    fingerprints: () => {
+      const out: string[] = [];
+      for (const binding of bindings.values()) {
+        if (binding.thinkToken !== undefined)
+          out.push(binding.thinkToken.slice(0, 8));
+      }
+      return out;
     },
     byThinkToken: (thinkToken) => {
       sweep();

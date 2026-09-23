@@ -1515,6 +1515,11 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
       logger.debug(
         {
           intent: result.intent,
+          // Debug only, and truncated: a turn read as UNCLEAR is
+          // indistinguishable in a log from a turn that never arrived,
+          // and over a microphone the difference is usually the first few
+          // words. Production runs at info and never reaches this.
+          heard: input.utterance.slice(0, 80),
           answering: result.answers.map((a) => a.stepKey),
           confirming: result.confirmations.map(
             (c) => `${c.stepKey}:${c.decision}`,

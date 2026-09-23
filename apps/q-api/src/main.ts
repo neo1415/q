@@ -989,6 +989,47 @@ if (deepgramProvider !== undefined) {
     { thinkPath: Q_VOICE_THINK_PATH, voices: deepgramProvider.voices },
     "voice transport: deepgram",
   );
+  /**
+   * Can the speech provider actually reach us? (QX-004 core gate.)
+   *
+   * The Voice Agent brings every turn back to `Q_API_PUBLIC_URL`, and
+   * when that origin is wrong the only thing anyone sees is the
+   * provider's own `FAILED_TO_THINK` in a browser console: audio flows,
+   * the agent speaks its greeting, the microphone is fine, and nothing
+   * whatsoever appears in this service's log, because nothing arrives.
+   * A tunnel that rotated overnight cost a night to find that way.
+   *
+   * So the origin is asked, once, whether it reaches this server. An
+   * unauthenticated think is refused with 401, and that refusal is the
+   * proof: it means the route is there and answering. Anything else is
+   * reported with the origin named, and nothing is blocked -- a warning
+   * at boot, not a service that will not start.
+   */
+  void (async () => {
+    const origin = config.voice.publicUrl;
+    if (origin === undefined) return;
+    try {
+      const probe = await fetch(
+        `${origin}${Q_VOICE_THINK_PATH}/chat/completions`,
+        {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ messages: [] }),
+          signal: AbortSignal.timeout(10_000),
+        },
+      );
+      if (probe.status === 401) return;
+      appLogger.warn(
+        { publicUrl: origin, status: probe.status },
+        "Q_API_PUBLIC_URL does not reach this server's think route; the speech provider will report FAILED_TO_THINK",
+      );
+    } catch (error: unknown) {
+      appLogger.warn(
+        { publicUrl: origin, err: error },
+        "Q_API_PUBLIC_URL is unreachable; the speech provider will report FAILED_TO_THINK",
+      );
+    }
+  })();
 }
 if (speechSynthesis !== undefined) {
   appLogger.info(

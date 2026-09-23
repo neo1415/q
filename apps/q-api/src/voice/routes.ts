@@ -124,6 +124,16 @@ export function registerQVoiceRoutes(
       const id = params.voiceSessionId ?? "";
       const binding = dependencies.bindings.byVoiceSessionId(id);
       if (binding === null || binding.actor.userId !== actor.userId) {
+        // The browser reads this as "the line is gone" and reconnects, so
+        // which of the two it was decides whether a reconnect loop is the
+        // server letting sessions go or somebody reading another person's.
+        request.log.warn(
+          {
+            reason: binding === null ? "NO_BINDING" : "NOT_THIS_PERSON",
+            boundCount: dependencies.bindings.size(),
+          },
+          "voice turn state refused",
+        );
         return reply.code(404).send({
           type: "about:blank",
           title: "Not found",

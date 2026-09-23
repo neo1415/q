@@ -110,8 +110,20 @@ export function registerVoiceThinkRoute(
       // with it for a while after — that was three refused thinks in a
       // second, and a person reading "Thinking" for good. Seen in a log,
       // the difference is between a leaked socket and a genuine intruder.
+      /**
+       * Fingerprints, not secrets: the first eight characters of the token
+       * presented and of each token held. Enough to say "the agent is on
+       * an older session than the one we hold" -- which is a different
+       * fault from "nothing is held at all" and from a genuine intruder --
+       * and not enough to replay anything.
+       */
       request.log.warn(
-        { reason: "NO_BINDING_FOR_TOKEN", boundCount: bindings.size() },
+        {
+          reason: "NO_BINDING_FOR_TOKEN",
+          boundCount: bindings.size(),
+          presented: token.slice(0, 8),
+          held: bindings.fingerprints(),
+        },
         "voice think refused",
       );
       return reply.code(401).send({

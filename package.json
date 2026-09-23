@@ -26,6 +26,7 @@
     "deploy:build:api": "turbo run build --filter=@capital-q/api...",
     "deploy:build:q-api": "turbo run build --filter=@capital-q/q-api...",
     "deploy:build:workers": "turbo run build --filter=@capital-q/workers...",
+    "deploy:build:web": "turbo run build --filter=@capital-q/web...",
     "typecheck": "turbo run typecheck && tsc --noEmit -p tsconfig.json",
     "lint": "eslint . --max-warnings=0",
     "lint:fix": "eslint . --fix",

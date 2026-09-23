@@ -202,22 +202,48 @@ export default defineRailway(() => {
   });
 
   /**
-   * Created by Railway's GitHub import; Vercel is the web host (ADR 0001,
-   * unchanged by 0014). Left byte-for-byte as imported and pinned to `main`
-   * so that applying this file does not redeploy it or delete it. Delete this
-   * block, and the service, once Vercel serves staging.
+   * The web app. Vercel is still the intended host (ADR 0001, unchanged by
+   * 0014); this serves staging until Vercel is authenticated.
+   *
+   * It was created by Railway's GitHub import and left as imported, which
+   * meant three things that each made it unservable: it built with a bare
+   * `pnpm --filter`, which builds no workspace dependency and fails on the
+   * first `@capital-q/api-client` import; it was pinned to `main` rather
+   * than the integration branch the other three services deploy; and it
+   * carried no application variables at all. All three are fixed here.
+   *
+   * The voice transport is the reason this matters beyond convenience. The
+   * speech provider calls back into q-api for every spoken turn, so a
+   * browser served from a laptop needs a public tunnel for q-api, and a
+   * tunnel that rotates takes voice down with it. Served from here, the
+   * callback origin is q-api's own permanent domain and there is no tunnel
+   * in the picture at all.
    */
   const web = service("@capital-q/web", {
-    source: github("neo1415/q", { branch: "main", checkSuites: false }),
-    build: {
-      buildCommand: "pnpm --filter @capital-q/web build",
-      buildEnvironment: "V3",
-      builder: "RAILPACK",
-      watchPatterns: ["/apps/web/**"],
-    },
+    source: repo,
+    build: buildFor("@capital-q/web"),
     start: "pnpm --filter @capital-q/web start",
-    replicas: { sfo: 1 },
+    replicas: { [EU_REGION]: 1 },
     networking: { privateNetworkEndpoint: "capital-qweb" },
+    variables: {
+      ...runtimeEnv,
+      PORT: "3000",
+      /**
+       * The browser reaches both services over their public domains: these
+       * are fetched from the person's own browser, not from this server, so
+       * a private address would not resolve.
+       */
+      CQ_API_URL: "https://${{@capital-q/api.RAILWAY_PUBLIC_DOMAIN}}",
+      CQ_Q_API_URL: "https://${{@capital-q/q-api.RAILWAY_PUBLIC_DOMAIN}}",
+      CQ_WEB_ORIGIN: "https://${{RAILWAY_PUBLIC_DOMAIN}}",
+      /**
+       * Statically replaced into the bundle at build time, which is why
+       * they are public by name: an anon Supabase URL and its publishable
+       * key are safe in a browser and are useless without RLS passing.
+       */
+      NEXT_PUBLIC_SUPABASE_URL: preserve(),
+      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: preserve(),
+    },
   });
 
   return project("Q", { resources: [api, qApi, workers, web] });
