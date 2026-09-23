@@ -1,4 +1,6 @@
 import { randomBytes, randomUUID } from "node:crypto";
+import { Readable } from "node:stream";
+import type { ReadableStream as WebReadableStream } from "node:stream/web";
 
 import type { FastifyInstance } from "fastify";
 import {
@@ -6,6 +8,7 @@ import {
   CreateQVoiceSessionRequestSchema,
   CreateQVoiceSessionResponseSchema,
   parseContract,
+  Q_SPEECH_MAX_CHARS,
   Q_VOICE_SESSIONS_PATH,
   Q_VOICE_SPEECH_PATH,
   Q_VOICE_TURN_PATH,
@@ -30,6 +33,7 @@ import {
 } from "./bindings.js";
 import type { Interviewer } from "./interviewer.js";
 import type { RealtimeVoiceProvider } from "./provider.js";
+import { bounded, speakable } from "./speech.js";
 import type {
   DeepgramAgentSettings,
   DeepgramVoiceProvider,
@@ -61,6 +65,20 @@ import type { ApplicationIdentityLookup } from "@capital-q/security/postgres";
  * spoken interview answer reaches the application API with exactly the
  * authority a typed one has. It is never written anywhere else.
  */
+
+/**
+ * Where the Deepgram Voice Agent fetches Q's voice (QX-004 SPEAK rework).
+ *
+ * Not in `@capital-q/contracts` with the other voice paths on purpose:
+ * this is not part of Capital Q's public API. It is an integration
+ * detail between this service and one speech transport, reachable only
+ * with a per-session secret, and it speaks a vendor's dialect rather
+ * than ours.
+ */
+export const Q_VOICE_SPEAK_RELAY_PATH = "/v1/q/voice/speak" as const;
+
+/** What `CreateQVoiceSessionResponseSchema` allows for an opening line. */
+const FIRST_MESSAGE_MAX = 700;
 
 export type QVoiceRoutesDependencies = ActorContextDependencies & {
   /** The ElevenLabs transport, when composed. */
@@ -226,6 +244,153 @@ export function registerQVoiceRoutes(
     },
   );
 
+  /**
+   * `POST /v1/q/voice/speak` — Q's voice, for the Voice Agent
+   * (QX-004 SPEAK rework).
+   *
+   * Not a person's route. The Deepgram Voice Agent calls this for the
+   * audio of each sentence it has been given, in ElevenLabs' own request
+   * dialect, and this asks ElevenLabs under the account key and streams
+   * the bytes straight back. It exists so that the key does not have to
+   * travel to the browser inside the agent settings.
+   *
+   * Authorised exactly as the think endpoint is: the bearer is the
+   * per-session secret minted with the session, and the binding it names
+   * was tied to a person before the microphone opened. The voice comes
+   * from that binding, never from the request.
+   */
+  const speakRelay = dependencies.deepgram?.speakRelay;
+  if (speakRelay !== undefined) {
+    app.post(Q_VOICE_SPEAK_RELAY_PATH, async (request, reply) => {
+      const header = request.headers.authorization;
+      const token =
+        typeof header === "string" && header.startsWith("Bearer ")
+          ? header.slice("Bearer ".length).trim()
+          : "";
+      const binding =
+        token.length === 0 ? null : dependencies.bindings.byThinkToken(token);
+      if (binding === null) {
+        request.log.warn(
+          {
+            reason: "NO_BINDING_FOR_TOKEN",
+            boundCount: dependencies.bindings.size(),
+            presented: token.slice(0, 8),
+          },
+          "voice speak relay refused",
+        );
+        return reply.code(401).send({
+          type: "about:blank",
+          title: "Unauthorized",
+          status: 401,
+          detail: "No voice session for this request.",
+        });
+      }
+      const body = request.body;
+      const text =
+        body !== null &&
+        typeof body === "object" &&
+        typeof (body as { text?: unknown }).text === "string"
+          ? (body as { text: string }).text
+          : "";
+      if (text.trim().length === 0 || text.length > Q_SPEECH_MAX_CHARS) {
+        return reply.code(400).send({
+          type: "about:blank",
+          title: "Bad Request",
+          status: 400,
+          detail: "There is nothing to say.",
+        });
+      }
+      const query = request.query;
+      const outputFormat =
+        query !== null &&
+        typeof query === "object" &&
+        typeof (query as { output_format?: unknown }).output_format === "string"
+          ? (query as { output_format: string }).output_format
+          : undefined;
+
+      /**
+       * The agent hangs up on Q mid-sentence every time the person speaks
+       * over it, which is barge-in working, not a fault. Left unhandled
+       * that arrives here as an unhandled `ERR_STREAM_PREMATURE_CLOSE`,
+       * the connection dies, and the agent reports it to the browser as
+       * INTERNAL_SERVER_ERROR and drops the line (seen live). So the
+       * request going away cancels the vendor call instead: the sentence
+       * nobody is listening to any more is not paid for or waited on.
+       */
+      const gone = new AbortController();
+      // The *response* closing unfinished is the agent dropping the
+      // request. Not the request stream's own close, which fires as soon
+      // as the body has been read and would cancel every sentence before
+      // a byte of it was sent — the same trap the think route documents.
+      reply.raw.on("close", () => {
+        if (!reply.raw.writableFinished) gone.abort();
+      });
+
+      let upstream: Response;
+      try {
+        upstream = await speakRelay.stream({
+          voice: binding.voice,
+          text,
+          outputFormat,
+          signal: gone.signal,
+        });
+      } catch (error: unknown) {
+        if (gone.signal.aborted) {
+          // Interrupted before the vendor answered. Nobody to tell.
+          return reply;
+        }
+        request.log.warn({ err: error }, "voice speak relay unreachable");
+        return reply.code(502).send({
+          type: "about:blank",
+          title: "Bad Gateway",
+          status: 502,
+          detail: "Q can't speak right now.",
+        });
+      }
+      if (!upstream.ok || upstream.body === null) {
+        // The vendor's status is for this log and nowhere else; the agent
+        // is told only that the audio did not come.
+        request.log.warn(
+          { status: upstream.status },
+          "voice speak relay refused upstream",
+        );
+        return reply.code(502).send({
+          type: "about:blank",
+          title: "Bad Gateway",
+          status: 502,
+          detail: "Q can't speak right now.",
+        });
+      }
+      spokenLines.add(1, { voice: binding.voice });
+      const audio = Readable.fromWeb(
+        upstream.body as WebReadableStream<Uint8Array>,
+      );
+      // A sentence cut off in the middle is the ordinary shape of a
+      // conversation, not something to log as a failure or to let bubble
+      // out of this handler.
+      audio.on("error", (error: NodeJS.ErrnoException) => {
+        if (gone.signal.aborted || error.code === "ERR_STREAM_PREMATURE_CLOSE") {
+          return;
+        }
+        request.log.warn({ err: error }, "voice speak relay stream ended early");
+      });
+      gone.signal.addEventListener("abort", () => audio.destroy(), {
+        once: true,
+      });
+      return (
+        reply
+          .code(200)
+          .header(
+            "content-type",
+            upstream.headers.get("content-type") ?? "application/octet-stream",
+          )
+          // Audio of one sentence in one person's live conversation.
+          .header("cache-control", "no-store")
+          .send(audio)
+      );
+    });
+  }
+
   app.post(
     Q_VOICE_SESSIONS_PATH,
     { onRequest: withContext },
@@ -319,6 +484,18 @@ export function registerQVoiceRoutes(
         } catch (error: unknown) {
           request.log.warn({ err: error }, "voice opening line unavailable");
         }
+      }
+
+      // Q's opening line goes to the speaker like any other, so it gets
+      // the same treatment: a greeting that named a raise target read out
+      // "two zero zero zero zero zero zero zero zero N G N", because every
+      // other spoken path runs through `speakable` and this one did not.
+      if (firstMessage !== undefined) {
+        const spoken = bounded(speakable(firstMessage), FIRST_MESSAGE_MAX);
+        // An opening line that was nothing but markup is no opening line:
+        // fall through to the plain greeting below rather than send the
+        // provider an empty string to say.
+        firstMessage = spoken.length === 0 ? undefined : spoken;
       }
 
       if (firstMessage === undefined) {

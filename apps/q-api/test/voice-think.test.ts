@@ -57,6 +57,9 @@ function fakeBindings(bound: VoiceSessionBinding): VoiceSessionBindings {
     get: () => bound,
     byVoiceSessionId: () => bound,
     byThinkToken: (token) => (token === bound.thinkToken ? bound : null),
+    // The refusal path logs these, so a double without them turned the
+    // 401 this test is about into a 500 and the assertion never ran.
+    fingerprints: () => [bound.thinkToken?.slice(0, 8) ?? ""],
     releaseFor: () => undefined,
     release: () => undefined,
     countFor: () => 1,

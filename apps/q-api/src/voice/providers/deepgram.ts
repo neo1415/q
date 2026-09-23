@@ -1,6 +1,7 @@
 import type { QVoiceChoice } from "@capital-q/contracts";
 
 import { ASR_KEYWORDS } from "../vocabulary.js";
+import type { ElevenLabsSpeechRelay } from "./elevenlabs-speak.js";
 
 /**
  * Deepgram Voice Agent as the speech transport (CQ-Q-VOICE-001 rework).
@@ -21,6 +22,13 @@ const SPEAK_MODELS: Readonly<Record<QVoiceChoice, string>> = {
   MALE: "aura-2-orion-en",
 };
 
+/**
+ * The ElevenLabs model the agent is told it is talking to (QX-004 SPEAK
+ * rework). It must match what the relay actually asks ElevenLabs for;
+ * both live next to each other on purpose.
+ */
+const ELEVENLABS_MODEL_ID = "eleven_turbo_v2_5";
+
 export type DeepgramAgentSettings = {
   readonly agent: Record<string, unknown>;
   readonly audio: {
@@ -39,6 +47,14 @@ export type DeepgramAgentSettings = {
 export type DeepgramVoiceProvider = {
   readonly name: "deepgram";
   readonly voices: readonly QVoiceChoice[];
+  /**
+   * Where Q's voice actually comes from, when it is not Deepgram's own
+   * (QX-004 SPEAK rework). Carried on the transport rather than composed
+   * separately because the settings that name the relay and the relay
+   * that answers them have to agree, and one object is what makes that
+   * impossible to get wrong.
+   */
+  readonly speakRelay: ElevenLabsSpeechRelay | undefined;
   /** One short-lived browser token for one connection. Never the API key. */
   readonly mintToken: () => Promise<string>;
   /** The agent settings for one session; the think endpoint carries the session's secret. */
@@ -61,6 +77,16 @@ export type DeepgramVoiceProviderOptions = {
   readonly publicUrl: string;
   /** The think route's path on this server. */
   readonly thinkPath: string;
+  /**
+   * Q's voice (QX-004 SPEAK rework). Present means ElevenLabs: the agent
+   * is told to fetch the audio of each sentence from `path` on this
+   * server, and `relay` is what answers there. Absent means the agent
+   * speaks in its own Aura-2 voice, which is what happens when no
+   * ElevenLabs key is configured.
+   */
+  readonly speak?:
+    | { readonly path: string; readonly relay: ElevenLabsSpeechRelay }
+    | undefined;
   readonly fetch?: typeof fetch | undefined;
 };
 
@@ -83,9 +109,43 @@ export function createDeepgramVoiceProvider(
   const doFetch = options.fetch ?? fetch;
   const publicUrl = options.publicUrl.replace(/\/$/, "");
   const thinkUrl = `${publicUrl}${options.thinkPath}/chat/completions`;
+  const speak = options.speak;
+
+  /**
+   * Where the agent gets Q's voice from.
+   *
+   * With a relay path this is Deepgram's bring-your-own-TTS pointed at
+   * *this server*, not at ElevenLabs. These settings are composed here but
+   * sent by the browser, so the vendor key that would normally sit in
+   * `endpoint.headers` would be public to the person; the session's own
+   * secret goes there instead and the ElevenLabs key never leaves the
+   * server. Without a relay path the agent speaks in Aura-2 as before.
+   */
+  const speakFor = (
+    voice: QVoiceChoice,
+    thinkToken: string,
+  ): Record<string, unknown> =>
+    speak === undefined
+      ? { provider: { type: "deepgram", model: SPEAK_MODELS[voice] } }
+      : {
+          provider: {
+            type: "eleven_labs",
+            model_id: ELEVENLABS_MODEL_ID,
+            language: "en",
+          },
+          endpoint: {
+            // No voice in the URL: the relay reads the session's voice
+            // from its binding, so a relayed call cannot ask to be spoken
+            // in a voice the session was not issued for.
+            url: `${publicUrl}${speak.path}`,
+            headers: { authorization: `Bearer ${thinkToken}` },
+          },
+        };
+
   return {
     name: "deepgram",
     voices: ["FEMALE", "MALE"],
+    speakRelay: speak?.relay,
     mintToken: async () => {
       const response = await doFetch(GRANT_URL, {
         method: "POST",
@@ -148,9 +208,7 @@ export function createDeepgramVoiceProvider(
           },
           prompt: THINK_PROMPT,
         },
-        speak: {
-          provider: { type: "deepgram", model: SPEAK_MODELS[voice] },
-        },
+        speak: speakFor(voice, thinkToken),
       },
       audio: {
         input: { encoding: "linear16", sample_rate: 16_000 },

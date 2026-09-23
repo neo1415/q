@@ -160,7 +160,12 @@ import { createWelcomeHost } from "./voice/welcome.js";
 import type { VoiceAttachment } from "./voice/provider.js";
 import { createDeepgramVoiceProvider } from "./voice/providers/deepgram.js";
 import { createDeepgramSpeechSynthesis } from "./voice/providers/deepgram-speak.js";
+import {
+  createElevenLabsSpeechRelay,
+  createElevenLabsSpeechSynthesis,
+} from "./voice/providers/elevenlabs-speak.js";
 import { createElevenLabsVoiceProvider } from "./voice/providers/elevenlabs.js";
+import { Q_VOICE_SPEAK_RELAY_PATH } from "./voice/routes.js";
 import { createVoiceTurnHandler } from "./voice/turn.js";
 import { createDecisionReader } from "./voice/decision.js";
 import { createPersonProfileUpdateAction } from "./composition/person-profile-action.js";
@@ -783,8 +788,26 @@ const voiceProvider =
         speechEngines,
       })
     : undefined;
+/**
+ * Q's voice (QX-004 SPEAK rework): Deepgram listens, Q thinks, ElevenLabs
+ * speaks. Composed from the ElevenLabs key alone — it needs no Speech
+ * Engine resource, because this is plain text-to-speech and not the
+ * whole-transport Speech Engine next to it.
+ */
+const elevenLabsSpeech =
+  speechSecrets.elevenLabs === undefined
+    ? undefined
+    : {
+        oneWay: createElevenLabsSpeechSynthesis({
+          apiKey: speechSecrets.elevenLabs.reveal(),
+        }),
+        relay: createElevenLabsSpeechRelay({
+          apiKey: speechSecrets.elevenLabs.reveal(),
+        }),
+      };
 // The Deepgram Voice Agent transport: the key and this server's public
-// origin, so the agent's think calls come back here.
+// origin, so the agent's think calls come back here — and, when ElevenLabs
+// is configured, its speak calls too.
 const deepgramProvider =
   config.voice.provider === "deepgram" && speechSecrets.deepgram !== undefined
     ? config.voice.publicUrl === undefined
@@ -797,23 +820,33 @@ const deepgramProvider =
           apiKey: speechSecrets.deepgram.reveal(),
           publicUrl: config.voice.publicUrl,
           thinkPath: Q_VOICE_THINK_PATH,
+          ...(elevenLabsSpeech === undefined
+            ? {}
+            : {
+                speak: {
+                  path: Q_VOICE_SPEAK_RELAY_PATH,
+                  relay: elevenLabsSpeech.relay,
+                },
+              }),
         })
     : undefined;
 /**
  * Q reading a line aloud (Q-FIRST-RUN-TTS-001).
  *
- * Composed from the Deepgram key alone. Deliberately not conditional on
+ * ElevenLabs where it is configured, so a first-run greeting and a spoken
+ * conversation are the same voice; Deepgram otherwise, which is what the
+ * preview stack falls back to. Deliberately not conditional on
  * `Q_API_PUBLIC_URL` or on a realtime transport: those exist because the
  * Voice Agent has to call this server back, and nothing calls back for
- * one-way synthesis. That is why first-run speech works on the preview
- * stack, which has no tunnel of its own.
+ * one-way synthesis.
  */
 const speechSynthesis =
-  speechSecrets.deepgram === undefined
+  elevenLabsSpeech?.oneWay ??
+  (speechSecrets.deepgram === undefined
     ? undefined
     : createDeepgramSpeechSynthesis({
         apiKey: speechSecrets.deepgram.reveal(),
-      });
+      }));
 const voiceBindings = createVoiceSessionBindings();
 // Q conducting the interview: one model-driven turn per utterance, every
 // reading validated and recorded through the onboarding runtime.
@@ -986,7 +1019,18 @@ await app.listen({
 
 if (deepgramProvider !== undefined) {
   appLogger.info(
-    { thinkPath: Q_VOICE_THINK_PATH, voices: deepgramProvider.voices },
+    {
+      thinkPath: Q_VOICE_THINK_PATH,
+      voices: deepgramProvider.voices,
+      // Which vendor is actually audible. The transport being Deepgram
+      // says nothing about the voice since the speak provider became
+      // configurable, and "which voice am I hearing" was otherwise only
+      // answerable by listening.
+      speak:
+        deepgramProvider.speakRelay === undefined
+          ? "deepgram-aura-2"
+          : `elevenlabs (relayed via ${Q_VOICE_SPEAK_RELAY_PATH})`,
+    },
     "voice transport: deepgram",
   );
   /**
