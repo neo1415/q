@@ -1,0 +1,177 @@
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+
+import type { DiscoveredCompanyDto } from "@capital-q/contracts";
+import { Button } from "@capital-q/ui/button";
+
+import type { FeedPreloadPolicy } from "../feed/feed-state";
+import {
+  attachNativeSource,
+  type AttachSource,
+  type PlaybackSource,
+} from "./pitch-playback";
+import { usePitchPlayback } from "./use-pitch-playback";
+
+/**
+ * The pitch player (CQ-WEB-021; doc 20 §35-§36, §44-§50, §60; ADR-001).
+ *
+ * A wrapper, not a player: a plain `<video>`, an injected strategy for
+ * getting a URL onto it, and an injected way of asking the server whether
+ * this viewer may watch. Everything about which card is playing comes from
+ * the feed controller's policy, so there is no state here that could
+ * disagree with the feed.
+ *
+ * Three rules are enforced by construction rather than by remembering:
+ * bytes never pass through the app origin (the element is pointed at the
+ * CDN URL the server authorised); nothing plays without the controller
+ * saying ACTIVE; and audio is off until a person turns it on.
+ */
+
+type PitchPlayerProps = {
+  readonly company: DiscoveredCompanyDto;
+  /** The tier this card is in, from the feed controller. */
+  readonly policy: FeedPreloadPolicy;
+  readonly authorize: PlaybackSource;
+  readonly reducedMotion: boolean;
+  /** Swappable for an MSE engine; the native path is the default. */
+  readonly attachSource?: AttachSource;
+};
+
+export function PitchPlayer({
+  company,
+  policy,
+  authorize,
+  reducedMotion,
+  attachSource = attachNativeSource,
+}: PitchPlayerProps) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [muted, setMuted] = useState(true);
+  const [playing, setPlaying] = useState(false);
+
+  const { intent, posterUrl, playbackUrl, failed } = usePitchPlayback({
+    mediaAssetId: company.pitch?.mediaAssetId ?? null,
+    policy,
+    authorize,
+    reducedMotion,
+  });
+
+  // Attaching and detaching is the strategy's job, including cancelling an
+  // in-flight fetch when this card goes cold (doc 20 §236).
+  useEffect(() => {
+    const video = videoRef.current;
+    if (video === null || playbackUrl === null) return;
+    return attachSource(video, playbackUrl);
+  }, [attachSource, playbackUrl]);
+
+  // Autoplay only where the controller said ACTIVE and motion is allowed.
+  // A rejected play() promise is normal -- browsers refuse autoplay under
+  // their own rules -- and leaves the Play control as the way in.
+  useEffect(() => {
+    const video = videoRef.current;
+    if (video === null) return;
+
+    if (!intent.autoplay || playbackUrl === null) {
+      if (!video.paused) video.pause();
+      return;
+    }
+
+    // `playing` is not set here. It is the element's own `play`/`pause`
+    // events that say what is happening -- a promise that resolved is not
+    // the same fact as a video that is running, and a browser may refuse
+    // autoplay under its own policy without either of them being wrong.
+    void video.play().catch(() => undefined);
+  }, [intent.autoplay, playbackUrl]);
+
+  // Muting is a property, not an attribute: React sets the attribute on
+  // first render only, and the element's own state is what the browser
+  // reads when deciding whether autoplay is allowed.
+  useEffect(() => {
+    const video = videoRef.current;
+    if (video !== null) video.muted = muted;
+  }, [muted]);
+
+  const pitch = company.pitch;
+  if (pitch === null) return null;
+
+  const aspectRatio = pitch.aspectRatio ?? "9 / 16";
+
+  return (
+    <div className="flex flex-col gap-3">
+      {/*
+        A known aspect ratio at all times, so a poster arriving or a source
+        attaching never moves the page (doc 20 §60, CLS).
+      */}
+      <div
+        className="relative overflow-hidden rounded-lg bg-(--cq-surface-strong)"
+        style={{ aspectRatio }}
+      >
+        <video
+          ref={videoRef}
+          className="size-full object-cover"
+          // Inline on iOS; fullscreen takeover is not a feed.
+          playsInline
+          muted={muted}
+          loop
+          // Derived only from the controller's tier. `undefined` when no
+          // source is attached, so the browser is told nothing to fetch.
+          {...(intent.preload === null ? {} : { preload: intent.preload })}
+          {...(posterUrl === null ? {} : { poster: posterUrl })}
+          aria-label={`Pitch from ${company.canonicalName}`}
+          data-policy={policy}
+          data-playing={playing ? "true" : "false"}
+          onPlay={() => setPlaying(true)}
+          onPause={() => setPlaying(false)}
+        />
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2">
+        {/*
+          Reduced motion keeps the video and removes the surprise: poster
+          plus an explicit Play (ADR-001). The control is a real button
+          with a word on it, not an icon overlay, so it is reachable by
+          keyboard and announced by a screen reader.
+        */}
+        {intent.requiresExplicitPlay && !playing ? (
+          <Button
+            variant="secondary"
+            size="compact"
+            onClick={() => {
+              void videoRef.current?.play().catch(() => undefined);
+            }}
+            disabled={playbackUrl === null}
+          >
+            Play
+          </Button>
+        ) : null}
+
+        {/*
+          Audio is off until a person enables it. The label states the
+          action and the state is never carried by colour alone.
+        */}
+        {intent.attach ? (
+          <Button
+            variant="quiet"
+            size="compact"
+            aria-pressed={!muted}
+            onClick={() => setMuted((previous) => !previous)}
+          >
+            {muted ? "Unmute" : "Mute"}
+          </Button>
+        ) : null}
+
+        {pitch.captionState === "AVAILABLE" ? (
+          <span className="cq-caption text-(--cq-text-tertiary)">
+            Captions available
+          </span>
+        ) : null}
+      </div>
+
+      {failed ? (
+        <p className="cq-caption text-(--cq-text-secondary)">
+          This pitch could not be loaded right now.
+        </p>
+      ) : null}
+    </div>
+  );
+}

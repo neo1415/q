@@ -155,4 +155,10 @@ export {
 } from "./q-stream-reducer.js";
 export { createSseParser, type SseMessage, type SseParser } from "./sse.js";
 
-export { discoverCompanies, discoverInvestors } from "./discovery.js";
+export {
+  discoverCompanies,
+  discoverInvestors,
+  passCompany,
+  saveCompany,
+  unsaveCompany,
+} from "./discovery.js";

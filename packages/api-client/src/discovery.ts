@@ -1,8 +1,14 @@
 import {
   DISCOVERY_COMPANIES_PATH,
+  DISCOVERY_COMPANY_PASS_PATH,
+  DISCOVERY_COMPANY_SAVE_PATH,
+  DISCOVERY_COMPANY_UNSAVE_PATH,
   DISCOVERY_INVESTORS_PATH,
   DiscoveryCompanySlateDtoSchema,
   DiscoveryInvestorSlateDtoSchema,
+  InteractionRecordedDtoSchema,
+  type PassCompanyRequest,
+  type SaveCompanyRequest,
 } from "@capital-q/contracts";
 
 import { call, type ApiSession } from "./request.js";
@@ -38,5 +44,62 @@ export function discoverInvestors(session: ApiSession, page: Page = {}) {
     "GET",
     `${DISCOVERY_INVESTORS_PATH}${query(page)}`,
     DiscoveryInvestorSlateDtoSchema,
+  );
+}
+
+/**
+ * Save, unsave and pass (CQ-REC-008; doc 19 §66–§69).
+ *
+ * Three functions rather than one taking a verb, because the contract is
+ * three paths rather than one taking a verb: the URL says which decision
+ * this is, so a request cannot change its own meaning in flight. The body
+ * carries only the caller's own context — `clientEventId` for idempotent
+ * retries, the surface, and the slate the person was looking at. Rank,
+ * ranking version, organisation and tenant are absent by design: the
+ * server resolves those, and a field for them would be a field to forge.
+ */
+function companyPath(template: string, companyId: string): string {
+  return template.replace(":companyId", encodeURIComponent(companyId));
+}
+
+export function saveCompany(
+  session: ApiSession,
+  companyId: string,
+  body: SaveCompanyRequest,
+) {
+  return call(
+    session,
+    "POST",
+    companyPath(DISCOVERY_COMPANY_SAVE_PATH, companyId),
+    InteractionRecordedDtoSchema,
+    { body },
+  );
+}
+
+export function unsaveCompany(
+  session: ApiSession,
+  companyId: string,
+  body: SaveCompanyRequest,
+) {
+  return call(
+    session,
+    "POST",
+    companyPath(DISCOVERY_COMPANY_UNSAVE_PATH, companyId),
+    InteractionRecordedDtoSchema,
+    { body },
+  );
+}
+
+export function passCompany(
+  session: ApiSession,
+  companyId: string,
+  body: PassCompanyRequest,
+) {
+  return call(
+    session,
+    "POST",
+    companyPath(DISCOVERY_COMPANY_PASS_PATH, companyId),
+    InteractionRecordedDtoSchema,
+    { body },
   );
 }
