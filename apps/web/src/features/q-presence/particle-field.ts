@@ -1,26 +1,29 @@
 import type { QPresenceState } from "./presence-state";
 
 /**
- * The particle formation behind Q's presence.
+ * The swarm behind Q's presence.
  *
- * A ring of points with a short tail at the lower right — the shape of a
- * Q, read at a glance and never drawn as a letter. Every particle has a
- * home on that formation and is eased toward a target that the state
- * moves: outward and loosened by the person's voice, inward and ordered
- * while Q thinks, brightened by Q's own voice, swept sideways once when Q
- * acts, settled with one pulse when it is done, and roughened — not
- * reddened — when something is wrong.
+ * Not a letter. A loose annulus of points — a band, with a sparser cloud
+ * inside it — whose radius, density and coherence carry what Q is doing.
+ * At rest the band is loose and drifting; the person's voice opens and
+ * loosens it; Q's thinking draws it in, tightens it into near-order and
+ * turns it; Q's own voice pulses it outward in rhythm; an action sweeps
+ * it once to the side; a settle pulses it once and stills it; an error
+ * scatters and dims it — never reddens, never flashes.
  *
  * Pure arithmetic over a plain array; no DOM here. The component owns the
  * canvas and the clock. Deterministic per particle (seeded), so the same
- * presence looks the same on every mount.
+ * presence looks the same on every mount, and the still frame under
+ * reduced motion is the same still frame every time.
  */
 
 export type Particle = {
-  /** Angle on the ring, radians. */
+  /** Angle on the annulus, radians. */
   readonly angle: number;
-  /** Which orbit: 0 outer ring, 1 inner ring, 2 tail. */
-  readonly orbit: 0 | 1 | 2;
+  /** Which population: 0 the band, 1 the inner cloud. */
+  readonly orbit: 0 | 1;
+  /** Where in its population's radial range this particle rests, 0..1. */
+  readonly depth: number;
   /** Per-particle phase for drift, 0..2π. */
   readonly phase: number;
   /** Per-particle scalar in 0..1, for size and drift amplitude. */
@@ -32,7 +35,7 @@ export type Particle = {
 
 export type Formation = {
   readonly particles: Particle[];
-  /** Radius of the outer ring at rest, in canvas units. */
+  /** Outer radius of the band at rest, in canvas units. */
   readonly radius: number;
 };
 
@@ -48,21 +51,28 @@ function seeded(seed: number): () => number {
   };
 }
 
+/** The band occupies this share of the radius; the cloud sits inside it. */
+const BAND_INNER = 0.66;
+const BAND_OUTER = 1;
+const CLOUD_INNER = 0.12;
+const CLOUD_OUTER = 0.52;
+/** Where the band gathers when it is fully coherent. */
+const BAND_MEAN = 0.84;
+
 /**
  * Lay the particles out. The count is the caller's (it follows the size);
- * roughly two thirds sit on the outer ring, a quarter on the inner ring,
- * the rest along the tail.
+ * roughly three quarters form the band, the rest the inner cloud.
  */
 export function createFormation(count: number, radius: number): Formation {
   const random = seeded(7);
   const particles: Particle[] = [];
-  const tail = Math.max(3, Math.round(count * 0.09));
-  const inner = Math.max(6, Math.round(count * 0.26));
-  const outer = Math.max(8, count - tail - inner);
-  const push = (angle: number, orbit: 0 | 1 | 2) => {
+  const cloud = Math.max(6, Math.round(count * 0.26));
+  const band = Math.max(12, count - cloud);
+  const push = (angle: number, orbit: 0 | 1) => {
     particles.push({
       angle,
       orbit,
+      depth: random(),
       phase: random() * Math.PI * 2,
       seed: random(),
       x: 0,
@@ -70,40 +80,15 @@ export function createFormation(count: number, radius: number): Formation {
       alpha: 0,
     });
   };
-  for (let i = 0; i < outer; i += 1) {
-    // Evenly spaced with a little jitter so the ring reads as a swarm and
-    // not as a dotted line.
-    push(((i + (random() - 0.5) * 0.35) / outer) * Math.PI * 2, 0);
+  for (let i = 0; i < band; i += 1) {
+    // Evenly spread with jitter, so the band reads as a swarm and never
+    // as a dotted line.
+    push(((i + (random() - 0.5) * 0.7) / band) * Math.PI * 2, 0);
   }
-  for (let i = 0; i < inner; i += 1) {
-    push(((i + (random() - 0.5) * 0.5) / inner) * Math.PI * 2 + 0.3, 1);
-  }
-  for (let i = 0; i < tail; i += 1) {
-    push((i + 0.5) / tail, 2);
+  for (let i = 0; i < cloud; i += 1) {
+    push(random() * Math.PI * 2, 1);
   }
   return { particles, radius };
-}
-
-/** Where a particle rests, before any state moves it. */
-function home(
-  particle: Particle,
-  radius: number,
-): { readonly x: number; readonly y: number } {
-  if (particle.orbit === 2) {
-    // The tail: a short stroke from the ring's lower-right edge outward,
-    // at the angle a Q's tail leaves the bowl.
-    const t = particle.angle; // 0..1 along the tail
-    const from = Math.PI * 0.25;
-    const startX = Math.cos(from) * radius * 0.82;
-    const startY = Math.sin(from) * radius * 0.82;
-    const length = radius * 0.62;
-    return {
-      x: startX + Math.cos(from) * length * t,
-      y: startY + Math.sin(from) * length * t,
-    };
-  }
-  const r = particle.orbit === 0 ? radius : radius * 0.58;
-  return { x: Math.cos(particle.angle) * r, y: Math.sin(particle.angle) * r };
 }
 
 export type FieldInput = {
@@ -139,10 +124,15 @@ export function stepFormation(formation: Formation, input: FieldInput): void {
   const voice = state === "SPEAKING" ? input.output : 0;
 
   // Formation-wide parameters per state.
+  /** Overall scale of the field. */
   let spread = 1;
+  /** Rotation of the band, radians. */
   let rotation = 0;
-  let drift = 0.02;
-  let order = 0.6;
+  /** Amplitude of per-particle wander, as a share of the radius. */
+  let drift = 0.035;
+  /** 0 loose cloud … 1 a near-perfect ring. */
+  let coherence = 0.25;
+  /** Sideways sweep, as a share of the radius. */
   let shear = 0;
   let baseAlpha = 0.55;
   let breathe = still ? 0 : Math.sin(time * 0.55) * 0.012;
@@ -151,27 +141,28 @@ export function stepFormation(formation: Formation, input: FieldInput): void {
     case "IDLE":
       break;
     case "LISTENING":
-      // Opens with the voice: the ring widens, loosens, and brightens.
-      spread = 1.04 + level * 0.22;
-      drift = 0.05 + level * 0.06;
-      order = 0.4;
+      // Opens with the voice: wider, looser, brighter — receptive.
+      spread = 1.04 + level * 0.2;
+      drift = 0.05 + level * 0.05;
+      coherence = 0.15;
       baseAlpha = 0.7 + level * 0.3;
       breathe = 0;
       break;
     case "THINKING":
-      // Converges and turns, in order: work, not waiting.
-      spread = 0.86;
-      rotation = still ? 0 : time * 0.45;
+      // Draws in, tightens toward order, and turns: work, not waiting.
+      spread = 0.84;
+      rotation = still ? 0 : time * 0.5;
       drift = 0.012;
-      order = 0.95;
+      coherence = 0.9;
       baseAlpha = 0.8;
       breathe = still ? 0 : Math.sin(time * 1.6) * 0.02;
       break;
     case "SPEAKING":
-      // Q's own voice moves the ring a little; less than the person's.
-      spread = 1 + voice * 0.1;
+      // Q's own voice pulses the field outward in rhythm; gathered enough
+      // to read as one voice, looser than thought.
+      spread = 1 + voice * 0.14;
       drift = 0.03;
-      order = 0.7;
+      coherence = 0.55;
       baseAlpha = 0.75 + voice * 0.25;
       breathe = 0;
       break;
@@ -180,25 +171,25 @@ export function stepFormation(formation: Formation, input: FieldInput): void {
       const t = Math.min(1, sinceState / 0.7);
       shear = Math.sin(t * Math.PI) * 0.35;
       spread = 1 - Math.sin(t * Math.PI) * 0.08;
-      order = 0.9;
+      coherence = 0.8;
       baseAlpha = 0.85;
       breathe = 0;
       break;
     }
     case "SUCCESS": {
-      // A single settle: out a touch, then home, slightly brighter.
+      // A single settle: out a touch, then home, gathered and brighter.
       const t = Math.min(1, sinceState / 0.6);
       spread = 1 + Math.sin(t * Math.PI) * 0.06;
-      order = 0.95;
+      coherence = 0.85;
       baseAlpha = 0.8;
       breathe = 0;
       break;
     }
     case "ERROR":
-      // Disturbed, dimmer, never flashing.
+      // Scattered, dimmer, never flashing.
       spread = 0.98;
-      drift = still ? 0.05 : 0.07;
-      order = 0.25;
+      drift = still ? 0.06 : 0.08;
+      coherence = 0;
       baseAlpha = 0.45;
       breathe = 0;
       break;
@@ -207,37 +198,43 @@ export function stepFormation(formation: Formation, input: FieldInput): void {
   // Under reduced motion the formation is its resting shape for the state,
   // with the same per-particle offsets every time, and nothing moves.
   const ease = still ? 1000 : 6;
+  const cos = Math.cos(rotation);
+  const sin = Math.sin(rotation);
 
   for (const particle of particles) {
-    const rest = home(particle, radius);
+    // Where this particle rests in its population's radial range, pulled
+    // toward the band's mean as coherence rises. The cloud gathers too,
+    // but keeps its own inner place: it never joins the band.
+    const loose =
+      particle.orbit === 0
+        ? BAND_INNER + (BAND_OUTER - BAND_INNER) * particle.depth
+        : CLOUD_INNER + (CLOUD_OUTER - CLOUD_INNER) * particle.depth;
+    // The cloud gathers less than the band, so an ordered field is a ring
+    // around a cluster and never a bullseye.
+    const gathered = particle.orbit === 0 ? BAND_MEAN : CLOUD_OUTER * 0.7;
+    const pull = particle.orbit === 0 ? coherence : coherence * 0.5;
+    const r = (loose + (gathered - loose) * pull) * radius;
+    const rx = Math.cos(particle.angle) * r;
+    const ry = Math.sin(particle.angle) * r;
+    // Drift: a slow, per-particle wander whose amplitude the state sets;
+    // coherence damps it so an ordered field is also a calmer one.
+    const wander = drift * radius * (1 - coherence * 0.7);
+    const wx = still
+      ? (particle.seed - 0.5) * wander * 2
+      : Math.sin(time * (0.6 + particle.seed * 0.5) + particle.phase) * wander;
+    const wy = still
+      ? (particle.phase / (Math.PI * 2) - 0.5) * wander * 2
+      : Math.cos(time * (0.5 + particle.seed * 0.4) + particle.phase) * wander;
     const scale = spread + breathe;
-    // Drift: a slow, per-particle wander whose amplitude the state sets.
-    const wobble = still
-      ? (particle.seed - 0.5) * drift * radius * 2
-      : Math.sin(time * (0.6 + particle.seed * 0.5) + particle.phase) *
-        drift *
-        radius;
-    const wobbleY = still
-      ? (particle.phase / (Math.PI * 2) - 0.5) * drift * radius * 2
-      : Math.cos(time * (0.5 + particle.seed * 0.4) + particle.phase) *
-        drift *
-        radius;
-    // Order pulls the wander back toward the formation.
-    const wx = wobble * (1 - order * 0.6);
-    const wy = wobbleY * (1 - order * 0.6);
-    // Rotation applies to the rings, not the tail — a turning tail reads
-    // as a spinner, which this must never be.
-    const cos = particle.orbit === 2 ? 1 : Math.cos(rotation);
-    const sin = particle.orbit === 2 ? 0 : Math.sin(rotation);
-    const rx = rest.x * cos - rest.y * sin;
-    const ry = rest.x * sin + rest.y * cos;
-    const targetX = rx * scale + wx + shear * radius * (0.6 + particle.seed);
-    const targetY = ry * scale + wy;
+    const targetX =
+      (rx * cos - ry * sin) * scale +
+      wx +
+      shear * radius * (0.6 + particle.seed);
+    const targetY = (rx * sin + ry * cos) * scale + wy;
     particle.x = approach(particle.x, targetX, ease, dt);
     particle.y = approach(particle.y, targetY, ease, dt);
-    // The inner ring is quieter than the outer; the tail sits between.
-    const orbitAlpha =
-      particle.orbit === 0 ? 1 : particle.orbit === 1 ? 0.7 : 0.85;
+    // The cloud is quieter than the band.
+    const orbitAlpha = particle.orbit === 0 ? 1 : 0.6;
     const targetAlpha = Math.min(
       1,
       baseAlpha * orbitAlpha * (0.75 + particle.seed * 0.35),
