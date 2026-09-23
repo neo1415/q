@@ -1,6 +1,12 @@
+import { randomUUID } from "node:crypto";
+
 import Fastify, { type FastifyBaseLogger, type FastifyInstance } from "fastify";
 
-import { Q_VOICE_THINK_PATH } from "@capital-q/contracts";
+import {
+  Q_INTERVIEW_PATH,
+  Q_INTERVIEW_TURN_SEGMENT,
+  Q_VOICE_THINK_PATH,
+} from "@capital-q/contracts";
 import { CONTRACTS_VERSION } from "@capital-q/contracts";
 import type { QApiConfig } from "@capital-q/config/q-api";
 import {
@@ -39,6 +45,7 @@ import {
   type QVoiceRoutesDependencies,
 } from "./voice/routes.js";
 import { registerVoiceThinkRoute } from "./voice/think.js";
+import { registerQInterviewRoute } from "./voice/interview-route.js";
 import type { VoiceTurnHandler } from "./voice/turn.js";
 
 export const SERVICE_NAME = "q-api";
@@ -315,6 +322,26 @@ export function createApp(
       speechThrottle: modules.voice.speechThrottle,
       now: modules.voice.now,
     });
+    /**
+     * One Q, whatever the input was (QX-004 core gate).
+     *
+     * The typed onboarding screen used to compose its own replies from
+     * templates while the spoken one ran this interviewer. This route is
+     * what lets apps/api hand a typed turn to the same interviewer, so a
+     * keyboard and a microphone differ in transport and not in what Q
+     * knows. It needs no Deepgram and no voice binding — only the
+     * interviewer and somewhere to read the session from.
+     */
+    const interviewApiBaseUrl = modules.voice.apiBaseUrl;
+    const typedInterviewer = modules.voice.interviewer;
+    if (interviewApiBaseUrl !== undefined && typedInterviewer !== undefined) {
+      registerQInterviewRoute(app, {
+        path: `${Q_INTERVIEW_PATH}${Q_INTERVIEW_TURN_SEGMENT}`,
+        interviewer: typedInterviewer,
+        apiBaseUrl: interviewApiBaseUrl,
+        correlation: () => randomUUID(),
+      });
+    }
     if (
       modules.voice.deepgram !== undefined &&
       modules.voice.turn !== undefined &&

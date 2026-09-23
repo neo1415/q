@@ -53,6 +53,7 @@ import {
   registerOnboardingRoutes,
   type OnboardingRoutesDependencies,
 } from "./http/onboarding.js";
+import { createQInterviewClient } from "./q/interview-client.js";
 import {
   registerOrganisationRoutes,
   type OrganisationRoutesDependencies,
@@ -266,6 +267,13 @@ export function createApp(
       resolver: security.resolver,
       identities: security.identities,
       onboarding: modules.onboarding,
+      // One Q (QX-004 core gate). The conversational turn belongs to the
+      // interviewer in q-api; this service carries it there and adapts the
+      // answer into the shape the onboarding screen already reads.
+      qInterview:
+        config.public.qApiBaseUrl === undefined
+          ? undefined
+          : createQInterviewClient({ baseUrl: config.public.qApiBaseUrl }),
     });
   }
 

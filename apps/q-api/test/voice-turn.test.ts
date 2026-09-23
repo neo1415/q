@@ -313,6 +313,11 @@ describe("a spoken interview answer", () => {
             stepKey: "F1.stage",
             summary: "Seed",
           },
+          // No interviewer is composed in this build, so the API answered
+          // without Q's words and the spoken line is composed from what
+          // the runtime understood (QX-004 core gate: one Q).
+          reply: null,
+          degraded: false,
         };
         return Promise.resolve(Response.json(body));
       }
@@ -346,6 +351,10 @@ describe("a spoken interview answer", () => {
     expect(requests[1]?.body).toEqual({
       text: "We're at seed.",
       expectedSessionVersion: 3,
+      // The thread travels with the turn so the one interviewer has the
+      // same context typed as aloud (QX-004 core gate: one Q). Empty here:
+      // this turn is the first thing said.
+      recentTurns: [],
     });
     expect(speaker.spoken).toEqual([
       "Noted. In a sentence or two, what does the company do?",
@@ -361,7 +370,7 @@ describe("a spoken interview answer", () => {
     // interviewer — which is the right thing on a free conversation and
     // the wrong thing while somebody is being interviewed.
     const said: string[] = [];
-    const fetchFake: typeof fetch = (input, init) => {
+    const fetchFake: typeof fetch = (input) => {
       const url =
         typeof input === "string"
           ? input
@@ -377,6 +386,11 @@ describe("a spoken interview answer", () => {
             stepKey: "F1.stage",
             proposed: 0,
           },
+          // No interviewer is composed in this build, so the API answered
+          // without Q's words and the spoken line is composed from what
+          // the runtime understood (QX-004 core gate: one Q).
+          reply: null,
+          degraded: false,
         };
         return Promise.resolve(Response.json(body));
       }

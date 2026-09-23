@@ -29,6 +29,20 @@ import type { SessionPresentation } from "./session";
 export type OnboardingPhase = "loading" | "ready" | "unavailable" | "error";
 export type SaveStatus = "idle" | "saving" | "saved" | "failed";
 
+/**
+ * What came back from one turn of the interview (QX-004 core gate: one Q).
+ *
+ * `reply` is Q's own words and is rendered as given; composing a sentence
+ * from the fields beside it is how a second conversation gets built in a
+ * browser, which is the defect this removes. `understood` is what the
+ * deterministic runtime read into the sentence, and is null when the one
+ * interviewer answered.
+ */
+export type OnboardingTurn = {
+  readonly understood: OnboardingUnderstanding | null;
+  readonly reply: string | null;
+};
+
 export type OnboardingState<TView> = {
   readonly phase: OnboardingPhase;
   readonly session: TView | undefined;
@@ -90,11 +104,20 @@ export type OnboardingActions<TResponse> = {
     readonly value: OnboardingResponseValue;
   }) => Promise<boolean>;
   /**
-   * One turn of the conversational interview (CQ-PRE-REC-001 §16-§21).
-   * Resolves to what the runtime understood, or null when this build has
-   * no path — never a fabricated acknowledgement.
+   * One turn of the conversational interview (CQ-PRE-REC-001 §16-§21),
+   * held by the one Q interviewer (QX-004 core gate: one Q).
+   *
+   * Resolves to Q's own words and to whatever the deterministic runtime
+   * read into the sentence, or to null when this build has no path — never
+   * a fabricated acknowledgement.
    */
-  readonly say: (text: string) => Promise<OnboardingUnderstanding | null>;
+  readonly say: (
+    text: string,
+    recentTurns: readonly {
+      readonly role: "person" | "q";
+      readonly text: string;
+    }[],
+  ) => Promise<OnboardingTurn | null>;
   /** Re-read the session from the runtime (Q's reading may have landed). */
   readonly refresh: () => Promise<void>;
   readonly retry: () => Promise<void>;
@@ -322,18 +345,18 @@ export function useOnboardingJourney<
       }
       return run(() => submit(input), true);
     },
-    say: async (text) => {
+    say: async (text, recentTurns) => {
       const say = requireClient().say;
       if (say === undefined) {
         return null;
       }
-      let understood: OnboardingUnderstanding | null = null;
+      let turn: OnboardingTurn | null = null;
       const ok = await run(async () => {
-        const outcome = await say({ text });
-        understood = outcome.understood;
+        const outcome = await say({ text, recentTurns });
+        turn = { understood: outcome.understood, reply: outcome.reply };
         return outcome.view;
       }, true);
-      return ok ? understood : null;
+      return ok ? turn : null;
     },
     refresh: async () => {
       const reload = requireClient().reload;

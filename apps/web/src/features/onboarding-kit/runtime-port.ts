@@ -85,6 +85,11 @@ export type RuntimePort = {
         readonly text: string;
         readonly expectedSessionVersion: number;
         readonly idempotencyKey: string;
+        /** The exchange so far, oldest first: same context typed as aloud. */
+        readonly recentTurns: readonly {
+          readonly role: "person" | "q";
+          readonly text: string;
+        }[];
       }) => Promise<SayOnboardingResponse>)
     | undefined;
   /**
@@ -482,7 +487,13 @@ export function createRuntimeClient<
     ...(port.say === undefined
       ? {}
       : {
-          say: (input: { readonly text: string }) =>
+          say: (input: {
+            readonly text: string;
+            readonly recentTurns: readonly {
+              readonly role: "person" | "q";
+              readonly text: string;
+            }[];
+          }) =>
             guarded(async () => {
               const say = port.say;
               if (say === undefined) {
@@ -497,10 +508,12 @@ export function createRuntimeClient<
                 text: input.text,
                 expectedSessionVersion: view.session.version,
                 idempotencyKey: crypto.randomUUID(),
+                recentTurns: input.recentTurns,
               });
               return {
                 view: await present(remember(outcome.view)),
                 understood: outcome.understood,
+                reply: outcome.reply,
               };
             }),
         }),

@@ -71,9 +71,19 @@ export type OnboardingClient<TView, TResponse> = {
       }) => Promise<TView>)
     | undefined;
   readonly say?:
-    | ((input: { readonly text: string }) => Promise<{
+    | ((input: {
+        readonly text: string;
+        /** The exchange so far, oldest first, so Q has the same context aloud and typed. */
+        readonly recentTurns: readonly {
+          readonly role: "person" | "q";
+          readonly text: string;
+        }[];
+      }) => Promise<{
         readonly view: TView;
-        readonly understood: OnboardingUnderstanding;
+        /** Null when the one Q interviewer answered; `reply` is then Q's words. */
+        readonly understood: OnboardingUnderstanding | null;
+        /** What Q said, shown as given. Never parsed to learn what was recorded. */
+        readonly reply: string | null;
       }>)
     | undefined;
   /** Deterministic taxonomy candidates for the user's own text. Never assigned here. */

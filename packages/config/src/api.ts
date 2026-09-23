@@ -55,6 +55,11 @@ const apiEnvSchema = z.object({
   // with no provider configured the applicant surface does not register at
   // all, which is a closed front door rather than a broken one.
   ...modelProviderEnvShape,
+  // Where the one Q interviewer runs (QX-004 core gate: one Q). The
+  // conversational onboarding turn is delegated to it rather than answered
+  // by a second implementation here. Optional: with no URL the /say route
+  // closes, which is a closed door rather than a quietly worse Q.
+  CQ_Q_API_URL: z.string().url("expected an absolute http(s) URL").optional(),
 });
 
 /**
@@ -71,6 +76,8 @@ export type ApiSecrets = {
 /** Non-secret operational values safe to expose in diagnostics. */
 export type ApiPublicConfig = {
   readonly documentUploadMaxBytes: number;
+  /** Absolute base URL of the Q service, or undefined when not composed. */
+  readonly qApiBaseUrl: string | undefined;
   /** Which providers are configured. Names and booleans, never keys. */
   readonly modelProviders: ModelProviderConfigStatus;
 };
@@ -103,6 +110,7 @@ export function parseApiConfig(env: EnvironmentInput): ApiConfig {
         : undefined,
     public: {
       documentUploadMaxBytes: parsed.CQ_DOCUMENT_UPLOAD_MAX_BYTES,
+      qApiBaseUrl: parsed.CQ_Q_API_URL?.replace(/\/$/, ""),
       modelProviders: modelProviderConfigStatus(toModelProviderSecrets(parsed)),
     },
     secrets: {

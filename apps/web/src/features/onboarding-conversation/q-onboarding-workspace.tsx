@@ -24,6 +24,7 @@ import { QStateIndicator } from "@capital-q/ui/q-state";
 import { InlineNotice } from "@capital-q/ui/states";
 
 import type { TaxonomyCandidateView } from "../onboarding-kit/client";
+import type { OnboardingTurn } from "../onboarding-kit/controller";
 import type { SessionPresentation } from "../onboarding-kit/session";
 import { askQAction, readQRunAction } from "../q/actions";
 import { useVoiceInterview } from "../voice/use-voice-interview";
@@ -36,7 +37,6 @@ import { destinationPath } from "../voice/destinations";
 import { useFollowTurn } from "../voice/use-follow-turn";
 import { VoiceStage } from "../voice/voice-stage";
 import {
-  acknowledge,
   acknowledgeValue,
   BRIDGE_LINE,
   gapValue,
@@ -78,7 +78,18 @@ import {
  */
 
 export type QOnboardingWorkspaceActions = {
-  readonly say: (text: string) => Promise<OnboardingUnderstanding | null>;
+  /**
+   * One turn of the interview, held by the one Q interviewer (QX-004 core
+   * gate: one Q). The thread travels with it so a typed turn carries the
+   * same context a spoken one does.
+   */
+  readonly say: (
+    text: string,
+    recentTurns: readonly {
+      readonly role: "person" | "q";
+      readonly text: string;
+    }[],
+  ) => Promise<OnboardingTurn | null>;
   readonly skip: () => Promise<void>;
   /** A tapped option, as the value it stands for (CQ-Q-VOICE-001 B §17). */
   readonly submitValue: (input: {
@@ -193,6 +204,20 @@ export function QOnboardingWorkspace({
     view === undefined ? null : welcomeBack(view, vocabulary),
   );
   const [turns, setTurns] = useState<readonly Turn[]>([]);
+  /**
+   * The question Q actually asked last, for the step it is asking about
+   * (QX-004 core gate: one Q).
+   *
+   * The step definition carries a bare label -- "Your firm" -- which is a
+   * fine column heading and a poor thing to say to someone who typed their
+   * firm at registration two screens ago. Q's own sentence is shown
+   * instead, and only while the session is still on the step Q asked
+   * about; the definition's prompt is what a fresh screen falls back to.
+   */
+  const [qQuestion, setQQuestion] = useState<{
+    readonly stepKey: string;
+    readonly text: string;
+  } | null>(null);
   const [reading, setReading] = useState(false);
   const [readingPolls, setReadingPolls] = useState(0);
   const [askingQ, setAskingQ] = useState(false);
@@ -249,6 +274,45 @@ export function QOnboardingWorkspace({
         : promptFor(view.currentStep, vocabulary),
     [view, vocabulary],
   );
+  /**
+   * Q's last sentence, waiting for the session to settle on the step it
+   * was about. `say` resolves once the view has been re-read, so the
+   * prompt this binds to is the one Q has just moved to.
+   */
+  const pendingReply = useRef<string | null>(null);
+  useEffect(() => {
+    const reply = pendingReply.current;
+    if (reply === null) {
+      return;
+    }
+    pendingReply.current = null;
+    setQQuestion(
+      prompt === null ? null : { stepKey: prompt.stepKey, text: reply },
+    );
+  }, [prompt]);
+
+  /**
+   * What the screen asks: Q's own sentence while the session is still on
+   * the step Q asked about, and the definition's prompt otherwise -- a
+   * fresh screen, a step reached by tapping, a journey resumed.
+   */
+  const questionText =
+    prompt === null
+      ? null
+      : qQuestion !== null && qQuestion.stepKey === prompt.stepKey
+        ? qQuestion.text
+        : prompt.text;
+
+  /** The thread so far, as the interviewer reads it. Words, never authority. */
+  const recentTurns = useCallback(
+    () =>
+      turns.slice(-12).map((turn) => ({
+        role: turn.kind === "Q" ? ("q" as const) : ("person" as const),
+        text: turn.text.slice(0, 1500),
+      })),
+    [turns],
+  );
+
   const labels = session.labels;
   const proposals = useMemo(
     () => (view === undefined ? [] : pickedUp(view, vocabulary, labels)),
@@ -394,17 +458,54 @@ export function QOnboardingWorkspace({
     [],
   );
 
+  /**
+   * Q opens (QX-004 core gate: one Q).
+   *
+   * A screen that has just loaded -- first visit or a browser refresh --
+   * has no sentence from Q yet, and the step definition's label is a poor
+   * substitute: "Your role there" is a column heading, not a question. So
+   * the interview is opened with an empty turn, which records nothing and
+   * asks Q what it would like to ask. Once per session; a person already
+   * mid-conversation is not interrupted.
+   */
+  const openedFor = useRef<string | null>(null);
+  useEffect(() => {
+    const sessionId = view?.session.id;
+    if (
+      sessionId === undefined ||
+      openedFor.current === sessionId ||
+      prompt === null ||
+      turns.length > 0
+    ) {
+      return;
+    }
+    openedFor.current = sessionId;
+    void actions.say("", []).then((turn) => {
+      if (turn?.reply != null) {
+        pendingReply.current = turn.reply;
+        // The prompt may not change, so bind it here as well as in the
+        // effect that watches for a new step.
+        setQQuestion({ stepKey: prompt.stepKey, text: turn.reply });
+        pendingReply.current = null;
+      }
+    });
+  }, [view?.session.id, prompt, turns.length, actions]);
+
   const settleReading = useCallback(() => {
     setReading(false);
     setReadingPolls(0);
   }, []);
 
+  /**
+   * What a finished turn does to the screen besides Q's words (QX-004 core
+   * gate: one Q). No prose is composed here: Q wrote the reply, and these
+   * are the movements the runtime's reading of the sentence still drives.
+   */
   const handleUnderstanding = useCallback(
     (understood: OnboardingUnderstanding | null) => {
       if (understood === null) {
         return;
       }
-      push("Q", acknowledge(understood, vocabulary));
       setNarrowedTo(
         understood.kind === "AMBIGUOUS" ? understood.optionKeys : null,
       );
@@ -422,7 +523,7 @@ export function QOnboardingWorkspace({
         }
       }
     },
-    [push, vocabulary, onEdit],
+    [vocabulary, onEdit],
   );
 
   /** The last answer a finished run recorded, or its clarifying question. */
@@ -545,7 +646,7 @@ export function QOnboardingWorkspace({
       // The question Q was asking joins the thread with its answer, so the
       // exchange reads back as one; the live prompt below then moves on.
       if (prompt !== null) {
-        push("Q", prompt.text);
+        push("Q", questionText ?? prompt.text);
       }
       push("PERSON", trimmed);
       settleReading();
@@ -574,16 +675,39 @@ export function QOnboardingWorkspace({
         prompt !== null &&
         prompt.control === "text" &&
         trimmed.split(/\s+/).length >= 6;
-      const understood = await actions.say(trimmed);
-      handleUnderstanding(understood);
-      if (understood?.kind === "ANSWERED" && narrativeStep) {
+      const turn = await actions.say(trimmed, recentTurns());
+      if (turn === null) {
+        return;
+      }
+      // Q's own words, as Q wrote them. The reply carries both the
+      // acknowledgement and the next question, so it also becomes the
+      // live question under the composer until the step moves on.
+      if (turn.reply !== null) {
+        // Not pushed into the thread here: the reply is the live question
+        // now, shown once under the composer, and it joins the thread as
+        // Q's line the moment the person answers it. Pushing as well would
+        // print Q's sentence twice.
+        setNarrowedTo(null);
+        pendingReply.current = turn.reply;
+      } else {
+        // No interviewer answered. Say so, rather than writing Q's side of
+        // the conversation from the runtime's reading of the sentence.
+        push(
+          "Q",
+          "I couldn't put that into words just now, but it's recorded below.",
+        );
+        handleUnderstanding(turn.understood);
+      }
+      if (turn.understood?.kind === "ANSWERED" && narrativeStep) {
         setReading(true);
         setReadingPolls(0);
       }
     },
     [
       prompt,
+      questionText,
       push,
+      recentTurns,
       settleReading,
       askQ,
       handleUnderstanding,
@@ -612,7 +736,7 @@ export function QOnboardingWorkspace({
         await say(chip.say);
         return;
       }
-      push("Q", prompt.text);
+      push("Q", questionText ?? prompt.text);
       push("PERSON", spoken ?? chip.label);
       settleReading();
       setNarrowedTo(null);
@@ -626,6 +750,7 @@ export function QOnboardingWorkspace({
     },
     [
       prompt,
+      questionText,
       say,
       push,
       settleReading,
@@ -651,7 +776,7 @@ export function QOnboardingWorkspace({
       voiceSendText(chosen.map((chip) => chip.label).join(", "));
       return;
     }
-    push("Q", prompt.text);
+    push("Q", questionText ?? prompt.text);
     push("PERSON", chosen.map((chip) => chip.label).join(", "));
     settleReading();
     const ok = await actions.submitValue({ stepKey: prompt.stepKey, value });
@@ -659,6 +784,7 @@ export function QOnboardingWorkspace({
       push("Q", acknowledgeValue(prompt.stepKey, value, vocabulary));
     }
   }, [
+    questionText,
     prompt,
     picks,
     push,
@@ -713,7 +839,7 @@ export function QOnboardingWorkspace({
       voiceSendText("Keep these");
       return;
     }
-    push("Q", prompt.text);
+    push("Q", questionText ?? prompt.text);
     push("PERSON", spoken);
     settleReading();
     let ok: boolean;
@@ -737,6 +863,7 @@ export function QOnboardingWorkspace({
       voiceSendText("Let's continue.");
     }
   }, [
+    questionText,
     prompt,
     keptTaxonomy,
     taxonomy,
@@ -783,10 +910,10 @@ export function QOnboardingWorkspace({
       if (autoNote !== undefined) {
         push("Q", autoNote);
       }
-      void actions.say(autoSay);
+      void actions.say(autoSay, recentTurns());
     }, 0);
     return () => clearTimeout(timer);
-  }, [prompt, push, actions]);
+  }, [prompt, push, actions, recentTurns]);
 
   const keep = async (suggestionId: string) => {
     settleReading();
@@ -848,7 +975,8 @@ export function QOnboardingWorkspace({
             }),
         ...(conversationId === undefined ? {} : { conversationId }),
       },
-      firstMessage: prompt === null || isFinal ? undefined : prompt.text,
+      firstMessage:
+        prompt === null || isFinal ? undefined : (questionText ?? prompt.text),
     });
   };
 
@@ -1064,7 +1192,11 @@ export function QOnboardingWorkspace({
           <QLine id="reading-stage" kind="Q" text={stage} />
         )}
         {prompt !== null && !isFinal && !askingQ ? (
-          <QLine id={`prompt:${prompt.stepKey}`} kind="Q" text={prompt.text} />
+          <QLine
+            id={`prompt:${prompt.stepKey}`}
+            kind="Q"
+            text={questionText ?? prompt.text}
+          />
         ) : null}
         <div ref={endRef} />
       </ol>
@@ -1171,7 +1303,7 @@ export function QOnboardingWorkspace({
               <div
                 className="flex flex-wrap items-center gap-2"
                 role="group"
-                aria-label={prompt.text}
+                aria-label={questionText ?? prompt.text}
               >
                 {visibleChips.map((chip) => (
                   <ChoiceChip
@@ -1343,7 +1475,7 @@ export function QOnboardingWorkspace({
                     voiceSendText("Skip this one");
                     return;
                   }
-                  push("Q", prompt.text);
+                  push("Q", questionText ?? prompt.text);
                   push("PERSON", "Skip this one");
                   settleReading();
                   void actions.skip();

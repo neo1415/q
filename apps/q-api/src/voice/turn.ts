@@ -39,7 +39,7 @@ import type {
 } from "@capital-q/q-runtime";
 
 import type { VoiceSessionBinding } from "./bindings.js";
-import type { Interviewer } from "./interviewer.js";
+import { signupContextFromToken, type Interviewer } from "./interviewer.js";
 import type { PresenceFound } from "./presence-trigger.js";
 import {
   declines,
@@ -1044,6 +1044,9 @@ export function createVoiceTurnHandler(
         session,
         onboardingSessionId: onboarding.sessionId,
         journeyType: onboarding.journeyType,
+        // What they typed at sign-up, from their own token. A candidate
+        // for confirmation, never an answer.
+        signup: signupContextFromToken(binding.accessToken),
         channel: "voice",
         attribution: {
           tenantId: binding.actor.tenantId,
@@ -1210,17 +1213,25 @@ export function createVoiceTurnHandler(
     }
     // The answer is committed before anything is spoken: an interruption
     // after this point loses words, never the person's answer.
+    // No interviewer is composed in this process, so the turn goes to the
+    // one the API delegates to (QX-004 core gate: one Q). Q's own words
+    // come back and are spoken as written; the composed acknowledgement
+    // below is only for a build where nothing answered at all.
     const outcome = await sayToOnboarding(
       session,
       onboarding.sessionId,
-      { text, expectedSessionVersion: before.session.version },
+      {
+        text,
+        expectedSessionVersion: before.session.version,
+        recentTurns: transcriptOf(binding).slice(0, -1),
+      },
       randomUUID(),
     );
-    const line = spokenAcknowledgement(
-      outcome.understood,
-      before,
-      outcome.view,
-    );
+    const line =
+      outcome.reply ??
+      (outcome.understood === null
+        ? "Noted."
+        : spokenAcknowledgement(outcome.understood, before, outcome.view));
     return (await speakLine(speaker, line, signal))
       ? { kind: "SPOKEN", path: "INTERVIEW" }
       : { kind: "INTERRUPTED", path: "INTERVIEW" };

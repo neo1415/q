@@ -6,7 +6,6 @@ import type {
 } from "@capital-q/contracts";
 
 import {
-  acknowledge,
   acknowledgeValue,
   gapValue,
   looksLikeQuestionForQ,
@@ -283,21 +282,6 @@ describe("promptFor · generic strength prompts", () => {
   });
 });
 
-describe("acknowledge", () => {
-  it("does not double the full stop when the answer ends a sentence", () => {
-    expect(
-      acknowledge(
-        {
-          kind: "ANSWERED",
-          stepKey: "F1.stage",
-          summary: "Founders who have sold into banks before.",
-        },
-        VOCABULARY,
-      ),
-    ).toBe("Stage: Founders who have sold into banks before. Noted.");
-  });
-});
-
 describe("welcomeBack", () => {
   const lastActivity = Date.parse("2026-09-13T10:01:00.000Z");
 
@@ -346,28 +330,15 @@ describe("progressLines", () => {
   });
 });
 
-describe("acknowledge", () => {
-  it("names the step and the answer, and explains a required step plainly", () => {
-    expect(
-      acknowledge(
-        { kind: "ANSWERED", stepKey: "F1.stage", summary: "Seed" },
-        VOCABULARY,
-      ),
-    ).toBe("Stage: Seed. Noted.");
-    expect(
-      acknowledge(
-        { kind: "REQUIRED", stepKey: "F1.stage", why: null },
-        VOCABULARY,
-      ),
-    ).toContain("I do need this one");
-    expect(
-      acknowledge(
-        { kind: "READING", stepKey: "F1.stage", utteranceId: "x" },
-        VOCABULARY,
-      ),
-    ).toContain("reading that now");
-  });
-});
+/**
+ * Q's side of the conversation is Q's (QX-004 core gate: one Q).
+ *
+ * This file used to assert the browser's own acknowledgements -- "Stage:
+ * Seed. Noted." -- which was the second conversational implementation in
+ * prose form. There is nothing here to assert now: the interviewer writes
+ * the reply and the screen shows it as written. What the module still owns
+ * is the deterministic vocabulary around it, tested above and below.
+ */
 
 describe("looksLikeQuestionForQ", () => {
   it("routes questions to Q but keeps the interview's own why", () => {

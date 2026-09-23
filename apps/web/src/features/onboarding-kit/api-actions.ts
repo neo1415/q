@@ -272,9 +272,21 @@ export async function onboardingAnswerQuestionAction(
 
 const SayInput = z.object({
   sessionId: Uuid,
-  text: z.string().trim().min(1).max(2000),
+  // Empty opens the interview: Q speaks first (QX-004 core gate: one Q).
+  text: z.string().trim().max(2000),
   expectedSessionVersion: Version,
   idempotencyKey: Uuid,
+  // The thread so far, so the one interviewer has the same context it has
+  // aloud (QX-004 core gate: one Q). Words, never authority.
+  recentTurns: z
+    .array(
+      z.object({
+        role: z.enum(["person", "q"]),
+        text: z.string().max(1500),
+      }),
+    )
+    .max(16)
+    .default([]),
 });
 
 /** The conversational interview (CQ-PRE-REC-001 §16-§21): one turn to Q about the current step. */
@@ -289,6 +301,7 @@ export async function onboardingSayAction(
       {
         text: input.text,
         expectedSessionVersion: input.expectedSessionVersion,
+        recentTurns: input.recentTurns,
       },
       input.idempotencyKey,
     ),

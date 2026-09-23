@@ -380,8 +380,33 @@ export const ONBOARDING_SAY_SEGMENT = "/say";
 
 export const SayOnboardingRequestSchema = z
   .object({
-    text: z.string().trim().min(1).max(2000),
+    /**
+     * What the person said.
+     *
+     * Empty opens the interview: Q speaks first, in its own words, for a
+     * screen that has just loaded or been refreshed (QX-004 core gate: one
+     * Q). Nothing is recorded from an empty turn -- there is no sentence
+     * to record -- so this is a question asked, not an answer given.
+     */
+    text: z.string().trim().max(2000),
     expectedSessionVersion: SessionVersionSchema,
+    /**
+     * The exchange so far, oldest first, so a typed turn carries the same
+     * context a spoken one does (QX-004 core gate: one Q). Untrusted --
+     * these are words the conversation produced, never authority over what
+     * was recorded.
+     */
+    recentTurns: z
+      .array(
+        z
+          .object({
+            role: z.enum(["person", "q"]),
+            text: z.string().max(1500),
+          })
+          .strict(),
+      )
+      .max(16)
+      .default([]),
   })
   .strict();
 export type SayOnboardingRequest = z.infer<typeof SayOnboardingRequestSchema>;
@@ -724,7 +749,35 @@ export type OnboardingSessionView = z.infer<typeof OnboardingSessionViewSchema>;
 export const SayOnboardingResponseSchema = z
   .object({
     view: OnboardingSessionViewSchema,
-    understood: OnboardingUnderstandingSchema,
+    /**
+     * What the deterministic runtime did with the sentence.
+     *
+     * Null when the one Q interviewer handled the turn: it places answers
+     * through the same validated submit and skip paths, but it does not
+     * produce this reading of them. `view` is then what was recorded, and
+     * `reply` is what Q said about it.
+     */
+    understood: OnboardingUnderstandingSchema.nullable(),
+    /**
+     * Q's own words for this turn (QX-004 core gate: one Q).
+     *
+     * The onboarding screen used to write Q's side of the conversation
+     * itself, composing "Investor type: Angel investor. Noted." from the
+     * fields above and then reading the next step's raw prompt aloud --
+     * "Your firm" -- to a person who had typed their firm at registration
+     * two screens earlier. That was a second conversational implementation
+     * living in the browser, and it was the poorer of the two.
+     *
+     * This carries what the one interviewer actually said, and a surface
+     * shows it as given. The fields above remain what the runtime did, and
+     * they are still the only evidence of it: a surface must not read this
+     * prose to decide what was recorded.
+     *
+     * Null when no interviewer was reachable for this turn.
+     */
+    reply: z.string().max(4000).nullable(),
+    /** True when Q answered without a model and said so plainly. */
+    degraded: z.boolean(),
   })
   .strict();
 export type SayOnboardingResponse = z.infer<typeof SayOnboardingResponseSchema>;

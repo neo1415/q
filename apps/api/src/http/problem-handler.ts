@@ -97,6 +97,8 @@ import {
   TaxonomyVocabularyNotFoundError,
 } from "@capital-q/taxonomy";
 
+import { QInterviewUnavailableError } from "../q/interview-client.js";
+
 /**
  * Fastify wiring for the Capital Q problem contract.
  *
@@ -366,6 +368,14 @@ function toProblem(
   // Private storage is unreachable or unconfigured. Uploads are closed
   // rather than open, and no provider detail is echoed.
   if (error instanceof DocumentStorageUnavailableError) {
+    return createProblemDetails({ code: "PROVIDER_UNAVAILABLE", requestId });
+  }
+
+  // The one Q interviewer is unreachable (QX-004 core gate: one Q). The
+  // conversational interview closes rather than falling back to the
+  // template engine it replaced; the person can still tap through the
+  // step. No provider, host or status detail is echoed.
+  if (error instanceof QInterviewUnavailableError) {
     return createProblemDetails({ code: "PROVIDER_UNAVAILABLE", requestId });
   }
 

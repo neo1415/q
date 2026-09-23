@@ -5,7 +5,6 @@ import type {
   OnboardingStepType,
   OnboardingStepView,
   OnboardingSuggestionView,
-  OnboardingUnderstanding,
 } from "@capital-q/contracts";
 
 /**
@@ -587,65 +586,17 @@ function joinNames(names: readonly string[]): string {
   return `${names.slice(0, -1).join(", ")} and ${names.at(-1) ?? ""}`;
 }
 
-/** Q's short acknowledgement of what the runtime understood (§18). */
-/** "…and I picked up N other things" when a sentence answered more than it was asked (CQ-Q-VOICE-001 A §8). */
-function withProposals(text: string, proposed: number | undefined): string {
-  if (proposed === undefined || proposed === 0) {
-    return text;
-  }
-  return proposed === 1
-    ? `${text} I also picked up one more thing from that; it's below for you to confirm.`
-    : `${text} I also picked up ${String(proposed)} other things from that; they're below for you to confirm.`;
-}
-
-export function acknowledge(
-  understood: OnboardingUnderstanding,
-  vocabulary: JourneyVocabulary,
-): string {
-  switch (understood.kind) {
-    case "ANSWERED":
-      return withProposals(
-        understood.utteranceId === undefined
-          ? `${vocabulary.stepTitle(understood.stepKey)}: ${trimSentenceEnd(understood.summary)}. Noted.`
-          : `${vocabulary.stepTitle(understood.stepKey)}: ${trimSentenceEnd(understood.summary)}. Noted. I'm reading the rest of that too; anything else I pick up will appear for you to confirm.`,
-        understood.proposed,
-      );
-    case "CORRECTED":
-      return withProposals(
-        `Updated — ${vocabulary.stepTitle(understood.stepKey)}: ${trimSentenceEnd(understood.summary)}.`,
-        understood.proposed,
-      );
-    case "SKIPPED":
-      return "Noted. I'll leave that open; you can come back to it any time.";
-    case "REQUIRED":
-      return understood.why === null
-        ? "I do need this one to finish setting things up. If a document already covers it, you can share that instead."
-        : `I do need this one to finish setting things up: ${understood.why} If a document already covers it, you can share that instead.`;
-    case "WHY":
-      return understood.why === null
-        ? "It helps me describe you accurately to the right people. You can skip it if you'd rather."
-        : understood.why;
-    case "UPLOAD":
-      return "Go ahead. Whatever the document covers, I won't ask again.";
-    case "AMBIGUOUS":
-      return withProposals(
-        "I can see more than one that fits. Which do you mean?",
-        understood.proposed,
-      );
-    case "DECLINED":
-      return "What should change? Pick the item below and I'll open it.";
-    case "READING":
-      return withProposals(
-        "Thanks. I'm reading that now; I'll show you what I picked up in a moment so you can confirm it.",
-        understood.proposed,
-      );
-    case "UNCLEAR":
-      return withProposals(
-        "I didn't catch that. Pick one below, or tell me a little more.",
-        understood.proposed,
-      );
-  }
-}
+/**
+ * Q's side of the conversation is written by Q (QX-004 core gate: one Q).
+ *
+ * A composer lived here: it turned what the runtime understood into
+ * "Investor type: Angel investor. Noted." and let the next step's raw
+ * label -- "Your firm" -- stand as the next question. That was a second
+ * conversational implementation, running in the browser, beside the one
+ * interviewer in q-api, and it was the poorer of the two. A turn now
+ * carries Q's own words and the screen shows them as written; there is
+ * deliberately nothing here to fall back to.
+ */
 
 /** Q's short acknowledgement of a tapped option (§17-§18). */
 export function acknowledgeValue(

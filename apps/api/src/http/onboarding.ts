@@ -37,6 +37,7 @@ import {
   OnboardingInterviewQuestionIdSchema,
   OnboardingSessionIdSchema,
   OnboardingSessionNotFoundError,
+  OnboardingSessionVersionConflictError,
   OnboardingSuggestionIdSchema,
   type OnboardingInterviewQuestionId,
   type OnboardingService,
@@ -44,7 +45,10 @@ import {
   type OnboardingSuggestionId,
 } from "@capital-q/onboarding";
 import { createCorrelationId } from "@capital-q/observability";
-
+import {
+  QInterviewUnavailableError,
+  type QInterviewClient,
+} from "../q/interview-client.js";
 import {
   getOnboardingActor,
   requireOnboardingActorHook,
@@ -63,6 +67,16 @@ import {
 
 export type OnboardingRoutesDependencies = OnboardingActorDependencies & {
   readonly onboarding: OnboardingService["runtime"];
+  /**
+   * The one Q interviewer (QX-004 core gate: one Q).
+   *
+   * `/say` delegates the whole turn to it. There is deliberately no
+   * fallback to the template conversation this service used to run: two
+   * engines is the defect, and quietly reverting to the weaker one under
+   * load would hide it rather than fix it. Absent means the conversational
+   * interview is closed, not degraded.
+   */
+  readonly qInterview: QInterviewClient | undefined;
 };
 
 function correlation(): CorrelationId {
@@ -327,22 +341,56 @@ export function registerOnboardingRoutes(
     `${byId}${ONBOARDING_SAY_SEGMENT}`,
     { onRequest: withActor },
     async (request, reply) => {
-      const key = idempotencyKey(request, "say something to Q");
+      // Still required: the header is what makes a repeated turn safe, and
+      // it is the browser's own retry key whichever engine answers.
+      idempotencyKey(request, "say something to Q");
       const input = parseContract(
         SayOnboardingRequestSchema,
         request.body,
         "The message is not valid.",
       );
-      const outcome = await runtime.say({
-        actor: getOnboardingActor(request),
-        sessionId: sessionIdParam(request),
-        text: input.text,
-        expectedSessionVersion: input.expectedSessionVersion,
-        idempotencyKey: key,
-        correlationId: correlation(),
+      const interviewer = dependencies.qInterview;
+      if (interviewer === undefined) {
+        throw new QInterviewUnavailableError("no interviewer is composed");
+      }
+      const sessionId = sessionIdParam(request);
+      const actor = getOnboardingActor(request);
+
+      // The interviewer works under the caller's own bearer, exactly as
+      // the spoken thread does, so a typed turn can do what the person
+      // could have done by tapping and no more.
+      const header = request.headers.authorization;
+      const accessToken =
+        typeof header === "string" && header.toLowerCase().startsWith("bearer ")
+          ? header.slice(7).trim()
+          : "";
+
+      const before = await runtime.getSession({ actor, sessionId });
+      if (before.session.version !== input.expectedSessionVersion) {
+        throw new OnboardingSessionVersionConflictError();
+      }
+
+      const turn = await interviewer.turn({
+        accessToken,
+        request: {
+          onboardingSessionId: sessionId,
+          journeyType: before.session.journeyType,
+          utterance: input.text,
+          channel: "text",
+          recentTurns: input.recentTurns,
+        },
       });
+
+      // What was recorded is read back from the session, never from the
+      // prose: the reply is Q's words and is not evidence of a write.
+      const after = await runtime.getSession({ actor, sessionId });
       void reply.header("Cache-Control", "no-store");
-      return SayOnboardingResponseSchema.parse(outcome);
+      return SayOnboardingResponseSchema.parse({
+        view: after,
+        understood: null,
+        reply: turn.reply,
+        degraded: turn.degraded,
+      });
     },
   );
 
