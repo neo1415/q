@@ -317,8 +317,10 @@ export function QResultBlocks({
              * The status is on the card because "prepared" and "still
              * being prepared" are different things to somebody about to
              * send a document to an investor, and an absence would make
-             * them guess. There is no download control: no bytes exist,
-             * and a button that produces none is worse than no button.
+             * them guess. There is no download control here even for a
+             * deck, which now has one: a card in a conversation offers the
+             * way in, and choosing between PowerPoint and PDF belongs
+             * beside the slides a person is looking at (QX-004 §7).
              */
             const ready = block.status === "READY";
             return (
@@ -327,7 +329,9 @@ export function QResultBlocks({
                 label={
                   block.type === "INVESTMENT_BRIEF"
                     ? "Investment brief"
-                    : "Document"
+                    : block.type === "PITCH_DECK"
+                      ? "Investor deck"
+                      : "Document"
                 }
                 title={block.title}
                 actions={

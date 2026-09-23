@@ -376,6 +376,27 @@ describe("QX-004 · the deck in the viewer", () => {
     expect(screen.queryByAltText("Slide 1")).toBeNull();
   });
 
+  it("calls a deck a deck on the card, not a document", () => {
+    render(
+      <QResultBlocks
+        blocks={[
+          {
+            kind: "ARTIFACT_REFERENCE",
+            artifactId: ARTIFACT,
+            type: "PITCH_DECK",
+            status: "READY",
+            title: "Northstar Logistics — investor deck",
+          },
+        ]}
+        onAsk={vi.fn()}
+        onOpenArtifact={vi.fn()}
+      />,
+    );
+    expect(screen.getByText("Investor deck")).toBeTruthy();
+    // The download lives beside the slides, not on a card in a thread.
+    expect(screen.queryByText("PowerPoint")).toBeNull();
+  });
+
   it("offers no download on a document that has no slides", async () => {
     readQArtifactAction.mockResolvedValue({
       ok: true,
