@@ -8,7 +8,6 @@ import { cx } from "@capital-q/ui";
 import { QConversationIdSchema } from "@capital-q/contracts";
 import { Button } from "@capital-q/ui/button";
 import { QComposer } from "@capital-q/ui/q-composer";
-import { QStateIndicator } from "@capital-q/ui/q-state";
 import { InlineNotice } from "@capital-q/ui/states";
 import type { ContextScope } from "@capital-q/ui/tokens";
 
@@ -16,17 +15,21 @@ import {
   materialUploadCompleteAction,
   materialUploadTargetAction,
 } from "../onboarding-kit/material-actions";
+import { presenceStateFromVoice, type QPresenceState } from "../q-presence";
 import { destinationPath } from "../voice/destinations";
+import { VOICE_STATE_LABELS } from "../voice/session";
 import { useFollowTurn } from "../voice/use-follow-turn";
 import { useVoiceInterview } from "../voice/use-voice-interview";
-import { VoiceStage } from "../voice/voice-stage";
 import { ArtifactViewer } from "./artifact-viewer";
 import { QAnswer } from "./q-answer";
+import { QHistorySheet } from "./q-history-sheet";
+import { QStage } from "./q-stage";
 import {
   failureMessage,
   recoveryHint,
   turnsFrom,
   workingLabel,
+  type QTurn,
 } from "./conversation";
 import { Q_CONVERSATION_PARAM } from "./chats-list";
 import {
@@ -41,15 +44,17 @@ type SpokenLine = {
 };
 
 /**
- * Q, in the browser (CQ-C5-R1 §13-§19; CQ-PRE-REC-001 §12-§13).
+ * Q, in the browser (CQ-C5-R1 §13-§19; CQ-PRE-REC-001 §12-§13), voice
+ * first.
  *
- * The composer connected to the real thing: a real run, a real stream, a
- * real answer, and the same conversation for the next question. The
- * conversation is the primary surface: before the first turn a few
- * contextual suggestions sit above the composer; after it they recede, and
- * the thread takes the space. The composer stays reachable — sticky at the
- * bottom of the workspace, above the mobile navigation — so a long answer
- * never pushes the next question off the screen.
+ * The screen is Q: its presence at the top, alive to what is happening;
+ * one word for what it is doing; the controls a hand needs; then the
+ * conversation, and the composer docked beneath it. Talking happens in
+ * place — the presence listens, thinks and speaks where it stands, and
+ * the thread fills in beneath — rather than behind a modal, so typing and
+ * speaking are visibly one conversation. The composer stays reachable,
+ * sticky at the bottom of the workspace above the mobile navigation, so
+ * a long answer never pushes the next question off the screen.
  *
  * What is deliberately absent: a local reply of any kind. There is no
  * fixture, no canned response, no simulated typing and no fabricated
@@ -84,6 +89,26 @@ export type QConversationPanelProps = {
    */
   readonly conversationId?: string | null | undefined;
 };
+
+/** How long the settle after an answer, and the sweep of an action, are shown. */
+const SUCCESS_MS = 900;
+const ACTION_MS = 700;
+
+const COMPOSER_ID = "home-q";
+
+/** The conversation as plain text, for saving. */
+function transcriptText(
+  turns: readonly QTurn[],
+  spoken: readonly SpokenLine[],
+): string {
+  const lines = turns.map((turn) =>
+    turn.kind === "PERSON" ? `You: ${turn.text}` : `Q: ${turn.text}`,
+  );
+  for (const line of spoken) {
+    lines.push(`${line.role === "user" ? "You" : "Q"}: ${line.text}`);
+  }
+  return lines.join("\n\n");
+}
 
 export function QConversationPanel({
   connected,
@@ -225,8 +250,8 @@ export function QConversationPanel({
   };
 
   // The spoken turns live in a conversation the server names; once it
-  // does, the screen is in that conversation too, so "Go to chat" and a
-  // refresh find what was said aloud.
+  // does, the screen is in that conversation too, so a refresh and the
+  // chats list find what was said aloud.
   const voiceConversationId = voice.turn?.conversationId;
   useEffect(() => {
     if (
@@ -241,6 +266,28 @@ export function QConversationPanel({
     }
   }, [voiceConversationId, conversationParam, onConversation, router]);
 
+  /**
+   * Two moments the presence shows and nothing else does: the settle
+   * after an answer lands, and the sweep when Q acts on something —
+   * follows a spoken "take me to…", or applies what was approved. Both
+   * are brief and time out on their own.
+   */
+  const [settled, setSettled] = useState(false);
+  const [acting, setActing] = useState(false);
+  const wasWorking = useRef(false);
+  useEffect(() => {
+    const finished = wasWorking.current && !q.working;
+    wasWorking.current = q.working;
+    if (!finished || q.state.failure !== null) return;
+    setSettled(true);
+    const timer = window.setTimeout(() => setSettled(false), SUCCESS_MS);
+    return () => window.clearTimeout(timer);
+  }, [q.working, q.state.failure]);
+  const act = useCallback(() => {
+    setActing(true);
+    window.setTimeout(() => setActing(false), ACTION_MS);
+  }, []);
+
   // "Take me to my profile", said on Home: followed once Q has said so.
   const voiceEnd = voice.end;
   useFollowTurn(voice.turn, voice.client, (followed) => {
@@ -250,6 +297,7 @@ export function QConversationPanel({
     }
     const path = destinationPath(followed.navigate);
     if (path !== null) {
+      act();
       void voiceEnd();
       router.push(path);
     }
@@ -307,6 +355,59 @@ export function QConversationPanel({
     !q.loading &&
     q.state.failure === null;
 
+  // What the presence shows, and the word beside it. Voice, while it is
+  // on, is the truth; otherwise the run's own state.
+  const presenceState: QPresenceState = voice.active
+    ? presenceStateFromVoice(voice.client.state)
+    : acting
+      ? "ACTION"
+      : q.working
+        ? "THINKING"
+        : settled
+          ? "SUCCESS"
+          : q.state.failure !== null
+            ? "ERROR"
+            : "IDLE";
+  const presenceLabel = voice.active
+    ? voice.client.muted
+      ? "Muted"
+      : VOICE_STATE_LABELS[voice.client.state]
+    : q.working
+      ? "Thinking"
+      : q.state.failure !== null
+        ? "Couldn't finish that"
+        : settled
+          ? "Done"
+          : undefined;
+  const presenceDetail = voice.active
+    ? undefined
+    : q.working
+      ? stage
+      : context.label;
+
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const focusComposer = () => {
+    const element = document.getElementById(COMPOSER_ID);
+    if (element instanceof HTMLTextAreaElement) {
+      element.focus();
+      element.scrollIntoView({ block: "nearest" });
+    }
+  };
+  const download =
+    turns.length === 0 && spoken.length === 0
+      ? undefined
+      : () => {
+          const blob = new Blob([transcriptText(turns, spoken)], {
+            type: "text/plain;charset=utf-8",
+          });
+          const url = URL.createObjectURL(blob);
+          const anchor = document.createElement("a");
+          anchor.href = url;
+          anchor.download = "capital-q-conversation.txt";
+          anchor.click();
+          URL.revokeObjectURL(url);
+        };
+
   return (
     <div
       className="flex flex-col gap-4 lg:flex-row lg:items-start lg:gap-6"
@@ -328,32 +429,63 @@ export function QConversationPanel({
         // layout does.
         data-q-turns={String(turns.length)}
       >
-        {voice.active ? (
-          // Talking with Q on Home is the same stage as the interview: the
-          // screen is Q, wherever the conversation started.
-          <VoiceStage
-            client={voice.client}
-            voice={voice.voice}
-            voices={["FEMALE", "MALE"]}
-            onChooseVoice={(choice) => void voice.chooseVoice(choice)}
-            onEnd={() => void voice.end()}
-            // Talking is the main way in; the typed thread is where this goes.
-            endLabel="Go to chat"
-            notice={voice.notice}
-            onDismissNotice={voice.clearNotice}
-            asking={voice.turn?.asking ?? null}
-            onSay={(text) => voice.client.sendText(text)}
-            onUseForm={undefined}
-            progress={[]}
-          />
-        ) : null}
-        {!voice.active && voice.notice !== null ? (
+        <QStage
+          state={presenceState}
+          inputLevel={voice.client.inputLevel}
+          outputLevel={voice.client.outputLevel}
+          label={presenceLabel}
+          detail={presenceDetail}
+          connected={connected}
+          voiceActive={voice.active}
+          muted={voice.client.muted}
+          voice={voice.voice}
+          voices={["FEMALE", "MALE"]}
+          onTalk={() => void talkWithQ()}
+          onEnd={() => void voice.end()}
+          onMute={(muted) => voice.client.setMuted(muted)}
+          onVolume={(volume) => voice.client.setVolume(volume)}
+          onChooseVoice={(choice) => void voice.chooseVoice(choice)}
+          onType={focusComposer}
+          onHistory={() => setHistoryOpen(true)}
+          onDownload={download}
+          asking={voice.turn?.asking ?? null}
+          onSay={(text) => voice.client.sendText(text)}
+          className="py-2 sm:py-4"
+        />
+        <QHistorySheet
+          open={historyOpen}
+          onOpenChange={setHistoryOpen}
+          active={q.conversationId}
+        />
+
+        {voice.notice !== null ? (
           <InlineNotice tone="warning" title={voice.notice}>
             <Button size="compact" variant="quiet" onClick={voice.clearNotice}>
               Dismiss
             </Button>
           </InlineNotice>
         ) : null}
+
+        {showSuggestions ? (
+          <ul
+            aria-label="Suggested questions"
+            className="flex flex-wrap justify-center gap-2"
+            data-q-suggestions
+          >
+            {context.suggestions.map((suggestion) => (
+              <li key={suggestion}>
+                <Button
+                  variant="secondary"
+                  size="compact"
+                  onClick={() => void q.ask(suggestion)}
+                >
+                  {suggestion}
+                </Button>
+              </li>
+            ))}
+          </ul>
+        ) : null}
+
         {spokenOnly.length > 0 ? (
           <ol className="flex flex-col gap-4" aria-label="Spoken">
             {spokenOnly.map((line) => (
@@ -418,14 +550,13 @@ export function QConversationPanel({
         ) : null}
 
         {q.loading && turns.length === 0 ? (
-          <p className="cq-body-sm text-(--cq-text-tertiary)">
+          <p className="cq-body-sm text-center text-(--cq-text-tertiary)">
             Opening your conversation…
           </p>
         ) : null}
 
         {q.working ? (
-          <div className="flex items-center justify-between gap-3">
-            <QStateIndicator state="WORKING" detail={stage} />
+          <div className="flex items-center justify-end gap-3">
             <Button
               variant="secondary"
               size="compact"
@@ -476,7 +607,13 @@ export function QConversationPanel({
                       </pre>
                     ) : null}
                     <div className="flex flex-wrap gap-2">
-                      <Button size="compact" onClick={() => void q.approve()}>
+                      <Button
+                        size="compact"
+                        onClick={() => {
+                          act();
+                          void q.approve();
+                        }}
+                      >
                         Approve
                       </Button>
                       <Button
@@ -499,34 +636,14 @@ export function QConversationPanel({
           </InlineNotice>
         ) : null}
 
-        {showSuggestions ? (
-          <ul
-            aria-label="Suggested questions"
-            className="flex flex-wrap gap-2"
-            data-q-suggestions
-          >
-            {context.suggestions.map((suggestion) => (
-              <li key={suggestion}>
-                <Button
-                  variant="secondary"
-                  size="compact"
-                  onClick={() => void q.ask(suggestion)}
-                >
-                  {suggestion}
-                </Button>
-              </li>
-            ))}
-          </ul>
-        ) : null}
-
         <div className="cq-q-composer-dock">
           <QComposer
-            id="home-q"
+            id={COMPOSER_ID}
             contextScope={context.scope}
             contextDetail={context.label}
             disabled={q.working}
-            onVoice={
-              connected && !voice.active ? () => void talkWithQ() : undefined
+            placeholder={
+              voice.active ? "Type instead — Q hears this too" : "Or type to Q"
             }
             attachments={attachments}
             {...(connected && context.companyId !== undefined
