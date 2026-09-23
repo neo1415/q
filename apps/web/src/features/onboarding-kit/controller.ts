@@ -361,6 +361,12 @@ export function useOnboardingJourney<
        * a great deal better than "Investor setup couldn't load."
        */
       if (text.length === 0) {
+        // Busy while Q opens, so the composer is closed until the opening
+        // has settled. Left open, a person who typed straight away had a
+        // second turn in flight against the same session version; the
+        // opening answered last and took the screen, and the typed turn
+        // came back a conflict the screen could not show.
+        setBusy(true);
         try {
           const outcome = await say({ text, recentTurns });
           setSession(outcome.view);
@@ -371,6 +377,8 @@ export function useOnboardingJourney<
           };
         } catch {
           return null;
+        } finally {
+          setBusy(false);
         }
       }
       const ok = await run(async () => {
