@@ -5,7 +5,17 @@ import { useState } from "react";
 import type { QVoiceChoice, QVoiceTurnState } from "@capital-q/contracts";
 import { cx } from "@capital-q/ui";
 import { Button, IconButton } from "@capital-q/ui/button";
-import { ICON_SIZE, ICON_STROKE, Mic } from "@capital-q/ui/icons";
+import {
+  Download,
+  History,
+  ICON_SIZE,
+  ICON_STROKE,
+  Keyboard,
+  Mic,
+  MicOff,
+  SlidersHorizontal,
+  Square,
+} from "@capital-q/ui/icons";
 import {
   PopoverContent,
   PopoverRoot,
@@ -18,14 +28,6 @@ import {
   useStagePresenceSize,
   type QPresenceState,
 } from "../q-presence";
-import {
-  DownloadIcon,
-  HistoryIcon,
-  KeyboardIcon,
-  MicOffIcon,
-  SettingsIcon,
-  StopIcon,
-} from "./q-control-icons";
 
 /**
  * The head of the Q surface: Q's presence, one word for what it is doing,
@@ -237,7 +239,7 @@ export function QStage({
             testId="mute"
           >
             {muted ? (
-              <MicOffIcon
+              <MicOff
                 aria-hidden="true"
                 size={ICON_SIZE.prominent}
                 strokeWidth={ICON_STROKE}
@@ -256,7 +258,7 @@ export function QStage({
             onClick={onHistory}
             testId="history"
           >
-            <HistoryIcon
+            <History
               aria-hidden="true"
               size={ICON_SIZE.prominent}
               strokeWidth={ICON_STROKE}
@@ -265,7 +267,7 @@ export function QStage({
         )}
 
         <Control label="Type to Q" onClick={onType} testId="type">
-          <KeyboardIcon
+          <Keyboard
             aria-hidden="true"
             size={ICON_SIZE.prominent}
             strokeWidth={ICON_STROKE}
@@ -287,7 +289,7 @@ export function QStage({
             )}
           >
             {voiceActive ? (
-              <StopIcon aria-hidden="true" size={24} strokeWidth={2} />
+              <Square aria-hidden="true" size={24} strokeWidth={2} />
             ) : (
               <Mic aria-hidden="true" size={26} strokeWidth={2} />
             )}
@@ -303,7 +305,7 @@ export function QStage({
                 className="rounded-full text-(--cq-text-secondary) hover:text-(--cq-text-primary)"
                 data-q-control="settings"
               >
-                <SettingsIcon
+                <SlidersHorizontal
                   aria-hidden="true"
                   size={ICON_SIZE.prominent}
                   strokeWidth={ICON_STROKE}
@@ -354,7 +356,7 @@ export function QStage({
             disabled={onDownload === undefined}
             testId="download"
           >
-            <DownloadIcon
+            <Download
               aria-hidden="true"
               size={ICON_SIZE.prominent}
               strokeWidth={ICON_STROKE}
@@ -368,7 +370,7 @@ export function QStage({
             onClick={onHistory}
             testId="history"
           >
-            <HistoryIcon
+            <History
               aria-hidden="true"
               size={ICON_SIZE.prominent}
               strokeWidth={ICON_STROKE}

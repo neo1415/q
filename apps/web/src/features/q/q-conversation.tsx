@@ -8,6 +8,7 @@ import { cx } from "@capital-q/ui";
 import { QConversationIdSchema } from "@capital-q/contracts";
 import { Button } from "@capital-q/ui/button";
 import { QComposer } from "@capital-q/ui/q-composer";
+import { QStateIndicator } from "@capital-q/ui/q-state";
 import { InlineNotice } from "@capital-q/ui/states";
 import type { ContextScope } from "@capital-q/ui/tokens";
 
@@ -536,7 +537,7 @@ export function QConversationPanel({
 
         {q.working ? (
           <div className="flex items-center justify-between gap-3">
-            <span className="cq-status-line">{stage ?? "Working on it"}</span>
+            <QStateIndicator state="WORKING" detail={stage} />
             <Button
               variant="quiet"
               size="compact"

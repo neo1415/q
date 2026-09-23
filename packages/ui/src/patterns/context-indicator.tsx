@@ -45,15 +45,43 @@ export type ContextIndicatorProps = {
   readonly scope: ContextScope;
   /** Optional trailing detail, e.g. an organisation name. */
   readonly detail?: string | undefined;
+  /**
+   * Icon only, for chrome that has no room for words (the mobile header):
+   * the same scope, its full label carried as the accessible name and the
+   * hover title rather than shown.
+   */
+  readonly compact?: boolean | undefined;
   readonly className?: string | undefined;
 };
 
 export function ContextIndicator({
   scope,
   detail,
+  compact = false,
   className,
 }: ContextIndicatorProps) {
   const { label, Icon } = presentation[scope];
+  if (compact) {
+    const name = detail === undefined ? label : `${label} · ${detail}`;
+    return (
+      <span
+        data-scope={scope}
+        role="img"
+        aria-label={name}
+        title={name}
+        className={cx(
+          "inline-flex size-8 shrink-0 items-center justify-center rounded-full border border-(--cq-border-subtle) bg-(--cq-surface-subtle) text-(--cq-text-secondary)",
+          className,
+        )}
+      >
+        <Icon
+          aria-hidden="true"
+          size={ICON_SIZE.compact}
+          strokeWidth={ICON_STROKE}
+        />
+      </span>
+    );
+  }
   return (
     <span
       data-scope={scope}

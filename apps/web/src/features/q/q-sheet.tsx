@@ -7,7 +7,13 @@ import { QConversationIdSchema } from "@capital-q/contracts";
 import { cx } from "@capital-q/ui";
 import { Button, IconButton } from "@capital-q/ui/button";
 import { ContextIndicator } from "@capital-q/ui/context-indicator";
-import { ICON_SIZE, ICON_STROKE, Mic } from "@capital-q/ui/icons";
+import {
+  ICON_SIZE,
+  ICON_STROKE,
+  Mic,
+  MicOff,
+  Square,
+} from "@capital-q/ui/icons";
 import { QComposer } from "@capital-q/ui/q-composer";
 import { InlineNotice } from "@capital-q/ui/states";
 import { Tooltip } from "@capital-q/ui/tooltip";
@@ -19,7 +25,6 @@ import { useVoiceInterview } from "../voice/use-voice-interview";
 import { Q_CONVERSATION_PARAM } from "./chats-list";
 import { failureMessage, recoveryHint, turnsFrom } from "./conversation";
 import { QAnswer } from "./q-answer";
-import { MicOffIcon, StopIcon } from "./q-control-icons";
 import type { QSubject } from "./q-subject";
 import { spokenNotYetStored, type SpokenLine } from "./spoken";
 import { useQConversation } from "./use-q-conversation";
@@ -172,7 +177,7 @@ export function QSheetConversation({
               data-q-control={voice.active ? "end" : "talk"}
             >
               {voice.active ? (
-                <StopIcon aria-hidden="true" size={ICON_SIZE.prominent} />
+                <Square aria-hidden="true" size={ICON_SIZE.prominent} />
               ) : (
                 <Mic
                   aria-hidden="true"
@@ -203,7 +208,7 @@ export function QSheetConversation({
               data-q-control="mute"
             >
               {voice.client.muted ? (
-                <MicOffIcon aria-hidden="true" size={ICON_SIZE.prominent} />
+                <MicOff aria-hidden="true" size={ICON_SIZE.prominent} />
               ) : (
                 <Mic
                   aria-hidden="true"

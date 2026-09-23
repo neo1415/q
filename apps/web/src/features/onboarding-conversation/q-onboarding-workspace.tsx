@@ -22,7 +22,7 @@ import { ChoiceChip } from "@capital-q/ui/chip";
 import { Input } from "@capital-q/ui/input";
 import { QComposer } from "@capital-q/ui/q-composer";
 import { QStateIndicator } from "@capital-q/ui/q-state";
-import { InlineNotice } from "@capital-q/ui/states";
+import { InlineNotice, Progress } from "@capital-q/ui/states";
 
 import type { TaxonomyCandidateView } from "../onboarding-kit/client";
 import type { OnboardingTurn } from "../onboarding-kit/controller";
@@ -1184,7 +1184,10 @@ export function QOnboardingWorkspace({
         : prompt.placeholder;
 
   return (
-    <div className="flex flex-col gap-4 pb-28" data-q-onboarding-workspace>
+    <div
+      className="mx-auto flex w-full max-w-(--cq-layout-reading) flex-col gap-4 pb-28"
+      data-q-onboarding-workspace
+    >
       {voice.active ? (
         <VoiceStage
           client={voice.client}
@@ -1241,7 +1244,12 @@ export function QOnboardingWorkspace({
           <QLine id="reading-stage" kind="Q" text={stage} />
         )}
         {prompt !== null && !isFinal && !askingQ && liveQuestion !== null ? (
-          <QLine id={`prompt:${prompt.stepKey}`} kind="Q" text={liveQuestion} />
+          <QLine
+            id={`prompt:${prompt.stepKey}`}
+            kind="Q"
+            text={liveQuestion}
+            heading
+          />
         ) : null}
         <div ref={endRef} />
       </ol>
@@ -1848,17 +1856,34 @@ function GapItem({
   );
 }
 
+/**
+ * One line of the interview. Q's current question is the page's one
+ * heading; what came before is quiet prose at reading measure; the
+ * person's own words are a compact sunken block at narrow width (doc 18
+ * s102; design/visual-debt.md). Never a messenger bubble.
+ */
 function QLine({
   id,
   kind,
   text,
   streaming = false,
+  heading = false,
 }: {
   readonly id: string;
   readonly kind: Turn["kind"];
   readonly text: string;
   readonly streaming?: boolean;
+  readonly heading?: boolean;
 }) {
+  if (heading) {
+    return (
+      <li data-turn={id} className="flex flex-col gap-1 pt-2">
+        <h2 className="cq-title-lg cq-prose text-balance text-(--cq-text-primary)">
+          {text}
+        </h2>
+      </li>
+    );
+  }
   return (
     <li
       data-turn={id}
@@ -1874,8 +1899,8 @@ function QLine({
       <p
         className={
           kind === "PERSON"
-            ? "cq-body max-w-(--cq-layout-narrow) rounded-lg bg-(--cq-surface-sunken) px-3 py-2 text-(--cq-text-primary)"
-            : "cq-body max-w-(--cq-layout-narrow) whitespace-pre-wrap text-(--cq-text-primary)"
+            ? "cq-body max-w-(--cq-layout-narrow) rounded-md bg-(--cq-surface-sunken) px-3 py-2 text-(--cq-text-primary)"
+            : "cq-body cq-prose whitespace-pre-wrap text-(--cq-text-secondary)"
         }
         data-streaming={streaming ? "true" : undefined}
       >
@@ -1898,28 +1923,22 @@ function ProgressStrip({
   if (lines.length === 0) {
     return null;
   }
+  // One line for the whole journey: how much is covered, and the area Q
+  // is on. The per-area counts are still in the data; six captions of
+  // "0/2" were the thing that made this read as a checklist.
+  const done = lines.reduce((sum, line) => sum + line.done, 0);
+  const total = lines.reduce((sum, line) => sum + line.total, 0);
+  const current = lines.find((line) => line.current);
+  const label =
+    current === undefined
+      ? `${String(done)} of ${String(total)} covered`
+      : `${current.label} · ${String(done)} of ${String(total)} covered`;
   return (
-    <ol
-      aria-label="Progress"
-      className="flex flex-wrap gap-x-4 gap-y-1"
-      data-q-progress
-    >
-      {lines.map((line) => (
-        <li
-          key={line.label}
-          className={
-            line.current
-              ? "cq-caption text-(--cq-text-primary)"
-              : "cq-caption text-(--cq-text-tertiary)"
-          }
-          aria-current={line.current ? "step" : undefined}
-        >
-          {line.label}{" "}
-          {line.done === line.total
-            ? "✓"
-            : `${String(line.done)}/${String(line.total)}`}
-        </li>
-      ))}
-    </ol>
+    <div data-q-progress>
+      <Progress
+        label={label}
+        value={total === 0 ? 0 : Math.round((done / total) * 100)}
+      />
+    </div>
   );
 }

@@ -20,7 +20,11 @@ export function AppHeader({ context }: { readonly context: ShellContext }) {
           Capital Q
         </Link>
         <div className="flex min-w-0 items-center gap-2">
-          <ContextIndicator scope={context.scope} detail={context.label} />
+          <ContextIndicator
+            scope={context.scope}
+            detail={context.label}
+            compact
+          />
           <GlobalQTrigger variant="header" />
         </div>
       </div>
