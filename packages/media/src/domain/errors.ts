@@ -66,3 +66,73 @@ export class MediaRuleError extends Error {
     this.name = "MediaRuleError";
   }
 }
+
+/**
+ * The deployment has no video provider for this operation (CQ-MEDIA-010).
+ *
+ * Raised instead of pretending: there is no fake upload target, no fake
+ * playback token and no "ready" that did not happen. `missing` names the
+ * environment variables an operator must set — names only, never values —
+ * so the failure is specific enough to fix and safe enough to show.
+ */
+export class MediaProviderNotConfiguredError extends Error {
+  readonly code = "MEDIA_PROVIDER_NOT_CONFIGURED" as const;
+  readonly operation: string;
+  readonly missing: readonly string[];
+
+  constructor(operation: string, missing: readonly string[]) {
+    super(
+      missing.length === 0
+        ? `No video provider is configured for ${operation}.`
+        : `No video provider is configured for ${operation}: set ${missing.join(", ")}.`,
+    );
+    this.name = "MediaProviderNotConfiguredError";
+    this.operation = operation;
+    this.missing = missing;
+  }
+}
+
+/**
+ * How a provider call fails, in Capital Q's words. The vendor's own status
+ * and reason code travel as private diagnostics; the message is a plain
+ * sentence that names no host, no token and no request.
+ */
+export const MEDIA_PROVIDER_FAILURES = [
+  /** The credential was refused. A configuration fault, not a user's. */
+  "AUTHENTICATION",
+  "RATE_LIMITED",
+  /** The provider refused what Capital Q asked for. */
+  "REJECTED",
+  /** Network, timeout or a 5xx: the provider could not answer. */
+  "UNAVAILABLE",
+  /** An answer arrived that does not have the shape the vendor documents. */
+  "MALFORMED_RESPONSE",
+] as const;
+export type MediaProviderFailure = (typeof MEDIA_PROVIDER_FAILURES)[number];
+
+export class MediaProviderError extends Error {
+  readonly provider: string;
+  readonly failure: MediaProviderFailure;
+  /** The provider's HTTP status, when there was one. */
+  readonly status: number | null;
+  /** The provider's own code, for private diagnostics only. */
+  readonly providerCode: string | null;
+
+  constructor(input: {
+    readonly provider: string;
+    readonly failure: MediaProviderFailure;
+    readonly operation: string;
+    readonly status?: number | null | undefined;
+    readonly providerCode?: string | null | undefined;
+    readonly cause?: unknown;
+  }) {
+    super(`The video provider could not complete ${input.operation}.`, {
+      cause: input.cause,
+    });
+    this.name = "MediaProviderError";
+    this.provider = input.provider;
+    this.failure = input.failure;
+    this.status = input.status ?? null;
+    this.providerCode = input.providerCode ?? null;
+  }
+}

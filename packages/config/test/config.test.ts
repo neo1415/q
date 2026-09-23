@@ -139,6 +139,8 @@ describe("per-service isolation", () => {
     expect(Object.keys(api.public).sort()).toEqual([
       "documentUploadMaxBytes",
       "modelProviders",
+      "qApiBaseUrl",
+      "videoProviders",
     ]);
     expect(api.public.documentUploadMaxBytes).toBe(26214400);
     expect(api.secrets.supabaseSecretKey).toBeUndefined();

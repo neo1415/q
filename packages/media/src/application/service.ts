@@ -1,4 +1,6 @@
+import type { VideoProviderCapabilities } from "../contracts/provider.js";
 import { createPostgresMediaRepositories } from "../infrastructure/postgres-media-repository.js";
+import { createUnconfiguredVideoProvider } from "../infrastructure/unconfigured-video-provider.js";
 import type { MediaServiceDependencies } from "./dependencies.js";
 import {
   createAttachProviderAsset,
@@ -36,21 +38,41 @@ export type MediaService = {
     typeof createRecordProviderMetadata
   >;
   readonly setMediaStates: ReturnType<typeof createSetMediaStates>;
+  /**
+   * Which provider this deployment composed and what it can do. Names and
+   * booleans only — safe for a health line, useless to an attacker.
+   */
+  readonly provider: {
+    readonly id: string;
+    readonly capabilities: VideoProviderCapabilities;
+  };
 };
 
 export type MediaServiceOptions = Omit<
   MediaServiceDependencies,
-  "repositories"
+  "repositories" | "videoProvider"
 > & {
   readonly repositories?: MediaRepositories | undefined;
+  /** Absent means the explicit unconfigured provider, which refuses by name. */
+  readonly videoProvider?:
+    MediaServiceDependencies["videoProvider"] | undefined;
 };
 
 export function createMediaService(options: MediaServiceOptions): MediaService {
   const dependencies: MediaServiceDependencies = {
     ...options,
     repositories: options.repositories ?? createPostgresMediaRepositories(),
+    videoProvider:
+      options.videoProvider ??
+      createUnconfiguredVideoProvider({
+        missing: ["CLOUDFLARE_ACCOUNT_ID", "CLOUDFLARE_STREAM_API_TOKEN"],
+      }),
   };
   return {
+    provider: {
+      id: dependencies.videoProvider.id,
+      capabilities: dependencies.videoProvider.capabilities,
+    },
     createCompanyPitch: createCreateCompanyPitch(dependencies),
     getCompanyPitch: createGetCompanyPitch(dependencies),
     listCompanyMedia: createListCompanyMedia(dependencies),

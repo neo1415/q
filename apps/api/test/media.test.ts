@@ -5,6 +5,8 @@ import { parseApiConfig } from "@capital-q/config/api";
 import {
   MediaAssetNotFoundError,
   MediaOwnerNotFoundError,
+  MediaProviderError,
+  MediaProviderNotConfiguredError,
   MediaReplacementConflictError,
   type MediaAsset,
   type MediaService,
@@ -250,6 +252,71 @@ describe("GET /v1/companies/:companyId/pitch", () => {
     expect(response.statusCode).toBe(422);
     expect(calls["get"]).toHaveLength(0);
     await app.close();
+  });
+
+  // CQ-MEDIA-010: a missing provider is said plainly, with the variable
+  // names and nothing else; a provider that answered badly is a closed door
+  // with no vendor detail on it. Neither becomes a 500 and neither leaks.
+  it("names the missing provider configuration, and hides provider failures", async () => {
+    const { service: unconfigured } = fakeService({
+      getCompanyPitch: () =>
+        Promise.reject(
+          new MediaProviderNotConfiguredError("playback", [
+            "CLOUDFLARE_STREAM_CUSTOMER_SUBDOMAIN",
+          ]),
+        ),
+    });
+    const app = buildApp({
+      principal: PRINCIPAL,
+      context: CONTEXT,
+      service: unconfigured,
+    });
+    const response = await app.inject({ method: "GET", url: pitchUrl });
+    expect(response.statusCode).toBe(503);
+    const problem = response.json<{ code: string; detail?: string }>();
+    expect(problem.code).toBe("PROVIDER_UNAVAILABLE");
+    expect(problem.detail).toBe(
+      "MEDIA_PROVIDER_NOT_CONFIGURED: No video provider is configured for playback: set CLOUDFLARE_STREAM_CUSTOMER_SUBDOMAIN.",
+    );
+    await app.close();
+
+    const { service: failing } = fakeService({
+      getCompanyPitch: () =>
+        Promise.reject(
+          new MediaProviderError({
+            provider: "CLOUDFLARE_STREAM",
+            failure: "AUTHENTICATION",
+            operation: "asset status",
+            status: 401,
+            providerCode: "10000",
+          }),
+        ),
+    });
+    const failingApp = buildApp({
+      principal: PRINCIPAL,
+      context: CONTEXT,
+      service: failing,
+    });
+    const failed = await failingApp.inject({ method: "GET", url: pitchUrl });
+    expect(failed.statusCode).toBe(503);
+    expect(failed.json()).toMatchObject({ code: "PROVIDER_UNAVAILABLE" });
+    expect(failed.payload).not.toContain("CLOUDFLARE");
+    expect(failed.payload).not.toContain("401");
+    expect(failed.payload).not.toContain("10000");
+    await failingApp.close();
+
+    // Every other error still reaches the application's own handler.
+    const { service: absent } = fakeService({
+      getCompanyPitch: () => Promise.reject(new MediaAssetNotFoundError()),
+    });
+    const absentApp = buildApp({
+      principal: PRINCIPAL,
+      context: CONTEXT,
+      service: absent,
+    });
+    const notFound = await absentApp.inject({ method: "GET", url: pitchUrl });
+    expect(notFound.statusCode).toBe(404);
+    await absentApp.close();
   });
 });
 

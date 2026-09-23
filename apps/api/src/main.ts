@@ -119,9 +119,11 @@ import {
   DOCUMENT_UPLOAD_SESSION_TTL_SECONDS,
 } from "@capital-q/evidence";
 import {
+  createCloudflareStreamVideoProvider,
   createCompanyMediaOwnerResolver,
   createMediaOwnerResolverRegistry,
   createMediaService,
+  createUnconfiguredVideoProvider,
 } from "@capital-q/media";
 import {
   createPostgresTaxonomyAssignmentRepository,
@@ -487,8 +489,28 @@ const evidence = createEvidenceService({
       }),
 });
 
-// Pitch media. No provider is configured or needed: this composes the
-// record-keeping domain only, and holds no video credential of any kind.
+// Pitch media. The Cloudflare Stream adapter is composed only when its
+// credential is configured (CQ-MEDIA-010); the token is revealed here and
+// nowhere else. Without it the Media context holds an explicit unconfigured
+// provider that refuses every upload and playback by naming what is missing.
+const cloudflareStream = config.secrets.videoProviders.cloudflareStream;
+const videoProvider =
+  cloudflareStream === undefined
+    ? createUnconfiguredVideoProvider({
+        missing: config.public.videoProviders.missing,
+      })
+    : createCloudflareStreamVideoProvider({
+        accountId: cloudflareStream.accountId,
+        apiToken: cloudflareStream.apiToken.reveal(),
+        customerSubdomain: cloudflareStream.customerSubdomain,
+        signingKey:
+          cloudflareStream.signingKey === undefined
+            ? undefined
+            : {
+                keyId: cloudflareStream.signingKey.keyId,
+                pem: cloudflareStream.signingKey.pem.reveal(),
+              },
+      });
 const media = createMediaService({
   sql: database.sql,
   transactions: database.transactions,
@@ -500,6 +522,7 @@ const media = createMediaService({
   ]),
   outbox,
   audit,
+  videoProvider,
 });
 
 // Discovery (doc 19): the founder side still reads the deterministic

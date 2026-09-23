@@ -24,6 +24,13 @@ import {
   toSupabaseAuthConfig,
   type SupabaseAuthConfig,
 } from "./supabase-auth.js";
+import {
+  toVideoProviderSecrets,
+  videoProviderConfigStatus,
+  videoProviderEnvShape,
+  type VideoProviderConfigStatus,
+  type VideoProviderSecrets,
+} from "./video-providers.js";
 
 /** Local default. Hosting platforms inject PORT. */
 export const API_DEFAULT_PORT = 3001;
@@ -60,6 +67,10 @@ const apiEnvSchema = z.object({
   // by a second implementation here. Optional: with no URL the /say route
   // closes, which is a closed door rather than a quietly worse Q.
   CQ_Q_API_URL: z.string().url("expected an absolute http(s) URL").optional(),
+  // Pitch video (CQ-MEDIA-010). Optional: without it the Media context
+  // composes an explicit unconfigured provider that refuses every upload
+  // and playback by name, and the rest of the API still serves.
+  ...videoProviderEnvShape,
 });
 
 /**
@@ -71,6 +82,8 @@ export type ApiSecrets = {
   readonly supabaseSecretKey: string | undefined;
   /** Inference credentials for the GateQ applicant interview. */
   readonly modelProviders: ModelProviderSecrets;
+  /** Cloudflare Stream credentials for pitch video. */
+  readonly videoProviders: VideoProviderSecrets;
 };
 
 /** Non-secret operational values safe to expose in diagnostics. */
@@ -80,6 +93,8 @@ export type ApiPublicConfig = {
   readonly qApiBaseUrl: string | undefined;
   /** Which providers are configured. Names and booleans, never keys. */
   readonly modelProviders: ModelProviderConfigStatus;
+  /** Whether pitch video can be uploaded and played. Names, never keys. */
+  readonly videoProviders: VideoProviderConfigStatus;
 };
 
 export type ApiConfig = {
@@ -95,6 +110,7 @@ export type ApiConfig = {
 export function parseApiConfig(env: EnvironmentInput): ApiConfig {
   const parsed = parseConfig("api", apiEnvSchema, env);
   const runtime = toRuntimeConfig(parsed);
+  const videoProviders = toVideoProviderSecrets(parsed);
 
   return {
     runtime,
@@ -112,10 +128,12 @@ export function parseApiConfig(env: EnvironmentInput): ApiConfig {
       documentUploadMaxBytes: parsed.CQ_DOCUMENT_UPLOAD_MAX_BYTES,
       qApiBaseUrl: parsed.CQ_Q_API_URL?.replace(/\/$/, ""),
       modelProviders: modelProviderConfigStatus(toModelProviderSecrets(parsed)),
+      videoProviders: videoProviderConfigStatus(videoProviders),
     },
     secrets: {
       supabaseSecretKey: parsed.SUPABASE_SECRET_KEY,
       modelProviders: toModelProviderSecrets(parsed),
+      videoProviders,
     },
   };
 }

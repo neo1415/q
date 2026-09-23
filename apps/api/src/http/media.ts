@@ -4,14 +4,19 @@ import {
   COMPANY_PITCH_SUFFIX,
   CorrelationIdSchema,
   CreateCompanyPitchRequestSchema,
+  createProblemDetails,
   parseContract,
+  PROBLEM_CONTENT_TYPE,
   UuidSchema,
   type CorrelationId,
   type MediaAssetDto,
+  type ProblemDetails,
 } from "@capital-q/contracts";
 import {
   DEFAULT_PITCH_DURATION_POLICY,
   MediaAssetIdSchema,
+  MediaProviderError,
+  MediaProviderNotConfiguredError,
   PREFERRED_PITCH_ASPECT_RATIO,
   toMediaAssetDto,
   type MediaAsset,
@@ -77,7 +82,68 @@ const GUIDANCE = {
   preferredAspectRatio: PREFERRED_PITCH_ASPECT_RATIO,
 } as const;
 
+/**
+ * What a caller is told when the video provider is the reason (CQ-MEDIA-010).
+ *
+ * Not configured is said plainly, with the variable names an operator must
+ * set, because a founder staring at a dead upload button deserves a cause
+ * and the names disclose nothing. A provider that answered badly is a
+ * closed door with no vendor, host, status or reason code on it: those
+ * stay in the server log. Anything else is not this function's to decide.
+ */
+export function mediaProviderProblem(
+  error: unknown,
+  requestId: string,
+): ProblemDetails | null {
+  if (error instanceof MediaProviderNotConfiguredError) {
+    return createProblemDetails({
+      code: "PROVIDER_UNAVAILABLE",
+      requestId,
+      detail: `${error.code}: ${error.message}`,
+    });
+  }
+  if (error instanceof MediaProviderError) {
+    return createProblemDetails({
+      code:
+        error.failure === "RATE_LIMITED"
+          ? "RATE_LIMITED"
+          : "PROVIDER_UNAVAILABLE",
+      requestId,
+      detail: "The video provider could not complete that. Try again shortly.",
+    });
+  }
+  return null;
+}
+
 export function registerMediaRoutes(
+  app: FastifyInstance,
+  dependencies: MediaRoutesDependencies,
+): void {
+  // Provider failures are translated here, in the one scope that can
+  // raise them; every other error keeps the application's handler.
+  const parentErrorHandler = app.errorHandler;
+  void app.register((scope, _options, done) => {
+    scope.setErrorHandler((error, request, reply) => {
+      const problem = mediaProviderProblem(error, request.id);
+      if (problem === null) {
+        parentErrorHandler(error, request, reply);
+        return;
+      }
+      request.log.warn(
+        { err: error, requestId: request.id },
+        "video provider refused or failed",
+      );
+      void reply
+        .status(problem.status)
+        .type(PROBLEM_CONTENT_TYPE)
+        .send(problem);
+    });
+    registerPitchRoutes(scope, dependencies);
+    done();
+  });
+}
+
+function registerPitchRoutes(
   app: FastifyInstance,
   dependencies: MediaRoutesDependencies,
 ): void {

@@ -15,9 +15,11 @@
  *   encoding status ≠ moderation status
  *   video quality ≠ investment quality
  *
- * No provider is implemented here. `VideoProvider` is the seam a later
- * adapter fills; nothing in this package calls a vendor API, holds a vendor
- * credential or knows a vendor's vocabulary.
+ * One provider is implemented, behind the `VideoProvider` port: Cloudflare
+ * Stream (CQ-MEDIA-010). Its vocabulary stops at its adapter file; the
+ * credential is revealed once at composition and appears nowhere else. A
+ * deployment without one holds the explicit unconfigured provider, which
+ * refuses every call by naming what is missing.
  *
  * Server-side only.
  */
@@ -26,12 +28,16 @@ export * from "./contracts/index.js";
 export * from "./contracts/provider.js";
 
 export {
+  MEDIA_PROVIDER_FAILURES,
   MediaAssetConflictError,
   MediaAssetNotFoundError,
   MediaOwnerNotFoundError,
+  MediaProviderError,
+  MediaProviderNotConfiguredError,
   MediaReplacementConflictError,
   MediaRuleError,
   MediaTransitionError,
+  type MediaProviderFailure,
 } from "./domain/errors.js";
 export {
   allowedTransitionsFrom,
@@ -88,5 +94,17 @@ export {
   createPostgresMediaAssetRepository,
   createPostgresMediaRepositories,
 } from "./infrastructure/postgres-media-repository.js";
+export {
+  CLOUDFLARE_STREAM_PROVIDER_ID,
+  classifyCloudflareStatus,
+  createCloudflareStreamVideoProvider,
+  translateCloudflareState,
+  type CloudflareStreamSigningKey,
+  type CloudflareStreamVideoProviderOptions,
+} from "./infrastructure/cloudflare-stream-video-provider.js";
+export {
+  UNCONFIGURED_VIDEO_PROVIDER_ID,
+  createUnconfiguredVideoProvider,
+} from "./infrastructure/unconfigured-video-provider.js";
 
 export const PACKAGE_NAME = "@capital-q/media" as const;

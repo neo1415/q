@@ -48,6 +48,10 @@
     "./model-providers": {
       "types": "./dist/model-providers.d.ts",
       "default": "./dist/model-providers.js"
+    },
+    "./video-providers": {
+      "types": "./dist/video-providers.d.ts",
+      "default": "./dist/video-providers.js"
     }
   },
   "main": "./dist/index.js",
