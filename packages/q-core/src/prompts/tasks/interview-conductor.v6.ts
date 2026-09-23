@@ -69,7 +69,9 @@ export const INTERVIEW_CONDUCTOR_V6: PromptDefinition<
 > = {
   ...INTERVIEW_CONDUCTOR_V5,
   version: 6,
-  status: "ACTIVE",
+  // Superseded by v7: the turn is read against every open step, not
+  // against the one question in hand.
+  status: "DEPRECATED",
   changeDescription:
     "QX-004 core gate: a step waiting for confirmation is decided in confirmations rather than answered again, and a turn about something else still answers what was said. Written after a held cheque was restated turn after turn — never committed — while the stages and geography the person actually gave were dropped.",
   effectiveFrom: "2026-09-23",

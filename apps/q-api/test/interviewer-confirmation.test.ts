@@ -201,7 +201,11 @@ describe("a material value waits for a yes", () => {
     expect(held.recorded).toEqual([]);
     // And Q asks about the value it is holding, not about the next step.
     expect(held.asking?.stepKey).toBe("F6.target_amount");
-    expect(held.reply).toContain("500000");
+    // Read back the way a person says it. The canonical 500000 is what
+    // reaches the owning service; it is not what reaches the person
+    // (Workstream A).
+    expect(held.reply).toContain("500,000");
+    expect(held.reply).not.toMatch(/\b500000\b/);
     expect(held.reply.toLowerCase()).toContain("is that right");
     // The model wanted to move on. It does not get to.
     expect(held.reply).not.toContain("What does the company do");
@@ -258,7 +262,7 @@ describe("a material value waits for a yes", () => {
     );
     // A correction is still a candidate: it is read back, not written.
     expect(written).toEqual([]);
-    expect(revised.reply).toContain("750000");
+    expect(revised.reply).toContain("750,000");
 
     const done = await interviewer.turn(turn(fetchFake, "Yes."));
     expect(done.recorded).toContain("F6.target_amount");
@@ -344,7 +348,7 @@ describe("a held value the model restates instead of deciding", () => {
     });
 
     const held = await interviewer.turn(turn(fetchFake, "Half a million."));
-    expect(held.reply).toContain("500000");
+    expect(held.reply).toContain("500,000");
 
     const next = await interviewer.turn(turn(fetchFake, "We're in Lagos."));
     // Still unconfirmed, so still unwritten: a restatement is not a yes.

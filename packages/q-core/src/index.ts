@@ -96,6 +96,7 @@ export { INTERVIEW_CONDUCTOR_V3 } from "./prompts/tasks/interview-conductor.v3.j
 export { INTERVIEW_CONDUCTOR_V4 } from "./prompts/tasks/interview-conductor.v4.js";
 export { INTERVIEW_CONDUCTOR_V5 } from "./prompts/tasks/interview-conductor.v5.js";
 export { INTERVIEW_CONDUCTOR_V6 } from "./prompts/tasks/interview-conductor.v6.js";
+export { INTERVIEW_CONDUCTOR_V7 } from "./prompts/tasks/interview-conductor.v7.js";
 export { DECISION_READER_V1 } from "./prompts/tasks/decision-reader.v1.js";
 export {
   DECISION_READER_SCHEMA_NAME,
@@ -146,16 +147,23 @@ export {
   INTERVIEW_CONDUCTOR_SCHEMA_NAME,
   INTERVIEW_CONDUCTOR_SCHEMA_VERSION,
   INTERVIEW_CONDUCTOR_V4_SCHEMA_VERSION,
+  INTERVIEW_CONDUCTOR_V5_SCHEMA_VERSION,
+  AnswerClaritySchema,
+  type AnswerClarity,
   InterviewConductorResultSchema,
   InterviewConductorV4ResultSchema,
+  InterviewConductorV5ResultSchema,
   InterviewConductorVariablesSchema,
   InterviewOpenStepSchema,
   type InterviewConductorResult,
   type InterviewConductorV3Result,
   type InterviewConductorV4Result,
+  type InterviewConductorV5Result,
   type InterviewConductorVariables,
   type InterviewConductorV3Variables,
+  type InterviewConductorV4Variables,
   InterviewConductorV3VariablesSchema,
+  InterviewConductorV4VariablesSchema,
   type InterviewOpenStep,
   INTERVIEW_DESTINATIONS,
   InterviewDestinationSchema,

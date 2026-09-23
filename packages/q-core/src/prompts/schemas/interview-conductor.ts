@@ -25,6 +25,7 @@ import {
 export const INTERVIEW_CONDUCTOR_SCHEMA_NAME = "InterviewConductorResult";
 export const INTERVIEW_CONDUCTOR_SCHEMA_VERSION = 3;
 export const INTERVIEW_CONDUCTOR_V4_SCHEMA_VERSION = 4;
+export const INTERVIEW_CONDUCTOR_V5_SCHEMA_VERSION = 5;
 
 const StepKey = z.string().min(1).max(64);
 
@@ -175,6 +176,45 @@ export const INTERVIEW_CONDUCTOR_V3_UNTRUSTED = [
   "memory",
 ] as const;
 
+/**
+ * v4 variables: v3's, plus what the person has already told Q that the
+ * journey could not take yet.
+ *
+ * A sentence answers several things at once — "I'm the founder, we just
+ * started investing, mostly fintech, and we're open globally" — and the
+ * journey will only accept them in its own order. Everything past the
+ * one step it is willing to take was being thrown away, so the question
+ * came round again later as though it had never been asked, which is the
+ * single behaviour that makes an interview feel like a form.
+ *
+ * The platform holds those readings and keeps trying to record them. It
+ * tells the model what it is holding so that Q does not ask for a thing
+ * it already has. CARRIED is the platform's own state, not the
+ * transcript: it is trusted in the same way KNOWN ANSWERS is, and the
+ * difference between them is that a carried value is not on the record
+ * yet. Q may say it has it; Q may not say it is saved.
+ */
+export const InterviewConductorV4VariablesSchema =
+  InterviewConductorV3VariablesSchema.extend({
+    carried: z
+      .array(
+        z.object({
+          stepKey: StepKey,
+          question: z.string().max(400),
+          value: z.string().max(400),
+        }),
+      )
+      .max(20)
+      .default([]),
+  }).strict();
+export type InterviewConductorV4Variables = z.infer<
+  typeof InterviewConductorV4VariablesSchema
+>;
+
+export const INTERVIEW_CONDUCTOR_V4_UNTRUSTED = [
+  ...INTERVIEW_CONDUCTOR_V3_UNTRUSTED,
+] as const;
+
 const AnswerValueSchema = z.union([
   z.string().max(2_000),
   z.array(z.string().max(120)).max(50),
@@ -302,5 +342,71 @@ export type InterviewConductorV4Result = z.infer<
   typeof InterviewConductorV4ResultSchema
 >;
 
+/**
+ * How settled a reading is — separately from how confident the model is
+ * that it read the right field.
+ *
+ * `confidence` answers "is this the step they meant"; this answers "do
+ * the words fix the value". They come apart on exactly the question that
+ * matters most: "maximum cheque is one hundred" names the field
+ * unmistakably and leaves the amount completely open, because a hundred
+ * what is the whole question. Recording 100 is wrong and guessing
+ * 100,000,000 is worse, so the platform records neither and asks.
+ */
+export const AnswerClaritySchema = z.enum([
+  /** The words fix the value; record it. */
+  "SETTLED",
+  /** A bare figure whose magnitude is not said: a hundred, fifty, three. */
+  "SCALE_UNCLEAR",
+  /** The quantity is fixed but what it counts is not. */
+  "UNIT_UNCLEAR",
+]);
+export type AnswerClarity = z.infer<typeof AnswerClaritySchema>;
+
+const AnswerV5Schema = z
+  .object({
+    stepKey: StepKey,
+    value: AnswerValueSchema,
+    confidence: z.enum(["HIGH", "MEDIUM"]),
+    clarity: AnswerClaritySchema.default("SETTLED"),
+  })
+  .strict();
+
+/**
+ * v4's result, plus the three readings a turn needs that it had no field
+ * for (Workstream A).
+ *
+ * All three are the ADR 0011 split: the model reads what somebody meant
+ * into a closed vocabulary, and the platform decides what that means in
+ * the domain. None of them is a value, and none of them records anything.
+ *
+ * **unrestricted** — "everywhere on the planet", "it can be anyone", "no
+ * preference". This is a real answer and it is not a skip, but it is
+ * rarely expressible as a list of option keys: the journey represents no
+ * geographic restriction as an empty geography, and no role preference as
+ * all three roles. Which of those it is depends on the step, so the step
+ * decides. Without it, "everywhere on the planet" went to the taxonomy
+ * classifier, matched nothing, recorded nothing, and the question came
+ * back — three times, in the live transcript.
+ *
+ * **clarity** — see AnswerClaritySchema.
+ *
+ * **frustrated** — "I already told you", "I'm getting angry". Repeating
+ * the parse that failed is the one response guaranteed to make it worse,
+ * so the platform stops asking and reconciles instead.
+ */
+export const InterviewConductorV5ResultSchema =
+  InterviewConductorV4ResultSchema.extend({
+    answers: z.array(AnswerV5Schema).max(12),
+    unrestricted: z
+      .array(z.object({ stepKey: StepKey }).strict())
+      .max(8)
+      .default([]),
+    frustrated: z.boolean().default(false),
+  }).strict();
+export type InterviewConductorV5Result = z.infer<
+  typeof InterviewConductorV5ResultSchema
+>;
+
 /** What the runtime works with: the newest shape. */
-export type InterviewConductorResult = InterviewConductorV4Result;
+export type InterviewConductorResult = InterviewConductorV5Result;

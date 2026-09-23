@@ -27,9 +27,9 @@ import {
   createDefaultPromptRegistry,
   DEFAULT_COMMUNICATION_PROFILE,
   renderPrompt,
-  InterviewConductorV4ResultSchema,
+  InterviewConductorV5ResultSchema,
   type InterviewConductorResult,
-  type InterviewConductorV3Variables,
+  type InterviewConductorV4Variables,
   type InterviewOpenStep,
   type PromptRegistry,
   personalityOf,
@@ -127,8 +127,54 @@ export type InterviewTurnInput = {
     readonly role: "person" | "q";
     readonly text: string;
   }[];
+  /**
+   * What Capital Q found on the public web about this subject, and what
+   * it looked for and could not find (Workstream C's presence reader).
+   *
+   * Structural rather than imported, so that the transport can be wired
+   * in the route without this module taking a dependency on the research
+   * packages. The caller maps the presence reader's own types onto it.
+   *
+   * Two rules, both enforced below rather than asked for politely:
+   *
+   * **It is never an answer.** These become platform NOTES — prose for
+   * the model to speak from — and never `answers`, never a candidate,
+   * never a commit. A page on the internet is provenance; only the
+   * person is authority. An absence is not evidence of anything either:
+   * "no public investment profile" says something about the web, not
+   * about them.
+   *
+   * **It never reaches an investor's mandate.** Declared Mandate is not
+   * Observed Behaviour and is not Q Inference. A finding about an
+   * investor may be spoken as context — "I couldn't find a public
+   * investment profile, and you said you have just started, so that
+   * makes sense" — and may never be offered for a mandate step.
+   */
+  readonly research?:
+    | {
+        readonly findings: readonly {
+          readonly statement: string;
+          readonly domains: readonly string[];
+          readonly stepKey: string | null;
+        }[];
+        readonly absences: readonly {
+          readonly code: string;
+          readonly stepKey: string | null;
+        }[];
+      }
+    | undefined;
   readonly signal?: AbortSignal | undefined;
 };
+
+/**
+ * Steps whose values are the investor's declared mandate.
+ *
+ * Nothing found on the public web may be offered for one of these, at
+ * any confidence, however plausible. An investor's mandate is a
+ * declaration they make; inferring it from a website and then ranking
+ * founders against the inference is the failure this exists to prevent.
+ */
+const MANDATE_PHASE = /^I[1-3]\./;
 
 export type InterviewOption = {
   readonly key: string;
@@ -295,6 +341,7 @@ function progressSentence(
       const value = describeValue(
         steps.get(step.stepKey),
         recorded.value,
+        recordedCurrency(view, steps),
       ).trim();
       if (value.length === 0) return null;
       return label === undefined || label.length === 0
@@ -457,6 +504,40 @@ type Pending = {
 };
 
 /**
+ * A step-shaped value the person gave that the journey has not recorded.
+ *
+ * Validated against the step the same way a recorded answer is — it went
+ * through `toResponseValue` — and then held, because the owning service
+ * is not ready for it. It carries what it is, not a promise that it will
+ * be kept: the ledger re-offers it every turn and drops it as soon as the
+ * session shows the step settled.
+ *
+ * Everything here has either been said plainly or been said yes to. A
+ * material value still awaiting its yes is not a candidate — it stays a
+ * pending confirmation, which is a different thing and already
+ * survives between turns.
+ */
+type Candidate = {
+  readonly stepKey: string;
+  readonly value: OnboardingResponseValue;
+  readonly spoken: string;
+  /** Commit attempts so far; a value the journey keeps refusing is let go. */
+  readonly attempts: number;
+};
+
+/**
+ * How many turns a candidate is re-offered before the platform stops.
+ *
+ * Generous, because the usual reason for a refusal is a prerequisite the
+ * interview is about to satisfy anyway; bounded, because a value the
+ * journey will never take should not be retried until the session ends,
+ * and should not be reported to the person as held.
+ */
+const MAX_CANDIDATE_ATTEMPTS = 12;
+/** Candidates held at once. Conversational state, not a queue. */
+const MAX_CARRIED = 16;
+
+/**
  * What one spoken interview turn may spend.
  *
  * The timings are set by the route above this one, not by the model: the
@@ -540,7 +621,43 @@ const UPLOAD_LINE =
  * argument with itself. A recovery message has one reason and one
  * question.
  */
+/**
+ * Questions whose own prompt is written in the platform's vocabulary
+ * rather than the person's (Workstream A).
+ *
+ * "Which mandate are we defining?" is a perfectly good label on a screen
+ * where the drafts are listed beside it, and it is nonsense said aloud
+ * to somebody who came to describe how they invest — they have never
+ * heard the word used that way and there is nothing on screen to explain
+ * it. Keyed by step key, so this is a presentation override for named
+ * steps and not an attempt to rewrite copy by matching words in it.
+ *
+ * It is a fallback: the mandate step is normally resolved by the
+ * platform without ever being asked (see `resolveSingleReference`), and
+ * this is what Q says in the rarer case where there is a genuine choice.
+ */
+const PLAIN_QUESTIONS: Readonly<Record<string, string>> = {
+  "I1.mandate_context":
+    "Are we setting up your main investment strategy, or a different one?",
+};
+
+/**
+ * What to call a step when reading a value back, rather than asking it.
+ *
+ * `questionFor` composes a question — "minimum cheque? Just the number
+ * is fine." — which is right when Q is asking and wrong when it already
+ * has the answer in hand. Here the step is a noun.
+ */
+function askLabel(step: OnboardingStepManifest): string {
+  return (PLAIN_QUESTIONS[step.stepKey] ?? step.configuration.prompt).replace(
+    /\?+$/,
+    "",
+  );
+}
+
 function questionFor(step: OnboardingStepManifest): string {
+  const plain = PLAIN_QUESTIONS[step.stepKey];
+  if (plain !== undefined) return plain;
   const c = step.configuration;
   const prompt = c.prompt.replace(/[.?!]+$/, "");
   switch (c.stepType) {
@@ -629,9 +746,67 @@ function optionsOf(step: OnboardingStepManifest): readonly InterviewOption[] {
   return [];
 }
 
+/**
+ * Steps whose numbers are money.
+ *
+ * Read off the step key rather than off a unit, because the journey's
+ * range steps carry no currency of their own — the currency is a
+ * separate step, which is exactly why "50000" could be spoken as a bare
+ * integer for as long as it was.
+ */
+const MONEY_STEP = /cheque|target_amount|valuation|round_size|revenue|mrr|arr/i;
+
+/** The symbol for each currency the journey offers. Domain reference data. */
+const CURRENCY_SYMBOLS: Readonly<Record<string, string>> = {
+  usd: "$",
+  eur: "€",
+  gbp: "£",
+  ngn: "₦",
+  kes: "KSh",
+  zar: "R",
+  aed: "AED ",
+  inr: "₹",
+  sgd: "S$",
+};
+
+/**
+ * A stored figure as a person would say it (Workstream A).
+ *
+ * Capital Q keeps the canonical number — 50000 is what goes to the
+ * owning service, and nothing here changes that. This is only how the
+ * same number is rendered when Q speaks or writes it, because live Q
+ * said "Minimum cheque: 50000. Is that right?" at somebody, and a
+ * machine reading its own database out loud is the least institutional
+ * thing a product can do.
+ *
+ * Millions and billions are named; everything else is grouped. A figure
+ * that is not a round million keeps one decimal ("1.5 million") rather
+ * than becoming a seven-digit string again.
+ */
+export function spokenFigure(value: number): string {
+  if (!Number.isFinite(value)) return String(value);
+  const say = (n: number, scale: string): string => {
+    const rounded = Math.round(n * 10) / 10;
+    return `${Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1)} ${scale}`;
+  };
+  const magnitude = Math.abs(value);
+  if (magnitude >= 1e9) return say(value / 1e9, "billion");
+  if (magnitude >= 1e6) return say(value / 1e6, "million");
+  return new Intl.NumberFormat("en-GB").format(value);
+}
+
+/** A figure with its currency in front of it, when the step is money. */
+export function spokenMoney(value: number, currency: string | null): string {
+  const symbol =
+    currency === null ? "" : (CURRENCY_SYMBOLS[currency.toLowerCase()] ?? "");
+  return `${symbol}${spokenFigure(value)}`;
+}
+
 function describeValue(
   step: OnboardingStepManifest | undefined,
   value: OnboardingResponseValue,
+  /** The currency the session has recorded, for money steps. */
+  currency?: string | null,
 ): string {
   const options = step === undefined ? [] : optionsOf(step);
   const label = (key: string) =>
@@ -641,8 +816,13 @@ function describeValue(
       return label(value.optionKey);
     case "MULTI_SELECT":
       return value.optionKeys.map(label).join(", ");
-    case "RANGE":
-      return value.value;
+    case "RANGE": {
+      const number = Number.parseFloat(value.value);
+      if (!Number.isFinite(number)) return value.value;
+      return step !== undefined && MONEY_STEP.test(step.stepKey)
+        ? spokenMoney(number, currency ?? null)
+        : spokenFigure(number);
+    }
     case "TEXT":
       return value.text.slice(0, 300);
     case "CONFIRMATION":
@@ -650,6 +830,26 @@ function describeValue(
     case "RESOURCE_REFERENCE":
       return `${String(value.resourceIds.length)} recorded`;
   }
+}
+
+/**
+ * The currency the session holds, as the cheque steps' option key.
+ *
+ * Null until the currency step is answered, which is a real state and
+ * not a reason to invent dollars: an unlabelled "50,000" is honest,
+ * and "$50,000" against a naira mandate is not.
+ */
+function recordedCurrency(
+  view: OnboardingSessionView,
+  steps: ReadonlyMap<string, OnboardingStepManifest>,
+): string | null {
+  for (const response of view.responses) {
+    if (!/\.currency$/.test(response.stepKey)) continue;
+    if (response.value.type !== "SINGLE_SELECT") continue;
+    if (steps.get(response.stepKey) === undefined) continue;
+    return response.value.optionKey;
+  }
+  return null;
 }
 
 /**
@@ -1036,6 +1236,111 @@ function toResponseValue(
   }
 }
 
+/**
+ * What "no restriction" means for one step (Workstream A).
+ *
+ * The model reads that somebody placed no restriction on something —
+ * "everywhere on the planet", "it can be anyone", "we don't mind". What
+ * that IS depends entirely on the step, and the step is the platform's
+ * to read, not the model's:
+ *
+ * - A multi-select whose options are the whole range of an answer
+ *   (lead, co-invest, follow) records no preference as all of them.
+ *   "It can be anyone" is a real, recordable answer there.
+ * - A single-select whose vocabulary already contains a no-preference
+ *   code records that code. `any` is a canonical option key in the
+ *   Investor constraint registry, not a word matched in prose.
+ * - A taxonomy step records no restriction as no entries: the journey
+ *   itself says "leave empty for anywhere". There is no node for
+ *   everywhere, so a list is the wrong shape and SET_ASIDE is the
+ *   journey's own way of saying it.
+ *
+ * Anything else — a required free-text answer, a number — genuinely
+ * cannot represent it, and the honest outcome is to ask.
+ */
+type UnrestrictedOutcome =
+  | { readonly kind: "VALUE"; readonly value: OnboardingResponseValue }
+  | { readonly kind: "SET_ASIDE" }
+  | { readonly kind: "CANNOT" };
+
+export function unrestrictedOutcome(
+  step: OnboardingStepManifest,
+): UnrestrictedOutcome {
+  const c = step.configuration;
+  switch (c.stepType) {
+    case "multi_select": {
+      const keys = c.options
+        .map((option) => option.optionKey)
+        .filter((key) => !c.exclusiveOptionKeys.includes(key))
+        .slice(0, c.maxSelections);
+      return keys.length === 0
+        ? { kind: "CANNOT" }
+        : { kind: "VALUE", value: { type: "MULTI_SELECT", optionKeys: keys } };
+    }
+    case "single_select": {
+      const none = c.options.find((option) => option.optionKey === "any");
+      return none === undefined
+        ? { kind: "CANNOT" }
+        : {
+            kind: "VALUE",
+            value: { type: "SINGLE_SELECT", optionKey: none.optionKey },
+          };
+    }
+    case "reference_select":
+      // Every reference step in the journey is optional and means
+      // "anything" when empty. A required one would be a different
+      // decision, and the journey does not have one.
+      return step.required ? { kind: "CANNOT" } : { kind: "SET_ASIDE" };
+    case "range":
+    case "short_text":
+    case "long_text":
+    case "voice_text":
+    case "confirmation":
+    case "document_upload":
+      return { kind: "CANNOT" };
+  }
+}
+
+/**
+ * A cheque figure that contradicts one already on the record
+ * (Workstream A).
+ *
+ * "Maximum cheque is one hundred" against a minimum of fifty thousand is
+ * not a maximum, it is a scale that was never said. The model is asked
+ * to mark that as SCALE_UNCLEAR, and usually does; this is the
+ * deterministic half, because a guessed magnitude is one of the few
+ * mistakes here that silently changes who an investor is shown.
+ *
+ * The domain invariant is the check — minimum ≤ typical ≤ maximum —
+ * rather than any threshold anybody invented. It never guesses the
+ * intended value; it only says the pair cannot both be right.
+ */
+const CHEQUE_ORDER = ["cheque_min", "cheque_typical", "cheque_max"] as const;
+
+export function chequeContradiction(
+  stepKey: string,
+  value: OnboardingResponseValue,
+  recorded: ReadonlyMap<string, number>,
+): boolean {
+  if (value.type !== "RANGE") return false;
+  const suffix = stepKey.split(".").at(-1);
+  const position = CHEQUE_ORDER.indexOf(
+    suffix as (typeof CHEQUE_ORDER)[number],
+  );
+  if (position < 0) return false;
+  const proposed = Number.parseFloat(value.value);
+  if (!Number.isFinite(proposed)) return false;
+  const prefix = stepKey.slice(0, stepKey.length - (suffix?.length ?? 0));
+  for (const [index, name] of CHEQUE_ORDER.entries()) {
+    if (index === position) continue;
+    const other = recorded.get(`${prefix}${name}`);
+    if (other === undefined) continue;
+    if (index < position && proposed < other) return true;
+    if (index > position && proposed > other) return true;
+  }
+  return false;
+}
+
 export function createInterviewer(dependencies: InterviewerDependencies) {
   const registry = dependencies.registry ?? createDefaultPromptRegistry();
   const { gateway, logger } = dependencies;
@@ -1102,6 +1407,39 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
   // Asides since the last recorded answer: the first two are answered in
   // full, later ones steer back (the prompt reads the count).
   const tangentsBySession = new Map<string, number>();
+  /**
+   * What the person has told Q that the journey has not taken yet
+   * (Workstream A — the carry-forward ledger).
+   *
+   * This is the fix for the behaviour that made the interview feel like
+   * a form. A sentence answers four things; the journey will accept one
+   * of them today, because the rest have prerequisites or are not yet
+   * eligible; and every version until now simply dropped the other
+   * three. So the same questions came round later, and the person had
+   * to say it all again, and Q looked like it had not been listening.
+   *
+   * A candidate is a validated, step-shaped value that has not been
+   * recorded. It is NOT a record and Q may never say it is saved — the
+   * whole point of the separation is that KNOWN ANSWERS stays the only
+   * proof of what is held. Every turn, the ledger is offered to the
+   * owning service again through the ordinary validated submit; whatever
+   * it accepts becomes a real answer and leaves the ledger, and whatever
+   * it still refuses waits for the next turn.
+   */
+  const carriedBySession = new Map<string, Candidate[]>();
+  /**
+   * How many turns running Q has asked the same step.
+   *
+   * Two components each behaving correctly can still produce a loop, and
+   * the person on the other end of it has no way to break out. The
+   * count is the platform's, taken from what the platform itself asked,
+   * and at the third time of asking Q stops asking and says what it
+   * needs instead.
+   */
+  const repeatsBySession = new Map<
+    string,
+    { readonly stepKey: string; readonly count: number }
+  >();
   const personality = personalityOf(dependencies.personality);
   /**
    * What is remembered, for this turn. A failed recall is an empty
@@ -1197,6 +1535,48 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
   };
 
   /**
+   * What the public web said, as something Q found rather than
+   * something Capital Q knows (Workstream C interface).
+   *
+   * Rendered as notes and nothing else. The model cannot turn a note
+   * into a record — only `answers` reach the submit path, and every
+   * answer is still validated against its step — so this is prose to
+   * speak from, offered and confirmable, never asserted.
+   *
+   * A finding pointed at an investor's mandate step is dropped here
+   * rather than rewritten: Declared Mandate is not Q Inference, and the
+   * safe rendering of a mandate finding is no rendering at all. What is
+   * left is the honest analyst's version — what the site presents, and
+   * what was looked for and not found — which the person then tells Q
+   * the truth about.
+   */
+  const researchNotes = (
+    input: InterviewTurnInput,
+    view: OnboardingSessionView,
+  ): readonly string[] => {
+    const research = input.research;
+    if (research === undefined) return [];
+    const answered = new Set(view.responses.map((r) => r.stepKey));
+    const notes: string[] = [];
+    for (const finding of research.findings.slice(0, 3)) {
+      if (finding.stepKey !== null && answered.has(finding.stepKey)) continue;
+      if (finding.stepKey !== null && MANDATE_PHASE.test(finding.stepKey)) {
+        continue;
+      }
+      const where = finding.domains[0];
+      notes.push(
+        `Found on the public web${where === undefined ? "" : ` (${where})`}: "${finding.statement.slice(0, 200)}". It is unverified and it is NOT on their record. Offer it in your own words as something you found and ask whether it is right; never state it as fact.`,
+      );
+    }
+    for (const absence of research.absences.slice(0, 2)) {
+      notes.push(
+        `Looked for ${absence.code} on the public web and found nothing. That says something about the web, not about them: it is not a gap, not a doubt and not a criterion. Mention it only if it makes the conversation more natural, and never as a shortcoming.`,
+      );
+    }
+    return notes.slice(0, 3);
+  };
+
+  /**
    * What Q asked last turn, as a note the model can act on.
    *
    * Only when it differs from the session's current step: saying it twice
@@ -1216,6 +1596,102 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
     ];
   };
 
+  /**
+   * Record the one candidate a reference step offers, if it offers one.
+   *
+   * Returns the session as it stands afterwards. A refusal is not an
+   * error worth surfacing — the step simply stays open and Q asks it in
+   * plain words — so the original view is returned and the interview
+   * carries on.
+   */
+  const resolveSingleReference = async (
+    input: InterviewTurnInput,
+    view: OnboardingSessionView,
+  ): Promise<OnboardingSessionView> => {
+    const current = view.currentStep;
+    if (current === null || current === undefined) return view;
+    if (current.presentation.stepType !== "reference_select") return view;
+    const context = current.context;
+    if (context === undefined) return view;
+    const suggested = context["suggestedMandateId"];
+    if (typeof suggested !== "string" || suggested.length === 0) return view;
+    const resourceType = current.presentation.resourceType;
+    if (resourceType === "TAXONOMY_NODE") return view;
+    try {
+      return await submitOnboardingResponse(
+        input.session,
+        input.onboardingSessionId,
+        {
+          stepKey: current.stepKey,
+          response: {
+            value: {
+              type: "RESOURCE_REFERENCE",
+              resourceType,
+              resourceIds: [suggested],
+            },
+          },
+          expectedSessionVersion: view.session.version,
+        },
+        randomUUID(),
+      );
+    } catch (error: unknown) {
+      logger.warn(
+        { err: error, stepKey: current.stepKey },
+        "the single reference candidate was not accepted; Q will ask instead",
+      );
+      return view;
+    }
+  };
+
+  /** Put a validated value in the ledger, or refresh the one already there. */
+  const carry = (sessionId: string, candidate: Candidate): void => {
+    const held = carriedBySession.get(sessionId) ?? [];
+    const without = held.filter((item) => item.stepKey !== candidate.stepKey);
+    carriedBySession.set(
+      sessionId,
+      [...without, candidate].slice(-MAX_CARRIED),
+    );
+  };
+
+  /** Drop a step from the ledger: it is settled, one way or another. */
+  const stopCarrying = (sessionId: string, stepKey: string): void => {
+    const held = carriedBySession.get(sessionId);
+    if (held === undefined) return;
+    carriedBySession.set(
+      sessionId,
+      held.filter((item) => item.stepKey !== stepKey),
+    );
+  };
+
+  /**
+   * Everything still worth carrying, with what the session has settled
+   * taken out.
+   *
+   * A candidate whose step is now COMPLETED or SKIPPED is not carried:
+   * it is answered, and telling the model otherwise would invite Q to
+   * raise something the person has finished with. This is the same
+   * discipline as `notesFor` — the platform's own state decides, every
+   * turn, and nothing accumulates because it was once true.
+   */
+  const carriedFor = (
+    sessionId: string,
+    view: OnboardingSessionView,
+  ): readonly Candidate[] => {
+    const held = carriedBySession.get(sessionId) ?? [];
+    const settled = new Set(
+      view.progress.eligibleSteps
+        .filter((s) => s.status === "COMPLETED" || s.status === "SKIPPED")
+        .map((s) => s.stepKey),
+    );
+    for (const response of view.responses) settled.add(response.stepKey);
+    const kept = held.filter(
+      (item) =>
+        !settled.has(item.stepKey) && item.attempts < MAX_CANDIDATE_ATTEMPTS,
+    );
+    carriedBySession.set(sessionId, kept);
+    return kept;
+  };
+
   return {
     /** Forget conversational state for a session (it ended). */
     forget: (sessionId: string) => {
@@ -1226,6 +1702,8 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
       unrecordedBySession.delete(sessionId);
       askedBySession.delete(sessionId);
       tangentsBySession.delete(sessionId);
+      carriedBySession.delete(sessionId);
+      repeatsBySession.delete(sessionId);
     },
 
     turn: async (input: InterviewTurnInput): Promise<InterviewTurnOutcome> => {
@@ -1234,6 +1712,30 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
         input.session,
         input.onboardingSessionId,
       );
+
+      /**
+       * A choice with exactly one candidate is not a question
+       * (Workstream A).
+       *
+       * The investor journey requires a mandate to be selected before
+       * anything in I2 can be written, and it is a reference step whose
+       * candidates only exist on the view while it is the current step.
+       * So the model cannot answer it — it has no identifier to give —
+       * and the conversation stalls there while every cheque, stage and
+       * geography behind it is refused for wanting it. That is the
+       * prerequisite cascade behind most of the lost answers in the
+       * QX-004 transcripts.
+       *
+       * The journey itself says when there is nothing to choose:
+       * `suggestedMandateId` is its own field, documented as set when
+       * exactly one draft exists and can be preselected. That is the
+       * platform's authority, not a guess made here, so the platform
+       * acts on it, records it through the ordinary submit under the
+       * person's own token, and the person is never asked a question
+       * about an internal concept they have no way to answer.
+       */
+      view = await resolveSingleReference(input, view);
+
       const statuses = new Map(
         view.progress.eligibleSteps.map((s) => [s.stepKey, s.status]),
       );
@@ -1268,14 +1770,20 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
         if (open !== null) openSteps.push(compact(open));
         if (openSteps.length >= MAX_OPEN_STEPS) break;
       }
+      const currency = recordedCurrency(view, steps);
       const knownAnswers = view.responses.map((r) => {
         const step = steps.get(r.stepKey);
         return {
           stepKey: r.stepKey,
           question: step?.configuration.prompt ?? r.stepKey,
-          value: describeValue(step, r.value),
+          // Rendered the way Q would say it, so that a model echoing a
+          // held figure echoes "£50,000" and never "50000". Canonical
+          // numbers stay canonical where they matter — in the value that
+          // goes to the owning service.
+          value: describeValue(step, r.value, currency),
         };
       });
+      const carried = carriedFor(input.onboardingSessionId, view);
       const pending = pendingFor(input.onboardingSessionId);
       // Proposals lifted from the person's documents, still unconfirmed and
       // not already held by Q: Q reads them back like its own readings.
@@ -1286,7 +1794,7 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
       );
 
       const variables: Omit<
-        InterviewConductorV3Variables,
+        InterviewConductorV4Variables,
         | "operatingMode"
         | "communicationProfile"
         | "communicationGuidance"
@@ -1302,6 +1810,12 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
         knownAnswers,
         openSteps,
         currentStepKey: view.currentStep?.stepKey ?? null,
+        carried: carried.map((item) => ({
+          stepKey: item.stepKey,
+          question:
+            steps.get(item.stepKey)?.configuration.prompt ?? item.stepKey,
+          value: item.spoken,
+        })),
         pendingConfirmations: pending.map((p) => ({
           stepKey: p.stepKey,
           question: p.question,
@@ -1310,13 +1824,18 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
         documentProposals: proposals.map((p) => ({
           stepKey: p.stepKey,
           question: steps.get(p.stepKey)?.configuration.prompt ?? p.stepKey,
-          value: describeValue(steps.get(p.stepKey), p.suggestedValue),
+          value: describeValue(
+            steps.get(p.stepKey),
+            p.suggestedValue,
+            currency,
+          ),
         })),
         notes: [
           ...signupNotes(input, view, steps),
+          ...researchNotes(input, view),
           ...askedNote(input.onboardingSessionId, view),
           ...notesFor(input.onboardingSessionId, view),
-        ],
+        ].slice(0, 6),
         recentTurns: input.recentTurns.slice(-MAX_RECENT_TURNS).map((t) => ({
           role: t.role,
           text: t.text.slice(0, RECENT_TURN_MAX_CHARS),
@@ -1324,7 +1843,7 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
         utterance: input.utterance.slice(0, 2_000),
         memory: await recallMemory(input.attribution),
       };
-      const rendered = renderPrompt<InterviewConductorV3Variables>(registry, {
+      const rendered = renderPrompt<InterviewConductorV4Variables>(registry, {
         task: "INTERVIEW_CONDUCTOR",
         charter: "Q_SYSTEM_VOICE",
         operatingMode: "ASSESSMENT",
@@ -1364,7 +1883,7 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
               : { dataPosture: dependencies.dataPosture }),
           },
           {
-            schema: InterviewConductorV4ResultSchema,
+            schema: InterviewConductorV5ResultSchema,
             ...(input.signal === undefined ? {} : { signal: input.signal }),
           },
         );
@@ -1466,6 +1985,17 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
       const commit = async (
         stepKey: string,
         value: OnboardingResponseValue,
+        /**
+         * True for the ledger's background re-offers (Workstream A).
+         *
+         * A carried value being refused again is the expected case — its
+         * prerequisite is simply not met yet — and it is not something
+         * to interrupt the person about. Counting it as `unsaved` would
+         * put "that one didn't go in" in front of every reply for as
+         * long as the ledger held anything, which is the loop this whole
+         * change exists to end. It is still logged.
+         */
+        quietly = false,
       ) => {
         try {
           view = await submitOnboardingResponse(
@@ -1482,9 +2012,10 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
           return true;
         } catch (error: unknown) {
           logger.warn(
-            { err: error, stepKey },
+            { err: error, stepKey, quietly },
             "interview answer was not accepted",
           );
+          if (quietly) return false;
           unsaved.push(stepKey);
           /**
            * Why the owning service said no, in its own words.
@@ -1574,7 +2105,24 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
           continue;
         }
         if (decision.decision === "CONFIRMED") {
-          await commit(held.stepKey, held.value);
+          /**
+           * They said yes and the journey said not yet (Workstream A).
+           *
+           * The worst possible place to lose a value: the person has
+           * read it back, agreed to it, and been told it is theirs.
+           * Before this it was dropped and asked for again from scratch.
+           * It is now carried with the yes attached — it is no longer a
+           * proposal, it is a confirmed value waiting for a
+           * prerequisite — so the ledger records it as soon as it can.
+           */
+          if (!(await commit(held.stepKey, held.value))) {
+            carry(input.onboardingSessionId, {
+              stepKey: held.stepKey,
+              value: held.value,
+              spoken: held.spoken,
+              attempts: 1,
+            });
+          }
         } else if (
           decision.decision === "REVISED" &&
           decision.value !== undefined
@@ -1607,6 +2155,23 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
        * here, and the person is told where the upload lives.
        */
       const spokenUploads: OnboardingStepManifest[] = [];
+      /**
+       * Figures the platform will not guess the scale of (Workstream A).
+       *
+       * Collected here and asked about below, in the step's own terms.
+       * Nothing is recorded for one of these: a value whose magnitude was
+       * never said is not a value, and both of the available guesses are
+       * wrong in a way that quietly changes who this investor is shown.
+       */
+      const unscaled: { step: OnboardingStepManifest; said: string }[] = [];
+      /** Money already on the record, for the ordering check below. */
+      const recordedAmounts = new Map<string, number>(
+        view.responses.flatMap((r) =>
+          r.value.type === "RANGE" && Number.isFinite(Number(r.value.value))
+            ? [[r.stepKey, Number(r.value.value)] as const]
+            : [],
+        ),
+      );
       for (const answer of result.answers) {
         const step = steps.get(answer.stepKey);
         const status = statuses.get(answer.stepKey);
@@ -1627,12 +2192,17 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
          * — a correction supersedes, it does not erase.
          */
         const correcting = result.intent === "CORRECTION";
+        if (step === undefined) continue;
         if (
-          step === undefined ||
-          status === undefined ||
-          (status === "COMPLETED" && !correcting)
-        )
+          (status === "COMPLETED" ||
+            view.responses.some((r) => r.stepKey === answer.stepKey)) &&
+          !correcting
+        ) {
+          // Already answered and not being corrected: nothing to do, and
+          // nothing to carry either.
+          stopCarrying(input.onboardingSessionId, answer.stepKey);
           continue;
+        }
         if (step.configuration.stepType === "document_upload") {
           // Nothing said can be a document. What they have is noted in
           // the reply; the step is settled below so it is not asked again.
@@ -1641,19 +2211,142 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
         }
         const value = toResponseValue(step, answer.value);
         if (value === null) {
-          rejected.push(step);
+          /**
+           * A reading the step will not take.
+           *
+           * Only worth saying so when it is the question in hand. A
+           * volunteered aside that did not map to some step five phases
+           * away is not something to interrupt the conversation about —
+           * Q asks that step properly when it gets there, which is what
+           * it would have done anyway.
+           */
+          if (
+            answer.stepKey === view.currentStep?.stepKey ||
+            answer.stepKey ===
+              askedBySession.get(input.onboardingSessionId)?.step
+          ) {
+            rejected.push(step);
+          }
           continue;
         }
-        if (isMaterial(step.stepKey) || answer.confidence === "MEDIUM") {
+        /**
+         * A figure whose scale was never said, or which contradicts one
+         * already on the record. Neither is recorded and neither is
+         * guessed; Q asks, in the step's own terms.
+         */
+        if (
+          // A reading with no clarity at all is SETTLED: the gateway's
+          // schema defaults it, and a caller that stubs the gateway is
+          // not making a claim about scale.
+          (answer.clarity !== undefined && answer.clarity !== "SETTLED") ||
+          chequeContradiction(step.stepKey, value, recordedAmounts)
+        ) {
+          unscaled.push({
+            step,
+            said: describeValue(step, value, currency),
+          });
+          continue;
+        }
+        /**
+         * Where this answer goes (Workstream A).
+         *
+         * Three destinations, and the choice is the platform's:
+         *
+         * **Read back first** for the values the domain will not take on
+         * one person's say-so — money and exclusions. Those are what an
+         * investor is judged on, and a wrong one is expensive. They said
+         * it this turn, so Q reads it back this turn (A §13); what is
+         * new is that a yes the journey then refuses no longer loses it.
+         *
+         * **Recorded** otherwise — and that is now most answers. Q used
+         * to read back anything the model marked MEDIUM, which is
+         * anything it inferred rather than heard verbatim, which is most
+         * of a natural conversation: "I'm the founder" came back as "so
+         * your role is Founder, is that right?". Asking somebody to
+         * confirm what they have just plainly said is not diligence, it
+         * is a form with a voice. Unambiguous meaning, a domain that can
+         * hold it, and no material-risk rule over it: record it.
+         */
+        if (isMaterial(step.stepKey)) {
           nextPending.push({
             stepKey: step.stepKey,
             question: step.configuration.prompt,
             value,
-            spoken: describeValue(step, value),
+            spoken: describeValue(step, value, currency),
           });
           continue;
         }
-        await commit(step.stepKey, value);
+        if (!(await commit(step.stepKey, value))) {
+          /**
+           * The journey would not take it YET.
+           *
+           * Before this, that was the end of it: the answer was dropped,
+           * a note said so for a turn or two, and the step came round
+           * later as though it had never been mentioned. Now the
+           * validated value is held and offered again every turn, so a
+           * thing said early is recorded the moment its prerequisites
+           * are met and is never asked for twice.
+           */
+          carry(input.onboardingSessionId, {
+            stepKey: step.stepKey,
+            value,
+            spoken: describeValue(step, value, currency),
+            attempts: 1,
+          });
+        }
+      }
+
+      /**
+       * 2b. No restriction, which is an answer and not a silence.
+       *
+       * "Everywhere on the planet" was reaching the taxonomy classifier,
+       * matching nothing, recording nothing, and leaving the geography
+       * question to be asked again — three times in the live transcript,
+       * with the person saying the same thing more emphatically each
+       * time. The model now names the step; the step says what no
+       * restriction means for it, because that is domain knowledge and
+       * not something to be read out of somebody's phrasing.
+       */
+      for (const item of result.unrestricted ?? []) {
+        const step = steps.get(item.stepKey);
+        if (step === undefined) continue;
+        if (view.responses.some((r) => r.stepKey === item.stepKey)) continue;
+        const status = statuses.get(item.stepKey);
+        if (status === "COMPLETED" || status === "SKIPPED") continue;
+        const outcome = unrestrictedOutcome(step);
+        if (outcome.kind === "VALUE") {
+          if (!(await commit(step.stepKey, outcome.value))) {
+            carry(input.onboardingSessionId, {
+              stepKey: step.stepKey,
+              value: outcome.value,
+              spoken: describeValue(step, outcome.value, currency),
+              attempts: 1,
+            });
+          }
+          continue;
+        }
+        if (outcome.kind === "SET_ASIDE") {
+          // The journey's own way of recording "anywhere": nothing
+          // listed. Not a skip in the sense of declining to answer —
+          // they answered, and this is what the answer looks like here.
+          try {
+            view = await skipOnboardingStep(
+              input.session,
+              input.onboardingSessionId,
+              step.stepKey,
+              { expectedSessionVersion: view.session.version },
+              randomUUID(),
+            );
+            skipped.push(step.stepKey);
+            stopCarrying(input.onboardingSessionId, step.stepKey);
+          } catch (error: unknown) {
+            logger.warn(
+              { err: error, stepKey: step.stepKey },
+              "an unrestricted step was not set aside",
+            );
+          }
+        }
+        // CANNOT: the step genuinely has no way to say it. Q asks it.
       }
 
       // 3. Categories: phrases → the platform's own candidates, read back.
@@ -1713,11 +2406,65 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
               // Fall through to holding it for confirmation.
             }
           }
-          nextPending.push({
-            stepKey: step.stepKey,
-            question: c.prompt,
-            value,
-            spoken: labels.join(", "),
+          /**
+           * Categories take the same three roads as any other answer
+           * (Workstream A).
+           *
+           * Before this they were always read back, which is where
+           * "fintech and software" turned into a confirmation question
+           * instead of an answer. The classifier has already done the
+           * only part that needed checking — these are the platform's
+           * own nodes, not the model's words — so a sector list is
+           * recorded like anything else, and only the exclusion steps,
+           * which the domain treats as material, are read back.
+           *
+           * And when the journey will not take it yet, it is carried
+           * rather than dropped. The taxonomy lookup that produced it
+           * cost a round trip; doing it again next turn would cost
+           * another, and doing it never is how the answer disappeared.
+           */
+          const spoken = labels.join(", ");
+          if (isMaterial(step.stepKey)) {
+            nextPending.push({
+              stepKey: step.stepKey,
+              question: c.prompt,
+              value,
+              spoken,
+            });
+          } else if (!(await commit(step.stepKey, value))) {
+            carry(input.onboardingSessionId, {
+              stepKey: step.stepKey,
+              value,
+              spoken,
+              attempts: 1,
+            });
+          }
+        }
+      }
+
+      /**
+       * 3b. Offer everything still in the ledger (Workstream A).
+       *
+       * This is where a thing said early actually lands. Its
+       * prerequisites are commonly satisfied by something recorded
+       * earlier in this same turn — a role and a deployment status given
+       * in one breath, where the second needed the first — so the ledger
+       * is worked after the turn's own answers rather than before.
+       *
+       * Nothing here needs anybody's permission: a value only reaches
+       * the ledger once it has been said plainly or said yes to. A
+       * material value still waiting for its yes stays a pending
+       * confirmation, which already survives between turns.
+       */
+      for (const candidate of carriedFor(input.onboardingSessionId, view)) {
+        if (recorded.includes(candidate.stepKey)) continue;
+        if (nextPending.some((p) => p.stepKey === candidate.stepKey)) continue;
+        if (await commit(candidate.stepKey, candidate.value, true)) {
+          stopCarrying(input.onboardingSessionId, candidate.stepKey);
+        } else {
+          carry(input.onboardingSessionId, {
+            ...candidate,
+            attempts: candidate.attempts + 1,
           });
         }
       }
@@ -1794,10 +2541,32 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
        * times). So Q says what it could not place, and asks the one thing
        * that settles it, in the step's own terms.
        */
+      /**
+       * A figure with no scale is asked about before anything else
+       * (Workstream A).
+       *
+       * Ahead of the guards below, because it is the one case where
+       * carrying on would record a number nobody meant. The question
+       * names the step and offers the two magnitudes rather than
+       * choosing one: "maximum cheque — a hundred thousand, or a hundred
+       * million?" is answerable in one word, where "how much?" starts
+       * the whole exchange again.
+       */
+      const needsScale = unscaled[0];
+      if (needsScale !== undefined) {
+        const label = needsScale.step.configuration.prompt
+          .replace(/\?+$/, "")
+          .toLowerCase();
+        reply = `I want to get the scale right on the ${label} — you said ${needsScale.said}. Is that thousands, millions, or exactly that?`;
+        result = { ...result, askNext: needsScale.step.stepKey };
+      }
       const unplaced = rejected.find(
         (step) => !recorded.includes(step.stepKey),
       );
-      if (unplaced !== undefined) {
+      if (needsScale !== undefined) {
+        // Already answered above; the guards below are about a different
+        // failure and saying both at once is two apologies in a row.
+      } else if (unplaced !== undefined) {
         reply = clarificationFor(unplaced);
         result = { ...result, askNext: unplaced.stepKey };
       } else if (
@@ -2203,12 +2972,20 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
             canonicalJsonStringify(item.value)
         );
       });
-      if (heldNow !== undefined && fromState === null) {
+      if (
+        heldNow !== undefined &&
+        fromState === null &&
+        needsScale === undefined
+      ) {
         const heldStep = steps.get(heldNow.stepKey);
+        // Said the way a person says it, not the way it is stored: this
+        // sentence is the single most common place a raw figure reached
+        // somebody. "Minimum cheque: 50000. Is that right?" was a real
+        // line Q said out loud.
         const question =
           heldStep === undefined
             ? `Is ${heldNow.spoken} right?`
-            : `${heldStep.configuration.prompt.replace(/\?+$/, "")}: ${heldNow.spoken}. Is that right?`;
+            : `${askLabel(heldStep)}: ${heldNow.spoken}. Is that right?`;
         // Keep the model's first sentence, which is its reading of what
         // they said, and drop whatever it asked after it.
         //
@@ -2293,8 +3070,80 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
         }
       }
 
-      const askStep =
+      /**
+       * The same question, a third time (Workstream A).
+       *
+       * Two components each behaving correctly can still build a loop,
+       * and the person inside it has no way out: they answer, something
+       * fails to parse, the same words come back, and every repetition
+       * makes them less willing to rephrase. Q asked "which sectors and
+       * product areas?" four times running in the live transcript.
+       *
+       * The count is the platform's own — taken from what the platform
+       * asked, not inferred from the transcript — and at the third time
+       * Q stops asking. It says what it is missing and what it can take,
+       * in the step's own terms, which is the one thing that had not
+       * been tried.
+       *
+       * A turn that recorded something resets it: progress means the
+       * exchange is working, whatever it looks like.
+       */
+      let askStep =
         result.askNext === null ? undefined : steps.get(result.askNext);
+      const repeated = repeatsBySession.get(input.onboardingSessionId);
+      const repeats =
+        askStep === undefined
+          ? 0
+          : recorded.length > 0 || skipped.length > 0
+            ? 1
+            : repeated?.stepKey === askStep.stepKey
+              ? repeated.count + 1
+              : 1;
+      if (askStep === undefined) {
+        repeatsBySession.delete(input.onboardingSessionId);
+      } else {
+        repeatsBySession.set(input.onboardingSessionId, {
+          stepKey: askStep.stepKey,
+          count: repeats,
+        });
+      }
+      /**
+       * They have told Q it is not listening, and they are usually right
+       * — something they said did not go in.
+       *
+       * The worst available response is the question that already
+       * failed, so it is not asked. What is said instead is composed
+       * from state: what the platform is still holding for them, and the
+       * one thing it does not have, in plain words.
+       */
+      const stuck =
+        askStep !== undefined && (repeats > 2 || result.frustrated === true);
+      if (stuck && askStep !== undefined) {
+        const holding = carriedFor(input.onboardingSessionId, view);
+        const heard =
+          holding.length === 0
+            ? ""
+            : ` I do have ${holding
+                .map((item) => item.spoken)
+                .slice(0, 3)
+                .join(
+                  ", ",
+                )} from you, and I'm still getting those onto your record.`;
+        const wanted = askStep;
+        const choices = optionsOf(wanted)
+          .map((option) => option.label)
+          .slice(0, 6);
+        const plainly =
+          choices.length === 0
+            ? `The one thing I still don't have is ${wanted.configuration.prompt.replace(/\?+$/, "").toLowerCase()}.`
+            : `The one thing I still don't have is ${wanted.configuration.prompt.replace(/\?+$/, "").toLowerCase()} — I can take any of ${choices.join(", ")}.`;
+        reply = `Sorry — you did tell me, and I didn't get it down.${heard} ${plainly}`;
+        repeatsBySession.set(input.onboardingSessionId, {
+          stepKey: wanted.stepKey,
+          count: 0,
+        });
+        askStep = wanted;
+      }
       const askOpen = askStep === undefined ? null : toOpenStep(askStep, view);
       if (askOpen !== null) {
         askedBySession.set(input.onboardingSessionId, {
