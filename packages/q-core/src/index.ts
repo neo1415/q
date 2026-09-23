@@ -94,6 +94,7 @@ export { INTERVIEW_CONDUCTOR_V1 } from "./prompts/tasks/interview-conductor.v1.j
 export { INTERVIEW_CONDUCTOR_V2 } from "./prompts/tasks/interview-conductor.v2.js";
 export { INTERVIEW_CONDUCTOR_V3 } from "./prompts/tasks/interview-conductor.v3.js";
 export { INTERVIEW_CONDUCTOR_V4 } from "./prompts/tasks/interview-conductor.v4.js";
+export { INTERVIEW_CONDUCTOR_V5 } from "./prompts/tasks/interview-conductor.v5.js";
 export { DECISION_READER_V1 } from "./prompts/tasks/decision-reader.v1.js";
 export {
   DECISION_READER_SCHEMA_NAME,

@@ -47,7 +47,8 @@ export const INTERVIEW_CONDUCTOR_V4: PromptDefinition<
 > = {
   ...INTERVIEW_CONDUCTOR_V3,
   version: 4,
-  status: "ACTIVE",
+  // Deprecated by v5, which stops the model writing names.
+  status: "DEPRECATED",
   changeDescription:
     "QX-004 core gate: a question about the step's own options or about progress is answered from the session rather than sent away to be researched. The model names which, in a closed field; the runtime writes the answer, so it arrives even with no provider available.",
   effectiveFrom: "2026-09-22",

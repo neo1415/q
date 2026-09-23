@@ -14,6 +14,7 @@ import {
 import { fetchMe } from "@capital-q/api-client";
 import { createCorrelationId, getMeter } from "@capital-q/observability";
 import { AuthenticationRequiredError } from "@capital-q/security";
+import { signupContextFromToken } from "./interviewer.js";
 import { extractBearerToken } from "@capital-q/security/supabase";
 
 import {
@@ -290,6 +291,10 @@ export function registerQVoiceRoutes(
           const opening = await interviewer.turn({
             session: { baseUrl: apiBaseUrl, accessToken },
             onboardingSessionId: input.onboarding.sessionId,
+            // The opening line is where sign-up context matters most:
+            // greeting somebody by name and offering the organisation
+            // they registered with, rather than asking cold.
+            signup: signupContextFromToken(accessToken),
             journeyType: input.onboarding.journeyType,
             channel: "voice",
             attribution: {

@@ -283,6 +283,20 @@ export type InterviewConductorV3Result = z.infer<
 export const InterviewConductorV4ResultSchema =
   InterviewConductorResultSchema.extend({
     answerFromState: z.enum(["OPTIONS", "PROGRESS"]).nullable().default(null),
+    /**
+     * They asked to leave the rest of the optional questions and finish.
+     *
+     * Distinct from a skip, which is about the one step in hand. Somebody
+     * who says "skip the optional detail, I'd like to finish" is asking
+     * to leave a run of them, and answering that with a single skip walks
+     * them into the next optional question — and the next, and the next.
+     * Fifteen times, in the investor journey (local, 2026-09-22).
+     *
+     * The model reads the intent; the platform decides what it means.
+     * Required steps are never skipped however anyone phrases it: they
+     * are the journey's own statement of what it cannot do without.
+     */
+    skipRemainingOptional: z.boolean().default(false),
   }).strict();
 export type InterviewConductorV4Result = z.infer<
   typeof InterviewConductorV4ResultSchema

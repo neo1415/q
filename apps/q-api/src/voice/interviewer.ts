@@ -100,6 +100,28 @@ export type InterviewTurnInput = {
   };
   /** Empty for the opening line. */
   readonly utterance: string;
+  /**
+   * What they typed when they created the account (QX-004 core gate §2).
+   *
+   * Captured at sign-up and then, until now, never used: Q asked "what is
+   * the name of your firm?" of somebody who had just written it into the
+   * registration form. That is the single most obvious way for a product
+   * to look like it is not paying attention.
+   *
+   * It is a CANDIDATE and nothing more. Text a person typed into a form
+   * is not an authoritative organisation, it is not a membership, and it
+   * is certainly not proof that this is the entity they are setting up —
+   * somebody may register with their employer's name and invest through
+   * a separate vehicle. So it is offered for confirmation and recorded
+   * only once they say yes, which is the ordinary path every other answer
+   * takes.
+   */
+  readonly signup?:
+    | {
+        readonly displayName: string | null;
+        readonly organisationName: string | null;
+      }
+    | undefined;
   readonly recentTurns: readonly {
     readonly role: "person" | "q";
     readonly text: string;
@@ -235,10 +257,13 @@ function optionsSentence(view: OnboardingSessionView): string | null {
  * arithmetic — not something to look up, and not a reason to re-ask the
  * field they were on.
  */
-function progressSentence(view: OnboardingSessionView): string {
+function progressSentence(
+  view: OnboardingSessionView,
+  steps: ReadonlyMap<string, OnboardingStepManifest>,
+): string {
   const eligible = view.progress.eligibleSteps;
-  const done = eligible.filter((step) => step.status === "COMPLETED").length;
-  const left = Math.max(0, eligible.length - done);
+  const done = eligible.filter((step) => step.status === "COMPLETED");
+  const left = Math.max(0, eligible.length - done.length);
   const current = view.currentStep?.prompt?.trim() ?? "";
   // Only when the step's prompt is actually a question. Some are bare
   // labels — "Your firm" — and reading one out is the exact thing that
@@ -247,10 +272,179 @@ function progressSentence(view: OnboardingSessionView): string {
   const where = /\?$/.test(current)
     ? ` We are on this one: ${current.replace(/\?+$/, "")}.`
     : "";
-  if (done === 0) {
-    return `We have not recorded anything yet — there are ${String(left)} to go.${where}`;
+  if (done.length === 0) {
+    return `Nothing is on your record yet — there are ${String(left)} to go.${where}`;
   }
-  return `${String(done)} of ${String(eligible.length)} answered, ${String(left)} to go.${where}`;
+
+  /**
+   * What is covered, named from the recorded answers themselves.
+   *
+   * Read from `view.responses`, which is the owning service's answer to
+   * "what do you hold", and never from anything the person said in
+   * conversation. The two came apart live: every provider was down, three
+   * answers went nowhere, and Q still reported "we have your type, which
+   * is Angel, and your firm, Zino Aviation" — from its own memory of the
+   * turns, against a session holding nothing at all.
+   */
+  const named = done
+    .map((step) => {
+      const recorded = view.responses.find((r) => r.stepKey === step.stepKey);
+      if (recorded === undefined) return null;
+      const label = steps.get(step.stepKey)?.configuration.prompt.trim();
+      const value = describeValue(
+        steps.get(step.stepKey),
+        recorded.value,
+      ).trim();
+      if (value.length === 0) return null;
+      return label === undefined || label.length === 0
+        ? value
+        : `${label.replace(/\?+$/, "")}: ${value}`;
+    })
+    .filter((line): line is string => line !== null)
+    .slice(0, 6);
+
+  const list =
+    named.length === 0 ? "" : ` On your record so far: ${named.join("; ")}.`;
+  return `${String(done.length)} of ${String(eligible.length)} answered, ${String(left)} to go.${list}${where}`;
+}
+
+/**
+ * Put the name Capital Q holds where the model left a placeholder
+ * (QX-004 core gate §7).
+ *
+ * Live, an investor whose firm is Zino Aviation was greeted about the
+ * "Zinoevation mandate". The prompt had asked the model to open by the
+ * firm's name, and a model writing prose will occasionally write a name
+ * that is nearly right — which, for a name, is wrong. It is the first
+ * thing somebody reads, and getting it wrong says Capital Q does not
+ * know who they are.
+ *
+ * The model now writes `<them>`; the authoritative value is substituted
+ * here. When nothing is recorded there is nothing to substitute, and the
+ * placeholder is removed along with the article in front of it, so the
+ * sentence reads as a shade less warm rather than as a gap. Less warm
+ * and true beats warm and wrong.
+ */
+export function withKnownName(
+  reply: string,
+  organisation: string | null,
+): string {
+  if (!reply.includes("<them>")) return reply;
+  if (organisation !== null && organisation.length > 0) {
+    return reply.replaceAll("<them>", organisation);
+  }
+  return reply
+    .replace(/\b(?:the|your|their)\s+<them>\b/g, "your organisation")
+    .replaceAll("<them>", "your organisation")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
+
+export type OnboardingRefusal = {
+  /**
+   * The service's own sentence, kept for the log and for the rare refusal
+   * that names no step.
+   *
+   * NOT the thing a person hears when the refusal is a prerequisite: a
+   * backend validation message is a diagnostic, it is written for whoever
+   * is reading the logs, and making it the words Q speaks would turn it
+   * into a UX contract that nobody meant to sign. What Q says is composed
+   * from `needs` and the step's own question.
+   */
+  readonly because: string | null;
+  /**
+   * The step the service says must be answered first, when it named one.
+   *
+   * The journey has prerequisites, and it reports a missed one as a
+   * validation code shaped `<step>_required` — "mandate_context_required",
+   * "investor_type_required". That is the authoritative answer to "what
+   * should Q ask next", so it is the one used: no guessing at an order, no
+   * list of steps kept in step with the definition by hand.
+   */
+  readonly needs: string | null;
+};
+
+/**
+ * What an owning service said when it refused an answer.
+ *
+ * Its own sentence and the step it named, and nothing else: a status code
+ * is not something to read out, a stack is not either, and a message
+ * Capital Q did not compose has no business being spoken. Both are null
+ * whenever the refusal carries neither, and Q falls back to saying plainly
+ * that it did not go in.
+ */
+export function readRefusal(error: unknown): OnboardingRefusal {
+  const nothing: OnboardingRefusal = { because: null, needs: null };
+  if (typeof error !== "object" || error === null) return nothing;
+  const problem = (error as { readonly problem?: unknown }).problem;
+  if (typeof problem !== "object" || problem === null) return nothing;
+
+  const sentence = (value: unknown): string | null => {
+    if (typeof value !== "string") return null;
+    const trimmed = value.trim();
+    if (trimmed.length === 0 || trimmed.length > 200) return null;
+    return /[.!?]$/.test(trimmed) ? trimmed : `${trimmed}.`;
+  };
+
+  const errors = (problem as { readonly errors?: unknown }).errors;
+  const first: unknown = Array.isArray(errors) ? errors[0] : undefined;
+  const violation =
+    typeof first === "object" && first !== null
+      ? (first as { readonly code?: unknown; readonly message?: unknown })
+      : undefined;
+
+  const code = typeof violation?.code === "string" ? violation.code : "";
+  const required = /^(.+)_required$/.exec(code);
+  return {
+    because:
+      sentence(violation?.message) ??
+      sentence((problem as { readonly detail?: unknown }).detail),
+    needs: required?.[1] ?? null,
+  };
+}
+
+/**
+ * What somebody typed when they created the account, read from their own
+ * access token (QX-004 core gate §2).
+ *
+ * Supabase carries `user_metadata` in the JWT, which is where the sign-up
+ * form's name and organisation land. Reading it here rather than asking
+ * the browser to send it keeps the browser out of it entirely: the token
+ * is already the person's proof of who they are, and a field a client
+ * could set would be a field a client could lie about.
+ *
+ * It is bounded and treated as text a person typed. Never authority.
+ */
+export function signupContextFromToken(accessToken: string): {
+  readonly displayName: string | null;
+  readonly organisationName: string | null;
+} {
+  const nothing = { displayName: null, organisationName: null };
+  try {
+    const payload = accessToken.split(".")[1];
+    if (payload === undefined) return nothing;
+    const decoded: unknown = JSON.parse(
+      Buffer.from(payload, "base64url").toString("utf8"),
+    );
+    const metadata =
+      typeof decoded === "object" && decoded !== null
+        ? (decoded as { readonly user_metadata?: unknown }).user_metadata
+        : undefined;
+    if (typeof metadata !== "object" || metadata === null) return nothing;
+    const read = (key: string, max: number): string | null => {
+      const value = (metadata as Record<string, unknown>)[key];
+      if (typeof value !== "string") return null;
+      const trimmed = value.trim();
+      return trimmed.length === 0 || trimmed.length > max ? null : trimmed;
+    };
+    return {
+      displayName: read("display_name", 80),
+      organisationName: read("organisation_name", 120),
+    };
+  } catch {
+    // A token we cannot read is a person we greet without their details.
+    return nothing;
+  }
 }
 
 /** Pending confirmations per onboarding session; conversational, in memory. */
@@ -273,14 +467,27 @@ type Pending = {
  * second most of the time and in sixteen sometimes, and the sixteens took
  * the whole turn with them.
  *
- * Twelve seconds leaves room for the interview's own round trips on
- * either side and for one fall to the next route inside the deadline.
- * Two attempts rather than four for the same reason: a dialogue turn that
- * needs four has already lost the person, and the honest degradation
- * above is better than a fourth try nobody waits for.
+ * The attempt timeout is what keeps a slow generation from eating the
+ * turn; the attempt COUNT is what lets the turn reach a second provider.
+ * Cutting the count to two conflated them, and the local harness caught
+ * it in seconds: with Gemini's two models answering 503, both attempts
+ * were spent inside Google and Groq — configured, healthy, a second away
+ * — was never asked. A budget must be able to walk the route it was
+ * given.
+ *
+ * So: four attempts, twelve seconds each. Four is the length of the
+ * fallback chain. Twelve because Gemini refuses a request deadline under
+ * ten seconds outright, and a budget below that turns every Gemini call
+ * into an HTTP 400 — which it did, for a while, silently, behind a
+ * genuine outage. The adapter floors what it sends the vendor now, but a
+ * caller budget that aborts before the vendor's own minimum is still a
+ * caller asking for something it cannot have.
+ *
+ * A turn that outlasts the route's twenty-second deadline is one the
+ * deadline speaks to, which it now does.
  */
 const DIALOGUE_BUDGET = {
-  maxAttempts: 2,
+  maxAttempts: 4,
   maxEstimatedCostUsd: 0.1,
   maxOutputTokens: 2_048,
   attemptTimeoutMs: 12_000,
@@ -321,7 +528,18 @@ const UPLOAD_LINE =
   "Whenever you like, add the deck or model on screen from your company page; I'll carry on here.";
 
 /** What Q asks when an answer could not be placed against the step. */
-function clarificationFor(step: OnboardingStepManifest): string {
+/**
+ * The step asked again, and nothing else.
+ *
+ * Split out from `clarificationFor` so that a caller which has already
+ * said why it is asking does not say it twice. Two guards each doing
+ * their job produced "Sorry — I didn't catch that well enough to write it
+ * down. I didn't quite catch that. Which sectors and product areas?" —
+ * one apology per guard, stacked, which reads as a machine having an
+ * argument with itself. A recovery message has one reason and one
+ * question.
+ */
+function questionFor(step: OnboardingStepManifest): string {
   const c = step.configuration;
   const prompt = c.prompt.replace(/[.?!]+$/, "");
   switch (c.stepType) {
@@ -330,18 +548,30 @@ function clarificationFor(step: OnboardingStepManifest): string {
       const labels = optionsOf(step)
         .map((o) => o.label)
         .slice(0, 7);
-      return `I couldn't place that. ${prompt}: ${labels.join(", ")}?`;
+      return `${prompt}: ${labels.join(", ")}?`;
     }
     case "range":
-      return `Just the number, please: ${prompt.toLowerCase()}?`;
+      return `${prompt.toLowerCase()}? Just the number is fine.`;
     case "short_text":
     case "long_text":
     case "voice_text":
     case "document_upload":
     case "confirmation":
     case "reference_select":
-      return `I didn't quite catch that. ${prompt}?`;
+      return `${prompt}?`;
   }
+}
+
+/** The step asked again, with a reason in front of it. */
+function clarificationFor(step: OnboardingStepManifest): string {
+  const c = step.configuration;
+  const lead =
+    c.stepType === "single_select" || c.stepType === "multi_select"
+      ? "I couldn't place that."
+      : c.stepType === "range"
+        ? "Sorry, I need a number."
+        : "I didn't quite catch that.";
+  return `${lead} ${questionFor(step)}`;
 }
 
 /**
@@ -829,6 +1059,45 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
    * web says about their company does not need to hear it again.
    */
   const researchedBySession = new Map<string, Set<string>>();
+  /**
+   * The step Q asked last turn, per session.
+   *
+   * The session's `currentStepKey` is where the journey is; it is not
+   * necessarily what Q just asked. When somebody says "skip the rest, I'd
+   * like to finish", Q jumps to the required step at the end — and the
+   * session's current step stays on the optional one it skipped past. The
+   * next turn's prompt carried only the session's version, so the model
+   * read "Balanced" against a question about sectors to avoid, made
+   * nothing of it, and walked the person back into the optional chain it
+   * had just agreed to leave. Their answer went nowhere (local,
+   * 2026-09-22).
+   *
+   * So what Q asked is remembered and told to the model as a platform
+   * note. Runtime state, not transcript inference: the runtime composed
+   * that question, so the runtime knows what it was.
+   */
+  const askedBySession = new Map<string, { step: string; question: string }>();
+  /**
+   * What the person said that the runtime did NOT record, per session
+   * (QX-004 core gate: state authority).
+   *
+   * The conversation is not the record, and the two came apart live:
+   * every provider was down, three answers went nowhere, and on the next
+   * turn Q reported "we have your type, which is Angel, and your firm,
+   * Zino Aviation" — read out of its own memory of the turns, against a
+   * session holding nothing at all.
+   *
+   * The model needs the transcript to reason with, so taking it away is
+   * the wrong fix. Telling it the truth is the right one: these go into
+   * the prompt's `notes`, which say what was said and not kept, and the
+   * charter says what that means. An entry is dropped as soon as the
+   * session shows the step recorded, because by then it is no longer
+   * true.
+   */
+  const unrecordedBySession = new Map<
+    string,
+    { readonly stepKey: string | null; readonly said: string }[]
+  >();
   // Asides since the last recorded answer: the first two are answered in
   // full, later ones steer back (the prompt reads the count).
   const tangentsBySession = new Map<string, number>();
@@ -853,6 +1122,99 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
   };
   const expressive = dependencies.expressive ?? false;
 
+  /** Remember that something was said and not kept. Bounded. */
+  const noteUnrecorded = (
+    sessionId: string,
+    stepKey: string | null,
+    said: string,
+  ): void => {
+    const held = unrecordedBySession.get(sessionId) ?? [];
+    unrecordedBySession.set(
+      sessionId,
+      [...held, { stepKey, said: said.trim().slice(0, 200) }].slice(-4),
+    );
+  };
+
+  /**
+   * The notes for this turn: what was said and not kept, minus anything
+   * the session has since recorded. Stated plainly, because the whole
+   * point is that the model reads it as fact rather than inferring the
+   * opposite from the transcript.
+   */
+  const notesFor = (
+    sessionId: string,
+    view: OnboardingSessionView,
+  ): readonly string[] => {
+    const held = unrecordedBySession.get(sessionId) ?? [];
+    const kept = held.filter(
+      (item) =>
+        item.stepKey === null ||
+        !view.responses.some((r) => r.stepKey === item.stepKey),
+    );
+    unrecordedBySession.set(sessionId, kept);
+    return kept.map(
+      (item) =>
+        `They said "${item.said}" and it was NOT recorded; it is not on the session.`,
+    );
+  };
+
+  /**
+   * The sign-up details, as notes, while they are still unanswered.
+   *
+   * Dropped the moment the step they would answer is on the record: a
+   * candidate for something already settled is noise, and worse, an
+   * invitation to ask again.
+   */
+  const signupNotes = (
+    input: InterviewTurnInput,
+    view: OnboardingSessionView,
+    steps: ReadonlyMap<string, OnboardingStepManifest>,
+  ): readonly string[] => {
+    const signup = input.signup;
+    if (signup === undefined) return [];
+    const answered = new Set(view.responses.map((r) => r.stepKey));
+    const notes: string[] = [];
+
+    const organisationKey = [...steps.keys()].find((key) =>
+      /\.(organisation_name|company_name)$/.test(key),
+    );
+    if (
+      signup.organisationName !== null &&
+      organisationKey !== undefined &&
+      !answered.has(organisationKey)
+    ) {
+      notes.push(
+        `They registered with "${signup.organisationName}". Offer it for ${organisationKey} rather than asking cold — ask whether that is the organisation being set up here, or whether they act through another one. It is a candidate, not an answer: record it only once they confirm.`,
+      );
+    }
+    if (signup.displayName !== null) {
+      notes.push(
+        `They registered as "${signup.displayName}". Use that name; confirm it only if something suggests it is wrong.`,
+      );
+    }
+    return notes;
+  };
+
+  /**
+   * What Q asked last turn, as a note the model can act on.
+   *
+   * Only when it differs from the session's current step: saying it twice
+   * where they agree is noise, and the interesting case is exactly where
+   * they disagree.
+   */
+  const askedNote = (
+    sessionId: string,
+    view: OnboardingSessionView,
+  ): readonly string[] => {
+    const asked = askedBySession.get(sessionId);
+    if (asked === undefined) return [];
+    if (asked.step === view.session.currentStepKey) return [];
+    if (view.responses.some((r) => r.stepKey === asked.step)) return [];
+    return [
+      `Last turn you asked them: "${asked.question}" (step ${asked.step}). Unless they have plainly changed the subject, what they just said answers THAT step, not the session's current one.`,
+    ];
+  };
+
   return {
     /** Forget conversational state for a session (it ended). */
     forget: (sessionId: string) => {
@@ -860,6 +1222,8 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
       warningsBySession.delete(sessionId);
       degradedBySession.delete(sessionId);
       researchedBySession.delete(sessionId);
+      unrecordedBySession.delete(sessionId);
+      askedBySession.delete(sessionId);
       tangentsBySession.delete(sessionId);
     },
 
@@ -947,7 +1311,11 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
           question: steps.get(p.stepKey)?.configuration.prompt ?? p.stepKey,
           value: describeValue(steps.get(p.stepKey), p.suggestedValue),
         })),
-        notes: [],
+        notes: [
+          ...signupNotes(input, view, steps),
+          ...askedNote(input.onboardingSessionId, view),
+          ...notesFor(input.onboardingSessionId, view),
+        ],
         recentTurns: input.recentTurns.slice(-MAX_RECENT_TURNS).map((t) => ({
           role: t.role,
           text: t.text.slice(0, RECENT_TURN_MAX_CHARS),
@@ -1055,6 +1423,9 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
         const failures =
           (degradedBySession.get(input.onboardingSessionId) ?? 0) + 1;
         degradedBySession.set(input.onboardingSessionId, failures);
+        if (input.utterance.trim().length > 0) {
+          noteUnrecorded(input.onboardingSessionId, null, input.utterance);
+        }
         const kept = view.responses.length;
         const earlier =
           kept === 0
@@ -1089,6 +1460,8 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
       const nextPending: Pending[] = [];
       /** Steps the model meant to record that the runtime would not take. */
       const unsaved: string[] = [];
+      /** What the owning service said when it refused, and what it wants first. */
+      const refusals: OnboardingRefusal[] = [];
       const commit = async (
         stepKey: string,
         value: OnboardingResponseValue,
@@ -1112,6 +1485,18 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
             "interview answer was not accepted",
           );
           unsaved.push(stepKey);
+          /**
+           * Why the owning service said no, in its own words.
+           *
+           * The journey has prerequisites — "Choose how you invest first"
+           * — and somebody who answers ahead of them gets their answer
+           * refused. Q used to report that as "I couldn't save that just
+           * now", which is true and useless: it names no reason and asks
+           * for the same thing again, and the person says the same thing
+           * again. The service already composed a sentence a person can
+           * act on, so that is the sentence they hear.
+           */
+          refusals.push(readRefusal(error));
           return false;
         }
       };
@@ -1196,10 +1581,27 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
       for (const answer of result.answers) {
         const step = steps.get(answer.stepKey);
         const status = statuses.get(answer.stepKey);
+        /**
+         * A step already answered is not re-answered by accident — except
+         * when the person is correcting it, which is the whole point of a
+         * correction.
+         *
+         * Dropping those was silent and total: "actually, scrap that —
+         * we're not an angel, we're a family office" produced a
+         * CORRECTION the runtime threw away, the record kept saying
+         * angel, and Q went on truthfully reporting angel (local,
+         * 2026-09-22). Truthful about the record and wrong about the
+         * person.
+         *
+         * The model says this is a correction; the runtime does the
+         * writing, and the owning service keeps whatever history it keeps
+         * — a correction supersedes, it does not erase.
+         */
+        const correcting = result.intent === "CORRECTION";
         if (
           step === undefined ||
           status === undefined ||
-          status === "COMPLETED"
+          (status === "COMPLETED" && !correcting)
         )
           continue;
         if (step.configuration.stepType === "document_upload") {
@@ -1374,7 +1776,10 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
         recorded.length === 0 &&
         nextPending.length === 0 &&
         skipped.length === 0 &&
-        rejected.length === 0
+        rejected.length === 0 &&
+        // A turn whose whole point was to move past the optional run took
+        // nothing in on purpose. That is not a missed answer.
+        !result.skipRemainingOptional
       ) {
         /**
          * The model answered as though it had taken something in, and the
@@ -1407,7 +1812,7 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
         reply =
           current === undefined
             ? "Sorry — I didn't catch that well enough to write it down. Could you say it once more?"
-            : `Sorry — I didn't catch that well enough to write it down. ${clarificationFor(current)}`;
+            : `Sorry — I didn't catch that well enough to write it down. ${questionFor(current)}`;
         result =
           current === undefined
             ? { ...result, askNext: null }
@@ -1551,10 +1956,29 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
         result.answerFromState === "OPTIONS"
           ? optionsSentence(view)
           : result.answerFromState === "PROGRESS"
-            ? progressSentence(view)
+            ? progressSentence(view, steps)
             : null;
       if (fromState !== null) {
-        reply = `${reply.trim()} ${fromState}`.trim();
+        /**
+         * The runtime's account REPLACES the model's, it does not follow
+         * it (QX-004 core gate §1).
+         *
+         * Appending left both on screen, and the model's came first. Live:
+         * "we have your type, which is Angel, and your firm, Zino
+         * Aviation" — read out of its memory of the conversation, against
+         * a session that held nothing, because every provider had been
+         * down while those answers were given. A person reading that has
+         * been told their onboarding is further along than it is, which is
+         * the one thing a progress answer must never do.
+         *
+         * Describing what is held is the runtime's job, because only the
+         * runtime has read it. The model's part is saying WHICH question
+         * was asked; it keeps that, and it does not keep the answer.
+         */
+        reply =
+          result.answerFromState === "OPTIONS"
+            ? `${reply.trim()} ${fromState}`.trim()
+            : fromState;
       }
 
       const questionForQ =
@@ -1583,18 +2007,230 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
        * anything happened. Where a commit was refused the person is told
        * so plainly, in place of whatever the model believed.
        */
+      for (const stepKey of unsaved) {
+        noteUnrecorded(
+          input.onboardingSessionId,
+          stepKey,
+          input.utterance.length > 0 ? input.utterance : stepKey,
+        );
+      }
       if (unsaved.length > 0 && recorded.length === 0) {
+        /**
+         * An answer the journey would not take yet.
+         *
+         * It has prerequisites, and a person who answers ahead of one gets
+         * their answer refused. Q used to report that as "I couldn't save
+         * that just now" and ask for the same thing again, so the person
+         * said the same thing again and it was refused again — a loop
+         * built out of two components each behaving correctly.
+         *
+         * The service says why and says which step it wants first. Both
+         * are used: its sentence is what the person hears, and the step it
+         * named is what Q asks, rather than Q guessing at an order it does
+         * not own.
+         */
+        const refusal = refusals.find(
+          (item) => item.because !== null || item.needs !== null,
+        );
+        const needed =
+          refusal?.needs === undefined || refusal.needs === null
+            ? undefined
+            : [...steps.keys()].find(
+                (key) => key.split(".").at(-1) === refusal.needs,
+              );
+        const neededStep = needed === undefined ? undefined : steps.get(needed);
+        const ask =
+          neededStep === undefined ? undefined : toOpenStep(neededStep, view);
+        /**
+         * What the person hears is composed here, from the step the
+         * service named and that step's own question.
+         *
+         * The service's validation message is a diagnostic written for
+         * whoever reads the logs; speaking it would make a backend string
+         * the UX contract, and it would drift. The structured half — the
+         * prerequisite code — decides the behaviour, and Q says it in its
+         * own words, naming the thing it could not save so the person can
+         * see why one follows the other.
+         */
+        const held = unsaved
+          .map((stepKey) => steps.get(stepKey)?.configuration.prompt)
+          .find((prompt) => prompt !== undefined);
+        const about =
+          held === undefined
+            ? "that"
+            : `that (${held.replace(/\?+$/, "").toLowerCase()})`;
+        /**
+         * Two kinds of refusal, and they need different answers.
+         *
+         * One is a prerequisite: the journey wants another step first, and
+         * it names it, so Q asks that. The other is the value itself —
+         * a maximum below the typical, a number out of range — where
+         * there is nothing else to ask and the thing to do is ask the same
+         * step again. Saying "could you say it once more" to somebody
+         * whose value was rejected on its merits invites them to say the
+         * same number again, which is a loop.
+         */
+        const refusedStep = unsaved
+          .map((stepKey) => steps.get(stepKey))
+          .find((step) => step !== undefined);
         reply =
-          "I couldn't save that just now — it hasn't gone in. Could you say it once more?";
-        result = { ...result, askNext: null };
+          ask !== undefined && ask !== null
+            ? `Before I can save ${about}, I need one thing first. ${ask.question}`
+            : refusedStep === undefined
+              ? "I couldn't save that just now — it hasn't gone in. Could you say it once more?"
+              : `That one didn't go in. ${questionFor(refusedStep)}`;
+        result = {
+          ...result,
+          askNext: needed ?? refusedStep?.stepKey ?? null,
+        };
       } else if (unsaved.length > 0) {
         reply =
           `${reply.trim()} One thing didn't save — I'll ask about it again in a moment.`.trim();
       }
 
+      // Last, so that a runtime-composed line is held to the same rule as
+      // the model's own: nothing leaves here carrying a name Capital Q
+      // does not hold.
+      // The recorded name first; failing that, the one they registered
+      // with. Both are things Capital Q actually holds — one confirmed,
+      // one they typed — and naming the registered one back is the whole
+      // point of having it. Only when there is neither does the sentence
+      // fall back to "your organisation".
+      reply = withKnownName(
+        reply,
+        subjectName ?? input.signup?.organisationName ?? null,
+      );
+
+      /**
+       * A value the runtime is holding must be the thing Q asks about
+       * (QX-004 core gate §4A).
+       *
+       * Money and exclusions are read back before they are recorded, which
+       * is deliberate: they are the answers an investor is judged on. But
+       * the holding is the runtime's and the asking was the model's, and
+       * the two came apart. Live: asked for a minimum cheque, the person
+       * said "around seventy-five thousand"; Q replied "Got it — minimum
+       * cheque is around seventy-five thousand dollars" and asked for the
+       * typical cheque instead. The value sat pending, nobody ever
+       * confirmed it, every later answer was refused for wanting it, and
+       * the journey stopped there with Q having said "got it".
+       *
+       * So when this turn put something in the runtime's hands, the
+       * runtime asks for it, in the step's own terms. The model's
+       * acknowledgement is kept — it read the value correctly — and the
+       * question after it is replaced, because a question about the next
+       * step is what loses the one in hand.
+       */
+      const heldNow = nextPending.find((item) => {
+        const before = pending.find((was) => was.stepKey === item.stepKey);
+        // New to the runtime's hands, or the same step holding a different
+        // value than it was. A correction during confirmation ("no, seven
+        // hundred and fifty") replaces the candidate rather than adding
+        // one, and it needs reading back exactly as the first value did —
+        // it is the one that would otherwise be written unseen.
+        return before === undefined || before.spoken !== item.spoken;
+      });
+      if (heldNow !== undefined && fromState === null) {
+        const heldStep = steps.get(heldNow.stepKey);
+        const question =
+          heldStep === undefined
+            ? `Is ${heldNow.spoken} right?`
+            : `${heldStep.configuration.prompt.replace(/\?+$/, "")}: ${heldNow.spoken}. Is that right?`;
+        // Keep the model's first sentence, which is its reading of what
+        // they said, and drop whatever it asked after it.
+        //
+        // Unless that sentence is itself a question, in which case the
+        // model has already read the value back and asking again produces
+        // "About fifty thousand dollars, is that right? Minimum cheque:
+        // 50000. Is that right?" — two guards, one thought, said twice.
+        //
+        // And when it is NOT a question, it is dropped rather than kept in
+        // front: the model's lead can disagree with the value the runtime
+        // is holding — "I didn't quite catch that. Where do you invest:
+        // West Africa, Nigeria, Ghana. Is that right?" — and of the two,
+        // the one that read the value out of the runtime's own hands is
+        // the one worth saying.
+        const acknowledgement = /^[^.!?]*[.!?]/.exec(reply.trim())?.[0] ?? "";
+        reply = acknowledgement.endsWith("?") ? acknowledgement : question;
+        result = { ...result, askNext: heldNow.stepKey };
+      }
+
+      /**
+       * Moving forward means moving past what is in between.
+       *
+       * Somebody who says "skip the optional detail, I'd like to finish"
+       * is asking to leave a run of steps, not the next one. Q would jump
+       * to the required step at the end, set aside exactly one on the way,
+       * and be back in the optional chain a turn later asking about
+       * customer types — the person agreeing to skip, and then being
+       * walked through the thing they skipped, fifteen times (local,
+       * 2026-09-22).
+       *
+       * So when Q asks for a step further along than where the journey is,
+       * every OPTIONAL step in between is set aside in the same turn.
+       * Required steps are never skipped — they are the journey's own
+       * decision about what it cannot do without, and a person cannot
+       * talk their way past one. The ordering comes from the definition
+       * rather than from a list kept here.
+       */
+      if (result.skipRemainingOptional) {
+        const answered = new Set(view.responses.map((r) => r.stepKey));
+        const skippedAlready = new Set(skipped);
+        // Every optional step still open, in the definition's own order.
+        // The next required one is where Q goes; the platform decides how
+        // far "the rest" reaches, and it never reaches a required step.
+        const ordered = [...steps.values()].sort(
+          (a, b) => a.sequenceOrder - b.sequenceOrder,
+        );
+        const nextRequired = ordered.find(
+          (step) => step.required && !answered.has(step.stepKey),
+        );
+        {
+          for (const step of ordered) {
+            if (step.required) continue;
+            if (
+              nextRequired !== undefined &&
+              step.sequenceOrder >= nextRequired.sequenceOrder
+            )
+              continue;
+            if (answered.has(step.stepKey)) continue;
+            if (skippedAlready.has(step.stepKey)) continue;
+            try {
+              view = await skipOnboardingStep(
+                input.session,
+                input.onboardingSessionId,
+                step.stepKey,
+                { expectedSessionVersion: view.session.version },
+                randomUUID(),
+              );
+              skipped.push(step.stepKey);
+            } catch (error: unknown) {
+              // One step the journey will not set aside is not a reason
+              // to stop setting aside the others.
+              logger.warn(
+                { err: error, stepKey: step.stepKey },
+                "interview skip of an intervening step was not accepted",
+              );
+              continue;
+            }
+          }
+          if (nextRequired !== undefined) {
+            result = { ...result, askNext: nextRequired.stepKey };
+          }
+        }
+      }
+
       const askStep =
         result.askNext === null ? undefined : steps.get(result.askNext);
       const askOpen = askStep === undefined ? null : toOpenStep(askStep, view);
+      if (askOpen !== null) {
+        askedBySession.set(input.onboardingSessionId, {
+          step: askOpen.stepKey,
+          question: askOpen.question,
+        });
+      } else {
+        askedBySession.delete(input.onboardingSessionId);
+      }
       return {
         reply,
         intent: result.intent,
