@@ -21,6 +21,7 @@ import type {
   ActiveMandateLookup,
   EligibilityPorts,
   MandateSnapshotForEligibility,
+  MandateTaxonomyRule,
 } from "../src/eligibility/ports.js";
 import type { EligibilityService } from "../src/eligibility/service.js";
 import { evaluateHardEligibility } from "../src/eligibility/policy.js";
@@ -549,6 +550,42 @@ describe("structured intent (pure)", () => {
     expect(intent.stageCodes).toEqual(["seed", "series_a", "series_b"]);
   });
 
+  it("structured-mandate.v4: where a stage constraint names the stages, the range adds none the investor did not choose (CQ-REC-STAGE-001)", () => {
+    // Onboarding writes the chosen stages as a constraint and their
+    // envelope as min/max: "pre-seed and Series A" is pre_seed..series_a.
+    const intent = deriveStructuredIntent({
+      constraints: [
+        {
+          dimension: "stage",
+          operator: "IN",
+          value: { kind: "codes", values: ["pre_seed", "series_a"] },
+          importance: "MUST",
+          isHardExclusion: false,
+          automatedUse: "ELIGIBLE",
+        },
+      ],
+      taxonomyPreferences: [],
+      stage: { minStageCode: "pre_seed", maxStageCode: "series_a" },
+    });
+    expect(intent.stageCodes).toEqual(["pre_seed", "series_a"]);
+    // A stage constraint that names nothing positive leaves the range to speak.
+    const avoided = deriveStructuredIntent({
+      constraints: [
+        {
+          dimension: "stage",
+          operator: "IN",
+          value: { kind: "codes", values: ["series_b"] },
+          importance: "AVOID",
+          isHardExclusion: false,
+          automatedUse: "ELIGIBLE",
+        },
+      ],
+      taxonomyPreferences: [],
+      stage: { minStageCode: "pre_seed", maxStageCode: "seed" },
+    });
+    expect(avoided.stageCodes).toEqual(["pre_seed", "seed"]);
+  });
+
   it("countryCodesOf reads ISO reference metadata of geography nodes only: a country's own code, a region's member codes", () => {
     const geo = (iso?: string) => ({
       vocabularyCode: "geography",
@@ -861,7 +898,7 @@ describe("structured candidate service", () => {
       };
       return w;
     };
-    const positive = (nodeId: string) => ({
+    const positive = (nodeId: string): MandateTaxonomyRule => ({
       nodeId,
       vocabularyCode: "geography",
       preferenceStrength: "STRONG",
@@ -907,14 +944,14 @@ describe("structured candidate service", () => {
 
     it("a negative or Q-proposed geography node retrieves nothing", async () => {
       for (const negative of [
-        { ...positive(NIGERIA), preferenceStrength: "AVOID" },
+        { ...positive(NIGERIA), preferenceStrength: "AVOID" as const },
         {
           ...positive(NIGERIA),
-          preferenceStrength: "HARD_EXCLUSION",
+          preferenceStrength: "HARD_EXCLUSION" as const,
           isExclusion: true,
         },
         { ...positive(NIGERIA), source: "q_inferred" },
-      ]) {
+      ] satisfies MandateTaxonomyRule[]) {
         const w = geoWorld([negative]);
         const r = await generated(w);
         expect(r.diagnostics.rawHitsByDimension.GEOGRAPHY).toBe(0);
@@ -986,14 +1023,14 @@ describe("structured candidate service", () => {
     for (const c of r.candidates) {
       expect(c.provenance).toMatchObject({
         generatorId: "STRUCTURED_MANDATE",
-        generatorVersion: "structured-mandate.v3",
+        generatorVersion: "structured-mandate.v4",
         taxonomyVersion: { industry: 1, geography: 1 },
       });
       expect(c.provenance.reasonCodes.length).toBeGreaterThan(0);
       expect("score" in c).toBe(false);
       expect("rank" in c).toBe(false);
     }
-    expect(r.generatorVersion).toBe("structured-mandate.v3");
+    expect(r.generatorVersion).toBe("structured-mandate.v4");
     expect(r.eligibilityPolicyVersion).toBe("eligibility.v2");
   });
 });

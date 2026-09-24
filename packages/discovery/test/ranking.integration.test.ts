@@ -187,13 +187,13 @@ describe("@capital-q/discovery deterministic ranking against local PostgreSQL", 
         if (r.internalScore === null) continue;
         const sum = r.factors.reduce((s, f) => s + (f.contribution ?? 0), 0);
         expect(Math.abs(sum - r.internalScore)).toBeLessThan(1e-9);
-        expect(r.rankingConfigVersion).toBe("ranking-config.v2");
+        expect(r.rankingConfigVersion).toBe("ranking-config.v3");
       }
       expect(result.diagnostics).toMatchObject({
         candidates: 5,
         scored: 5,
         unscored: 0,
-        rankingConfigVersion: "ranking-config.v2",
+        rankingConfigVersion: "ranking-config.v3",
         rankerVersion: "deterministic-ranker.v1",
       });
       expect(result.diagnostics.features.queries).toBe(6);

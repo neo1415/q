@@ -94,6 +94,19 @@ export type MandateSnapshotForEligibility = {
   readonly status: "DRAFT" | "ACTIVE" | "CLOSED";
   readonly constraints: readonly MandateHardConstraint[];
   readonly taxonomyPreferences: readonly MandateTaxonomyRule[];
+  /**
+   * The mandate's declared stage range (CQ-REC-STAGE-001). Never an
+   * eligibility rule — eligibility reads constraints only — but it is
+   * stage intent: a mandate declared as "pre-seed to Series A" with no
+   * stage constraint must still retrieve and score by stage. Absent on
+   * a snapshot built before this existed, and then it is simply no range.
+   */
+  readonly stage?:
+    | {
+        readonly minStageCode: string | null;
+        readonly maxStageCode: string | null;
+      }
+    | undefined;
 };
 
 export type ActiveMandateLookup =
