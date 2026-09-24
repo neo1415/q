@@ -43,6 +43,12 @@ export type OnboardingTurn = {
   readonly reply: string | null;
   /** Where Q is taking the person, if anywhere; "FORM" hands over to the form. */
   readonly navigate: string | null;
+  /**
+   * What Q said it would look into, when the turn asked for something
+   * real (CQ-QX-005). The surface carries it to the same Q run a spoken
+   * turn would start, then returns to the interview.
+   */
+  readonly researching: string | null;
 };
 
 export type OnboardingState<TView> = {
@@ -374,6 +380,7 @@ export function useOnboardingJourney<
             understood: outcome.understood,
             reply: outcome.reply,
             navigate: outcome.navigate,
+            researching: outcome.researching,
           };
         } catch {
           return null;
@@ -387,6 +394,7 @@ export function useOnboardingJourney<
           understood: outcome.understood,
           reply: outcome.reply,
           navigate: outcome.navigate,
+          researching: outcome.researching,
         };
         return outcome.view;
       }, true);

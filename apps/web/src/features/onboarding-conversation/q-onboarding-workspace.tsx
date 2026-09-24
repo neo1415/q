@@ -42,7 +42,6 @@ import {
   BRIDGE_LINE,
   gapValue,
   isTaxonomySuggestion,
-  looksLikeQuestionForQ,
   PAUSED_LINE,
   pauseIntent,
   pickedUp,
@@ -680,13 +679,11 @@ export function QOnboardingWorkspace({
         push("Q", resumeLine(prompt));
         return;
       }
-      if (looksLikeQuestionForQ(trimmed)) {
-        await askQ(trimmed);
-        if (prompt !== null) {
-          push("Q", BRIDGE_LINE);
-        }
-        return;
-      }
+      // A question for Q is not pre-sorted here by its words (CQ-QX-005;
+      // ADR 0011): the interviewer reads every turn, answers a question
+      // in the turn itself, and says when something real needs looking
+      // up — `researching` — which is the one case this surface carries
+      // away to a Q run before coming back to the interview.
       // Prose on a narrative step is committed as the answer and also read
       // by Q (the worker reacts to the commit), so its proposals are worth
       // waiting for the same way a free-text turn's are.
@@ -701,6 +698,19 @@ export function QOnboardingWorkspace({
       // Q's own words, as Q wrote them. The reply carries both the
       // acknowledgement and the next question, so it also becomes the
       // live question under the composer until the step moves on.
+      if (turn.researching !== null) {
+        // Q said it would look (its reply is the lead-in, not the next
+        // question): the lead-in joins the thread, the same Q run a spoken
+        // turn would start answers it, and the interview resumes.
+        if (turn.reply !== null) {
+          push("Q", turn.reply);
+        }
+        await askQ(turn.researching);
+        if (prompt !== null) {
+          push("Q", BRIDGE_LINE);
+        }
+        return;
+      }
       if (turn.reply !== null) {
         // Not pushed into the thread here: the reply is the live question
         // now, shown once under the composer, and it joins the thread as
