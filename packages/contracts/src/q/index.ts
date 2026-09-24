@@ -312,7 +312,10 @@ export {
   Q_COMPARISON_SUBJECTS_MAX,
   Q_COMPARISON_SUBJECTS_MIN,
   Q_UI_COMPANY_SECTIONS,
+  Q_NAVIGATE_DESTINATIONS,
   Q_UI_INTENT_KINDS,
+  QNavigateDestinationSchema,
+  QNavigateIntentSchema,
   QFocusSectionIntentSchema,
   QOpenCompanyIntentSchema,
   QShowComparisonIntentSchema,
@@ -323,6 +326,7 @@ export {
   type QUiCompanySection,
   type QUiIntent,
   type QUiIntentKind,
+  type QNavigateDestination,
 } from "./ui-intent.js";
 
 export {
