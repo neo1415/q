@@ -17,7 +17,7 @@ import {
   type OnboardingUnderstanding,
   QVoiceDestinationSchema,
 } from "@capital-q/contracts";
-import { Button } from "@capital-q/ui/button";
+import { Button, buttonClassName } from "@capital-q/ui/button";
 import { ChoiceChip } from "@capital-q/ui/chip";
 import { Input } from "@capital-q/ui/input";
 import { QComposer } from "@capital-q/ui/q-composer";
@@ -1145,13 +1145,19 @@ export function QOnboardingWorkspace({
       }
       setUploadNote(null);
       await actions.refresh();
-      voiceSendText(
-        ready
-          ? `I've just uploaded ${file.name}. Read back what you found in it and check it with me.`
-          : `I've just uploaded ${file.name}; it's still being read. Carry on and come back to it when it's ready.`,
-      );
+      const told = ready
+        ? `I've just uploaded ${file.name}. Read back what you found in it and check it with me.`
+        : `I've just uploaded ${file.name}; it's still being read. Carry on and come back to it when it's ready.`;
+      // Typed or spoken, Q hears about it the same way (founder
+      // walkthrough F2): the upload is part of the conversation, not a
+      // detour to the company page.
+      if (voiceActive) {
+        voiceSendText(told);
+      } else {
+        await say(told);
+      }
     },
-    [companyIdForUpload, actions, voiceSendText],
+    [companyIdForUpload, actions, voiceSendText, voiceActive, say],
   );
 
   // Q takes the person somewhere, or leaves them with the form: followed
@@ -1539,6 +1545,43 @@ export function QOnboardingWorkspace({
           ) : null}
 
           <div className="flex flex-wrap items-center gap-2">
+            {vocabulary.subject === "founder" ? (
+              /**
+               * Upload in the conversation (founder walkthrough F2).
+               *
+               * "Can I just upload our one-pager instead?" had nowhere to
+               * go in the typed thread: the voice stage had an uploader,
+               * the typed composer sent the person off to the company page.
+               * The same upload path, the same reading, and Q is told
+               * about it in the thread.
+               */
+              <>
+                <input
+                  id={`q-upload-${prompt.stepKey}`}
+                  type="file"
+                  accept=".pdf,.ppt,.pptx,.doc,.docx,.txt,application/pdf"
+                  className="sr-only"
+                  disabled={working || uploadNote !== null}
+                  onChange={(event) => {
+                    const file = event.target.files?.[0];
+                    event.target.value = "";
+                    if (file === undefined) return;
+                    void uploadWhileTalking(file);
+                  }}
+                />
+                <label
+                  htmlFor={`q-upload-${prompt.stepKey}`}
+                  className={buttonClassName(
+                    "quiet",
+                    "compact",
+                    "cursor-pointer",
+                  )}
+                  aria-busy={uploadNote !== null}
+                >
+                  {uploadNote ?? "Upload a document"}
+                </label>
+              </>
+            ) : null}
             {prompt.control === "editor" || prompt.control === "upload" ? (
               <Button
                 size="compact"
