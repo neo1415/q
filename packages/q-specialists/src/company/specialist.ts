@@ -17,7 +17,7 @@ import {
   createDefaultPromptRegistry,
   DEFAULT_COMMUNICATION_PROFILE,
   renderPrompt,
-  type CompanyAnalystV6Result,
+  type CompanyAnalystV8Result,
   type CompanyAnalystV5Variables,
   NOTHING_REMEMBERED,
   type CompanyIntelligenceDimension,
@@ -26,7 +26,7 @@ import {
   citePublicSources,
 } from "@capital-q/q-core";
 import {
-  CompanyAnalystV6ResultSchema,
+  CompanyAnalystV8ResultSchema,
   COMPANY_INTELLIGENCE_DIMENSIONS,
   DisplayNameRequestSchema,
   ProfileUpdateSchema,
@@ -44,6 +44,7 @@ import {
   PROFILE_UPDATE_NOTE,
   DISPLAY_NAME_NOTE,
   clearsOnPurpose,
+  withoutActionTalk,
   type QMemoryRecall,
   type QProfileUpdateNotebook,
   type QUserStatementRecorder,
@@ -255,7 +256,7 @@ async function recallMemory(
 
 async function recordUserStatements(
   recorder: QUserStatementRecorder | undefined,
-  statements: CompanyAnalystV6Result["userStatements"],
+  statements: CompanyAnalystV8Result["userStatements"],
   request: CompanyIntelligenceRequest,
   context: QSpecialistExecutionContext,
   logger: Logger | undefined,
@@ -644,7 +645,7 @@ export function createCompanyIntelligenceSpecialist(
       > = {
         capability: context.capability,
         userMessage: request.question,
-        conversation: [],
+        conversation: [...(request.conversation ?? [])],
         authorisedFacts: assembled.facts.map((fact) => fact.fact),
         subjectDescription: assembled.subjectDescription,
         institutionalNotes: notes,
@@ -687,10 +688,10 @@ export function createCompanyIntelligenceSpecialist(
         promptCharacters: rendered.characters,
       };
 
-      let analyst: CompanyAnalystV6Result | undefined;
+      let analyst: CompanyAnalystV8Result | undefined;
       let blocked: QSpecialistBlockedReason | null = null;
       try {
-        const result = await gateway.execute<CompanyAnalystV6Result>(
+        const result = await gateway.execute<CompanyAnalystV8Result>(
           {
             taskClass: "EVIDENCE_SYNTHESIS",
             budget: budgetForTaskClass("EVIDENCE_SYNTHESIS"),
@@ -714,7 +715,7 @@ export function createCompanyIntelligenceSpecialist(
               : { dataPosture: dependencies.dataPosture }),
           },
           {
-            schema: CompanyAnalystV6ResultSchema,
+            schema: CompanyAnalystV8ResultSchema,
             ...(context.signal === undefined ? {} : { signal: context.signal }),
           },
         );
@@ -781,11 +782,20 @@ export function createCompanyIntelligenceSpecialist(
         rejectedCitationCount = validation.rejectedCitations;
         // Public sources by their presentation; Capital Q's own fact
         // labels (F3) by the source they stand for, or not at all (H3b).
+        // What the model said about acting is Capital Q's to say, from
+        // the action it actually holds (CQ-QX-007): the sentences the
+        // model itself named as such never reach the person.
         synthesis = citeAuthorisedFacts(
-          citePublicSources(analyst.answer, researchRead?.sources ?? []),
+          citePublicSources(
+            withoutActionTalk(analyst.answer, analyst.actionTalk).text,
+            researchRead?.sources ?? [],
+          ),
+          // The person-facing source, never the line the model reads:
+          // that one carries confidence classes and evidence counts, and
+          // "(F3)" must not become a paragraph of machinery (F1).
           assembled.facts.map((labelled) => ({
             ref: labelled.label,
-            source: labelled.fact.source,
+            source: labelled.presentedSource ?? undefined,
           })),
         );
         metrics.rejectedFindings.add(validation.rejectedFindings);
@@ -920,6 +930,7 @@ export function createCompanyIntelligenceSpecialist(
       return finish({
         companyId,
         companyName: canonicalRead.canonicalName,
+        canonicalDescription: canonicalRead.description ?? null,
         specialistVersion: `${COMPANY_INTELLIGENCE_ID}/${COMPANY_INTELLIGENCE_VERSION}`,
         asOf: asOfStamp,
         blocked,

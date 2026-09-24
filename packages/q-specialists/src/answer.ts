@@ -42,6 +42,8 @@ import {
 } from "./company/prepare-artifact.js";
 import {
   analystResultBlocks,
+  askedSubjects,
+  provenanceLine,
   type QTurnReader,
 } from "@capital-q/model-gateway/q";
 
@@ -141,6 +143,35 @@ export type SpecialistQAnswer = QAnswerPort & {
 };
 
 const ANSWER_LIMIT_CHARS = 32_000;
+
+/**
+ * How much of the conversation the specialist reads (CQ-QX-007 H3a).
+ * Enough to carry a correction made a few turns back; bounded so a long
+ * conversation does not become a long prompt.
+ */
+const CONVERSATION_TURNS_MAX = 12;
+const CONVERSATION_TURN_CHARS_MAX = 4_000;
+
+/** The conversation before this message, as the prompt's DATA. */
+export function earlierTurns(
+  history: readonly QConversationMessage[],
+  latestId: string,
+): readonly { readonly role: "USER" | "Q"; readonly content: string }[] {
+  return history
+    .filter((message) => message.id !== latestId)
+    .flatMap((message) =>
+      (message.role === "USER" || message.role === "Q") &&
+      message.content.trim().length > 0
+        ? [
+            {
+              role: message.role,
+              content: message.content.slice(0, CONVERSATION_TURN_CHARS_MAX),
+            },
+          ]
+        : [],
+    )
+    .slice(-CONVERSATION_TURNS_MAX);
+}
 
 /**
  * What a person reads when the specialist could not produce findings.
@@ -527,7 +558,10 @@ export function createSpecialistQAnswer(
 
     const probe: QSpecialistProbe = {
       capability: request.capability,
-      subjects: request.subjects,
+      // Their own firm, carried as context for a fit question, is not a
+      // second subject: the question is still about the company
+      // (CQ-QX-007). The specialist reads their mandate from the plan.
+      subjects: askedSubjects(request.subjects, request.plan),
       question: latest.content,
     };
     if (!specialist.supports(probe)) {
@@ -549,6 +583,7 @@ export function createSpecialistQAnswer(
       {
         company,
         question: latest.content,
+        conversation: earlierTurns(history, latest.id),
         publicResearch: directive?.mode === "EXPLICIT",
         // A gap question changes what is emphasised, never what is read.
         ...(asksAboutGaps(latest.content) ? { focus: ["GAPS"] as const } : {}),
@@ -652,10 +687,30 @@ export function createSpecialistQAnswer(
           : preparation?.kind === "FAILED"
             ? "\n\nI couldn't put that document together just now. What's above is what the record supports; ask again in a moment and I'll try the document again."
             : "";
-    const content = `${guarded.text}${acknowledgement}${documentNote}`
-      .slice(0, ANSWER_LIMIT_CHARS)
-      .trim();
-    if (content.length === 0) {
+    // Where the answer's supported findings came from, named the way the
+    // person knows it (CQ-QX-007 F1). Resolved from the citations that
+    // held, so it can never name a source the answer did not rest on.
+    const provenance = (() => {
+      if (result.blocked !== null && !degraded) return "";
+      const line = provenanceLine(result.findings);
+      return line === null
+        ? ""
+        : `
+
+${line}`;
+    })();
+    const content =
+      `${guarded.text}${provenance}${acknowledgement}${documentNote}`
+        .slice(0, ANSWER_LIMIT_CHARS)
+        .trim();
+    // An answer that was nothing but talk about acting (CQ-QX-007) had
+    // every sentence removed; Capital Q's own lines say what happened, and
+    // without one it is acknowledged and no more.
+    const said =
+      content.length === 0 && result.blocked === null && result.synthesis === ""
+        ? "Understood."
+        : content;
+    if (said.length === 0) {
       return { kind: "FAILED", diagnosticCode: "MODEL_PROVIDER_UNAVAILABLE" };
     }
 
@@ -671,7 +726,7 @@ export function createSpecialistQAnswer(
           contradiction.statements.join(" — and — "),
         ),
       },
-      subjects: request.subjects,
+      subjects: askedSubjects(request.subjects, request.plan),
     });
 
     const blocks: QResultBlock[] | undefined =
@@ -695,7 +750,7 @@ export function createSpecialistQAnswer(
         conversationId,
         runId: request.runId,
         role: "Q",
-        content,
+        content: said,
         ...(blocks === undefined ? {} : { blocks }),
       });
       await appendRunEvent(

@@ -144,15 +144,47 @@ describe("QX-004 §3 · what a deck is made of", () => {
     expect(deck?.content.sections[0]?.body ?? "").not.toContain("4,000");
   });
 
-  it("carries a synthesis that invents nothing", () => {
+  it("builds the cover and the Summary from the record, never from Q's chat reply (CQ-QX-007)", () => {
+    // Live: the cover subtitle and the Summary read "I am preparing your
+    // seed-stage investor pitch deck…" — the reply to the request, put on
+    // a slide meant for investors.
+    const chat =
+      "I am preparing your seed-stage investor pitch deck for Northstar. The deck will highlight your operational metrics.";
     const deck = composePitchDeck({
       companyName: "Northstar Logistics",
       result: result({
         findings: populated().findings,
-        synthesis: "Northstar moves freight between Lagos and Abuja.",
+        canonicalDescription:
+          "Northstar Logistics matches shippers with vetted truckers between Lagos and Abuja.",
+        synthesis: chat,
       }),
     });
-    expect(deck?.content.deck?.slides[0]?.subtitle).toContain("Lagos");
+    const cover = deck?.content.deck?.slides[0];
+    expect(cover?.subtitle).toBe(
+      "Northstar Logistics matches shippers with vetted truckers between Lagos and Abuja.",
+    );
+    const summary = deck?.content.sections[0];
+    expect(summary?.heading).toBe("Summary");
+    expect(summary?.body).not.toContain("I am preparing");
+    expect(deck?.summary).not.toContain("I am preparing");
+    for (const slide of deck?.content.deck?.slides ?? []) {
+      expect(
+        `${slide.title} ${slide.subtitle ?? ""} ${slide.bullets.join(" ")}`,
+      ).not.toContain("preparing your");
+    }
+  });
+
+  it("falls back to the description finding, then to the name alone", () => {
+    const fromFinding = composePitchDeck({
+      companyName: "Northstar Logistics",
+      result: result({
+        findings: populated().findings,
+        synthesis: "Here is your deck!",
+      }),
+    });
+    expect(fromFinding?.content.deck?.slides[0]?.subtitle ?? "").not.toContain(
+      "Here is your deck",
+    );
   });
 });
 

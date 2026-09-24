@@ -38,6 +38,12 @@ export type CompanyCanonicalPort = {
     /** Present when the actor may not see this company at all. */
     readonly available: boolean;
     readonly canonicalName: string | null;
+    /**
+     * The company's own description of itself, from its canonical
+     * profile, when it has one. What a document about the company opens
+     * with — never the conversational reply (CQ-QX-007 deck content).
+     */
+    readonly description?: string | null | undefined;
   }>;
 };
 

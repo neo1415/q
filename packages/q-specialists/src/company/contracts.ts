@@ -59,6 +59,18 @@ export type CompanyIntelligenceRequest = {
    * (CQ-QX-005). Only then is the public web read. Absent means no.
    */
   readonly publicResearch?: boolean | undefined;
+  /**
+   * The conversation so far, oldest first, without this message. DATA.
+   *
+   * The specialist answered each turn as if it were the first: a founder
+   * corrected August GMV from 412k to 380k, and the very next answer
+   * quoted 412k again, because the model was never shown the correction
+   * (CQ-QX-007 H3a). What the person said earlier in THIS conversation is
+   * part of what the answer must honour.
+   */
+  readonly conversation?:
+    | readonly { readonly role: "USER" | "Q"; readonly content: string }[]
+    | undefined;
 };
 
 /** One dimension's evidential standing. No percentage, ever (§40). */
@@ -118,6 +130,12 @@ export type CompanyIntelligenceResult = {
    * document nobody would send.
    */
   readonly companyName?: string | null | undefined;
+  /**
+   * The company's own description from its canonical profile, when it has
+   * one. What a document about the company opens with (CQ-QX-007): the
+   * record, never the reply Q wrote in the conversation.
+   */
+  readonly canonicalDescription?: string | null | undefined;
   readonly specialistVersion: string;
   /** The information state the findings describe. */
   readonly asOf: UtcTimestamp;
@@ -191,6 +209,13 @@ export type CompanyFinding = QSpecialistFinding & {
   readonly dimension: CompanyIntelligenceDimension;
   /** DETERMINISTIC: computed from institutional state. MODEL: written, then validated. */
   readonly derivation: "DETERMINISTIC" | "MODEL";
+  /**
+   * Where the facts this finding rests on came from, as the person reads
+   * it ("kivu-one-pager.pdf, page 1", "what you told me on 24 September
+   * 2026"). Resolved from the citations that held, never from anything
+   * the model wrote about its sources (CQ-QX-007 F1).
+   */
+  readonly sources?: readonly string[] | undefined;
 };
 
 /**

@@ -156,6 +156,35 @@ function sentence(finding: CompanyFinding): string {
   return `${stopped}${qualifier}.`;
 }
 
+/**
+ * What a document about the company opens with: the record's own words
+ * (CQ-QX-007).
+ *
+ * Not the conversational reply. That is Q talking to one person about one
+ * request -- "I am preparing your seed-stage investor pitch deck" -- and
+ * put on a cover slide it is Q's chat, addressed to nobody, in a document
+ * meant for investors. The company's canonical description is what the
+ * company says it is; failing that, the first description finding that
+ * stands on evidence. Null when the record holds neither, and the
+ * composer then opens plainly rather than borrowing prose.
+ */
+export function recordOpening(
+  result: CompanyIntelligenceResult,
+): string | null {
+  const described = result.canonicalDescription?.trim() ?? "";
+  if (described.length > 0) {
+    return described;
+  }
+  const finding = result.findings.find(
+    (candidate) =>
+      candidate.dimension === "DESCRIPTION" &&
+      (candidate.type === "FACT" || candidate.type === "OBSERVATION") &&
+      candidate.evidenceStatus !== "NO_EVIDENCE",
+  );
+  const statement = finding?.statement.trim() ?? "";
+  return statement.length > 0 ? statement : null;
+}
+
 export type ComposedInvestmentBrief = {
   readonly title: string;
   readonly summary: string;
@@ -191,17 +220,15 @@ export function composeInvestmentBrief(input: {
   const grounding = result.findings.map((finding) => finding.statement);
 
   /**
-   * The opening paragraph, and the one place a model's prose appears.
-   *
-   * Used only if it invents no figure. When it does — or when there was
-   * no synthesis, because the route was refused or the provider was out —
-   * the brief opens with a plain sentence instead. A brief that opens
-   * honestly is better than one that opens well.
+   * The opening paragraph: the record's own description of the company,
+   * never Q's conversational reply (CQ-QX-007). When the record holds no
+   * description, a plain sentence. A brief that opens honestly is better
+   * than one that opens well.
    */
-  const synthesis = result.synthesis?.trim() ?? "";
+  const described = recordOpening(result);
   const opening =
-    synthesis.length > 0 && !inventsFigures(synthesis, grounding)
-      ? synthesis
+    described !== null && !inventsFigures(described, grounding)
+      ? described
       : `This brief sets out what Capital Q holds on record about ${companyName}, and what it does not.`;
   sections.push({
     heading: "Summary",

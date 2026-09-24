@@ -9,7 +9,7 @@ import type {
 import type { CompanyIntelligenceDimension } from "@capital-q/q-core";
 
 import type { CompanyFinding, CompanyIntelligenceResult } from "./contracts.js";
-import { inventsFigures } from "./investment-brief.js";
+import { inventsFigures, recordOpening } from "./investment-brief.js";
 
 /**
  * The investor deck Q composes (QX-004 §2, §3, §4, §6).
@@ -264,24 +264,26 @@ export function composePitchDeck(input: {
   const slides: QSlide[] = [];
 
   /**
-   * The opening, and the one place a model's prose reaches a slide.
-   *
-   * Used only if it invents no figure the record does not carry. When it
-   * does — or when there was no synthesis at all, because the route was
-   * refused or the provider was out — the deck opens with the company's
-   * name and nothing else, which is a perfectly good title slide.
+   * The opening: the record's own description of the company, never Q's
+   * conversational reply (CQ-QX-007). The chat answer is addressed to one
+   * person about one request ("I am preparing your deck"); a cover slide
+   * is addressed to investors. With no description on record the deck
+   * opens with the company's name alone, which is a good title slide.
    */
-  const synthesis = result.synthesis?.trim() ?? "";
+  const described = recordOpening(result);
+  const opening =
+    described !== null && !inventsFigures(described, grounding)
+      ? described
+      : null;
   const subtitle =
-    synthesis.length > 0 && !inventsFigures(synthesis, grounding)
-      ? synthesis.split(/(?<=[.!?])\s/)[0]?.slice(0, 240)
-      : undefined;
+    opening === null
+      ? undefined
+      : opening.split(/(?<=[.!?])\s/)[0]?.slice(0, 240);
   sections.push({
     heading: "Summary",
     body:
-      synthesis.length > 0 && !inventsFigures(synthesis, grounding)
-        ? synthesis
-        : `This deck sets out what Capital Q holds on record about ${companyName}, and what it does not.`,
+      opening ??
+      `This deck sets out what Capital Q holds on record about ${companyName}, and what it does not.`,
     findings: [],
   });
   slides.push({
