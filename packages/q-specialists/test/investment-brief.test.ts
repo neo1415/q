@@ -94,7 +94,9 @@ describe("QX-003D · a brief states no figure the record does not", () => {
     expect(summary).toContain("Northstar Logistics");
   });
 
-  it("keeps a synthesis whose figures the record carries", () => {
+  it("opens with the record, never the conversational reply (CQ-QX-007)", () => {
+    // The reply is Q talking to one person about one request. Even when it
+    // invents nothing it is chat, and a brief is sent to investors.
     const composed = composeInvestmentBrief({
       companyName: "Northstar Logistics",
       result: result({
@@ -105,11 +107,36 @@ describe("QX-003D · a brief states no figure the record does not", () => {
           }),
           finding(),
         ],
-        synthesis: "Revenue on record is 120000 NGN.",
+        synthesis:
+          "I am preparing your investment brief. Revenue on record is 120000 NGN.",
+      }),
+    });
+    const opening = composed?.content.sections[0]?.body ?? "";
+    expect(opening).toBe(
+      "Northstar Logistics moves freight between Lagos and Abuja.",
+    );
+    expect(opening).not.toContain("I am preparing");
+    expect(composed?.summary).not.toContain("I am preparing");
+  });
+
+  it("prefers the company's canonical description to any finding", () => {
+    const composed = composeInvestmentBrief({
+      companyName: "Northstar Logistics",
+      result: result({
+        canonicalDescription:
+          "Northstar Logistics is a freight marketplace for West African shippers.",
+        findings: [
+          finding({
+            statement: "The company recorded 120000 NGN of revenue.",
+            dimension: "FINANCIAL",
+          }),
+          finding(),
+        ],
+        synthesis: "Here's your brief! Let me know what you think.",
       }),
     });
     expect(composed?.content.sections[0]?.body).toBe(
-      "Revenue on record is 120000 NGN.",
+      "Northstar Logistics is a freight marketplace for West African shippers.",
     );
   });
 });

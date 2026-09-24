@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import {
   QFindingIdSchema,
   QResultBlocksSchema,
+  type PermittedContextPlan,
   type QConfidenceLevel,
   type QFindingType,
   type EvidenceStatus,
@@ -51,6 +52,14 @@ export type AnalystResultLike = {
         readonly confidence?: string | undefined;
         readonly truthClass?: string | undefined;
         readonly evidenceStatus?: string | undefined;
+        /** The company dimension it speaks to, when the producer has one. */
+        readonly dimension?: string | undefined;
+        /**
+         * DETERMINISTIC: Capital Q computed it from state before any model
+         * ran. A deterministic GAP is a claim about a whole dimension
+         * ("holds no authorised understanding of customers").
+         */
+        readonly derivation?: string | undefined;
       }[]
     | undefined;
   readonly missingEvidence?: readonly string[] | undefined;
@@ -139,6 +148,143 @@ function subjectBlocks(
   });
 }
 
+/**
+ * Whether a finding stands on evidence: a claim about the business that
+ * rests on at least one authorised source. Gaps and uncertainties are
+ * about evidence, not on it.
+ */
+function supportedOn(finding: {
+  readonly type?: string | undefined;
+  readonly evidenceStatus?: string | undefined;
+}): boolean {
+  return (
+    finding.type !== "GAP" &&
+    finding.type !== "UNCERTAINTY" &&
+    finding.evidenceStatus !== undefined &&
+    finding.evidenceStatus !== "NO_EVIDENCE"
+  );
+}
+
+/**
+ * One answer never says two opposite things about its own evidence
+ * (CQ-QX-007 F1).
+ *
+ * Capital Q computes a gap per asked-about dimension before the model
+ * runs, from its structured knowledge: "holds no authorised understanding
+ * of customers". A document passage has no dimension until a finding
+ * gives it one, so a question answered from the one-pager still produced
+ * that gap — beside the FACT that answered it from the one-pager. The
+ * whole-dimension gap is only true when nothing in the same answer
+ * stands on evidence for that dimension; when something does, the gap is
+ * withdrawn here, at assembly, rather than trusted to a model or a
+ * sentence match. A narrower gap the analyst wrote about part of the
+ * dimension ("the other 62% of loads is not established") is not
+ * contradicted by a fact about the rest, and stays.
+ */
+export function withoutContradictedGaps<
+  F extends {
+    readonly type?: string | undefined;
+    readonly evidenceStatus?: string | undefined;
+    readonly dimension?: string | undefined;
+    readonly derivation?: string | undefined;
+  },
+>(findings: readonly F[]): readonly F[] {
+  const evidenced = new Set(
+    findings.flatMap((finding) =>
+      finding.dimension !== undefined && supportedOn(finding)
+        ? [finding.dimension]
+        : [],
+    ),
+  );
+  return findings.filter(
+    (finding) =>
+      !(
+        finding.type === "GAP" &&
+        finding.derivation === "DETERMINISTIC" &&
+        finding.dimension !== undefined &&
+        evidenced.has(finding.dimension)
+      ),
+  );
+}
+
+/**
+ * Where the answer's supported findings came from, as one line the person
+ * reads (CQ-QX-007 F1): "Source: kivu-one-pager.pdf, page 1." Built only
+ * from the sources the findings' own citations resolved to — the
+ * producer's person-facing names, never identifiers and never anything the
+ * model wrote about its sources. Null when nothing named supports the
+ * answer: an answer from the profile alone does not need a footnote, and
+ * an undisclosable document is never named.
+ */
+export const PROVENANCE_SOURCES_MAX = 4;
+
+export function provenanceLine(
+  findings: readonly {
+    readonly type?: string | undefined;
+    readonly evidenceStatus?: string | undefined;
+    readonly sources?: readonly string[] | undefined;
+  }[],
+): string | null {
+  const named = [
+    ...new Set(
+      findings.flatMap((finding) =>
+        supportedOn(finding) ? [...(finding.sources ?? [])] : [],
+      ),
+    ),
+  ]
+    .map((source) => source.trim())
+    .filter((source) => source.length > 0)
+    .slice(0, PROVENANCE_SOURCES_MAX);
+  if (named.length === 0) return null;
+  return named.length === 1
+    ? `Source: ${named[0] ?? ""}.`
+    : `Sources: ${named.join("; ")}.`;
+}
+
+/**
+ * The person's OWN investor organisation, when the run carries it beside a
+ * company (CQ-QX-007 fit): the organisation an INVESTOR_MANDATE scope is
+ * bound to. The firewall admits a mandate to its owner and to nobody else,
+ * so a bound mandate scope is the proof — never the subject list, which a
+ * client may have declared.
+ */
+export function ownInvestorOrganisationIn(
+  plan: Pick<PermittedContextPlan, "scopes">,
+): string | null {
+  for (const scope of plan.scopes) {
+    if (
+      scope.kind === "INVESTOR_MANDATE" &&
+      scope.subject?.kind === "INVESTOR_ORGANISATION"
+    ) {
+      return scope.subject.investorOrganisationId;
+    }
+  }
+  return null;
+}
+
+/**
+ * What the question is about, without the person's own organisation
+ * carried along as context. "Is this company worth my time?" is about the
+ * company; the investor's own firm is why the answer can be specific, not
+ * a second subject to show a card for or to route by.
+ */
+export function askedSubjects(
+  subjects: readonly QSubjectRef[],
+  plan: Pick<PermittedContextPlan, "scopes">,
+): readonly QSubjectRef[] {
+  const own = ownInvestorOrganisationIn(plan);
+  if (own === null || !subjects.some((subject) => subject.kind === "COMPANY")) {
+    return subjects;
+  }
+  return subjects.filter(
+    (subject) =>
+      !(
+        subject.kind === "INVESTOR_ORGANISATION" &&
+        subject.investorOrganisationId === own
+      ),
+  );
+}
+
 export function analystResultBlocks(input: {
   readonly result: AnalystResultLike;
   readonly subjects: readonly QSubjectRef[];
@@ -148,7 +294,9 @@ export function analystResultBlocks(input: {
   const idFor = input.findingId ?? (() => randomUUID());
   const blocks: QResultBlock[] = [];
 
-  for (const [index, finding] of (input.result.findings ?? []).entries()) {
+  for (const [index, finding] of withoutContradictedGaps(
+    input.result.findings ?? [],
+  ).entries()) {
     const statement = finding.statement.trim();
     if (statement.length === 0) continue;
     blocks.push({

@@ -49,6 +49,15 @@ export type LabelledFact = {
   readonly label: string;
   readonly dimension: CompanyIntelligenceDimension | null;
   readonly evidenceRefs: readonly QEvidenceRef[];
+  /**
+   * Where this came from, as the person reads it: "kivu-one-pager.pdf,
+   * page 1", "what you told me on 24 September 2026", "your company
+   * profile". Never an identifier, never a label, never the machinery
+   * line the model reads. Null when the source may not be named — a
+   * passage whose document's existence is not disclosable to this reader
+   * informs the answer without being cited (CQ-QX-007 F1).
+   */
+  readonly presentedSource?: string | null | undefined;
   /** True when the underlying understanding is past its useful life (§21). */
   readonly stale: boolean;
   /** True when another settled understanding of the same period disagrees (§20). */
@@ -93,9 +102,63 @@ function provenanceOf(
   }
 }
 
+/**
+ * Who is reading, relative to the company: its own people, or anybody
+ * else. Decides only the voice a source is named in — "what you told me"
+ * to the founder who said it, "what the company told Capital Q" to an
+ * investor — never what is shown.
+ */
+export type SourceAudience = "OWNER" | "OTHER";
+
+export function audienceOf(plan: PermittedContextPlan): SourceAudience {
+  return plan.purpose.taskClass === "OWN_COMPANY_QUESTION" ? "OWNER" : "OTHER";
+}
+
+/** A calendar date a person reads, never a timestamp. */
+function spokenDate(at: string | null | undefined): string | null {
+  if (at === null || at === undefined) return null;
+  const parsed = new Date(at);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return parsed.toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC",
+  });
+}
+
+/** The person-facing name of where a knowledge reading was established. */
+export function presentedKnowledgeSource(
+  known: AuthorisedKnowledge,
+  audience: SourceAudience,
+): string {
+  const on = spokenDate(known.object.recordedAt);
+  const dated = (text: string): string =>
+    on === null ? text : `${text} on ${on}`;
+  switch (known.object.sourceEnvironment) {
+    case "CONVERSATION":
+      return audience === "OWNER"
+        ? dated("what you told me")
+        : dated("what the company told Capital Q");
+    case "DOCUMENT":
+      return audience === "OWNER"
+        ? "a document you supplied"
+        : "a document the company supplied";
+    case "PUBLIC":
+      return "a public web source";
+    case "MEETING":
+      return "a meeting record";
+    case "INTEGRATION":
+      return "a connected system";
+    case "PLATFORM":
+      return "Capital Q's records";
+  }
+}
+
 export function knowledgeToFact(
   known: AuthorisedKnowledge,
   label: string,
+  audience: SourceAudience = "OTHER",
 ): LabelledFact {
   const parts = [
     "Capital Q's current understanding",
@@ -141,6 +204,7 @@ export function knowledgeToFact(
     label,
     dimension: dimensionForKnowledgeKey(known.object.knowledgeKey),
     evidenceRefs: refs,
+    presentedSource: presentedKnowledgeSource(known, audience),
     stale: known.freshness.stale,
     disputed: known.disputed,
     validAt: known.object.validFrom,
@@ -207,6 +271,7 @@ export function publicSourceToFact(
     label,
     dimension: null,
     evidenceRefs: [],
+    presentedSource: `${title} (${source.domain})`,
     stale: false,
     disputed: false,
     validAt: null,
@@ -248,6 +313,9 @@ export function passageToFact(hit: RetrievalHit, label: string): LabelledFact {
     label,
     dimension: null,
     evidenceRefs: refs,
+    // The document by name only where its existence may be disclosed;
+    // otherwise the passage informs the answer and is never cited.
+    presentedSource: hit.canDiscloseExistence ? describeSource(hit) : null,
     stale: false,
     disputed: false,
     validAt: null,
@@ -267,6 +335,7 @@ export function assembleCompanyContext(
   input: CompanyContextInput,
 ): AssembledCompanyContext {
   const facts: LabelledFact[] = [];
+  const audience = audienceOf(input.plan);
   const push = (
     fact: AuthorisedFact,
     dimension: CompanyIntelligenceDimension | null,
@@ -281,6 +350,14 @@ export function assembleCompanyContext(
       label,
       dimension,
       evidenceRefs: refs,
+      presentedSource:
+        // A mandate is only ever read by its owner (the firewall admits
+        // INVESTOR_MANDATE to nobody else), so it is always theirs.
+        fact.scope === "INVESTOR_MANDATE"
+          ? "your declared mandate"
+          : audience === "OWNER"
+            ? "your company profile"
+            : "the company's profile",
       stale: false,
       disputed: false,
       validAt: null,
@@ -296,7 +373,7 @@ export function assembleCompanyContext(
     if (facts.length >= COMPANY_CONTEXT_MAX_FACTS) {
       break;
     }
-    facts.push(knowledgeToFact(known, labelAt(facts.length)));
+    facts.push(knowledgeToFact(known, labelAt(facts.length), audience));
   }
   for (const hit of input.passages) {
     if (facts.length >= COMPANY_CONTEXT_MAX_FACTS) {

@@ -37,8 +37,8 @@ import {
   citePublicSources,
   type AuthorisedFact,
   type PublicSourceLike,
-  type CompanyAnalystV5Result,
-  CompanyAnalystV5ResultSchema,
+  type CompanyAnalystV8Result,
+  CompanyAnalystV8ResultSchema,
   DisplayNameRequestSchema,
   NOTHING_REMEMBERED,
   ProfileUpdateSchema,
@@ -71,13 +71,26 @@ import { isModelGatewayError } from "../errors.js";
 import { createPartialAnswerReader } from "../policy/partial-answer.js";
 import type { ModelGateway, ModelGatewayExecuteOptions } from "../gateway.js";
 import { acceptStructuredOutput } from "../policy/structured.js";
-import { analystResultBlocks } from "./result-blocks.js";
+import { withoutActionTalk } from "./action-talk.js";
+import {
+  analystResultBlocks,
+  askedSubjects,
+  ownInvestorOrganisationIn,
+} from "./result-blocks.js";
 
 export {
   analystResultBlocks,
+  askedSubjects,
+  ownInvestorOrganisationIn,
+  provenanceLine,
+  withoutContradictedGaps,
   type AnalystResultLike,
 } from "./result-blocks.js";
 export { createQTurnReader, type QTurnReader } from "./turn-reader.js";
+export {
+  withoutActionTalk,
+  type ActionTalkStripResult,
+} from "./action-talk.js";
 
 /**
  * The Q answer seam over the Prompt Registry, the Tool Registry and the
@@ -86,7 +99,7 @@ export { createQTurnReader, type QTurnReader } from "./turn-reader.js";
  *   run → Context Firewall plan → authorised facts (port) → tools offered
  *   for this plan (port) → resolve bundle → render charter + task with
  *   untrusted fences → bounded tool loop through the gateway → validated
- *   CompanyAnalystV5Result → Q message + bundle version on the run
+ *   CompanyAnalystV8Result → Q message + bundle version on the run
  *
  * The tool loop: while tools are offered, the model is asked with a TEXT
  * output and may either propose tool calls or answer with the JSON the
@@ -315,6 +328,17 @@ const SOURCE_CHANGE_NOTE: ModelMessage = {
   role: "SYSTEM",
   content:
     "What Capital Q holds about this person was not enough for their question, so public web sources were read. Say so in a few words before using them (\"What you've shared with me doesn't cover that, so this is from public sources\"), and keep what they told you apart from what the web says.",
+};
+
+/**
+ * What the model is told when the person's own mandate was fetched for it
+ * (CQ-QX-007). The investor organisation among the subjects is theirs; the
+ * question is about the company.
+ */
+export const OWN_MANDATE_NOTE: ModelMessage = {
+  role: "SYSTEM",
+  content:
+    "The investor organisation in this conversation is the person's own, and the mandate above is what they declared. The question is about the company. If they ask whether it suits what they invest in, compare the company's profile with each declared criterion (matches, misses, not on record), with no score or verdict.",
 };
 
 /** What the model is told when public research is among its tools (CQ-Q-RESEARCH-001 §26, §30). */
@@ -635,7 +659,7 @@ export type QToolCallObservation = {
 };
 
 export type QAnswerObservation = {
-  readonly result: CompanyAnalystV5Result;
+  readonly result: CompanyAnalystV8Result;
   readonly providerCode: string;
   readonly modelCode: string;
   readonly promptBundleVersion: string;
@@ -1111,9 +1135,9 @@ export function createModelGatewayQAnswer(
         }
       };
 
-      const options: ModelGatewayExecuteOptions<CompanyAnalystV5Result> = {
+      const options: ModelGatewayExecuteOptions<CompanyAnalystV8Result> = {
         signal: request.signal,
-        schema: CompanyAnalystV5ResultSchema,
+        schema: CompanyAnalystV8ResultSchema,
         onTextDelta,
       };
 
@@ -1258,13 +1282,54 @@ export function createModelGatewayQAnswer(
           ? [...rendered.messages]
           : [...rendered.messages, TOOLS_FIRST_NOTE];
 
+      /**
+       * Their own declared mandate, fetched for them (CQ-QX-007 fit).
+       *
+       * An investor asking about a company from its page asks "is this
+       * worth my time given what I invest in?", and the answer was "we
+       * have no facts on your investment thesis" — the thesis was never in
+       * front of the model. When the run carries their own organisation
+       * (proved by the mandate scope the firewall bound to it, which only
+       * an owner receives) the mandate is read through the same tool the
+       * model could call, under the same plan, and handed over as data.
+       */
+      const ownInvestor = ownInvestorOrganisationIn(plan);
+      const mandateTool = offeredByName.get("get_investor_mandate");
+      if (
+        ownInvestor !== null &&
+        mandateTool !== undefined &&
+        request.subjects.some((subject) => subject.kind === "COMPANY")
+      ) {
+        const call = {
+          callId: "q-own-mandate",
+          name: "get_investor_mandate",
+          arguments: { investorOrganisationId: ownInvestor },
+        };
+        const outcome = await tools.execute(call, toolContext);
+        toolCalls.push({
+          toolName: outcome.toolName,
+          providerName: call.name,
+          status: outcome.status,
+          failureCode: outcome.failureCode,
+          latencyMs: outcome.latencyMs,
+        });
+        if (outcome.result.ok) {
+          messages = [
+            ...messages,
+            fetchedForYouMessage(call.name, outcome),
+            OWN_MANDATE_NOTE,
+          ];
+        }
+        took("mandate");
+      }
+
       type AnswerResult = Awaited<
-        ReturnType<typeof gateway.execute<CompanyAnalystV5Result>>
+        ReturnType<typeof gateway.execute<CompanyAnalystV8Result>>
       >;
 
       try {
         let final: AnswerResult | undefined;
-        let analyst: CompanyAnalystV5Result | undefined;
+        let analyst: CompanyAnalystV8Result | undefined;
 
         if (offered.length > 0) {
           took("prepare");
@@ -1276,10 +1341,10 @@ export function createModelGatewayQAnswer(
           ) {
             modelCalls += 1;
             let result: Awaited<
-              ReturnType<typeof gateway.execute<CompanyAnalystV5Result>>
+              ReturnType<typeof gateway.execute<CompanyAnalystV8Result>>
             >;
             try {
-              result = await gateway.execute<CompanyAnalystV5Result>(
+              result = await gateway.execute<CompanyAnalystV8Result>(
                 {
                   ...base,
                   messages,
@@ -1334,7 +1399,7 @@ export function createModelGatewayQAnswer(
                */
               const accepted = acceptStructuredOutput(
                 result.output.text,
-                CompanyAnalystV5ResultSchema,
+                CompanyAnalystV8ResultSchema,
               );
               if (accepted.ok) {
                 final = result;
@@ -1469,7 +1534,7 @@ export function createModelGatewayQAnswer(
         }
         if (analyst === undefined || final === undefined) {
           modelCalls += 1;
-          final = await gateway.execute<CompanyAnalystV5Result>(
+          final = await gateway.execute<CompanyAnalystV8Result>(
             { ...base, messages, output: rendered.output },
             options,
           );
@@ -1491,7 +1556,17 @@ export function createModelGatewayQAnswer(
         // charter forbids writing one and a prompt is not a boundary, so
         // it is removed here rather than hoped for.
         took("answer");
-        const promises = stripEmptyPromises(analyst.answer);
+        // What the analyst said about acting is Capital Q's to say, from
+        // the action it actually holds (CQ-QX-007): the sentences the
+        // model itself named as such are removed before anything else.
+        const spoken = withoutActionTalk(analyst.answer, analyst.actionTalk);
+        if (spoken.removed > 0) {
+          logger?.info(
+            { qRunId: request.runId, removed: spoken.removed },
+            "sentences claiming an action were removed from a Q answer",
+          );
+        }
+        const promises = stripEmptyPromises(spoken.text);
         if (promises.removed.length > 0) {
           logger?.warn(
             {
@@ -1620,7 +1695,7 @@ export function createModelGatewayQAnswer(
           .join("\n\n")
           .slice(0, ANSWER_LIMIT_CHARS)
           .trim();
-        if (content.length === 0) {
+        if (content.length === 0 && spoken.removed === 0) {
           return {
             kind: "FAILED",
             diagnosticCode: "MODEL_PROVIDER_UNAVAILABLE",
@@ -1677,15 +1752,23 @@ export function createModelGatewayQAnswer(
           result: analyst,
           // The run's own authorised subjects, never anything the model
           // named: a reference is caused by what the server allowed this
-          // run to be about.
-          subjects: request.subjects,
+          // run to be about. Their own firm, carried as context for a fit
+          // question, is not what they asked about (CQ-QX-007).
+          subjects: askedSubjects(request.subjects, plan),
         });
-        const message = await persistAnswer(
+        // An answer that was nothing but talk about acting leaves Capital
+        // Q's own lines — the revision below, the action's own narration —
+        // to say what happened. Alone, it is acknowledged and no more.
+        const reply =
           revisedArtifact === null
-            ? content
+            ? content.length > 0
+              ? content
+              : "Understood."
             : `${content}
 
-I've updated **${revisedArtifact.title}** — that's version ${String(revisedArtifact.currentVersion)}. The previous version is still there, and nothing has been shared or sent.`,
+I've updated **${revisedArtifact.title}** — that's version ${String(revisedArtifact.currentVersion)}. The previous version is still there, and nothing has been shared or sent.`.trim();
+        const message = await persistAnswer(
+          reply,
           revisedArtifact === null
             ? analystBlocks
             : [
