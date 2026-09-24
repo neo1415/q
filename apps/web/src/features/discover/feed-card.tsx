@@ -175,21 +175,14 @@ export function FeedCard({
       aria-label={company.canonicalName}
       data-company-id={company.companyId}
     >
-      {company.pitch === null ? (
-        /*
-          No pitch, and nothing pretending to be one. A still frame with a
-          play control over it would promise a video that does not exist.
-        */
-        <div
-          className="flex items-center justify-center rounded-lg border border-(--cq-border-subtle) bg-(--cq-surface) p-8"
-          style={{ aspectRatio: "9 / 16" }}
-        >
-          <p className="cq-body-sm max-w-(--cq-layout-narrow) text-center text-(--cq-text-tertiary)">
-            No pitch video yet. Everything below is what {company.canonicalName}{" "}
-            has declared.
-          </p>
-        </div>
-      ) : (
+      {/*
+        No pitch, and nothing pretending to be one: no frame is reserved
+        for a video that does not exist. It used to be an empty 9:16 box,
+        taller than a laptop screen, with the company below the fold — the
+        "broken empty video screen" the first viewport showed an investor
+        (CQ-ACCEPT-001). Without a pitch, the company leads.
+      */}
+      {company.pitch === null ? null : (
         <PitchPlayer
           company={company}
           policy={policy}
@@ -210,6 +203,13 @@ export function FeedCard({
         {place === "" ? null : (
           <p className="cq-caption text-(--cq-text-tertiary)">{place}</p>
         )}
+
+        {company.pitch === null ? (
+          <p className="cq-caption text-(--cq-text-tertiary)">
+            No pitch video yet. This is what {company.canonicalName} has
+            declared.
+          </p>
+        ) : null}
 
         {company.shortDescription === null ? null : (
           <p className="cq-body max-w-(--cq-layout-narrow) text-(--cq-text-secondary)">
