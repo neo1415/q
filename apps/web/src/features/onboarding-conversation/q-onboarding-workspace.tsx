@@ -28,7 +28,10 @@ import type { TaxonomyCandidateView } from "../onboarding-kit/client";
 import type { OnboardingTurn } from "../onboarding-kit/controller";
 import type { SessionPresentation } from "../onboarding-kit/session";
 import { askQAction, readQRunAction } from "../q/actions";
-import { onboardingThreadAction } from "./thread-actions";
+import {
+  onboardingThreadAction,
+  onboardingThreadKeepAction,
+} from "./thread-actions";
 import { useVoiceInterview } from "../voice/use-voice-interview";
 import {
   materialListAction,
@@ -635,9 +638,16 @@ export function QOnboardingWorkspace({
           // The stream could not be opened or dropped; the run itself may
           // still finish. Read it back below rather than claiming failure.
         }
+        // What the person sees is what the thread keeps (round 2, #7).
+        const show = (text: string) => {
+          push("Q", text);
+          const sessionId = view?.session.id;
+          if (sessionId !== undefined) {
+            void onboardingThreadKeepAction(sessionId, text);
+          }
+        };
         if (streamed) {
-          push(
-            "Q",
+          show(
             answerOf(state) ??
               "I couldn't answer that just now. Let's carry on; you can ask again later.",
           );
@@ -658,8 +668,7 @@ export function QOnboardingWorkspace({
             .map((message) => message.text ?? "")
             .filter((text) => text.length > 0)
             .at(-1);
-          push(
-            "Q",
+          show(
             answer ??
               "I couldn't answer that just now. Let's carry on; you can ask again later.",
           );
@@ -674,7 +683,7 @@ export function QOnboardingWorkspace({
         setQStream(null);
       }
     },
-    [push, qSubject, answerOf],
+    [push, qSubject, answerOf, view?.session.id],
   );
 
   const say = useCallback(

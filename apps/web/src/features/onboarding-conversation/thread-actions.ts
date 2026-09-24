@@ -2,7 +2,10 @@
 
 import { z } from "zod";
 
-import { listOnboardingInterviewTurns } from "@capital-q/api-client";
+import {
+  appendOnboardingInterviewTurns,
+  listOnboardingInterviewTurns,
+} from "@capital-q/api-client";
 import { loadWebServerConfig } from "@capital-q/config/web";
 import type { OnboardingInterviewTurn } from "@capital-q/contracts";
 
@@ -39,5 +42,38 @@ export async function onboardingThreadAction(
     return listed.items;
   } catch {
     return [];
+  }
+}
+
+/**
+ * Keep a line of Q's that the interviewer did not write (adversarial
+ * round 2, #7): the answer to a research question comes from a Q run the
+ * surface carried, not from the interviewer's reply, so the thread must
+ * keep exactly what the person saw. Best effort; nothing on screen
+ * depends on it.
+ */
+export async function onboardingThreadKeepAction(
+  rawSessionId: string,
+  rawText: string,
+): Promise<void> {
+  const sessionId = z.string().uuid().safeParse(rawSessionId);
+  const text = z.string().trim().min(1).max(4000).safeParse(rawText);
+  if (!sessionId.success || !text.success) return;
+  const { apiBaseUrl } = loadWebServerConfig();
+  if (apiBaseUrl === undefined) return;
+  const accessToken = await getSessionAccessToken();
+  if (accessToken === null) return;
+  try {
+    await appendOnboardingInterviewTurns(
+      { baseUrl: apiBaseUrl, accessToken },
+      sessionId.data,
+      {
+        turnRef: crypto.randomUUID(),
+        turns: [{ role: "Q", text: text.data, channel: "TEXT" }],
+      },
+    );
+  } catch {
+    // The thread is a display record; a missed line is a worse reload,
+    // never a lost answer.
   }
 }
