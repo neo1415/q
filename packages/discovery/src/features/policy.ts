@@ -208,6 +208,10 @@ export type PreferenceHierarchyProjection = {
     readonly vocabularyCode: string;
     readonly unrestricted: boolean;
     readonly descendantNodeIds: readonly string[];
+    /** The node's own ISO 3166-1 alpha-2 reference metadata, when it is a country node. */
+    readonly countryCode: string | null;
+    /** Distinct, sorted ISO codes of the countries below the node (a region's members). */
+    readonly descendantCountryCodes: readonly string[];
   }[];
 };
 
@@ -410,17 +414,34 @@ function computeOne(
           scopeViolation: false,
         };
       }
-      const country = input.company.headquartersCountry;
-      if (
-        country !== null &&
-        intent.countryCodes.includes(country.toUpperCase())
-      ) {
+      const country = input.company.headquartersCountry?.toUpperCase() ?? null;
+      if (country !== null && intent.countryCodes.includes(country)) {
         return {
           value: present(d, "COUNTRY_MATCH", sources, {
-            headquartersCountry: country.toUpperCase(),
+            headquartersCountry: country,
           }),
           scopeViolation: false,
         };
+      }
+      // v2: a positive geography node IS declared country intent. Investor
+      // onboarding records "Nigeria" as the taxonomy node, not as a
+      // `geography.country` constraint; reading only the constraint scored
+      // the very companies the investor named as a mismatch. The node's ISO
+      // code is reference metadata, read through the taxonomy port.
+      const byNodeId = [...narrowing].sort((a, b) =>
+        a.preferredNodeId.localeCompare(b.preferredNodeId),
+      );
+      if (country !== null) {
+        const named = byNodeId.find((n) => n.countryCode === country);
+        if (named !== undefined) {
+          return {
+            value: present(d, "COUNTRY_MATCH", sources, {
+              headquartersCountry: country,
+              preferredNodeId: named.preferredNodeId,
+            }),
+            scopeViolation: false,
+          };
+        }
       }
       const geographyClassifications = declaredClassifications(
         input.taxonomy,
@@ -437,6 +458,22 @@ function computeOne(
               preferredNodeId: node.preferredNodeId,
               matchedNodeId: hit.nodeId,
               exact: hit.nodeId === node.preferredNodeId,
+            }),
+            scopeViolation: false,
+          };
+        }
+      }
+      if (country !== null) {
+        // A region the investor named that contains the headquarters country.
+        const containing = byNodeId.find((n) =>
+          n.descendantCountryCodes.includes(country),
+        );
+        if (containing !== undefined) {
+          return {
+            value: present(d, "REGION_MATCH", sources, {
+              preferredNodeId: containing.preferredNodeId,
+              headquartersCountry: country,
+              exact: false,
             }),
             scopeViolation: false,
           };

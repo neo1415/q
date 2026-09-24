@@ -22,6 +22,7 @@ import type {
   OnboardingDefinitionVersionId,
   OnboardingInterviewQuestion,
   OnboardingInterviewQuestionId,
+  OnboardingInterviewTurnRecord,
   OnboardingQuestionStatus,
   OnboardingResponse,
   OnboardingResponseId,
@@ -330,6 +331,34 @@ export type OnboardingUtteranceRepository = {
     utteranceId: OnboardingUtteranceId,
     status: Exclude<OnboardingUtteranceStatus, "PENDING">,
   ) => Promise<boolean>;
+};
+
+export type NewOnboardingInterviewTurn = Pick<
+  OnboardingInterviewTurnRecord,
+  "sessionId" | "role" | "text" | "stepKey" | "channel" | "turnRef"
+>;
+
+/** The interview thread (CQ-QX-006): append-only, idempotent per reference and role. */
+export type OnboardingInterviewTurnRepository = {
+  /**
+   * Appends one turn; null when the (session, turnRef, role) already exists,
+   * in which case nothing was written.
+   */
+  readonly append: (
+    tx: TransactionContext,
+    input: NewOnboardingInterviewTurn,
+  ) => Promise<OnboardingInterviewTurnRecord | null>;
+  readonly findByRef: (
+    executor: DatabaseExecutor,
+    sessionId: OnboardingSessionId,
+    turnRef: string,
+  ) => Promise<readonly OnboardingInterviewTurnRecord[]>;
+  /** The newest `limit` turns, oldest first. */
+  readonly listRecent: (
+    executor: DatabaseExecutor,
+    sessionId: OnboardingSessionId,
+    limit: number,
+  ) => Promise<readonly OnboardingInterviewTurnRecord[]>;
 };
 
 /** Hash-only idempotency for session start and session mutations. */

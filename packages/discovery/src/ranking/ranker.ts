@@ -1,6 +1,6 @@
 import {
   FEATURE_SCHEMA_VERSION,
-  SnapshotCandidateProvenanceSchema,
+  RankableCandidateProvenanceSchema,
   type FeatureValue,
   type RecommendationFeatureSnapshot,
 } from "../features/contracts.js";
@@ -313,8 +313,10 @@ export function validateRankingInput(
       `computed under ${String(s.eligibilityPolicyVersion)}, current is ${ELIGIBILITY_POLICY_VERSION}`,
     );
   }
+  // The snapshot schema reads every published generator version (history
+  // must stay explainable); ranking accepts only the current one.
   if (
-    !SnapshotCandidateProvenanceSchema.safeParse(s.candidateProvenance).success
+    !RankableCandidateProvenanceSchema.safeParse(s.candidateProvenance).success
   ) {
     throw new RankingInputError(
       "CANDIDATE_VERSION_MISMATCH",

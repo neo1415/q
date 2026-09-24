@@ -19,7 +19,7 @@ import {
   createPostgresRefreshRequestStore,
   createPostgresSlateRepository,
 } from "../src/infrastructure/postgres-slate-repository.js";
-import { RANKING_CONFIG_V1 } from "../src/ranking/config.js";
+import { RANKING_CONFIG_CURRENT } from "../src/ranking/config.js";
 import { RANKER_VERSION } from "../src/ranking/contracts.js";
 import { SEMANTIC_GENERATOR_VERSION } from "../src/semantic/contracts.js";
 import {
@@ -98,7 +98,7 @@ const VERSIONS: SlateVersions = {
   semanticGeneratorVersion: SEMANTIC_GENERATOR_VERSION,
   featureSchemaVersion: FEATURE_SCHEMA_VERSION,
   rankerVersion: RANKER_VERSION,
-  rankingConfigVersion: RANKING_CONFIG_V1.version,
+  rankingConfigVersion: RANKING_CONFIG_CURRENT.version,
   taxonomyVersion: { industry: 1 },
 };
 
@@ -610,7 +610,9 @@ describe("@capital-q/discovery slate builder over the live local pipeline", () =
         SEMANTIC_GENERATOR_VERSION,
       );
       expect(first.slate.rankerVersion).toBe(RANKER_VERSION);
-      expect(first.slate.rankingConfigVersion).toBe(RANKING_CONFIG_V1.version);
+      expect(first.slate.rankingConfigVersion).toBe(
+        RANKING_CONFIG_CURRENT.version,
+      );
       expect(first.slate.taxonomyVersion).not.toBeNull();
       const items = await w.pipeline.slates.pageItems({
         slateId: first.slate.id,

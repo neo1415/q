@@ -13,6 +13,7 @@ import {
   FEATURE_SCHEMA_VERSION,
   RECOMMENDATION_FEATURES,
   RecommendationFeatureDefinitionSchema,
+  SnapshotCandidateProvenanceSchema,
   type RecommendationFeatureSnapshot,
 } from "../src/features/contracts.js";
 import {
@@ -25,7 +26,9 @@ import {
 } from "../src/features/policy.js";
 import type { FeatureService } from "../src/features/service.js";
 import {
+  RANKING_CONFIG_CURRENT,
   RANKING_CONFIG_V1,
+  RANKING_CONFIG_V2,
   RANKING_CONFIGS,
   RankingConfigError,
   RankingConfigSchema,
@@ -158,6 +161,7 @@ function snapshotFor(
     readonly mandate?: MandateSnapshotForEligibility;
     readonly definitions?: typeof DEFINITIONS;
     readonly context?: RecommendationContext;
+    readonly hierarchy?: FeatureInputs["hierarchy"]["nodes"];
   } = {},
 ): RecommendationFeatureSnapshot {
   const mandate = options.mandate ?? gmMandate();
@@ -175,12 +179,14 @@ function snapshotFor(
     taxonomy: { sourceClass: "CANONICAL_TAXONOMY", classifications: c.nodes },
     hierarchy: {
       sourceClass: "TAXONOMY_REFERENCE_HIERARCHY",
-      nodes: [
+      nodes: options.hierarchy ?? [
         {
           preferredNodeId: PAYMENTS,
           vocabularyCode: "industry",
           unrestricted: false,
           descendantNodeIds: [],
+          countryCode: null,
+          descendantCountryCodes: [],
         },
       ],
     },
@@ -241,7 +247,7 @@ const enrich = (s: RecommendationFeatureSnapshot): EnrichedCandidate => ({
 });
 const rank = (
   companies: readonly Company[],
-  config: RankingConfig = RANKING_CONFIG_V1,
+  config: RankingConfig = RANKING_CONFIG_CURRENT,
 ) =>
   rankSnapshots(
     config,
@@ -269,24 +275,53 @@ const EXACT: Company = {
   structured: true,
 };
 
-describe("ranking-config.v1", () => {
+describe("ranking-config.v2", () => {
+  it("v2 is v1 with the geography mapping bound to declared_fit.geography v2; v1 stays published, unedited, and refuses today's registry", () => {
+    expect(RANKING_CONFIG_CURRENT).toBe(RANKING_CONFIG_V2);
+    expect(RANKING_CONFIGS.map((c) => c.version)).toEqual([
+      "ranking-config.v1",
+      "ranking-config.v2",
+    ]);
+    const geography = (c: RankingConfig) =>
+      c.factors.find((f) => f.featureId === "declared_fit.geography");
+    expect(geography(RANKING_CONFIG_V1)?.featureVersion).toBe("v1");
+    expect(geography(RANKING_CONFIG_V2)?.featureVersion).toBe("v2");
+    // Nothing but the geography binding moved: same weights, maps, tie-break.
+    const strip = (c: RankingConfig) => ({
+      ...c,
+      version: "",
+      description: "",
+      factors: c.factors.map((f) => ({ ...f, featureVersion: "" })),
+    });
+    expect(strip(RANKING_CONFIG_V2)).toEqual(strip(RANKING_CONFIG_V1));
+    expect(Object.isFrozen(RANKING_CONFIG_V1)).toBe(true);
+    expect(() => validateRankingConfig(RANKING_CONFIG_V1, registry)).toThrow(
+      /declared_fit\.geography is registered at v2, not v1/,
+    );
+  });
+
   it("is valid against the registry, frozen, uncalibrated and accounts for every registered feature", () => {
     expect(() =>
-      validateRankingConfigs(RANKING_CONFIGS, registry),
+      validateRankingConfigs([RANKING_CONFIG_CURRENT], registry),
     ).not.toThrow();
-    expect(Object.isFrozen(RANKING_CONFIG_V1)).toBe(true);
-    expect(Object.isFrozen(RANKING_CONFIG_V1.factors[0]?.normalization)).toBe(
-      true,
+    expect(Object.isFrozen(RANKING_CONFIG_CURRENT)).toBe(true);
+    expect(
+      Object.isFrozen(RANKING_CONFIG_CURRENT.factors[0]?.normalization),
+    ).toBe(true);
+    expect(RANKING_CONFIG_CURRENT.status).toBe(
+      "INITIAL_HEURISTIC_UNCALIBRATED",
     );
-    expect(RANKING_CONFIG_V1.status).toBe("INITIAL_HEURISTIC_UNCALIBRATED");
-    expect(RANKING_CONFIG_V1.thresholds.minimumFit).toBeNull();
-    expect(RANKING_CONFIG_V1.exploration).toEqual({ mode: "NONE", rate: 0 });
+    expect(RANKING_CONFIG_CURRENT.thresholds.minimumFit).toBeNull();
+    expect(RANKING_CONFIG_CURRENT.exploration).toEqual({
+      mode: "NONE",
+      rate: 0,
+    });
     const accounted = [
-      ...RANKING_CONFIG_V1.factors.map((f) => f.featureId),
-      ...RANKING_CONFIG_V1.inactiveFeatures.map((f) => f.featureId),
+      ...RANKING_CONFIG_CURRENT.factors.map((f) => f.featureId),
+      ...RANKING_CONFIG_CURRENT.inactiveFeatures.map((f) => f.featureId),
     ].sort();
     expect(accounted).toEqual(RECOMMENDATION_FEATURES.map((d) => d.id).sort());
-    expect(RANKING_CONFIG_V1.inactiveFeatures).toEqual([
+    expect(RANKING_CONFIG_CURRENT.inactiveFeatures).toEqual([
       {
         featureId: "eligibility.hard_gate",
         featureVersion: "v1",
@@ -300,14 +335,14 @@ describe("ranking-config.v1", () => {
     ]);
     // Print the complete production config for review (§94).
     console.info(
-      `[REC-005 ranking-config.v1] ${JSON.stringify(RANKING_CONFIG_V1)}`,
+      `[REC-005 ranking-config.v2] ${JSON.stringify(RANKING_CONFIG_CURRENT)}`,
     );
   });
 
   it("fails fast on a malformed config", () => {
     const bad = (patch: Partial<RankingConfig>) => () =>
       validateRankingConfig(
-        RankingConfigSchema.parse({ ...RANKING_CONFIG_V1, ...patch }),
+        RankingConfigSchema.parse({ ...RANKING_CONFIG_CURRENT, ...patch }),
         registry,
       );
     expect(bad({ inactiveFeatures: [] })).toThrow(/not accounted/);
@@ -317,15 +352,18 @@ describe("ranking-config.v1", () => {
     );
     expect(
       bad({
-        factors: RANKING_CONFIG_V1.factors.map((f) => ({ ...f, weight: 0 })),
+        factors: RANKING_CONFIG_CURRENT.factors.map((f) => ({
+          ...f,
+          weight: 0,
+        })),
       }),
     ).toThrow(/positive weight/);
-    const stage = RANKING_CONFIG_V1.factors[0];
+    const stage = RANKING_CONFIG_CURRENT.factors[0];
     if (stage === undefined) throw new Error("fixture");
     expect(
       bad({
         factors: [
-          ...RANKING_CONFIG_V1.factors,
+          ...RANKING_CONFIG_CURRENT.factors,
           { ...stage, featureId: "behavior.profile_views" },
         ],
       }),
@@ -347,24 +385,27 @@ describe("ranking-config.v1", () => {
               },
             },
           },
-          ...RANKING_CONFIG_V1.factors.slice(1),
+          ...RANKING_CONFIG_CURRENT.factors.slice(1),
         ],
       }),
     ).toThrow(/cover exactly/);
     expect(() =>
       RankingConfigSchema.parse({
-        ...RANKING_CONFIG_V1,
+        ...RANKING_CONFIG_CURRENT,
         factors: [{ ...stage, weight: -1 }],
       }),
     ).toThrow();
     expect(() =>
       RankingConfigSchema.parse({
-        ...RANKING_CONFIG_V1,
+        ...RANKING_CONFIG_CURRENT,
         factors: [{ ...stage, weight: Number.NaN }],
       }),
     ).toThrow();
     expect(() =>
-      validateRankingConfigs([RANKING_CONFIG_V1, RANKING_CONFIG_V1], registry),
+      validateRankingConfigs(
+        [RANKING_CONFIG_CURRENT, RANKING_CONFIG_CURRENT],
+        registry,
+      ),
     ).toThrow(/unique/);
   });
 
@@ -376,18 +417,21 @@ describe("ranking-config.v1", () => {
           : d,
       ),
     );
-    expect(() => validateRankingConfig(RANKING_CONFIG_V1, moved)).toThrow(
+    expect(() => validateRankingConfig(RANKING_CONFIG_CURRENT, moved)).toThrow(
       /registered at v2, not v1/,
     );
     expect(() =>
-      createDeterministicRanker({ config: RANKING_CONFIG_V1, registry: moved }),
+      createDeterministicRanker({
+        config: RANKING_CONFIG_CURRENT,
+        registry: moved,
+      }),
     ).toThrow(RankingConfigError);
   });
 });
 
 describe("normalization (§19–§23, §71–§72)", () => {
   const factor = (id: string) => {
-    const f = RANKING_CONFIG_V1.factors.find((x) => x.featureId === id);
+    const f = RANKING_CONFIG_CURRENT.factors.find((x) => x.featureId === id);
     if (f === undefined) throw new Error(id);
     return f.normalization;
   };
@@ -500,12 +544,12 @@ describe("scoring and ordering", () => {
       },
     ];
     const configured = new Set(
-      RANKING_CONFIG_V1.factors.map((f) => f.featureId),
+      RANKING_CONFIG_CURRENT.factors.map((f) => f.featureId),
     );
     const registered = new Set(RECOMMENDATION_FEATURES.map((d) => d.id));
     for (const r of rank(pool)) {
       expect(r.factors.map((f) => f.featureId)).toEqual(
-        RANKING_CONFIG_V1.factors.map((f) => f.featureId),
+        RANKING_CONFIG_CURRENT.factors.map((f) => f.featureId),
       );
       for (const f of r.factors) {
         expect(configured.has(f.featureId)).toBe(true);
@@ -653,10 +697,10 @@ describe("scoring and ordering", () => {
   it("the score reads no clock: computedAt changes nothing", () => {
     const s = snapshotFor(EXACT);
     const later = { ...s, computedAt: "2031-01-01T00:00:00.000Z" };
-    const a = rankSnapshots(RANKING_CONFIG_V1, registry, RANKING_CONTEXT, [
+    const a = rankSnapshots(RANKING_CONFIG_CURRENT, registry, RANKING_CONTEXT, [
       enrich(s),
     ]).ranked;
-    const b = rankSnapshots(RANKING_CONFIG_V1, registry, RANKING_CONTEXT, [
+    const b = rankSnapshots(RANKING_CONFIG_CURRENT, registry, RANKING_CONTEXT, [
       enrich(later),
     ]).ranked;
     expect(b).toEqual(a);
@@ -664,9 +708,9 @@ describe("scoring and ordering", () => {
 
   it("weights are configuration: a test config changes the score as its weights say, and results record which config (§73–§74)", () => {
     const testV2 = RankingConfigSchema.parse({
-      ...RANKING_CONFIG_V1,
+      ...RANKING_CONFIG_CURRENT,
       version: "ranking-config.test-v2",
-      factors: RANKING_CONFIG_V1.factors.map((f) => ({
+      factors: RANKING_CONFIG_CURRENT.factors.map((f) => ({
         ...f,
         weight: f.featureId === "declared_fit.stage" ? 3 : 1,
       })),
@@ -686,9 +730,11 @@ describe("scoring and ordering", () => {
     const v2 = byN(rank([c], testV2), 30);
     expect(v1.internalScore).toBeCloseTo(1 / 3, 12);
     expect(v2.internalScore).toBeCloseTo(3 / 5, 12);
-    expect(v1.rankingConfigVersion).toBe("ranking-config.v1");
+    expect(v1.rankingConfigVersion).toBe("ranking-config.v2");
     expect(v2.rankingConfigVersion).toBe("ranking-config.test-v2");
-    expect(RANKING_CONFIG_V1.factors.every((f) => f.weight === 1)).toBe(true);
+    expect(RANKING_CONFIG_CURRENT.factors.every((f) => f.weight === 1)).toBe(
+      true,
+    );
     expect(byN(rank([c]), 30)).toEqual(v1);
   });
 
@@ -705,7 +751,7 @@ describe("scoring and ordering", () => {
     };
     expect(rank([weak, EXACT])).toHaveLength(2);
     const gated = RankingConfigSchema.parse({
-      ...RANKING_CONFIG_V1,
+      ...RANKING_CONFIG_CURRENT,
       version: "ranking-config.test-threshold",
       thresholds: { minimumFit: 0.5 },
     });
@@ -725,7 +771,7 @@ describe("scoring and ordering", () => {
       rank: 1,
       rankerId: RANKER_ID,
       rankerVersion: RANKER_VERSION,
-      rankingConfigVersion: "ranking-config.v1",
+      rankingConfigVersion: "ranking-config.v2",
       featureSchemaVersion: FEATURE_SCHEMA_VERSION,
       featureSnapshot: {
         fingerprint: snapshotFor(EXACT).fingerprint,
@@ -781,6 +827,56 @@ describe("golden matching scenarios (doc 19 §179–§180)", () => {
     expect(
       byN(ranked, 1).factors.some((f) => f.featureId === "declared_fit.cheque"),
     ).toBe(false);
+  });
+
+  it("CQ-REC-GEO-001: a mandate that named Nigeria as a taxonomy node ranks an NG company GEOGRAPHY_COUNTRY_ALIGNED, not GEOGRAPHY_MISMATCH", () => {
+    // The live slate: onboarding stored geography/nigeria (ISO NG) and a
+    // stage; no geography.country constraint; the companies carry no
+    // geography classification. v1 said STAGE_ALIGNED + GEOGRAPHY_MISMATCH.
+    const NIGERIA = "44444444-0000-4000-8000-000000000048";
+    const onboarded = gmMandate({
+      constraints: gmMandate().constraints.filter(
+        (c) => c.dimension === "stage",
+      ),
+      taxonomyPreferences: [
+        {
+          nodeId: NIGERIA,
+          vocabularyCode: "geography",
+          preferenceStrength: "STRONG",
+          isExclusion: false,
+          source: "user_selected",
+        },
+      ],
+    });
+    const hierarchy = [
+      {
+        preferredNodeId: NIGERIA,
+        vocabularyCode: "geography",
+        unrestricted: false,
+        descendantNodeIds: [],
+        countryCode: "NG",
+        descendantCountryCodes: [],
+      },
+    ];
+    const lagos: Company = { ...A, n: 60, nodes: [], semantic: null };
+    const berlin: Company = { ...lagos, n: 61, country: "DE" };
+    const nowhere: Company = { ...lagos, n: 62, country: null };
+    const ranked = rankSnapshots(
+      RANKING_CONFIG_CURRENT,
+      registry,
+      RANKING_CONTEXT,
+      [lagos, berlin, nowhere].map((c) =>
+        enrich(snapshotFor(c, { mandate: onboarded, hierarchy })),
+      ),
+    ).ranked;
+    expect(byN(ranked, 60).reasonCodes).toEqual(
+      expect.arrayContaining(["STAGE_ALIGNED", "GEOGRAPHY_COUNTRY_ALIGNED"]),
+    );
+    expect(byN(ranked, 60).reasonCodes).not.toContain("GEOGRAPHY_MISMATCH");
+    expect(byN(ranked, 61).reasonCodes).toContain("GEOGRAPHY_MISMATCH");
+    // Unknown headquarters is not a mismatch: the factor does not contribute.
+    expect(byN(ranked, 62).reasonCodes).not.toContain("GEOGRAPHY_MISMATCH");
+    expect(order(ranked)[0]).toBe(companyId(60));
   });
 
   it("GM-02: an eligible consumer social app ranks below the aligned company", () => {
@@ -875,7 +971,7 @@ describe("input refusal (§92 A–L)", () => {
     context: RankingContext = RANKING_CONTEXT,
   ) => {
     try {
-      rankSnapshots(RANKING_CONFIG_V1, registry, context, [enrich(s)]);
+      rankSnapshots(RANKING_CONFIG_CURRENT, registry, context, [enrich(s)]);
     } catch (error: unknown) {
       if (error instanceof RankingInputError) return error.code;
       throw error;
@@ -955,12 +1051,12 @@ describe("input refusal (§92 A–L)", () => {
 
   it("a snapshot for another company and a duplicate company are refused", () => {
     expect(() =>
-      rankSnapshots(RANKING_CONFIG_V1, registry, RANKING_CONTEXT, [
+      rankSnapshots(RANKING_CONFIG_CURRENT, registry, RANKING_CONTEXT, [
         { companyId: companyId(99), snapshot: good },
       ]),
     ).toThrow(/COMPANY_MISMATCH/);
     expect(() =>
-      rankSnapshots(RANKING_CONFIG_V1, registry, RANKING_CONTEXT, [
+      rankSnapshots(RANKING_CONFIG_CURRENT, registry, RANKING_CONTEXT, [
         enrich(good),
         enrich(good),
       ]),
@@ -1011,7 +1107,7 @@ describe("input refusal (§92 A–L)", () => {
       }),
     ]);
     expect(() =>
-      rankSnapshots(RANKING_CONFIG_V1, gateqOnly, RANKING_CONTEXT, [
+      rankSnapshots(RANKING_CONFIG_CURRENT, gateqOnly, RANKING_CONTEXT, [
         enrich(extra("gateq.founder_prior_exit")),
       ]),
     ).toThrow(/FEATURE_NOT_ALLOWED/);
@@ -1034,7 +1130,7 @@ describe("input refusal (§92 A–L)", () => {
 
   it("a snapshot computed under a superseded eligibility policy or candidate generator is refused, even with a self-consistent fingerprint", () => {
     expect(ELIGIBILITY_POLICY_VERSION).toBe("eligibility.v2");
-    expect(STRUCTURED_GENERATOR_VERSION).toBe("structured-mandate.v2");
+    expect(STRUCTURED_GENERATOR_VERSION).toBe("structured-mandate.v3");
     const staleEligibility = refingerprint({
       ...good,
       eligibilityPolicyVersion: "eligibility.v1",
@@ -1060,6 +1156,23 @@ describe("input refusal (§92 A–L)", () => {
       },
     } as unknown as Omit<RecommendationFeatureSnapshot, "fingerprint">);
     expect(refuse(staleGenerator)).toBe("CANDIDATE_VERSION_MISMATCH");
+    // A v2-era snapshot is still readable (explanations of served slates),
+    // but it is not rankable input any more.
+    const v2Era = refingerprint({
+      ...good,
+      candidateProvenance: {
+        ...good.candidateProvenance,
+        structured: {
+          generatorVersion: "structured-mandate.v2",
+          reasonCodes: ["STAGE_OVERLAP"],
+        },
+      },
+    });
+    expect(
+      SnapshotCandidateProvenanceSchema.safeParse(v2Era.candidateProvenance)
+        .success,
+    ).toBe(true);
+    expect(refuse(v2Era)).toBe("CANDIDATE_VERSION_MISMATCH");
   });
 
   it("K: a tampered value (a client-supplied score or feature) no longer matches its fingerprint and is refused", () => {
@@ -1131,7 +1244,7 @@ describe("ranking service", () => {
       snapshotFor({ ...EXACT, n: 50, stage: "series_b" }),
     ];
     const ranker = createDeterministicRanker({
-      config: RANKING_CONFIG_V1,
+      config: RANKING_CONFIG_CURRENT,
       registry,
     });
     const service = createRankingService({ features: features(pool), ranker });
@@ -1149,18 +1262,18 @@ describe("ranking service", () => {
     expect(result.diagnostics).toMatchObject({
       rankerId: "DETERMINISTIC",
       rankerVersion: "deterministic-ranker.v1",
-      rankingConfigVersion: "ranking-config.v1",
+      rankingConfigVersion: "ranking-config.v2",
       candidates: 2,
       scored: 2,
       unscored: 0,
     });
     expect(result.ranked.map((r) => r.rankingConfigVersion)).toEqual([
-      "ranking-config.v1",
-      "ranking-config.v1",
+      "ranking-config.v2",
+      "ranking-config.v2",
     ]);
     expect(result.ranked).toEqual(
       rankSnapshots(
-        RANKING_CONFIG_V1,
+        RANKING_CONFIG_CURRENT,
         registry,
         RANKING_CONTEXT,
         pool.map(enrich),
@@ -1170,7 +1283,7 @@ describe("ranking service", () => {
 
   it("passes NO_ACTIVE_MANDATE through and ranks an empty pool to nothing", async () => {
     const ranker = createDeterministicRanker({
-      config: RANKING_CONFIG_V1,
+      config: RANKING_CONFIG_CURRENT,
       registry,
     });
     expect(
@@ -1198,7 +1311,7 @@ describe("ranking service", () => {
 
   it("R: the ranker has no provider, database or model dependency; its only inputs are a config, a registry and snapshots", () => {
     const ranker = createDeterministicRanker({
-      config: RANKING_CONFIG_V1,
+      config: RANKING_CONFIG_CURRENT,
       registry,
     });
     expect(Object.keys(ranker).sort()).toEqual([
@@ -1237,7 +1350,7 @@ describe("performance (§84)", () => {
     );
     const started = performance.now();
     const { ranked } = rankSnapshots(
-      RANKING_CONFIG_V1,
+      RANKING_CONFIG_CURRENT,
       registry,
       RANKING_CONTEXT,
       pool,
@@ -1248,7 +1361,7 @@ describe("performance (§84)", () => {
       Array.from({ length: 200 }, (_, i) => i + 1),
     );
     const again = rankSnapshots(
-      RANKING_CONFIG_V1,
+      RANKING_CONFIG_CURRENT,
       registry,
       RANKING_CONTEXT,
       [...pool].reverse(),

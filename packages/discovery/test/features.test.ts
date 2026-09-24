@@ -180,24 +180,32 @@ const HIERARCHY: FeatureInputs["hierarchy"] = {
       vocabularyCode: "industry",
       unrestricted: false,
       descendantNodeIds: [PAYMENTS],
+      countryCode: null,
+      descendantCountryCodes: [],
     },
     {
       preferredNodeId: WEST_AFRICA,
       vocabularyCode: "geography",
       unrestricted: false,
       descendantNodeIds: [],
+      countryCode: null,
+      descendantCountryCodes: [],
     },
     {
       preferredNodeId: AFRICA,
       vocabularyCode: "geography",
       unrestricted: false,
       descendantNodeIds: [WEST_AFRICA],
+      countryCode: null,
+      descendantCountryCodes: [],
     },
     {
       preferredNodeId: GLOBAL,
       vocabularyCode: "geography",
       unrestricted: true,
       descendantNodeIds: [],
+      countryCode: null,
+      descendantCountryCodes: [],
     },
   ],
 };
@@ -211,6 +219,7 @@ function inputs(
     readonly semantic?: number | null;
     readonly structured?: boolean;
     readonly companySourceClass?: string;
+    readonly hierarchy?: FeatureInputs["hierarchy"];
   } = {},
 ): FeatureInputs {
   const m = overrides.mandate ?? mandate();
@@ -237,14 +246,14 @@ function inputs(
         },
       ],
     },
-    hierarchy: HIERARCHY,
+    hierarchy: overrides.hierarchy ?? HIERARCHY,
     candidate: {
       structured:
         overrides.structured === false
           ? null
           : {
               sourceClass: "STRUCTURED_CANDIDATE_PROVENANCE",
-              generatorVersion: "structured-mandate.v2",
+              generatorVersion: "structured-mandate.v3",
               reasonCodes: ["STAGE_OVERLAP"],
             },
       semantic:
@@ -674,7 +683,7 @@ describe("feature computation (pure)", () => {
       eligibilityDecision: "ELIGIBLE" as const,
       candidateProvenance: {
         structured: {
-          generatorVersion: "structured-mandate.v2" as const,
+          generatorVersion: "structured-mandate.v3" as const,
           reasonCodes: ["STAGE_OVERLAP" as const],
         },
         semantic: null,
@@ -714,6 +723,201 @@ describe("feature computation (pure)", () => {
       computedAt: "2026-09-19T12:00:00.000Z",
     });
     expect(s1.fingerprint).toBe(s2.fingerprint);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// declared_fit.geography v2 (CQ-REC-GEO-001): a named country node is country
+// intent. Investor onboarding stores "Nigeria" as geography/nigeria with
+// reference metadata iso3166Alpha2 "NG", not as a geography.country
+// constraint; v1 scored a Nigerian company NO_MATCH against it.
+// ---------------------------------------------------------------------------
+
+describe("declared_fit.geography v2: geography taxonomy nodes carry country intent", () => {
+  const NIGERIA = "44444444-0000-4000-8000-000000000048";
+  const GEO_HIERARCHY: FeatureInputs["hierarchy"] = {
+    sourceClass: "TAXONOMY_REFERENCE_HIERARCHY",
+    nodes: [
+      {
+        preferredNodeId: NIGERIA,
+        vocabularyCode: "geography",
+        unrestricted: false,
+        descendantNodeIds: [],
+        countryCode: "NG",
+        descendantCountryCodes: [],
+      },
+      {
+        preferredNodeId: WEST_AFRICA,
+        vocabularyCode: "geography",
+        unrestricted: false,
+        descendantNodeIds: [NIGERIA],
+        countryCode: null,
+        descendantCountryCodes: ["GH", "NG"],
+      },
+    ],
+  };
+  const geoMandate = (
+    preferences: MandateSnapshotForEligibility["taxonomyPreferences"],
+    constraints: MandateSnapshotForEligibility["constraints"] = [],
+  ) => mandate({ constraints, taxonomyPreferences: preferences });
+  const positive = (nodeId: string) => ({
+    nodeId,
+    vocabularyCode: "geography",
+    preferenceStrength: "STRONG",
+    isExclusion: false,
+    source: "user_selected",
+  });
+  const geography = (
+    m: MandateSnapshotForEligibility,
+    country: string | null,
+    classifications: FeatureInputs["taxonomy"]["classifications"] = [],
+  ) =>
+    valueOf(
+      computeFeatureValues(
+        ALL,
+        inputs({
+          mandate: m,
+          country,
+          classifications,
+          hierarchy: GEO_HIERARCHY,
+        }),
+      ).values,
+      "declared_fit.geography",
+    );
+
+  it("is registered at v2", () => {
+    const d = RECOMMENDATION_FEATURES.find(
+      (x) => x.id === "declared_fit.geography",
+    );
+    expect(d?.version).toBe("v2");
+  });
+
+  it("a Nigeria node matches a company headquartered in NG as COUNTRY_MATCH, with no geography classification", () => {
+    expect(geography(geoMandate([positive(NIGERIA)]), "NG")).toMatchObject({
+      featureVersion: "v2",
+      status: "PRESENT",
+      value: "COUNTRY_MATCH",
+      provenance: { headquartersCountry: "NG", preferredNodeId: NIGERIA },
+    });
+    // The canonical code is compared case-insensitively, as v1 did.
+    expect(geography(geoMandate([positive(NIGERIA)]), "ng")).toMatchObject({
+      value: "COUNTRY_MATCH",
+    });
+  });
+
+  it("a West Africa region node matches a company headquartered in NG as REGION_MATCH", () => {
+    expect(geography(geoMandate([positive(WEST_AFRICA)]), "NG")).toMatchObject({
+      status: "PRESENT",
+      value: "REGION_MATCH",
+      provenance: {
+        preferredNodeId: WEST_AFRICA,
+        headquartersCountry: "NG",
+        exact: false,
+      },
+    });
+  });
+
+  it("the named country outranks the region containing it", () => {
+    expect(
+      geography(geoMandate([positive(WEST_AFRICA), positive(NIGERIA)]), "NG"),
+    ).toMatchObject({ value: "COUNTRY_MATCH" });
+  });
+
+  it("a country outside every named node is still NO_MATCH", () => {
+    expect(geography(geoMandate([positive(NIGERIA)]), "DE")).toMatchObject({
+      status: "PRESENT",
+      value: "NO_MATCH",
+    });
+    expect(geography(geoMandate([positive(WEST_AFRICA)]), "KE")).toMatchObject({
+      value: "NO_MATCH",
+    });
+  });
+
+  it("a negative preference node never produces a match, even when the hierarchy carries it", () => {
+    for (const negative of [
+      { ...positive(NIGERIA), preferenceStrength: "AVOID" },
+      {
+        ...positive(NIGERIA),
+        preferenceStrength: "HARD_EXCLUSION",
+        isExclusion: true,
+      },
+      { ...positive(WEST_AFRICA), preferenceStrength: "AVOID" },
+    ]) {
+      expect(geography(geoMandate([negative]), "NG")).toMatchObject({
+        status: "NOT_APPLICABLE",
+        value: null,
+        missingReason: "NO_DECLARED_PREFERENCE",
+      });
+    }
+  });
+
+  it("a Q-proposed geography preference is not declared intent", () => {
+    expect(
+      geography(
+        geoMandate([{ ...positive(NIGERIA), source: "q_inferred" }]),
+        "NG",
+      ),
+    ).toMatchObject({
+      status: "NOT_APPLICABLE",
+      missingReason: "NO_DECLARED_PREFERENCE",
+    });
+  });
+
+  it("a company with no headquarters country is unknown, never a mismatch", () => {
+    for (const node of [NIGERIA, WEST_AFRICA]) {
+      expect(geography(geoMandate([positive(node)]), null)).toMatchObject({
+        status: "MISSING",
+        value: null,
+        missingReason: "COMPANY_GEOGRAPHY_UNKNOWN",
+      });
+    }
+  });
+
+  it("an explicit geography.country constraint behaves exactly as before", () => {
+    const ng = {
+      dimension: "geography.country",
+      operator: "IN" as const,
+      value: { kind: "codes" as const, values: ["NG"] },
+      importance: "STRONG" as const,
+      isHardExclusion: false,
+      automatedUse: "ELIGIBLE" as const,
+    };
+    const explicit = [ng];
+    const m = geoMandate([], explicit);
+    const match = geography(m, "NG");
+    expect(match).toMatchObject({ status: "PRESENT", value: "COUNTRY_MATCH" });
+    expect(match.provenance).toEqual({ headquartersCountry: "NG" });
+    expect(geography(m, "DE")).toMatchObject({ value: "NO_MATCH" });
+    expect(geography(m, null)).toMatchObject({
+      status: "MISSING",
+      missingReason: "COMPANY_GEOGRAPHY_UNKNOWN",
+    });
+    // "Anywhere but NG" narrows nothing, now as in v1.
+    expect(
+      geography(geoMandate([], [{ ...ng, operator: "NOT_IN" as const }]), "NG"),
+    ).toMatchObject({
+      status: "NOT_APPLICABLE",
+      missingReason: "NO_DECLARED_PREFERENCE",
+    });
+  });
+
+  it("a declared geography classification still yields its REGION_MATCH when the country is elsewhere", () => {
+    expect(
+      geography(geoMandate([positive(WEST_AFRICA)]), "GB", [
+        {
+          nodeId: NIGERIA,
+          vocabularyCode: "geography",
+          source: "user_selected",
+        },
+      ]),
+    ).toMatchObject({
+      value: "REGION_MATCH",
+      provenance: {
+        preferredNodeId: WEST_AFRICA,
+        matchedNodeId: NIGERIA,
+        exact: false,
+      },
+    });
   });
 });
 
@@ -986,7 +1190,7 @@ const candidate = (
   structured: structured
     ? {
         generatorId: "STRUCTURED_MANDATE",
-        generatorVersion: "structured-mandate.v2",
+        generatorVersion: "structured-mandate.v3",
         matchedDimensions: ["STAGE"],
         reasonCodes: ["STAGE_OVERLAP"],
         matchedNodes: [],
@@ -1044,7 +1248,7 @@ describe("feature service", () => {
     const [both, semanticOnly, structuredOnly] = r.snapshots;
     expect(both?.candidateProvenance).toEqual({
       structured: {
-        generatorVersion: "structured-mandate.v2",
+        generatorVersion: "structured-mandate.v3",
         reasonCodes: ["STAGE_OVERLAP"],
       },
       semantic: {

@@ -26,7 +26,8 @@ import {
  * REC-005's ranker and REC-003's merge will call.
  *
  *   resolve investor + ACTIVE mandate
- *   → derive positive structured intent
+ *   → derive positive structured intent (+ the ISO codes of declared
+ *     geography nodes, from the reference hierarchy)
  *   → run each dimension retrieval independently (bounded, id-ordered)
  *   → merge by canonical company id, keep every reason
  *   → REC-001 eligibility, in one batch
@@ -159,32 +160,54 @@ export function createStructuredCandidateService(
                 rawHitsByDimension.STAGE += refs.length;
               });
 
-      const countryWork =
-        intent.countryCodes.length === 0
-          ? Promise.resolve()
-          : retrieval.companies
-              .byHeadquartersCountries(
-                intent.countryCodes,
-                CANDIDATE_DIMENSION_LIMIT,
-              )
-              .then((refs) => {
-                for (const ref of refs) {
-                  hits.push({
-                    ...ref,
-                    dimension: "GEOGRAPHY",
-                    reasonCode: "GEOGRAPHY_OVERLAP",
-                  });
-                }
-                rawHitsByDimension.GEOGRAPHY += refs.length;
-              });
+      const expansionWork = Promise.all(
+        intent.taxonomyNodeIds.map((nodeId) =>
+          retrieval.taxonomy.expandPreference(nodeId),
+        ),
+      );
+
+      // structured-mandate.v3: a positive geography node is country intent
+      // through its reference ISO code, exactly as a `geography.country`
+      // constraint is. A named country retrieves as GEOGRAPHY_OVERLAP; the
+      // countries below a named region as GEOGRAPHY_REGION_OVERLAP.
+      const byCountries = async (
+        codes: readonly string[],
+        reasonCode: "GEOGRAPHY_OVERLAP" | "GEOGRAPHY_REGION_OVERLAP",
+      ) => {
+        if (codes.length === 0) return;
+        const refs = await retrieval.companies.byHeadquartersCountries(
+          codes,
+          CANDIDATE_DIMENSION_LIMIT,
+        );
+        for (const ref of refs) {
+          hits.push({ ...ref, dimension: "GEOGRAPHY", reasonCode });
+        }
+        rawHitsByDimension.GEOGRAPHY += refs.length;
+      };
+      const countryWork = expansionWork.then(async (expansions) => {
+        const named = new Set(intent.countryCodes);
+        const contained = new Set<string>();
+        for (const e of expansions) {
+          if (
+            e === null ||
+            e.unrestricted ||
+            e.vocabularyCode !== GEOGRAPHY_VOCABULARY
+          ) {
+            continue;
+          }
+          if (e.countryCode !== null) named.add(e.countryCode);
+          for (const code of e.descendantCountryCodes) contained.add(code);
+        }
+        const regionOnly = [...contained].filter((c) => !named.has(c)).sort();
+        await Promise.all([
+          byCountries([...named].sort(), "GEOGRAPHY_OVERLAP"),
+          byCountries(regionOnly, "GEOGRAPHY_REGION_OVERLAP"),
+        ]);
+      });
 
       const taxonomyWork = (async () => {
         if (intent.taxonomyNodeIds.length === 0) return;
-        const expansions = await Promise.all(
-          intent.taxonomyNodeIds.map((nodeId) =>
-            retrieval.taxonomy.expandPreference(nodeId),
-          ),
-        );
+        const expansions = await expansionWork;
         // node id asked about → (preferred node, vocabulary, exact?)
         const asked = new Map<
           string,

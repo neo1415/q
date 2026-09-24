@@ -122,6 +122,11 @@ function country(
   };
 }
 
+/** A node spec with extra plain-language synonyms (e.g. "Ivory Coast"). */
+function withAliases(spec: NodeSpec, synonyms: readonly string[]): NodeSpec {
+  return { ...spec, aliases: [...(spec.aliases ?? []), ...synonyms] };
+}
+
 const VOCABULARIES: readonly VocabularySpec[] = [
   {
     code: "industry",
@@ -548,7 +553,10 @@ const VOCABULARIES: readonly VocabularySpec[] = [
     name: "Geography",
     description:
       "Operating and target markets: regions and countries. Regional containment is a pragmatic MVP grouping, not a political statement.",
-    version: 1,
+    // v2 (CQ-ACCEPT-001): an investor named Côte d'Ivoire and only Ghana
+    // could be recorded. More of the markets investors here name, and a
+    // Central Africa region.
+    version: 2,
     nodes: [
       {
         code: "global",
@@ -559,12 +567,38 @@ const VOCABULARIES: readonly VocabularySpec[] = [
       { code: "west_africa", name: "West Africa", parent: "africa" },
       country("nigeria", "Nigeria", "NG", "west_africa"),
       country("ghana", "Ghana", "GH", "west_africa"),
+      withAliases(
+        country("cote_divoire", "Côte d'Ivoire", "CI", "west_africa"),
+        ["Ivory Coast", "Cote d'Ivoire", "Cote dIvoire"],
+      ),
+      country("senegal", "Senegal", "SN", "west_africa"),
+      country("benin", "Benin", "BJ", "west_africa"),
+      country("togo", "Togo", "TG", "west_africa"),
       { code: "east_africa", name: "East Africa", parent: "africa" },
       country("kenya", "Kenya", "KE", "east_africa"),
+      country("rwanda", "Rwanda", "RW", "east_africa"),
+      country("uganda", "Uganda", "UG", "east_africa"),
+      country("tanzania", "Tanzania", "TZ", "east_africa"),
+      country("ethiopia", "Ethiopia", "ET", "east_africa"),
+      { code: "central_africa", name: "Central Africa", parent: "africa" },
+      country("cameroon", "Cameroon", "CM", "central_africa"),
+      withAliases(
+        country(
+          "dr_congo",
+          "Democratic Republic of the Congo",
+          "CD",
+          "central_africa",
+        ),
+        ["DRC", "DR Congo", "Congo-Kinshasa"],
+      ),
       { code: "southern_africa", name: "Southern Africa", parent: "africa" },
       country("south_africa", "South Africa", "ZA", "southern_africa"),
+      country("zambia", "Zambia", "ZM", "southern_africa"),
+      country("botswana", "Botswana", "BW", "southern_africa"),
       { code: "north_africa", name: "North Africa", parent: "africa" },
       country("egypt", "Egypt", "EG", "north_africa"),
+      country("morocco", "Morocco", "MA", "north_africa"),
+      country("tunisia", "Tunisia", "TN", "north_africa"),
       { code: "europe", name: "Europe" },
       country("united_kingdom", "United Kingdom", "GB", "europe"),
       country("germany", "Germany", "DE", "europe"),

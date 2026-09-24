@@ -75,8 +75,23 @@ describe("reference taxonomy (§110-120)", () => {
       "impact_theme",
       "regulatory_profile",
     ]);
-    expect(REFERENCE_TAXONOMY.vocabularies.every((v) => v.version === 1)).toBe(
-      true,
+    // Every vocabulary is at its first version except geography, which grew
+    // in v2 (CQ-ACCEPT-001: more African markets, a Central Africa region).
+    expect(
+      Object.fromEntries(
+        REFERENCE_TAXONOMY.vocabularies.map((v) => [v.code, v.version]),
+      ),
+    ).toMatchObject({ geography: 2, industry: 1 });
+    expect(
+      REFERENCE_TAXONOMY.vocabularies
+        .filter((v) => v.code !== "geography")
+        .every((v) => v.version === 1),
+    ).toBe(true);
+    expect(referenceNode("geography", "cote_divoire").metadata).toEqual({
+      iso3166Alpha2: "CI",
+    });
+    expect(referenceNode("geography", "cote_divoire").parentCode).toBe(
+      "west_africa",
     );
     expect(REFERENCE_TAXONOMY.nodes.length).toBeGreaterThan(100);
     expect(REFERENCE_TAXONOMY.nodes.length).toBeLessThan(400);

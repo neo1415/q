@@ -38,7 +38,7 @@ import {
   createHybridCandidateService,
   type HybridCandidateService,
 } from "../hybrid/service.js";
-import { RANKING_CONFIG_V1 } from "../ranking/config.js";
+import { RANKING_CONFIG_CURRENT } from "../ranking/config.js";
 import { createDeterministicRanker } from "../ranking/ranker.js";
 import {
   createRankingService,
@@ -307,7 +307,7 @@ export function createRecommendationPipeline(
   const ranking = createRankingService({
     features,
     ranker: createDeterministicRanker({
-      config: RANKING_CONFIG_V1,
+      config: RANKING_CONFIG_CURRENT,
       registry: createFeatureRegistry(),
     }),
     logger,
