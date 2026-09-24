@@ -40,13 +40,15 @@ import {
   reduceConversation,
   renderPrompt,
   resolveOptionReference,
-  InterviewConductorV6ResultSchema,
+  InterviewConductorV7ResultSchema,
+  deliveryFromCue,
   shouldNotify,
   subsystemNotice,
   traceVerdict,
   type ConversationEvent,
   type ConversationState,
   type ConversationTurnReading,
+  type SpeechDelivery,
   type InterviewConductorResult,
   type InterviewConductorV8Variables,
   type InterviewOpenStep,
@@ -268,6 +270,12 @@ export type InterviewTurnOutcome = {
   readonly qualitative: readonly QualitativeMeaning[];
   /** raw STT → normalised → classification → extracted → persisted. */
   readonly trace: TurnTrace | null;
+  /**
+   * How the reply should sound, as the model asked (CQ-VOICE-010). For the
+   * speech layer only. It is never part of `reply`, the thread or memory.
+   * Absent on every path where the model did not write the reply.
+   */
+  readonly delivery?: SpeechDelivery | null | undefined;
 };
 
 /**
@@ -621,6 +629,22 @@ const DIALOGUE_BUDGET = {
   maxOutputTokens: 2_048,
   attemptTimeoutMs: 12_000,
 } as const;
+
+/**
+ * The preferred dialogue model's patience when another model can take the
+ * turn (CQ-VOICE-010).
+ *
+ * gpt-5.6-luna is now preferred (migrations 20261008120000/130000), with
+ * gemini-3.5-flash-lite behind it. On the real rendered conductor request
+ * at effort "none", 17 luna calls measured p50 3.2 to 3.8 s and p95 4.0 to
+ * 4.3 s, and none ran longer than 4.5 s. 6 s leaves room above every call
+ * seen. A luna that has not answered by then hands the turn to
+ * flash-lite (healthy p95 3.4 s), which still lands inside the voice
+ * route's 20 s deadline even if flash-lite takes its whole 12 s budget.
+ * Before this cap, a hung first model cost the entire attempt budget and
+ * then a retry of the same model.
+ */
+const FIRST_DIALOGUE_ATTEMPT_MS = 6_000;
 
 /**
  * Steps whose values are always read back before they are recorded (A §13).
@@ -1627,6 +1651,18 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
   /** Sessions that have heard the Type hint (once each, voice only). */
   const typeHintGiven = new Set<string>();
   /**
+   * The values Q's own last reply put forward, per step (v10 `offered`),
+   * so "the second number you said" and "go with what you said" resolve
+   * against what Q actually said (CQ-QX-005 round 2, #9 and #3).
+   */
+  const offeredBySession = new Map<
+    string,
+    readonly {
+      readonly target: string;
+      readonly values: readonly (string | readonly string[] | boolean)[];
+    }[]
+  >();
+  /**
    * Category phrases heard before they could be placed (adversarial
    * round 2, #1): "I only do Côte d'Ivoire and Senegal" in the very first
    * sentence, before the organisation existed, when the platform's own
@@ -2042,6 +2078,7 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
       qualitativeBySession.delete(sessionId);
       typeHintGiven.delete(sessionId);
       phrasesBySession.delete(sessionId);
+      offeredBySession.delete(sessionId);
     },
 
     /**
@@ -2370,7 +2407,10 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
               : { dataPosture: dependencies.dataPosture }),
           },
           {
-            schema: InterviewConductorV6ResultSchema,
+            schema: InterviewConductorV7ResultSchema,
+            // A person is waiting (CQ-VOICE-010). The first model gets
+            // FIRST_DIALOGUE_ATTEMPT_MS when another stands behind it.
+            firstAttemptTimeoutMs: FIRST_DIALOGUE_ATTEMPT_MS,
             ...(input.signal === undefined ? {} : { signal: input.signal }),
           },
         );
@@ -3167,6 +3207,77 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
           reference.select !== "ADD" &&
           reference.select !== "EXCLUDE"
         ) {
+          continue;
+        }
+        /**
+         * Pointing at Q's own words, or at another step's answer (v10).
+         *
+         * "The second number you said" is the second value Q itself put
+         * forward for this step last turn; "go with what you said" is the
+         * only one, or Q's own suggestion for the step. "Both full time"
+         * after "two founders" takes the value the record holds for the
+         * step named in `from`. Resolved from what the platform holds —
+         * never a figure the model composed — and then written or held
+         * exactly like any other answer.
+         */
+        if (reference.select === "OFFERED" || reference.select === "VALUE_OF") {
+          const raw = ((): string | readonly string[] | boolean | undefined => {
+            if (reference.select === "VALUE_OF") {
+              const source = view.responses.find(
+                (r) => r.stepKey === reference.from,
+              )?.value;
+              if (source === undefined) return undefined;
+              switch (source.type) {
+                case "RANGE":
+                  return String(source.value);
+                case "TEXT":
+                  return source.text;
+                case "SINGLE_SELECT":
+                  return source.optionKey;
+                case "MULTI_SELECT":
+                  return source.optionKeys;
+                case "RESOURCE_REFERENCE":
+                case "CONFIRMATION":
+                  return undefined;
+              }
+            }
+            const offered = (offeredBySession.get(sessionId) ?? []).find(
+              (item) => item.target === step.stepKey,
+            );
+            const position = reference.ordinals?.[0];
+            if (offered !== undefined) {
+              if (position !== undefined) return offered.values[position - 1];
+              return offered.values.length === 1
+                ? offered.values[0]
+                : undefined;
+            }
+            // "Go with what you said" about Q's own suggestion.
+            return conversation.proposals.find(
+              (proposal) => proposal.target === step.stepKey,
+            )?.value;
+          })();
+          const value = raw === undefined ? null : toResponseValue(step, raw);
+          if (value === null) {
+            unresolved.push({ step, because: "EMPTY" });
+            continue;
+          }
+          const spoken = describeValue(step, value, currency);
+          dispatch({ type: "PROPOSAL_DECIDED", target: step.stepKey });
+          if (isMaterial(step) || disposition.confirm) {
+            nextPending.push({
+              stepKey: step.stepKey,
+              question: step.configuration.prompt,
+              value,
+              spoken,
+            });
+          } else if (!(await commit(step.stepKey, value))) {
+            carry(input.onboardingSessionId, {
+              stepKey: step.stepKey,
+              value,
+              spoken,
+              attempts: 1,
+            });
+          }
           continue;
         }
         const shownOptions: readonly ShownOption[] =
@@ -4771,6 +4882,15 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
       );
       logger.debug({ trace: loggableTrace(trace) }, "interview turn trace");
       keepThread(reply, inFrontAtStart, askOpen?.stepKey ?? null);
+      // Parsed again: a double written for an older shape carries none.
+      const offeredNow =
+        InterviewConductorV7ResultSchema.shape.offered.safeParse(read.offered);
+      offeredBySession.set(
+        sessionId,
+        offeredNow.success
+          ? offeredNow.data.filter((item) => steps.has(item.target))
+          : [],
+      );
 
       return {
         reply,
@@ -4804,6 +4924,13 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
             : null,
         qualitative: qualitativeBySession.get(sessionId) ?? [],
         trace,
+        // Only for the words the model wrote. A reply the runtime replaced
+        // (a repair, a held read-back) must not get a laugh that was meant
+        // for other words. Words the runtime only appended leave the
+        // model's sentence positions where they were.
+        delivery: reply.trim().startsWith(result.reply.trim())
+          ? deliveryFromCue(result.delivery)
+          : null,
       };
     },
   };

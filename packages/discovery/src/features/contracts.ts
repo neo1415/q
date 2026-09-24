@@ -339,7 +339,11 @@ export const RECOMMENDATION_FEATURES: readonly RecommendationFeatureDefinition[]
       },
       {
         id: "declared_fit.stage",
-        version: "v1",
+        // v2 (CQ-REC-STAGE-001): the declared min/max range is stage intent
+        // when no stage constraint names the stages; a constraint alone is
+        // the intent where one exists. v1 described the union but never
+        // received the range, so a range-only mandate scored NOT_APPLICABLE.
+        version: "v2",
         featureGroup: "DECLARED_FIT",
         dataType: "category",
         allowedContexts: INVESTOR_ONLY,
@@ -347,7 +351,7 @@ export const RECOMMENDATION_FEATURES: readonly RecommendationFeatureDefinition[]
         sensitivity: "CONFIDENTIAL",
         missingPolicy: "PRESERVE_MISSING",
         description:
-          "Whether the company's canonical stage is inside the mandate's positive stage intent (declared stage constraints and range). MATCH / NO_MATCH when both sides are known; NOT_APPLICABLE when the mandate declares no positive stage intent; MISSING when the company's stage is unknown. Never inferred from a document, a memory or a model.",
+          "Whether the company's canonical stage is inside the mandate's positive stage intent (the stages its positive stage constraints name, or, when none does, its declared min/max range). MATCH / NO_MATCH when both sides are known; NOT_APPLICABLE when the mandate declares no positive stage intent; MISSING when the company's stage is unknown. Never inferred from a document, a memory or a model.",
         categories: ["MATCH", "NO_MATCH"],
         range: null,
       },

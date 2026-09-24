@@ -35,6 +35,11 @@ export function resolveOptionReference(
   /** What they chose last time on this target, for "same as before". */
   previous: readonly string[] | null,
 ): ResolvedReference {
+  // Q's own words and another step's value are not positions in the
+  // shown options; the consumer resolves them against what it holds.
+  if (reference.select === "OFFERED" || reference.select === "VALUE_OF") {
+    return { kind: "UNRESOLVED", because: "EMPTY" };
+  }
   if (reference.select === "SAME_AS_BEFORE") {
     return previous === null || previous.length === 0
       ? { kind: "UNRESOLVED", because: "NO_PREVIOUS_SELECTION" }

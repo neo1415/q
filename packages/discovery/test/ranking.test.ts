@@ -29,6 +29,7 @@ import {
   RANKING_CONFIG_CURRENT,
   RANKING_CONFIG_V1,
   RANKING_CONFIG_V2,
+  RANKING_CONFIG_V3,
   RANKING_CONFIGS,
   RankingConfigError,
   RankingConfigSchema,
@@ -275,18 +276,23 @@ const EXACT: Company = {
   structured: true,
 };
 
-describe("ranking-config.v2", () => {
-  it("v2 is v1 with the geography mapping bound to declared_fit.geography v2; v1 stays published, unedited, and refuses today's registry", () => {
-    expect(RANKING_CONFIG_CURRENT).toBe(RANKING_CONFIG_V2);
+describe("ranking-config.v3", () => {
+  it("v3 is v2 with the stage mapping bound to declared_fit.stage v2; v2 is v1 with geography v2; older configs stay published, unedited, and refuse today's registry", () => {
+    expect(RANKING_CONFIG_CURRENT).toBe(RANKING_CONFIG_V3);
     expect(RANKING_CONFIGS.map((c) => c.version)).toEqual([
       "ranking-config.v1",
       "ranking-config.v2",
+      "ranking-config.v3",
     ]);
-    const geography = (c: RankingConfig) =>
-      c.factors.find((f) => f.featureId === "declared_fit.geography");
-    expect(geography(RANKING_CONFIG_V1)?.featureVersion).toBe("v1");
-    expect(geography(RANKING_CONFIG_V2)?.featureVersion).toBe("v2");
-    // Nothing but the geography binding moved: same weights, maps, tie-break.
+    const factor = (c: RankingConfig, id: string) =>
+      c.factors.find((f) => f.featureId === id)?.featureVersion;
+    expect(factor(RANKING_CONFIG_V1, "declared_fit.geography")).toBe("v1");
+    expect(factor(RANKING_CONFIG_V2, "declared_fit.geography")).toBe("v2");
+    expect(factor(RANKING_CONFIG_V3, "declared_fit.geography")).toBe("v2");
+    expect(factor(RANKING_CONFIG_V1, "declared_fit.stage")).toBe("v1");
+    expect(factor(RANKING_CONFIG_V2, "declared_fit.stage")).toBe("v1");
+    expect(factor(RANKING_CONFIG_V3, "declared_fit.stage")).toBe("v2");
+    // Nothing but the feature bindings moved: same weights, maps, tie-break.
     const strip = (c: RankingConfig) => ({
       ...c,
       version: "",
@@ -294,10 +300,14 @@ describe("ranking-config.v2", () => {
       factors: c.factors.map((f) => ({ ...f, featureVersion: "" })),
     });
     expect(strip(RANKING_CONFIG_V2)).toEqual(strip(RANKING_CONFIG_V1));
+    expect(strip(RANKING_CONFIG_V3)).toEqual(strip(RANKING_CONFIG_V2));
     expect(Object.isFrozen(RANKING_CONFIG_V1)).toBe(true);
-    expect(() => validateRankingConfig(RANKING_CONFIG_V1, registry)).toThrow(
-      /declared_fit\.geography is registered at v2, not v1/,
-    );
+    expect(Object.isFrozen(RANKING_CONFIG_V2)).toBe(true);
+    for (const older of [RANKING_CONFIG_V1, RANKING_CONFIG_V2]) {
+      expect(() => validateRankingConfig(older, registry)).toThrow(
+        /declared_fit\.stage is registered at v2, not v1/,
+      );
+    }
   });
 
   it("is valid against the registry, frozen, uncalibrated and accounts for every registered feature", () => {
@@ -335,7 +345,7 @@ describe("ranking-config.v2", () => {
     ]);
     // Print the complete production config for review (§94).
     console.info(
-      `[REC-005 ranking-config.v2] ${JSON.stringify(RANKING_CONFIG_CURRENT)}`,
+      `[REC-005 ranking-config.v3] ${JSON.stringify(RANKING_CONFIG_CURRENT)}`,
     );
   });
 
@@ -409,16 +419,16 @@ describe("ranking-config.v2", () => {
     ).toThrow(/unique/);
   });
 
-  it("a changed feature version requires a new config: v1 mappings refuse a registry that moved stage to v2 (§11)", () => {
+  it("a changed feature version requires a new config: v1 mappings refuse a registry that moved stage to v3 (§11)", () => {
     const moved = createFeatureRegistry(
       RECOMMENDATION_FEATURES.map((d) =>
         d.id === "declared_fit.stage"
-          ? RecommendationFeatureDefinitionSchema.parse({ ...d, version: "v2" })
+          ? RecommendationFeatureDefinitionSchema.parse({ ...d, version: "v3" })
           : d,
       ),
     );
     expect(() => validateRankingConfig(RANKING_CONFIG_CURRENT, moved)).toThrow(
-      /registered at v2, not v1/,
+      /registered at v3, not v2/,
     );
     expect(() =>
       createDeterministicRanker({
@@ -730,7 +740,7 @@ describe("scoring and ordering", () => {
     const v2 = byN(rank([c], testV2), 30);
     expect(v1.internalScore).toBeCloseTo(1 / 3, 12);
     expect(v2.internalScore).toBeCloseTo(3 / 5, 12);
-    expect(v1.rankingConfigVersion).toBe("ranking-config.v2");
+    expect(v1.rankingConfigVersion).toBe("ranking-config.v3");
     expect(v2.rankingConfigVersion).toBe("ranking-config.test-v2");
     expect(RANKING_CONFIG_CURRENT.factors.every((f) => f.weight === 1)).toBe(
       true,
@@ -771,7 +781,7 @@ describe("scoring and ordering", () => {
       rank: 1,
       rankerId: RANKER_ID,
       rankerVersion: RANKER_VERSION,
-      rankingConfigVersion: "ranking-config.v2",
+      rankingConfigVersion: "ranking-config.v3",
       featureSchemaVersion: FEATURE_SCHEMA_VERSION,
       featureSnapshot: {
         fingerprint: snapshotFor(EXACT).fingerprint,
@@ -1071,7 +1081,7 @@ describe("input refusal (§92 A–L)", () => {
       } as unknown as RecommendationFeatureSnapshot),
     ).toBe("FEATURE_SCHEMA_MISMATCH");
     const v2 = good.features.map((f) =>
-      f.featureId === "declared_fit.stage" ? { ...f, featureVersion: "v2" } : f,
+      f.featureId === "declared_fit.stage" ? { ...f, featureVersion: "v3" } : f,
     );
     expect(refuse(refingerprint({ ...good, features: v2 }))).toBe(
       "SNAPSHOT_INVALID",
@@ -1130,7 +1140,7 @@ describe("input refusal (§92 A–L)", () => {
 
   it("a snapshot computed under a superseded eligibility policy or candidate generator is refused, even with a self-consistent fingerprint", () => {
     expect(ELIGIBILITY_POLICY_VERSION).toBe("eligibility.v2");
-    expect(STRUCTURED_GENERATOR_VERSION).toBe("structured-mandate.v3");
+    expect(STRUCTURED_GENERATOR_VERSION).toBe("structured-mandate.v4");
     const staleEligibility = refingerprint({
       ...good,
       eligibilityPolicyVersion: "eligibility.v1",
@@ -1262,14 +1272,14 @@ describe("ranking service", () => {
     expect(result.diagnostics).toMatchObject({
       rankerId: "DETERMINISTIC",
       rankerVersion: "deterministic-ranker.v1",
-      rankingConfigVersion: "ranking-config.v2",
+      rankingConfigVersion: "ranking-config.v3",
       candidates: 2,
       scored: 2,
       unscored: 0,
     });
     expect(result.ranked.map((r) => r.rankingConfigVersion)).toEqual([
-      "ranking-config.v2",
-      "ranking-config.v2",
+      "ranking-config.v3",
+      "ranking-config.v3",
     ]);
     expect(result.ranked).toEqual(
       rankSnapshots(

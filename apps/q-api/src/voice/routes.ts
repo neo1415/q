@@ -333,6 +333,9 @@ export function registerQVoiceRoutes(
           text,
           outputFormat,
           signal: gone.signal,
+          // Keys this sentence's delivery cues and timing (CQ-VOICE-010);
+          // from the binding, like the voice, never from the request.
+          session: binding.voiceSessionId,
         });
       } catch (error: unknown) {
         if (gone.signal.aborted) {

@@ -121,6 +121,8 @@ const quiet: InterviewConductorResult = {
   unrestricted: [],
   frustrated: false,
   reading: null,
+  delivery: null,
+  offered: [],
 };
 
 function gateway(

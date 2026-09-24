@@ -84,8 +84,8 @@ function ladderSlice(
 
 /**
  * Positive stage intent: codes named by positive `stage` constraints
- * (EQ/IN name them; NEQ/NOT_IN name the rest of the ladder), plus the
- * declared min/max range. A mandate that says nothing about stage has no
+ * (EQ/IN name them; NEQ/NOT_IN name the rest of the ladder), or — when no
+ * constraint names any — the declared min/max range. A mandate that says nothing about stage has no
  * stage signal — and loses no candidates for it, because the union means
  * another dimension can still find them.
  */
@@ -141,7 +141,13 @@ export function deriveStructuredIntent(
       }
     }
   }
-  if (mandate.stage !== undefined) {
+  // The declared range is stage intent only when no stage constraint names
+  // the stages (structured-mandate.v4). Onboarding writes both: the stages
+  // chosen, as a constraint, and their envelope as min/max — so for
+  // "pre-seed and Series A" the range pre_seed..series_a would add a seed
+  // the investor never chose. The constraint is the precise declaration;
+  // the range speaks for a mandate that has nothing more precise.
+  if (mandate.stage !== undefined && stages.size === 0) {
     const { minStageCode, maxStageCode } = mandate.stage;
     if (minStageCode !== null || maxStageCode !== null) {
       for (const code of ladderSlice(minStageCode, maxStageCode))

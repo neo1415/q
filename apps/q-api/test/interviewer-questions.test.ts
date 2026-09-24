@@ -137,6 +137,8 @@ const base: InterviewConductorResult = {
   unrestricted: [],
   frustrated: false,
   reading: null,
+  delivery: null,
+  offered: [],
 };
 
 function gateway(result: InterviewConductorResult): InterviewGateway {

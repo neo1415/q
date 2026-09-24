@@ -69,6 +69,7 @@ import {
 import { withTestRouting } from "@capital-q/model-gateway";
 import { createGoogleModelProvider } from "@capital-q/model-gateway/providers/google";
 import { createGroqModelProvider } from "@capital-q/model-gateway/providers/groq";
+import { createOpenAIModelProvider } from "@capital-q/model-gateway/providers/openai";
 import { createLogger, createTelemetryRuntime } from "@capital-q/observability";
 import { createPostgresOrganisationQueryPort } from "@capital-q/organisations";
 import { createRecommendationNarrator } from "@capital-q/q-specialists";
@@ -391,6 +392,15 @@ if (providerSecrets.groq !== undefined) {
         .slice(1)
         .map((key) => key.reveal()),
     }),
+  );
+}
+// The routing policies name gpt-5.6-luna first for every task class
+// (20261008130000); a provider routed to but never registered is
+// PROVIDER_UNCONFIGURED on every call, and every turn fell through to
+// the free tiers it was meant to replace.
+if (providerSecrets.openai !== undefined) {
+  providers.push(
+    createOpenAIModelProvider({ apiKey: providerSecrets.openai.reveal() }),
   );
 }
 /**
@@ -1082,6 +1092,8 @@ const voiceTurn = timedVoiceTurns(
             fetch: timedFetch(fetch, voiceTimings),
           },
         }),
+    // How each reply should sound, for the speak relay (CQ-VOICE-010).
+    performance: speechPerformance,
     logger,
   }),
   voiceTimings,

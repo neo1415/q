@@ -99,6 +99,7 @@ export { INTERVIEW_CONDUCTOR_V6 } from "./prompts/tasks/interview-conductor.v6.j
 export { INTERVIEW_CONDUCTOR_V7 } from "./prompts/tasks/interview-conductor.v7.js";
 export { INTERVIEW_CONDUCTOR_V8 } from "./prompts/tasks/interview-conductor.v8.js";
 export { INTERVIEW_CONDUCTOR_V9 } from "./prompts/tasks/interview-conductor.v9.js";
+export { INTERVIEW_CONDUCTOR_V10 } from "./prompts/tasks/interview-conductor.v10.js";
 export { DECISION_READER_V1 } from "./prompts/tasks/decision-reader.v1.js";
 export { TURN_READER_V1 } from "./prompts/tasks/turn-reader.v1.js";
 export { TURN_READER_V2 } from "./prompts/tasks/turn-reader.v2.js";
@@ -169,6 +170,7 @@ export {
   INTERVIEW_CONDUCTOR_V4_SCHEMA_VERSION,
   INTERVIEW_CONDUCTOR_V5_SCHEMA_VERSION,
   INTERVIEW_CONDUCTOR_V6_SCHEMA_VERSION,
+  INTERVIEW_CONDUCTOR_V7_SCHEMA_VERSION,
   INTERVIEW_CONDUCTOR_V8_UNTRUSTED,
   AnswerClaritySchema,
   type AnswerClarity,
@@ -176,6 +178,8 @@ export {
   InterviewConductorV4ResultSchema,
   InterviewConductorV5ResultSchema,
   InterviewConductorV6ResultSchema,
+  InterviewConductorV7ResultSchema,
+  type InterviewConductorV7Result,
   InterviewConductorV8VariablesSchema,
   type InterviewConductorV6Result,
   type InterviewConductorV8Variables,
@@ -434,3 +438,17 @@ export {
 export const PACKAGE_NAME = "@capital-q/q-core" as const;
 
 export * from "./conversation/index.js";
+export {
+  deliveryFromCue,
+  PLAIN_DELIVERY,
+  SPEECH_CUES,
+  SPEECH_MAX_SENTENCE_INDEX,
+  SPEECH_PACES,
+  SPEECH_REACTIONS,
+  SpeechCueSchema,
+  SpeechDeliverySchema,
+  type SpeechCue,
+  type SpeechDelivery,
+  type SpeechPace,
+  type SpeechReaction,
+} from "./speech/delivery.js";

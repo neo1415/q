@@ -327,6 +327,8 @@ export const base: InterviewConductorResult = {
   unrestricted: [],
   frustrated: false,
   reading: null,
+  delivery: null,
+  offered: [],
 };
 
 export function gateway(
