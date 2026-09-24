@@ -164,6 +164,80 @@ export function selectedMandateId(values: ResponseValues): InvestorMandateId {
   return parsed.data;
 }
 
+/** The idempotency key of the first draft this session creates; one per session. */
+function firstMandateKey(session: OnboardingSession): string {
+  return `onboarding:${session.id}:mandate`;
+}
+
+/**
+ * The mandate an answer is about.
+ *
+ * The I1 choice when the investor has made one. Before that, the investor's
+ * only open mandate — and when they have none yet, the first draft, created
+ * exactly as the deployment-status step creates it (same idempotency key,
+ * never activated). Only an investor with several open mandates has to say
+ * which one first; "Most investors have one" is the journey's own premise.
+ *
+ * Refusing every I2+ answer until I1 was answered lost what people say up
+ * front: "we write pre-seed and seed cheques of 100 to 250k" was read
+ * correctly, refused as `mandate_context_required`, and asked again later
+ * (CQ-ACCEPT-001, investor walkthrough).
+ */
+export async function mandateInScope(
+  services: InvestorDomainServices,
+  bound: BoundInvestor,
+  values: ResponseValues,
+  create?: {
+    readonly session: OnboardingSession;
+    readonly correlationId: CorrelationId;
+  },
+): Promise<InvestorMandateId> {
+  const chosen = InvestorMandateIdSchema.safeParse(
+    resourceIds(values, INVESTOR_STEPS.mandateContext)?.[0],
+  );
+  if (chosen.success) {
+    return chosen.data;
+  }
+  const page = await services.investors.listInvestorMandates({
+    actor: bound.context,
+    investorOrganisationId: bound.investorOrganisationId,
+    limit: 50,
+  });
+  const open = page.items.filter((m) => m.status !== "CLOSED");
+  const only = open.length === 1 ? open[0] : undefined;
+  if (only !== undefined) {
+    return only.id;
+  }
+  if (open.length === 0 && create !== undefined) {
+    const created = await createFirstMandate(services, bound, create);
+    return created;
+  }
+  return selectedMandateId(values);
+}
+
+async function createFirstMandate(
+  services: InvestorDomainServices,
+  bound: BoundInvestor,
+  input: {
+    readonly session: OnboardingSession;
+    readonly correlationId: CorrelationId;
+  },
+): Promise<InvestorMandateId> {
+  // A first DRAFT to define; never activated here.
+  const mandate = await services.investors.createInvestorMandate({
+    actor: bound.context,
+    investorOrganisationId: bound.investorOrganisationId,
+    input: parseContract(
+      CreateInvestorMandateRequestSchema,
+      { name: "Primary mandate" },
+      "The mandate is not valid.",
+    ),
+    idempotencyKey: firstMandateKey(input.session),
+    correlationId: input.correlationId,
+  });
+  return mandate.id;
+}
+
 // ---------------------------------------------------------------------------
 // Canonical vocabularies from option keys
 // ---------------------------------------------------------------------------
@@ -769,7 +843,7 @@ async function withMandate(
     | Promise<Omit<UpdateInvestorMandateRequest, "expectedVersion">>,
 ): Promise<void> {
   const bound = await boundInvestor(services, context.actor, context.session);
-  const mandateId = selectedMandateId(values);
+  const mandateId = await mandateInScope(services, bound, values, context);
   const mandate = await currentMandate(services, bound, mandateId);
   const resolved = await patch(mandate);
   await updateMandate(
@@ -864,18 +938,7 @@ export function createInvestorWriteTargets(
       if (open.length > 0) {
         return;
       }
-      // A first DRAFT to define; never activated here.
-      await services.investors.createInvestorMandate({
-        actor: bound.context,
-        investorOrganisationId: bound.investorOrganisationId,
-        input: parseContract(
-          CreateInvestorMandateRequestSchema,
-          { name: "Primary mandate" },
-          "The mandate is not valid.",
-        ),
-        idempotencyKey: `onboarding:${context.session.id}:mandate`,
-        correlationId: context.correlationId,
-      });
+      await createFirstMandate(services, bound, context);
     },
 
     [INVESTOR_WRITE_TARGETS.mandateSelect]: async (
@@ -1032,7 +1095,7 @@ export function createInvestorWriteTargets(
         context.actor,
         context.session,
       );
-      const mandateId = selectedMandateId(values);
+      const mandateId = await mandateInScope(services, bound, values);
       const mandate = await currentMandate(services, bound, mandateId);
       if (mandate.status !== "DRAFT") {
         return;
