@@ -60,6 +60,10 @@ export function isPrivateEmbeddingHost(host: string): boolean {
   if (name === "localhost" || name === "::1" || name === "0.0.0.0") return true;
   if (PRIVATE_IPV4.test(name)) return true;
   if (name.startsWith("fd") || name.startsWith("fc")) return true;
+  // `.internal` is reserved by ICANN for private use and never delegated in
+  // public DNS; Railway's private network (`<service>.railway.internal`) is
+  // one such zone, and it is how a hosted runtime is reached.
+  if (name.endsWith(".internal")) return true;
   // A single-label name is a container or service on an internal network;
   // anything with a dot resolves through public DNS.
   return !name.includes(".") && name.length > 0;

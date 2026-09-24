@@ -49,6 +49,7 @@ describe("embedding configuration", () => {
       "172.16.4.4",
       "embeddings",
       "capital-q-embeddings",
+      "capital-qembeddings.railway.internal",
     ]) {
       expect(isPrivateEmbeddingHost(host)).toBe(true);
       expect(
@@ -66,6 +67,8 @@ describe("embedding configuration", () => {
       "https://embeddings.some-vendor.io:443",
       "http://8.8.8.8:8080",
       "https://huggingface.co",
+      "http://internal.example.com",
+      "http://railway.internal.example.com",
     ]) {
       expect(isPrivateEmbeddingHost(new URL(url).hostname)).toBe(false);
       expect(() =>
