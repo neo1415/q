@@ -163,6 +163,7 @@ async function main(): Promise<void> {
           organisation_name: "Zino Aviation",
           synthetic: true,
         },
+        app_metadata: { synthetic: true },
       }),
     });
     if (!made.ok) {

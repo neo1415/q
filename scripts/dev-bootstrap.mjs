@@ -107,6 +107,9 @@ async function ensureAuthUser(person) {
       password: PASSWORD,
       email_confirm: true,
       user_metadata: { display_name: person.displayName, synthetic: true },
+      // The marker the platform trusts: app_metadata is writable only with
+      // the service role; user_metadata is the person's own to edit.
+      app_metadata: { synthetic: true },
     }),
   });
   if (response.ok) return "created";

@@ -126,6 +126,7 @@ async function createPerson({ journey, name, organisation }) {
         synthetic: true,
         ...(organisation === null ? {} : { organisation_name: organisation }),
       },
+      app_metadata: { synthetic: true },
     }),
   });
   if (!response.ok) {
