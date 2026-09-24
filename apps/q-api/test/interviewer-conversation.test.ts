@@ -234,7 +234,7 @@ describe("a choice made by pointing at the screen", () => {
     });
     const outcome = await interviewer.turn(turn(world, "the ninth one"));
     expect(outcome.recorded).toEqual([]);
-    expect(outcome.reply).toContain("Founding-team capabilities");
+    expect(outcome.reply).toContain("founding-team capabilities");
     expect(outcome.asking?.stepKey).toBe("I5.founder_preferences");
   });
 });
@@ -771,7 +771,7 @@ describe("one degraded subsystem never makes Q unusable", () => {
     });
     expect(asked.questionForQ).not.toBeNull();
     expect(asked.resume?.stepKey).toBe("I5.founder_preferences");
-    expect(asked.resume?.question).toContain("Founding-team capabilities");
+    expect(asked.resume?.question).toContain("founding-team capabilities");
     expect(interviewer.conversation(SESSION_ID).research).not.toBeNull();
 
     // The caller carried the run and reports how it ended.

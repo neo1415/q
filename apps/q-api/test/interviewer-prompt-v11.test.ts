@@ -6,6 +6,7 @@ import {
   INTERVIEW_CONDUCTOR_V7,
   INTERVIEW_CONDUCTOR_V8,
   INTERVIEW_CONDUCTOR_V9,
+  INTERVIEW_CONDUCTOR_V10,
   InterviewConductorV6ResultSchema,
   InterviewConductorV7ResultSchema,
 } from "@capital-q/q-core";
@@ -29,8 +30,9 @@ describe("INTERVIEW_CONDUCTOR v10 is what the interview runs", () => {
   const active = registry.getActive("INTERVIEW_CONDUCTOR");
   const template = active.definition.template;
 
-  it("is the single active version, and v7, v8 and v9 are retired", () => {
-    expect(active.definition.version).toBe(10);
+  it("is the single active version, and v7 to v10 are retired", () => {
+    expect(active.definition.version).toBe(11);
+    expect(INTERVIEW_CONDUCTOR_V10.status).toBe("DEPRECATED");
     expect(INTERVIEW_CONDUCTOR_V7.status).toBe("DEPRECATED");
     expect(INTERVIEW_CONDUCTOR_V8.status).toBe("DEPRECATED");
     expect(INTERVIEW_CONDUCTOR_V9.status).toBe("DEPRECATED");
@@ -162,5 +164,10 @@ describe("INTERVIEW_CONDUCTOR v10 is what the interview runs", () => {
     });
     expect(read.reading?.question?.kind).toBe("ADVICE");
     expect(read.reading?.references).toEqual([]);
+  });
+
+  it("points a question about their own answers at the steps it concerns (v11)", () => {
+    expect(template).toContain("about = the steps it concerns");
+    expect(template).toContain("never QUESTION_TO_Q");
   });
 });

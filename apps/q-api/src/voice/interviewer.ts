@@ -4,6 +4,7 @@ import {
   appendOnboardingInterviewTurns,
   completeOnboardingSession,
   findTaxonomyCandidates,
+  getTaxonomyNode,
   getOnboardingSession,
   resolveOnboardingSuggestion,
   skipOnboardingStep,
@@ -64,6 +65,7 @@ import {
   type QPersonalityCode,
 } from "@capital-q/q-core";
 
+import { SPOKEN_QUESTIONS, stepNoun } from "./step-copy.js";
 /**
  * Q conducting the interview (CQ-Q-VOICE-001 rework).
  *
@@ -788,12 +790,18 @@ function askLabel(step: OnboardingStepManifest): string {
  * capabilities that matter to you") is used as the noun it already is.
  */
 function repairLabel(step: OnboardingStepManifest): string {
-  const prompt = (
-    PLAIN_QUESTIONS[step.stepKey] ?? step.configuration.prompt
-  ).trim();
-  return /\?$/.test(prompt)
-    ? `an answer to "${prompt}"`
-    : prompt.charAt(0).toLowerCase() + prompt.slice(1);
+  return `your ${noun(step)}`;
+}
+
+function joinWithAnd(items: readonly string[]): string {
+  return items.length <= 1
+    ? (items[0] ?? "")
+    : `${items.slice(0, -1).join(", ")} and ${items.at(-1) ?? ""}`;
+}
+
+/** The step as a noun, from the platform's own copy (step-copy.ts). */
+function noun(step: OnboardingStepManifest): string {
+  return stepNoun(step.stepKey, step.configuration.prompt);
 }
 
 function askAgain(
@@ -861,28 +869,35 @@ function askWithChoices(
   return `${question} The choices are ${listed}.`;
 }
 
-function questionFor(step: OnboardingStepManifest): string {
-  const plain = PLAIN_QUESTIONS[step.stepKey];
-  if (plain !== undefined) return plain;
+export function questionFor(step: OnboardingStepManifest): string {
   const c = step.configuration;
-  const prompt = c.prompt.replace(/[.?!]+$/, "");
+  /**
+   * Always a whole question (ACC round 3 #3, #4). A step whose prompt is a
+   * form label ("Typical cheque") is asked in the platform's own words
+   * (step-copy.ts); one whose prompt is already a question is asked as
+   * written. Never "Website?" or "typical cheque? Just the number…".
+   */
+  const spoken =
+    SPOKEN_QUESTIONS[step.stepKey] ??
+    (/\?\s*$/.test(c.prompt) ? c.prompt.trim() : `What's your ${noun(step)}?`);
+  const stem = spoken.replace(/[.?!]+$/, "");
   switch (c.stepType) {
     case "single_select":
     case "multi_select": {
       const labels = optionsOf(step)
         .map((o) => o.label)
         .slice(0, 7);
-      return `${prompt}: ${labels.join(", ")}?`;
+      return `${stem}: ${labels.join(", ")}?`;
     }
     case "range":
-      return `${prompt.toLowerCase()}? Just the number is fine.`;
+      return `${spoken} Just the number is fine.`;
     case "short_text":
     case "long_text":
     case "voice_text":
     case "document_upload":
     case "confirmation":
     case "reference_select":
-      return `${prompt}?`;
+      return spoken;
   }
 }
 
@@ -1215,12 +1230,28 @@ export function readingFrom(
         kind: "QUESTION_TO_Q",
         question:
           result.answerFromState === "OPTIONS"
-            ? { kind: "OPTIONS", text: result.questionForQ ?? "options" }
+            ? {
+                kind: "OPTIONS",
+                text: result.questionForQ ?? "options",
+                about: [],
+              }
             : result.answerFromState === "PROGRESS"
-              ? { kind: "PROGRESS", text: result.questionForQ ?? "progress" }
+              ? {
+                  kind: "PROGRESS",
+                  text: result.questionForQ ?? "progress",
+                  about: [],
+                }
               : result.questionForQ === null
-                ? { kind: "ADVICE", text: result.reply.slice(0, 1_000) }
-                : { kind: "PUBLIC_FACTS", text: result.questionForQ },
+                ? {
+                    kind: "ADVICE",
+                    text: result.reply.slice(0, 1_000),
+                    about: [],
+                  }
+                : {
+                    kind: "PUBLIC_FACTS",
+                    text: result.questionForQ,
+                    about: [],
+                  },
       };
     case "LOOKUP":
       return {
@@ -1229,6 +1260,7 @@ export function readingFrom(
         question: {
           kind: "PUBLIC_FACTS",
           text: result.lookup?.query.slice(0, 1_000) ?? "lookup",
+          about: [],
         },
       };
     case "UNCLEAR":
@@ -2579,6 +2611,28 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
       const unsaved: string[] = [];
       /** What the owning service said when it refused, and what it wants first. */
       const refusals: OnboardingRefusal[] = [];
+      /**
+       * A stored value as the person would say it; category ids are named
+       * by the platform's own taxonomy, best effort (a lookup that fails
+       * leaves the count rather than inventing a name).
+       */
+      const describeStored = async (
+        step: OnboardingStepManifest,
+        value: OnboardingResponseValue,
+      ): Promise<string> => {
+        if (value.type !== "RESOURCE_REFERENCE") {
+          return describeValue(step, value, currency).trim();
+        }
+        const names: string[] = [];
+        for (const id of value.resourceIds.slice(0, 6)) {
+          try {
+            names.push((await getTaxonomyNode(input.session, id)).displayName);
+          } catch {
+            return describeValue(step, value, currency).trim();
+          }
+        }
+        return joinWithAnd(names);
+      };
       /** Steps whose value this turn the service refused as invalid. */
       const invalidValues = new Set<string>();
       const commit = async (
@@ -2883,7 +2937,31 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
        * words to mean — an interpretation the repair ladder may offer —
        * and never as values.
        */
-      const takingAnswers = disposition.write || disposition.confirm;
+      /**
+       * Values carried by a turn read as a question (ACC round 3 #1).
+       *
+       * "Bet on it being mostly co-investing, we rarely lead. Oh, and did
+       * gambling go in as a hard no?" was read as a question alone, so the
+       * co-investing the model put in `answers` was thrown away while its
+       * reply said "I'll take that as co-investing". A value the model
+       * extracted from the person's words is never dropped for the turn's
+       * shape: it is held and read back for a yes, which is the honest
+       * middle between writing a question's content blind and ignoring it.
+       */
+      const proposedValues =
+        result.answers.length > 0 ||
+        result.categoryPhrases.length > 0 ||
+        reading.references.length > 0 ||
+        (result.unrestricted ?? []).length > 0;
+      const questionCarriedValues =
+        !disposition.write &&
+        !disposition.confirm &&
+        !disposition.transcription &&
+        disposition.answer &&
+        proposedValues;
+      const confirmOnly = disposition.confirm || questionCarriedValues;
+      const takingAnswers =
+        disposition.write || disposition.confirm || questionCarriedValues;
       /**
        * Answers that only restate what is already on the record. Not
        * written, and not a failure either: "right, angel, and we're at
@@ -3039,7 +3117,7 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
         if (
           misplaced ||
           isMaterial(step) ||
-          disposition.confirm ||
+          confirmOnly ||
           tense.has(step.stepKey)
         ) {
           nextPending.push({
@@ -3081,7 +3159,9 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
        * restriction means for it, because that is domain knowledge and
        * not something to be read out of somebody's phrasing.
        */
-      for (const item of takingAnswers ? (result.unrestricted ?? []) : []) {
+      for (const item of takingAnswers && !questionCarriedValues
+        ? (result.unrestricted ?? [])
+        : []) {
         const step = steps.get(item.stepKey);
         if (step === undefined) continue;
         const status = statuses.get(item.stepKey);
@@ -3267,7 +3347,7 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
           }
           const spoken = describeValue(step, value, currency);
           dispatch({ type: "PROPOSAL_DECIDED", target: step.stepKey });
-          if (isMaterial(step) || disposition.confirm) {
+          if (isMaterial(step) || confirmOnly) {
             nextPending.push({
               stepKey: step.stepKey,
               question: step.configuration.prompt,
@@ -3320,11 +3400,7 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
         }
         selectionsThisTurn[step.stepKey] = resolved.keys;
         const spoken = labelsOf(resolved.keys, shownOptions).join(", ");
-        if (
-          isMaterial(step) ||
-          disposition.confirm ||
-          tense.has(step.stepKey)
-        ) {
+        if (isMaterial(step) || confirmOnly || tense.has(step.stepKey)) {
           nextPending.push({
             stepKey: step.stepKey,
             question: step.configuration.prompt,
@@ -3473,7 +3549,7 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
            * another, and doing it never is how the answer disappeared.
            */
           const spoken = labels.join(", ");
-          if (isMaterial(step)) {
+          if (isMaterial(step) || confirmOnly) {
             nextPending.push({
               stepKey: step.stepKey,
               question: c.prompt,
@@ -3547,7 +3623,7 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
       //    may set a question aside.
       let deferredUpload = false;
       const toSkip = [
-        ...(takingAnswers ? result.skips : []),
+        ...(takingAnswers && !questionCarriedValues ? result.skips : []),
         ...spokenUploads.map((step) => step.stepKey),
       ];
       for (const stepKey of toSkip) {
@@ -3918,7 +3994,7 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
         const next =
           result.askNext === null ? undefined : steps.get(result.askNext);
         reply = [
-          `I've got ${firstHeld.phrases.join(" and ")}${heldStep === undefined ? "" : ` for ${askLabel(heldStep).toLowerCase()}`} — I can't put it on your record until the rest of the setup is in place, so I'm holding it and it goes in as soon as it can.`,
+          `I've got ${firstHeld.phrases.join(" and ")}${heldStep === undefined ? "" : ` for ${noun(heldStep)}`} — I can't put it on your record until the rest of the setup is in place, so I'm holding it and it goes in as soon as it can.`,
           next === undefined || next.stepKey === firstHeld.stepKey
             ? ""
             : askAgain(next, input),
@@ -4312,11 +4388,11 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
         const heldLabels = unsaved
           .map((key) => steps.get(key))
           .filter((step): step is OnboardingStepManifest => step !== undefined)
-          .map((step) => askLabel(step).toLowerCase());
+          .map((step) => noun(step));
         const downLabels = recorded
           .map((key) => steps.get(key))
           .filter((step): step is OnboardingStepManifest => step !== undefined)
-          .map((step) => askLabel(step).toLowerCase());
+          .map((step) => noun(step));
         const list = (items: readonly string[]) =>
           items.length <= 1
             ? (items[0] ?? "")
@@ -4460,7 +4536,23 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
         view.responses.length > 0 &&
         fromState === null
       ) {
-        const nextKey = result.askNext ?? view.currentStep?.stepKey ?? null;
+        // The question that was on screen before the reload, when it is
+        // still open; then the journey's own current step; the model's
+        // choice last (ACC round 3 #4: a reload opened on a different step).
+        const stillOpen = (key: string | null | undefined): key is string =>
+          key !== null &&
+          key !== undefined &&
+          view.progress.eligibleSteps.some(
+            (e) =>
+              e.stepKey === key &&
+              e.status !== "COMPLETED" &&
+              e.status !== "SKIPPED",
+          );
+        const nextKey = stillOpen(conversation.asked?.topic)
+          ? conversation.asked.topic
+          : stillOpen(view.currentStep?.stepKey)
+            ? view.currentStep.stepKey
+            : result.askNext;
         const next = nextKey === null ? undefined : steps.get(nextKey);
         if (next !== undefined && toOpenStep(next, view) !== null) {
           const question = askWithChoices(next, input);
@@ -4547,6 +4639,35 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
        * recorded this turn and not held for a yes is settled; the journey
        * knows what comes next, so that is what is asked.
        */
+      /**
+       * Never a raw step label as Q's line (adversarial round 1, #8).
+       *
+       * "Your firm" and "Typical cheque" reached the person as the whole of
+       * what Q said: a model that echoes a label, or a turn whose reply is
+       * the step's own prompt. A reply that IS a step's label — compared
+       * against the platform's own labels, nothing else — is replaced by
+       * that step asked properly.
+       */
+      const bareLabel = (() => {
+        const said = reply
+          .trim()
+          .replace(/[.?!:]+$/, "")
+          .toLowerCase();
+        if (said.length === 0 || said.length > 80) return undefined;
+        return [...steps.values()].find(
+          (step) =>
+            said ===
+              step.configuration.prompt.replace(/[.?!:]+$/, "").toLowerCase() ||
+            said ===
+              askLabel(step)
+                .replace(/[.?!:]+$/, "")
+                .toLowerCase(),
+        );
+      })();
+      if (bareLabel !== undefined) {
+        reply = askWithChoices(bareLabel, input);
+        result = { ...result, askNext: bareLabel.stepKey };
+      }
       const settledKey = result.askNext;
       /**
        * Settled before this turn too (adversarial round 1, #7): after a
@@ -4598,12 +4719,12 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
             const step = steps.get(item.target);
             return step === undefined
               ? null
-              : `I've kept "${item.meaning.slice(0, 120)}" as a note on your ${askLabel(step).toLowerCase()}.`;
+              : `I've kept "${item.meaning.slice(0, 120)}" as a note on your ${noun(step)}.`;
           })
           .filter((line): line is string => line !== null);
         const lead = [
           changed.length > 0 && settledStep !== undefined
-            ? `I've updated your ${askLabel(settledStep).toLowerCase()}.`
+            ? `I've updated your ${noun(settledStep)}.`
             : "",
           ...kept,
         ]
@@ -4726,33 +4847,131 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
         reply = result.reply.trim().length > 0 ? result.reply : reply;
       }
       /**
-       * Never a raw step label as Q's line (adversarial round 1, #8).
-       *
-       * "Your firm" and "Typical cheque" reached the person as the whole of
-       * what Q said: a model that echoes a label, or a turn whose reply is
-       * the step's own prompt. A reply that IS a step's label — compared
-       * against the platform's own labels, nothing else — is replaced by
-       * that step asked properly.
+       * A held value is never dropped from the conversation without a yes
+       * (ACC round 3 #1: a typical cheque held, then a turn about
+       * something else, and it was never asked again). When nothing new
+       * was read back this turn and Q is about to ask something other than
+       * what it is holding, the oldest held value is asked instead.
        */
-      const bareLabel = (() => {
-        const said = reply
-          .trim()
-          .replace(/[.?!:]+$/, "")
-          .toLowerCase();
-        if (said.length === 0 || said.length > 80) return undefined;
-        return [...steps.values()].find(
-          (step) =>
-            said ===
-              step.configuration.prompt.replace(/[.?!:]+$/, "").toLowerCase() ||
-            said ===
-              askLabel(step)
-                .replace(/[.?!:]+$/, "")
-                .toLowerCase(),
-        );
-      })();
-      if (bareLabel !== undefined) {
-        reply = askWithChoices(bareLabel, input);
-        result = { ...result, askNext: bareLabel.stepKey };
+      // Not the very turn after it was read back: that would be the same
+      // question twice running (a restatement is not a decision either).
+      const staleHeld =
+        heldNow === undefined && fromState === null && !pausing
+          ? nextPending.find(
+              (held) =>
+                held.stepKey !== inFrontAtStart &&
+                pending.some((was) => was.stepKey === held.stepKey),
+            )
+          : undefined;
+      if (
+        staleHeld !== undefined &&
+        result.askNext !== staleHeld.stepKey &&
+        navigate === null &&
+        handoff === null
+      ) {
+        const heldStep = steps.get(staleHeld.stepKey);
+        const readBack =
+          heldStep === undefined
+            ? `Is ${staleHeld.spoken} right?`
+            : `${askLabel(heldStep)}: ${staleHeld.spoken}. Is that right?`;
+        const answerPart =
+          disposition.answer && reading.question !== null ? reply.trim() : "";
+        reply = `${answerPart} ${readBack}`.trim();
+        result = { ...result, askNext: staleHeld.stepKey };
+      }
+
+      /**
+       * A question about their own answers, answered from what is stored
+       * (ACC round 3 #1, #2). "Did gambling go in as a hard no?" was
+       * answered "yes" with nothing stored; "did you save the 25k minimum?"
+       * was not answered at all. The model names the steps (v11
+       * reading.question.about); the platform says what is on the record,
+       * held, carried or missing — then what this turn put down, then the
+       * next question. The model's own words about those steps are not used.
+       */
+      const aboutSteps = (reading.question?.about ?? [])
+        .map((key) => steps.get(key))
+        .filter((step): step is OnboardingStepManifest => step !== undefined);
+      if (aboutSteps.length > 0) {
+        const carriedNow = carriedFor(input.onboardingSessionId, view);
+        const lines: string[] = [];
+        for (const step of aboutSteps) {
+          const stored = view.responses.find((r) => r.stepKey === step.stepKey);
+          const held = nextPending.find((h) => h.stepKey === step.stepKey);
+          const carried = carriedNow.find((c) => c.stepKey === step.stepKey);
+          const status = view.progress.eligibleSteps.find(
+            (e) => e.stepKey === step.stepKey,
+          )?.status;
+          if (stored !== undefined) {
+            const said = await describeStored(step, stored.value);
+            lines.push(
+              said.length > 0
+                ? `Yes, your ${noun(step)} is on your record: ${said}.`
+                : `Yes, your ${noun(step)} is on your record.`,
+            );
+          } else if (held !== undefined) {
+            lines.push(
+              `Not yet: your ${noun(step)} (${held.spoken}) is waiting for your yes.`,
+            );
+          } else if (carried !== undefined) {
+            lines.push(
+              `Not yet: I have your ${noun(step)} (${carried.spoken}) and it goes in as soon as the setup can take it.`,
+            );
+          } else if (status === "SKIPPED") {
+            lines.push(`Your ${noun(step)} is set aside for now.`);
+          } else {
+            lines.push(
+              `Not yet: nothing is on your record for your ${noun(step)}. Want me to add it?`,
+            );
+          }
+        }
+        const aboutKeys = new Set(aboutSteps.map((step) => step.stepKey));
+        const putDown = recorded
+          .filter((key) => !aboutKeys.has(key))
+          .map((key) => steps.get(key))
+          .filter((step): step is OnboardingStepManifest => step !== undefined)
+          .map((step) => noun(step));
+        if (putDown.length > 0) {
+          lines.push(`I've also put down your ${joinWithAnd(putDown)}.`);
+        }
+        const nextKey = result.askNext;
+        const nextHeld =
+          nextKey === null
+            ? undefined
+            : nextPending.find((h) => h.stepKey === nextKey);
+        const nextStep = nextKey === null ? undefined : steps.get(nextKey);
+        const offersToAdd = lines.some((line) => line.endsWith("add it?"));
+        if (!offersToAdd && nextHeld !== undefined && nextStep !== undefined) {
+          lines.push(
+            `${askLabel(nextStep)}: ${nextHeld.spoken}. Is that right?`,
+          );
+        } else if (
+          !offersToAdd &&
+          nextStep !== undefined &&
+          !aboutKeys.has(nextStep.stepKey)
+        ) {
+          lines.push(askWithChoices(nextStep, input));
+        }
+        reply = lines.join(" ");
+        if (offersToAdd) {
+          result = { ...result, askNext: aboutSteps[0]?.stepKey ?? null };
+        }
+      } else if (
+        disposition.answer &&
+        reading.question !== null &&
+        reading.question.kind !== "OPTIONS" &&
+        reading.question.kind !== "PROGRESS" &&
+        fromState === null &&
+        read.reply.trim().length > 0 &&
+        !reply.includes(read.reply.trim().slice(0, 40))
+      ) {
+        /**
+         * A question inside an answer turn is always answered (ACC round 3
+         * #2). Runtime lines — a read-back, a repair, what did not land —
+         * replace the model's reply, and with it went the answer to the
+         * person's question. The model's answer is put back in front.
+         */
+        reply = `${read.reply.trim()} ${reply.trim()}`.trim();
       }
       const askStep =
         result.askNext === null ? undefined : steps.get(result.askNext);

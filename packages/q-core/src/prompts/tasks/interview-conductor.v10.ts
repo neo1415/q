@@ -66,7 +66,7 @@ export const INTERVIEW_CONDUCTOR_V10: PromptDefinition<
 > = {
   ...INTERVIEW_CONDUCTOR_V9,
   version: 10,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   changeDescription:
     "CQ-VOICE-010: no audio tags inside the reply (they reached the transcript, the thread and memory, and a voice that cannot render them read them aloud); how a reply sounds is asked for in a closed `delivery` field beside it, rendered by the speech layer only where the voice can. CQ-QX-005: the values Q puts forward are listed in `offered` and can be pointed at (OFFERED), a step can take another's value (VALUE_OF), and the whole sentence is read against every step — facts and exclusions said early, 'about to raise' as preparing, an optional thing they do not have as a skip.",
   effectiveFrom: "2026-09-24",

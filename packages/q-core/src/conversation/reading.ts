@@ -152,6 +152,14 @@ export const QuestionToQSchema = z
     kind: QuestionKindSchema,
     /** The question in the person's own words, bounded. */
     text: z.string().min(1).max(1_000),
+    /**
+     * The steps a question about their own answers is about ("did gambling
+     * go in as a hard no?", "did you save the 25k minimum?"). The consumer
+     * answers it from what is actually stored — never the model's belief —
+     * so Q cannot say "yes, that's recorded" about something that is not
+     * (ACC round 3 #1). Empty for every other question.
+     */
+    about: z.array(z.string().min(1).max(80)).max(6).default([]),
   })
   .strict();
 export type QuestionToQ = z.infer<typeof QuestionToQSchema>;
