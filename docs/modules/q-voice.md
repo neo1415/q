@@ -170,9 +170,28 @@ Conduct, after the first live transcripts:
   model as DOCUMENT PROPOSALS and read back like Q's own readings; a yes
   resolves the suggestion through the runtime's ACCEPT path, a different
   value through EDIT.
-- **Expressiveness.** With `Q_VOICE_EXPRESSIVE=true` (written by
-  `voice:setup`) Q may use one inline tag such as [laughs] per reply; the
-  engines render them only on `eleven_v3_conversational`.
+- **Expressiveness (CQ-VOICE-010).** No tag ever goes inside what Q
+  says: a tag in the reply ended up in the transcript, the thread and
+  memory, and turbo read `[laughs]` aloud. The conductor asks for one
+  delivery cue _beside_ the reply (`delivery`: LAUGH, CHUCKLE, SIGH or
+  PAUSE; q-core `speech/delivery.ts`). `turn.ts` anchors it to the spoken
+  sentences on a per-session board (`voice/speech-performance.ts`), and the
+  speak relay renders it only where the voice was measured to render it
+  (`voice/providers/speech-markup.ts`). `Q_VOICE_EXPRESSIVE` no longer
+  reaches a prompt.
+- **Voice engine (CQ-VOICE-010).** The relay speaks in
+  `eleven_v3_conversational`, chosen by listening to
+  `design/voice-comparison/comparison.md` (Sarah / Daniel, HTTP `/stream`,
+  never `optimize_streaming_latency`). An utterance that v3 fails, or that
+  has no audio within 1.2 s, is spoken by `eleven_turbo_v2_5` in the same
+  voice, with pauses and pace only. Aura-2, with pauses only, speaks when
+  ElevenLabs cannot. `Q_VOICE_TTS_MODEL=eleven_turbo_v2_5` rolls back.
+- **Timing (CQ-VOICE-010).** Every spoken turn logs one `voice turn timed`
+  line: reasoning start and end, first text, first TTS request, first
+  audio byte, the engine that voiced each utterance, and every
+  model/API/memory step. The line never contains words.
+  `railway logs --service @capital-q/q-api --json | node scripts/voice-timings.mjs`
+  summarises it.
 - **Size.** A live turn renders the `Q_SYSTEM_VOICE` charter (a third of
   `Q_SYSTEM`) and a compact open-steps list (full options for the first
   three open steps, ten and a count for the rest): about 3k tokens a turn
