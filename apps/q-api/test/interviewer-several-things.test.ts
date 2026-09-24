@@ -572,3 +572,111 @@ describe("a returning person is never met as new", () => {
     expect(opening.asking?.stepKey).toBe("I4.revenue_state");
   });
 });
+
+describe("round 2 #1 · words that cannot be placed yet are kept, not dropped", () => {
+  it("holds sectors heard before the lookup can run, and records them once it can", async () => {
+    const world = investorSession({
+      currentStepKey: "I0.investor_type",
+      taxonomy: { senegal: "a1b2c3d4-0000-4000-8000-000000000002" },
+    });
+    let lookupWorks = false;
+    const fetch: typeof globalThis.fetch = (input, init) => {
+      const url =
+        typeof input === "string"
+          ? input
+          : input instanceof URL
+            ? input.toString()
+            : input.url;
+      if (url.includes("/taxonomy/candidates") && !lookupWorks) {
+        return Promise.resolve(
+          Response.json(
+            { title: "Forbidden", status: 403, code: "FORBIDDEN" },
+            { status: 403 },
+          ),
+        );
+      }
+      return world.fetch(input, init);
+    };
+    const interviewer = createInterviewer({
+      gateway: gateway(
+        {
+          ...base,
+          intent: "ANSWER",
+          reply: "Senegal, got it. How do you invest?",
+          categoryPhrases: [{ stepKey: "I3.geography", phrases: ["Senegal"] }],
+          askNext: "I0.investor_type",
+          reading: reading({}),
+        },
+        {
+          ...base,
+          intent: "ANSWER",
+          reply: "An angel, then.",
+          answers: [
+            {
+              stepKey: "I0.investor_type",
+              value: "angel",
+              confidence: "HIGH",
+              clarity: "SETTLED",
+            },
+          ],
+          reading: reading({}),
+        },
+      ),
+      logger,
+    });
+    const first = await interviewer.turn(
+      turn({ ...world, fetch }, "I only do Senegal"),
+    );
+    expect(first.recorded).toEqual([]);
+    expect(first.reply).not.toMatch(/got it/i);
+    expect(first.reply).toMatch(/holding it/);
+    lookupWorks = true;
+    const second = await interviewer.turn(
+      turn({ ...world, fetch }, "I'm an angel"),
+    );
+    expect(second.recorded).toEqual(
+      expect.arrayContaining(["I0.investor_type", "I3.geography"]),
+    );
+  });
+});
+
+describe("round 2 #2 · a write refused early in a turn and landed later is not 'unsaved'", () => {
+  it("records the cheque once the firm exists in the same turn, and never says it didn't save", async () => {
+    const world = investorSession({
+      currentStepKey: "I0.organisation_name",
+      recorded: { "I0.investor_type": "angel" },
+      refuseUntil: { "I2.cheque_typical": "I0.organisation_name" },
+    });
+    const interviewer = createInterviewer({
+      gateway: gateway({
+        ...base,
+        intent: "ANSWER",
+        reply: "Noted.",
+        answers: [
+          {
+            stepKey: "I2.cheque_typical",
+            value: "20000",
+            confidence: "HIGH",
+            clarity: "SETTLED",
+          },
+          {
+            stepKey: "I0.organisation_name",
+            value: "Coastline Capital",
+            confidence: "HIGH",
+            clarity: "SETTLED",
+          },
+        ],
+        reading: reading({}),
+      }),
+      logger,
+    });
+    const outcome = await interviewer.turn(
+      turn(
+        world,
+        "typical is 20 thousand pounds, put the firm down as Coastline Capital",
+      ),
+    );
+    expect(outcome.recorded).toContain("I0.organisation_name");
+    expect(outcome.reply).not.toMatch(/didn't save/);
+  });
+});
