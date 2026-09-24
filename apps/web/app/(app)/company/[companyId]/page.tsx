@@ -10,6 +10,7 @@ import {
   PageContainer,
   PageHeader,
 } from "@/components/app-shell/page-container";
+import { countryLabel, stageLabel } from "@/features/company/declared-labels";
 import { apiSession } from "@/features/q/context";
 import { QPageSubject } from "@/features/q/q-subject";
 
@@ -55,12 +56,15 @@ export default async function CompanyPage({
     );
   }
 
-  const place = [company.headquartersCity, company.headquartersCountry]
+  const place = [
+    company.headquartersCity,
+    countryLabel(company.headquartersCountry),
+  ]
     .filter((part): part is string => part !== null)
     .join(", ");
 
   const rows: readonly (readonly [string, string])[] = [
-    ["Stage", company.currentStageCode ?? "Not declared"],
+    ["Stage", stageLabel(company.currentStageCode) ?? "Not declared"],
     ["Where", place === "" ? "Not declared" : place],
     ["Founded", company.foundedDate ?? "Not declared"],
     ["Legal name", company.legalName ?? "Not declared"],
