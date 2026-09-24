@@ -9,8 +9,11 @@ import type {
   MarketplaceReadinessAssessment,
 } from "@capital-q/contracts";
 import { COUNTRY_OPTIONS, STAGE_OPTIONS } from "@capital-q/founder-onboarding";
+import { Badge } from "@capital-q/ui/badge";
 import { Button, buttonClassName } from "@capital-q/ui/button";
-import { EmptyState, InlineNotice, Skeleton } from "@capital-q/ui/states";
+import { ContextIndicator } from "@capital-q/ui/context-indicator";
+import { Eye, ICON_SIZE, ICON_STROKE, Lock } from "@capital-q/ui/icons";
+import { InlineNotice, Skeleton } from "@capital-q/ui/states";
 
 import {
   assessMarketplaceReadinessAction,
@@ -171,7 +174,7 @@ export function VisibilityScreen({ companyId }: VisibilityScreenProps) {
   };
 
   return (
-    <div className="flex flex-col gap-8" data-visibility-screen>
+    <div className="flex flex-col gap-10" data-visibility-screen>
       {saved !== null ? (
         <InlineNotice tone="positive" title="Saved">
           {saved}
@@ -183,44 +186,76 @@ export function VisibilityScreen({ companyId }: VisibilityScreenProps) {
         </InlineNotice>
       ) : null}
 
+      {/*
+        The state is a dossier panel: the scope it is in, what that means,
+        and the one action that changes it. The scope indicator and the
+        words carry the meaning; the panel has no wash and no gradient.
+      */}
       <section
         aria-labelledby="visibility-status"
-        className="flex flex-col gap-3"
+        className="cq-panel max-w-(--cq-layout-reading)"
+        data-visible={visible ? "true" : "false"}
       >
-        <h2
-          id="visibility-status"
-          className="cq-title-md text-(--cq-text-primary)"
-        >
-          {visible
-            ? "Visible to investors on the network"
-            : "Private to your organisation"}
-        </h2>
-        <p className="cq-body max-w-(--cq-layout-narrow) text-(--cq-text-secondary)">
-          {visible
-            ? "Investors on Capital Q can find your company by name and read the profile below. Everything else you have shared with Q stays private."
-            : "Only people in your organisation can see your company. Investors cannot find it, and Q will not mention it to them."}
-        </p>
-        <div className="flex flex-wrap gap-2">
-          {visible ? (
-            <Button
-              variant="secondary"
-              disabled={busy}
-              onClick={() => void choose("organisation_private")}
-            >
-              Make private again
-            </Button>
-          ) : (
-            <Button
-              disabled={busy}
-              onClick={() => void choose("network_visible")}
-            >
-              Make visible to investors
-            </Button>
-          )}
+        <header className="cq-panel-header">
+          <h2
+            id="visibility-status"
+            className="cq-title-md text-(--cq-text-primary)"
+          >
+            {visible
+              ? "Visible to investors on the network"
+              : "Private to your organisation"}
+          </h2>
+          <ContextIndicator
+            scope={visible ? "network_visible" : "organisation_private"}
+          />
+        </header>
+        <div className="cq-panel-body flex flex-col gap-4">
+          <p className="cq-body max-w-(--cq-layout-reading) text-(--cq-text-secondary)">
+            {visible
+              ? "Investors on Capital Q can find your company by name and read the profile below. Everything else you have shared with Q stays private."
+              : "Only people in your organisation can see your company. Investors cannot find it, and Q will not mention it to them."}
+          </p>
+          <p className="cq-status-line">
+            {visible ? (
+              <Eye
+                aria-hidden="true"
+                size={ICON_SIZE.compact}
+                strokeWidth={ICON_STROKE}
+              />
+            ) : (
+              <Lock
+                aria-hidden="true"
+                size={ICON_SIZE.compact}
+                strokeWidth={ICON_STROKE}
+              />
+            )}
+            {visible
+              ? "Investors see the profile previewed below, nothing more."
+              : "Investors see nothing until you choose otherwise."}
+          </p>
+          <div className="flex flex-wrap items-center gap-3">
+            {visible ? (
+              <Button
+                variant="secondary"
+                disabled={busy}
+                onClick={() => void choose("organisation_private")}
+              >
+                Make private again
+              </Button>
+            ) : (
+              <Button
+                variant="primary"
+                disabled={busy}
+                onClick={() => void choose("network_visible")}
+              >
+                Make visible to investors
+              </Button>
+            )}
+            <span className="cq-status-line">
+              Finishing setup never changes this on its own. You decide.
+            </span>
+          </div>
         </div>
-        <p className="cq-caption text-(--cq-text-tertiary)">
-          Finishing setup never changes this on its own. You decide.
-        </p>
       </section>
 
       <section
@@ -233,7 +268,7 @@ export function VisibilityScreen({ companyId }: VisibilityScreenProps) {
         >
           Who can see what
         </h2>
-        <dl className="flex flex-col divide-y divide-(--cq-border-subtle) border-y border-(--cq-border-subtle)">
+        <dl className="flex max-w-(--cq-layout-reading) flex-col divide-y divide-(--cq-border-subtle) border-y border-(--cq-border-subtle)">
           <div className="flex flex-col gap-1 py-3">
             <dt className="cq-label text-(--cq-text-primary)">
               Private to you and your organisation
@@ -241,7 +276,7 @@ export function VisibilityScreen({ companyId }: VisibilityScreenProps) {
             <dd className="cq-body-sm text-(--cq-text-secondary)">
               Your setup answers, uploaded documents, what Q read from them,
               your conversations with Q, and your capital objective. None of
-              this is visible to investors, whatever you choose below.
+              this is visible to investors, whatever you choose above.
             </dd>
           </div>
           <div className="flex flex-col gap-1 py-3">
@@ -269,34 +304,38 @@ export function VisibilityScreen({ companyId }: VisibilityScreenProps) {
 
       <section
         aria-labelledby="visibility-discovery"
-        className="flex flex-col gap-3"
+        className="flex flex-col gap-4"
       >
-        <h2
-          id="visibility-discovery"
-          className="cq-title-md text-(--cq-text-primary)"
-        >
-          Discovery status
-        </h2>
-        <p className="cq-body max-w-(--cq-layout-narrow) text-(--cq-text-secondary)">
-          {visible
-            ? "Discoverable to investors: they can look your company up and ask Q about it."
-            : "Not discoverable yet: investors cannot find your company until you make it visible."}
-        </p>
-        <h3 className="cq-label text-(--cq-text-primary)">
-          Investor recommendations
-        </h3>
-        <p className="cq-body max-w-(--cq-layout-narrow) text-(--cq-text-secondary)">
-          {ready
-            ? "Your company meets the marketplace requirements and can be included in investor recommendations. Being visible and being recommended are separate: both are needed."
-            : "Not in investor recommendations yet. Being visible does not change that on its own; the marketplace requirements below decide it."}
-        </p>
+        <div className="flex flex-col gap-2">
+          <h2
+            id="visibility-discovery"
+            className="cq-title-md text-(--cq-text-primary)"
+          >
+            Discovery status
+          </h2>
+          <p className="cq-body max-w-(--cq-layout-reading) text-(--cq-text-secondary)">
+            {visible
+              ? "Discoverable to investors: they can look your company up and ask Q about it."
+              : "Not discoverable yet: investors cannot find your company until you make it visible."}
+          </p>
+        </div>
+        <div className="flex flex-col gap-2">
+          <h3 className="cq-label text-(--cq-text-primary)">
+            Investor recommendations
+          </h3>
+          <p className="cq-body max-w-(--cq-layout-reading) text-(--cq-text-secondary)">
+            {ready
+              ? "Your company meets the marketplace requirements and can be included in investor recommendations. Being visible and being recommended are separate: both are needed."
+              : "Not in investor recommendations yet. Being visible does not change that on its own; the marketplace requirements below decide it."}
+          </p>
+        </div>
         {readiness === null ? (
-          <p className="cq-caption text-(--cq-text-tertiary)">
+          <p className="cq-status-line">
             Readiness couldn&apos;t be read just now.
           </p>
         ) : (
           <ul
-            className="flex max-w-(--cq-layout-narrow) flex-col gap-2"
+            className="flex max-w-(--cq-layout-reading) flex-col divide-y divide-(--cq-border-subtle) border-y border-(--cq-border-subtle)"
             data-marketplace-requirements
           >
             {readiness.requirements
@@ -304,14 +343,15 @@ export function VisibilityScreen({ companyId }: VisibilityScreenProps) {
               .map((r) => (
                 <li
                   key={r.requirement}
-                  className="cq-body-sm flex gap-2 text-(--cq-text-secondary)"
+                  className="cq-body-sm flex items-start gap-3 py-3 text-(--cq-text-secondary)"
                   data-outcome={r.outcome}
                 >
-                  <span
-                    aria-hidden="true"
-                    className="cq-caption mt-0.5 w-5 shrink-0 text-(--cq-text-tertiary)"
-                  >
-                    {r.outcome === "SATISFIED" ? "Done" : "Next"}
+                  {/* The status word in a fixed column, in words as well as
+                      tone; the readiness of a requirement is never a colour. */}
+                  <span className="w-14 shrink-0" aria-hidden="true">
+                    <Badge tone="neutral">
+                      {r.outcome === "SATISFIED" ? "Done" : "Next"}
+                    </Badge>
                   </span>
                   <span>
                     <span className="sr-only">
@@ -324,10 +364,12 @@ export function VisibilityScreen({ companyId }: VisibilityScreenProps) {
           </ul>
         )}
         {readiness !== null && !readiness.verificationAvailable ? (
-          <p className="cq-caption max-w-(--cq-layout-narrow) text-(--cq-text-tertiary)">
-            Identity and organisation verification are not yet available on
-            Capital Q, so no company is in investor recommendations today.
-            Nothing here calls your company verified when it isn&apos;t.
+          <p className="cq-status-line max-w-(--cq-layout-reading) items-start">
+            <span>
+              Identity and organisation verification are not yet available on
+              Capital Q, so no company is in investor recommendations today.
+              Nothing here calls your company verified when it isn&apos;t.
+            </span>
           </p>
         ) : null}
         <div className="flex flex-wrap gap-2">
@@ -347,18 +389,22 @@ export function VisibilityScreen({ companyId }: VisibilityScreenProps) {
         aria-labelledby="visibility-preview"
         className="flex flex-col gap-3"
       >
-        <h2
-          id="visibility-preview"
-          className="cq-title-md text-(--cq-text-primary)"
-        >
-          What investors will see
-        </h2>
-        <p className="cq-caption text-(--cq-text-tertiary)">
-          This is the exact profile Q gives an investor who asks about your
-          company{visible ? "." : " once it is visible."}
-        </p>
+        <div className="flex flex-col gap-1">
+          <h2
+            id="visibility-preview"
+            className="cq-title-md text-(--cq-text-primary)"
+          >
+            What investors will see
+          </h2>
+          <p className="cq-status-line">
+            This is the exact profile Q gives an investor who asks about your
+            company{visible ? "." : " once it is visible."}
+          </p>
+        </div>
+        {/* The preview is the dossier an investor would open: one panel,
+            hairline rows, no card inside it. */}
         <dl
-          className="flex flex-col gap-2 rounded-lg border border-(--cq-border-subtle) p-4"
+          className="cq-panel cq-panel-rows max-w-(--cq-layout-reading)"
           data-network-preview
         >
           <PreviewRow label="Company" value={preview.canonicalName} />
@@ -379,13 +425,18 @@ export function VisibilityScreen({ companyId }: VisibilityScreenProps) {
             label="Stage"
             value={stageLabel(preview.currentStageCode)}
           />
-          <PreviewRow label="Founded" value={preview.foundedDate} />
+          <PreviewRow label="Founded" value={preview.foundedDate} numeric />
           <PreviewRow label="In short" value={preview.shortDescription} />
           <PreviewRow label="Description" value={preview.primaryDescription} />
         </dl>
-        <div>
+        <div className="flex flex-wrap items-center gap-3">
+          {/* The pitch video is part of what investors see; it has its own
+              flow (CQ-MEDIA), founder-only. */}
+          <Link href="/pitch" className={buttonClassName("secondary")}>
+            Your pitch video
+          </Link>
           {/* Changes are asked of Q in one's own words and approved (ADR 0011). */}
-          <Link href="/home" className={buttonClassName("quiet", "compact")}>
+          <Link href="/home" className={buttonClassName("quiet")}>
             Ask Q to change it
           </Link>
         </div>
@@ -397,14 +448,24 @@ export function VisibilityScreen({ companyId }: VisibilityScreenProps) {
 function PreviewRow({
   label,
   value,
+  numeric = false,
 }: {
   readonly label: string;
   readonly value: string | null;
+  readonly numeric?: boolean | undefined;
 }) {
   return (
-    <div className="flex flex-col gap-0.5">
-      <dt className="cq-caption text-(--cq-text-tertiary)">{label}</dt>
-      <dd className="cq-body text-(--cq-text-primary)">
+    <div className="flex flex-col gap-0.5 px-5 py-3 sm:flex-row sm:gap-4">
+      <dt className="cq-label shrink-0 text-(--cq-text-secondary) sm:w-32">
+        {label}
+      </dt>
+      <dd
+        className={
+          numeric
+            ? "cq-body cq-numeric text-(--cq-text-primary)"
+            : "cq-body text-(--cq-text-primary)"
+        }
+      >
         {value === null || value.length === 0 ? (
           <span className="text-(--cq-text-tertiary)">Not shared</span>
         ) : (
@@ -415,19 +476,32 @@ function PreviewRow({
   );
 }
 
+/**
+ * No company yet: one sentence and the way in, without a dashed frame
+ * around an absence (design/visual-direction.md, "No dashboards").
+ */
 export function VisibilityUnavailable() {
   return (
-    <EmptyState
-      title="No company to show yet."
-      description="Set up as a founder first. Until then there is nothing investors could see."
-      action={
+    <section
+      aria-label="No company to show yet."
+      className="flex max-w-(--cq-layout-reading) flex-col gap-3"
+      data-state="empty"
+    >
+      <p className="cq-body text-(--cq-text-primary)">
+        No company to show yet.
+      </p>
+      <p className="cq-body-sm text-(--cq-text-secondary)">
+        Set up as a founder first. Until then there is nothing investors could
+        see.
+      </p>
+      <div className="pt-1">
         <Link
           href="/onboarding/founder"
           className={buttonClassName("secondary")}
         >
           Set up as a founder
         </Link>
-      }
-    />
+      </div>
+    </section>
   );
 }

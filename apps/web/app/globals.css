@@ -117,28 +117,6 @@
     animation: cq-step-in var(--cq-motion-emphasis) var(--cq-ease) both;
   }
 
-  /*
-   * Visibility state: one calm card, its meaning carried by the icon and
-   * the words; the wash only reinforces them (never colour alone, AA).
-   */
-  .cq-visibility-state {
-    padding: 18px 20px;
-    border-radius: 16px;
-    border: 1px solid var(--cq-border-subtle);
-    background: linear-gradient(
-      180deg,
-      var(--cq-surface-subtle) 0%,
-      transparent 120%
-    );
-  }
-  .cq-visibility-state[data-visible="true"] {
-    border-color: var(--cq-border);
-    background: linear-gradient(
-      180deg,
-      var(--cq-accent-soft) 0%,
-      transparent 120%
-    );
-  }
   /* The appearance choice: three plain options, the current one filled. */
   .cq-appearance-option {
     min-height: 36px;
@@ -167,9 +145,6 @@
   }
 
   .cq-discover-list > li + li {
-    border-top: 1px solid var(--cq-border-subtle);
-  }
-  .cq-visibility-preview > div + div {
     border-top: 1px solid var(--cq-border-subtle);
   }
 

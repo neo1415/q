@@ -8,8 +8,9 @@ import type {
   InvestorOrganisationDto,
 } from "@capital-q/contracts";
 import { Button, buttonClassName } from "@capital-q/ui/button";
-import { Eye, ICON_SIZE, Lock } from "@capital-q/ui/icons";
-import { EmptyState, InlineNotice, Skeleton } from "@capital-q/ui/states";
+import { ContextIndicator } from "@capital-q/ui/context-indicator";
+import { Eye, ICON_SIZE, ICON_STROKE, Lock } from "@capital-q/ui/icons";
+import { InlineNotice, Skeleton } from "@capital-q/ui/states";
 
 import {
   loadInvestorVisibilityAction,
@@ -149,7 +150,7 @@ export function InvestorVisibilityScreen({
   const visible = preview.networkVisible;
 
   return (
-    <div className="flex flex-col gap-8" data-investor-visibility-screen>
+    <div className="flex flex-col gap-10" data-investor-visibility-screen>
       {saved !== null ? (
         <InlineNotice tone="positive" title="Saved">
           {saved}
@@ -161,47 +162,70 @@ export function InvestorVisibilityScreen({
         </InlineNotice>
       ) : null}
 
+      {/*
+        The state is a dossier panel: the scope it is in, what that means,
+        and the one action that changes it. The scope indicator and the
+        words carry the meaning; no wash, no gradient.
+      */}
       <section
         aria-labelledby="investor-visibility-status"
-        className="cq-visibility-state flex flex-col gap-3"
+        className="cq-panel max-w-(--cq-layout-reading)"
         data-visible={visible ? "true" : "false"}
       >
-        <div className="flex items-center gap-2">
-          {visible ? (
-            <Eye size={ICON_SIZE.prominent} aria-hidden="true" />
-          ) : (
-            <Lock size={ICON_SIZE.prominent} aria-hidden="true" />
-          )}
+        <header className="cq-panel-header">
           <h2
             id="investor-visibility-status"
             className="cq-title-md text-(--cq-text-primary)"
           >
             {visible ? "Founders can find you" : "Private to your organisation"}
           </h2>
-        </div>
-        <p className="cq-body max-w-(--cq-layout-narrow) text-(--cq-text-secondary)">
-          {visible
-            ? "Founders on Capital Q can find your profile and ask Q about you. Your mandate, portfolio and everything you have told Q stay private."
-            : "Only people in your organisation can see this profile. Founders cannot find you, and Q will not mention you to them."}
-        </p>
-        <div className="flex flex-wrap gap-2">
-          {visible ? (
-            <Button
-              variant="secondary"
-              disabled={busy}
-              onClick={() => void choose("organisation_private")}
-            >
-              Make private
-            </Button>
-          ) : (
-            <Button
-              variant="primary"
-              disabled={busy}
-              onClick={() => void choose("network_visible")}
-            >
-              Let founders find me
-            </Button>
-          )}
+          <ContextIndicator
+            scope={visible ? "network_visible" : "organisation_private"}
+          />
+        </header>
+        <div className="cq-panel-body flex flex-col gap-4">
+          <p className="cq-body max-w-(--cq-layout-reading) text-(--cq-text-secondary)">
+            {visible
+              ? "Founders on Capital Q can find your profile and ask Q about you. Your mandate, portfolio and everything you have told Q stay private."
+              : "Only people in your organisation can see this profile. Founders cannot find you, and Q will not mention you to them."}
+          </p>
+          <p className="cq-status-line">
+            {visible ? (
+              <Eye
+                aria-hidden="true"
+                size={ICON_SIZE.compact}
+                strokeWidth={ICON_STROKE}
+              />
+            ) : (
+              <Lock
+                aria-hidden="true"
+                size={ICON_SIZE.compact}
+                strokeWidth={ICON_STROKE}
+              />
+            )}
+            {visible
+              ? "Founders see the profile previewed below, nothing more."
+              : "Founders see nothing until you choose otherwise."}
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {visible ? (
+              <Button
+                variant="secondary"
+                disabled={busy}
+                onClick={() => void choose("organisation_private")}
+              >
+                Make private
+              </Button>
+            ) : (
+              <Button
+                variant="primary"
+                disabled={busy}
+                onClick={() => void choose("network_visible")}
+              >
+                Let founders find me
+              </Button>
+            )}
+          </div>
         </div>
       </section>
 
@@ -209,17 +233,19 @@ export function InvestorVisibilityScreen({
         aria-labelledby="investor-preview"
         className="flex flex-col gap-3"
       >
-        <h2
-          id="investor-preview"
-          className="cq-title-md text-(--cq-text-primary)"
-        >
-          What founders will see
-        </h2>
-        <p className="cq-body-sm max-w-(--cq-layout-narrow) text-(--cq-text-secondary)">
-          This is the whole profile. Your mandate, cheque size, portfolio and
-          anything you have discussed with Q are not part of it.
-        </p>
-        <dl className="cq-visibility-preview flex flex-col">
+        <div className="flex flex-col gap-1">
+          <h2
+            id="investor-preview"
+            className="cq-title-md text-(--cq-text-primary)"
+          >
+            What founders will see
+          </h2>
+          <p className="cq-body-sm max-w-(--cq-layout-reading) text-(--cq-text-secondary)">
+            This is the whole profile. Your mandate, cheque size, portfolio and
+            anything you have discussed with Q are not part of it.
+          </p>
+        </div>
+        <dl className="cq-panel cq-panel-rows max-w-(--cq-layout-reading)">
           <PreviewRow label="Investor" value={preview.displayName} />
           <PreviewRow label="Type" value={typeLabel(preview.investorType)} />
           <PreviewRow label="Website" value={preview.websiteUrl} />
@@ -240,9 +266,10 @@ export function InvestorVisibilityScreen({
         </div>
       </section>
 
-      <p className="cq-caption text-(--cq-text-tertiary)">
-        Profile version {String(investor.version)}. Changing visibility is
-        recorded; nothing else about you is shared by it.
+      <p className="cq-status-line">
+        Profile version{" "}
+        <span className="cq-numeric">{String(investor.version)}</span>. Changing
+        visibility is recorded; nothing else about you is shared by it.
       </p>
     </div>
   );
@@ -256,8 +283,8 @@ function PreviewRow({
   readonly value: string | null;
 }) {
   return (
-    <div className="flex flex-col gap-0.5 py-3 sm:flex-row sm:gap-4">
-      <dt className="cq-caption shrink-0 text-(--cq-text-tertiary) sm:w-32">
+    <div className="flex flex-col gap-0.5 px-5 py-3 sm:flex-row sm:gap-4">
+      <dt className="cq-label shrink-0 text-(--cq-text-secondary) sm:w-32">
         {label}
       </dt>
       <dd className="cq-body text-(--cq-text-primary)">
@@ -271,19 +298,32 @@ function PreviewRow({
   );
 }
 
+/**
+ * No investor profile yet: one sentence and the way in, without a dashed
+ * frame around an absence.
+ */
 export function InvestorVisibilityUnavailable() {
   return (
-    <EmptyState
-      title="No investor profile to show yet."
-      description="Set up your mandate first. Until then there is nothing founders could see."
-      action={
+    <section
+      aria-label="No investor profile to show yet."
+      className="flex max-w-(--cq-layout-reading) flex-col gap-3"
+      data-state="empty"
+    >
+      <p className="cq-body text-(--cq-text-primary)">
+        No investor profile to show yet.
+      </p>
+      <p className="cq-body-sm text-(--cq-text-secondary)">
+        Set up your mandate first. Until then there is nothing founders could
+        see.
+      </p>
+      <div className="pt-1">
         <Link
           href="/onboarding/investor"
           className={buttonClassName("secondary")}
         >
           Set up your mandate
         </Link>
-      }
-    />
+      </div>
+    </section>
   );
 }
