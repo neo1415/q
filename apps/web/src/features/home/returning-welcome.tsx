@@ -91,7 +91,9 @@ export function ReturningWelcome({
   return (
     <section
       aria-labelledby="returning-headline"
-      className="mx-auto flex w-full max-w-(--cq-layout-reading) flex-col gap-5"
+      // The 16 px phone gutter; from `sm` the column lines up with the
+      // composer below it instead.
+      className="mx-auto flex w-full max-w-(--cq-layout-reading) flex-col gap-5 px-4 sm:px-0"
       data-q-returning
     >
       <div className="flex items-start gap-3">
