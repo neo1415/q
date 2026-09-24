@@ -16,6 +16,7 @@ import {
   createListCompanyMedia,
 } from "./pitch-use-cases.js";
 import type { MediaRepositories, PitchViewerAccessPort } from "./ports.js";
+import { createApplyProviderStatusReport } from "./provider-status-use-cases.js";
 import {
   createApplyAutomatedModeration,
   createSetPitchPlaybackPolicy,
@@ -51,6 +52,14 @@ export type MediaService = {
   readonly createUploadSession: ReturnType<typeof createCreateUploadSession>;
   readonly syncMediaAsset: ReturnType<typeof createSyncMediaAsset>;
   readonly authorisePlayback: ReturnType<typeof createAuthorisePlayback>;
+  /**
+   * A verified provider report, applied under the platform's authority
+   * (CQ-MEDIA-012). Reached only by a webhook route that has checked the
+   * delivery's signature; never by anything a browser can call.
+   */
+  readonly applyProviderStatusReport: ReturnType<
+    typeof createApplyProviderStatusReport
+  >;
   /** The publish path (CQ-MEDIA-013): the owner's decision, and the platform's. */
   readonly setPitchPlaybackPolicy: ReturnType<
     typeof createSetPitchPlaybackPolicy
@@ -113,6 +122,7 @@ export function createMediaService(options: MediaServiceOptions): MediaService {
     createUploadSession: createCreateUploadSession(dependencies),
     syncMediaAsset: createSyncMediaAsset(dependencies),
     authorisePlayback: createAuthorisePlayback(dependencies),
+    applyProviderStatusReport: createApplyProviderStatusReport(dependencies),
     setPitchPlaybackPolicy: createSetPitchPlaybackPolicy(dependencies),
     applyAutomatedModeration: createApplyAutomatedModeration(dependencies),
   };

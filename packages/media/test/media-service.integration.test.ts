@@ -692,6 +692,131 @@ describe("@capital-q/media against local PostgreSQL", () => {
     });
   });
 
+  it("applies verified provider reports idempotently, as the platform, through the outbox (CQ-MEDIA-012)", async () => {
+    await withWorld(async (world) => {
+      const uid = `wh${randomUUID().replace(/-/g, "")}`;
+      const { asset } = await world.service.createCompanyPitch({
+        actor: world.adminA,
+        companyId: world.companyA,
+        input: {},
+        correlationId: CORRELATION(),
+      });
+      await world.service.attachProviderAsset({
+        tenantId: world.tenantA,
+        mediaAssetId: asset.id,
+        provider: "CLOUDFLARE_STREAM",
+        providerAssetId: uid,
+      });
+      await world.service.transitionMediaStatus({
+        tenantId: world.tenantA,
+        mediaAssetId: asset.id,
+        status: "UPLOAD_PENDING",
+      });
+      // A pitch in the other tenant that no report names: it must not move.
+      const other = await world.service.createCompanyPitch({
+        actor: world.adminB,
+        companyId: world.companyB,
+        input: {},
+        correlationId: CORRELATION(),
+      });
+
+      const apply = (
+        report: Parameters<
+          MediaService["applyProviderStatusReport"]
+        >[0]["report"],
+      ) =>
+        world.service.applyProviderStatusReport({
+          provider: "CLOUDFLARE_STREAM",
+          report,
+          mediaAssetId: asset.id,
+          correlationId: CORRELATION(),
+        });
+      const ready = {
+        providerAssetId: uid,
+        status: "READY" as const,
+        durationSeconds: 87,
+        width: 1080,
+        height: 1920,
+        thumbnailReference: `${uid}/thumbnails/thumbnail.jpg`,
+      };
+
+      expect(await apply(ready)).toMatchObject({
+        kind: "APPLIED",
+        status: "READY",
+        appliedTransitions: ["UPLOADING", "PROCESSING", "READY"],
+      });
+      // Duplicate, out-of-order, and failure-after-READY deliveries.
+      expect(await apply(ready)).toMatchObject({
+        kind: "UNCHANGED",
+        stale: false,
+      });
+      expect(
+        await apply({ providerAssetId: uid, status: "PROCESSING" }),
+      ).toMatchObject({ kind: "UNCHANGED", stale: true });
+      expect(
+        await apply({
+          providerAssetId: uid,
+          status: "PROCESSING_FAILED",
+          providerErrorCode: "ERR_MALFORMED_VIDEO",
+        }),
+      ).toMatchObject({ kind: "UNCHANGED", status: "READY" });
+      expect(
+        await world.service.applyProviderStatusReport({
+          provider: "CLOUDFLARE_STREAM",
+          report: { ...ready, providerAssetId: `${uid}x` },
+          correlationId: CORRELATION(),
+        }),
+      ).toEqual({ kind: "UNKNOWN_ASSET" });
+
+      const [row] = await world.tx.sql<
+        {
+          status: string;
+          ready_at: Date | null;
+          aspect_ratio: string | null;
+          duration_seconds: number | null;
+        }[]
+      >`select status, ready_at, aspect_ratio, duration_seconds
+          from media.media_assets where id = ${asset.id}`;
+      expect(row).toMatchObject({
+        status: "READY",
+        aspect_ratio: "9:16",
+        duration_seconds: 87,
+      });
+      expect(row?.ready_at).not.toBeNull();
+      const [untouched] = await world.tx.sql<
+        { status: string }[]
+      >`select status from media.media_assets where id = ${other.asset.id}`;
+      expect(untouched?.status).toBe("CREATED");
+
+      // One event per step, once; attributed to the platform; no uid.
+      const events = await world.tx.sql<
+        { payload: { actor: { type: string }; data: { status: string } } }[]
+      >`select payload from events.outbox
+         where event_type = 'media.asset.status_changed'
+           and payload->'aggregate'->>'id' = ${asset.id}
+         order by id`;
+      expect(events.map((e) => e.payload.data.status)).toEqual([
+        "UPLOADING",
+        "PROCESSING",
+        "READY",
+      ]);
+      for (const event of events) {
+        expect(event.payload.actor.type).toBe("SYSTEM");
+      }
+      const audits = await world.tx.sql<
+        { actor_type: string }[]
+      >`select actor_type from audit.material_actions
+         where action_type = 'media.asset.provider_status_applied'
+           and resource_id = ${asset.id}`;
+      expect(audits).toHaveLength(1);
+      expect(audits[0]?.actor_type).toBe("capital_q_system");
+      const outboxRows = await world.tx.sql<
+        { payload: unknown }[]
+      >`select to_jsonb(o.*) as payload from events.outbox o`;
+      expect(JSON.stringify(outboxRows)).not.toContain(uid);
+    });
+  });
+
   it("answers the current-pitch query port without scanning history", async () => {
     await withWorld(async (world) => {
       const port = createPostgresCompanyPitchQueryPort({ sql: world.tx.sql });

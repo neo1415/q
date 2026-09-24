@@ -28,6 +28,7 @@ export const VIDEO_PROVIDER_ENV_NAMES = [
   "CLOUDFLARE_STREAM_CUSTOMER_SUBDOMAIN",
   "CLOUDFLARE_STREAM_SIGNING_KEY_ID",
   "CLOUDFLARE_STREAM_SIGNING_KEY_PEM",
+  "CLOUDFLARE_STREAM_WEBHOOK_SECRET",
 ] as const;
 
 const apiToken = z
@@ -67,6 +68,18 @@ export const videoProviderEnvShape = {
     .min(64, "expected a private key")
     .max(16_384, "expected a private key")
     .optional(),
+  /**
+   * The signing secret Cloudflare returned when the webhook URL was
+   * registered (CQ-MEDIA-012; `scripts/register-stream-webhook.mjs`).
+   * Independent of the API token: without it the webhook route refuses
+   * every delivery as unconfigured, and it never accepts an unsigned one.
+   */
+  CLOUDFLARE_STREAM_WEBHOOK_SECRET: z
+    .string()
+    .trim()
+    .min(16, "expected a webhook signing secret")
+    .max(512, "expected a webhook signing secret")
+    .optional(),
 };
 
 export type CloudflareStreamSecrets = {
@@ -80,6 +93,8 @@ export type CloudflareStreamSecrets = {
 export type VideoProviderSecrets = {
   /** Absent means no adapter is composed and every provider call refuses. */
   readonly cloudflareStream: CloudflareStreamSecrets | undefined;
+  /** Absent means the webhook route answers 503 to every delivery. */
+  readonly cloudflareStreamWebhookSecret: ProviderCredential | undefined;
 };
 
 export type VideoProviderConfigStatus = {
@@ -88,6 +103,8 @@ export type VideoProviderConfigStatus = {
   readonly playback: "configured" | "unconfigured";
   /** How playback tokens are signed, when they can be. */
   readonly signing: "local_key" | "provider_token_endpoint" | "none";
+  /** Whether provider webhooks can be verified, and so accepted at all. */
+  readonly webhook: "configured" | "unconfigured";
   /** Variable names still needed for upload and playback. Names only. */
   readonly missing: readonly string[];
 };
@@ -99,14 +116,19 @@ type ParsedVideoProviderEnv = {
   readonly CLOUDFLARE_STREAM_CUSTOMER_SUBDOMAIN?: string | undefined;
   readonly CLOUDFLARE_STREAM_SIGNING_KEY_ID?: string | undefined;
   readonly CLOUDFLARE_STREAM_SIGNING_KEY_PEM?: string | undefined;
+  readonly CLOUDFLARE_STREAM_WEBHOOK_SECRET?: string | undefined;
 };
 
 export function toVideoProviderSecrets(
   parsed: ParsedVideoProviderEnv,
 ): VideoProviderSecrets {
   const token = parsed.CLOUDFLARE_STREAM_API_TOKEN ?? parsed.CLOUDFLARE_API_KEY;
+  const cloudflareStreamWebhookSecret =
+    parsed.CLOUDFLARE_STREAM_WEBHOOK_SECRET === undefined
+      ? undefined
+      : new ProviderCredential(parsed.CLOUDFLARE_STREAM_WEBHOOK_SECRET);
   if (parsed.CLOUDFLARE_ACCOUNT_ID === undefined || token === undefined) {
-    return { cloudflareStream: undefined };
+    return { cloudflareStream: undefined, cloudflareStreamWebhookSecret };
   }
   const keyId = parsed.CLOUDFLARE_STREAM_SIGNING_KEY_ID;
   const pem = parsed.CLOUDFLARE_STREAM_SIGNING_KEY_PEM;
@@ -120,6 +142,7 @@ export function toVideoProviderSecrets(
           ? { keyId, pem: new ProviderCredential(pem) }
           : undefined,
     },
+    cloudflareStreamWebhookSecret,
   };
 }
 
@@ -148,6 +171,10 @@ export function videoProviderConfigStatus(
         : stream?.signingKey === undefined
           ? "provider_token_endpoint"
           : "local_key",
+    webhook:
+      secrets.cloudflareStreamWebhookSecret === undefined
+        ? "unconfigured"
+        : "configured",
     missing,
   };
 }

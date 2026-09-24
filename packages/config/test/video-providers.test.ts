@@ -30,6 +30,7 @@ describe("video provider configuration", () => {
       "CLOUDFLARE_STREAM_CUSTOMER_SUBDOMAIN",
       "CLOUDFLARE_STREAM_SIGNING_KEY_ID",
       "CLOUDFLARE_STREAM_SIGNING_KEY_PEM",
+      "CLOUDFLARE_STREAM_WEBHOOK_SECRET",
     ]);
     for (const name of VIDEO_PROVIDER_ENV_NAMES) {
       expect(name.startsWith("NEXT_PUBLIC_")).toBe(false);
@@ -43,6 +44,7 @@ describe("video provider configuration", () => {
       cloudflareStream: "unconfigured",
       playback: "unconfigured",
       signing: "none",
+      webhook: "unconfigured",
       missing: [
         "CLOUDFLARE_ACCOUNT_ID",
         "CLOUDFLARE_STREAM_API_TOKEN",
@@ -77,6 +79,7 @@ describe("video provider configuration", () => {
       cloudflareStream: "configured",
       playback: "unconfigured",
       signing: "none",
+      webhook: "unconfigured",
       missing: ["CLOUDFLARE_STREAM_CUSTOMER_SUBDOMAIN"],
     });
 
@@ -103,6 +106,7 @@ describe("video provider configuration", () => {
       cloudflareStream: "configured",
       playback: "configured",
       signing: "provider_token_endpoint",
+      webhook: "unconfigured",
       missing: [],
     });
 
@@ -165,5 +169,28 @@ describe("video provider configuration", () => {
     expect(
       videoProviderConfigStatus(config.secrets.videoProviders).missing,
     ).toEqual(["CLOUDFLARE_STREAM_CUSTOMER_SUBDOMAIN"]);
+  });
+  it("holds the webhook secret on its own, redacted, and reports it by presence", () => {
+    const SECRET = "synthetic-webhook-secret-0000000000000000";
+    const config = parseApiConfig({
+      ...base,
+      CLOUDFLARE_STREAM_WEBHOOK_SECRET: SECRET,
+    });
+    // Verifying a delivery needs no API credential, so the secret stands
+    // alone; the adapter is still unconfigured without account and token.
+    expect(config.secrets.videoProviders.cloudflareStream).toBeUndefined();
+    expect(
+      config.secrets.videoProviders.cloudflareStreamWebhookSecret?.reveal(),
+    ).toBe(SECRET);
+    expect(config.public.videoProviders.webhook).toBe("configured");
+    for (const rendering of [
+      JSON.stringify(config),
+      inspect(config, { depth: 10 }),
+    ]) {
+      expect(rendering).not.toContain(SECRET);
+    }
+    expect(() =>
+      parseApiConfig({ ...base, CLOUDFLARE_STREAM_WEBHOOK_SECRET: "short" }),
+    ).toThrow(/CLOUDFLARE_STREAM_WEBHOOK_SECRET/);
   });
 });

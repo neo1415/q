@@ -42,6 +42,19 @@ export type MediaAssetRepository = {
     tenantId: TenantId,
     mediaAssetId: MediaAssetId,
   ) => Promise<MediaAsset | null>;
+  /**
+   * The asset a provider's identifier names, in whichever tenant holds it
+   * (CQ-MEDIA-012). Cross-tenant by necessity — a provider webhook carries
+   * no tenant — and therefore a lookup only: the caller has already
+   * verified the delivery's signature, and everything it then does goes
+   * through `lockById` with the tenant this row states. Knowing an
+   * identifier is never a reason to act on the asset it names.
+   */
+  readonly findByProviderAssetId: (
+    executor: DatabaseExecutor,
+    provider: MediaProvider,
+    providerAssetId: string,
+  ) => Promise<MediaAsset | null>;
   /** Row lock for a replacement or a deletion decided from what is current. */
   readonly lockById: (
     tx: TransactionContext,

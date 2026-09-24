@@ -25,10 +25,11 @@ import {
  * Cloudflare Stream behind the `VideoProvider` port (CQ-MEDIA-010; doc 20
  * §5, §9–§13, §21, §31–§33).
  *
- * This is the only file in the product that knows Cloudflare's vocabulary.
- * Its status strings, error reason codes, envelope shape and URL layout are
- * read here and translated into Capital Q's own lifecycle before anything
- * leaves; nothing downstream can tell which vendor answered.
+ * This file and its webhook sibling (`cloudflare-stream-webhook.ts`,
+ * CQ-MEDIA-012) are the only places in the product that know Cloudflare's
+ * vocabulary. Its status strings, error reason codes, envelope shape and
+ * URL layout are read here and translated into Capital Q's own lifecycle
+ * before anything leaves; nothing downstream can tell which vendor answered.
  *
  * Three things are settled by the server and never by a browser: the
  * creator reference, the duration reservation and the expiry of an upload
@@ -141,10 +142,16 @@ const DirectUploadResultSchema = z.object({
   uid: ProviderAssetIdSchema,
 });
 
-const VideoResultSchema = z.object({
+/**
+ * One Stream video as the vendor describes it — the `result` of a status
+ * read and, byte for byte, the body of a webhook delivery. Both paths parse
+ * it with this schema and translate it with `normalizeCloudflareVideo`, so
+ * the poll and the webhook cannot disagree about what a vendor answer means.
+ */
+export const CloudflareVideoSchema = z.object({
   uid: ProviderAssetIdSchema,
   status: z.object({
-    state: z.string(),
+    state: z.string().max(64),
     errorReasonCode: z.string().nullable().optional(),
   }),
   readyToStream: z.boolean().optional(),
@@ -158,7 +165,10 @@ const VideoResultSchema = z.object({
     .optional(),
   /** Set once bytes arrived. Its absence is what tells an upload failure apart. */
   uploaded: z.string().nullable().optional(),
+  /** The creator reference Capital Q set at upload: our media asset id. */
+  creator: z.string().nullable().optional(),
 });
+export type CloudflareVideo = z.infer<typeof CloudflareVideoSchema>;
 
 const TokenResultSchema = z.object({ token: z.string().min(1) });
 
@@ -189,6 +199,61 @@ export function translateCloudflareState(video: {
     default:
       return null;
   }
+}
+
+/**
+ * One vendor video, in Capital Q's words — or null for a vendor state this
+ * adapter does not know, which the caller must refuse rather than guess.
+ *
+ * `readyToStream: false` alongside a `ready` state is read as still
+ * processing: READY means the provider says the media is playable, and here
+ * it says it is not. The lifecycle can always move PROCESSING → READY on the
+ * next report; it can never take READY back.
+ */
+export function normalizeCloudflareVideo(
+  video: CloudflareVideo,
+): VideoAssetStatus | null {
+  const translated = translateCloudflareState({
+    state: video.status.state,
+    uploaded: video.uploaded,
+  });
+  if (translated === null) {
+    return null;
+  }
+  const status =
+    translated === "READY" && video.readyToStream === false
+      ? "PROCESSING"
+      : translated;
+  const duration =
+    video.duration !== undefined && video.duration >= 1
+      ? Math.round(video.duration)
+      : undefined;
+  const width =
+    video.input?.width !== undefined && video.input.width >= 1
+      ? Math.round(video.input.width)
+      : undefined;
+  const height =
+    video.input?.height !== undefined && video.input.height >= 1
+      ? Math.round(video.input.height)
+      : undefined;
+  const errorCode = video.status.errorReasonCode ?? undefined;
+  return VideoAssetStatusSchema.parse({
+    providerAssetId: video.uid,
+    status,
+    ...(duration === undefined || duration > 86_400
+      ? {}
+      : { durationSeconds: duration }),
+    ...(width === undefined || width > 16_384 ? {} : { width }),
+    ...(height === undefined || height > 16_384 ? {} : { height }),
+    // A reference on the vendor's edge, never the vendor's full URL: the
+    // host is configuration, and a stored URL would outlive a change of it.
+    ...(status === "READY"
+      ? { thumbnailReference: `${video.uid}/thumbnails/thumbnail.jpg` }
+      : {}),
+    ...(errorCode === undefined || errorCode.length === 0
+      ? {}
+      : { providerErrorCode: errorCode.slice(0, 64) }),
+  });
 }
 
 export function classifyCloudflareStatus(status: number): MediaProviderFailure {
@@ -381,7 +446,7 @@ export function createCloudflareStreamVideoProvider(
       "asset status",
       "GET",
       `/${encodeURIComponent(uid)}`,
-      VideoResultSchema,
+      CloudflareVideoSchema,
     );
     if (answer.kind === "NOT_FOUND") {
       // The vendor no longer has it. For an id Capital Q issued that means
@@ -393,40 +458,16 @@ export function createCloudflareStreamVideoProvider(
         providerErrorCode: "ASSET_NOT_FOUND",
       });
     }
-    const video = answer.result;
-    const status = translateCloudflareState({
-      state: video.status.state,
-      uploaded: video.uploaded,
-    });
-    if (status === null) {
-      throw fail("asset status", "MALFORMED_RESPONSE", 200, video.status.state);
+    const normalized = normalizeCloudflareVideo(answer.result);
+    if (normalized === null) {
+      throw fail(
+        "asset status",
+        "MALFORMED_RESPONSE",
+        200,
+        answer.result.status.state,
+      );
     }
-    const duration =
-      video.duration !== undefined && video.duration >= 1
-        ? Math.round(video.duration)
-        : undefined;
-    const width =
-      video.input?.width !== undefined && video.input.width >= 1
-        ? Math.round(video.input.width)
-        : undefined;
-    const height =
-      video.input?.height !== undefined && video.input.height >= 1
-        ? Math.round(video.input.height)
-        : undefined;
-    const errorCode = video.status.errorReasonCode ?? undefined;
-    return VideoAssetStatusSchema.parse({
-      providerAssetId: video.uid,
-      status,
-      ...(duration === undefined ? {} : { durationSeconds: duration }),
-      ...(width === undefined ? {} : { width }),
-      ...(height === undefined ? {} : { height }),
-      ...(status === "READY"
-        ? { thumbnailReference: `${video.uid}/thumbnails/thumbnail.jpg` }
-        : {}),
-      ...(errorCode === undefined || errorCode.length === 0
-        ? {}
-        : { providerErrorCode: errorCode.slice(0, 64) }),
-    });
+    return normalized;
   }
 
   function signLocally(

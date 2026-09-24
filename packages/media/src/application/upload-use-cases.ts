@@ -16,12 +16,9 @@ import {
   type MediaAsset,
   type MediaAssetId,
   type MediaOwnerRef,
-  type MediaStatus,
-  type MediaTechnicalMetadata,
 } from "../contracts/index.js";
 import type {
   PlaybackAuthorization,
-  VideoAssetStatus,
   VideoUploadSession,
 } from "../contracts/provider.js";
 import {
@@ -30,7 +27,6 @@ import {
   MediaOwnerNotFoundError,
   MediaRuleError,
 } from "../domain/errors.js";
-import { transitionPath } from "../domain/lifecycle.js";
 import type { ResolvedMediaOwner } from "../domain/owners.js";
 import { mediaAssetStatusChangedEvent } from "../events/index.js";
 import {
@@ -41,6 +37,11 @@ import {
   ownerScope,
 } from "./authority.js";
 import type { MediaServiceDependencies } from "./dependencies.js";
+import {
+  applyProviderReportPlan,
+  isEmptyPlan,
+  planProviderReport,
+} from "./provider-report.js";
 
 /**
  * The direct upload flow, server side (CQ-MEDIA-011; doc 20 §9–§14, §20,
@@ -84,53 +85,6 @@ function belongsTo(asset: MediaAsset, owner: ResolvedMediaOwner): boolean {
     asset.ownerId === owner.ownerId &&
     asset.purpose === PITCH
   );
-}
-
-/** `1080 × 1920` → `9:16`; anything that will not reduce to three digits stays unknown. */
-export function aspectRatioOf(
-  width: number,
-  height: number,
-): string | undefined {
-  const gcd = (a: number, b: number): number => (b === 0 ? a : gcd(b, a % b));
-  const divisor = gcd(width, height);
-  const w = width / divisor;
-  const h = height / divisor;
-  return w > 999 || h > 999 ? undefined : `${String(w)}:${String(h)}`;
-}
-
-/** What the provider told us that the record does not yet hold. */
-function metadataDelta(
-  asset: MediaAsset,
-  status: VideoAssetStatus,
-): MediaTechnicalMetadata | null {
-  const delta: {
-    -readonly [K in keyof MediaTechnicalMetadata]: MediaTechnicalMetadata[K];
-  } = {};
-  if (
-    status.durationSeconds !== undefined &&
-    status.durationSeconds !== asset.durationSeconds
-  ) {
-    delta.durationSeconds = status.durationSeconds;
-  }
-  if (status.width !== undefined && status.width !== asset.width) {
-    delta.width = status.width;
-  }
-  if (status.height !== undefined && status.height !== asset.height) {
-    delta.height = status.height;
-  }
-  if (status.width !== undefined && status.height !== undefined) {
-    const ratio = aspectRatioOf(status.width, status.height);
-    if (ratio !== undefined && ratio !== asset.aspectRatio) {
-      delta.aspectRatio = ratio;
-    }
-  }
-  if (
-    status.thumbnailReference !== undefined &&
-    status.thumbnailReference !== asset.thumbnailReference
-  ) {
-    delta.thumbnailReference = status.thumbnailReference;
-  }
-  return Object.keys(delta).length === 0 ? null : delta;
 }
 
 // ---------------------------------------------------------------------------
@@ -343,74 +297,34 @@ export function createSyncMediaAsset(dependencies: MediaServiceDependencies) {
     }
 
     const reported = await videoProvider.getAsset(asset.providerAssetId);
-    const path = transitionPath(asset.status, reported.status);
-    const metadata = metadataDelta(asset, reported);
-    if ((path === null || path.length === 0) && metadata === null) {
+    const plan = planProviderReport(asset, reported);
+    if (isEmptyPlan(plan)) {
       return asset;
     }
 
     return transactions.run(async (tx: TransactionContext) => {
-      let current = await repositories.mediaAssets.lockById(
+      const locked = await repositories.mediaAssets.lockById(
         tx,
         owner.tenantId,
         asset.id,
       );
-      if (current === null) {
+      if (locked === null) {
         throw new MediaAssetNotFoundError();
       }
-      if (current.version !== asset.version) {
-        // Somebody else applied something meanwhile. Their view of the
-        // provider is as good as ours; the next poll starts from theirs.
+      if (locked.version !== asset.version) {
+        // Somebody else applied something meanwhile — a webhook, or another
+        // tab. Their view of the provider is as good as ours; the next poll
+        // starts from theirs.
         throw new MediaAssetConflictError();
       }
 
-      if (metadata !== null) {
-        const described = await repositories.mediaAssets.updateProviderMetadata(
-          tx,
-          {
-            tenantId: owner.tenantId,
-            mediaAssetId: asset.id,
-            expectedVersion: current.version,
-            metadata,
-          },
-        );
-        if (described === null) {
-          throw new MediaAssetConflictError();
-        }
-        current = described;
-      }
-
-      const applied: MediaStatus[] = [];
-      for (const next of path ?? []) {
-        const previous = current.status;
-        const moved = await repositories.mediaAssets.transitionStatus(tx, {
-          tenantId: owner.tenantId,
-          mediaAssetId: asset.id,
-          expectedVersion: current.version,
-          status: next,
-          ...(next === "READY" ? { readyAt: new Date().toISOString() } : {}),
-        });
-        if (moved === null) {
-          throw new MediaAssetConflictError();
-        }
-        current = moved;
-        applied.push(next);
-        await outbox.enqueue(
-          tx,
-          mediaAssetStatusChangedEvent(
-            { actor, organisationId, correlationId: command.correlationId },
-            current.version,
-            {
-              mediaAssetId: asset.id,
-              ownerType: asset.ownerType,
-              ownerId: asset.ownerId,
-              purpose: asset.purpose,
-              previousStatus: previous,
-              status: next,
-            },
-          ),
-        );
-      }
+      const { asset: current, applied } = await applyProviderReportPlan(
+        tx,
+        { repositories, outbox },
+        locked,
+        plan,
+        { actor, organisationId, correlationId: command.correlationId },
+      );
 
       await audit.record(tx, {
         ...auditActorFromContext(actor),
@@ -427,8 +341,8 @@ export function createSyncMediaAsset(dependencies: MediaServiceDependencies) {
           purpose: asset.purpose,
           previousStatus: asset.status,
           status: current.status,
-          appliedTransitions: applied,
-          metadataUpdated: metadata !== null,
+          appliedTransitions: [...applied],
+          metadataUpdated: plan.metadata !== null,
           ...(reported.providerErrorCode === undefined
             ? {}
             : { providerErrorCode: reported.providerErrorCode }),

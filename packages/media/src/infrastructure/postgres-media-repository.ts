@@ -161,6 +161,15 @@ export function createPostgresMediaAssetRepository(): MediaAssetRepository {
 
     findById,
 
+    findByProviderAssetId: async (executor, provider, providerAssetId) => {
+      // Served by media_assets_provider_asset_idx; unique per provider.
+      const rows = await executor`
+        ${select(executor)}
+         where m.provider = ${provider}
+           and m.provider_asset_id = ${providerAssetId}`;
+      return rows.length === 0 ? null : toAsset(rows[0]);
+    },
+
     lockById: async (tx, tenantId, mediaAssetId) => {
       const rows = await tx.sql`
         ${select(tx.sql)}

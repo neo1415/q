@@ -30,10 +30,11 @@ import {
  * reference or a transcript: those are integration and content material,
  * and an event is the wrong place for both.
  *
- * There is deliberately no `ready` event. Nothing in this packet can
- * truthfully make an asset READY, and an event no producer can emit is a
- * promise to consumers that the system cannot keep. `CQ-MEDIA-012` adds it
- * when verified provider webhooks can genuinely say so.
+ * There is deliberately no separate `ready` event. Reaching READY is one
+ * `media.asset.status_changed` step, produced by the founder's status poll
+ * (CQ-MEDIA-011) or a verified provider webhook (CQ-MEDIA-012) — whichever
+ * hears first — and never twice, because the lifecycle admits the step
+ * once.
  */
 
 export const MEDIA_EVENT_OWNER = "@capital-q/media" as const;
@@ -186,7 +187,8 @@ export const MEDIA_EVENTS: readonly EventDefinition[] = [
   MediaAssetModeratedEvent,
 ];
 
-type Context = {
+/** A person acted: their tenant, their organisation, their correlation. */
+export type EventContext = {
   readonly actor: ActorContext;
   readonly organisationId: string;
   readonly correlationId: CorrelationId;
@@ -205,7 +207,7 @@ export type SystemContext = {
 
 function envelope<TData>(
   definition: EventDefinition,
-  context: Context | SystemContext,
+  context: EventContext | SystemContext,
   aggregate: {
     readonly type: string;
     readonly id: string;
@@ -245,7 +247,7 @@ function envelope<TData>(
 }
 
 export function mediaAssetPlaybackPolicyChangedEvent(
-  context: Context,
+  context: EventContext,
   assetVersion: number,
   data: z.infer<typeof MediaAssetPlaybackPolicyChangedEvent.dataSchema>,
 ) {
@@ -258,7 +260,7 @@ export function mediaAssetPlaybackPolicyChangedEvent(
 }
 
 export function mediaAssetModeratedEvent(
-  context: Context | SystemContext,
+  context: EventContext | SystemContext,
   assetVersion: number,
   data: z.infer<typeof MediaAssetModeratedEvent.dataSchema>,
 ) {
@@ -271,7 +273,7 @@ export function mediaAssetModeratedEvent(
 }
 
 export function mediaAssetCreatedEvent(
-  context: Context,
+  context: EventContext,
   data: z.infer<typeof MediaAssetCreatedEvent.dataSchema>,
 ) {
   return envelope(
@@ -283,7 +285,7 @@ export function mediaAssetCreatedEvent(
 }
 
 export function mediaAssetReplacedEvent(
-  context: Context,
+  context: EventContext,
   data: z.infer<typeof MediaAssetReplacedEvent.dataSchema>,
 ) {
   return envelope(
@@ -295,7 +297,7 @@ export function mediaAssetReplacedEvent(
 }
 
 export function mediaAssetStatusChangedEvent(
-  context: Context,
+  context: EventContext | SystemContext,
   assetVersion: number,
   data: z.infer<typeof MediaAssetStatusChangedEvent.dataSchema>,
 ) {
@@ -308,7 +310,7 @@ export function mediaAssetStatusChangedEvent(
 }
 
 export function mediaAssetDeletedEvent(
-  context: Context,
+  context: EventContext,
   assetVersion: number,
   data: z.infer<typeof MediaAssetDeletedEvent.dataSchema>,
 ) {

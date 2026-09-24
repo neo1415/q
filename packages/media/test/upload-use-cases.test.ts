@@ -122,6 +122,14 @@ function memoryRepository(initial: MediaAsset) {
   const mediaAssets: MediaAssetRepository = {
     insert: () => Promise.reject(new Error("not under test")),
     findById: (_executor, tenantId, id) => find(tenantId, id),
+    findByProviderAssetId: (_executor, provider, providerAssetId) =>
+      Promise.resolve(
+        row !== null &&
+          row.provider === provider &&
+          row.providerAssetId === providerAssetId
+          ? row
+          : null,
+      ),
     lockById: (_tx, tenantId, id) => find(tenantId, id),
     findCurrentForOwner: () => Promise.resolve(row),
     lockCurrentForOwner: () => Promise.resolve(row),
@@ -672,5 +680,200 @@ describe("authorisePlayback", () => {
     expect((failure as MediaProviderNotConfiguredError).missing).toEqual([
       "CLOUDFLARE_STREAM_CUSTOMER_SUBDOMAIN",
     ]);
+  });
+});
+
+describe("applyProviderStatusReport (verified webhook, CQ-MEDIA-012)", () => {
+  const pending = () =>
+    asset({
+      status: "UPLOAD_PENDING",
+      provider: "CLOUDFLARE_STREAM",
+      providerAssetId: UID,
+    });
+  const readyReport: VideoAssetStatus = {
+    providerAssetId: UID,
+    status: "READY",
+    durationSeconds: 87,
+    width: 1080,
+    height: 1920,
+    thumbnailReference: `${UID}/thumbnails/thumbnail.jpg`,
+  };
+  const deliver = (
+    h: ReturnType<typeof harness>,
+    report: VideoAssetStatus,
+    mediaAssetId?: MediaAsset["id"],
+  ) =>
+    h.service.applyProviderStatusReport({
+      provider: "CLOUDFLARE_STREAM",
+      report,
+      ...(mediaAssetId === undefined ? {} : { mediaAssetId }),
+      correlationId: CORRELATION,
+    });
+
+  it("walks the lifecycle to READY with metadata, as the platform, one event per step", async () => {
+    const h = harness({ asset: pending() });
+    const outcome = await deliver(h, readyReport, ASSET_ID);
+    expect(outcome).toEqual({
+      kind: "APPLIED",
+      mediaAssetId: ASSET_ID,
+      status: "READY",
+      appliedTransitions: ["UPLOADING", "PROCESSING", "READY"],
+      metadataUpdated: true,
+    });
+    expect(h.repository.current()).toMatchObject({
+      status: "READY",
+      durationSeconds: 87,
+      aspectRatio: "9:16",
+      thumbnailReference: `${UID}/thumbnails/thumbnail.jpg`,
+    });
+    expect(h.repository.current()?.readyAt).not.toBeNull();
+    expect(statusEvents(h.events)).toEqual([
+      "UPLOAD_PENDING->UPLOADING",
+      "UPLOADING->PROCESSING",
+      "PROCESSING->READY",
+    ]);
+    // Attributed to the platform, never to a person; no provider identifier.
+    for (const event of h.events as { actor: unknown; tenantId: string }[]) {
+      expect(event.actor).toEqual({ type: "SYSTEM" });
+      expect(event.tenantId).toBe(TENANT_A);
+    }
+    expect(JSON.stringify(h.events)).not.toContain(UID);
+    expect(h.audits).toHaveLength(1);
+    expect(h.audits[0]).toMatchObject({
+      actorType: "SYSTEM",
+      tenantId: TENANT_A,
+      actionType: "media.asset.provider_status_applied",
+    });
+  });
+
+  it("is idempotent: a duplicate READY changes nothing and emits nothing", async () => {
+    const h = harness({ asset: pending() });
+    await deliver(h, readyReport);
+    const settled = h.repository.current();
+    const events = h.events.length;
+    const audits = h.audits.length;
+    const again = await deliver(h, readyReport);
+    expect(again).toEqual({
+      kind: "UNCHANGED",
+      mediaAssetId: ASSET_ID,
+      status: "READY",
+      stale: false,
+    });
+    expect(h.repository.current()).toEqual(settled);
+    expect(h.events).toHaveLength(events);
+    expect(h.audits).toHaveLength(audits);
+  });
+
+  it("never regresses: a PROCESSING delivered after READY is refused whole, metadata too", async () => {
+    const h = harness({ asset: pending() });
+    await deliver(h, readyReport);
+    const settled = h.repository.current();
+    const events = h.events.length;
+    const late = await deliver(h, {
+      providerAssetId: UID,
+      status: "PROCESSING",
+      durationSeconds: 12,
+    });
+    expect(late).toMatchObject({ kind: "UNCHANGED", stale: true });
+    expect(h.repository.current()).toEqual(settled);
+    expect(h.events).toHaveLength(events);
+  });
+
+  it("does not record a failure for an asset that is already READY", async () => {
+    const h = harness({ asset: pending() });
+    await deliver(h, readyReport);
+    const events = h.events.length;
+    const outcome = await deliver(h, {
+      providerAssetId: UID,
+      status: "PROCESSING_FAILED",
+      providerErrorCode: "ERR_MALFORMED_VIDEO",
+    });
+    expect(outcome).toMatchObject({ kind: "UNCHANGED", status: "READY" });
+    expect(h.repository.current()?.status).toBe("READY");
+    expect(h.events).toHaveLength(events);
+  });
+
+  it("records a terminal failure once, however often it is delivered", async () => {
+    const h = harness({
+      asset: asset({
+        status: "PROCESSING",
+        provider: "CLOUDFLARE_STREAM",
+        providerAssetId: UID,
+      }),
+    });
+    const failure: VideoAssetStatus = {
+      providerAssetId: UID,
+      status: "PROCESSING_FAILED",
+      providerErrorCode: "ERR_NON_VIDEO",
+    };
+    expect(await deliver(h, failure)).toMatchObject({
+      kind: "APPLIED",
+      status: "PROCESSING_FAILED",
+    });
+    expect(await deliver(h, failure)).toMatchObject({ kind: "UNCHANGED" });
+    expect(statusEvents(h.events)).toEqual(["PROCESSING->PROCESSING_FAILED"]);
+    expect(h.audits).toHaveLength(1);
+    // The vendor's code is diagnostics: in the audit row, never in an event.
+    expect(JSON.stringify(h.audits)).toContain("ERR_NON_VIDEO");
+    expect(JSON.stringify(h.events)).not.toContain("ERR_NON_VIDEO");
+  });
+
+  it("treats an unknown provider identifier as nothing of ours", async () => {
+    const h = harness({ asset: pending() });
+    expect(
+      await deliver(h, { ...readyReport, providerAssetId: "someoneelsesuid" }),
+    ).toEqual({ kind: "UNKNOWN_ASSET" });
+    expect(h.repository.current()?.status).toBe("UPLOAD_PENDING");
+    expect(h.events).toHaveLength(0);
+  });
+
+  it("refuses a report whose own reference names a different asset", async () => {
+    const h = harness({ asset: pending() });
+    const other = MediaAssetIdSchema.parse(
+      "f0000000-0000-4000-8000-000000000999",
+    );
+    expect(await deliver(h, readyReport, other)).toEqual({
+      kind: "REFERENCE_MISMATCH",
+      mediaAssetId: ASSET_ID,
+    });
+    expect(h.repository.current()?.status).toBe("UPLOAD_PENDING");
+    expect(h.events).toHaveLength(0);
+  });
+
+  it("never touches a DELETED asset and never reports one into deletion", async () => {
+    const deleted = harness({
+      asset: asset({
+        status: "DELETED",
+        provider: "CLOUDFLARE_STREAM",
+        providerAssetId: UID,
+        deletedAt: "2026-09-23T10:00:00.000Z",
+      }),
+    });
+    expect(await deliver(deleted, readyReport)).toMatchObject({
+      kind: "UNCHANGED",
+      stale: true,
+    });
+    const live = harness({ asset: pending() });
+    expect(
+      await deliver(live, { providerAssetId: UID, status: "DELETED" }),
+    ).toMatchObject({ kind: "UNCHANGED", stale: true });
+    expect(live.repository.current()?.status).toBe("UPLOAD_PENDING");
+    expect(deleted.events).toHaveLength(0);
+    expect(live.events).toHaveLength(0);
+  });
+
+  it("leaves the founder's poll nothing to do once a webhook has applied READY", async () => {
+    const { provider } = scriptedProvider({ status: readyReport });
+    const h = harness({ asset: pending(), provider });
+    await deliver(h, readyReport);
+    const events = h.events.length;
+    const synced = await h.service.syncMediaAsset({
+      actor: founder,
+      companyId: COMPANY,
+      mediaAssetId: ASSET_ID,
+      correlationId: CORRELATION,
+    });
+    expect(synced.status).toBe("READY");
+    expect(h.events).toHaveLength(events);
   });
 });

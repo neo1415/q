@@ -28,6 +28,7 @@ import {
   registerMediaRoutes,
   type MediaRoutesDependencies,
 } from "./http/media.js";
+import { registerMediaWebhookRoutes } from "./http/media-webhooks.js";
 import {
   registerRecommendationInteractionRoutes,
   type RecommendationInteractionRoutesDependencies,
@@ -315,6 +316,15 @@ export function createApp(
       authenticator: security.authenticator,
       resolver: security.resolver,
       media: modules.media,
+    });
+    // Provider deliveries (CQ-MEDIA-012). Registered with the Media module
+    // because they act on its records; authenticated by signature, not by
+    // a person. Without a signing secret the route answers 503 — a closed
+    // door, never an open one.
+    registerMediaWebhookRoutes(app, {
+      media: modules.media,
+      cloudflareStreamWebhookSecret:
+        config.secrets.videoProviders.cloudflareStreamWebhookSecret?.reveal(),
     });
   }
 

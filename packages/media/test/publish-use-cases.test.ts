@@ -111,6 +111,7 @@ function harness(options: {
   const mediaAssets: MediaAssetRepository = {
     insert: notUnderTest,
     findById: (_e, tenantId, id) => find(tenantId, id),
+    findByProviderAssetId: () => Promise.reject(new Error("not under test")),
     lockById: (_tx, tenantId, id) => find(tenantId, id),
     findCurrentForOwner: () => Promise.resolve(row),
     lockCurrentForOwner: () => Promise.resolve(row),
