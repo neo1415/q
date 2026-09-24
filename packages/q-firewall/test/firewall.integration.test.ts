@@ -503,6 +503,79 @@ describe("@capital-q/q-firewall against local PostgreSQL", () => {
     });
   });
 
+  it("CQ-QX-007 fit: an investor asking about a company with their own firm alongside gets their own mandate and still nothing founder-private", async () => {
+    await withWorld(async (world) => {
+      await makeNetworkVisible(world);
+      const decision = await world.firewall.plan(
+        ask(world.apexAdmin, "ANSWER", [
+          company(world.companyAlpha),
+          investor(world.investorApex),
+        ]),
+      );
+      expect(decision.outcome).toBe("AUTHORISED");
+      if (decision.outcome !== "AUTHORISED") {
+        return;
+      }
+      // Their own firm is context: the question is still about a company
+      // they do not own, under the counterparty rules.
+      expect(decision.plan.purpose.taskClass).toBe(
+        "COUNTERPARTY_COMPANY_QUESTION",
+      );
+      const mandate = decision.plan.scopes.find(
+        (s) => s.kind === "INVESTOR_MANDATE",
+      );
+      expect(mandate?.subject).toEqual(investor(world.investorApex));
+      expect(mandate?.contextLabel).toBe("investor_private");
+      const kinds = decision.plan.scopes.map((s) => s.kind);
+      expect(kinds).toContain("COMPANY_PROFILE");
+      expect(kinds).not.toContain("COMPANY_PRIVATE_FINANCIALS");
+      expect(kinds).not.toContain("EVIDENCE_DOCUMENTS");
+      expect(kinds).not.toContain("COMPANY_CAPITAL_OBJECTIVE");
+      expect(
+        decision.plan.scopes.find((s) => s.kind === "COMPANY_PROFILE")
+          ?.contextLabel,
+      ).toBe("network_visible");
+      assertNoMarkers(JSON.stringify(decision));
+      assertNoMarkers(world.logLines.join("\n"));
+    });
+  });
+
+  it("CQ-QX-007 fit: a founder who names an investor beside their own company never receives that investor's mandate", async () => {
+    await withWorld(async (world) => {
+      await world.permissions.policies.grant({
+        actor: world.apexAdmin,
+        resource: { type: "investor_organisation", id: world.investorApex },
+        scopeType: "specifically_shared",
+        recipient: { type: "ORGANISATION", id: world.orgAlpha },
+        accessLevel: "view",
+        correlationId: CORRELATION(),
+      });
+      const decision = await world.firewall.plan(
+        ask(world.founderAlpha, "ANSWER", [
+          company(world.companyAlpha),
+          investor(world.investorApex),
+        ]),
+      );
+      // Somebody else's firm is a subject of the question, not context.
+      expect(decision.outcome).toBe("AUTHORISED");
+      if (decision.outcome === "AUTHORISED") {
+        expect(decision.plan.purpose.taskClass).toBe("INVESTOR_QUESTION");
+        expect(decision.plan.scopes.map((s) => s.kind)).not.toContain(
+          "INVESTOR_MANDATE",
+        );
+        expect(decision.plan.denied).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({
+              kind: "INVESTOR_MANDATE",
+              reason: "OWNER_ONLY",
+            }),
+          ]),
+        );
+      }
+      assertNoMarkers(JSON.stringify(decision));
+    });
+  });
+
   it("GOLDEN own public presence: the owner may read it and a counterparty never can", async () => {
     await withWorld(async (world) => {
       await makeNetworkVisible(world);

@@ -154,6 +154,56 @@ describe("purpose policy", () => {
     );
   });
 
+  it("keeps a question about a company a company question when the actor's own investor organisation rides along (CQ-QX-007)", () => {
+    // An investor asking from a company page: their own firm is context.
+    expect(
+      deriveTaskClass("ANSWER", [
+        { kind: "COMPANY", relation: "NETWORK" },
+        { kind: "INVESTOR_ORGANISATION", relation: "OWNER" },
+      ]),
+    ).toBe("COUNTERPARTY_COMPANY_QUESTION");
+    expect(
+      deriveTaskClass("INVESTIGATE", [
+        { kind: "INVESTOR_ORGANISATION", relation: "OWNER" },
+        { kind: "COMPANY", relation: "COUNTERPARTY" },
+      ]),
+    ).toBe("COUNTERPARTY_COMPANY_QUESTION");
+    // Only the actor's OWN organisation is set aside: somebody else's
+    // investor organisation beside a company is still an investor question.
+    expect(
+      deriveTaskClass("ANSWER", [
+        { kind: "COMPANY", relation: "NETWORK" },
+        { kind: "INVESTOR_ORGANISATION", relation: "NETWORK" },
+      ]),
+    ).toBe("INVESTOR_QUESTION");
+    // Their own firm on its own is still a question about their firm.
+    expect(
+      deriveTaskClass("ANSWER", [
+        { kind: "INVESTOR_ORGANISATION", relation: "OWNER" },
+      ]),
+    ).toBe("INVESTOR_QUESTION");
+    // A founder asking about an investor never becomes a company question.
+    expect(
+      deriveTaskClass("ANSWER", [
+        { kind: "INVESTOR_ORGANISATION", relation: "NETWORK" },
+      ]),
+    ).toBe("INVESTOR_QUESTION");
+    // Relationships and comparisons keep their own classes.
+    expect(
+      deriveTaskClass("ANSWER", [
+        { kind: "COMPANY", relation: "NETWORK" },
+        { kind: "INVESTOR_ORGANISATION", relation: "OWNER" },
+        { kind: "RELATIONSHIP", relation: "COUNTERPARTY" },
+      ]),
+    ).toBe("RELATIONSHIP_QUESTION");
+    expect(
+      deriveTaskClass("COMPARE", [
+        { kind: "COMPANY", relation: "NETWORK" },
+        { kind: "INVESTOR_ORGANISATION", relation: "OWNER" },
+      ]),
+    ).toBe("COMPARISON");
+  });
+
   it("lets a person reach what Capital Q understands of their own public footprint", () => {
     // The presence build researches a person, drops every page that does
     // not name them, and writes through the Write Gate. Without a scope

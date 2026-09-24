@@ -42,6 +42,7 @@ import { createPostgresDocumentQueryPort } from "@capital-q/evidence";
 import {
   createPostgresInvestorMandateQueryPort,
   createPostgresInvestorOrganisationQueryPort,
+  createPostgresInvestorOrganisationRepository,
 } from "@capital-q/investors";
 import {
   createPostgresRelationshipEventRepository,
@@ -324,12 +325,24 @@ const firewall = createContextFirewall({
 });
 
 const repositories = createPostgresQRuntimeRepositories();
+const ownInvestorOrganisations = createPostgresInvestorOrganisationRepository();
 const runtimeDependencies = {
   sql: database.sql,
   transactions: database.transactions,
   subjects,
   securityEvents: createPostgresSecurityEventWriter({ sql: database.sql }),
   logger,
+  // An investor asking about a company carries their own firm as context,
+  // resolved from their membership on the server (CQ-QX-007).
+  ownInvestorOrganisation: async (actor: ActorContext) => {
+    if (actor.organisationId === undefined) return null;
+    const found = await ownInvestorOrganisations.findByOrganisation(
+      database.sql,
+      actor.tenantId,
+      actor.organisationId,
+    );
+    return found === null ? null : found.id;
+  },
 };
 const qRuntime = createQRuntimeService({
   ...runtimeDependencies,

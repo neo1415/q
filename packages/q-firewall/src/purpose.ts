@@ -42,9 +42,34 @@ export function deriveTaskClass(
   if (capability === "COMPARE") {
     return "COMPARISON";
   }
-  const entity = subjects.filter(
+  const all = subjects.filter(
     (subject) => subject.kind !== "USER" && subject.kind !== "ORGANISATION",
   );
+  /**
+   * The actor's OWN investor organisation, carried beside a company they
+   * are asking about, is context — their declared mandate — not what the
+   * question is about (CQ-QX-007). It must not turn "is this company worth
+   * my time?" into an investor question: the company stays on the side of
+   * the firewall its relation puts it, and the counterparty rules keep
+   * applying to it. The own organisation's scopes are still evaluated on
+   * their own merits (owner rights), so this changes the class and
+   * nothing about what either subject may reach.
+   */
+  const companyShaped = all.some(
+    (subject) =>
+      subject.kind === "COMPANY" ||
+      subject.kind === "CAPITAL_OBJECTIVE" ||
+      subject.kind === "DOCUMENT",
+  );
+  const entity = companyShaped
+    ? all.filter(
+        (subject) =>
+          !(
+            subject.kind === "INVESTOR_ORGANISATION" &&
+            subject.relation === "OWNER"
+          ),
+      )
+    : all;
   if (entity.length === 0) {
     return "GENERAL_QUESTION";
   }

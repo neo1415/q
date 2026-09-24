@@ -186,6 +186,11 @@ export function createGetInvestorMandateTool(
       "INVESTOR_QUESTION",
       "RELATIONSHIP_QUESTION",
       "COMPARISON",
+      // An investor asking about a company carries their own organisation
+      // as context (CQ-QX-007). The purpose only makes the tool eligible;
+      // `authorize` still requires the plan's INVESTOR_MANDATE scope for
+      // that organisation, which the firewall grants to its owner alone.
+      "COUNTERPARTY_COMPANY_QUESTION",
     ],
     requiredScopeKinds: ["INVESTOR_MANDATE"],
     approval: "NONE",
