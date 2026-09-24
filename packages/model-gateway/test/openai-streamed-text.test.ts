@@ -1,4 +1,3 @@
-import type OpenAI from "openai";
 import { describe, expect, it } from "vitest";
 
 import { createOpenAIModelProvider } from "../src/providers/openai.js";
@@ -32,7 +31,12 @@ const completed = {
   },
 };
 
-function streamingClient(): OpenAI {
+/** The adapter's own test seam, typed from the adapter, never from the SDK. */
+type AdapterClient = NonNullable<
+  Parameters<typeof createOpenAIModelProvider>[0]["client"]
+>;
+
+function streamingClient(): AdapterClient {
   return {
     responses: {
       create: () =>
@@ -45,7 +49,7 @@ function streamingClient(): OpenAI {
           })(),
         ),
     },
-  } as unknown as OpenAI;
+  } as unknown as AdapterClient;
 }
 
 describe("the OpenAI adapter's streamed text", () => {
