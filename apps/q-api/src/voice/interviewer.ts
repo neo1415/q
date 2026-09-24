@@ -2124,6 +2124,11 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
         dispatch({ type: "RESEARCH_FINISHED" });
         dispatch({ type: "QUESTION_ANSWERED" });
       }
+      // Independent of the view and authorised by the same attribution, so
+      // it is read while the view is fetched rather than after it (CQ-VOICE-010:
+      // a spoken turn waits on every sequential read before Q can speak).
+      // Never rejects: a failed recall is an empty memory.
+      const memory = recallMemory(input.attribution);
       let view = await getOnboardingSession(
         input.session,
         input.onboardingSessionId,
@@ -2286,7 +2291,7 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
         ].slice(0, 6),
         recentTurns: recentWithinBudget(input.recentTurns),
         utterance: input.utterance.slice(0, 2_000),
-        memory: await recallMemory(input.attribution),
+        memory: await memory,
       };
       const rendered = renderPrompt<InterviewConductorV8Variables>(registry, {
         task: "INTERVIEW_CONDUCTOR",
