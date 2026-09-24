@@ -18,8 +18,14 @@ import {
   continueQRunAction,
   readQConversationAction,
   rejectQApprovalAction,
+  type QStartedRun,
 } from "./actions";
 import type { PendingTurn } from "./conversation";
+import {
+  forgetPendingAsk,
+  readPendingAsk,
+  rememberPendingAsk,
+} from "./pending-ask";
 
 /**
  * One live Q conversation in the browser (CQ-C5-R1 §13-§16; ADR 0012).
@@ -127,6 +133,8 @@ export function useQConversation(
   /** Whether the open run has reached a terminal event. True when none is open. */
   const finished = useRef(true);
   const abort = useRef<AbortController | null>(null);
+  /** Recovers a question a reload interrupted (H1); set below, once `begin` exists. */
+  const recoverRef = useRef<() => void>(() => undefined);
   const onConversation = useRef(options.onConversation);
   useEffect(() => {
     onConversation.current = options.onConversation;
@@ -228,7 +236,14 @@ export function useQConversation(
         reset();
         conversationId.current = wanted;
         setConversationIdState(wanted);
-        if (wanted === null) return null;
+        if (wanted === null) {
+          // A surface that names no conversation may be a reload of one
+          // whose first question was still being accepted (H1, below).
+          // Asked from here, after the reset, so nothing clears it again,
+          // and only by the open that was not abandoned.
+          recoverRef.current();
+          return null;
+        }
         setLoading(true);
         return readQConversationAction(wanted);
       })
@@ -282,6 +297,32 @@ export function useQConversation(
     };
   }, [wanted, follow, reset]);
 
+  /** A run the Q API accepted: this surface is now in its conversation, following it. */
+  const begin = useCallback(
+    (started: QStartedRun) => {
+      // The finished run's turns become the conversation's history, and
+      // the reducer starts clean for the run about to begin.
+      setHistory((current) => [...current, ...runState.messages]);
+      setRunState(createQStreamState());
+      finished.current = false;
+      const named = started.conversationId ?? conversationId.current;
+      const isNew = named !== null && named !== conversationId.current;
+      conversationId.current = named;
+      setConversationIdState(named);
+      openRun.current = started.runId;
+      setRunId(started.runId);
+      if (isNew && named !== null) {
+        // The caller writes it to the URL; that change is ours, not a
+        // request to reopen.
+        opened.current = named;
+        onConversation.current?.(named);
+        announceConversationsChanged();
+      }
+      follow(started.runId);
+    },
+    [follow, runState.messages],
+  );
+
   const ask = useCallback(
     async (question: string) => {
       const text = question.trim();
@@ -315,6 +356,24 @@ export function useQConversation(
           return;
         }
 
+        // A question that starts a conversation is remembered for this
+        // tab until the conversation is named, so a reload in between
+        // reopens it (CQ-QX-007 H1; pending-ask.ts).
+        const idempotencyKey = crypto.randomUUID();
+        const startsConversation = conversationId.current === null;
+        if (startsConversation) {
+          rememberPendingAsk({
+            idempotencyKey,
+            text,
+            at: placeholder.at,
+            ...(options.companyId === undefined
+              ? {}
+              : { companyId: options.companyId }),
+            ...(options.investorOrganisationId === undefined
+              ? {}
+              : { investorOrganisationId: options.investorOrganisationId }),
+          });
+        }
         const started = await askQAction(
           text,
           conversationId.current ?? undefined,
@@ -323,45 +382,81 @@ export function useQConversation(
             : options.investorOrganisationId !== undefined
               ? { investorOrganisationId: options.investorOrganisationId }
               : undefined,
+          idempotencyKey,
         );
         if (!started.ok) {
+          forgetPendingAsk(idempotencyKey);
           drop();
           setNotice(started.message);
           return;
         }
-
-        // The finished run's turns become the conversation's history, and
-        // the reducer starts clean for the run about to begin.
-        setHistory((current) => [...current, ...runState.messages]);
-        setRunState(createQStreamState());
-        finished.current = false;
-        const named = started.value.conversationId ?? conversationId.current;
-        const isNew = named !== null && named !== conversationId.current;
-        conversationId.current = named;
-        setConversationIdState(named);
-        openRun.current = started.value.runId;
-        setRunId(started.value.runId);
-        if (isNew && named !== null) {
-          // The caller writes it to the URL; that change is ours, not a
-          // request to reopen.
-          opened.current = named;
-          onConversation.current?.(named);
-          announceConversationsChanged();
-        }
-        follow(started.value.runId);
+        begin(started.value);
+        forgetPendingAsk(idempotencyKey);
       } finally {
         setSubmitting(false);
       }
     },
     [
-      follow,
+      begin,
       options.companyId,
       options.investorOrganisationId,
-      runState.messages,
       streaming,
       submitting,
     ],
   );
+
+  /**
+   * A reload while the question that started this conversation was still
+   * being accepted (CQ-QX-007 H1). The same question is asked again under
+   * the same key: the Q API hands back the run it already created — or
+   * creates it, if the first request never arrived — and the page is in
+   * that conversation, following that run, as if it had never reloaded.
+   * Only on a surface that names no conversation and is about the same
+   * subject the question was asked about.
+   */
+  useEffect(() => {
+    recoverRef.current = () => {
+      const remembered = readPendingAsk();
+      if (
+        remembered === null ||
+        remembered.companyId !== options.companyId ||
+        remembered.investorOrganisationId !== options.investorOrganisationId
+      ) {
+        return;
+      }
+      const placeholder: PendingTurn = {
+        id: crypto.randomUUID(),
+        text: remembered.text,
+        at: remembered.at,
+      };
+      setPending((current) => [...current, placeholder]);
+      setSubmitting(true);
+      void askQAction(
+        remembered.text,
+        undefined,
+        remembered.companyId !== undefined
+          ? { companyId: remembered.companyId }
+          : remembered.investorOrganisationId !== undefined
+            ? { investorOrganisationId: remembered.investorOrganisationId }
+            : undefined,
+        remembered.idempotencyKey,
+      )
+        .then((started) => {
+          forgetPendingAsk(remembered.idempotencyKey);
+          if (!started.ok) {
+            setPending((current) =>
+              current.filter((turn) => turn.id !== placeholder.id),
+            );
+            setNotice(started.message);
+            return;
+          }
+          begin(started.value);
+        })
+        .finally(() => {
+          setSubmitting(false);
+        });
+    };
+  }, [begin, options.companyId, options.investorOrganisationId]);
 
   const stop = useCallback(async () => {
     const open = openRun.current;

@@ -190,6 +190,13 @@ export async function askQAction(
   rawQuestion: string,
   rawConversationId?: string,
   rawSubject?: QSubjectInput | string,
+  /**
+   * The browser's key for this question (CQ-QX-007 H1), so the same
+   * question asked again after a reload is the same run, not a second
+   * one. Input, never proof: the Q API scopes a key to the authenticated
+   * person and refuses one reused for a different request.
+   */
+  rawIdempotencyKey?: string,
 ): Promise<QActionResult<QStartedRun>> {
   const parsed = QuestionSchema.safeParse(rawQuestion);
   if (!parsed.success) {
@@ -221,8 +228,16 @@ export async function askQAction(
             },
           ];
 
+  const idempotencyKey =
+    rawIdempotencyKey === undefined
+      ? undefined
+      : RunIdSchema.safeParse(rawIdempotencyKey).data;
+
   return run(async (session) => {
-    const start = (inConversation: typeof conversationId) =>
+    const start = (
+      inConversation: typeof conversationId,
+      key: string = idempotencyKey ?? crypto.randomUUID(),
+    ) =>
       createQRun(
         session,
         {
@@ -234,7 +249,7 @@ export async function askQAction(
             ? {}
             : { conversationId: inConversation }),
         },
-        crypto.randomUUID(),
+        key,
       );
     /**
      * A conversation that is no longer this person's to continue in their
@@ -255,7 +270,7 @@ export async function askQAction(
         error instanceof ApiProblemError &&
         error.status === 404
       ) {
-        return start(undefined);
+        return start(undefined, crypto.randomUUID());
       }
       throw error;
     });
