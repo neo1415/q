@@ -50,4 +50,31 @@ describe("figures, spoken", () => {
       "Target: 200 million naira.",
     );
   });
+
+  // CQ-VOICE-010 case 08: the upper bound was left as "3m", and voices said
+  // it as "three annum" (turbo) and "three meters" (Aura-2).
+  it("says a money range as one range in one currency", () => {
+    expect(spokenFigures("cheques of USD 250k–3m.")).toBe(
+      "cheques of 250 thousand to 3 million dollars.",
+    );
+    expect(spokenFigures("between $250k-$3m, then")).toBe(
+      "between 250 thousand to 3 million dollars, then",
+    );
+    expect(spokenFigures("raise 250k–3m USD now")).toBe(
+      "raise 250 thousand to 3 million dollars now",
+    );
+    expect(spokenFigures("₦50m–₦200m")).toBe("50 million to 200 million naira");
+  });
+
+  it("gives a bare lower bound the upper bound's scale, as a person means it", () => {
+    expect(spokenFigures("USD 2–3m")).toBe("2 million to 3 million dollars");
+  });
+
+  it("leaves ranges that are not money, and money followed by 'to' something else, alone", () => {
+    expect(spokenFigures("in 2020-2021 we")).toBe("in 2020-2021 we");
+    expect(spokenFigures("14–16 March")).toBe("14–16 March");
+    expect(spokenFigures("USD 5m to 10 founders")).toBe(
+      "5 million dollars to 10 founders",
+    );
+  });
 });
