@@ -338,6 +338,31 @@ export type CompanyAnalystV6Result = z.infer<
 >;
 export const COMPANY_ANALYST_V6_SCHEMA_VERSION = 6;
 
+/**
+ * v6's result plus the sentences in which the model talks about acting
+ * (CQ-QX-007).
+ *
+ * Q never acts in its prose: Capital Q says what was prepared, applied or
+ * refused, from the action it actually created. Models still wrote "I have
+ * prepared the update" and "this is ready for your approval" beside that
+ * line — sometimes about a proposal that did not exist. Which sentences
+ * are about acting is meaning, so the model reads it into this closed
+ * field (ADR 0011); the runtime removes those sentences, verbatim, from
+ * what the person reads. The field is never shown.
+ *
+ * Numbered 8 with the prompt version that introduced it; the schema
+ * versions before it were numbered by the prompt that first carried them.
+ */
+export const CompanyAnalystV8ResultSchema = CompanyAnalystV6ResultSchema.extend(
+  {
+    actionTalk: z.array(ModelStatementSchema).max(6).default([]),
+  },
+).strict();
+export type CompanyAnalystV8Result = z.infer<
+  typeof CompanyAnalystV8ResultSchema
+>;
+export const COMPANY_ANALYST_V8_SCHEMA_VERSION = 8;
+
 export const NOTHING_REMEMBERED =
   "Nothing is remembered about this person yet.";
 

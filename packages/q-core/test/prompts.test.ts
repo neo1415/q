@@ -197,7 +197,7 @@ describe("renderer", () => {
     expect(rendered.messages[0]?.content).toContain("You are Q");
     expect(rendered.messages[0]?.content).toContain("OPERATING MODE: DEBRIEF");
     expect(rendered.bundle.bundleVersion).toBe(
-      "q-system.v1_company-analyst.v7_comm.v1",
+      "q-system.v1_company-analyst.v8_comm.v1",
     );
     expect(rendered.bundle.bundleVersion).toMatch(
       /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/,
@@ -280,7 +280,7 @@ describe("renderer", () => {
     ]);
   });
 
-  it("keeps rendered prompts small: charter under 2,000 tokens, task bundles under 3,300", () => {
+  it("keeps rendered prompts small: charter under 2,000 tokens, task bundles under 3,500", () => {
     const rendered = render();
     const system = rendered.messages[0]?.content.length ?? 0;
     expect(system / 4).toBeLessThan(2_000);
@@ -288,7 +288,12 @@ describe("renderer", () => {
     // ~180 tokens of instruction on top of a bundle that was at the old
     // bound already. Anything past this is a template that has grown, not
     // a variable that has.
-    expect(rendered.characters / 4).toBeLessThan(3_300);
+    // 3,500 since company-analyst/v8 (CQ-QX-007): about 140 tokens that
+    // separate talk about acting from the answer, carry a person's
+    // correction forward and answer fit from their own mandate. The 8k
+    // provider window that set the old margin is no longer on any route
+    // this task is sent to.
+    expect(rendered.characters / 4).toBeLessThan(3_500);
   });
 });
 
