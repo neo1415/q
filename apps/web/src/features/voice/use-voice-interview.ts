@@ -71,6 +71,15 @@ const TURN_POLL_MS = 1_500;
  * talking with one blip in it is not two blips away from giving up.
  */
 const RECONNECT_DELAYS_MS = [1_200, 3_000, 8_000] as const;
+/**
+ * How long a line has to hold before a drop counts as a fresh blip.
+ *
+ * Not "the server issued a session": issuance succeeds even when the
+ * provider fails on its first word, and resetting there retried such a
+ * line forever — a new session, and a model call for its greeting, every
+ * few seconds (seen live, 2026-09-24).
+ */
+const STABLE_LINE_MS = 20_000;
 const GAVE_UP =
   "I couldn't get the line back. You can keep typing, or start voice again when you're ready.";
 
@@ -90,6 +99,8 @@ export function useVoiceInterview(
   // A session that drops on its own comes back on the same thread before
   // the person has to do anything.
   const reconnectAttempts = useRef(0);
+  /** When the current line came up; null while there is none. */
+  const upSince = useRef<number | null>(null);
   const talkRef = useRef<VoiceInterview["talk"] | null>(null);
   /**
    * One handler for a line ending, reachable from the transport's own
@@ -100,6 +111,13 @@ export function useVoiceInterview(
   const ended = (reason: "ended" | "dropped" | "error"): void => {
     const last = lastStart.current;
     const again = talkRef.current;
+    const heldFor = upSince.current === null ? 0 : Date.now() - upSince.current;
+    upSince.current = null;
+    if (heldFor >= STABLE_LINE_MS) {
+      // A line that worked for a while and then dropped gets the full
+      // three tries again.
+      reconnectAttempts.current = 0;
+    }
     if (reason === "ended" || last === null || again === null) {
       reconnectAttempts.current = 0;
       setActive(false);
@@ -168,9 +186,7 @@ export function useVoiceInterview(
       setVoiceSessionId(started.value.voiceSessionId);
       setTurn(null);
       setActive(true);
-      // A session that came up is a line that works; the next blip gets
-      // the full three tries again.
-      reconnectAttempts.current = 0;
+      upSince.current = Date.now();
       // Q composes its own opening from the interview's state; the caller's
       // line is only a fallback when the server had none to give.
       await client.start({
@@ -191,6 +207,7 @@ export function useVoiceInterview(
     setTurn(null);
     lastStart.current = null;
     reconnectAttempts.current = 0;
+    upSince.current = null;
     await client.end();
   }, [client]);
 

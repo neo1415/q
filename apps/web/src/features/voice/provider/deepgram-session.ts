@@ -350,24 +350,23 @@ export function useDeepgramVoiceSession(
         console.warn("voice agent error", message.code, message.description);
         fail(PLAIN_ERRORS.generic);
       });
-      session.on("disconnected", (reason) => {
-        const clean = /client|user|normal/i.test(reason);
-        if (!clean) {
-          fail(PLAIN_ERRORS.connection);
-          return;
-        }
+      session.on("disconnected", () => {
+        // Who closed the line, not how the close was worded. Every close
+        // this client asks for (end, fail, a replaced session) lets go of
+        // `live` first, so a session that is still `live` here was closed
+        // by the other side or gave up reconnecting. That is a dropped
+        // line even when its reason reads "normal": treating it as clean
+        // ended the stage with no word to the person, and nothing brought
+        // it back. Seen live on the welcome screen.
+        //
+        // A close this client asked for says nothing more: whoever closed
+        // it has already stopped the microphone and reported the ending.
+        // Reporting it again as "ended" is what used to reset the
+        // reconnect budget on every failed line, so a provider that
+        // failed on every greeting was retried without end.
         if (liveRef.current === live) {
-          liveRef.current = null;
+          fail(PLAIN_ERRORS.connection);
         }
-        try {
-          microphone.stop();
-          player.dispose();
-        } catch {
-          // Already gone.
-        }
-        setConnected(false);
-        setState("IDLE");
-        eventsRef.current.onEnded?.("ended");
       });
 
       try {
