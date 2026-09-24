@@ -13,7 +13,9 @@ import {
 import type {
   ActiveMandateLookup,
   EligibilityPorts,
+  MandateHardConstraint,
   MandateSnapshotForEligibility,
+  MandateTaxonomyRule,
 } from "../src/eligibility/ports.js";
 import {
   FEATURE_SCHEMA_VERSION,
@@ -253,7 +255,7 @@ function inputs(
           ? null
           : {
               sourceClass: "STRUCTURED_CANDIDATE_PROVENANCE",
-              generatorVersion: "structured-mandate.v3",
+              generatorVersion: "structured-mandate.v4",
               reasonCodes: ["STAGE_OVERLAP"],
             },
       semantic:
@@ -683,7 +685,7 @@ describe("feature computation (pure)", () => {
       eligibilityDecision: "ELIGIBLE" as const,
       candidateProvenance: {
         structured: {
-          generatorVersion: "structured-mandate.v3" as const,
+          generatorVersion: "structured-mandate.v4" as const,
           reasonCodes: ["STAGE_OVERLAP" as const],
         },
         semantic: null,
@@ -733,6 +735,56 @@ describe("feature computation (pure)", () => {
 // constraint; v1 scored a Nigerian company NO_MATCH against it.
 // ---------------------------------------------------------------------------
 
+describe("declared_fit.stage v2: the declared range is stage intent when no constraint names the stages (CQ-REC-STAGE-001)", () => {
+  const stage = (m: MandateSnapshotForEligibility, companyStage: string) =>
+    valueOf(
+      computeFeatureValues(ALL, inputs({ mandate: m, stage: companyStage }))
+        .values,
+      "declared_fit.stage",
+    );
+  const rangeOnly = mandate({
+    constraints: [],
+    stage: { minStageCode: "pre_seed", maxStageCode: "series_a" },
+  });
+
+  it("is registered at v2", () => {
+    expect(
+      RECOMMENDATION_FEATURES.find((x) => x.id === "declared_fit.stage")
+        ?.version,
+    ).toBe("v2");
+  });
+
+  it("a range-only mandate scores the stage inside it MATCH and outside it NO_MATCH, never NOT_APPLICABLE", () => {
+    expect(stage(rangeOnly, "seed")).toMatchObject({
+      featureVersion: "v2",
+      status: "PRESENT",
+      value: "MATCH",
+    });
+    expect(stage(rangeOnly, "series_b")).toMatchObject({
+      status: "PRESENT",
+      value: "NO_MATCH",
+    });
+  });
+
+  it("a stage constraint is the intent where one exists: the envelope adds no stage the investor did not choose", () => {
+    const chosen = mandate({
+      constraints: [
+        {
+          dimension: "stage",
+          operator: "IN",
+          value: { kind: "codes", values: ["pre_seed", "series_a"] },
+          importance: "MUST",
+          isHardExclusion: false,
+          automatedUse: "ELIGIBLE",
+        },
+      ],
+      stage: { minStageCode: "pre_seed", maxStageCode: "series_a" },
+    });
+    expect(stage(chosen, "seed")).toMatchObject({ value: "NO_MATCH" });
+    expect(stage(chosen, "series_a")).toMatchObject({ value: "MATCH" });
+  });
+});
+
 describe("declared_fit.geography v2: geography taxonomy nodes carry country intent", () => {
   const NIGERIA = "44444444-0000-4000-8000-000000000048";
   const GEO_HIERARCHY: FeatureInputs["hierarchy"] = {
@@ -760,7 +812,7 @@ describe("declared_fit.geography v2: geography taxonomy nodes carry country inte
     preferences: MandateSnapshotForEligibility["taxonomyPreferences"],
     constraints: MandateSnapshotForEligibility["constraints"] = [],
   ) => mandate({ constraints, taxonomyPreferences: preferences });
-  const positive = (nodeId: string) => ({
+  const positive = (nodeId: string): MandateTaxonomyRule => ({
     nodeId,
     vocabularyCode: "geography",
     preferenceStrength: "STRONG",
@@ -835,14 +887,14 @@ describe("declared_fit.geography v2: geography taxonomy nodes carry country inte
 
   it("a negative preference node never produces a match, even when the hierarchy carries it", () => {
     for (const negative of [
-      { ...positive(NIGERIA), preferenceStrength: "AVOID" },
+      { ...positive(NIGERIA), preferenceStrength: "AVOID" as const },
       {
         ...positive(NIGERIA),
-        preferenceStrength: "HARD_EXCLUSION",
+        preferenceStrength: "HARD_EXCLUSION" as const,
         isExclusion: true,
       },
-      { ...positive(WEST_AFRICA), preferenceStrength: "AVOID" },
-    ]) {
+      { ...positive(WEST_AFRICA), preferenceStrength: "AVOID" as const },
+    ] satisfies MandateTaxonomyRule[]) {
       expect(geography(geoMandate([negative]), "NG")).toMatchObject({
         status: "NOT_APPLICABLE",
         value: null,
@@ -874,7 +926,7 @@ describe("declared_fit.geography v2: geography taxonomy nodes carry country inte
   });
 
   it("an explicit geography.country constraint behaves exactly as before", () => {
-    const ng = {
+    const ng: MandateHardConstraint = {
       dimension: "geography.country",
       operator: "IN" as const,
       value: { kind: "codes" as const, values: ["NG"] },
@@ -1190,7 +1242,7 @@ const candidate = (
   structured: structured
     ? {
         generatorId: "STRUCTURED_MANDATE",
-        generatorVersion: "structured-mandate.v3",
+        generatorVersion: "structured-mandate.v4",
         matchedDimensions: ["STAGE"],
         reasonCodes: ["STAGE_OVERLAP"],
         matchedNodes: [],
@@ -1248,7 +1300,7 @@ describe("feature service", () => {
     const [both, semanticOnly, structuredOnly] = r.snapshots;
     expect(both?.candidateProvenance).toEqual({
       structured: {
-        generatorVersion: "structured-mandate.v3",
+        generatorVersion: "structured-mandate.v4",
         reasonCodes: ["STAGE_OVERLAP"],
       },
       semantic: {

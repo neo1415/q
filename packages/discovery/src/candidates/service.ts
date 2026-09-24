@@ -166,7 +166,7 @@ export function createStructuredCandidateService(
         ),
       );
 
-      // structured-mandate.v3: a positive geography node is country intent
+      // structured-mandate.v3+: a positive geography node is country intent
       // through its reference ISO code, exactly as a `geography.country`
       // constraint is. A named country retrieves as GEOGRAPHY_OVERLAP; the
       // countries below a named region as GEOGRAPHY_REGION_OVERLAP.

@@ -174,6 +174,30 @@ function toUsage(response: OpenAIResponse): ModelUsage | undefined {
   };
 }
 
+/**
+ * The text the model wrote, from the response's own output items.
+ *
+ * `output_text` is a convenience the SDK adds to a response it returns
+ * from a non-streaming call. The response carried by a stream's
+ * `response.completed` event does not have it, so a streamed answer read
+ * `undefined` as its text and structured-output acceptance threw on it:
+ * every streamed Q answer failed as INTERNAL_ERROR the first time OpenAI
+ * actually served (CQ-ACCEPT-001).
+ */
+export function textOf(response: OpenAIResponse): string {
+  const convenience: unknown = (response as { output_text?: unknown })
+    .output_text;
+  if (typeof convenience === "string") return convenience;
+  const parts: string[] = [];
+  for (const item of response.output) {
+    if (item.type !== "message") continue;
+    for (const content of item.content) {
+      if (content.type === "output_text") parts.push(content.text);
+    }
+  }
+  return parts.join("");
+}
+
 function finishOf(response: OpenAIResponse): ModelFinishStatus {
   if (response.status === "incomplete") {
     return response.incomplete_details?.reason === "max_output_tokens"
@@ -338,7 +362,7 @@ export function createOpenAIModelProvider(
             timeout: context.attemptTimeoutMs,
           });
           return {
-            text: response.output_text,
+            text: textOf(response),
             toolCalls: toToolCalls(response),
             usage: toUsage(response),
             finish: finishOf(response),
@@ -375,7 +399,7 @@ export function createOpenAIModelProvider(
           });
         }
         return {
-          text: completed.output_text,
+          text: textOf(completed),
           toolCalls: toToolCalls(completed),
           usage: toUsage(completed),
           finish: finishOf(completed),

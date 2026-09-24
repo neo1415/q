@@ -116,6 +116,7 @@ import {
 } from "@capital-q/model-gateway";
 import { createGoogleModelProvider } from "@capital-q/model-gateway/providers/google";
 import { createGroqModelProvider } from "@capital-q/model-gateway/providers/groq";
+import { createOpenAIModelProvider } from "@capital-q/model-gateway/providers/openai";
 import { budgetForTaskClass } from "@capital-q/model-gateway/q";
 import {
   createOnboardingService,
@@ -220,6 +221,15 @@ if (providerSecrets.groq !== undefined) {
         .slice(1)
         .map((key) => key.reveal()),
     }),
+  );
+}
+// The routing policies name gpt-5.6-luna first for every task class
+// (20261008130000). A provider the catalogue routes to but nobody
+// registered is PROVIDER_UNCONFIGURED on every call, so every request
+// silently fell to the Gemini fallbacks and failed with them.
+if (providerSecrets.openai !== undefined) {
+  modelProviders.push(
+    createOpenAIModelProvider({ apiKey: providerSecrets.openai.reveal() }),
   );
 }
 
