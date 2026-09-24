@@ -93,4 +93,94 @@ describe("how a requested document ended", () => {
       artifactType: "PITCH_DECK",
     });
   });
+
+  it("revises the document already in the conversation, however thin the record, and never creates one (CQ-QACT-001, F5)", async () => {
+    const ARTIFACT = "a1000000-0000-4000-8000-000000000001";
+    const calls = { prepare: 0, revise: [] as unknown[], rewrote: 0 };
+    const section = {
+      heading: "Traction",
+      body: "Monthly GMV reached USD 412,000 in August 2026, across three countries and 1,140 truckers.",
+      findings: [],
+    };
+    const artifacts: ArtifactPreparation = {
+      port: {
+        prepare: () => {
+          calls.prepare += 1;
+          return Promise.reject(new Error("a revision must not create"));
+        },
+        revise: (input) => {
+          calls.revise.push(input);
+          return Promise.resolve({
+            artifactId: ARTIFACT,
+            type: "PITCH_DECK",
+            status: "READY",
+            title: "Kivu Freight investor deck",
+            currentVersion: 2,
+          } as never);
+        },
+        currentVersion: (_actor, id) =>
+          Promise.resolve(
+            id === ARTIFACT
+              ? ({
+                  version: 1,
+                  title: "Kivu Freight investor deck",
+                  summary: "A deck",
+                  content: { sections: [section], gaps: [] },
+                } as never)
+              : null,
+          ),
+      },
+      reviser: {
+        revise: (input) => {
+          calls.rewrote += 1;
+          return Promise.resolve(input.base);
+        },
+      },
+    };
+    const outcome = await prepareOrReviseArtifact({
+      artifacts,
+      request: {
+        ...request,
+        actor: { tenantId: "t", userId: "u" },
+        plan: { maxSensitivity: "CONFIDENTIAL" },
+      } as unknown as QAnswerRequest,
+      company: {
+        kind: "COMPANY",
+        companyId: "c0000000-0000-4000-8000-000000000001",
+      },
+      companyName: "your company",
+      saidVerbatim: "make the traction slide shorter",
+      // Nothing on record but gaps: a fresh composition would be THIN_RECORD.
+      result: result({
+        artifactRequest: {
+          kind: "REVISE",
+          artifactType: "PITCH_DECK",
+          instruction: "make the traction slide shorter",
+          visualDirection: null,
+          quote: "make the traction slide shorter",
+        },
+      }),
+      history: [
+        {
+          blocks: [
+            {
+              kind: "ARTIFACT_REFERENCE",
+              artifactId: ARTIFACT,
+              type: "PITCH_DECK",
+              status: "READY",
+              title: "Kivu Freight investor deck",
+            },
+          ],
+        },
+      ],
+    });
+    expect(outcome.kind).toBe("PREPARED");
+    expect(calls.prepare).toBe(0);
+    expect(calls.rewrote).toBe(1);
+    expect(calls.revise).toHaveLength(1);
+    expect(calls.revise[0]).toMatchObject({
+      artifactId: ARTIFACT,
+      instruction: "make the traction slide shorter",
+    });
+  });
 });
