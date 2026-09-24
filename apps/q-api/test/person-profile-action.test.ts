@@ -117,7 +117,7 @@ describe("person.profile.update", () => {
         payload: { userId: USER, displayName: "John" },
         targets: [{ kind: "USER", userId: USER }],
       } as never,
-      { correlationId: "cor_test", attempt: 1 },
+      { approver: PERSON, correlationId: "cor_test", attempt: 1 },
     );
     expect(ok).toEqual({
       outcome: "EXECUTED",
@@ -131,7 +131,7 @@ describe("person.profile.update", () => {
         payload: { userId: OTHER, displayName: "John" },
         targets: [{ kind: "USER", userId: OTHER }],
       } as never,
-      { correlationId: "cor_test", attempt: 1 },
+      { approver: PERSON, correlationId: "cor_test", attempt: 1 },
     );
     expect(refused).toMatchObject({
       outcome: "FAILED",

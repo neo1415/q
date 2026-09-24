@@ -4,12 +4,23 @@ import {
   type QVoiceChoice,
 } from "@capital-q/contracts";
 
+import type { SpeechPerformanceBoard } from "../speech-performance.js";
 import {
   SpeechSynthesisError,
   type SpeechSynthesisPort,
   type SpeechSynthesisRequest,
   type SynthesisedSpeech,
 } from "../synthesis.js";
+import type { VoiceTurnTimings } from "../turn-timing.js";
+import type { DeepgramSpeakStream } from "./deepgram-speak.js";
+import {
+  AURA_MARKUP,
+  renderSpeech,
+  SPEECH_MARKUP,
+  withoutMarkup,
+  type ElevenLabsSpeechModel,
+  type SpeechMarkup,
+} from "./speech-markup.js";
 
 /**
  * ElevenLabs as the voice Q is heard in (QX-004 SPEAK rework).
@@ -31,6 +42,21 @@ import {
  * The agent is therefore given this server's origin and the session's own
  * secret — exactly what the think endpoint already carries — and the real
  * key never leaves this process.
+ *
+ * Which voice renders an utterance (CQ-VOICE-010):
+ *
+ *   1. `eleven_v3_conversational`: the voice chosen by listening. It is the
+ *      only one measured to laugh or sigh without reading the tag aloud.
+ *   2. `eleven_turbo_v2_5`, same voice, for that one utterance, when v3
+ *      errors or has not produced a byte of audio within
+ *      `FIRST_AUDIO_DEADLINE_MS`. Only what turbo can render goes with it:
+ *      pauses and pace. A reaction is dropped, never spoken as a word.
+ *   3. Deepgram Aura-2, pauses only, when ElevenLabs cannot voice the
+ *      utterance at all.
+ *
+ * The person hears one Q either way. The only thing a fallback can lose
+ * is a laugh. The turn's timing line records which engine served each
+ * utterance.
  */
 
 /**
@@ -48,13 +74,57 @@ const VOICE_IDS: Readonly<Record<QVoiceChoice, string>> = {
 const API_ORIGIN = "https://api.elevenlabs.io";
 
 /**
- * Turbo v2.5 for both surfaces. The Speech Engine resources were tuned to
- * `eleven_v3_conversational`, which is a Speech Engine feature and not a
- * plain text-to-speech model; on this path the choice is between latency
- * and expressiveness, and a conversation that answers late reads as
- * broken long before it reads as flat.
+ * v3 conversational, chosen by the person who listened to the comparison
+ * (design/voice-comparison, 2026-09-24). A deployment may still pin
+ * turbo with `Q_VOICE_TTS_MODEL`.
+ *
+ * v3 refuses `optimize_streaming_latency` with a 400, so that parameter is
+ * never sent to any model. Nothing here adds it, and the relay's allow-list
+ * passes through only the output format.
  */
-const MODEL_ID = "eleven_turbo_v2_5";
+const DEFAULT_MODEL: ElevenLabsSpeechModel = "eleven_v3_conversational";
+
+/** The same voice, faster and plainer, for an utterance v3 did not deliver. */
+const SAME_VENDOR_FALLBACK: ElevenLabsSpeechModel = "eleven_turbo_v2_5";
+
+/**
+ * How long v3 has to produce its first byte of audio before the utterance
+ * is handed to turbo instead.
+ *
+ * Measured from Lagos, which is further from ElevenLabs than Railway's EU
+ * region:
+ * - v3 TTFA p95 was 301 to 563 ms across eight sentence-length cases × 5
+ *   runs and three interleaved re-runs;
+ * - the slowest single request was 615 ms, a cold first call;
+ * - a 700-character block reached p95 737 ms.
+ *
+ * 1.2 s is about twice the worst sentence-length p95, so a healthy v3 is
+ * never cut off. It is also early enough that turbo's own ~300 ms still
+ * lands the first sound at about 1.5 s, which a person still hears as Q
+ * answering rather than Q failing.
+ */
+export const FIRST_AUDIO_DEADLINE_MS = 1_200;
+
+/**
+ * After ElevenLabs refuses our key, or fails several utterances running,
+ * its engines are skipped for this long and Aura-2 speaks. Paying two
+ * failing round trips on every sentence of an outage is its own outage.
+ */
+const ELEVENLABS_REST_MS = 60_000;
+const ELEVENLABS_FAILURES_BEFORE_REST = 3;
+
+/**
+ * The voice's own settings, restated when a request has to carry a speed.
+ * A request's `voice_settings` replaces the stored ones for that request,
+ * so a pace cue must not silently reset the rest. These are the values
+ * read from both voices on 2026-09-24.
+ */
+const VOICE_DEFAULTS = {
+  stability: 0.5,
+  similarity_boost: 0.75,
+  style: 0,
+  use_speaker_boost: true,
+} as const;
 
 /** A synthesis that has not answered by now is not going to help anybody. */
 const DEFAULT_TIMEOUT_MS = 10_000;
@@ -65,9 +135,23 @@ const ONE_WAY_OUTPUT_FORMAT = "mp3_44100_128";
 export type ElevenLabsSpeechOptions = {
   /** Revealed once at composition; never in a response, a log or a metric. */
   readonly apiKey: string;
+  /** Absent means v3 conversational. */
+  readonly model?: ElevenLabsSpeechModel | undefined;
   readonly fetch?: typeof fetch | undefined;
   readonly timeoutMs?: number | undefined;
   readonly maxBytes?: number | undefined;
+  /** Absent means `FIRST_AUDIO_DEADLINE_MS`. */
+  readonly firstAudioDeadlineMs?: number | undefined;
+};
+
+export type ElevenLabsSpeechRelayOptions = ElevenLabsSpeechOptions & {
+  /** Where the delivery cues for each session's sentences wait. */
+  readonly performance?: SpeechPerformanceBoard | undefined;
+  /** Where each turn's speech request and first audio byte are noted. */
+  readonly timings?: VoiceTurnTimings | undefined;
+  /** Aura-2, for an utterance ElevenLabs could not voice at all. */
+  readonly aura?: DeepgramSpeakStream | undefined;
+  readonly now?: (() => number) | undefined;
 };
 
 /**
@@ -89,12 +173,144 @@ function streamUrl(voice: QVoiceChoice, outputFormat: string): URL {
   return url;
 }
 
+/** The ElevenLabs models to try for one utterance, best first. */
+function modelsFor(model: ElevenLabsSpeechModel): ElevenLabsSpeechModel[] {
+  return model === SAME_VENDOR_FALLBACK
+    ? [model]
+    : [model, SAME_VENDOR_FALLBACK];
+}
+
+function elevenLabsRequest(
+  apiKey: string,
+  model: ElevenLabsSpeechModel,
+  text: string,
+  speed: number | undefined,
+  signal: AbortSignal,
+): RequestInit {
+  return {
+    method: "POST",
+    headers: { "xi-api-key": apiKey, "content-type": "application/json" },
+    body: JSON.stringify({
+      text,
+      model_id: model,
+      ...(speed === undefined
+        ? {}
+        : { voice_settings: { ...VOICE_DEFAULTS, speed } }),
+    }),
+    signal,
+  };
+}
+
+type Attempt =
+  | {
+      readonly ok: true;
+      readonly response: Response;
+      readonly first: Uint8Array;
+      readonly reader: ReadableStreamDefaultReader<Uint8Array>;
+    }
+  | {
+      readonly ok: false;
+      readonly status: number | undefined;
+      readonly reason: "REFUSED" | "UNREACHABLE" | "SLOW" | "EMPTY";
+    };
+
+/**
+ * Ask one engine and wait, at most `deadlineMs` when given, for its first
+ * byte of audio. The request is abandoned if that byte does not come, and
+ * whatever it would have cost is not waited for.
+ */
+async function firstAudio(
+  request: (signal: AbortSignal) => Promise<Response>,
+  callerSignal: AbortSignal | undefined,
+  deadlineMs: number | undefined,
+): Promise<Attempt> {
+  const own = new AbortController();
+  const signal =
+    callerSignal === undefined
+      ? own.signal
+      : AbortSignal.any([own.signal, callerSignal]);
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const slow = new Promise<"SLOW">((resolve) => {
+    if (deadlineMs !== undefined) {
+      timer = setTimeout(() => resolve("SLOW"), deadlineMs);
+    }
+  });
+  const work = (async (): Promise<Attempt> => {
+    let response: Response;
+    try {
+      response = await request(signal);
+    } catch {
+      return { ok: false, status: undefined, reason: "UNREACHABLE" };
+    }
+    if (!response.ok || response.body === null) {
+      await response.body?.cancel().catch(() => undefined);
+      return { ok: false, status: response.status, reason: "REFUSED" };
+    }
+    const reader: ReadableStreamDefaultReader<Uint8Array> =
+      response.body.getReader();
+    for (;;) {
+      const chunk = await reader.read().then(
+        (read) => read,
+        () => null,
+      );
+      if (chunk === null) {
+        return { ok: false, status: undefined, reason: "UNREACHABLE" };
+      }
+      if (chunk.done) {
+        return { ok: false, status: response.status, reason: "EMPTY" };
+      }
+      if (chunk.value.byteLength > 0) {
+        return { ok: true, response, first: chunk.value, reader };
+      }
+    }
+  })();
+  try {
+    const outcome = await Promise.race([work, slow]);
+    if (outcome === "SLOW") {
+      own.abort();
+      // Whatever the abandoned request does next is not waited for, and
+      // a stream it may still open is released.
+      void work.then((late) => {
+        if (late.ok) void late.reader.cancel().catch(() => undefined);
+      });
+      return { ok: false, status: undefined, reason: "SLOW" };
+    }
+    return outcome;
+  } finally {
+    if (timer !== undefined) clearTimeout(timer);
+  }
+}
+
+/** The first chunk, already read, then the rest as it comes. */
+function resumed(attempt: Extract<Attempt, { ok: true }>): Response {
+  const { first, reader, response } = attempt;
+  const body = new ReadableStream<Uint8Array>({
+    start(controller) {
+      controller.enqueue(first);
+    },
+    async pull(controller) {
+      const next = await reader.read();
+      if (next.done) controller.close();
+      else controller.enqueue(next.value);
+    },
+    cancel(reason) {
+      return reader.cancel(reason);
+    },
+  });
+  return new Response(body, {
+    status: response.status,
+    headers: response.headers,
+  });
+}
+
 export function createElevenLabsSpeechSynthesis(
   options: ElevenLabsSpeechOptions,
 ): SpeechSynthesisPort {
   const doFetch = options.fetch ?? fetch;
   const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   const maxBytes = options.maxBytes ?? Q_SPEECH_MAX_BYTES;
+  const deadline = options.firstAudioDeadlineMs ?? FIRST_AUDIO_DEADLINE_MS;
+  const models = modelsFor(options.model ?? DEFAULT_MODEL);
 
   return {
     name: "elevenlabs",
@@ -107,52 +323,54 @@ export function createElevenLabsSpeechSynthesis(
         request.signal === undefined
           ? timeout
           : AbortSignal.any([timeout, request.signal]);
+      // One-way lines carry no delivery cues, and stage directions a model
+      // left in the text are not read out.
+      const text = withoutMarkup(request.text);
+      let failure = new SpeechSynthesisError(true);
 
-      let response: Response;
-      try {
-        response = await doFetch(
-          streamUrl(request.voice, ONE_WAY_OUTPUT_FORMAT),
-          {
-            method: "POST",
-            headers: {
-              "xi-api-key": options.apiKey,
-              "content-type": "application/json",
-            },
-            body: JSON.stringify({
-              text: request.text,
-              model_id: MODEL_ID,
-            }),
-            signal,
-          },
+      // The same engine order as the relay: v3, then turbo for this line
+      // if v3 fails or is slow to start.
+      for (const [index, model] of models.entries()) {
+        const attempt = await firstAudio(
+          (s) =>
+            doFetch(
+              streamUrl(request.voice, ONE_WAY_OUTPUT_FORMAT),
+              elevenLabsRequest(options.apiKey, model, text, undefined, s),
+            ),
+          signal,
+          index < models.length - 1 ? deadline : undefined,
         );
-      } catch {
-        // A timeout or a transport failure. Worth another attempt later;
-        // nothing about it is worth saying out loud.
-        throw new SpeechSynthesisError(true);
+        if (signal.aborted) throw new SpeechSynthesisError(true);
+        if (!attempt.ok) {
+          failure = new SpeechSynthesisError(
+            attempt.status === undefined ? true : retryable(attempt.status),
+          );
+          continue;
+        }
+        const mediaType = (attempt.response.headers.get("content-type") ?? "")
+          .split(";")[0]
+          ?.trim()
+          .toLowerCase();
+        if (mediaType !== Q_SPEECH_MEDIA_TYPE) {
+          // Asked for audio and given something else. Whatever it is, it
+          // is not going to an audio element.
+          await attempt.reader.cancel().catch(() => undefined);
+          throw new SpeechSynthesisError(false);
+        }
+        const buffer = await resumed(attempt)
+          .arrayBuffer()
+          .catch(() => {
+            throw new SpeechSynthesisError(true);
+          });
+        if (buffer.byteLength === 0 || buffer.byteLength > maxBytes) {
+          throw new SpeechSynthesisError(false);
+        }
+        return {
+          audio: new Uint8Array(buffer),
+          mediaType: Q_SPEECH_MEDIA_TYPE,
+        };
       }
-
-      if (!response.ok) {
-        throw new SpeechSynthesisError(retryable(response.status));
-      }
-
-      const mediaType = (response.headers.get("content-type") ?? "")
-        .split(";")[0]
-        ?.trim()
-        .toLowerCase();
-      if (mediaType !== Q_SPEECH_MEDIA_TYPE) {
-        // Asked for audio and given something else. Whatever it is, it is
-        // not going to an audio element.
-        throw new SpeechSynthesisError(false);
-      }
-
-      const buffer = await response.arrayBuffer().catch(() => {
-        throw new SpeechSynthesisError(true);
-      });
-      if (buffer.byteLength === 0 || buffer.byteLength > maxBytes) {
-        throw new SpeechSynthesisError(false);
-      }
-
-      return { audio: new Uint8Array(buffer), mediaType: Q_SPEECH_MEDIA_TYPE };
+      throw failure;
     },
   };
 }
@@ -163,9 +381,9 @@ export function createElevenLabsSpeechSynthesis(
  * Deepgram addresses this the way it would address ElevenLabs — the
  * sentence to say in the body, the audio format in the query — and this
  * forwards that to ElevenLabs under the real key and streams the bytes
- * straight back. Nothing is buffered: the agent starts playing the first
- * chunk while the rest is still arriving, which is the whole point of
- * asking for a stream.
+ * straight back. Nothing is buffered beyond the first chunk: the agent
+ * starts playing while the rest is still arriving, which is the whole
+ * point of asking for a stream.
  *
  * The voice is decided by the caller from the session's binding, never by
  * anything in the request, so a relayed call cannot select a voice the
@@ -179,6 +397,12 @@ export type ElevenLabsSpeechRelay = {
     /** Passed through from the agent; an unknown one falls back to 24k PCM. */
     readonly outputFormat?: string | undefined;
     readonly signal?: AbortSignal | undefined;
+    /**
+     * The voice session the sentence belongs to, from the caller's
+     * binding. It keys that sentence's delivery cues and its timing. It
+     * never selects anything the binding did not.
+     */
+    readonly session?: string | undefined;
   }) => Promise<Response>;
 };
 
@@ -206,12 +430,54 @@ const RELAYABLE_FORMATS = new Set([
   "ulaw_8000",
 ]);
 
+type Engine = {
+  readonly name: ElevenLabsSpeechModel | "aura-2";
+  readonly markup: SpeechMarkup;
+  readonly elevenLabs: boolean;
+  readonly request: (input: {
+    readonly voice: QVoiceChoice;
+    readonly format: string;
+    readonly text: string;
+    readonly speed: number | undefined;
+    readonly signal: AbortSignal;
+  }) => Promise<Response>;
+};
+
 export function createElevenLabsSpeechRelay(
-  options: ElevenLabsSpeechOptions,
+  options: ElevenLabsSpeechRelayOptions,
 ): ElevenLabsSpeechRelay {
   const doFetch = options.fetch ?? fetch;
+  const now = options.now ?? Date.now;
+  const deadline = options.firstAudioDeadlineMs ?? FIRST_AUDIO_DEADLINE_MS;
+  const elevenLabsEngines: Engine[] = modelsFor(
+    options.model ?? DEFAULT_MODEL,
+  ).map((model) => ({
+    name: model,
+    markup: SPEECH_MARKUP[model],
+    elevenLabs: true,
+    request: ({ voice, format, text, speed, signal }) =>
+      doFetch(
+        streamUrl(voice, format),
+        elevenLabsRequest(options.apiKey, model, text, speed, signal),
+      ),
+  }));
+  const auraStream = options.aura;
+  const aura: Engine | undefined =
+    auraStream === undefined
+      ? undefined
+      : {
+          name: "aura-2",
+          markup: AURA_MARKUP,
+          elevenLabs: false,
+          request: ({ voice, format, text, signal }) =>
+            auraStream({ voice, text, outputFormat: format, signal }),
+        };
+  /** ElevenLabs is skipped until then, when Aura-2 is there to speak. */
+  let restingUntil = 0;
+  let failuresRunning = 0;
+
   return {
-    stream: ({ voice, text, outputFormat, signal }) => {
+    stream: async ({ voice, text, outputFormat, signal, session }) => {
       // An allow-list rather than a passthrough: the query string arrives
       // from outside this server, and a vendor URL is not the place to
       // relay a stranger's parameters.
@@ -219,14 +485,75 @@ export function createElevenLabsSpeechRelay(
         outputFormat !== undefined && RELAYABLE_FORMATS.has(outputFormat)
           ? outputFormat
           : AGENT_OUTPUT_FORMAT;
-      return doFetch(streamUrl(voice, format), {
-        method: "POST",
-        headers: {
-          "xi-api-key": options.apiKey,
-          "content-type": "application/json",
-        },
-        body: JSON.stringify({ text, model_id: MODEL_ID }),
-        ...(signal === undefined ? {} : { signal }),
+      // The text arrives exactly as Q said it. Cues for it, if Q asked for
+      // any, come from the board and are rendered by each engine only as
+      // far as that engine can render them. The rest is dropped.
+      const cues =
+        session === undefined || options.performance === undefined
+          ? []
+          : options.performance.take(session, text);
+      const timing =
+        session === undefined
+          ? undefined
+          : options.timings?.speech(session, text.length);
+
+      const resting = aura !== undefined && now() < restingUntil;
+      const engines = [
+        ...(resting ? [] : elevenLabsEngines),
+        ...(aura === undefined ? [] : [aura]),
+      ];
+      let last: Attempt | undefined;
+      for (const [index, engine] of engines.entries()) {
+        const speech = renderSpeech(text, cues, engine.markup);
+        // Only a first choice with a same-vendor voice behind it is held to
+        // the deadline. A last resort is waited for.
+        const nextIsElevenLabs = engines[index + 1]?.elevenLabs === true;
+        const attempt = await firstAudio(
+          (s) =>
+            engine.request({
+              voice,
+              format,
+              text: speech.text,
+              speed: speech.speed,
+              signal: s,
+            }),
+          signal,
+          engine.elevenLabs && nextIsElevenLabs ? deadline : undefined,
+        );
+        timing?.headers();
+        if (signal?.aborted === true) {
+          // The agent hung up because the person spoke. The route knows
+          // this for what it is and answers nobody.
+          throw new DOMException("The agent stopped listening.", "AbortError");
+        }
+        if (attempt.ok) {
+          if (engine.elevenLabs) failuresRunning = 0;
+          timing?.firstByte();
+          timing?.served(engine.name, index > 0 || resting);
+          timing?.rendered(speech.rendered);
+          return resumed(attempt);
+        }
+        last = attempt;
+        if (engine.elevenLabs) {
+          const refusedKey = attempt.status === 401 || attempt.status === 403;
+          const lastElevenLabs = !nextIsElevenLabs;
+          if (lastElevenLabs) failuresRunning += 1;
+          if (
+            refusedKey ||
+            failuresRunning >= ELEVENLABS_FAILURES_BEFORE_REST
+          ) {
+            restingUntil = now() + ELEVENLABS_REST_MS;
+            failuresRunning = 0;
+          }
+        }
+      }
+      // Nothing could voice it. The route tells the agent the audio did not
+      // come, and never why.
+      return new Response(null, {
+        status:
+          last !== undefined && !last.ok && last.status !== undefined
+            ? last.status
+            : 502,
       });
     },
   };

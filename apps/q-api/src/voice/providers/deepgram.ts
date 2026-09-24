@@ -24,8 +24,13 @@ const SPEAK_MODELS: Readonly<Record<QVoiceChoice, string>> = {
 
 /**
  * The ElevenLabs model the agent is told it is talking to (QX-004 SPEAK
- * rework). It must match what the relay actually asks ElevenLabs for;
- * both live next to each other on purpose.
+ * rework).
+ *
+ * This is a declaration to Deepgram, not a choice of voice. The agent's
+ * speak endpoint is this server's relay, and the relay decides which
+ * model renders the audio (`Q_VOICE_TTS_MODEL`, CQ-VOICE-010). The value
+ * stays one Deepgram is known to accept, so switching the relay's model
+ * never depends on what the agent's settings validator allows.
  */
 const ELEVENLABS_MODEL_ID = "eleven_turbo_v2_5";
 

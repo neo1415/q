@@ -7,7 +7,7 @@ import {
   Q_CONTEXT_FIREWALL_POLICY_VERSION,
 } from "@capital-q/contracts";
 import type { QTurnReader } from "@capital-q/model-gateway/q";
-import type { TurnReaderResult } from "@capital-q/q-core";
+import type { TurnReaderV2Result as TurnReaderResult } from "@capital-q/q-core";
 import type {
   QAnswerOutcome,
   QAnswerRequest,
@@ -75,6 +75,9 @@ function seam(options: {
   readonly said: string;
   readonly reading: TurnReaderResult | null;
   readonly outcomes: readonly QAnswerOutcome[];
+  readonly visibility?: {
+    noteVisibility: (entry: Record<string, unknown>) => void;
+  };
 }) {
   const message: QConversationMessage = {
     id: randomUUID() as QConversationMessage["id"],
@@ -91,6 +94,9 @@ function seam(options: {
   const turns: QTurnReader = {
     read: () => Promise.resolve(options.reading),
   };
+  const stored: QConversationMessage[] = [];
+  const events: { type: string; data: unknown }[] = [];
+  let delegated = 0;
   const answer = createSpecialistQAnswer({
     specialist: {
       id: "company-intelligence",
@@ -98,8 +104,12 @@ function seam(options: {
       supports: () => false,
       investigate: () => Promise.reject(new Error("not used")),
     },
+    ...(options.visibility === undefined
+      ? {}
+      : { visibility: options.visibility }),
     delegate: {
       answer: async (req) => {
+        delegated += 1;
         directives.push(
           req.research === undefined ? undefined : await req.research,
         );
@@ -116,14 +126,147 @@ function seam(options: {
     repositories: {
       messages: {
         listRecentForConversationOfRun: () => Promise.resolve([message]),
+        insert: (_tx: unknown, input: Omit<QConversationMessage, "id">) => {
+          const row = {
+            ...input,
+            id: randomUUID(),
+            contentType: "TEXT",
+            createdAt: new Date().toISOString(),
+          } as unknown as QConversationMessage;
+          stored.push(row);
+          return Promise.resolve(row);
+        },
+      },
+      runs: { allocateEventSequence: () => Promise.resolve(events.length + 1) },
+      runEvents: {
+        append: (
+          _tx: unknown,
+          input: { eventType: string; payload: unknown },
+        ) => {
+          events.push({ type: input.eventType, data: input.payload });
+          return Promise.resolve(input);
+        },
       },
     } as unknown as QRuntimeRepositories,
     sql: {} as never,
     transactions: { run: (work) => work({} as never) },
     turns,
   });
-  return { answer, directives };
+  return {
+    answer,
+    directives,
+    stored,
+    events,
+    delegated: () => delegated,
+  };
 }
+
+const COMPANY = "c0c0c0c0-c0c0-4c0c-8c0c-c0c0c0c0c0c0";
+
+function toolReading(
+  tool: NonNullable<TurnReaderResult["tool"]>,
+  confidence: TurnReaderResult["confidence"] = "HIGH",
+): TurnReaderResult {
+  return {
+    kind: "TOOL_REQUEST",
+    confidence,
+    transcript: "CLEAR",
+    question: null,
+    aboutNamedOther: false,
+    tool,
+  };
+}
+
+describe("a request for one of Q's own hands (CQ-QACT-001)", () => {
+  it("answers 'take me to discover' with a NAVIGATE intent and no model answer (F8)", async () => {
+    const run = seam({
+      said: "take me to discover",
+      reading: toolReading({
+        kind: "NAVIGATE",
+        destination: "DISCOVER",
+        visibility: null,
+      }),
+      outcomes: [],
+    });
+    const outcome = await run.answer.answer(request());
+    expect(outcome.kind).toBe("ANSWERED");
+    expect(run.delegated()).toBe(0);
+    expect(run.stored).toHaveLength(1);
+    expect(run.stored[0]?.content).toBe("Taking you to Discover.");
+    expect(run.stored[0]?.blocks).toEqual([
+      {
+        kind: "UI_INTENT",
+        intent: { kind: "NAVIGATE", destination: "DISCOVER" },
+      },
+    ]);
+    expect(run.events.map((event) => event.type)).toEqual([
+      "q.message.completed",
+    ]);
+  });
+
+  it("never navigates on a guess, and never to a surface the run has no subject for", async () => {
+    const guess = seam({
+      said: "discover?",
+      reading: toolReading(
+        { kind: "NAVIGATE", destination: "DISCOVER", visibility: null },
+        "LOW",
+      ),
+      outcomes: [],
+    });
+    await guess.answer.answer(request());
+    expect(guess.stored).toHaveLength(0);
+    expect(guess.delegated()).toBe(1);
+
+    // No company in this run: its visibility page is not somewhere to go.
+    const noCompany = seam({
+      said: "open my visibility settings",
+      reading: toolReading({
+        kind: "NAVIGATE",
+        destination: "COMPANY_VISIBILITY",
+        visibility: null,
+      }),
+      outcomes: [],
+    });
+    await noCompany.answer.answer(request());
+    expect(noCompany.stored).toHaveLength(0);
+    expect(noCompany.delegated()).toBe(1);
+  });
+
+  it("hands 'make my company visible to investors' to the proposer and prepares no document (F6)", async () => {
+    const noted: Record<string, unknown>[] = [];
+    const run = seam({
+      said: "please make my company visible to investors",
+      reading: toolReading({
+        kind: "SET_VISIBILITY",
+        destination: null,
+        visibility: "network_visible",
+      }),
+      outcomes: [],
+      visibility: { noteVisibility: (entry) => noted.push(entry) },
+    });
+    const turn = {
+      ...request(),
+      subjects: [{ kind: "COMPANY" as const, companyId: COMPANY }],
+    } as QAnswerRequest;
+    const outcome = await run.answer.answer(turn);
+    expect(outcome.kind).toBe("ANSWERED");
+    // Neither the specialist nor the conversational seam ran: nothing
+    // that could prepare a deck was reached.
+    expect(run.delegated()).toBe(0);
+    expect(noted).toEqual([
+      {
+        runId: turn.runId,
+        tenantId: TENANT,
+        companyId: COMPANY,
+        visibility: "network_visible",
+      },
+    ]);
+    // It explains, honestly, and claims nothing: the action port says it
+    // prepared something only once the proposal exists.
+    expect(run.stored[0]?.content).toMatch(/recommendations/);
+    expect(run.stored[0]?.content).not.toMatch(/prepared|approve|done/i);
+  });
+});
 
 const advice: TurnReaderResult = {
   kind: "QUESTION_TO_Q",
@@ -131,6 +274,7 @@ const advice: TurnReaderResult = {
   transcript: "CLEAR",
   question: { kind: "ADVICE", text: "what else should I look for?" },
   aboutNamedOther: false,
+  tool: null,
 };
 
 describe("a general turn is read before it is answered", () => {

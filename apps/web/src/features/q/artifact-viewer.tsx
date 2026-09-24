@@ -41,6 +41,13 @@ import { readQArtifactAction, readQArtifactVersionAction } from "./actions";
 export type ArtifactViewerProps = {
   readonly artifactId: string;
   readonly onClose: () => void;
+  /**
+   * Changes whenever the conversation puts this document in front of the
+   * person again — a revision Q just wrote (CQ-QACT-001, F5). Live, the
+   * viewer stayed on Version 1 after "make the traction slide shorter"
+   * had produced Version 2, until it was closed and reopened.
+   */
+  readonly revision?: string | undefined;
 };
 
 function whenLabel(iso: string): string {
@@ -78,12 +85,34 @@ function slideSource(svg: string): string {
   return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
 }
 
-export function ArtifactViewer({ artifactId, onClose }: ArtifactViewerProps) {
+export function ArtifactViewer({
+  artifactId,
+  onClose,
+  revision,
+}: ArtifactViewerProps) {
   const [detail, setDetail] = useState<QArtifactDetail | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   /** Which version is on screen; null means whatever is current. */
   const [showing, setShowing] = useState<number | null>(null);
+  /**
+   * Bumped when the conversation says the document changed, so the
+   * current version is read again. Somebody deliberately reading an
+   * earlier version keeps it, and is told a newer one exists instead.
+   */
+  const [reloads, setReloads] = useState(0);
+  const [newer, setNewer] = useState(false);
+  // Adjusted while rendering, React's pattern for state that follows a
+  // prop: no effect, no extra paint showing the stale version.
+  const [seenRevision, setSeenRevision] = useState(revision);
+  if (seenRevision !== revision) {
+    setSeenRevision(revision);
+    if (showing === null) {
+      setReloads((count) => count + 1);
+    } else {
+      setNewer(true);
+    }
+  }
   /**
    * The drawn slides, and which version they are of.
    *
@@ -127,7 +156,7 @@ export function ArtifactViewer({ artifactId, onClose }: ArtifactViewerProps) {
     return () => {
       cancelled = true;
     };
-  }, [load, showing]);
+  }, [load, showing, reloads]);
 
   const current = detail?.current;
   const isDeck = current?.content.deck !== undefined;
@@ -215,6 +244,23 @@ export function ArtifactViewer({ artifactId, onClose }: ArtifactViewerProps) {
       {notice !== null ? (
         <InlineNotice tone="warning" title="That didn't open">
           {notice}
+        </InlineNotice>
+      ) : null}
+
+      {newer ? (
+        <InlineNotice tone="info" title="A new version is ready">
+          <button
+            type="button"
+            className={buttonClassName("secondary", "compact")}
+            onClick={() => {
+              setNewer(false);
+              setShowing(null);
+              setReloads((count) => count + 1);
+            }}
+            data-q-artifact-show-latest
+          >
+            Show the latest
+          </button>
         </InlineNotice>
       ) : null}
 

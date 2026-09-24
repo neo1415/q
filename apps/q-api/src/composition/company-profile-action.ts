@@ -6,6 +6,7 @@ import {
   UpdateCompanyRequestSchema,
   UuidSchema,
   type CompanyEditableField,
+  type CompanyVisibilityChoice,
   type QSubjectRef,
 } from "@capital-q/contracts";
 import {
@@ -25,12 +26,12 @@ import {
   type QActionProposer,
 } from "@capital-q/q-actions";
 import type { QActionPrepareContext } from "@capital-q/q-runtime";
-import {
-  ActorContextSchema,
-  capability,
-  type AuthorizationService,
-} from "@capital-q/security";
+import { capability, type AuthorizationService } from "@capital-q/security";
 
+import {
+  COMPANY_VISIBILITY_SET,
+  CompanyVisibilitySetPayloadSchema,
+} from "./company-visibility-action.js";
 import {
   PERSON_PROFILE_UPDATE,
   PersonProfileUpdatePayloadSchema,
@@ -233,16 +234,9 @@ export function createCompanyProfileUpdateAction(
       },
       executor: {
         execute: async (action, context) => {
-          // The approver's own authority, reconstructed from what the
-          // approval recorded; the companies context checks it again.
-          const actor = ActorContextSchema.parse({
-            userId: action.approvedByUserId,
-            tenantId: action.tenantId,
-            ...(action.organisationId === null
-              ? {}
-              : { organisationId: action.organisationId }),
-            actorType: "HUMAN",
-          });
+          // The approver's own authority, as the gate just verified it;
+          // the companies context checks it again.
+          const actor = context.approver;
           const companyId = CompanyIdSchema.parse(action.payload.companyId);
           try {
             const current = await service.getCompany({ actor, companyId });
@@ -292,6 +286,24 @@ type Noted = {
   readonly companyId: string;
   readonly updates: readonly QProfileUpdateReading[];
   readonly at: number;
+};
+
+/** A request to be seen by investors, or not, per run (CQ-QACT-001). */
+type NotedVisibility = {
+  readonly tenantId: string;
+  readonly companyId: string;
+  readonly visibility: CompanyVisibilityChoice;
+  readonly at: number;
+};
+
+/** Where the answer seam hands a visibility reading to the proposer. */
+export type QVisibilityNotebook = {
+  readonly noteVisibility: (entry: {
+    readonly runId: string;
+    readonly tenantId: string;
+    readonly companyId: string;
+    readonly visibility: CompanyVisibilityChoice;
+  }) => void;
 };
 
 /** A request to be called something else, per run (ADR 0011). */
@@ -344,10 +356,12 @@ export function createProfileUpdateBoard(
     QProfileUpdateNotebook["noteDisplayName"]
   >;
 } & QActionProposer &
-  ProfileSuggestionBoard {
+  ProfileSuggestionBoard &
+  QVisibilityNotebook {
   const now = options.now ?? (() => Date.now());
   const noted = new Map<string, Noted>();
   const names = new Map<string, NotedName>();
+  const visibilities = new Map<string, NotedVisibility>();
   const offered = new Map<
     string,
     ProfileSuggestion & { readonly at: number }
@@ -359,6 +373,9 @@ export function createProfileUpdateBoard(
     }
     for (const [runId, entry] of names) {
       if (entry.at < cutoff) names.delete(runId);
+    }
+    for (const [runId, entry] of visibilities) {
+      if (entry.at < cutoff) visibilities.delete(runId);
     }
     const stale = now() - SUGGESTION_TTL_MS;
     for (const [userId, entry] of offered) {
@@ -391,6 +408,10 @@ export function createProfileUpdateBoard(
     noteDisplayName: (entry) => {
       sweep();
       names.set(entry.runId, { ...entry, at: now() });
+    },
+    noteVisibility: (entry) => {
+      sweep();
+      visibilities.set(entry.runId, { ...entry, at: now() });
     },
     offer: (suggestion) => {
       sweep();
@@ -428,6 +449,32 @@ export function createProfileUpdateBoard(
           });
         }
       }
+      // Who can see their company: only the company this run is about, in
+      // the tenant the reading came from.
+      const seen = visibilities.get(context.runId);
+      if (seen !== undefined) {
+        visibilities.delete(context.runId);
+        const about = context.subjects.some(
+          (subject) =>
+            subject.kind === "COMPANY" && subject.companyId === seen.companyId,
+        );
+        if (about && seen.tenantId === context.plan.tenantId) {
+          const parsed = CompanyVisibilitySetPayloadSchema.safeParse({
+            companyId: seen.companyId,
+            visibility: seen.visibility,
+          });
+          if (parsed.success) {
+            return Promise.resolve({
+              actionType: COMPANY_VISIBILITY_SET,
+              payload: parsed.data,
+            });
+          }
+        }
+        return Promise.resolve({
+          refused:
+            "I can only change who sees the company this conversation is about",
+        });
+      }
       const entry = take(context);
       if (entry === undefined) return Promise.resolve(null);
       // Only for the company this run is about, and only in this tenant.
@@ -442,11 +489,18 @@ export function createProfileUpdateBoard(
       for (const update of entry.updates) {
         // "kivu-freight.example" is what people say; the field holds an
         // http(s) URL. The same normaliser onboarding writes through, so a
-        // website typed to Q and one typed in setup land identically.
-        changes[update.field] =
-          update.field === "websiteUrl" && update.value !== null
-            ? normaliseWebsite(update.value)
-            : update.value;
+        // website typed to Q and one typed in setup land identically — and
+        // a value that is not a public web address ("instagram") is refused
+        // the same way in both, here as an honest refusal, not a throw.
+        if (update.field === "websiteUrl" && update.value !== null) {
+          try {
+            changes[update.field] = normaliseWebsite(update.value);
+          } catch {
+            return Promise.resolve({ refused: refusalReason(["websiteUrl"]) });
+          }
+        } else {
+          changes[update.field] = update.value;
+        }
       }
       const parsed = CompanyProfileUpdatePayloadSchema.safeParse({
         companyId: entry.companyId,

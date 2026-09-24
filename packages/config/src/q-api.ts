@@ -68,6 +68,13 @@ const qApiEnvSchema = z.object({
   // Whether the Speech Engines render inline audio tags ([laughs]); set by
   // voice:setup alongside the engine ids.
   Q_VOICE_EXPRESSIVE: z.enum(["true", "false"]).optional(),
+  // The ElevenLabs model that renders Q's voice behind the speak relay
+  // (CQ-VOICE-010). Unset means eleven_v3_conversational, chosen by
+  // listening to design/voice-comparison; turbo stands behind it per
+  // utterance either way. Pinning turbo is the rollback.
+  Q_VOICE_TTS_MODEL: z
+    .enum(["eleven_turbo_v2_5", "eleven_v3_conversational"])
+    .optional(),
   // Q as an MCP server (doc 12 §34.2): a constrained façade over the tools
   // the registry offers the authenticated person. Off unless a deployment
   // says otherwise; nothing about Q's own behaviour depends on it.
@@ -98,6 +105,8 @@ export type QApiVoiceConfig = {
   readonly personality: "UPBEAT" | "CALM" | "DIRECT";
   /** Whether the Speech Engines render inline audio tags. */
   readonly expressive: boolean;
+  /** The ElevenLabs model behind the speak relay and one-way speech. */
+  readonly ttsModel: "eleven_turbo_v2_5" | "eleven_v3_conversational";
   /** The transport that carries the voice, resolved from keys and preference; absent means no voice. */
   readonly provider: VoiceProviderCode | undefined;
   /** This server's public origin as the speech provider reaches it (the tunnel in development). */
@@ -145,6 +154,7 @@ export function parseQApiConfig(env: EnvironmentInput): QApiConfig {
       apiBaseUrl: parsed.CQ_API_URL?.replace(/\/$/, ""),
       personality: parsed.Q_PERSONALITY ?? "UPBEAT",
       expressive: parsed.Q_VOICE_EXPRESSIVE === "true",
+      ttsModel: parsed.Q_VOICE_TTS_MODEL ?? "eleven_v3_conversational",
       provider: resolveVoiceProvider(
         toSpeechProviderSecrets(parsed),
         toSpeechEngineIds(parsed),
