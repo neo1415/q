@@ -101,6 +101,19 @@ export type ModelGatewayExecuteOptions<T> = {
    * hears the answer as it is written instead of after it.
    */
   readonly onTextDelta?: ((text: string) => void) | undefined;
+  /**
+   * How long the FIRST model may take, when another eligible model waits
+   * behind it (CQ-VOICE-010). Never longer than the budget's own
+   * `attemptTimeoutMs`. A first model that runs out of this is not asked a
+   * second time: the next model is.
+   *
+   * For a caller with a person waiting on the answer. In the hosted ledger
+   * the preferred dialogue model answered inside 3.4 s at p95 on a healthy
+   * day. When it hung, the turn paid the whole attempt timeout before any
+   * fallback was tried. Once it hung twice, because a timeout was retried
+   * on the same model.
+   */
+  readonly firstAttemptTimeoutMs?: number | undefined;
 };
 
 export type ModelGateway = {
@@ -243,6 +256,8 @@ export function createModelGateway(
     onTextDelta: ((text: string) => void) | undefined,
     /** Set by this attempt the first time it emits; read by the caller. */
     spoke: { spoke: boolean },
+    /** This attempt's wall clock: the budget's, or a first model's shorter one. */
+    timeoutMs: number,
   ): Promise<AttemptOutcome<T> & { readonly record: ModelAttemptRecord }> {
     const labels = {
       provider: candidate.provider.code,
@@ -261,9 +276,7 @@ export function createModelGateway(
       },
       async (span) => {
         const startedAt = Date.now();
-        const timeoutSignal = AbortSignal.timeout(
-          request.budget.attemptTimeoutMs,
-        );
+        const timeoutSignal = AbortSignal.timeout(timeoutMs);
         const signal = AbortSignal.any([callerSignal, timeoutSignal]);
         const outputTokens = reachForModelMaximum
           ? candidate.model.maxOutputTokens
@@ -287,7 +300,7 @@ export function createModelGateway(
             },
             {
               signal,
-              attemptTimeoutMs: request.budget.attemptTimeoutMs,
+              attemptTimeoutMs: timeoutMs,
               attempt: attemptNumber,
               correlationId: request.attribution.correlationId,
               ...(onTextDelta === undefined
@@ -566,6 +579,7 @@ export function createModelGateway(
             callerSignal,
             span,
             options.onTextDelta,
+            options.firstAttemptTimeoutMs,
           );
         } finally {
           span.end();
@@ -582,6 +596,7 @@ export function createModelGateway(
       setAttribute: (key: string, value: string | number | boolean) => unknown;
     },
     onTextDelta: ((text: string) => void) | undefined,
+    firstAttemptTimeoutMs: number | undefined,
   ): Promise<ModelGatewayResult<T>> {
     if (callerSignal.aborted) {
       throw new ModelGatewayError("model request cancelled before routing", {
@@ -717,6 +732,22 @@ export function createModelGateway(
           metrics.budgetRejected.add(1, { task_class: request.taskClass });
           break;
         }
+        // Whether another eligible model could take this request if this
+        // one does not answer.
+        const anotherCandidateWaits = plan.eligible.some(
+          (other) =>
+            other.candidateIndex > candidate.candidateIndex &&
+            dependencies.registry.get(other.provider.code) !== undefined,
+        );
+        // The first model is held to the caller's shorter patience only
+        // when there is somewhere else to go. A last resort gets the whole
+        // attempt budget.
+        const timeoutMs =
+          attemptNumber === 0 &&
+          anotherCandidateWaits &&
+          firstAttemptTimeoutMs !== undefined
+            ? Math.min(firstAttemptTimeoutMs, request.budget.attemptTimeoutMs)
+            : request.budget.attemptTimeoutMs;
         attemptNumber += 1;
         attemptsOnCandidate += 1;
         const spoke = { spoke: false };
@@ -731,6 +762,7 @@ export function createModelGateway(
           room.ranOut,
           onTextDelta,
           spoke,
+          timeoutMs,
         );
         attempts.push(outcome.record);
         spentUsd +=
@@ -814,14 +846,18 @@ export function createModelGateway(
         // A per-minute quota is spent for the whole minute: when another
         // eligible model is waiting, moving to it now beats sleeping on
         // this one. The same model is retried only when it is the last.
-        const anotherCandidateWaits = plan.eligible.some(
-          (other) =>
-            other.candidateIndex > candidate.candidateIndex &&
-            dependencies.registry.get(other.provider.code) !== undefined,
-        );
+        //
+        // A timeout is the same (CQ-VOICE-010). A model that has just used
+        // up a whole attempt without answering is the likeliest of all to
+        // do it again, and a second wait on it was the 24-second turn in
+        // the hosted ledger. With another model waiting, ask that one.
         const canRetryHere =
           isRetryableModelFailure(outcome.failureClass) &&
-          !(outcome.failureClass === "RATE_LIMIT" && anotherCandidateWaits) &&
+          !(
+            (outcome.failureClass === "RATE_LIMIT" ||
+              outcome.failureClass === "TIMEOUT") &&
+            anotherCandidateWaits
+          ) &&
           attemptsOnCandidate < ATTEMPTS_PER_CANDIDATE &&
           attemptNumber < request.budget.maxAttempts;
         if (canRetryHere) {
