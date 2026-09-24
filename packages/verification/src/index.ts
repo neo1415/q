@@ -1,0 +1,79 @@
+/**
+ * @capital-q/verification
+ *
+ * Owns: Capital Q's claim-specific verification record
+ * (`evidence.verification_claims`, CQ-VERIFY-001): a founder's request that
+ * a founder's identity and the organisation be verified, Capital Q's
+ * decision on it and how that decision was made, and the standings the
+ * Companies readiness policy reads.
+ *
+ * Does not own: evidence, truth class, evidence status or lifecycle
+ * status (ADR-001 keeps verification a separate workflow), companies,
+ * readiness itself, or any operator principal. No LLM anywhere.
+ *
+ *   Verification ≠ Evidence ≠ Endorsement ≠ Q inference
+ *
+ * Two decision methods exist in the vocabulary. Only
+ * SYNTHETIC_DEMO_ATTESTATION is implemented, and only where the deployment
+ * holds the synthetic-demo allowance and the people involved are
+ * synthetic. OPERATOR_DECISION waits for an operator principal
+ * (docs/escalations/verify-001/README.md §4).
+ *
+ * Server-side only.
+ */
+
+export {
+  describeStanding,
+  founderIdentityOf,
+  isRequestable,
+  organisationIdentityOf,
+  standingOf,
+  SUBJECT_TYPE_OF,
+  type VerificationClaim,
+  type VerificationProvider,
+} from "./domain/claims.js";
+export {
+  decisionBasisOf,
+  deploymentRefusal,
+  type SyntheticDecisionRefusal,
+  type SyntheticDemoAttestation,
+} from "./domain/attestation.js";
+export type {
+  NewPendingClaim,
+  NewSyntheticDecision,
+  SyntheticPrincipalPort,
+  VerificationClaimRepository,
+} from "./application/ports.js";
+export {
+  COMPANY_EDIT,
+  toCompanyVerification,
+  VERIFICATION_REQUEST,
+  VERIFICATION_VIEW,
+  type GetCompanyVerificationQuery,
+  type RequestCompanyVerificationCommand,
+  type RequestCompanyVerificationResult,
+} from "./application/company-verification.js";
+export type {
+  DecideSyntheticCommand,
+  DecideSyntheticOutcome,
+} from "./application/decide-synthetic.js";
+export {
+  createCompanyVerificationService,
+  createSyntheticVerificationDecider,
+  type CompanyVerificationService,
+} from "./application/service.js";
+export {
+  createPostgresSyntheticPrincipalPort,
+  createPostgresVerificationClaimRepository,
+} from "./infrastructure/postgres-verification-repository.js";
+export {
+  createVerificationClaimsReadinessPort,
+  VERIFICATION_CLAIMS_SOURCE,
+} from "./infrastructure/readiness-port.js";
+export {
+  VERIFICATION_EVENTS,
+  VerificationClaimDecidedEvent,
+  VerificationClaimRecordedEvent,
+} from "./events/index.js";
+
+export const PACKAGE_NAME = "@capital-q/verification" as const;

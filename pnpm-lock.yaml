@@ -119,6 +119,9 @@ importers:
       '@capital-q/taxonomy':
         specifier: workspace:*
         version: link:../../packages/taxonomy
+      '@capital-q/verification':
+        specifier: workspace:*
+        version: link:../../packages/verification
       fastify:
         specifier: ^5.12.1
         version: 5.12.1
@@ -413,6 +416,9 @@ importers:
       '@capital-q/taxonomy':
         specifier: workspace:*
         version: link:../../packages/taxonomy
+      '@capital-q/verification':
+        specifier: workspace:*
+        version: link:../../packages/verification
       pdfjs-dist:
         specifier: 6.3.289
         version: 6.3.289
@@ -1897,6 +1903,40 @@ importers:
       react-dom:
         specifier: 19.2.8
         version: 19.2.8(react@19.2.8)
+      typescript:
+        specifier: 5.9.3
+        version: 5.9.3
+
+  packages/verification:
+    dependencies:
+      '@capital-q/audit':
+        specifier: workspace:*
+        version: link:../audit
+      '@capital-q/companies':
+        specifier: workspace:*
+        version: link:../companies
+      '@capital-q/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      '@capital-q/database':
+        specifier: workspace:*
+        version: link:../database
+      '@capital-q/eventing':
+        specifier: workspace:*
+        version: link:../eventing
+      '@capital-q/security':
+        specifier: workspace:*
+        version: link:../security
+      zod:
+        specifier: 4.5.4
+        version: 4.5.4
+    devDependencies:
+      '@capital-q/config':
+        specifier: workspace:*
+        version: link:../config
+      '@types/node':
+        specifier: ^24.13.3
+        version: 24.13.3
       typescript:
         specifier: 5.9.3
         version: 5.9.3

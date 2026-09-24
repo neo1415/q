@@ -9,6 +9,7 @@ import { ONBOARDING_EVENTS } from "@capital-q/onboarding/events";
 import { ORGANISATION_EVENTS } from "@capital-q/organisations/events";
 import { PERMISSIONS_EVENTS } from "@capital-q/permissions/events";
 import { TAXONOMY_EVENTS } from "@capital-q/taxonomy/events";
+import { VERIFICATION_EVENTS } from "@capital-q/verification/events";
 
 /**
  * The production event registry the worker validates outbox rows against.
@@ -29,5 +30,6 @@ export function createProductionEventRegistry(): EventRegistry {
     ...TAXONOMY_EVENTS,
     ...ONBOARDING_EVENTS,
     ...MEDIA_EVENTS,
+    ...VERIFICATION_EVENTS,
   ]);
 }

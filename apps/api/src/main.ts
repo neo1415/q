@@ -106,6 +106,10 @@ import {
 } from "./gateq/intake-ports.js";
 import { createAuthorizationService } from "@capital-q/security";
 import {
+  createCompanyVerificationService,
+  createVerificationClaimsReadinessPort,
+} from "@capital-q/verification";
+import {
   createCompanyOnboardingSubjectResolver,
   createInvestorOrganisationOnboardingSubjectResolver,
   createOnboardingService,
@@ -196,6 +200,19 @@ const companies = createCompanyService({
   transactions: database.transactions,
   authorization,
   organisations: createPostgresOrganisationQueryPort({ sql: database.sql }),
+  outbox,
+  audit,
+  // CQ-VERIFY-001: readiness reads Capital Q's own verification claims.
+  verification: createVerificationClaimsReadinessPort({ sql: database.sql }),
+});
+
+// The founder asks for verification and reads where it stands; nothing in
+// this process can decide a claim (that is the worker's, under attestation).
+const verification = createCompanyVerificationService({
+  sql: database.sql,
+  transactions: database.transactions,
+  authorization,
+  companies: createPostgresCompanyQueryPort({ sql: database.sql }),
   outbox,
   audit,
 });
@@ -673,6 +690,7 @@ const { app, logger } = createApp(config, security, {
   onboarding: onboarding.runtime,
   evidence,
   media,
+  verification,
 });
 
 app.addHook("onClose", async () => {

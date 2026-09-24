@@ -63,6 +63,10 @@ import {
   registerTaxonomyRoutes,
   type TaxonomyRoutesDependencies,
 } from "./http/taxonomy.js";
+import {
+  registerVerificationRoutes,
+  type VerificationRoutesDependencies,
+} from "./http/verification.js";
 
 export const SERVICE_NAME = "api";
 
@@ -116,6 +120,9 @@ export type ApiModules = {
   readonly onboarding?: OnboardingRoutesDependencies["onboarding"] | undefined;
   readonly evidence?: DocumentRoutesDependencies["evidence"] | undefined;
   readonly media?: MediaRoutesDependencies["media"] | undefined;
+  /** CQ-VERIFY-001: a founder asks and reads; nothing here decides. */
+  readonly verification?:
+    VerificationRoutesDependencies["verification"] | undefined;
 };
 
 /**
@@ -304,6 +311,14 @@ export function createApp(
       authenticator: security.authenticator,
       resolver: security.resolver,
       media: modules.media,
+    });
+  }
+
+  if (modules.verification !== undefined) {
+    registerVerificationRoutes(app, {
+      authenticator: security.authenticator,
+      resolver: security.resolver,
+      verification: modules.verification,
     });
   }
 

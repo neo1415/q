@@ -166,3 +166,8 @@ export {
   saveCompany,
   unsaveCompany,
 } from "./discovery.js";
+
+export {
+  getCompanyVerification,
+  requestCompanyVerification,
+} from "./verification.js";

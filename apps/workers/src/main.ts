@@ -92,6 +92,7 @@ import {
   createTaxonomyCandidateFinder,
   createTaxonomyClassifier,
 } from "@capital-q/taxonomy";
+import { createSyntheticVerificationDecider } from "@capital-q/verification";
 import { modelProviderConfigStatus } from "@capital-q/config/model-providers";
 import {
   createModelGateway,
@@ -128,6 +129,7 @@ import { createPipelineMetrics } from "./documents/metrics.js";
 import { createUnavailableMalwareScanner } from "./documents/malware.js";
 import { createDomainEventHandler } from "./events/document-processing-handler.js";
 import { createProductionEventRegistry } from "./event-registry.js";
+import { withVerificationDecisions } from "./verification/decide-handler.js";
 import { createOutboxPublisherRunner } from "./outbox-runner.js";
 import { createParserSandbox } from "./parser/sandbox.js";
 import { composeWorkerPresence } from "./presence/composition.js";
@@ -539,42 +541,59 @@ const mediaModeration = createPostgresAutomatedModeration({
   outbox: createOutboxWriter({ registry }),
 });
 
+/**
+ * CQ-VERIFY-001: Capital Q decides a verification request by synthetic-demo
+ * attestation, holding the same allowance the model gateway was given. It
+ * is null wherever real people are served, so there the decider refuses
+ * every request by name and each stays PENDING.
+ */
+const verificationDecider = createSyntheticVerificationDecider({
+  sql: database.sql,
+  transactions: database.transactions,
+  outbox: createOutboxWriter({ registry }),
+  attestation: syntheticDemo,
+  environment: config.runtime.deploymentEnvironment,
+});
+
 const documentEvents = createQueueRunner({
   queue: DOMAIN_EVENTS_QUEUE,
   client: queues,
-  handle: createDomainEventHandler({
-    registry,
-    queues,
-    pipelineVersion: config.documents.pipelineVersion,
-    mediaModeration: {
-      onReady: (event) => {
-        // The message names the asset; the decision re-reads it. An id that
-        // is not one is archived by the handler's own outcome, not thrown.
-        const mediaAssetId = MediaAssetIdSchema.safeParse(event.mediaAssetId);
-        if (!mediaAssetId.success) {
-          return Promise.resolve({ kind: "SKIPPED" });
-        }
-        return mediaModeration({
-          tenantId: event.tenantId,
-          mediaAssetId: mediaAssetId.data,
-          correlationId: CorrelationIdSchema.parse(
-            event.correlationId ?? `cor_${randomUUID()}`,
-          ),
-        });
+  handle: withVerificationDecisions(
+    createDomainEventHandler({
+      registry,
+      queues,
+      pipelineVersion: config.documents.pipelineVersion,
+      mediaModeration: {
+        onReady: (event) => {
+          // The message names the asset; the decision re-reads it. An id that
+          // is not one is archived by the handler's own outcome, not thrown.
+          const mediaAssetId = MediaAssetIdSchema.safeParse(event.mediaAssetId);
+          if (!mediaAssetId.success) {
+            return Promise.resolve({ kind: "SKIPPED" });
+          }
+          return mediaModeration({
+            tenantId: event.tenantId,
+            mediaAssetId: mediaAssetId.data,
+            correlationId: CorrelationIdSchema.parse(
+              event.correlationId ?? `cor_${randomUUID()}`,
+            ),
+          });
+        },
       },
-    },
-    ...(founderReview === undefined ? {} : { founderReview }),
-    ...(mandateReview === undefined ? {} : { mandateReview }),
-    ...(presenceResearch === undefined ? {} : { presenceResearch }),
-    recommendations: {
-      onEvent: (event) =>
-        slateInvalidation.apply(refreshDirectiveFor(event), {
-          correlationId: event.correlationId,
-          causationId: `cau_${event.id}`,
-        }),
-    },
-    logger,
-  }),
+      ...(founderReview === undefined ? {} : { founderReview }),
+      ...(mandateReview === undefined ? {} : { mandateReview }),
+      ...(presenceResearch === undefined ? {} : { presenceResearch }),
+      recommendations: {
+        onEvent: (event) =>
+          slateInvalidation.apply(refreshDirectiveFor(event), {
+            correlationId: event.correlationId,
+            causationId: `cau_${event.id}`,
+          }),
+      },
+      logger,
+    }),
+    { registry, decide: verificationDecider, logger },
+  ),
   batchSize: config.documents.batchSize,
   pollIntervalMs: config.documents.pollIntervalMs,
   visibilityTimeoutSeconds: 60,
