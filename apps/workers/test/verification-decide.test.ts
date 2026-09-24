@@ -2,7 +2,6 @@ import { randomUUID } from "node:crypto";
 
 import { describe, expect, it } from "vitest";
 
-import type { MaterialActionAuditWriter } from "@capital-q/audit";
 import {
   createEventRegistry,
   UtcTimestampSchema,
@@ -30,6 +29,12 @@ import { createRecordingLogger, TENANT_A } from "./support/fakes.js";
  * missing attestation decides nothing; a redelivery decides nothing twice;
  * and the message always reaches the other consumers.
  */
+
+// The worker does not depend on @capital-q/audit; the writer's type is the
+// one the decider itself accepts.
+type MaterialActionAuditWriter = NonNullable<
+  Parameters<typeof createSyntheticVerificationDecider>[0]["audit"]
+>;
 
 const registry = createEventRegistry([...VERIFICATION_EVENTS]);
 const PROOF = {

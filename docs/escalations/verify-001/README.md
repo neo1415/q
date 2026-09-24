@@ -90,7 +90,7 @@ when the lead decides to add it:
 - the route `POST /v1/operator/verification/claims/:claimId/decision`
   (service-role credential isolated in the api process, never in the
   browser), body `{ status: "VERIFIED" | "REVOKED", decisionBasis,
-  revocationReason? }`, Idempotency-Key required, audited as
+revocationReason? }`, Idempotency-Key required, audited as
   `verification.claim.decided` with `method = OPERATOR_DECISION`,
   `decided_by_actor_type = HUMAN`, `decided_by_user_id = operator`.
 
