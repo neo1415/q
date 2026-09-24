@@ -172,7 +172,7 @@ export function InvestorVisibilityScreen({
         className="cq-panel max-w-(--cq-layout-reading)"
         data-visible={visible ? "true" : "false"}
       >
-        <header className="cq-panel-header">
+        <header className="cq-panel-header flex-wrap">
           <h2
             id="investor-visibility-status"
             className="cq-title-md text-(--cq-text-primary)"
@@ -266,7 +266,7 @@ export function InvestorVisibilityScreen({
         </div>
       </section>
 
-      <p className="cq-status-line">
+      <p className="cq-caption max-w-(--cq-layout-reading) text-(--cq-text-tertiary)">
         Profile version{" "}
         <span className="cq-numeric">{String(investor.version)}</span>. Changing
         visibility is recorded; nothing else about you is shared by it.

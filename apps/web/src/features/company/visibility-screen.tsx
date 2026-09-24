@@ -196,7 +196,7 @@ export function VisibilityScreen({ companyId }: VisibilityScreenProps) {
         className="cq-panel max-w-(--cq-layout-reading)"
         data-visible={visible ? "true" : "false"}
       >
-        <header className="cq-panel-header">
+        <header className="cq-panel-header flex-wrap">
           <h2
             id="visibility-status"
             className="cq-title-md text-(--cq-text-primary)"
