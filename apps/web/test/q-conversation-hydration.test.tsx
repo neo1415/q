@@ -133,3 +133,26 @@ describe("QX-003A · a conversation reopened from its URL", () => {
     expect(screen.getByTestId("surface").dataset["turns"]).toBe("2");
   });
 });
+
+describe("a conversation opened while its run is still answering", () => {
+  it("shows the person's own question from the record, not only Q's side (Home card → /home?c=)", async () => {
+    const live = detail();
+    readQConversationAction.mockResolvedValue({
+      ok: true,
+      value: {
+        ...live,
+        latestRun: { runId: RUN, status: "RUNNING", createdAt: AT },
+        // Q has not written anything yet: only the question is recorded.
+        messages: live.messages.filter((m) => m.role === "USER"),
+      },
+    });
+    render(
+      <StrictMode>
+        <Surface conversationId={CONVERSATION} />
+      </StrictMode>,
+    );
+    await waitFor(() => {
+      expect(screen.getByText("Review my company")).toBeTruthy();
+    });
+  });
+});
