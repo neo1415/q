@@ -266,7 +266,10 @@ export function createRequestCompanyVerification(
         ORGANISATION: company.organisationId,
       };
       const requested: VerificationClaimType[] = [];
-      for (const [index, claimType] of COMPANY_VERIFICATION_CLAIM_TYPES.entries()) {
+      for (const [
+        index,
+        claimType,
+      ] of COMPANY_VERIFICATION_CLAIM_TYPES.entries()) {
         const standing = view.standings[index];
         if (standing === undefined || !isRequestable(standing.status)) continue;
         const claim = await repository.insertPending(tx, {

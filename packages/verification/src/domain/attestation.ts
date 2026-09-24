@@ -20,9 +20,7 @@ export type SyntheticDemoAttestation = {
 const NEVER_SYNTHETIC = new Set(["production", "preview"]);
 
 export type SyntheticDecisionRefusal =
-  | "NO_ATTESTATION"
-  | "PRODUCTION_POSTURE"
-  | "PRINCIPAL_NOT_SYNTHETIC";
+  "NO_ATTESTATION" | "PRODUCTION_POSTURE" | "PRINCIPAL_NOT_SYNTHETIC";
 
 /**
  * Deployment-level gate. Belt and braces: the allowance factory already
@@ -42,9 +40,7 @@ export function deploymentRefusal(
   return null;
 }
 
-export function decisionBasisOf(
-  attestation: SyntheticDemoAttestation,
-): string {
+export function decisionBasisOf(attestation: SyntheticDemoAttestation): string {
   return [
     ...attestation.attestation,
     "requesting account marked synthetic",

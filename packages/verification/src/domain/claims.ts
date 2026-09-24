@@ -21,8 +21,7 @@ import type {
  */
 
 export type VerificationProvider =
-  | "CAPITAL_Q_SYNTHETIC_DEMO"
-  | "CAPITAL_Q_OPERATOR";
+  "CAPITAL_Q_SYNTHETIC_DEMO" | "CAPITAL_Q_OPERATOR";
 
 export type VerificationClaim = {
   readonly id: string;

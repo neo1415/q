@@ -46,7 +46,9 @@ const Row = z.object({
   revision: z.number().int().min(1),
   decides_claim_id: z.string().uuid().nullable(),
   method: VerificationMethodSchema.nullable(),
-  provider: z.enum(["CAPITAL_Q_SYNTHETIC_DEMO", "CAPITAL_Q_OPERATOR"]).nullable(),
+  provider: z
+    .enum(["CAPITAL_Q_SYNTHETIC_DEMO", "CAPITAL_Q_OPERATOR"])
+    .nullable(),
   decision_basis: z.string().nullable(),
   decided_by_actor_type: z.enum(["HUMAN", "SYSTEM"]).nullable(),
   decided_by_user_id: z.string().uuid().nullable(),
