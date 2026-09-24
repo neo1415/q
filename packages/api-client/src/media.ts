@@ -4,14 +4,17 @@ import {
   CompanyMediaListResponseSchema,
   CompanyPitchResponseSchema,
   CreateCompanyPitchResponseSchema,
+  MEDIA_PLAYBACK_POLICY_SUFFIX,
   MEDIA_PLAYBACK_SUFFIX,
   MEDIA_SYNC_SUFFIX,
   MEDIA_UPLOAD_SESSION_SUFFIX,
   MediaUploadSessionDtoSchema,
   PlaybackAuthorizationDtoSchema,
+  SetPitchPlaybackPolicyResponseSchema,
   SyncMediaAssetResponseSchema,
   type CreateCompanyPitchRequest,
   type CreateMediaUploadSessionRequest,
+  type SetPitchPlaybackPolicyRequest,
 } from "@capital-q/contracts";
 
 import { call, type ApiSession } from "./request.js";
@@ -124,6 +127,26 @@ export function syncPitch(
     `${assetPath(companyId, mediaAssetId)}${MEDIA_SYNC_SUFFIX}`,
     SyncMediaAssetResponseSchema,
     { body: {} },
+  );
+}
+
+/**
+ * `POST …/pitch/:mediaAssetId/playback-policy` — the founder's decision on
+ * whether investors may be granted playback (CQ-MEDIA-013). Reversible,
+ * and versioned so a stale screen never decides.
+ */
+export function setPitchPlaybackPolicy(
+  session: ApiSession,
+  companyId: string,
+  mediaAssetId: string,
+  request: SetPitchPlaybackPolicyRequest,
+) {
+  return call(
+    session,
+    "POST",
+    `${assetPath(companyId, mediaAssetId)}${MEDIA_PLAYBACK_POLICY_SUFFIX}`,
+    SetPitchPlaybackPolicyResponseSchema,
+    { body: request },
   );
 }
 

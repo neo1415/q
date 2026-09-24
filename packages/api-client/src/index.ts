@@ -118,6 +118,7 @@ export {
   deletePitchMediaAsset,
   getCompanyPitch,
   listCompanyMedia,
+  setPitchPlaybackPolicy,
   syncPitch,
 } from "./media.js";
 

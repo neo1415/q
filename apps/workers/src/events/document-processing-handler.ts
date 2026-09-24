@@ -45,6 +45,7 @@ const PROCESS_TRIGGER_EVENT = "evidence.document.version_created";
 const READY_EVENT = "evidence.document.ready";
 /** An investor's narrative answer → Q's reading of the mandate (CQ-PRE-REC-001 §6). */
 const RESPONSE_COMMITTED_EVENT = "onboarding.response.committed";
+const MEDIA_STATUS_CHANGED_EVENT = "media.asset.status_changed";
 /**
  * A free-text turn of the conversational interview that no deterministic
  * rule could place (CQ-PRE-REC-001 §20): the journey's own reading turns it
@@ -140,7 +141,27 @@ export type DocumentProcessingHandlerOptions = {
         }>;
       }
     | undefined;
+  /**
+   * Automated moderation (CQ-MEDIA-013): Capital Q's integrity decision,
+   * applied when a pitch becomes READY. Identifiers only; the asset and
+   * its technical facts are re-read under a row lock, never trusted from
+   * the message, and the decision is idempotent under redelivery.
+   */
+  readonly mediaModeration?:
+    | {
+        readonly onReady: (event: {
+          readonly tenantId: TenantId;
+          readonly mediaAssetId: string;
+          readonly correlationId: string | undefined;
+        }) => Promise<{ readonly kind: string }>;
+      }
+    | undefined;
   readonly logger: RunnerLogger;
+};
+
+type MediaStatusChangedData = {
+  readonly mediaAssetId: string;
+  readonly status: string;
 };
 
 /**
@@ -188,6 +209,7 @@ export function createDomainEventHandler(
     mandateReview,
     presenceResearch,
     recommendations,
+    mediaModeration,
     logger,
   } = options;
 
@@ -215,6 +237,34 @@ export function createDomainEventHandler(
           "recommendation slate refresh failed; retrying",
         );
         return { kind: "RETRY", errorCode: "RECOMMENDATION_REFRESH_FAILED" };
+      }
+    }
+    if (event.type === MEDIA_STATUS_CHANGED_EVENT) {
+      const changed = event.data as MediaStatusChangedData;
+      if (mediaModeration === undefined || changed.status !== "READY") {
+        return { kind: "ARCHIVE" };
+      }
+      const tenantId = TenantIdSchema.safeParse(event.tenantId);
+      if (!tenantId.success) {
+        return { kind: "ARCHIVE" };
+      }
+      try {
+        const outcome = await mediaModeration.onReady({
+          tenantId: tenantId.data,
+          mediaAssetId: changed.mediaAssetId,
+          correlationId: event.correlationId,
+        });
+        logger.info(
+          { msgId: message.msgId, eventId: event.id, outcome: outcome.kind },
+          "pitch moderation applied",
+        );
+        return { kind: "ARCHIVE" };
+      } catch (error: unknown) {
+        logger.warn(
+          { err: error, msgId: message.msgId, eventId: event.id },
+          "pitch moderation failed; retrying",
+        );
+        return { kind: "RETRY", errorCode: "MEDIA_MODERATION_FAILED" };
       }
     }
     if (event.type === RESPONSE_COMMITTED_EVENT) {

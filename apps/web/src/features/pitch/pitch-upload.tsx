@@ -31,6 +31,7 @@ import {
   createPitchAction,
   createUploadSessionAction,
   loadPitchOverviewAction,
+  setPitchPlaybackPolicyAction,
   syncPitchAction,
 } from "./pitch-actions";
 import {
@@ -137,6 +138,8 @@ export function PitchUpload({ companyId }: PitchUploadProps) {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [fileNotice, setFileNotice] = useState<string | null>(null);
   const [preview, setPreview] = useState<Preview | null>(null);
+  const [deciding, setDeciding] = useState(false);
+  const [decisionNotice, setDecisionNotice] = useState<string | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
   const uploadAbort = useRef<AbortController | null>(null);
   // The OS preference, read as an external store: the server renders
@@ -240,6 +243,31 @@ export function PitchUpload({ companyId }: PitchUploadProps) {
         throw new Error(result.message);
       }
       return result.value;
+    },
+    [companyId],
+  );
+
+  // The founder's decision (CQ-MEDIA-013): one command, against the
+  // version this screen saw, and the record re-read afterwards. Nothing
+  // here decides discoverability; the standing line reports it.
+  const decide = useCallback(
+    async (pitch: MediaAssetDto, playbackPolicy: "AUTHORISED" | "PRIVATE") => {
+      setDeciding(true);
+      setDecisionNotice(null);
+      const result = await setPitchPlaybackPolicyAction(
+        companyId,
+        pitch.mediaAssetId,
+        playbackPolicy,
+        pitch.version,
+      );
+      setDeciding(false);
+      if (!result.ok) {
+        setDecisionNotice(result.message);
+        return;
+      }
+      dispatch({ type: "PITCH_UPDATED", pitch: result.value });
+      const overview = await loadPitchOverviewAction(companyId);
+      if (overview.ok) setCompany(overview.value.company);
     },
     [companyId],
   );
@@ -457,6 +485,38 @@ export function PitchUpload({ companyId }: PitchUploadProps) {
         title="Who sees it"
         description="A pitch reaches investors through the same door as the rest of your profile."
       >
+        {flow.kind === "READY" ? (
+          <div className="mb-4 flex flex-wrap items-center gap-3">
+            {flow.pitch.playbackPolicy === "PRIVATE" ? (
+              <Button
+                variant="primary"
+                disabled={deciding}
+                onClick={() => void decide(flow.pitch, "AUTHORISED")}
+              >
+                Let investors play this pitch
+              </Button>
+            ) : (
+              <>
+                <span className="cq-status-line">
+                  <Check size={ICON_SIZE.compact} aria-hidden="true" />
+                  Investors may play this pitch
+                </span>
+                <Button
+                  variant="quiet"
+                  disabled={deciding}
+                  onClick={() => void decide(flow.pitch, "PRIVATE")}
+                >
+                  Keep it private
+                </Button>
+              </>
+            )}
+          </div>
+        ) : null}
+        {decisionNotice !== null ? (
+          <InlineNotice tone="warning" className="mb-4">
+            {decisionNotice}
+          </InlineNotice>
+        ) : null}
         <p className="cq-status-line">
           {standing.visible ? (
             <Check size={ICON_SIZE.compact} aria-hidden="true" />

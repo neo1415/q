@@ -318,7 +318,7 @@ describe("describeNetworkStanding", () => {
     );
     expect(standing.visible).toBe(false);
     expect(standing.sentence).toBe(
-      "Your pitch is ready. Before investors see it, it needs a review of the video, playback to be opened beyond your organisation and your company to be visible to the network.",
+      "Your pitch is ready. Before investors see it, it needs a review of the video, your decision to let investors play it and your company to be visible to the network.",
     );
     expect(
       describeNetworkStanding(

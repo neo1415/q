@@ -160,6 +160,44 @@ export async function syncPitchAction(
   return run((transport) => transport.sync(companyId.data, mediaAssetId.data));
 }
 
+const OwnerPolicyInput = z.enum(["AUTHORISED", "PRIVATE"]);
+
+/**
+ * The founder's decision: may investors be granted playback (CQ-MEDIA-013).
+ *
+ * This is the one entry point for that decision from the web. A later
+ * packet that lets a founder ask Q to "publish my pitch" prepares this
+ * same command through the approval engine and calls the same route; it
+ * does not get a second way in, and neither does anything else.
+ */
+export async function setPitchPlaybackPolicyAction(
+  rawCompanyId: string,
+  rawMediaAssetId: string,
+  rawPlaybackPolicy: string,
+  rawExpectedVersion: number,
+): Promise<PitchActionResult<MediaAssetDto>> {
+  const companyId = UuidInput.safeParse(rawCompanyId);
+  const mediaAssetId = UuidInput.safeParse(rawMediaAssetId);
+  const playbackPolicy = OwnerPolicyInput.safeParse(rawPlaybackPolicy);
+  const expectedVersion = VersionInput.safeParse(rawExpectedVersion);
+  if (
+    !companyId.success ||
+    !mediaAssetId.success ||
+    !playbackPolicy.success ||
+    !expectedVersion.success
+  ) {
+    return { ok: false, message: "That request couldn't be made." };
+  }
+  return run((transport) =>
+    transport.setPlaybackPolicy(
+      companyId.data,
+      mediaAssetId.data,
+      playbackPolicy.data,
+      expectedVersion.data,
+    ),
+  );
+}
+
 export async function authorisePitchPlaybackAction(
   rawCompanyId: string,
   rawMediaAssetId: string,

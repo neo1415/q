@@ -6,6 +6,7 @@ import {
   CreateCompanyPitchRequestSchema,
   CreateMediaUploadSessionRequestSchema,
   createProblemDetails,
+  MEDIA_PLAYBACK_POLICY_SUFFIX,
   MEDIA_PLAYBACK_SUFFIX,
   MEDIA_SYNC_SUFFIX,
   MEDIA_UPLOAD_SESSION_SUFFIX,
@@ -13,6 +14,8 @@ import {
   parseContract,
   PlaybackAuthorizationDtoSchema,
   PROBLEM_CONTENT_TYPE,
+  SetPitchPlaybackPolicyRequestSchema,
+  SetPitchPlaybackPolicyResponseSchema,
   SyncMediaAssetRequestSchema,
   SyncMediaAssetResponseSchema,
   UuidSchema,
@@ -304,6 +307,35 @@ function registerPitchRoutes(
       return reply
         .header("Cache-Control", "no-store")
         .send(SyncMediaAssetResponseSchema.parse({ pitch: payload(asset) }));
+    },
+  );
+
+  // The founder's decision on who may be granted playback (CQ-MEDIA-013).
+  // Reversible and consequential: `media.manage`, versioned, audited. It
+  // opens one gate; discoverability still needs review and visibility.
+  app.post(
+    `${pitch}/:mediaAssetId${MEDIA_PLAYBACK_POLICY_SUFFIX}`,
+    { onRequest: withContext },
+    async (request, reply) => {
+      const actor = getActorContext(request);
+      const input = parseContract(
+        SetPitchPlaybackPolicyRequestSchema,
+        request.body ?? {},
+        "The playback policy request is not valid.",
+      );
+      const asset = await service.setPitchPlaybackPolicy({
+        actor,
+        companyId: companyIdParam(request),
+        mediaAssetId: mediaAssetIdParam(request),
+        playbackPolicy: input.playbackPolicy,
+        expectedVersion: input.expectedVersion,
+        correlationId: correlation(),
+      });
+      return reply
+        .header("Cache-Control", "no-store")
+        .send(
+          SetPitchPlaybackPolicyResponseSchema.parse({ pitch: payload(asset) }),
+        );
     },
   );
 

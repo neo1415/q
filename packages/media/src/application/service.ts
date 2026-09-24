@@ -17,6 +17,10 @@ import {
 } from "./pitch-use-cases.js";
 import type { MediaRepositories, PitchViewerAccessPort } from "./ports.js";
 import {
+  createApplyAutomatedModeration,
+  createSetPitchPlaybackPolicy,
+} from "./publish-use-cases.js";
+import {
   createAuthorisePlayback,
   createCreateUploadSession,
   createSyncMediaAsset,
@@ -47,6 +51,13 @@ export type MediaService = {
   readonly createUploadSession: ReturnType<typeof createCreateUploadSession>;
   readonly syncMediaAsset: ReturnType<typeof createSyncMediaAsset>;
   readonly authorisePlayback: ReturnType<typeof createAuthorisePlayback>;
+  /** The publish path (CQ-MEDIA-013): the owner's decision, and the platform's. */
+  readonly setPitchPlaybackPolicy: ReturnType<
+    typeof createSetPitchPlaybackPolicy
+  >;
+  readonly applyAutomatedModeration: ReturnType<
+    typeof createApplyAutomatedModeration
+  >;
   /**
    * Which provider this deployment composed and what it can do. Names and
    * booleans only — safe for a health line, useless to an attacker.
@@ -102,5 +113,7 @@ export function createMediaService(options: MediaServiceOptions): MediaService {
     createUploadSession: createCreateUploadSession(dependencies),
     syncMediaAsset: createSyncMediaAsset(dependencies),
     authorisePlayback: createAuthorisePlayback(dependencies),
+    setPitchPlaybackPolicy: createSetPitchPlaybackPolicy(dependencies),
+    applyAutomatedModeration: createApplyAutomatedModeration(dependencies),
   };
 }

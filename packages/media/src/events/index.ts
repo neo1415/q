@@ -17,6 +17,8 @@ import {
   MediaOwnerTypeSchema,
   MediaPurposeSchema,
   MediaStatusSchema,
+  ModerationStatusSchema,
+  PlaybackPolicySchema,
 } from "../contracts/index.js";
 
 /**
@@ -121,11 +123,67 @@ export const MediaAssetStatusChangedEvent = defineEvent({
     "A media asset moved one step along Capital Q's lifecycle, as observed from the provider. Carries no provider identifier, upload target or playback material.",
 });
 
+/**
+ * The founder's commercial decision (CQ-MEDIA-013): whether investors may
+ * play the pitch. A separate axis from the lifecycle and from moderation,
+ * and a separate event, so a consumer never has to infer a decision from
+ * a status.
+ */
+export const MediaAssetPlaybackPolicyChangedEvent = defineEvent({
+  name: "media.asset.playback_policy_changed",
+  version: 1,
+  owner: MEDIA_EVENT_OWNER,
+  producer: MEDIA_EVENT_PRODUCER,
+  consumers: CONSUMERS,
+  sensitivity: "INTERNAL",
+  replaySafety: "REPLAY_SAFE",
+  dataSchema: z
+    .object({
+      ...ownership,
+      previousPlaybackPolicy: PlaybackPolicySchema,
+      playbackPolicy: PlaybackPolicySchema,
+    })
+    .strict(),
+  description:
+    "The owner changed who may be granted playback of a media asset. Discoverability follows the existing rules; nothing here publishes anything by itself.",
+});
+
+/**
+ * Capital Q's integrity decision (CQ-MEDIA-013): what review concluded and
+ * who concluded it. Provenance travels with the decision so a consumer
+ * can tell a rule's verdict from a person's.
+ */
+export const MediaAssetModeratedEvent = defineEvent({
+  name: "media.asset.moderated",
+  version: 1,
+  owner: MEDIA_EVENT_OWNER,
+  producer: MEDIA_EVENT_PRODUCER,
+  consumers: CONSUMERS,
+  sensitivity: "INTERNAL",
+  replaySafety: "REPLAY_SAFE",
+  dataSchema: z
+    .object({
+      ...ownership,
+      previousModerationStatus: ModerationStatusSchema,
+      moderationStatus: ModerationStatusSchema,
+      /** AUTOMATED_RULE_V1 today; a reviewer's provenance when one exists. */
+      provenance: z.string().min(1).max(64),
+      ruleVersion: z.string().min(1).max(64).nullable(),
+      /** Why a rule held rather than allowed; empty when it allowed. */
+      holdReasons: z.array(z.string().max(64)).max(16),
+    })
+    .strict(),
+  description:
+    "A moderation decision was recorded for a media asset, with its provenance. Automation only ever allows or holds for a person; it never blocks.",
+});
+
 export const MEDIA_EVENTS: readonly EventDefinition[] = [
   MediaAssetCreatedEvent,
   MediaAssetReplacedEvent,
   MediaAssetDeletedEvent,
   MediaAssetStatusChangedEvent,
+  MediaAssetPlaybackPolicyChangedEvent,
+  MediaAssetModeratedEvent,
 ];
 
 type Context = {
@@ -134,9 +192,20 @@ type Context = {
   readonly correlationId: CorrelationId;
 };
 
+/**
+ * The platform acting on its own authority (CQ-MEDIA-013): a rule ran, no
+ * person pressed anything. Attributable without an actor id, exactly as
+ * the envelope allows for SYSTEM.
+ */
+export type SystemContext = {
+  readonly tenantId: string;
+  readonly organisationId: string;
+  readonly correlationId: CorrelationId;
+};
+
 function envelope<TData>(
   definition: EventDefinition,
-  context: Context,
+  context: Context | SystemContext,
   aggregate: {
     readonly type: string;
     readonly id: string;
@@ -144,6 +213,19 @@ function envelope<TData>(
   },
   data: TData,
 ): CapitalQEvent<TData> {
+  const attribution: {
+    readonly tenantId: string;
+    readonly actor: {
+      readonly type: "SYSTEM" | ActorContext["actorType"];
+      readonly id?: string;
+    };
+  } =
+    "actor" in context
+      ? {
+          tenantId: context.actor.tenantId,
+          actor: { type: context.actor.actorType, id: context.actor.userId },
+        }
+      : { tenantId: context.tenantId, actor: { type: "SYSTEM" } };
   return {
     specVersion: "1.0",
     id: EventIdSchema.parse(randomUUID()),
@@ -153,13 +235,39 @@ function envelope<TData>(
     subject: `${aggregate.type}/${aggregate.id}`,
     dataContentType: "application/json",
     eventVersion: definition.version,
-    tenantId: context.actor.tenantId,
+    tenantId: attribution.tenantId,
     organisationId: context.organisationId,
-    actor: { type: context.actor.actorType, id: context.actor.userId },
+    actor: attribution.actor,
     correlationId: context.correlationId,
     aggregate,
     data,
   };
+}
+
+export function mediaAssetPlaybackPolicyChangedEvent(
+  context: Context,
+  assetVersion: number,
+  data: z.infer<typeof MediaAssetPlaybackPolicyChangedEvent.dataSchema>,
+) {
+  return envelope(
+    MediaAssetPlaybackPolicyChangedEvent,
+    context,
+    { type: "media_asset", id: data.mediaAssetId, version: assetVersion },
+    data,
+  );
+}
+
+export function mediaAssetModeratedEvent(
+  context: Context | SystemContext,
+  assetVersion: number,
+  data: z.infer<typeof MediaAssetModeratedEvent.dataSchema>,
+) {
+  return envelope(
+    MediaAssetModeratedEvent,
+    context,
+    { type: "media_asset", id: data.mediaAssetId, version: assetVersion },
+    data,
+  );
 }
 
 export function mediaAssetCreatedEvent(
