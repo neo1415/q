@@ -45,6 +45,7 @@ import {
   DISPLAY_NAME_NOTE,
   clearsOnPurpose,
   withoutActionTalk,
+  requestedChangeValues,
   type QMemoryRecall,
   type QProfileUpdateNotebook,
   type QUserStatementRecorder,
@@ -716,6 +717,9 @@ export function createCompanyIntelligenceSpecialist(
           },
           {
             schema: CompanyAnalystV8ResultSchema,
+            // Independent readings: one malformed statement must not throw
+            // away the change beside it (CQ-QX-007 A5).
+            invalidListItems: "DROP",
             ...(context.signal === undefined ? {} : { signal: context.signal }),
           },
         );
@@ -787,7 +791,11 @@ export function createCompanyIntelligenceSpecialist(
         // model itself named as such never reach the person.
         synthesis = citeAuthorisedFacts(
           citePublicSources(
-            withoutActionTalk(analyst.answer, analyst.actionTalk).text,
+            withoutActionTalk(
+              analyst.answer,
+              analyst.actionTalk,
+              requestedChangeValues(analyst, request.question),
+            ).text,
             researchRead?.sources ?? [],
           ),
           // The person-facing source, never the line the model reads:
