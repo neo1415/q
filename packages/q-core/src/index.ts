@@ -201,6 +201,7 @@ export { COMPANY_ANALYST_V4 } from "./prompts/tasks/company-analyst.v4.js";
 export { COMPANY_ANALYST_V5 } from "./prompts/tasks/company-analyst.v5.js";
 export { COMPANY_ANALYST_V6 } from "./prompts/tasks/company-analyst.v6.js";
 export { COMPANY_ANALYST_V7 } from "./prompts/tasks/company-analyst.v7.js";
+export { COMPANY_ANALYST_V8 } from "./prompts/tasks/company-analyst.v8.js";
 export { ARTIFACT_REVISION_V1 } from "./prompts/tasks/artifact-revision.v1.js";
 export {
   ARTIFACT_REVISION_BODY_MAX,
@@ -245,6 +246,7 @@ export {
   COMPANY_ANALYST_V4_UNTRUSTED,
   COMPANY_ANALYST_V5_SCHEMA_VERSION,
   COMPANY_ANALYST_V6_SCHEMA_VERSION,
+  COMPANY_ANALYST_V8_SCHEMA_VERSION,
   COMPANY_ANALYST_V5_UNTRUSTED,
   ARTIFACT_REQUEST_KINDS,
   ARTIFACT_REQUEST_TYPES,
@@ -253,11 +255,13 @@ export {
   ArtifactRequestV2Schema,
   CompanyAnalystV5ResultSchema,
   CompanyAnalystV6ResultSchema,
+  CompanyAnalystV8ResultSchema,
   CompanyAnalystV5VariablesSchema,
   type ArtifactRequest,
   type ArtifactRequestV2,
   type CompanyAnalystV5Result,
   type CompanyAnalystV6Result,
+  type CompanyAnalystV8Result,
   type CompanyAnalystV5Variables,
   CompanyAnalystV4ResultSchema,
   CompanyAnalystV4VariablesSchema,

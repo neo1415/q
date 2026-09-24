@@ -41,7 +41,10 @@ export const COMPANY_ANALYST_V7: PromptDefinition<
 > = {
   ...COMPANY_ANALYST_V6,
   version: 7,
-  status: "ACTIVE",
+  // Deprecated by v8 (CQ-QX-007), which stops telling the model to say a
+  // name change is ready for approval and separates talk about acting from
+  // the answer. Retired, never removed.
+  status: "DEPRECATED",
   changeDescription:
     "CQ-QX-005: the reply to a document request never narrates the structured output (no 'request recorded', no 'awaiting approval', no schema field names); the platform reports the document itself.",
   effectiveFrom: "2026-09-24",
