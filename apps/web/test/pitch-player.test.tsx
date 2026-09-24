@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { render, screen, waitFor } from "@testing-library/react";
+import { StrictMode } from "react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -190,6 +191,30 @@ describe("the player element", () => {
     expect(video.getAttribute("playsinline")).not.toBeNull();
     expect(video.getAttribute("preload")).toBe("auto");
     expect(video.poster).toBe("https://cdn.test/sample.jpg");
+  });
+
+  it("still attaches the pitch when its effects run twice (CQ-ACCEPT-001, C7)", async () => {
+    // React's development double-run cancels the first request. The
+    // cancelled one used to keep the in-flight slot, so the second run
+    // never asked and the card stayed an empty grey box forever.
+    const authorize = vi.fn(() => Promise.resolve(authorization()));
+    const { container } = render(
+      <StrictMode>
+        <PitchPlayer
+          company={company(1)}
+          policy="ACTIVE"
+          authorize={authorize}
+          reducedMotion={false}
+        />
+      </StrictMode>,
+    );
+
+    await waitFor(() =>
+      expect(videoIn(container).getAttribute("src")).toBe(
+        "https://cdn.test/sample.mp4",
+      ),
+    );
+    expect(videoIn(container).poster).toBe("https://cdn.test/sample.jpg");
   });
 
   it("attaches no source and requests nothing for a cold card", () => {
