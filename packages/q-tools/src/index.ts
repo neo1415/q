@@ -48,7 +48,12 @@ export {
   planScopeKinds,
   scopesOfKind,
 } from "./plan.js";
-export type { QToolPorts } from "./ports.js";
+export type {
+  InvestorFeedCompany,
+  InvestorFeedDecision,
+  InvestorFeedPort,
+  QToolPorts,
+} from "./ports.js";
 export {
   createQToolRegistry,
   inputJsonSchemaOf,

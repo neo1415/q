@@ -103,7 +103,7 @@ export function createSearchCompaniesTool(
     status: "ACTIVE",
     providerName: "search_companies",
     description:
-      "Searches companies visible across the Capital Q network by name substring, stage code and headquarters country, returning up to 20 per page with a cursor. Call it to find candidate companies; then use get_company for a profile. Results are declared profiles, not assessments.",
+      "Searches companies visible across the Capital Q network by name substring, stage code and headquarters country, returning up to 20 per page with a cursor. Call it to find a company the person names or describes; then use get_company for a profile. Results are declared profiles, not assessments, and not recommendations: being visible is not being in anyone's feed, so never use these results to say what an investor should look at — that comes only from discovery_slate.",
     classification: "READ_ONLY",
     riskClass: "SAFE_READ",
     requiredCapabilities: [],

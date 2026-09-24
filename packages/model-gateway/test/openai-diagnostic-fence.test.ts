@@ -167,6 +167,34 @@ describe("the OpenAI adapter runs one model and no other", () => {
     }
   });
 
+  // CQ-VOICE-010: it asked for "low" whatever the caller wanted; on the
+  // interview turn that was about three seconds at the tail.
+  it("asks for the effort the caller asked for, and nothing more", async () => {
+    const efforts: unknown[] = [];
+    const client = {
+      responses: {
+        create: (params: { reasoning?: { effort?: unknown } }) => {
+          efforts.push(params.reasoning?.effort);
+          return Promise.resolve({
+            id: "resp_1",
+            model: "gpt-5.6-luna",
+            output: [],
+            output_text: "ok",
+            status: "completed",
+          });
+        },
+      },
+    };
+    const fenced = createOpenAIModelProvider({
+      apiKey: "sk-not-a-real-key",
+      client: client as never,
+    });
+    for (const reasoning of ["NONE", "LOW", "MEDIUM", "HIGH"] as const) {
+      await fenced.generate({ ...request("gpt-5.6-luna"), reasoning }, context);
+    }
+    expect(efforts).toEqual(["none", "low", "medium", "high"]);
+  });
+
   it("never puts the key in an error it throws", async () => {
     const error = await adapter
       .generate(request("gpt-5.6-terra"), context)

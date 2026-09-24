@@ -174,9 +174,10 @@ describe("the ElevenLabs relay", () => {
       `https://api.elevenlabs.io/v1/text-to-speech/${FEMALE_VOICE_ID}/stream?output_format=pcm_24000`,
     );
     expect(calls[0]?.key).toBe(KEY);
+    // v3 conversational, chosen by listening (CQ-VOICE-010).
     expect(calls[0]?.body).toEqual({
       text: "Fifty thousand euros.",
-      model_id: "eleven_turbo_v2_5",
+      model_id: "eleven_v3_conversational",
     });
   });
 

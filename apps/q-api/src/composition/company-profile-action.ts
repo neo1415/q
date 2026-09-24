@@ -489,11 +489,18 @@ export function createProfileUpdateBoard(
       for (const update of entry.updates) {
         // "kivu-freight.example" is what people say; the field holds an
         // http(s) URL. The same normaliser onboarding writes through, so a
-        // website typed to Q and one typed in setup land identically.
-        changes[update.field] =
-          update.field === "websiteUrl" && update.value !== null
-            ? normaliseWebsite(update.value)
-            : update.value;
+        // website typed to Q and one typed in setup land identically — and
+        // a value that is not a public web address ("instagram") is refused
+        // the same way in both, here as an honest refusal, not a throw.
+        if (update.field === "websiteUrl" && update.value !== null) {
+          try {
+            changes[update.field] = normaliseWebsite(update.value);
+          } catch {
+            return Promise.resolve({ refused: refusalReason(["websiteUrl"]) });
+          }
+        } else {
+          changes[update.field] = update.value;
+        }
       }
       const parsed = CompanyProfileUpdatePayloadSchema.safeParse({
         companyId: entry.companyId,

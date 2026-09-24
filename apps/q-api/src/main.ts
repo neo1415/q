@@ -139,11 +139,13 @@ import {
   createProfileUpdateBoard,
 } from "./composition/company-profile-action.js";
 import { createCompanyVisibilitySetAction } from "./composition/company-visibility-action.js";
+import { createInvestorFeedPort } from "./composition/investor-feed.js";
 import {
   createDiscoveryService,
   createPostgresCompanyCardPort,
   createCurrentSlateExplanationService,
   createPostgresDiscoveryRepository,
+  createPostgresInvestorDecisionReader,
   createRecommendationExplanationService,
   createSlateReadPipeline,
   readFeatureSnapshotById,
@@ -162,14 +164,25 @@ import { createVoiceTurnBoard } from "./voice/turn-board.js";
 import { createWelcomeHost } from "./voice/welcome.js";
 import type { VoiceAttachment } from "./voice/provider.js";
 import { createDeepgramVoiceProvider } from "./voice/providers/deepgram.js";
-import { createDeepgramSpeechSynthesis } from "./voice/providers/deepgram-speak.js";
+import {
+  createDeepgramSpeakStream,
+  createDeepgramSpeechSynthesis,
+} from "./voice/providers/deepgram-speak.js";
+import { speechWithFallback } from "./voice/synthesis.js";
 import {
   createElevenLabsSpeechRelay,
   createElevenLabsSpeechSynthesis,
 } from "./voice/providers/elevenlabs-speak.js";
 import { createElevenLabsVoiceProvider } from "./voice/providers/elevenlabs.js";
 import { Q_VOICE_SPEAK_RELAY_PATH } from "./voice/routes.js";
+import { createSpeechPerformanceBoard } from "./voice/speech-performance.js";
 import { createVoiceTurnHandler } from "./voice/turn.js";
+import {
+  createVoiceTurnTimings,
+  timedFetch,
+  timedModelGateway,
+  timedVoiceTurns,
+} from "./voice/turn-timing.js";
 import { createDecisionReader } from "./voice/decision.js";
 import { createPersonProfileUpdateAction } from "./composition/person-profile-action.js";
 import {
@@ -419,14 +432,24 @@ const modelCatalog = withTestRouting(
   },
 );
 
-const modelGateway = createModelGateway({
-  catalog: modelCatalog,
-  registry: createModelProviderRegistry(providers),
-  usage: createPostgresModelUsageRepository({ sql: database.sql }),
-  health: createProcessLocalProviderHealth(),
-  syntheticDemo,
-  logger,
-});
+/**
+ * Where each spoken turn's time goes (CQ-VOICE-010): one line per voice
+ * turn, "voice turn timed". Created before the gateway so that every model
+ * call made inside a voice turn is listed on it, whichever part of Q made
+ * it. Outside a voice turn the wrapper adds nothing.
+ */
+const voiceTimings = createVoiceTurnTimings({ logger });
+const modelGateway = timedModelGateway(
+  createModelGateway({
+    catalog: modelCatalog,
+    registry: createModelProviderRegistry(providers),
+    usage: createPostgresModelUsageRepository({ sql: database.sql }),
+    health: createProcessLocalProviderHealth(),
+    syntheticDemo,
+    logger,
+  }),
+  voiceTimings,
+);
 logger.info(
   { modelProviders: modelProviderConfigStatus(providerSecrets) },
   "model gateway composed",
@@ -567,6 +590,16 @@ const qTools = createQTools({
     // platform rather than from nothing.
     discovery: createDiscoveryService({
       repository: createPostgresDiscoveryRepository({ sql: database.sql }),
+    }),
+    // An investor's "what should I look at" is answered from their own
+    // feed — the same reader the Discover surface calls — and their own
+    // Save/Pass decisions by company id (CQ-QACT-001).
+    investorFeed: createInvestorFeedPort({
+      reader: slateRead.reader,
+      ports: slateRead.eligibilityPorts,
+      cards: createPostgresCompanyCardPort({ sql: database.sql }),
+      decisions: createPostgresInvestorDecisionReader({ sql: database.sql }),
+      logger,
     }),
     // Why a company is in this person's recommendations, from the
     // recommendation context itself. Without it Q explains nothing about
@@ -847,10 +880,20 @@ const voiceProvider =
       })
     : undefined;
 /**
+ * How Q's words sound, kept apart from what they are (CQ-VOICE-010): the
+ * delivery cues for each session's sentences wait here for the speak relay
+ * and never enter the text, the transcript or the thread.
+ */
+const speechPerformance = createSpeechPerformanceBoard();
+/**
  * Q's voice (QX-004 SPEAK rework): Deepgram listens, Q thinks, ElevenLabs
  * speaks. Composed from the ElevenLabs key alone — it needs no Speech
  * Engine resource, because this is plain text-to-speech and not the
  * whole-transport Speech Engine next to it.
+ *
+ * v3 conversational first, turbo for any utterance v3 fails or is slow to
+ * start, and Aura-2 (same Deepgram key as the transport) for one ElevenLabs
+ * cannot voice at all (CQ-VOICE-010).
  */
 const elevenLabsSpeech =
   speechSecrets.elevenLabs === undefined
@@ -858,9 +901,20 @@ const elevenLabsSpeech =
     : {
         oneWay: createElevenLabsSpeechSynthesis({
           apiKey: speechSecrets.elevenLabs.reveal(),
+          model: config.voice.ttsModel,
         }),
         relay: createElevenLabsSpeechRelay({
           apiKey: speechSecrets.elevenLabs.reveal(),
+          model: config.voice.ttsModel,
+          performance: speechPerformance,
+          timings: voiceTimings,
+          ...(speechSecrets.deepgram === undefined
+            ? {}
+            : {
+                aura: createDeepgramSpeakStream({
+                  apiKey: speechSecrets.deepgram.reveal(),
+                }),
+              }),
         }),
       };
 // The Deepgram Voice Agent transport: the key and this server's public
@@ -898,13 +952,18 @@ const deepgramProvider =
  * Voice Agent has to call this server back, and nothing calls back for
  * one-way synthesis.
  */
-const speechSynthesis =
-  elevenLabsSpeech?.oneWay ??
-  (speechSecrets.deepgram === undefined
-    ? undefined
-    : createDeepgramSpeechSynthesis({
-        apiKey: speechSecrets.deepgram.reveal(),
-      }));
+const speechSynthesis = speechWithFallback([
+  ...(elevenLabsSpeech === undefined ? [] : [elevenLabsSpeech.oneWay]),
+  // Aura-2 speaks a line only when ElevenLabs cannot (CQ-VOICE-010), and
+  // is the whole voice on a build without an ElevenLabs key.
+  ...(speechSecrets.deepgram === undefined
+    ? []
+    : [
+        createDeepgramSpeechSynthesis({
+          apiKey: speechSecrets.deepgram.reveal(),
+        }),
+      ]),
+]);
 const voiceBindings = createVoiceSessionBindings();
 // Q conducting the interview: one model-driven turn per utterance, every
 // reading validated and recorded through the onboarding runtime.
@@ -918,19 +977,26 @@ const interviewer = createInterviewer({
   dataPosture: demoDataPosture,
   logger,
   personality: config.voice.personality,
-  expressive: config.voice.expressive,
+  // Never inline audio tags in what Q says (CQ-VOICE-010). A tag written
+  // into the reply is in the transcript, the thread and memory, and a voice
+  // that cannot render it reads it out ("[laughs]" measured as "Halfs" on
+  // turbo v2.5). How a reply sounds travels beside it, never inside it, so
+  // Q_VOICE_EXPRESSIVE no longer reaches a prompt.
+  expressive: false,
   // The interview meets the same person twice and knows it (ADR 0012).
   memory: {
     recallText: (attribution) =>
-      memoryLearner.recall.recall({
-        actor: ActorContextSchema.parse({
-          userId: attribution.userId,
-          tenantId: attribution.tenantId,
-          actorType: "HUMAN",
+      voiceTimings.measure("memory", "recall", () =>
+        memoryLearner.recall.recall({
+          actor: ActorContextSchema.parse({
+            userId: attribution.userId,
+            tenantId: attribution.tenantId,
+            actorType: "HUMAN",
+          }),
+          runId: "interview",
+          subjects: [],
         }),
-        runId: "interview",
-        subjects: [],
-      }),
+      ),
   },
 });
 const voiceTurnBoard = createVoiceTurnBoard();
@@ -938,7 +1004,8 @@ const welcomeHost = createWelcomeHost({
   gateway: modelGateway,
   logger,
   personality: config.voice.personality,
-  expressive: config.voice.expressive,
+  // As for the interviewer: no stage directions inside what Q says.
+  expressive: false,
 });
 const pronunciation =
   config.secrets.speechProviders.elevenLabs !== undefined &&
@@ -956,46 +1023,56 @@ const pronunciation =
     : createLoggingPronunciationTeacher(logger);
 // One turn handler for every transport: the websocket channel and the
 // think route both hand it a bound conversation and a speaker.
-const voiceTurn = createVoiceTurnHandler({
-  qRuntime,
-  qStream,
-  interviewer,
-  board: voiceTurnBoard,
-  welcome: welcomeHost,
-  pronunciation,
-  // A spoken yes to a proposal is the same decision a tap records.
-  approvals: qActions,
-  // And whether it was a yes is read from their words (ADR 0011).
-  decisions: createDecisionReader({ gateway: modelGateway, logger }),
-  ...(presenceComposition === undefined
-    ? {}
-    : {
-        presence: createPresenceTrigger({
-          presence: presenceComposition.presence,
-          // What a company's own website says it does is offered into an
-          // empty short description, through the same approval as any
-          // change the person asks for (ADR 0011).
-          profileSuggestions: profileBoard,
-          profiles: {
-            shortDescriptionOf: async (companyId) =>
-              (
-                await companies.findCanonicalCompanyProfile(
-                  CompanyIdSchema.parse(companyId),
-                )
-              )?.shortDescription ?? null,
-          },
-          // The name to look a person up by, read from their own profile
-          // row. Their own only: the query is keyed on the acting user.
-          people: { displayNameFor },
-          logger,
+const voiceTurn = timedVoiceTurns(
+  createVoiceTurnHandler({
+    qRuntime,
+    qStream,
+    interviewer,
+    board: voiceTurnBoard,
+    welcome: welcomeHost,
+    pronunciation,
+    // A spoken yes to a proposal is the same decision a tap records.
+    approvals: qActions,
+    // And whether it was a yes is read from their words (ADR 0011).
+    decisions: createDecisionReader({ gateway: modelGateway, logger }),
+    ...(presenceComposition === undefined
+      ? {}
+      : {
+          presence: createPresenceTrigger({
+            presence: presenceComposition.presence,
+            // What a company's own website says it does is offered into an
+            // empty short description, through the same approval as any
+            // change the person asks for (ADR 0011).
+            profileSuggestions: profileBoard,
+            profiles: {
+              shortDescriptionOf: async (companyId) =>
+                (
+                  await companies.findCanonicalCompanyProfile(
+                    CompanyIdSchema.parse(companyId),
+                  )
+                )?.shortDescription ?? null,
+            },
+            // The name to look a person up by, read from their own profile
+            // row. Their own only: the query is keyed on the acting user.
+            people: { displayNameFor },
+            logger,
+          }),
         }),
-      }),
-  orchestration: { orchestrator, autostart: Q_ORCHESTRATION_AUTOSTART },
-  ...(config.voice.apiBaseUrl === undefined
-    ? {}
-    : { onboarding: { apiBaseUrl: config.voice.apiBaseUrl } }),
-  logger,
-});
+    orchestration: { orchestrator, autostart: Q_ORCHESTRATION_AUTOSTART },
+    ...(config.voice.apiBaseUrl === undefined
+      ? {}
+      : {
+          onboarding: {
+            apiBaseUrl: config.voice.apiBaseUrl,
+            // Each application-API call a spoken turn makes is listed on
+            // that turn's timing line, by route shape only.
+            fetch: timedFetch(fetch, voiceTimings),
+          },
+        }),
+    logger,
+  }),
+  voiceTimings,
+);
 logger.info(
   {
     speech: speechProviderConfigStatus(
