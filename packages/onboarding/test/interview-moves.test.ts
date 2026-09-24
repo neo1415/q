@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  looksLikeQuestionForQ,
   pauseIntent,
   resumeIntent,
   thinkingIntent,
@@ -11,27 +10,6 @@ import {
  * The interview's own moves, one implementation for the typed and the
  * spoken thread (CQ-Q-VOICE-001 B §23-§25, C §35, D §55).
  */
-
-describe("looksLikeQuestionForQ", () => {
-  it("routes questions and request-shaped sentences to Q, keeps the interview's own why", () => {
-    expect(looksLikeQuestionForQ("What did my deck say about churn?")).toBe(
-      true,
-    );
-    expect(
-      looksLikeQuestionForQ("Tell me about Series A rounds in Nigeria"),
-    ).toBe(true);
-    expect(looksLikeQuestionForQ("Can you check what Paystack raised")).toBe(
-      true,
-    );
-    expect(looksLikeQuestionForQ("Why do you need this?")).toBe(false);
-    expect(
-      looksLikeQuestionForQ(
-        "We make AI software for freight forwarders and logistics companies.",
-      ),
-    ).toBe(false);
-    expect(looksLikeQuestionForQ("Lagos")).toBe(false);
-  });
-});
 
 describe("resume, pause, thinking", () => {
   it("hears the packet's phrases", () => {

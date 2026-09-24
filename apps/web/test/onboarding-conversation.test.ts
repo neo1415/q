@@ -8,7 +8,6 @@ import type {
 import {
   acknowledgeValue,
   gapValue,
-  looksLikeQuestionForQ,
   pauseIntent,
   progressLines,
   promptFor,
@@ -339,35 +338,6 @@ describe("progressLines", () => {
  * the reply and the screen shows it as written. What the module still owns
  * is the deterministic vocabulary around it, tested above and below.
  */
-
-describe("looksLikeQuestionForQ", () => {
-  it("routes questions to Q but keeps the interview's own why", () => {
-    expect(looksLikeQuestionForQ("What did my deck say about churn?")).toBe(
-      true,
-    );
-    expect(looksLikeQuestionForQ("Why do you need this?")).toBe(false);
-    expect(
-      looksLikeQuestionForQ("Why does the stage matter to investors?"),
-    ).toBe(true);
-    expect(looksLikeQuestionForQ("Seed")).toBe(false);
-  });
-
-  it("recognises a request for Q without a question mark, but not an answer (CQ-Q-VOICE-001 B §23)", () => {
-    expect(
-      looksLikeQuestionForQ("Tell me about Series A rounds in Nigeria"),
-    ).toBe(true);
-    expect(looksLikeQuestionForQ("Can you check what Paystack raised")).toBe(
-      true,
-    );
-    expect(looksLikeQuestionForQ("Look up Flutterwave")).toBe(true);
-    expect(
-      looksLikeQuestionForQ(
-        "We make AI software for freight forwarders and logistics companies.",
-      ),
-    ).toBe(false);
-    expect(looksLikeQuestionForQ("Lagos")).toBe(false);
-  });
-});
 
 describe("resume and pause (CQ-Q-VOICE-001 B §24-§25)", () => {
   it("hears the explicit ways back to the interview", () => {

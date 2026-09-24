@@ -86,6 +86,8 @@ export type OnboardingClient<TView, TResponse> = {
         readonly reply: string | null;
         /** Where Q is taking the person, if anywhere; "FORM" hands over to the form. */
         readonly navigate: string | null;
+        /** What Q said it would look into (CQ-QX-005); null when nothing. */
+        readonly researching: string | null;
       }>)
     | undefined;
   /** Deterministic taxonomy candidates for the user's own text. Never assigned here. */

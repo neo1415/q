@@ -609,14 +609,13 @@ export function acknowledgeValue(
 }
 
 /**
- * The interview's own moves — a question for Q, a pause, a resume — are
+ * The interview's own moves — a pause, a resume — are
  * one implementation shared with the spoken thread (CQ-Q-VOICE-001 C):
  * `@capital-q/onboarding/interview`. Re-exported here so this planner
  * stays the thread's single vocabulary.
  */
 export {
   BRIDGE_LINE,
-  looksLikeQuestionForQ,
   PAUSED_LINE,
   pauseIntent,
   resumeIntent,

@@ -10,30 +10,6 @@
  */
 
 /**
- * "Why do you need this?" is the interview's own move (the runtime answers
- * it from the step's own reason); any other question is for Q.
- */
-export const INTERVIEW_WHY =
-  /^(?:why|why (?:do you (?:need|ask|want)|does (?:this|that|it) matter|is (?:this|that) (?:needed|important|relevant))(?: (?:this|that|it))?|what(?:'s| is) (?:this|that) for)\??[.!]?$/i;
-
-/**
- * A request for Q that does not end in a question mark ("Tell me about
- * Series A rounds in Nigeria", "Can you check what Paystack raised",
- * "Look up Flutterwave") — the shape of a request, not of an answer.
- */
-const REQUEST_FOR_Q =
-  /^(?:(?:can|could|would|will) you\b|tell me (?:about|what|how|more)\b|(?:please )?(?:look up|search(?: for)?|check|find out|research|compare|explain|summari[sz]e|help me (?:understand|with))\b|what (?:do you know|can you tell me|have you found)\b|how (?:do|does|would|should) (?:i|we|one|a founder|an investor)\b)/i;
-
-/** True when the text reads as a question for Q rather than an answer. */
-export function looksLikeQuestionForQ(text: string): boolean {
-  const trimmed = text.trim();
-  if (INTERVIEW_WHY.test(trimmed)) {
-    return false;
-  }
-  return trimmed.endsWith("?") || REQUEST_FOR_Q.test(trimmed);
-}
-
-/**
  * "Let's continue." / "Where were we?" / "Back to onboarding." — the person
  * is returning from a tangent. Q picks the interview up where the session
  * says it is; nothing is sent to the runtime.
