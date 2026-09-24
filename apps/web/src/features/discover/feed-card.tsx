@@ -6,9 +6,10 @@ import type {
   DiscoveredCompanyDto,
   DiscoveryReasonDto,
 } from "@capital-q/contracts";
-import { COUNTRY_OPTIONS, STAGE_OPTIONS } from "@capital-q/founder-onboarding";
 import { Button, buttonClassName } from "@capital-q/ui/button";
 import { Building2, Globe, ICON_SIZE } from "@capital-q/ui/icons";
+
+import { countryLabel, stageLabel } from "../company/declared-labels";
 
 import type { FeedPreloadPolicy } from "./feed/feed-state";
 import { actionPlaybackSource } from "./feed/action-feed-transport";
@@ -34,27 +35,6 @@ const REASON_LABELS: Readonly<Record<DiscoveryReasonDto["kind"], string>> = {
   DECLARED_DEPLOYING: "Deploying",
   PROFILE_COMPLETE: "Profile",
 };
-
-// Codes reach the screen as the words the founder chose them by.
-const STAGE_LABELS: ReadonlyMap<string, string> = new Map(
-  STAGE_OPTIONS.map((option) => [option.optionKey, option.label]),
-);
-const COUNTRY_LABELS: ReadonlyMap<string, string> = new Map(
-  COUNTRY_OPTIONS.map((option) => [option.optionKey, option.label]),
-);
-
-function stageLabel(code: string | null): string | null {
-  return code === null
-    ? null
-    : (STAGE_LABELS.get(code) ?? code.replace(/_/g, " "));
-}
-
-/** Option keys are lowercase ISO codes; companies store them uppercase. */
-function countryLabel(code: string | null): string | null {
-  return code === null
-    ? null
-    : (COUNTRY_LABELS.get(code.toLowerCase()) ?? code);
-}
 
 /**
  * What the persisted slate says two declared profiles share (CQ-REC-006).
