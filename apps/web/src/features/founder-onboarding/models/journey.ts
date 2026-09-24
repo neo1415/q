@@ -23,6 +23,7 @@ import {
   type Submission,
 } from "../../onboarding-kit/runtime-port";
 import type { SnapshotSection } from "@capital-q/ui/intelligence-snapshot";
+import { formatAmountForDisplay } from "@capital-q/ui/money-input";
 
 import type {
   FounderOnboardingSessionView,
@@ -953,7 +954,11 @@ function snapshotSections(snapshot: FounderSnapshotContext): SnapshotSection[] {
       items:
         raise.status === "active"
           ? [
-              ...item("target", `Raising ${raise.currency} ${raise.amount}`),
+              // Display grouping only; the stored amount stays the exact string.
+              ...item(
+                "target",
+                `Raising ${raise.currency} ${formatAmountForDisplay(raise.amount)}`,
+              ),
               ...item(
                 "instrument",
                 raise.instrumentCode === null

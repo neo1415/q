@@ -245,7 +245,7 @@ describe("founder journey over the runtime contract", () => {
     expect(snapshot.headline).toBe("Here's what we have so far.");
     const text = JSON.stringify(snapshot);
     expect(text).toContain("NexaRail Technologies");
-    expect(text).toContain("Raising USD 500000");
+    expect(text).toContain("Raising USD 500,000");
     expect(text).toContain("2 founders, 2 full-time");
     expect(text).not.toMatch(/readiness|score|verified|Q inferred|match/i);
     // The founder skipped F2, so material to share is an open gap — stated
@@ -311,7 +311,7 @@ describe("founder journey over the runtime contract", () => {
     });
     // Everything after was already visited: the client jumps forward.
     expect(session.currentStepId).toBe("snapshot");
-    expect(JSON.stringify(session.step)).toContain("Raising USD 3000000");
+    expect(JSON.stringify(session.step)).toContain("Raising USD 3,000,000");
   });
 
   it("revenue-stage companies get the revenue traction variant", async () => {

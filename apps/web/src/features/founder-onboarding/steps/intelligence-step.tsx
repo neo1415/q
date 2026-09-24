@@ -1,8 +1,7 @@
 "use client";
 
-import { ContextIndicator } from "@capital-q/ui/context-indicator";
+import { ICON_SIZE, ICON_STROKE, Lock } from "@capital-q/ui/icons";
 import { IntelligenceSnapshot } from "@capital-q/ui/intelligence-snapshot";
-import { InlineNotice } from "@capital-q/ui/states";
 
 import { CompanyIntelligencePanel } from "./company-intelligence-panel";
 import type { StepProps } from "./step-props";
@@ -21,7 +20,7 @@ import type { StepProps } from "./step-props";
  */
 export function IntelligenceStep({ step }: StepProps<"snapshot">) {
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-8">
       <h1 className="sr-only">{step.title}</h1>
       <IntelligenceSnapshot
         headline={step.headline}
@@ -37,14 +36,25 @@ export function IntelligenceStep({ step }: StepProps<"snapshot">) {
           companyName={step.companyName}
         />
       ) : null}
-      <div className="flex flex-col gap-3">
-        <ContextIndicator scope="organisation_private" detail="your company" />
-        <InlineNotice tone="info" title="Investors don't see this.">
+      {/*
+        One quiet line, not a notice: nothing here needs attention, it only
+        needs to be true. Becoming discoverable is a separate, later choice
+        with its own readiness checks; nothing on this screen changes who can
+        see the company.
+      */}
+      <p className="cq-status-line items-start" data-visibility-note>
+        <Lock
+          aria-hidden="true"
+          size={ICON_SIZE.compact}
+          strokeWidth={ICON_STROKE}
+          className="mt-0.5 shrink-0"
+        />
+        <span>
+          <span>Investors don&apos;t see this.</span> Private to your company.
           Becoming discoverable is a separate step later, with its own readiness
-          checks and verification. Nothing here changes who can see your
-          company.
-        </InlineNotice>
-      </div>
+          checks and verification.
+        </span>
+      </p>
     </div>
   );
 }
