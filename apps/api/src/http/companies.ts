@@ -1,10 +1,12 @@
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import {
   CompanyIdSchema,
+  CompanyNotFoundError,
   isNetworkVisible,
   projectCompanyForNetwork,
   toCompanyDto,
   type CompanyId,
+  type CompanyProfileFacts,
   type CompanyService,
 } from "@capital-q/companies";
 import {
@@ -27,6 +29,7 @@ import {
   type PitchSummaryDto,
 } from "@capital-q/contracts";
 import type { DiscoverablePitchQueryPort } from "@capital-q/media";
+import type { ActorContext } from "@capital-q/security";
 import { createCorrelationId } from "@capital-q/observability";
 
 import {
@@ -52,6 +55,23 @@ export type CompanyRoutesDependencies = ActorContextDependencies & {
    * Absent, every `pitch` is null.
    */
   readonly pitches?: DiscoverablePitchQueryPort | undefined;
+  /**
+   * Another organisation's company, as the network may see it. Absent: a
+   * network preview is readable by the owning organisation only.
+   */
+  readonly networkView?: CompanyNetworkViewPort | undefined;
+};
+
+/**
+ * A company someone else owns, read only when disclosure says this actor
+ * may view it because it is network-visible or public — never through a
+ * relationship grant, which is the Data Room's to make. Null when not.
+ */
+export type CompanyNetworkViewPort = {
+  readonly findNetworkVisible: (
+    actor: ActorContext,
+    companyId: CompanyId,
+  ) => Promise<CompanyProfileFacts | null>;
 };
 
 /**
@@ -228,14 +248,36 @@ export function registerCompanyRoutes(
   // network, built from the declared profile alone (§33). The founder's
   // own read of the company authorises it; nothing founder-private can be
   // in the result because the projection never reads it.
+  //
+  // An investor opening a company from Discover reads the same
+  // projection. Their read is authorised by disclosure (network-visible
+  // or public), exactly as Q's company tool is; before, the route only
+  // accepted the owner's read, so every company the feed served answered
+  // "This company isn't available to you" one click later (CQ-ACCEPT-001).
   app.get(
     `${COMPANIES_PATH}/:companyId${COMPANY_NETWORK_PREVIEW_SEGMENT}`,
     { onRequest: withContext },
     async (request, reply) => {
-      const company = await service.getCompany({
-        actor: getActorContext(request),
-        companyId: companyIdParam(request),
-      });
+      const actor = getActorContext(request);
+      const companyId = companyIdParam(request);
+      const company = await service
+        .getCompany({ actor, companyId })
+        .catch(async (error: unknown) => {
+          if (
+            !(error instanceof CompanyNotFoundError) ||
+            dependencies.networkView === undefined
+          ) {
+            throw error;
+          }
+          const visible = await dependencies.networkView.findNetworkVisible(
+            actor,
+            companyId,
+          );
+          if (visible === null) {
+            throw error;
+          }
+          return visible;
+        });
       void reply.header("Cache-Control", "no-store");
       return CompanyNetworkPreviewSchema.parse({
         ...projectCompanyForNetwork(company),

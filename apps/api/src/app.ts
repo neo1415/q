@@ -100,6 +100,9 @@ export type ApiModules = {
   readonly companies?: CompanyRoutesDependencies["companies"] | undefined;
   /** CQ-MEDIA-012. Absent: a company's `pitch` is null on every read. */
   readonly companyPitches?: CompanyRoutesDependencies["pitches"] | undefined;
+  /** Absent: a company's network preview is readable by its owner only. */
+  readonly companyNetworkView?:
+    CompanyRoutesDependencies["networkView"] | undefined;
   readonly investors?: InvestorRoutesDependencies["investors"] | undefined;
   readonly discovery?:
     | (Pick<DiscoveryRoutesDependencies, "discovery" | "slates"> & {
@@ -198,6 +201,7 @@ export function createApp(
       resolver: security.resolver,
       companies: modules.companies,
       pitches: modules.companyPitches,
+      networkView: modules.companyNetworkView,
     });
     registerCompanyTeamRoutes(app, {
       authenticator: security.authenticator,
