@@ -207,6 +207,33 @@ describe("a card", () => {
     expect(text).not.toMatch(/top pick|hot|trending/i);
   });
 
+  it("reads a slate's alignment codes when the item carries no reasons (CQ-ACCEPT-001)", () => {
+    const { container } = render(
+      <FeedCard
+        company={company(1, {
+          headquartersCountry: "NG",
+          currentStageCode: "pre_seed",
+          reasons: [],
+          reasonCodes: ["STAGE_ALIGNED", "GEOGRAPHY_MISMATCH"],
+        })}
+        policy="ACTIVE"
+        reducedMotion={false}
+        saved={false}
+        deciding={false}
+        onSave={() => undefined}
+        onPass={() => undefined}
+        onAskQ={() => undefined}
+      />,
+    );
+
+    expect(screen.getByText("Pre-seed, in your range")).toBeTruthy();
+    expect(screen.getByText("Nigeria · Pre-seed")).toBeTruthy();
+    const text = container.textContent ?? "";
+    expect(text).not.toMatch(/nothing declared in common/);
+    // Missingness and mismatch are never shown as a reason.
+    expect(text).not.toMatch(/mismatch/i);
+  });
+
   it("says plainly when there is no pitch, and shows no player", () => {
     const { container } = render(
       <FeedCard
@@ -223,6 +250,9 @@ describe("a card", () => {
 
     expect(screen.getByText(/No pitch video yet/i)).toBeTruthy();
     expect(container.querySelector("video")).toBeNull();
+    // No empty frame held open for a video that does not exist: the
+    // company leads (CQ-ACCEPT-001).
+    expect(container.querySelector('[style*="aspect-ratio"]')).toBeNull();
   });
 
   it("keeps Pass neutral -- never the danger variant", () => {
