@@ -250,6 +250,9 @@ describe("a card", () => {
 
     expect(screen.getByText(/No pitch video yet/i)).toBeTruthy();
     expect(container.querySelector("video")).toBeNull();
+    // No empty frame held open for a video that does not exist: the
+    // company leads (CQ-ACCEPT-001).
+    expect(container.querySelector('[style*="aspect-ratio"]')).toBeNull();
   });
 
   it("keeps Pass neutral -- never the danger variant", () => {
