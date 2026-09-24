@@ -132,6 +132,8 @@ function fakeService(overrides: Partial<CompanyService> = {}) {
     getMarketplaceReadiness: () => Promise.reject(new Error("not under test")),
     assessMarketplaceReadiness: () =>
       Promise.reject(new Error("not under test")),
+    reconcileMarketplaceReadinessAsSystem: () =>
+      Promise.reject(new Error("not under test")),
     getMyFounderProfile: () => Promise.resolve(PROFILE),
     updateMyFounderProfile: (command) => {
       calls["profile"]?.push(command);

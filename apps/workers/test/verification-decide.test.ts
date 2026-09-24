@@ -7,6 +7,7 @@ import {
   UtcTimestampSchema,
   type CapitalQEvent,
 } from "@capital-q/contracts";
+import { AuditEventIdSchema } from "@capital-q/audit";
 import type { DatabaseExecutor, TransactionManager } from "@capital-q/database";
 import type { OutboxWriter } from "@capital-q/eventing";
 import {
@@ -133,7 +134,7 @@ function memoryWorld(requester: string) {
   const audit: MaterialActionAuditWriter = {
     record: (_tx, input) => {
       audits.push(input);
-      return Promise.resolve(input.auditEventId);
+      return Promise.resolve(AuditEventIdSchema.parse(input.auditEventId));
     },
   };
   const decider = (attestation: typeof PROOF | null, environment: string) =>
