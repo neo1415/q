@@ -823,6 +823,13 @@ export function createVoiceTurnHandler(
     let runFailed = false;
     lastRunFailed.set(binding, false);
     let streamedDeltas = false;
+    /**
+     * The answer has been handed to the speaker, streamed or whole. Progress
+     * is about work still being done for the answer, so once the answer is
+     * out no stage is narrated over it (directive I: "I'm comparing the
+     * opportunities now" was said after an answer had been read out whole).
+     */
+    let answerGiven = false;
     let spokenCharacters = 0;
     // A look-up is gathered whole and offered only if it found something,
     // so it is never narrated beyond the research line.
@@ -867,6 +874,7 @@ export function createVoiceTurnHandler(
           case "q.message.completed": {
             const text = event.data.message.text;
             if (!streamedDeltas && text !== undefined) {
+              answerGiven = true;
               yield bounded(speakable(text));
             }
             break;
@@ -929,7 +937,7 @@ export function createVoiceTurnHandler(
             // the closed stage vocabulary, never over an answer already
             // under way (CQ-VOICE-010).
             const line = progress.lineFor(event.data.stage, {
-              answered: streamedDeltas,
+              answered: streamedDeltas || answerGiven,
               researchLine: () => fillerLine("RESEARCH"),
             });
             if (line !== null) {

@@ -119,7 +119,10 @@ export function createSearchCompaniesTool(
     approval: "NONE",
     idempotency: "SAFE_TO_REPEAT",
     owner: "q-tools",
-    visibleStage: "COMPARING_OPPORTUNITIES",
+    // A lookup by name is reviewing company records, not comparing
+    // opportunities: live, "I'm comparing the opportunities now" was said
+    // while Q looked a company up for a deck (directive I).
+    visibleStage: "REVIEWING_COMPANY",
     input: SearchCompaniesInputSchema,
     output: SearchCompaniesOutputSchema,
     authorize: (_input, context) => {

@@ -1,5 +1,5 @@
 import { FILLERS_RESEARCH } from "../src/voice/navigation.js";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import type {
   OnboardingSessionView,
@@ -771,6 +771,55 @@ describe("a spoken question for Q", () => {
       ),
       said,
     ).toBe(true);
+  });
+
+  it("never narrates progress once the answer has been said (directive I)", async () => {
+    // A slow run: the quiet window has long passed when its events arrive.
+    const realNow = Date.now.bind(Date);
+    const started = realNow();
+    let offset = 0;
+    const spy = vi.spyOn(Date, "now").mockImplementation(() => {
+      offset += 2_000;
+      return started + offset;
+    });
+    try {
+      const runtime = fakeRuntime();
+      const handle = createVoiceTurnHandler({
+        qRuntime: runtime.service,
+        qStream: fakeStream([
+          event("q.message.completed", {
+            message: {
+              messageId: "m1",
+              runId: RUN_ID,
+              role: "Q",
+              text: "Your deck is ready.",
+              createdAt: NOW,
+            },
+          }),
+          // Work the run does after its answer (an action, a follow-up
+          // lookup) is not something to announce over the answer.
+          event("q.stage.changed", { stage: "COMPARING_OPPORTUNITIES" }),
+          event("q.run.completed", { status: "COMPLETED", completedAt: NOW }),
+        ]),
+        logger,
+      });
+      const speaker = fakeSpeaker();
+      await handle(
+        binding({
+          conversationId: undefined,
+          subjects: undefined,
+          onboarding: undefined,
+        }),
+        [{ role: "user", content: "Make me a deck" }],
+        new AbortController().signal,
+        speaker,
+      );
+      const said = speaker.spoken.join(" ");
+      expect(said).toContain("Your deck is ready.");
+      expect(said).not.toMatch(/comparing the opportunities/i);
+    } finally {
+      spy.mockRestore();
+    }
   });
 
   it("speaks a run's public failure and nothing internal", async () => {
