@@ -380,14 +380,14 @@ const GENERAL_KNOWLEDGE_NOTE =
  * company.
  */
 export const PROFILE_UPDATE_NOTE =
-  "If they ask in this message to change a field of their own company profile (company name, legal name, website, founded date, HQ country or city, stage, short or full description) AND give the new value, put it in profileUpdates: field, value in the field's own form, their exact words as quote; say it is ready for their approval. No value given: ask for it, propose nothing. What YOU call THEM (their own name) is not a company field: it goes in displayName, never in profileUpdates. Never say the profile cannot be changed here, never say it was changed.";
+  "If they ask in this message to change a field of their own company profile (company name, legal name, website, founded date, HQ country or city, stage, short or full description) AND give the new value, put it in profileUpdates: field, value in the field's own form, their exact words as quote. Do not say it is prepared, ready or awaiting approval: Capital Q tells them itself, once it has actually prepared it (or could not). No value given: ask for it, propose nothing. What YOU call THEM (their own name) is not a company field: it goes in displayName, never in profileUpdates. Never say the profile cannot be changed here, never say it was changed.";
 
 /**
  * The person's own name is theirs to change wherever they are, not only
  * in a conversation about a company, so this note travels on every run.
  */
 export const DISPLAY_NAME_NOTE =
-  "If they ask in this message to be called something else or to change their own name on Capital Q AND give the new name, put it in displayName with their exact words as quote and say it is ready for their approval; never say it was changed. No new name given: ask for it.";
+  "If they ask in this message to be called something else or to change their own name on Capital Q AND give the new name, put it in displayName with their exact words as quote. Do not say it is prepared, ready or changed: Capital Q tells them itself once it has actually prepared it. No new name given: ask for it.";
 
 /**
  * A reading that would clear a field is kept only when the person's own
@@ -1598,17 +1598,11 @@ export function createModelGatewayQAnswer(
             "a change to what Q calls the person was read; handed to the proposer",
           );
         }
+        // No "I've prepared that change" here (CQ-QACT-001, F7): noting a
+        // request is not preparing one. The action port says it, from the
+        // proposal it actually created or the refusal it actually got.
         const content = [
           guarded.text,
-          ...(proposed
-            ? [
-                "I've prepared that change to your profile. Approve it and it goes in; decline and nothing changes.",
-              ]
-            : proposedName
-              ? [
-                  "I've prepared that change to your name. Approve it and it goes in; decline and nothing changes.",
-                ]
-              : []),
           ...(recordedStatements.length === 0
             ? []
             : [
