@@ -112,3 +112,66 @@ export const TurnReaderV2ResultSchema = TurnReaderResultSchema.extend({
   tool: TurnToolSchema.nullable().default(null),
 }).strict();
 export type TurnReaderV2Result = z.infer<typeof TurnReaderV2ResultSchema>;
+
+/**
+ * v3 (CQ-QACT-002): a third hand — producing a document now.
+ *
+ * Live, a founder asked about eight times for a PDF pitch deck on a
+ * company from public sources, and each time Q explained what such a deck
+ * would contain, because no reading named the request as something Capital
+ * Q does rather than something to talk about. PREPARE_DOCUMENT names it:
+ * which kind of document, and which company as the person named it — in
+ * this turn or, for "just give me the PDF", in the turns before it. Code
+ * then researches, composes, renders and files it; the reader decides
+ * nothing about how.
+ */
+export const TURN_TOOL_V3_KINDS = [
+  "NAVIGATE",
+  "SET_VISIBILITY",
+  "PREPARE_DOCUMENT",
+] as const;
+export const TURN_DOCUMENT_TYPES = ["PITCH_DECK", "INVESTMENT_BRIEF"] as const;
+
+export const TurnToolV3Schema = z
+  .object({
+    kind: z.enum(TURN_TOOL_V3_KINDS),
+    destination: QNavigateDestinationSchema.nullable().default(null),
+    visibility: z.enum(TURN_TOOL_VISIBILITIES).nullable().default(null),
+    documentType: z.enum(TURN_DOCUMENT_TYPES).nullable().default(null),
+    /** The company as the person named it; null when it is plainly their own. */
+    subjectName: z.string().trim().min(1).max(120).nullable().default(null),
+  })
+  .strict()
+  .refine(
+    (tool) => {
+      switch (tool.kind) {
+        case "NAVIGATE":
+          return (
+            tool.destination !== null &&
+            tool.visibility === null &&
+            tool.documentType === null
+          );
+        case "SET_VISIBILITY":
+          return (
+            tool.visibility !== null &&
+            tool.destination === null &&
+            tool.documentType === null
+          );
+        case "PREPARE_DOCUMENT":
+          return (
+            tool.documentType !== null &&
+            tool.destination === null &&
+            tool.visibility === null
+          );
+      }
+    },
+    { message: "a tool carries exactly its own parameters" },
+  );
+export type TurnToolV3 = z.infer<typeof TurnToolV3Schema>;
+
+export const TURN_READER_V3_SCHEMA_VERSION = 3;
+
+export const TurnReaderV3ResultSchema = TurnReaderResultSchema.extend({
+  tool: TurnToolV3Schema.nullable().default(null),
+}).strict();
+export type TurnReaderV3Result = z.infer<typeof TurnReaderV3ResultSchema>;

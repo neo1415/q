@@ -104,11 +104,19 @@ export { INTERVIEW_CONDUCTOR_V11 } from "./prompts/tasks/interview-conductor.v11
 export { DECISION_READER_V1 } from "./prompts/tasks/decision-reader.v1.js";
 export { TURN_READER_V1 } from "./prompts/tasks/turn-reader.v1.js";
 export { TURN_READER_V2 } from "./prompts/tasks/turn-reader.v2.js";
+export { TURN_READER_V3 } from "./prompts/tasks/turn-reader.v3.js";
 export {
   TURN_READER_SCHEMA_NAME,
   TURN_READER_SCHEMA_VERSION,
   TURN_READER_UNTRUSTED,
   TURN_READER_V2_SCHEMA_VERSION,
+  TURN_READER_V3_SCHEMA_VERSION,
+  TURN_DOCUMENT_TYPES,
+  TURN_TOOL_V3_KINDS,
+  TurnReaderV3ResultSchema,
+  TurnToolV3Schema,
+  type TurnReaderV3Result,
+  type TurnToolV3,
   TURN_TOOL_KINDS,
   TURN_TOOL_VISIBILITIES,
   TurnReaderResultSchema,

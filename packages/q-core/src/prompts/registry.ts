@@ -21,6 +21,7 @@ import { ARTIFACT_REVISION_V1 } from "./tasks/artifact-revision.v1.js";
 import { DECISION_READER_V1 } from "./tasks/decision-reader.v1.js";
 import { TURN_READER_V1 } from "./tasks/turn-reader.v1.js";
 import { TURN_READER_V2 } from "./tasks/turn-reader.v2.js";
+import { TURN_READER_V3 } from "./tasks/turn-reader.v3.js";
 import { MEMORY_EXTRACTOR_V1 } from "./tasks/memory-extractor.v1.js";
 import { FIT_EXPLANATION_V1 } from "./tasks/fit-explanation.v1.js";
 import { FOUNDER_ONBOARDING_EXTRACTION_V1 } from "./tasks/founder-onboarding-extraction.v1.js";
@@ -187,6 +188,7 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition<unknown, unknown>[] =
     DECISION_READER_V1,
     TURN_READER_V1,
     TURN_READER_V2,
+    TURN_READER_V3,
     MEMORY_EXTRACTOR_V1,
     GATEQ_INTERVIEWER_V1,
   ];
