@@ -1,19 +1,20 @@
 import type { Metadata } from "next";
-import Link from "next/link";
-
-import { buttonClassName } from "@capital-q/ui/button";
-import { EmptyState } from "@capital-q/ui/states";
 
 import {
   PageContainer,
   PageHeader,
 } from "@/components/app-shell/page-container";
+import { CapitalScreen } from "@/features/capital/capital-screen";
 
 export const metadata: Metadata = { title: "Capital" };
 
+// The objective is read under the person's own session on every request.
+export const dynamic = "force-dynamic";
+
 /**
- * Capital workspace shell: objectives, relationships, meetings, diligence
- * and execution will live here. Until an objective exists, it says so.
+ * Capital workspace: the objective, the relationships behind it, and what
+ * happens next. Meetings, diligence and execution will gather here; until
+ * there is an objective, the page says so in a sentence.
  */
 export default function CapitalPage() {
   return (
@@ -22,15 +23,7 @@ export default function CapitalPage() {
         title="Capital"
         description="Your objective, the relationships behind it, and what happens next, in one working view."
       />
-      <EmptyState
-        title="No capital objective yet."
-        description="Tell Q what you're raising or deploying. Relationships, meetings and diligence gather around that objective as they happen."
-        action={
-          <Link href="/home#q" className={buttonClassName("secondary")}>
-            Tell Q your objective
-          </Link>
-        }
-      />
+      <CapitalScreen />
     </PageContainer>
   );
 }
