@@ -69,8 +69,9 @@ const qApiEnvSchema = z.object({
   // voice:setup alongside the engine ids.
   Q_VOICE_EXPRESSIVE: z.enum(["true", "false"]).optional(),
   // The ElevenLabs model that renders Q's voice behind the speak relay
-  // (CQ-VOICE-010). Unset means eleven_turbo_v2_5. The comparison behind
-  // the choice is design/voice-comparison/comparison.md.
+  // (CQ-VOICE-010). Unset means eleven_v3_conversational, chosen by
+  // listening to design/voice-comparison; turbo stands behind it per
+  // utterance either way. Pinning turbo is the rollback.
   Q_VOICE_TTS_MODEL: z
     .enum(["eleven_turbo_v2_5", "eleven_v3_conversational"])
     .optional(),
@@ -153,7 +154,7 @@ export function parseQApiConfig(env: EnvironmentInput): QApiConfig {
       apiBaseUrl: parsed.CQ_API_URL?.replace(/\/$/, ""),
       personality: parsed.Q_PERSONALITY ?? "UPBEAT",
       expressive: parsed.Q_VOICE_EXPRESSIVE === "true",
-      ttsModel: parsed.Q_VOICE_TTS_MODEL ?? "eleven_turbo_v2_5",
+      ttsModel: parsed.Q_VOICE_TTS_MODEL ?? "eleven_v3_conversational",
       provider: resolveVoiceProvider(
         toSpeechProviderSecrets(parsed),
         toSpeechEngineIds(parsed),

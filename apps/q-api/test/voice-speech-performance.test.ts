@@ -2,7 +2,11 @@ import { describe, expect, it } from "vitest";
 
 import { createLogger } from "@capital-q/observability";
 
-import { createElevenLabsSpeechRelay } from "../src/voice/providers/elevenlabs-speak.js";
+import {
+  createElevenLabsSpeechRelay,
+  createElevenLabsSpeechSynthesis,
+} from "../src/voice/providers/elevenlabs-speak.js";
+import { speechWithFallback } from "../src/voice/synthesis.js";
 import {
   renderSpeech,
   SPEECH_MARKUP,
@@ -270,7 +274,7 @@ describe("the speak relay with the layer in place", () => {
     expect(sent[0]?.url).not.toContain("optimize_streaming_latency");
   });
 
-  it("keeps turbo v2.5 the default and never sends it a reaction", async () => {
+  it("never sends turbo v2.5 a reaction, on a deployment pinned to it", async () => {
     const board = createSpeechPerformanceBoard();
     board.perform(
       "s",
@@ -279,6 +283,7 @@ describe("the speak relay with the layer in place", () => {
     const { fetch, sent } = vendor();
     const relay = createElevenLabsSpeechRelay({
       apiKey: "k",
+      model: "eleven_turbo_v2_5",
       fetch,
       performance: board,
     });
@@ -299,6 +304,7 @@ describe("the speak relay with the layer in place", () => {
     const { fetch, sent } = vendor();
     const relay = createElevenLabsSpeechRelay({
       apiKey: "k",
+      model: "eleven_turbo_v2_5",
       fetch,
       performance: board,
     });
@@ -372,12 +378,324 @@ describe("the speak relay with the layer in place", () => {
     expect(timed).toMatchObject({
       firstTextMs: 900,
       ttsRequestMs: 1000,
-      firstAudioMs: 1300,
+      // The relay holds the first chunk before answering, so the first
+      // byte is noted when it arrived, not when the agent read it.
+      firstAudioMs: 1000,
       endMs: 1300,
       cues: ["reaction"],
       ttsRequests: 1,
+      ttsEngines: ["eleven_v3_conversational"],
+      ttsFallbacks: 0,
     });
     // What was said is never in the line.
     expect(JSON.stringify(timed)).not.toContain("Fair enough");
+  });
+});
+
+type Scripted = {
+  readonly fetch: typeof fetch;
+  readonly sent: (Sent & { signal: AbortSignal | undefined })[];
+};
+
+/** A vendor whose answer depends on which model was asked. */
+function scripted(
+  answer: (model: string, signal: AbortSignal | undefined) => Response,
+): Scripted {
+  const sent: Scripted["sent"] = [];
+  return {
+    sent,
+    fetch: (input, init) => {
+      const body = JSON.parse(
+        typeof init?.body === "string" ? init.body : "{}",
+      ) as Record<string, unknown>;
+      const signal = init?.signal ?? undefined;
+      sent.push({
+        url:
+          typeof input === "string"
+            ? input
+            : input instanceof URL
+              ? input.href
+              : input.url,
+        body,
+        signal,
+      });
+      return Promise.resolve(
+        answer(
+          typeof body["model_id"] === "string" ? body["model_id"] : "aura",
+          signal,
+        ),
+      );
+    },
+  };
+}
+
+const audio = () =>
+  new Response(new Uint8Array([7, 7, 7]), {
+    status: 200,
+    headers: { "content-type": "audio/pcm" },
+  });
+/** Headers at once, then no audio at all until the request is abandoned. */
+const stalled = (signal: AbortSignal | undefined) =>
+  new Response(
+    new ReadableStream<Uint8Array>({
+      start(controller) {
+        signal?.addEventListener("abort", () => {
+          controller.error(new DOMException("aborted", "AbortError"));
+        });
+      },
+    }),
+    { status: 200 },
+  );
+
+function recordedTimings() {
+  const lines: Record<string, unknown>[] = [];
+  const logger = createLogger(
+    { serviceName: "t", environment: "test" },
+    {
+      level: "info",
+      destination: {
+        write: (line: string) => {
+          lines.push(JSON.parse(line) as Record<string, unknown>);
+        },
+      },
+    },
+  );
+  const timings = createVoiceTurnTimings({ logger, graceMs: 0 });
+  return {
+    timings,
+    line: () => lines.find((l) => l["msg"] === "voice turn timed"),
+  };
+}
+
+describe("which voice serves an utterance (v3, then turbo, then Aura-2)", () => {
+  const cues = anchorCues(SPOKEN, {
+    ...PLAIN,
+    reaction: "LAUGH",
+    reactionAt: 0,
+    pauseAfter: [0],
+  });
+  const said = SPOKEN[0] ?? "";
+
+  it("is v3 conversational by default, with the reaction and the pause", async () => {
+    const board = createSpeechPerformanceBoard();
+    board.perform("s", cues);
+    const { fetch, sent } = scripted(() => audio());
+    const relay = createElevenLabsSpeechRelay({
+      apiKey: "k",
+      fetch,
+      performance: board,
+    });
+    await relay.stream({ voice: "FEMALE", text: said, session: "s" });
+    expect(sent.map((s) => s.body["model_id"])).toEqual([
+      "eleven_v3_conversational",
+    ]);
+    expect(sent[0]?.body["text"]).toBe(`[laughs] ${said} [short pause]`);
+  });
+
+  it("hands the utterance to turbo when v3 errors, keeping the pause and dropping the laugh", async () => {
+    const board = createSpeechPerformanceBoard();
+    board.perform("s", cues);
+    const { timings, line } = recordedTimings();
+    const { fetch, sent } = scripted((model) =>
+      model === "eleven_v3_conversational"
+        ? new Response("busy", { status: 503 })
+        : audio(),
+    );
+    const relay = createElevenLabsSpeechRelay({
+      apiKey: "k",
+      fetch,
+      performance: board,
+      timings,
+    });
+    const turn = timings.begin("s");
+    const response = await relay.stream({
+      voice: "FEMALE",
+      text: said,
+      session: "s",
+    });
+    turn.end("SPOKEN");
+    expect([...new Uint8Array(await response.arrayBuffer())]).toEqual([
+      7, 7, 7,
+    ]);
+    expect(sent.map((s) => s.body["model_id"])).toEqual([
+      "eleven_v3_conversational",
+      "eleven_turbo_v2_5",
+    ]);
+    // Same voice, same words; never a tag turbo would read aloud.
+    expect(sent[1]?.url).toBe(sent[0]?.url);
+    expect(sent[1]?.body["text"]).toBe(`${said} <break time="0.6s" />`);
+    expect(String(sent[1]?.body["text"])).not.toContain("[");
+    expect(line()).toMatchObject({
+      ttsEngines: ["eleven_turbo_v2_5"],
+      ttsFallbacks: 1,
+      cues: ["pause"],
+    });
+  });
+
+  it("hands the utterance to turbo when v3 has produced no audio by the deadline, and abandons v3", async () => {
+    const { fetch, sent } = scripted((model, signal) =>
+      model === "eleven_v3_conversational" ? stalled(signal) : audio(),
+    );
+    const relay = createElevenLabsSpeechRelay({
+      apiKey: "k",
+      fetch,
+      firstAudioDeadlineMs: 30,
+    });
+    const started = Date.now();
+    const response = await relay.stream({ voice: "FEMALE", text: said });
+    expect(response.ok).toBe(true);
+    expect(Date.now() - started).toBeLessThan(1_000);
+    expect(sent.map((s) => s.body["model_id"])).toEqual([
+      "eleven_v3_conversational",
+      "eleven_turbo_v2_5",
+    ]);
+    expect(sent[0]?.signal?.aborted).toBe(true);
+  });
+
+  it("uses Aura-2 only when ElevenLabs cannot voice the utterance at all, with pauses and nothing else", async () => {
+    const board = createSpeechPerformanceBoard();
+    board.perform("s", cues);
+    const { timings, line } = recordedTimings();
+    const { fetch, sent } = scripted(() => new Response("", { status: 500 }));
+    const auraSaid: string[] = [];
+    const relay = createElevenLabsSpeechRelay({
+      apiKey: "k",
+      fetch,
+      performance: board,
+      timings,
+      aura: ({ text }) => {
+        auraSaid.push(text);
+        return Promise.resolve(audio());
+      },
+    });
+    const turn = timings.begin("s");
+    const response = await relay.stream({
+      voice: "FEMALE",
+      text: said,
+      session: "s",
+    });
+    turn.end("SPOKEN");
+    expect(response.ok).toBe(true);
+    expect(sent).toHaveLength(2);
+    expect(auraSaid).toEqual(["Fair enough, that one's on me..."]);
+    expect(line()).toMatchObject({
+      ttsEngines: ["aura-2"],
+      ttsFallbacks: 1,
+    });
+  });
+
+  it("goes straight to Aura-2 for a while once ElevenLabs refuses the key", async () => {
+    const { fetch, sent } = scripted(() => new Response("", { status: 401 }));
+    let aura = 0;
+    const relay = createElevenLabsSpeechRelay({
+      apiKey: "k",
+      fetch,
+      aura: () => {
+        aura += 1;
+        return Promise.resolve(audio());
+      },
+    });
+    await relay.stream({ voice: "FEMALE", text: "One." });
+    const before = sent.length;
+    await relay.stream({ voice: "FEMALE", text: "Two." });
+    expect(sent.length).toBe(before);
+    expect(aura).toBe(2);
+  });
+
+  it("tells the route the audio did not come when no voice could speak", async () => {
+    const { fetch } = scripted(() => new Response("", { status: 500 }));
+    const relay = createElevenLabsSpeechRelay({ apiKey: "k", fetch });
+    const response = await relay.stream({ voice: "FEMALE", text: said });
+    expect(response.ok).toBe(false);
+  });
+
+  it("stops trying the moment the agent hangs up", async () => {
+    const agent = new AbortController();
+    const { fetch, sent } = scripted((_model, signal) => stalled(signal));
+    const relay = createElevenLabsSpeechRelay({
+      apiKey: "k",
+      fetch,
+      firstAudioDeadlineMs: 5_000,
+    });
+    const pending = relay.stream({
+      voice: "FEMALE",
+      text: said,
+      signal: agent.signal,
+    });
+    setTimeout(() => {
+      agent.abort();
+    }, 10);
+    await expect(pending).rejects.toThrow();
+    expect(sent).toHaveLength(1);
+  });
+});
+
+describe("one-way speech follows the same engine choice", () => {
+  const mp3 = () =>
+    new Response(new Uint8Array([9, 9]), {
+      status: 200,
+      headers: { "content-type": "audio/mpeg" },
+    });
+
+  it("reads a line in v3, stripped of any stage direction", async () => {
+    const { fetch, sent } = scripted(() => mp3());
+    const speech = createElevenLabsSpeechSynthesis({ apiKey: "k", fetch });
+    await speech.synthesise({ voice: "FEMALE", text: "[laughs] Welcome." });
+    expect(sent[0]?.body).toEqual({
+      text: "Welcome.",
+      model_id: "eleven_v3_conversational",
+    });
+  });
+
+  it("falls back to turbo for the line when v3 fails or is slow", async () => {
+    const failing = scripted((model) =>
+      model === "eleven_v3_conversational"
+        ? new Response("", { status: 500 })
+        : mp3(),
+    );
+    const speech = createElevenLabsSpeechSynthesis({
+      apiKey: "k",
+      fetch: failing.fetch,
+    });
+    const out = await speech.synthesise({ voice: "FEMALE", text: "Hello." });
+    expect([...out.audio]).toEqual([9, 9]);
+    expect(failing.sent.map((s) => s.body["model_id"])).toEqual([
+      "eleven_v3_conversational",
+      "eleven_turbo_v2_5",
+    ]);
+
+    const slow = scripted((model, signal) =>
+      model === "eleven_v3_conversational" ? stalled(signal) : mp3(),
+    );
+    const quick = createElevenLabsSpeechSynthesis({
+      apiKey: "k",
+      fetch: slow.fetch,
+      firstAudioDeadlineMs: 30,
+    });
+    await quick.synthesise({ voice: "FEMALE", text: "Hello." });
+    expect(slow.sent.map((s) => s.body["model_id"])).toEqual([
+      "eleven_v3_conversational",
+      "eleven_turbo_v2_5",
+    ]);
+  });
+
+  it("is spoken by Aura-2 when ElevenLabs cannot speak it at all", async () => {
+    const eleven = createElevenLabsSpeechSynthesis({
+      apiKey: "k",
+      fetch: scripted(() => new Response("", { status: 500 })).fetch,
+    });
+    const aura = {
+      name: "deepgram",
+      voices: ["FEMALE", "MALE"] as const,
+      synthesise: () =>
+        Promise.resolve({
+          audio: new Uint8Array([1]),
+          mediaType: "audio/mpeg",
+        }),
+    };
+    const both = speechWithFallback([eleven, aura]);
+    expect(both?.name).toBe("elevenlabs+deepgram");
+    const out = await both?.synthesise({ voice: "FEMALE", text: "Hi." });
+    expect([...(out?.audio ?? [])]).toEqual([1]);
   });
 });

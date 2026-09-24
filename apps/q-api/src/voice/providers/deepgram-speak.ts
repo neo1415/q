@@ -56,6 +56,60 @@ function retryable(status: number): boolean {
   return status === 429 || status >= 500;
 }
 
+/**
+ * Aura-2 as the last voice behind the speak relay (CQ-VOICE-010): used for
+ * an utterance only when ElevenLabs could not voice it at all. Same
+ * account and key as everything else Deepgram does here, and the same
+ * Aura-2 voices the agent itself falls back to.
+ *
+ * The agent asks the relay for a format by its ElevenLabs name. The formats
+ * it actually plays are mapped to Aura's parameters. Anything else is PCM
+ * at 24 kHz, which is the agent socket's own output.
+ */
+export type DeepgramSpeakStream = (input: {
+  readonly voice: QVoiceChoice;
+  readonly text: string;
+  readonly outputFormat?: string | undefined;
+  readonly signal?: AbortSignal | undefined;
+}) => Promise<Response>;
+
+function auraFormat(outputFormat: string | undefined): Record<string, string> {
+  const pcm = /^pcm_(8000|16000|22050|24000|44100)$/.exec(outputFormat ?? "");
+  if (pcm?.[1] !== undefined) {
+    return { encoding: "linear16", sample_rate: pcm[1], container: "none" };
+  }
+  if (outputFormat === "ulaw_8000") {
+    return { encoding: "mulaw", sample_rate: "8000", container: "none" };
+  }
+  if (outputFormat?.startsWith("mp3_") === true) {
+    return { encoding: "mp3" };
+  }
+  return { encoding: "linear16", sample_rate: "24000", container: "none" };
+}
+
+export function createDeepgramSpeakStream(options: {
+  readonly apiKey: string;
+  readonly fetch?: typeof fetch | undefined;
+}): DeepgramSpeakStream {
+  const doFetch = options.fetch ?? fetch;
+  return ({ voice, text, outputFormat, signal }) => {
+    const url = new URL(SPEAK_URL);
+    url.searchParams.set("model", SPEAK_MODELS[voice]);
+    for (const [key, value] of Object.entries(auraFormat(outputFormat))) {
+      url.searchParams.set(key, value);
+    }
+    return doFetch(url, {
+      method: "POST",
+      headers: {
+        Authorization: `Token ${options.apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ text }),
+      ...(signal === undefined ? {} : { signal }),
+    });
+  };
+}
+
 export function createDeepgramSpeechSynthesis(
   options: DeepgramSpeechSynthesisOptions,
 ): SpeechSynthesisPort {
