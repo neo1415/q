@@ -29,6 +29,31 @@ export default async function DiscoverPage() {
   const context = await resolveOwnContext();
   const session = await apiSession();
 
+  if (context.kind === "NONE" && context.unavailable === true) {
+    /*
+      Capital Q could not be asked who this person is. That is not "no
+      context": telling a signed-in investor to set up first because the
+      API was restarting is the P1 this branch closes (CQ-VERIFY-001).
+    */
+    return (
+      <PageContainer>
+        <PageHeader
+          title="Discover"
+          description="Opportunities ranked by fit and evidence, with the reasons alongside."
+        />
+        <EmptyState
+          title="Discover couldn't load."
+          description="Nothing is wrong with your setup. Capital Q didn't answer just now; try again in a moment."
+          action={
+            <Link href="/discover" className={buttonClassName("secondary")}>
+              Try again
+            </Link>
+          }
+        />
+      </PageContainer>
+    );
+  }
+
   if (context.kind === "NONE" || session === null) {
     return (
       <PageContainer>

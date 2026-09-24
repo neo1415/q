@@ -1,4 +1,8 @@
 import type { Metadata } from "next";
+import Link from "next/link";
+
+import { buttonClassName } from "@capital-q/ui/button";
+import { EmptyState } from "@capital-q/ui/states";
 
 import {
   PageContainer,
@@ -40,6 +44,20 @@ export default async function VisibilityPage() {
       ) : context.kind === "INVESTOR" ? (
         <InvestorVisibilityScreen
           investorOrganisationId={context.investorOrganisationId}
+        />
+      ) : context.unavailable === true ? (
+        // Not known to be nobody: Capital Q did not answer this render.
+        <EmptyState
+          title="Visibility couldn't load."
+          description="Nothing is wrong with your setup. Capital Q didn't answer just now; try again in a moment."
+          action={
+            <Link
+              href="/company/visibility"
+              className={buttonClassName("secondary")}
+            >
+              Try again
+            </Link>
+          }
         />
       ) : (
         <VisibilityUnavailable />
