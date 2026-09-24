@@ -4607,7 +4607,6 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
         }
       }
       if (pausing) {
-        repairAsk = null;
         result = { ...result, askNext: null };
         reply = result.reply.trim().length > 0 ? result.reply : reply;
       }
