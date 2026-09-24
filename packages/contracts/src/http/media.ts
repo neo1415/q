@@ -150,13 +150,31 @@ export const MEDIA_PLAYBACK_SUFFIX = "/playback" as const;
 export const UPLOAD_MODES = ["DIRECT", "RESUMABLE"] as const;
 export const UploadModeSchema = z.enum(UPLOAD_MODES);
 
+export const MEDIA_UPLOAD_CANCEL_SUFFIX = "/upload-session/cancel" as const;
+
 /**
- * `POST .../pitch/:mediaAssetId/upload-session` — the server reserves a
- * one-time upload target with the provider. The client sends the version
- * it saw so a stale tab cannot reopen an upload on an asset that moved on.
+ * `POST .../pitch/:mediaAssetId/upload-session` — the server reserves an
+ * upload target with the provider. The client sends the version it saw so
+ * a stale tab cannot reopen an upload on an asset that moved on.
+ *
+ * `uploadLengthBytes` (CQ-MEDIA-011) is how a client that can resume says
+ * so: the file's exact size. The server then chooses the mode — RESUMABLE
+ * when its provider supports it, DIRECT otherwise — and the answer's
+ * `uploadMode` is what the client must follow. With a length the
+ * `Idempotency-Key` header (IDEMPOTENCY_KEY_HEADER) is required; the same
+ * key and length again, while the target is open, returns the same target
+ * rather than a refusal, which is how a dropped answer or a reload resumes.
  */
 export const CreateMediaUploadSessionRequestSchema = z
-  .object({ expectedVersion: ResourceVersionSchema })
+  .object({
+    expectedVersion: ResourceVersionSchema,
+    uploadLengthBytes: z
+      .number()
+      .int()
+      .min(1)
+      .max(Number.MAX_SAFE_INTEGER)
+      .optional(),
+  })
   .strict();
 export type CreateMediaUploadSessionRequest = z.infer<
   typeof CreateMediaUploadSessionRequestSchema
@@ -166,15 +184,38 @@ export const MediaUploadSessionDtoSchema = z
   .object({
     mediaAssetId: UuidSchema,
     uploadMode: UploadModeSchema,
-    /** One-time target on the provider's edge: bytes go browser → CDN, never through the API. */
+    /**
+     * The target on the provider's edge: bytes go browser → CDN, never
+     * through the API. DIRECT: one POST of the whole file. RESUMABLE: a tus
+     * 1.0.0 resource the client HEADs for its offset and PATCHes in chunks.
+     */
     uploadUrl: z.string().url(),
     expiresAt: UtcTimestampSchema,
     /** The server's reservation; the client may not exceed it. */
     maxDurationSeconds: z.number().int().min(1).max(3600),
+    /** RESUMABLE only: the size of each PATCH (the last may be shorter). */
+    chunkSizeBytes: z.number().int().min(1).optional(),
     pitch: MediaAssetDtoSchema,
   })
   .strict();
 export type MediaUploadSessionDto = z.infer<typeof MediaUploadSessionDtoSchema>;
+
+/**
+ * `POST .../pitch/:mediaAssetId/upload-session/cancel` — the founder stops
+ * an unfinished upload. Empty body. The pitch ends UPLOAD_FAILED and the
+ * provider's target is released; repeating it changes nothing.
+ */
+export const CancelMediaUploadRequestSchema = z.object({}).strict();
+export type CancelMediaUploadRequest = z.infer<
+  typeof CancelMediaUploadRequestSchema
+>;
+
+export const CancelMediaUploadResponseSchema = z
+  .object({ pitch: MediaAssetDtoSchema })
+  .strict();
+export type CancelMediaUploadResponse = z.infer<
+  typeof CancelMediaUploadResponseSchema
+>;
 
 /**
  * `POST .../pitch/:mediaAssetId/sync` — idempotent "look at the provider

@@ -552,6 +552,8 @@ export {
 } from "./documents.js";
 
 export {
+  CancelMediaUploadRequestSchema,
+  CancelMediaUploadResponseSchema,
   COMPANY_PITCH_SUFFIX,
   CompanyMediaListResponseSchema,
   CompanyPitchResponseSchema,
@@ -565,6 +567,7 @@ export {
   MEDIA_PURPOSES,
   MEDIA_STATUSES,
   MEDIA_SYNC_SUFFIX,
+  MEDIA_UPLOAD_CANCEL_SUFFIX,
   MEDIA_UPLOAD_SESSION_SUFFIX,
   MediaAssetDtoSchema,
   MediaPurposeSchema,
@@ -585,6 +588,8 @@ export {
   SyncMediaAssetResponseSchema,
   UPLOAD_MODES,
   UploadModeSchema,
+  type CancelMediaUploadRequest,
+  type CancelMediaUploadResponse,
   type CompanyMediaListResponse,
   type CompanyPitchResponse,
   type CreateCompanyPitchRequest,
