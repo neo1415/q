@@ -1001,20 +1001,21 @@ function recordedCurrency(
 /**
  * A question with nothing to tap is a question somebody may need to type.
  *
- * Every question that HAS choices now shows them, so the ones left are the
+ * Every question that HAS choices shows them, so the ones left are the
  * ones where only the person's own words will do: a name, a website, a
- * description, a number. Those are exactly the ones where somebody on a
- * bus or in an open-plan office is stuck, and the stage has always had a
- * Type button they had no reason to look for. So Q mentions it, once, on
- * the questions where it is the answer.
+ * description, a number. Somebody on a bus is stuck there, and the stage
+ * has a Type button they had no reason to look for.
+ *
+ * This used to be an instruction written into the step's note for the
+ * model to act on ("…mention once that they can tap Type…"), and the model
+ * read it out word for word (founder walkthrough F3). An instruction is
+ * never speakable content: the platform says the line itself, once per
+ * session, over voice, on the first such question.
  */
-function typeable(note: string | undefined): string {
-  return [
-    note,
-    "There are no choices to tap for this one, so if speaking is awkward, mention once that they can tap Type and write it instead. Once only, and never on a question that has options.",
-  ]
-    .filter((n): n is string => n !== undefined)
-    .join(" ");
+const TYPE_HINT = "If it's easier, you can tap Type and write it instead.";
+
+function isTypeable(kind: InterviewOpenStep["kind"]): boolean {
+  return kind === "NUMBER" || kind === "SHORT_TEXT" || kind === "LONG_TEXT";
 }
 
 function toOpenStep(
@@ -1045,13 +1046,12 @@ function toOpenStep(
         min: c.min,
         max: c.max,
         ...(c.unit === undefined ? {} : { unit: c.unit }),
-        note: typeable(base.note),
       };
     case "short_text":
-      return { ...base, kind: "SHORT_TEXT", note: typeable(base.note) };
+      return { ...base, kind: "SHORT_TEXT" };
     case "long_text":
     case "voice_text":
-      return { ...base, kind: "LONG_TEXT", note: typeable(base.note) };
+      return { ...base, kind: "LONG_TEXT" };
     case "confirmation":
       // A review of what has been gathered: Q reads it back in speech
       // before it asks, rather than asking for a "confirmation".
@@ -1599,6 +1599,8 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
    * second one" refers to and what a volunteered sentence answers.
    */
   const conversationBySession = new Map<string, ConversationState>();
+  /** Sessions that have heard the Type hint (once each, voice only). */
+  const typeHintGiven = new Set<string>();
   /**
    * Meaning kept beside a field, per session (CQ-QX-005 §3).
    *
@@ -2002,6 +2004,7 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
       carriedBySession.delete(sessionId);
       conversationBySession.delete(sessionId);
       qualitativeBySession.delete(sessionId);
+      typeHintGiven.delete(sessionId);
     },
 
     /**
@@ -4358,6 +4361,39 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
       const askStep =
         result.askNext === null ? undefined : steps.get(result.askNext);
       const askOpen = askStep === undefined ? null : toOpenStep(askStep, view);
+      /**
+       * Nothing the platform told the model is ever said to the person
+       * (founder walkthrough F3). The notes, the conversation block and
+       * the steps' own notes are instructions and context; a sentence of
+       * theirs that comes back verbatim in the reply is removed. Compared
+       * against the platform's own words only — nothing of the person's.
+       */
+      const instructionSentences = [
+        ...variables.notes,
+        ...variables.conversation.split("\n"),
+        ...variables.openSteps.map((step) => step.note ?? ""),
+      ]
+        .flatMap((text) => text.split(/(?<=[.!?])\s+/))
+        .map((sentence) => sentence.trim())
+        .filter((sentence) => sentence.length >= 30);
+      for (const sentence of instructionSentences) {
+        if (reply.includes(sentence)) {
+          reply = reply
+            .replace(sentence, "")
+            .replace(/\s{2,}/g, " ")
+            .trim();
+        }
+      }
+      if (
+        input.channel === "voice" &&
+        askOpen !== null &&
+        isTypeable(askOpen.kind) &&
+        !typeHintGiven.has(sessionId) &&
+        reply.length > 0
+      ) {
+        typeHintGiven.add(sessionId);
+        reply = `${reply} ${TYPE_HINT}`;
+      }
 
       // What the conversation now knows: what was recorded and chosen,
       // what is on screen, and whether the turn moved the job along.
