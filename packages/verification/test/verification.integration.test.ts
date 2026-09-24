@@ -138,7 +138,7 @@ describe("@capital-q/verification against local PostgreSQL", () => {
   ): Promise<Member> {
     const authUserId = randomUUID();
     const metadata = JSON.stringify(synthetic ? { synthetic: true } : {});
-    await tx.sql`insert into auth.users (id, raw_user_meta_data) values (${authUserId}, ${metadata}::jsonb)`;
+    await tx.sql`insert into auth.users (id, raw_user_meta_data) values (${authUserId}, ${metadata}::text::jsonb)`;
     const [profile] = await tx.sql<
       { id: string }[]
     >`select id from identity.user_profiles where auth_user_id = ${authUserId}`;
@@ -177,7 +177,7 @@ describe("@capital-q/verification against local PostgreSQL", () => {
           tx,
           a.tenant,
           a.org,
-          "organisation_member",
+          "organisation_admin",
           false,
         );
         const adminB = await insertMember(
