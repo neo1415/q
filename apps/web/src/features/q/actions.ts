@@ -222,17 +222,43 @@ export async function askQAction(
           ];
 
   return run(async (session) => {
-    const handle = await createQRun(
-      session,
-      {
-        capability: "ANSWER",
-        message: { text: parsed.data },
-        modality: "TEXT",
-        ...(subjects === undefined ? {} : { subjects }),
-        ...(conversationId === undefined ? {} : { conversationId }),
-      },
-      crypto.randomUUID(),
-    );
+    const start = (inConversation: typeof conversationId) =>
+      createQRun(
+        session,
+        {
+          capability: "ANSWER",
+          message: { text: parsed.data },
+          modality: "TEXT",
+          ...(subjects === undefined ? {} : { subjects }),
+          ...(inConversation === undefined
+            ? {}
+            : { conversationId: inConversation }),
+        },
+        crypto.randomUUID(),
+      );
+    /**
+     * A conversation that is no longer this person's to continue in their
+     * current context (CQ-QX-005, adversarial round 1 #4).
+     *
+     * The onboarding thread opened its Q conversation before the person
+     * had an organisation; creating one changed their actor context, and
+     * the next question met "I couldn't find that Q conversation" — a dead
+     * end over something they never did. Not found is the Q API's answer
+     * for "not yours here"; the question is asked again in a fresh
+     * conversation under the context they have now, and the caller keeps
+     * the new id. Nothing is widened: the new run is authorised as any
+     * other.
+     */
+    const handle = await start(conversationId).catch((error: unknown) => {
+      if (
+        conversationId !== undefined &&
+        error instanceof ApiProblemError &&
+        error.status === 404
+      ) {
+        return start(undefined);
+      }
+      throw error;
+    });
     return {
       runId: handle.runId,
       conversationId: handle.conversationId,

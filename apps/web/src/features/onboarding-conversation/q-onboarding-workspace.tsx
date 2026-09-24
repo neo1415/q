@@ -28,6 +28,7 @@ import type { TaxonomyCandidateView } from "../onboarding-kit/client";
 import type { OnboardingTurn } from "../onboarding-kit/controller";
 import type { SessionPresentation } from "../onboarding-kit/session";
 import { askQAction, readQRunAction } from "../q/actions";
+import { onboardingThreadAction } from "./thread-actions";
 import { useVoiceInterview } from "../voice/use-voice-interview";
 import {
   materialListAction,
@@ -496,15 +497,43 @@ export function QOnboardingWorkspace({
       return;
     }
     openedFor.current = sessionId;
-    void actions.say("", []).then((turn) => {
-      if (turn?.reply != null) {
-        pendingReply.current = turn.reply;
-        // The prompt may not change, so bind it here as well as in the
-        // effect that watches for a new step.
-        setQQuestion({ stepKey: prompt.stepKey, text: turn.reply });
-        pendingReply.current = null;
-      }
-    });
+    /**
+     * The thread first, then Q (CQ-QX-006; adversarial round 1, #7).
+     *
+     * A reload used to start from nothing: Q greeted them as new and
+     * their next "yep" answered a read-back they could no longer see.
+     * The conversation is redrawn from what the server kept, and Q opens
+     * with that history in hand — the interviewer then re-presents what
+     * it is actually waiting on rather than starting over.
+     */
+    void onboardingThreadAction(sessionId)
+      .then((kept) => {
+        const restored: Turn[] = kept.map((turn) => ({
+          id: newId(),
+          kind: turn.role === "Q" ? ("Q" as const) : ("PERSON" as const),
+          text: turn.text,
+        }));
+        if (restored.length > 0) {
+          // A turn typed while the thread loaded stays after it.
+          setTurns((current) => [...restored, ...current]);
+        }
+        return actions.say(
+          "",
+          restored.slice(-12).map((turn) => ({
+            role: turn.kind === "Q" ? ("q" as const) : ("person" as const),
+            text: turn.text.slice(0, 1500),
+          })),
+        );
+      })
+      .then((turn) => {
+        if (turn?.reply != null) {
+          pendingReply.current = turn.reply;
+          // The prompt may not change, so bind it here as well as in the
+          // effect that watches for a new step.
+          setQQuestion({ stepKey: prompt.stepKey, text: turn.reply });
+          pendingReply.current = null;
+        }
+      });
   }, [view?.session.id, prompt, turns.length, actions]);
 
   const settleReading = useCallback(() => {
@@ -1430,8 +1459,7 @@ export function QOnboardingWorkspace({
                 </div>
               ) : (
                 <p className="cq-caption text-(--cq-text-secondary)">
-                  Describe the company in a sentence, or search the categories
-                  below.
+                  Say it in a sentence, or search the categories below.
                 </p>
               )}
               <div className="flex flex-col gap-2">
