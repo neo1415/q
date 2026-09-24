@@ -17,6 +17,7 @@ import {
   type ModelFailureClass,
   type ModelFinishStatus,
   type ModelMessage,
+  type ModelReasoningLevel,
   type ModelToolCall,
   type ModelToolDefinition,
   type ModelUsage,
@@ -59,6 +60,25 @@ export const OPENAI_PROVIDER_CODE = "openai";
 
 /** The one model this adapter is permitted to run. */
 export const OPENAI_TEST_MODEL = "gpt-5.6-luna";
+
+/**
+ * The caller's requested effort, as this vendor spells it (CQ-VOICE-010).
+ *
+ * It used to be "low" whatever was asked. On the interview turn, which
+ * asks for NONE, that cost about a second at the median and three at the
+ * tail. Measured on the real rendered INTERVIEW_CONDUCTOR request, 5
+ * interleaved runs: "none" p50 3.76 s / p95 4.31 s against "low" p50
+ * 4.61 s / p95 7.51 s, all fifteen outputs valid. "minimal" is refused by
+ * this model, so nothing maps to it.
+ */
+const OPENAI_REASONING_EFFORT: Readonly<
+  Record<ModelReasoningLevel, "none" | "low" | "medium" | "high">
+> = {
+  NONE: "none",
+  LOW: "low",
+  MEDIUM: "medium",
+  HIGH: "high",
+};
 
 export type OpenAIProviderOptions = {
   readonly apiKey: string;
@@ -290,7 +310,7 @@ export function createOpenAIModelProvider(
         ...(tools === undefined ? {} : { tools: [...tools] }),
         // No summary is asked for and none is read: a reasoning trace is
         // not something Capital Q surfaces or stores (doc 12).
-        reasoning: { effort: "low" as const },
+        reasoning: { effort: OPENAI_REASONING_EFFORT[request.reasoning] },
         // Nothing is kept on the vendor's side between calls.
         store: false,
         ...(request.output.kind === "STRUCTURED"
