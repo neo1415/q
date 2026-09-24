@@ -15,7 +15,7 @@ import {
   type PresenceSubject,
 } from "../contracts.js";
 import {
-  distinctiveTerms,
+  subjectSignature,
   domainLabel,
   pageNamesSubject,
 } from "../domain/subject-match.js";
@@ -167,8 +167,8 @@ export function createPresenceService(
         // asked what a page says will faithfully report a stranger's page.
         // Nothing that fails to name the subject reaches evidence, a model
         // or the gate (see domain/subject-match.ts).
-        const terms = distinctiveTerms(identity.data);
-        const found = read.filter((page) => pageNamesSubject(terms, page));
+        const signature = subjectSignature(identity.data);
+        const found = read.filter((page) => pageNamesSubject(signature, page));
         if (found.length < read.length) {
           logger?.info(
             {

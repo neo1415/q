@@ -75,6 +75,8 @@ export {
   distinctiveTerms,
   domainLabel,
   pageNamesSubject,
+  subjectSignature,
+  type SubjectSignature,
 } from "./domain/subject-match.js";
 
 export { createPostgresPresenceBuildLog } from "./infrastructure/postgres-presence-build-log.js";

@@ -116,18 +116,64 @@ export function distinctiveTerms(identity: {
   return [...terms];
 }
 
-/** Whether one page names the subject anywhere a reader would see. */
+/**
+ * What a page has to contain to be about the subject: every distinctive
+ * word of their name, or their own domain label.
+ */
+export type SubjectSignature = {
+  /** The name's distinctive words, in the name's order. */
+  readonly nameTerms: readonly string[];
+  /** The whole name with spacing removed: "The Vault Lyne" → "thevaultlyne". */
+  readonly wholeName: string;
+  readonly domainLabel: string | null;
+};
+
+export function subjectSignature(identity: {
+  readonly name: string;
+  readonly websiteUrl: string | null;
+}): SubjectSignature {
+  return {
+    nameTerms: distinctiveTerms({ name: identity.name, websiteUrl: null }),
+    wholeName: normalise(identity.name).replace(/ /g, ""),
+    domainLabel: domainLabel(identity.websiteUrl),
+  };
+}
+
+/**
+ * Whether one page names the subject anywhere a reader would see.
+ *
+ * The name as a name: its distinctive words together and in order, or
+ * the whole name, and not any one word of it. Matching on any one word
+ * let "Kivu Freight" accept a page about Kivu Logistics (airline tickets)
+ * and "Lumen Health" accept Lumin Health (ketamine clinics in Boston). Each
+ * shared one word, and Q offered a stranger's description as theirs
+ * (CQ-ACCEPT-001). Both words scattered through a page are not enough
+ * either: the Kivu Logistics page also said "freight coordination". The
+ * domain label, when there is one, is recognised on its own.
+ */
 export function pageNamesSubject(
-  terms: readonly string[],
+  signature: SubjectSignature,
   page: {
     readonly url: string;
     readonly title: string | null;
     readonly excerpt: string;
   },
 ): boolean {
-  if (terms.length === 0) return false;
   const haystack = normalise(
     `${page.url} ${page.title ?? ""} ${page.excerpt}`,
   ).replace(/ /g, "");
-  return terms.some((term) => haystack.includes(term));
+  if (
+    signature.domainLabel !== null &&
+    haystack.includes(signature.domainLabel)
+  ) {
+    return true;
+  }
+  if (signature.nameTerms.length === 0) {
+    // Nothing distinctive in the name: only the domain could vouch.
+    return false;
+  }
+  return (
+    haystack.includes(signature.nameTerms.join("")) ||
+    (signature.wholeName.length > 0 && haystack.includes(signature.wholeName))
+  );
 }

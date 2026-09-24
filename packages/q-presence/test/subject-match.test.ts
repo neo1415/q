@@ -4,6 +4,7 @@ import {
   distinctiveTerms,
   domainLabel,
   pageNamesSubject,
+  subjectSignature,
 } from "../src/domain/subject-match.js";
 
 /**
@@ -56,7 +57,7 @@ describe("what makes a subject findable", () => {
 });
 
 describe("whether a page is about the subject", () => {
-  const terms = distinctiveTerms(VAULTLYNE);
+  const terms = subjectSignature(VAULTLYNE);
 
   it("rejects every page a real search returned about a namesake", () => {
     const strangers = [
@@ -119,12 +120,56 @@ describe("whether a page is about the subject", () => {
 
   it("keeps nothing when there is nothing distinctive to recognise", () => {
     expect(
-      pageNamesSubject([], page("https://x.example/a", "Anything", "Anything")),
+      pageNamesSubject(
+        { nameTerms: [], wholeName: "thecompanygroup", domainLabel: null },
+        page("https://x.example/a", "Anything", "Anything"),
+      ),
+    ).toBe(false);
+  });
+
+  it("needs every distinctive word of a name, so one shared word is a stranger (CQ-ACCEPT-001)", () => {
+    const kivu = subjectSignature({
+      name: "Kivu Freight",
+      websiteUrl: "https://kivufreight.example",
+    });
+    expect(
+      pageNamesSubject(
+        kivu,
+        page(
+          "https://kivulogistics.example/",
+          "Kivu Logistics",
+          "Reliable cargo, freight coordination and airline ticket assistance.",
+        ),
+      ),
+    ).toBe(false);
+    expect(
+      pageNamesSubject(
+        kivu,
+        page("https://news.example/a", "Kivu Freight opens a corridor", ""),
+      ),
+    ).toBe(true);
+    expect(
+      pageNamesSubject(
+        kivu,
+        page("https://kivufreight.example/about", null, ""),
+      ),
+    ).toBe(true);
+
+    const lumen = subjectSignature({ name: "Lumen Health", websiteUrl: null });
+    expect(
+      pageNamesSubject(
+        lumen,
+        page(
+          "https://luminhealth.example/",
+          "Lumin Health",
+          "Insurance-covered ketamine therapy in Boston, MA.",
+        ),
+      ),
     ).toBe(false);
   });
 
   it("recognises a well-known subject in every page a real search returned", () => {
-    const paystack = distinctiveTerms({
+    const paystack = subjectSignature({
       name: "Paystack",
       websiteUrl: "https://paystack.com",
     });
