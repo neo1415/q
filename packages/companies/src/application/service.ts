@@ -14,8 +14,11 @@ import { createUnavailableVerificationClaimsPort } from "../infrastructure/unava
 import {
   createAssessMarketplaceReadiness,
   createGetMarketplaceReadiness,
+  createReconcileMarketplaceReadinessAsSystem,
   type AssessMarketplaceReadinessCommand,
   type GetMarketplaceReadinessQuery,
+  type ReconcileMarketplaceReadinessAsSystemCommand,
+  type SystemReadinessOutcome,
 } from "./marketplace-readiness.js";
 import {
   createPostgresCompanyMemberRepository,
@@ -71,6 +74,14 @@ export type CompanyService = {
   readonly assessMarketplaceReadiness: (
     command: AssessMarketplaceReadinessCommand,
   ) => Promise<MarketplaceReadinessAssessment>;
+  /**
+   * Trusted server operation (CQ-VERIFY-002): Capital Q reconciles an
+   * organisation's companies after a verification decision. Composed by
+   * the worker only; no route calls it.
+   */
+  readonly reconcileMarketplaceReadinessAsSystem: (
+    command: ReconcileMarketplaceReadinessAsSystemCommand,
+  ) => Promise<readonly SystemReadinessOutcome[]>;
   readonly getMyCompanyMembership: (
     query: GetMyCompanyMembershipQuery,
   ) => Promise<CompanyMember>;
@@ -129,6 +140,8 @@ export function createCompanyService(
     setCompanyVisibility: createSetCompanyVisibility(dependencies),
     getMarketplaceReadiness: createGetMarketplaceReadiness(dependencies),
     assessMarketplaceReadiness: createAssessMarketplaceReadiness(dependencies),
+    reconcileMarketplaceReadinessAsSystem:
+      createReconcileMarketplaceReadinessAsSystem(dependencies),
     getMyCompanyMembership: createGetMyCompanyMembership(dependencies),
     upsertMyCompanyMembership: createUpsertMyCompanyMembership(dependencies),
     getMyFounderProfile: createGetMyFounderProfile(dependencies),

@@ -5,11 +5,16 @@ import {
   MarketplaceReadinessAssessmentSchema,
   type CorrelationId,
 } from "@capital-q/contracts";
-import type { ActorContext, AuthorizationService } from "@capital-q/security";
+import {
+  OrganisationIdSchema,
+  type ActorContext,
+  type AuthorizationService,
+} from "@capital-q/security";
 
 import type { CompanyServiceDependencies } from "../src/application/dependencies.js";
 import {
   createAssessMarketplaceReadiness,
+  createReconcileMarketplaceReadinessAsSystem,
   createGetMarketplaceReadiness,
 } from "../src/application/marketplace-readiness.js";
 import type {
@@ -272,9 +277,19 @@ function dependencies(w: World): CompanyServiceDependencies {
     : never;
   const companies: Pick<
     CompanyRepository,
-    "findById" | "lockById" | "updateReadiness" | "updateVisibility"
+    | "findById"
+    | "lockById"
+    | "lockByOrganisation"
+    | "updateReadiness"
+    | "updateVisibility"
   > = {
     findById: (_e, t, o, id) => Promise.resolve(owned(t, o, id)),
+    lockByOrganisation: (_tx, t, o) =>
+      Promise.resolve(
+        w.company.tenantId === t && w.company.organisationId === o
+          ? [w.company]
+          : [],
+      ),
     lockById: (_tx, t, o, id) => Promise.resolve(owned(t, o, id)),
     updateReadiness: (_tx, input) => {
       if (w.company.version !== input.expectedVersion) {
@@ -520,6 +535,70 @@ describe("marketplace readiness use cases", () => {
     expect(w.company.marketplaceReadinessState).toBe(
       "requirements_outstanding",
     );
+  });
+
+  it("Capital Q reconciles after a verification decision as SYSTEM, once, and a replay writes nothing", async () => {
+    const port = { standing: "VERIFIED" as "VERIFIED" | "REVOKED" };
+    const w = world({
+      verification: {
+        sourceLabel: "VERIFICATION_TEST",
+        currentStandings: () =>
+          Promise.resolve({
+            available: true,
+            founderIdentity: port.standing,
+            organisationIdentity: "VERIFIED",
+          }),
+      },
+    });
+    const reconcile = createReconcileMarketplaceReadinessAsSystem(
+      dependencies(w),
+    );
+    const command = {
+      tenantId: w.company.tenantId,
+      organisationId: w.company.organisationId,
+      correlationId: CORRELATION,
+      trigger: "VERIFICATION_DECIDED" as const,
+    };
+
+    const first = await reconcile(command);
+    expect(first).toEqual([
+      { companyId: w.company.id, state: "marketplace_ready", changed: true },
+    ]);
+    expect(w.audits).toHaveLength(1);
+    expect(w.audits[0]).toMatchObject({
+      actorType: "SYSTEM",
+      metadata: {
+        trigger: "VERIFICATION_DECIDED",
+        verificationSource: "VERIFICATION_TEST",
+      },
+    });
+    expect(w.audits[0]).not.toHaveProperty("actorId");
+    expect(w.events).toHaveLength(1);
+    expect(w.events[0]).toMatchObject({ actor: { type: "SYSTEM" } });
+
+    // A redelivered decision: the state already agrees, nothing is written.
+    const replay = await reconcile(command);
+    expect(replay[0]?.changed).toBe(false);
+    expect(w.audits).toHaveLength(1);
+    expect(w.events).toHaveLength(1);
+
+    // A revocation is a decision too, and it lowers readiness.
+    port.standing = "REVOKED";
+    const lowered = await reconcile(command);
+    expect(lowered[0]?.state).toBe("requirements_outstanding");
+    expect(w.company.marketplaceReadinessState).toBe(
+      "requirements_outstanding",
+    );
+
+    // Another organisation's decision touches no company here.
+    expect(
+      await reconcile({
+        ...command,
+        organisationId: OrganisationIdSchema.parse(
+          "d0000000-0000-4000-8000-00000000ffff",
+        ),
+      }),
+    ).toEqual([]);
   });
 
   it("a founder without company.edit cannot assess; nobody can pass a desired state", async () => {

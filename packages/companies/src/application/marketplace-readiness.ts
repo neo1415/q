@@ -11,7 +11,12 @@ import {
   type MarketplaceReadinessAssessment,
 } from "@capital-q/contracts";
 import type { TransactionContext } from "@capital-q/database";
-import { capability, type ActorContext } from "@capital-q/security";
+import {
+  capability,
+  type ActorContext,
+  type OrganisationId,
+  type TenantId,
+} from "@capital-q/security";
 
 import type { Company, CompanyId } from "../contracts/index.js";
 import { CompanyNotFoundError } from "../domain/errors.js";
@@ -58,6 +63,28 @@ export type AssessMarketplaceReadinessCommand = {
   readonly actor: ActorContext;
   readonly companyId: CompanyId;
   readonly correlationId: CorrelationId;
+};
+
+/**
+ * Capital Q itself reconciling readiness because a fact the policy reads
+ * changed underneath it (CQ-VERIFY-002: a verification decision). Not a
+ * person, not an ActorContext, and not a capability holder: it can only
+ * make the stored state agree with the policy, never choose a state.
+ */
+export type SystemReadinessActor = { readonly kind: "SYSTEM" };
+export const SYSTEM_READINESS_ACTOR: SystemReadinessActor = { kind: "SYSTEM" };
+
+export type ReconcileMarketplaceReadinessAsSystemCommand = {
+  readonly tenantId: TenantId;
+  readonly organisationId: OrganisationId;
+  readonly correlationId: CorrelationId;
+  readonly trigger: "VERIFICATION_DECIDED";
+};
+
+export type SystemReadinessOutcome = {
+  readonly companyId: CompanyId;
+  readonly state: MarketplaceReadinessAssessment["state"];
+  readonly changed: boolean;
 };
 
 export type MarketplaceReadinessReconciliation = {
@@ -112,11 +139,12 @@ export async function reconcileMarketplaceReadinessInTransaction(
   dependencies: CompanyServiceDependencies,
   tx: TransactionContext,
   input: {
-    readonly actor: ActorContext;
+    readonly actor: ActorContext | SystemReadinessActor;
     readonly locked: Company;
     readonly correlationId: CorrelationId;
     /** Why this reconciliation ran; audit metadata, never prose. */
-    readonly trigger: "ASSESSMENT_REQUESTED" | "VISIBILITY_WITHDRAWN";
+    readonly trigger:
+      "ASSESSMENT_REQUESTED" | "VISIBILITY_WITHDRAWN" | "VERIFICATION_DECIDED";
   },
 ): Promise<MarketplaceReadinessReconciliation> {
   const { actor, locked } = input;
@@ -145,8 +173,15 @@ export async function reconcileMarketplaceReadinessInTransaction(
     throw new Error("marketplace readiness update lost its lock");
   }
 
+  const system = "kind" in actor;
   await dependencies.audit.record(tx, {
-    ...auditActorFromContext(actor),
+    ...(system
+      ? {
+          tenantId: locked.tenantId,
+          actorType: "SYSTEM" as const,
+          organisationId: locked.organisationId,
+        }
+      : auditActorFromContext(actor)),
     auditEventId: createAuditEventId(),
     actionType: READINESS_CHANGED,
     resourceType: COMPANY_RESOURCE,
@@ -173,7 +208,7 @@ export async function reconcileMarketplaceReadinessInTransaction(
       organisationId: locked.organisationId,
       companyId: updated.id,
       version: updated.version,
-      actorUserId: actor.userId,
+      ...(system ? {} : { actorUserId: actor.userId }),
       correlationId: input.correlationId,
       readinessState: evaluation.state,
       policyVersion: evaluation.policyVersion,
@@ -278,4 +313,45 @@ export function createAssessMarketplaceReadiness(
       return assessment;
     });
   };
+}
+
+/**
+ * Reconcile readiness for every company an organisation owns, as Capital Q
+ * (CQ-VERIFY-002). A trusted server operation: composed only by the worker
+ * that consumes `verification.claim.decided`, never by a route, so no
+ * browser can reach it. It carries no capability check because no person
+ * is acting; what it may do is exactly what the policy answers, and when
+ * the stored state already agrees it writes nothing, which is what makes
+ * a redelivered decision harmless.
+ */
+export function createReconcileMarketplaceReadinessAsSystem(
+  dependencies: CompanyServiceDependencies,
+) {
+  const { transactions, repositories } = dependencies;
+  return (
+    command: ReconcileMarketplaceReadinessAsSystemCommand,
+  ): Promise<readonly SystemReadinessOutcome[]> =>
+    transactions.run(async (tx) => {
+      const companies = await repositories.companies.lockByOrganisation(
+        tx,
+        command.tenantId,
+        command.organisationId,
+      );
+      const outcomes: SystemReadinessOutcome[] = [];
+      for (const locked of companies) {
+        const { company, assessment, changed } =
+          await reconcileMarketplaceReadinessInTransaction(dependencies, tx, {
+            actor: SYSTEM_READINESS_ACTOR,
+            locked,
+            correlationId: command.correlationId,
+            trigger: command.trigger,
+          });
+        outcomes.push({
+          companyId: company.id,
+          state: assessment.state,
+          changed,
+        });
+      }
+      return outcomes;
+    });
 }

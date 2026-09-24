@@ -185,6 +185,16 @@ export function createPostgresCompanyRepository(): CompanyRepository {
       return rows.length === 0 ? null : toCompany(rows[0]);
     },
 
+    lockByOrganisation: async (tx, tenantId, organisationId) => {
+      const rows = await tx.sql`
+        ${companySelect(tx.sql)}
+         where c.tenant_id = ${tenantId}
+           and c.organisation_id = ${organisationId}
+         order by c.id
+           for update`;
+      return rows.map(toCompany);
+    },
+
     updateProfile: async (tx, input) => {
       const columns = toColumnChanges(input.changes);
       // founded_date must be cast from text; every other column is text.

@@ -99,6 +99,17 @@ export type CompanyRepository = {
     },
   ) => Promise<Company | null>;
   /**
+   * Locks every company the organisation owns in its tenant, ordered by
+   * id, for the rest of the transaction. Used only by the system
+   * reconciliation after a verification decision (CQ-VERIFY-002), which
+   * knows the organisation a claim belongs to and not a company id.
+   */
+  readonly lockByOrganisation: (
+    tx: TransactionContext,
+    tenantId: TenantId,
+    organisationId: OrganisationId,
+  ) => Promise<readonly Company[]>;
+  /**
    * Written only by the marketplace-readiness reconciliation, under the
    * row lock, with the state the policy decided. No profile PATCH, no
    * visibility change and no client field reaches this method.
