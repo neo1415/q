@@ -435,6 +435,10 @@ export function VisibilityScreen({ companyId }: VisibilityScreenProps) {
           <Link href="/pitch" className={buttonClassName("secondary")}>
             Your pitch video
           </Link>
+          {/* Capital Q verifies; the founder asks (CQ-VERIFY-001). */}
+          <Link href="/verification" className={buttonClassName("secondary")}>
+            Verification
+          </Link>
           {/* Changes are asked of Q in one's own words and approved (ADR 0011). */}
           <Link href="/home" className={buttonClassName("quiet")}>
             Ask Q to change it
