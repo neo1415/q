@@ -2135,6 +2135,8 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
        */
       const inFrontAtStart =
         conversation.asked?.topic ?? view.currentStep?.stepKey ?? null;
+      /** The journey's own current step when they spoke. */
+      const currentAtStart = view.currentStep?.stepKey ?? null;
 
       /**
        * A choice with exactly one candidate is not a question
@@ -2913,7 +2915,27 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
          * (CQ-QX-005 §4, §15). The same held-for-a-yes path in every
          * case, so a yes writes it and a no drops it.
          */
+        /**
+         * The answer lands on the journey's current step while Q had asked
+         * a different one (adversarial round 1, c): "strong" to a question
+         * about sectors was recorded as geography strength. The step Q
+         * declared as asked governs; when the reading puts the answer on
+         * the other one instead, and the asked step would take the same
+         * answer, the two cannot be told apart from the words — so it is
+         * held and read back under its step's name, never written blind.
+         */
+        const askedTopic = conversation.asked?.topic ?? null;
+        const askedStep =
+          askedTopic === null ? undefined : steps.get(askedTopic);
+        const misplaced =
+          askedStep !== undefined &&
+          askedStep.stepKey !== step.stepKey &&
+          step.stepKey === currentAtStart &&
+          statuses.get(askedStep.stepKey) !== "COMPLETED" &&
+          !result.answers.some((a) => a.stepKey === askedStep.stepKey) &&
+          toResponseValue(askedStep, answer.value) !== null;
         if (
+          misplaced ||
           isMaterial(step) ||
           disposition.confirm ||
           tense.has(step.stepKey)

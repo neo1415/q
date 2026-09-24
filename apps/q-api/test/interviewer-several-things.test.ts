@@ -507,3 +507,46 @@ describe("F3 · no instruction to the model is ever said to the person", () => {
     expect(first.reply).not.toMatch(/mention once|Once only/);
   });
 });
+
+describe("round 1 c · the step Q asked governs where the answer goes", () => {
+  it("holds 'strong' for a read-back instead of writing it to the current step when Q had asked another", async () => {
+    const world = investorSession({
+      currentStepKey: "I3.geography_strength",
+      recorded: MANDATE_SO_FAR,
+    });
+    const interviewer = createInterviewer({
+      gateway: gateway(
+        // Q declared the sector-strength question as asked…
+        {
+          ...base,
+          intent: "ANSWER",
+          reply: "How firm is your sector preference?",
+          askNext: "I3.sector_strength",
+          reading: reading({ kind: "CONTROL" }),
+        },
+        // …and the model then put the answer on the journey's current step.
+        {
+          ...base,
+          intent: "ANSWER",
+          reply: "Strong, then.",
+          answers: [
+            {
+              stepKey: "I3.geography_strength",
+              value: "must",
+              confidence: "HIGH",
+              clarity: "SETTLED",
+            },
+          ],
+          reading: reading({}),
+        },
+      ),
+      logger,
+    });
+    await interviewer.turn(turn(world, "ok"));
+    const outcome = await interviewer.turn(turn(world, "strong"));
+    expect(outcome.recorded).not.toContain("I3.geography_strength");
+    expect(world.recordedValue("I3.geography_strength")).toBeUndefined();
+    expect(outcome.trace?.persisted.held).toContain("I3.geography_strength");
+    expect(outcome.reply).toMatch(/Is that right\?/);
+  });
+});
