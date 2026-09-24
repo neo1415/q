@@ -35,6 +35,7 @@
     "@capital-q/permissions": "workspace:*",
     "@capital-q/security": "workspace:*",
     "@capital-q/taxonomy": "workspace:*",
+    "@capital-q/verification": "workspace:*",
     "fastify": "^5.12.1"
   },
   "devDependencies": {

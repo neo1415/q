@@ -119,6 +119,9 @@ importers:
       '@capital-q/taxonomy':
         specifier: workspace:*
         version: link:../../packages/taxonomy
+      '@capital-q/verification':
+        specifier: workspace:*
+        version: link:../../packages/verification
       fastify:
         specifier: ^5.12.1
         version: 5.12.1
@@ -413,6 +416,9 @@ importers:
       '@capital-q/taxonomy':
         specifier: workspace:*
         version: link:../../packages/taxonomy
+      '@capital-q/verification':
+        specifier: workspace:*
+        version: link:../../packages/verification
       pdfjs-dist:
         specifier: 6.3.289
         version: 6.3.289

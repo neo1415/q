@@ -1,4 +1,7 @@
-import type { MaterialActionAuditWriter } from "@capital-q/audit";
+import {
+  createPostgresMaterialActionAuditWriter,
+  type MaterialActionAuditWriter,
+} from "@capital-q/audit";
 import type { CompanyQueryPort } from "@capital-q/companies";
 import type { DatabaseExecutor, TransactionManager } from "@capital-q/database";
 import type { OutboxWriter } from "@capital-q/eventing";
@@ -59,7 +62,8 @@ export function createSyntheticVerificationDecider(options: {
   readonly sql: DatabaseExecutor;
   readonly transactions: TransactionManager;
   readonly outbox: OutboxWriter;
-  readonly audit: MaterialActionAuditWriter;
+  /** Absent: the platform's PostgreSQL audit writer. */
+  readonly audit?: MaterialActionAuditWriter | undefined;
   readonly attestation: SyntheticDemoAttestation | null;
   readonly environment: string | undefined;
   readonly repository?: VerificationClaimRepository | undefined;
@@ -67,6 +71,7 @@ export function createSyntheticVerificationDecider(options: {
 }) {
   return createDecideBySyntheticAttestation({
     ...options,
+    audit: options.audit ?? createPostgresMaterialActionAuditWriter(),
     repository:
       options.repository ?? createPostgresVerificationClaimRepository(),
     principals: options.principals ?? createPostgresSyntheticPrincipalPort(),
