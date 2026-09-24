@@ -33,6 +33,17 @@ export default async function PitchPage() {
       />
       {context.kind === "FOUNDER" ? (
         <PitchUpload companyId={context.companyId} />
+      ) : context.kind === "NONE" && context.unavailable === true ? (
+        // Not known to have no company: Capital Q did not answer.
+        <EmptyState
+          title="Your pitch couldn't load."
+          description="Nothing is wrong with your setup. Capital Q didn't answer just now; try again in a moment."
+          action={
+            <Link href="/pitch" className={buttonClassName("secondary")}>
+              Try again
+            </Link>
+          }
+        />
       ) : (
         <EmptyState
           title="A pitch belongs to a company."
