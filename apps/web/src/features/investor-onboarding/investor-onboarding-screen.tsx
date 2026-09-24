@@ -6,6 +6,7 @@ import { useMemo, useState } from "react";
 
 import type { FounderOnboardingAdapter } from "@capital-q/config/web";
 import { Button, buttonClassName } from "@capital-q/ui/button";
+import { QMark } from "@capital-q/ui/q-mark";
 import { EmptyState, InlineNotice, Skeleton } from "@capital-q/ui/states";
 
 import { createInvestorOnboardingClient } from "./adapters/compose";
@@ -181,14 +182,16 @@ export function InvestorOnboardingScreen({
       >
         Back to Q
       </Button>
+      {/* The form's one primary is Continue; Q's voice is the alternative. */}
       <Button
-        variant="primary"
-        size="compact"
+        variant="secondary"
+        size="regular"
         onClick={() => {
           setTalkOnOpen(true);
           setMode("conversation");
         }}
       >
+        <QMark size="sm" />
         Talk with Q
       </Button>
     </div>
