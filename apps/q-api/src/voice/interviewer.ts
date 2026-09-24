@@ -727,9 +727,13 @@ function currencyFromUtterance(utterance: string): string | null {
   return null;
 }
 
-/** Where a document actually goes, said once when one is mentioned aloud. */
+/**
+ * Where a document goes when they mention one (founder walkthrough F2):
+ * right here in the conversation — the typed thread and the voice stage
+ * both carry an uploader now — never a detour to the company page.
+ */
 const UPLOAD_LINE =
-  "Whenever you like, add the deck or model on screen from your company page; I'll carry on here.";
+  "Whenever you like, upload the deck or model right here and I'll read it; I'll carry on meanwhile.";
 
 /**
  * Questions whose own prompt is written in the platform's vocabulary

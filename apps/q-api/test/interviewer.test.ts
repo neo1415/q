@@ -334,7 +334,7 @@ describe("interviewer", () => {
     expect(outcome.recorded).toEqual([]);
     expect(outcome.skipped).toEqual(["F2.materials"]);
     expect(api.requests.some((r) => r.url.includes("F2.materials"))).toBe(true);
-    expect(outcome.reply).toContain("on screen");
+    expect(outcome.reply).toContain("upload the deck or model right here");
     // "unicorn" fits nothing, so Q does not say "got it": it asks the one
     // question that settles it, with the step's own options — through the
     // repair ladder (CQ-QX-005 §6), never with a fixed apology.
