@@ -51,6 +51,7 @@ function textResponse(input: {
     responseType: "TEXT",
     value: { type: "TEXT", text: input.text },
     rawText: input.text,
+    note: null,
     sourceModality: "TYPED_TEXT",
     createdAt: now(),
     supersededByResponseId: null,

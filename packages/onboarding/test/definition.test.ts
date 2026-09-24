@@ -112,6 +112,7 @@ function response(
     responseType: value.type,
     value,
     rawText: value.type === "TEXT" ? value.text : null,
+    note: null,
     sourceModality: value.type === "TEXT" ? "TYPED_TEXT" : "SELECTION",
     createdAt: "2026-09-04T00:00:00.000Z",
     supersededByResponseId: null,
