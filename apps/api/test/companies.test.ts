@@ -155,6 +155,8 @@ function fakeService(overrides: Partial<CompanyService> = {}) {
       calls.assess.push(command);
       return Promise.resolve(READINESS);
     },
+    // A worker-only operation (CQ-VERIFY-002); no route reaches it.
+    reconcileMarketplaceReadinessAsSystem: notUnderTest,
     // Founder / team operations are covered by company-team.test.ts.
     getMyCompanyMembership: notUnderTest,
     upsertMyCompanyMembership: notUnderTest,

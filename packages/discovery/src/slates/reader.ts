@@ -4,7 +4,7 @@ import type { ActorContext } from "@capital-q/security";
 
 import type { EligibilityPorts } from "../eligibility/ports.js";
 import type { EligibilityService } from "../eligibility/service.js";
-import { RANKING_CONFIG_V1 } from "../ranking/config.js";
+import { RANKING_CONFIG_CURRENT } from "../ranking/config.js";
 import type { ProactiveSuppressionPort } from "../rerank/suppression.js";
 import {
   decodeSlateCursor,
@@ -146,7 +146,7 @@ export function createSlateReadService(
     slateId: string | null = null,
   ): SlatePage => ({
     slateId,
-    rankingVersion: RANKING_CONFIG_V1.version,
+    rankingVersion: RANKING_CONFIG_CURRENT.version,
     items: [],
     notes,
     nextCursor: null,

@@ -4,6 +4,11 @@ import { z } from "zod";
 
 import {
   CorrelationIdSchema,
+  ONBOARDING_INTERVIEW_TURNS_DEFAULT,
+  ONBOARDING_INTERVIEW_TURNS_MAX,
+  ONBOARDING_TEXT_MAX_LENGTH,
+  OnboardingInterviewTurnChannelSchema,
+  OnboardingInterviewTurnRoleSchema,
   OnboardingJourneyTypeSchema,
   OnboardingQuestionOptionViewSchema,
   OnboardingQuestionReasonSchema,
@@ -13,6 +18,9 @@ import {
   OnboardingSuggestionResolutionSchema,
   UuidSchema,
   type CorrelationId,
+  type OnboardingInterviewTurn,
+  type OnboardingInterviewTurnChannel,
+  type OnboardingInterviewTurnRole,
   type OnboardingJourneyType,
   type OnboardingPathChanges,
   type OnboardingSessionView,
@@ -90,6 +98,7 @@ import type {
   OnboardingDefinitionRepository,
   OnboardingIdempotencyRepository,
   OnboardingInterviewQuestionRepository,
+  OnboardingInterviewTurnRepository,
   OnboardingResponseRepository,
   OnboardingSessionRepository,
   OnboardingStepContextRegistry,
@@ -150,6 +159,8 @@ export type OnboardingRuntimeDependencies = {
   readonly questions?: OnboardingInterviewQuestionRepository | undefined;
   /** Optional; absent means a free-text turn Q would read is refused, never dropped. */
   readonly utterances?: OnboardingUtteranceRepository | undefined;
+  /** Optional; absent means the interview thread cannot be appended or read. */
+  readonly interviewTurns?: OnboardingInterviewTurnRepository | undefined;
   /** Journey-supplied plain-language names for options (CQ-PRE-REC-001 §19). */
   readonly utteranceAliases?: OnboardingUtteranceAliases | undefined;
   /** Where a journey's figures and exclusions live (CQ-Q-VOICE-001 A §8, §12). */
@@ -211,6 +222,26 @@ export type SayOnboardingOutcome = {
 export type SessionScopedQuery = {
   readonly actor: OnboardingActor;
   readonly sessionId: OnboardingSessionId;
+};
+
+/** One exchange of the interview thread (CQ-QX-006), appended after it happened. */
+export type AppendOnboardingInterviewTurnsCommand = SessionScopedQuery & {
+  readonly turnRef: string;
+  readonly turns: readonly {
+    readonly role: OnboardingInterviewTurnRole;
+    readonly text: string;
+    readonly stepKey?: string | undefined;
+    readonly channel: OnboardingInterviewTurnChannel;
+  }[];
+};
+
+export type AppendOnboardingInterviewTurnsResult = {
+  /** False when every turn of this exchange was already recorded. */
+  readonly written: boolean;
+};
+
+export type ListOnboardingInterviewTurnsQuery = SessionScopedQuery & {
+  readonly limit?: number | undefined;
 };
 
 export type CurrentSessionQuery = {
@@ -2345,6 +2376,132 @@ export function createOnboardingUseCases(
     return proposeFromUtterance(placed, { text: command.text });
   };
 
+  const interviewTurnsRepo = (): OnboardingInterviewTurnRepository => {
+    if (runtime.interviewTurns === undefined) {
+      throw new OnboardingRuntimeConfigurationError(
+        "INTERVIEW_TURNS_UNAVAILABLE",
+        "no interview turn repository is composed",
+      );
+    }
+    return runtime.interviewTurns;
+  };
+
+  /**
+   * Appends one exchange to the interview thread (CQ-QX-006) so a reload
+   * redraws the conversation, typed or spoken. The session must be the
+   * actor's own -- the same ownership check every session read makes; a
+   * session id alone is never proof. Any session status is accepted: Q's
+   * closing words after completion belong to the thread too.
+   *
+   * Idempotent by `turnRef`: a retried exchange writes nothing, and a
+   * reference reused for different words is a conflict, never an overwrite.
+   * A display record only, so no event: nothing downstream acts on it.
+   */
+  const appendInterviewTurns = async (
+    raw: AppendOnboardingInterviewTurnsCommand,
+  ): Promise<AppendOnboardingInterviewTurnsResult> => {
+    const command = z
+      .object({
+        actor: ActorSchema,
+        sessionId: OnboardingSessionIdSchema,
+        turnRef: UuidSchema,
+        turns: z
+          .array(
+            z
+              .object({
+                role: OnboardingInterviewTurnRoleSchema,
+                text: z.string().min(1).max(ONBOARDING_TEXT_MAX_LENGTH),
+                stepKey: OnboardingStepKeySchema.optional(),
+                channel: OnboardingInterviewTurnChannelSchema,
+              })
+              .strict(),
+          )
+          .min(1)
+          .max(2)
+          .refine(
+            (turns) => new Set(turns.map((t) => t.role)).size === turns.length,
+            "each role appears at most once in one exchange",
+          ),
+      })
+      .strict()
+      .parse(raw);
+    const repo = interviewTurnsRepo();
+    return transactions.run(async (tx) => {
+      const session = await ownedSession(
+        runtime,
+        tx.sql,
+        command.actor,
+        command.sessionId,
+      );
+      let written = false;
+      for (const turn of command.turns) {
+        const stepKey = turn.stepKey ?? null;
+        const appended = await repo.append(tx, {
+          sessionId: session.id,
+          role: turn.role,
+          text: turn.text,
+          stepKey,
+          channel: turn.channel,
+          turnRef: command.turnRef,
+        });
+        if (appended !== null) {
+          written = true;
+          continue;
+        }
+        const recorded = (
+          await repo.findByRef(tx.sql, session.id, command.turnRef)
+        ).find((t) => t.role === turn.role);
+        if (
+          recorded === undefined ||
+          recorded.text !== turn.text ||
+          recorded.channel !== turn.channel ||
+          recorded.stepKey !== stepKey
+        ) {
+          throw new OnboardingMutationConflictError();
+        }
+      }
+      if (written) {
+        safeLog(runtime, "interview_turns.appended", session, {
+          count: command.turns.length,
+        });
+      }
+      return { written };
+    });
+  };
+
+  /** The newest turns of the actor's own interview thread, oldest first. */
+  const listInterviewTurns = async (
+    raw: ListOnboardingInterviewTurnsQuery,
+  ): Promise<readonly OnboardingInterviewTurn[]> => {
+    const query = z
+      .object({
+        actor: ActorSchema,
+        sessionId: OnboardingSessionIdSchema,
+        limit: z
+          .number()
+          .int()
+          .min(1)
+          .max(ONBOARDING_INTERVIEW_TURNS_MAX)
+          .default(ONBOARDING_INTERVIEW_TURNS_DEFAULT),
+      })
+      .strict()
+      .parse(raw);
+    const repo = interviewTurnsRepo();
+    const session = await ownedSession(
+      runtime,
+      sql,
+      query.actor,
+      query.sessionId,
+    );
+    const turns = await repo.listRecent(sql, session.id, query.limit);
+    return turns.map((t) => ({
+      role: t.role,
+      text: t.text,
+      channel: t.channel,
+      createdAt: t.createdAt,
+    }));
+  };
+
   return {
     startSession,
     getCurrentSession,
@@ -2361,6 +2518,8 @@ export function createOnboardingUseCases(
     answerInterviewQuestion,
     dismissInterviewQuestion,
     say,
+    appendInterviewTurns,
+    listInterviewTurns,
   };
 }
 

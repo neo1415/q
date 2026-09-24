@@ -12,6 +12,7 @@ import {
 } from "../src/candidates/ports.js";
 import { createStructuredCandidateService } from "../src/candidates/service.js";
 import {
+  countryCodesOf,
   deriveStructuredIntent,
   mergeDimensionHits,
   type DimensionHit,
@@ -87,6 +88,8 @@ type World = {
   nodeVocabulary: Record<string, string>;
   unrestricted: string[];
   queries: string[];
+  /** node → ISO 3166-1 alpha-2 reference metadata (country nodes only) */
+  iso?: Record<string, string>;
 };
 
 function company(n: number, overrides: Partial<Company> = {}): Company {
@@ -337,6 +340,15 @@ function retrieval(w: World): StructuredRetrievalPorts {
           vocabularyCode,
           unrestricted: w.unrestricted.includes(nodeId),
           descendantNodeIds: [...(w.hierarchy[nodeId] ?? [])].sort(),
+          countryCode: w.iso?.[nodeId] ?? null,
+          descendantCountryCodes: [
+            ...new Set(
+              (w.hierarchy[nodeId] ?? []).flatMap((d) => {
+                const code = w.iso?.[d];
+                return code === undefined ? [] : [code];
+              }),
+            ),
+          ].sort(),
         });
       },
     },
@@ -535,6 +547,27 @@ describe("structured intent (pure)", () => {
       stage: { minStageCode: "seed", maxStageCode: "series_b" },
     });
     expect(intent.stageCodes).toEqual(["seed", "series_a", "series_b"]);
+  });
+
+  it("countryCodesOf reads ISO reference metadata of geography nodes only: a country's own code, a region's member codes", () => {
+    const geo = (iso?: string) => ({
+      vocabularyCode: "geography",
+      metadata: iso === undefined ? {} : { iso3166Alpha2: iso },
+    });
+    expect(countryCodesOf(geo("NG"), [])).toEqual({
+      countryCode: "NG",
+      descendantCountryCodes: [],
+    });
+    expect(
+      countryCodesOf(geo(), [geo("NG"), geo("GH"), geo(), geo("NG")]),
+    ).toEqual({ countryCode: null, descendantCountryCodes: ["GH", "NG"] });
+    // Another vocabulary never stands for a country, whatever it carries.
+    expect(
+      countryCodesOf(
+        { vocabularyCode: "industry", metadata: { iso3166Alpha2: "NG" } },
+        [geo("GH")],
+      ),
+    ).toEqual({ countryCode: null, descendantCountryCodes: [] });
   });
 });
 
@@ -802,6 +835,94 @@ describe("structured candidate service", () => {
     expect(r.diagnostics.rawHitsByDimension.GEOGRAPHY).toBe(1);
   });
 
+  describe("structured-mandate.v3: a geography node's ISO code is country intent (CQ-REC-GEO-001)", () => {
+    const NIGERIA = "44444444-0000-4000-8000-000000000048";
+    const GHANA = "44444444-0000-4000-8000-000000000050";
+    const geoWorld = (
+      preferences: MandateSnapshotForEligibility["taxonomyPreferences"],
+      constraints: MandateSnapshotForEligibility["constraints"] = [],
+    ) => {
+      const w = world({
+        hierarchy: {
+          [FINTECH]: [PAYMENTS],
+          [AFRICA]: [WEST_AFRICA, NIGERIA, GHANA],
+          [WEST_AFRICA]: [NIGERIA, GHANA],
+        },
+        iso: { [NIGERIA]: "NG", [GHANA]: "GH" },
+      });
+      w.nodeVocabulary[NIGERIA] = "geography";
+      w.nodeVocabulary[GHANA] = "geography";
+      const active = w.mandates[0];
+      if (active === undefined) throw new Error("fixture");
+      w.mandates[0] = {
+        ...active,
+        constraints,
+        taxonomyPreferences: preferences,
+      };
+      return w;
+    };
+    const positive = (nodeId: string) => ({
+      nodeId,
+      vocabularyCode: "geography",
+      preferenceStrength: "STRONG",
+      isExclusion: false,
+      source: "user_selected",
+    });
+
+    it("a Nigeria node finds NG-headquartered companies that carry no geography classification", async () => {
+      const r = await generated(geoWorld([positive(NIGERIA)]));
+      // 1, 2, 6 and 9 are NG and eligible; 7 is not ready, 8 is private.
+      expect(ids(r)).toEqual([1, 2, 6, 9].map(companyId));
+      expect(reasons(r, 2)).toEqual(["GEOGRAPHY_OVERLAP"]);
+      expect(r.diagnostics.rawHitsByDimension.GEOGRAPHY).toBe(5);
+    });
+
+    it("a West Africa node finds the companies headquartered in its countries as region overlap", async () => {
+      const r = await generated(geoWorld([positive(WEST_AFRICA)]));
+      expect(ids(r)).toEqual([1, 2, 6, 9, 10].map(companyId));
+      expect(reasons(r, 2)).toEqual(["GEOGRAPHY_REGION_OVERLAP"]);
+      expect(reasons(r, 10)).toEqual(["GEOGRAPHY_REGION_OVERLAP"]);
+      expect(ids(r)).not.toContain(companyId(4));
+    });
+
+    it("an explicit country and a named region: the named country is GEOGRAPHY_OVERLAP, the rest of the region is region overlap", async () => {
+      const r = await generated(
+        geoWorld(
+          [positive(WEST_AFRICA)],
+          [
+            {
+              dimension: "geography.country",
+              operator: "IN",
+              value: { kind: "codes", values: ["NG"] },
+              importance: "STRONG",
+              isHardExclusion: false,
+              automatedUse: "ELIGIBLE",
+            },
+          ],
+        ),
+      );
+      expect(reasons(r, 2)).toEqual(["GEOGRAPHY_OVERLAP"]);
+      expect(reasons(r, 10)).toEqual(["GEOGRAPHY_REGION_OVERLAP"]);
+    });
+
+    it("a negative or Q-proposed geography node retrieves nothing", async () => {
+      for (const negative of [
+        { ...positive(NIGERIA), preferenceStrength: "AVOID" },
+        {
+          ...positive(NIGERIA),
+          preferenceStrength: "HARD_EXCLUSION",
+          isExclusion: true,
+        },
+        { ...positive(NIGERIA), source: "q_inferred" },
+      ]) {
+        const w = geoWorld([negative]);
+        const r = await generated(w);
+        expect(r.diagnostics.rawHitsByDimension.GEOGRAPHY).toBe(0);
+        expect(w.queries).not.toContain("companies.byCountry");
+      }
+    });
+  });
+
   it("D. cheque: the seam reports NOT_COMPUTABLE and contributes nothing; a $3m raise against a $250k–$1m cheque is not excluded", async () => {
     const w = world();
     const active = w.mandates[0];
@@ -865,14 +986,14 @@ describe("structured candidate service", () => {
     for (const c of r.candidates) {
       expect(c.provenance).toMatchObject({
         generatorId: "STRUCTURED_MANDATE",
-        generatorVersion: "structured-mandate.v2",
+        generatorVersion: "structured-mandate.v3",
         taxonomyVersion: { industry: 1, geography: 1 },
       });
       expect(c.provenance.reasonCodes.length).toBeGreaterThan(0);
       expect("score" in c).toBe(false);
       expect("rank" in c).toBe(false);
     }
-    expect(r.generatorVersion).toBe("structured-mandate.v2");
+    expect(r.generatorVersion).toBe("structured-mandate.v3");
     expect(r.eligibilityPolicyVersion).toBe("eligibility.v2");
   });
 });

@@ -1,5 +1,9 @@
 import {
+  AppendOnboardingInterviewTurnsResponseSchema,
   IDEMPOTENCY_KEY_HEADER,
+  ListOnboardingInterviewTurnsResponseSchema,
+  ONBOARDING_TURNS_SEGMENT,
+  type AppendOnboardingInterviewTurnsRequest,
   ONBOARDING_ANSWER_SEGMENT,
   ONBOARDING_SAY_SEGMENT,
   SayOnboardingResponseSchema,
@@ -201,5 +205,43 @@ export function sayToOnboarding(
     `${byId(sessionId)}${ONBOARDING_SAY_SEGMENT}`,
     SayOnboardingResponseSchema,
     { body: request, ...idempotent(idempotencyKey) },
+  );
+}
+
+/**
+ * `GET /v1/onboarding/sessions/:sessionId/turns?limit=` -- the newest turns
+ * of the interview thread, oldest first (CQ-QX-006). A display record for
+ * redrawing the conversation; the session view stays the only evidence of
+ * what was recorded.
+ */
+export function listOnboardingInterviewTurns(
+  session: ApiSession,
+  sessionId: string,
+  limit?: number,
+) {
+  const query = limit === undefined ? "" : `?limit=${String(limit)}`;
+  return call(
+    session,
+    "GET",
+    `${byId(sessionId)}${ONBOARDING_TURNS_SEGMENT}${query}`,
+    ListOnboardingInterviewTurnsResponseSchema,
+  );
+}
+
+/**
+ * `POST /v1/onboarding/sessions/:sessionId/turns` -- append one exchange.
+ * Idempotent by `request.turnRef`: a retry writes nothing (`written: false`).
+ */
+export function appendOnboardingInterviewTurns(
+  session: ApiSession,
+  sessionId: string,
+  request: AppendOnboardingInterviewTurnsRequest,
+) {
+  return call(
+    session,
+    "POST",
+    `${byId(sessionId)}${ONBOARDING_TURNS_SEGMENT}`,
+    AppendOnboardingInterviewTurnsResponseSchema,
+    { body: request },
   );
 }

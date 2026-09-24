@@ -276,9 +276,40 @@ export const RANKING_CONFIG_V1: RankingConfig = deepFreeze(
   }),
 );
 
-/** Every published config. A published version is never edited; a change is a new entry. */
+/**
+ * `ranking-config.v2` (CQ-REC-GEO-001): v1's weights, maps and tie-break,
+ * unchanged, written for `declared_fit.geography` v2 — the version that
+ * reads a positive geography taxonomy node's ISO code as country intent.
+ * A mapping bound to a feature version never reads another, so the feature
+ * bump is a config bump; v1 stays published, unedited, so slates ranked
+ * under it can still be explained from their own snapshots.
+ */
+export const RANKING_CONFIG_V2: RankingConfig = deepFreeze(
+  RankingConfigSchema.parse({
+    ...RANKING_CONFIG_V1,
+    version: "ranking-config.v2",
+    factors: RANKING_CONFIG_V1.factors.map((factor) =>
+      factor.featureId === "declared_fit.geography"
+        ? { ...factor, featureVersion: "v2" }
+        : factor,
+    ),
+    description:
+      "Initial, heuristic, uncalibrated ordering for INVESTOR_DISCOVER, identical in weights and maps to v1: stage, geography (v2: a declared geography node's country counts), taxonomy and semantic similarity, equally weighted, averaged over the factors that are present. Missing factors do not contribute and are not zero; cheque is inactive while not computable; the eligibility gate is never weighted. Not a probability, not a quality score, not a public number.",
+  }),
+);
+
+/** The config new slates are ranked under. Valid against today's registry. */
+export const RANKING_CONFIG_CURRENT: RankingConfig = RANKING_CONFIG_V2;
+
+/**
+ * Every published config, oldest first. A published version is never
+ * edited; a change is a new entry. Readers look a persisted slate's config
+ * up here; only RANKING_CONFIG_CURRENT has to validate against the
+ * registry this build carries (v1 names `declared_fit.geography` v1).
+ */
 export const RANKING_CONFIGS: readonly RankingConfig[] = Object.freeze([
   RANKING_CONFIG_V1,
+  RANKING_CONFIG_V2,
 ]);
 
 function deepFreeze<T>(value: T): T {

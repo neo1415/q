@@ -49,6 +49,10 @@ export type ExpandedPreferenceNode = {
   readonly unrestricted: boolean;
   /** Descendant node ids (never the node itself), bounded by the reference depth. */
   readonly descendantNodeIds: readonly string[];
+  /** The node's own ISO 3166-1 alpha-2 code (reference metadata), when it is a country node. */
+  readonly countryCode: string | null;
+  /** Distinct, sorted ISO codes carried by the descendants: the countries a region contains. */
+  readonly descendantCountryCodes: readonly string[];
 };
 
 export type TaxonomyStructuredRetrievalPort = {

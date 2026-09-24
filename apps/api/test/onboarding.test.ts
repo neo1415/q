@@ -141,6 +141,10 @@ function fakeRuntime(overrides: Partial<Runtime> = {}) {
         understood: { kind: "UNCLEAR" as const, stepKey: "intent" },
       }),
     ),
+    appendInterviewTurns: record("appendInterviewTurns", () =>
+      Promise.resolve({ written: true }),
+    ),
+    listInterviewTurns: record("listInterviewTurns", () => Promise.resolve([])),
     ...overrides,
   };
   return { runtime, calls };

@@ -2,6 +2,8 @@ import { z } from "zod";
 
 import {
   createUuidIdSchema,
+  type OnboardingInterviewTurnChannel,
+  type OnboardingInterviewTurnRole,
   type OnboardingJourneyType,
   type OnboardingResponseType,
   type OnboardingResponseValue,
@@ -303,4 +305,28 @@ export type OnboardingUtterance = {
   readonly status: OnboardingUtteranceStatus;
   readonly createdAt: UtcTimestamp;
   readonly readAt: UtcTimestamp | null;
+};
+
+export const OnboardingInterviewTurnIdSchema = createUuidIdSchema(
+  "OnboardingInterviewTurnId",
+);
+export type OnboardingInterviewTurnId = z.infer<
+  typeof OnboardingInterviewTurnIdSchema
+>;
+
+/**
+ * One side of one exchange in the interview thread (CQ-QX-006), as it was
+ * shown: the person's words or Q's reply, typed or spoken. A display
+ * record for redrawing the conversation after a reload; never a response,
+ * never evidence of what was recorded.
+ */
+export type OnboardingInterviewTurnRecord = {
+  readonly id: OnboardingInterviewTurnId;
+  readonly sessionId: OnboardingSessionId;
+  readonly role: OnboardingInterviewTurnRole;
+  readonly text: string;
+  readonly stepKey: string | null;
+  readonly channel: OnboardingInterviewTurnChannel;
+  readonly turnRef: string | null;
+  readonly createdAt: UtcTimestamp;
 };

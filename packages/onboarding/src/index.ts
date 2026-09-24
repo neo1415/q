@@ -111,6 +111,8 @@ export type {
   NewOnboardingSuggestion,
   NewOnboardingInterviewQuestion,
   NewOnboardingUtterance,
+  NewOnboardingInterviewTurn,
+  OnboardingInterviewTurnRepository,
   OnboardingInterviewQuestionRepository,
   OnboardingUtteranceRepository,
   OnboardingDefinitionRepository,
@@ -171,6 +173,9 @@ export {
   type StartOnboardingSessionResult,
   type SayOnboardingCommand,
   type SayOnboardingOutcome,
+  type AppendOnboardingInterviewTurnsCommand,
+  type AppendOnboardingInterviewTurnsResult,
+  type ListOnboardingInterviewTurnsQuery,
   type SubmitOnboardingResponseCommand,
 } from "./application/use-cases.js";
 export { getOnboardingMetrics } from "./application/metrics.js";
@@ -182,6 +187,7 @@ export {
 export { createPostgresOnboardingDefinitionRepository } from "./infrastructure/postgres-definition-repository.js";
 export { createPostgresOnboardingInterviewQuestionRepository } from "./infrastructure/postgres-question-repository.js";
 export { createPostgresOnboardingUtteranceRepository } from "./infrastructure/postgres-utterance-repository.js";
+export { createPostgresOnboardingInterviewTurnRepository } from "./infrastructure/postgres-interview-turn-repository.js";
 export {
   interpretUtterance,
   isRichUtterance,

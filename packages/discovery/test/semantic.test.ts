@@ -921,6 +921,8 @@ function structuredRetrieval(w: World): StructuredRetrievalPorts {
                 vocabularyCode: n.vocabularyCode,
                 unrestricted: false,
                 descendantNodeIds: [],
+                countryCode: null,
+                descendantCountryCodes: [],
               },
         );
       },
