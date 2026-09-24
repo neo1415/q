@@ -6,6 +6,7 @@ import type {
   DiscoveredCompanyDto,
   DiscoveryReasonDto,
 } from "@capital-q/contracts";
+import { COUNTRY_OPTIONS, STAGE_OPTIONS } from "@capital-q/founder-onboarding";
 import { Button, buttonClassName } from "@capital-q/ui/button";
 import { Building2, Globe, ICON_SIZE } from "@capital-q/ui/icons";
 
@@ -33,6 +34,86 @@ const REASON_LABELS: Readonly<Record<DiscoveryReasonDto["kind"], string>> = {
   DECLARED_DEPLOYING: "Deploying",
   PROFILE_COMPLETE: "Profile",
 };
+
+// Codes reach the screen as the words the founder chose them by.
+const STAGE_LABELS: ReadonlyMap<string, string> = new Map(
+  STAGE_OPTIONS.map((option) => [option.optionKey, option.label]),
+);
+const COUNTRY_LABELS: ReadonlyMap<string, string> = new Map(
+  COUNTRY_OPTIONS.map((option) => [option.optionKey, option.label]),
+);
+
+function stageLabel(code: string | null): string | null {
+  return code === null
+    ? null
+    : (STAGE_LABELS.get(code) ?? code.replace(/_/g, " "));
+}
+
+/** Option keys are lowercase ISO codes; companies store them uppercase. */
+function countryLabel(code: string | null): string | null {
+  return code === null
+    ? null
+    : (COUNTRY_LABELS.get(code.toLowerCase()) ?? code);
+}
+
+/**
+ * What the persisted slate says two declared profiles share (CQ-REC-006).
+ *
+ * The feed is served from the slate, whose items carry bounded alignment
+ * codes and no per-reason detail (`reasons` is empty on that path), so
+ * the card has to read the codes. It did not, and every company in a
+ * real feed said "nothing declared in common" — including a Nigerian
+ * pre-seed company in front of a Nigeria, pre-seed-to-seed mandate
+ * (CQ-ACCEPT-001). The detail is the company's own declared value; the
+ * mandate's side is never quoted. A code this card does not know is not
+ * shown rather than guessed at.
+ */
+function slateReasons(company: DiscoveredCompanyDto): DiscoveryReasonDto[] {
+  const stage = stageLabel(company.currentStageCode);
+  const country = countryLabel(company.headquartersCountry);
+  const reasons: DiscoveryReasonDto[] = [];
+  for (const code of company.reasonCodes) {
+    switch (code) {
+      case "STAGE_ALIGNED":
+        reasons.push({
+          kind: "STAGE_IN_RANGE",
+          detail:
+            stage === null ? "In your stage range" : `${stage}, in your range`,
+        });
+        break;
+      case "GEOGRAPHY_COUNTRY_ALIGNED":
+        reasons.push({
+          kind: "GEOGRAPHY_MATCH",
+          detail:
+            country === null
+              ? "A country you invest in"
+              : `${country}, a country you invest in`,
+        });
+        break;
+      case "GEOGRAPHY_REGION_ALIGNED":
+        reasons.push({
+          kind: "GEOGRAPHY_MATCH",
+          detail: "In a region you invest in",
+        });
+        break;
+      case "TAXONOMY_EXACT":
+        reasons.push({
+          kind: "SECTOR_MATCH",
+          detail: "A category you named",
+        });
+        break;
+      case "TAXONOMY_RELATED":
+        reasons.push({
+          kind: "SECTOR_MATCH",
+          detail: "Close to a category you named",
+        });
+        break;
+      default:
+        break;
+    }
+  }
+  return reasons;
+}
 
 function Reasons({
   reasons,
@@ -81,7 +162,10 @@ export function FeedCard({
   readonly onPass: () => void;
   readonly onAskQ: () => void;
 }) {
-  const place = [company.headquartersCountry, company.currentStageCode]
+  const place = [
+    countryLabel(company.headquartersCountry),
+    stageLabel(company.currentStageCode),
+  ]
     .filter((part): part is string => part !== null)
     .join(" · ");
 
@@ -133,7 +217,11 @@ export function FeedCard({
           </p>
         )}
 
-        <Reasons reasons={company.reasons} />
+        <Reasons
+          reasons={
+            company.reasons.length > 0 ? company.reasons : slateReasons(company)
+          }
+        />
 
         {company.websiteUrl === null ? null : (
           <p className="flex items-center gap-1.5">
