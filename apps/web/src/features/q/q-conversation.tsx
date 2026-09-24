@@ -22,6 +22,7 @@ import { VOICE_STATE_LABELS } from "../voice/session";
 import { useFollowTurn } from "../voice/use-follow-turn";
 import { useVoiceInterview } from "../voice/use-voice-interview";
 import { ArtifactViewer } from "./artifact-viewer";
+import { navigationToFollow } from "./follow-navigation";
 import { QAnswer } from "./q-answer";
 import { QHistorySheet } from "./q-history-sheet";
 import { QStage } from "./q-stage";
@@ -298,6 +299,34 @@ export function QConversationPanel({
       router.push(path);
     }
   });
+
+  /**
+   * "Take me to Discover", typed (CQ-QACT-001): Q's answer carries a
+   * NAVIGATE intent and the screen follows it, exactly as it follows the
+   * spoken request, through the same route map. What was already on
+   * screen when the conversation opened is never followed.
+   */
+  const followedTurns = useRef<Set<string> | null>(null);
+  useEffect(() => {
+    if (q.loading) {
+      // A conversation being (re)opened: whatever it brings is history.
+      followedTurns.current = null;
+      return;
+    }
+    if (followedTurns.current === null) {
+      followedTurns.current = new Set(
+        turns.filter((turn) => turn.kind === "Q").map((turn) => turn.id),
+      );
+      return;
+    }
+    const path = destinationPath(
+      navigationToFollow(turns, followedTurns.current),
+    );
+    if (path !== null) {
+      act();
+      router.push(path);
+    }
+  }, [turns, q.loading, act, router]);
 
   useEffect(() => {
     // Follow the answer as it arrives, and respect a reader who has asked
@@ -645,7 +674,23 @@ export function QConversationPanel({
 
       {openArtifact === null ? null : (
         <div className="flex min-w-0 flex-1 flex-col lg:sticky lg:top-6 lg:max-h-[calc(100vh-6rem)]">
-          <ArtifactViewer artifactId={openArtifact} onClose={closeArtifact} />
+          <ArtifactViewer
+            artifactId={openArtifact}
+            onClose={closeArtifact}
+            // The latest answer that put this document in front of them:
+            // a revision Q just wrote changes it, and the viewer follows.
+            revision={
+              turns.findLast(
+                (turn) =>
+                  turn.kind === "Q" &&
+                  turn.blocks.some(
+                    (block) =>
+                      block.kind === "ARTIFACT_REFERENCE" &&
+                      block.artifactId === openArtifact,
+                  ),
+              )?.id
+            }
+          />
         </div>
       )}
     </div>

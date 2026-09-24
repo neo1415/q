@@ -6,6 +6,7 @@ import {
   UpdateCompanyRequestSchema,
   UuidSchema,
   type CompanyEditableField,
+  type CompanyVisibilityChoice,
   type QSubjectRef,
 } from "@capital-q/contracts";
 import {
@@ -31,6 +32,10 @@ import {
   type AuthorizationService,
 } from "@capital-q/security";
 
+import {
+  COMPANY_VISIBILITY_SET,
+  CompanyVisibilitySetPayloadSchema,
+} from "./company-visibility-action.js";
 import {
   PERSON_PROFILE_UPDATE,
   PersonProfileUpdatePayloadSchema,
@@ -294,6 +299,24 @@ type Noted = {
   readonly at: number;
 };
 
+/** A request to be seen by investors, or not, per run (CQ-QACT-001). */
+type NotedVisibility = {
+  readonly tenantId: string;
+  readonly companyId: string;
+  readonly visibility: CompanyVisibilityChoice;
+  readonly at: number;
+};
+
+/** Where the answer seam hands a visibility reading to the proposer. */
+export type QVisibilityNotebook = {
+  readonly noteVisibility: (entry: {
+    readonly runId: string;
+    readonly tenantId: string;
+    readonly companyId: string;
+    readonly visibility: CompanyVisibilityChoice;
+  }) => void;
+};
+
 /** A request to be called something else, per run (ADR 0011). */
 type NotedName = {
   readonly tenantId: string;
@@ -344,10 +367,12 @@ export function createProfileUpdateBoard(
     QProfileUpdateNotebook["noteDisplayName"]
   >;
 } & QActionProposer &
-  ProfileSuggestionBoard {
+  ProfileSuggestionBoard &
+  QVisibilityNotebook {
   const now = options.now ?? (() => Date.now());
   const noted = new Map<string, Noted>();
   const names = new Map<string, NotedName>();
+  const visibilities = new Map<string, NotedVisibility>();
   const offered = new Map<
     string,
     ProfileSuggestion & { readonly at: number }
@@ -359,6 +384,9 @@ export function createProfileUpdateBoard(
     }
     for (const [runId, entry] of names) {
       if (entry.at < cutoff) names.delete(runId);
+    }
+    for (const [runId, entry] of visibilities) {
+      if (entry.at < cutoff) visibilities.delete(runId);
     }
     const stale = now() - SUGGESTION_TTL_MS;
     for (const [userId, entry] of offered) {
@@ -391,6 +419,10 @@ export function createProfileUpdateBoard(
     noteDisplayName: (entry) => {
       sweep();
       names.set(entry.runId, { ...entry, at: now() });
+    },
+    noteVisibility: (entry) => {
+      sweep();
+      visibilities.set(entry.runId, { ...entry, at: now() });
     },
     offer: (suggestion) => {
       sweep();
@@ -427,6 +459,32 @@ export function createProfileUpdateBoard(
               "that name doesn't fit what Capital Q can show as a name (up to 80 characters)",
           });
         }
+      }
+      // Who can see their company: only the company this run is about, in
+      // the tenant the reading came from.
+      const seen = visibilities.get(context.runId);
+      if (seen !== undefined) {
+        visibilities.delete(context.runId);
+        const about = context.subjects.some(
+          (subject) =>
+            subject.kind === "COMPANY" && subject.companyId === seen.companyId,
+        );
+        if (about && seen.tenantId === context.plan.tenantId) {
+          const parsed = CompanyVisibilitySetPayloadSchema.safeParse({
+            companyId: seen.companyId,
+            visibility: seen.visibility,
+          });
+          if (parsed.success) {
+            return Promise.resolve({
+              actionType: COMPANY_VISIBILITY_SET,
+              payload: parsed.data,
+            });
+          }
+        }
+        return Promise.resolve({
+          refused:
+            "I can only change who sees the company this conversation is about",
+        });
       }
       const entry = take(context);
       if (entry === undefined) return Promise.resolve(null);

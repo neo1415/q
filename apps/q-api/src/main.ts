@@ -138,6 +138,7 @@ import {
   createCompanyProfileUpdateAction,
   createProfileUpdateBoard,
 } from "./composition/company-profile-action.js";
+import { createCompanyVisibilitySetAction } from "./composition/company-visibility-action.js";
 import {
   createDiscoveryService,
   createPostgresCompanyCardPort,
@@ -617,6 +618,14 @@ const qActionRegistry = createQActionRegistry([
     authorization,
     logger,
   }),
+  // Who can see the company: the Visibility screen's own two choices,
+  // through the same companies command it calls (CQ-QACT-001).
+  createCompanyVisibilitySetAction({
+    profiles: companies,
+    service: companyService,
+    authorization,
+    logger,
+  }),
   // What Q calls the person: their own record, their own approval.
   createPersonProfileUpdateAction({
     people: {
@@ -748,6 +757,7 @@ const qIntelligence = composeQIntelligence({
   deltas: liveDeltas,
   artifacts: qArtifacts.preparation,
   artifactReviser: qArtifacts.reviser,
+  visibility: profileBoard,
   logger,
 });
 logger.info(

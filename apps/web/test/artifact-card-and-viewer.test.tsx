@@ -220,6 +220,54 @@ describe("QX-003E · the viewer", () => {
     expect(screen.getByText(/an earlier version/)).toBeTruthy();
   });
 
+  it("shows the new version as soon as the conversation says one was written, without a reopen (CQ-QACT-001, F5)", async () => {
+    readQArtifactAction.mockResolvedValue({
+      ok: true,
+      value: detail(1, "The original, longer opening."),
+    });
+    const { rerender } = render(
+      <ArtifactViewer artifactId={ARTIFACT} onClose={vi.fn()} revision="m1" />,
+    );
+    await waitFor(() => {
+      expect(screen.getByText("The original, longer opening.")).toBeTruthy();
+    });
+    readQArtifactAction.mockResolvedValue({
+      ok: true,
+      value: detail(2, "Short and plain."),
+    });
+    rerender(
+      <ArtifactViewer artifactId={ARTIFACT} onClose={vi.fn()} revision="m2" />,
+    );
+    await waitFor(() => {
+      expect(screen.getByText("Short and plain.")).toBeTruthy();
+    });
+    expect(screen.getByText(/Version 2/)).toBeTruthy();
+  });
+
+  it("keeps an earlier version somebody chose, and says a newer one is ready", async () => {
+    const { rerender } = render(
+      <ArtifactViewer artifactId={ARTIFACT} onClose={vi.fn()} revision="m1" />,
+    );
+    await waitFor(() => {
+      expect(screen.getByText("Short and plain.")).toBeTruthy();
+    });
+    await userEvent.click(screen.getByText("V1"));
+    await waitFor(() => {
+      expect(screen.getByText("The original, longer opening.")).toBeTruthy();
+    });
+    rerender(
+      <ArtifactViewer artifactId={ARTIFACT} onClose={vi.fn()} revision="m2" />,
+    );
+    await waitFor(() => {
+      expect(screen.getByText("A new version is ready")).toBeTruthy();
+    });
+    expect(screen.getByText("The original, longer opening.")).toBeTruthy();
+    await userEvent.click(screen.getByText("Show the latest"));
+    await waitFor(() => {
+      expect(screen.getByText("Short and plain.")).toBeTruthy();
+    });
+  });
+
   it("says one plain sentence when it is not this person's to read", async () => {
     readQArtifactAction.mockResolvedValue({
       ok: false,

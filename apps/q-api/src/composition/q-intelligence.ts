@@ -41,6 +41,7 @@ import {
   createSpecialistQAnswer,
   createToolCanonicalPort,
   type ArtifactPreparation,
+  type QVisibilityNotebook,
 } from "@capital-q/q-specialists";
 
 /**
@@ -121,6 +122,11 @@ export type QIntelligenceDependencies = {
    * investigation, so it never reaches the specialist seam.
    */
   readonly artifactReviser?: QArtifactReviser | undefined;
+  /**
+   * Where a turn read as "show / hide my company" goes to be proposed
+   * (CQ-QACT-001). Absent: such a turn is answered like any other.
+   */
+  readonly visibility?: QVisibilityNotebook | undefined;
   readonly logger?: Logger | undefined;
 };
 
@@ -276,6 +282,9 @@ export function composeQIntelligence(
     ...(dependencies.artifacts === undefined
       ? {}
       : { artifacts: dependencies.artifacts }),
+    ...(dependencies.visibility === undefined
+      ? {}
+      : { visibility: dependencies.visibility }),
     ...(logger === undefined ? {} : { logger }),
     // Every turn is read before it is answered (CQ-QX-005): research and
     // failure notices are decided by the conversation core, not by a word
