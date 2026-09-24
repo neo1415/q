@@ -96,6 +96,7 @@ import {
 } from "@capital-q/model-gateway";
 import { createGoogleModelProvider } from "@capital-q/model-gateway/providers/google";
 import { createGroqModelProvider } from "@capital-q/model-gateway/providers/groq";
+import { createOpenAIModelProvider } from "@capital-q/model-gateway/providers/openai";
 
 import {
   createGateQCompanyProjectionPort,
@@ -324,6 +325,16 @@ if (gateqProviderSecrets.groq !== undefined) {
       additionalApiKeys: gateqProviderSecrets.groqKeys
         .slice(1)
         .map((key) => key.reveal()),
+    }),
+  );
+}
+// The routing policies name gpt-5.6-luna first (20261008130000); a
+// provider routed to but never registered is PROVIDER_UNCONFIGURED on
+// every call.
+if (gateqProviderSecrets.openai !== undefined) {
+  gateqModelProviders.push(
+    createOpenAIModelProvider({
+      apiKey: gateqProviderSecrets.openai.reveal(),
     }),
   );
 }
