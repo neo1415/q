@@ -550,3 +550,25 @@ describe("round 1 c · the step Q asked governs where the answer goes", () => {
     expect(outcome.reply).toMatch(/Is that right\?/);
   });
 });
+
+describe("a returning person is never met as new", () => {
+  it("opens on the next question, without a first-meeting greeting, when anything is on record", async () => {
+    const world = investorSession({
+      currentStepKey: "I4.revenue_state",
+      recorded: MANDATE_SO_FAR,
+    });
+    const interviewer = createInterviewer({
+      gateway: gateway({
+        ...base,
+        intent: "OPENING",
+        reply: "Good to meet you, Ama. What revenue do you expect?",
+        askNext: "I4.revenue_state",
+        reading: reading({ kind: "CONTROL" }),
+      }),
+      logger,
+    });
+    const opening = await interviewer.turn(turn(world, ""));
+    expect(opening.reply).not.toMatch(/meet you/i);
+    expect(opening.asking?.stepKey).toBe("I4.revenue_state");
+  });
+});

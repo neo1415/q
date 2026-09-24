@@ -4154,6 +4154,32 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
               : question;
         result = { ...result, askNext: heldNow.stepKey };
       }
+      /**
+       * A returning person is never met as new (ACC mobile pass).
+       *
+       * The screen already says "Welcome back. We already covered …" from
+       * the session's own state; Q's opener then said "Good to meet you,
+       * Ama." — two openings, one of them wrong. When anything is already
+       * on the record, the opening is the next question and nothing
+       * before it: the returning line is the platform's, derived from
+       * state, and on a call (where there is no such line on screen) it is
+       * said in front of the question.
+       */
+      if (
+        opening &&
+        heldNow === undefined &&
+        view.responses.length > 0 &&
+        fromState === null
+      ) {
+        const nextKey = result.askNext ?? view.currentStep?.stepKey ?? null;
+        const next = nextKey === null ? undefined : steps.get(nextKey);
+        if (next !== undefined && toOpenStep(next, view) !== null) {
+          const question = askWithChoices(next, input);
+          reply =
+            input.channel === "voice" ? `Welcome back. ${question}` : question;
+          result = { ...result, askNext: next.stepKey };
+        }
+      }
 
       /**
        * Moving forward means moving past what is in between.
