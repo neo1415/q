@@ -4,12 +4,20 @@ import {
   type QVoiceChoice,
 } from "@capital-q/contracts";
 
+import type { SpeechPerformanceBoard } from "../speech-performance.js";
 import {
   SpeechSynthesisError,
   type SpeechSynthesisPort,
   type SpeechSynthesisRequest,
   type SynthesisedSpeech,
 } from "../synthesis.js";
+import type { VoiceTurnTimings } from "../turn-timing.js";
+import {
+  renderSpeech,
+  SPEECH_MARKUP,
+  withoutMarkup,
+  type ElevenLabsSpeechModel,
+} from "./speech-markup.js";
 
 /**
  * ElevenLabs as the voice Q is heard in (QX-004 SPEAK rework).
@@ -48,13 +56,30 @@ const VOICE_IDS: Readonly<Record<QVoiceChoice, string>> = {
 const API_ORIGIN = "https://api.elevenlabs.io";
 
 /**
- * Turbo v2.5 for both surfaces. The Speech Engine resources were tuned to
- * `eleven_v3_conversational`, which is a Speech Engine feature and not a
- * plain text-to-speech model; on this path the choice is between latency
- * and expressiveness, and a conversation that answers late reads as
- * broken long before it reads as flat.
+ * The model Q is voiced by, unless a deployment chooses the other.
+ *
+ * Turbo v2.5 remains the default. `eleven_v3_conversational` is a plain
+ * text-to-speech model on this account too (the old note here, that it was
+ * a Speech Engine feature, was measured wrong on 2026-09-24). It is the
+ * only one of the two that renders a laugh or a sigh without reading the
+ * tag aloud, and its time to first audio is no worse
+ * (design/voice-comparison). Which one runs is a deployment decision
+ * (`Q_VOICE_TTS_MODEL`), taken on that evidence and on a listening check.
  */
-const MODEL_ID = "eleven_turbo_v2_5";
+const DEFAULT_MODEL: ElevenLabsSpeechModel = "eleven_turbo_v2_5";
+
+/**
+ * The voice's own settings, restated when a request has to carry a speed.
+ * A request's `voice_settings` replaces the stored ones for that request,
+ * so a pace cue must not silently reset the rest. These are the values
+ * read from both voices on 2026-09-24.
+ */
+const VOICE_DEFAULTS = {
+  stability: 0.5,
+  similarity_boost: 0.75,
+  style: 0,
+  use_speaker_boost: true,
+} as const;
 
 /** A synthesis that has not answered by now is not going to help anybody. */
 const DEFAULT_TIMEOUT_MS = 10_000;
@@ -65,9 +90,18 @@ const ONE_WAY_OUTPUT_FORMAT = "mp3_44100_128";
 export type ElevenLabsSpeechOptions = {
   /** Revealed once at composition; never in a response, a log or a metric. */
   readonly apiKey: string;
+  /** Absent means turbo v2.5. */
+  readonly model?: ElevenLabsSpeechModel | undefined;
   readonly fetch?: typeof fetch | undefined;
   readonly timeoutMs?: number | undefined;
   readonly maxBytes?: number | undefined;
+};
+
+export type ElevenLabsSpeechRelayOptions = ElevenLabsSpeechOptions & {
+  /** Where the delivery cues for each session's sentences wait. */
+  readonly performance?: SpeechPerformanceBoard | undefined;
+  /** Where each turn's speech request and first audio byte are noted. */
+  readonly timings?: VoiceTurnTimings | undefined;
 };
 
 /**
@@ -95,6 +129,7 @@ export function createElevenLabsSpeechSynthesis(
   const doFetch = options.fetch ?? fetch;
   const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   const maxBytes = options.maxBytes ?? Q_SPEECH_MAX_BYTES;
+  const model = options.model ?? DEFAULT_MODEL;
 
   return {
     name: "elevenlabs",
@@ -118,9 +153,11 @@ export function createElevenLabsSpeechSynthesis(
               "xi-api-key": options.apiKey,
               "content-type": "application/json",
             },
+            // One-way lines carry no delivery cues, and stage directions a
+            // model left in the text are not read out.
             body: JSON.stringify({
-              text: request.text,
-              model_id: MODEL_ID,
+              text: withoutMarkup(request.text),
+              model_id: model,
             }),
             signal,
           },
@@ -179,6 +216,12 @@ export type ElevenLabsSpeechRelay = {
     /** Passed through from the agent; an unknown one falls back to 24k PCM. */
     readonly outputFormat?: string | undefined;
     readonly signal?: AbortSignal | undefined;
+    /**
+     * The voice session the sentence belongs to, from the caller's
+     * binding. It keys that sentence's delivery cues and its timing. It
+     * never selects anything the binding did not.
+     */
+    readonly session?: string | undefined;
   }) => Promise<Response>;
 };
 
@@ -207,11 +250,13 @@ const RELAYABLE_FORMATS = new Set([
 ]);
 
 export function createElevenLabsSpeechRelay(
-  options: ElevenLabsSpeechOptions,
+  options: ElevenLabsSpeechRelayOptions,
 ): ElevenLabsSpeechRelay {
   const doFetch = options.fetch ?? fetch;
+  const model = options.model ?? DEFAULT_MODEL;
+  const markup = SPEECH_MARKUP[model];
   return {
-    stream: ({ voice, text, outputFormat, signal }) => {
+    stream: async ({ voice, text, outputFormat, signal, session }) => {
       // An allow-list rather than a passthrough: the query string arrives
       // from outside this server, and a vendor URL is not the place to
       // relay a stranger's parameters.
@@ -219,14 +264,55 @@ export function createElevenLabsSpeechRelay(
         outputFormat !== undefined && RELAYABLE_FORMATS.has(outputFormat)
           ? outputFormat
           : AGENT_OUTPUT_FORMAT;
-      return doFetch(streamUrl(voice, format), {
+      // The text arrives exactly as Q said it. Cues for it, if Q asked for
+      // any, come from the board and are rendered only as far as this
+      // model can render them. Whatever it cannot render is dropped.
+      const cues =
+        session === undefined || options.performance === undefined
+          ? []
+          : options.performance.take(session, text);
+      const speech = renderSpeech(text, cues, markup);
+      const timing =
+        session === undefined
+          ? undefined
+          : options.timings?.speech(session, text.length);
+      timing?.rendered(speech.rendered);
+      const response = await doFetch(streamUrl(voice, format), {
         method: "POST",
         headers: {
           "xi-api-key": options.apiKey,
           "content-type": "application/json",
         },
-        body: JSON.stringify({ text, model_id: MODEL_ID }),
+        body: JSON.stringify({
+          text: speech.text,
+          model_id: model,
+          ...(speech.speed === undefined
+            ? {}
+            : { voice_settings: { ...VOICE_DEFAULTS, speed: speech.speed } }),
+        }),
         ...(signal === undefined ? {} : { signal }),
+      });
+      timing?.headers();
+      if (timing === undefined || !response.ok || response.body === null) {
+        return response;
+      }
+      // The bytes pass through untouched. The only thing noted is when the
+      // first one arrived, because that is when Q starts to be heard.
+      let first = true;
+      const noted = response.body.pipeThrough(
+        new TransformStream<Uint8Array, Uint8Array>({
+          transform(chunk, controller) {
+            if (first && chunk.byteLength > 0) {
+              first = false;
+              timing.firstByte();
+            }
+            controller.enqueue(chunk);
+          },
+        }),
+      );
+      return new Response(noted, {
+        status: response.status,
+        headers: response.headers,
       });
     },
   };

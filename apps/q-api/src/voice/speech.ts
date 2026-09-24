@@ -85,8 +85,75 @@ function compactNumber(digits: string): string {
  */
 const FIGURE = String.raw`(\d[\d ,\u00a0\u202f.]*\d|\d)(?:\s*(k|m|b|thousand|million|billion)\b)?`;
 
+/**
+ * An en dash, em dash or hyphen between two figures. Not "to": in "USD 5m
+ * to 10 founders" the second number is not money, and a range already
+ * written out in words reads correctly figure by figure.
+ */
+const RANGE_JOIN = String.raw`\s*[–—-]\s*`;
+
 export function spokenFigures(text: string): string {
   let out = text;
+  const codes = Object.keys(CURRENCY_WORDS).join("|");
+  /**
+   * A range: "USD 250k–3m", "$250k-$3m", "250k–3m USD".
+   *
+   * Only the first figure used to be read as money, which left "250
+   * thousand dollars–3m" for the voice. Turbo said the upper bound as
+   * "three annum" and Aura-2 as "three meters" (CQ-VOICE-010, case 08).
+   * Both ends are money in one currency and are said as one: "250
+   * thousand to 3 million dollars". A bare lower bound takes the upper
+   * bound's scale, as a person means it ("USD 2–3m").
+   */
+  out = out.replace(
+    new RegExp(
+      String.raw`\b(${codes})\s*${FIGURE}${RANGE_JOIN}(?:\1\s*)?${FIGURE}`,
+      "gi",
+    ),
+    (
+      _all: string,
+      code: string,
+      low: string,
+      lowScale: string | undefined,
+      high: string,
+      highScale: string | undefined,
+    ) => rangeWords(low, lowScale, high, highScale, code),
+  );
+  out = out.replace(
+    new RegExp(
+      String.raw`([$₦£€])\s*${FIGURE}${RANGE_JOIN}\1?\s*${FIGURE}`,
+      "gi",
+    ),
+    (
+      _all: string,
+      symbol: string,
+      low: string,
+      lowScale: string | undefined,
+      high: string,
+      highScale: string | undefined,
+    ) =>
+      rangeWords(
+        low,
+        lowScale,
+        high,
+        highScale,
+        CURRENCY_SYMBOLS[symbol] ?? "USD",
+      ),
+  );
+  out = out.replace(
+    new RegExp(
+      String.raw`${FIGURE}${RANGE_JOIN}${FIGURE}\s*\b(${codes})\b`,
+      "gi",
+    ),
+    (
+      _all: string,
+      low: string,
+      lowScale: string | undefined,
+      high: string,
+      highScale: string | undefined,
+      code: string,
+    ) => rangeWords(low, lowScale, high, highScale, code),
+  );
   // A code after the figure: "200 000 000 NGN", "1.5m USD", "200 million NGN".
   out = out.replace(
     new RegExp(
@@ -122,21 +189,43 @@ export function spokenFigures(text: string): string {
   return out;
 }
 
+function multiplierOf(suffix: string | undefined): number {
+  const scale = (suffix ?? "").toLowerCase();
+  return scale === "k" || scale === "thousand"
+    ? 1e3
+    : scale === "m" || scale === "million"
+      ? 1e6
+      : scale === "b" || scale === "billion"
+        ? 1e9
+        : 1;
+}
+
+function rangeWords(
+  low: string,
+  lowScale: string | undefined,
+  high: string,
+  highScale: string | undefined,
+  code: string,
+): string {
+  const lowValue =
+    Number(low.replace(/[ ,\u00a0\u202f]/g, "")) *
+    multiplierOf(lowScale ?? highScale);
+  const highValue =
+    Number(high.replace(/[ ,\u00a0\u202f]/g, "")) * multiplierOf(highScale);
+  if (!Number.isFinite(lowValue) || !Number.isFinite(highValue)) {
+    return `${low}${lowScale ?? ""} to ${high}${highScale ?? ""} ${code}`;
+  }
+  const [, many] = CURRENCY_WORDS[code.toUpperCase()] ?? [code, code];
+  return `${compactNumber(String(lowValue))} to ${compactNumber(String(highValue))} ${many}`;
+}
+
 function moneyWords(
   figure: string,
   suffix: string | undefined,
   code: string,
 ): string {
-  const scale = (suffix ?? "").toLowerCase();
-  const multiplier =
-    scale === "k" || scale === "thousand"
-      ? 1e3
-      : scale === "m" || scale === "million"
-        ? 1e6
-        : scale === "b" || scale === "billion"
-          ? 1e9
-          : 1;
-  const value = Number(figure.replace(/[ ,\u00a0\u202f]/g, "")) * multiplier;
+  const value =
+    Number(figure.replace(/[ ,\u00a0\u202f]/g, "")) * multiplierOf(suffix);
   if (!Number.isFinite(value)) {
     return `${figure} ${code}`;
   }
