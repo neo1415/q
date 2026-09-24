@@ -299,3 +299,70 @@ describe("QX-004 §3.3 · the deck says how it should look, and nothing more", (
     expect(deck?.content.deck?.direction).toBe("MINIMAL_INSTITUTIONAL");
   });
 });
+
+describe("CQ-QACT-002 · a deck from public sources only", () => {
+  const publicDeck = () =>
+    composePitchDeck({
+      companyName: "Zino Aviation",
+      result: result({
+        companyId: null,
+        canonicalDescription: null,
+        findings: [
+          finding({
+            dimension: "DESCRIPTION",
+            statement:
+              "Zino Aviation describes itself as a pilot-training and aviation consultancy in Lagos.",
+            truthClass: "UNKNOWN",
+            subjects: [],
+          }),
+          finding({
+            dimension: "PRODUCT",
+            statement:
+              "Its website lists ground school, simulator classes and pilot mentorship.",
+            truthClass: "UNKNOWN",
+            subjects: [],
+          }),
+        ],
+      }),
+      provenance: "PUBLIC_SOURCES",
+    });
+
+  it("says on its cover and in its summary that it is preliminary and unverified", () => {
+    const deck = publicDeck();
+    expect(deck).not.toBeNull();
+    expect(deck?.title).toBe(
+      "Zino Aviation — preliminary deck from public sources",
+    );
+    expect(deck?.content.deck?.markIsDraft).toBe(true);
+    expect(deck?.content.sections[0]?.body).toMatch(/public sources/);
+    expect(deck?.content.sections[0]?.body).toMatch(/verified none of it/);
+  });
+
+  it("marks what the sources do not say inside the deck, on a slide, rather than refusing", () => {
+    const slides = publicDeck()?.content.deck?.slides ?? [];
+    const unknown = slides.filter((s) => s.title === "Not in public sources");
+    expect(unknown.length).toBeGreaterThan(0);
+    const bullets = unknown.flatMap((s) => s.bullets);
+    // Nothing about money, traction or the raise was public: each is named.
+    expect(bullets).toContain("Traction");
+    expect(bullets).toContain("Financial performance and runway");
+    expect(bullets).toContain("What is being raised, and for what");
+    // And nothing the sources did say is listed as unknown.
+    expect(bullets).not.toContain("What the company does");
+    expect(bullets).not.toContain("Product detail");
+  });
+
+  it("leaves a record-based deck exactly as it was", () => {
+    const deck = composePitchDeck({
+      companyName: "Northstar Logistics",
+      result: populated(),
+    });
+    expect(deck?.title).toBe("Northstar Logistics — investor deck");
+    expect(deck?.content.deck?.markIsDraft).toBe(false);
+    expect(
+      (deck?.content.deck?.slides ?? []).some(
+        (s) => s.title === "Not in public sources",
+      ),
+    ).toBe(false);
+  });
+});

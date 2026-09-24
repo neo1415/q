@@ -118,7 +118,8 @@ export type ArtifactPreparationOutcome =
 export async function prepareOrReviseArtifact(input: {
   readonly artifacts: ArtifactPreparation;
   readonly request: QAnswerRequest;
-  readonly company: QSubjectRef;
+  /** The run's company record, or undefined for a company known only publicly. */
+  readonly company: QSubjectRef | undefined;
   readonly companyName: string;
   /** The person's own message, as the instruction of last resort. */
   readonly saidVerbatim: string;
@@ -226,6 +227,8 @@ export async function prepareOrReviseArtifact(input: {
       ? composePitchDeck({
           companyName,
           result,
+          // No record behind it: everything came from the public web.
+          provenance: company === undefined ? "PUBLIC_SOURCES" : "RECORD",
           ...(ask.visualDirection === null
             ? {}
             : { direction: ask.visualDirection }),
@@ -247,7 +250,7 @@ export async function prepareOrReviseArtifact(input: {
         actorContext: request.actor,
         permittedContextPlan: request.plan,
         qRunId: request.runId,
-        subject: company,
+        ...(company === undefined ? {} : { subject: company }),
         artifactType: ask.artifactType,
         content: base,
       }),

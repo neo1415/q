@@ -241,7 +241,12 @@ async function recallMemory(
       await port.recall({
         actor: context.actor,
         runId: context.runId,
-        subjects: [{ kind: "COMPANY", companyId: request.company.companyId }],
+        // A company Capital Q holds no record of has no memories filed
+        // against it; what is remembered about the person still applies.
+        subjects:
+          request.company.kind === "COMPANY"
+            ? [{ kind: "COMPANY", companyId: request.company.companyId }]
+            : [],
         signal: context.signal,
       })
     ).trim();
@@ -262,9 +267,17 @@ async function recordUserStatements(
   context: QSpecialistExecutionContext,
   logger: Logger | undefined,
 ): Promise<readonly string[]> {
-  if (recorder === undefined || statements.length === 0) {
+  // A statement about a company is recorded against its record. One
+  // Capital Q does not hold has nowhere for it to go, and inventing one
+  // would be a second record of a company nobody created.
+  if (
+    recorder === undefined ||
+    statements.length === 0 ||
+    request.company.kind !== "COMPANY"
+  ) {
     return [];
   }
+  const companyId = request.company.companyId;
   const recorded: string[] = [];
   for (const statement of statements.slice(0, 5)) {
     // Same closed namespace as the conversational seam: a key the model
@@ -279,7 +292,7 @@ async function recordUserStatements(
     try {
       const outcome = await recorder.record({
         actor: context.actor,
-        companyId: request.company.companyId,
+        companyId,
         runId: context.runId,
         userText: request.question,
         statement,
@@ -310,7 +323,7 @@ const metrics = {
 };
 
 function blockedResult(
-  companyId: string,
+  companyId: string | null,
   reason: QSpecialistBlockedReason,
   asOf: UtcTimestamp,
   telemetry: CompanyIntelligenceResult["telemetry"],
@@ -411,9 +424,19 @@ export function createCompanyIntelligenceSpecialist(
       // Read fresh each time: control-flow narrowing must not cache an
       // earlier answer to "has this run been cancelled" (§101).
       const cancelled = (): boolean => context.signal?.aborted === true;
-      const companyId = request.company.companyId;
+      /*
+       * A company Capital Q holds no record of (CQ-QACT-002): it has no
+       * id, no canonical state, no Q Knowledge and no documents of its
+       * own, so every one of those reads is skipped rather than aimed at
+       * somebody else's. What is known about it comes from the public
+       * web alone, read as unverified data, and the findings say so.
+       */
+      const subject = request.company;
+      const publicOnly = subject.kind === "PUBLIC_COMPANY";
+      const companyId = subject.kind === "COMPANY" ? subject.companyId : null;
       const asOfStamp = now().toISOString();
-      const subjects: readonly QSubjectRef[] = [request.company];
+      const subjects: readonly QSubjectRef[] =
+        subject.kind === "COMPANY" ? [subject] : [];
       // Findings are run output, not durable records, so their identity is
       // fresh per run. The seed is kept for readability at the call sites.
       const findingId = (_seed: string): QFindingId =>
@@ -474,7 +497,17 @@ export function createCompanyIntelligenceSpecialist(
       };
 
       // ---- 1. canonical structured state (§15) ---------------------------
-      const canonicalRead = await canonical.read(toolContext, companyId);
+      const canonicalRead =
+        companyId === null
+          ? {
+              facts: [],
+              toolCalls: 0,
+              available: true,
+              canonicalName:
+                subject.kind === "PUBLIC_COMPANY" ? subject.name : null,
+              description: null,
+            }
+          : await canonical.read(toolContext, companyId);
       telemetry = { ...telemetry, toolCalls: canonicalRead.toolCalls };
       if (!canonicalRead.available) {
         // Absent, cross-tenant, unshared and out-of-plan are one answer.
@@ -491,17 +524,20 @@ export function createCompanyIntelligenceSpecialist(
       }
 
       // ---- 2. authorised Q Knowledge (§16) -------------------------------
-      const [current, disputes] = await Promise.all([
-        knowledge.current(context.plan, companyId),
-        knowledge.disputes(context.plan, companyId),
-      ]);
-      let knowledgeReads = 2;
+      const [current, disputes] =
+        companyId === null
+          ? [[], []]
+          : await Promise.all([
+              knowledge.current(context.plan, companyId),
+              knowledge.disputes(context.plan, companyId),
+            ]);
+      let knowledgeReads = companyId === null ? 0 : 2;
 
       // A historical question is answered from valid time. The current
       // readings are replaced, not supplemented, so nothing about a later
       // period can reach the answer (§65, §81).
       const historical: AuthorisedKnowledge[] = [];
-      if (request.asOf !== undefined) {
+      if (request.asOf !== undefined && companyId !== null) {
         for (const key of new Set(current.map((k) => k.object.knowledgeKey))) {
           const at = await knowledge.asOf(
             context.plan,
@@ -519,7 +555,11 @@ export function createCompanyIntelligenceSpecialist(
 
       // ---- series, only when the question is about change (§22, §67) ----
       const series = new Map<string, readonly AuthorisedKnowledge[]>();
-      if (request.asOf === undefined && asksAboutChange(request.question)) {
+      if (
+        companyId !== null &&
+        request.asOf === undefined &&
+        asksAboutChange(request.question)
+      ) {
         const present = new Set(current.map((k) => k.object.knowledgeKey));
         for (const key of CHANGE_KEYS) {
           if (!present.has(key)) {
@@ -553,22 +593,30 @@ export function createCompanyIntelligenceSpecialist(
       // handled as data from here on. The retrieval query is the person's
       // own words, with no model spent rewriting it — one fewer place for
       // an injected instruction to be laundered into a search.
+      // A company known only publicly is always researched: the public
+      // web is the only place anything about it is.
       const wantsResearch =
-        research !== undefined && request.publicResearch === true;
+        research !== undefined &&
+        (request.publicResearch === true || publicOnly);
       if (wantsResearch) {
         await context.showStage?.("SEARCHING_PUBLIC_SOURCES");
       }
       const researching: Promise<CompanyResearchRead | null> = wantsResearch
-        ? research.research(toolContext, {
-            companyId,
-            question: request.question,
-          })
+        ? research.research(
+            toolContext,
+            subject.kind === "COMPANY"
+              ? { companyId: subject.companyId, question: request.question }
+              : // The company's name, as the person gave it: the search
+                // is for it, and the egress policy still keeps every
+                // word that was not theirs from leaving.
+                { question: subject.name },
+          )
         : Promise.resolve(null);
-      const retrieving = evidence.search(
-        context.plan,
-        request.question,
-        context.signal,
-      );
+      // The actor's own documents are not what a company nobody holds is
+      // described by; a public-only investigation reads none of them.
+      const retrieving = publicOnly
+        ? Promise.resolve([])
+        : evidence.search(context.plan, request.question, context.signal);
       const [researchRead, hits] = await Promise.all([researching, retrieving]);
       if (researchRead !== null) {
         telemetry = {
@@ -591,8 +639,9 @@ export function createCompanyIntelligenceSpecialist(
         knowledge: readings,
         passages: hits,
         publicSources: researchRead?.sources ?? [],
-        subjectDescription:
-          canonicalRead.canonicalName === null
+        subjectDescription: publicOnly
+          ? `${canonicalRead.canonicalName ?? "a named company"}, a company Capital Q holds no record of; everything known about it here is what the public web sources below say, which is unverified`
+          : canonicalRead.canonicalName === null
             ? "a company available in this conversation"
             : `${canonicalRead.canonicalName}, a company available in this conversation`,
       });
@@ -837,13 +886,17 @@ export function createCompanyIntelligenceSpecialist(
               clearsOnPurpose(update),
           )
         : [];
+      // A profile change needs a profile: none is proposed for a company
+      // Capital Q holds no record of.
       const proposedChange =
-        dependencies.profileUpdates !== undefined && profileUpdates.length > 0;
+        dependencies.profileUpdates !== undefined &&
+        companyId !== null &&
+        profileUpdates.length > 0;
       if (proposedChange) {
         dependencies.profileUpdates?.note({
           runId: context.runId,
           tenantId: context.actor.tenantId,
-          companyId: request.company.companyId,
+          companyId,
           updates: profileUpdates,
         });
         logger?.info(

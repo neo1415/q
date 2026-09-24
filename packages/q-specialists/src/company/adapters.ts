@@ -433,7 +433,9 @@ export function createToolResearchPort(
             // The person's words, bounded. The tool composes the real query
             // from these and the authorised identity; private tokens drop.
             query: input.question.trim().slice(0, 200) || "company",
-            companyId: input.companyId,
+            ...(input.companyId === undefined
+              ? {}
+              : { companyId: input.companyId }),
           },
         },
         context,

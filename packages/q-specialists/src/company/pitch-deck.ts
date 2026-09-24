@@ -97,6 +97,11 @@ const CHARTABLE: ReadonlySet<CompanyIntelligenceDimension> = new Set([
 const BULLET_MAX = 180;
 const BULLETS_PER_SLIDE = 5;
 
+const PUBLIC_COVER_LINE =
+  "Preliminary · built from public sources · not verified by Capital Q";
+const PUBLIC_SUMMARY_NOTE =
+  "This is a preliminary deck built only from public sources. Capital Q holds no record of the company and has verified none of it; what the sources do not say is listed as not known.";
+
 /** The public projection of a finding: no evidence identifiers travel. */
 function toPublicFinding(finding: CompanyFinding): QPublicFinding {
   return {
@@ -202,7 +207,10 @@ function figureIn(
  * read so the number on it can be traced back to the sentence it came
  * from (§4).
  */
-function chartFor(findings: readonly CompanyFinding[]): QChart | null {
+function chartFor(
+  findings: readonly CompanyFinding[],
+  publicOnly: boolean,
+): QChart | null {
   const points: { label: string; value: string }[] = [];
   const sources: string[] = [];
   let unit: string | null = null;
@@ -220,13 +228,14 @@ function chartFor(findings: readonly CompanyFinding[]): QChart | null {
   if (points.length < 2 || unit === null) return null;
   return {
     kind: "COLUMN",
-    measure: "From the record",
+    measure: publicOnly ? "From public sources" : "From the record",
     unit,
     points,
-    grounding: `Read from what Capital Q holds: ${sources.join("; ")}`.slice(
-      0,
-      300,
-    ),
+    grounding:
+      `${publicOnly ? "Read from public sources, unverified" : "Read from what Capital Q holds"}: ${sources.join("; ")}`.slice(
+        0,
+        300,
+      ),
   };
 }
 
@@ -249,8 +258,17 @@ export function composePitchDeck(input: {
   readonly result: CompanyIntelligenceResult;
   readonly direction?: QVisualDirection | undefined;
   readonly accent?: string | undefined;
+  /**
+   * Where what the deck says came from (CQ-QACT-002). PUBLIC_SOURCES is
+   * a company Capital Q holds no record of, described only by the public
+   * web: the deck says so on its cover, and what the sources do not say
+   * is a slide of its own, because unknowns are marked inside the deck
+   * rather than being a reason not to make one.
+   */
+  readonly provenance?: "RECORD" | "PUBLIC_SOURCES" | undefined;
 }): ComposedPitchDeck | null {
   const { companyName, result } = input;
+  const publicOnly = input.provenance === "PUBLIC_SOURCES";
   const byDimension = new Map<CompanyIntelligenceDimension, CompanyFinding[]>();
   for (const finding of result.findings) {
     if (finding.type === "GAP") continue;
@@ -277,13 +295,16 @@ export function composePitchDeck(input: {
       : null;
   const subtitle =
     opening === null
-      ? undefined
+      ? publicOnly
+        ? PUBLIC_COVER_LINE
+        : undefined
       : opening.split(/(?<=[.!?])\s/)[0]?.slice(0, 240);
   sections.push({
     heading: "Summary",
-    body:
-      opening ??
-      `This deck sets out what Capital Q holds on record about ${companyName}, and what it does not.`,
+    body: publicOnly
+      ? `${opening === null ? "" : `${opening} `}${PUBLIC_SUMMARY_NOTE}`
+      : (opening ??
+        `This deck sets out what Capital Q holds on record about ${companyName}, and what it does not.`),
     findings: [],
   });
   slides.push({
@@ -306,7 +327,9 @@ export function composePitchDeck(input: {
       findings: findings.slice(0, 12).map(toPublicFinding),
     });
 
-    const chart = CHARTABLE.has(dimension) ? chartFor(findings) : null;
+    const chart = CHARTABLE.has(dimension)
+      ? chartFor(findings, publicOnly)
+      : null;
     const bullets = findings
       .map(bullet)
       .filter((line): line is string => line !== null)
@@ -363,8 +386,25 @@ export function composePitchDeck(input: {
     return null;
   }
 
+  // Unknown stays unknown, and in a public-source deck it is said on a
+  // slide: someone reading only the PDF must see what is not public.
+  if (publicOnly && gaps.length > 0) {
+    for (let at = 0; at < gaps.length; at += BULLETS_PER_SLIDE) {
+      slides.push({
+        layout: "BULLETS",
+        title: "Not in public sources",
+        bullets: gaps.slice(at, at + BULLETS_PER_SLIDE),
+        bulletsRight: [],
+        section: 0,
+      });
+    }
+  }
+
   return {
-    title: `${companyName} — investor deck`.slice(0, 160),
+    title: (publicOnly
+      ? `${companyName} — preliminary deck from public sources`
+      : `${companyName} — investor deck`
+    ).slice(0, 160),
     summary: (sections[0]?.body ?? companyName).slice(0, 600),
     content: {
       sections: sections.slice(0, 24),
@@ -373,7 +413,7 @@ export function composePitchDeck(input: {
         slides: slides.slice(0, 24),
         direction: input.direction ?? "MINIMAL_INSTITUTIONAL",
         ...(input.accent === undefined ? {} : { accent: input.accent }),
-        markIsDraft: false,
+        markIsDraft: publicOnly,
       },
     },
   };

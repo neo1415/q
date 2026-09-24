@@ -101,8 +101,13 @@ export type PrepareArtifactInput = {
   /** The Context Firewall's own decision for this run. Never hand-built. */
   readonly permittedContextPlan: PermittedContextPlan;
   readonly qRunId: string;
-  /** Must be one the plan already authorises. */
-  readonly subject: QSubjectRef;
+  /**
+   * Must be one the plan already authorises. Absent for a document about
+   * a company Capital Q holds no record of (CQ-QACT-002), built from
+   * public sources: it belongs to the actor's organisation like any
+   * other, and names no canonical entity because there is none to name.
+   */
+  readonly subject?: QSubjectRef | undefined;
   readonly artifactType: string;
   /** Already composed, under that plan, by something that cannot write. */
   readonly content: ComposedArtifact;
@@ -285,9 +290,9 @@ export function createArtifactService(dependencies: {
           // The owner is the actor's own organisation. Never an argument.
           organisationId,
           type: input.artifactType,
-          companyId: subject.kind === "COMPANY" ? subject.companyId : null,
+          companyId: subject?.kind === "COMPANY" ? subject.companyId : null,
           investorOrganisationId:
-            subject.kind === "INVESTOR_ORGANISATION"
+            subject?.kind === "INVESTOR_ORGANISATION"
               ? subject.investorOrganisationId
               : null,
           createdByUserId: input.actorContext.userId,

@@ -156,6 +156,7 @@ function harness(options: {
   readonly withoutResearchPort?: boolean | undefined;
 }) {
   const requests: unknown[] = [];
+  const reads = { canonical: 0, knowledge: 0, evidence: 0 };
   const gateway = {
     execute: (request: unknown) => {
       requests.push(request);
@@ -172,8 +173,9 @@ function harness(options: {
     },
   } as unknown as ModelGateway;
   const canonical: CompanyCanonicalPort = {
-    read: () =>
-      Promise.resolve({
+    read: () => {
+      reads.canonical += 1;
+      return Promise.resolve({
         facts: [
           {
             scope: "COMPANY_PROFILE",
@@ -195,19 +197,26 @@ function harness(options: {
         toolCalls: 1,
         available: true,
         canonicalName: "Kobo360",
-      }),
+      });
+    },
   };
   const knowledge: CompanyKnowledgePort = {
-    current: () => Promise.resolve([]),
+    current: () => {
+      reads.knowledge += 1;
+      return Promise.resolve([]);
+    },
     disputes: () => Promise.resolve([]),
     series: () => Promise.resolve([]),
     asOf: () => Promise.resolve(null),
   };
   const evidence: CompanyEvidencePort = {
-    search: () => Promise.resolve([]),
+    search: () => {
+      reads.evidence += 1;
+      return Promise.resolve([]);
+    },
   };
   const researchCalls: {
-    companyId: string;
+    companyId: string | undefined;
     question: string;
     latest: string;
   }[] = [];
@@ -255,7 +264,23 @@ function harness(options: {
       } satisfies CompanyIntelligenceRequest,
       context,
     );
-  return { investigate, requests, researchCalls, stages };
+  // A company Capital Q holds no record of (CQ-QACT-002).
+  const investigatePublic = (name: string, question: string) =>
+    specialist.investigate(
+      {
+        company: { kind: "PUBLIC_COMPANY", name },
+        question,
+      } satisfies CompanyIntelligenceRequest,
+      context,
+    );
+  return {
+    investigate,
+    investigatePublic,
+    requests,
+    researchCalls,
+    stages,
+    reads,
+  };
 }
 
 function promptText(requests: readonly unknown[]): string {
@@ -589,5 +614,36 @@ describe("specialist answer seam", () => {
       "Noted as your statement: “Kenya was only a pilot and ended last year”.",
     );
     expect(answer).toContain("not as verified fact");
+  });
+});
+
+describe("a company Capital Q holds no record of (CQ-QACT-002)", () => {
+  it("is researched by the name the person gave, and nothing of anybody's record is read", async () => {
+    const h = harness({
+      analyst: analyst(
+        "Zino Aviation trains pilots in Lagos, per its website.",
+      ),
+    });
+    const words =
+      "Generate a PDF pitch deck for Zino Aviation from what you can find publicly.";
+    const result = await h.investigatePublic("Zino Aviation", words);
+    expect(result.blocked).toBeNull();
+    expect(result.companyId).toBeNull();
+    expect(result.companyName).toBe("Zino Aviation");
+    // Always researched: the public web is the only place it is described.
+    expect(h.researchCalls).toEqual([
+      { companyId: undefined, question: "Zino Aviation", latest: words },
+    ]);
+    // No canonical record, no Q Knowledge, no document retrieval: there
+    // is no record of this company, and the actor's own documents are not
+    // what describes it.
+    expect(h.reads).toEqual({ canonical: 0, knowledge: 0, evidence: 0 });
+    const prompt = promptText(h.requests);
+    expect(prompt).toContain("Capital Q holds no record of");
+    expect(prompt).toContain("PUBLIC WEB SOURCE S1");
+    // A finding cites nothing on record: every fact is a public source.
+    for (const finding of result.findings) {
+      expect(finding.subjects).toEqual([]);
+    }
   });
 });

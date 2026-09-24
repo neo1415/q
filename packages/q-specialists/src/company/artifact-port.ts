@@ -29,7 +29,12 @@ export type ArtifactPreparationPort = {
     readonly actorContext: ActorContext;
     readonly permittedContextPlan: PermittedContextPlan;
     readonly qRunId: string;
-    readonly subject: QSubjectRef;
+    /**
+     * The canonical entity it is about. Absent for a company Capital Q
+     * holds no record of (CQ-QACT-002): the document belongs to the
+     * person's organisation and names no record, because there is none.
+     */
+    readonly subject?: QSubjectRef | undefined;
     readonly artifactType: string;
     readonly content: {
       readonly title: string;

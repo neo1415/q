@@ -7,7 +7,7 @@ import {
   Q_CONTEXT_FIREWALL_POLICY_VERSION,
 } from "@capital-q/contracts";
 import type { QTurnReader } from "@capital-q/model-gateway/q";
-import type { TurnReaderV2Result as TurnReaderResult } from "@capital-q/q-core";
+import type { TurnReaderV3Result as TurnReaderResult } from "@capital-q/q-core";
 import type {
   QAnswerOutcome,
   QAnswerRequest,
@@ -164,7 +164,10 @@ function seam(options: {
 const COMPANY = "c0c0c0c0-c0c0-4c0c-8c0c-c0c0c0c0c0c0";
 
 function toolReading(
-  tool: NonNullable<TurnReaderResult["tool"]>,
+  tool: Omit<
+    NonNullable<TurnReaderResult["tool"]>,
+    "documentType" | "subjectName"
+  >,
   confidence: TurnReaderResult["confidence"] = "HIGH",
 ): TurnReaderResult {
   return {
@@ -173,7 +176,8 @@ function toolReading(
     transcript: "CLEAR",
     question: null,
     aboutNamedOther: false,
-    tool,
+    // v3's document parameters belong to PREPARE_DOCUMENT only.
+    tool: { ...tool, documentType: null, subjectName: null },
   };
 }
 

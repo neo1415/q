@@ -14,7 +14,7 @@ import {
   withoutRecommendationClaims,
   type ConversationState,
   type FailureOperation,
-  type TurnTool,
+  type TurnToolV3,
 } from "@capital-q/q-core";
 import type { DatabaseExecutor, TransactionManager } from "@capital-q/database";
 import type { Logger } from "@capital-q/observability";
@@ -35,6 +35,12 @@ import type {
   CompanyIntelligenceResult,
 } from "./company/contracts.js";
 import { asksAboutGaps } from "./company/dimensions.js";
+import {
+  existingDocumentCard,
+  namedByPerson,
+  personsRecentWords,
+  sameCompanyName,
+} from "./company/document-request.js";
 import {
   latestArtifactCardIn,
   prepareOrReviseArtifact,
@@ -352,6 +358,182 @@ export function createSpecialistQAnswer(
   }
 
   /**
+   * "Make me a deck on X", done rather than described (CQ-QACT-002).
+   *
+   * The chain is the platform's, run to the end without asking permission
+   * for any step, because every step is a safe internal action: read what
+   * Capital Q holds or what the public web says, reconcile it into typed
+   * findings (the specialist's own validation — a finding cites a source
+   * or is dropped), compose the document, file it as a private artifact
+   * of the person's organisation. Nothing is sent to anybody and nothing
+   * in anybody's record changes, which is why none of it waits for
+   * approval. What is not known goes into the document as not known.
+   *
+   * The reply is the result, briefly: the person asked for a document,
+   * not for an account of one.
+   */
+  async function prepareDocument(
+    request: QAnswerRequest,
+    history: readonly QConversationMessage[],
+    ask: {
+      readonly documentType: "PITCH_DECK" | "INVESTMENT_BRIEF";
+      readonly subjectName: string | null;
+    },
+  ): Promise<{
+    readonly content: string;
+    readonly blocks?: readonly QResultBlock[] | undefined;
+  }> {
+    const noun = ask.documentType === "PITCH_DECK" ? "deck" : "brief";
+    // Asked for again: the one already made.
+    const existing = existingDocumentCard({
+      history,
+      documentType: ask.documentType,
+      subjectName: ask.subjectName,
+    });
+    if (existing !== null) {
+      return {
+        content:
+          ask.documentType === "PITCH_DECK"
+            ? "Here it is. The PDF is one tap away on the card."
+            : "Here it is.",
+        blocks: [existing],
+      };
+    }
+    const latest = [...history].reverse().find((m) => m.role === "USER");
+    const said = latest?.content ?? "";
+    const personsWords = personsRecentWords(history);
+    const record = request.subjects.find(
+      (subject): subject is Extract<typeof subject, { kind: "COMPANY" }> =>
+        subject.kind === "COMPANY",
+    );
+    if (ask.subjectName === null && record === undefined) {
+      return { content: `Which company should the ${noun} be about?` };
+    }
+    if (
+      ask.subjectName !== null &&
+      !namedByPerson(ask.subjectName, personsWords)
+    ) {
+      // The reader named a company the person never did.
+      return { content: `Which company should the ${noun} be about?` };
+    }
+
+    const context = {
+      actor: request.actor,
+      runId: request.runId,
+      correlationId: request.correlationId,
+      capability: request.capability,
+      plan: request.plan,
+      ...(request.signal === undefined ? {} : { signal: request.signal }),
+      showStage: (stage: QVisibleStage) => showStage(request, stage),
+    };
+    const investigatePublic = (name: string) =>
+      specialist.investigate(
+        {
+          company: { kind: "PUBLIC_COMPANY", name },
+          // The person's own recent words: what the search may be built
+          // from, and what the findings are read against.
+          question: personsWords,
+          publicResearch: true,
+        },
+        context,
+      );
+
+    let result: CompanyIntelligenceResult;
+    let subject: typeof record;
+    if (record !== undefined) {
+      const onRecord = await specialist.investigate(
+        { company: record, question: said, publicResearch: true },
+        context,
+      );
+      // Their company, unless they named another one.
+      const theirs =
+        ask.subjectName === null ||
+        (onRecord.companyName !== null &&
+          onRecord.companyName !== undefined &&
+          sameCompanyName(onRecord.companyName, ask.subjectName));
+      if (theirs) {
+        result = onRecord;
+        subject = record;
+      } else {
+        result = await investigatePublic(ask.subjectName);
+        subject = undefined;
+      }
+    } else {
+      result = await investigatePublic(ask.subjectName ?? "");
+      subject = undefined;
+    }
+    last = result;
+    if (result.blocked === "CANCELLED") {
+      return { content: `I stopped before the ${noun} was ready.` };
+    }
+    if (result.blocked !== null) {
+      return { content: publicBlockedMessage(result.blocked) };
+    }
+
+    const name = result.companyName ?? ask.subjectName ?? "your company";
+    const preparation = await prepareOrReviseArtifact({
+      artifacts: artifacts as ArtifactPreparation,
+      request,
+      company: subject,
+      companyName: name,
+      saidVerbatim: said,
+      // The reading decided this is a request to prepare; a model's own
+      // field (which may be empty for an impatient "just do it") does not
+      // get to overrule it. How it should look is still the model's read.
+      result: {
+        ...result,
+        artifactRequest: {
+          kind: "PREPARE",
+          artifactType: ask.documentType,
+          instruction: said.slice(0, 2_000),
+          visualDirection: result.artifactRequest?.visualDirection ?? null,
+          quote: said.slice(0, 400),
+        },
+      },
+      history,
+      ...(logger === undefined ? {} : { logger }),
+    });
+    const sources = result.research?.sourceCount ?? 0;
+    switch (preparation.kind) {
+      case "PREPARED": {
+        const card: QResultBlock = {
+          kind: "ARTIFACT_REFERENCE",
+          artifactId: preparation.summary.artifactId,
+          type: preparation.summary.type,
+          status: preparation.summary.status,
+          title: preparation.summary.title,
+        };
+        const origin =
+          subject === undefined
+            ? ` Built from ${String(sources)} public source${sources === 1 ? "" : "s"}; what they don't say is marked as not known inside it.`
+            : "";
+        const pdf =
+          ask.documentType === "PITCH_DECK"
+            ? " Download the PDF from the card."
+            : "";
+        return {
+          content: `Here's the ${noun} for ${name}.${origin}${pdf}`,
+          blocks: [card],
+        };
+      }
+      case "THIN_RECORD":
+        return {
+          content:
+            subject === undefined
+              ? sources === 0
+                ? `I couldn't find public sources on ${name}, so there is nothing to build a ${noun} from. If you have a website or a document for it, give me that and I'll build it from there.`
+                : `The public sources I found on ${name} don't say enough about the company to fill a ${noun}. If you have a website or a document for it, give me that and I'll build it from there.`
+              : `There isn't enough on record about the company yet to build a ${noun} worth sending. Add your deck or model on your company page, or tell me what you do, for whom, and the traction so far, and I'll build it from that.`,
+        };
+      case "FAILED":
+      case "NOT_ASKED":
+        return {
+          content: `The ${noun} didn't come through just now, and nothing was saved. Ask again and I'll retry.`,
+        };
+    }
+  }
+
+  /**
    * One of Q's own hands, from the turn's reading (CQ-QACT-001).
    *
    * NAVIGATE: the message carries a UI_INTENT the screen follows through
@@ -368,11 +550,20 @@ export function createSpecialistQAnswer(
   async function actOnTool(
     request: QAnswerRequest,
     conversationId: QConversationMessage["conversationId"],
-    tool: TurnTool,
+    tool: TurnToolV3,
+    history: readonly QConversationMessage[],
   ): Promise<QAnswerOutcome | null> {
     const company = request.subjects.find(
       (subject) => subject.kind === "COMPANY",
     );
+    if (tool.kind === "PREPARE_DOCUMENT" && tool.documentType !== null) {
+      if (artifacts === undefined) return null;
+      const done = await prepareDocument(request, history, {
+        documentType: tool.documentType,
+        subjectName: tool.subjectName,
+      });
+      return recordAnswer(request, conversationId, done.content, done.blocks);
+    }
     if (tool.kind === "NAVIGATE" && tool.destination !== null) {
       const destination = tool.destination;
       if (destination === "COMPANY_VISIBILITY" && company === undefined) {
@@ -503,13 +694,20 @@ export function createSpecialistQAnswer(
       );
     }
     // A LOW reading is a guess, and a guess never moves anybody's screen or
-    // prepares a change: it is answered like any other turn.
+    // prepares a change: it is answered like any other turn. A document
+    // asked for "from what you can find publicly" may be read as a
+    // research request as much as a tool request; either way it is a
+    // request for the document, and the document is what they get.
     const tool =
-      read !== null && read.kind === "TOOL_REQUEST" && read.confidence !== "LOW"
+      read !== null &&
+      read.confidence !== "LOW" &&
+      (read.kind === "TOOL_REQUEST" ||
+        (read.kind === "RESEARCH_REQUEST" &&
+          read.tool?.kind === "PREPARE_DOCUMENT"))
         ? read.tool
         : null;
     if (tool !== null) {
-      const acted = await actOnTool(request, conversationId, tool);
+      const acted = await actOnTool(request, conversationId, tool, history);
       if (acted !== null) {
         remember(
           conversationId,

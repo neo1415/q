@@ -124,7 +124,11 @@ export type CompanyResearchRead = {
 export type CompanyResearchPort = {
   readonly research: (
     context: QToolExecutionContext,
-    input: { readonly companyId: string; readonly question: string },
+    input: {
+      /** Absent for a company Capital Q holds no record of: a general search. */
+      readonly companyId?: string | undefined;
+      readonly question: string;
+    },
   ) => Promise<CompanyResearchRead>;
 };
 

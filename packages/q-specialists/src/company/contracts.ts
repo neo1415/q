@@ -31,8 +31,21 @@ import type {
 export type CompanyIntelligenceFocus =
   CompanyIntelligenceDimension | "CHANGES" | "RISKS" | "STRENGTHS" | "GAPS";
 
+/**
+ * A company Capital Q holds no record of, named by the person, that Q is
+ * asked to work on from what the public web says about it (CQ-QACT-002).
+ * No identifier: there is no canonical entity to point at, and inventing
+ * one would be a second, quieter record. Everything known about it in an
+ * investigation comes from public sources, as unverified data.
+ */
+export type PublicCompanySubject = {
+  readonly kind: "PUBLIC_COMPANY";
+  readonly name: string;
+};
+
 export type CompanyIntelligenceRequest = {
-  readonly company: Extract<QSubjectRef, { kind: "COMPANY" }>;
+  readonly company:
+    Extract<QSubjectRef, { kind: "COMPANY" }> | PublicCompanySubject;
   /** The person's message, verbatim. DATA, never an instruction. */
   readonly question: string;
   /**
@@ -123,7 +136,8 @@ export type OpenDocument = {
 };
 
 export type CompanyIntelligenceResult = {
-  readonly companyId: string;
+  /** Null when the company is not on Capital Q (a PUBLIC_COMPANY subject). */
+  readonly companyId: string | null;
   /**
    * The company's canonical name as the authorised read returned it, when
    * it did. A document titled "your company — investor deck" is a

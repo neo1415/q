@@ -336,10 +336,10 @@ export function QResultBlocks({
              * The status is on the card because "prepared" and "still
              * being prepared" are different things to somebody about to
              * send a document to an investor, and an absence would make
-             * them guess. There is no download control here even for a
-             * deck, which now has one: a card in a conversation offers the
-             * way in, and choosing between PowerPoint and PDF belongs
-             * beside the slides a person is looking at (QX-004 §7).
+             * them guess. A deck's PDF is on the card (CQ-QACT-002: "just
+             * give me the PDF" is answered with the PDF, not a trip into a
+             * viewer); PowerPoint and older versions stay beside the
+             * slides, where the choice is made while looking (QX-004 §7).
              */
             const ready = block.status === "READY";
             return (
@@ -366,6 +366,20 @@ export function QResultBlocks({
                       >
                         View
                       </button>
+                    ) : null}
+                    {ready && block.type === "PITCH_DECK" ? (
+                      // "Just give me the PDF" (CQ-QACT-002): the file the
+                      // person asked for is one tap from the answer that
+                      // made it, not behind the viewer. The current version,
+                      // through the same narrow route the viewer uses, so
+                      // the session cookie is the only authority it carries.
+                      <a
+                        className={buttonClassName("secondary", "compact")}
+                        href={`/api/q-artifact/${encodeURIComponent(block.artifactId)}/pdf`}
+                        data-q-artifact-card-pdf={block.artifactId}
+                      >
+                        PDF
+                      </a>
                     ) : null}
                     {ready && onAsk !== undefined ? (
                       <button

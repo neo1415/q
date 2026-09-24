@@ -63,7 +63,7 @@ export function createQArtifacts(dependencies: {
         actorContext: input.actorContext,
         permittedContextPlan: input.permittedContextPlan,
         qRunId: input.qRunId,
-        subject: input.subject,
+        ...(input.subject === undefined ? {} : { subject: input.subject }),
         artifactType: input.artifactType,
         content: input.content,
       });
