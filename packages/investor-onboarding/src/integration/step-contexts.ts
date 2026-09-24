@@ -37,7 +37,7 @@ import {
   type InvestorDomainDependencies,
   type InvestorDomainServices,
 } from "./services.js";
-import { boundInvestor, selectedMandateId } from "./write-targets.js";
+import { boundInvestor, mandateInScope } from "./write-targets.js";
 
 /**
  * Step-context providers: the mandate candidates (I1), the deterministic
@@ -120,7 +120,7 @@ async function mandateFor(
   const mandate = await services.investors.getInvestorMandate({
     actor: bound.context,
     investorOrganisationId: bound.investorOrganisationId,
-    mandateId: selectedMandateId(values),
+    mandateId: await mandateInScope(services, bound, values),
   });
   return { bound, mandate };
 }

@@ -991,6 +991,38 @@ describe("@capital-q/investor-onboarding against local PostgreSQL", () => {
     });
   });
 
+  it("keeps a stage said before I1 on the investor's one draft, which I1 then offers (CQ-ACCEPT-001)", async () => {
+    await withWorld(async (world) => {
+      const { tx, newcomer } = world;
+      const journey = await startInvestor(world, newcomer);
+      await journey.submit(INVESTOR_STEPS.investorType, single("vc"));
+      await journey.submit(
+        INVESTOR_STEPS.organisationName,
+        text("Harmattan Ventures"),
+      );
+      // Said up front, before deployment status or a mandate choice: kept.
+      await journey.submit(INVESTOR_STEPS.stages, multi(["seed"]));
+      const investorId = investorIdOf(journey.view());
+      const drafts = await tx.sql<{ id: string; min_stage_code: string }[]>`
+        select id, min_stage_code from core.investor_mandates
+         where investor_organisation_id = ${investorId}`;
+      expect(drafts).toHaveLength(1);
+      expect(drafts[0]?.min_stage_code).toBe("seed");
+
+      // The deployment step creates nothing more, and I1 offers that draft.
+      await journey.skip(INVESTOR_STEPS.businessTitle);
+      await journey.submit(
+        INVESTOR_STEPS.deploymentStatus,
+        single("actively_investing"),
+      );
+      const offered = InvestorMandatesContextSchema.parse(
+        (await journey.refresh()).currentStep?.context,
+      );
+      expect(offered.candidates).toHaveLength(1);
+      expect(offered.suggestedMandateId).toBe(drafts[0]?.id);
+    });
+  });
+
   it("refuses an inverted cheque range and a protected attribute, leaving the mandate untouched", async () => {
     await withWorld(async (world) => {
       const { tx, newcomer } = world;
