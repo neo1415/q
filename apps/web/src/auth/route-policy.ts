@@ -24,6 +24,7 @@ export const PROTECTED_PATH_PREFIXES = [
   "/capital",
   "/company",
   "/pitch",
+  "/verification",
   "/profile",
   "/onboarding",
   // Setting a new password needs the recovery session the callback created.

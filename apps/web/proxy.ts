@@ -19,6 +19,7 @@ export const config = {
     "/capital/:path*",
     "/company/:path*",
     "/pitch/:path*",
+    "/verification/:path*",
     "/profile/:path*",
     "/onboarding/:path*",
     "/auth/:path*",
