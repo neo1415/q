@@ -5,6 +5,7 @@ import Link from "next/link";
 import type { QSubjectRef, QUiIntent } from "@capital-q/contracts";
 import { buttonClassName } from "@capital-q/ui/button";
 
+import { destinationPath } from "../voice/destinations";
 import type { QTurnObjectBlock } from "./conversation";
 
 /**
@@ -41,7 +42,9 @@ import type { QTurnObjectBlock } from "./conversation";
  * state, and each one lights up by adding a line here when its screen
  * exists, rather than by shipping a link to a 404 now.
  */
-const INTENT_ROUTES: Readonly<Record<QUiIntent["kind"], string | null>> = {
+const INTENT_ROUTES: Readonly<
+  Record<Exclude<QUiIntent["kind"], "NAVIGATE">, string | null>
+> = {
   OPEN_COMPANY: null,
   FOCUS_SECTION: null,
   SHOW_COMPARISON: null,
@@ -49,6 +52,10 @@ const INTENT_ROUTES: Readonly<Record<QUiIntent["kind"], string | null>> = {
 };
 
 function intentHref(intent: QUiIntent): string | null {
+  // A named surface, through the same route map spoken navigation uses.
+  if (intent.kind === "NAVIGATE") {
+    return destinationPath(intent.destination);
+  }
   const route = INTENT_ROUTES[intent.kind];
   if (route === null) {
     return null;
@@ -74,8 +81,20 @@ function intentLabel(intent: QUiIntent): string {
       return "See them side by side";
     case "SHOW_EVIDENCE":
       return "See the sources";
+    case "NAVIGATE":
+      return DESTINATION_LABELS[intent.destination];
   }
 }
+
+const DESTINATION_LABELS: Readonly<
+  Record<Extract<QUiIntent, { kind: "NAVIGATE" }>["destination"], string>
+> = {
+  HOME: "Go home",
+  PROFILE: "Open your profile",
+  CAPITAL: "Open Capital",
+  DISCOVER: "Open Discover",
+  COMPANY_VISIBILITY: "Open visibility settings",
+};
 
 function subjectLabel(subject: QSubjectRef): string {
   switch (subject.kind) {

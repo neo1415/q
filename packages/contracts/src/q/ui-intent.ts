@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { UuidSchema } from "../common/ids.js";
 import { QEvidenceRefsSchema } from "./evidence-ref.js";
+import type { QVoiceDestination } from "./voice.js";
 
 /**
  * A known Capital Q UI action Q may suggest (doc 12 §70-71).
@@ -21,6 +22,7 @@ export const Q_UI_INTENT_KINDS = [
   "SHOW_COMPARISON",
   "FOCUS_SECTION",
   "SHOW_EVIDENCE",
+  "NAVIGATE",
 ] as const;
 
 export type QUiIntentKind = (typeof Q_UI_INTENT_KINDS)[number];
@@ -79,11 +81,38 @@ export const QShowEvidenceIntentSchema = z
   })
   .strict();
 
+/**
+ * Where a typed request may take the person (CQ-QACT-001): the platform's
+ * own top-level surfaces, by name. A subset of the spoken destinations, so
+ * a typed "take me to Discover" and a spoken one go to the same place
+ * through the same route map; the setup and form hand-offs are the
+ * interview's own and are not offered here. Never a path, never a URL.
+ */
+export const Q_NAVIGATE_DESTINATIONS = [
+  "HOME",
+  "PROFILE",
+  "CAPITAL",
+  "DISCOVER",
+  "COMPANY_VISIBILITY",
+] as const satisfies readonly QVoiceDestination[];
+
+export type QNavigateDestination = (typeof Q_NAVIGATE_DESTINATIONS)[number];
+
+export const QNavigateDestinationSchema = z.enum(Q_NAVIGATE_DESTINATIONS);
+
+export const QNavigateIntentSchema = z
+  .object({
+    kind: z.literal("NAVIGATE"),
+    destination: QNavigateDestinationSchema,
+  })
+  .strict();
+
 export const QUiIntentSchema = z.discriminatedUnion("kind", [
   QOpenCompanyIntentSchema,
   QShowComparisonIntentSchema,
   QFocusSectionIntentSchema,
   QShowEvidenceIntentSchema,
+  QNavigateIntentSchema,
 ]);
 
 export type QUiIntent = z.infer<typeof QUiIntentSchema>;

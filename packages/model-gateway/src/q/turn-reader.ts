@@ -4,9 +4,9 @@ import {
   createDefaultPromptRegistry,
   DEFAULT_COMMUNICATION_PROFILE,
   renderPrompt,
-  TurnReaderResultSchema,
+  TurnReaderV2ResultSchema,
   type PromptRegistry,
-  type TurnReaderResult,
+  type TurnReaderV2Result,
   type TurnReaderVariables,
 } from "@capital-q/q-core";
 
@@ -36,7 +36,7 @@ export type QTurnReader = {
       readonly correlationId: string;
     };
     readonly signal?: AbortSignal | undefined;
-  }) => Promise<TurnReaderResult | null>;
+  }) => Promise<TurnReaderV2Result | null>;
 };
 
 /**
@@ -91,7 +91,7 @@ export function createQTurnReader(dependencies: {
             "You classify one turn and nothing else; Capital Q decides what follows from it.",
           variables,
         });
-        const response = await gateway.execute<TurnReaderResult>(
+        const response = await gateway.execute<TurnReaderV2Result>(
           {
             taskClass: "FAST_CLASSIFICATION",
             // A closed classification needs little thought; left unset, a
@@ -104,12 +104,12 @@ export function createQTurnReader(dependencies: {
             attribution: input.attribution,
           },
           {
-            schema: TurnReaderResultSchema,
+            schema: TurnReaderV2ResultSchema,
             ...(input.signal === undefined ? {} : { signal: input.signal }),
           },
         );
         if (response.output.kind !== "STRUCTURED") return null;
-        const parsed = TurnReaderResultSchema.safeParse(
+        const parsed = TurnReaderV2ResultSchema.safeParse(
           (response.output as { readonly value: unknown }).value,
         );
         return parsed.success ? parsed.data : null;

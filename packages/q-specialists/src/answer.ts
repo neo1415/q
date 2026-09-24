@@ -1,4 +1,5 @@
 import type {
+  QNavigateDestination,
   QResponseMessage,
   QResultBlock,
   QVisibleStage,
@@ -13,6 +14,7 @@ import {
   withoutRecommendationClaims,
   type ConversationState,
   type FailureOperation,
+  type TurnTool,
 } from "@capital-q/q-core";
 import type { DatabaseExecutor, TransactionManager } from "@capital-q/database";
 import type { Logger } from "@capital-q/observability";
@@ -22,6 +24,7 @@ import {
   type QAnswerOutcome,
   type QAnswerPort,
   type QAnswerRequest,
+  type QConversationMessage,
   type QResearchDirective,
   type QRuntimeRepositories,
 } from "@capital-q/q-runtime";
@@ -88,6 +91,48 @@ export type SpecialistQAnswerDependencies = {
   readonly turns?: QTurnReader | undefined;
   /** Whether public research exists in this composition at all. */
   readonly researchAvailable?: boolean | undefined;
+  /**
+   * Where a turn read as "show / hide my company" is handed to the action
+   * proposer (CQ-QACT-001). Absent: such a turn is answered like any other.
+   */
+  readonly visibility?: QVisibilityNotebook | undefined;
+};
+
+/** The proposer's side of a visibility reading; nothing here applies it. */
+export type QVisibilityNotebook = {
+  readonly noteVisibility: (entry: {
+    readonly runId: string;
+    readonly tenantId: string;
+    readonly companyId: string;
+    readonly visibility: "network_visible" | "organisation_private";
+  }) => void;
+};
+
+/**
+ * What Q says as it takes somebody somewhere (CQ-QACT-001). The same
+ * words voice speaks for the same destinations; the screen follows the
+ * UI_INTENT the message carries, through its one route map.
+ */
+const DESTINATION_LINES: Readonly<Record<QNavigateDestination, string>> = {
+  HOME: "Taking you home now.",
+  PROFILE: "Opening your profile.",
+  CAPITAL: "Taking you to Capital.",
+  DISCOVER: "Taking you to Discover.",
+  COMPANY_VISIBILITY: "Opening your visibility settings.",
+};
+
+/**
+ * What changing visibility means, said before the proposal (which Q only
+ * claims once it exists). The Visibility & Discovery screen's own terms,
+ * readiness included: visible and recommended are separate states.
+ */
+const VISIBILITY_EXPLANATIONS: Readonly<
+  Record<"network_visible" | "organisation_private", string>
+> = {
+  network_visible:
+    "Making your company visible means investors on Capital Q can find it by name and read its profile; everything else you've shared with me stays private. Being visible doesn't put you in investor recommendations on its own: the marketplace requirements decide that, separately.",
+  organisation_private:
+    "Making your company private means only people in your organisation can see it: investors can no longer find it, and I won't mention it to them. If it's in investor recommendations now, it leaves them until it's visible again.",
 };
 
 export type SpecialistQAnswer = QAnswerPort & {
@@ -235,6 +280,115 @@ export function createSpecialistQAnswer(
     }
   }
 
+  /** A Q message and its durable completion event, committed together. */
+  async function recordAnswer(
+    request: QAnswerRequest,
+    conversationId: QConversationMessage["conversationId"],
+    content: string,
+    blocks?: readonly QResultBlock[],
+  ): Promise<QAnswerOutcome> {
+    const message = await transactions.run(async (tx) => {
+      const stored = await repositories.messages.insert(tx, {
+        tenantId: request.tenantId,
+        conversationId,
+        runId: request.runId,
+        role: "Q",
+        content,
+        ...(blocks === undefined ? {} : { blocks }),
+      });
+      await appendRunEvent(
+        repositories,
+        tx,
+        { id: request.runId, tenantId: request.tenantId },
+        {
+          type: "q.message.completed",
+          data: {
+            message: {
+              ...(toQMessage(stored) as QResponseMessage),
+              ...(blocks === undefined ? {} : { blocks: [...blocks] }),
+            },
+          },
+        },
+      );
+      return stored;
+    });
+    return {
+      kind: "ANSWERED",
+      messageId: message.id,
+      modelPolicyVersion: "none",
+      promptBundleVersion: "none",
+    };
+  }
+
+  /**
+   * One of Q's own hands, from the turn's reading (CQ-QACT-001).
+   *
+   * NAVIGATE: the message carries a UI_INTENT the screen follows through
+   * its one route map — the same destinations voice uses — and nothing
+   * else happens; a surface this run has no subject for is not offered.
+   *
+   * SET_VISIBILITY: the reading is handed to the proposer, for the company
+   * this run is about and nothing else; the message says what the change
+   * means and claims nothing. The Approval Engine prepares it, the action
+   * port says so from the record, and the person's yes executes it
+   * through the companies context — the capability the Visibility screen
+   * calls. Null: not something this seam performs; answer normally.
+   */
+  async function actOnTool(
+    request: QAnswerRequest,
+    conversationId: QConversationMessage["conversationId"],
+    tool: TurnTool,
+  ): Promise<QAnswerOutcome | null> {
+    const company = request.subjects.find(
+      (subject) => subject.kind === "COMPANY",
+    );
+    if (tool.kind === "NAVIGATE" && tool.destination !== null) {
+      const destination = tool.destination;
+      if (destination === "COMPANY_VISIBILITY" && company === undefined) {
+        return null;
+      }
+      logger?.info(
+        { qRunId: request.runId, destination },
+        "q is taking the person to a screen",
+      );
+      return recordAnswer(
+        request,
+        conversationId,
+        DESTINATION_LINES[destination],
+        [{ kind: "UI_INTENT", intent: { kind: "NAVIGATE", destination } }],
+      );
+    }
+    if (
+      tool.kind === "SET_VISIBILITY" &&
+      tool.visibility !== null &&
+      dependencies.visibility !== undefined
+    ) {
+      if (company === undefined || company.kind !== "COMPANY") {
+        return recordAnswer(
+          request,
+          conversationId,
+          "I can change who sees a company once it's set up on Capital Q, and there isn't one in this conversation yet.",
+        );
+      }
+      dependencies.visibility.noteVisibility({
+        runId: request.runId,
+        tenantId: request.tenantId,
+        companyId: company.companyId,
+        visibility: tool.visibility,
+      });
+      logger?.info(
+        { qRunId: request.runId, visibility: tool.visibility },
+        "visibility change read from the person's words; handed to the proposer",
+      );
+      return recordAnswer(
+        request,
+        conversationId,
+        VISIBILITY_EXPLANATIONS[tool.visibility],
+      );
+    }
+    return null;
+  }
+
   /**
    * One turn, read and then answered (CQ-QX-005).
    *
@@ -264,7 +418,18 @@ export function createSpecialistQAnswer(
     }
     const state =
       conversations.get(conversationId) ?? INITIAL_CONVERSATION_STATE;
-    const research: Promise<QResearchDirective> = turns
+    /*
+     * The reading is awaited before anything is answered (CQ-QACT-001).
+     * It used to run beside the answer and decide only research, which
+     * left "take me to Discover" and "make my company visible" to the
+     * answer's own reading — one that has no word for either, so the
+     * first was told to navigate itself and the second became a deck.
+     * A request for one of Q's own hands is now acted on from this
+     * reading, through the capability the screen uses; the specialist
+     * path already waited on it, so only the conversational path pays
+     * the one classification it was already making.
+     */
+    const read = await turns
       .read({
         utterance: latest.content,
         recentTurns: history
@@ -282,30 +447,46 @@ export function createSpecialistQAnswer(
         },
         signal: request.signal,
       })
-      .then((result) => {
-        if (result === null) return NO_RESEARCH;
-        const directive = researchDirectiveFor(
-          state,
-          readingFromTurnReader(result),
-          {
+      .catch(() => null);
+    const research: Promise<QResearchDirective> = Promise.resolve(
+      read === null
+        ? NO_RESEARCH
+        : researchDirectiveFor(state, readingFromTurnReader(read), {
             available: dependencies.researchAvailable ?? true,
-            aboutNamedOther: result.aboutNamedOther,
-          },
+            aboutNamedOther: read.aboutNamedOther,
+          }),
+    );
+    if (read !== null) {
+      logger?.info(
+        {
+          qRunId: request.runId,
+          kind: read.kind,
+          confidence: read.confidence,
+          transcript: read.transcript,
+          question: read.question?.kind ?? null,
+          aboutNamedOther: read.aboutNamedOther,
+          research: (await research).mode,
+          tool: read.tool?.kind ?? null,
+        },
+        "q turn read",
+      );
+    }
+    // A LOW reading is a guess, and a guess never moves anybody's screen or
+    // prepares a change: it is answered like any other turn.
+    const tool =
+      read !== null && read.kind === "TOOL_REQUEST" && read.confidence !== "LOW"
+        ? read.tool
+        : null;
+    if (tool !== null) {
+      const acted = await actOnTool(request, conversationId, tool);
+      if (acted !== null) {
+        remember(
+          conversationId,
+          reduceConversation(state, { type: "SUCCEEDED", operation: "TOOL" }),
         );
-        logger?.info(
-          {
-            qRunId: request.runId,
-            kind: result.kind,
-            confidence: result.confidence,
-            transcript: result.transcript,
-            question: result.question?.kind ?? null,
-            aboutNamedOther: result.aboutNamedOther,
-            research: directive.mode,
-          },
-          "q turn read",
-        );
-        return directive;
-      });
+        return acted;
+      }
+    }
     const outcome = await answerOnce({ ...request, research });
     if (outcome.kind === "FAILED") {
       const operation = operationOf(outcome.diagnosticCode);

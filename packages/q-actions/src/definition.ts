@@ -63,6 +63,16 @@ export type ApprovedQAction<P> = {
 };
 
 export type QActionExecutionContext = {
+  /**
+   * The approver, exactly as the gate just verified them: the same person
+   * who approved, in the same tenant and organisation, holding the approve
+   * capability and the action's own permission at this moment. An
+   * executor acts under this authority and no other — rebuilding an actor
+   * from the approval's user id loses the membership that roles hang on,
+   * and live, every approved profile change failed its own permission
+   * check that way (CQ-QACT-001).
+   */
+  readonly approver: ActorContext;
   readonly correlationId: CorrelationId;
   /** 1 for the first claim; a retry under the same approval increments it. */
   readonly attempt: number;

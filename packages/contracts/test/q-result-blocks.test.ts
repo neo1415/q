@@ -195,6 +195,7 @@ describe("QUiIntent", () => {
       section: "FINANCIALS",
     },
     SHOW_EVIDENCE: { kind: "SHOW_EVIDENCE", evidenceRefs: [evidenceRef] },
+    NAVIGATE: { kind: "NAVIGATE", destination: "DISCOVER" },
   };
 
   it("parses every supported intent", () => {
@@ -214,6 +215,9 @@ describe("QUiIntent", () => {
       { kind: "SET_RAW_HTML", html: "<b>x</b>" },
       { kind: "CALL_API", path: "/v1/companies" },
       { kind: "NAVIGATE", href: "/anything" },
+      { kind: "NAVIGATE", destination: "/admin" },
+      { kind: "NAVIGATE", destination: "FORM" },
+      { kind: "NAVIGATE", destination: "DISCOVER", href: "/x" },
     ]) {
       expect(QUiIntentSchema.safeParse(intent).success).toBe(false);
     }
