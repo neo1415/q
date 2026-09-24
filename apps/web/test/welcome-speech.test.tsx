@@ -80,6 +80,21 @@ beforeEach(() => {
     "fetch",
     vi.fn(() => Promise.resolve(audioResponse())),
   );
+  // jsdom has no matchMedia; Q's presence reads reduced motion and its
+  // own size from it. Full motion and a desktop width, as a browser would.
+  vi.stubGlobal(
+    "matchMedia",
+    vi.fn((query: string) => ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addEventListener: () => undefined,
+      removeEventListener: () => undefined,
+      addListener: () => undefined,
+      removeListener: () => undefined,
+      dispatchEvent: () => false,
+    })),
+  );
 });
 
 afterEach(() => {

@@ -3,7 +3,11 @@ import { redirect } from "next/navigation";
 
 import { loadWebServerConfig } from "@capital-q/config/web";
 
-import { resolveOwnContext } from "@/features/q/context";
+import { arrivalFor } from "@/features/home/returning";
+import {
+  resolveOwnContext,
+  resolveUnfinishedSetup,
+} from "@/features/q/context";
 import { WelcomeScreen } from "@/features/welcome/welcome-screen";
 import { fetchMe, updateMe } from "@capital-q/api-client";
 import { accountDetails } from "@/auth/account-details";
@@ -32,8 +36,14 @@ export default async function WelcomePage({
     redirect("/home");
   }
   const context = await resolveOwnContext();
-  if (context.kind !== "NONE" && params["again"] !== "1") {
-    redirect("/home");
+  if (params["again"] !== "1") {
+    // Somebody part-way through a setup that has not named a company yet
+    // is back too, and Home is where Q welcomes them back (CQ-WEB-030).
+    const unfinished =
+      context.kind === "NONE" ? await resolveUnfinishedSetup() : null;
+    if (arrivalFor(context, unfinished) === "RETURNING") {
+      redirect("/home");
+    }
   }
   let knownName: string | null = null;
   let knownOrganisation: string | null = null;

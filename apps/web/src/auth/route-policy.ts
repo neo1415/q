@@ -8,11 +8,23 @@
  * auth-locks the whole application.
  */
 
+/*
+ * Every route in the `(app)` and `(onboarding)` groups belongs here, and
+ * `proxy.ts` must match each one (test/route-policy.test.ts holds both).
+ * A protected route the proxy does not run on still renders -- the layout
+ * guard verifies the session -- but an expired access token is then
+ * refreshed inside a Server Component, which cannot write cookies: the
+ * rotated session is thrown away and the browser keeps the old one, so the
+ * refresh repeats on every such page until something else writes it.
+ */
 export const PROTECTED_PATH_PREFIXES = [
   "/home",
   "/welcome",
   "/discover",
   "/capital",
+  "/company",
+  "/pitch",
+  "/verification",
   "/profile",
   "/onboarding",
   // Setting a new password needs the recovery session the callback created.
