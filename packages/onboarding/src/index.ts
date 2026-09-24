@@ -240,8 +240,6 @@ export {
 export type { OnboardingTaxonomyResolver } from "./application/ports.js";
 export {
   BRIDGE_LINE,
-  INTERVIEW_WHY,
-  looksLikeQuestionForQ,
   PAUSED_LINE,
   pauseIntent,
   resumeIntent,

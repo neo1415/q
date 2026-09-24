@@ -67,7 +67,6 @@ export {
 export {
   asksAboutChange,
   asksAboutGaps,
-  asksForPublicResearch,
   dimensionForKnowledgeKey,
   focusFromQuestion,
 } from "./company/dimensions.js";
@@ -147,5 +146,6 @@ export type { ArtifactPreparationPort } from "./company/artifact-port.js";
 export {
   latestArtifactIn,
   prepareOrReviseArtifact,
+  type ArtifactPreparationOutcome,
   type ArtifactPreparation,
 } from "./company/prepare-artifact.js";

@@ -3,6 +3,7 @@ import type { DatabaseExecutor, TransactionManager } from "@capital-q/database";
 import type { ModelGateway } from "@capital-q/model-gateway";
 import {
   createModelGatewayQAnswer,
+  createQTurnReader,
   type QArtifactReviser,
   type QProfileUpdateNotebook,
   type QUserStatementRecorder,
@@ -276,6 +277,13 @@ export function composeQIntelligence(
       ? {}
       : { artifacts: dependencies.artifacts }),
     ...(logger === undefined ? {} : { logger }),
+    // Every turn is read before it is answered (CQ-QX-005): research and
+    // failure notices are decided by the conversation core, not by a word
+    // list. Without a logger there is nothing to report a failed reading
+    // to, and the reading is skipped rather than failing silently.
+    ...(logger === undefined
+      ? {}
+      : { turns: createQTurnReader({ gateway, logger }) }),
   });
 
   return {

@@ -99,6 +99,22 @@ function companyNameFrom(
     : candidate.slice(0, 120);
 }
 
+/**
+ * How a requested document ended. THIN_RECORD is not a failure and must
+ * never be told as one: there is too little on record to write from, and
+ * "try again in a moment" would send the person round the same loop.
+ */
+export type ArtifactPreparationOutcome =
+  | { readonly kind: "NOT_ASKED" }
+  | { readonly kind: "PREPARED"; readonly summary: QArtifactSummary }
+  | {
+      readonly kind: "THIN_RECORD";
+      readonly artifactType: NonNullable<
+        CompanyIntelligenceResult["artifactRequest"]
+      >["artifactType"];
+    }
+  | { readonly kind: "FAILED" };
+
 export async function prepareOrReviseArtifact(input: {
   readonly artifacts: ArtifactPreparation;
   readonly request: QAnswerRequest;
@@ -109,18 +125,23 @@ export async function prepareOrReviseArtifact(input: {
   readonly result: CompanyIntelligenceResult;
   readonly history: HistoryLike;
   readonly logger?: Logger | undefined;
-}): Promise<QArtifactSummary | null> {
+}): Promise<ArtifactPreparationOutcome> {
   const { artifacts, request, company, result, history, logger } = input;
   const ask = result.artifactRequest;
   if (ask === null) {
-    return null;
+    return { kind: "NOT_ASKED" };
   }
   // Their own words when the model put the change in the quote and left
   // the field empty. Acting on an empty instruction is not something to
   // attempt, and a revision with no instruction is not a revision.
   const instruction =
     ask.instruction.length > 0 ? ask.instruction : input.saidVerbatim;
-  const companyName = companyNameFrom(result, input.companyName);
+  const companyName =
+    result.companyName !== undefined &&
+    result.companyName !== null &&
+    result.companyName.trim().length > 0
+      ? result.companyName.trim().slice(0, 120)
+      : companyNameFrom(result, input.companyName);
   /**
    * Which composer, chosen by what they asked for.
    *
@@ -147,7 +168,7 @@ export async function prepareOrReviseArtifact(input: {
       { qRunId: request.runId },
       "artifact not prepared: nothing on record to compose from",
     );
-    return null;
+    return { kind: "THIN_RECORD", artifactType: ask.artifactType };
   }
   const grounding = result.findings.map((finding) => finding.statement);
 
@@ -177,33 +198,39 @@ export async function prepareOrReviseArtifact(input: {
             },
             ...(request.signal === undefined ? {} : { signal: request.signal }),
           });
-          return await artifacts.port.revise({
-            actorContext: request.actor,
-            permittedContextPlan: request.plan,
-            qRunId: request.runId,
-            artifactId: target,
-            instruction,
-            content: revised,
-          });
+          return {
+            kind: "PREPARED",
+            summary: await artifacts.port.revise({
+              actorContext: request.actor,
+              permittedContextPlan: request.plan,
+              qRunId: request.runId,
+              artifactId: target,
+              instruction,
+              content: revised,
+            }),
+          };
         }
       }
       // Asked to change something that is not in this conversation, or is
       // no longer theirs to read. Preparing a fresh one is the useful
       // answer and is no less authorised than any other preparation.
     }
-    return await artifacts.port.prepare({
-      actorContext: request.actor,
-      permittedContextPlan: request.plan,
-      qRunId: request.runId,
-      subject: company,
-      artifactType: ask.artifactType,
-      content: base,
-    });
+    return {
+      kind: "PREPARED",
+      summary: await artifacts.port.prepare({
+        actorContext: request.actor,
+        permittedContextPlan: request.plan,
+        qRunId: request.runId,
+        subject: company,
+        artifactType: ask.artifactType,
+        content: base,
+      }),
+    };
   } catch (error: unknown) {
     logger?.warn(
       { err: error, qRunId: request.runId },
       "artifact preparation did not complete",
     );
-    return null;
+    return { kind: "FAILED" };
   }
 }

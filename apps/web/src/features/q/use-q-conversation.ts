@@ -245,10 +245,17 @@ export function useQConversation(
         const latest = detail.latestRun;
         const live = latest !== null && !FINISHED_STATUSES.has(latest.status);
         if (live) {
-          // Its own turns arrive again on the stream, so they are not
-          // also taken from the recorded thread.
+          // Q's side of the live run arrives again on the stream, so it is
+          // not also taken from the recorded thread. The person's own
+          // question is not on the stream at all: it is only ever in the
+          // record, so it stays. Dropping it left a conversation opened
+          // mid-run (a Home card that started the run, then /home?c=)
+          // showing Q's answer to a question nobody asked.
           setHistory(
-            detail.messages.filter((message) => message.runId !== latest.runId),
+            detail.messages.filter(
+              (message) =>
+                message.runId !== latest.runId || message.role === "USER",
+            ),
           );
           openRun.current = latest.runId;
           finished.current = false;

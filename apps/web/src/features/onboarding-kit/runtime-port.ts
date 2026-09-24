@@ -515,6 +515,7 @@ export function createRuntimeClient<
                 understood: outcome.understood,
                 reply: outcome.reply,
                 navigate: outcome.navigate,
+                researching: outcome.researching,
               };
             }),
         }),

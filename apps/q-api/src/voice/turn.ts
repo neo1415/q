@@ -23,7 +23,6 @@ import {
 } from "@capital-q/contracts";
 import type { QActionService } from "@capital-q/q-actions";
 import {
-  looksLikeQuestionForQ,
   PAUSED_LINE,
   pauseIntent,
   resumeIntent,
@@ -49,6 +48,7 @@ import {
   type SpokenVisibility,
   isNonLexical,
   recoveryLine,
+  recoverySettled,
   resumeAcknowledgement,
   spokenDestination,
   wantsToEndVoice,
@@ -896,10 +896,15 @@ export function createVoiceTurnHandler(
               );
               return;
             }
-            yield recoveryLine(event.data.failure.code);
+            // Q's own notice for this conversation when the core composed
+            // one (named by the subsystem, said once); the line's own
+            // ledger otherwise, so a repeat never sounds the same.
+            yield event.data.failure.notice ??
+              recoveryLine(event.data.failure.code, binding);
             return;
           case "q.run.completed":
             terminal = true;
+            recoverySettled(binding);
             return;
           case "q.stage.changed":
             // The one stage worth a spoken word: research takes seconds,
@@ -1227,18 +1232,9 @@ export function createVoiceTurnHandler(
         ? { kind: "SPOKEN", path: "INTERVIEW" }
         : { kind: "INTERRUPTED", path: "INTERVIEW" };
     }
-    if (looksLikeQuestionForQ(text)) {
-      const outcome = await askQ(binding, text, signal, speaker);
-      if (outcome.kind === "SPOKEN" && before.currentStep !== null) {
-        // Back to the interview: the live question, aloud (B §23).
-        await speakLine(
-          speaker,
-          `Back to where we were. ${before.currentStep.prompt}`,
-          signal,
-        );
-      }
-      return outcome;
-    }
+    // A question for Q is not pre-sorted by its words (CQ-QX-005;
+    // ADR 0011): it goes to the interviewer like any other turn, which
+    // reads it, answers it in the turn and returns to the interview.
     // The answer is committed before anything is spoken: an interruption
     // after this point loses words, never the person's answer.
     // No interviewer is composed in this process, so the turn goes to the
