@@ -33,14 +33,17 @@ export const PROGRESS_MAX_LINES = 2;
 export type ProgressNarrator = {
   /**
    * The line for a stage the run has just entered, or null to say
-   * nothing. `researchLine` is what a move to public sources is announced
+   * nothing. `researchLine` gives what a move to public sources is announced
    * with. That line is always said at once: it tells the person the
    * answer will come from somewhere other than their own records, and
    * that is worth hearing however quick the search turns out to be.
    */
   readonly lineFor: (
     stage: QVisibleStage,
-    options: { readonly answered: boolean; readonly researchLine: string },
+    options: {
+      readonly answered: boolean;
+      readonly researchLine: () => string;
+    },
   ) => string | null;
 };
 
@@ -59,7 +62,7 @@ export function createProgressNarrator(options: {
       if (answered || said.has(stage)) return null;
       if (stage === "SEARCHING_PUBLIC_SOURCES") {
         said.add(stage);
-        return researchLine;
+        return researchLine();
       }
       const line = PROGRESS_LINES[stage];
       if (line === undefined) return null;

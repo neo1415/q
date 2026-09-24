@@ -243,7 +243,7 @@ describe("route shapes in the timing line", () => {
 });
 
 describe("progress while a long answer is worked out", () => {
-  const research = "Checking the public web on that.";
+  const research = () => "Checking the public web on that.";
 
   it("says nothing for a quick answer", () => {
     let now = 0;
@@ -280,7 +280,7 @@ describe("progress while a long answer is worked out", () => {
         answered: false,
         researchLine: research,
       }),
-    ).toBe(research);
+    ).toBe(research());
     const later = createProgressNarrator({ startedAt: 0, now: () => 5_000 });
     expect(
       later.lineFor("PREPARING_ANALYSIS", {
