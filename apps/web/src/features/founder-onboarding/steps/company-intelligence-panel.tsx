@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react";
 
-import { QStateIndicator } from "@capital-q/ui/q-state";
+import { QMark } from "@capital-q/ui/q-mark";
 import { InlineNotice } from "@capital-q/ui/states";
 
 import {
@@ -52,19 +52,38 @@ export function CompanyIntelligencePanel({
   const answer = turns.filter((turn) => turn.kind === "Q").at(-1);
 
   return (
-    <section className="flex flex-col gap-4" aria-labelledby="q-first-reading">
-      <h2 id="q-first-reading" className="cq-label text-(--cq-text-secondary)">
+    <section className="flex flex-col gap-3" aria-labelledby="q-first-reading">
+      <h2 id="q-first-reading" className="cq-title-md text-(--cq-text-primary)">
         What Q makes of it so far
       </h2>
 
+      {/*
+        While Q reads, one status line says so; the reading itself arrives
+        as open prose at reading measure, not in a box (doc 18 §§19, 102).
+      */}
       {q.working ? (
-        <QStateIndicator state="WORKING" detail={workingLabel(q.state)} />
+        <p
+          role="status"
+          className="cq-status-line"
+          data-q-first-reading-working
+        >
+          <QMark size="sm" state="WORKING" />
+          {workingLabel(q.state)}
+          <span aria-hidden="true" className="inline-flex gap-0.5">
+            <span className="cq-working-dot">·</span>
+            <span className="cq-working-dot">·</span>
+            <span className="cq-working-dot">·</span>
+          </span>
+        </p>
       ) : null}
 
       {answer !== undefined ? (
-        <p className="cq-body max-w-(--cq-layout-narrow) whitespace-pre-wrap text-(--cq-text-primary)">
+        <div
+          className="cq-prose cq-body cq-arrive whitespace-pre-wrap text-(--cq-text-primary)"
+          data-q-first-reading-answer
+        >
           {answer.text}
-        </p>
+        </div>
       ) : null}
 
       {q.state.failure !== null ? (
@@ -84,7 +103,7 @@ export function CompanyIntelligencePanel({
         on what the founder supplied, and none of it has been checked against
         anything (§20).
       */}
-      <p className="cq-caption text-(--cq-text-tertiary)">
+      <p className="cq-status-line">
         Based on what you&apos;ve told Capital Q and the material you shared.
         Nothing here has been independently verified.
       </p>

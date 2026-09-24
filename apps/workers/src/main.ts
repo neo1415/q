@@ -16,6 +16,8 @@
  * makes a hostile document a data problem instead of a credential problem.
  */
 
+import { randomUUID } from "node:crypto";
+
 import { z } from "zod";
 
 import { createPostgresCapitalObjectiveQueryPort } from "@capital-q/capital";
@@ -28,7 +30,11 @@ import {
   toResearchProviderSecrets,
 } from "@capital-q/config/research-providers";
 import { loadWorkerConfig } from "@capital-q/config/workers";
-import { CONTRACTS_VERSION, type ModelDataPosture } from "@capital-q/contracts";
+import {
+  CONTRACTS_VERSION,
+  CorrelationIdSchema,
+  type ModelDataPosture,
+} from "@capital-q/contracts";
 import { createRequestDatabaseClient } from "@capital-q/database";
 import {
   createOutboxPublisher,
@@ -108,6 +114,10 @@ import {
   createPostgresOnboardingUtteranceRepository,
 } from "@capital-q/onboarding";
 import { ProcessDocumentJob } from "@capital-q/evidence/jobs";
+import {
+  createPostgresAutomatedModeration,
+  MediaAssetIdSchema,
+} from "@capital-q/media";
 import { createLogger, createTelemetryRuntime } from "@capital-q/observability";
 import {
   createPostgresChunkRepository,
@@ -522,6 +532,15 @@ const recommendationRefresh = createQueueRunner({
   logger,
 });
 
+// Automated pitch moderation (CQ-MEDIA-013): the platform's integrity
+// decision, run by a versioned rule when a pitch becomes READY. Composed
+// on the Media context's trusted operation with the worker's own outbox
+// and audit writers; no actor, no browser, no model.
+const mediaModeration = createPostgresAutomatedModeration({
+  transactions: database.transactions,
+  outbox: createOutboxWriter({ registry }),
+});
+
 /**
  * CQ-VERIFY-001: Capital Q decides a verification request by synthetic-demo
  * attestation, holding the same allowance the model gateway was given. It
@@ -544,6 +563,23 @@ const documentEvents = createQueueRunner({
       registry,
       queues,
       pipelineVersion: config.documents.pipelineVersion,
+      mediaModeration: {
+        onReady: (event) => {
+          // The message names the asset; the decision re-reads it. An id that
+          // is not one is archived by the handler's own outcome, not thrown.
+          const mediaAssetId = MediaAssetIdSchema.safeParse(event.mediaAssetId);
+          if (!mediaAssetId.success) {
+            return Promise.resolve({ kind: "SKIPPED" });
+          }
+          return mediaModeration({
+            tenantId: event.tenantId,
+            mediaAssetId: mediaAssetId.data,
+            correlationId: CorrelationIdSchema.parse(
+              event.correlationId ?? `cor_${randomUUID()}`,
+            ),
+          });
+        },
+      },
       ...(founderReview === undefined ? {} : { founderReview }),
       ...(mandateReview === undefined ? {} : { mandateReview }),
       ...(presenceResearch === undefined ? {} : { presenceResearch }),

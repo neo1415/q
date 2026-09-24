@@ -176,7 +176,7 @@ test.describe("founder onboarding (desktop, real API)", () => {
       }),
     ).toBeVisible();
     await expect(page.getByText(name).first()).toBeVisible();
-    await expect(page.getByText("Raising USD 500000")).toBeVisible();
+    await expect(page.getByText("Raising USD 500,000")).toBeVisible();
     await expect(page.getByText("2 founders, 2 full-time")).toBeVisible();
     await expect(page.getByText(/onboarding complete/i)).toHaveCount(0);
     await expect(

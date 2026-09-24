@@ -142,6 +142,42 @@ target's expiry is the provider's (a vendor 404 on sync becomes `EXPIRED`
 where the lifecycle allows it), and signed playback derives from
 `playback_policy` at reservation time.
 
+## The publish path (CQ-MEDIA-013)
+
+Two authorities, two axes, never one switch. Discoverability itself is
+unchanged: a pitch reaches the feed item and `CompanyDto.pitch` only when it
+is `READY` **and** moderation `ALLOWED` **and** policy not `PRIVATE` **and** the
+company is network-visible.
+
+| Authority             | Decision                                                              | How                                                                                                                                                              | Records                                                                                                                                   |
+| --------------------- | --------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| Founder (commercial)  | May investors be granted playback? `AUTHORISED`/`PRIVATE`, reversible | `POST …/pitch/:mediaAssetId/playback-policy` `{ playbackPolicy, expectedVersion }` → owner + `media.manage`, version-checked, idempotent. PUBLIC is not offered. | audit `media.asset.playback_policy_set` (human); event `media.asset.playback_policy_changed` v1                                           |
+| Capital Q (integrity) | Is it allowed on the platform?                                        | Automated rule on `media.asset.status_changed → READY`, consumed by the workers' domain-events handler; also invocable by hand through the same use case.        | audit `media.asset.moderated` (actor `capital_q_system`, provenance `AUTOMATED_RULE_V1`, `ruleVersion`); event `media.asset.moderated` v1 |
+
+**The rule** is one versioned object, `AUTOMATED_MODERATION_RULE_V1`
+(`packages/media/src/domain/moderation.ts`): `version automated-moderation.v1`,
+duration 1–180 s (the product's hard maximum, read from the one place it is
+defined), dimensions 64–8192 px each way, and the provider must have finished
+(`READY`). Everything it clears is `ALLOWED`; anything it cannot clear is
+`PENDING` for a person with the hold reasons recorded. **Automation never
+BLOCKS**: a refusal is a judgement about content and the rule reads none.
+Replay is a no-op (`ALREADY_DECIDED`), and a person's decision is never
+overwritten by the rule. Provenance lives in the audit row and the event; no
+column was added.
+
+**Q action convergence.** `createSetPitchPlaybackPolicy` is the single entry
+point for the founder's decision. A later packet that lets a founder ask Q to
+"publish my pitch" prepares exactly this command through the approval engine
+and calls the same route; nothing else gets a second way in.
+
+**Live on 2026-09-24** (local, through the real UI and API): the READY pitch
+was set `AUTHORISED` from `/pitch`, the company set `network_visible` from the
+Visibility page, moderation applied `ALLOWED` (rule v1), and
+`GET /v1/companies/:id` and `/network-preview` both answered with the pitch.
+The investor slate stayed `NO_DISCOVERABLE_COUNTERPARTS`: marketplace
+readiness needs identity and organisation verification, which no packet
+provides yet, so the slate step is blocked there and was not forced.
+
 ## Not in this packet
 
 Webhook ingestion (CQ-MEDIA-012), captions, the feed player and the founder

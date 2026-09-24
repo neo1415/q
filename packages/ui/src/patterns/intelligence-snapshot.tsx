@@ -32,6 +32,21 @@ export type IntelligenceSnapshotProps = {
   readonly className?: string | undefined;
 };
 
+/**
+ * Provenance is said once per section when every item shares it, and per
+ * item only where it differs or carries a specific locator. Twenty rows of
+ * "You told Q" hid the one row that did not (design/visual-debt.md, F8).
+ */
+function sharedEvidence(
+  items: readonly SnapshotItem[],
+): EvidenceKind | undefined {
+  const first = items[0]?.evidence;
+  if (first === undefined) {
+    return undefined;
+  }
+  return items.every((item) => item.evidence === first) ? first : undefined;
+}
+
 export function IntelligenceSnapshot({
   headline,
   summary,
@@ -55,35 +70,43 @@ export function IntelligenceSnapshot({
         </div>
       </header>
 
-      {sections.map((section) => (
-        <section
-          key={section.id}
-          aria-labelledby={`snapshot-${section.id}`}
-          className="flex flex-col gap-3"
-        >
-          <h3
-            id={`snapshot-${section.id}`}
-            className="cq-title-md text-(--cq-text-primary)"
+      {sections.map((section) => {
+        const shared = sharedEvidence(section.items);
+        return (
+          <section
+            key={section.id}
+            aria-labelledby={`snapshot-${section.id}`}
+            className="flex flex-col gap-3"
           >
-            {section.title}
-          </h3>
-          <ul className="flex flex-col divide-y divide-(--cq-border-subtle) border-y border-(--cq-border-subtle)">
-            {section.items.map((item) => (
-              <li key={item.id} className="flex flex-col gap-1 py-3">
-                <p className="cq-body max-w-(--cq-layout-reading) text-(--cq-text-primary)">
-                  {item.text}
-                </p>
-                {item.evidence !== undefined ? (
-                  <EvidenceStatus
-                    kind={item.evidence}
-                    detail={item.evidenceDetail}
-                  />
-                ) : null}
-              </li>
-            ))}
-          </ul>
-        </section>
-      ))}
+            <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+              <h3
+                id={`snapshot-${section.id}`}
+                className="cq-title-md text-(--cq-text-primary)"
+              >
+                {section.title}
+              </h3>
+              {shared !== undefined ? <EvidenceStatus kind={shared} /> : null}
+            </div>
+            <ul className="flex flex-col divide-y divide-(--cq-border-subtle) border-y border-(--cq-border-subtle)">
+              {section.items.map((item) => (
+                <li key={item.id} className="flex flex-col gap-1 py-3">
+                  <p className="cq-body cq-numeric max-w-(--cq-layout-reading) text-(--cq-text-primary)">
+                    {item.text}
+                  </p>
+                  {item.evidence !== undefined &&
+                  (shared === undefined ||
+                    item.evidenceDetail !== undefined) ? (
+                    <EvidenceStatus
+                      kind={item.evidence}
+                      detail={item.evidenceDetail}
+                    />
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+          </section>
+        );
+      })}
 
       {nextSteps.length > 0 ? (
         <section

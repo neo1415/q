@@ -116,17 +116,19 @@ export function EmptyState({
   ...rest
 }: StateBlockProps) {
   return (
+    // An absence is a sentence and, at most, a way forward -- never a dashed
+    // frame drawn around nothing (design/visual-direction.md, "No dashboards").
     <section
       data-state="empty"
       aria-label={title}
       className={cx(
-        "flex flex-col gap-2 rounded-lg border border-dashed border-(--cq-border) text-(--cq-text-primary)",
-        compact ? "px-4 py-5" : "px-5 py-8",
+        "flex max-w-(--cq-layout-reading) flex-col gap-2 text-(--cq-text-primary)",
+        compact ? "py-3" : "py-4",
         className,
       )}
       {...rest}
     >
-      <h3 className={compact ? "cq-body font-medium" : "cq-title-md"}>
+      <h3 className={compact ? "cq-body font-medium" : "cq-title-sm"}>
         {title}
       </h3>
       {description !== undefined ? (

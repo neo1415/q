@@ -43,36 +43,55 @@ export function NarrativeStep({
     void actions.submit({ kind: "narrative", text: trimmed });
   }
 
+  // F7 with nothing left to ask is one sentence and Continue: an empty
+  // 2000-character box under a notice saying nothing is needed asked the
+  // founder to fill silence (design/visual-debt.md, follow-up step).
+  const nothingNeeded =
+    step.questions !== undefined &&
+    step.questions.length === 0 &&
+    text.length === 0;
+
   return (
     <form id={formId} onSubmit={handleSubmit} className="flex flex-col gap-6">
       <StepHeading title={step.title} prompt={step.prompt} help={step.help} />
-      {step.questions !== undefined ? (
+      {step.questions !== undefined && step.questions.length > 0 ? (
         <FollowUpQuestions
           questions={step.questions}
           busy={busy}
           actions={actions}
         />
       ) : null}
+      {nothingNeeded ? (
+        <p
+          className="cq-body max-w-(--cq-layout-reading) text-(--cq-text-secondary)"
+          data-follow-up-questions={0}
+        >
+          Nothing I still need from you. Everything material is answered or
+          waiting on your review.
+        </p>
+      ) : null}
       {step.skipped && text.length === 0 ? (
         <InlineNotice tone="info">
           Skipped for now. You can add this later.
         </InlineNotice>
       ) : null}
-      <NarrativeInput
-        id={`${step.id}-text`}
-        label={step.prompt ?? step.title}
-        labelHidden
-        placeholder={step.placeholder}
-        value={text}
-        maxLength={step.maxLength}
-        voiceEnabled={step.voiceEnabled}
-        disabled={busy}
-        error={error}
-        onChange={(next) => {
-          setText(next);
-          setError(undefined);
-        }}
-      />
+      {nothingNeeded ? null : (
+        <NarrativeInput
+          id={`${step.id}-text`}
+          label={step.prompt ?? step.title}
+          labelHidden
+          placeholder={step.placeholder}
+          value={text}
+          maxLength={step.maxLength}
+          voiceEnabled={step.voiceEnabled}
+          disabled={busy}
+          error={error}
+          onChange={(next) => {
+            setText(next);
+            setError(undefined);
+          }}
+        />
+      )}
     </form>
   );
 }

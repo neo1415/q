@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useRef, useState, type KeyboardEvent } from "react";
 
 import { Button } from "@capital-q/ui/button";
+import { Check, ICON_SIZE } from "@capital-q/ui/icons";
 
 /**
  * Which side of the table you are on (QX-001 §12; QX-002 §A5).
@@ -109,7 +110,12 @@ export function PersonaCards({
   };
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex max-w-(--cq-layout-narrow) flex-col gap-4">
+      {/*
+        Two compact options, not two wide cards (design/visual-debt.md,
+        Home persona choice). Selection reads three ways: the strong
+        border and accent-soft ground, the check, and the word.
+      */}
       <div
         role="radiogroup"
         aria-label="What are you here to do?"
@@ -140,34 +146,49 @@ export function PersonaCards({
               }}
               data-persona={persona.id}
               className={[
-                "flex flex-col gap-2 rounded-lg border p-5 text-left transition-colors duration-(--cq-motion-fast)",
+                "flex min-h-11 items-start gap-3 rounded-md border px-4 py-3 text-left transition-colors duration-(--cq-motion-fast)",
                 "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--cq-focus-ring)",
                 isSelected
-                  ? "border-(--cq-border-strong) bg-(--cq-surface-raised)"
-                  : "border-(--cq-border-subtle) bg-(--cq-surface) hover:border-(--cq-border)",
+                  ? "border-(--cq-border-strong) bg-(--cq-accent-soft)"
+                  : "border-(--cq-border) bg-(--cq-surface) hover:border-(--cq-border-strong)",
               ].join(" ")}
             >
-              <span className="cq-body font-medium text-(--cq-text-primary)">
-                {persona.lede}
+              <span
+                aria-hidden="true"
+                className={[
+                  "mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full border transition-colors duration-(--cq-motion-fast)",
+                  isSelected
+                    ? "border-(--cq-accent) bg-(--cq-accent) text-(--cq-text-inverse)"
+                    : "border-(--cq-border-strong) bg-(--cq-surface-raised)",
+                ].join(" ")}
+              >
+                {isSelected ? (
+                  <Check size={ICON_SIZE.compact - 2} strokeWidth={3} />
+                ) : null}
               </span>
-              {/* The role name in words as well as by which card is
-                  outlined: selection is never carried by colour alone. */}
-              <span className="cq-label text-(--cq-text-tertiary)">
-                {persona.role}
-                {isSelected ? " · selected" : ""}
-              </span>
-              <span className="cq-body-sm text-(--cq-text-secondary)">
-                {persona.description}
+              <span className="flex min-w-0 flex-col gap-0.5">
+                <span className="cq-body font-medium text-(--cq-text-primary)">
+                  {persona.lede}
+                </span>
+                {/* The role name in words as well as by which option is
+                    marked: selection is never carried by colour alone. */}
+                <span className="cq-body-sm text-(--cq-text-secondary)">
+                  {persona.role} · {persona.description}
+                  {isSelected ? (
+                    <span className="sr-only"> · selected</span>
+                  ) : null}
+                </span>
               </span>
             </button>
           );
         })}
       </div>
       {/* Kept for the person who arrowed to an option and wants a
-          visible thing to press. A click on the card itself already
+          visible thing to press. A click on the option itself already
           goes, so this is a second door rather than the only one. */}
       <div>
         <Button
+          variant="primary"
           onClick={() => {
             go(selected);
           }}

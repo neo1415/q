@@ -12,6 +12,7 @@ import { SignOutButton } from "@/features/auth";
 import {
   PageContainer,
   PageHeader,
+  PageSection,
 } from "@/components/app-shell/page-container";
 
 export const metadata: Metadata = { title: "Profile" };
@@ -56,20 +57,28 @@ export default async function ProfilePage() {
           <ThemeToggle />
         </ProfileRow>
       </dl>
-      <div className="flex flex-col gap-4 pt-5">
-        <div>
-          <Link
-            href="/company/visibility"
-            className={buttonClassName("secondary", "regular")}
-          >
-            Visibility &amp; Discovery
-          </Link>
+      <div className="flex flex-col gap-10 pt-10">
+        <PageSection
+          id="visibility"
+          title="Visibility & Discovery"
+          description="Who can see you on the network, what they see, and the one switch that changes it."
+        >
+          <div>
+            <Link
+              href="/company/visibility"
+              className={buttonClassName("secondary", "regular")}
+            >
+              Manage visibility
+            </Link>
+          </div>
+        </PageSection>
+        <div className="flex flex-col gap-4">
+          <p className="cq-status-line">
+            Verification and organisation membership are managed by Capital Q
+            and appear here once they exist.
+          </p>
+          <SignOutButton />
         </div>
-        <p className="cq-body-sm text-(--cq-text-secondary)">
-          Verification and organisation membership are managed by Capital Q and
-          appear here once they exist.
-        </p>
-        <SignOutButton />
       </div>
     </PageContainer>
   );
@@ -117,9 +126,13 @@ function ProfileRow({
   readonly children: React.ReactNode;
 }) {
   return (
-    <div className="flex flex-col gap-1.5 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-      <dt className="cq-label text-(--cq-text-primary)">{term}</dt>
-      <dd className="cq-body-sm min-w-0">{children}</dd>
+    // Values sit beside their labels, left-aligned, so the list reads as a
+    // profile rather than a settings table (design/visual-debt.md, Profile).
+    <div className="flex flex-col gap-1.5 py-4 sm:flex-row sm:items-start sm:gap-6">
+      <dt className="cq-label shrink-0 text-(--cq-text-primary) sm:w-44 sm:pt-0.5">
+        {term}
+      </dt>
+      <dd className="cq-body-sm min-w-0 flex-1">{children}</dd>
     </div>
   );
 }

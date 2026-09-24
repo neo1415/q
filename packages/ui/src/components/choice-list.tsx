@@ -62,7 +62,14 @@ function ChoiceFrame({
           {description}
         </p>
       ) : null}
-      <div className="flex flex-col gap-2">{children}</div>
+      {/*
+       * Hairline-divided rows, not a stack of cards (doc 18 §4.4;
+       * design/visual-direction.md). The list's own top and bottom rules
+       * frame it; each row is a 44 px control with the mark leading.
+       */}
+      <div className="flex flex-col divide-y divide-(--cq-border-subtle) border-y border-(--cq-border-subtle)">
+        {children}
+      </div>
       {error !== undefined ? (
         <p
           id={`${id}-error`}
@@ -77,10 +84,11 @@ function ChoiceFrame({
 }
 
 const rowClass =
-  "relative flex min-h-14 cursor-pointer items-center gap-3 rounded-md border px-4 py-3 transition-colors duration-(--cq-motion-fast) has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-(--cq-focus-ring)";
-const rowIdle =
-  "border-(--cq-border) bg-(--cq-surface) hover:border-(--cq-border-strong)";
-const rowSelected = "border-(--cq-accent) bg-(--cq-accent-soft)";
+  "relative flex min-h-11 cursor-pointer items-center gap-3 px-3 py-2 transition-colors duration-(--cq-motion-fast) has-focus-visible:outline-2 has-focus-visible:-outline-offset-2 has-focus-visible:outline-(--cq-focus-ring)";
+const rowIdle = "hover:bg-(--cq-surface-subtle)";
+// Selection is the accent-soft ground plus the filled mark; the mark carries
+// the meaning where the ground alone would be colour only.
+const rowSelected = "bg-(--cq-accent-soft)";
 
 function RowText({ option }: { readonly option: ChoiceOption }) {
   return (
@@ -174,8 +182,8 @@ export function ChoiceList({
               onChange={() => onChange(option.value)}
               className="absolute inset-0 size-full cursor-pointer opacity-0"
             />
-            <RowText option={option} />
             <Mark selected={selected} round />
+            <RowText option={option} />
           </label>
         );
       })}
@@ -256,8 +264,8 @@ export function MultiChoiceList({
               onChange={() => toggle(option.value)}
               className="absolute inset-0 size-full cursor-pointer opacity-0"
             />
-            <RowText option={option} />
             <Mark selected={selected} round={false} />
+            <RowText option={option} />
           </label>
         );
       })}

@@ -3,6 +3,7 @@ import type { FastifyInstance } from "fastify";
 
 import { parseApiConfig } from "@capital-q/config/api";
 import {
+  MediaAssetConflictError,
   MediaAssetNotFoundError,
   MediaOwnerNotFoundError,
   MediaProviderError,
@@ -529,6 +530,125 @@ describe("POST /v1/companies/:companyId/pitch/:mediaAssetId/{upload-session,sync
       });
       expect(response.statusCode, suffix).toBe(401);
     }
+    await app.close();
+  });
+});
+
+// The founder's decision (CQ-MEDIA-013). The service is a double; what is
+// proven is the boundary: exactly the two contract fields reach the
+// service, a stale version is 409, a stranger's company is 404, and the
+// answer is the pitch DTO with no provider material.
+describe("POST /v1/companies/:companyId/pitch/:mediaAssetId/playback-policy", () => {
+  const url = `${pitchUrl}/${ASSET_ID}/playback-policy`;
+
+  it("records the owner's decision against the version they saw", async () => {
+    const commands: unknown[] = [];
+    const { service } = fakeService({
+      setPitchPlaybackPolicy: (command: unknown) => {
+        commands.push(command);
+        return Promise.resolve({
+          ...ASSET,
+          status: "READY",
+          playbackPolicy: "AUTHORISED",
+          version: 4,
+        });
+      },
+    });
+    const app = buildApp({ principal: PRINCIPAL, context: CONTEXT, service });
+    const response = await app.inject({
+      method: "POST",
+      url,
+      payload: { playbackPolicy: "AUTHORISED", expectedVersion: 3 },
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.headers["cache-control"]).toBe("no-store");
+    expect(
+      response.json<{ pitch: { playbackPolicy: string; version: number } }>()
+        .pitch,
+    ).toMatchObject({ playbackPolicy: "AUTHORISED", version: 4 });
+    expect(response.payload).not.toContain(PROVIDER_SECRET);
+    expect(commands[0]).toMatchObject({
+      companyId: COMPANY,
+      mediaAssetId: ASSET_ID,
+      playbackPolicy: "AUTHORISED",
+      expectedVersion: 3,
+    });
+    expect(Object.keys(commands[0] as object).sort()).toEqual([
+      "actor",
+      "companyId",
+      "correlationId",
+      "expectedVersion",
+      "mediaAssetId",
+      "playbackPolicy",
+    ]);
+    await app.close();
+  });
+
+  it("refuses PUBLIC, a moderation field, and a missing version", async () => {
+    const { service } = fakeService();
+    const app = buildApp({ principal: PRINCIPAL, context: CONTEXT, service });
+    for (const payload of [
+      { playbackPolicy: "PUBLIC", expectedVersion: 3 },
+      {
+        playbackPolicy: "AUTHORISED",
+        expectedVersion: 3,
+        moderationStatus: "ALLOWED",
+      },
+      { playbackPolicy: "AUTHORISED" },
+      {},
+    ]) {
+      const response = await app.inject({ method: "POST", url, payload });
+      expect(response.statusCode, JSON.stringify(payload)).toBe(422);
+    }
+    await app.close();
+  });
+
+  it("answers 409 for a stale version and 404 for a company that is not the caller's", async () => {
+    const { service: stale } = fakeService({
+      setPitchPlaybackPolicy: () =>
+        Promise.reject(new MediaAssetConflictError()),
+    });
+    const staleApp = buildApp({
+      principal: PRINCIPAL,
+      context: CONTEXT,
+      service: stale,
+    });
+    const conflict = await staleApp.inject({
+      method: "POST",
+      url,
+      payload: { playbackPolicy: "AUTHORISED", expectedVersion: 1 },
+    });
+    expect(conflict.statusCode).toBe(409);
+    expect(conflict.json<{ code: string }>().code).toBe("VERSION_CONFLICT");
+    await staleApp.close();
+
+    const { service: foreign } = fakeService({
+      setPitchPlaybackPolicy: () =>
+        Promise.reject(new MediaOwnerNotFoundError()),
+    });
+    const foreignApp = buildApp({
+      principal: PRINCIPAL,
+      context: CONTEXT,
+      service: foreign,
+    });
+    const notFound = await foreignApp.inject({
+      method: "POST",
+      url,
+      payload: { playbackPolicy: "AUTHORISED", expectedVersion: 1 },
+    });
+    expect(notFound.statusCode).toBe(404);
+    await foreignApp.close();
+  });
+
+  it("refuses without a session", async () => {
+    const { service } = fakeService();
+    const app = buildApp({ principal: null, service });
+    const response = await app.inject({
+      method: "POST",
+      url,
+      payload: { playbackPolicy: "AUTHORISED", expectedVersion: 1 },
+    });
+    expect(response.statusCode).toBe(401);
     await app.close();
   });
 });

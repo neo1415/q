@@ -1,7 +1,7 @@
 import Link from "next/link";
-import type { ReactNode } from "react";
+import type { MouseEvent, ReactNode } from "react";
 
-import { Button, IconButton } from "@capital-q/ui/button";
+import { Button, buttonClassName, IconButton } from "@capital-q/ui/button";
 import { ArrowLeft, ICON_SIZE, ICON_STROKE } from "@capital-q/ui/icons";
 
 import type { SaveStatus } from "../controller";
@@ -13,6 +13,11 @@ import { SaveStatusIndicator } from "./save-status";
  * its own space and respects the safe area and the on-screen keyboard.
  * Desktop centres the same column at reading width. The bottom navigation is
  * deliberately absent; "Save & leave" is the exit, always visible.
+ *
+ * The action bar is part of the reading column, not a full-bleed strip: it
+ * sits directly under the step and only sticks to the bottom of the viewport
+ * while the step is longer than the screen (design/visual-debt.md, form
+ * shell). Continue is the one primary action on the screen.
  */
 export type OnboardingShellProps = {
   /** Changes when the step changes, so the new step animates in. */
@@ -44,6 +49,20 @@ export function OnboardingShell({
   secondaryAction,
   notice,
 }: OnboardingShellProps) {
+  // While a save is in flight the primary keeps its colour and stays in the
+  // tab order; a second press is simply not taken. It is announced as
+  // unavailable rather than dimmed into a pale block, and the status line
+  // beside it says why. Any other busy state (going back, opening a step)
+  // disables it as before.
+  const saving = busy && saveStatus === "saving";
+  const guard = (event: MouseEvent<HTMLButtonElement>) => {
+    if (saving) {
+      event.preventDefault();
+      return;
+    }
+    primaryAction.onClick?.();
+  };
+
   return (
     <div className="flex min-h-dvh flex-col">
       <header className="sticky top-0 z-(--cq-z-sticky) border-b border-(--cq-border-subtle) bg-(--cq-canvas) pt-(--cq-safe-top)">
@@ -63,7 +82,7 @@ export function OnboardingShell({
           <span className="cq-label text-(--cq-text-primary)">Capital Q</span>
           <Link
             href="/home"
-            className="flex min-h-11 items-center rounded-md px-3 cq-label text-(--cq-text-secondary) hover:text-(--cq-text-primary)"
+            className={buttonClassName("quiet", "regular", "px-3")}
           >
             Save &amp; leave
           </Link>
@@ -75,7 +94,7 @@ export function OnboardingShell({
 
       <main
         id="main"
-        className="mx-auto flex w-full max-w-(--cq-layout-reading) flex-1 flex-col gap-6 px-4 pt-6 pb-[calc(96px+var(--cq-safe-bottom))] sm:px-6"
+        className="mx-auto flex w-full max-w-(--cq-layout-reading) flex-col gap-6 px-4 pt-6 pb-6 sm:px-6"
       >
         {notice}
         <div key={stepKey ?? "step"} className="cq-step-enter">
@@ -83,9 +102,9 @@ export function OnboardingShell({
         </div>
       </main>
 
-      <div className="fixed inset-x-0 bottom-0 z-(--cq-z-navigation) border-t border-(--cq-border-subtle) bg-(--cq-surface) pb-(--cq-safe-bottom)">
-        <div className="mx-auto flex w-full max-w-(--cq-layout-reading) items-center gap-3 px-4 py-3 sm:px-6">
-          <div className="flex min-w-0 flex-1 flex-col">
+      <div className="sticky bottom-0 z-(--cq-z-sticky) mx-auto mt-auto w-full max-w-(--cq-layout-reading) bg-(--cq-canvas) px-4 pb-[calc(12px+var(--cq-safe-bottom))] sm:px-6 lg:mt-0">
+        <div className="flex items-center gap-3 border-t border-(--cq-border-subtle) pt-3">
+          <div className="flex min-w-0 flex-1 flex-col gap-1">
             <SaveStatusIndicator status={saveStatus} />
             {secondaryAction !== undefined ? (
               <Button
@@ -102,7 +121,7 @@ export function OnboardingShell({
           {primaryAction.href !== undefined ? (
             <Link
               href={primaryAction.href}
-              className="inline-flex h-12 shrink-0 items-center justify-center rounded-md bg-(--cq-accent) px-5 cq-body font-medium text-(--cq-text-inverse) hover:bg-(--cq-accent-hover)"
+              className={buttonClassName("primary", "large", "shrink-0")}
             >
               {primaryAction.label}
             </Link>
@@ -112,8 +131,10 @@ export function OnboardingShell({
               form={primaryAction.formId}
               variant="primary"
               size="large"
-              onClick={primaryAction.onClick}
-              disabled={busy}
+              onClick={guard}
+              disabled={busy && !saving}
+              aria-disabled={saving ? true : undefined}
+              data-saving={saving ? "" : undefined}
               className="shrink-0"
             >
               {primaryAction.label}

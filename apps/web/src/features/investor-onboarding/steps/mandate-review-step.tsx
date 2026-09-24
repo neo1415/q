@@ -3,8 +3,10 @@
 import { type FormEvent, type ReactNode } from "react";
 
 import type { InvestorReviewContext } from "@capital-q/investor-onboarding/definition";
+import { Badge } from "@capital-q/ui/badge";
 import { Button } from "@capital-q/ui/button";
 import { ContextIndicator } from "@capital-q/ui/context-indicator";
+import { formatAmountForDisplay } from "@capital-q/ui/money-input";
 import { InlineNotice } from "@capital-q/ui/states";
 
 import type { AskedQuestionView, QReadingItem } from "../models/presentation";
@@ -17,10 +19,52 @@ type Row = {
   readonly editStepId: string;
 };
 
-const NONE = <span className="text-(--cq-text-secondary)">Not set</span>;
+// Unset is a quiet fact, not a failure: tertiary, never a warning tone.
+const NONE = <span className="text-(--cq-text-tertiary)">Not set</span>;
 
 function list(items: readonly { readonly label: string }[]): ReactNode {
   return items.length === 0 ? NONE : items.map((item) => item.label).join(", ");
+}
+
+/**
+ * A cheque figure in the compact form an investor says it in: 250k, 1m,
+ * 2.5m. Display only. The exact decimal string is what is stored and what
+ * the edit screen shows; nothing here feeds back into the mandate.
+ */
+function compactAmount(amount: string): string {
+  const [integer = ""] = amount.split(".");
+  const digits = integer.replace(/^0+(?=\d)/, "");
+  const trim = (value: number) => value.toFixed(1).replace(/\.0$/, "");
+  if (digits.length > 6) {
+    return `${trim(Number(digits) / 1_000_000)}m`;
+  }
+  if (digits.length > 3) {
+    return `${trim(Number(digits) / 1_000)}k`;
+  }
+  return formatAmountForDisplay(amount);
+}
+
+function chequeSummary(
+  review: NonNullable<InvestorReviewContext["mandate"]["cheque"]>,
+): string | undefined {
+  const range =
+    review.min !== null && review.max !== null
+      ? `${compactAmount(review.min)}–${compactAmount(review.max)}`
+      : review.min !== null
+        ? `from ${compactAmount(review.min)}`
+        : review.max !== null
+          ? `up to ${compactAmount(review.max)}`
+          : undefined;
+  const typical =
+    review.typical === null
+      ? undefined
+      : `typically ${compactAmount(review.typical)}`;
+  const parts = [range, typical].filter(
+    (part): part is string => part !== undefined,
+  );
+  return parts.length === 0
+    ? undefined
+    : `${review.currency} ${parts.join(", ")}`;
 }
 
 function withStrength(
@@ -62,14 +106,12 @@ function strengthLabel(code: string): string {
 
 function cheque(review: InvestorReviewContext["mandate"]["cheque"]): ReactNode {
   if (review === null) return NONE;
-  const parts = [
-    review.min === null ? undefined : `min ${review.min}`,
-    review.typical === null ? undefined : `typical ${review.typical}`,
-    review.max === null ? undefined : `max ${review.max}`,
-  ].filter((part): part is string => part !== undefined);
-  return parts.length === 0
-    ? NONE
-    : `${review.currency} · ${parts.join(" · ")}`;
+  const summary = chequeSummary(review);
+  return summary === undefined ? (
+    NONE
+  ) : (
+    <span className="cq-numeric">{summary}</span>
+  );
 }
 
 function rows(review: InvestorReviewContext): readonly Row[] {
@@ -253,19 +295,28 @@ export function MandateReviewStep({
                 </Button>
               </div>
             ))}
-          </dl>
-          <section
-            data-review-item="hard_exclusions"
-            aria-labelledby="review-hard-exclusions"
-            className="flex flex-col gap-2 rounded-(--cq-radius-md) border border-(--cq-border-subtle) p-4"
-          >
-            <div className="flex items-start justify-between gap-4">
-              <h2
-                id="review-hard-exclusions"
-                className="cq-label text-(--cq-text-primary)"
-              >
-                Never show me
-              </h2>
+            {/*
+              The one row that is a rule rather than a preference. It sits in
+              the same list as everything else; the badge, not a box, says
+              what kind of thing it is.
+            */}
+            <div
+              data-review-item="hard_exclusions"
+              className="flex items-start justify-between gap-4 py-3"
+            >
+              <div className="flex min-w-0 flex-col gap-1">
+                <dt className="cq-caption flex flex-wrap items-center gap-2 text-(--cq-text-tertiary)">
+                  Never show me
+                  <Badge tone="neutral">Hard exclusion</Badge>
+                </dt>
+                <dd className="cq-body text-(--cq-text-primary)">
+                  {list(review.mandate.hardExclusions)}
+                </dd>
+                <dd className="cq-caption text-(--cq-text-tertiary)">
+                  Not shown in standard discovery, whatever the discovery style.
+                  Different from “rather not see”, which only ranks lower.
+                </dd>
+              </div>
               <Button
                 type="button"
                 variant="quiet"
@@ -276,15 +327,7 @@ export function MandateReviewStep({
                 Change<span className="sr-only"> hard exclusions</span>
               </Button>
             </div>
-            <p className="cq-caption text-(--cq-text-tertiary)">
-              Hard exclusions. Not shown in standard discovery, whatever the
-              discovery style. Different from “rather not see”, which only ranks
-              lower.
-            </p>
-            <p className="cq-body text-(--cq-text-primary)">
-              {list(review.mandate.hardExclusions)}
-            </p>
-          </section>
+          </dl>
           <p
             className="cq-caption text-(--cq-text-tertiary)"
             data-mandate-version

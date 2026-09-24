@@ -97,6 +97,8 @@ export type PitchFlowEvent =
   | { readonly type: "UPLOAD_PROGRESS"; readonly progress: number }
   | { readonly type: "UPLOADED" }
   | { readonly type: "SYNCED"; readonly pitch: MediaAssetDto }
+  /** The record changed outside the upload (a decision was recorded). */
+  | { readonly type: "PITCH_UPDATED"; readonly pitch: MediaAssetDto }
   | {
       readonly type: "REQUEST_FAILED";
       readonly message: string;
@@ -269,6 +271,16 @@ export function pitchFlowReducer(
       });
     }
 
+    case "PITCH_UPDATED":
+      // A decision changed the record while it rests. Re-derive from the
+      // record; a state that is mid-flight keeps its own truth.
+      return state.kind === "READY" ||
+        state.kind === "CREATED" ||
+        state.kind === "FAILED" ||
+        state.kind === "EMPTY"
+        ? fromRecord(event.pitch, { uploadedHere: false, attempt: 0 })
+        : state;
+
     case "REQUEST_FAILED": {
       const pitch =
         state.kind === "PREPARING" ||
@@ -366,12 +378,21 @@ export function describeNetworkStanding(
   if (company.pitch !== null && networkVisible) {
     return { visible: true, sentence: "Investors can now see your pitch." };
   }
+  if (pitch.moderationStatus === "BLOCKED") {
+    return {
+      visible: false,
+      sentence:
+        "This pitch was not allowed on the platform. Replace it with a new video to try again.",
+    };
+  }
   const needed: string[] = [];
-  if (pitch.moderationStatus !== "ALLOWED") {
+  if (pitch.moderationStatus === "PENDING") {
+    needed.push("a review of the video, which is under way");
+  } else if (pitch.moderationStatus !== "ALLOWED") {
     needed.push("a review of the video");
   }
   if (pitch.playbackPolicy === "PRIVATE") {
-    needed.push("playback to be opened beyond your organisation");
+    needed.push("your decision to let investors play it");
   }
   if (!networkVisible) {
     needed.push("your company to be visible to the network");

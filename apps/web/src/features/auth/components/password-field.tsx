@@ -42,7 +42,7 @@ export function PasswordField({
       <div className="flex justify-end">
         <Button
           variant="quiet"
-          size="regular"
+          size="compact"
           aria-pressed={visible}
           aria-controls={id}
           onClick={() => {

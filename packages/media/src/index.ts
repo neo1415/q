@@ -69,6 +69,25 @@ export type {
   PitchViewerAccessPort,
 } from "./application/ports.js";
 export {
+  AUTOMATED_MODERATION_RULE_V1,
+  evaluateAutomatedModeration,
+  MODERATION_HOLD_REASONS,
+  type AutomatedModerationRule,
+  type ModerationHoldReason,
+  type ModerationVerdict,
+} from "./domain/moderation.js";
+export {
+  createApplyAutomatedModeration,
+  createPostgresAutomatedModeration,
+  createSetPitchPlaybackPolicy,
+  OwnerPlaybackPolicySchema,
+  type ApplyAutomatedModerationCommand,
+  type AutomatedModerationDependencies,
+  type AutomatedModerationResult,
+  type OwnerPlaybackPolicy,
+  type SetPitchPlaybackPolicyCommand,
+} from "./application/publish-use-cases.js";
+export {
   aspectRatioOf,
   type AuthorisePlaybackQuery,
   type CreateUploadSessionCommand,

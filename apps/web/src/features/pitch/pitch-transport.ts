@@ -4,6 +4,7 @@ import {
   createPitchUploadSession,
   getCompany,
   getCompanyPitch,
+  setPitchPlaybackPolicy,
   syncPitch,
   type ApiSession,
 } from "@capital-q/api-client";
@@ -53,6 +54,13 @@ export type PitchTransport = {
     companyId: string,
     mediaAssetId: string,
   ) => Promise<PlaybackAuthorizationDto>;
+  /** `POST …/playback-policy` — the founder's decision on investor playback. */
+  readonly setPlaybackPolicy: (
+    companyId: string,
+    mediaAssetId: string,
+    playbackPolicy: "AUTHORISED" | "PRIVATE",
+    expectedVersion: number,
+  ) => Promise<MediaAssetDto>;
 };
 
 export function apiPitchTransport(session: ApiSession): PitchTransport {
@@ -78,5 +86,17 @@ export function apiPitchTransport(session: ApiSession): PitchTransport {
       (await syncPitch(session, companyId, mediaAssetId)).pitch,
     authorise: (companyId, mediaAssetId) =>
       authorisePitchPlayback(session, companyId, mediaAssetId),
+    setPlaybackPolicy: async (
+      companyId,
+      mediaAssetId,
+      playbackPolicy,
+      expectedVersion,
+    ) =>
+      (
+        await setPitchPlaybackPolicy(session, companyId, mediaAssetId, {
+          playbackPolicy,
+          expectedVersion,
+        })
+      ).pitch,
   };
 }
