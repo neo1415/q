@@ -187,6 +187,16 @@ async function sessionFor(email) {
   return (await verified.json()).access_token;
 }
 
+/** A body that is not JSON is still an answer: the caller reads the status. */
+function parseJson(text) {
+  if (text.length === 0) return null;
+  try {
+    return JSON.parse(text);
+  } catch {
+    return null;
+  }
+}
+
 function api(token) {
   return async (method, path, headers = {}) => {
     const response = await fetch(`${API_URL}${path}`, {
@@ -194,13 +204,7 @@ function api(token) {
       headers: { authorization: `Bearer ${token}`, ...headers },
     });
     const text = await response.text();
-    let body = null;
-    try {
-      body = text.length > 0 ? JSON.parse(text) : null;
-    } catch {
-      body = null;
-    }
-    return { status: response.status, body };
+    return { status: response.status, body: parseJson(text) };
   };
 }
 
@@ -246,9 +250,9 @@ async function seed(email) {
     console.log(`           ${email}: no founder company; nothing to verify`);
     return true;
   }
-  if (company.visibility !== "network_visible") {
+  if (company.marketplaceVisibility !== "network_visible") {
     console.log(
-      `           ${email}: company ${company.id} is ${company.visibility}; visibility is the founder's choice, so no request`,
+      `           ${email}: company ${company.id} is ${company.marketplaceVisibility}; visibility is the founder's choice, so no request`,
     );
     return true;
   }
