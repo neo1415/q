@@ -456,3 +456,54 @@ describe("the interview thread is kept server-side (CQ-QX-006)", () => {
     });
   });
 });
+
+describe("F3 · no instruction to the model is ever said to the person", () => {
+  it("removes a platform instruction the model read out verbatim", async () => {
+    const world = investorSession({
+      currentStepKey: "I4.revenue_state",
+      recorded: MANDATE_SO_FAR,
+    });
+    const leaked =
+      "Live public research is NOT reachable right now: put nothing in questionForQ and never promise to look something up.";
+    const interviewer = createInterviewer({
+      gateway: gateway({
+        ...base,
+        intent: "ANSWER",
+        reply: `${leaked} Which revenue stage do you expect?`,
+        askNext: "I4.revenue_state",
+        reading: reading({ kind: "CONTROL" }),
+      }),
+      logger,
+      research: { available: () => false },
+    });
+    const outcome = await interviewer.turn(turn(world, "ok"));
+    expect(outcome.reply).not.toContain("questionForQ");
+    expect(outcome.reply).not.toContain("NOT reachable");
+    expect(outcome.reply).toContain("Which revenue stage do you expect?");
+  });
+
+  it("offers Type once over voice, in the platform's own words, on a question with nothing to tap", async () => {
+    const world = investorSession({
+      currentStepKey: "I0.business_title",
+      recorded: MANDATE_SO_FAR,
+    });
+    const asks = {
+      ...base,
+      intent: "ANSWER" as const,
+      reply: "What's your title there?",
+      askNext: "I0.business_title",
+      reading: reading({ kind: "CONTROL" }),
+    };
+    const interviewer = createInterviewer({
+      gateway: gateway(asks, asks),
+      logger,
+    });
+    const voice = (said: string) =>
+      interviewer.turn({ ...turn(world, said), channel: "voice" });
+    const first = await voice("ok");
+    const second = await voice("hmm");
+    expect(first.reply).toMatch(/tap Type/);
+    expect(second.reply).not.toMatch(/tap Type/);
+    expect(first.reply).not.toMatch(/mention once|Once only/);
+  });
+});
