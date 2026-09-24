@@ -58,3 +58,26 @@ export const PLAIN_DELIVERY: SpeechDelivery = {
   pace: "NORMAL",
   emphasis: [],
 };
+
+/**
+ * One cue, for a prompt with no room for the whole delivery object.
+ *
+ * The interview conductor runs inside a small model's ~8,000-token
+ * request, and its rendered worst case was already within a few dozen
+ * tokens of that before delivery existed. The full object's JSON Schema
+ * alone is about 175 tokens. So the conductor asks for at most one cue,
+ * the one that matters most in a spoken reply: a reaction that opens it,
+ * or a thinking pause after its first sentence. It maps onto the same
+ * delivery the speech layer renders.
+ */
+export const SPEECH_CUES = ["LAUGH", "CHUCKLE", "SIGH", "PAUSE"] as const;
+export type SpeechCue = (typeof SPEECH_CUES)[number];
+export const SpeechCueSchema = z.enum(SPEECH_CUES);
+
+export function deliveryFromCue(
+  cue: SpeechCue | null | undefined,
+): SpeechDelivery {
+  if (cue === null || cue === undefined) return PLAIN_DELIVERY;
+  if (cue === "PAUSE") return { ...PLAIN_DELIVERY, pauseAfter: [0] };
+  return { ...PLAIN_DELIVERY, reaction: cue, reactionAt: 0 };
+}

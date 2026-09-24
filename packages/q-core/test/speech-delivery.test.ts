@@ -1,9 +1,32 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  deliveryFromCue,
   PLAIN_DELIVERY,
+  SpeechCueSchema,
   SpeechDeliverySchema,
 } from "../src/speech/delivery.js";
+
+describe("one cue, for a prompt with no room for more", () => {
+  it("opens the reply with a reaction, or pauses after its first sentence", () => {
+    expect(deliveryFromCue("SIGH")).toEqual({
+      ...PLAIN_DELIVERY,
+      reaction: "SIGH",
+      reactionAt: 0,
+    });
+    expect(deliveryFromCue("PAUSE")).toEqual({
+      ...PLAIN_DELIVERY,
+      pauseAfter: [0],
+    });
+    expect(deliveryFromCue(null)).toEqual(PLAIN_DELIVERY);
+  });
+
+  it("is a closed vocabulary: no tag, no free text", () => {
+    for (const bad of ["[laughs]", "laughs", "WHISPER", ""]) {
+      expect(SpeechCueSchema.safeParse(bad).success).toBe(false);
+    }
+  });
+});
 
 /**
  * The delivery a model may ask for beside its reply (CQ-VOICE-010): a
