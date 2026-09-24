@@ -1406,6 +1406,8 @@ export function createQActionService(
           let report: Awaited<ReturnType<typeof definition.executor.execute>>;
           try {
             report = await definition.executor.execute(approved, {
+              // Verified above: the approver, re-authorised just now.
+              approver: actor,
               correlationId,
               attempt: claimed.executionAttempts,
               signal: context.signal,

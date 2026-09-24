@@ -16,11 +16,7 @@ import {
 } from "@capital-q/companies";
 import type { Logger } from "@capital-q/observability";
 import { defineQAction, type AnyQActionDefinition } from "@capital-q/q-actions";
-import {
-  ActorContextSchema,
-  capability,
-  type AuthorizationService,
-} from "@capital-q/security";
+import { capability, type AuthorizationService } from "@capital-q/security";
 
 /**
  * Who can see the company, changed by Q (CQ-QACT-001, acceptance F6).
@@ -155,16 +151,10 @@ export function createCompanyVisibilitySetAction(dependencies: {
       },
       executor: {
         execute: async (action, context) => {
-          // The approver's own authority, reconstructed from what the
-          // approval recorded; the companies context checks it again.
-          const actor = ActorContextSchema.parse({
-            userId: action.approvedByUserId,
-            tenantId: action.tenantId,
-            ...(action.organisationId === null
-              ? {}
-              : { organisationId: action.organisationId }),
-            actorType: "HUMAN",
-          });
+          // The approver's own authority, as the gate just verified it —
+          // membership included, which roles hang on; the companies
+          // context checks it again.
+          const actor = context.approver;
           const companyId = CompanyIdSchema.parse(action.payload.companyId);
           try {
             const current = await service.getCompany({ actor, companyId });

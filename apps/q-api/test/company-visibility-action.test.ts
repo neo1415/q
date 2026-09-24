@@ -162,7 +162,7 @@ describe("company.visibility.set", () => {
         approvalId: "22222222-2222-4222-8222-222222222222",
         approvedByUserId: USER,
       } as never,
-      { correlationId: "cor_test", attempt: 1 },
+      { approver: OWNER, correlationId: "cor_test", attempt: 1 },
     );
     expect(report).toEqual({
       outcome: "EXECUTED",
@@ -177,7 +177,8 @@ describe("company.visibility.set", () => {
       actor: ActorContext;
       input: Record<string, unknown>;
     };
-    expect(command.actor.userId).toBe(USER);
+    // The gate-verified approver itself, membership included.
+    expect(command.actor).toBe(OWNER);
     expect(command.input).toEqual({
       visibility: "network_visible",
       expectedVersion: 4,
