@@ -141,10 +141,35 @@ function invalid(path: string, code: string, message: string): never {
   throw new ContractValidationError(message, [{ path, code, message }]);
 }
 
-/** "example.com" is what founders type; the canonical field is an http(s) URL. */
+/**
+ * "example.com" is what founders type; the canonical field is an http(s)
+ * URL of a public host.
+ *
+ * A host with no dot is not a website anybody can visit. "we're still on
+ * instagram" became `https://instagram` on the canonical company record,
+ * which investors would then see as the company's website
+ * (CQ-ACCEPT-001). It is refused, the same way any other invalid value is,
+ * so the step stays open and Q says it did not go in.
+ */
 export function normaliseWebsite(raw: string): string {
   const trimmed = raw.trim();
-  return /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+  const url = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+  let host: string;
+  try {
+    host = new URL(url).hostname;
+  } catch {
+    invalid("value.text", "website_invalid", "That isn't a web address.");
+  }
+  const labels = host.split(".");
+  const tld = labels.at(-1) ?? "";
+  if (
+    labels.length < 2 ||
+    labels.some((l) => l.length === 0) ||
+    tld.length < 2
+  ) {
+    invalid("value.text", "website_invalid", "That isn't a web address.");
+  }
+  return url;
 }
 
 async function updateCompanyIfChanged(

@@ -3,6 +3,8 @@ import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
 
+import { ContractValidationError } from "@capital-q/contracts";
+
 import {
   hashOnboardingRequest,
   referencedStepKeys,
@@ -251,6 +253,19 @@ describe("Founder canonical mappings", () => {
     );
     expect(normaliseWebsite("  HTTPS://Example.com ")).toBe(
       "HTTPS://Example.com",
+    );
+  });
+
+  it("refuses words that are not a public host (CQ-ACCEPT-001)", () => {
+    // "we're still on instagram" once became https://instagram on the
+    // canonical record.
+    for (const said of ["instagram", "no website yet", "https://intranet"]) {
+      expect(() => normaliseWebsite(said), said).toThrow(
+        ContractValidationError,
+      );
+    }
+    expect(normaliseWebsite("instagram.com/lumenhealth")).toBe(
+      "https://instagram.com/lumenhealth",
     );
   });
 
