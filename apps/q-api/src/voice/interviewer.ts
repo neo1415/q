@@ -1549,8 +1549,13 @@ export function unrestrictedOutcome(
     case "short_text":
     case "long_text":
     case "voice_text":
-    case "confirmation":
     case "document_upload":
+      // "No website yet", "we don't have a deck": for an optional step
+      // that is an honest answer and the journey's skip records it; asking
+      // again would be asking for something they said does not exist
+      // (founder round 2, c). A required one still has to be asked.
+      return step.required ? { kind: "CANNOT" } : { kind: "SET_ASIDE" };
+    case "confirmation":
       return { kind: "CANNOT" };
   }
 }
@@ -2530,6 +2535,8 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
       const unsaved: string[] = [];
       /** What the owning service said when it refused, and what it wants first. */
       const refusals: OnboardingRefusal[] = [];
+      /** Steps whose value this turn the service refused as invalid. */
+      const invalidValues = new Set<string>();
       const commit = async (
         stepKey: string,
         value: OnboardingResponseValue,
@@ -2570,6 +2577,20 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
             { err: error, stepKey, quietly },
             "interview answer was not accepted",
           );
+          /**
+           * Refused as a value the service will never take (founder round
+           * 2, #1: "https://instagrampage" for a website), not as one it
+           * cannot take YET. Such a value is never carried, never read back
+           * as something Q holds, and the step is asked again.
+           */
+          const status = (error as { readonly status?: unknown }).status;
+          if (
+            (status === 400 || status === 422) &&
+            readRefusal(error).needs === null
+          ) {
+            invalidValues.add(stepKey);
+            return false;
+          }
           if (quietly) return false;
           unsaved.push(stepKey);
           dispatch({ type: "FAILED", operation: "WRITE" });
@@ -3394,6 +3415,17 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
           unsaved.splice(index, 1);
         }
       }
+      for (const key of invalidValues) {
+        stopCarrying(input.onboardingSessionId, key);
+        const step = steps.get(key);
+        if (
+          step !== undefined &&
+          !recorded.includes(key) &&
+          !rejected.some((r) => r.stepKey === key)
+        ) {
+          rejected.push(step);
+        }
+      }
 
       // 4. Skips, optional steps only; an upload answered aloud is one.
       //    A skip is a commitment too: only a turn that could answer
@@ -3502,6 +3534,12 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
        * fragment is asked for again as a transcription matter, and never
        * as Q failing to understand.
        */
+      /**
+       * "Ok let's stop here, I'll do the rest tomorrow" (founder round 2,
+       * #3): a pause ends the turn gracefully. No repair, no read-back, no
+       * question — and so no failed repair line left as the heading.
+       */
+      const pausing = result.intent === "PAUSE";
       let repairUsed: RepairStrategy | null = null;
       let repairAsk: string | null = null;
       const repairOn = (
@@ -3599,6 +3637,7 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
         result = { ...result, askNext: step?.stepKey ?? null };
       } else if (
         result.frustrated === true &&
+        !pausing &&
         recorded.length === 0 &&
         stepInHand() !== undefined
       ) {
@@ -3810,7 +3849,8 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
           // sentence that claimed the value, and which of its sentences
           // are true only the runtime knows. What did land is on screen;
           // what did not is said, and asked now, while it is fresh.
-          reply = `I haven't got ${repairLabel(first)} down yet — what you said didn't match anything I can record. ${askWithChoices(first, input)}`;
+          // Never a step label quoted at the person (founder round 2, a).
+          reply = `That didn't fit anything I can record for this one yet, so it isn't down. ${askWithChoices(first, input)}`;
           result = { ...result, askNext: first.stepKey };
         }
       }
@@ -4434,8 +4474,26 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
           settledValue !== undefined
             ? describeValue(settledStep, settledValue, currency).trim()
             : "";
-        const lead =
-          changed.length > 0 ? `I've changed that to ${changed}.` : "";
+        // What changed, named by the step and not by echoing its option
+        // label back ("I've changed that to I'm preparing to raise.") —
+        // and anything they said that no step holds, acknowledged as kept
+        // beside the nearest one (founder round 2, b: "we're in Abuja now").
+        const kept = reading.qualitative
+          .map((item) => {
+            const step = steps.get(item.target);
+            return step === undefined
+              ? null
+              : `I've kept "${item.meaning.slice(0, 120)}" as a note on your ${askLabel(step).toLowerCase()}.`;
+          })
+          .filter((line): line is string => line !== null);
+        const lead = [
+          changed.length > 0 && settledStep !== undefined
+            ? `I've updated your ${askLabel(settledStep).toLowerCase()}.`
+            : "",
+          ...kept,
+        ]
+          .filter((part) => part.length > 0)
+          .join(" ");
         reply =
           next === undefined
             ? lead.length > 0
@@ -4547,6 +4605,11 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
             );
           }
         }
+      }
+      if (pausing) {
+        repairAsk = null;
+        result = { ...result, askNext: null };
+        reply = result.reply.trim().length > 0 ? result.reply : reply;
       }
       /**
        * Never a raw step label as Q's line (adversarial round 1, #8).

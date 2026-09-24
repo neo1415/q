@@ -3,7 +3,12 @@ import { describe, expect, it } from "vitest";
 import { createLogger } from "@capital-q/observability";
 import type { ConversationTurnReading } from "@capital-q/q-core";
 
-import { createInterviewer } from "../src/voice/interviewer.js";
+import { FOUNDER_DEFINITION_V2 } from "@capital-q/founder-onboarding";
+
+import {
+  createInterviewer,
+  unrestrictedOutcome,
+} from "../src/voice/interviewer.js";
 
 import {
   base,
@@ -251,7 +256,7 @@ describe("ACC d · Q never states a value as recorded when the write did not hap
     );
     expect(outcome.recorded).toEqual(["I4.revenue_state"]);
     expect(outcome.reply).not.toMatch(/got it/i);
-    expect(outcome.reply).toMatch(/haven't got .* down yet/i);
+    expect(outcome.reply).toMatch(/didn't fit anything I can record/i);
     expect(outcome.asking?.stepKey).toBe("I3.sectors_avoid");
   });
 });
@@ -703,5 +708,78 @@ describe("round 2 #3 · a person-requested finish with something required open",
     expect(outcome.navigate).toBeNull();
     expect(outcome.reply).toMatch(/^Before I take you there/);
     expect(outcome.asking).not.toBeNull();
+  });
+});
+
+describe("founder round 2", () => {
+  it("(c) sets aside an optional step they do not have, instead of asking again", () => {
+    const website = FOUNDER_DEFINITION_V2.steps.find(
+      (step) => step.stepKey === "F1.website",
+    );
+    expect(website).toBeDefined();
+    if (website === undefined) return;
+    expect(website.required).toBe(false);
+    expect(unrestrictedOutcome(website)).toEqual({ kind: "SET_ASIDE" });
+  });
+
+  it("(#3) a pause ends the turn: nothing asked, nothing repaired", async () => {
+    const world = investorSession({
+      currentStepKey: "I4.revenue_state",
+      recorded: MANDATE_SO_FAR,
+    });
+    const interviewer = createInterviewer({
+      gateway: gateway({
+        ...base,
+        intent: "PAUSE",
+        reply:
+          "Of course. Everything so far is saved; pick it up whenever you like.",
+        askNext: "I4.revenue_state",
+        frustrated: true,
+        reading: reading({ kind: "CONTROL" }),
+      }),
+      logger,
+    });
+    const outcome = await interviewer.turn(
+      turn(world, "ok let's stop here, I'll do the rest tomorrow"),
+    );
+    expect(outcome.asking).toBeNull();
+    expect(outcome.reply).toMatch(/^Of course\./);
+    expect(outcome.trace?.repair).toBeNull();
+  });
+
+  it("(b) acknowledges a detail no step holds as kept, and names the change by its step", async () => {
+    const world = investorSession({
+      currentStepKey: "I1.deployment_status",
+      recorded: { "I0.investor_type": "vc" },
+    });
+    const interviewer = createInterviewer({
+      gateway: gateway({
+        ...base,
+        intent: "CORRECTION",
+        reply: "I've changed that to Angel investor.",
+        answers: [
+          {
+            stepKey: "I0.investor_type",
+            value: "angel",
+            confidence: "HIGH",
+            clarity: "SETTLED",
+          },
+        ],
+        askNext: "I0.investor_type",
+        reading: reading({
+          kind: "CORRECTION",
+          qualitative: [
+            { target: "I0.investor_type", meaning: "based in Abuja now" },
+          ],
+        }),
+      }),
+      logger,
+    });
+    const outcome = await interviewer.turn(
+      turn(world, "actually I'm an angel, and we're based in Abuja now"),
+    );
+    expect(outcome.reply).toMatch(/^I've updated your /);
+    expect(outcome.reply).toContain(`I've kept "based in Abuja now" as a note`);
+    expect(outcome.reply).not.toMatch(/changed that to Angel investor/);
   });
 });

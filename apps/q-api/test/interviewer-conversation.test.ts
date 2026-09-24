@@ -348,7 +348,8 @@ describe("a correction after a misinterpretation reaches the record", () => {
     );
     expect(outcome.recorded).toEqual(["I0.investor_type"]);
     expect(outcome.asking?.stepKey).not.toBe("I0.investor_type");
-    expect(outcome.reply).toMatch(/^I've changed that to Angel investor\./);
+    // What changed, by the step's name — not its option label read back.
+    expect(outcome.reply).toMatch(/^I've updated your /);
     expect(outcome.reply).not.toMatch(/individual angel/);
   });
 
