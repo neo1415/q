@@ -621,6 +621,17 @@ describe("degraded and empty states", () => {
 
     render(<InvestorFeedScreen />);
 
-    expect(await screen.findByText(/no active mandate yet/i)).toBeTruthy();
+    expect(await screen.findByText(/mandate isn't active yet/i)).toBeTruthy();
+    // The way forward, not a claim about the market (CQ-ACCEPT-001).
+    expect(
+      screen
+        .getByRole("link", { name: "Finish my mandate" })
+        .getAttribute("href"),
+    ).toBe("/onboarding/investor");
+    expect(screen.queryByText(/founders choose to be discoverable/i)).toBe(
+      null,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Ask Q" }));
+    expect(setOpen).toHaveBeenCalledWith(true);
   });
 });
