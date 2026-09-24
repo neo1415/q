@@ -253,7 +253,9 @@ export function promptFor(
           control: "taxonomy",
           chips: [],
           maxSelections: presentation.maxItems,
-          placeholder: "Or describe the company in your own words",
+          // Journey-neutral: an investor choosing sectors has no company
+          // to describe (adversarial round 1, #7).
+          placeholder: "Or say it in your own words",
         };
       }
       if (candidates.length > 0) {
