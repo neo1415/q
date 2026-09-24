@@ -22,6 +22,7 @@ import {
   NOTHING_REMEMBERED,
   type CompanyIntelligenceDimension,
   type PromptRegistry,
+  citeAuthorisedFacts,
   citePublicSources,
 } from "@capital-q/q-core";
 import {
@@ -778,9 +779,14 @@ export function createCompanyIntelligenceSpecialist(
         findings = [...computed, ...validation.accepted];
         rejectedFindingCount = validation.rejectedFindings;
         rejectedCitationCount = validation.rejectedCitations;
-        synthesis = citePublicSources(
-          analyst.answer,
-          researchRead?.sources ?? [],
+        // Public sources by their presentation; Capital Q's own fact
+        // labels (F3) by the source they stand for, or not at all (H3b).
+        synthesis = citeAuthorisedFacts(
+          citePublicSources(analyst.answer, researchRead?.sources ?? []),
+          assembled.facts.map((labelled) => ({
+            ref: labelled.label,
+            source: labelled.fact.source,
+          })),
         );
         metrics.rejectedFindings.add(validation.rejectedFindings);
         metrics.rejectedCitations.add(validation.rejectedCitations);

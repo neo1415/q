@@ -110,3 +110,59 @@ export function citePublicSources(
     },
   );
 }
+
+/** The part of an authorised fact a citation needs. */
+export type CitableFact = {
+  readonly ref?: string | undefined;
+  readonly source?: string | undefined;
+};
+
+function escapeForPattern(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/**
+ * Capital Q's own fact labels never reach a person (CQ-QX-005, H3b).
+ *
+ * Authorised facts are shown to the model under per-render labels — F1,
+ * F2 — so its findings can cite them. A small model also writes them into
+ * its prose ("GMV was $412k (F3)"), and a label is machinery: it means
+ * nothing to the person and is not a source. Only the labels issued for
+ * THIS render are rewritten — into the fact's coarse source description
+ * where it has one ("your one-pager"), otherwise removed — so nothing the
+ * person or a document said is touched.
+ */
+export function citeAuthorisedFacts(
+  text: string,
+  facts: readonly CitableFact[],
+): string {
+  const byRef = new Map<string, CitableFact>();
+  for (const fact of facts) {
+    if (fact.ref !== undefined) byRef.set(fact.ref, fact);
+  }
+  if (byRef.size === 0) return text;
+  const refs = [...byRef.keys()]
+    .sort((a, b) => b.length - a.length)
+    .map(escapeForPattern)
+    .join("|");
+  const sourcesIn = (matched: string): string[] => {
+    const found = [...matched.matchAll(new RegExp(`\\b(${refs})\\b`, "g"))]
+      .map((m) => byRef.get(m[1] ?? "")?.source)
+      .filter((source): source is string => source !== undefined);
+    return [...new Set(found)];
+  };
+  const grouped = new RegExp(
+    `\\s*[\\[(]\\s*(?:facts?\\s+)?(?:${refs})(?:\\s*(?:,|;|&|and)\\s*(?:${refs}))*\\s*[\\])]`,
+    "g",
+  );
+  const bare = new RegExp(`\\b(?:facts?\\s+)?(?:${refs})\\b`, "g");
+  return text
+    .replace(grouped, (matched) => {
+      const sources = sourcesIn(matched);
+      return sources.length === 0 ? "" : ` (${sources.join("; ")})`;
+    })
+    .replace(bare, (matched) => sourcesIn(matched)[0] ?? "")
+    .replace(/[ \t]{2,}/g, " ")
+    .replace(/[ \t]+([.,;:!?])/g, "$1")
+    .trim();
+}
