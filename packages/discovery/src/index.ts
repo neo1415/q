@@ -639,7 +639,11 @@ export type {
   InteractionRepository,
   NewInteractionEvent,
 } from "./interactions/ports.js";
-export { createPostgresInteractionRepository } from "./infrastructure/postgres-interaction-repository.js";
+export {
+  createPostgresInteractionRepository,
+  createPostgresInvestorDecisionReader,
+  type InvestorCompanyDecision,
+} from "./infrastructure/postgres-interaction-repository.js";
 
 export {
   createCurrentSlateExplanationService,
