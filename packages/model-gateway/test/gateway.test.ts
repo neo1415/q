@@ -366,8 +366,11 @@ describe("reliability", () => {
     expect(waits).toEqual([]);
   });
 
-  it("bounds a hung provider by the attempt timeout, retries, then falls back", async () => {
-    const { gateway } = build({
+  // CQ-VOICE-010: a timed-out model was asked a second time before the
+  // waiting fallback. That second wait was the 24-second turn in the
+  // hosted ledger.
+  it("bounds a hung provider by the attempt timeout and moves to the waiting model rather than waiting on it twice", async () => {
+    const { gateway, alpha } = build({
       alpha: [{ kind: "HANG" }, { kind: "HANG" }],
     });
     const result = await gateway.execute(
@@ -381,12 +384,69 @@ describe("reliability", () => {
       }),
     );
     expect(result.providerCode).toBe("beta");
+    expect(alpha.calls).toHaveLength(1);
     expect(result.attempts.map((a) => a.outcome)).toEqual([
-      "TIMEOUT",
       "TIMEOUT",
       "SUCCESS",
     ]);
   }, 10_000);
+
+  it("still retries a timed-out model when it is the only one there is", async () => {
+    const alpha = createFakeModelProvider({
+      code: "alpha",
+      script: [{ kind: "HANG" }, { kind: "TEXT", text: "alpha, second time" }],
+    });
+    const { gateway } = build({ providers: [alpha] });
+    const result = await gateway.execute(
+      request({
+        budget: {
+          maxAttempts: 3,
+          maxEstimatedCostUsd: 0.5,
+          maxOutputTokens: 256,
+          attemptTimeoutMs: 1_000,
+        },
+      }),
+    );
+    expect(result.attempts.map((a) => a.outcome)).toEqual([
+      "TIMEOUT",
+      "SUCCESS",
+    ]);
+  }, 10_000);
+
+  it("holds the first model to the caller's shorter patience when another waits behind it", async () => {
+    const { gateway, alpha } = build({ alpha: [{ kind: "HANG" }] });
+    const started = Date.now();
+    const result = await gateway.execute(
+      request({
+        budget: {
+          maxAttempts: 4,
+          maxEstimatedCostUsd: 0.5,
+          maxOutputTokens: 256,
+          attemptTimeoutMs: 8_000,
+        },
+      }),
+      { firstAttemptTimeoutMs: 80 },
+    );
+    expect(Date.now() - started).toBeLessThan(2_000);
+    expect(result.providerCode).toBe("beta");
+    expect(alpha.calls).toHaveLength(1);
+    expect(result.attempts.map((a) => a.outcome)).toEqual([
+      "TIMEOUT",
+      "SUCCESS",
+    ]);
+  }, 10_000);
+
+  it("gives the last model standing its whole attempt budget, whatever the caller's first patience", async () => {
+    const alpha = createFakeModelProvider({
+      code: "alpha",
+      script: [{ kind: "TEXT", text: "slow but sure", delayMs: 150 }],
+    });
+    const { gateway } = build({ providers: [alpha] });
+    const result = await gateway.execute(request(), {
+      firstAttemptTimeoutMs: 20,
+    });
+    expect(result.attempts.map((a) => a.outcome)).toEqual(["SUCCESS"]);
+  });
 
   it("does not retry an authentication failure on the same provider but may fall back", async () => {
     const { gateway, alpha } = build({
