@@ -67,7 +67,7 @@ const KEY: SlateKey = {
 
 const VERSIONS = {
   eligibilityPolicyVersion: "eligibility.v2" as const,
-  structuredGeneratorVersion: "structured-mandate.v3" as const,
+  structuredGeneratorVersion: "structured-mandate.v4" as const,
   semanticGeneratorVersion: "semantic-mandate.v1" as const,
   featureSchemaVersion: FEATURE_SCHEMA_VERSION,
   rankerVersion: RANKER_VERSION,
@@ -100,7 +100,7 @@ async function publish(
       featureSnapshotFingerprint: "a".repeat(64),
       candidateProvenance: {
         structured: {
-          generatorVersion: "structured-mandate.v3",
+          generatorVersion: "structured-mandate.v4",
           reasonCodes: ["STAGE_OVERLAP"],
         },
         semantic: null,
@@ -486,7 +486,7 @@ describe("slate reader (CQ-REC-006)", () => {
     const none = await h.reader.pageCompanies({ actor });
     expect(none).toEqual({
       slateId: null,
-      rankingVersion: "ranking-config.v2",
+      rankingVersion: "ranking-config.v3",
       items: [],
       notes: ["RECOMMENDATIONS_REFRESHING"],
       nextCursor: null,

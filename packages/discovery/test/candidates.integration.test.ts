@@ -514,7 +514,7 @@ describe("@capital-q/discovery structured candidates against local PostgreSQL", 
         "GEOGRAPHY_REGION_OVERLAP",
       ]);
       for (const c of r.candidates) {
-        expect(c.provenance.generatorVersion).toBe("structured-mandate.v3");
+        expect(c.provenance.generatorVersion).toBe("structured-mandate.v4");
         expect(c.provenance.taxonomyVersion).not.toBeNull();
         expect(c.eligibility.decision).toBe("ELIGIBLE");
       }
@@ -651,6 +651,36 @@ describe("@capital-q/discovery structured candidates against local PostgreSQL", 
       const limited = generatedOf(await w.generate({ limit: 2 }));
       expect(limited.candidates.length).toBeLessThanOrEqual(2);
       expect(limited.diagnostics.truncated).toBe(true);
+    });
+  });
+
+  it("structured-mandate.v4: an ACTIVE mandate declared only as a stage range retrieves by stage (CQ-REC-STAGE-001)", async () => {
+    await withWorld(async (w) => {
+      // "Series A to Series B", and nothing else: no stage constraint, no
+      // country, no taxonomy. Live, this built an EMPTY slate, because the
+      // eligibility adapter dropped min/max before intent was derived.
+      await w.tx
+        .sql`delete from core.investor_mandate_constraints where mandate_id = ${w.mandateId}`;
+      await w.tx
+        .sql`delete from taxonomy.mandate_preferences where mandate_id = ${w.mandateId}`;
+      const nothing = generatedOf(await w.generate());
+      expect(nothing.candidates).toEqual([]);
+
+      await w.tx
+        .sql`update core.investor_mandates set min_stage_code = 'series_a', max_stage_code = 'series_b' where id = ${w.mandateId}`;
+      const r = generatedOf(await w.generate());
+      const labels = labelsOf(w, r);
+      expect(r.diagnostics.rawHitsByDimension.STAGE).toBeGreaterThan(0);
+      expect(labels).toContain("TaxonomyOnly");
+      expect(labels).toContain("RegionOnly");
+      expect(labels).not.toContain("AllThree");
+      expect(labels).not.toContain("StageOnly");
+      for (const candidate of r.candidates) {
+        expect(candidate.provenance.reasonCodes).toEqual(["STAGE_OVERLAP"]);
+        expect(candidate.provenance.generatorVersion).toBe(
+          "structured-mandate.v4",
+        );
+      }
     });
   });
 });

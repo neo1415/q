@@ -93,7 +93,7 @@ const candidate = (n: number): HybridCandidate => ({
   companyId: id(n),
   structured: {
     generatorId: "STRUCTURED_MANDATE",
-    generatorVersion: "structured-mandate.v3",
+    generatorVersion: "structured-mandate.v4",
     matchedDimensions: ["STAGE"],
     reasonCodes: ["STAGE_OVERLAP"],
     matchedNodes: [],
@@ -123,7 +123,7 @@ function pool(
   return {
     kind: "GENERATED",
     poolVersion: "hybrid-candidate-pool.v1",
-    structuredGeneratorVersion: "structured-mandate.v3",
+    structuredGeneratorVersion: "structured-mandate.v4",
     semanticGeneratorVersion: "semantic-mandate.v1",
     eligibilityPolicyVersion: "eligibility.v2",
     context: {
@@ -186,7 +186,7 @@ function rankedCandidate(
     },
     candidateProvenance: {
       structured: {
-        generatorVersion: "structured-mandate.v3",
+        generatorVersion: "structured-mandate.v4",
         reasonCodes: ["STAGE_OVERLAP"],
       },
       semantic: null,
@@ -572,7 +572,7 @@ describe("slate builder (CQ-REC-006)", () => {
       mandateVersion: 1,
       versions: {
         eligibilityPolicyVersion: "eligibility.v2",
-        structuredGeneratorVersion: "structured-mandate.v3",
+        structuredGeneratorVersion: "structured-mandate.v4",
         semanticGeneratorVersion: "semantic-mandate.v1",
         featureSchemaVersion: FEATURE_SCHEMA_VERSION,
         rankerVersion: RANKER_VERSION,
@@ -606,7 +606,7 @@ describe("slate builder (CQ-REC-006)", () => {
     };
     const versions = {
       eligibilityPolicyVersion: "eligibility.v2" as const,
-      structuredGeneratorVersion: "structured-mandate.v3" as const,
+      structuredGeneratorVersion: "structured-mandate.v4" as const,
       semanticGeneratorVersion: "semantic-mandate.v1" as const,
       featureSchemaVersion: FEATURE_SCHEMA_VERSION,
       rankerVersion: RANKER_VERSION,

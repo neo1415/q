@@ -375,7 +375,7 @@ function collectingQueue(): RefreshQueue & {
 
 const VERSIONS = {
   eligibilityPolicyVersion: "eligibility.v2" as const,
-  structuredGeneratorVersion: "structured-mandate.v3" as const,
+  structuredGeneratorVersion: "structured-mandate.v4" as const,
   semanticGeneratorVersion: "semantic-mandate.v1" as const,
   featureSchemaVersion: FEATURE_SCHEMA_VERSION,
   rankerVersion: RANKER_VERSION,
@@ -407,7 +407,7 @@ async function publishedSlate(
       featureSnapshotFingerprint: "a".repeat(64),
       candidateProvenance: {
         structured: {
-          generatorVersion: "structured-mandate.v3",
+          generatorVersion: "structured-mandate.v4",
           reasonCodes: ["STAGE_OVERLAP"],
         },
         semantic: null,

@@ -46,8 +46,16 @@ export const STRUCTURED_GENERATOR_ID = "STRUCTURED_MANDATE" as const;
  * as GEOGRAPHY_OVERLAP, the countries below a region as
  * GEOGRAPHY_REGION_OVERLAP. v2 found a company in a named country only if
  * it carried a geography classification.
+ *
+ * v4 (CQ-REC-STAGE-001): the declared min/max stage range is stage intent
+ * when no stage constraint names the stages. v3 was written to read the
+ * range but never received it, so a mandate declared only as "pre-seed to
+ * Series A" retrieved nothing by stage and built an empty slate. Where a
+ * constraint names the stages it alone is the intent: onboarding's min/max
+ * is the envelope of the chosen stages, and a range would add ones the
+ * investor never chose.
  */
-export const STRUCTURED_GENERATOR_VERSION = "structured-mandate.v3" as const;
+export const STRUCTURED_GENERATOR_VERSION = "structured-mandate.v4" as const;
 
 /**
  * Every version a persisted artifact (a feature snapshot's provenance) may
@@ -57,6 +65,7 @@ export const STRUCTURED_GENERATOR_VERSION = "structured-mandate.v3" as const;
 export const STRUCTURED_GENERATOR_VERSIONS = [
   "structured-mandate.v1",
   "structured-mandate.v2",
+  "structured-mandate.v3",
   STRUCTURED_GENERATOR_VERSION,
 ] as const;
 

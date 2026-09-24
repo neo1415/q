@@ -91,6 +91,14 @@ export function createDomainEligibilityPorts(
       isExclusion: p.isExclusion,
       source: p.source,
     })),
+    // The declared range. Dropped here until CQ-REC-STAGE-001, which is
+    // why a mandate carrying only a min/max stage built an empty slate:
+    // every consumer of the intent was written to read it, and nothing
+    // ever handed it over.
+    stage: {
+      minStageCode: snapshot.stage.minStageCode,
+      maxStageCode: snapshot.stage.maxStageCode,
+    },
   });
 
   return {
