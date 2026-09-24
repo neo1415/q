@@ -175,6 +175,8 @@ const answered: InterviewConductorResult = {
   unrestricted: [],
   frustrated: false,
   reading: null,
+  delivery: null,
+  offered: [],
 };
 
 function turn(fetchFake: typeof fetch, utterance: string) {

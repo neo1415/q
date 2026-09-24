@@ -79,6 +79,16 @@ export const OPTION_SELECTIONS = [
   "EXCLUDE",
   /** "And the second one too": positions added to what they chose before. */
   "ADD",
+  /**
+   * "The second number you said", "go with what you said": a value Q
+   * itself put forward last turn (the result's `offered`), by position.
+   */
+  "OFFERED",
+  /**
+   * "Both full time" after "two founders": the same value as another step
+   * they just answered (`from`), resolved from the record, never guessed.
+   */
+  "VALUE_OF",
 ] as const;
 export const OptionSelectionSchema = z.enum(OPTION_SELECTIONS);
 export type OptionSelection = z.infer<typeof OptionSelectionSchema>;
@@ -89,8 +99,10 @@ export const OptionReferenceSchema = z
     select: OptionSelectionSchema,
     /** For LAST / FIRST: how many. Absent means one. */
     count: z.number().int().min(1).max(60).optional(),
-    /** For ORDINAL / EXCLUDE / ADD: one-based positions in the shown list. */
+    /** For ORDINAL / EXCLUDE / ADD / OFFERED: one-based positions. */
     ordinals: z.array(z.number().int().min(1).max(60)).max(20).optional(),
+    /** For VALUE_OF: the step whose recorded value this one takes. */
+    from: Target.optional(),
   })
   .strict();
 export type OptionReference = z.infer<typeof OptionReferenceSchema>;
