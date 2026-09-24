@@ -1,6 +1,7 @@
 import type { SecurityEventWriter } from "@capital-q/audit";
 import type { DatabaseExecutor, TransactionManager } from "@capital-q/database";
 import type { Logger } from "@capital-q/observability";
+import type { ActorContext } from "@capital-q/security";
 
 import type { QSubjectResolverRegistry } from "../domain/subjects.js";
 import type { QRuntimeRepositories } from "./ports.js";
@@ -26,4 +27,12 @@ export type QRuntimeDependencies = {
   readonly securityEvents?: SecurityEventWriter | undefined;
   /** Identifiers and coded outcomes only; never a message body. */
   readonly logger?: Logger | undefined;
+  /**
+   * The canonical investor organisation of the actor's own organisation,
+   * when it is one (CQ-QX-007). Server-side, from the actor's membership,
+   * never from the request. Absent: no run gains a subject it did not ask
+   * for, which is the behaviour before fit questions were answerable.
+   */
+  readonly ownInvestorOrganisation?:
+    ((actor: ActorContext) => Promise<string | null>) | undefined;
 };

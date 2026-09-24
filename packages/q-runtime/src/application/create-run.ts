@@ -1,5 +1,6 @@
 import {
   CreateQRunRequestSchema,
+  Q_SUBJECTS_MAX,
   QConversationIdSchema,
   type CorrelationId,
   type CreateQRunRequest,
@@ -65,6 +66,62 @@ export type CreateQRunResult = {
  * until an orchestrator exists to pick it up; the response says exactly
  * that. There is no model, no retrieval, no tool and no answer.
  */
+/**
+ * An investor asking about a company carries their own firm as context
+ * (CQ-QX-007).
+ *
+ * "Is this one worth my time given what I invest in?", asked from a
+ * company's page, declared the company alone, so the investor's own
+ * mandate was never a candidate and Q answered that it knew nothing of
+ * their thesis. Their own investor organisation is added here, on the
+ * server, from their membership — a subject a client declares is input,
+ * never proof — and only after it resolves in their tenant as belonging
+ * to their own organisation. What it may contribute is still decided per
+ * run by the Context Firewall: owner scopes for their own firm, and
+ * nothing about the company changes, because its task class does not
+ * (q-firewall purpose policy).
+ *
+ * Not added when the turn already names an investor or a relationship:
+ * that question is about those, and it is not this function's to widen.
+ */
+async function withOwnInvestorOrganisation(
+  dependencies: QRuntimeDependencies,
+  actor: ActorContext,
+  refs: readonly QSubjectRef[],
+): Promise<readonly QSubjectRef[]> {
+  const lookup = dependencies.ownInvestorOrganisation;
+  if (
+    lookup === undefined ||
+    actor.organisationId === undefined ||
+    refs.length >= Q_SUBJECTS_MAX ||
+    !refs.some((ref) => ref.kind === "COMPANY") ||
+    refs.some(
+      (ref) =>
+        ref.kind === "INVESTOR_ORGANISATION" || ref.kind === "RELATIONSHIP",
+    ) ||
+    !dependencies.subjects.supports("INVESTOR_ORGANISATION")
+  ) {
+    return refs;
+  }
+  const investorOrganisationId = await lookup(actor);
+  if (investorOrganisationId === null) {
+    return refs;
+  }
+  const ref: QSubjectRef = {
+    kind: "INVESTOR_ORGANISATION",
+    investorOrganisationId,
+  };
+  const resolved = await dependencies.subjects.resolve(actor, ref);
+  if (
+    resolved === null ||
+    resolved.tenantId !== actor.tenantId ||
+    resolved.organisationId !== actor.organisationId
+  ) {
+    return refs;
+  }
+  return [...refs, ref];
+}
+
 export function createCreateQRun(dependencies: QRuntimeDependencies) {
   const { transactions, repositories, subjects } = dependencies;
 
@@ -140,6 +197,8 @@ export function createCreateQRun(dependencies: QRuntimeDependencies) {
       }
       refs = carried;
     }
+
+    refs = await withOwnInvestorOrganisation(dependencies, actor, refs);
 
     const keyHash = hashRunIdempotencyKey(command.idempotencyKey);
     const requestHash = hashCreateQRunRequest(input);
