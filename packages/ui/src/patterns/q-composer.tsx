@@ -59,6 +59,11 @@ export type QComposerProps = {
   /** What is attached or attaching, in the surface's own words. */
   readonly attachments?: readonly string[] | undefined;
   readonly attachAccept?: string | undefined;
+  /**
+   * A question to start from, which the person can edit or clear. Only
+   * ever a draft: nothing is sent until they send it.
+   */
+  readonly initialValue?: string | undefined;
 };
 
 export function QComposer({
@@ -76,10 +81,11 @@ export function QComposer({
   attachLabel = "Attach a document",
   attachments = [],
   attachAccept,
+  initialValue = "",
 }: QComposerProps) {
   const generatedId = useId();
   const inputId = id ?? `q-composer-${generatedId}`;
-  const [value, setValue] = useState("");
+  const [value, setValue] = useState(initialValue);
   const [notice, setNotice] = useState<"unavailable" | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);

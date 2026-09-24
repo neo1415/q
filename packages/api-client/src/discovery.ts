@@ -3,10 +3,12 @@ import {
   DISCOVERY_COMPANY_PASS_PATH,
   DISCOVERY_COMPANY_SAVE_PATH,
   DISCOVERY_COMPANY_UNSAVE_PATH,
+  DISCOVERY_EXPLANATION_PATH,
   DISCOVERY_INVESTORS_PATH,
   DiscoveryCompanySlateDtoSchema,
   DiscoveryInvestorSlateDtoSchema,
   InteractionRecordedDtoSchema,
+  RecommendationExplanationDtoSchema,
   type PassCompanyRequest,
   type SaveCompanyRequest,
 } from "@capital-q/contracts";
@@ -87,6 +89,30 @@ export function unsaveCompany(
     companyPath(DISCOVERY_COMPANY_UNSAVE_PATH, companyId),
     InteractionRecordedDtoSchema,
     { body },
+  );
+}
+
+/**
+ * `GET /v1/discovery/slates/:slateId/companies/:companyId/explanation`
+ * (CQ-REC-007) — why this company is in this investor's slate.
+ *
+ * Served by the Q API, so the session's `baseUrl` is the Q API's. Neither
+ * id is authority: the server answers not-found for a slate the caller's
+ * own investor organisation does not own.
+ */
+export function getRecommendationExplanation(
+  session: ApiSession,
+  slateId: string,
+  companyId: string,
+) {
+  return call(
+    session,
+    "GET",
+    DISCOVERY_EXPLANATION_PATH.replace(
+      ":slateId",
+      encodeURIComponent(slateId),
+    ).replace(":companyId", encodeURIComponent(companyId)),
+    RecommendationExplanationDtoSchema,
   );
 }
 

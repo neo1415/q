@@ -99,6 +99,26 @@ export function readFeedPosition(
   }
 }
 
+/**
+ * The slate the reader was last in, whatever slate is on screen now — for
+ * a company profile opened from the feed, which has no slate of its own to
+ * match against (CQ-WEB-024). Read-only: the profile never moves the
+ * reader's place, so Back still lands on the same card.
+ */
+export function readStoredFeedSlateId(
+  store: FeedPositionStore | null,
+): string | null {
+  if (store === null) return null;
+  try {
+    const raw = store.getItem(STORAGE_KEY);
+    if (raw === null) return null;
+    const parsed: unknown = JSON.parse(raw);
+    return isPosition(parsed) ? parsed.slateId : null;
+  } catch {
+    return null;
+  }
+}
+
 export function writeFeedPosition(
   store: FeedPositionStore | null,
   position: PersistedFeedPosition,

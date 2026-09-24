@@ -45,11 +45,14 @@ export function QSheetConversation({
   subject,
   connected,
   onActivity,
+  seed = null,
 }: {
   readonly subject: QSubject;
   readonly connected: boolean;
   /** What Q is doing, for the presence in the chrome. */
   readonly onActivity?: ((state: QPresenceState) => void) | undefined;
+  /** A draft question to open with; the person edits or sends it. */
+  readonly seed?: string | null | undefined;
 }) {
   const [conversationId, setConversationId] = useState<string | null>(null);
   const companyId = subject.kind === "COMPANY" ? subject.companyId : undefined;
@@ -309,6 +312,9 @@ export function QSheetConversation({
 
       <div className="sticky bottom-0 flex flex-col gap-2 bg-(--cq-surface-raised) pt-2">
         <QComposer
+          // A new draft is a new starting point, not an edit of the last.
+          key={seed ?? ""}
+          {...(seed === null ? {} : { initialValue: seed, autoFocus: true })}
           id="shell-q"
           contextScope={subject.scope}
           contextDetail={subject.kind === "NONE" ? undefined : subject.label}

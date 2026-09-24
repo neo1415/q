@@ -10,6 +10,7 @@ import {
   PageContainer,
   PageHeader,
 } from "@/components/app-shell/page-container";
+import { CompanyDeeperView } from "@/features/company/company-deeper-view";
 import { countryLabel, stageLabel } from "@/features/company/declared-labels";
 import { apiSession } from "@/features/q/context";
 import { QPageSubject } from "@/features/q/q-subject";
@@ -114,6 +115,17 @@ export default async function CompanyPage({
           </span>
         </p>
       )}
+
+      {/*
+        The deeper view (CQ-WEB-024): why it is in the reader's feed, and
+        what is known about it on the three evidence axes. Built from the
+        same projection as everything above; nothing is filtered here.
+      */}
+      <CompanyDeeperView
+        companyId={company.companyId}
+        companyName={company.canonicalName}
+        facts={company.facts}
+      />
     </PageContainer>
   );
 }

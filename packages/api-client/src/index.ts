@@ -164,6 +164,7 @@ export { createSseParser, type SseMessage, type SseParser } from "./sse.js";
 export {
   discoverCompanies,
   discoverInvestors,
+  getRecommendationExplanation,
   passCompany,
   saveCompany,
   unsaveCompany,

@@ -16,6 +16,22 @@ describe("QComposer", () => {
     expect(screen.getByRole("form", { name: "Ask Q" })).toBeTruthy();
   });
 
+  it("opens with a draft the person can still edit, and sends nothing on its own", async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn();
+    render(
+      <QComposer initialValue="Is the stage supported?" onSubmit={onSubmit} />,
+    );
+    const input = screen.getByRole("textbox", { name: "Ask Q" });
+    expect((input as HTMLTextAreaElement).value).toBe(
+      "Is the stage supported?",
+    );
+    expect(onSubmit).not.toHaveBeenCalled();
+    await user.type(input, " Really?");
+    await user.keyboard("{Enter}");
+    expect(onSubmit).toHaveBeenCalledWith("Is the stage supported? Really?");
+  });
+
   it("keeps submit disabled until there is a question", async () => {
     const user = userEvent.setup();
     render(<QComposer />);

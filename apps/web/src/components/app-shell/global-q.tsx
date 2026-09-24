@@ -41,6 +41,9 @@ type GlobalQValue = {
   readonly activity: QPresenceState;
   readonly setActivity: (state: QPresenceState) => void;
   readonly connected: boolean;
+  /** A draft question the sheet opens with; null for an empty composer. */
+  readonly seed: string | null;
+  readonly askAbout: (seed: string) => void;
 };
 
 const GlobalQContext = createContext<GlobalQValue>({
@@ -49,6 +52,8 @@ const GlobalQContext = createContext<GlobalQValue>({
   activity: "IDLE",
   setActivity: () => undefined,
   connected: false,
+  seed: null,
+  askAbout: () => undefined,
 });
 
 export function GlobalQProvider({
@@ -62,11 +67,30 @@ export function GlobalQProvider({
   readonly connected: boolean;
   readonly children: ReactNode;
 }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpenState] = useState(false);
+  const [seed, setSeed] = useState<string | null>(null);
   const [activity, setActivity] = useState<QPresenceState>("IDLE");
+  // A draft belongs to the opening that asked for it; closing drops it so
+  // the next plain "Ask Q" starts empty.
+  const setOpen = useCallback((next: boolean) => {
+    setOpenState(next);
+    if (!next) setSeed(null);
+  }, []);
+  const askAbout = useCallback((next: string) => {
+    setSeed(next);
+    setOpenState(true);
+  }, []);
   const value = useMemo<GlobalQValue>(
-    () => ({ open, setOpen, activity, setActivity, connected }),
-    [open, activity, connected],
+    () => ({
+      open,
+      setOpen,
+      activity,
+      setActivity,
+      connected,
+      seed,
+      askAbout,
+    }),
+    [open, setOpen, activity, connected, seed, askAbout],
   );
   return (
     <QSubjectProvider own={subject}>
@@ -85,13 +109,18 @@ export function GlobalQProvider({
  * surface that offers its own "Ask Q" — a Discover card, a profile —
  * needs both, and neither grants anything: the subject is still resolved
  * and authorised again by the Q API on every run.
+ *
+ * `askAbout` opens the same sheet with a draft question in the composer —
+ * a starting point the person edits or sends, never a message sent for
+ * them (CQ-WEB-024).
  */
 export function useGlobalQ(): {
   readonly open: boolean;
   readonly setOpen: (open: boolean) => void;
+  readonly askAbout: (seed: string) => void;
 } {
-  const { open, setOpen } = useContext(GlobalQContext);
-  return { open, setOpen };
+  const { open, setOpen, askAbout } = useContext(GlobalQContext);
+  return { open, setOpen, askAbout };
 }
 
 const QUIET_ROUTES = ["/home"];
@@ -159,7 +188,8 @@ export function GlobalQTrigger({
 }
 
 function GlobalQSheet() {
-  const { open, setOpen, setActivity, connected } = useContext(GlobalQContext);
+  const { open, setOpen, setActivity, connected, seed } =
+    useContext(GlobalQContext);
   const subject = useQSubject();
   const onActivity = useCallback(
     (state: QPresenceState) => setActivity(state),
@@ -177,6 +207,7 @@ function GlobalQSheet() {
             subject={subject}
             connected={connected}
             onActivity={onActivity}
+            seed={seed}
           />
         </SheetContent>
       ) : null}
