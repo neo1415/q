@@ -77,3 +77,7 @@ export {
 } from "./events/index.js";
 
 export const PACKAGE_NAME = "@capital-q/verification" as const;
+export {
+  createDecidedClaimOwnerLookup,
+  type DecidedClaimOwner,
+} from "./infrastructure/decided-claim-owner.js";

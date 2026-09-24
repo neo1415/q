@@ -21,7 +21,14 @@ import { randomUUID } from "node:crypto";
 import { z } from "zod";
 
 import { createPostgresCapitalObjectiveQueryPort } from "@capital-q/capital";
-import { createPostgresCompanyQueryPort } from "@capital-q/companies";
+import {
+  createCompanyService,
+  createPostgresCompanyQueryPort,
+} from "@capital-q/companies";
+import { createPostgresMaterialActionAuditWriter } from "@capital-q/audit";
+import { createPostgresOrganisationQueryPort } from "@capital-q/organisations";
+import { createAuthorizationService } from "@capital-q/security";
+import { createPostgresAuthorizationPolicySource } from "@capital-q/security/postgres";
 import { loadDatabaseConfig } from "@capital-q/config/database";
 import { loadEmbeddingConfig } from "@capital-q/config/embeddings";
 import {
@@ -92,7 +99,11 @@ import {
   createTaxonomyCandidateFinder,
   createTaxonomyClassifier,
 } from "@capital-q/taxonomy";
-import { createSyntheticVerificationDecider } from "@capital-q/verification";
+import {
+  createDecidedClaimOwnerLookup,
+  createSyntheticVerificationDecider,
+  createVerificationClaimsReadinessPort,
+} from "@capital-q/verification";
 import { modelProviderConfigStatus } from "@capital-q/config/model-providers";
 import {
   createModelGateway,
@@ -130,6 +141,7 @@ import { createUnavailableMalwareScanner } from "./documents/malware.js";
 import { createDomainEventHandler } from "./events/document-processing-handler.js";
 import { createProductionEventRegistry } from "./event-registry.js";
 import { withVerificationDecisions } from "./verification/decide-handler.js";
+import { withReadinessAfterVerification } from "./verification/readiness-handler.js";
 import { createOutboxPublisherRunner } from "./outbox-runner.js";
 import { createParserSandbox } from "./parser/sandbox.js";
 import { composeWorkerPresence } from "./presence/composition.js";
@@ -555,44 +567,72 @@ const verificationDecider = createSyntheticVerificationDecider({
   environment: config.runtime.deploymentEnvironment,
 });
 
+/**
+ * CQ-VERIFY-002: readiness follows a verification decision. The Companies
+ * context's own reconciliation, run as Capital Q, for the organisation the
+ * decided claim belongs to. The service holds the Verification claims as
+ * its readiness seam, exactly as the API's does.
+ */
+const readinessCompanies = createCompanyService({
+  sql: database.sql,
+  transactions: database.transactions,
+  authorization: createAuthorizationService(
+    createPostgresAuthorizationPolicySource({ sql: database.sql }),
+  ),
+  organisations: createPostgresOrganisationQueryPort({ sql: database.sql }),
+  outbox: createOutboxWriter({ registry }),
+  audit: createPostgresMaterialActionAuditWriter(),
+  verification: createVerificationClaimsReadinessPort({ sql: database.sql }),
+});
+
 const documentEvents = createQueueRunner({
   queue: DOMAIN_EVENTS_QUEUE,
   client: queues,
-  handle: withVerificationDecisions(
-    createDomainEventHandler({
-      registry,
-      queues,
-      pipelineVersion: config.documents.pipelineVersion,
-      mediaModeration: {
-        onReady: (event) => {
-          // The message names the asset; the decision re-reads it. An id that
-          // is not one is archived by the handler's own outcome, not thrown.
-          const mediaAssetId = MediaAssetIdSchema.safeParse(event.mediaAssetId);
-          if (!mediaAssetId.success) {
-            return Promise.resolve({ kind: "SKIPPED" });
-          }
-          return mediaModeration({
-            tenantId: event.tenantId,
-            mediaAssetId: mediaAssetId.data,
-            correlationId: CorrelationIdSchema.parse(
-              event.correlationId ?? `cor_${randomUUID()}`,
-            ),
-          });
+  handle: withReadinessAfterVerification(
+    withVerificationDecisions(
+      createDomainEventHandler({
+        registry,
+        queues,
+        pipelineVersion: config.documents.pipelineVersion,
+        mediaModeration: {
+          onReady: (event) => {
+            // The message names the asset; the decision re-reads it. An id that
+            // is not one is archived by the handler's own outcome, not thrown.
+            const mediaAssetId = MediaAssetIdSchema.safeParse(
+              event.mediaAssetId,
+            );
+            if (!mediaAssetId.success) {
+              return Promise.resolve({ kind: "SKIPPED" });
+            }
+            return mediaModeration({
+              tenantId: event.tenantId,
+              mediaAssetId: mediaAssetId.data,
+              correlationId: CorrelationIdSchema.parse(
+                event.correlationId ?? `cor_${randomUUID()}`,
+              ),
+            });
+          },
         },
-      },
-      ...(founderReview === undefined ? {} : { founderReview }),
-      ...(mandateReview === undefined ? {} : { mandateReview }),
-      ...(presenceResearch === undefined ? {} : { presenceResearch }),
-      recommendations: {
-        onEvent: (event) =>
-          slateInvalidation.apply(refreshDirectiveFor(event), {
-            correlationId: event.correlationId,
-            causationId: `cau_${event.id}`,
-          }),
-      },
+        ...(founderReview === undefined ? {} : { founderReview }),
+        ...(mandateReview === undefined ? {} : { mandateReview }),
+        ...(presenceResearch === undefined ? {} : { presenceResearch }),
+        recommendations: {
+          onEvent: (event) =>
+            slateInvalidation.apply(refreshDirectiveFor(event), {
+              correlationId: event.correlationId,
+              causationId: `cau_${event.id}`,
+            }),
+        },
+        logger,
+      }),
+      { registry, decide: verificationDecider, logger },
+    ),
+    {
+      registry,
+      ownerOf: createDecidedClaimOwnerLookup({ sql: database.sql }),
+      reconcile: readinessCompanies.reconcileMarketplaceReadinessAsSystem,
       logger,
-    }),
-    { registry, decide: verificationDecider, logger },
+    },
   ),
   batchSize: config.documents.batchSize,
   pollIntervalMs: config.documents.pollIntervalMs,
