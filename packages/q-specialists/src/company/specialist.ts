@@ -197,11 +197,13 @@ const OPERATING_MODE: QOperatingMode = "ASSESSMENT";
 const STATEMENT_NOTE =
   "If the person states a fact about their own company in THIS message, put it in userStatements with their exact words as the quote; otherwise leave userStatements empty.";
 
-/** Said once when a change to the profile has been handed to the proposer (ADR 0011). */
-const PREPARED_NAME_LINE =
-  "I've prepared that change to your name. Approve it and it goes in; decline and nothing changes.";
-const PREPARED_CHANGE_LINE =
-  "I've prepared that change to your profile. Approve it and it goes in; decline and nothing changes.";
+/*
+ * No "I've prepared that change" is written here (CQ-QACT-001, F7). Noting
+ * a request is not preparing one: the proposer may still refuse the value
+ * and the Approval Engine may still refuse the proposal. What Q says about
+ * the change is composed by the action port from the proposal it actually
+ * created, or from the refusal it actually received.
+ */
 
 /** Present only when public sources were read for this question (CQ-Q-RESEARCH-001 §30). */
 const PUBLIC_RESEARCH_NOTE =
@@ -828,7 +830,6 @@ export function createCompanyIntelligenceSpecialist(
           },
           "profile change read from the person's words; handed to the proposer",
         );
-        synthesis = [synthesis ?? "", PREPARED_CHANGE_LINE].join(" ").trim();
       }
       // ---- 6c. their own name, read the same way (ADR 0011) ---------------
       const readName = DisplayNameRequestSchema.nullable().safeParse(
@@ -852,7 +853,6 @@ export function createCompanyIntelligenceSpecialist(
           displayName: displayName.value,
           quote: displayName.quote,
         });
-        synthesis = [synthesis ?? "", PREPARED_NAME_LINE].join(" ").trim();
       }
 
       const countsByType: Record<string, number> = {};

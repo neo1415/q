@@ -82,6 +82,7 @@ import {
 } from "@capital-q/permissions";
 import {
   createPostgresQActionRepositories,
+  createQActionNarrator,
   createQActionPort,
   createQActionRegistry,
   createQActionService,
@@ -608,28 +609,30 @@ const companyService = createCompanyService({
 // on this board (ADR 0011); the Approval Engine does everything after.
 const profileBoard = createProfileUpdateBoard({ logger });
 const identity = createPostgresApplicationIdentityLookup({ sql: database.sql });
+const qActionRepositories = createPostgresQActionRepositories();
+const qActionRegistry = createQActionRegistry([
+  createCompanyProfileUpdateAction({
+    profiles: companies,
+    service: companyService,
+    authorization,
+    logger,
+  }),
+  // What Q calls the person: their own record, their own approval.
+  createPersonProfileUpdateAction({
+    people: {
+      updateDisplayName: ({ userId, displayName }) =>
+        identity.updateDisplayNameOfUser?.(userId, displayName) ??
+        Promise.resolve(false),
+    },
+    logger,
+  }),
+]);
 const qActions = createQActionService({
   sql: database.sql,
   transactions: database.transactions,
-  repositories: createPostgresQActionRepositories(),
+  repositories: qActionRepositories,
   runtime: repositories,
-  registry: createQActionRegistry([
-    createCompanyProfileUpdateAction({
-      profiles: companies,
-      service: companyService,
-      authorization,
-      logger,
-    }),
-    // What Q calls the person: their own record, their own approval.
-    createPersonProfileUpdateAction({
-      people: {
-        updateDisplayName: ({ userId, displayName }) =>
-          identity.updateDisplayNameOfUser?.(userId, displayName) ??
-          Promise.resolve(false),
-      },
-      logger,
-    }),
-  ]),
+  registry: qActionRegistry,
   authorization,
   audit: createPostgresMaterialActionAuditWriter(),
   securityEvents: createPostgresSecurityEventWriter({ sql: database.sql }),
@@ -641,6 +644,16 @@ const qActions = createQActionService({
 const qActionPort = createQActionPort({
   service: qActions,
   proposer: profileBoard,
+  // What Q says about an action is read from the records the engine
+  // wrote, never from what a model intended (CQ-QACT-001).
+  narrator: createQActionNarrator({
+    sql: database.sql,
+    transactions: database.transactions,
+    runtime: repositories,
+    actions: qActionRepositories.actions,
+    registry: qActionRegistry,
+    logger,
+  }),
   logger,
 });
 
@@ -786,12 +799,25 @@ const Q_ORCHESTRATION_AUTOSTART = true;
 // Runs this process was orchestrating when it last stopped have no engine
 // any more. Close them before serving, so a reconnecting client receives one
 // terminal, retryable failure instead of "working" forever (CQ-PRE-REC-001 §8).
-await createOrphanedRunSweep({
+// Fenced by silence (CQ-QACT-001): another process's live run is never
+// touched, so a second instance or a rolling deploy is safe. Periodic,
+// because a run this process's predecessor left behind is only closed
+// once it has been quiet long enough to be certainly nobody's.
+const orphanSweep = createOrphanedRunSweep({
   sql: database.sql,
   runs: repositories.runs,
   runtime: orchestrationRuntime,
   logger,
-}).sweep();
+});
+await orphanSweep.sweep();
+setInterval(
+  () => {
+    orphanSweep.sweep().catch((error: unknown) => {
+      logger.warn({ err: error }, "orphaned q run sweep failed");
+    });
+  },
+  5 * 60 * 1000,
+).unref();
 
 // The realtime voice channel (CQ-Q-VOICE-001 C): ElevenLabs as the Speech
 // Engine, composed only when its key and a Speech Engine id are configured.

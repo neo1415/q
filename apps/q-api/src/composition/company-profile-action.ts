@@ -17,6 +17,7 @@ import type {
   QProfileUpdateNotebook,
   QProfileUpdateReading,
 } from "@capital-q/model-gateway/q";
+import { normaliseWebsite } from "@capital-q/founder-onboarding";
 import type { Logger } from "@capital-q/observability";
 import {
   defineQAction,
@@ -128,6 +129,48 @@ function describeChanges(changes: CompanyProfileUpdatePayload["changes"]): {
   };
 }
 
+/**
+ * Why a requested value does not fit, per field, in the person's terms.
+ * Code's words, chosen by which field the schema refused: never the
+ * value, never a model's explanation.
+ */
+const FIELD_SHAPES: Readonly<Record<CompanyEditableField, string>> = {
+  canonicalName: "the name needs to be between 1 and 200 characters",
+  legalName: "the legal name needs to be between 1 and 200 characters",
+  websiteUrl:
+    "the website needs to be a web address, such as https://example.com",
+  foundedDate: "the founding date needs to be a full date, such as 2024-03-01",
+  headquartersCountry:
+    "the country needs to be one Capital Q can record, such as KE for Kenya",
+  headquartersCity: "the city name is longer than the profile holds",
+  currentStageCode: "that stage isn't one the profile records",
+  primaryDescription: "the description is longer than the profile holds",
+  shortDescription: "the short description is longer than the profile holds",
+};
+
+function refusedFields(
+  issues: readonly { readonly path: readonly PropertyKey[] }[],
+): readonly CompanyEditableField[] {
+  const fields = new Set<CompanyEditableField>();
+  for (const issue of issues) {
+    const field = issue.path[1];
+    if (
+      issue.path[0] === "changes" &&
+      typeof field === "string" &&
+      (COMPANY_EDITABLE_FIELDS as readonly string[]).includes(field)
+    ) {
+      fields.add(field as CompanyEditableField);
+    }
+  }
+  return [...fields];
+}
+
+export function refusalReason(fields: readonly CompanyEditableField[]): string {
+  return fields.length === 0
+    ? "the change didn't fit what your company profile holds"
+    : fields.map((field) => FIELD_SHAPES[field]).join("; ");
+}
+
 export type CompanyProfileUpdateActionDependencies = {
   readonly profiles: CompanyQueryPort;
   readonly service: CompanyService;
@@ -153,6 +196,9 @@ export function createCompanyProfileUpdateAction(
         { kind: "COMPANY", companyId: payload.companyId },
       ],
       describe: (payload) => describeChanges(payload.changes),
+      // Said after the gate persisted EXECUTED, from the approved payload.
+      confirm: (payload) =>
+        `Done. Your company profile now reads: ${describeChanges(payload.changes).preview.split("\n").join("; ")}.`,
       authorize: async (payload, actor) => {
         if (actor.actorType !== "HUMAN") {
           return { outcome: "DENY", code: "NOT_A_PERSON" };
@@ -376,6 +422,10 @@ export function createProfileUpdateBoard(
             { qRunId: context.runId },
             "a requested name did not fit a display name's shape",
           );
+          return Promise.resolve({
+            refused:
+              "that name doesn't fit what Capital Q can show as a name (up to 80 characters)",
+          });
         }
       }
       const entry = take(context);
@@ -390,13 +440,20 @@ export function createProfileUpdateBoard(
       }
       const changes: Record<string, string | null> = {};
       for (const update of entry.updates) {
-        changes[update.field] = update.value;
+        // "kivu-freight.example" is what people say; the field holds an
+        // http(s) URL. The same normaliser onboarding writes through, so a
+        // website typed to Q and one typed in setup land identically.
+        changes[update.field] =
+          update.field === "websiteUrl" && update.value !== null
+            ? normaliseWebsite(update.value)
+            : update.value;
       }
       const parsed = CompanyProfileUpdatePayloadSchema.safeParse({
         companyId: entry.companyId,
         changes,
       });
       if (!parsed.success) {
+        const refused = refusedFields(parsed.error.issues);
         // Which fields the model got into the wrong shape, never the values.
         options.logger?.info(
           {
@@ -407,7 +464,7 @@ export function createProfileUpdateBoard(
           },
           "a requested profile change did not fit the profile's own shape",
         );
-        return Promise.resolve(null);
+        return Promise.resolve({ refused: refusalReason(refused) });
       }
       return Promise.resolve({
         actionType: COMPANY_PROFILE_UPDATE,

@@ -1,9 +1,10 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef } from "react";
 
 import type { DiscoveryNoteDto } from "@capital-q/contracts";
-import { Button } from "@capital-q/ui/button";
+import { Button, buttonClassName } from "@capital-q/ui/button";
 import { EmptyState } from "@capital-q/ui/states";
 
 import { useGlobalQ } from "@/components/app-shell/global-q";
@@ -131,12 +132,44 @@ export function InvestorFeedScreen() {
         title="Discover couldn't load."
         description="Nothing is wrong with your mandate. Try again in a moment."
       />
+    ) : notes.includes("NO_ACTIVE_MANDATE") ? (
+      /*
+        Empty because the mandate is unfinished, not because nobody is
+        discoverable. Saying "companies appear as founders choose to be
+        discoverable" here told an investor something untrue about the
+        market and gave them nowhere to go (CQ-ACCEPT-001). The way forward
+        is the mandate; Q is one tap away for anything else.
+      */
+      <div className="flex flex-col gap-4">
+        <EmptyState
+          title="Finish your mandate to see companies."
+          description="Discover ranks companies against what you declared. Your mandate isn't active yet, so there is nothing to rank them against."
+          action={
+            <div className="flex flex-wrap items-center gap-2">
+              <Link
+                href="/onboarding/investor"
+                className={buttonClassName("primary")}
+              >
+                Finish my mandate
+              </Link>
+              <Button variant="secondary" onClick={() => setOpen(true)}>
+                Ask Q
+              </Button>
+            </div>
+          }
+        />
+      </div>
     ) : (
       <div className="flex flex-col gap-4">
         <Notes notes={notes} />
         <EmptyState
           title="Nothing to review yet."
           description="Companies appear here as founders choose to be discoverable. Q can tell you about any of them once they do."
+          action={
+            <Button variant="secondary" onClick={() => setOpen(true)}>
+              Ask Q
+            </Button>
+          }
         />
       </div>
     );

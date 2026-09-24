@@ -265,7 +265,9 @@ describe("an answer that arrives as it is written", () => {
         ],
       },
     ]);
-    expect(capture.content).toContain("prepared that change to your profile");
+    // Noting is not preparing (CQ-QACT-001): the answer claims nothing;
+    // the action port says so once a proposal actually exists.
+    expect(capture.content).not.toContain("prepared");
   });
 
   it("puts a sentence through the guards before anybody hears it", async () => {

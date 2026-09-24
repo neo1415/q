@@ -101,8 +101,19 @@ export {
 export {
   createQActionPort,
   noQActionProposer,
+  type QActionProposal,
   type QActionProposer,
+  type QActionRefusal,
 } from "./application/port.js";
+export {
+  createQActionNarrator,
+  failedLine,
+  noQActionNarrator,
+  proposedLine,
+  refusedLine,
+  type QActionNarrator,
+  type QRunRef,
+} from "./application/narrator.js";
 export { createPostgresQActionRepositories } from "./infrastructure/postgres-repositories.js";
 
 export const PACKAGE_NAME = "@capital-q/q-actions" as const;

@@ -112,6 +112,12 @@ export type QActionDefinition<P, R> = {
     actor: ActorContext,
   ) => Promise<QActionAuthorization>;
   readonly executor: QActionExecutor<P, R>;
+  /**
+   * What Q tells the person once the gate has persisted EXECUTED, from the
+   * approved payload and the executor's validated result — never from a
+   * model. Absent: the approval summary, prefixed "Done".
+   */
+  readonly confirm?: ((payload: P, result: R) => string) | undefined;
 };
 
 /** Erased for the registry; per-definition types stay with the definition. */

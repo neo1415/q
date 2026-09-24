@@ -10,6 +10,7 @@ import {
   QActionUnavailableError,
   QActionVersionConflictError,
 } from "../domain/errors.js";
+import { noQActionNarrator, type QActionNarrator } from "./narrator.js";
 import type { QActionService } from "./service.js";
 
 /**
@@ -23,11 +24,24 @@ import type { QActionService } from "./service.js";
  * action. Whatever a proposer says, an unregistered or prohibited type
  * never becomes a proposal, and a proposer can never approve anything.
  */
+export type QActionProposal = {
+  readonly actionType: string;
+  readonly payload: unknown;
+};
+
+/**
+ * The person asked for something this run could not turn into a proposal
+ * (a value the target refuses, a field it does not have). `refused` is a
+ * plain sentence for them, composed by code from the refusal — never a
+ * model's words — so "I couldn't prepare that" is as honest as "I've
+ * prepared this".
+ */
+export type QActionRefusal = { readonly refused: string };
+
 export type QActionProposer = {
-  readonly propose: (context: QActionPrepareContext) => Promise<{
-    readonly actionType: string;
-    readonly payload: unknown;
-  } | null>;
+  readonly propose: (
+    context: QActionPrepareContext,
+  ) => Promise<QActionProposal | QActionRefusal | null>;
 };
 
 export const noQActionProposer: QActionProposer = {
@@ -38,13 +52,28 @@ export const noQActionProposer: QActionProposer = {
 export function createQActionPort(options: {
   readonly service: QActionService;
   readonly proposer?: QActionProposer | undefined;
+  /**
+   * Says what happened, from the record (CQ-QACT-001). Absent: nothing is
+   * said beside the approval control, which is drawn from the proposal.
+   */
+  readonly narrator?: QActionNarrator | undefined;
   readonly logger?: Logger | undefined;
 }): QActionPort {
   const proposer = options.proposer ?? noQActionProposer;
+  const narrator = options.narrator ?? noQActionNarrator;
   return {
     prepare: async (context): Promise<QActionPrepareOutcome> => {
       const proposal = await proposer.propose(context);
       if (proposal === null) {
+        return { kind: "NONE" };
+      }
+      const run = {
+        runId: context.runId,
+        tenantId: context.actor.tenantId,
+        actorUserId: context.actor.userId,
+      };
+      if ("refused" in proposal) {
+        await narrator.refused(run, proposal.refused);
         return { kind: "NONE" };
       }
       try {
@@ -55,6 +84,9 @@ export function createQActionPort(options: {
           actionType: proposal.actionType,
           payload: proposal.payload,
         });
+        // Only now, with the proposal and its approval request committed,
+        // may Q say it has prepared anything.
+        await narrator.proposed(run, action);
         return {
           kind: "AWAITING_APPROVAL",
           actionId: action.id,
@@ -76,11 +108,22 @@ export function createQActionPort(options: {
             },
             "q action proposal refused",
           );
+          await narrator.refused(
+            run,
+            error instanceof QActionVersionConflictError
+              ? "something else changed at the same moment, so ask me again"
+              : "that isn't something I can change for you from here",
+          );
           return { kind: "NONE" };
         }
         throw error;
       }
     },
-    executeApproved: (context) => options.service.executeApproved(context),
+    executeApproved: async (context) => {
+      const outcome = await options.service.executeApproved(context);
+      // "Done" only after the gate persisted what the executor reported.
+      await narrator.settled(context, outcome);
+      return outcome;
+    },
   };
 }

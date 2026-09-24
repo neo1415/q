@@ -11,18 +11,24 @@ import { runRef, type QOrchestrationRuntime } from "./orchestration-runtime.js";
  * run in flight — a deploy, a crash, a developer rebuild — the run's row
  * keeps saying PLANNING or SYNTHESIS, nothing ever moves it again, and a
  * person who reconnects sees "working" forever; a Stop request lands as
- * CANCEL_REQUESTED and stays there for the same reason.
+ * CANCEL_REQUESTED and stays there for the same reason. Such a run is
+ * closed honestly: a pending cancellation is finished, and everything else
+ * fails as RUN_EXPIRED, whose public projection is retryable.
  *
- * At startup, every non-terminal run is therefore closed honestly: a
- * pending cancellation is finished, and everything else fails as
- * RUN_EXPIRED, whose public projection is retryable and says the request
- * expired before it could finish. The terminal event is durable, so a
- * client that reconnects with Last-Event-ID receives it and shows exactly
- * one failure.
+ * Fenced by silence, not by "whatever is not terminal" (CQ-QACT-001). The
+ * sweep used to close every non-terminal run in the database at startup,
+ * which on a shared database — two local instances, or a rolling deploy
+ * with old and new processes overlapping — killed another process's live
+ * run seconds after it started. A run is orphaned here only when it has
+ * shown no sign of life for longer than any live run goes quiet: a live
+ * run writes a durable event at every stage, so one silent for the
+ * in-flight window has no engine behind it anywhere. A run paused for a
+ * person (approval, input) needs no engine at all — its checkpoint resumes
+ * in any process — so it is left alone for much longer, and never closed
+ * merely because a process restarted.
  *
- * This assumes a single orchestrating process, which is how q-api is
- * deployed (one Render service). A second instance would need to fence runs
- * by owner before sweeping; that is deliberately not modelled here.
+ * Because young orphans are now left until they age out, the sweep also
+ * runs periodically rather than only at startup.
  */
 
 export type OrphanedRunSweepDependencies = {
@@ -30,6 +36,11 @@ export type OrphanedRunSweepDependencies = {
   readonly runs: QRunRepository;
   readonly runtime: QOrchestrationRuntime;
   readonly logger?: Logger | undefined;
+  /** Silence after which an in-flight run has no engine. Default 15 minutes. */
+  readonly inFlightWindowMs?: number | undefined;
+  /** Silence after which a paused run is abandoned. Default 24 hours. */
+  readonly pausedWindowMs?: number | undefined;
+  readonly now?: (() => Date) | undefined;
 };
 
 export type OrphanedRunSweepResult = {
@@ -40,14 +51,25 @@ export type OrphanedRunSweepResult = {
 };
 
 const SWEEP_LIMIT = 500;
+export const ORPHAN_IN_FLIGHT_WINDOW_MS = 15 * 60 * 1000;
+export const ORPHAN_PAUSED_WINDOW_MS = 24 * 60 * 60 * 1000;
 
 export function createOrphanedRunSweep(
   dependencies: OrphanedRunSweepDependencies,
 ): { readonly sweep: () => Promise<OrphanedRunSweepResult> } {
   const { sql, runs, runtime, logger } = dependencies;
+  const now = dependencies.now ?? (() => new Date());
+  const inFlightWindow =
+    dependencies.inFlightWindowMs ?? ORPHAN_IN_FLIGHT_WINDOW_MS;
+  const pausedWindow = dependencies.pausedWindowMs ?? ORPHAN_PAUSED_WINDOW_MS;
   return {
     sweep: async (): Promise<OrphanedRunSweepResult> => {
-      const orphaned = await runs.listNonTerminal(sql, SWEEP_LIMIT);
+      const at = now().getTime();
+      const orphaned = await runs.listStale(sql, {
+        inFlightSilentSince: new Date(at - inFlightWindow).toISOString(),
+        pausedSilentSince: new Date(at - pausedWindow).toISOString(),
+        limit: SWEEP_LIMIT,
+      });
       let failed = 0;
       let cancelled = 0;
       let untouched = 0;
