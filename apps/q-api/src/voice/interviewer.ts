@@ -1602,6 +1602,17 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
   /** Sessions that have heard the Type hint (once each, voice only). */
   const typeHintGiven = new Set<string>();
   /**
+   * Category phrases heard before they could be placed (adversarial
+   * round 2, #1): "I only do Côte d'Ivoire and Senegal" in the very first
+   * sentence, before the organisation existed, when the platform's own
+   * lookup could not yet run for this person. The words are kept and put
+   * through the lookup again on every later turn until they land.
+   */
+  const phrasesBySession = new Map<
+    string,
+    { readonly stepKey: string; readonly phrases: readonly string[] }[]
+  >();
+  /**
    * Meaning kept beside a field, per session (CQ-QX-005 §3).
    *
    * "As long as they've got the grit" sets no option and is not no
@@ -2005,6 +2016,7 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
       conversationBySession.delete(sessionId);
       qualitativeBySession.delete(sessionId);
       typeHintGiven.delete(sessionId);
+      phrasesBySession.delete(sessionId);
     },
 
     /**
@@ -3185,7 +3197,13 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
         readonly placed: readonly string[];
         readonly unplaced: readonly string[];
       }[] = [];
-      const categoryPhrases = takingAnswers
+      const carriedPhrases = (phrasesBySession.get(sessionId) ?? []).filter(
+        (item) => statuses.get(item.stepKey) !== "COMPLETED",
+      );
+      phrasesBySession.delete(sessionId);
+      /** Steps whose phrases are held for a later lookup this turn. */
+      const phrasesHeld: string[] = [];
+      const categoryPhrasesThisTurn = takingAnswers
         ? [
             ...read.categoryPhrases,
             ...phrasesFromAnswers.filter(
@@ -3194,6 +3212,13 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
             ),
           ]
         : [];
+      const categoryPhrases = [
+        ...categoryPhrasesThisTurn,
+        ...carriedPhrases.filter(
+          (item) =>
+            !categoryPhrasesThisTurn.some((c) => c.stepKey === item.stepKey),
+        ),
+      ];
       for (const item of categoryPhrases) {
         const step = steps.get(item.stepKey);
         if (
@@ -3205,6 +3230,7 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
         const ids: string[] = [];
         const labels: string[] = [];
         const unplacedPhrases: string[] = [];
+        let lookupFailed = false;
         for (const phrase of item.phrases.slice(0, 6)) {
           try {
             const found = await findTaxonomyCandidates(input.session, {
@@ -3219,9 +3245,21 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
               labels.push(best.displayName);
             }
           } catch {
-            // The classifier is optional here; nothing is invented in its place.
+            // The classifier could not run for this person yet (commonly:
+            // no organisation so far). Nothing is invented in its place,
+            // and nothing is dropped either: the words are kept below.
+            lookupFailed = true;
             unplacedPhrases.push(phrase.trim().slice(0, 80));
           }
+        }
+        if (ids.length === 0 && lookupFailed) {
+          const kept = phrasesBySession.get(sessionId) ?? [];
+          phrasesBySession.set(sessionId, [
+            ...kept.filter((k) => k.stepKey !== step.stepKey),
+            { stepKey: step.stepKey, phrases: item.phrases.slice(0, 6) },
+          ]);
+          phrasesHeld.push(step.stepKey);
+          continue;
         }
         if (ids.length > 0 && unplacedPhrases.length > 0) {
           partlyPlaced.push({
@@ -3321,6 +3359,19 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
             ...candidate,
             attempts: candidate.attempts + 1,
           });
+        }
+      }
+      /**
+       * Refused first, landed on the retry above (adversarial round 2,
+       * #2): "the minimum is 20k… put the firm down as Coastline" wrote the
+       * cheques before the organisation existed, the ledger landed them
+       * once it did, and Q still said one thing had not saved. A value on
+       * the record is not unsaved.
+       */
+      for (let index = unsaved.length - 1; index >= 0; index -= 1) {
+        const key = unsaved[index];
+        if (key !== undefined && recorded.includes(key)) {
+          unsaved.splice(index, 1);
         }
       }
 
@@ -3500,6 +3551,7 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
         unresolved.length === 0 &&
         unsaved.length === 0 &&
         notCleared.length === 0 &&
+        phrasesHeld.length === 0 &&
         restated === 0 &&
         !result.skipRemainingOptional;
       if (needsScale !== undefined) {
@@ -3672,6 +3724,25 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
           .filter((part) => part.length > 0)
           .join(" ");
       }
+      const heldNowPhrases = categoryPhrasesThisTurn.filter((item) =>
+        phrasesHeld.includes(item.stepKey),
+      );
+      const firstHeld = heldNowPhrases[0];
+      if (firstHeld !== undefined && repairAsk === null) {
+        // Heard this turn and kept for later (round 2, #1): said as held,
+        // never as recorded, whatever the model's reply called it.
+        const heldStep = steps.get(firstHeld.stepKey);
+        const next =
+          result.askNext === null ? undefined : steps.get(result.askNext);
+        reply = [
+          `I've got ${firstHeld.phrases.join(" and ")}${heldStep === undefined ? "" : ` for ${askLabel(heldStep).toLowerCase()}`} — I can't put it on your record until the rest of the setup is in place, so I'm holding it and it goes in as soon as it can.`,
+          next === undefined || next.stepKey === firstHeld.stepKey
+            ? ""
+            : askAgain(next, input),
+        ]
+          .filter((part) => part.length > 0)
+          .join(" ");
+      }
       if (takingAnswers && repairAsk === null && needsScale === undefined) {
         const carriedNow = new Set(
           carriedFor(input.onboardingSessionId, view).map((c) => c.stepKey),
@@ -3686,6 +3757,7 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
           ...unscaled.map((item) => item.step.stepKey),
           ...spokenUploads.map((step) => step.stepKey),
           ...carriedNow,
+          ...phrasesHeld,
           ...view.responses.map((response) => response.stepKey),
         ]);
         const claimed = [
@@ -4046,8 +4118,35 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
               : (view.currentStep?.stepKey ?? needed ?? null),
         };
       } else if (unsaved.length > 0) {
-        reply =
-          `${reply.trim()} One thing didn't save — I'll ask about it again in a moment.`.trim();
+        /**
+         * Some of the turn landed and some did not (round 2, #2). The
+         * model's words may call it all "noted"; the runtime knows better,
+         * so the account is its own: what went down, what is being held
+         * for the moment the setup can take it, and then the question.
+         */
+        const heldLabels = unsaved
+          .map((key) => steps.get(key))
+          .filter((step): step is OnboardingStepManifest => step !== undefined)
+          .map((step) => askLabel(step).toLowerCase());
+        const downLabels = recorded
+          .map((key) => steps.get(key))
+          .filter((step): step is OnboardingStepManifest => step !== undefined)
+          .map((step) => askLabel(step).toLowerCase());
+        const list = (items: readonly string[]) =>
+          items.length <= 1
+            ? (items[0] ?? "")
+            : `${items.slice(0, -1).join(", ")} and ${items.at(-1) ?? ""}`;
+        const next =
+          result.askNext === null ? undefined : steps.get(result.askNext);
+        reply = [
+          downLabels.length > 0
+            ? `I've put down your ${list(downLabels)}.`
+            : "",
+          `Your ${list(heldLabels)} ${heldLabels.length === 1 ? "isn't" : "aren't"} on the record yet — the setup needs something else first — so I'm holding ${heldLabels.length === 1 ? "it" : "them"} and will add ${heldLabels.length === 1 ? "it" : "them"} the moment it can.`,
+          next === undefined ? "" : askAgain(next, input),
+        ]
+          .filter((part) => part.length > 0)
+          .join(" ");
       }
 
       // Last, so that a runtime-composed line is held to the same rule as
