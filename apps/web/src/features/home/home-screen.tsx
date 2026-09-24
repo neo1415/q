@@ -75,6 +75,14 @@ function surfaceContext(context: OwnContext): QSurfaceContext {
   }
 }
 
+/**
+ * Everything under the Q surface sits in the same reading column, with the
+ * page gutter, so a section never starts at the workspace edge while Q is
+ * centred above it.
+ */
+const SECTION_COLUMN =
+  "mx-auto w-full max-w-(--cq-layout-reading) px-4 sm:px-6 lg:px-8";
+
 /** The one line under Q, in the person's terms rather than the product's. */
 function openingLine(context: OwnContext): string {
   switch (context.kind) {
@@ -152,6 +160,7 @@ export async function HomeScreen({
           id="setup"
           title="What are you here to do?"
           description="Q works from whatever you already have, and asks only for what is missing."
+          className={SECTION_COLUMN}
         >
           <PersonaCards />
         </PageSection>
@@ -161,6 +170,7 @@ export async function HomeScreen({
         <PageSection
           id="continue-setup"
           title="Finish setting up"
+          className={SECTION_COLUMN}
           description={
             unfinished === "founder"
               ? "Your company setup is part-way through. Q picks up exactly where you left off, and asks only for what is still missing."
@@ -182,6 +192,7 @@ export async function HomeScreen({
         <PageSection
           id="visibility"
           title="Visibility & Discovery"
+          className={SECTION_COLUMN}
           description={
             context.kind === "INVESTOR"
               ? "Who can see your investor profile, what founders would see, and whether they can find you. Nothing becomes visible until you choose."
