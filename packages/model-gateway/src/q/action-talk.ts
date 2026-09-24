@@ -23,12 +23,66 @@ export type ActionTalkStripResult = {
 /** Shorter than this is not a sentence worth matching: "OK." is not a claim. */
 const MIN_SENTENCE_CHARS = 8;
 
+/**
+ * Sentences that restate a change the person asked for (CQ-QX-007 A5).
+ *
+ * When the analyst read a change request — a new website, a new name —
+ * the value it read is in a closed schema field. A sentence of the model's
+ * that carries that value is the model talking about the change, and what
+ * happened to the change is Capital Q's to say, from the proposal it
+ * created or the refusal it got. Matched on the value the structured
+ * reading holds, never on words: "noted", "updated" and "will change" are
+ * all the same sentence to this, and so is one no list would anticipate.
+ */
+// A full stop inside "kivu-freight.africa" does not end a sentence: only
+// punctuation followed by whitespace or the end of the line does.
+const SENTENCE = /[^\n]+?(?:[.!?]+(?=\s|$)|$)/g;
+/** Shorter than this, a value is not distinctive enough to anchor on. */
+const MIN_VALUE_CHARS = 4;
+
+function withoutSentencesCarrying(
+  text: string,
+  values: readonly string[],
+): { readonly text: string; readonly removed: number } {
+  // A value is stored in its field's own form ("https://x.africa/"); a
+  // sentence says it as people do ("x.africa"). Both forms anchor.
+  const anchors = values
+    .map((value) => value.trim().toLowerCase())
+    .flatMap((value) => [
+      value,
+      value
+        .replace(/^[a-z][a-z0-9+.-]*:\/\//, "")
+        .replace(/^www\./, "")
+        .replace(/\/+$/, ""),
+    ])
+    .filter((value) => value.length >= MIN_VALUE_CHARS);
+  if (anchors.length === 0) return { text, removed: 0 };
+  let removed = 0;
+  const kept = text
+    .split("\n")
+    .map((line) =>
+      line.replace(SENTENCE, (sentence) => {
+        const lower = sentence.toLowerCase();
+        if (anchors.some((anchor) => lower.includes(anchor))) {
+          removed += 1;
+          return "";
+        }
+        return sentence;
+      }),
+    )
+    .join("\n");
+  return { text: kept, removed };
+}
+
 export function withoutActionTalk(
   answer: string,
   actionTalk: readonly string[] | undefined,
+  /** The values of the changes the structured reading carried. */
+  requestedValues: readonly string[] = [],
 ): ActionTalkStripResult {
-  let text = answer;
-  let removed = 0;
+  const carrying = withoutSentencesCarrying(answer, requestedValues);
+  let text = carrying.text;
+  let removed = carrying.removed;
   const sentences = [...(actionTalk ?? [])]
     .map((sentence) => sentence.trim())
     .filter((sentence) => sentence.length >= MIN_SENTENCE_CHARS)

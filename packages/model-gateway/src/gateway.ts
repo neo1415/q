@@ -38,7 +38,10 @@ import {
   type EligibleCandidate,
 } from "./policy/eligibility.js";
 import { alwaysHealthy } from "./policy/health.js";
-import { acceptStructuredOutput } from "./policy/structured.js";
+import {
+  acceptStructuredOutput,
+  type InvalidListItems,
+} from "./policy/structured.js";
 
 /**
  * The Model Gateway (doc 12 §24; packet §8).
@@ -114,6 +117,12 @@ export type ModelGatewayExecuteOptions<T> = {
    * on the same model.
    */
   readonly firstAttemptTimeoutMs?: number | undefined;
+  /**
+   * STRUCTURED output only: whether one refused element of a list refuses
+   * the whole object (REFUSE, the default) or is dropped and logged
+   * (DROP). For callers whose lists are independent readings.
+   */
+  readonly invalidListItems?: InvalidListItems | undefined;
 };
 
 export type ModelGateway = {
@@ -258,6 +267,7 @@ export function createModelGateway(
     spoke: { spoke: boolean },
     /** This attempt's wall clock: the budget's, or a first model's shorter one. */
     timeoutMs: number,
+    invalidListItems: InvalidListItems | undefined,
   ): Promise<AttemptOutcome<T> & { readonly record: ModelAttemptRecord }> {
     const labels = {
       provider: candidate.provider.code,
@@ -369,7 +379,20 @@ export function createModelGateway(
                 },
               );
             }
-            const accepted = acceptStructuredOutput(result.text, schema);
+            const accepted = acceptStructuredOutput(result.text, schema, {
+              invalidListItems,
+            });
+            if (accepted.ok && (accepted.dropped?.length ?? 0) > 0) {
+              // Paths and codes only, never a value the model wrote.
+              logger?.warn(
+                {
+                  ...labels,
+                  qRunId: request.attribution.qRunId,
+                  dropped: accepted.dropped,
+                },
+                "structured output kept; refused list elements were dropped",
+              );
+            }
             if (!accepted.ok) {
               // Room, not competence: the model was still writing when the
               // ceiling stopped it, so the object it was building could not
@@ -580,6 +603,7 @@ export function createModelGateway(
             span,
             options.onTextDelta,
             options.firstAttemptTimeoutMs,
+            options.invalidListItems,
           );
         } finally {
           span.end();
@@ -597,6 +621,7 @@ export function createModelGateway(
     },
     onTextDelta: ((text: string) => void) | undefined,
     firstAttemptTimeoutMs: number | undefined,
+    invalidListItems: InvalidListItems | undefined,
   ): Promise<ModelGatewayResult<T>> {
     if (callerSignal.aborted) {
       throw new ModelGatewayError("model request cancelled before routing", {
@@ -763,6 +788,7 @@ export function createModelGateway(
           onTextDelta,
           spoke,
           timeoutMs,
+          invalidListItems,
         );
         attempts.push(outcome.record);
         spentUsd +=
