@@ -680,3 +680,28 @@ describe("round 2 #2 · a write refused early in a turn and landed later is not 
     expect(outcome.reply).not.toMatch(/didn't save/);
   });
 });
+
+describe("round 2 #3 · a person-requested finish with something required open", () => {
+  it("says what the setup still needs instead of sending them away", async () => {
+    const world = investorSession({
+      currentStepKey: "I4.revenue_state",
+      recorded: MANDATE_SO_FAR,
+    });
+    const interviewer = createInterviewer({
+      gateway: gateway({
+        ...base,
+        intent: "NAVIGATE",
+        navigate: "DISCOVER",
+        reply: "Let's finish up and head over to your matches.",
+        reading: reading({ kind: "TOOL_REQUEST" }),
+      }),
+      logger,
+    });
+    const outcome = await interviewer.turn(
+      turn(world, "I'm done, show me companies now"),
+    );
+    expect(outcome.navigate).toBeNull();
+    expect(outcome.reply).toMatch(/^Before I take you there/);
+    expect(outcome.asking).not.toBeNull();
+  });
+});

@@ -794,6 +794,26 @@ function askAgain(
  * different order and no choices. A repeated question carries its
  * choices whenever it has them and did not already say them.
  */
+/**
+ * Where a finished setup goes (adversarial round 2, #8): one place per
+ * journey, the same one the screen's own button uses — an investor to the
+ * companies they set it up to see, a founder home.
+ */
+function finishedDestination(journeyType: "founder" | "investor"): {
+  readonly navigate: InterviewDestination;
+  readonly line: string;
+} {
+  return journeyType === "investor"
+    ? {
+        navigate: "DISCOVER",
+        line: "That's everything I need for now. I'm taking you to Discover.",
+      }
+    : {
+        navigate: "HOME",
+        line: "That's everything I need for now. I'm taking you to your home.",
+      };
+}
+
 function askWithChoices(
   step: OnboardingStepManifest,
   input: {
@@ -3592,7 +3612,16 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
          * on rather than saying it again.
          */
         const wanted = stepInHand();
-        if (wanted !== undefined) {
+        if (wanted !== undefined && wanted.stepKey !== inFrontAtStart) {
+          /**
+           * "You already asked that" about a step Q never put to them
+           * (adversarial round 2, #5): Q must not say "you did tell me, and
+           * I didn't get it down" about a question that was not asked. It
+           * asks the step, plainly, with its choices.
+           */
+          repairAsk = wanted.stepKey;
+          reply = askWithChoices(wanted, input);
+        } else if (wanted !== undefined) {
           dispatch({
             type: "REPAIRED",
             topic: wanted.stepKey,
@@ -3842,8 +3871,9 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
             input.onboardingSessionId,
             { expectedSessionVersion: view.session.version },
           );
-          navigate = "HOME";
-          reply = `${reply} That's everything I need for now. I'm taking you to your home.`;
+          const finished = finishedDestination(input.journeyType);
+          navigate = finished.navigate;
+          reply = `${reply} ${finished.line}`;
         } catch (error: unknown) {
           logger.warn({ err: error }, "interview completion was not accepted");
         }
@@ -4415,6 +4445,43 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
         result = { ...result, askNext: next?.stepKey ?? null };
       }
       /**
+       * "I'm done, show me companies now" (adversarial round 2, #3).
+       *
+       * Asked to leave while something required is still open, Q must not
+       * send them away with the setup unfinished — the screen stayed on the
+       * required step while Q said "let's head over to your matches". It
+       * says what is left and asks it; the optional rest is already
+       * skippable through the ordinary skip-the-rest path.
+       */
+      const leaving =
+        navigate === "HOME" || navigate === "DISCOVER" || handoff === "FORM";
+      if (
+        leaving &&
+        handoff === null &&
+        view.session.status === "ACTIVE" &&
+        !view.progress.canComplete
+      ) {
+        const stillOpen = view.progress.eligibleSteps
+          .filter(
+            (step) =>
+              step.required &&
+              step.status !== "COMPLETED" &&
+              step.status !== "SKIPPED",
+          )
+          .map((step) => steps.get(step.stepKey))
+          .find(
+            (step): step is OnboardingStepManifest =>
+              step !== undefined &&
+              step.configuration.stepType !== "document_upload" &&
+              toOpenStep(step, view) !== null,
+          );
+        if (stillOpen !== undefined) {
+          navigate = null;
+          reply = `Before I take you there, there's one thing the setup still needs. ${askAgain(stillOpen, input)}`;
+          result = { ...result, askNext: stillOpen.stepKey };
+        }
+      }
+      /**
        * Q may only offer to finish when the journey can finish (ACC e).
        *
        * "Shall we wrap up and head to your discovery feed?" with a
@@ -4470,9 +4537,9 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
               input.onboardingSessionId,
               { expectedSessionVersion: view.session.version },
             );
-            navigate = "HOME";
-            reply =
-              `${reply.trim()} That's everything I need for now. I'm taking you to your home.`.trim();
+            const finished = finishedDestination(input.journeyType);
+            navigate = finished.navigate;
+            reply = `${reply.trim()} ${finished.line}`.trim();
           } catch (error: unknown) {
             logger.warn(
               { err: error },
