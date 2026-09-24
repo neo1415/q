@@ -328,8 +328,12 @@ export function disposeTurn(reading: ConversationTurnReading): TurnDisposition {
       (writing && reading.confidence === "LOW") ||
       reading.kind === "CLARIFICATION",
     transcription,
+    // A writing turn may carry their question beside it ("yes — and what
+    // would you look for?"): it is answered in the same turn (v9, E1).
     answer:
-      reading.kind === "QUESTION_TO_Q" || reading.kind === "RESEARCH_REQUEST",
+      reading.kind === "QUESTION_TO_Q" ||
+      reading.kind === "RESEARCH_REQUEST" ||
+      reading.question !== null,
     aside: reading.kind === "OFF_TOPIC" || reading.kind === "SMALL_TALK",
   };
 }

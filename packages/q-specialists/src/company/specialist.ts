@@ -71,11 +71,7 @@ import {
   materialChangeFindings,
   type DeterministicInput,
 } from "./deterministic.js";
-import {
-  asksAboutChange,
-  asksForPublicResearch,
-  focusFromQuestion,
-} from "./dimensions.js";
+import { asksAboutChange, focusFromQuestion } from "./dimensions.js";
 import type {
   CompanyCanonicalPort,
   CompanyEvidencePort,
@@ -545,14 +541,15 @@ export function createCompanyIntelligenceSpecialist(
       // network the retrieval does not need to wait for, and waiting for
       // it in turn was most of what a person experienced as Q being slow.
       // Neither influences the other's input, so concurrency changes the
-      // clock and nothing else. Research is decided here, deterministically,
-      // from the person's own words; the model never chooses to reach
-      // outside Capital Q. What comes back is unverified public text,
+      // clock and nothing else. Research is decided before the specialist
+      // runs, by the conversation core from its closed reading of the
+      // turn (CQ-QX-005); the model never chooses to reach outside
+      // Capital Q here. What comes back is unverified public text,
       // handled as data from here on. The retrieval query is the person's
       // own words, with no model spent rewriting it — one fewer place for
       // an injected instruction to be laundered into a search.
       const wantsResearch =
-        research !== undefined && asksForPublicResearch(request.question);
+        research !== undefined && request.publicResearch === true;
       if (wantsResearch) {
         await context.showStage?.("SEARCHING_PUBLIC_SOURCES");
       }
@@ -916,6 +913,7 @@ export function createCompanyIntelligenceSpecialist(
 
       return finish({
         companyId,
+        companyName: canonicalRead.canonicalName,
         specialistVersion: `${COMPANY_INTELLIGENCE_ID}/${COMPANY_INTELLIGENCE_VERSION}`,
         asOf: asOfStamp,
         blocked,

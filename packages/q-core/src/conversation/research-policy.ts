@@ -53,24 +53,25 @@ export function decideResearch(
   },
 ): ResearchDecision {
   const resumeTopic = state.asked?.topic ?? state.topic;
+  // An answer is never a reason to search. A turn that answers AND asks
+  // for something real ("yes, that's right — who else invests like me?")
+  // carries its question explicitly, and the question is judged as one.
   if (
-    reading.kind === "ANSWER" ||
-    reading.kind === "CORRECTION" ||
-    reading.kind === "CLARIFICATION"
+    (reading.kind === "ANSWER" ||
+      reading.kind === "CORRECTION" ||
+      reading.kind === "CLARIFICATION") &&
+    reading.question === null
   ) {
     return { run: false, because: "ANSWER_TURN" };
   }
   const question = reading.question;
   const explicit =
     reading.kind === "RESEARCH_REQUEST" ||
-    (reading.kind === "QUESTION_TO_Q" &&
-      question !== null &&
+    (question !== null &&
       (question.kind === "REAL_WORLD_EXAMPLE" ||
         question.kind === "PUBLIC_FACTS"));
   const fromTheirRecords =
-    reading.kind === "QUESTION_TO_Q" &&
-    question !== null &&
-    question.kind === "THEIR_OWN_RECORDS";
+    question !== null && question.kind === "THEIR_OWN_RECORDS";
   if (!explicit && !fromTheirRecords) {
     return { run: false, because: "NOT_ASKED" };
   }

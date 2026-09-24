@@ -30,9 +30,7 @@ import type { DatabaseExecutor, TransactionManager } from "@capital-q/database";
 import type { Logger } from "@capital-q/observability";
 import type { ActorContext } from "@capital-q/security";
 import {
-  asksForPublicResearch,
   createSentenceCutter,
-  namesSomething,
   isRecordableKnowledgeKey,
   recordableNamespacesSentence,
   citePublicSources,
@@ -78,6 +76,7 @@ export {
   analystResultBlocks,
   type AnalystResultLike,
 } from "./result-blocks.js";
+export { createQTurnReader, type QTurnReader } from "./turn-reader.js";
 
 /**
  * The Q answer seam over the Prompt Registry, the Tool Registry and the
@@ -308,6 +307,13 @@ const TOOLS_FIRST_NOTE: ModelMessage = {
   role: "SYSTEM",
   content:
     'LOOK IT UP FIRST. If the message names a company, organisation or person you have no authorised facts about, look it up now with the tools (search_companies with the name as given, then get_company with the returned companyId). If the person asks for public, current, external or web information, or asks you to check or compare what the public web says, call research_public_web now with a short public query (a few words: the subject as named plus what to look for; never a figure, a customer name or an identifier). Call the tool through the function-calling interface and write nothing else in that turn. THEN ANSWER IN THE SAME TURN. When nothing needs looking up, or once results are in front of you, write the JSON object and nothing else: at minimum {"answer": "...", "responseShape": "CONCISE" or "ANALYTICAL", "insufficientEvidence": true or false}, plus any other field of the schema that applies. Never reply with prose outside the object, and never reply that you are about to answer.',
+};
+
+/** Said when an answer about their own records had to use the public web. */
+const SOURCE_CHANGE_NOTE: ModelMessage = {
+  role: "SYSTEM",
+  content:
+    "What Capital Q holds about this person was not enough for their question, so public web sources were read. Say so in a few words before using them (\"What you've shared with me doesn't cover that, so this is from public sources\"), and keep what they told you apart from what the web says.",
 };
 
 /** What the model is told when public research is among its tools (CQ-Q-RESEARCH-001 §26, §30). */
@@ -932,10 +938,28 @@ export function createModelGatewayQAnswer(
         // from authorised public identity, never from a model argument.
         conversation: { latestUserText: latest.content },
       };
-      const offered = await tools.offer(toolContext);
+      const offeredForRun = await tools.offer(toolContext);
       took("tools");
       const memory = await recallMemory(request, conversationId);
       took("memory");
+      /**
+       * Whether this turn may reach the public web (CQ-QX-005), decided by
+       * the conversation core from its reading of the turn, which has been
+       * running alongside everything above. NEVER takes the research tool
+       * out of the model's hands for this turn altogether: "what else
+       * should I look for?" is not a search, and a company's name being
+       * in the sentence is not one either. Absent (no reader composed):
+       * the model keeps the tool and nothing is forced.
+       */
+      const research =
+        request.research === undefined ? undefined : await request.research;
+      took("reading");
+      const offered =
+        research?.mode === "NEVER"
+          ? offeredForRun.filter(
+              (tool) => tool.definition.name !== "research_public_web",
+            )
+          : offeredForRun;
       const offeredByName = new Map(
         offered.map((tool) => [tool.definition.name, tool] as const),
       );
@@ -1375,17 +1399,19 @@ export function createModelGatewayQAnswer(
           }
         }
 
-        // Q decides when to research, from the person's words and from
-        // what the platform actually returned — never from the model's mood
-        // (CQ-Q-RESEARCH-001 §26). Two triggers, both deterministic: the
-        // question asks for public information, or a platform lookup came
-        // back empty and the outside world is the only place left to look.
-        // The second is the one that matters in practice: a small model
-        // reliably searches Capital Q, finds nothing, and stops, and the
-        // person reads "I have no information" about a company with a
-        // Wikipedia page. The tool composes the outbound query from the
-        // person's words and authorised identity; the result joins the
-        // transcript as data, never as instruction.
+        // Q decides when to research from the conversation core's reading
+        // of the turn and from what the platform actually returned — never
+        // from the model's mood and never from a word list (CQ-QX-005;
+        // CQ-Q-RESEARCH-001 §26). Two triggers: the turn explicitly asked
+        // for something real, current or public (EXPLICIT); or it asked
+        // about their own records or a named company, and the platform
+        // lookup came back empty (ONLY_IF_EMPTY). The second is the one
+        // that matters in practice: a small model reliably searches
+        // Capital Q, finds nothing, and stops, and the person reads "I
+        // have no information" about a company with a Wikipedia page. The
+        // tool composes the outbound query from the person's words and
+        // authorised identity; the result joins the transcript as data,
+        // never as instruction.
         const researchTool = offeredByName.get("research_public_web");
         if (
           analyst === undefined &&
@@ -1394,8 +1420,9 @@ export function createModelGatewayQAnswer(
           // when the words name something to look up. A lookup comes back
           // empty for "what's up" too, and small talk was being followed
           // by three seconds on the web for nothing.
-          (asksForPublicResearch(latest.content) ||
-            (platformLookupFoundNothing && namesSomething(latest.content))) &&
+          (research?.mode === "EXPLICIT" ||
+            (research?.mode === "ONLY_IF_EMPTY" &&
+              platformLookupFoundNothing)) &&
           !toolCalls.some((call) => call.providerName === "research_public_web")
         ) {
           if (
@@ -1430,6 +1457,15 @@ export function createModelGatewayQAnswer(
           }
         }
 
+        // They asked about their own records and Capital Q's context was
+        // not enough, so the answer draws on the public web: said out
+        // loud as a change of source, never silently (CQ-QX-005).
+        if (
+          research?.announceSourceChange === true &&
+          toolCalls.some((call) => call.providerName === "research_public_web")
+        ) {
+          messages = [...messages, SOURCE_CHANGE_NOTE];
+        }
         if (analyst === undefined || final === undefined) {
           modelCalls += 1;
           final = await gateway.execute<CompanyAnalystV5Result>(

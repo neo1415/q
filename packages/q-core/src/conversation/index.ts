@@ -75,3 +75,10 @@ export {
   type TurnDisposition,
 } from "./state.js";
 export { loggableTrace, traceVerdict, type TurnTrace } from "./trace.js";
+export {
+  NO_RESEARCH,
+  noteAnswerFailure,
+  readingFromTurnReader,
+  researchDirectiveFor,
+  type ResearchDirective,
+} from "./general-turn.js";

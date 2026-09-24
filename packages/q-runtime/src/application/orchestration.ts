@@ -170,6 +170,23 @@ export type QAnswerRequest = QOrchestrationSubjectContext & {
   readonly plan: PermittedContextPlan;
   /** Cooperative cancellation: the engine's signal, propagated to the model call. */
   readonly signal?: AbortSignal | undefined;
+  /**
+   * Whether this turn may go to the public web (CQ-QX-005), decided from
+   * the conversation core's reading of the turn before the answer runs.
+   * EXPLICIT: they asked for something real or current. ONLY_IF_EMPTY:
+   * about their own records — authorised context first, the web only if
+   * that came back empty, announced as a change of source. NEVER: every
+   * other turn. A promise, so that reading the turn runs alongside the
+   * context the answer assembles anyway; the answer path awaits it only
+   * where research is decided. Absent means no reading was made, and the
+   * answer path forces no research of its own.
+   */
+  readonly research?: Promise<QResearchDirective> | undefined;
+};
+
+export type QResearchDirective = {
+  readonly mode: "EXPLICIT" | "ONLY_IF_EMPTY" | "NEVER";
+  readonly announceSourceChange: boolean;
 };
 
 export type QAnswerOutcome =
@@ -194,6 +211,14 @@ export type QAnswerOutcome =
 
 export type QAnswerPort = {
   readonly answer: (request: QAnswerRequest) => Promise<QAnswerOutcome>;
+  /**
+   * Q's own sentence for a run whose answer FAILED, from the conversation
+   * core's failure ledger (CQ-QX-005): named by the subsystem that failed,
+   * and undefined when the ledger says the person has already been told.
+   * A port, not graph state: checkpoints hold coded outcomes, never prose.
+   * Read once; the port forgets it.
+   */
+  readonly failureNotice?: (runId: string) => string | undefined;
 };
 
 export function createUnconfiguredQAnswer(): QAnswerPort {

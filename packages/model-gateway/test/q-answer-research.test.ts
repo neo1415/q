@@ -315,7 +315,7 @@ describe("environment notes with research offered", () => {
 });
 
 describe("answer seam: Q decides to research", () => {
-  it("calls research_public_web itself when the question asks for public information and the gathering round did not", async () => {
+  it("calls research_public_web itself when the turn was read as asking for public information and the gathering round did not", async () => {
     const tools = toolPort([GET_COMPANY, RESEARCH], (p) =>
       p.name === "research_public_web"
         ? researchOutcome(
@@ -354,7 +354,14 @@ describe("answer seam: Q decides to research", () => {
       tools: tools.port,
       userText: question,
     });
-    const outcome = await seam.answer(request);
+    // The conversation core read the turn as asking for public facts.
+    const outcome = await seam.answer({
+      ...request,
+      research: Promise.resolve({
+        mode: "EXPLICIT",
+        announceSourceChange: false,
+      }),
+    });
     expect(outcome.kind).toBe("ANSWERED");
     expect(tools.executed.map((e) => e.proposal.name)).toEqual([
       "get_company",
@@ -384,7 +391,46 @@ describe("answer seam: Q decides to research", () => {
     ).toEqual(["get_company", "research_public_web"]);
   });
 
-  it("does not research a question without a public-facing cue, and does not repeat a research the model already made", async () => {
+  it("takes research out of the model's hands on a turn the core read as not asking for it, whatever its words (CQ-QX-005)", async () => {
+    const quiet = toolPort([RESEARCH], (p) => researchOutcome(p, "x"));
+    const advice = build({
+      script: [{ kind: "JSON", value: analystResult("advice") }],
+      tools: quiet.port,
+      userText: "What else should I look for in the public web of founders?",
+    });
+    await advice.seam.answer({
+      ...advice.request,
+      research: Promise.resolve({ mode: "NEVER", announceSourceChange: false }),
+    });
+    expect(quiet.executed).toHaveLength(0);
+    for (const call of advice.alpha.calls) {
+      expect((call.request.tools ?? []).map((tool) => tool.name)).not.toContain(
+        "research_public_web",
+      );
+    }
+  });
+
+  it("says so when an answer about their own records had to go to the public web", async () => {
+    const tools = toolPort([RESEARCH], (p) => researchOutcome(p, "x"));
+    const own = build({
+      script: [researchCall, { kind: "JSON", value: analystResult("own") }],
+      tools: tools.port,
+      userText: "Based on what you know about me, who else invests like me?",
+    });
+    await own.seam.answer({
+      ...own.request,
+      research: Promise.resolve({
+        mode: "ONLY_IF_EMPTY",
+        announceSourceChange: true,
+      }),
+    });
+    const finalCall = own.alpha.calls.at(-1)?.request;
+    expect(
+      finalCall?.messages.some((m) => m.content.includes("public sources")),
+    ).toBe(true);
+  });
+
+  it("does not research a question the core did not read as asking, and does not repeat a research the model already made", async () => {
     const quiet = toolPort([RESEARCH], (p) => researchOutcome(p, "x"));
     const noCue = build({
       script: [{ kind: "JSON", value: analystResult("inside") }],

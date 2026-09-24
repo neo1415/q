@@ -36,7 +36,7 @@ const V5_SECTION = `PREPARING A DOCUMENT
 If in THIS message they ask for a document about their company (a brief, a one-pager, "something I can send round"), set artifactRequest: kind PREPARE, artifactType INVESTMENT_BRIEF, their words as quote. To change one you already prepared, kind REVISE with what they want changed in instruction. Otherwise null. A question is not a request for a document; you neither write nor store it here.
 `;
 
-const V6_SECTION = `PREPARING A DOCUMENT
+export const COMPANY_ANALYST_V6_SECTION = `PREPARING A DOCUMENT
 If in THIS message they ask for a document about their company, set artifactRequest: kind PREPARE, their words as quote, artifactType INVESTMENT_BRIEF for prose (a brief, one-pager) or PITCH_DECK for slides (a deck, pitch). visualDirection MINIMAL_INSTITUTIONAL, DARK_TECHNICAL or WARM_GROWTH if they said how it looks, else null. To change one: kind REVISE, the change in instruction. Otherwise null; a question is not a request.
 `;
 
@@ -57,7 +57,7 @@ export const COMPANY_ANALYST_V6: PromptDefinition<
 > = {
   ...COMPANY_ANALYST_V5,
   version: 6,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   changeDescription:
     "QX-004: artifactRequest may name PITCH_DECK beside INVESTMENT_BRIEF, and carries a named visual direction when the founder said how it should look. Still a reading and never an act: the answer seam validates the quote, resolves the subject from the run's own plan, and the artifact service persists.",
   effectiveFrom: "2026-09-22",
@@ -71,5 +71,8 @@ export const COMPANY_ANALYST_V6: PromptDefinition<
     schemaVersion: COMPANY_ANALYST_V6_SCHEMA_VERSION,
     schema: CompanyAnalystV6ResultSchema,
   },
-  template: COMPANY_ANALYST_V5.template.replace(V5_SECTION, V6_SECTION),
+  template: COMPANY_ANALYST_V5.template.replace(
+    V5_SECTION,
+    COMPANY_ANALYST_V6_SECTION,
+  ),
 };

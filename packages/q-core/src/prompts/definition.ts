@@ -39,6 +39,8 @@ export const PROMPT_IDS = [
   "GATEQ_INTERVIEWER",
   /** QX-003F: rewriting the prose of a document Q already composed. */
   "ARTIFACT_REVISION",
+  /** CQ-QX-005: what one turn to Q was, before Q answers it. */
+  "TURN_READER",
 ] as const;
 export type PromptId = (typeof PROMPT_IDS)[number];
 
@@ -57,6 +59,7 @@ export const PROMPT_SLUGS: Readonly<Record<PromptId, string>> = {
   MEMORY_EXTRACTOR: "memory-extractor",
   GATEQ_INTERVIEWER: "gateq-interviewer",
   ARTIFACT_REVISION: "artifact-revision",
+  TURN_READER: "turn-reader",
 };
 
 export type PromptKind = "CHARTER" | "TASK";

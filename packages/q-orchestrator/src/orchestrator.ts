@@ -216,7 +216,11 @@ export function createLangGraphQOrchestrator(
                 await runtime.finishCancellation(ref);
                 outcome = "cancelled";
               } else {
-                await runtime.fail(ref, code);
+                await runtime.fail(
+                  ref,
+                  code,
+                  options.answer.failureNotice?.(ref.runId),
+                );
                 outcome = "answer_failed";
               }
             } else {

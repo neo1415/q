@@ -53,6 +53,12 @@ export type CompanyIntelligenceRequest = {
    * shorter" can be read as a request to change it (QX-003F).
    */
   readonly openDocument?: OpenDocument | undefined;
+  /**
+   * Whether this turn asked for public, current or external information,
+   * as the conversation core decided from its reading of the turn
+   * (CQ-QX-005). Only then is the public web read. Absent means no.
+   */
+  readonly publicResearch?: boolean | undefined;
 };
 
 /** One dimension's evidential standing. No percentage, ever (§40). */
@@ -106,6 +112,12 @@ export type OpenDocument = {
 
 export type CompanyIntelligenceResult = {
   readonly companyId: string;
+  /**
+   * The company's canonical name as the authorised read returned it, when
+   * it did. A document titled "your company — investor deck" is a
+   * document nobody would send.
+   */
+  readonly companyName?: string | null | undefined;
   readonly specialistVersion: string;
   /** The information state the findings describe. */
   readonly asOf: UtcTimestamp;

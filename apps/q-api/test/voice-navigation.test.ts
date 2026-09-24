@@ -4,6 +4,7 @@ import {
   fillerLine,
   isNonLexical,
   recoveryLine,
+  recoverySettled,
   resumeAcknowledgement,
   spokenDestination,
   wantsToEndVoice,
@@ -75,6 +76,24 @@ describe("spoken navigation, read deterministically", () => {
     );
     expect(fillers.size).toBeGreaterThan(2);
     expect(resumeAcknowledgement()).not.toBe(resumeAcknowledgement());
+  });
+
+  it("counts run failures per conversation line, names the subsystem, and never repeats back to back (CQ-QX-005)", () => {
+    const mine = {};
+    const theirs = {};
+    const said = Array.from({ length: 5 }, () =>
+      recoveryLine("Q_UNAVAILABLE", mine),
+    );
+    for (let i = 1; i < said.length; i += 1) {
+      expect(said[i]).not.toBe(said[i - 1]);
+    }
+    // The second failure running is the one that says Q stops trying.
+    expect(said[1]).toMatch(/reasoning service still isn't answering/i);
+    // Somebody else's session is not told about my outage.
+    expect(recoveryLine("Q_UNAVAILABLE", theirs)).toBe(said[0]);
+    // A run that completes makes the next failure a first again.
+    recoverySettled(mine);
+    expect(recoveryLine("Q_UNAVAILABLE", mine)).toBe(said[0]);
   });
 });
 

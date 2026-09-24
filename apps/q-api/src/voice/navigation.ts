@@ -1,4 +1,12 @@
 import type { QVoiceDestination } from "@capital-q/contracts";
+import {
+  EMPTY_FAILURES,
+  FAILURE_THRESHOLD,
+  noteFailure,
+  subsystemNotice,
+  type FailureLedger,
+  type FailureOperation,
+} from "@capital-q/q-core";
 
 /**
  * What a spoken sentence asks the screen to do, read deterministically
@@ -94,20 +102,60 @@ const RECOVERY_LINES: Readonly<Record<string, readonly string[]>> = {
 const RECOVERY_DEFAULT = [
   "I couldn't finish that one. Ask me again, or tell me what would help most and I'll go from there.",
 ];
-let recoveryTurn = 0;
-
 /**
- * Never the same apology twice in a row: the lines rotate, and each says
- * what Q can do instead of only what it couldn't.
+ * Which subsystem a run failure is, for the failure ledger (CQ-QX-005
+ * §7): no model answering or answering too slowly is reasoning; anything
+ * else is a step Q could not complete. Neither is ever the person's words.
  */
-function rotate(lines: readonly string[], turn: number): string {
-  return lines[turn % lines.length] ?? lines.join(" ");
+function operationOf(code: string): FailureOperation {
+  return code === "Q_UNAVAILABLE" || code === "Q_TIMEOUT" ? "MODEL" : "TOOL";
 }
 
-export function recoveryLine(code: string): string {
-  const lines = RECOVERY_LINES[code] ?? RECOVERY_DEFAULT;
-  recoveryTurn += 1;
-  return rotate(lines, recoveryTurn);
+/** Failures per spoken line, and the sentence said last, so none repeats. */
+const recoveries = new WeakMap<
+  object,
+  { readonly ledger: FailureLedger; readonly last: string | null }
+>();
+/** For a caller with no line to key on (tests, one-off use). */
+const UNKEYED = {};
+
+/**
+ * Why a run stopped, in one spoken line that says what Q can still do.
+ *
+ * Counted per conversation line through the core's failure ledger, not
+ * with one counter shared by every session on the process: the first
+ * failure says what Q can still do; the one that reaches the threshold
+ * says Q is leaving that alone; later ones rotate. No two in a row are
+ * the same sentence.
+ */
+export function recoveryLine(code: string, line: object = UNKEYED): string {
+  const operation = operationOf(code);
+  const held = recoveries.get(line) ?? { ledger: EMPTY_FAILURES, last: null };
+  const ledger = noteFailure(held.ledger, operation);
+  const count = ledger[operation];
+  const own = RECOVERY_LINES[code] ?? RECOVERY_DEFAULT;
+  const offset = (count - 1) % own.length;
+  const rotated = [...own.slice(offset), ...own.slice(0, offset)];
+  const candidates =
+    count === FAILURE_THRESHOLD
+      ? [subsystemNotice(operation, true), ...rotated]
+      : [...rotated, subsystemNotice(operation, false)];
+  const chosen =
+    candidates.find((candidate) => candidate !== held.last) ??
+    candidates[0] ??
+    "";
+  recoveries.set(line, { ledger, last: chosen });
+  return chosen;
+}
+
+/** A run that completed: the next failure on this line is a first again. */
+export function recoverySettled(line: object): void {
+  recoveries.delete(line);
+}
+
+/** Lines that rotate, so the same filler is never said twice running. */
+function rotate(lines: readonly string[], turn: number): string {
+  return lines[turn % lines.length] ?? lines.join(" ");
 }
 
 export const FILLERS_THINKING = [
