@@ -5,6 +5,7 @@ import type { Logger } from "@capital-q/observability";
 
 import { createPostgresOnboardingDefinitionRepository } from "../infrastructure/postgres-definition-repository.js";
 import { createPostgresOnboardingInterviewQuestionRepository } from "../infrastructure/postgres-question-repository.js";
+import { createPostgresOnboardingInterviewTurnRepository } from "../infrastructure/postgres-interview-turn-repository.js";
 import { createPostgresOnboardingUtteranceRepository } from "../infrastructure/postgres-utterance-repository.js";
 import type { OnboardingUtteranceAliases } from "../domain/interpretation.js";
 import {
@@ -18,6 +19,7 @@ import type {
   OnboardingDefinitionRepository,
   OnboardingIdempotencyRepository,
   OnboardingInterviewQuestionRepository,
+  OnboardingInterviewTurnRepository,
   OnboardingResponseRepository,
   OnboardingSessionRepository,
   OnboardingStepContextProvider,
@@ -63,6 +65,8 @@ export type OnboardingService = {
     | "answerInterviewQuestion"
     | "dismissInterviewQuestion"
     | "say"
+    | "appendInterviewTurns"
+    | "listInterviewTurns"
   >;
   readonly internal: Pick<
     OnboardingUseCases,
@@ -93,6 +97,7 @@ export type OnboardingServiceOptions = {
         readonly suggestions?: OnboardingSuggestionRepository | undefined;
         readonly questions?: OnboardingInterviewQuestionRepository | undefined;
         readonly utterances?: OnboardingUtteranceRepository | undefined;
+        readonly interviewTurns?: OnboardingInterviewTurnRepository | undefined;
         readonly idempotency?: OnboardingIdempotencyRepository | undefined;
       }
     | undefined;
@@ -139,6 +144,9 @@ export function createOnboardingService(
     utterances:
       options.repositories?.utterances ??
       createPostgresOnboardingUtteranceRepository(),
+    interviewTurns:
+      options.repositories?.interviewTurns ??
+      createPostgresOnboardingInterviewTurnRepository(),
     utteranceAliases: options.utteranceAliases,
     interviewCues: options.interviewCues,
     taxonomy: options.taxonomy,
@@ -169,6 +177,8 @@ export function createOnboardingService(
       answerInterviewQuestion: useCases.answerInterviewQuestion,
       dismissInterviewQuestion: useCases.dismissInterviewQuestion,
       say: useCases.say,
+      appendInterviewTurns: useCases.appendInterviewTurns,
+      listInterviewTurns: useCases.listInterviewTurns,
     },
     internal: {
       bindSessionContext: useCases.bindSessionContext,

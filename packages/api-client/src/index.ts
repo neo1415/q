@@ -90,6 +90,8 @@ export {
 
 export {
   answerOnboardingQuestion,
+  appendOnboardingInterviewTurns,
+  listOnboardingInterviewTurns,
   sayToOnboarding,
   completeOnboardingSession,
   dismissOnboardingQuestion,

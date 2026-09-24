@@ -821,3 +821,105 @@ export const SayOnboardingResponseSchema = z
   })
   .strict();
 export type SayOnboardingResponse = z.infer<typeof SayOnboardingResponseSchema>;
+
+// ---------------------------------------------------------------------------
+// The interview thread (CQ-QX-006)
+// ---------------------------------------------------------------------------
+
+/**
+ * `GET|POST /v1/onboarding/sessions/:id/turns` -- the conversation as it was
+ * shown, both sides and both modalities, so a reload redraws the thread
+ * instead of dropping it. A display record only: it is never evidence of
+ * what was recorded (the session view is), and nothing reads it to decide.
+ */
+export const ONBOARDING_TURNS_SEGMENT = "/turns";
+export const ONBOARDING_INTERVIEW_TURNS_MAX = 100;
+export const ONBOARDING_INTERVIEW_TURNS_DEFAULT = 50;
+
+export const OnboardingInterviewTurnRoleSchema = z.enum(["PERSON", "Q"]);
+export type OnboardingInterviewTurnRole = z.infer<
+  typeof OnboardingInterviewTurnRoleSchema
+>;
+export const OnboardingInterviewTurnChannelSchema = z.enum(["TEXT", "VOICE"]);
+export type OnboardingInterviewTurnChannel = z.infer<
+  typeof OnboardingInterviewTurnChannelSchema
+>;
+
+export const OnboardingInterviewTurnSchema = z
+  .object({
+    role: OnboardingInterviewTurnRoleSchema,
+    text: z.string().min(1).max(ONBOARDING_TEXT_MAX_LENGTH),
+    channel: OnboardingInterviewTurnChannelSchema,
+    createdAt: UtcTimestampSchema,
+  })
+  .strict();
+export type OnboardingInterviewTurn = z.infer<
+  typeof OnboardingInterviewTurnSchema
+>;
+
+/** `?limit=` -- the newest N turns, returned oldest first. */
+export const ListOnboardingInterviewTurnsQuerySchema = z
+  .object({
+    limit: z.coerce
+      .number()
+      .int()
+      .min(1)
+      .max(ONBOARDING_INTERVIEW_TURNS_MAX)
+      .default(ONBOARDING_INTERVIEW_TURNS_DEFAULT),
+  })
+  .strict();
+export type ListOnboardingInterviewTurnsQuery = z.infer<
+  typeof ListOnboardingInterviewTurnsQuerySchema
+>;
+
+export const ListOnboardingInterviewTurnsResponseSchema = z
+  .object({
+    items: z
+      .array(OnboardingInterviewTurnSchema)
+      .max(ONBOARDING_INTERVIEW_TURNS_MAX),
+  })
+  .strict();
+export type ListOnboardingInterviewTurnsResponse = z.infer<
+  typeof ListOnboardingInterviewTurnsResponseSchema
+>;
+
+/**
+ * One exchange, appended after it happened: the person's words and Q's
+ * reply, or either alone. `turnRef` makes a retried append write nothing
+ * (one row per reference and role), so each role appears at most once.
+ */
+export const AppendOnboardingInterviewTurnsRequestSchema = z
+  .object({
+    turnRef: UuidSchema,
+    turns: z
+      .array(
+        z
+          .object({
+            role: OnboardingInterviewTurnRoleSchema,
+            text: z.string().min(1).max(ONBOARDING_TEXT_MAX_LENGTH),
+            stepKey: OnboardingStepKeySchema.optional(),
+            channel: OnboardingInterviewTurnChannelSchema,
+          })
+          .strict(),
+      )
+      .min(1)
+      .max(2)
+      .refine(
+        (turns) => new Set(turns.map((t) => t.role)).size === turns.length,
+        "each role appears at most once in one exchange",
+      ),
+  })
+  .strict();
+export type AppendOnboardingInterviewTurnsRequest = z.infer<
+  typeof AppendOnboardingInterviewTurnsRequestSchema
+>;
+
+export const AppendOnboardingInterviewTurnsResponseSchema = z
+  .object({
+    /** False when this exchange reference was already recorded. */
+    written: z.boolean(),
+  })
+  .strict();
+export type AppendOnboardingInterviewTurnsResponse = z.infer<
+  typeof AppendOnboardingInterviewTurnsResponseSchema
+>;

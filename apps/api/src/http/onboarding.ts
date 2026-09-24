@@ -1,6 +1,11 @@
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import {
   AnswerOnboardingQuestionRequestSchema,
+  AppendOnboardingInterviewTurnsRequestSchema,
+  AppendOnboardingInterviewTurnsResponseSchema,
+  ListOnboardingInterviewTurnsQuerySchema,
+  ListOnboardingInterviewTurnsResponseSchema,
+  ONBOARDING_TURNS_SEGMENT,
   CompleteOnboardingSessionRequestSchema,
   DismissOnboardingQuestionRequestSchema,
   CorrelationIdSchema,
@@ -416,6 +421,52 @@ export function registerOnboardingRoutes(
       });
       void reply.header("Cache-Control", "no-store");
       return OnboardingSessionViewSchema.parse(view);
+    },
+  );
+
+  // The interview thread (CQ-QX-006): what was said on screen, both sides
+  // and both modalities, so a reload redraws the conversation. Ownership is
+  // checked by the runtime from the actor; the path's session id is input.
+  app.get(
+    `${byId}${ONBOARDING_TURNS_SEGMENT}`,
+    { onRequest: withActor },
+    async (request, reply) => {
+      const query = parseContract(
+        ListOnboardingInterviewTurnsQuerySchema,
+        request.query ?? {},
+        "The thread request is not valid.",
+      );
+      const items = await runtime.listInterviewTurns({
+        actor: getOnboardingActor(request),
+        sessionId: sessionIdParam(request),
+        limit: query.limit,
+      });
+      void reply.header("Cache-Control", "no-store");
+      return ListOnboardingInterviewTurnsResponseSchema.parse({ items });
+    },
+  );
+
+  // Idempotent by the body's turnRef: 201 when anything was written, 200
+  // when the exchange was already recorded.
+  app.post(
+    `${byId}${ONBOARDING_TURNS_SEGMENT}`,
+    { onRequest: withActor },
+    async (request, reply) => {
+      const input = parseContract(
+        AppendOnboardingInterviewTurnsRequestSchema,
+        request.body,
+        "The thread entry is not valid.",
+      );
+      const result = await runtime.appendInterviewTurns({
+        actor: getOnboardingActor(request),
+        sessionId: sessionIdParam(request),
+        turnRef: input.turnRef,
+        turns: input.turns,
+      });
+      void reply
+        .status(result.written ? 201 : 200)
+        .header("Cache-Control", "no-store");
+      return AppendOnboardingInterviewTurnsResponseSchema.parse(result);
     },
   );
 }
