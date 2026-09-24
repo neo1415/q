@@ -111,7 +111,7 @@ export function composeRepair(
       : ` I do have ${list(slots.held.slice(0, 3))} from you.`;
   switch (strategy) {
     case "REPHRASE":
-      return `Let me ask that differently. ${slots.question}`;
+      return `Let me ask that differently. ${sentence(slots.question)}`;
     case "OFFER_INTERPRETATION":
       return slots.interpretation === undefined
         ? `I heard the words, but I'm not sure which preference you want me to record.${canTake}`
@@ -123,6 +123,12 @@ export function composeRepair(
         ? `I don't want to keep you on ${slots.label}. We can leave it for now and come back, or you can tap Type and put it in your own words.`
         : `I don't want to keep you on ${slots.label}, and I do need it to finish. Tapping Type and writing it in your own words is the surest way through.`;
   }
+}
+
+/** A question composed as a fragment ("typical cheque?") starts a sentence here. */
+function sentence(text: string): string {
+  const trimmed = text.trim();
+  return trimmed.charAt(0).toUpperCase() + trimmed.slice(1);
 }
 
 function list(items: readonly string[]): string {

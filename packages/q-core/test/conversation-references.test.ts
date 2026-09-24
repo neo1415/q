@@ -90,6 +90,26 @@ describe("a pointed-at choice resolves against the shown options", () => {
     ).toEqual({ kind: "KEYS", keys: ["network"] });
   });
 
+  it("adds 'and the second one too' to what was chosen before", () => {
+    expect(
+      resolveOptionReference(
+        { target: "t", select: "ADD", ordinals: [2] },
+        SHOWN,
+        ["domain", "sales", "grit", "network"],
+      ),
+    ).toEqual({
+      kind: "KEYS",
+      keys: ["domain", "sales", "grit", "network", "repeat"],
+    });
+    expect(
+      resolveOptionReference(
+        { target: "t", select: "ADD", ordinals: [2] },
+        SHOWN,
+        null,
+      ),
+    ).toEqual({ kind: "KEYS", keys: ["repeat"] });
+  });
+
   it("refuses a position that was never on screen rather than guessing", () => {
     expect(
       resolveOptionReference(

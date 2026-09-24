@@ -130,6 +130,9 @@ const base: InterviewConductorResult = {
   navigate: null,
   lookup: null,
   pronounce: null,
+  unrestricted: [],
+  frustrated: false,
+  reading: null,
 };
 
 function gateway(result: InterviewConductorResult): InterviewGateway {
@@ -175,7 +178,12 @@ describe("a correction reaches the record", () => {
         intent: "CORRECTION",
         reply: "Series A, then — not seed.",
         answers: [
-          { stepKey: "F1.stage", value: "series_a", confidence: "HIGH" },
+          {
+            stepKey: "F1.stage",
+            value: "series_a",
+            confidence: "HIGH",
+            clarity: "SETTLED",
+          },
         ],
       }),
       logger,
@@ -201,7 +209,12 @@ describe("a correction reaches the record", () => {
         intent: "ANSWER",
         reply: "Series A, got it.",
         answers: [
-          { stepKey: "F1.stage", value: "series_a", confidence: "HIGH" },
+          {
+            stepKey: "F1.stage",
+            value: "series_a",
+            confidence: "HIGH",
+            clarity: "SETTLED",
+          },
         ],
       }),
       logger,
@@ -219,7 +232,12 @@ describe("a correction reaches the record", () => {
         intent: "CORRECTION",
         reply: "Series A, then.",
         answers: [
-          { stepKey: "F1.stage", value: "series_a", confidence: "HIGH" },
+          {
+            stepKey: "F1.stage",
+            value: "series_a",
+            confidence: "HIGH",
+            clarity: "SETTLED",
+          },
         ],
       }),
       logger,

@@ -24,14 +24,37 @@ import {
 } from "@capital-q/model-gateway";
 import type { Logger } from "@capital-q/observability";
 import {
+  composeRepair,
+  ConversationTurnReadingSchema,
   createDefaultPromptRegistry,
+  decideResearch,
   DEFAULT_COMMUNICATION_PROFILE,
+  disposeTurn,
+  INITIAL_CONVERSATION_STATE,
+  isExhausted,
+  labelsOf,
+  loggableTrace,
+  nextRepair,
+  reduceConversation,
   renderPrompt,
-  InterviewConductorV5ResultSchema,
+  resolveOptionReference,
+  InterviewConductorV6ResultSchema,
+  shouldNotify,
+  subsystemNotice,
+  traceVerdict,
+  type ConversationEvent,
+  type ConversationState,
+  type ConversationTurnReading,
   type InterviewConductorResult,
-  type InterviewConductorV4Variables,
+  type InterviewConductorV8Variables,
   type InterviewOpenStep,
   type PromptRegistry,
+  type QualitativeMeaning,
+  type ReadingConfidence,
+  type RepairStrategy,
+  type ResearchDecision,
+  type ShownOption,
+  type TurnTrace,
   personalityOf,
   type InterviewDestination,
   type QPersonalityCode,
@@ -87,6 +110,15 @@ export type InterviewerDependencies = {
         }) => Promise<string>;
       }
     | undefined;
+  /**
+   * Whether this deployment can run public research at all (CQ-QX-005
+   * §11, §13). Absent means it can, over a transport that carries a
+   * question away (voice). A typed turn has no such transport today, so
+   * the research policy treats text as unavailable whatever this says:
+   * Q answers from what it knows and says the public sources are out of
+   * reach from here, rather than promising a look-up nothing will run.
+   */
+  readonly research?: { readonly available: () => boolean } | undefined;
 };
 
 export type InterviewTurnInput = {
@@ -218,47 +250,25 @@ export type InterviewTurnOutcome = {
   readonly view: OnboardingSessionView;
   /** True when the model could not be reached and Q spoke a fallback line. */
   readonly degraded: boolean;
+  /**
+   * What the turn was, in the conversation core's closed vocabulary
+   * (CQ-QX-005). Null only when no model answered.
+   */
+  readonly reading: ConversationTurnReading | null;
+  /**
+   * The question to return to once an interruption — a question of
+   * theirs, a research run — is over, said the way Q would ask it. A
+   * caller that carried the interruption speaks this after it.
+   */
+  readonly resume: {
+    readonly stepKey: string;
+    readonly question: string;
+  } | null;
+  /** Meaning kept beside a field this session, in the person's words. */
+  readonly qualitative: readonly QualitativeMeaning[];
+  /** raw STT → normalised → classification → extracted → persisted. */
+  readonly trace: TurnTrace | null;
 };
-
-/**
- * What Q is sent to find out about a subject it has just learned the name
- * of, and how it should come back with it (QX-004 §1.1, §1.2, §1.4, §1.8).
- *
- * Three things this asks for that a plain research prompt does not:
- *
- * **Only what an investment conversation needs.** A founder's company and
- * an investor's organisation have different relevant facts, and neither
- * includes the person's private life. Person is not Organisation.
- *
- * **A source, named once.** So that "where did you get that?" has a true
- * answer, without every sentence carrying a URL.
- *
- * **A question at the end.** Nobody asked for this, and what comes back
- * is a stranger's web page: it is offered for the person to confirm or
- * correct, never read out as though Capital Q now knows it.
- */
-function proactiveLookupQuestion(input: {
-  readonly journeyType: "founder" | "investor";
-  readonly subject: string;
-  readonly website: string | null;
-}): string {
-  const subject = input.subject.trim().slice(0, 200);
-  const where =
-    input.website === null
-      ? `the company "${subject}"`
-      : `the public website ${spokenUrl(input.website).slice(0, 200)}`;
-  const wanted =
-    input.journeyType === "founder"
-      ? "what it does and for whom, its product, how it makes money, where it operates, any funding or milestones it has announced, and any customers or partners it names"
-      : "what it invests in — stage, sectors, geography, cheque size where it is published — its stated thesis, and any fund or programme and portfolio companies it names";
-  return [
-    `Look ${input.website === null ? "up" : "at"} ${where} on the public web.`,
-    `Report ${wanted}.`,
-    'Say it in two or three spoken sentences as unverified public context for this interview, naming the source once ("their site says", "their Crunchbase page says").',
-    "Then ask whether that is the right one, so they can confirm or correct it.",
-    "Nothing you find is a fact about them until they confirm it.",
-  ].join(" ");
-}
 
 /**
  * The choices on the step somebody is standing on, in a sentence
@@ -636,11 +646,38 @@ const SHORT_OPTIONS = 6;
  * A far step's question is enough to recognise a candidate; the value is
  * validated by the owning service whatever the model saw.
  */
-const OPTIONS_STEPS = 8;
+const OPTIONS_STEPS = 5;
 /** Warnings before Q leaves the person with the form. */
 const WARNINGS_BEFORE_HANDOFF = 2;
 const MAX_RECENT_TURNS = 12;
 const RECENT_TURN_MAX_CHARS = 600;
+/**
+ * All the recent turns together (CQ-QX-005). Twelve turns of six hundred
+ * characters is 7,200 characters — near two thousand tokens on top of a
+ * v8 prompt that is already most of a small model's request limit. The
+ * conversation core now carries what the transcript used to be read
+ * for (the open question, the resume target, what is on screen), so the
+ * newest turns are kept whole and older ones are dropped once this is
+ * spent, rather than the request being refused outright.
+ */
+const RECENT_TURNS_TOTAL_CHARS = 2_400;
+
+/** The newest turns that fit the budget, oldest first. */
+function recentWithinBudget(
+  turns: readonly { readonly role: "person" | "q"; readonly text: string }[],
+): { role: "person" | "q"; text: string }[] {
+  const kept: { role: "person" | "q"; text: string }[] = [];
+  let spent = 0;
+  for (const turn of [...turns.slice(-MAX_RECENT_TURNS)].reverse()) {
+    const text = turn.text.slice(0, RECENT_TURN_MAX_CHARS);
+    if (spent + text.length > RECENT_TURNS_TOTAL_CHARS && kept.length > 0) {
+      break;
+    }
+    kept.push({ role: turn.role, text });
+    spent += text.length;
+  }
+  return kept.reverse();
+}
 
 /** The currency a person named while saying an amount, as the step's option key. */
 function currencyFromUtterance(utterance: string): string | null {
@@ -661,18 +698,6 @@ function currencyFromUtterance(utterance: string): string | null {
 const UPLOAD_LINE =
   "Whenever you like, add the deck or model on screen from your company page; I'll carry on here.";
 
-/** What Q asks when an answer could not be placed against the step. */
-/**
- * The step asked again, and nothing else.
- *
- * Split out from `clarificationFor` so that a caller which has already
- * said why it is asking does not say it twice. Two guards each doing
- * their job produced "Sorry — I didn't catch that well enough to write it
- * down. I didn't quite catch that. Which sectors and product areas?" —
- * one apology per guard, stacked, which reads as a machine having an
- * argument with itself. A recovery message has one reason and one
- * question.
- */
 /**
  * Questions whose own prompt is written in the platform's vocabulary
  * rather than the person's (Workstream A).
@@ -717,6 +742,23 @@ function askLabel(step: OnboardingStepManifest): string {
  * at registration, the runtime asks the way Q would, offering that name as
  * a candidate; otherwise the step's question stands.
  */
+/**
+ * The thing a repair line says it is missing, as a noun phrase.
+ *
+ * A prompt written as a question ("Which stages do you invest at?") does
+ * not read as a noun — "I'm still missing which stages do you invest at"
+ * — so it is quoted as the question it is; a label ("Founding-team
+ * capabilities that matter to you") is used as the noun it already is.
+ */
+function repairLabel(step: OnboardingStepManifest): string {
+  const prompt = (
+    PLAIN_QUESTIONS[step.stepKey] ?? step.configuration.prompt
+  ).trim();
+  return /\?$/.test(prompt)
+    ? `an answer to "${prompt}"`
+    : prompt.charAt(0).toLowerCase() + prompt.slice(1);
+}
+
 function askAgain(
   step: OnboardingStepManifest,
   input: {
@@ -756,18 +798,6 @@ function questionFor(step: OnboardingStepManifest): string {
     case "reference_select":
       return `${prompt}?`;
   }
-}
-
-/** The step asked again, with a reason in front of it. */
-function clarificationFor(step: OnboardingStepManifest): string {
-  const c = step.configuration;
-  const lead =
-    c.stepType === "single_select" || c.stepType === "multi_select"
-      ? "I couldn't place that."
-      : c.stepType === "range"
-        ? "Sorry, I need a number."
-        : "I didn't quite catch that.";
-  return `${lead} ${questionFor(step)}`;
 }
 
 /**
@@ -1047,6 +1077,88 @@ function toOpenStep(
       }
       return null;
     }
+  }
+}
+
+/**
+ * A reading for a result that carries none (CQ-QX-005).
+ *
+ * A run recorded against an older conductor, or a test double written for
+ * one, says what it took from the words in `intent` and nothing about what
+ * the turn was. The conservative translation: a legacy UNCLEAR is a
+ * reading the model could not place — reasoning, not hearing, because a
+ * model that answered at all had words to read — and a legacy question
+ * that needed looking up is a request for public facts, so that it meets
+ * the research policy rather than bypassing it.
+ */
+export function readingFrom(
+  result: InterviewConductorResult,
+): ConversationTurnReading {
+  // Parsed again here: a double that skips the gateway's schema carries no
+  // field, or a reading without its defaults, and either would be read as
+  // a turn that failed. What does not parse is treated as no reading.
+  if (result.reading !== null && result.reading !== undefined) {
+    const parsed = ConversationTurnReadingSchema.safeParse(result.reading);
+    if (parsed.success) return parsed.data;
+  }
+  // A legacy per-answer MEDIUM meant "inferred", and v7 recorded those
+  // outright; the reading-level confidence that holds a value for a yes
+  // is a v8 judgement the old shape never made.
+  const confidence: ReadingConfidence = "HIGH";
+  const base = {
+    confidence,
+    transcript: "CLEAR" as const,
+    references: [],
+    qualitative: [],
+    question: null,
+    suggestions: [],
+    tensions: [],
+    clears: [],
+  };
+  switch (result.intent) {
+    case "ANSWER":
+      return { ...base, kind: "ANSWER" };
+    case "OPENING":
+      // Q speaking first: nothing was said, so nothing was read.
+      return { ...base, kind: "CONTROL" };
+    case "CORRECTION":
+      return { ...base, kind: "CORRECTION" };
+    case "QUESTION_FOR_Q":
+      return {
+        ...base,
+        kind: "QUESTION_TO_Q",
+        question:
+          result.answerFromState === "OPTIONS"
+            ? { kind: "OPTIONS", text: result.questionForQ ?? "options" }
+            : result.answerFromState === "PROGRESS"
+              ? { kind: "PROGRESS", text: result.questionForQ ?? "progress" }
+              : result.questionForQ === null
+                ? { kind: "ADVICE", text: result.reply.slice(0, 1_000) }
+                : { kind: "PUBLIC_FACTS", text: result.questionForQ },
+      };
+    case "LOOKUP":
+      return {
+        ...base,
+        kind: "RESEARCH_REQUEST",
+        question: {
+          kind: "PUBLIC_FACTS",
+          text: result.lookup?.query.slice(0, 1_000) ?? "lookup",
+        },
+      };
+    case "UNCLEAR":
+      return { ...base, kind: "ANSWER", confidence: "LOW" };
+    case "SMALL_TALK":
+      return { ...base, kind: "SMALL_TALK" };
+    case "OFF_TOPIC":
+    case "SABOTAGE":
+      return { ...base, kind: "OFF_TOPIC" };
+    case "NAVIGATE":
+      return { ...base, kind: "TOOL_REQUEST" };
+    case "PAUSE":
+    case "RESUME":
+    case "THINKING":
+    case "PRONOUNCE":
+      return { ...base, kind: "CONTROL" };
   }
 }
 
@@ -1428,39 +1540,31 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
     pendingBySession.get(sessionId) ?? [];
   const warningsBySession = new Map<string, number>();
   /**
-   * Consecutive turns this session could not reach a model (QX-004 §0.4).
+   * The conversation itself, per session (CQ-QX-005 §16).
    *
-   * Bounded degradation needs to know it is the second time. The first
-   * failure is worth an apology; repeating the current question after
-   * every failure is the loop that made hosted Q unusable — the person
-   * answers, the answer is thrown away, the same words come back.
+   * What Q asked and the options it showed, a question of theirs being
+   * answered, where to resume, Q's own suggestions awaiting a yes, the
+   * research task in flight, which subsystem has failed and how often,
+   * and which repair rungs have been used on the topic in hand. One
+   * value, reduced by the conversation core; the six unrelated maps it
+   * replaces were each right and together could not tell a question
+   * from a failed answer.
+   *
+   * The session's `currentStepKey` is where the journey is; `asked` is
+   * what Q actually put in front of the person, which is what "the
+   * second one" refers to and what a volunteered sentence answers.
    */
-  const degradedBySession = new Map<string, number>();
+  const conversationBySession = new Map<string, ConversationState>();
   /**
-   * Subjects this session has already been sent to look up (QX-004 §1.1,
-   * §1.2). One proactive lookup per subject: research is bounded, it costs
-   * somebody's budget, and a person who has already heard what the public
-   * web says about their company does not need to hear it again.
-   */
-  const researchedBySession = new Map<string, Set<string>>();
-  /**
-   * The step Q asked last turn, per session.
+   * Meaning kept beside a field, per session (CQ-QX-005 §3).
    *
-   * The session's `currentStepKey` is where the journey is; it is not
-   * necessarily what Q just asked. When somebody says "skip the rest, I'd
-   * like to finish", Q jumps to the required step at the end — and the
-   * session's current step stays on the optional one it skipped past. The
-   * next turn's prompt carried only the session's version, so the model
-   * read "Balanced" against a question about sectors to avoid, made
-   * nothing of it, and walked the person back into the optional chain it
-   * had just agreed to leave. Their answer went nowhere (local,
-   * 2026-09-22).
-   *
-   * So what Q asked is remembered and told to the model as a platform
-   * note. Runtime state, not transcript inference: the runtime composed
-   * that question, so the runtime knows what it was.
+   * "As long as they've got the grit" sets no option and is not no
+   * preference. What it meant is held here in the person's words, rendered
+   * to the model every turn so Q never reduces them to the list, and
+   * written as the response's own `note` the moment a value for that step
+   * goes on the record.
    */
-  const askedBySession = new Map<string, { step: string; question: string }>();
+  const qualitativeBySession = new Map<string, QualitativeMeaning[]>();
   /**
    * What the person said that the runtime did NOT record, per session
    * (QX-004 core gate: state authority).
@@ -1505,19 +1609,6 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
    * it still refuses waits for the next turn.
    */
   const carriedBySession = new Map<string, Candidate[]>();
-  /**
-   * How many turns running Q has asked the same step.
-   *
-   * Two components each behaving correctly can still produce a loop, and
-   * the person on the other end of it has no way to break out. The
-   * count is the platform's, taken from what the platform itself asked,
-   * and at the third time of asking Q stops asking and says what it
-   * needs instead.
-   */
-  const repeatsBySession = new Map<
-    string,
-    { readonly stepKey: string; readonly count: number }
-  >();
   const personality = personalityOf(dependencies.personality);
   /**
    * What is remembered, for this turn. A failed recall is an empty
@@ -1662,16 +1753,103 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
    * they disagree.
    */
   const askedNote = (
-    sessionId: string,
+    state: ConversationState,
     view: OnboardingSessionView,
   ): readonly string[] => {
-    const asked = askedBySession.get(sessionId);
-    if (asked === undefined) return [];
-    if (asked.step === view.session.currentStepKey) return [];
-    if (view.responses.some((r) => r.stepKey === asked.step)) return [];
+    const asked = state.asked;
+    if (asked === null) return [];
+    if (asked.topic === view.session.currentStepKey) return [];
+    if (view.responses.some((r) => r.stepKey === asked.topic)) return [];
     return [
-      `Last turn you asked them: "${asked.question}" (step ${asked.step}). Unless they have plainly changed the subject, what they just said answers THAT step, not the session's current one.`,
+      `Last turn you asked them: "${asked.question}" (step ${asked.topic}). Unless they have plainly changed the subject, what they just said answers THAT step, not the session's current one.`,
     ];
+  };
+
+  /**
+   * What is on their screen, numbered, for the model to point at
+   * (CQ-QX-005 §5). Positions are one-based because that is how a person
+   * counts ("the second one"), and the platform resolves them back.
+   */
+  const askedBlock = (state: ConversationState): string => {
+    const asked = state.asked;
+    if (asked === null) return "(nothing is on screen)";
+    const lines = asked.options
+      .slice(0, 24)
+      .map((option, index) => `${String(index + 1)}. ${option.label}`);
+    return [`${asked.topic}: ${asked.question}`, ...lines].join("\n");
+  };
+
+  /**
+   * The platform's own account of the exchange, as trusted text
+   * (CQ-QX-005 §16). Everything here is runtime state the model cannot
+   * infer from a transcript: which question of theirs is being answered
+   * and where to return to, what Q has suggested and is waiting on, what
+   * meaning is kept beside a field, and which subsystem is down — so
+   * that Q neither promises a look-up nothing will run nor blames the
+   * person for a failure that was Q's.
+   */
+  const conversationBlock = (
+    state: ConversationState,
+    sessionId: string,
+    steps: ReadonlyMap<string, OnboardingStepManifest>,
+    researchAvailable: boolean,
+  ): string => {
+    const lines: string[] = [];
+    const resume = state.research?.resumeTopic ?? state.resumeTopic;
+    if (resume !== null && resume !== undefined) {
+      const step = steps.get(resume);
+      if (step !== undefined) {
+        lines.push(
+          `OPEN QUESTION TO RETURN TO after answering them: ${askLabel(step)} (${resume}).`,
+        );
+      }
+    }
+    if (state.answering !== null) {
+      lines.push(
+        `You are answering their question (${state.answering.kind}): "${state.answering.text.slice(0, 200)}".`,
+      );
+    }
+    for (const proposal of state.proposals.slice(0, 4)) {
+      const step = steps.get(proposal.target);
+      lines.push(
+        `YOUR SUGGESTION, awaiting their yes, not theirs and not recorded: ${step === undefined ? proposal.target : askLabel(step)} — ${describeSuggested(step, proposal.value)} (because ${proposal.because.slice(0, 120)}). Decide it in confirmations under ${proposal.target} only if they say so.`,
+      );
+    }
+    for (const kept of (qualitativeBySession.get(sessionId) ?? []).slice(-4)) {
+      const step = steps.get(kept.target);
+      lines.push(
+        `MEANING KEPT beside ${step === undefined ? kept.target : askLabel(step)}, in their words: "${kept.meaning.slice(0, 200)}". Honour it; do not reduce it to the list or ask for it again.`,
+      );
+    }
+    if (!researchAvailable || isExhausted(state.failures, "RESEARCH")) {
+      lines.push(
+        "Live public research is NOT reachable right now: put nothing in questionForQ and never promise to look something up. Answer the question now from what you know — as your general knowledge, not verified current fact — say in a few words that live sources are out of reach, then return to the open question.",
+      );
+    } else if (state.research !== null) {
+      lines.push("A research run is already in flight; do not start another.");
+    }
+    if (state.repair !== null && state.repair.used.length > 0) {
+      const step = steps.get(state.repair.topic);
+      lines.push(
+        `You have already asked ${step === undefined ? state.repair.topic : askLabel(step)} ${String(state.repair.used.length)} time(s) without placing an answer; if they answer it again, read it generously and say what you would take it to mean.`,
+      );
+    }
+    return lines.length === 0 ? "(nothing to note)" : lines.join("\n");
+  };
+
+  /** A suggested value in the step's own labels, for reading it back. */
+  const describeSuggested = (
+    step: OnboardingStepManifest | undefined,
+    value: string | readonly string[] | boolean,
+  ): string => {
+    if (typeof value === "boolean") return value ? "yes" : "no";
+    const options = step === undefined ? [] : optionsOf(step);
+    const label = (key: string) =>
+      options.find((o) => o.key === key || o.label === key)?.label ?? key;
+    return (typeof value === "string" ? [value] : value)
+      .map(label)
+      .join(", ")
+      .slice(0, 200);
   };
 
   /**
@@ -1775,17 +1953,69 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
     forget: (sessionId: string) => {
       pendingBySession.delete(sessionId);
       warningsBySession.delete(sessionId);
-      degradedBySession.delete(sessionId);
-      researchedBySession.delete(sessionId);
       unrecordedBySession.delete(sessionId);
-      askedBySession.delete(sessionId);
       tangentsBySession.delete(sessionId);
       carriedBySession.delete(sessionId);
-      repeatsBySession.delete(sessionId);
+      conversationBySession.delete(sessionId);
+      qualitativeBySession.delete(sessionId);
     },
+
+    /**
+     * How a research run the caller carried away ended (CQ-QX-005 §7,
+     * §13). The interviewer started it through its outcome and cannot
+     * see it finish; the caller says, so that the failure ledger counts
+     * a research route that is down and the policy stops sending people
+     * to it.
+     */
+    researchEnded: (sessionId: string, ok: boolean) => {
+      const state = conversationBySession.get(sessionId);
+      if (state === undefined) return;
+      conversationBySession.set(
+        sessionId,
+        reduceConversation(
+          reduceConversation(
+            reduceConversation(state, { type: "RESEARCH_FINISHED" }),
+            { type: "QUESTION_ANSWERED" },
+          ),
+          ok
+            ? { type: "SUCCEEDED", operation: "RESEARCH" }
+            : { type: "FAILED", operation: "RESEARCH" },
+        ),
+      );
+    },
+
+    /** The conversation as the core holds it, for tests and traces. */
+    conversation: (sessionId: string): ConversationState =>
+      conversationBySession.get(sessionId) ?? INITIAL_CONVERSATION_STATE,
 
     turn: async (input: InterviewTurnInput): Promise<InterviewTurnOutcome> => {
       const steps = stepsByKey(input.journeyType);
+      const sessionId = input.onboardingSessionId;
+      /**
+       * The conversation, reduced as the turn goes (CQ-QX-005 §16).
+       *
+       * Every change of state is an event through the core's reducer, so
+       * what the turn did to the conversation is the list of events it
+       * raised — inspectable, and impossible to advance by accident.
+       */
+      let conversation = reduceConversation(
+        conversationBySession.get(sessionId) ?? INITIAL_CONVERSATION_STATE,
+        { type: "TURN_STARTED" },
+      );
+      const dispatch = (event: ConversationEvent): void => {
+        conversation = reduceConversation(conversation, event);
+        conversationBySession.set(sessionId, conversation);
+      };
+      conversationBySession.set(sessionId, conversation);
+      /**
+       * Research needs a transport that can carry a question away and
+       * bring an answer back. A spoken turn has one (the caller runs a Q
+       * run); a typed turn today does not, so there Q must never promise
+       * a look-up. The policy is told the truth and decides.
+       */
+      const researchAvailable =
+        input.channel === "voice" &&
+        (dependencies.research?.available() ?? true);
       let view = await getOnboardingSession(
         input.session,
         input.onboardingSessionId,
@@ -1876,12 +2106,19 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
       );
 
       const variables: Omit<
-        InterviewConductorV4Variables,
+        InterviewConductorV8Variables,
         | "operatingMode"
         | "communicationProfile"
         | "communicationGuidance"
         | "environmentNotes"
       > = {
+        asked: askedBlock(conversation),
+        conversation: conversationBlock(
+          conversation,
+          sessionId,
+          steps,
+          researchAvailable,
+        ),
         journey: input.journeyType,
         channel: input.channel,
         personality: personality.manner,
@@ -1898,11 +2135,23 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
             steps.get(item.stepKey)?.configuration.prompt ?? item.stepKey,
           value: item.spoken,
         })),
-        pendingConfirmations: pending.map((p) => ({
-          stepKey: p.stepKey,
-          question: p.question,
-          value: p.spoken,
-        })),
+        pendingConfirmations: [
+          ...pending.map((p) => ({
+            stepKey: p.stepKey,
+            question: p.question,
+            value: p.spoken,
+          })),
+          // Q's own suggestions wait here too, marked as Q's: a yes
+          // decides them in `confirmations`, and nothing else does.
+          ...conversation.proposals.map((p) => ({
+            stepKey: p.target,
+            question: `${steps.get(p.target)?.configuration.prompt ?? p.target} (Q's suggestion, not theirs)`,
+            value: describeSuggested(steps.get(p.target), p.value).slice(
+              0,
+              400,
+            ),
+          })),
+        ].slice(0, 8),
         documentProposals: proposals.map((p) => ({
           stepKey: p.stepKey,
           question: steps.get(p.stepKey)?.configuration.prompt ?? p.stepKey,
@@ -1915,17 +2164,14 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
         notes: [
           ...signupNotes(input, view, steps),
           ...researchNotes(input, view),
-          ...askedNote(input.onboardingSessionId, view),
+          ...askedNote(conversation, view),
           ...notesFor(input.onboardingSessionId, view),
         ].slice(0, 6),
-        recentTurns: input.recentTurns.slice(-MAX_RECENT_TURNS).map((t) => ({
-          role: t.role,
-          text: t.text.slice(0, RECENT_TURN_MAX_CHARS),
-        })),
+        recentTurns: recentWithinBudget(input.recentTurns),
         utterance: input.utterance.slice(0, 2_000),
         memory: await recallMemory(input.attribution),
       };
-      const rendered = renderPrompt<InterviewConductorV4Variables>(registry, {
+      const rendered = renderPrompt<InterviewConductorV8Variables>(registry, {
         task: "INTERVIEW_CONDUCTOR",
         charter: "Q_SYSTEM_VOICE",
         operatingMode: "ASSESSMENT",
@@ -1965,7 +2211,7 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
               : { dataPosture: dependencies.dataPosture }),
           },
           {
-            schema: InterviewConductorV5ResultSchema,
+            schema: InterviewConductorV6ResultSchema,
             ...(input.signal === undefined ? {} : { signal: input.signal }),
           },
         );
@@ -1990,6 +2236,10 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
             warnings: warningsBySession.get(input.onboardingSessionId) ?? 0,
             view,
             degraded: false,
+            reading: null,
+            resume: null,
+            qualitative: qualitativeBySession.get(sessionId) ?? [],
+            trace: null,
           };
         }
         logger.warn(
@@ -2022,9 +2272,8 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
          * they answered earlier is still on the record, which this turn
          * has read and can stand behind.
          */
-        const failures =
-          (degradedBySession.get(input.onboardingSessionId) ?? 0) + 1;
-        degradedBySession.set(input.onboardingSessionId, failures);
+        dispatch({ type: "FAILED", operation: "MODEL" });
+        const failures = conversation.failures.MODEL;
         if (input.utterance.trim().length > 0) {
           noteUnrecorded(input.onboardingSessionId, null, input.utterance);
         }
@@ -2035,11 +2284,19 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
             : kept === 1
               ? " The one answer you have given me is on the record."
               : ` The ${String(kept)} answers you have given me are on the record.`;
+        /**
+         * The ledger's notices for the first failure and for the one
+         * that stops the retries; past that, two short lines that
+         * alternate, so that an outage is never the same sentence twice
+         * in a row and never nags (CQ-QX-005 §7).
+         */
+        const reply = shouldNotify(conversation.failures, "MODEL")
+          ? `${subsystemNotice("MODEL", isExhausted(conversation.failures, "MODEL"))}${earlier}`
+          : failures % 2 === 1
+            ? `Still no reasoning service on my side, so that one hasn't gone in.${earlier} I'm here when it comes back.`
+            : `My reasoning service is still down, I'm afraid.${earlier} Try again in a minute, or tap Type if you'd rather keep going that way.`;
         return {
-          reply:
-            failures === 1
-              ? `I can't reach my reasoning service just now, so I haven't taken that in — it hasn't been saved.${earlier} Say it again in a moment and I'll pick it up.`
-              : `Still can't reach it, I'm afraid, so that one hasn't gone in either.${earlier} Give it a minute and try again.`,
+          reply,
           intent: "UNCLEAR",
           asking: null,
           recorded: [],
@@ -2052,10 +2309,64 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
           warnings: warningsBySession.get(input.onboardingSessionId) ?? 0,
           view,
           degraded: true,
+          reading: null,
+          resume: null,
+          qualitative: qualitativeBySession.get(sessionId) ?? [],
+          trace: null,
         };
       }
 
-      degradedBySession.delete(input.onboardingSessionId);
+      dispatch({ type: "SUCCEEDED", operation: "MODEL" });
+      /** The result, narrowed once for the closures below. */
+      const read: InterviewConductorResult = result;
+      /**
+       * What the turn WAS, before anything is done with it (CQ-QX-005
+       * §2). The reading's kind and confidence decide what may be
+       * written; a question to Q is answered; a fragment is a transcript
+       * matter; an aside moves nothing. Decided here, once, and logged
+       * beside the trace.
+       */
+      // An opening turn is Q asking itself what to ask: there are no words
+      // to read, so whatever the model wrote in the reading, the turn is a
+      // control turn — never an answer that failed to land.
+      const reading: ConversationTurnReading =
+        input.utterance.trim().length === 0
+          ? { ...readingFrom(result), kind: "CONTROL" }
+          : readingFrom(result);
+      const disposition = disposeTurn(reading);
+      if (
+        reading.transcript === "FRAGMENT" ||
+        reading.kind === "UNCLEAR_TRANSCRIPT"
+      ) {
+        dispatch({ type: "FAILED", operation: "TRANSCRIPT" });
+      } else {
+        dispatch({ type: "SUCCEEDED", operation: "TRANSCRIPT" });
+      }
+      if (reading.question !== null && disposition.answer) {
+        dispatch({
+          type: "QUESTION_RECEIVED",
+          kind: reading.question.kind,
+          text: reading.question.text,
+        });
+      }
+      if (reading.suggestions.length > 0) {
+        dispatch({ type: "PROPOSED", suggestions: reading.suggestions });
+      }
+      for (const kept of reading.qualitative) {
+        if (!steps.has(kept.target)) continue;
+        const held = qualitativeBySession.get(sessionId) ?? [];
+        qualitativeBySession.set(
+          sessionId,
+          [...held.filter((item) => item.target !== kept.target), kept].slice(
+            -8,
+          ),
+        );
+      }
+      /** The meaning kept for a step, for the response's own `note`. */
+      const noteFor = (stepKey: string): string | undefined =>
+        (qualitativeBySession.get(sessionId) ?? []).find(
+          (item) => item.target === stepKey,
+        )?.meaning;
 
       const recorded: string[] = [];
       const skipped: string[] = [];
@@ -2080,17 +2391,24 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
         quietly = false,
       ) => {
         try {
+          // Meaning kept beside the field rides with the value as the
+          // response's own note: prose for people, never a filter.
+          const note = noteFor(stepKey);
           view = await submitOnboardingResponse(
             input.session,
             input.onboardingSessionId,
             {
               stepKey,
-              response: { value },
+              response: {
+                value,
+                ...(note === undefined ? {} : { note: note.slice(0, 500) }),
+              },
               expectedSessionVersion: view.session.version,
             },
             randomUUID(),
           );
           recorded.push(stepKey);
+          dispatch({ type: "SUCCEEDED", operation: "WRITE" });
           return true;
         } catch (error: unknown) {
           logger.warn(
@@ -2099,6 +2417,7 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
           );
           if (quietly) return false;
           unsaved.push(stepKey);
+          dispatch({ type: "FAILED", operation: "WRITE" });
           /**
            * Why the owning service said no, in its own words.
            *
@@ -2128,6 +2447,9 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
       logger.debug(
         {
           intent: result.intent,
+          kind: reading.kind,
+          confidence: reading.confidence,
+          transcript: reading.transcript,
           // Debug only, and truncated: a turn read as UNCLEAR is
           // indistinguishable in a log from a turn that never arrived,
           // and over a microphone the difference is usually the first few
@@ -2143,10 +2465,54 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
         "interview conductor read the turn",
       );
 
-      // 1. Decisions on what Q read back last time, and on document proposals.
-      for (const decision of result.confirmations) {
+      /**
+       * Only a turn that commits to something may decide what is held
+       * (CQ-QX-005 §2). A question to Q, an aside, or noise cannot say
+       * yes to a cheque figure by accident.
+       */
+      const mayDecide =
+        reading.kind === "ANSWER" ||
+        reading.kind === "CLARIFICATION" ||
+        reading.kind === "CORRECTION" ||
+        reading.kind === "CONTROL";
+
+      // 1. Decisions on what Q read back last time, on document proposals,
+      //    and on Q's own suggestions.
+      for (const decision of mayDecide ? result.confirmations : []) {
         const held = pending.find((p) => p.stepKey === decision.stepKey);
         if (held === undefined) {
+          /**
+           * A suggestion of Q's, decided (CQ-QX-005 §10).
+           *
+           * Declared Mandate ≠ Q Inference: nothing Q inferred reaches
+           * the record until the person says so, and then it reaches it
+           * through the same validated submit as their own words, as
+           * their own answer. A no drops it; anything else leaves it
+           * waiting.
+           */
+          const suggested = conversation.proposals.find(
+            (p) => p.target === decision.stepKey,
+          );
+          if (suggested !== undefined) {
+            const step = steps.get(suggested.target);
+            if (decision.decision === "REJECTED") {
+              dispatch({ type: "PROPOSAL_DECIDED", target: suggested.target });
+              continue;
+            }
+            if (decision.decision === "CONFIRMED" && step !== undefined) {
+              const value = toResponseValue(step, suggested.value);
+              dispatch({ type: "PROPOSAL_DECIDED", target: suggested.target });
+              if (value !== null && !(await commit(step.stepKey, value))) {
+                carry(input.onboardingSessionId, {
+                  stepKey: step.stepKey,
+                  value,
+                  spoken: describeValue(step, value, currency),
+                  attempts: 1,
+                });
+              }
+            }
+            continue;
+          }
           const proposal = proposals.find(
             (p) => p.stepKey === decision.stepKey,
           );
@@ -2222,7 +2588,9 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
         }
         // REJECTED: dropped; Q asks again in its own words.
       }
-      const decided = new Set(result.confirmations.map((d) => d.stepKey));
+      const decided = new Set(
+        (mayDecide ? result.confirmations : []).map((d) => d.stepKey),
+      );
       for (const held of pending) {
         if (!decided.has(held.stepKey)) nextPending.push(held);
       }
@@ -2254,7 +2622,40 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
             : [],
         ),
       );
-      for (const answer of result.answers) {
+      /**
+       * Steps a tension names (CQ-QX-005 §15). The model has asked which
+       * the person means; a value for one of these is held for the yes
+       * rather than written under it, so the record never carries the
+       * contradiction silently.
+       */
+      const tense = new Set(reading.tensions.flatMap((t) => t.targets));
+      /**
+       * Nothing is written unless the turn was an answer or a correction
+       * (CQ-QX-005 §2). A question to Q, an aside, a fragment: the
+       * model's `answers` for those are read as what it would take the
+       * words to mean — an interpretation the repair ladder may offer —
+       * and never as values.
+       */
+      const takingAnswers = disposition.write || disposition.confirm;
+      /**
+       * Answers that only restate what is already on the record. Not
+       * written, and not a failure either: "right, angel, and we're at
+       * seed" is a person carrying on, and a turn made only of such
+       * answers must not fall into the repair ladder (live, 2026-09-24).
+       */
+      let restated = 0;
+      /**
+       * Category phrases the model put in `answers` rather than in
+       * `categoryPhrases`. The value of a CATEGORIES step is a taxonomy
+       * node the platform resolves, so words placed there are phrases for
+       * the classifier — routed to it, not refused for being words (live,
+       * 2026-09-24: "marketplaces and SaaS" against business models).
+       */
+      const phrasesFromAnswers: {
+        readonly stepKey: string;
+        readonly phrases: readonly string[];
+      }[] = [];
+      for (const answer of takingAnswers ? result.answers : []) {
         const step = steps.get(answer.stepKey);
         const status = statuses.get(answer.stepKey);
         /**
@@ -2283,6 +2684,21 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
           // Already answered and not being corrected: nothing to do, and
           // nothing to carry either.
           stopCarrying(input.onboardingSessionId, answer.stepKey);
+          restated += 1;
+          continue;
+        }
+        if (
+          step.configuration.stepType === "reference_select" &&
+          step.configuration.resourceType === "TAXONOMY_NODE" &&
+          typeof answer.value !== "boolean"
+        ) {
+          const phrases = asList(answer.value)
+            .map((phrase) => phrase.trim())
+            .filter((phrase) => phrase.length > 0)
+            .slice(0, 8);
+          if (phrases.length > 0) {
+            phrasesFromAnswers.push({ stepKey: step.stepKey, phrases });
+          }
           continue;
         }
         if (step.configuration.stepType === "document_upload") {
@@ -2304,8 +2720,7 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
            */
           if (
             answer.stepKey === view.currentStep?.stepKey ||
-            answer.stepKey ===
-              askedBySession.get(input.onboardingSessionId)?.step
+            answer.stepKey === conversation.asked?.topic
           ) {
             rejected.push(step);
           }
@@ -2349,7 +2764,17 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
          * is a form with a voice. Unambiguous meaning, a domain that can
          * hold it, and no material-risk rule over it: record it.
          */
-        if (isMaterial(step.stepKey)) {
+        /**
+         * Read back before it is written: a material value, a value the
+         * model only inferred (MEDIUM), or one a tension names
+         * (CQ-QX-005 §4, §15). The same held-for-a-yes path in every
+         * case, so a yes writes it and a no drops it.
+         */
+        if (
+          isMaterial(step.stepKey) ||
+          disposition.confirm ||
+          tense.has(step.stepKey)
+        ) {
           nextPending.push({
             stepKey: step.stepKey,
             question: step.configuration.prompt,
@@ -2389,12 +2814,19 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
        * restriction means for it, because that is domain knowledge and
        * not something to be read out of somebody's phrasing.
        */
-      for (const item of result.unrestricted ?? []) {
+      for (const item of takingAnswers ? (result.unrestricted ?? []) : []) {
         const step = steps.get(item.stepKey);
         if (step === undefined) continue;
-        if (view.responses.some((r) => r.stepKey === item.stepKey)) continue;
         const status = statuses.get(item.stepKey);
-        if (status === "COMPLETED" || status === "SKIPPED") continue;
+        const onRecord =
+          view.responses.some((r) => r.stepKey === item.stepKey) ||
+          status === "COMPLETED";
+        // "There's nothing I'd avoid" said as a CORRECTION of a step that
+        // holds something is the one case no restriction reaches a step
+        // already answered: a value supersedes, a set-aside is attempted
+        // and honestly reported if the journey refuses it.
+        if (onRecord && reading.kind !== "CORRECTION") continue;
+        if (status === "SKIPPED") continue;
         const outcome = unrestrictedOutcome(step);
         if (outcome.kind === "VALUE") {
           if (!(await commit(step.stepKey, outcome.value))) {
@@ -2431,8 +2863,157 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
         // CANNOT: the step genuinely has no way to say it. Q asks it.
       }
 
+      /**
+       * 2b'. An earlier answer taken back entirely (CQ-QX-005 §1, §2).
+       *
+       * A correction may name steps to clear. Optional steps are set
+       * aside through the journey's own skip; a required step cannot be
+       * emptied — the journey says it cannot do without it — so it is
+       * noted as not done and Q asks for its replacement instead. Never
+       * from any kind but CORRECTION: a question or an aside clears
+       * nothing. Clearing is a write, so it takes the same HIGH
+       * confidence a value does. A clear the journey refuses is said
+       * plainly below, never folded into a repair of another question.
+       */
+      const notCleared: OnboardingStepManifest[] = [];
+      for (const key of reading.kind === "CORRECTION" && disposition.write
+        ? reading.clears
+        : []) {
+        const step = steps.get(key);
+        if (step === undefined) continue;
+        const onRecord =
+          view.responses.some((r) => r.stepKey === key) ||
+          statuses.get(key) === "COMPLETED";
+        if (!onRecord || skipped.includes(key)) continue;
+        if (step.required) {
+          noteUnrecorded(input.onboardingSessionId, key, input.utterance);
+          notCleared.push(step);
+          continue;
+        }
+        try {
+          view = await skipOnboardingStep(
+            input.session,
+            input.onboardingSessionId,
+            key,
+            { expectedSessionVersion: view.session.version },
+            randomUUID(),
+          );
+          skipped.push(key);
+          stopCarrying(input.onboardingSessionId, key);
+        } catch (error: unknown) {
+          logger.warn(
+            { err: error, stepKey: key },
+            "a withdrawn answer was not set aside",
+          );
+          noteUnrecorded(input.onboardingSessionId, key, input.utterance);
+          notCleared.push(step);
+        }
+      }
+
+      /**
+       * 2c. A choice made by pointing at the screen (CQ-QX-005 §5).
+       *
+       * "The last four", "both", "the second one": the model says how
+       * they pointed and the platform resolves it against the options Q
+       * actually showed — the person's screen, not the catalogue. A
+       * reference that cannot be resolved (nothing shown, a position off
+       * the end) is asked about through the ladder, never guessed.
+       */
+      const unresolved: {
+        readonly step: OnboardingStepManifest;
+        readonly because: string;
+      }[] = [];
+      const selectionsThisTurn: Record<string, readonly string[]> = {};
+      for (const reference of takingAnswers ? reading.references : []) {
+        const step = steps.get(reference.target);
+        if (step === undefined) continue;
+        if (recorded.includes(step.stepKey)) continue;
+        /**
+         * A step already on the record is amended by pointing only when
+         * the pointing says so — "and the second one too" (ADD), "not that
+         * one" (EXCLUDE) — or the turn is a correction. A plain "the
+         * second one" against a settled step would otherwise replace a
+         * whole selection with one item.
+         */
+        const settled =
+          statuses.get(step.stepKey) === "COMPLETED" ||
+          view.responses.some((r) => r.stepKey === step.stepKey);
+        if (
+          settled &&
+          reading.kind !== "CORRECTION" &&
+          reference.select !== "ADD" &&
+          reference.select !== "EXCLUDE"
+        ) {
+          continue;
+        }
+        const shownOptions: readonly ShownOption[] =
+          conversation.asked !== null &&
+          conversation.asked.topic === reference.target
+            ? conversation.asked.options
+            : optionsOf(step);
+        const resolved = resolveOptionReference(
+          reference,
+          shownOptions,
+          conversation.selections[reference.target] ??
+            (() => {
+              const previous = view.responses.find(
+                (r) => r.stepKey === reference.target,
+              )?.value;
+              return previous?.type === "MULTI_SELECT"
+                ? previous.optionKeys
+                : previous?.type === "SINGLE_SELECT"
+                  ? [previous.optionKey]
+                  : null;
+            })(),
+        );
+        if (resolved.kind === "UNRESOLVED") {
+          unresolved.push({ step, because: resolved.because });
+          continue;
+        }
+        const value = toResponseValue(
+          step,
+          step.configuration.stepType === "single_select"
+            ? (resolved.keys[0] ?? "")
+            : resolved.keys,
+        );
+        if (value === null) {
+          unresolved.push({ step, because: "EMPTY" });
+          continue;
+        }
+        selectionsThisTurn[step.stepKey] = resolved.keys;
+        const spoken = labelsOf(resolved.keys, shownOptions).join(", ");
+        if (
+          isMaterial(step.stepKey) ||
+          disposition.confirm ||
+          tense.has(step.stepKey)
+        ) {
+          nextPending.push({
+            stepKey: step.stepKey,
+            question: step.configuration.prompt,
+            value,
+            spoken,
+          });
+        } else if (!(await commit(step.stepKey, value))) {
+          carry(input.onboardingSessionId, {
+            stepKey: step.stepKey,
+            value,
+            spoken,
+            attempts: 1,
+          });
+        }
+      }
+
       // 3. Categories: phrases → the platform's own candidates, read back.
-      for (const item of result.categoryPhrases) {
+      const categoryPhrases = takingAnswers
+        ? [
+            ...read.categoryPhrases,
+            ...phrasesFromAnswers.filter(
+              (item) =>
+                !read.categoryPhrases.some((c) => c.stepKey === item.stepKey),
+            ),
+          ]
+        : [];
+      for (const item of categoryPhrases) {
         const step = steps.get(item.stepKey);
         if (
           step === undefined ||
@@ -2552,9 +3133,11 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
       }
 
       // 4. Skips, optional steps only; an upload answered aloud is one.
+      //    A skip is a commitment too: only a turn that could answer
+      //    may set a question aside.
       let deferredUpload = false;
       const toSkip = [
-        ...result.skips,
+        ...(takingAnswers ? result.skips : []),
         ...spokenUploads.map((step) => step.stepKey),
       ];
       for (const stepKey of toSkip) {
@@ -2642,24 +3225,180 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
         reply = `I want to get the scale right on the ${label} — you said ${needsScale.said}. Is that thousands, millions, or exactly that?`;
         result = { ...result, askNext: needsScale.step.stepKey };
       }
+      /**
+       * Conversational repair (CQ-QX-005 §6, §7, §8).
+       *
+       * Every failure to place what was said used to produce a fixed
+       * line — "I couldn't place that.", "Sorry — I didn't catch that
+       * well enough to write it down." — and the same line came back on
+       * every failure, which is the loop that made the interview
+       * unusable and which blamed hearing for reasoning. Repair is now a
+       * rung on the core's ladder, chosen from how many times this topic
+       * has already failed, composed from state, and never the rung used
+       * last. Transcript trouble takes a different path entirely: a
+       * fragment is asked for again as a transcription matter, and never
+       * as Q failing to understand.
+       */
+      let repairUsed: RepairStrategy | null = null;
+      let repairAsk: string | null = null;
+      const repairOn = (
+        step: OnboardingStepManifest,
+        interpretation: string | undefined,
+      ): string => {
+        const strategy = nextRepair(conversation.repair, step.stepKey, {
+          hasInterpretation: interpretation !== undefined,
+        });
+        dispatch({ type: "REPAIRED", topic: step.stepKey, strategy });
+        dispatch({ type: "FAILED", operation: "PARSE" });
+        repairUsed = strategy;
+        repairAsk = step.stepKey;
+        return composeRepair(strategy, {
+          label: repairLabel(step),
+          question: askAgain(step, input),
+          interpretation,
+          options: optionsOf(step).map((o) => o.label),
+          held: carriedFor(input.onboardingSessionId, view).map(
+            (item) => item.spoken,
+          ),
+          optional: !step.required,
+        });
+      };
+      /** What the model would take the words to mean, for "do you mean…?". */
+      const interpretationOf = (step: OnboardingStepManifest) => {
+        const candidate = read.answers.find((a) => a.stepKey === step.stepKey);
+        if (candidate === undefined) return undefined;
+        // Only a reading the step would actually take is worth offering:
+        // "do you mean unicorn?" for a stage is a question about a word,
+        // not a way through.
+        const value = toResponseValue(step, candidate.value);
+        if (value === null) return undefined;
+        const said = describeValue(step, value, currency).trim();
+        return said.length === 0 ? undefined : said;
+      };
+      const stepInHand = (): OnboardingStepManifest | undefined => {
+        const key =
+          conversation.asked?.topic ?? view.currentStep?.stepKey ?? null;
+        return key === null ? undefined : steps.get(key);
+      };
       const unplaced = rejected.find(
         (step) => !recorded.includes(step.stepKey),
       );
-      if (needsScale !== undefined) {
-        // Already answered above; the guards below are about a different
-        // failure and saying both at once is two apologies in a row.
-      } else if (unplaced !== undefined) {
-        reply = clarificationFor(unplaced);
-        result = { ...result, askNext: unplaced.stepKey };
-      } else if (
-        (result.intent === "ANSWER" || result.intent === "CORRECTION") &&
+      const unresolvedReference = unresolved[0];
+      // A write the owning service refused is not a reading that failed:
+      // the refusal path below says what the setup wants first, and the
+      // ladder must not count it as a rung.
+      const nothingHappened =
         recorded.length === 0 &&
         nextPending.length === 0 &&
         skipped.length === 0 &&
         rejected.length === 0 &&
-        // A turn whose whole point was to move past the optional run took
-        // nothing in on purpose. That is not a missed answer.
-        !result.skipRemainingOptional
+        unresolved.length === 0 &&
+        unsaved.length === 0 &&
+        notCleared.length === 0 &&
+        restated === 0 &&
+        !result.skipRemainingOptional;
+      if (needsScale !== undefined) {
+        // Already answered above; the guards below are about a different
+        // failure and saying both at once is two apologies in a row.
+      } else if (disposition.transcription) {
+        /**
+         * The words were noise. This is the one place speech recognition
+         * is named, and it is named as itself: the person is asked to say
+         * it once more, not told Q could not understand them.
+         */
+        if (shouldNotify(conversation.failures, "TRANSCRIPT")) {
+          reply = subsystemNotice(
+            "TRANSCRIPT",
+            isExhausted(conversation.failures, "TRANSCRIPT"),
+          );
+        } else {
+          const step = stepInHand();
+          reply =
+            step === undefined
+              ? "Still breaking up on my side. One more time?"
+              : `Still breaking up on my side. ${askAgain(step, input)}`;
+        }
+        const step = stepInHand();
+        result = { ...result, askNext: step?.stepKey ?? null };
+      } else if (
+        result.frustrated === true &&
+        recorded.length === 0 &&
+        stepInHand() !== undefined
+      ) {
+        /**
+         * They have told Q it is not listening, and they are usually
+         * right — something they said did not go in (CQ-QX-005 §6).
+         * The worst available response is the question that already
+         * failed, so the ladder goes straight to naming the gap: what
+         * the platform is still holding for them, and the one thing it
+         * does not have. Recorded as a rung, so the next failure moves
+         * on rather than saying it again.
+         */
+        const wanted = stepInHand();
+        if (wanted !== undefined) {
+          dispatch({
+            type: "REPAIRED",
+            topic: wanted.stepKey,
+            strategy: "NAME_THE_GAP",
+          });
+          dispatch({ type: "FAILED", operation: "PARSE" });
+          repairUsed = "NAME_THE_GAP";
+          repairAsk = wanted.stepKey;
+          reply = `You did tell me, and I didn't get it down. ${composeRepair(
+            "NAME_THE_GAP",
+            {
+              label: repairLabel(wanted),
+              question: askAgain(wanted, input),
+              options: optionsOf(wanted).map((o) => o.label),
+              held: carriedFor(input.onboardingSessionId, view).map(
+                (item) => item.spoken,
+              ),
+              optional: !wanted.required,
+            },
+          )}`;
+        }
+      } else if (
+        notCleared[0] !== undefined &&
+        recorded.length === 0 &&
+        skipped.length === 0
+      ) {
+        /**
+         * They took an answer back and the journey would not let it go
+         * (a required step, or one it will not set aside from here). The
+         * earlier answer stands, and Q says so rather than claiming a
+         * change or repairing some other question.
+         */
+        const kept = notCleared[0];
+        reply = kept.required
+          ? `I can't leave ${repairLabel(kept)} empty — the setup needs something there, so your earlier answer stands for now. Tell me what to put instead and I'll change it.`
+          : `I couldn't take back your answer on ${repairLabel(kept)} from here, so it still stands. You can clear it on the form, or tell me what to put instead.`;
+      } else if (unresolvedReference !== undefined) {
+        // "The second one" with nothing on screen, or a position past
+        // the end: asked about, in the step's own labels, never guessed.
+        reply = repairOn(unresolvedReference.step, undefined);
+      } else if (unplaced !== undefined) {
+        reply = repairOn(unplaced, interpretationOf(unplaced));
+      } else if (
+        disposition.clarify &&
+        reading.kind !== "CLARIFICATION" &&
+        nothingHappened
+      ) {
+        /**
+         * The model was guessing (LOW confidence): a targeted question,
+         * offering its own best reading as the thing to say yes to, so
+         * that the person answers in one word rather than starting the
+         * whole exchange again.
+         */
+        const step = stepInHand();
+        if (step !== undefined) {
+          reply = repairOn(step, interpretationOf(step));
+        }
+      } else if (
+        (reading.kind === "ANSWER" || reading.kind === "CORRECTION") &&
+        takingAnswers &&
+        nothingHappened &&
+        reading.qualitative.length === 0 &&
+        reading.tensions.length === 0
       ) {
         /**
          * The model answered as though it had taken something in, and the
@@ -2667,36 +3406,27 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
          *
          * Live, 2026-09-22: "Zino Aviation, got it." — and the session
          * recorded no organisation name, because the model's structured
-         * answer carried none. Nothing was refused, so the guard above
-         * had nothing to catch; the acknowledgement was simply untrue,
-         * and the step came round again later as if never asked.
-         *
-         * Decided from the model's own closed fields and the runtime's
-         * own result, never from reading its prose: an ANSWER that
-         * produced no commit, no confirmation to read back and no skip
-         * did not happen. Q says so, and asks the step again in the
-         * step's own terms rather than leaving the person to discover it.
+         * answer carried none. Decided from the model's own closed fields
+         * and the runtime's own result, never from reading its prose: an
+         * ANSWER that produced no commit, no confirmation to read back
+         * and no skip did not happen. Q says what it is still missing,
+         * through the ladder, rather than blaming its hearing.
          */
-        const current =
-          view.currentStep === undefined || view.currentStep === null
-            ? undefined
-            : steps.get(view.currentStep.stepKey);
+        const current = stepInHand();
         logger.warn(
           {
             journey: input.journeyType,
-            stepKey: view.currentStep?.stepKey,
+            stepKey: current?.stepKey,
             intent: result.intent,
           },
           "the model acknowledged an answer the runtime did not record",
         );
-        reply =
-          current === undefined
-            ? "Sorry — I didn't catch that well enough to write it down. Could you say it once more?"
-            : `Sorry — I didn't catch that well enough to write it down. ${askAgain(current, input)}`;
-        result =
-          current === undefined
-            ? { ...result, askNext: null }
-            : { ...result, askNext: current.stepKey };
+        if (current !== undefined) {
+          reply = repairOn(current, interpretationOf(current));
+        }
+      }
+      if (repairAsk !== null) {
+        result = { ...result, askNext: repairAsk };
       }
       if (deferredUpload) {
         reply = `${reply.trim()} ${UPLOAD_LINE}`.trim();
@@ -2768,13 +3498,18 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
           ? result.lookup
           : null;
       /**
-       * The subject this journey is about, once it is named (QX-004 §1.1,
-       * §1.2).
+       * The subject this journey is about, once it is named. A founder's
+       * company, or an investor's organisation — never the person. Read
+       * from what the runtime has actually recorded, so a value the model
+       * proposed and nobody confirmed is not spoken as the name.
        *
-       * A founder's company, or an investor's organisation — never the
-       * person. Read from what the runtime has actually recorded, so a
-       * value the model proposed and nobody confirmed does not send
-       * anything out of Capital Q.
+       * It is no longer a reason to research. The interview used to look
+       * the subject up on the first turn after the name landed, whatever
+       * that turn was — which is how "what else should I look for?" sent
+       * Q to the public web about Zino Aviation (CQ-QX-005 §11). The
+       * public presence of a named subject is read detached, off the
+       * committed response, by the presence path; in the conversation,
+       * research runs only when the person asks for something real.
        */
       const subjectName = (() => {
         const key =
@@ -2787,41 +3522,18 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
         const described = describeValue(step, recordedValue.value).trim();
         return described.length === 0 ? null : described;
       })();
-      const website = (() => {
-        if (input.journeyType !== "founder") return null;
-        const recordedValue = view.responses.find(
-          (r) => r.stepKey === "F1.website",
-        );
-        if (recordedValue === undefined) return null;
-        const step = steps.get("F1.website");
-        const described = describeValue(step, recordedValue.value).trim();
-        return described.length === 0 ? null : described;
-      })();
 
       /**
-       * Look the subject up once, as soon as it is known.
-       *
-       * Reusing the lookup path the model already has rather than adding a
-       * second way out: the same tools, the same egress policy, the same
-       * treatment of a page's text as data. What comes back is spoken as
-       * unverified public context and confirmed by the person before
-       * anything is recorded — a search result is provenance, never truth.
-       *
-       * It never displaces a question the person actually asked.
+       * Whether this turn goes to the public web at all (CQ-QX-005 §11,
+       * §13): the core's policy, over the reading and the state. Only an
+       * explicit request for something real, named and current runs; an
+       * answer turn never does; a route that is down is not offered.
        */
-      const alreadyResearched =
-        researchedBySession.get(input.onboardingSessionId) ?? new Set<string>();
-      const proactive =
-        subjectName !== null && !alreadyResearched.has(subjectName)
-          ? {
-              subject: subjectName,
-              question: proactiveLookupQuestion({
-                journeyType: input.journeyType,
-                subject: subjectName,
-                website,
-              }),
-            }
-          : null;
+      const research: ResearchDecision | null = disposition.answer
+        ? decideResearch(conversation, reading, {
+            available: researchAvailable,
+          })
+        : null;
 
       /**
        * A question the interview can answer itself (QX-004 core gate §8).
@@ -2861,21 +3573,75 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
             : fromState;
       }
 
-      const questionForQ =
-        fromState !== null
+      /**
+       * Where the conversation returns to once an interruption is over:
+       * the question Q had open when they asked, else the one in hand.
+       * Said the way Q asks it, for the caller to speak after a research
+       * result, and returned as `asking` so the screen keeps the choices.
+       */
+      const resumeKey =
+        conversation.research?.resumeTopic ??
+        conversation.resumeTopic ??
+        conversation.asked?.topic ??
+        view.currentStep?.stepKey ??
+        null;
+      const resumeStep = resumeKey === null ? undefined : steps.get(resumeKey);
+      const resume =
+        resumeStep === undefined
           ? null
-          : result.intent === "QUESTION_FOR_Q"
-            ? result.questionForQ
-            : lookup !== null
-              ? lookupQuestion(lookup.kind, lookup.query)
-              : (proactive?.question ?? null);
-      const researching =
-        proactive !== null && questionForQ === proactive.question
-          ? proactive.subject
-          : null;
-      if (researching !== null && proactive !== null) {
-        alreadyResearched.add(proactive.subject);
-        researchedBySession.set(input.onboardingSessionId, alreadyResearched);
+          : {
+              stepKey: resumeStep.stepKey,
+              question: askAgain(resumeStep, input),
+            };
+
+      let questionForQ: string | null = null;
+      let researching: string | null = null;
+      if (fromState !== null) {
+        dispatch({ type: "QUESTION_ANSWERED" });
+      } else if (research !== null && research.run) {
+        // The model's own phrasing of what to look up, where it gave one;
+        // the person's question otherwise. Either way bounded words.
+        questionForQ =
+          lookup !== null
+            ? lookupQuestion(lookup.kind, lookup.query)
+            : (result.questionForQ ?? research.question);
+        researching = (reading.question?.text ?? questionForQ).slice(0, 200);
+        dispatch({
+          type: "RESEARCH_STARTED",
+          question: questionForQ,
+          resumeTopic: research.resumeTopic,
+        });
+        if (research.announceSourceChange) {
+          reply =
+            `${reply.trim()} What I know from you isn't enough for that, so I'm going to the public web for it.`.trim();
+        }
+      } else if (research !== null && !research.run) {
+        /**
+         * A question, answered here rather than sent away (CQ-QX-005 §9,
+         * §13). ADVICE and the like the model answered in its reply. A
+         * request for something real that cannot be looked up right now
+         * is told so, narrowly, and the open question is returned to —
+         * never "I'll look at that" for a look-up nothing will run.
+         */
+        const promisedLookup =
+          result.questionForQ !== null || result.intent === "LOOKUP";
+        if (
+          promisedLookup &&
+          (research.because === "UNAVAILABLE" ||
+            research.because === "EXHAUSTED" ||
+            research.because === "ALREADY_RUNNING")
+        ) {
+          const notice =
+            research.because === "ALREADY_RUNNING"
+              ? "I'm still on the last look-up; I'll bring that back as soon as it lands."
+              : subsystemNotice("RESEARCH", research.because === "EXHAUSTED");
+          reply =
+            resume === null ? notice : `${notice} ${resume.question}`.trim();
+        }
+        dispatch({ type: "QUESTION_ANSWERED" });
+        if (result.askNext === null && resume !== null) {
+          result = { ...result, askNext: resume.stepKey };
+        }
       }
 
       /**
@@ -3057,7 +3823,11 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
       if (
         heldNow !== undefined &&
         fromState === null &&
-        needsScale === undefined
+        needsScale === undefined &&
+        // A value held because a tension names it is asked about in the
+        // model's own words — the analyst's challenge — not read back
+        // flat as "is that right?" (CQ-QX-005 §15).
+        !tense.has(heldNow.stepKey)
       ) {
         const heldStep = steps.get(heldNow.stepKey);
         // Said the way a person says it, not the way it is stored: this
@@ -3153,88 +3923,152 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
       }
 
       /**
-       * The same question, a third time (Workstream A).
+       * What Q asks next, never the thing it has just written.
        *
-       * Two components each behaving correctly can still build a loop,
-       * and the person inside it has no way out: they answer, something
-       * fails to parse, the same words come back, and every repetition
-       * makes them less willing to rephrase. Q asked "which sectors and
-       * product areas?" four times running in the live transcript.
-       *
-       * The count is the platform's own — taken from what the platform
-       * asked, not inferred from the transcript — and at the third time
-       * Q stops asking. It says what it is missing and what it can take,
-       * in the step's own terms, which is the one thing that had not
-       * been tried.
-       *
-       * A turn that recorded something resets it: progress means the
-       * exchange is working, whatever it looks like.
+       * Repeated asking is the repair ladder's business now (above): it
+       * counts per topic and changes strategy every time. What is left
+       * here is one structural guard. A correction that landed ("no — I'm
+       * an angel, not a fund") was recorded, and the model then asked the
+       * same step again in its own words, which reads as Q not having
+       * heard the correction it just made (live, 2026-09-24). A step
+       * recorded this turn and not held for a yes is settled; the journey
+       * knows what comes next, so that is what is asked.
        */
-      let askStep =
+      const settledKey = result.askNext;
+      if (
+        settledKey !== null &&
+        recorded.includes(settledKey) &&
+        !nextPending.some((held) => held.stepKey === settledKey) &&
+        repairAsk === null
+      ) {
+        const following = view.currentStep?.stepKey ?? null;
+        const next =
+          following === null || following === settledKey
+            ? undefined
+            : steps.get(following);
+        // The model's words were a question about the settled step, so
+        // they cannot stand beside a different question on screen: Q says
+        // what changed (a correction is the one acknowledgement that adds
+        // confidence) and asks what the journey wants next.
+        const settledStep = steps.get(settledKey);
+        const settledValue = view.responses.find(
+          (r) => r.stepKey === settledKey,
+        )?.value;
+        const changed =
+          reading.kind === "CORRECTION" &&
+          settledStep !== undefined &&
+          settledValue !== undefined
+            ? describeValue(settledStep, settledValue, currency).trim()
+            : "";
+        const lead =
+          changed.length > 0 ? `I've changed that to ${changed}.` : "";
+        reply =
+          next === undefined
+            ? lead.length > 0
+              ? lead
+              : reply
+            : `${lead} ${askAgain(next, input)}`.trim();
+        result = { ...result, askNext: next?.stepKey ?? null };
+      }
+      const askStep =
         result.askNext === null ? undefined : steps.get(result.askNext);
-      const repeated = repeatsBySession.get(input.onboardingSessionId);
-      const repeats =
-        askStep === undefined
-          ? 0
-          : recorded.length > 0 || skipped.length > 0
-            ? 1
-            : repeated?.stepKey === askStep.stepKey
-              ? repeated.count + 1
-              : 1;
-      if (askStep === undefined) {
-        repeatsBySession.delete(input.onboardingSessionId);
-      } else {
-        repeatsBySession.set(input.onboardingSessionId, {
-          stepKey: askStep.stepKey,
-          count: repeats,
-        });
-      }
-      /**
-       * They have told Q it is not listening, and they are usually right
-       * — something they said did not go in.
-       *
-       * The worst available response is the question that already
-       * failed, so it is not asked. What is said instead is composed
-       * from state: what the platform is still holding for them, and the
-       * one thing it does not have, in plain words.
-       */
-      const stuck =
-        askStep !== undefined && (repeats > 2 || result.frustrated === true);
-      if (stuck && askStep !== undefined) {
-        const holding = carriedFor(input.onboardingSessionId, view);
-        const heard =
-          holding.length === 0
-            ? ""
-            : ` I do have ${holding
-                .map((item) => item.spoken)
-                .slice(0, 3)
-                .join(
-                  ", ",
-                )} from you, and I'm still getting those onto your record.`;
-        const wanted = askStep;
-        const choices = optionsOf(wanted)
-          .map((option) => option.label)
-          .slice(0, 6);
-        const plainly =
-          choices.length === 0
-            ? `The one thing I still don't have is ${wanted.configuration.prompt.replace(/\?+$/, "").toLowerCase()}.`
-            : `The one thing I still don't have is ${wanted.configuration.prompt.replace(/\?+$/, "").toLowerCase()} — I can take any of ${choices.join(", ")}.`;
-        reply = `Sorry — you did tell me, and I didn't get it down.${heard} ${plainly}`;
-        repeatsBySession.set(input.onboardingSessionId, {
-          stepKey: wanted.stepKey,
-          count: 0,
-        });
-        askStep = wanted;
-      }
       const askOpen = askStep === undefined ? null : toOpenStep(askStep, view);
+
+      // What the conversation now knows: what was recorded and chosen,
+      // what is on screen, and whether the turn moved the job along.
+      const settledNow = [...recorded, ...skipped];
+      if (settledNow.length > 0) {
+        dispatch({
+          type: "RECORDED",
+          topics: settledNow,
+          selections: selectionsThisTurn,
+        });
+        dispatch({ type: "PROGRESSED" });
+      } else if (nextPending.length > 0 || fromState !== null) {
+        dispatch({ type: "PROGRESSED" });
+      } else {
+        dispatch({ type: "STALLED" });
+      }
       if (askOpen !== null) {
-        askedBySession.set(input.onboardingSessionId, {
-          step: askOpen.stepKey,
-          question: askOpen.question,
+        dispatch({
+          type: "ASKED",
+          asked: {
+            topic: askOpen.stepKey,
+            question: askOpen.question,
+            options: (askOpen.options ?? []).map(({ key, label }) => ({
+              key,
+              label,
+            })),
+          },
         });
       } else {
-        askedBySession.delete(input.onboardingSessionId);
+        dispatch({ type: "NOTHING_ASKED" });
       }
+      // An interruption that is over — the question answered here, no
+      // research in flight — has been returned from: the next turn starts
+      // on the question just asked, not on a stale resume target.
+      if (conversation.research === null && conversation.answering === null) {
+        dispatch({ type: "RESUMED" });
+      }
+
+      /**
+       * The turn, inspectable end to end (CQ-QX-005 §8): raw words →
+       * normalised → what the turn was → what was extracted → what was
+       * persisted. Logged without the person's values; the verdict says
+       * where, if anywhere, it went wrong, and it keeps transcript
+       * trouble apart from reasoning trouble.
+       */
+      const trace: TurnTrace = {
+        raw: input.utterance,
+        normalised: input.utterance.trim().replace(/\s+/g, " "),
+        transcript: reading.transcript,
+        classification: {
+          kind: reading.kind,
+          confidence: reading.confidence,
+          question: reading.question?.kind ?? null,
+        },
+        extracted: {
+          targets: result.answers.map((a) => a.stepKey),
+          references: reading.references.map((r) => `${r.target}:${r.select}`),
+          qualitative: reading.qualitative.map((q) => q.target),
+          suggestions: reading.suggestions.map((s) => s.target),
+          tensions: reading.tensions.length,
+        },
+        persisted: {
+          recorded,
+          held: nextPending.map((p) => p.stepKey),
+          skipped,
+          refused: unsaved,
+          carried: carriedFor(input.onboardingSessionId, view).map(
+            (c) => c.stepKey,
+          ),
+        },
+        repair: repairUsed,
+        research,
+        failures: conversation.failures,
+      };
+      logger.info(
+        {
+          verdict: traceVerdict(trace),
+          kind: trace.classification.kind,
+          confidence: trace.classification.confidence,
+          transcript: trace.transcript,
+          recorded: trace.persisted.recorded,
+          held: trace.persisted.held,
+          refused: trace.persisted.refused,
+          // Targets only, never the person's words.
+          qualitative: trace.extracted.qualitative,
+          suggestions: trace.extracted.suggestions,
+          tensions: trace.extracted.tensions,
+          repair: trace.repair,
+          research:
+            research === null ? null : research.run ? "RUN" : research.because,
+          asking: askOpen?.stepKey ?? null,
+        },
+        "interview turn traced",
+      );
+      logger.debug({ trace: loggableTrace(trace) }, "interview turn trace");
+
       return {
         reply,
         intent: result.intent,
@@ -3260,6 +4094,13 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
         warnings,
         view,
         degraded: false,
+        reading,
+        resume:
+          questionForQ !== null || conversation.answering !== null
+            ? resume
+            : null,
+        qualitative: qualitativeBySession.get(sessionId) ?? [],
+        trace,
       };
     },
   };

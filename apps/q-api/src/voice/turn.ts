@@ -198,6 +198,13 @@ type VisibilitySubject =
   | { readonly kind: "COMPANY"; readonly id: string }
   | { readonly kind: "INVESTOR"; readonly id: string };
 
+/**
+ * Whether the last Q run this line started ended in failure, so that a
+ * research run carried for the interviewer can be reported back to it
+ * (CQ-QX-005 §7): a route that keeps failing stops being offered.
+ */
+const lastRunFailed = new WeakMap<VoiceSessionBinding, boolean>();
+
 /** A proposal Q made in this conversation and has not yet heard yes or no to. */
 const pendingApproval = new WeakMap<
   VoiceSessionBinding,
@@ -804,6 +811,7 @@ export function createVoiceTurnHandler(
      * my side."). The operator has the log; the person hears nothing.
      */
     let runFailed = false;
+    lastRunFailed.set(binding, false);
     let streamedDeltas = false;
     let spokenCharacters = 0;
     let saidResearch = false;
@@ -876,6 +884,7 @@ export function createVoiceTurnHandler(
           case "q.run.failed":
             terminal = true;
             runFailed = true;
+            lastRunFailed.set(binding, true);
             if (streamedDeltas) {
               // The answer has been heard. A run that fails after that
               // has failed at something the person never saw, and telling
@@ -1103,19 +1112,38 @@ export function createVoiceTurnHandler(
         if (outcome.reply.length > 0) {
           await speakLine(speaker, outcome.reply, signal, binding);
         }
+        /**
+         * Research the person asked for (CQ-QX-005 §11, §13, §16). The
+         * interviewer decided it should run and where to return to; this
+         * carries it, tells the interviewer how it ended so a route that
+         * is down stops being offered, and then returns the conversation
+         * to the question that was open — the tool result re-enters the
+         * conversational state rather than leaving the person in the air.
+         */
         const asked = await askQ(
           binding,
           outcome.questionForQ,
           signal,
           speaker,
           {
-            // A look-up nobody asked for is held to the same rule as one
-            // the model requested: what it finds is offered, what it does
-            // not find is not announced (QX-004 §1.6).
-            lookup: outcome.intent === "LOOKUP" || outcome.researching !== null,
-            proactive: outcome.researching !== null,
+            // A look-up: what it finds is offered, what it does not find
+            // is said in one line rather than narrated (QX-004 §1.6).
+            lookup: true,
+            proactive: false,
           },
         );
+        interviewer.researchEnded(
+          onboarding.sessionId,
+          lastRunFailed.get(binding) !== true,
+        );
+        if (asked.kind === "SPOKEN" && outcome.resume !== null) {
+          await speakLine(
+            speaker,
+            `Back to where we were. ${outcome.resume.question}`,
+            signal,
+            binding,
+          );
+        }
         return asked;
       }
       /**

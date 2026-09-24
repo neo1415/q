@@ -7,6 +7,7 @@ import type { Logger } from "@capital-q/observability";
 
 import type { VoiceSessionBindings } from "./bindings.js";
 import type { VoiceSpeaker, VoiceTranscriptTurn } from "./provider.js";
+import { turnFailureLine, turnSucceeded } from "./turn-failure.js";
 import type { VoiceTurnHandler } from "./turn.js";
 
 /**
@@ -258,14 +259,17 @@ export function registerVoiceThinkRoute(
     };
     try {
       await turn(binding, transcript, controller.signal, speaker);
+      turnSucceeded(binding);
     } catch (error: unknown) {
       logger.error(
         { err: error, qVoiceSessionId: binding.voiceSessionId },
         "voice think turn failed",
       );
-      // A turn we stopped has already said so; do not say it twice.
+      // A turn we stopped has already said so; do not say it twice. A
+      // turn that threw is Q's failure, named as such and never the
+      // same way twice running (CQ-QX-005).
       if (!timedOut) {
-        write("I couldn't take that just now. Could you say it again?");
+        write(turnFailureLine(binding, error));
       }
     } finally {
       clearInterval(keepAlive);

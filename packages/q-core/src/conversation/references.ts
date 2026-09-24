@@ -78,6 +78,23 @@ export function resolveOptionReference(
         ),
       };
     }
+    case "ADD": {
+      const ordinals = reference.ordinals ?? [];
+      if (ordinals.length === 0) {
+        return { kind: "UNRESOLVED", because: "EMPTY" };
+      }
+      if (ordinals.some((n) => n > keys.length)) {
+        return { kind: "UNRESOLVED", because: "OUT_OF_RANGE" };
+      }
+      const added = ordinals
+        .map((n) => keys[n - 1])
+        .filter((key): key is string => key !== undefined);
+      const base =
+        previous !== null && previous.length > 0
+          ? previous.filter((key) => keys.includes(key))
+          : [];
+      return { kind: "KEYS", keys: [...new Set([...base, ...added])] };
+    }
     case "EXCLUDE": {
       const ordinals = reference.ordinals ?? [];
       if (ordinals.some((n) => n > keys.length)) {

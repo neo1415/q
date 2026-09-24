@@ -110,11 +110,11 @@ export function subsystemNotice(
         : "I can't reach my reasoning service just now, so I haven't taken that in. Say it again in a moment.";
     case "RESEARCH":
       return stopping
-        ? "Live research isn't reachable at the moment, so I'll stop trying and answer from what I know instead."
-        : "Live research isn't reachable just now. I'll answer from what I know and come back to the public sources when they're up.";
+        ? "Live research still isn't reachable, so I'll stop trying it for now and work from what you've told me and what I already know."
+        : "Live research isn't reachable just now, so I can't check public sources for that. What I can give you comes from what you've told me and what I already know.";
     case "TOOL":
       return stopping
-        ? "That change still isn't going through, so I'll leave it for now and we can carry on."
+        ? "That still isn't going through on my side, so I'll leave it for now and we can carry on."
         : "That didn't go through on my side. I'll try it again when you're ready.";
     case "PARSE":
       return stopping

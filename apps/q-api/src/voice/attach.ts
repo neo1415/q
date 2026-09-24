@@ -8,6 +8,7 @@ import type {
   VoiceAttachment,
   VoiceSpeaker,
 } from "./provider.js";
+import { turnFailureLine, turnSucceeded } from "./turn-failure.js";
 import type { VoiceTurnHandler } from "./turn.js";
 
 /**
@@ -129,6 +130,7 @@ export async function attachVoiceChannel(
       };
       void turn(binding, transcript, signal, timed)
         .then((outcome) => {
+          turnSucceeded(binding);
           turnsCounter.add(1, {
             outcome: outcome.kind,
             path: outcome.kind === "NOTHING" ? "none" : outcome.path,
@@ -140,9 +142,11 @@ export async function attachVoiceChannel(
             { err: error, qVoiceSessionId: binding.voiceSessionId },
             "voice turn failed",
           );
+          // Q's failure, named as such and never the same way twice
+          // running (CQ-QX-005).
           if (!signal.aborted && speaker.isOpen) {
             void speaker
-              .speak("I couldn't take that just now. Could you say it again?")
+              .speak(turnFailureLine(binding, error))
               .catch(() => undefined);
           }
         });

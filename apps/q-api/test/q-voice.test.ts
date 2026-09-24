@@ -393,8 +393,9 @@ describe("voice channel", () => {
       bound,
     );
     await new Promise((resolve) => setTimeout(resolve, 10));
+    // Q's failure, named as Q's (CQ-QX-005 §8): never the person's words.
     expect(bound.spoken).toEqual([
-      "I couldn't take that just now. Could you say it again?",
+      "That didn't go through on my side. I'll try it again when you're ready.",
     ]);
     expect(bound.spoken.join(" ")).not.toContain(BEARER);
   });

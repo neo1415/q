@@ -77,6 +77,8 @@ export const OPTION_SELECTIONS = [
   "ORDINAL",
   "SAME_AS_BEFORE",
   "EXCLUDE",
+  /** "And the second one too": positions added to what they chose before. */
+  "ADD",
 ] as const;
 export const OptionSelectionSchema = z.enum(OPTION_SELECTIONS);
 export type OptionSelection = z.infer<typeof OptionSelectionSchema>;
@@ -87,7 +89,7 @@ export const OptionReferenceSchema = z
     select: OptionSelectionSchema,
     /** For LAST / FIRST: how many. Absent means one. */
     count: z.number().int().min(1).max(60).optional(),
-    /** For ORDINAL / EXCLUDE: one-based positions in the shown list. */
+    /** For ORDINAL / EXCLUDE / ADD: one-based positions in the shown list. */
     ordinals: z.array(z.number().int().min(1).max(60)).max(20).optional(),
   })
   .strict();
@@ -188,6 +190,14 @@ export const ConversationTurnReadingSchema = z
     question: QuestionToQSchema.nullable().default(null),
     suggestions: z.array(InferenceSuggestionSchema).max(4).default([]),
     tensions: z.array(TensionSchema).max(3).default([]),
+    /**
+     * Earlier answers the person is withdrawing entirely ("there's nothing
+     * I'd avoid after all"). A correction can replace a value through the
+     * ordinary answer; this is the closed field for taking one away, so
+     * that "I've cleared that" is something the platform did rather than
+     * something a model said. Only a CORRECTION may carry it.
+     */
+    clears: z.array(Target).max(4).default([]),
   })
   .strict();
 export type ConversationTurnReading = z.infer<
@@ -204,6 +214,7 @@ export const EMPTY_TURN_READING: ConversationTurnReading = {
   question: null,
   suggestions: [],
   tensions: [],
+  clears: [],
 };
 
 /** The kinds that may put anything on the record. Everything else may not. */

@@ -49,7 +49,7 @@ describe("the failure ledger", () => {
     expect(subsystemNotice("MODEL", false)).toMatch(/reasoning service/i);
     expect(subsystemNotice("RESEARCH", true)).toMatch(/live research/i);
     expect(subsystemNotice("RESEARCH", true)).toMatch(
-      /answer from what I know/i,
+      /what you've told me and what I already know/i,
     );
   });
 });

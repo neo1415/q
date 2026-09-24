@@ -13,7 +13,7 @@ import {
 } from "./interviewer-fixtures.js";
 
 /**
- * Q stops asking the question that is not working (Workstream A).
+ * Q stops repeating the question that is not working (CQ-QX-005 §6, §7).
  *
  * Two components each behaving correctly can still build a loop, and the
  * person inside one has no way out: they answer, the reading fails to
@@ -21,12 +21,10 @@ import {
  * willing to rephrase. Live, "which sectors and product areas?" was
  * asked four times running, and the fourth was word for word the first.
  *
- * The count is the platform's own — taken from what the platform asked,
- * not inferred from the transcript — so it is right even when the model
- * has lost the thread entirely. At the third time of asking, and
- * immediately when the person says they have already answered, Q stops.
- * What it says instead is composed from state: what it is holding for
- * them, and the one thing it does not have, in ordinary words.
+ * Repair is now a ladder over the conversation core's own count of
+ * failures on the topic — never the same rung twice running — and a
+ * person who says they have already answered is believed at once: Q names
+ * what it is holding for them and the one thing it does not have.
  */
 
 const logger = createLogger(
@@ -48,8 +46,8 @@ const ASKS_AGAIN: InterviewConductorResult = {
   askNext: "I2.stages",
 };
 
-describe("the same question is not asked a third time", () => {
-  it("says what is missing instead of repeating the question that failed", async () => {
+describe("the same repair is never said twice running", () => {
+  it("changes strategy on every failed turn and ends by offering a way out", async () => {
     const world = investorSession({
       currentStepKey: "I2.stages",
       recorded: ANSWERED,
@@ -59,21 +57,34 @@ describe("the same question is not asked a third time", () => {
       logger,
     });
 
-    const first = await interviewer.turn(turn(world, "early ones"));
-    const second = await interviewer.turn(turn(world, "the early ones"));
-    const third = await interviewer.turn(
-      turn(world, "early stage, like I said"),
-    );
+    const replies: string[] = [];
+    for (const said of [
+      "early ones",
+      "the early ones",
+      "early stage, like I said",
+      "EARLY",
+    ]) {
+      replies.push((await interviewer.turn(turn(world, said))).reply);
+    }
 
-    // The first two are the model's own question; the third is not.
-    expect(first.reply).toContain("which stages");
-    expect(second.reply).toContain("which stages");
-    expect(third.reply).not.toBe(second.reply);
-    expect(third.reply).toMatch(/you did tell me/i);
-    // And it names what it can actually take, which is the one thing
-    // that had not been tried.
-    expect(third.reply).toContain("Pre-seed");
-    expect(third.reply).toContain("Series A");
+    // Never the model's own failed question repeated, and never the
+    // same repair line twice in a row.
+    for (let i = 1; i < replies.length; i += 1) {
+      expect(replies[i]).not.toBe(replies[i - 1]);
+    }
+    for (const reply of replies) {
+      expect(reply).not.toBe("Sorry, which stages do you invest at?");
+      // Reasoning trouble is never blamed on hearing.
+      expect(reply.toLowerCase()).not.toContain("didn't catch");
+    }
+    // The gap is named in the step's own terms along the way…
+    expect(replies.join(" ")).toContain("Pre-seed");
+    expect(replies.join(" ")).toContain("Series A");
+    // …and the ladder reaches the floor: a way out, not a fifth ask.
+    expect(replies.join(" ")).toMatch(/tap(?:ping)? Type/i);
+    expect(
+      interviewer.conversation(turn(world, "").onboardingSessionId).repair,
+    ).not.toBeNull();
   });
 
   it("resets when a turn actually records something", async () => {
@@ -112,16 +123,19 @@ describe("the same question is not asked a third time", () => {
     await interviewer.turn(turn(world, "early ones"));
     await interviewer.turn(turn(world, "the early ones"));
     // Progress: the exchange is working, whatever it looked like.
-    await interviewer.turn(turn(world, "seed"));
+    const recorded = await interviewer.turn(turn(world, "seed"));
+    expect(recorded.recorded).toEqual(["I2.stages"]);
     const after = await interviewer.turn(turn(world, "hmm"));
 
-    expect(after.reply).toContain("Which currency?");
-    expect(after.reply).not.toMatch(/you did tell me/i);
+    // A fresh topic starts the ladder again from its first rung.
+    expect(after.reply).toMatch(/^Let me ask that differently\./);
+    expect(after.reply).toContain("currency");
+    expect(after.reply).not.toMatch(/tap(?:ping)? Type/i);
   });
 });
 
 describe("somebody who says they have already answered is believed", () => {
-  it("does not repeat the failed parse, and says plainly what is missing", async () => {
+  it("does not repeat the failed parse, and says plainly what is missing and what is held", async () => {
     const world = investorSession({
       currentStepKey: "I2.stages",
       recorded: ANSWERED,
@@ -166,8 +180,9 @@ describe("somebody who says they have already answered is believed", () => {
     expect(angry.reply).toMatch(/you did tell me/i);
     // It accounts for what it is holding rather than claiming it is saved.
     expect(angry.reply).toContain("Pound sterling");
-    expect(angry.reply).toMatch(/onto your record/i);
-    // And it names the one thing it still needs.
+    expect(angry.reply).not.toMatch(/saved|recorded/i);
+    // And it names the one thing it still needs, and what it can take.
+    expect(angry.reply).toContain("still missing");
     expect(angry.reply).toContain("Pre-seed");
   });
 });

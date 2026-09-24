@@ -84,6 +84,7 @@ function view(
         value: { type: "TEXT", text: "Northstar" },
         sourceModality: "TYPED_TEXT",
         createdAt: NOW,
+        note: null,
       },
     ],
     pendingQuestions: [],
@@ -169,6 +170,11 @@ const base: InterviewConductorResult = {
   navigate: null,
   lookup: null,
   pronounce: null,
+  answerFromState: null,
+  skipRemainingOptional: false,
+  unrestricted: [],
+  frustrated: false,
+  reading: null,
 };
 
 function turnInput(fetchFake: typeof fetch, utterance: string) {
@@ -197,7 +203,14 @@ describe("interviewer", () => {
     const gateway = queuedGateway([
       {
         ...base,
-        answers: [{ stepKey: "F1.stage", value: "seed", confidence: "HIGH" }],
+        answers: [
+          {
+            stepKey: "F1.stage",
+            value: "seed",
+            confidence: "HIGH",
+            clarity: "SETTLED",
+          },
+        ],
       },
     ]);
     const interviewer = createInterviewer({ gateway, logger });
@@ -247,11 +260,13 @@ describe("interviewer", () => {
             stepKey: "F4.team_size",
             value: "Yeah. Just four",
             confidence: "HIGH",
+            clarity: "SETTLED",
           },
           {
             stepKey: "F1.website",
             value: "Savage Bridge dot com.",
             confidence: "HIGH",
+            clarity: "SETTLED",
           },
         ],
       },
@@ -292,8 +307,14 @@ describe("interviewer", () => {
             stepKey: "F2.materials",
             value: "demo and the website",
             confidence: "HIGH",
+            clarity: "SETTLED",
           },
-          { stepKey: "F1.stage", value: "unicorn", confidence: "HIGH" },
+          {
+            stepKey: "F1.stage",
+            value: "unicorn",
+            confidence: "HIGH",
+            clarity: "SETTLED",
+          },
         ],
       },
     ]);
@@ -308,8 +329,10 @@ describe("interviewer", () => {
     expect(api.requests.some((r) => r.url.includes("F2.materials"))).toBe(true);
     expect(outcome.reply).toContain("on screen");
     // "unicorn" fits nothing, so Q does not say "got it": it asks the one
-    // question that settles it, with the step's own options.
-    expect(outcome.reply).toMatch(/^I couldn't place that\./);
+    // question that settles it, with the step's own options — through the
+    // repair ladder (CQ-QX-005 §6), never with a fixed apology.
+    expect(outcome.reply).not.toContain("got it");
+    expect(outcome.reply).toMatch(/^Let me ask that differently\./);
     expect(outcome.reply).toContain("Seed");
     expect(outcome.asking?.stepKey).toBe("F1.stage");
   });
@@ -336,6 +359,7 @@ describe("interviewer", () => {
             stepKey: "F6.target_amount",
             value: "300000000",
             confidence: "HIGH",
+            clarity: "SETTLED",
           },
         ],
       },
@@ -360,9 +384,24 @@ describe("interviewer", () => {
       {
         ...base,
         answers: [
-          { stepKey: "F1.stage", value: "unicorn", confidence: "HIGH" },
-          { stepKey: "F1.company_name", value: "Renamed", confidence: "HIGH" },
-          { stepKey: "F9.invented", value: "x", confidence: "HIGH" },
+          {
+            stepKey: "F1.stage",
+            value: "unicorn",
+            confidence: "HIGH",
+            clarity: "SETTLED",
+          },
+          {
+            stepKey: "F1.company_name",
+            value: "Renamed",
+            confidence: "HIGH",
+            clarity: "SETTLED",
+          },
+          {
+            stepKey: "F9.invented",
+            value: "x",
+            confidence: "HIGH",
+            clarity: "SETTLED",
+          },
         ],
       },
     ]);
@@ -382,7 +421,12 @@ describe("interviewer", () => {
         reply:
           "One and a half million dollars, mostly for sales — is that right?",
         answers: [
-          { stepKey: "F6.target_amount", value: "$1.5m", confidence: "HIGH" },
+          {
+            stepKey: "F6.target_amount",
+            value: "$1.5m",
+            confidence: "HIGH",
+            clarity: "SETTLED",
+          },
         ],
         askNext: null,
       },
@@ -559,6 +603,7 @@ describe("interviewer", () => {
             confidence: "0.8",
             status: "PENDING",
             createdAt: NOW,
+            sourceRefs: [],
           },
         ],
       }),

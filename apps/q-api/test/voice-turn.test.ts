@@ -318,6 +318,7 @@ describe("a spoken interview answer", () => {
           // the runtime understood (QX-004 core gate: one Q).
           reply: null,
           navigate: null,
+          researching: null,
           degraded: false,
         };
         return Promise.resolve(Response.json(body));
@@ -392,6 +393,7 @@ describe("a spoken interview answer", () => {
           // the runtime understood (QX-004 core gate: one Q).
           reply: null,
           navigate: null,
+          researching: null,
           degraded: false,
         };
         return Promise.resolve(Response.json(body));

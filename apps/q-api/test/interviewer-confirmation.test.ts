@@ -143,6 +143,10 @@ const base: InterviewConductorResult = {
   navigate: null,
   lookup: null,
   pronounce: null,
+  skipRemainingOptional: false,
+  unrestricted: [],
+  frustrated: false,
+  reading: null,
 };
 
 /** A gateway that returns each queued result in turn. */
@@ -184,7 +188,14 @@ function turn(fetchFake: typeof fetch, utterance: string) {
 const proposes = (value: string): InterviewConductorResult => ({
   ...base,
   reply: `${value}, got it. What does the company do?`,
-  answers: [{ stepKey: "F6.target_amount", value, confidence: "HIGH" }],
+  answers: [
+    {
+      stepKey: "F6.target_amount",
+      value,
+      confidence: "HIGH",
+      clarity: "SETTLED",
+    },
+  ],
 });
 
 describe("a material value waits for a yes", () => {
@@ -341,7 +352,12 @@ describe("a held value the model restates instead of deciding", () => {
         reply: "Lagos, got it. What does the company do?",
         // The same money, said differently. Not a correction.
         answers: [
-          { stepKey: "F6.target_amount", value: "500000", confidence: "HIGH" },
+          {
+            stepKey: "F6.target_amount",
+            value: "500000",
+            confidence: "HIGH",
+            clarity: "SETTLED",
+          },
         ],
       }),
       logger,

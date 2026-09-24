@@ -133,6 +133,10 @@ const base: InterviewConductorResult = {
   navigate: null,
   lookup: null,
   pronounce: null,
+  skipRemainingOptional: false,
+  unrestricted: [],
+  frustrated: false,
+  reading: null,
 };
 
 function gateway(result: InterviewConductorResult): InterviewGateway {

@@ -156,7 +156,10 @@ function formatValue(value: unknown): string {
   if (typeof value === "number" || typeof value === "boolean") {
     return String(value);
   }
-  return JSON.stringify(value, null, 2);
+  // Compact: indentation is whitespace a model does not need and a small
+  // model's request budget pays for — several hundred tokens a turn on
+  // the interview's open-step list alone (CQ-QX-005).
+  return JSON.stringify(value);
 }
 
 export function fenceUntrusted(source: string, value: unknown): string {

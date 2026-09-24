@@ -101,6 +101,7 @@ function view(
         value: { type: "TEXT", text: "Northstar" },
         sourceModality: "TYPED_TEXT",
         createdAt: NOW,
+        note: null,
       },
     ],
     pendingQuestions: [],
@@ -157,6 +158,7 @@ const answered: InterviewConductorResult = {
       stepKey: "F1.stage",
       value: "seed",
       confidence: "HIGH",
+      clarity: "SETTLED",
     },
   ],
   categoryPhrases: [],
@@ -168,6 +170,11 @@ const answered: InterviewConductorResult = {
   navigate: null,
   lookup: null,
   pronounce: null,
+  answerFromState: null,
+  skipRemainingOptional: false,
+  unrestricted: [],
+  frustrated: false,
+  reading: null,
 };
 
 function turn(fetchFake: typeof fetch, utterance: string) {
@@ -212,7 +219,7 @@ describe("QX-004 §0.4 · Q with no model route", () => {
     // of this line said "nothing you've told me is lost" while the
     // browser was showing "Capital Q couldn't save that".
     expect(first.reply.toLowerCase()).toContain("can't reach");
-    expect(first.reply.toLowerCase()).toContain("hasn't been saved");
+    expect(first.reply.toLowerCase()).toContain("haven't taken that in");
     expect(first.reply.toLowerCase()).not.toContain("nothing you");
     expect(first.reply.toLowerCase()).not.toContain("is saved;");
     // What it may stand behind is what this turn actually read back: the
@@ -271,7 +278,10 @@ describe("QX-004 core gate §5 · Q may not narrate a save it never made", () =>
     const result = await interviewer.turn(turn(fetchFake, "Zino Aviation."));
     expect(result.recorded).toEqual([]);
     expect(result.reply).not.toContain("got it");
-    expect(result.reply.toLowerCase()).toContain("didn't catch that");
+    // Repair, not blame (CQ-QX-005 §8): an intelligible sentence the
+    // model could not place is never described as a hearing problem.
+    expect(result.reply.toLowerCase()).not.toContain("didn't catch");
+    expect(result.reply).toContain("What stage is the company at");
     // And it asks the step again rather than leaving the person to find
     // out later that it never went in.
     expect(result.asking?.stepKey).toBe("F1.stage");
