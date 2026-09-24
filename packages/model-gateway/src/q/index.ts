@@ -72,6 +72,7 @@ import { createPartialAnswerReader } from "../policy/partial-answer.js";
 import type { ModelGateway, ModelGatewayExecuteOptions } from "../gateway.js";
 import { acceptStructuredOutput } from "../policy/structured.js";
 import { withoutActionTalk } from "./action-talk.js";
+import { ownProfileFact } from "./own-profile.js";
 import {
   analystResultBlocks,
   askedSubjects,
@@ -87,6 +88,7 @@ export {
   type AnalystResultLike,
 } from "./result-blocks.js";
 export { createQTurnReader, type QTurnReader } from "./turn-reader.js";
+export { mandateStatement, ownProfileFact } from "./own-profile.js";
 export {
   withoutActionTalk,
   type ActionTalkStripResult,
@@ -338,7 +340,7 @@ const SOURCE_CHANGE_NOTE: ModelMessage = {
 export const OWN_MANDATE_NOTE: ModelMessage = {
   role: "SYSTEM",
   content:
-    "The investor organisation above is the person's own, and that result is their own declared profile: how they invest, whether they are deploying capital, and their mandate. A mandate with status DRAFT is still being declared: say so, and name the criteria it does not yet declare. Asked who they are or what their profile says, answer from it in plain words, never as a field list. Asked whether a company suits what they invest in, compare the company's profile with each declared criterion (matches, misses, not on record), with no score or verdict.",
+    "Among the authorised facts is the person's own declared investor profile: their organisation, how they invest, whether they are deploying capital, and their mandate. Asked who they are or what their profile says, answer from it in plain words, never as a field list; a draft mandate is still being declared, so say so and name what it does not yet declare. Asked whether a company suits what they invest in, compare the company's profile with each declared criterion (matches, misses, not on record), with no score or verdict.",
 };
 
 /**
@@ -1066,6 +1068,46 @@ export function createModelGatewayQAnswer(
         offered.map((tool) => [tool.definition.name, tool] as const),
       );
 
+      /**
+       * Their own declared profile, read for them (CQ-QX-007; directive
+       * "Home Q doesn't know the person").
+       *
+       * An investor asking "according to my profile, who am I?" was told
+       * no profile facts existed, and one asking whether a company suits
+       * what they invest in was told their thesis was unknown: the
+       * firewall had admitted their own mandate and nothing read it. When
+       * the plan binds INVESTOR_MANDATE to their own organisation (which
+       * only an owner receives) it is read through the same tool the model
+       * could call, under the same plan, and placed among the AUTHORISED
+       * FACTS the model answers from.
+       */
+      let ownProfile: AuthorisedFact | null = null;
+      let ownProfileCall: QToolCallObservation | null = null;
+      const ownInvestor = ownInvestorOrganisationIn(plan);
+      if (ownInvestor !== null && offeredByName.has("get_investor_mandate")) {
+        const call = {
+          callId: "q-own-mandate",
+          name: "get_investor_mandate",
+          arguments: { investorOrganisationId: ownInvestor },
+        };
+        const outcome = await tools.execute(call, toolContext);
+        ownProfileCall = {
+          toolName: outcome.toolName,
+          providerName: call.name,
+          status: outcome.status,
+          failureCode: outcome.failureCode,
+          latencyMs: outcome.latencyMs,
+        };
+        if (outcome.result.ok) {
+          ownProfile = ownProfileFact(outcome.result.data);
+        }
+        took("mandate");
+      }
+      const facts: readonly AuthorisedFact[] =
+        ownProfile === null
+          ? assembled.facts
+          : [ownProfile, ...assembled.facts];
+
       const variables: Omit<
         CompanyAnalystV4Variables,
         | "operatingMode"
@@ -1079,7 +1121,7 @@ export function createModelGatewayQAnswer(
           role: m.role,
           content: m.content,
         })),
-        authorisedFacts: [...assembled.facts],
+        authorisedFacts: [...facts],
         subjectDescription: assembled.subjectDescription,
         institutionalNotes:
           assembled.institutionalNotes ??
@@ -1091,7 +1133,7 @@ export function createModelGatewayQAnswer(
         operatingMode: operatingModeForCapability(request.capability),
         communicationProfile: profile,
         environmentNotes: environmentNotesFor(
-          assembled.facts,
+          facts,
           offered,
           request.subjects,
           {
@@ -1194,7 +1236,7 @@ export function createModelGatewayQAnswer(
           // Fact labels are rewritten before a sentence goes out, not only
           // in the stored answer: on a voice call it is said aloud (H3b).
           const guarded = guardSentence(
-            citeAuthorisedFacts(sentence, assembled.facts),
+            citeAuthorisedFacts(sentence, facts),
             firstSentence,
             recommendationGrounds,
           );
@@ -1365,45 +1407,11 @@ export function createModelGatewayQAnswer(
           ? [...rendered.messages]
           : [...rendered.messages, TOOLS_FIRST_NOTE];
 
-      /**
-       * Their own declared mandate, fetched for them (CQ-QX-007 fit).
-       *
-       * An investor asking about a company from its page asks "is this
-       * worth my time given what I invest in?", and the answer was "we
-       * have no facts on your investment thesis" — the thesis was never in
-       * front of the model. When the run carries their own organisation
-       * (proved by the mandate scope the firewall bound to it, which only
-       * an owner receives) the mandate is read through the same tool the
-       * model could call, under the same plan, and handed over as data.
-       */
-      const ownInvestor = ownInvestorOrganisationIn(plan);
-      const mandateTool = offeredByName.get("get_investor_mandate");
-      // On Home too, not only beside a company (CQ-QX-007): an investor
-      // asking "according to my profile, who am I?" was told no profile
-      // facts existed, because nothing read their own declaration and the
-      // model did not reach for the tool.
-      if (ownInvestor !== null && mandateTool !== undefined) {
-        const call = {
-          callId: "q-own-mandate",
-          name: "get_investor_mandate",
-          arguments: { investorOrganisationId: ownInvestor },
-        };
-        const outcome = await tools.execute(call, toolContext);
-        toolCalls.push({
-          toolName: outcome.toolName,
-          providerName: call.name,
-          status: outcome.status,
-          failureCode: outcome.failureCode,
-          latencyMs: outcome.latencyMs,
-        });
-        if (outcome.result.ok) {
-          messages = [
-            ...messages,
-            fetchedForYouMessage(call.name, outcome),
-            OWN_MANDATE_NOTE,
-          ];
+      if (ownProfileCall !== null) {
+        toolCalls.push(ownProfileCall);
+        if (ownProfile !== null) {
+          messages = [...messages, OWN_MANDATE_NOTE];
         }
-        took("mandate");
       }
 
       type AnswerResult = Awaited<
@@ -1674,7 +1682,7 @@ export function createModelGatewayQAnswer(
         const guarded = withoutRecommendationClaims(
           citeAuthorisedFacts(
             citePublicSources(promises.text, publicSources),
-            assembled.facts,
+            facts,
           ),
           recommendationGrounds,
         );
@@ -1963,7 +1971,7 @@ I've updated **${revisedArtifact.title}** — that's version ${String(revisedArt
                   ).text,
                   publicSources,
                 ),
-                assembled.facts,
+                facts,
               ),
               recommendationGrounds,
             )

@@ -192,9 +192,13 @@ describe("Home Q reads the person's own declared profile", () => {
     const sent = alpha.calls
       .flatMap((call) => call.request.messages.map((m) => m.content))
       .join("\n");
-    expect(sent).toContain("Zino Aviation");
-    expect(sent).toContain('"investorType":"ANGEL"');
-    expect(sent).toContain('"status":"DRAFT"');
+    // Among the AUTHORISED FACTS, in words, not as a trailing tool dump.
+    const facts = sent.slice(sent.indexOf("AUTHORISED FACTS"));
+    expect(facts).toContain("own declared investor profile");
+    expect(facts).toContain("their investor organisation is Zino Aviation");
+    expect(facts).toContain("they invest as angel");
+    expect(facts).toContain("deployment: actively investing");
+    expect(facts).toContain("draft mandate (still being declared)");
     expect(sent).toContain(OWN_MANDATE_NOTE.content);
   });
 

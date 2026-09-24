@@ -10,7 +10,11 @@ import {
   type RetrievalHit,
 } from "@capital-q/q-knowledge";
 import type { QToolExecutionContext, QToolPort } from "@capital-q/q-runtime";
-import { ownInvestorOrganisationIn } from "@capital-q/model-gateway/q";
+import {
+  mandateStatement,
+  ownInvestorOrganisationIn,
+  ownProfileFact,
+} from "@capital-q/model-gateway/q";
 
 import type {
   CompanyCanonicalPort,
@@ -204,16 +208,11 @@ export function createToolCanonicalPort(
           context,
         );
         if (outcome.result.ok) {
-          const statement = mandateStatement(outcome.result.data);
-          if (statement !== null) {
-            facts.push({
-              scope: "INVESTOR_MANDATE",
-              statement,
-              // Declared by the investor about themselves.
-              truthClass: "USER_CLAIM",
-              evidenceStatus: "SELF_REPORTED",
-              source: "the person's own declared investment mandate",
-            });
+          // Declared by the investor about themselves; the same fact the
+          // conversational path puts in front of the model.
+          const own = ownProfileFact(outcome.result.data);
+          if (own !== null) {
+            facts.push(own);
           }
         }
       }
@@ -227,84 +226,8 @@ export function createToolCanonicalPort(
   };
 }
 
-type MandateRead = {
-  readonly displayName?: string;
-  readonly mandates?: readonly {
-    readonly status?: string;
-    readonly cheque: {
-      readonly currency: string;
-      readonly min?: string;
-      readonly typical?: string;
-      readonly max?: string;
-    } | null;
-    readonly stage: {
-      readonly minStageCode: string | null;
-      readonly maxStageCode: string | null;
-    };
-    readonly constraints: readonly {
-      readonly dimension: string;
-      readonly operator: string;
-      readonly value: unknown;
-      readonly isHardExclusion: boolean;
-    }[];
-    readonly taxonomyPreferences: readonly {
-      readonly canonicalCode: string;
-      readonly isExclusion: boolean;
-    }[];
-  }[];
-};
-
-/**
- * A declared mandate as one plain statement the model can compare a
- * company against. Only what was declared: an absent criterion is left
- * out rather than written as "any", because unknown is not open.
- */
-export function mandateStatement(data: unknown): string | null {
-  const read = data as MandateRead;
-  const mandate = read.mandates?.[0];
-  if (mandate === undefined) return null;
-  const parts: string[] = [];
-  const cheque = mandate.cheque;
-  if (cheque !== null) {
-    const bounds = [cheque.min, cheque.max].filter(
-      (value): value is string => value !== undefined,
-    );
-    const typical =
-      cheque.typical === undefined ? "" : ` (typical ${cheque.typical})`;
-    if (bounds.length > 0 || typical.length > 0) {
-      parts.push(`cheque ${bounds.join(" to ")}${typical} ${cheque.currency}`);
-    }
-  }
-  if (
-    mandate.stage.minStageCode !== null ||
-    mandate.stage.maxStageCode !== null
-  ) {
-    parts.push(
-      `stages ${mandate.stage.minStageCode ?? "not stated"} to ${mandate.stage.maxStageCode ?? "not stated"}`,
-    );
-  }
-  const preferred = mandate.taxonomyPreferences
-    .filter((preference) => !preference.isExclusion)
-    .map((preference) => preference.canonicalCode);
-  const excluded = mandate.taxonomyPreferences
-    .filter((preference) => preference.isExclusion)
-    .map((preference) => preference.canonicalCode);
-  if (preferred.length > 0) parts.push(`focus ${preferred.join(", ")}`);
-  if (excluded.length > 0) parts.push(`excludes ${excluded.join(", ")}`);
-  for (const constraint of mandate.constraints.slice(0, 20)) {
-    parts.push(
-      `${constraint.dimension.toLowerCase()} ${constraint.operator.toLowerCase()} ${JSON.stringify(constraint.value)}${constraint.isHardExclusion ? " (hard exclusion)" : ""}`,
-    );
-  }
-  if (parts.length === 0) return null;
-  const whose = read.displayName === undefined ? "" : ` (${read.displayName})`;
-  // A draft is what they have declared so far, not a settled mandate.
-  const draft = mandate.status === "DRAFT" ? ", still a draft" : "";
-  return `The person's own declared investment mandate${whose}${draft}: ${parts.join("; ")}.`.slice(
-    0,
-    4_000,
-  );
-}
+/** Re-exported: the one statement of a declared mandate lives in the gateway's own-profile module. */
+export { mandateStatement };
 
 /** Authorised Q Knowledge reads under the plan's own envelope (§16, §46). */
 export function createKnowledgeCompanyPort(
