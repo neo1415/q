@@ -127,7 +127,7 @@ export function usePitchPlayback(
    * waiting for is thrown away -- a request that cancels itself and never
    * retries, because on re-entry the guard it just set turns it back.
    */
-  const authorizingRef = useRef(false);
+  const authorizingRef = useRef<object | null>(null);
   /**
    * A bound on re-asking. An authorization that arrives already inside the
    * expiry margin makes `usable` false immediately, which is a legitimate
@@ -146,7 +146,9 @@ export function usePitchPlayback(
   const wanted = intent.authorize && mediaAssetId !== null;
 
   useEffect(() => {
-    if (!wanted || usable || failed || authorizingRef.current) return;
+    if (!wanted || usable || failed || authorizingRef.current !== null) {
+      return;
+    }
     if (mediaAssetId === null) return;
 
     // The attempt budget belongs to one asset; a new card starts fresh.
@@ -160,7 +162,8 @@ export function usePitchPlayback(
     }
 
     let cancelled = false;
-    authorizingRef.current = true;
+    const request = {};
+    authorizingRef.current = request;
     attemptsRef.current = {
       mediaAssetId,
       count: attemptsRef.current.count + 1,
@@ -180,12 +183,22 @@ export function usePitchPlayback(
         setRefused(mediaAssetId);
       })
       .finally(() => {
-        authorizingRef.current = false;
+        // Only the request that still holds the slot releases it; a
+        // cancelled one already gave it up.
+        if (authorizingRef.current === request) authorizingRef.current = null;
         if (!cancelled) setAuthorizingFor(null);
       });
 
     return () => {
       cancelled = true;
+      // A cancelled request's answer is thrown away, so it must not keep
+      // the slot either. It used to: the effect re-ran (a dependency
+      // changed, or React's development double-run of effects), found the
+      // slot still taken and returned, and the cancelled answer then set
+      // nothing and triggered no render. Nothing ever asked again, and an
+      // investor's feed showed a grey box where an authorised pitch should
+      // play (CQ-ACCEPT-001, C7).
+      if (authorizingRef.current === request) authorizingRef.current = null;
     };
     // `authorization` and not only `usable`: an answer that arrives
     // already inside the expiry margin leaves `usable` false, so keying on
