@@ -66,7 +66,7 @@ export const TURN_READER_V1: PromptDefinition<
 > = {
   id: "TURN_READER",
   version: 1,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   kind: "TASK",
   taskClass: "FAST_CLASSIFICATION",
   owner: "q-core",
