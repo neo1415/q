@@ -246,6 +246,14 @@ const syntheticDemo = createSyntheticDemoRoutingAllowance({
   operatorEnabled: providerSecrets.syntheticDemoRouting,
   environment: config.runtime.deploymentEnvironment,
   databaseUrl: databaseConfig.secrets.url,
+  // Hosted staging attests the same way q-api does (QX-004 §0.3): without
+  // these the opt-in throws at startup on Railway, so the worker could only
+  // ever run REAL_CUSTOMER there while q-api ran the synthetic posture.
+  hostedAttested: providerSecrets.syntheticDemoAttested,
+  ...(providerSecrets.syntheticDemoProjectRef === undefined
+    ? {}
+    : { syntheticProjectRef: providerSecrets.syntheticDemoProjectRef }),
+  supabaseUrl: config.public.supabaseUrl,
 });
 /**
  * What kind of material this worker handles (CQ-REC-008 entry gate).
