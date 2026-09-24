@@ -521,11 +521,14 @@ describe("@capital-q/discovery structured candidates against local PostgreSQL", 
 
       // Diagnostics: raw = stage(AllThree, StageOnly, Excluded, NotReady) 4
       //   + country NG (AllThree, GeographyOnly, Excluded, NotReady, UnknownStage) 5
-      //   + region (RegionOnly) 1 + taxonomy (AllThree, TaxonomyOnly, NotReady) 3 = 13;
+      //   + region classification (RegionOnly) 1
+      //   + west_africa's other countries by headquarters, GH (RegionOnly) 1
+      //     (structured-mandate.v3; NG is already named, so not counted twice)
+      //   + taxonomy (AllThree, TaxonomyOnly, NotReady) 3 = 14;
       //   Private carries payments too but is not on the discoverable projection.
       expect(r.diagnostics).toMatchObject({
-        rawHitsByDimension: { STAGE: 4, GEOGRAPHY: 6, TAXONOMY: 3, CHEQUE: 0 },
-        rawHits: 13,
+        rawHitsByDimension: { STAGE: 4, GEOGRAPHY: 7, TAXONOMY: 3, CHEQUE: 0 },
+        rawHits: 14,
         deduped: 8,
         eligible: 5,
         ineligible: 3,
@@ -587,13 +590,20 @@ describe("@capital-q/discovery structured candidates against local PostgreSQL", 
       expect(inferred.eligibilityPolicyVersion).toBe("eligibility.v2");
       expect(labelsOf(w, inferred)).toContain("TaxonomyOnly");
 
-      // RegionOnly's only route in is its declared west_africa row; its
-      // declared industry (logistics) keeps it ELIGIBLE throughout. The same
-      // node as a Q inference is not a retrieval signal.
+      // RegionOnly comes in through its declared west_africa row and, since
+      // structured-mandate.v3, through its GH headquarters inside West
+      // Africa; its declared industry (logistics) keeps it ELIGIBLE
+      // throughout. The same node as a Q inference is not a retrieval
+      // signal: the classification route (and its matched node) goes, the
+      // headquarters route stays.
       const region = w.companies["RegionOnly"];
       if (region === undefined) throw new Error("fixture");
+      const matchedNodesOf = (r: ReturnType<typeof generatedOf>) =>
+        r.candidates.find((c) => c.companyId === region.id)?.provenance
+          .matchedNodes;
       const declared = generatedOf(await w.generate());
       expect(labelsOf(w, declared)).toContain("RegionOnly");
+      expect(matchedNodesOf(declared)).toHaveLength(1);
       await w.tx
         .sql`update taxonomy.entity_assignments set status = 'SUPERSEDED', valid_to = clock_timestamp()
         where entity_id = ${region.id} and node_id = ${node("geography", "west_africa")} and status = 'ACTIVE'`;
@@ -601,7 +611,8 @@ describe("@capital-q/discovery structured candidates against local PostgreSQL", 
         .sql`insert into taxonomy.entity_assignments (tenant_id, entity_type, entity_id, node_id, assignment_source)
         values (${region.tenantId}, 'COMPANY', ${region.id}, ${node("geography", "west_africa")}, 'q_inferred')`;
       const undeclared = generatedOf(await w.generate());
-      expect(labelsOf(w, undeclared)).not.toContain("RegionOnly");
+      expect(labelsOf(w, undeclared)).toContain("RegionOnly");
+      expect(matchedNodesOf(undeclared)).toEqual([]);
       expect(undeclared.diagnostics.rawHitsByDimension.GEOGRAPHY).toBe(
         declared.diagnostics.rawHitsByDimension.GEOGRAPHY - 1,
       );
@@ -617,9 +628,21 @@ describe("@capital-q/discovery structured candidates against local PostgreSQL", 
       expect(pinnedDraft.kind).toBe("NO_ACTIVE_MANDATE");
       expect(labelsOf(w, await w.generate())).not.toContain("AvoidOnly");
 
-      // Withdraw the geography constraint: the geography-only companies leave.
+      // Withdraw the geography constraint: the NG companies stay, because
+      // the declared West Africa node contains Nigeria (structured-mandate.v3),
+      // now as region overlap rather than a named country.
       await w.tx
         .sql`delete from core.investor_mandate_constraints where mandate_id = ${w.mandateId} and dimension = 'geography.country'`;
+      const withoutCountry = generatedOf(await w.generate());
+      expect(labelsOf(w, withoutCountry)).toContain("GeographyOnly");
+      expect(
+        withoutCountry.candidates.find(
+          (c) => c.companyId === w.companies["GeographyOnly"]?.id,
+        )?.provenance.reasonCodes,
+      ).toEqual(["GEOGRAPHY_REGION_OVERLAP"]);
+      // Withdraw the region too: the geography-only companies leave.
+      await w.tx
+        .sql`delete from taxonomy.mandate_preferences where mandate_id = ${w.mandateId} and node_id = ${node("geography", "west_africa")}`;
       const after = labelsOf(w, await w.generate());
       expect(after).not.toContain("GeographyOnly");
       expect(after).not.toContain("UnknownStage");
