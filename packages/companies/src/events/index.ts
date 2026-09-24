@@ -116,7 +116,8 @@ type EnvelopeInput = {
   readonly organisationId: string;
   readonly companyId: string;
   readonly version: number;
-  readonly actorUserId: string;
+  /** Absent when Capital Q itself acted (a SYSTEM reconciliation). */
+  readonly actorUserId?: string | undefined;
   readonly correlationId: CorrelationId;
 };
 
@@ -136,7 +137,10 @@ function envelope<TData>(
     eventVersion: definition.version,
     tenantId: input.tenantId,
     organisationId: input.organisationId,
-    actor: { type: "HUMAN", id: input.actorUserId },
+    actor:
+      input.actorUserId === undefined
+        ? { type: "SYSTEM" }
+        : { type: "HUMAN", id: input.actorUserId },
     correlationId: input.correlationId,
     aggregate: { type: "company", id: input.companyId, version: input.version },
     data,

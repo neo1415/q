@@ -46,7 +46,12 @@ export {
 export {
   createAssessMarketplaceReadiness,
   createGetMarketplaceReadiness,
+  createReconcileMarketplaceReadinessAsSystem,
   reconcileMarketplaceReadinessInTransaction,
+  SYSTEM_READINESS_ACTOR,
+  type ReconcileMarketplaceReadinessAsSystemCommand,
+  type SystemReadinessActor,
+  type SystemReadinessOutcome,
   type AssessMarketplaceReadinessCommand,
   type GetMarketplaceReadinessQuery,
   type MarketplaceReadinessReconciliation,
