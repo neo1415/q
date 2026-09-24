@@ -2,6 +2,7 @@ import type { FastifyInstance, FastifyRequest } from "fastify";
 import {
   CompanyIdSchema,
   CompanyNotFoundError,
+  declaredFactsForNetwork,
   isNetworkVisible,
   projectCompanyForNetwork,
   toCompanyDto,
@@ -279,10 +280,14 @@ export function registerCompanyRoutes(
           return visible;
         });
       void reply.header("Cache-Control", "no-store");
+      const projection = projectCompanyForNetwork(company);
       return CompanyNetworkPreviewSchema.parse({
-        ...projectCompanyForNetwork(company),
+        ...projection,
         networkVisible: isNetworkVisible(company.marketplaceVisibility),
         pitch: await pitchSummaryOf(dependencies.pitches, company.id),
+        // Classified from the projection, never from the company row: a
+        // fact the projection does not carry cannot be one (CQ-WEB-024).
+        facts: declaredFactsForNetwork(projection),
       });
     },
   );

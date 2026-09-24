@@ -231,6 +231,74 @@ describe("GET /v1/companies/:id/network-preview for another organisation (CQ-ACC
     await app.close();
   });
 
+  it("classifies only the projection's declared fields, and carries nothing else the port returned (CQ-WEB-024)", async () => {
+    const { service } = fakeService({ getCompany: notMine });
+    const secret = "founder-private-8d1c";
+    // A port that returned more than it should: extra private fields must
+    // still never reach the wire, because the route reads the projection's
+    // field list, not the row.
+    const leaky = {
+      ...COMPANY_A,
+      currentStageCode: "seed",
+      headquartersCountry: "NG",
+      marketplaceVisibility: "network_visible" as const,
+      marketplaceReadinessState: "requirements_outstanding",
+      logoStorageKey: `private/${secret}`,
+      professionalSummary: secret,
+      teamSize: 9,
+    };
+    const app = buildApp({
+      principal: PRINCIPAL,
+      context: CONTEXT,
+      service,
+      networkView: { findNetworkVisible: () => Promise.resolve(leaky) },
+    });
+    const response = await app.inject({
+      method: "GET",
+      url: `/v1/companies/${COMPANY_A.id}/network-preview`,
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.body).not.toContain(secret);
+    expect(response.body).not.toContain("readiness");
+    expect(response.body).not.toContain("teamSize");
+
+    const body = response.json<{
+      facts: {
+        key: string;
+        statements: {
+          value: string;
+          truthClass: string;
+          evidenceStatus: string;
+          lifecycleStatus: string;
+          source: string;
+        }[];
+      }[];
+    }>();
+    expect(body.facts.map((fact) => fact.key)).toEqual([
+      "currentStageCode",
+      "headquartersCountry",
+      "headquartersCity",
+      "foundedDate",
+      "legalName",
+      "websiteUrl",
+    ]);
+    expect(body.facts[0]?.statements).toEqual([
+      {
+        value: "seed",
+        truthClass: "USER_CLAIM",
+        evidenceStatus: "SELF_REPORTED",
+        lifecycleStatus: "CURRENT",
+        source: "COMPANY_PROFILE",
+      },
+    ]);
+    // Not declared is unknown: no statement, never an empty or zero value.
+    expect(body.facts.find((fact) => fact.key === "foundedDate")).toEqual({
+      key: "foundedDate",
+      statements: [],
+    });
+    await app.close();
+  });
+
   it("stays not-found when disclosure refuses, and without the port", async () => {
     const { service } = fakeService({ getCompany: notMine });
     const refused = buildApp({
@@ -544,6 +612,8 @@ describe("company visibility (CQ-PRE-REC-001 §31-§35)", () => {
         "companyId",
         "companyStatus",
         "currentStageCode",
+        // The declared fields above, classified (CQ-WEB-024) — no new data.
+        "facts",
         "foundedDate",
         "headquartersCity",
         "headquartersCountry",

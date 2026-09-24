@@ -173,6 +173,7 @@ export const PACKAGE_NAME = "@capital-q/companies" as const;
 
 export {
   COMPANY_VISIBILITY_CHOICES,
+  declaredFactsForNetwork,
   isNetworkVisible,
   NETWORK_PROJECTION_DESCRIPTION_MAX,
   projectCompanyForNetwork,

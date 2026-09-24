@@ -4,6 +4,11 @@ import { CountryCodeSchema } from "../common/geography.js";
 import { UuidSchema } from "../common/ids.js";
 import { UtcTimestampSchema } from "../common/time.js";
 import { ResourceVersionSchema } from "../common/version.js";
+import {
+  EvidenceStatusSchema,
+  LifecycleStatusSchema,
+  TruthClassSchema,
+} from "../evidence/vocabulary.js";
 import { PitchSummaryDtoSchema } from "./media.js";
 
 /**
@@ -298,6 +303,54 @@ export type SetCompanyVisibilityRequest = z.infer<
 >;
 
 /**
+ * The declared fields the investor projection classifies as facts
+ * (CQ-WEB-024). Each names a field of the projection below; nothing
+ * outside the projection can be a fact here.
+ */
+export const COMPANY_NETWORK_FACT_KEYS = [
+  "currentStageCode",
+  "headquartersCountry",
+  "headquartersCity",
+  "foundedDate",
+  "legalName",
+  "websiteUrl",
+] as const;
+export const CompanyNetworkFactKeySchema = z.enum(COMPANY_NETWORK_FACT_KEYS);
+export type CompanyNetworkFactKey = z.infer<typeof CompanyNetworkFactKeySchema>;
+
+/**
+ * One statement of a fact, on ADR-001's three independent axes, with where
+ * it came from. `value` is the machine value (a stage code, a country
+ * code, a date); the reader labels it.
+ */
+export const CompanyNetworkFactStatementSchema = z
+  .object({
+    value: z.string().min(1).max(2048),
+    truthClass: TruthClassSchema,
+    evidenceStatus: EvidenceStatusSchema,
+    lifecycleStatus: LifecycleStatusSchema,
+    /** Provenance. The declared profile is the only source this projection reads. */
+    source: z.enum(["COMPANY_PROFILE"]),
+  })
+  .strict();
+export type CompanyNetworkFactStatement = z.infer<
+  typeof CompanyNetworkFactStatementSchema
+>;
+
+/**
+ * What is known about one fact. No statements means unknown: nothing was
+ * declared, which is never zero and never a negative. More than one means
+ * the statements disagree, and none has been chosen over the others.
+ */
+export const CompanyNetworkFactSchema = z
+  .object({
+    key: CompanyNetworkFactKeySchema,
+    statements: z.array(CompanyNetworkFactStatementSchema).max(4),
+  })
+  .strict();
+export type CompanyNetworkFact = z.infer<typeof CompanyNetworkFactSchema>;
+
+/**
  * What an investor across the network sees of a company: the same
  * projection Q's company tool serves, returned to the founder as a preview
  * (§33). Nothing founder-private can appear here because the projection
@@ -320,6 +373,15 @@ export const CompanyNetworkPreviewSchema = z
     networkVisible: z.boolean(),
     /** The pitch an investor may play here; see `PitchSummaryDtoSchema`. */
     pitch: PitchSummaryDtoSchema.nullable().default(null),
+    /**
+     * The declared fields above, classified (CQ-WEB-024): what is known
+     * and how well supported it is. Defaults to empty so a server that
+     * predates it still parses; empty then says nothing, not "unknown".
+     */
+    facts: z
+      .array(CompanyNetworkFactSchema)
+      .max(COMPANY_NETWORK_FACT_KEYS.length)
+      .default([]),
   })
   .strict();
 export type CompanyNetworkPreview = z.infer<typeof CompanyNetworkPreviewSchema>;

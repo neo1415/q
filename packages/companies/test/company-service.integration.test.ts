@@ -5,6 +5,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createPostgresMaterialActionAuditWriter } from "@capital-q/audit";
 import { parseDatabaseConfig } from "@capital-q/config/database";
 import {
+  COMPANY_NETWORK_FACT_KEYS,
   createEventRegistry,
   type CorrelationId,
   type CreateCompanyRequest,
@@ -37,6 +38,7 @@ import {
   CompanyVersionConflictError,
   createCompanyService,
   createPostgresCompanyQueryPort,
+  declaredFactsForNetwork,
   projectCompanyForNetwork,
   type CompanyService,
 } from "../src/index.js";
@@ -739,6 +741,79 @@ describe("@capital-q/companies against local PostgreSQL", () => {
       });
       expect(withdrawn.marketplaceVisibility).toBe("organisation_private");
       expect(withdrawn.version).toBe(3);
+    });
+  });
+
+  it("the investor's facts carry nothing founder-private, and a private verified claim never upgrades them (CQ-WEB-024)", async () => {
+    await withWorld(async ({ tx, service, adminA, tenantA }) => {
+      const marker = `founder-private-${randomUUID()}`;
+      const a = await service.createCompany({
+        actor: adminA,
+        input: request("Facts A", {
+          currentStageCode: "seed",
+          headquartersCountry: "NG",
+        }),
+        idempotencyKey: "facts-a",
+        correlationId: CORRELATION(),
+      });
+      await service.setCompanyVisibility({
+        actor: adminA,
+        companyId: a.id,
+        input: { visibility: "network_visible", expectedVersion: 1 },
+        correlationId: CORRELATION(),
+      });
+
+      // Private material about the same company: a founder-private profile,
+      // organisation-only team facts, and a founder-private claim that says
+      // something different about the stage and claims to be verified.
+      await tx.sql`insert into core.founder_profiles (tenant_id, user_id, primary_company_id, professional_summary)
+        values (${tenantA}, ${adminA.userId}, ${a.id}, ${marker})`;
+      await tx.sql`insert into core.company_team_facts (tenant_id, company_id, founder_count, team_size)
+        values (${tenantA}, ${a.id}, 2, 9)`;
+      const claimId = randomUUID();
+      const revisionId = randomUUID();
+      await tx.sql`insert into evidence.claims (id, tenant_id, subject_type, subject_id, claim_type, claim_key,
+          statement, asserted_by_type, asserted_by_id, asserted_at, truth_class, evidence_status,
+          lifecycle_status, visibility_scope, sensitivity_class, current_revision_id)
+        values (${claimId}, ${tenantA}, 'COMPANY', ${a.id}, 'company.stage', 'company.stage',
+          ${`series_b ${marker}`}, 'USER', ${adminA.userId}, now(), 'VERIFIED', 'PLATFORM_VERIFIED',
+          'CURRENT', 'founder_private', 'CONFIDENTIAL', ${revisionId})`;
+      await tx.sql`insert into evidence.claim_revisions (id, tenant_id, claim_id, revision_number, statement,
+          truth_class, evidence_status, lifecycle_status, changed_by_type, changed_by_id)
+        values (${revisionId}, ${tenantA}, ${claimId}, 1, ${`series_b ${marker}`}, 'VERIFIED',
+          'PLATFORM_VERIFIED', 'CURRENT', 'USER', ${adminA.userId})`;
+
+      // The read an investor's network view makes, then the projection.
+      const profile = await createPostgresCompanyQueryPort({
+        sql: tx.sql,
+      }).findCanonicalCompanyProfile(a.id);
+      expect(profile).not.toBeNull();
+      if (profile === null) return;
+      const facts = declaredFactsForNetwork(projectCompanyForNetwork(profile));
+      const wire = JSON.stringify(facts);
+
+      expect(wire).not.toContain(marker);
+      expect(wire).not.toContain("series_b");
+      expect(wire).not.toMatch(/VERIFIED|PLATFORM|DOCUMENT/);
+      expect(facts.map((fact) => fact.key)).toEqual([
+        ...COMPANY_NETWORK_FACT_KEYS,
+      ]);
+      // What the company declared, and only as its own claim.
+      expect(
+        facts.find((fact) => fact.key === "currentStageCode")?.statements,
+      ).toEqual([
+        {
+          value: "seed",
+          truthClass: "USER_CLAIM",
+          evidenceStatus: "SELF_REPORTED",
+          lifecycleStatus: "CURRENT",
+          source: "COMPANY_PROFILE",
+        },
+      ]);
+      // Never declared: unknown, with no statement standing in for it.
+      expect(
+        facts.find((fact) => fact.key === "foundedDate")?.statements,
+      ).toEqual([]);
     });
   });
 

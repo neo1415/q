@@ -1,6 +1,8 @@
-import type {
-  CompanyStatus,
-  MarketplaceVisibility,
+import {
+  COMPANY_NETWORK_FACT_KEYS,
+  type CompanyNetworkFact,
+  type CompanyStatus,
+  type MarketplaceVisibility,
 } from "@capital-q/contracts";
 
 /**
@@ -70,6 +72,42 @@ export function projectCompanyForNetwork(
         : source.primaryDescription.slice(0, max),
     companyStatus: source.companyStatus,
   };
+}
+
+/**
+ * The projection's declared fields as facts, each on ADR-001's three axes
+ * (CQ-WEB-024): the investor's "what is known, and how well supported".
+ *
+ * Every value here is something the company said about itself on its own
+ * profile, so it is a USER_CLAIM, SELF_REPORTED and CURRENT — nothing more.
+ * Declaring a field does not verify it, and no document or verification
+ * is read to suggest otherwise. A field that was never declared has no
+ * statement at all: unknown, never an empty string, a zero or a negative.
+ *
+ * Built from the same projection, so a fact cannot exist that the
+ * projection itself would not show.
+ */
+export function declaredFactsForNetwork(
+  profile: NetworkVisibleCompanyProfile,
+): CompanyNetworkFact[] {
+  return COMPANY_NETWORK_FACT_KEYS.map((key) => {
+    const value = profile[key];
+    return {
+      key,
+      statements:
+        value === null || value.trim() === ""
+          ? []
+          : [
+              {
+                value,
+                truthClass: "USER_CLAIM",
+                evidenceStatus: "SELF_REPORTED",
+                lifecycleStatus: "CURRENT",
+                source: "COMPANY_PROFILE",
+              },
+            ],
+    };
+  });
 }
 
 /**
