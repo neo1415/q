@@ -1,0 +1,77 @@
+{
+  "measuredAt": "2026-09-24T09:01:33.574Z",
+  "rows": [
+    {
+      "k": "01-neutral|osl=none",
+      "p50": 260,
+      "p95": 563,
+      "totalP50": 1458,
+      "ttfa": "615,357,227,240,260",
+      "errors": ""
+    },
+    {
+      "k": "01-neutral|osl=3",
+      "p50": null,
+      "p95": null,
+      "totalP50": null,
+      "ttfa": "",
+      "errors": "400 {\"detail\":{\"type\":\"validation_error\",\"code\":\"unsupported_model\",\"message\":\"Providing optimize_streaming_latency is not supported with the 'eleven_v3_conversational' model.\",\"status\":\"unsupported_model\",\"request_id\":\"c5f8902b08603aa395cdcadd91c3ce31\",\"param\":\"model_id\"}}"
+    },
+    {
+      "k": "01-neutral|osl=4",
+      "p50": null,
+      "p95": null,
+      "totalP50": null,
+      "ttfa": "",
+      "errors": "400 {\"detail\":{\"type\":\"validation_error\",\"code\":\"unsupported_model\",\"message\":\"Providing optimize_streaming_latency is not supported with the 'eleven_v3_conversational' model.\",\"status\":\"unsupported_model\",\"request_id\":\"1743de77ffe687e295cdcadd91c3c8d1\",\"param\":\"model_id\"}}"
+    },
+    {
+      "k": "04-amusement|osl=none",
+      "p50": 344,
+      "p95": 436,
+      "totalP50": 1061,
+      "ttfa": "453,251,367,252,344",
+      "errors": ""
+    },
+    {
+      "k": "04-amusement|osl=3",
+      "p50": null,
+      "p95": null,
+      "totalP50": null,
+      "ttfa": "",
+      "errors": "400 {\"detail\":{\"type\":\"validation_error\",\"code\":\"unsupported_model\",\"message\":\"Providing optimize_streaming_latency is not supported with the 'eleven_v3_conversational' model.\",\"status\":\"unsupported_model\",\"request_id\":\"57cba8e0c55c8979d1e19bf013aa90a2\",\"param\":\"model_id\"}}"
+    },
+    {
+      "k": "04-amusement|osl=4",
+      "p50": null,
+      "p95": null,
+      "totalP50": null,
+      "ttfa": "",
+      "errors": "400 {\"detail\":{\"type\":\"validation_error\",\"code\":\"unsupported_model\",\"message\":\"Providing optimize_streaming_latency is not supported with the 'eleven_v3_conversational' model.\",\"status\":\"unsupported_model\",\"request_id\":\"34bb6c498973b01295cdcadd91c3c82b\",\"param\":\"model_id\"}}"
+    },
+    {
+      "k": "07-disagreement|osl=none",
+      "p50": 313,
+      "p95": 540,
+      "totalP50": 1655,
+      "ttfa": "297,302,343,589,313",
+      "errors": ""
+    },
+    {
+      "k": "07-disagreement|osl=3",
+      "p50": null,
+      "p95": null,
+      "totalP50": null,
+      "ttfa": "",
+      "errors": "400 {\"detail\":{\"type\":\"validation_error\",\"code\":\"unsupported_model\",\"message\":\"Providing optimize_streaming_latency is not supported with the 'eleven_v3_conversational' model.\",\"status\":\"unsupported_model\",\"request_id\":\"471ae92c8c0a46d3d1e19bf013aa9683\",\"param\":\"model_id\"}}"
+    },
+    {
+      "k": "07-disagreement|osl=4",
+      "p50": null,
+      "p95": null,
+      "totalP50": null,
+      "ttfa": "",
+      "errors": "400 {\"detail\":{\"type\":\"validation_error\",\"code\":\"unsupported_model\",\"message\":\"Providing optimize_streaming_latency is not supported with the 'eleven_v3_conversational' model.\",\"status\":\"unsupported_model\",\"request_id\":\"b9a033ae986fd86295cdcadd91c3c419\",\"param\":\"model_id\"}}"
+    }
+  ]
+}
