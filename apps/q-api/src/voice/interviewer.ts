@@ -620,11 +620,20 @@ const DIALOGUE_BUDGET = {
   attemptTimeoutMs: 12_000,
 } as const;
 
-/** Steps whose values are always read back before they are recorded (A §13). */
-const MATERIAL_STEP_PATTERNS = [
-  /target_amount|cheque|revenue|mrr|arr|customers|valuation|round_size/i,
-  /hard_exclusions|sector_exclusions/i,
-];
+/**
+ * Steps whose values are always read back before they are recorded (A §13).
+ *
+ * Figures: an amount heard wrong is the costliest mistake a voice can make,
+ * so a stated figure is read back. Only a figure, though — the key pattern
+ * matched "revenue" and so held I4.revenue_state, a choice between "pre-
+ * revenue is fine" and "revenue required", for a yes it did not need; the
+ * person said yes, the model restated rather than decided, and Q asked the
+ * same question three times (acceptance walkthrough, 2026-09-24). Hard
+ * exclusions are held whatever their shape: they remove companies outright.
+ */
+const MATERIAL_FIGURE_PATTERN =
+  /target_amount|cheque|revenue|mrr|arr|customers|valuation|round_size/i;
+const MATERIAL_ANY_PATTERN = /hard_exclusions|sector_exclusions/i;
 
 const MAX_OPEN_STEPS = 40;
 /** Open steps beyond the current few carry a shortened options list. */
@@ -771,6 +780,35 @@ function askAgain(
     return `Are we setting things up as ${registered}, or do you go by another name?`;
   }
   return questionFor(step);
+}
+
+/**
+ * The question asked again with what it can take (ACC b).
+ *
+ * Several steps ask in plain words ("What's your appetite for regulated
+ * sectors?") rather than reading the list out, which is right the first
+ * time and wrong the second: a person who did not know what to say, or
+ * asked for "some options", was answered with the same words in a
+ * different order and no choices. A repeated question carries its
+ * choices whenever it has them and did not already say them.
+ */
+function askWithChoices(
+  step: OnboardingStepManifest,
+  input: {
+    readonly signup?: { readonly organisationName: string | null } | undefined;
+  },
+): string {
+  const question = askAgain(step, input);
+  const labels = optionsOf(step)
+    .map((option) => option.label)
+    .slice(0, 7);
+  const first = labels[0];
+  if (first === undefined || question.includes(first)) return question;
+  const listed =
+    labels.length === 1
+      ? first
+      : `${labels.slice(0, -1).join(", ")} or ${labels.at(-1) ?? ""}`;
+  return `${question} The choices are ${listed}.`;
 }
 
 function questionFor(step: OnboardingStepManifest): string {
@@ -1167,8 +1205,14 @@ function asList(raw: string | readonly string[] | boolean): readonly string[] {
   return raw;
 }
 
-function isMaterial(stepKey: string): boolean {
-  return MATERIAL_STEP_PATTERNS.some((pattern) => pattern.test(stepKey));
+function isMaterial(step: OnboardingStepManifest): boolean {
+  if (MATERIAL_ANY_PATTERN.test(step.stepKey)) return true;
+  const type = step.configuration.stepType;
+  const choice =
+    type === "single_select" ||
+    type === "multi_select" ||
+    type === "reference_select";
+  return !choice && MATERIAL_FIGURE_PATTERN.test(step.stepKey);
 }
 
 const NUMBER_WORDS: Readonly<Record<string, number>> = {
@@ -2776,7 +2820,7 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
          * case, so a yes writes it and a no drops it.
          */
         if (
-          isMaterial(step.stepKey) ||
+          isMaterial(step) ||
           disposition.confirm ||
           tense.has(step.stepKey)
         ) {
@@ -2988,7 +3032,7 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
         selectionsThisTurn[step.stepKey] = resolved.keys;
         const spoken = labelsOf(resolved.keys, shownOptions).join(", ");
         if (
-          isMaterial(step.stepKey) ||
+          isMaterial(step) ||
           disposition.confirm ||
           tense.has(step.stepKey)
         ) {
@@ -3092,7 +3136,7 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
            * another, and doing it never is how the answer disappeared.
            */
           const spoken = labels.join(", ");
-          if (isMaterial(step.stepKey)) {
+          if (isMaterial(step)) {
             nextPending.push({
               stepKey: step.stepKey,
               question: c.prompt,
@@ -3259,7 +3303,7 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
         repairAsk = step.stepKey;
         return composeRepair(strategy, {
           label: repairLabel(step),
-          question: askAgain(step, input),
+          question: askWithChoices(step, input),
           interpretation,
           options: optionsOf(step).map((o) => o.label),
           held: carriedFor(input.onboardingSessionId, view).map(
@@ -3432,6 +3476,61 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
       }
       if (repairAsk !== null) {
         result = { ...result, askNext: repairAsk };
+      }
+      /**
+       * What the model said it took in, against what the platform actually
+       * did with it (ACC d).
+       *
+       * "Gambling and tobacco avoided, got it" — and nothing was recorded:
+       * the phrases matched nothing in the taxonomy, the step stayed open,
+       * and the reply said otherwise. The model cannot know whether a
+       * write landed; the runtime does. So every step the model put a
+       * value against this turn must have gone somewhere the runtime can
+       * account for — recorded, held for a yes, carried, set aside,
+       * refused and said so, or already on the record. Anything else is
+       * said plainly, from the runtime's result and in the step's own
+       * terms, and never left to the model's acknowledgement.
+       */
+      if (takingAnswers && repairAsk === null && needsScale === undefined) {
+        const carriedNow = new Set(
+          carriedFor(input.onboardingSessionId, view).map((c) => c.stepKey),
+        );
+        const accounted = new Set<string>([
+          ...recorded,
+          ...skipped,
+          ...unsaved,
+          ...nextPending.map((held) => held.stepKey),
+          ...rejected.map((step) => step.stepKey),
+          ...unresolved.map((item) => item.step.stepKey),
+          ...unscaled.map((item) => item.step.stepKey),
+          ...spokenUploads.map((step) => step.stepKey),
+          ...carriedNow,
+          ...view.responses.map((response) => response.stepKey),
+        ]);
+        const claimed = [
+          ...result.answers.map((answer) => answer.stepKey),
+          ...categoryPhrases.map((item) => item.stepKey),
+        ];
+        const missed = [...new Set(claimed)]
+          .filter((key) => !accounted.has(key))
+          .map((key) => steps.get(key))
+          .filter((step): step is OnboardingStepManifest => step !== undefined);
+        const first = missed[0];
+        if (first !== undefined) {
+          for (const step of missed) {
+            noteUnrecorded(
+              input.onboardingSessionId,
+              step.stepKey,
+              input.utterance,
+            );
+          }
+          // The model's reply is not kept in front of this: it is the
+          // sentence that claimed the value, and which of its sentences
+          // are true only the runtime knows. What did land is on screen;
+          // what did not is said, and asked now, while it is fresh.
+          reply = `I haven't got ${repairLabel(first)} down yet — what you said didn't match anything I can record. ${askWithChoices(first, input)}`;
+          result = { ...result, askNext: first.stepKey };
+        }
       }
       if (deferredUpload) {
         reply = `${reply.trim()} ${UPLOAD_LINE}`.trim();
@@ -3992,6 +4091,73 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
               : reply
             : `${lead} ${askAgain(next, input)}`.trim();
         result = { ...result, askNext: next?.stepKey ?? null };
+      }
+      /**
+       * Q may only offer to finish when the journey can finish (ACC e).
+       *
+       * "Shall we wrap up and head to your discovery feed?" with a
+       * required step still open: the person said "yes, let's go", there
+       * was nothing to complete, and they were left where they were. A
+       * turn that asks nothing specific — the shape a wrap-up offer takes —
+       * while something required is still open names what is left and
+       * asks it, from the journey's own state; and when nothing required
+       * is left, the journey is completed rather than offered.
+       */
+      if (
+        result.askNext === null &&
+        navigate === null &&
+        handoff === null &&
+        fromState === null &&
+        questionForQ === null &&
+        !disposition.answer &&
+        repairAsk === null &&
+        nextPending.length === 0 &&
+        view.session.status === "ACTIVE" &&
+        input.utterance.trim().length > 0 &&
+        // Only a turn that moved the job: a pause, an aside or small talk
+        // asks nothing because nothing is being asked, not to finish.
+        (reading.kind === "ANSWER" ||
+          reading.kind === "CORRECTION" ||
+          reading.kind === "CLARIFICATION")
+      ) {
+        const openRequired = view.progress.eligibleSteps.filter(
+          (step) =>
+            step.required &&
+            step.status !== "COMPLETED" &&
+            step.status !== "SKIPPED",
+        );
+        const nextRequired = openRequired
+          .map((step) => steps.get(step.stepKey))
+          .find(
+            (step): step is OnboardingStepManifest =>
+              step !== undefined &&
+              step.configuration.stepType !== "document_upload" &&
+              // Only a step the screen can put in front of them: the
+              // mandate choice exists only while it is the current step.
+              toOpenStep(step, view) !== null,
+          );
+        if (nextRequired !== undefined) {
+          const lead = /^[^.!?]*[.!]/.exec(reply.trim())?.[0] ?? "";
+          reply =
+            `${lead} Before we finish, one more thing. ${askAgain(nextRequired, input)}`.trim();
+          result = { ...result, askNext: nextRequired.stepKey };
+        } else if (view.progress.canComplete) {
+          try {
+            view = await completeOnboardingSession(
+              input.session,
+              input.onboardingSessionId,
+              { expectedSessionVersion: view.session.version },
+            );
+            navigate = "HOME";
+            reply =
+              `${reply.trim()} That's everything I need for now. I'm taking you to your home.`.trim();
+          } catch (error: unknown) {
+            logger.warn(
+              { err: error },
+              "interview completion was not accepted",
+            );
+          }
+        }
       }
       const askStep =
         result.askNext === null ? undefined : steps.get(result.askNext);

@@ -184,3 +184,110 @@ describe("E3 · the opening re-presents what is actually pending", () => {
     expect(opening.reply).not.toMatch(/title/i);
   });
 });
+
+describe("ACC a · a preference about revenue is not a figure to read back", () => {
+  it("records the revenue expectation straight away instead of holding it for a yes", async () => {
+    const world = investorSession({
+      currentStepKey: "I4.revenue_state",
+      recorded: MANDATE_SO_FAR,
+    });
+    const interviewer = createInterviewer({
+      gateway: gateway({
+        ...base,
+        intent: "ANSWER",
+        reply: "Revenue expected. What else matters to you?",
+        answers: [
+          {
+            stepKey: "I4.revenue_state",
+            value: "revenue_required",
+            confidence: "HIGH",
+            clarity: "SETTLED",
+          },
+        ],
+        reading: reading({}),
+      }),
+      logger,
+    });
+    const outcome = await interviewer.turn(
+      turn(world, "they need to have revenue"),
+    );
+    expect(outcome.recorded).toEqual(["I4.revenue_state"]);
+    expect(outcome.trace?.persisted.held).toEqual([]);
+  });
+});
+
+describe("ACC d · Q never states a value as recorded when the write did not happen", () => {
+  it("says a sector exclusion that matched nothing is not down yet, and asks it again", async () => {
+    const world = investorSession({
+      currentStepKey: "I3.sectors_avoid",
+      recorded: MANDATE_SO_FAR,
+    });
+    const interviewer = createInterviewer({
+      gateway: gateway({
+        ...base,
+        intent: "ANSWER",
+        reply:
+          "Gambling and tobacco avoided, got it. What business models do you like?",
+        // Something else in the same turn does land, so nothing looks
+        // like a failed turn — the live shape of the defect.
+        answers: [
+          {
+            stepKey: "I4.revenue_state",
+            value: "revenue_required",
+            confidence: "HIGH",
+            clarity: "SETTLED",
+          },
+        ],
+        categoryPhrases: [
+          { stepKey: "I3.sectors_avoid", phrases: ["gambling", "tobacco"] },
+        ],
+        askNext: "I4.business_models",
+        reading: reading({}),
+      }),
+      logger,
+    });
+    const outcome = await interviewer.turn(
+      turn(world, "gambling and tobacco, hard no, and they need revenue"),
+    );
+    expect(outcome.recorded).toEqual(["I4.revenue_state"]);
+    expect(outcome.reply).not.toMatch(/got it/i);
+    expect(outcome.reply).toMatch(/haven't got .* down yet/i);
+    expect(outcome.asking?.stepKey).toBe("I3.sectors_avoid");
+  });
+});
+
+describe("ACC e · Q offers to finish only when the journey can finish", () => {
+  it("names what is left instead of letting a wrap-up offer stand over an open required step", async () => {
+    const world = investorSession({
+      currentStepKey: "I4.revenue_state",
+      recorded: MANDATE_SO_FAR,
+    });
+    const interviewer = createInterviewer({
+      gateway: gateway({
+        ...base,
+        intent: "ANSWER",
+        reply:
+          "That covers the essentials. Shall we wrap up and head to your discovery feed?",
+        answers: [
+          {
+            stepKey: "I4.revenue_state",
+            value: "revenue_required",
+            confidence: "HIGH",
+            clarity: "SETTLED",
+          },
+        ],
+        askNext: null,
+        reading: reading({}),
+      }),
+      logger,
+    });
+    const outcome = await interviewer.turn(
+      turn(world, "they need revenue, that's all"),
+    );
+    expect(outcome.recorded).toEqual(["I4.revenue_state"]);
+    expect(outcome.reply).not.toMatch(/wrap up/i);
+    expect(outcome.reply).toMatch(/Before we finish, one more thing\./);
+    expect(outcome.asking).not.toBeNull();
+    expect(outcome.navigate).toBeNull();
+  });
+});
