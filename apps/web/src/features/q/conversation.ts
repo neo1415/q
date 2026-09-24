@@ -326,10 +326,19 @@ export function workingLabel(state: QStreamState): string | undefined {
  * closed list, and rewording it here would be a second vocabulary drifting
  * from the first. The fallback covers a transport failure, where no public
  * projection exists because nothing was received.
+ *
+ * When the conversation core composed Q's own notice for this failure
+ * (CQ-QX-005) — named by the subsystem that failed, said once — that is
+ * what the person reads instead.
  */
 export function failureMessage(
-  failure: { readonly message?: string | undefined } | null,
+  failure: {
+    readonly message?: string | undefined;
+    readonly notice?: string | undefined;
+  } | null,
 ): string {
+  const notice = failure?.notice;
+  if (notice !== undefined && notice.length > 0) return notice;
   const message = failure?.message;
   return message !== undefined && message.length > 0
     ? message
@@ -353,6 +362,9 @@ const RECOVERY_HINTS: Readonly<Partial<Record<string, string>>> = {
 };
 
 export function recoveryHint(failure: QStreamState["failure"]): string {
+  // Q's own notice already says what still works; a stacked hint would be
+  // a second apology for the same failure.
+  if (failure?.notice !== undefined && failure.notice.length > 0) return "";
   return (
     (failure === null ? undefined : RECOVERY_HINTS[failure.code]) ??
     "Try it another way, or ask for something Q can check directly."
