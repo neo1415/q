@@ -121,7 +121,12 @@ describe("whether a page is about the subject", () => {
   it("keeps nothing when there is nothing distinctive to recognise", () => {
     expect(
       pageNamesSubject(
-        { nameTerms: [], wholeName: "thecompanygroup", domainLabel: null },
+        {
+          nameTerms: [],
+          wholeName: "thecompanygroup",
+          nameWords: ["the", "company", "group"],
+          domainLabel: null,
+        },
         page("https://x.example/a", "Anything", "Anything"),
       ),
     ).toBe(false);
@@ -156,6 +161,23 @@ describe("whether a page is about the subject", () => {
     ).toBe(true);
 
     const lumen = subjectSignature({ name: "Lumen Health", websiteUrl: null });
+    // A longer word that starts with the name is somebody else.
+    expect(
+      pageNamesSubject(
+        lumen,
+        page(
+          "https://www.lumencare.com/",
+          "Lumen Healthcare",
+          "Built for high-performance clinical environments.",
+        ),
+      ),
+    ).toBe(false);
+    expect(
+      pageNamesSubject(
+        lumen,
+        page("https://news.example/b", "Lumen Health raises seed", ""),
+      ),
+    ).toBe(true);
     expect(
       pageNamesSubject(
         lumen,
