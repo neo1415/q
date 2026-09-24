@@ -107,6 +107,7 @@ export {
   createSpecialistQAnswer,
   type SpecialistQAnswer,
   type SpecialistQAnswerDependencies,
+  type QVisibilityNotebook,
 } from "./answer.js";
 
 export const PACKAGE_NAME = "@capital-q/q-specialists" as const;
