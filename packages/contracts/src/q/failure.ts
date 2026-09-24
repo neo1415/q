@@ -136,6 +136,18 @@ export const QPublicFailureSchema = z
     runId: QRunIdSchema.optional(),
     /** So support can find the private diagnostic without the client seeing it. */
     requestId: RequestIdSchema.optional(),
+    /**
+     * Q's own sentence for this failure in this conversation (CQ-QX-005):
+     * a subsystem notice the conversation core composes from its fixed
+     * lines, so a person hears which capability is down and what Q will do
+     * instead, and never the same line twice running. A surface shows it
+     * instead of `message` when present. Never exception or vendor text.
+     */
+    notice: z
+      .string()
+      .min(1)
+      .max(Q_PUBLIC_FAILURE_MESSAGE_MAX_LENGTH)
+      .optional(),
   })
   .strict();
 
@@ -179,6 +191,8 @@ const PUBLIC_PROJECTION: Readonly<
 export type QPublicFailureRefs = {
   readonly runId?: string | undefined;
   readonly requestId?: string | undefined;
+  /** A conversation-core subsystem notice; see `QPublicFailureSchema.notice`. */
+  readonly notice?: string | undefined;
 };
 
 /** The internal failure, or anything that at least names its diagnostic code. */
@@ -206,5 +220,6 @@ export function toPublicQFailure(
     retryable: projection.retryable,
     ...(refs.runId === undefined ? {} : { runId: refs.runId }),
     ...(refs.requestId === undefined ? {} : { requestId: refs.requestId }),
+    ...(refs.notice === undefined ? {} : { notice: refs.notice }),
   });
 }
