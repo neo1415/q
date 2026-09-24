@@ -291,3 +291,168 @@ describe("ACC e · Q offers to finish only when the journey can finish", () => {
     expect(outcome.navigate).toBeNull();
   });
 });
+
+describe("round 1 #1 · a yes covers the value on screen", () => {
+  it("commits the read-back value when the model confirmed another held value instead", async () => {
+    const world = investorSession({
+      currentStepKey: "I2.cheque_min",
+      recorded: MANDATE_SO_FAR,
+    });
+    const interviewer = createInterviewer({
+      gateway: gateway(HOLDS_CHEQUES, {
+        ...base,
+        intent: "ANSWER",
+        reply: "Good.",
+        // The model attached the yes to the value they mentioned, not to
+        // the one Q read back.
+        confirmations: [{ stepKey: "I2.cheque_max", decision: "CONFIRMED" }],
+        reading: reading({}),
+      }),
+      logger,
+    });
+    const held = await interviewer.turn(turn(world, "25k to 250k"));
+    expect(held.asking?.stepKey).toBe("I2.cheque_min");
+    const outcome = await interviewer.turn(
+      turn(world, "yep. and the 250k top end stands"),
+    );
+    expect(outcome.recorded).toEqual(
+      expect.arrayContaining(["I2.cheque_min", "I2.cheque_max"]),
+    );
+    expect(outcome.reply).not.toMatch(/differently/i);
+  });
+});
+
+describe("round 1 #5 · only what committed is said as committed", () => {
+  it("names the place it could not find instead of confirming both", async () => {
+    const world = investorSession({
+      currentStepKey: "I3.geography",
+      recorded: MANDATE_SO_FAR,
+      taxonomy: { ghana: "a1b2c3d4-0000-4000-8000-000000000001" },
+    });
+    const interviewer = createInterviewer({
+      gateway: gateway({
+        ...base,
+        intent: "ANSWER",
+        reply: "Got it, just Ghana and Côte d'Ivoire. How firm is that?",
+        categoryPhrases: [
+          { stepKey: "I3.geography", phrases: ["Ghana", "Côte d'Ivoire"] },
+        ],
+        askNext: "I3.geography_strength",
+        reading: reading({}),
+      }),
+      logger,
+    });
+    const outcome = await interviewer.turn(
+      turn(world, "just ghana and cote d'ivoire"),
+    );
+    expect(outcome.recorded).toEqual(["I3.geography"]);
+    expect(outcome.reply).not.toMatch(/Got it, just Ghana and/);
+    expect(outcome.reply).toMatch(/I've put down Ghana\./);
+    expect(outcome.reply).toMatch(/couldn't find Côte d'Ivoire/);
+  });
+});
+
+describe("round 1 #7 · a settled step is not asked again", () => {
+  it("does not re-ask an avoid-list the person already set aside", async () => {
+    const world = investorSession({
+      currentStepKey: "I4.revenue_state",
+      recorded: MANDATE_SO_FAR,
+    });
+    const interviewer = createInterviewer({
+      gateway: gateway({
+        ...base,
+        intent: "ANSWER",
+        reply: "Nothing to avoid, then.",
+        unrestricted: [{ stepKey: "I3.sectors_avoid" }],
+        askNext: "I3.sectors_avoid",
+        reading: reading({}),
+      }),
+      logger,
+    });
+    const outcome = await interviewer.turn(
+      turn(world, "there's nothing else to avoid"),
+    );
+    expect(outcome.skipped).toEqual(["I3.sectors_avoid"]);
+    expect(outcome.asking?.stepKey).not.toBe("I3.sectors_avoid");
+  });
+});
+
+describe("round 1 #8 · never a bare step label as Q's line", () => {
+  it("asks the step properly when the reply is only its label", async () => {
+    const world = investorSession({
+      currentStepKey: "I2.cheque_typical",
+      recorded: MANDATE_SO_FAR,
+    });
+    const interviewer = createInterviewer({
+      gateway: gateway({
+        ...base,
+        intent: "ANSWER",
+        reply: "Typical cheque",
+        askNext: "I2.cheque_typical",
+        reading: reading({ kind: "CONTROL" }),
+      }),
+      logger,
+    });
+    const outcome = await interviewer.turn(turn(world, "ok"));
+    expect(outcome.reply).not.toBe("Typical cheque");
+    expect(outcome.reply).toMatch(/\?/);
+  });
+});
+
+describe("the interview thread is kept server-side (CQ-QX-006)", () => {
+  it("appends what the person said and what Q said, once per turn, on the channel it came by", async () => {
+    const world = investorSession({
+      currentStepKey: "I4.revenue_state",
+      recorded: MANDATE_SO_FAR,
+    });
+    const kept: unknown[] = [];
+    const fetch: typeof globalThis.fetch = (input, init) => {
+      const url =
+        typeof input === "string"
+          ? input
+          : input instanceof URL
+            ? input.toString()
+            : input.url;
+      if (url.endsWith("/turns")) {
+        kept.push(
+          JSON.parse(typeof init?.body === "string" ? init.body : "null"),
+        );
+        return Promise.resolve(Response.json({ written: true }));
+      }
+      return world.fetch(input, init);
+    };
+    const interviewer = createInterviewer({
+      gateway: gateway({
+        ...base,
+        intent: "ANSWER",
+        reply: "Revenue expected, then. What else matters to you?",
+        answers: [
+          {
+            stepKey: "I4.revenue_state",
+            value: "revenue_required",
+            confidence: "HIGH",
+            clarity: "SETTLED",
+          },
+        ],
+        reading: reading({}),
+      }),
+      logger,
+    });
+    await interviewer.turn(
+      turn({ ...world, fetch }, "they need to have revenue"),
+    );
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(kept).toHaveLength(1);
+    expect(kept[0]).toMatchObject({
+      turns: [
+        {
+          role: "PERSON",
+          text: "they need to have revenue",
+          channel: "TEXT",
+          stepKey: "I4.revenue_state",
+        },
+        { role: "Q", channel: "TEXT" },
+      ],
+    });
+  });
+});

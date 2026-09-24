@@ -336,6 +336,9 @@ export function createApp(
     const typedInterviewer = modules.voice.interviewer;
     if (interviewApiBaseUrl !== undefined && typedInterviewer !== undefined) {
       registerQInterviewRoute(app, {
+        authenticator: security.authenticator,
+        resolver: security.resolver,
+        identity: security.identity,
         path: `${Q_INTERVIEW_PATH}${Q_INTERVIEW_TURN_SEGMENT}`,
         interviewer: typedInterviewer,
         apiBaseUrl: interviewApiBaseUrl,
