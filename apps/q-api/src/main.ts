@@ -1079,6 +1079,8 @@ const voiceTurn = timedVoiceTurns(
             fetch: timedFetch(fetch, voiceTimings),
           },
         }),
+    // How each reply should sound, for the speak relay (CQ-VOICE-010).
+    performance: speechPerformance,
     logger,
   }),
   voiceTimings,

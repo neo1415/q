@@ -63,7 +63,7 @@ export const INTERVIEW_CONDUCTOR_V9: PromptDefinition<
 > = {
   ...INTERVIEW_CONDUCTOR_V8,
   version: 9,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   changeDescription:
     "CQ-QX-005 E1: a turn may confirm, correct and ask at once; the writing kind carries the person's question beside it, so nothing they confirmed or changed is dropped and the question is still answered in the turn.",
   effectiveFrom: "2026-09-24",

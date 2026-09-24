@@ -783,3 +783,74 @@ describe("founder round 2", () => {
     expect(outcome.reply).not.toMatch(/changed that to Angel investor/);
   });
 });
+
+describe("v10 · pointing at Q's own words and at another step's answer", () => {
+  it("resolves 'the second number you said' against what Q actually offered", async () => {
+    const world = investorSession({
+      currentStepKey: "I2.cheque_typical",
+      recorded: MANDATE_SO_FAR,
+    });
+    const interviewer = createInterviewer({
+      gateway: gateway(
+        {
+          ...base,
+          intent: "ANSWER",
+          reply:
+            "Would a typical cheque of 25 or 30 thousand dollars be right?",
+          askNext: "I2.cheque_typical",
+          offered: [
+            { target: "I2.cheque_typical", values: ["25000", "30000"] },
+          ],
+          reading: reading({ kind: "CONTROL" }),
+        } as never,
+        {
+          ...base,
+          intent: "ANSWER",
+          reply: "Thirty it is.",
+          reading: reading({
+            references: [
+              { target: "I2.cheque_typical", select: "OFFERED", ordinals: [2] },
+            ],
+          }),
+        },
+      ),
+      logger,
+    });
+    await interviewer.turn(turn(world, "ok"));
+    const outcome = await interviewer.turn(
+      turn(world, "fine, the second number you said"),
+    );
+    expect(outcome.trace?.persisted.held).toContain("I2.cheque_typical");
+    expect(outcome.reply).toMatch(/\$30,000\. Is that right\?/);
+    expect(outcome.reply).not.toMatch(/50,000/);
+  });
+
+  it("takes another step's recorded value for 'the same as', from the record", async () => {
+    const world = investorSession({
+      currentStepKey: "I2.cheque_max",
+      recorded: { ...MANDATE_SO_FAR, "I2.cheque_min": "40000" },
+    });
+    const interviewer = createInterviewer({
+      gateway: gateway({
+        ...base,
+        intent: "ANSWER",
+        reply: "Same as the minimum, then.",
+        reading: reading({
+          references: [
+            {
+              target: "I2.cheque_max",
+              select: "VALUE_OF",
+              from: "I2.cheque_min",
+            },
+          ],
+        }),
+      }),
+      logger,
+    });
+    const outcome = await interviewer.turn(
+      turn(world, "the max is the same as the min"),
+    );
+    expect(outcome.trace?.persisted.held).toContain("I2.cheque_max");
+    expect(outcome.reply).toMatch(/\$40,000/);
+  });
+});
