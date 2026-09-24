@@ -54,6 +54,38 @@ export class SpeechSynthesisError extends Error {
 }
 
 /**
+ * One voice, then the next when it cannot speak (CQ-VOICE-010).
+ *
+ * A one-way line follows the same engine order as a conversation:
+ * ElevenLabs (which already tries v3 and then turbo inside itself), and
+ * Deepgram Aura-2 only when ElevenLabs cannot voice the line at all. A
+ * caller that has gone away is not answered by the next voice.
+ */
+export function speechWithFallback(
+  ports: readonly SpeechSynthesisPort[],
+): SpeechSynthesisPort | undefined {
+  const [primary] = ports;
+  if (primary === undefined) return undefined;
+  if (ports.length === 1) return primary;
+  return {
+    name: ports.map((port) => port.name).join("+"),
+    voices: primary.voices,
+    async synthesise(request) {
+      let failure: unknown = new SpeechSynthesisError(true);
+      for (const port of ports) {
+        if (request.signal?.aborted === true) break;
+        try {
+          return await port.synthesise(request);
+        } catch (error: unknown) {
+          failure = error;
+        }
+      }
+      throw failure;
+    },
+  };
+}
+
+/**
  * How often one person may ask Q to speak.
  *
  * Synthesis costs money per character and this endpoint is reachable by

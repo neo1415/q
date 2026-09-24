@@ -62,6 +62,8 @@ export type SpeechTiming = {
   readonly headers: () => void;
   readonly firstByte: () => void;
   readonly rendered: (cues: readonly string[]) => void;
+  /** Which engine voiced this utterance, and whether it was a fallback. */
+  readonly served: (engine: string, fallback: boolean) => void;
 };
 
 export type VoiceTurnTimings = {
@@ -113,6 +115,9 @@ type Open = {
   firstAudio?: number;
   ttsRequests: number;
   ttsChars: number;
+  /** The engine that voiced each utterance, in order. */
+  engines: string[];
+  ttsFallbacks: number;
   cues: Set<string>;
   steps: Step[];
   done: boolean;
@@ -159,6 +164,8 @@ export function createVoiceTurnTimings(options: {
         firstAudioMs: rel(open, open.firstAudio),
         ttsRequests: open.ttsRequests,
         ttsChars: open.ttsChars,
+        ttsEngines: open.engines,
+        ttsFallbacks: open.ttsFallbacks,
         cues: [...open.cues],
         modelCalls: models.length,
         modelMs: models.reduce((n, s) => n + s.ms, 0),
@@ -241,6 +248,8 @@ export function createVoiceTurnTimings(options: {
         t0: now(),
         ttsRequests: 0,
         ttsChars: 0,
+        engines: [],
+        ttsFallbacks: 0,
         cues: new Set(),
         steps: [],
         done: false,
@@ -276,6 +285,10 @@ export function createVoiceTurnTimings(options: {
         },
         rendered: (cues) => {
           for (const cue of cues) open.cues.add(cue);
+        },
+        served: (engine, fallback) => {
+          if (open.engines.length < MAX_STEPS) open.engines.push(engine);
+          if (fallback) open.ttsFallbacks += 1;
         },
       };
     },

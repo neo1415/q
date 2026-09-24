@@ -160,7 +160,11 @@ import { createVoiceTurnBoard } from "./voice/turn-board.js";
 import { createWelcomeHost } from "./voice/welcome.js";
 import type { VoiceAttachment } from "./voice/provider.js";
 import { createDeepgramVoiceProvider } from "./voice/providers/deepgram.js";
-import { createDeepgramSpeechSynthesis } from "./voice/providers/deepgram-speak.js";
+import {
+  createDeepgramSpeakStream,
+  createDeepgramSpeechSynthesis,
+} from "./voice/providers/deepgram-speak.js";
+import { speechWithFallback } from "./voice/synthesis.js";
 import {
   createElevenLabsSpeechRelay,
   createElevenLabsSpeechSynthesis,
@@ -828,17 +832,21 @@ const voiceProvider =
       })
     : undefined;
 /**
- * Q's voice (QX-004 SPEAK rework): Deepgram listens, Q thinks, ElevenLabs
- * speaks. Composed from the ElevenLabs key alone — it needs no Speech
- * Engine resource, because this is plain text-to-speech and not the
- * whole-transport Speech Engine next to it.
- */
-/**
  * How Q's words sound, kept apart from what they are (CQ-VOICE-010): the
  * delivery cues for each session's sentences wait here for the speak relay
  * and never enter the text, the transcript or the thread.
  */
 const speechPerformance = createSpeechPerformanceBoard();
+/**
+ * Q's voice (QX-004 SPEAK rework): Deepgram listens, Q thinks, ElevenLabs
+ * speaks. Composed from the ElevenLabs key alone — it needs no Speech
+ * Engine resource, because this is plain text-to-speech and not the
+ * whole-transport Speech Engine next to it.
+ *
+ * v3 conversational first, turbo for any utterance v3 fails or is slow to
+ * start, and Aura-2 (same Deepgram key as the transport) for one ElevenLabs
+ * cannot voice at all (CQ-VOICE-010).
+ */
 const elevenLabsSpeech =
   speechSecrets.elevenLabs === undefined
     ? undefined
@@ -852,6 +860,13 @@ const elevenLabsSpeech =
           model: config.voice.ttsModel,
           performance: speechPerformance,
           timings: voiceTimings,
+          ...(speechSecrets.deepgram === undefined
+            ? {}
+            : {
+                aura: createDeepgramSpeakStream({
+                  apiKey: speechSecrets.deepgram.reveal(),
+                }),
+              }),
         }),
       };
 // The Deepgram Voice Agent transport: the key and this server's public
@@ -889,13 +904,18 @@ const deepgramProvider =
  * Voice Agent has to call this server back, and nothing calls back for
  * one-way synthesis.
  */
-const speechSynthesis =
-  elevenLabsSpeech?.oneWay ??
-  (speechSecrets.deepgram === undefined
-    ? undefined
-    : createDeepgramSpeechSynthesis({
-        apiKey: speechSecrets.deepgram.reveal(),
-      }));
+const speechSynthesis = speechWithFallback([
+  ...(elevenLabsSpeech === undefined ? [] : [elevenLabsSpeech.oneWay]),
+  // Aura-2 speaks a line only when ElevenLabs cannot (CQ-VOICE-010), and
+  // is the whole voice on a build without an ElevenLabs key.
+  ...(speechSecrets.deepgram === undefined
+    ? []
+    : [
+        createDeepgramSpeechSynthesis({
+          apiKey: speechSecrets.deepgram.reveal(),
+        }),
+      ]),
+]);
 const voiceBindings = createVoiceSessionBindings();
 // Q conducting the interview: one model-driven turn per utterance, every
 // reading validated and recorded through the onboarding runtime.

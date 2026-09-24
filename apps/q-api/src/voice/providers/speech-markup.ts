@@ -38,6 +38,12 @@ export type SpeechMarkup = {
   readonly capabilities: SpeechCapabilities;
   readonly reaction: (reaction: SpeechReaction) => string;
   readonly pause: string;
+  /**
+   * How the pause is written. "after" appends it after the sentence.
+   * "trailing" puts it in place of the sentence's closing stop ("that...")
+   * for a voice that reads trailing punctuation as hesitation.
+   */
+  readonly pauseStyle?: "after" | "trailing" | undefined;
   readonly emphasis: (phrase: string) => string;
   /** A speaking-rate multiplier for the vendor, or undefined for as-is. */
   readonly speed: (pace: SpeechPace) => number | undefined;
@@ -89,6 +95,21 @@ export const SPEECH_MARKUP: Readonly<
 };
 
 /**
+ * Deepgram Aura-2, used only when ElevenLabs cannot speak at all. It
+ * renders pauses and nothing else (the lead's decision, 2026-09-24). An
+ * ellipsis was the only pause it took, and it took it unreliably: case 03
+ * showed no measurable gap. It reads every tag aloud.
+ */
+export const AURA_MARKUP: SpeechMarkup = {
+  capabilities: { reaction: false, pause: true, pace: false, emphasis: false },
+  reaction: NONE,
+  pause: "...",
+  pauseStyle: "trailing",
+  emphasis: (phrase) => phrase,
+  speed: () => undefined,
+};
+
+/**
  * Stage directions a model may still have written into its text: `[laughs]`
  * or an SSML break. They are removed before rendering, so that the only
  * markup that ever reaches a voice is the markup this layer chose for it.
@@ -113,7 +134,12 @@ export type RenderedSpeech = {
   readonly rendered: readonly ("reaction" | "pause" | "pace" | "emphasis")[];
 };
 
-type Insertion = { readonly at: number; readonly text: string };
+type Insertion = {
+  readonly at: number;
+  readonly text: string;
+  /** Characters replaced at `at`; none when only inserting. */
+  readonly remove?: number;
+};
 
 /**
  * Render the cues that belong to this text in one voice's markup.
@@ -163,7 +189,14 @@ export function renderSpeech(
       rendered.add("reaction");
     }
     if (can.pause && p.pauseAfter && isEnd) {
-      insertions.push({ at: end, text: ` ${markup.pause}` });
+      const stop = /[.!?]/.test(body.charAt(end - 1));
+      insertions.push(
+        markup.pauseStyle === "trailing"
+          ? stop
+            ? { at: end - 1, text: markup.pause, remove: 1 }
+            : { at: end, text: markup.pause }
+          : { at: end, text: ` ${markup.pause}` },
+      );
       rendered.add("pause");
     }
     if (can.pace && speed === undefined) {
@@ -175,7 +208,9 @@ export function renderSpeech(
   // Right to left, so an insertion never moves the place of the next.
   for (const insertion of [...insertions].sort((a, b) => b.at - a.at)) {
     body =
-      body.slice(0, insertion.at) + insertion.text + body.slice(insertion.at);
+      body.slice(0, insertion.at) +
+      insertion.text +
+      body.slice(insertion.at + (insertion.remove ?? 0));
   }
   return { text: body.trim(), speed, rendered: [...rendered] };
 }
