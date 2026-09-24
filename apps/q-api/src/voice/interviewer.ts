@@ -1636,6 +1636,35 @@ export function unrestrictedOutcome(
  */
 const CHEQUE_ORDER = ["cheque_min", "cheque_typical", "cheque_max"] as const;
 
+/** The recorded cheque a figure contradicts, if any (see below). */
+export function chequeConflict(
+  stepKey: string,
+  value: OnboardingResponseValue,
+  recorded: ReadonlyMap<string, number>,
+): { readonly stepKey: string; readonly amount: number } | null {
+  if (value.type !== "RANGE") return null;
+  const suffix = stepKey.split(".").at(-1);
+  const position = CHEQUE_ORDER.indexOf(
+    suffix as (typeof CHEQUE_ORDER)[number],
+  );
+  if (position < 0) return null;
+  const proposed = Number.parseFloat(value.value);
+  if (!Number.isFinite(proposed)) return null;
+  const prefix = stepKey.slice(0, stepKey.length - (suffix?.length ?? 0));
+  for (const [index, name] of CHEQUE_ORDER.entries()) {
+    if (index === position) continue;
+    const other = recorded.get(`${prefix}${name}`);
+    if (other === undefined) continue;
+    if (
+      (index < position && proposed < other) ||
+      (index > position && proposed > other)
+    ) {
+      return { stepKey: `${prefix}${name}`, amount: other };
+    }
+  }
+  return null;
+}
+
 export function chequeContradiction(
   stepKey: string,
   value: OnboardingResponseValue,
@@ -2914,7 +2943,12 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
        * never said is not a value, and both of the available guesses are
        * wrong in a way that quietly changes who this investor is shown.
        */
-      const unscaled: { step: OnboardingStepManifest; said: string }[] = [];
+      const unscaled: {
+        step: OnboardingStepManifest;
+        said: string;
+        /** The recorded cheque it contradicts, when that is the problem. */
+        conflict: { readonly stepKey: string; readonly amount: number } | null;
+      }[] = [];
       /** Money already on the record, for the ordering check below. */
       const recordedAmounts = new Map<string, number>(
         view.responses.flatMap((r) =>
@@ -3060,12 +3094,24 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
           // A reading with no clarity at all is SETTLED: the gateway's
           // schema defaults it, and a caller that stubs the gateway is
           // not making a claim about scale.
-          (answer.clarity !== undefined && answer.clarity !== "SETTLED") ||
+          // A figure the reading already carries in thousands or more has
+          // its scale: "20k" read as 20000 is not a scale question
+          // (live, round 3: "you said $20,000. Is that thousands…?").
+          (answer.clarity !== undefined &&
+            answer.clarity !== "SETTLED" &&
+            !(value.type === "RANGE" && Number(value.value) >= 1_000)) ||
           chequeContradiction(step.stepKey, value, recordedAmounts)
         ) {
           unscaled.push({
             step,
             said: describeValue(step, value, currency),
+            // A bare "100" against a 50k minimum is a missing scale; a
+            // figure already in thousands that crosses the record is a
+            // genuine contradiction, and is asked about as one.
+            conflict:
+              value.type === "RANGE" && Number(value.value) >= 1_000
+                ? chequeConflict(step.stepKey, value, recordedAmounts)
+                : null,
           });
           continue;
         }
@@ -3708,7 +3754,18 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
         const label = needsScale.step.configuration.prompt
           .replace(/\?+$/, "")
           .toLowerCase();
-        reply = `I want to get the scale right on the ${label} — you said ${needsScale.said}. Is that thousands, millions, or exactly that?`;
+        // A figure whose scale was clear but which contradicts a cheque on
+        // the record is asked about as the contradiction it is (round 3,
+        // live: "20k typical" against a 25k minimum was asked "is that
+        // thousands, millions…").
+        const conflictStep =
+          needsScale.conflict === null
+            ? undefined
+            : steps.get(needsScale.conflict.stepKey);
+        reply =
+          needsScale.conflict !== null && conflictStep !== undefined
+            ? `You said ${needsScale.said} for your ${noun(needsScale.step)}, but your ${noun(conflictStep)} is ${spokenMoney(needsScale.conflict.amount, currency)}. Which should I change?`
+            : `I want to get the scale right on the ${label} — you said ${needsScale.said}. Is that thousands, millions, or exactly that?`;
         result = { ...result, askNext: needsScale.step.stepKey };
       }
       /**
@@ -4932,7 +4989,12 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
           .filter((step): step is OnboardingStepManifest => step !== undefined)
           .map((step) => noun(step));
         if (putDown.length > 0) {
-          lines.push(`I've also put down your ${joinWithAnd(putDown)}.`);
+          // What went down first, the offer to add last, so the turn ends
+          // on the one question it asks.
+          const offerAt = lines.findIndex((line) => line.endsWith("add it?"));
+          const put = `I've also put down your ${joinWithAnd(putDown)}.`;
+          if (offerAt === -1) lines.push(put);
+          else lines.splice(offerAt, 0, put);
         }
         const nextKey = result.askNext;
         const nextHeld =

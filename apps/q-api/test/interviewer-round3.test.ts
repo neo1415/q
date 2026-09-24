@@ -303,3 +303,73 @@ describe("never a step label, a fragment, or the step just recorded", () => {
     );
   });
 });
+
+describe("round 3 live follow-ups", () => {
+  it("asks about a cheque that contradicts the record as the contradiction, not a scale", async () => {
+    const world = investorSession({
+      currentStepKey: "I2.cheque_typical",
+      recorded: { ...SO_FAR, "I2.cheque_min": "25000" },
+    });
+    const interviewer = createInterviewer({
+      gateway: gateway({
+        ...base,
+        intent: "ANSWER",
+        reply: "Twenty thousand, then.",
+        answers: [
+          {
+            stepKey: "I2.cheque_typical",
+            value: "20000",
+            confidence: "HIGH",
+            clarity: "SETTLED",
+          },
+        ],
+        reading: reading({}),
+      }),
+      logger,
+    });
+    const outcome = await interviewer.turn(
+      turn(world, "honestly I'd say 20k typical"),
+    );
+    expect(outcome.recorded).toEqual([]);
+    expect(outcome.reply).toBe(
+      "You said $20,000 for your typical cheque, but your minimum cheque is $25,000. Which should I change?",
+    );
+  });
+
+  it("says what went down before it offers to add what is missing, and ends on that one question", async () => {
+    const world = investorSession({
+      currentStepKey: "I2.investment_role",
+      recorded: SO_FAR,
+    });
+    const interviewer = createInterviewer({
+      gateway: gateway({
+        ...base,
+        intent: "ANSWER",
+        reply: "Co-investing it is. And yes, gambling is the hard no.",
+        answers: [
+          {
+            stepKey: "I2.investment_role",
+            value: ["co_invest"],
+            confidence: "HIGH",
+            clarity: "SETTLED",
+          },
+        ],
+        reading: reading({
+          question: {
+            kind: "THEIR_OWN_RECORDS",
+            text: "did gambling go in as a hard no?",
+            about: ["I7.hard_exclusions"],
+          },
+        }),
+      }),
+      logger,
+    });
+    const outcome = await interviewer.turn(
+      turn(world, "mostly co-investing. did gambling go in as a hard no?"),
+    );
+    expect(outcome.recorded).toEqual(["I2.investment_role"]);
+    expect(outcome.reply).toBe(
+      "I've also put down your investment role. Not yet: nothing is on your record for your hard exclusions. Want me to add it?",
+    );
+  });
+});
