@@ -26,11 +26,7 @@ import {
   type QActionProposer,
 } from "@capital-q/q-actions";
 import type { QActionPrepareContext } from "@capital-q/q-runtime";
-import {
-  ActorContextSchema,
-  capability,
-  type AuthorizationService,
-} from "@capital-q/security";
+import { capability, type AuthorizationService } from "@capital-q/security";
 
 import {
   COMPANY_VISIBILITY_SET,
@@ -238,16 +234,9 @@ export function createCompanyProfileUpdateAction(
       },
       executor: {
         execute: async (action, context) => {
-          // The approver's own authority, reconstructed from what the
-          // approval recorded; the companies context checks it again.
-          const actor = ActorContextSchema.parse({
-            userId: action.approvedByUserId,
-            tenantId: action.tenantId,
-            ...(action.organisationId === null
-              ? {}
-              : { organisationId: action.organisationId }),
-            actorType: "HUMAN",
-          });
+          // The approver's own authority, as the gate just verified it;
+          // the companies context checks it again.
+          const actor = context.approver;
           const companyId = CompanyIdSchema.parse(action.payload.companyId);
           try {
             const current = await service.getCompany({ actor, companyId });
