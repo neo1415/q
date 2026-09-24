@@ -1,0 +1,373 @@
+diff --git a/packages/companies/src/application/marketplace-readiness.ts b/packages/companies/src/application/marketplace-readiness.ts
+index a555111..83c6969 100644
+--- a/packages/companies/src/application/marketplace-readiness.ts
++++ b/packages/companies/src/application/marketplace-readiness.ts
+@@ -11,7 +11,12 @@ import {
+   type MarketplaceReadinessAssessment,
+ } from "@capital-q/contracts";
+ import type { TransactionContext } from "@capital-q/database";
+-import { capability, type ActorContext } from "@capital-q/security";
++import {
++  capability,
++  type ActorContext,
++  type OrganisationId,
++  type TenantId,
++} from "@capital-q/security";
+ 
+ import type { Company, CompanyId } from "../contracts/index.js";
+ import { CompanyNotFoundError } from "../domain/errors.js";
+@@ -60,6 +65,28 @@ export type AssessMarketplaceReadinessCommand = {
+   readonly correlationId: CorrelationId;
+ };
+ 
++/**
++ * Capital Q itself reconciling readiness because a fact the policy reads
++ * changed underneath it (CQ-VERIFY-002: a verification decision). Not a
++ * person, not an ActorContext, and not a capability holder: it can only
++ * make the stored state agree with the policy, never choose a state.
++ */
++export type SystemReadinessActor = { readonly kind: "SYSTEM" };
++export const SYSTEM_READINESS_ACTOR: SystemReadinessActor = { kind: "SYSTEM" };
++
++export type ReconcileMarketplaceReadinessAsSystemCommand = {
++  readonly tenantId: TenantId;
++  readonly organisationId: OrganisationId;
++  readonly correlationId: CorrelationId;
++  readonly trigger: "VERIFICATION_DECIDED";
++};
++
++export type SystemReadinessOutcome = {
++  readonly companyId: CompanyId;
++  readonly state: MarketplaceReadinessAssessment["state"];
++  readonly changed: boolean;
++};
++
+ export type MarketplaceReadinessReconciliation = {
+   readonly company: Company;
+   readonly assessment: MarketplaceReadinessAssessment;
+@@ -112,11 +139,12 @@ export async function reconcileMarketplaceReadinessInTransaction(
+   dependencies: CompanyServiceDependencies,
+   tx: TransactionContext,
+   input: {
+-    readonly actor: ActorContext;
++    readonly actor: ActorContext | SystemReadinessActor;
+     readonly locked: Company;
+     readonly correlationId: CorrelationId;
+     /** Why this reconciliation ran; audit metadata, never prose. */
+-    readonly trigger: "ASSESSMENT_REQUESTED" | "VISIBILITY_WITHDRAWN";
++    readonly trigger:
++      "ASSESSMENT_REQUESTED" | "VISIBILITY_WITHDRAWN" | "VERIFICATION_DECIDED";
+   },
+ ): Promise<MarketplaceReadinessReconciliation> {
+   const { actor, locked } = input;
+@@ -145,8 +173,15 @@ export async function reconcileMarketplaceReadinessInTransaction(
+     throw new Error("marketplace readiness update lost its lock");
+   }
+ 
++  const system = "kind" in actor;
+   await dependencies.audit.record(tx, {
+-    ...auditActorFromContext(actor),
++    ...(system
++      ? {
++          tenantId: locked.tenantId,
++          actorType: "SYSTEM" as const,
++          organisationId: locked.organisationId,
++        }
++      : auditActorFromContext(actor)),
+     auditEventId: createAuditEventId(),
+     actionType: READINESS_CHANGED,
+     resourceType: COMPANY_RESOURCE,
+@@ -173,7 +208,7 @@ export async function reconcileMarketplaceReadinessInTransaction(
+       organisationId: locked.organisationId,
+       companyId: updated.id,
+       version: updated.version,
+-      actorUserId: actor.userId,
++      ...(system ? {} : { actorUserId: actor.userId }),
+       correlationId: input.correlationId,
+       readinessState: evaluation.state,
+       policyVersion: evaluation.policyVersion,
+@@ -279,3 +314,44 @@ export function createAssessMarketplaceReadiness(
+     });
+   };
+ }
++
++/**
++ * Reconcile readiness for every company an organisation owns, as Capital Q
++ * (CQ-VERIFY-002). A trusted server operation: composed only by the worker
++ * that consumes `verification.claim.decided`, never by a route, so no
++ * browser can reach it. It carries no capability check because no person
++ * is acting; what it may do is exactly what the policy answers, and when
++ * the stored state already agrees it writes nothing, which is what makes
++ * a redelivered decision harmless.
++ */
++export function createReconcileMarketplaceReadinessAsSystem(
++  dependencies: CompanyServiceDependencies,
++) {
++  const { transactions, repositories } = dependencies;
++  return (
++    command: ReconcileMarketplaceReadinessAsSystemCommand,
++  ): Promise<readonly SystemReadinessOutcome[]> =>
++    transactions.run(async (tx) => {
++      const companies = await repositories.companies.lockByOrganisation(
++        tx,
++        command.tenantId,
++        command.organisationId,
++      );
++      const outcomes: SystemReadinessOutcome[] = [];
++      for (const locked of companies) {
++        const { company, assessment, changed } =
++          await reconcileMarketplaceReadinessInTransaction(dependencies, tx, {
++            actor: SYSTEM_READINESS_ACTOR,
++            locked,
++            correlationId: command.correlationId,
++            trigger: command.trigger,
++          });
++        outcomes.push({
++          companyId: company.id,
++          state: assessment.state,
++          changed,
++        });
++      }
++      return outcomes;
++    });
++}
+diff --git a/packages/companies/src/application/ports.ts b/packages/companies/src/application/ports.ts
+index 4e74d56..0b45d56 100644
+--- a/packages/companies/src/application/ports.ts
++++ b/packages/companies/src/application/ports.ts
+@@ -98,6 +98,17 @@ export type CompanyRepository = {
+       readonly visibility: MarketplaceVisibility;
+     },
+   ) => Promise<Company | null>;
++  /**
++   * Locks every company the organisation owns in its tenant, ordered by
++   * id, for the rest of the transaction. Used only by the system
++   * reconciliation after a verification decision (CQ-VERIFY-002), which
++   * knows the organisation a claim belongs to and not a company id.
++   */
++  readonly lockByOrganisation: (
++    tx: TransactionContext,
++    tenantId: TenantId,
++    organisationId: OrganisationId,
++  ) => Promise<readonly Company[]>;
+   /**
+    * Written only by the marketplace-readiness reconciliation, under the
+    * row lock, with the state the policy decided. No profile PATCH, no
+diff --git a/packages/companies/src/application/service.ts b/packages/companies/src/application/service.ts
+index 2f5b374..9d33249 100644
+--- a/packages/companies/src/application/service.ts
++++ b/packages/companies/src/application/service.ts
+@@ -14,8 +14,11 @@ import { createUnavailableVerificationClaimsPort } from "../infrastructure/unava
+ import {
+   createAssessMarketplaceReadiness,
+   createGetMarketplaceReadiness,
++  createReconcileMarketplaceReadinessAsSystem,
+   type AssessMarketplaceReadinessCommand,
+   type GetMarketplaceReadinessQuery,
++  type ReconcileMarketplaceReadinessAsSystemCommand,
++  type SystemReadinessOutcome,
+ } from "./marketplace-readiness.js";
+ import {
+   createPostgresCompanyMemberRepository,
+@@ -71,6 +74,14 @@ export type CompanyService = {
+   readonly assessMarketplaceReadiness: (
+     command: AssessMarketplaceReadinessCommand,
+   ) => Promise<MarketplaceReadinessAssessment>;
++  /**
++   * Trusted server operation (CQ-VERIFY-002): Capital Q reconciles an
++   * organisation's companies after a verification decision. Composed by
++   * the worker only; no route calls it.
++   */
++  readonly reconcileMarketplaceReadinessAsSystem: (
++    command: ReconcileMarketplaceReadinessAsSystemCommand,
++  ) => Promise<readonly SystemReadinessOutcome[]>;
+   readonly getMyCompanyMembership: (
+     query: GetMyCompanyMembershipQuery,
+   ) => Promise<CompanyMember>;
+@@ -129,6 +140,8 @@ export function createCompanyService(
+     setCompanyVisibility: createSetCompanyVisibility(dependencies),
+     getMarketplaceReadiness: createGetMarketplaceReadiness(dependencies),
+     assessMarketplaceReadiness: createAssessMarketplaceReadiness(dependencies),
++    reconcileMarketplaceReadinessAsSystem:
++      createReconcileMarketplaceReadinessAsSystem(dependencies),
+     getMyCompanyMembership: createGetMyCompanyMembership(dependencies),
+     upsertMyCompanyMembership: createUpsertMyCompanyMembership(dependencies),
+     getMyFounderProfile: createGetMyFounderProfile(dependencies),
+diff --git a/packages/companies/src/events/index.ts b/packages/companies/src/events/index.ts
+index d918aea..9cdc15a 100644
+--- a/packages/companies/src/events/index.ts
++++ b/packages/companies/src/events/index.ts
+@@ -116,7 +116,8 @@ type EnvelopeInput = {
+   readonly organisationId: string;
+   readonly companyId: string;
+   readonly version: number;
+-  readonly actorUserId: string;
++  /** Absent when Capital Q itself acted (a SYSTEM reconciliation). */
++  readonly actorUserId?: string | undefined;
+   readonly correlationId: CorrelationId;
+ };
+ 
+@@ -136,7 +137,10 @@ function envelope<TData>(
+     eventVersion: definition.version,
+     tenantId: input.tenantId,
+     organisationId: input.organisationId,
+-    actor: { type: "HUMAN", id: input.actorUserId },
++    actor:
++      input.actorUserId === undefined
++        ? { type: "SYSTEM" }
++        : { type: "HUMAN", id: input.actorUserId },
+     correlationId: input.correlationId,
+     aggregate: { type: "company", id: input.companyId, version: input.version },
+     data,
+diff --git a/packages/companies/src/index.ts b/packages/companies/src/index.ts
+index 81de941..9e51489 100644
+--- a/packages/companies/src/index.ts
++++ b/packages/companies/src/index.ts
+@@ -46,7 +46,12 @@ export {
+ export {
+   createAssessMarketplaceReadiness,
+   createGetMarketplaceReadiness,
++  createReconcileMarketplaceReadinessAsSystem,
+   reconcileMarketplaceReadinessInTransaction,
++  SYSTEM_READINESS_ACTOR,
++  type ReconcileMarketplaceReadinessAsSystemCommand,
++  type SystemReadinessActor,
++  type SystemReadinessOutcome,
+   type AssessMarketplaceReadinessCommand,
+   type GetMarketplaceReadinessQuery,
+   type MarketplaceReadinessReconciliation,
+diff --git a/packages/companies/src/infrastructure/postgres-company-repository.ts b/packages/companies/src/infrastructure/postgres-company-repository.ts
+index 117502c..aba2d9a 100644
+--- a/packages/companies/src/infrastructure/postgres-company-repository.ts
++++ b/packages/companies/src/infrastructure/postgres-company-repository.ts
+@@ -185,6 +185,16 @@ export function createPostgresCompanyRepository(): CompanyRepository {
+       return rows.length === 0 ? null : toCompany(rows[0]);
+     },
+ 
++    lockByOrganisation: async (tx, tenantId, organisationId) => {
++      const rows = await tx.sql`
++        ${companySelect(tx.sql)}
++         where c.tenant_id = ${tenantId}
++           and c.organisation_id = ${organisationId}
++         order by c.id
++           for update`;
++      return rows.map(toCompany);
++    },
++
+     updateProfile: async (tx, input) => {
+       const columns = toColumnChanges(input.changes);
+       // founded_date must be cast from text; every other column is text.
+diff --git a/packages/companies/test/marketplace-readiness.test.ts b/packages/companies/test/marketplace-readiness.test.ts
+index e5a9cff..ffd20d9 100644
+--- a/packages/companies/test/marketplace-readiness.test.ts
++++ b/packages/companies/test/marketplace-readiness.test.ts
+@@ -5,11 +5,16 @@ import {
+   MarketplaceReadinessAssessmentSchema,
+   type CorrelationId,
+ } from "@capital-q/contracts";
+-import type { ActorContext, AuthorizationService } from "@capital-q/security";
++import {
++  OrganisationIdSchema,
++  type ActorContext,
++  type AuthorizationService,
++} from "@capital-q/security";
+ 
+ import type { CompanyServiceDependencies } from "../src/application/dependencies.js";
+ import {
+   createAssessMarketplaceReadiness,
++  createReconcileMarketplaceReadinessAsSystem,
+   createGetMarketplaceReadiness,
+ } from "../src/application/marketplace-readiness.js";
+ import type {
+@@ -272,9 +277,19 @@ function dependencies(w: World): CompanyServiceDependencies {
+     : never;
+   const companies: Pick<
+     CompanyRepository,
+-    "findById" | "lockById" | "updateReadiness" | "updateVisibility"
++    | "findById"
++    | "lockById"
++    | "lockByOrganisation"
++    | "updateReadiness"
++    | "updateVisibility"
+   > = {
+     findById: (_e, t, o, id) => Promise.resolve(owned(t, o, id)),
++    lockByOrganisation: (_tx, t, o) =>
++      Promise.resolve(
++        w.company.tenantId === t && w.company.organisationId === o
++          ? [w.company]
++          : [],
++      ),
+     lockById: (_tx, t, o, id) => Promise.resolve(owned(t, o, id)),
+     updateReadiness: (_tx, input) => {
+       if (w.company.version !== input.expectedVersion) {
+@@ -522,6 +537,70 @@ describe("marketplace readiness use cases", () => {
+     );
+   });
+ 
++  it("Capital Q reconciles after a verification decision as SYSTEM, once, and a replay writes nothing", async () => {
++    const port = { standing: "VERIFIED" as "VERIFIED" | "REVOKED" };
++    const w = world({
++      verification: {
++        sourceLabel: "VERIFICATION_TEST",
++        currentStandings: () =>
++          Promise.resolve({
++            available: true,
++            founderIdentity: port.standing,
++            organisationIdentity: "VERIFIED",
++          }),
++      },
++    });
++    const reconcile = createReconcileMarketplaceReadinessAsSystem(
++      dependencies(w),
++    );
++    const command = {
++      tenantId: w.company.tenantId,
++      organisationId: w.company.organisationId,
++      correlationId: CORRELATION,
++      trigger: "VERIFICATION_DECIDED" as const,
++    };
++
++    const first = await reconcile(command);
++    expect(first).toEqual([
++      { companyId: w.company.id, state: "marketplace_ready", changed: true },
++    ]);
++    expect(w.audits).toHaveLength(1);
++    expect(w.audits[0]).toMatchObject({
++      actorType: "SYSTEM",
++      metadata: {
++        trigger: "VERIFICATION_DECIDED",
++        verificationSource: "VERIFICATION_TEST",
++      },
++    });
++    expect(w.audits[0]).not.toHaveProperty("actorId");
++    expect(w.events).toHaveLength(1);
++    expect(w.events[0]).toMatchObject({ actor: { type: "SYSTEM" } });
++
++    // A redelivered decision: the state already agrees, nothing is written.
++    const replay = await reconcile(command);
++    expect(replay[0]?.changed).toBe(false);
++    expect(w.audits).toHaveLength(1);
++    expect(w.events).toHaveLength(1);
++
++    // A revocation is a decision too, and it lowers readiness.
++    port.standing = "REVOKED";
++    const lowered = await reconcile(command);
++    expect(lowered[0]?.state).toBe("requirements_outstanding");
++    expect(w.company.marketplaceReadinessState).toBe(
++      "requirements_outstanding",
++    );
++
++    // Another organisation's decision touches no company here.
++    expect(
++      await reconcile({
++        ...command,
++        organisationId: OrganisationIdSchema.parse(
++          "d0000000-0000-4000-8000-00000000ffff",
++        ),
++      }),
++    ).toEqual([]);
++  });
++
+   it("a founder without company.edit cannot assess; nobody can pass a desired state", async () => {
+     const w = world({ verification: synthetic(), denyCapabilities: true });
+     await expect(
