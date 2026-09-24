@@ -176,7 +176,7 @@ test.describe("investor onboarding (desktop, real API)", () => {
       "Seed, Series A",
     );
     await expect(page.locator('[data-review-item="cheque"]')).toContainText(
-      "USD · min 250000 · typical 1000000 · max 3000000",
+      "USD 250k–3m, typically 1m",
     );
     await expect(
       page.locator('[data-review-item="geographies"]'),
@@ -225,7 +225,7 @@ test.describe("investor onboarding (desktop, real API)", () => {
     await continueStep(page);
     await screen(page, "Here's the mandate you've defined");
     await expect(page.locator('[data-review-item="cheque"]')).toContainText(
-      "typical 1500000",
+      "typically 1.5m",
     );
     const versionAfter =
       (await page.locator("[data-mandate-version]").textContent()) ?? "";
