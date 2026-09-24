@@ -108,6 +108,11 @@ function fakeApi(current: () => OnboardingSessionView) {
         : input instanceof URL
           ? input.toString()
           : input.url;
+    // The interview thread (CQ-QX-006) is a display record appended after
+    // every turn; it is not an answer write, and these tests count writes.
+    if (url.endsWith("/turns")) {
+      return Promise.resolve(Response.json({ written: true }));
+    }
     const headers = new Headers(init?.headers);
     requests.push({
       url,

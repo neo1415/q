@@ -8,6 +8,13 @@ import { AuthenticationRequiredError } from "@capital-q/security";
 
 import { extractBearerToken } from "@capital-q/security/supabase";
 
+import {
+  getActorContext,
+  requireActorContextHook,
+  requireActorContextOrPersonalHook,
+  type ActorContextDependencies,
+} from "../security/actor-context.js";
+import type { QVoiceRoutesDependencies } from "./routes.js";
 import { signupContextFromToken, type Interviewer } from "./interviewer.js";
 
 /**
@@ -32,7 +39,12 @@ import { signupContextFromToken, type Interviewer } from "./interviewer.js";
  * could have done by tapping, and no more.
  */
 
-export type QInterviewRouteDependencies = {
+export type QInterviewRouteDependencies = ActorContextDependencies & {
+  /**
+   * A person with no organisation yet is still attributed to themselves,
+   * under the personal bootstrap tenant — exactly as the voice routes do.
+   */
+  readonly identity?: QVoiceRoutesDependencies["identity"] | undefined;
   readonly path: string;
   readonly interviewer: Interviewer;
   /** Where the onboarding session lives; the interviewer calls it as the person. */
@@ -44,61 +56,75 @@ export function registerQInterviewRoute(
   app: FastifyInstance,
   dependencies: QInterviewRouteDependencies,
 ): void {
-  app.post(dependencies.path, async (request: FastifyRequest, reply) => {
-    const header = request.headers.authorization;
-    const accessToken = extractBearerToken(
-      typeof header === "string" ? header : undefined,
-    );
-    if (accessToken === null) {
-      throw new AuthenticationRequiredError();
-    }
+  const identity = dependencies.identity;
+  const withContext =
+    identity === undefined
+      ? requireActorContextHook(dependencies)
+      : requireActorContextOrPersonalHook({ ...dependencies, identity });
+  app.post(
+    dependencies.path,
+    { onRequest: withContext },
+    async (request: FastifyRequest, reply) => {
+      const header = request.headers.authorization;
+      const accessToken = extractBearerToken(
+        typeof header === "string" ? header : undefined,
+      );
+      if (accessToken === null) {
+        throw new AuthenticationRequiredError();
+      }
 
-    const input = QInterviewTurnRequestSchema.parse(request.body ?? {});
-    const outcome = await dependencies.interviewer.turn({
-      session: { baseUrl: dependencies.apiBaseUrl, accessToken },
-      onboardingSessionId: input.onboardingSessionId,
-      journeyType: input.journeyType === "investor" ? "investor" : "founder",
-      channel: input.channel,
-      // Attribution only. Authority is the bearer above, and the
-      // onboarding service re-derives everything from it.
-      attribution: {
-        tenantId: "00000000-0000-4000-8000-000000000000",
-        userId: "00000000-0000-4000-8000-000000000000",
-        correlationId: dependencies.correlation(),
-      },
-      signup: signupContextFromToken(accessToken),
-      utterance: input.utterance,
-      recentTurns: [...input.recentTurns],
-    });
+      const actor = getActorContext(request);
+      const input = QInterviewTurnRequestSchema.parse(request.body ?? {});
+      const outcome = await dependencies.interviewer.turn({
+        session: { baseUrl: dependencies.apiBaseUrl, accessToken },
+        onboardingSessionId: input.onboardingSessionId,
+        journeyType: input.journeyType === "investor" ? "investor" : "founder",
+        channel: input.channel,
+        // Attribution: the person, resolved server-side like every other Q
+        // route — never a placeholder. A constant tenant failed every
+        // usage-ledger write on its foreign key and, worse, made the typed
+        // interview recall memory for nobody, so Q forgot between sessions
+        // what the person had told it. Authority is still the bearer above;
+        // the onboarding service re-derives everything from it.
+        attribution: {
+          tenantId: actor.tenantId,
+          userId: actor.userId,
+          correlationId: dependencies.correlation(),
+        },
+        signup: signupContextFromToken(accessToken),
+        utterance: input.utterance,
+        recentTurns: [...input.recentTurns],
+      });
 
-    void reply.header("Cache-Control", "no-store");
-    return QInterviewTurnResponseSchema.parse({
-      reply: outcome.reply,
-      intent: outcome.intent,
-      asking:
-        outcome.asking === null
-          ? null
-          : {
-              stepKey: outcome.asking.stepKey,
-              kind: outcome.asking.kind,
-              options: outcome.asking.options.map((option) => ({
-                key: option.key,
-                label: option.label,
-                ...(option.description === undefined
+      void reply.header("Cache-Control", "no-store");
+      return QInterviewTurnResponseSchema.parse({
+        reply: outcome.reply,
+        intent: outcome.intent,
+        asking:
+          outcome.asking === null
+            ? null
+            : {
+                stepKey: outcome.asking.stepKey,
+                kind: outcome.asking.kind,
+                options: outcome.asking.options.map((option) => ({
+                  key: option.key,
+                  label: option.label,
+                  ...(option.description === undefined
+                    ? {}
+                    : { description: option.description }),
+                })),
+                ...(outcome.asking.maxChoices === undefined
                   ? {}
-                  : { description: option.description }),
-              })),
-              ...(outcome.asking.maxChoices === undefined
-                ? {}
-                : { maxChoices: outcome.asking.maxChoices }),
-            },
-      recorded: [...outcome.recorded],
-      skipped: [...outcome.skipped],
-      questionForQ: outcome.questionForQ,
-      researching: outcome.researching,
-      navigate: outcome.navigate,
-      handoff: outcome.handoff,
-      degraded: outcome.degraded,
-    });
-  });
+                  : { maxChoices: outcome.asking.maxChoices }),
+              },
+        recorded: [...outcome.recorded],
+        skipped: [...outcome.skipped],
+        questionForQ: outcome.questionForQ,
+        researching: outcome.researching,
+        navigate: outcome.navigate,
+        handoff: outcome.handoff,
+        degraded: outcome.degraded,
+      });
+    },
+  );
 }
