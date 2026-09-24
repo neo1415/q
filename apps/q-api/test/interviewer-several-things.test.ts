@@ -456,3 +456,252 @@ describe("the interview thread is kept server-side (CQ-QX-006)", () => {
     });
   });
 });
+
+describe("F3 · no instruction to the model is ever said to the person", () => {
+  it("removes a platform instruction the model read out verbatim", async () => {
+    const world = investorSession({
+      currentStepKey: "I4.revenue_state",
+      recorded: MANDATE_SO_FAR,
+    });
+    const leaked =
+      "Live public research is NOT reachable right now: put nothing in questionForQ and never promise to look something up.";
+    const interviewer = createInterviewer({
+      gateway: gateway({
+        ...base,
+        intent: "ANSWER",
+        reply: `${leaked} Which revenue stage do you expect?`,
+        askNext: "I4.revenue_state",
+        reading: reading({ kind: "CONTROL" }),
+      }),
+      logger,
+      research: { available: () => false },
+    });
+    const outcome = await interviewer.turn(turn(world, "ok"));
+    expect(outcome.reply).not.toContain("questionForQ");
+    expect(outcome.reply).not.toContain("NOT reachable");
+    expect(outcome.reply).toContain("Which revenue stage do you expect?");
+  });
+
+  it("offers Type once over voice, in the platform's own words, on a question with nothing to tap", async () => {
+    const world = investorSession({
+      currentStepKey: "I0.business_title",
+      recorded: MANDATE_SO_FAR,
+    });
+    const asks = {
+      ...base,
+      intent: "ANSWER" as const,
+      reply: "What's your title there?",
+      askNext: "I0.business_title",
+      reading: reading({ kind: "CONTROL" }),
+    };
+    const interviewer = createInterviewer({
+      gateway: gateway(asks, asks),
+      logger,
+    });
+    const voice = (said: string) =>
+      interviewer.turn({ ...turn(world, said), channel: "voice" });
+    const first = await voice("ok");
+    const second = await voice("hmm");
+    expect(first.reply).toMatch(/tap Type/);
+    expect(second.reply).not.toMatch(/tap Type/);
+    expect(first.reply).not.toMatch(/mention once|Once only/);
+  });
+});
+
+describe("round 1 c · the step Q asked governs where the answer goes", () => {
+  it("holds 'strong' for a read-back instead of writing it to the current step when Q had asked another", async () => {
+    const world = investorSession({
+      currentStepKey: "I3.geography_strength",
+      recorded: MANDATE_SO_FAR,
+    });
+    const interviewer = createInterviewer({
+      gateway: gateway(
+        // Q declared the sector-strength question as asked…
+        {
+          ...base,
+          intent: "ANSWER",
+          reply: "How firm is your sector preference?",
+          askNext: "I3.sector_strength",
+          reading: reading({ kind: "CONTROL" }),
+        },
+        // …and the model then put the answer on the journey's current step.
+        {
+          ...base,
+          intent: "ANSWER",
+          reply: "Strong, then.",
+          answers: [
+            {
+              stepKey: "I3.geography_strength",
+              value: "must",
+              confidence: "HIGH",
+              clarity: "SETTLED",
+            },
+          ],
+          reading: reading({}),
+        },
+      ),
+      logger,
+    });
+    await interviewer.turn(turn(world, "ok"));
+    const outcome = await interviewer.turn(turn(world, "strong"));
+    expect(outcome.recorded).not.toContain("I3.geography_strength");
+    expect(world.recordedValue("I3.geography_strength")).toBeUndefined();
+    expect(outcome.trace?.persisted.held).toContain("I3.geography_strength");
+    expect(outcome.reply).toMatch(/Is that right\?/);
+  });
+});
+
+describe("a returning person is never met as new", () => {
+  it("opens on the next question, without a first-meeting greeting, when anything is on record", async () => {
+    const world = investorSession({
+      currentStepKey: "I4.revenue_state",
+      recorded: MANDATE_SO_FAR,
+    });
+    const interviewer = createInterviewer({
+      gateway: gateway({
+        ...base,
+        intent: "OPENING",
+        reply: "Good to meet you, Ama. What revenue do you expect?",
+        askNext: "I4.revenue_state",
+        reading: reading({ kind: "CONTROL" }),
+      }),
+      logger,
+    });
+    const opening = await interviewer.turn(turn(world, ""));
+    expect(opening.reply).not.toMatch(/meet you/i);
+    expect(opening.asking?.stepKey).toBe("I4.revenue_state");
+  });
+});
+
+describe("round 2 #1 · words that cannot be placed yet are kept, not dropped", () => {
+  it("holds sectors heard before the lookup can run, and records them once it can", async () => {
+    const world = investorSession({
+      currentStepKey: "I0.investor_type",
+      taxonomy: { senegal: "a1b2c3d4-0000-4000-8000-000000000002" },
+    });
+    let lookupWorks = false;
+    const fetch: typeof globalThis.fetch = (input, init) => {
+      const url =
+        typeof input === "string"
+          ? input
+          : input instanceof URL
+            ? input.toString()
+            : input.url;
+      if (url.includes("/taxonomy/candidates") && !lookupWorks) {
+        return Promise.resolve(
+          Response.json(
+            { title: "Forbidden", status: 403, code: "FORBIDDEN" },
+            { status: 403 },
+          ),
+        );
+      }
+      return world.fetch(input, init);
+    };
+    const interviewer = createInterviewer({
+      gateway: gateway(
+        {
+          ...base,
+          intent: "ANSWER",
+          reply: "Senegal, got it. How do you invest?",
+          categoryPhrases: [{ stepKey: "I3.geography", phrases: ["Senegal"] }],
+          askNext: "I0.investor_type",
+          reading: reading({}),
+        },
+        {
+          ...base,
+          intent: "ANSWER",
+          reply: "An angel, then.",
+          answers: [
+            {
+              stepKey: "I0.investor_type",
+              value: "angel",
+              confidence: "HIGH",
+              clarity: "SETTLED",
+            },
+          ],
+          reading: reading({}),
+        },
+      ),
+      logger,
+    });
+    const first = await interviewer.turn(
+      turn({ ...world, fetch }, "I only do Senegal"),
+    );
+    expect(first.recorded).toEqual([]);
+    expect(first.reply).not.toMatch(/got it/i);
+    expect(first.reply).toMatch(/holding it/);
+    lookupWorks = true;
+    const second = await interviewer.turn(
+      turn({ ...world, fetch }, "I'm an angel"),
+    );
+    expect(second.recorded).toEqual(
+      expect.arrayContaining(["I0.investor_type", "I3.geography"]),
+    );
+  });
+});
+
+describe("round 2 #2 · a write refused early in a turn and landed later is not 'unsaved'", () => {
+  it("records the cheque once the firm exists in the same turn, and never says it didn't save", async () => {
+    const world = investorSession({
+      currentStepKey: "I0.organisation_name",
+      recorded: { "I0.investor_type": "angel" },
+      refuseUntil: { "I2.cheque_typical": "I0.organisation_name" },
+    });
+    const interviewer = createInterviewer({
+      gateway: gateway({
+        ...base,
+        intent: "ANSWER",
+        reply: "Noted.",
+        answers: [
+          {
+            stepKey: "I2.cheque_typical",
+            value: "20000",
+            confidence: "HIGH",
+            clarity: "SETTLED",
+          },
+          {
+            stepKey: "I0.organisation_name",
+            value: "Coastline Capital",
+            confidence: "HIGH",
+            clarity: "SETTLED",
+          },
+        ],
+        reading: reading({}),
+      }),
+      logger,
+    });
+    const outcome = await interviewer.turn(
+      turn(
+        world,
+        "typical is 20 thousand pounds, put the firm down as Coastline Capital",
+      ),
+    );
+    expect(outcome.recorded).toContain("I0.organisation_name");
+    expect(outcome.reply).not.toMatch(/didn't save/);
+  });
+});
+
+describe("round 2 #3 · a person-requested finish with something required open", () => {
+  it("says what the setup still needs instead of sending them away", async () => {
+    const world = investorSession({
+      currentStepKey: "I4.revenue_state",
+      recorded: MANDATE_SO_FAR,
+    });
+    const interviewer = createInterviewer({
+      gateway: gateway({
+        ...base,
+        intent: "NAVIGATE",
+        navigate: "DISCOVER",
+        reply: "Let's finish up and head over to your matches.",
+        reading: reading({ kind: "TOOL_REQUEST" }),
+      }),
+      logger,
+    });
+    const outcome = await interviewer.turn(
+      turn(world, "I'm done, show me companies now"),
+    );
+    expect(outcome.navigate).toBeNull();
+    expect(outcome.reply).toMatch(/^Before I take you there/);
+    expect(outcome.asking).not.toBeNull();
+  });
+});

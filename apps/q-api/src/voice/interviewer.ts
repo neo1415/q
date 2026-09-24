@@ -794,6 +794,26 @@ function askAgain(
  * different order and no choices. A repeated question carries its
  * choices whenever it has them and did not already say them.
  */
+/**
+ * Where a finished setup goes (adversarial round 2, #8): one place per
+ * journey, the same one the screen's own button uses — an investor to the
+ * companies they set it up to see, a founder home.
+ */
+function finishedDestination(journeyType: "founder" | "investor"): {
+  readonly navigate: InterviewDestination;
+  readonly line: string;
+} {
+  return journeyType === "investor"
+    ? {
+        navigate: "DISCOVER",
+        line: "That's everything I need for now. I'm taking you to Discover.",
+      }
+    : {
+        navigate: "HOME",
+        line: "That's everything I need for now. I'm taking you to your home.",
+      };
+}
+
 function askWithChoices(
   step: OnboardingStepManifest,
   input: {
@@ -1001,20 +1021,21 @@ function recordedCurrency(
 /**
  * A question with nothing to tap is a question somebody may need to type.
  *
- * Every question that HAS choices now shows them, so the ones left are the
+ * Every question that HAS choices shows them, so the ones left are the
  * ones where only the person's own words will do: a name, a website, a
- * description, a number. Those are exactly the ones where somebody on a
- * bus or in an open-plan office is stuck, and the stage has always had a
- * Type button they had no reason to look for. So Q mentions it, once, on
- * the questions where it is the answer.
+ * description, a number. Somebody on a bus is stuck there, and the stage
+ * has a Type button they had no reason to look for.
+ *
+ * This used to be an instruction written into the step's note for the
+ * model to act on ("…mention once that they can tap Type…"), and the model
+ * read it out word for word (founder walkthrough F3). An instruction is
+ * never speakable content: the platform says the line itself, once per
+ * session, over voice, on the first such question.
  */
-function typeable(note: string | undefined): string {
-  return [
-    note,
-    "There are no choices to tap for this one, so if speaking is awkward, mention once that they can tap Type and write it instead. Once only, and never on a question that has options.",
-  ]
-    .filter((n): n is string => n !== undefined)
-    .join(" ");
+const TYPE_HINT = "If it's easier, you can tap Type and write it instead.";
+
+function isTypeable(kind: InterviewOpenStep["kind"]): boolean {
+  return kind === "NUMBER" || kind === "SHORT_TEXT" || kind === "LONG_TEXT";
 }
 
 function toOpenStep(
@@ -1045,13 +1066,12 @@ function toOpenStep(
         min: c.min,
         max: c.max,
         ...(c.unit === undefined ? {} : { unit: c.unit }),
-        note: typeable(base.note),
       };
     case "short_text":
-      return { ...base, kind: "SHORT_TEXT", note: typeable(base.note) };
+      return { ...base, kind: "SHORT_TEXT" };
     case "long_text":
     case "voice_text":
-      return { ...base, kind: "LONG_TEXT", note: typeable(base.note) };
+      return { ...base, kind: "LONG_TEXT" };
     case "confirmation":
       // A review of what has been gathered: Q reads it back in speech
       // before it asks, rather than asking for a "confirmation".
@@ -1599,6 +1619,19 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
    * second one" refers to and what a volunteered sentence answers.
    */
   const conversationBySession = new Map<string, ConversationState>();
+  /** Sessions that have heard the Type hint (once each, voice only). */
+  const typeHintGiven = new Set<string>();
+  /**
+   * Category phrases heard before they could be placed (adversarial
+   * round 2, #1): "I only do Côte d'Ivoire and Senegal" in the very first
+   * sentence, before the organisation existed, when the platform's own
+   * lookup could not yet run for this person. The words are kept and put
+   * through the lookup again on every later turn until they land.
+   */
+  const phrasesBySession = new Map<
+    string,
+    { readonly stepKey: string; readonly phrases: readonly string[] }[]
+  >();
   /**
    * Meaning kept beside a field, per session (CQ-QX-005 §3).
    *
@@ -2002,6 +2035,8 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
       carriedBySession.delete(sessionId);
       conversationBySession.delete(sessionId);
       qualitativeBySession.delete(sessionId);
+      typeHintGiven.delete(sessionId);
+      phrasesBySession.delete(sessionId);
     },
 
     /**
@@ -2121,6 +2156,11 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
         dispatch({ type: "RESEARCH_FINISHED" });
         dispatch({ type: "QUESTION_ANSWERED" });
       }
+      // Independent of the view and authorised by the same attribution, so
+      // it is read while the view is fetched rather than after it (CQ-VOICE-010:
+      // a spoken turn waits on every sequential read before Q can speak).
+      // Never rejects: a failed recall is an empty memory.
+      const memory = recallMemory(input.attribution);
       let view = await getOnboardingSession(
         input.session,
         input.onboardingSessionId,
@@ -2132,6 +2172,8 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
        */
       const inFrontAtStart =
         conversation.asked?.topic ?? view.currentStep?.stepKey ?? null;
+      /** The journey's own current step when they spoke. */
+      const currentAtStart = view.currentStep?.stepKey ?? null;
 
       /**
        * A choice with exactly one candidate is not a question
@@ -2281,7 +2323,7 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
         ].slice(0, 6),
         recentTurns: recentWithinBudget(input.recentTurns),
         utterance: input.utterance.slice(0, 2_000),
-        memory: await recallMemory(input.attribution),
+        memory: await memory,
       };
       const rendered = renderPrompt<InterviewConductorV8Variables>(registry, {
         task: "INTERVIEW_CONDUCTOR",
@@ -2910,7 +2952,27 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
          * (CQ-QX-005 §4, §15). The same held-for-a-yes path in every
          * case, so a yes writes it and a no drops it.
          */
+        /**
+         * The answer lands on the journey's current step while Q had asked
+         * a different one (adversarial round 1, c): "strong" to a question
+         * about sectors was recorded as geography strength. The step Q
+         * declared as asked governs; when the reading puts the answer on
+         * the other one instead, and the asked step would take the same
+         * answer, the two cannot be told apart from the words — so it is
+         * held and read back under its step's name, never written blind.
+         */
+        const askedTopic = conversation.asked?.topic ?? null;
+        const askedStep =
+          askedTopic === null ? undefined : steps.get(askedTopic);
+        const misplaced =
+          askedStep !== undefined &&
+          askedStep.stepKey !== step.stepKey &&
+          step.stepKey === currentAtStart &&
+          statuses.get(askedStep.stepKey) !== "COMPLETED" &&
+          !result.answers.some((a) => a.stepKey === askedStep.stepKey) &&
+          toResponseValue(askedStep, answer.value) !== null;
         if (
+          misplaced ||
           isMaterial(step) ||
           disposition.confirm ||
           tense.has(step.stepKey)
@@ -3155,7 +3217,13 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
         readonly placed: readonly string[];
         readonly unplaced: readonly string[];
       }[] = [];
-      const categoryPhrases = takingAnswers
+      const carriedPhrases = (phrasesBySession.get(sessionId) ?? []).filter(
+        (item) => statuses.get(item.stepKey) !== "COMPLETED",
+      );
+      phrasesBySession.delete(sessionId);
+      /** Steps whose phrases are held for a later lookup this turn. */
+      const phrasesHeld: string[] = [];
+      const categoryPhrasesThisTurn = takingAnswers
         ? [
             ...read.categoryPhrases,
             ...phrasesFromAnswers.filter(
@@ -3164,6 +3232,13 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
             ),
           ]
         : [];
+      const categoryPhrases = [
+        ...categoryPhrasesThisTurn,
+        ...carriedPhrases.filter(
+          (item) =>
+            !categoryPhrasesThisTurn.some((c) => c.stepKey === item.stepKey),
+        ),
+      ];
       for (const item of categoryPhrases) {
         const step = steps.get(item.stepKey);
         if (
@@ -3175,6 +3250,7 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
         const ids: string[] = [];
         const labels: string[] = [];
         const unplacedPhrases: string[] = [];
+        let lookupFailed = false;
         for (const phrase of item.phrases.slice(0, 6)) {
           try {
             const found = await findTaxonomyCandidates(input.session, {
@@ -3189,9 +3265,21 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
               labels.push(best.displayName);
             }
           } catch {
-            // The classifier is optional here; nothing is invented in its place.
+            // The classifier could not run for this person yet (commonly:
+            // no organisation so far). Nothing is invented in its place,
+            // and nothing is dropped either: the words are kept below.
+            lookupFailed = true;
             unplacedPhrases.push(phrase.trim().slice(0, 80));
           }
+        }
+        if (ids.length === 0 && lookupFailed) {
+          const kept = phrasesBySession.get(sessionId) ?? [];
+          phrasesBySession.set(sessionId, [
+            ...kept.filter((k) => k.stepKey !== step.stepKey),
+            { stepKey: step.stepKey, phrases: item.phrases.slice(0, 6) },
+          ]);
+          phrasesHeld.push(step.stepKey);
+          continue;
         }
         if (ids.length > 0 && unplacedPhrases.length > 0) {
           partlyPlaced.push({
@@ -3291,6 +3379,19 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
             ...candidate,
             attempts: candidate.attempts + 1,
           });
+        }
+      }
+      /**
+       * Refused first, landed on the retry above (adversarial round 2,
+       * #2): "the minimum is 20k… put the firm down as Coastline" wrote the
+       * cheques before the organisation existed, the ledger landed them
+       * once it did, and Q still said one thing had not saved. A value on
+       * the record is not unsaved.
+       */
+      for (let index = unsaved.length - 1; index >= 0; index -= 1) {
+        const key = unsaved[index];
+        if (key !== undefined && recorded.includes(key)) {
+          unsaved.splice(index, 1);
         }
       }
 
@@ -3470,6 +3571,7 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
         unresolved.length === 0 &&
         unsaved.length === 0 &&
         notCleared.length === 0 &&
+        phrasesHeld.length === 0 &&
         restated === 0 &&
         !result.skipRemainingOptional;
       if (needsScale !== undefined) {
@@ -3510,7 +3612,16 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
          * on rather than saying it again.
          */
         const wanted = stepInHand();
-        if (wanted !== undefined) {
+        if (wanted !== undefined && wanted.stepKey !== inFrontAtStart) {
+          /**
+           * "You already asked that" about a step Q never put to them
+           * (adversarial round 2, #5): Q must not say "you did tell me, and
+           * I didn't get it down" about a question that was not asked. It
+           * asks the step, plainly, with its choices.
+           */
+          repairAsk = wanted.stepKey;
+          reply = askWithChoices(wanted, input);
+        } else if (wanted !== undefined) {
           dispatch({
             type: "REPAIRED",
             topic: wanted.stepKey,
@@ -3642,6 +3753,25 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
           .filter((part) => part.length > 0)
           .join(" ");
       }
+      const heldNowPhrases = categoryPhrasesThisTurn.filter((item) =>
+        phrasesHeld.includes(item.stepKey),
+      );
+      const firstHeld = heldNowPhrases[0];
+      if (firstHeld !== undefined && repairAsk === null) {
+        // Heard this turn and kept for later (round 2, #1): said as held,
+        // never as recorded, whatever the model's reply called it.
+        const heldStep = steps.get(firstHeld.stepKey);
+        const next =
+          result.askNext === null ? undefined : steps.get(result.askNext);
+        reply = [
+          `I've got ${firstHeld.phrases.join(" and ")}${heldStep === undefined ? "" : ` for ${askLabel(heldStep).toLowerCase()}`} — I can't put it on your record until the rest of the setup is in place, so I'm holding it and it goes in as soon as it can.`,
+          next === undefined || next.stepKey === firstHeld.stepKey
+            ? ""
+            : askAgain(next, input),
+        ]
+          .filter((part) => part.length > 0)
+          .join(" ");
+      }
       if (takingAnswers && repairAsk === null && needsScale === undefined) {
         const carriedNow = new Set(
           carriedFor(input.onboardingSessionId, view).map((c) => c.stepKey),
@@ -3656,6 +3786,7 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
           ...unscaled.map((item) => item.step.stepKey),
           ...spokenUploads.map((step) => step.stepKey),
           ...carriedNow,
+          ...phrasesHeld,
           ...view.responses.map((response) => response.stepKey),
         ]);
         const claimed = [
@@ -3740,8 +3871,9 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
             input.onboardingSessionId,
             { expectedSessionVersion: view.session.version },
           );
-          navigate = "HOME";
-          reply = `${reply} That's everything I need for now. I'm taking you to your home.`;
+          const finished = finishedDestination(input.journeyType);
+          navigate = finished.navigate;
+          reply = `${reply} ${finished.line}`;
         } catch (error: unknown) {
           logger.warn({ err: error }, "interview completion was not accepted");
         }
@@ -4016,8 +4148,35 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
               : (view.currentStep?.stepKey ?? needed ?? null),
         };
       } else if (unsaved.length > 0) {
-        reply =
-          `${reply.trim()} One thing didn't save — I'll ask about it again in a moment.`.trim();
+        /**
+         * Some of the turn landed and some did not (round 2, #2). The
+         * model's words may call it all "noted"; the runtime knows better,
+         * so the account is its own: what went down, what is being held
+         * for the moment the setup can take it, and then the question.
+         */
+        const heldLabels = unsaved
+          .map((key) => steps.get(key))
+          .filter((step): step is OnboardingStepManifest => step !== undefined)
+          .map((step) => askLabel(step).toLowerCase());
+        const downLabels = recorded
+          .map((key) => steps.get(key))
+          .filter((step): step is OnboardingStepManifest => step !== undefined)
+          .map((step) => askLabel(step).toLowerCase());
+        const list = (items: readonly string[]) =>
+          items.length <= 1
+            ? (items[0] ?? "")
+            : `${items.slice(0, -1).join(", ")} and ${items.at(-1) ?? ""}`;
+        const next =
+          result.askNext === null ? undefined : steps.get(result.askNext);
+        reply = [
+          downLabels.length > 0
+            ? `I've put down your ${list(downLabels)}.`
+            : "",
+          `Your ${list(heldLabels)} ${heldLabels.length === 1 ? "isn't" : "aren't"} on the record yet — the setup needs something else first — so I'm holding ${heldLabels.length === 1 ? "it" : "them"} and will add ${heldLabels.length === 1 ? "it" : "them"} the moment it can.`,
+          next === undefined ? "" : askAgain(next, input),
+        ]
+          .filter((part) => part.length > 0)
+          .join(" ");
       }
 
       // Last, so that a runtime-composed line is held to the same rule as
@@ -4128,6 +4287,32 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
               ? acknowledgement
               : question;
         result = { ...result, askNext: heldNow.stepKey };
+      }
+      /**
+       * A returning person is never met as new (ACC mobile pass).
+       *
+       * The screen already says "Welcome back. We already covered …" from
+       * the session's own state; Q's opener then said "Good to meet you,
+       * Ama." — two openings, one of them wrong. When anything is already
+       * on the record, the opening is the next question and nothing
+       * before it: the returning line is the platform's, derived from
+       * state, and on a call (where there is no such line on screen) it is
+       * said in front of the question.
+       */
+      if (
+        opening &&
+        heldNow === undefined &&
+        view.responses.length > 0 &&
+        fromState === null
+      ) {
+        const nextKey = result.askNext ?? view.currentStep?.stepKey ?? null;
+        const next = nextKey === null ? undefined : steps.get(nextKey);
+        if (next !== undefined && toOpenStep(next, view) !== null) {
+          const question = askWithChoices(next, input);
+          reply =
+            input.channel === "voice" ? `Welcome back. ${question}` : question;
+          result = { ...result, askNext: next.stepKey };
+        }
       }
 
       /**
@@ -4260,6 +4445,43 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
         result = { ...result, askNext: next?.stepKey ?? null };
       }
       /**
+       * "I'm done, show me companies now" (adversarial round 2, #3).
+       *
+       * Asked to leave while something required is still open, Q must not
+       * send them away with the setup unfinished — the screen stayed on the
+       * required step while Q said "let's head over to your matches". It
+       * says what is left and asks it; the optional rest is already
+       * skippable through the ordinary skip-the-rest path.
+       */
+      const leaving =
+        navigate === "HOME" || navigate === "DISCOVER" || handoff === "FORM";
+      if (
+        leaving &&
+        handoff === null &&
+        view.session.status === "ACTIVE" &&
+        !view.progress.canComplete
+      ) {
+        const stillOpen = view.progress.eligibleSteps
+          .filter(
+            (step) =>
+              step.required &&
+              step.status !== "COMPLETED" &&
+              step.status !== "SKIPPED",
+          )
+          .map((step) => steps.get(step.stepKey))
+          .find(
+            (step): step is OnboardingStepManifest =>
+              step !== undefined &&
+              step.configuration.stepType !== "document_upload" &&
+              toOpenStep(step, view) !== null,
+          );
+        if (stillOpen !== undefined) {
+          navigate = null;
+          reply = `Before I take you there, there's one thing the setup still needs. ${askAgain(stillOpen, input)}`;
+          result = { ...result, askNext: stillOpen.stepKey };
+        }
+      }
+      /**
        * Q may only offer to finish when the journey can finish (ACC e).
        *
        * "Shall we wrap up and head to your discovery feed?" with a
@@ -4315,9 +4537,9 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
               input.onboardingSessionId,
               { expectedSessionVersion: view.session.version },
             );
-            navigate = "HOME";
-            reply =
-              `${reply.trim()} That's everything I need for now. I'm taking you to your home.`.trim();
+            const finished = finishedDestination(input.journeyType);
+            navigate = finished.navigate;
+            reply = `${reply.trim()} ${finished.line}`.trim();
           } catch (error: unknown) {
             logger.warn(
               { err: error },
@@ -4358,6 +4580,39 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
       const askStep =
         result.askNext === null ? undefined : steps.get(result.askNext);
       const askOpen = askStep === undefined ? null : toOpenStep(askStep, view);
+      /**
+       * Nothing the platform told the model is ever said to the person
+       * (founder walkthrough F3). The notes, the conversation block and
+       * the steps' own notes are instructions and context; a sentence of
+       * theirs that comes back verbatim in the reply is removed. Compared
+       * against the platform's own words only — nothing of the person's.
+       */
+      const instructionSentences = [
+        ...variables.notes,
+        ...variables.conversation.split("\n"),
+        ...variables.openSteps.map((step) => step.note ?? ""),
+      ]
+        .flatMap((text) => text.split(/(?<=[.!?])\s+/))
+        .map((sentence) => sentence.trim())
+        .filter((sentence) => sentence.length >= 30);
+      for (const sentence of instructionSentences) {
+        if (reply.includes(sentence)) {
+          reply = reply
+            .replace(sentence, "")
+            .replace(/\s{2,}/g, " ")
+            .trim();
+        }
+      }
+      if (
+        input.channel === "voice" &&
+        askOpen !== null &&
+        isTypeable(askOpen.kind) &&
+        !typeHintGiven.has(sessionId) &&
+        reply.length > 0
+      ) {
+        typeHintGiven.add(sessionId);
+        reply = `${reply} ${TYPE_HINT}`;
+      }
 
       // What the conversation now knows: what was recorded and chosen,
       // what is on screen, and whether the turn moved the job along.

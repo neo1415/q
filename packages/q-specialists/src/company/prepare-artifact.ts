@@ -136,6 +136,76 @@ export async function prepareOrReviseArtifact(input: {
   // attempt, and a revision with no instruction is not a revision.
   const instruction =
     ask.instruction.length > 0 ? ask.instruction : input.saidVerbatim;
+  const findingStatements = result.findings.map((finding) => finding.statement);
+
+  /**
+   * A change to a document that already exists is a revision of THAT
+   * document, and it is decided before anything is composed (CQ-QACT-001,
+   * F5). Live, "make the traction slide shorter" was answered with "there
+   * isn't enough on record to build a deck": the fresh composition a
+   * revision never uses ran first, came back empty on a thin record, and
+   * the thin-record answer won. A revision rewrites what the document
+   * already says, so how much the record holds today does not decide it.
+   */
+  if (ask.kind === "REVISE") {
+    const target = latestArtifactIn(history);
+    if (target !== null) {
+      try {
+        const current = await artifacts.port.currentVersion(
+          request.actor,
+          target,
+        );
+        if (current !== null) {
+          const revised = await artifacts.reviser.revise({
+            base: {
+              title: current.title,
+              summary: current.summary,
+              content: current.content,
+            },
+            instruction,
+            // What the document already carries may be restated; the
+            // record's findings may be drawn on. Nothing else.
+            grounding: [
+              ...current.content.sections.flatMap((section) => [
+                section.body,
+                ...section.findings.map((finding) => finding.statement),
+              ]),
+              ...findingStatements,
+            ],
+            sensitivity: request.plan.maxSensitivity,
+            attribution: {
+              tenantId: request.actor.tenantId,
+              userId: request.actor.userId,
+              qRunId: request.runId,
+              correlationId: request.correlationId,
+            },
+            ...(request.signal === undefined ? {} : { signal: request.signal }),
+          });
+          return {
+            kind: "PREPARED",
+            summary: await artifacts.port.revise({
+              actorContext: request.actor,
+              permittedContextPlan: request.plan,
+              qRunId: request.runId,
+              artifactId: target,
+              instruction,
+              content: revised,
+            }),
+          };
+        }
+      } catch (error: unknown) {
+        logger?.warn(
+          { err: error, qRunId: request.runId },
+          "artifact revision did not complete",
+        );
+        return { kind: "FAILED" };
+      }
+    }
+    // Asked to change something that is not in this conversation, or is no
+    // longer theirs to read. Preparing a fresh one is the useful answer and
+    // is no less authorised than any other preparation.
+  }
+
   const companyName =
     result.companyName !== undefined &&
     result.companyName !== null &&
@@ -170,51 +240,7 @@ export async function prepareOrReviseArtifact(input: {
     );
     return { kind: "THIN_RECORD", artifactType: ask.artifactType };
   }
-  const grounding = result.findings.map((finding) => finding.statement);
-
   try {
-    if (ask.kind === "REVISE") {
-      const target = latestArtifactIn(history);
-      if (target !== null) {
-        const current = await artifacts.port.currentVersion(
-          request.actor,
-          target,
-        );
-        if (current !== null) {
-          const revised = await artifacts.reviser.revise({
-            base: {
-              title: current.title,
-              summary: current.summary,
-              content: current.content,
-            },
-            instruction,
-            grounding,
-            sensitivity: request.plan.maxSensitivity,
-            attribution: {
-              tenantId: request.actor.tenantId,
-              userId: request.actor.userId,
-              qRunId: request.runId,
-              correlationId: request.correlationId,
-            },
-            ...(request.signal === undefined ? {} : { signal: request.signal }),
-          });
-          return {
-            kind: "PREPARED",
-            summary: await artifacts.port.revise({
-              actorContext: request.actor,
-              permittedContextPlan: request.plan,
-              qRunId: request.runId,
-              artifactId: target,
-              instruction,
-              content: revised,
-            }),
-          };
-        }
-      }
-      // Asked to change something that is not in this conversation, or is
-      // no longer theirs to read. Preparing a fresh one is the useful
-      // answer and is no less authorised than any other preparation.
-    }
     return {
       kind: "PREPARED",
       summary: await artifacts.port.prepare({

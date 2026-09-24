@@ -132,13 +132,19 @@ export type QRunRepository = {
     readonly actorUserId: UserId;
   } | null>;
   /**
-   * Every run that has not reached a terminal status, oldest first, bounded.
-   * For the startup sweep: with one orchestrating process, a non-terminal
-   * run at startup has no engine working on it and never will.
+   * Non-terminal runs that have shown no sign of life (no durable event,
+   * no start, no creation) since the given instants, oldest first,
+   * bounded. In-flight and paused runs have separate windows: a run paused
+   * for a person is not orphaned by being quiet. For the orphan sweep,
+   * which must never touch a run another process is still working on.
    */
-  readonly listNonTerminal: (
+  readonly listStale: (
     executor: DatabaseExecutor,
-    limit: number,
+    input: {
+      readonly inFlightSilentSince: UtcTimestamp;
+      readonly pausedSilentSince: UtcTimestamp;
+      readonly limit: number;
+    },
   ) => Promise<readonly QRunRecord[]>;
   /** The newest run of a conversation, for reopening it where it stopped. Owner-scoped. */
   readonly findLatestForConversation: (
