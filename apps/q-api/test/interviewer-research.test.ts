@@ -219,7 +219,52 @@ describe("CQ-QX-005 §11 · research runs only when asked for", () => {
     );
   });
 
-  it("never promises a look-up over a transport that cannot carry one", async () => {
+  it("carries a typed request for a real example to the surface, and lets the next typed turn look again", async () => {
+    const fetchFake = api(() =>
+      view({ journeyType: "investor", responses: [] }),
+    );
+    const asks: InterviewConductorResult = {
+      ...quiet,
+      reply: "Let me look for one.",
+      intent: "QUESTION_FOR_Q",
+      questionForQ: "a real aviation investor with a similar profile",
+      askNext: null,
+      reading: {
+        kind: "QUESTION_TO_Q",
+        confidence: "HIGH",
+        transcript: "CLEAR",
+        references: [],
+        qualitative: [],
+        question: {
+          kind: "REAL_WORLD_EXAMPLE",
+          text: "a real investor like me?",
+        },
+        suggestions: [],
+        tensions: [],
+        clears: [],
+      },
+    };
+    const interviewer = createInterviewer({
+      gateway: gateway({ ...quiet, askNext: "F1.stage" }, asks, asks),
+      logger,
+    });
+    const typed = (utterance: string) =>
+      interviewer.turn({
+        ...turn(fetchFake, "founder"),
+        channel: "text",
+        utterance,
+      });
+    await typed("We're at seed");
+    const first = await typed("a real investor like me?");
+    expect(first.researching).toContain("a real investor like me");
+    // The surface answered it before the person typed again; the next
+    // typed request is not refused as "already running".
+    const second = await typed("and another one?");
+    expect(second.researching).not.toBeNull();
+    expect(second.trace?.research).toMatchObject({ run: true });
+  });
+
+  it("never promises a look-up in a deployment that cannot research", async () => {
     const fetchFake = api(() =>
       view({ journeyType: "investor", responses: [] }),
     );
@@ -233,6 +278,7 @@ describe("CQ-QX-005 §11 · research runs only when asked for", () => {
     const interviewer = createInterviewer({
       gateway: gateway({ ...quiet, askNext: "F1.stage" }, asks),
       logger,
+      research: { available: () => false },
     });
     await interviewer.turn({ ...turn(fetchFake, "founder"), channel: "text" });
     const typed = await interviewer.turn({
@@ -278,6 +324,7 @@ describe("CQ-QX-005 §11 · research runs only when asked for", () => {
     const interviewer = createInterviewer({
       gateway: gateway({ ...quiet, askNext: "F1.stage" }, answered),
       logger,
+      research: { available: () => false },
     });
     await interviewer.turn({ ...turn(fetchFake, "founder"), channel: "text" });
     const typed = await interviewer.turn({

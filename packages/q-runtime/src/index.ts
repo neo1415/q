@@ -140,6 +140,7 @@ export {
   type QAnswerOutcome,
   type QAnswerPort,
   type QAnswerRequest,
+  type QResearchDirective,
   type QCancelInput,
   type QOrchestrationInput,
   type QOrchestrationSubjectContext,

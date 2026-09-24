@@ -3,11 +3,13 @@ import { describe, expect, it } from "vitest";
 import {
   createDefaultPromptRegistry,
   INTERVIEW_CONDUCTOR_V7,
+  INTERVIEW_CONDUCTOR_V8,
   InterviewConductorV6ResultSchema,
 } from "@capital-q/q-core";
 
 /**
- * The active conductor is v8, and v7 is retired unchanged (CQ-QX-005).
+ * The active conductor is v9 (v8 plus several-things turns, E1), and v7
+ * and v8 are retired unchanged (CQ-QX-005).
  *
  * v8 is built by rewriting v7's template, which is the repository's
  * convention and also the thing most likely to go wrong quietly: a missed
@@ -18,14 +20,20 @@ import {
  * double without one still parses.
  */
 
-describe("INTERVIEW_CONDUCTOR v8 is what the interview runs", () => {
+describe("INTERVIEW_CONDUCTOR v9 is what the interview runs", () => {
   const registry = createDefaultPromptRegistry();
   const active = registry.getActive("INTERVIEW_CONDUCTOR");
   const template = active.definition.template;
 
-  it("is the single active version, and v7 is retired", () => {
-    expect(active.definition.version).toBe(8);
+  it("is the single active version, and v7 and v8 are retired", () => {
+    expect(active.definition.version).toBe(9);
     expect(INTERVIEW_CONDUCTOR_V7.status).toBe("DEPRECATED");
+    expect(INTERVIEW_CONDUCTOR_V8.status).toBe("DEPRECATED");
+  });
+
+  it("lets one turn confirm, correct and ask, and drops none of it (E1)", () => {
+    expect(template).toContain("One turn can confirm, correct and ask at once");
+    expect(template).toContain("Drop nothing");
   });
 
   it("answers a question to Q in the turn instead of sending it away", () => {

@@ -98,7 +98,18 @@ export { INTERVIEW_CONDUCTOR_V5 } from "./prompts/tasks/interview-conductor.v5.j
 export { INTERVIEW_CONDUCTOR_V6 } from "./prompts/tasks/interview-conductor.v6.js";
 export { INTERVIEW_CONDUCTOR_V7 } from "./prompts/tasks/interview-conductor.v7.js";
 export { INTERVIEW_CONDUCTOR_V8 } from "./prompts/tasks/interview-conductor.v8.js";
+export { INTERVIEW_CONDUCTOR_V9 } from "./prompts/tasks/interview-conductor.v9.js";
 export { DECISION_READER_V1 } from "./prompts/tasks/decision-reader.v1.js";
+export { TURN_READER_V1 } from "./prompts/tasks/turn-reader.v1.js";
+export {
+  TURN_READER_SCHEMA_NAME,
+  TURN_READER_SCHEMA_VERSION,
+  TURN_READER_UNTRUSTED,
+  TurnReaderResultSchema,
+  TurnReaderVariablesSchema,
+  type TurnReaderResult,
+  type TurnReaderVariables,
+} from "./prompts/schemas/turn-reader.js";
 export {
   DECISION_READER_SCHEMA_NAME,
   DECISION_READER_SCHEMA_VERSION,
@@ -181,6 +192,7 @@ export { COMPANY_ANALYST_V3 } from "./prompts/tasks/company-analyst.v3.js";
 export { COMPANY_ANALYST_V4 } from "./prompts/tasks/company-analyst.v4.js";
 export { COMPANY_ANALYST_V5 } from "./prompts/tasks/company-analyst.v5.js";
 export { COMPANY_ANALYST_V6 } from "./prompts/tasks/company-analyst.v6.js";
+export { COMPANY_ANALYST_V7 } from "./prompts/tasks/company-analyst.v7.js";
 export { ARTIFACT_REVISION_V1 } from "./prompts/tasks/artifact-revision.v1.js";
 export {
   ARTIFACT_REVISION_BODY_MAX,
@@ -352,10 +364,6 @@ export {
   type GuardedAnswer,
   type RecommendationGrounds,
 } from "./communication/recommendation-guard.js";
-export {
-  asksForPublicResearch,
-  PUBLIC_RESEARCH_CUES,
-} from "./communication/research-cues.js";
 export {
   citePublicSources,
   describePublicSource,

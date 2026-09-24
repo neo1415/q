@@ -572,75 +572,53 @@ describe("a spoken category confirmation", () => {
 });
 
 describe("a spoken question for Q", () => {
-  it("starts a VOICE run in the bound conversation, speaks it as it streams, and returns to the interview", async () => {
+  it("is not pre-sorted by its words: it goes to the one interviewer, which reads and answers it (CQ-QX-005, ADR 0011)", async () => {
+    const requests: string[] = [];
+    const fetchFake: typeof fetch = (input) => {
+      const url =
+        typeof input === "string"
+          ? input
+          : input instanceof URL
+            ? input.toString()
+            : input.url;
+      requests.push(url);
+      if (url.endsWith("/say")) {
+        const body: SayOnboardingResponse = {
+          view: view(),
+          understood: null,
+          reply:
+            "Seed rounds there tend to be small. Back to you: what stage is the company at?",
+          navigate: null,
+          researching: null,
+          degraded: false,
+        };
+        return Promise.resolve(Response.json(body));
+      }
+      return Promise.resolve(Response.json(view()));
+    };
     const runtime = fakeRuntime();
-    const fetchFake: typeof fetch = () =>
-      Promise.resolve(Response.json(view()));
     const handle = createVoiceTurnHandler({
       qRuntime: runtime.service,
-      qStream: fakeStream([
-        event("q.run.started", { status: "RECEIVED", capability: "ANSWER" }),
-        event("q.message.delta", {
-          messageId: "m1",
-          text: "Seed rounds in Nigeria ",
-        }),
-        event("q.message.delta", {
-          messageId: "m1",
-          text: "typically run from $500k. Most ",
-        }),
-        event("q.message.delta", {
-          messageId: "m1",
-          text: "close within a quarter.",
-        }),
-        event("q.message.completed", {
-          message: {
-            messageId: "m1",
-            runId: RUN_ID,
-            role: "Q",
-            text: "Seed rounds in Nigeria typically run from $500k. Most close within a quarter.",
-            createdAt: NOW,
-          },
-        }),
-        event("q.run.completed", { status: "COMPLETED", completedAt: NOW }),
-      ]),
+      qStream: fakeStream([]),
       onboarding: { apiBaseUrl: "http://api.test", fetch: fetchFake },
       logger,
     });
     const speaker = fakeSpeaker();
-    const bound = binding({
-      conversationId: undefined,
-      subjects: [
-        { kind: "COMPANY", companyId: "f0000000-0000-4000-8000-000000000030" },
-      ],
-      onboarding: { sessionId: SESSION_ID, journeyType: "founder" },
-    });
     const outcome = await handle(
-      bound,
+      binding({
+        conversationId: undefined,
+        subjects: undefined,
+        onboarding: { sessionId: SESSION_ID, journeyType: "founder" },
+      }),
       [{ role: "user", content: "How big are seed rounds in Nigeria?" }],
       new AbortController().signal,
       speaker,
     );
-    expect(outcome).toEqual({ kind: "SPOKEN", path: "Q" });
-    const command = runtime.calls.createRun[0] as {
-      actor: ActorContext;
-      input: Record<string, unknown>;
-    };
-    expect(command.actor).toEqual(CONTEXT);
-    expect(command.input).toMatchObject({
-      capability: "ANSWER",
-      modality: "VOICE",
-      message: { text: "How big are seed rounds in Nigeria?" },
-      subjects: [{ kind: "COMPANY" }],
-    });
-    // Spoken as the deltas arrived (one line), then the bridge back.
-    expect(speaker.spoken).toEqual([
-      // Money is said the way a person says it: "$500k" was read aloud as
-      // a dollar sign, a number and a letter.
-      "Seed rounds in Nigeria typically run from 500 thousand dollars. Most close within a quarter.",
-      "Back to where we were. What stage is the company at?",
-    ]);
-    expect(bound.thread.conversationId).toBe(CONVERSATION_ID);
-    expect(runtime.calls.cancelRun).toHaveLength(0);
+    expect(outcome).toEqual({ kind: "SPOKEN", path: "INTERVIEW" });
+    // No Q run was started behind the interviewer's back.
+    expect(runtime.calls.createRun).toHaveLength(0);
+    expect(requests.some((url) => url.endsWith("/say"))).toBe(true);
+    expect(speaker.spoken.join(" ")).toContain("Seed rounds there");
   });
 
   it("pauses at an interruption: nothing stale is spoken, the run keeps going, and 'go on' resumes the answer (rework)", async () => {

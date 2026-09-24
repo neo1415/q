@@ -15,8 +15,10 @@ import { COMPANY_ANALYST_V3 } from "./tasks/company-analyst.v3.js";
 import { COMPANY_ANALYST_V4 } from "./tasks/company-analyst.v4.js";
 import { COMPANY_ANALYST_V5 } from "./tasks/company-analyst.v5.js";
 import { COMPANY_ANALYST_V6 } from "./tasks/company-analyst.v6.js";
+import { COMPANY_ANALYST_V7 } from "./tasks/company-analyst.v7.js";
 import { ARTIFACT_REVISION_V1 } from "./tasks/artifact-revision.v1.js";
 import { DECISION_READER_V1 } from "./tasks/decision-reader.v1.js";
+import { TURN_READER_V1 } from "./tasks/turn-reader.v1.js";
 import { MEMORY_EXTRACTOR_V1 } from "./tasks/memory-extractor.v1.js";
 import { FIT_EXPLANATION_V1 } from "./tasks/fit-explanation.v1.js";
 import { FOUNDER_ONBOARDING_EXTRACTION_V1 } from "./tasks/founder-onboarding-extraction.v1.js";
@@ -30,6 +32,7 @@ import { INTERVIEW_CONDUCTOR_V5 } from "./tasks/interview-conductor.v5.js";
 import { INTERVIEW_CONDUCTOR_V6 } from "./tasks/interview-conductor.v6.js";
 import { INTERVIEW_CONDUCTOR_V7 } from "./tasks/interview-conductor.v7.js";
 import { INTERVIEW_CONDUCTOR_V8 } from "./tasks/interview-conductor.v8.js";
+import { INTERVIEW_CONDUCTOR_V9 } from "./tasks/interview-conductor.v9.js";
 import { PRESENCE_READER_V1 } from "./tasks/presence-reader.v1.js";
 import { WELCOME_CONDUCTOR_V1 } from "./tasks/welcome-conductor.v1.js";
 import { INVESTOR_MANDATE_SYNTHESIS_V1 } from "./tasks/investor-mandate-synthesis.v1.js";
@@ -159,6 +162,7 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition<unknown, unknown>[] =
     INTERVIEW_CONDUCTOR_V6,
     INTERVIEW_CONDUCTOR_V7,
     INTERVIEW_CONDUCTOR_V8,
+    INTERVIEW_CONDUCTOR_V9,
     WELCOME_CONDUCTOR_V1,
     CLAIM_EXTRACTION_V1,
     INVESTOR_MANDATE_SYNTHESIS_V1,
@@ -169,10 +173,12 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition<unknown, unknown>[] =
     COMPANY_ANALYST_V4,
     COMPANY_ANALYST_V5,
     COMPANY_ANALYST_V6,
+    COMPANY_ANALYST_V7,
     ARTIFACT_REVISION_V1,
     FIT_EXPLANATION_V1,
     PRESENCE_READER_V1,
     DECISION_READER_V1,
+    TURN_READER_V1,
     MEMORY_EXTRACTOR_V1,
     GATEQ_INTERVIEWER_V1,
   ];

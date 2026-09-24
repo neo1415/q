@@ -112,11 +112,9 @@ export type InterviewerDependencies = {
     | undefined;
   /**
    * Whether this deployment can run public research at all (CQ-QX-005
-   * §11, §13). Absent means it can, over a transport that carries a
-   * question away (voice). A typed turn has no such transport today, so
-   * the research policy treats text as unavailable whatever this says:
-   * Q answers from what it knows and says the public sources are out of
-   * reach from here, rather than promising a look-up nothing will run.
+   * §11, §13). Absent means it can. Both transports carry a question
+   * away: a spoken turn's caller runs the Q run itself, and the typed
+   * surface starts the same run from the turn's `researching`.
    */
   readonly research?: { readonly available: () => boolean } | undefined;
 };
@@ -2009,13 +2007,20 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
       conversationBySession.set(sessionId, conversation);
       /**
        * Research needs a transport that can carry a question away and
-       * bring an answer back. A spoken turn has one (the caller runs a Q
-       * run); a typed turn today does not, so there Q must never promise
-       * a look-up. The policy is told the truth and decides.
+       * bring an answer back; both have one (see `research` above). The
+       * policy is told whether the deployment can research at all.
        */
-      const researchAvailable =
-        input.channel === "voice" &&
-        (dependencies.research?.available() ?? true);
+      const researchAvailable = dependencies.research?.available() ?? true;
+      /**
+       * A typed research run is carried by the surface, which answers it
+       * before the person can type again and never reports back here. So
+       * the next typed turn is proof it ended: without this the run would
+       * look in flight forever and no second question could be looked up.
+       */
+      if (input.channel === "text" && conversation.research !== null) {
+        dispatch({ type: "RESEARCH_FINISHED" });
+        dispatch({ type: "QUESTION_ANSWERED" });
+      }
       let view = await getOnboardingSession(
         input.session,
         input.onboardingSessionId,
@@ -3798,7 +3803,16 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
        * question after it is replaced, because a question about the next
        * step is what loses the one in hand.
        */
+      /**
+       * An opening with something already held (E3): a reload, or coming
+       * back to the interview. The first thing Q says is the confirmation
+       * it is actually waiting on — not whatever the model would open
+       * with — so that the person's "yep" answers the question they can
+       * see, and never confirms one they cannot.
+       */
+      const opening = input.utterance.trim().length === 0;
       const heldNow = nextPending.find((item) => {
+        if (opening) return true;
         const before = pending.find((was) => was.stepKey === item.stepKey);
         // New to the runtime's hands, or the same step holding a different
         // value than it was. A correction during confirmation ("no, seven
@@ -3853,7 +3867,16 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
         // the one that read the value out of the runtime's own hands is
         // the one worth saying.
         const acknowledgement = /^[^.!?]*[.!?]/.exec(reply.trim())?.[0] ?? "";
-        reply = acknowledgement.endsWith("?") ? acknowledgement : question;
+        // Except when they also asked something (v9, E1): the model's
+        // reply is then the answer to their question, and dropping it
+        // would lose the question the way v8 did. The read-back follows it.
+        reply = opening
+          ? question
+          : disposition.answer && reading.question !== null
+            ? `${reply.trim()} ${question}`.trim()
+            : acknowledgement.endsWith("?")
+              ? acknowledgement
+              : question;
         result = { ...result, askNext: heldNow.stepKey };
       }
 

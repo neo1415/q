@@ -110,7 +110,7 @@ export const INTERVIEW_CONDUCTOR_V8: PromptDefinition<
 > = {
   ...INTERVIEW_CONDUCTOR_V7,
   version: 8,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   changeDescription:
     "CQ-QX-005: every turn carries a closed reading of what it was (answer, clarification, correction, question to Q, research request, tool request, unclear transcript, aside) with confidence kept apart from transcript quality; a question to Q is answered in the turn and the open question resumed; a pointed-at choice is a reference against the shown options; meaning the options cannot hold is kept beside the field; Q's inferences are offered as suggestions and never recorded; no acknowledgement per field, and tensions are raised like an analyst.",
   effectiveFrom: "2026-09-23",

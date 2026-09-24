@@ -8,6 +8,7 @@
     "company-analyst/v4": "f9b36094d18d55f110db8cf94eedbfe065facae1751ea0c202c7eb13c11cf891",
     "company-analyst/v5": "837e7151090fdd38d8e9efeae051a9fd662db0220fd20707d4a5f4da7af7855c",
     "company-analyst/v6": "bc52482cda6ab610ab774e28c2fc79feb5e41ae465324d9717400d00c4f0d849",
+    "company-analyst/v7": "9bd8c450b7812893696948c18e88e8dc50e6899888397c40d77568584d1ba63b",
     "decision-reader/v1": "370437e22d4c51e629055edca591275c6af3c39f96505df82f19e04b4bb5c839",
     "fit-explanation/v1": "3d552b0e5bdb9497ae2259ea56d21acdbf9df2920ea3f64481b633ec2006cc85",
     "founder-onboarding-extraction/v1": "98295baebb0cd8b62f008291c9c4d5947193d0122e706feb4ea67de3c87b3380",
@@ -21,12 +22,14 @@
     "interview-conductor/v6": "c8be501b2655151dab2f6499ee1935e121610a73fb9dd591a8fdaa09f9132d3d",
     "interview-conductor/v7": "4311cbd0912a01459cbdefff04317629df91610a51f57e90fa61f55c85d8c64d",
     "interview-conductor/v8": "ae2f181d3389365573235303baf0cca6bd73e9979fe3763d4f9e6b3d85cc14b6",
+    "interview-conductor/v9": "55d04dde8e543cf69a050e40ed746b6b971acc683d97e1654c51da0982416516",
     "investor-mandate-synthesis/v1": "73557439a7a9fa001ba43f56f60faaa20c45f927faf4bcbbf76ccdf52df5ab9e",
     "investor-mandate-synthesis/v2": "74c10a85a0697b41b681b06517fea21db5da8a9224005c454956633a8c695565",
     "memory-extractor/v1": "9a8cb14a00f114b12ed1f4c57144ba6cfc58f942e30354da21e923da9bdf2929",
     "presence-reader/v1": "1c0fb1e776609bd3471b53479068632dc9dbf0f25921061d97634f8f253ccdfd",
     "q-system-voice/v1": "e68321c5f3d630689655f8118e41cb571329165ccf29da25bfc62a7333eda9bf",
     "q-system/v1": "bf49c4ecd849ba4437bda173e17424340d17bcb7753d7c6ac7448dfc3162b863",
+    "turn-reader/v1": "7f99a1fad49c3b753afe9478878ea9390b4e0f0bfe982066048e972df5c7b241",
     "welcome-conductor/v1": "1bee2c687f0b73949090001e0ae6064eaf95344ff4addea78ab9d611eb712810"
   },
   "generatedBy": "CQ-Q-006"

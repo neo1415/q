@@ -24,7 +24,6 @@ import type {
   CompanyIntelligenceRequest,
   CompanyIntelligenceResult,
 } from "../src/company/contracts.js";
-import { asksForPublicResearch } from "../src/company/dimensions.js";
 import type {
   CompanyCanonicalPort,
   CompanyEvidencePort,
@@ -245,11 +244,14 @@ function harness(options: {
       return Promise.resolve();
     },
   };
-  const investigate = (question: string) =>
+  // `publicResearch` is the conversation core's decision for the turn
+  // (CQ-QX-005); the specialist never reads it out of the words itself.
+  const investigate = (question: string, publicResearch = false) =>
     specialist.investigate(
       {
         company: { kind: "COMPANY", companyId: COMPANY },
         question,
+        publicResearch,
       } satisfies CompanyIntelligenceRequest,
       context,
     );
@@ -262,29 +264,17 @@ function promptText(requests: readonly unknown[]): string {
     .join(" ");
 }
 
-describe("asksForPublicResearch", () => {
-  it("fires on questions about the public web, the press, a website or competitors", () => {
-    for (const question of [
-      "What does the public web say about our markets?",
-      "Check what our website currently says about where we operate.",
-      "Any recent news or press coverage about Kobo360?",
-      "Who are our competitors online?",
-      "Search the web and compare it with what you have on record.",
-    ]) {
-      expect(asksForPublicResearch(question), question).toBe(true);
-    }
+describe("the specialist reads the web only when the turn was read as asking", () => {
+  it("does not research a public-sounding question the core did not mark", async () => {
+    const h = harness({});
+    await h.investigate("What does the public web say about us?", false);
+    expect(h.researchCalls).toHaveLength(0);
   });
 
-  it("stays quiet for questions that live inside Capital Q", () => {
-    for (const question of [
-      "Analyse my company",
-      "What did my deck say about our customers?",
-      "What should I fix before investors see this?",
-      "What is our runway?",
-      "Kenya was only a pilot and ended last year.",
-    ]) {
-      expect(asksForPublicResearch(question), question).toBe(false);
-    }
+  it("researches a turn the core marked, whatever its words", async () => {
+    const h = harness({});
+    await h.investigate("Analyse my company", true);
+    expect(h.researchCalls).toHaveLength(1);
   });
 });
 
@@ -293,7 +283,7 @@ describe("company intelligence with public-web research", () => {
     const h = harness({});
     const question =
       "What does the public web currently say about which countries Kobo360 operates in? Compare it with what Capital Q has on record.";
-    const result = await h.investigate(question);
+    const result = await h.investigate(question, true);
     expect(result.blocked).toBeNull();
     expect(h.researchCalls).toEqual([
       { companyId: COMPANY, question, latest: question },
@@ -315,8 +305,9 @@ describe("company intelligence with public-web research", () => {
     expect(prompt).toContain("kobo360.example");
     expect(prompt).toContain("published 2026-06-01");
     expect(prompt).toContain("company's own public website");
-    expect(prompt).toContain('"truthClass": "UNKNOWN"');
-    expect(prompt).toContain('"evidenceStatus": "NO_EVIDENCE"');
+    // Rendered variables are compact JSON (CQ-QX-005 prompt budget).
+    expect(prompt).toContain('"truthClass":"UNKNOWN"');
+    expect(prompt).toContain('"evidenceStatus":"NO_EVIDENCE"');
     // Capital Q's reading, and how to speak.
     expect(prompt).toContain("PUBLIC WEB COMPARISON (source S1");
     expect(prompt).toContain("for the company to say");
@@ -347,6 +338,7 @@ describe("company intelligence with public-web research", () => {
     const without = await harness({}).investigate("Analyse my company");
     const withResearch = await harness({}).investigate(
       "What does the public web say about us?",
+      true,
     );
     expect(withResearch.informationConfidence).toBe(
       without.informationConfidence,
@@ -364,7 +356,7 @@ describe("company intelligence with public-web research", () => {
         toolCalls: 0,
       },
     });
-    const result = await h.investigate("What does the web say about us?");
+    const result = await h.investigate("What does the web say about us?", true);
     expect(result.research).toEqual({
       status: "NO_PUBLIC_IDENTITY",
       sourceCount: 0,
@@ -386,7 +378,7 @@ describe("company intelligence with public-web research", () => {
         toolCalls: 1,
       },
     });
-    await outage.investigate("Any news about us?");
+    await outage.investigate("Any news about us?", true);
     expect(promptText(outage.requests)).toContain(
       "public sources could not be reached just now",
     );
@@ -395,7 +387,7 @@ describe("company intelligence with public-web research", () => {
     );
 
     const unoffered = harness({ withoutResearchPort: true });
-    const result = await unoffered.investigate("Any news about us?");
+    const result = await unoffered.investigate("Any news about us?", true);
     expect(result.research).toBeNull();
     expect(unoffered.stages).toEqual([]);
   });

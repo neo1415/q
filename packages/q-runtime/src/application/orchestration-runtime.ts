@@ -107,6 +107,8 @@ export type QOrchestrationRuntime = {
   readonly fail: (
     ref: QRunRef,
     diagnosticCode: QFailureDiagnosticCode,
+    /** Q's own sentence for this failure (CQ-QX-005); see QPublicFailure.notice. */
+    notice?: string,
   ) => Promise<QLifecycleOutcome>;
   /** CANCEL_REQUESTED → CANCELLED, with the terminal event. */
   readonly finishCancellation: (ref: QRunRef) => Promise<QLifecycleOutcome>;
@@ -241,7 +243,7 @@ export function createQOrchestrationRuntime(
           },
         }),
       }),
-    fail: (ref, diagnosticCode) =>
+    fail: (ref, diagnosticCode, notice) =>
       move(ref, {
         to: "FAILED",
         failureCode: diagnosticCode,
@@ -249,7 +251,13 @@ export function createQOrchestrationRuntime(
           type: "q.run.failed",
           data: {
             status: "FAILED",
-            failure: toPublicQFailure({ diagnosticCode }, { runId: run.id }),
+            failure: toPublicQFailure(
+              { diagnosticCode },
+              {
+                runId: run.id,
+                ...(notice === undefined ? {} : { notice }),
+              },
+            ),
           },
         }),
       }),

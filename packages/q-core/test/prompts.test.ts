@@ -99,6 +99,8 @@ describe("registry", () => {
         "GATEQ_INTERVIEWER",
         // ADR 0013: rewriting the prose of a document Q already composed.
         "ARTIFACT_REVISION",
+        // CQ-QX-005: what one turn to Q was, before Q answers it.
+        "TURN_READER",
       ].sort(),
     );
     for (const id of PROMPT_IDS) {
@@ -195,7 +197,7 @@ describe("renderer", () => {
     expect(rendered.messages[0]?.content).toContain("You are Q");
     expect(rendered.messages[0]?.content).toContain("OPERATING MODE: DEBRIEF");
     expect(rendered.bundle.bundleVersion).toBe(
-      "q-system.v1_company-analyst.v6_comm.v1",
+      "q-system.v1_company-analyst.v7_comm.v1",
     );
     expect(rendered.bundle.bundleVersion).toMatch(
       /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/,
