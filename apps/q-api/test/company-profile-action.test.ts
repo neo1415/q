@@ -240,6 +240,48 @@ describe("the profile update board", () => {
       ),
     ).toBeNull();
     note("not a url at all");
-    expect(await board.propose(prepareContext(COMPANY))).toBeNull();
+    // Refused with a reason in the person's terms, never silently.
+    expect(await board.propose(prepareContext(COMPANY))).toEqual({
+      refused:
+        "the website needs to be a web address, such as https://example.com",
+    });
+  });
+
+  it("normalises a bare domain the way onboarding does, so 'kivu-freight.example' becomes a proposal (CQ-QACT-001, F7)", async () => {
+    const board = createProfileUpdateBoard();
+    board.note({
+      runId: RUN,
+      tenantId: TENANT,
+      companyId: COMPANY,
+      updates: [
+        {
+          field: "websiteUrl",
+          value: "kivu-freight.example",
+          quote: "it's kivu-freight.example now",
+        },
+      ],
+    });
+    expect(await board.propose(prepareContext(COMPANY))).toEqual({
+      actionType: COMPANY_PROFILE_UPDATE,
+      payload: {
+        companyId: COMPANY,
+        changes: { websiteUrl: "https://kivu-freight.example" },
+      },
+    });
+  });
+
+  it("confirms from the approved payload once executed", () => {
+    const { action } = fakes();
+    expect(
+      action.confirm?.(
+        {
+          companyId: COMPANY,
+          changes: { websiteUrl: "https://kivu-freight.example" },
+        },
+        { companyId: COMPANY, version: 8, fields: ["websiteUrl"] },
+      ),
+    ).toBe(
+      "Done. Your company profile now reads: Website: https://kivu-freight.example.",
+    );
   });
 });

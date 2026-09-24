@@ -412,12 +412,27 @@ export function createPostgresQRuntimeRepositories(): QRuntimeRepositories {
            limit 1`;
         return rows.length === 0 ? null : toRun(rows[0]);
       },
-      listNonTerminal: async (executor, limit) => {
+      listStale: async (executor, input) => {
+        // A run's last sign of life is its newest durable event, else its
+        // start, else its creation. A paused run waits on a person and no
+        // engine; an in-flight one is held by whichever process runs it.
         const rows = await executor`
           ${selectRun(executor)}
            where r.status not in ('COMPLETED', 'FAILED', 'CANCELLED', 'EXPIRED')
+             and coalesce(
+                   (select max(e.occurred_at)
+                      from q_runtime.run_events e
+                     where e.tenant_id = r.tenant_id
+                       and e.run_id = r.id),
+                   r.started_at,
+                   r.created_at
+                 ) < case
+                       when r.status in ('AWAITING_INPUT', 'AWAITING_APPROVAL')
+                         then ${input.pausedSilentSince}::timestamptz
+                       else ${input.inFlightSilentSince}::timestamptz
+                     end
            order by r.created_at
-           limit ${limit}`;
+           limit ${input.limit}`;
         return rows.map(toRun);
       },
       lockForActor: async (tx, tenantId, userId, runId) => {
