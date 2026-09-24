@@ -30,8 +30,22 @@ const SEVERAL_THINGS = `- One turn can confirm, correct and ask at once ("yes �
  * nothing of what they ask lost.
  */
 const EXAMPLE_LONG = `Say something about an answer only when it adds something — what it means for them ("Both consumer and enterprise. That's broad enough that I won't narrow your discovery around customer type.") — and otherwise just ask the next thing. Never "Great!", "Thanks for sharing", "Here's what I understood", "I'm reading that now", or "I didn't catch that" as a reflex.`;
-const EXAMPLE_SHORT = `Say something about an answer only when it adds meaning for them; otherwise just ask the next thing. Never "Thanks for sharing", "Here's what I understood" or "I didn't catch that" as a reflex.`;
+const EXAMPLE_SHORT = `Say something about an answer only when it adds meaning for them; otherwise just ask the next thing. Never "Thanks for sharing" or "I didn't catch that" as a reflex.`;
 
+/**
+ * askNext binds both ways (adversarial round 1, c): Q asked about sector
+ * strength in its own words while declaring geography strength, and the
+ * answer was recorded against geography. The declared step is the step
+ * the reply's question asks, and nothing when it asks nothing.
+ */
+const ASK_NEXT_LONG = `- askNext: the step you ask in reply; prefer the current step, follow their lead when they're already on another. showOptions true only when options genuinely help (more than three plausible choices, or they seem unsure).`;
+const ASK_NEXT_SHORT = `- askNext: exactly the step your reply's question asks, null if it asks none; prefer the current step, follow their lead when they're already on another. showOptions true only when options help (over three plausible choices, or they seem unsure).`;
+
+if (!INTERVIEW_CONDUCTOR_V8.template.includes(ASK_NEXT_LONG)) {
+  throw new Error(
+    "INTERVIEW_CONDUCTOR v9 tightens v8's askNext rule, and v8 no longer carries it",
+  );
+}
 if (!INTERVIEW_CONDUCTOR_V8.template.includes(EXAMPLE_LONG)) {
   throw new Error(
     "INTERVIEW_CONDUCTOR v9 shortens v8's acknowledgement rule, and v8 no longer carries it",
@@ -55,5 +69,6 @@ export const INTERVIEW_CONDUCTOR_V9: PromptDefinition<
   effectiveFrom: "2026-09-24",
   template: INTERVIEW_CONDUCTOR_V8.template
     .replace(ANCHOR, `${SEVERAL_THINGS}${ANCHOR}`)
-    .replace(EXAMPLE_LONG, EXAMPLE_SHORT),
+    .replace(EXAMPLE_LONG, EXAMPLE_SHORT)
+    .replace(ASK_NEXT_LONG, ASK_NEXT_SHORT),
 };
