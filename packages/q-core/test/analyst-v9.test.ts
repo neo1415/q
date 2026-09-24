@@ -29,6 +29,9 @@ describe("COMPANY_ANALYST v9", () => {
     expect(template).toContain("LIKELY INVESTORS");
     expect(template).toContain("labelled likely fit");
     expect(template).toContain("Interest is separate and needs a source");
+    expect(template).toContain(
+      "prospecting, not a search for existing backers",
+    );
     // Nothing else of v8 was lost.
     expect(template).toContain("ACTING, CORRECTIONS, MANDATES");
   });

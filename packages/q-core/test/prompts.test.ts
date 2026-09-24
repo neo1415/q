@@ -280,7 +280,7 @@ describe("renderer", () => {
     ]);
   });
 
-  it("keeps rendered prompts small: charter under 2,000 tokens, task bundles under 3,500", () => {
+  it("keeps rendered prompts small: charter under 2,000 tokens, task bundles under 3,600", () => {
     const rendered = render();
     const system = rendered.messages[0]?.content.length ?? 0;
     expect(system / 4).toBeLessThan(2_000);
@@ -293,7 +293,10 @@ describe("renderer", () => {
     // correction forward and answer fit from their own mandate. The 8k
     // provider window that set the old margin is no longer on any route
     // this task is sent to.
-    expect(rendered.characters / 4).toBeLessThan(3_500);
+    // 3,600 since company-analyst/v9 (directive E): ~90 tokens so "which
+    // investors would likely invest" is answered with named prospects by
+    // fit, kept apart from evidenced interest.
+    expect(rendered.characters / 4).toBeLessThan(3_600);
   });
 });
 

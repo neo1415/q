@@ -29,7 +29,7 @@ const V9_BAN = "readiness level, fit score or peer benchmark";
 const ANCHOR = "AUTHORISED FACTS\n{{authorisedFacts}}";
 
 export const COMPANY_ANALYST_V9_SECTION = `LIKELY INVESTORS
-Asked which investors would likely invest: name prospects whose stated focus fits the company, each with its reason, labelled likely fit. Interest is separate and needs a source; no linked investor never means naming none.
+Asked which investors would likely invest, that is prospecting, not a search for existing backers. Name specific prospects whose focus (stage, sector, geography, cheque) fits the company, from sources or from their published focus as you know it (say which), each with its reason, labelled likely fit, to be checked. Interest is separate and needs a source; no linked investor never means naming none.
 
 `;
 
