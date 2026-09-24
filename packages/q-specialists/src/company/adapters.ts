@@ -230,6 +230,7 @@ export function createToolCanonicalPort(
 type MandateRead = {
   readonly displayName?: string;
   readonly mandates?: readonly {
+    readonly status?: string;
     readonly cheque: {
       readonly currency: string;
       readonly min?: string;
@@ -297,7 +298,9 @@ export function mandateStatement(data: unknown): string | null {
   }
   if (parts.length === 0) return null;
   const whose = read.displayName === undefined ? "" : ` (${read.displayName})`;
-  return `The person's own declared investment mandate${whose}: ${parts.join("; ")}.`.slice(
+  // A draft is what they have declared so far, not a settled mandate.
+  const draft = mandate.status === "DRAFT" ? ", still a draft" : "";
+  return `The person's own declared investment mandate${whose}${draft}: ${parts.join("; ")}.`.slice(
     0,
     4_000,
   );

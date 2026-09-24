@@ -520,5 +520,10 @@ export function createPostgresInvestorMandateQueryPort(options: {
         status: "ACTIVE",
         limit: 100,
       }),
+    listDraftMandates: (tenantId, investorOrganisationId) =>
+      repository.list(sql, tenantId, investorOrganisationId, {
+        status: "DRAFT",
+        limit: 10,
+      }),
   };
 }

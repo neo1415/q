@@ -6,6 +6,7 @@ import {
   createDefaultQTools,
   createQToolExecutor,
   createQToolRegistry,
+  createSearchCompaniesTool,
 } from "../src/index.js";
 import {
   actorA,
@@ -307,6 +308,68 @@ describe("GET_INVESTOR_MANDATE", () => {
     expect(JSON.stringify(outcome)).not.toContain(MANDATE_B);
   });
 
+  it("gives the owner their draft, marked DRAFT, when nothing is active yet, with how they invest (CQ-QX-007)", async () => {
+    const base = fakePorts().mandates;
+    const drafted = {
+      ...base,
+      listActiveMandates: () => Promise.resolve([]),
+      listDraftMandates: base.listActiveMandates,
+      getMandate: async (
+        ...args: Parameters<typeof base.getMandate>
+      ): ReturnType<typeof base.getMandate> => {
+        const one = await base.getMandate(...args);
+        return one === null ? null : { ...one, status: "DRAFT" };
+      },
+    };
+    const { port: p } = port({ mandates: drafted });
+    const outcome = await p.execute(
+      {
+        callId: "c1",
+        name: "get_investor_mandate",
+        arguments: { investorOrganisationId: INVESTOR_B },
+      },
+      contextFor(actorB, investorPlan),
+    );
+    expect(outcome.status).toBe("SUCCEEDED");
+    expect(outcome.result).toMatchObject({
+      ok: true,
+      data: {
+        mandates: [{ mandateId: MANDATE_B, status: "DRAFT" }],
+      },
+    });
+    const data = (outcome.result as { data: Record<string, unknown> }).data;
+    expect(data).toHaveProperty("investorType");
+    expect(data).toHaveProperty("deploymentState");
+  });
+
+  it("never shows a draft to anyone but the owner", async () => {
+    const base = fakePorts().mandates;
+    const { port: p } = port({
+      mandates: {
+        ...base,
+        listActiveMandates: () => Promise.resolve([]),
+        listDraftMandates: base.listActiveMandates,
+      },
+    });
+    const plan = planFor(actorA, "INVESTOR_QUESTION", [
+      {
+        kind: "INVESTOR_MANDATE",
+        sensitivity: "CONFIDENTIAL",
+        investorOrganisationId: INVESTOR_B,
+      },
+    ]);
+    const outcome = await p.execute(
+      {
+        callId: "c1",
+        name: "get_investor_mandate",
+        arguments: { investorOrganisationId: INVESTOR_B },
+      },
+      contextFor(actorA, plan),
+    );
+    expect(outcome.status).toBe("DENIED");
+    expect(JSON.stringify(outcome)).not.toContain(MANDATE_B);
+  });
+
   it("returns an empty list for a mandate id that is not the organisation's", async () => {
     const { port: p } = port();
     const outcome = await p.execute(
@@ -326,6 +389,12 @@ describe("GET_INVESTOR_MANDATE", () => {
 });
 
 describe("SEARCH_COMPANIES", () => {
+  it("is shown as reviewing company records, never as comparing opportunities (directive I)", () => {
+    expect(createSearchCompaniesTool(fakePorts()).visibleStage).toBe(
+      "REVIEWING_COMPANY",
+    );
+  });
+
   it("returns only disclosure-confirmed network-visible companies, never private ones", async () => {
     const { port: p } = port();
     const outcome = await p.execute(

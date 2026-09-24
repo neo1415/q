@@ -116,6 +116,10 @@ export const GetInvestorMandateOutputSchema = z
   .object({
     investorOrganisationId: UuidSchema,
     displayName: z.string(),
+    /** How the organisation invests (angel, venture fund…), as declared. */
+    investorType: z.string().nullable(),
+    /** Whether they are deploying capital now; null is not yet answered. */
+    deploymentState: z.string().nullable(),
     mandates: z.array(MandateProjectionSchema).max(MANDATES_MAX),
     /** True when more active mandates exist than were returned. */
     truncated: z.boolean(),
@@ -253,14 +257,27 @@ export function createGetInvestorMandateTool(
         return {
           investorOrganisationId: organisation.id,
           displayName: organisation.displayName,
+          investorType: organisation.investorType,
+          deploymentState: organisation.deploymentState,
           mandates: one === null ? [] : [project(one)],
           truncated: false,
         };
       }
-      const summaries = await ports.mandates.listActiveMandates(
+      const active = await ports.mandates.listActiveMandates(
         organisation.tenantId,
         organisation.id,
       );
+      // Nothing active yet: the owner's own draft — what they have declared
+      // so far, status DRAFT in the projection so it is never read as a
+      // settled mandate (CQ-QX-007). Only reached after the owner check in
+      // authorize; discovery never reads a draft.
+      const summaries =
+        active.length > 0
+          ? active
+          : ((await ports.mandates.listDraftMandates?.(
+              organisation.tenantId,
+              organisation.id,
+            )) ?? []);
       const snapshots = await Promise.all(
         summaries
           .slice(0, MANDATES_MAX)
@@ -275,6 +292,8 @@ export function createGetInvestorMandateTool(
       return {
         investorOrganisationId: organisation.id,
         displayName: organisation.displayName,
+        investorType: organisation.investorType,
+        deploymentState: organisation.deploymentState,
         mandates: snapshots
           .filter(
             (snapshot): snapshot is InvestorMandateSnapshot =>

@@ -338,7 +338,7 @@ const SOURCE_CHANGE_NOTE: ModelMessage = {
 export const OWN_MANDATE_NOTE: ModelMessage = {
   role: "SYSTEM",
   content:
-    "The investor organisation in this conversation is the person's own, and the mandate above is what they declared. The question is about the company. If they ask whether it suits what they invest in, compare the company's profile with each declared criterion (matches, misses, not on record), with no score or verdict.",
+    "The investor organisation above is the person's own, and that result is their own declared profile: how they invest, whether they are deploying capital, and their mandate. A mandate with status DRAFT is still being declared: say so, and name the criteria it does not yet declare. Asked who they are or what their profile says, answer from it in plain words, never as a field list. Asked whether a company suits what they invest in, compare the company's profile with each declared criterion (matches, misses, not on record), with no score or verdict.",
 };
 
 /**
@@ -1378,11 +1378,11 @@ export function createModelGatewayQAnswer(
        */
       const ownInvestor = ownInvestorOrganisationIn(plan);
       const mandateTool = offeredByName.get("get_investor_mandate");
-      if (
-        ownInvestor !== null &&
-        mandateTool !== undefined &&
-        request.subjects.some((subject) => subject.kind === "COMPANY")
-      ) {
+      // On Home too, not only beside a company (CQ-QX-007): an investor
+      // asking "according to my profile, who am I?" was told no profile
+      // facts existed, because nothing read their own declaration and the
+      // model did not reach for the tool.
+      if (ownInvestor !== null && mandateTool !== undefined) {
         const call = {
           callId: "q-own-mandate",
           name: "get_investor_mandate",

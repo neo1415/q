@@ -194,4 +194,15 @@ export type InvestorMandateQueryPort = {
     tenantId: TenantId,
     investorOrganisationId: InvestorOrganisationId,
   ) => Promise<readonly InvestorMandateSummary[]>;
+  /**
+   * The mandates still being declared (DRAFT). For the owner's own view
+   * only — an investor part way through onboarding has declared a stage
+   * and a cheque on a draft, and asking Q "who am I" must reach it
+   * (CQ-QX-007). Callers authorize ownership first; discovery never uses
+   * a draft. Optional so an existing implementation keeps compiling.
+   */
+  readonly listDraftMandates?: (
+    tenantId: TenantId,
+    investorOrganisationId: InvestorOrganisationId,
+  ) => Promise<readonly InvestorMandateSummary[]>;
 };
