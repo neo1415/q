@@ -15,6 +15,15 @@ import {
   type QSurfaceContext,
 } from "@/features/q/q-conversation";
 import { PersonaCards } from "@/features/persona/persona-cards";
+import type { QSubjectInput } from "@/features/q/actions";
+
+import {
+  arrivalFor,
+  chooseReturningCards,
+  returningGreeting,
+} from "./returning";
+import { resolveReturningFacts } from "./returning-facts";
+import { ReturningWelcome } from "./returning-welcome";
 
 /**
  * Home is Q (QX-001 §4; doc 17 §60-§63).
@@ -83,8 +92,24 @@ function surfaceContext(context: OwnContext): QSurfaceContext {
 const SECTION_COLUMN =
   "mx-auto w-full max-w-(--cq-layout-reading) px-4 sm:px-6 lg:px-8";
 
+/** The person's own subject, for a question a welcome card asks Q. */
+function askSubject(context: OwnContext): QSubjectInput | undefined {
+  switch (context.kind) {
+    case "FOUNDER":
+      return { companyId: context.companyId };
+    case "INVESTOR":
+      return { investorOrganisationId: context.investorOrganisationId };
+    case "NONE":
+      return undefined;
+  }
+}
+
 /** The one line under Q, in the person's terms rather than the product's. */
 function openingLine(context: OwnContext): string {
+  if (context.kind === "NONE" && context.unavailable === true) {
+    // Not known to be new: Capital Q did not answer (CQ-VERIFY-001).
+    return "Capital Q didn't answer just now, so I can't show where you left off. Ask me anything, or try again in a moment.";
+  }
   switch (context.kind) {
     case "FOUNDER":
       return "Ask about your company, your raise, or what to do next.";
@@ -107,10 +132,20 @@ export async function HomeScreen({
   const context = qConnected
     ? await resolveOwnContext()
     : { kind: "NONE" as const };
-  // A setup that was left part-way is offered back, in one tap.
-  const unfinished =
-    qConnected && context.kind !== "NONE"
-      ? await resolveUnfinishedSetup()
+  // A setup that was left part-way is offered back, in one tap -- to
+  // somebody whose setup has not named a company yet as well, who is
+  // back rather than new (CQ-WEB-030).
+  const unfinished = qConnected ? await resolveUnfinishedSetup() : null;
+  const arrival = arrivalFor(context, unfinished);
+  /*
+    Welcome back: Q's greeting and a few places to go, for a person
+    Capital Q already knows. Not over an open conversation, which is
+    what they came to Home for. A first-time person keeps the first-run
+    welcome and the choice of side below.
+  */
+  const welcome =
+    arrival === "RETURNING" && conversationId === null
+      ? await resolveReturningFacts(context, unfinished)
       : null;
 
   return (
@@ -128,9 +163,17 @@ export async function HomeScreen({
         {/* Previous conversations live in the sidebar on desktop and behind
             the history control on the Q surface everywhere (QX-001 §7;
             design/visual-debt.md P0): never a list above the composer. */}
-        <p className="cq-body mx-auto w-full max-w-(--cq-layout-reading) text-center text-(--cq-text-secondary)">
-          {openingLine(context)}
-        </p>
+        {welcome !== null ? (
+          <ReturningWelcome
+            greeting={returningGreeting(welcome)}
+            cards={chooseReturningCards(welcome)}
+            subject={askSubject(context)}
+          />
+        ) : (
+          <p className="cq-body mx-auto w-full max-w-(--cq-layout-reading) text-center text-(--cq-text-secondary)">
+            {openingLine(context)}
+          </p>
+        )}
 
         {/*
           Deliberately not inside a Suspense boundary (QX-003A).
@@ -155,7 +198,7 @@ export async function HomeScreen({
         />
       </section>
 
-      {context.kind === "NONE" ? (
+      {arrival === "FIRST_TIME" ? (
         <PageSection
           id="setup"
           title="What are you here to do?"
@@ -166,7 +209,8 @@ export async function HomeScreen({
         </PageSection>
       ) : null}
 
-      {unfinished !== null ? (
+      {/* The welcome's first card already offers this. */}
+      {unfinished !== null && welcome === null ? (
         <PageSection
           id="continue-setup"
           title="Finish setting up"
