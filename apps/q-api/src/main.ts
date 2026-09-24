@@ -139,11 +139,13 @@ import {
   createProfileUpdateBoard,
 } from "./composition/company-profile-action.js";
 import { createCompanyVisibilitySetAction } from "./composition/company-visibility-action.js";
+import { createInvestorFeedPort } from "./composition/investor-feed.js";
 import {
   createDiscoveryService,
   createPostgresCompanyCardPort,
   createCurrentSlateExplanationService,
   createPostgresDiscoveryRepository,
+  createPostgresInvestorDecisionReader,
   createRecommendationExplanationService,
   createSlateReadPipeline,
   readFeatureSnapshotById,
@@ -567,6 +569,16 @@ const qTools = createQTools({
     // platform rather than from nothing.
     discovery: createDiscoveryService({
       repository: createPostgresDiscoveryRepository({ sql: database.sql }),
+    }),
+    // An investor's "what should I look at" is answered from their own
+    // feed — the same reader the Discover surface calls — and their own
+    // Save/Pass decisions by company id (CQ-QACT-001).
+    investorFeed: createInvestorFeedPort({
+      reader: slateRead.reader,
+      ports: slateRead.eligibilityPorts,
+      cards: createPostgresCompanyCardPort({ sql: database.sql }),
+      decisions: createPostgresInvestorDecisionReader({ sql: database.sql }),
+      logger,
     }),
     // Why a company is in this person's recommendations, from the
     // recommendation context itself. Without it Q explains nothing about
