@@ -33,6 +33,7 @@ import {
   createSentenceCutter,
   isRecordableKnowledgeKey,
   recordableNamespacesSentence,
+  citeAuthorisedFacts,
   citePublicSources,
   type AuthorisedFact,
   type PublicSourceLike,
@@ -1502,7 +1503,10 @@ export function createModelGatewayQAnswer(
           );
         }
         const guarded = withoutRecommendationClaims(
-          citePublicSources(promises.text, publicSources),
+          citeAuthorisedFacts(
+            citePublicSources(promises.text, publicSources),
+            assembled.facts,
+          ),
           recommendationGrounds,
         );
         if (guarded.removed > 0) {
@@ -1765,7 +1769,13 @@ I've updated **${revisedArtifact.title}** — that's version ${String(revisedArt
           if (error.failureClass === "INVALID_MODEL_OUTPUT") {
             const heard = partial.complete() ? seenAnswer : streamedText;
             const salvaged = withoutRecommendationClaims(
-              citePublicSources(stripEmptyPromises(heard).text, publicSources),
+              citeAuthorisedFacts(
+                citePublicSources(
+                  stripEmptyPromises(heard).text,
+                  publicSources,
+                ),
+                assembled.facts,
+              ),
               recommendationGrounds,
             )
               .text.slice(0, ANSWER_LIMIT_CHARS)

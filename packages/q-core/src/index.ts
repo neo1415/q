@@ -365,8 +365,10 @@ export {
   type RecommendationGrounds,
 } from "./communication/recommendation-guard.js";
 export {
+  citeAuthorisedFacts,
   citePublicSources,
   describePublicSource,
+  type CitableFact,
   presentPublicSource,
   type PublicSourceLike,
   type PublicSourcePresentation,
