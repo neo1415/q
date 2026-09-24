@@ -62,7 +62,8 @@ export const COMPANY_ANALYST_V8: PromptDefinition<
 > = {
   ...COMPANY_ANALYST_V7,
   version: 8,
-  status: "ACTIVE",
+  // Deprecated by v9 (acceptance directive E: fit is not interest).
+  status: "DEPRECATED",
   changeDescription:
     "CQ-QX-007: the model never says a change is ready for approval (v4's name paragraph no longer tells it to); talk about acting goes in actionTalk, which the runtime removes; a correction the person made in the conversation is stated as current and as theirs, with the differing record named as its own and both kept as a contradiction; fit questions compare the person's own declared mandate criterion by criterion, with no score.",
   effectiveFrom: "2026-09-24",
