@@ -125,6 +125,8 @@ export type SubjectSignature = {
   readonly nameTerms: readonly string[];
   /** The whole name with spacing removed: "The Vault Lyne" → "thevaultlyne". */
   readonly wholeName: string;
+  /** Every word of the name, generic ones included, in order. */
+  readonly nameWords: readonly string[];
   readonly domainLabel: string | null;
 };
 
@@ -135,6 +137,9 @@ export function subjectSignature(identity: {
   return {
     nameTerms: distinctiveTerms({ name: identity.name, websiteUrl: null }),
     wholeName: normalise(identity.name).replace(/ /g, ""),
+    nameWords: normalise(identity.name)
+      .split(" ")
+      .filter((word) => word.length > 0),
     domainLabel: domainLabel(identity.websiteUrl),
   };
 }
@@ -168,12 +173,45 @@ export function pageNamesSubject(
   ) {
     return true;
   }
-  if (signature.nameTerms.length === 0) {
+  const terms = signature.nameTerms;
+  if (terms.length === 0) {
     // Nothing distinctive in the name: only the domain could vouch.
     return false;
   }
+  if (terms.length === 1) {
+    // One distinctive word is the name; found even split across markup.
+    return haystack.includes(terms[0] ?? "");
+  }
+  // Several words: they must appear as the name, word for word. As whole
+  // words, because "Lumen Healthcare" is not "Lumen Health", and as one
+  // run, because a page mentioning "kivu" and later "freight" is not
+  // about Kivu Freight. A token that is the name squeezed together
+  // ("kivufreight" in a URL or handle) also counts.
+  const tokens = normalise(`${page.url} ${page.title ?? ""} ${page.excerpt}`)
+    .split(" ")
+    .filter((token) => token.length > 0);
+  const joined = terms.join("");
+  if (tokens.includes(joined) || tokens.includes(signature.wholeName)) {
+    return true;
+  }
+  const wholeWords = normalise(signature.nameWords.join(" "))
+    .split(" ")
+    .filter((word) => word.length > 0);
   return (
-    haystack.includes(signature.nameTerms.join("")) ||
-    (signature.wholeName.length > 0 && haystack.includes(signature.wholeName))
+    containsRun(tokens, terms) ||
+    (wholeWords.length > 0 && containsRun(tokens, wholeWords))
   );
+}
+
+/** Whether `run` appears in `tokens` as consecutive, whole tokens. */
+function containsRun(
+  tokens: readonly string[],
+  run: readonly string[],
+): boolean {
+  for (let start = 0; start + run.length <= tokens.length; start += 1) {
+    if (run.every((word, offset) => tokens[start + offset] === word)) {
+      return true;
+    }
+  }
+  return false;
 }
