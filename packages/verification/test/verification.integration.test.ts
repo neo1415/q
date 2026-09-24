@@ -77,6 +77,8 @@ type World = {
   readonly readiness: ReturnType<typeof createVerificationClaimsReadinessPort>;
   readonly adminA: Member;
   readonly realMemberA: Member;
+  /** Marked synthetic only in user_metadata, which a person can edit. */
+  readonly selfMarkedA: Member;
   readonly adminB: Member;
   readonly tenantA: string;
   readonly orgA: string;
@@ -134,11 +136,13 @@ describe("@capital-q/verification against local PostgreSQL", () => {
     tenantId: string,
     organisationId: string,
     roleCode: "organisation_admin" | "organisation_member",
-    synthetic: boolean,
+    marker: "app_metadata" | "user_metadata" | "none",
   ): Promise<Member> {
     const authUserId = randomUUID();
-    const metadata = JSON.stringify(synthetic ? { synthetic: true } : {});
-    await tx.sql`insert into auth.users (id, raw_user_meta_data) values (${authUserId}, ${metadata}::text::jsonb)`;
+    const flag = (where: typeof marker) =>
+      JSON.stringify(marker === where ? { synthetic: true } : {});
+    await tx.sql`insert into auth.users (id, raw_app_meta_data, raw_user_meta_data)
+      values (${authUserId}, ${flag("app_metadata")}::text::jsonb, ${flag("user_metadata")}::text::jsonb)`;
     const [profile] = await tx.sql<
       { id: string }[]
     >`select id from identity.user_profiles where auth_user_id = ${authUserId}`;
@@ -171,21 +175,28 @@ describe("@capital-q/verification against local PostgreSQL", () => {
           a.tenant,
           a.org,
           "organisation_admin",
-          true,
+          "app_metadata",
         );
         const realMemberA = await insertMember(
           tx,
           a.tenant,
           a.org,
           "organisation_admin",
-          false,
+          "none",
+        );
+        const selfMarkedA = await insertMember(
+          tx,
+          a.tenant,
+          a.org,
+          "organisation_admin",
+          "user_metadata",
         );
         const adminB = await insertMember(
           tx,
           b.tenant,
           b.org,
           "organisation_admin",
-          true,
+          "app_metadata",
         );
         const transactions = nestedTransactions(tx);
         const outbox = createOutboxWriter({ registry });
@@ -219,6 +230,7 @@ describe("@capital-q/verification against local PostgreSQL", () => {
           readiness: createVerificationClaimsReadinessPort({ sql }),
           adminA,
           realMemberA,
+          selfMarkedA,
           adminB,
           tenantA: a.tenant,
           orgA: a.org,
@@ -365,9 +377,15 @@ describe("@capital-q/verification against local PostgreSQL", () => {
     });
   });
 
-  it("leaves a non-synthetic person's request PENDING", async () => {
+  it.each([
+    ["a real person", "realMemberA"],
+    [
+      "a person marked synthetic only in their own user_metadata",
+      "selfMarkedA",
+    ],
+  ] as const)("leaves %s's request PENDING", async (_label, who) => {
     await withWorld(async (world) => {
-      const result = await request(world, world.realMemberA);
+      const result = await request(world, world[who]);
       expect(result.requested).toContain("FOUNDER_IDENTITY");
       const [founder] = await world.tx.sql<{ id: string }[]>`
         select id from evidence.verification_claims

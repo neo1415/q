@@ -74,8 +74,9 @@ export type VerificationClaimRepository = {
 
 /**
  * Whether a Person's auth account was created as synthetic demo data
- * (`user_metadata.synthetic = true`, set by the dev/demo bootstrap through
- * the Supabase admin API). Read from the database, never from a message.
+ * (`app_metadata.synthetic = true`, set only through the Supabase admin
+ * API with the service role). Read from the database, never from a
+ * message, and never from user_metadata, which the person can edit.
  */
 export type SyntheticPrincipalPort = {
   readonly isSynthetic: (

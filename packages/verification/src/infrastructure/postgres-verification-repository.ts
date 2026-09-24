@@ -187,14 +187,18 @@ async function currentRevision(
 }
 
 /**
- * `auth.users.raw_user_meta_data ->> 'synthetic'`, through the person's
- * profile. False for anything but an explicit boolean true.
+ * `auth.users.raw_app_meta_data -> 'synthetic'`, through the person's
+ * profile. app_metadata, never user_metadata: a signed-in person can edit
+ * their own user_metadata through Supabase Auth, and on a synthetic-demo
+ * deployment that would let anyone mark themselves synthetic and be
+ * verified. app_metadata is writable only with the service role. False
+ * for anything but an explicit boolean true.
  */
 export function createPostgresSyntheticPrincipalPort(): SyntheticPrincipalPort {
   return {
     isSynthetic: async (executor, userId) => {
       const [row] = await executor`
-        select coalesce(u.raw_user_meta_data -> 'synthetic' = 'true'::jsonb, false) as synthetic
+        select coalesce(u.raw_app_meta_data -> 'synthetic' = 'true'::jsonb, false) as synthetic
           from identity.user_profiles p
           join auth.users u on u.id = p.auth_user_id
          where p.id = ${userId}`;
