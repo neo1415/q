@@ -147,6 +147,8 @@ const base: InterviewConductorResult = {
   unrestricted: [],
   frustrated: false,
   reading: null,
+  delivery: null,
+  offered: [],
 };
 
 /** A gateway that returns each queued result in turn. */

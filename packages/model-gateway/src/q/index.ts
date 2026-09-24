@@ -33,6 +33,7 @@ import {
   createSentenceCutter,
   isRecordableKnowledgeKey,
   recordableNamespacesSentence,
+  citeAuthorisedFacts,
   citePublicSources,
   type AuthorisedFact,
   type PublicSourceLike,
@@ -380,14 +381,14 @@ const GENERAL_KNOWLEDGE_NOTE =
  * company.
  */
 export const PROFILE_UPDATE_NOTE =
-  "If they ask in this message to change a field of their own company profile (company name, legal name, website, founded date, HQ country or city, stage, short or full description) AND give the new value, put it in profileUpdates: field, value in the field's own form, their exact words as quote. Do not say it is prepared, ready or awaiting approval: Capital Q tells them itself, once it has actually prepared it (or could not). No value given: ask for it, propose nothing. What YOU call THEM (their own name) is not a company field: it goes in displayName, never in profileUpdates. Never say the profile cannot be changed here, never say it was changed.";
+  "If they ask in this message to change a field of their own company profile (company name, legal name, website, founded date, HQ country or city, stage, short or full description) AND give the new value, put it in profileUpdates: field, value in the field's own form, their exact words as quote. No value given: ask for it, propose nothing. What YOU call THEM (their own name) is not a company field: it goes in displayName, never in profileUpdates. Never say the profile cannot be changed here, or that it was changed or prepared; Capital Q says that.";
 
 /**
  * The person's own name is theirs to change wherever they are, not only
  * in a conversation about a company, so this note travels on every run.
  */
 export const DISPLAY_NAME_NOTE =
-  "If they ask in this message to be called something else or to change their own name on Capital Q AND give the new name, put it in displayName with their exact words as quote. Do not say it is prepared, ready or changed: Capital Q tells them itself once it has actually prepared it. No new name given: ask for it.";
+  "If they ask in this message to be called something else or to change their own name on Capital Q AND give the new name, put it in displayName with their exact words as quote; never say it was changed or prepared. No new name given: ask for it.";
 
 /**
  * A reading that would clear a field is kept only when the person's own
@@ -1502,7 +1503,10 @@ export function createModelGatewayQAnswer(
           );
         }
         const guarded = withoutRecommendationClaims(
-          citePublicSources(promises.text, publicSources),
+          citeAuthorisedFacts(
+            citePublicSources(promises.text, publicSources),
+            assembled.facts,
+          ),
           recommendationGrounds,
         );
         if (guarded.removed > 0) {
@@ -1765,7 +1769,13 @@ I've updated **${revisedArtifact.title}** — that's version ${String(revisedArt
           if (error.failureClass === "INVALID_MODEL_OUTPUT") {
             const heard = partial.complete() ? seenAnswer : streamedText;
             const salvaged = withoutRecommendationClaims(
-              citePublicSources(stripEmptyPromises(heard).text, publicSources),
+              citeAuthorisedFacts(
+                citePublicSources(
+                  stripEmptyPromises(heard).text,
+                  publicSources,
+                ),
+                assembled.facts,
+              ),
               recommendationGrounds,
             )
               .text.slice(0, ANSWER_LIMIT_CHARS)

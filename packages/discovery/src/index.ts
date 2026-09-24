@@ -375,6 +375,7 @@ export {
   RANKING_CONFIG_CURRENT,
   RANKING_CONFIG_V1,
   RANKING_CONFIG_V2,
+  RANKING_CONFIG_V3,
   RANKING_CONFIGS,
   RANKING_REASON_CODES,
   RankingConfigError,
@@ -639,7 +640,11 @@ export type {
   InteractionRepository,
   NewInteractionEvent,
 } from "./interactions/ports.js";
-export { createPostgresInteractionRepository } from "./infrastructure/postgres-interaction-repository.js";
+export {
+  createPostgresInteractionRepository,
+  createPostgresInvestorDecisionReader,
+  type InvestorCompanyDecision,
+} from "./infrastructure/postgres-interaction-repository.js";
 
 export {
   createCurrentSlateExplanationService,

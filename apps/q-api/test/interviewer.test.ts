@@ -180,6 +180,8 @@ const base: InterviewConductorResult = {
   unrestricted: [],
   frustrated: false,
   reading: null,
+  delivery: null,
+  offered: [],
 };
 
 function turnInput(fetchFake: typeof fetch, utterance: string) {

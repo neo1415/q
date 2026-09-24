@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { QArtifactIdSchema } from "@capital-q/contracts";
 import type { QAnswerRequest } from "@capital-q/q-runtime";
 
 import type { CompanyIntelligenceResult } from "../src/company/contracts.js";
@@ -95,7 +96,9 @@ describe("how a requested document ended", () => {
   });
 
   it("revises the document already in the conversation, however thin the record, and never creates one (CQ-QACT-001, F5)", async () => {
-    const ARTIFACT = "a1000000-0000-4000-8000-000000000001";
+    const ARTIFACT = QArtifactIdSchema.parse(
+      "a1000000-0000-4000-8000-000000000001",
+    );
     const calls = { prepare: 0, revise: [] as unknown[], rewrote: 0 };
     const section = {
       heading: "Traction",

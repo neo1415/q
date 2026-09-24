@@ -323,3 +323,48 @@ export function createPostgresInteractionRepository(options: {
     },
   };
 }
+
+/** An investor's standing decision on one company, from the derived state. */
+export type InvestorCompanyDecision = {
+  readonly companyId: string;
+  readonly decision: "SAVED" | "PASSED";
+};
+
+/**
+ * What an investor organisation has saved and passed, by company identity,
+ * newest first (CQ-QACT-001). Read from the same derived interaction state
+ * the feed's pass suppression reads, so Q and the feed agree on what was
+ * dismissed. A company both saved and later passed counts as passed.
+ */
+export function createPostgresInvestorDecisionReader(options: {
+  readonly sql: DatabaseExecutor;
+}): {
+  readonly decided: (query: {
+    readonly tenantId: string;
+    readonly investorOrganisationId: string;
+    readonly limit: number;
+  }) => Promise<readonly InvestorCompanyDecision[]>;
+} {
+  const { sql } = options;
+  return {
+    decided: async (query) => {
+      const rows = await sql`
+        select company_id, passed
+          from recommendation.interaction_state
+         where tenant_id = ${query.tenantId}
+           and investor_organisation_id = ${query.investorOrganisationId}
+           and (saved or passed)
+         order by greatest(passed_at, saved_at) desc nulls last, company_id
+         limit ${query.limit}`;
+      return rows.map((row) => {
+        const parsed = z
+          .object({ company_id: z.string().uuid(), passed: z.boolean() })
+          .parse(row);
+        return {
+          companyId: parsed.company_id,
+          decision: parsed.passed ? ("PASSED" as const) : ("SAVED" as const),
+        };
+      });
+    },
+  };
+}

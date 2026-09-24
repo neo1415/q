@@ -6,6 +6,7 @@ import {
 } from "@capital-q/contracts";
 
 import { ConversationTurnReadingSchema } from "../../conversation/reading.js";
+import { SpeechCueSchema } from "../../speech/delivery.js";
 
 /**
  * INTERVIEW_CONDUCTOR — Q conducting the onboarding interview
@@ -461,5 +462,52 @@ export const INTERVIEW_CONDUCTOR_V8_UNTRUSTED = [
   ...INTERVIEW_CONDUCTOR_V4_UNTRUSTED,
 ] as const;
 
+/**
+ * v7 result: v6's, plus how the reply should sound (CQ-VOICE-010).
+ *
+ * `delivery` sits beside `reply` and never inside it. The reply is what Q
+ * said, and it is recorded, shown and remembered as written. Delivery is
+ * for the speech layer alone, which renders it only where the voice can
+ * and drops it everywhere else. It is a single cue rather than the whole
+ * delivery object, because the conductor's request has no room for more
+ * (`SpeechCueSchema`). Null by default: most replies need nothing, and a
+ * run recorded against an older version still parses.
+ */
+export const INTERVIEW_CONDUCTOR_V7_SCHEMA_VERSION = 7;
+
+export const InterviewConductorV7ResultSchema =
+  InterviewConductorV6ResultSchema.extend({
+    delivery: SpeechCueSchema.nullable().default(null),
+    /**
+     * Concrete values Q's own reply put in front of the person, per step,
+     * in the order said ("25 or 30k?"), so that "the second number you
+     * said" resolves against what Q actually offered (CQ-QX-005 round 2,
+     * #9). Q's words are data here, never a value until the person picks.
+     */
+    offered: z
+      .array(
+        z
+          .object({
+            target: z.string().min(1).max(80),
+            values: z
+              .array(
+                z.union([
+                  z.string().max(200),
+                  z.array(z.string().max(120)).max(20),
+                  z.boolean(),
+                ]),
+              )
+              .min(1)
+              .max(6),
+          })
+          .strict(),
+      )
+      .max(3)
+      .default([]),
+  }).strict();
+export type InterviewConductorV7Result = z.infer<
+  typeof InterviewConductorV7ResultSchema
+>;
+
 /** What the runtime works with: the newest shape. */
-export type InterviewConductorResult = InterviewConductorV6Result;
+export type InterviewConductorResult = InterviewConductorV7Result;

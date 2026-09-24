@@ -68,6 +68,7 @@ import {
 import { withTestRouting } from "@capital-q/model-gateway";
 import { createGoogleModelProvider } from "@capital-q/model-gateway/providers/google";
 import { createGroqModelProvider } from "@capital-q/model-gateway/providers/groq";
+import { createOpenAIModelProvider } from "@capital-q/model-gateway/providers/openai";
 import { createLogger, createTelemetryRuntime } from "@capital-q/observability";
 import { createPostgresOrganisationQueryPort } from "@capital-q/organisations";
 import { createRecommendationNarrator } from "@capital-q/q-specialists";
@@ -139,11 +140,13 @@ import {
   createProfileUpdateBoard,
 } from "./composition/company-profile-action.js";
 import { createCompanyVisibilitySetAction } from "./composition/company-visibility-action.js";
+import { createInvestorFeedPort } from "./composition/investor-feed.js";
 import {
   createDiscoveryService,
   createPostgresCompanyCardPort,
   createCurrentSlateExplanationService,
   createPostgresDiscoveryRepository,
+  createPostgresInvestorDecisionReader,
   createRecommendationExplanationService,
   createSlateReadPipeline,
   readFeatureSnapshotById,
@@ -378,6 +381,15 @@ if (providerSecrets.groq !== undefined) {
     }),
   );
 }
+// The routing policies name gpt-5.6-luna first for every task class
+// (20261008130000); a provider routed to but never registered is
+// PROVIDER_UNCONFIGURED on every call, and every turn fell through to
+// the free tiers it was meant to replace.
+if (providerSecrets.openai !== undefined) {
+  providers.push(
+    createOpenAIModelProvider({ apiKey: providerSecrets.openai.reveal() }),
+  );
+}
 /**
  * Doc 15 §62: free/shared inference may be used aggressively for synthetic
  * data and development, while confidential customer information still
@@ -588,6 +600,16 @@ const qTools = createQTools({
     // platform rather than from nothing.
     discovery: createDiscoveryService({
       repository: createPostgresDiscoveryRepository({ sql: database.sql }),
+    }),
+    // An investor's "what should I look at" is answered from their own
+    // feed — the same reader the Discover surface calls — and their own
+    // Save/Pass decisions by company id (CQ-QACT-001).
+    investorFeed: createInvestorFeedPort({
+      reader: slateRead.reader,
+      ports: slateRead.eligibilityPorts,
+      cards: createPostgresCompanyCardPort({ sql: database.sql }),
+      decisions: createPostgresInvestorDecisionReader({ sql: database.sql }),
+      logger,
     }),
     // Why a company is in this person's recommendations, from the
     // recommendation context itself. Without it Q explains nothing about
@@ -1057,6 +1079,8 @@ const voiceTurn = timedVoiceTurns(
             fetch: timedFetch(fetch, voiceTimings),
           },
         }),
+    // How each reply should sound, for the speak relay (CQ-VOICE-010).
+    performance: speechPerformance,
     logger,
   }),
   voiceTimings,

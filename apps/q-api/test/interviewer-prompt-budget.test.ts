@@ -21,10 +21,16 @@ import { base, investorSession, turn } from "./interviewer-fixtures.js";
  * options on screen and the conversation block full. The structured-output
  * JSON schema travels in the same request and is counted too.
  *
- * Ratios are calibrated, not guessed: counted with cl100k (close to the
- * Llama tokenizer the fallback uses), this prompt runs 4.3 characters to
- * a token and the result schema 3.8. Measured 2026-09-24, deep worst case:
- * 6,328 prompt tokens + 1,415 schema tokens = 7,743.
+ * Ratios are calibrated, not guessed: counted with cl100k, this prompt
+ * runs 4.3 characters to a token and the result schema 3.8. Measured
+ * 2026-09-24, deep worst case: 6,328 prompt tokens + 1,415 schema tokens
+ * = 7,743 under v9.
+ *
+ * The Groq free tier and its 8,000-token cap are gone from the route
+ * (OpenAI gpt-5.6-luna first, Gemini flash-lite behind it — both with
+ * far larger windows). What still binds is latency: a turn the person
+ * waits for grows with its prompt. So the budget is relaxed to 12,000,
+ * not removed — room for v10's reading, and a line that notices growth.
  */
 
 const logger = createLogger(
@@ -32,7 +38,7 @@ const logger = createLogger(
   { level: "silent" },
 );
 
-const TOKEN_BUDGET = 8_000;
+const TOKEN_BUDGET = 12_000;
 const PROMPT_CHARS_PER_TOKEN = 4.3;
 const SCHEMA_CHARS_PER_TOKEN = 3.8;
 

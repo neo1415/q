@@ -68,6 +68,11 @@ import type { PresenceTrigger } from "./presence-trigger.js";
 import type { PronunciationTeacher } from "./pronunciation.js";
 import type { DecisionReader, DecisionReading } from "./decision.js";
 import type { VoiceTurnBoard } from "./turn-board.js";
+import { createProgressNarrator } from "./progress.js";
+import {
+  anchorCues,
+  type SpeechPerformanceBoard,
+} from "./speech-performance.js";
 import type { WelcomeHost } from "./welcome.js";
 import type { VoiceSpeaker, VoiceTranscriptTurn } from "./provider.js";
 import {
@@ -129,6 +134,11 @@ export type VoiceTurnDependencies = {
    * reading below stands in, as it does when the model does not answer.
    */
   readonly decisions?: DecisionReader | undefined;
+  /**
+   * Where how a reply should sound waits for the speak relay
+   * (CQ-VOICE-010). Absent means every reply is spoken as written.
+   */
+  readonly performance?: SpeechPerformanceBoard | undefined;
   /** The application API, for spoken interview turns; absent means Q conversations only. */
   readonly onboarding?:
     | { readonly apiBaseUrl: string; readonly fetch?: typeof fetch | undefined }
@@ -814,7 +824,12 @@ export function createVoiceTurnHandler(
     lastRunFailed.set(binding, false);
     let streamedDeltas = false;
     let spokenCharacters = 0;
-    let saidResearch = false;
+    // A look-up is gathered whole and offered only if it found something,
+    // so it is never narrated beyond the research line.
+    const progress = createProgressNarrator({
+      startedAt: Date.now(),
+      ...(options.lookup === true ? { maxLines: 0 } : {}),
+    });
     let proposedSummary: string | null = null;
     const record = await qStream.authorize(actor, runId, correlationId);
     async function* answer(): AsyncGenerator<string> {
@@ -906,17 +921,22 @@ export function createVoiceTurnHandler(
             terminal = true;
             recoverySettled(binding);
             return;
-          case "q.stage.changed":
-            // The one stage worth a spoken word: research takes seconds,
-            // and "Looking at public sources" is the approved label (D §56).
-            if (
-              event.data.stage === "SEARCHING_PUBLIC_SOURCES" &&
-              !saidResearch
-            ) {
-              saidResearch = true;
-              yield `${fillerLine("RESEARCH")} `;
+          case "q.stage.changed": {
+            // Research is announced at once: it takes seconds, and the
+            // answer will come from somewhere other than their records
+            // (D §56). Any other stage is spoken only once the run has
+            // shown itself to be an investigation, in a line or two from
+            // the closed stage vocabulary, never over an answer already
+            // under way (CQ-VOICE-010).
+            const line = progress.lineFor(event.data.stage, {
+              answered: streamedDeltas,
+              researchLine: () => fillerLine("RESEARCH"),
+            });
+            if (line !== null) {
+              yield `${line} `;
             }
             break;
+          }
           case "q.run.started":
           case "q.finding.available":
             break;
@@ -1074,6 +1094,16 @@ export function createVoiceTurnHandler(
       if (signal.aborted) {
         return { kind: "INTERRUPTED", path: "INTERVIEW" };
       }
+      // How the reply should sound (CQ-VOICE-010), anchored to the
+      // sentences about to be spoken and handed to the speak relay. The
+      // reply itself goes out, and is kept, exactly as written.
+      dependencies.performance?.perform(
+        binding.voiceSessionId,
+        anchorCues(
+          sentences(bounded(speakable(outcome.reply))),
+          outcome.delivery,
+        ),
+      );
       // Capital Q may now know enough to look this company up, and the
       // person who named it. Detached: the read happens while they keep
       // talking, and what it finds waits here for the next gap.
