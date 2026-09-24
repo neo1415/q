@@ -56,6 +56,7 @@ import {
   type RelationshipQueryPort,
 } from "@capital-q/network";
 import {
+  actorPrincipal,
   createDefaultDisclosureResolvers,
   createDisclosureAccessService,
   createDisclosureResourceResolverRegistry,
@@ -568,19 +569,50 @@ const disclosurePorts = {
   capital: createPostgresCapitalObjectiveQueryPort({ sql: database.sql }),
   relationships,
 };
+const disclosure = createDisclosureAccessService({
+  sql: database.sql,
+  policies: createPostgresDisclosurePolicyRepository(),
+  resolvers: createDisclosureResourceResolverRegistry(
+    createDefaultDisclosureResolvers(disclosurePorts),
+  ),
+  relationshipParties: createRelationshipPartyResolver(disclosurePorts),
+  clock: systemDisclosureClock,
+});
 const slates = createSlateReadPipeline({
   sql: database.sql,
-  disclosure: createDisclosureAccessService({
-    sql: database.sql,
-    policies: createPostgresDisclosurePolicyRepository(),
-    resolvers: createDisclosureResourceResolverRegistry(
-      createDefaultDisclosureResolvers(disclosurePorts),
-    ),
-    relationshipParties: createRelationshipPartyResolver(disclosurePorts),
-    clock: systemDisclosureClock,
-  }),
+  disclosure,
   queue: createPostgresRefreshQueue({ sql: database.sql }),
 });
+
+/**
+ * An investor opening a company from Discover: the network projection of
+ * a company another organisation owns, when disclosure says it is
+ * network-visible or public to this actor. The same rule Q's company tool
+ * applies, so the page and Q's answer cannot disagree about who may see
+ * a company.
+ */
+const companyNetworkView = {
+  findNetworkVisible: async (
+    actor: Parameters<typeof actorPrincipal>[0],
+    companyId: Parameters<
+      typeof disclosurePorts.companies.findCanonicalCompanyProfile
+    >[0],
+  ) => {
+    const decision = await disclosure.canDisclose({
+      principal: actorPrincipal(actor),
+      resource: { type: "company", id: companyId },
+      requestedAccess: "view",
+    });
+    if (
+      decision.outcome !== "ALLOW" ||
+      (decision.reasonCode !== "NETWORK_VISIBLE" &&
+        decision.reasonCode !== "PUBLIC_EXTERNAL")
+    ) {
+      return null;
+    }
+    return disclosurePorts.companies.findCanonicalCompanyProfile(companyId);
+  },
+};
 
 /**
  * What an investor did with a recommendation (CQ-REC-008).
@@ -680,6 +712,7 @@ const { app, logger } = createApp(config, security, {
   // The same port answers the founder's own view and network preview, so
   // "what investors will see" is what the feed shows.
   companyPitches: discoverablePitches,
+  companyNetworkView,
   gateq,
   gateqApply,
   capital,

@@ -27,6 +27,7 @@ import {
 } from "@capital-q/security";
 
 import { createApp, type ApiSecurityDependencies } from "../src/app.js";
+import type { CompanyNetworkViewPort } from "../src/http/companies.js";
 
 /**
  * HTTP adaptation of the company service: context hook (CONTEXT_REQUIRED
@@ -171,6 +172,7 @@ function buildApp(options: {
   readonly context?: ActorContext | undefined;
   readonly service: CompanyService;
   readonly pitches?: DiscoverablePitchQueryPort | undefined;
+  readonly networkView?: CompanyNetworkViewPort | undefined;
 }): FastifyInstance {
   const security: ApiSecurityDependencies = {
     authenticator: { authenticate: () => Promise.resolve(options.principal) },
@@ -189,8 +191,68 @@ function buildApp(options: {
     ...(options.pitches === undefined
       ? {}
       : { companyPitches: options.pitches }),
+    ...(options.networkView === undefined
+      ? {}
+      : { companyNetworkView: options.networkView }),
   }).app;
 }
+
+describe("GET /v1/companies/:id/network-preview for another organisation (CQ-ACCEPT-001)", () => {
+  const notMine = () => Promise.reject(new CompanyNotFoundError());
+
+  it("serves the projection when disclosure says the company is network-visible", async () => {
+    const { service } = fakeService({ getCompany: notMine });
+    const asked: string[] = [];
+    const app = buildApp({
+      principal: PRINCIPAL,
+      context: CONTEXT,
+      service,
+      networkView: {
+        findNetworkVisible: (_actor, companyId) => {
+          asked.push(companyId);
+          return Promise.resolve({
+            ...COMPANY_A,
+            marketplaceVisibility: "network_visible",
+          });
+        },
+      },
+    });
+    const response = await app.inject({
+      method: "GET",
+      url: `/v1/companies/${COMPANY_A.id}/network-preview`,
+    });
+    expect(response.statusCode).toBe(200);
+    expect(
+      response.json<{ canonicalName: string; networkVisible: boolean }>(),
+    ).toMatchObject({ canonicalName: "Acme", networkVisible: true });
+    expect(asked).toEqual([COMPANY_A.id]);
+    await app.close();
+  });
+
+  it("stays not-found when disclosure refuses, and without the port", async () => {
+    const { service } = fakeService({ getCompany: notMine });
+    const refused = buildApp({
+      principal: PRINCIPAL,
+      context: CONTEXT,
+      service,
+      networkView: { findNetworkVisible: () => Promise.resolve(null) },
+    });
+    const denied = await refused.inject({
+      method: "GET",
+      url: `/v1/companies/${COMPANY_A.id}/network-preview`,
+    });
+    expect(denied.statusCode).toBe(404);
+    await refused.close();
+
+    const bare = buildApp({ principal: PRINCIPAL, context: CONTEXT, service });
+    const absent = await bare.inject({
+      method: "GET",
+      url: `/v1/companies/${COMPANY_A.id}/network-preview`,
+    });
+    expect(absent.statusCode).toBe(404);
+    await bare.close();
+  });
+});
 
 describe("POST /v1/companies", () => {
   it("is 401 without a session and calls nothing", async () => {
