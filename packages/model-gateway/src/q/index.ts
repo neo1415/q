@@ -1191,8 +1191,10 @@ export function createModelGatewayQAnswer(
           // The tool loop has already run, so the grounds -- if the
           // model asked for them -- are known before the first sentence
           // is published.
+          // Fact labels are rewritten before a sentence goes out, not only
+          // in the stored answer: on a voice call it is said aloud (H3b).
           const guarded = guardSentence(
-            sentence,
+            citeAuthorisedFacts(sentence, assembled.facts),
             firstSentence,
             recommendationGrounds,
           );

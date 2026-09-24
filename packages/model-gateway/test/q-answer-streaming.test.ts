@@ -62,6 +62,14 @@ function build(
   answer: string,
   extras: Record<string, unknown> = {},
   capture: { content?: string; noted?: unknown[] } = {},
+  facts: readonly {
+    scope: string;
+    statement: string;
+    truthClass: "USER_CLAIM";
+    evidenceStatus: "DOCUMENT_SUPPORTED";
+    source?: string;
+    ref?: string;
+  }[] = [],
 ) {
   const messages: QConversationMessage[] = [
     {
@@ -144,6 +152,10 @@ function build(
         capture.noted = [...(capture.noted ?? []), entry];
       },
     },
+    context: {
+      assemble: () =>
+        Promise.resolve({ facts, subjectDescription: "a company" }),
+    },
   });
 
   const request: QAnswerRequest = {
@@ -165,6 +177,33 @@ function build(
 }
 
 describe("an answer that arrives as it is written", () => {
+  it("never sends a fact label, even in a sentence on its way out (H3b)", async () => {
+    const answer =
+      "August GMV was USD 380,000 as you told me (F2). The one-pager says USD 412,000 (F1). Burn is not on file.";
+    const { seam, request, published } = build(answer, {}, {}, [
+      {
+        scope: "EVIDENCE_DOCUMENTS",
+        statement: "Monthly GMV reached USD 412,000 in August 2026.",
+        truthClass: "USER_CLAIM",
+        evidenceStatus: "DOCUMENT_SUPPORTED",
+        source: "kivu-one-pager, page 1",
+        ref: "F1",
+      },
+      {
+        scope: "KNOWLEDGE_OBJECTS",
+        statement: "Monthly GMV was USD 380,000 in August 2026.",
+        truthClass: "USER_CLAIM",
+        evidenceStatus: "DOCUMENT_SUPPORTED",
+        ref: "F2",
+      },
+    ]);
+    await seam.answer(request);
+    const heard = published.map((delta) => delta.text).join("");
+    expect(heard.length).toBeGreaterThan(0);
+    expect(heard).not.toMatch(/\bF\d+\b/);
+    expect(heard).toContain("(kivu-one-pager, page 1)");
+  });
+
   it("sends whole sentences, in order, and nothing of the object around them", async () => {
     const answer =
       "Paystack is a Nigerian payments company. Stripe acquired it in 2020. It serves about 60,000 merchants.";
