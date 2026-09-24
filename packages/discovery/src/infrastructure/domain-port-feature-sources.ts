@@ -11,6 +11,7 @@ import {
 } from "@capital-q/taxonomy";
 
 import {
+  countryCodesOf,
   GEOGRAPHY_VOCABULARY,
   UNRESTRICTED_GEOGRAPHY_CODE,
 } from "../candidates/structured.js";
@@ -108,6 +109,7 @@ export function createDomainFeaturePorts(
                 vocabularyCode: node.vocabularyCode,
                 unrestricted,
                 descendantNodeIds: descendants.map((d) => d.id).sort(),
+                ...countryCodesOf(node, descendants),
               },
             ];
           }),

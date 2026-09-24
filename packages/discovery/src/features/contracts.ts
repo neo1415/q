@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import {
   STRUCTURED_GENERATOR_VERSION,
+  STRUCTURED_GENERATOR_VERSIONS,
   CandidateReasonCodeSchema,
 } from "../candidates/contracts.js";
 import {
@@ -233,7 +234,8 @@ export const SnapshotCandidateProvenanceSchema = z
   .object({
     structured: z
       .object({
-        generatorVersion: z.literal(STRUCTURED_GENERATOR_VERSION),
+        // Read side of a persisted artifact: every published version.
+        generatorVersion: z.enum(STRUCTURED_GENERATOR_VERSIONS),
         reasonCodes: z.array(CandidateReasonCodeSchema).max(8),
       })
       .strict()
@@ -257,6 +259,19 @@ export const SnapshotCandidateProvenanceSchema = z
 export type SnapshotCandidateProvenance = z.infer<
   typeof SnapshotCandidateProvenanceSchema
 >;
+
+/**
+ * What a ranker accepts as input: the provenance under the CURRENT
+ * structured generator only. A readable older snapshot is stale input and
+ * is recomputed, never re-labelled.
+ */
+export const RankableCandidateProvenanceSchema =
+  SnapshotCandidateProvenanceSchema.refine(
+    (p) =>
+      p.structured === null ||
+      p.structured.generatorVersion === STRUCTURED_GENERATOR_VERSION,
+    { message: "structured provenance is not the current generator version" },
+  );
 
 /** Bounded above by the registry: one value per active definition. */
 export const FEATURE_SNAPSHOT_VALUES_MAX = 64;
@@ -338,7 +353,12 @@ export const RECOMMENDATION_FEATURES: readonly RecommendationFeatureDefinition[]
       },
       {
         id: "declared_fit.geography",
-        version: "v1",
+        // v2 (CQ-REC-GEO-001): a positive geography preference node carrying
+        // an ISO 3166-1 code is country intent, and a region node containing
+        // the headquarters country is a region match. v1 read countries only
+        // from `geography.country` constraints, so a mandate that named
+        // Nigeria as a node scored Nigerian companies NO_MATCH.
+        version: "v2",
         featureGroup: "DECLARED_FIT",
         dataType: "category",
         allowedContexts: INVESTOR_ONLY,
@@ -351,7 +371,7 @@ export const RECOMMENDATION_FEATURES: readonly RecommendationFeatureDefinition[]
         sensitivity: "CONFIDENTIAL",
         missingPolicy: "PRESERVE_MISSING",
         description:
-          "COUNTRY_MATCH when the headquarters country is in the mandate's positive country intent; REGION_MATCH when a declared geography classification equals or descends from a positive geography preference node; NO_MATCH when neither holds and the company's geography is known; NOT_APPLICABLE when the mandate declares no positive geography intent or only the unrestricted node; MISSING when neither the country nor a geography classification is known.",
+          "COUNTRY_MATCH when the headquarters country is named by a positive `geography.country` constraint or a positive geography node's ISO code; REGION_MATCH when a declared geography classification equals or descends from a positive geography node, or the headquarters country lies below one; NO_MATCH when neither holds and the company's geography is known; NOT_APPLICABLE without positive geography intent or with only the unrestricted node; MISSING when neither the country nor a geography classification is known.",
         categories: ["COUNTRY_MATCH", "REGION_MATCH", "NO_MATCH"],
         range: null,
       },

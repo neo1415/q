@@ -40,8 +40,25 @@ export const STRUCTURED_GENERATOR_ID = "STRUCTURED_MANDATE" as const;
  * v2: taxonomy and geography-region retrieval match declared company
  * classifications only (user_selected, admin_curated), as eligibility.v2
  * and the feature registry already read them.
+ *
+ * v3 (CQ-REC-GEO-001): a positive geography preference node retrieves by
+ * headquarters country through its reference ISO code — the node's own code
+ * as GEOGRAPHY_OVERLAP, the countries below a region as
+ * GEOGRAPHY_REGION_OVERLAP. v2 found a company in a named country only if
+ * it carried a geography classification.
  */
-export const STRUCTURED_GENERATOR_VERSION = "structured-mandate.v2" as const;
+export const STRUCTURED_GENERATOR_VERSION = "structured-mandate.v3" as const;
+
+/**
+ * Every version a persisted artifact (a feature snapshot's provenance) may
+ * name. New provenance is always the current version; history stays
+ * readable so a served slate can still be explained until it is rebuilt.
+ */
+export const STRUCTURED_GENERATOR_VERSIONS = [
+  "structured-mandate.v1",
+  "structured-mandate.v2",
+  STRUCTURED_GENERATOR_VERSION,
+] as const;
 
 export const CANDIDATE_DIMENSIONS = [
   "STAGE",
@@ -60,9 +77,9 @@ export type CandidateDimension = z.infer<typeof CandidateDimensionSchema>;
 export const CANDIDATE_REASON_CODES = [
   /** current_stage_code ∈ the mandate's positive stage intent. */
   "STAGE_OVERLAP",
-  /** headquarters_country ∈ a positive `geography.country` constraint. */
+  /** headquarters_country ∈ a positive `geography.country` constraint, or is a positive geography node's ISO code. */
   "GEOGRAPHY_OVERLAP",
-  /** An ACTIVE geography-vocabulary classification equals, or descends from, a positive geography preference node. */
+  /** An ACTIVE geography-vocabulary classification equals, or descends from, a positive geography preference node; or headquarters_country is a country below one. */
   "GEOGRAPHY_REGION_OVERLAP",
   /** An ACTIVE classification equals a positive taxonomy preference node. */
   "TAXONOMY_OVERLAP",

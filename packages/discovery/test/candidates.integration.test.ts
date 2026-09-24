@@ -514,7 +514,7 @@ describe("@capital-q/discovery structured candidates against local PostgreSQL", 
         "GEOGRAPHY_REGION_OVERLAP",
       ]);
       for (const c of r.candidates) {
-        expect(c.provenance.generatorVersion).toBe("structured-mandate.v2");
+        expect(c.provenance.generatorVersion).toBe("structured-mandate.v3");
         expect(c.provenance.taxonomyVersion).not.toBeNull();
         expect(c.eligibility.decision).toBe("ELIGIBLE");
       }

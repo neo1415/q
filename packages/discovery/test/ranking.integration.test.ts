@@ -7,7 +7,7 @@ import {
 } from "@capital-q/database";
 
 import { createFeatureRegistry } from "../src/features/policy.js";
-import { RANKING_CONFIG_V1 } from "../src/ranking/config.js";
+import { RANKING_CONFIG_CURRENT } from "../src/ranking/config.js";
 import type { RankedCandidate } from "../src/ranking/contracts.js";
 import { createDeterministicRanker } from "../src/ranking/ranker.js";
 import { createRankingService } from "../src/ranking/service.js";
@@ -23,7 +23,7 @@ import {
 /**
  * The deterministic ranker over the whole local pipeline (CQ-REC-005 §95):
  * REC-001 eligibility, REC-002 + REC-003 candidates, REC-004 feature
- * snapshots in the real store, then ranking-config.v1. Synthetic companies
+ * snapshots in the real store, then ranking-config.v2. Synthetic companies
  * only; everything rolls back. The ranker itself reads nothing: every
  * statement here is candidate generation or feature computation.
  */
@@ -138,7 +138,7 @@ describe("@capital-q/discovery deterministic ranking against local PostgreSQL", 
     createRankingService({
       features: w.features,
       ranker: createDeterministicRanker({
-        config: RANKING_CONFIG_V1,
+        config: RANKING_CONFIG_CURRENT,
         registry: createFeatureRegistry(),
       }),
     });
@@ -187,19 +187,19 @@ describe("@capital-q/discovery deterministic ranking against local PostgreSQL", 
         if (r.internalScore === null) continue;
         const sum = r.factors.reduce((s, f) => s + (f.contribution ?? 0), 0);
         expect(Math.abs(sum - r.internalScore)).toBeLessThan(1e-9);
-        expect(r.rankingConfigVersion).toBe("ranking-config.v1");
+        expect(r.rankingConfigVersion).toBe("ranking-config.v2");
       }
       expect(result.diagnostics).toMatchObject({
         candidates: 5,
         scored: 5,
         unscored: 0,
-        rankingConfigVersion: "ranking-config.v1",
+        rankingConfigVersion: "ranking-config.v2",
         rankerVersion: "deterministic-ranker.v1",
       });
       expect(result.diagnostics.features.queries).toBe(6);
 
       console.info(
-        `[REC-005 live ranking] config=${RANKING_CONFIG_V1.version} candidates=${String(result.diagnostics.candidates)} scored=${String(result.diagnostics.scored)} unscored=${String(result.diagnostics.unscored)} rankMs=${String(result.diagnostics.rankDurationMs)} featureQueries=${String(result.diagnostics.features.queries)} rankerQueries=0 providerCalls=0`,
+        `[REC-005 live ranking] config=${RANKING_CONFIG_CURRENT.version} candidates=${String(result.diagnostics.candidates)} scored=${String(result.diagnostics.scored)} unscored=${String(result.diagnostics.unscored)} rankMs=${String(result.diagnostics.rankDurationMs)} featureQueries=${String(result.diagnostics.features.queries)} rankerQueries=0 providerCalls=0`,
       );
       for (const r of result.ranked) {
         const present = r.factors.filter((f) => f.outcome === "SCORED");
@@ -230,7 +230,7 @@ describe("@capital-q/discovery deterministic ranking against local PostgreSQL", 
       // A Q inference on the very node this investor hard-excludes. Under
       // eligibility.v2 only declared classifications decide exclusion, and
       // KoboLogistics declares its industry, so the company stays ELIGIBLE;
-      // structured-mandate.v2 and the feature layer ignore the row too.
+      // structured-mandate.v3 and the feature layer ignore the row too.
       await w.tx
         .sql`insert into taxonomy.entity_assignments (tenant_id, entity_type, entity_id, node_id, assignment_source)
         values (${target.tenantId}, 'COMPANY', ${target.id}, ${node("industry", "media_entertainment")}, 'q_inferred')`;

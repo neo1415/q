@@ -23,6 +23,40 @@ const POSITIVE_CLASSES: readonly string[] = ["MUST", "STRONG", "NICE"];
 export const GEOGRAPHY_VOCABULARY = "geography";
 export const UNRESTRICTED_GEOGRAPHY_CODE = "global";
 
+/** The slice of a reference node the ISO reading needs. */
+type IsoCarryingNode = {
+  readonly vocabularyCode: string;
+  readonly metadata: { readonly iso3166Alpha2?: string | undefined };
+};
+
+/**
+ * The ISO 3166-1 alpha-2 codes a geography preference node stands for:
+ * its own (a country node) and those of the countries below it (a
+ * region). Reference metadata only; any other vocabulary carries none.
+ */
+export function countryCodesOf(
+  node: IsoCarryingNode,
+  descendants: readonly IsoCarryingNode[],
+): {
+  readonly countryCode: string | null;
+  readonly descendantCountryCodes: readonly string[];
+} {
+  if (node.vocabularyCode !== GEOGRAPHY_VOCABULARY) {
+    return { countryCode: null, descendantCountryCodes: [] };
+  }
+  const codes = new Set<string>();
+  for (const d of descendants) {
+    const code = d.metadata.iso3166Alpha2;
+    if (d.vocabularyCode === GEOGRAPHY_VOCABULARY && code !== undefined) {
+      codes.add(code.toUpperCase());
+    }
+  }
+  return {
+    countryCode: node.metadata.iso3166Alpha2?.toUpperCase() ?? null,
+    descendantCountryCodes: [...codes].sort(),
+  };
+}
+
 export type StructuredIntent = {
   /** Distinct, sorted stage codes the mandate positively wants; empty means no stage signal. */
   readonly stageCodes: readonly string[];

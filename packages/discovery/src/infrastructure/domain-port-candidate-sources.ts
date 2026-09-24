@@ -12,6 +12,7 @@ import {
 import type { StructuredRetrievalPorts } from "../candidates/ports.js";
 import { createNotComputableChequeRetrieval } from "../candidates/ports.js";
 import {
+  countryCodesOf,
   GEOGRAPHY_VOCABULARY,
   UNRESTRICTED_GEOGRAPHY_CODE,
 } from "../candidates/structured.js";
@@ -121,6 +122,7 @@ export function createDomainCandidatePorts(
           vocabularyCode: node.vocabularyCode,
           unrestricted,
           descendantNodeIds: descendants.map((d) => d.id).sort(),
+          ...countryCodesOf(node, descendants),
         };
       },
     },
