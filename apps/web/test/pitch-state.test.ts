@@ -61,7 +61,7 @@ function run(events: readonly PitchFlowEvent[], from = INITIAL_PITCH_FLOW) {
 }
 
 describe("pitchFlowReducer", () => {
-  it("walks the happy path: empty → preparing → uploading → processing → ready", () => {
+  it("walks the happy path: empty â†’ preparing â†’ uploading â†’ processing â†’ ready", () => {
     let state: PitchFlowState = run([{ type: "LOADED", pitch: null }]);
     expect(state).toEqual({ kind: "EMPTY" });
 
@@ -164,6 +164,7 @@ describe("pitchFlowReducer", () => {
       pitch: SESSION.pitch,
       session: SESSION,
       progress: 1,
+      reconnecting: false,
     };
     expect(pitchFlowReducer(uploading, { type: "UPLOADED" }).kind).toBe(
       "PROCESSING",
@@ -234,6 +235,7 @@ describe("pitchFlowReducer", () => {
         pitch: SESSION.pitch,
         session: SESSION,
         progress: 0.3,
+        reconnecting: false,
       },
       { type: "REQUEST_FAILED", message: "ignored", failure: "UPLOAD_FAILED" },
     );
@@ -244,6 +246,81 @@ describe("pitchFlowReducer", () => {
     expect((rejected as { message: string }).message).toContain(
       "replace this pitch",
     );
+  });
+});
+
+describe("pitchFlowReducer, resumable (CQ-MEDIA-011)", () => {
+  const uploading: PitchFlowState = {
+    kind: "UPLOADING",
+    file: FILE,
+    pitch: SESSION.pitch,
+    session: { ...SESSION, uploadMode: "RESUMABLE", chunkSizeBytes: 5_242_880 },
+    progress: 0.4,
+    reconnecting: false,
+  };
+
+  it("says 'reconnecting' while a drop is retried, and drops it when bytes move again", () => {
+    const retrying = pitchFlowReducer(uploading, { type: "UPLOAD_RETRYING" });
+    expect(retrying).toMatchObject({
+      kind: "UPLOADING",
+      reconnecting: true,
+      progress: 0.4,
+    });
+    expect(
+      pitchFlowReducer(retrying, { type: "UPLOAD_RECOVERED" }),
+    ).toMatchObject({ kind: "UPLOADING", reconnecting: false });
+  });
+
+  it("pauses, with the record and the file, when retries run out", () => {
+    expect(pitchFlowReducer(uploading, { type: "UPLOAD_INTERRUPTED" })).toEqual(
+      {
+        kind: "INTERRUPTED",
+        pitch: SESSION.pitch,
+        file: FILE,
+        reason: "CONNECTION",
+      },
+    );
+  });
+
+  it("reads UPLOAD_PENDING as resumable only when this browser remembers the file", () => {
+    const pending = pitch({ status: "UPLOAD_PENDING", version: 3 });
+    expect(run([{ type: "LOADED", pitch: pending, resumable: FILE }])).toEqual({
+      kind: "INTERRUPTED",
+      pitch: pending,
+      file: FILE,
+      reason: "RELOADED",
+    });
+    expect(
+      run([{ type: "LOADED", pitch: pending, resumable: null }]),
+    ).toMatchObject({ kind: "FAILED", failure: "TARGET_LOST" });
+  });
+
+  it("resumes into the same record, never a replacement", () => {
+    const paused: PitchFlowState = {
+      kind: "INTERRUPTED",
+      pitch: SESSION.pitch,
+      file: FILE,
+      reason: "RELOADED",
+    };
+    expect(replaceablePitch(paused)).toBeNull();
+    expect(
+      pitchFlowReducer(paused, { type: "FILE_CHOSEN", file: FILE }),
+    ).toEqual({ kind: "PREPARING", file: FILE, pitch: SESSION.pitch });
+  });
+
+  it("shows a cancel as what the server recorded", () => {
+    const cancelled = pitch({ status: "UPLOAD_FAILED", version: 4 });
+    const state = pitchFlowReducer(uploading, {
+      type: "CANCELLED",
+      pitch: cancelled,
+    });
+    expect(state).toMatchObject({
+      kind: "FAILED",
+      failure: "CANCELLED",
+      pitch: cancelled,
+    });
+    // A cancelled pitch is replaced by choosing a file.
+    expect(replaceablePitch(state)).toEqual(cancelled);
   });
 });
 

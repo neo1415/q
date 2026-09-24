@@ -32,6 +32,8 @@ export type PitchFailure =
    * gone; the record says UPLOAD_PENDING and will say so forever. Replace.
    */
   | "TARGET_LOST"
+  /** The founder stopped the upload; the record says so. Choose a file. */
+  | "CANCELLED"
   /** Something between here and the server; the pitch itself is unchanged. */
   | "REQUEST_FAILED";
 
@@ -59,6 +61,20 @@ export type PitchFlowState =
       readonly session: MediaUploadSessionDto;
       /** 0–1. */
       readonly progress: number;
+      /** The connection dropped and the upload is waiting to try again. */
+      readonly reconnecting: boolean;
+    }
+  /**
+   * A resumable upload stopped part-way and can carry on from where the
+   * provider says it stands: the connection stayed down longer than the
+   * retries last, or the page was reloaded mid-upload. The same file is
+   * needed again after a reload, because a browser does not keep it.
+   */
+  | {
+      readonly kind: "INTERRUPTED";
+      readonly pitch: MediaAssetDto;
+      readonly file: ChosenFile;
+      readonly reason: "CONNECTION" | "RELOADED";
     }
   /** Bytes arrived; the provider is encoding. Polling the server. */
   | {
@@ -86,7 +102,16 @@ export type ChosenFile = {
 };
 
 export type PitchFlowEvent =
-  | { readonly type: "LOADED"; readonly pitch: MediaAssetDto | null }
+  | {
+      readonly type: "LOADED";
+      readonly pitch: MediaAssetDto | null;
+      /**
+       * The file this browser was uploading into that pitch, when it
+       * remembers one: an UPLOAD_PENDING record is then resumable here
+       * rather than lost.
+       */
+      readonly resumable?: ChosenFile | null | undefined;
+    }
   | { readonly type: "FILE_CHOSEN"; readonly file: ChosenFile }
   | { readonly type: "CREATED"; readonly pitch: MediaAssetDto }
   | {
@@ -95,6 +120,14 @@ export type PitchFlowEvent =
       readonly session: MediaUploadSessionDto;
     }
   | { readonly type: "UPLOAD_PROGRESS"; readonly progress: number }
+  /** The connection dropped; the upload waits and tries again. */
+  | { readonly type: "UPLOAD_RETRYING" }
+  /** Bytes are moving again. */
+  | { readonly type: "UPLOAD_RECOVERED" }
+  /** Retries ran out; the upload can be resumed by hand. */
+  | { readonly type: "UPLOAD_INTERRUPTED" }
+  /** The server recorded the founder's cancel. */
+  | { readonly type: "CANCELLED"; readonly pitch: MediaAssetDto }
   | { readonly type: "UPLOADED" }
   | { readonly type: "SYNCED"; readonly pitch: MediaAssetDto }
   /** The record changed outside the upload (a decision was recorded). */
@@ -123,7 +156,8 @@ const FAILURE_MESSAGE: Readonly<Record<PitchFailure, string>> = {
   EXPIRED:
     "The upload window closed before the file arrived. Choose the file again to replace this pitch.",
   TARGET_LOST:
-    "This upload was started elsewhere and can't be resumed here. Choose the file again to replace this pitch.",
+    "This upload was started elsewhere and can't be resumed here. Cancel it, or choose the file again to replace this pitch.",
+  CANCELLED: "Upload cancelled. Choose a file when you're ready.",
   REQUEST_FAILED:
     "Capital Q couldn't complete that right now. Please try again.",
 };
@@ -135,16 +169,28 @@ export function pitchFailureMessage(failure: PitchFailure): string {
 /** The server's lifecycle, read into the screen's state. */
 function fromRecord(
   pitch: MediaAssetDto,
-  context: { readonly uploadedHere: boolean; readonly attempt: number },
+  context: {
+    readonly uploadedHere: boolean;
+    readonly attempt: number;
+    readonly resumable?: ChosenFile | null | undefined;
+  },
 ): PitchFlowState {
   switch (pitch.status) {
     case "CREATED":
       return { kind: "CREATED", pitch };
     case "UPLOAD_PENDING":
-      // Bytes not seen by the provider yet. Transient right after this
-      // session's upload; permanent for a target reserved elsewhere.
+      // Bytes not all seen by the provider yet. Transient right after
+      // this session's upload; resumable when this browser remembers the
+      // file it was sending; otherwise a target nobody here can reach.
       if (!context.uploadedHere) {
-        return failed("TARGET_LOST", pitch);
+        return context.resumable === null || context.resumable === undefined
+          ? failed("TARGET_LOST", pitch)
+          : {
+              kind: "INTERRUPTED",
+              pitch,
+              file: context.resumable,
+              reason: "RELOADED",
+            };
       }
       return context.attempt >= PENDING_AFTER_UPLOAD_MAX_ATTEMPTS
         ? failed("UPLOAD_FAILED", pitch)
@@ -190,6 +236,8 @@ export function replaceablePitch(state: PitchFlowState): MediaAssetDto | null {
     case "CREATED":
     case "FAILED":
       return state.pitch;
+    // Mid-upload: stopped, not finished. Cancel it before replacing it.
+    case "INTERRUPTED":
     case "LOADING":
     case "EMPTY":
     case "PREPARING":
@@ -207,11 +255,16 @@ export function pitchFlowReducer(
     case "LOADED":
       return event.pitch === null
         ? { kind: "EMPTY" }
-        : fromRecord(event.pitch, { uploadedHere: false, attempt: 0 });
+        : fromRecord(event.pitch, {
+            uploadedHere: false,
+            attempt: 0,
+            resumable: event.resumable,
+          });
 
     case "FILE_CHOSEN": {
       // A file may be chosen from any resting state. From CREATED the
-      // record is reused; from READY or FAILED the record is replaced.
+      // record is reused, and from INTERRUPTED the upload resumes into it;
+      // from READY or FAILED the record is replaced.
       if (
         state.kind === "LOADING" ||
         state.kind === "PREPARING" ||
@@ -223,7 +276,10 @@ export function pitchFlowReducer(
       return {
         kind: "PREPARING",
         file: event.file,
-        pitch: state.kind === "CREATED" ? state.pitch : null,
+        pitch:
+          state.kind === "CREATED" || state.kind === "INTERRUPTED"
+            ? state.pitch
+            : null,
       };
     }
 
@@ -240,6 +296,7 @@ export function pitchFlowReducer(
             pitch: event.pitch,
             session: event.session,
             progress: 0,
+            reconnecting: false,
           }
         : state;
 
@@ -247,6 +304,29 @@ export function pitchFlowReducer(
       return state.kind === "UPLOADING"
         ? { ...state, progress: Math.max(0, Math.min(1, event.progress)) }
         : state;
+
+    case "UPLOAD_RETRYING":
+      return state.kind === "UPLOADING"
+        ? { ...state, reconnecting: true }
+        : state;
+
+    case "UPLOAD_RECOVERED":
+      return state.kind === "UPLOADING"
+        ? { ...state, reconnecting: false }
+        : state;
+
+    case "UPLOAD_INTERRUPTED":
+      return state.kind === "UPLOADING"
+        ? {
+            kind: "INTERRUPTED",
+            pitch: state.pitch,
+            file: state.file,
+            reason: "CONNECTION",
+          }
+        : state;
+
+    case "CANCELLED":
+      return failed("CANCELLED", event.pitch);
 
     case "UPLOADED":
       return state.kind === "UPLOADING"
@@ -287,7 +367,8 @@ export function pitchFlowReducer(
         state.kind === "UPLOADING" ||
         state.kind === "PROCESSING" ||
         state.kind === "CREATED" ||
-        state.kind === "READY"
+        state.kind === "READY" ||
+        state.kind === "INTERRUPTED"
           ? state.pitch
           : state.kind === "FAILED"
             ? state.pitch

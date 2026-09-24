@@ -115,6 +115,7 @@ export {
 
 export {
   authorisePitchPlayback,
+  cancelPitchUpload,
   createPitchMediaAsset,
   createPitchUploadSession,
   deletePitchMediaAsset,

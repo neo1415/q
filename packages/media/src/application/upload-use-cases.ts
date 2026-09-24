@@ -28,6 +28,10 @@ import {
   MediaRuleError,
 } from "../domain/errors.js";
 import type { ResolvedMediaOwner } from "../domain/owners.js";
+import {
+  MAX_PITCH_UPLOAD_BYTES,
+  uploadReservationKey,
+} from "../domain/upload-reservation.js";
 import { mediaAssetStatusChangedEvent } from "../events/index.js";
 import {
   activeOrganisation,
@@ -49,8 +53,12 @@ import {
  *
  * Three operations, and what each one refuses to be:
  *
- *   reserve   — asks the provider for a one-time upload target on the
- *               server's terms and records that it did. Not an upload.
+ *   reserve   — asks the provider for an upload target (one-shot, or
+ *               resumable tus) on the server's terms and records that it
+ *               did. Not an upload. A retry of the same resumable request
+ *               gets the same target back, never a second one.
+ *   cancel    — the founder stops an unfinished upload: the record says
+ *               UPLOAD_FAILED and the provider lets go of its asset.
  *   sync      — asks the provider where the bytes stand and walks the
  *               lifecycle to match, one legal step at a time. Not a
  *               webhook: it is the founder's own poll, and it never moves
@@ -68,6 +76,7 @@ import {
 const RESOURCE_MEDIA = AuditResourceTypeSchema.parse("media_asset");
 const ACTION = {
   reserved: AuditActionTypeSchema.parse("media.asset.upload_reserved"),
+  cancelled: AuditActionTypeSchema.parse("media.asset.upload_cancelled"),
   synced: AuditActionTypeSchema.parse("media.asset.synced"),
 };
 
@@ -97,6 +106,18 @@ export type CreateUploadSessionCommand = {
   readonly mediaAssetId: MediaAssetId;
   /** The version the caller saw. A stale tab does not reopen an upload. */
   readonly expectedVersion: number;
+  /**
+   * The file's exact size, from a client that can resume. With a provider
+   * that supports it this asks for a RESUMABLE target; without either, the
+   * one-shot DIRECT target is issued as before.
+   */
+  readonly uploadLengthBytes?: number | undefined;
+  /**
+   * The client's key for this intended reservation, reused on retry.
+   * Required with `uploadLengthBytes`: it is what lets a retry, or a
+   * reload, get back the same resumable target instead of a refusal.
+   */
+  readonly idempotencyKey?: string | undefined;
   readonly correlationId: CorrelationId;
 };
 
@@ -105,18 +126,27 @@ export type UploadSessionResult = {
   readonly session: VideoUploadSession;
   /** The server's reservation, so the client can say what it may not exceed. */
   readonly maxDurationSeconds: number;
+  /** True when a retried request was answered with the target it opened. */
+  readonly replayed: boolean;
 };
 
 /**
- * Reserves a one-time upload target for a CREATED pitch.
+ * Reserves an upload target for a CREATED pitch.
  *
- * Every term is the server's: the duration allowance is the product's hard
- * maximum, the target's expiry is the adapter's, and playback is signed
- * unless the asset's own policy is PUBLIC. The one-time URL is handed back
- * exactly once and never stored; the provider's identifier is stored and
- * never handed back. An asset that already holds a target is refused
- * rather than re-issued, because a second reservation would orphan the
- * first and the record would name bytes that never arrive.
+ * Every term is the server's: the mode (resumable when the provider can
+ * and the client said how many bytes), the duration allowance (the
+ * product's hard maximum), the target's expiry (the adapter's), and signed
+ * playback unless the asset's own policy is PUBLIC. The target is never
+ * stored; the provider's identifier is stored and never handed back.
+ *
+ * An asset that already holds a target is refused rather than re-issued —
+ * a second reservation would orphan the first — with one exception that is
+ * not a second reservation at all: the same request again. A RESUMABLE
+ * reservation carries a digest of (asset, length, idempotency key) on the
+ * provider's record, so a retry whose digest matches, while the target is
+ * still open, is answered with that same target. Nothing changes, nothing
+ * is emitted, and the version check is not applied, because the retry's
+ * version is by definition the one from before its own first attempt.
  */
 export function createCreateUploadSession(
   dependencies: MediaServiceDependencies,
@@ -148,6 +178,39 @@ export function createCreateUploadSession(
     if (asset === null || !belongsTo(asset, owner)) {
       throw new MediaAssetNotFoundError();
     }
+
+    const maxDurationSeconds = DEFAULT_PITCH_DURATION_POLICY.hardMaxSeconds;
+    const resumable = resumableTerms(
+      command,
+      asset.id,
+      videoProvider.capabilities.resumableUpload,
+    );
+
+    // The same request again: answered from the provider's own record,
+    // or not at all.
+    if (
+      resumable !== null &&
+      asset.status === "UPLOAD_PENDING" &&
+      asset.providerAssetId !== null
+    ) {
+      const reopened = await videoProvider.resumeUploadSession({
+        mediaAssetId: asset.id,
+        providerAssetId: asset.providerAssetId,
+        reservationKey: resumable.reservationKey,
+      });
+      if (reopened !== null) {
+        return {
+          asset,
+          session: reopened,
+          maxDurationSeconds,
+          replayed: true,
+        };
+      }
+      throw new MediaRuleError(
+        "This pitch already has an upload target that this request did not open.",
+      );
+    }
+
     if (asset.version !== command.expectedVersion) {
       throw new MediaAssetConflictError();
     }
@@ -160,12 +223,17 @@ export function createCreateUploadSession(
     }
 
     // The vendor first, with nothing locked.
-    const maxDurationSeconds = DEFAULT_PITCH_DURATION_POLICY.hardMaxSeconds;
     const session = await videoProvider.createUploadSession({
       mediaAssetId: asset.id,
       purpose: asset.purpose,
       maxDurationSeconds,
       requireSignedPlayback: asset.playbackPolicy !== "PUBLIC",
+      ...(resumable === null
+        ? {}
+        : {
+            uploadLengthBytes: resumable.uploadLengthBytes,
+            reservationKey: resumable.reservationKey,
+          }),
     });
 
     const updated = await transactions.run(async (tx: TransactionContext) => {
@@ -217,6 +285,9 @@ export function createCreateUploadSession(
           uploadMode: session.uploadMode,
           maxDurationSeconds,
           requireSignedPlayback: asset.playbackPolicy !== "PUBLIC",
+          ...(resumable === null
+            ? {}
+            : { uploadLengthBytes: resumable.uploadLengthBytes }),
         },
         correlationId: command.correlationId,
       });
@@ -238,7 +309,204 @@ export function createCreateUploadSession(
       return pending;
     });
 
-    return { asset: updated, session, maxDurationSeconds };
+    return { asset: updated, session, maxDurationSeconds, replayed: false };
+  };
+}
+
+/**
+ * The resumable terms of a request, or null for the one-shot target.
+ *
+ * A client that sent no length gets DIRECT, as before. A provider that
+ * cannot resume gives DIRECT too, and the client uploads whichever mode
+ * the answer names. A length without a key, or a length no pitch could
+ * be, is refused: the first could never be retried safely, and the second
+ * would hold a provider reservation open for nothing.
+ */
+function resumableTerms(
+  command: CreateUploadSessionCommand,
+  mediaAssetId: MediaAssetId,
+  providerCanResume: boolean,
+): {
+  readonly uploadLengthBytes: number;
+  readonly reservationKey: string;
+} | null {
+  const { uploadLengthBytes, idempotencyKey } = command;
+  if (uploadLengthBytes === undefined || !providerCanResume) {
+    return null;
+  }
+  if (idempotencyKey === undefined) {
+    throw new MediaRuleError(
+      "A resumable upload needs an idempotency key so it can be retried.",
+    );
+  }
+  if (
+    !Number.isInteger(uploadLengthBytes) ||
+    uploadLengthBytes < 1 ||
+    uploadLengthBytes > MAX_PITCH_UPLOAD_BYTES
+  ) {
+    throw new MediaRuleError(
+      "That file is larger than a pitch could be. Trim it or export at a lower bitrate.",
+    );
+  }
+  return {
+    uploadLengthBytes,
+    reservationKey: uploadReservationKey({
+      mediaAssetId,
+      uploadLengthBytes,
+      idempotencyKey,
+    }),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Cancel an upload
+// ---------------------------------------------------------------------------
+
+export type CancelUploadCommand = {
+  readonly actor: ActorContext;
+  readonly companyId: string;
+  readonly mediaAssetId: MediaAssetId;
+  readonly correlationId: CorrelationId;
+};
+
+export type CancelUploadResult = {
+  readonly asset: MediaAsset;
+  /**
+   * Whether the provider let go of its asset. False means the record is
+   * already honest and the provider's target will lapse at its expiry; a
+   * repeat of the cancel tries the release again.
+   */
+  readonly providerReleased: boolean;
+};
+
+/**
+ * The founder stops an upload that has not finished.
+ *
+ * The record moves first, to UPLOAD_FAILED — the lifecycle's own word for
+ * "the bytes did not arrive", legal from both UPLOAD_PENDING and UPLOADING
+ * — with the reason in the audit. Then, outside any transaction, the
+ * provider's asset is deleted: that releases its storage reservation and
+ * kills the upload target, so a tab still sending bytes is refused by the
+ * provider rather than completing into a record that has already said no.
+ * If bytes did land in the gap, the lifecycle refuses every later report
+ * for a terminal asset, so the record cannot be walked back to READY.
+ *
+ * Idempotent: cancelling an upload that is already UPLOAD_FAILED changes
+ * nothing and only retries the provider release. Anything that is not an
+ * upload in flight is refused; deleting a pitch is a different decision
+ * with its own capability.
+ */
+export function createCancelUpload(dependencies: MediaServiceDependencies) {
+  const { repositories, transactions, audit, outbox, videoProvider } =
+    dependencies;
+
+  const release = async (providerAssetId: string | null): Promise<boolean> => {
+    if (providerAssetId === null) return true;
+    try {
+      await videoProvider.deleteAsset(providerAssetId);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  return async (command: CancelUploadCommand): Promise<CancelUploadResult> => {
+    const { actor } = command;
+    const organisationId = activeOrganisation(actor);
+    const owner = await ownedResource(
+      dependencies,
+      actor,
+      companyRef(command.companyId),
+    );
+    await dependencies.authorization.requireCapability({
+      actor,
+      capability: MEDIA_CREATE,
+      resource: ownerScope(actor, owner),
+    });
+
+    const asset = await repositories.mediaAssets.findById(
+      dependencies.sql,
+      owner.tenantId,
+      command.mediaAssetId,
+    );
+    if (asset === null || !belongsTo(asset, owner)) {
+      throw new MediaAssetNotFoundError();
+    }
+    if (asset.status === "UPLOAD_FAILED") {
+      return {
+        asset,
+        providerReleased: await release(asset.providerAssetId),
+      };
+    }
+    if (asset.status !== "UPLOAD_PENDING" && asset.status !== "UPLOADING") {
+      throw new MediaRuleError(
+        `A ${asset.status} pitch has no upload in progress to cancel.`,
+      );
+    }
+
+    const cancelled = await transactions.run(async (tx: TransactionContext) => {
+      const locked = await repositories.mediaAssets.lockById(
+        tx,
+        owner.tenantId,
+        asset.id,
+      );
+      if (locked === null) {
+        throw new MediaAssetNotFoundError();
+      }
+      if (locked.version !== asset.version) {
+        // A webhook or a sync moved it meanwhile — perhaps the bytes
+        // finished. The caller re-reads rather than cancelling blind.
+        throw new MediaAssetConflictError();
+      }
+      const failed = await repositories.mediaAssets.transitionStatus(tx, {
+        tenantId: owner.tenantId,
+        mediaAssetId: asset.id,
+        expectedVersion: locked.version,
+        status: "UPLOAD_FAILED",
+      });
+      if (failed === null) {
+        throw new MediaAssetConflictError();
+      }
+      await audit.record(tx, {
+        ...auditActorFromContext(actor),
+        auditEventId: createAuditEventId(),
+        actionType: ACTION.cancelled,
+        resourceType: RESOURCE_MEDIA,
+        resourceId: asset.id,
+        occurredAt: occurredNow(),
+        outcome: "SUCCEEDED",
+        metadata: {
+          ownerType: asset.ownerType,
+          ownerId: asset.ownerId,
+          purpose: asset.purpose,
+          previousStatus: asset.status,
+          status: failed.status,
+          reason: "CANCELLED_BY_CREATOR",
+        },
+        correlationId: command.correlationId,
+      });
+      await outbox.enqueue(
+        tx,
+        mediaAssetStatusChangedEvent(
+          { actor, organisationId, correlationId: command.correlationId },
+          failed.version,
+          {
+            mediaAssetId: asset.id,
+            ownerType: asset.ownerType,
+            ownerId: asset.ownerId,
+            purpose: asset.purpose,
+            previousStatus: asset.status,
+            status: failed.status,
+          },
+        ),
+      );
+      return failed;
+    });
+
+    return {
+      asset: cancelled,
+      providerReleased: await release(cancelled.providerAssetId),
+    };
   };
 }
 

@@ -1,14 +1,19 @@
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import {
+  CancelMediaUploadRequestSchema,
+  CancelMediaUploadResponseSchema,
   COMPANIES_PATH,
   COMPANY_PITCH_SUFFIX,
   CorrelationIdSchema,
   CreateCompanyPitchRequestSchema,
   CreateMediaUploadSessionRequestSchema,
   createProblemDetails,
+  IDEMPOTENCY_KEY_HEADER,
+  IdempotencyKeyHeaderSchema,
   MEDIA_PLAYBACK_POLICY_SUFFIX,
   MEDIA_PLAYBACK_SUFFIX,
   MEDIA_SYNC_SUFFIX,
+  MEDIA_UPLOAD_CANCEL_SUFFIX,
   MEDIA_UPLOAD_SESSION_SUFFIX,
   MediaUploadSessionDtoSchema,
   parseContract,
@@ -245,7 +250,7 @@ function registerPitchRoutes(
     },
   );
 
-  // The direct upload flow (CQ-MEDIA-011). Three POSTs on one asset, each
+  // The direct upload flow (CQ-MEDIA-011). POSTs on one asset, each
   // answering with a contract DTO that carries no provider identifier: the
   // one-time upload target and the minted playback URL are the only
   // provider-shaped things a client ever sees, and both are the server's
@@ -263,15 +268,30 @@ function registerPitchRoutes(
         request.body ?? {},
         "The upload request is not valid.",
       );
+      // A client that can resume says how many bytes, and must name the
+      // request so a retry can be recognised. Without a length the key is
+      // optional and unused: a one-shot target cannot be issued twice.
+      const rawKey = request.headers[IDEMPOTENCY_KEY_HEADER];
+      const idempotencyKey =
+        input.uploadLengthBytes === undefined
+          ? undefined
+          : parseContract(
+              IdempotencyKeyHeaderSchema,
+              typeof rawKey === "string" ? rawKey : undefined,
+              "An Idempotency-Key header is required for a resumable upload.",
+            );
       const result = await service.createUploadSession({
         actor,
         companyId: companyIdParam(request),
         mediaAssetId: mediaAssetIdParam(request),
         expectedVersion: input.expectedVersion,
+        ...(input.uploadLengthBytes === undefined
+          ? {}
+          : { uploadLengthBytes: input.uploadLengthBytes, idempotencyKey }),
         correlationId: correlation(),
       });
       return reply
-        .code(201)
+        .code(result.replayed ? 200 : 201)
         .header("Cache-Control", "no-store")
         .send(
           MediaUploadSessionDtoSchema.parse({
@@ -280,9 +300,46 @@ function registerPitchRoutes(
             uploadUrl: result.session.uploadUrl,
             expiresAt: result.session.expiresAt,
             maxDurationSeconds: result.maxDurationSeconds,
+            ...(result.session.chunkSizeBytes === undefined
+              ? {}
+              : { chunkSizeBytes: result.session.chunkSizeBytes }),
             pitch: payload(result.asset),
           }),
         );
+    },
+  );
+
+  // Cancel. The founder stops an unfinished upload: the record says
+  // UPLOAD_FAILED and the provider lets go of its target. Idempotent.
+  app.post(
+    `${pitch}/:mediaAssetId${MEDIA_UPLOAD_CANCEL_SUFFIX}`,
+    { onRequest: withContext },
+    async (request, reply) => {
+      const actor = getActorContext(request);
+      parseContract(
+        CancelMediaUploadRequestSchema,
+        request.body ?? {},
+        "The cancel request is not valid.",
+      );
+      const result = await service.cancelUpload({
+        actor,
+        companyId: companyIdParam(request),
+        mediaAssetId: mediaAssetIdParam(request),
+        correlationId: correlation(),
+      });
+      if (!result.providerReleased) {
+        // The record is already honest; the provider's target lapses at
+        // its expiry, and a repeat of this call retries the release.
+        request.log.warn(
+          { requestId: request.id, mediaAssetId: result.asset.id },
+          "cancelled upload not yet released by the video provider",
+        );
+      }
+      return reply.header("Cache-Control", "no-store").send(
+        CancelMediaUploadResponseSchema.parse({
+          pitch: payload(result.asset),
+        }),
+      );
     },
   );
 

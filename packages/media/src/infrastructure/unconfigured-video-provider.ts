@@ -27,6 +27,10 @@ export function createUnconfiguredVideoProvider(options: {
       Promise.reject(
         new MediaProviderNotConfiguredError("upload", options.missing),
       ),
+    resumeUploadSession: () =>
+      Promise.reject(
+        new MediaProviderNotConfiguredError("upload", options.missing),
+      ),
     getAsset: () =>
       Promise.reject(
         new MediaProviderNotConfiguredError("asset status", options.missing),

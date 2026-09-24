@@ -6,6 +6,7 @@ import {
   COMPANY_PITCH_SUFFIX,
   MEDIA_PLAYBACK_SUFFIX,
   MEDIA_SYNC_SUFFIX,
+  MEDIA_UPLOAD_CANCEL_SUFFIX,
   MEDIA_UPLOAD_SESSION_SUFFIX,
 } from "@capital-q/contracts";
 
@@ -43,6 +44,7 @@ type Recorded = {
   readonly path: string;
   readonly body: unknown;
   readonly authorization: string | null;
+  readonly idempotencyKey: string | null;
 };
 
 function sessionDouble(
@@ -66,6 +68,7 @@ function sessionDouble(
           ? (JSON.parse(init.body) as unknown)
           : null,
       authorization: headers.get("authorization"),
+      idempotencyKey: headers.get("idempotency-key"),
     });
     const scripted = answer(url.pathname);
     return Promise.resolve(
@@ -175,6 +178,48 @@ describe("apiPitchTransport", () => {
     for (const call of calls) {
       expect(call.authorization).toBe("Bearer session-token");
     }
+  });
+
+  it("reserves resumably with the length in the body and the key as a header, and cancels on its own path", async () => {
+    const { session, calls } = sessionDouble((path) =>
+      path.endsWith(MEDIA_UPLOAD_CANCEL_SUFFIX)
+        ? {
+            status: 200,
+            body: { pitch: { ...PITCH, status: "UPLOAD_FAILED", version: 4 } },
+          }
+        : {
+            status: 201,
+            body: {
+              mediaAssetId: ASSET,
+              uploadMode: "RESUMABLE",
+              uploadUrl: "https://upload.provider.example/tus/resource",
+              expiresAt: "2026-09-23T11:00:00.000Z",
+              maxDurationSeconds: 180,
+              chunkSizeBytes: 5_242_880,
+              pitch: { ...PITCH, status: "UPLOAD_PENDING", version: 3 },
+            },
+          },
+    );
+    const transport = apiPitchTransport(session);
+    const reserved = await transport.reserve(COMPANY, ASSET, 1, {
+      uploadLengthBytes: 6_291_456,
+      idempotencyKey: "pitch-upload-key-0001",
+    });
+    expect(reserved.uploadMode).toBe("RESUMABLE");
+    expect(reserved.chunkSizeBytes).toBe(5_242_880);
+    const cancelled = await transport.cancel(COMPANY, ASSET);
+    expect(cancelled.status).toBe("UPLOAD_FAILED");
+
+    expect(
+      calls.map((call) => [call.path, call.body, call.idempotencyKey]),
+    ).toEqual([
+      [
+        `${assetPath}${MEDIA_UPLOAD_SESSION_SUFFIX}`,
+        { expectedVersion: 1, uploadLengthBytes: 6_291_456 },
+        "pitch-upload-key-0001",
+      ],
+      [`${assetPath}${MEDIA_UPLOAD_CANCEL_SUFFIX}`, {}, null],
+    ]);
   });
 
   it("loads the company and its current pitch together", async () => {

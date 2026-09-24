@@ -6,11 +6,13 @@ import { ProviderAssetIdSchema, type MediaStatus } from "../contracts/index.js";
 import {
   CreateVideoUploadSessionSchema,
   PlaybackAuthorizationRequestSchema,
+  ResumeVideoUploadSessionSchema,
   VideoAssetStatusSchema,
   VideoUploadSessionSchema,
   type CreateVideoUploadSession,
   type PlaybackAuthorization,
   type PlaybackAuthorizationRequest,
+  type ResumeVideoUploadSession,
   type VideoAssetStatus,
   type VideoProvider,
   type VideoUploadSession,
@@ -38,10 +40,17 @@ import {
  * `Authorization` header of a request to the vendor. It is never part of a
  * returned value, an error message or a thrown cause.
  *
- * Resumable (tus) creator uploads are deliberately not claimed. Cloudflare
- * requires the byte length up front for that mode and the port does not
- * carry it, so the adapter reports `resumableUpload: false` rather than
- * promising a mode it cannot open.
+ * Two upload targets (CQ-MEDIA-011, doc 20 §10–§11). Without a byte length
+ * the target is the one-shot direct creator upload: one POST of the whole
+ * file. With one it is a tus direct creator upload: the server asks Stream
+ * for a tus resource on its terms, and the browser PATCHes the bytes to it
+ * in chunks, asking where it stands after any drop. Either way the browser
+ * talks to Cloudflare and never to us, and never holds the API token.
+ *
+ * A tus reservation carries a digest of the request that made it
+ * (`cqreservation` in the upload metadata). That is how a retried
+ * reservation is recognised without Capital Q storing anything new: the
+ * provider's own record says which request opened it.
  */
 
 export const CLOUDFLARE_STREAM_PROVIDER_ID = "CLOUDFLARE_STREAM" as const;
@@ -52,8 +61,26 @@ const DEFAULT_TIMEOUT_MS = 15_000;
 const UPLOAD_EXPIRY_MIN_SECONDS = 120;
 const UPLOAD_EXPIRY_MAX_SECONDS = 6 * 3_600;
 const DEFAULT_UPLOAD_EXPIRY_SECONDS = 30 * 60;
+/**
+ * A resumable target outlives the one-shot kind: its point is surviving a
+ * slow, dropping connection. Still bounded, because Stream reserves storage
+ * against `maxDurationSeconds` until the upload completes or expires.
+ */
+const DEFAULT_RESUMABLE_UPLOAD_EXPIRY_SECONDS = 2 * 3_600;
 /** Tolerance for clock skew between this server and the vendor's edge. */
 const NOT_BEFORE_SKEW_SECONDS = 60;
+
+const TUS_VERSION = "1.0.0";
+/**
+ * Stream's tus rules: at least 5 MiB per PATCH unless the file is smaller,
+ * a multiple of 256 KiB, at most 200 MiB. The minimum is chosen on purpose:
+ * a dropped mobile connection then costs at most one chunk.
+ */
+export const CLOUDFLARE_TUS_CHUNK_SIZE_BYTES = 5 * 1024 * 1024;
+/** Where Stream serves tus resources. Bytes are never sent anywhere else. */
+const TUS_UPLOAD_ORIGIN = "https://upload.cloudflarestream.com";
+/** The upload-metadata key that binds a tus asset to the request that opened it. */
+const RESERVATION_METADATA_KEY = "cqreservation";
 
 export type CloudflareStreamSigningKey = {
   /** The key id Cloudflare issued with the signing key. */
@@ -78,6 +105,8 @@ export type CloudflareStreamVideoProviderOptions = {
    */
   readonly signingKey?: CloudflareStreamSigningKey | undefined;
   readonly uploadExpirySeconds?: number | undefined;
+  /** Expiry of a resumable (tus) target; defaults to two hours. */
+  readonly resumableUploadExpirySeconds?: number | undefined;
   readonly apiBaseUrl?: string | undefined;
   readonly timeoutMs?: number | undefined;
   /** Test seam. */
@@ -109,6 +138,12 @@ const OptionsSchema = z
       .min(UPLOAD_EXPIRY_MIN_SECONDS)
       .max(UPLOAD_EXPIRY_MAX_SECONDS)
       .default(DEFAULT_UPLOAD_EXPIRY_SECONDS),
+    resumableUploadExpirySeconds: z
+      .number()
+      .int()
+      .min(UPLOAD_EXPIRY_MIN_SECONDS)
+      .max(UPLOAD_EXPIRY_MAX_SECONDS)
+      .default(DEFAULT_RESUMABLE_UPLOAD_EXPIRY_SECONDS),
     apiBaseUrl: z.string().url().default(DEFAULT_API_BASE_URL),
     timeoutMs: z
       .number()
@@ -170,6 +205,12 @@ export const CloudflareVideoSchema = z.object({
 });
 export type CloudflareVideo = z.infer<typeof CloudflareVideoSchema>;
 
+/** The same video, with what a tus resume check reads besides. */
+const ResumableVideoSchema = CloudflareVideoSchema.extend({
+  meta: z.record(z.string(), z.unknown()).optional(),
+  uploadExpiry: z.string().nullable().optional(),
+});
+
 const TokenResultSchema = z.object({ token: z.string().min(1) });
 
 /**
@@ -177,6 +218,11 @@ const TokenResultSchema = z.object({ token: z.string().min(1) });
  * bytes ever arrived: with an `uploaded` timestamp the encoder failed, and
  * without one the upload did. A state this table does not know is reported
  * as a malformed answer rather than guessed into the lifecycle.
+ *
+ * Observed live (2026-09-24): a tus reservation carries `uploaded` from the
+ * moment it is created, so an `error` on a tus asset always reads as a
+ * processing failure. The founder's next step is the same either way —
+ * replace the file — and the vendor's reason code travels with it.
  */
 export function translateCloudflareState(video: {
   readonly state: string;
@@ -273,6 +319,29 @@ function posterUrl(subdomain: string, tokenOrUid: string): string {
 
 const base64url = (value: string | Buffer): string =>
   Buffer.from(value).toString("base64url");
+/** tus `Upload-Metadata` values are standard base64 (RFC 4648 §4). */
+const base64 = (value: string): string =>
+  Buffer.from(value, "utf8").toString("base64");
+
+/**
+ * The tus resource Stream issued, accepted only on its upload host and at
+ * `/tus/<the video id it named>`. Anything else is refused as a malformed
+ * answer rather than handed to a browser: a target elsewhere would send a
+ * founder's bytes somewhere Capital Q never agreed to, and a different
+ * shape would break the resume path, which addresses the same resource.
+ */
+function tusTarget(location: string | null, uid: string): string | null {
+  if (location === null) return null;
+  let url: URL;
+  try {
+    url = new URL(location);
+  } catch {
+    return null;
+  }
+  return url.origin === TUS_UPLOAD_ORIGIN && url.pathname === `/tus/${uid}`
+    ? url.toString()
+    : null;
+}
 
 function privateKeyPem(pem: string): string {
   return pem.trimStart().startsWith("-----")
@@ -293,6 +362,9 @@ export function createCloudflareStreamVideoProvider(
     ...(input.uploadExpirySeconds === undefined
       ? {}
       : { uploadExpirySeconds: input.uploadExpirySeconds }),
+    ...(input.resumableUploadExpirySeconds === undefined
+      ? {}
+      : { resumableUploadExpirySeconds: input.resumableUploadExpirySeconds }),
     ...(input.apiBaseUrl === undefined ? {} : { apiBaseUrl: input.apiBaseUrl }),
     ...(input.timeoutMs === undefined ? {} : { timeoutMs: input.timeoutMs }),
   });
@@ -325,22 +397,23 @@ export function createCloudflareStreamVideoProvider(
    * live here so every operation fails the same way. 404 is handed back to
    * the caller because it means different things to different operations.
    */
-  async function request<TSchema extends z.ZodType>(
+  /** The one place a request leaves for the vendor, authenticated and timed. */
+  async function send(
     operation: string,
     method: "GET" | "POST" | "DELETE",
-    path: string,
-    schema: TSchema,
+    pathAndQuery: string,
+    headers: Readonly<Record<string, string>>,
     body?: unknown,
-  ): Promise<Answer<z.infer<TSchema>>> {
+  ): Promise<Response> {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), options.timeoutMs);
-    let response: Response;
     try {
-      response = await doFetch(`${streamBase}${path}`, {
+      return await doFetch(`${streamBase}${pathAndQuery}`, {
         method,
         headers: {
           authorization: `Bearer ${options.apiToken}`,
           accept: "application/json",
+          ...headers,
           ...(body === undefined ? {} : { "content-type": "application/json" }),
         },
         ...(body === undefined ? {} : { body: JSON.stringify(body) }),
@@ -351,11 +424,9 @@ export function createCloudflareStreamVideoProvider(
     } finally {
       clearTimeout(timer);
     }
+  }
 
-    if (response.status === 404) {
-      return { kind: "NOT_FOUND" };
-    }
-
+  async function readEnvelope(response: Response) {
     let payload: unknown = null;
     const text = await response.text().catch(() => "");
     if (text.length > 0) {
@@ -370,6 +441,23 @@ export function createCloudflareStreamVideoProvider(
       envelope.success && envelope.data.errors[0]?.code !== undefined
         ? String(envelope.data.errors[0].code)
         : null;
+    return { text, envelope, providerCode };
+  }
+
+  async function request<TSchema extends z.ZodType>(
+    operation: string,
+    method: "GET" | "POST" | "DELETE",
+    path: string,
+    schema: TSchema,
+    body?: unknown,
+  ): Promise<Answer<z.infer<TSchema>>> {
+    const response = await send(operation, method, path, {}, body);
+
+    if (response.status === 404) {
+      return { kind: "NOT_FOUND" };
+    }
+
+    const { text, envelope, providerCode } = await readEnvelope(response);
 
     if (!response.ok) {
       throw fail(
@@ -407,6 +495,9 @@ export function createCloudflareStreamVideoProvider(
     raw: CreateVideoUploadSession,
   ): Promise<VideoUploadSession> {
     const session = CreateVideoUploadSessionSchema.parse(raw);
+    if (session.uploadLengthBytes !== undefined) {
+      return createResumableUploadSession(session, session.uploadLengthBytes);
+    }
     const expiresAt = new Date(
       now().getTime() + options.uploadExpirySeconds * 1_000,
     ).toISOString();
@@ -437,6 +528,117 @@ export function createCloudflareStreamVideoProvider(
       uploadMode: "DIRECT",
       uploadUrl: answer.result.uploadURL,
       expiresAt,
+    });
+  }
+
+  /**
+   * A tus direct creator upload. The request is the vendor's documented
+   * shape: `?direct_user=true`, the tus headers, the creator reference as
+   * `Upload-Creator`, and every term in `Upload-Metadata` as
+   * `key base64(value)` pairs. The answer has no body; the tus resource is
+   * the `Location` header and the video id is `stream-media-id`.
+   */
+  async function createResumableUploadSession(
+    session: CreateVideoUploadSession,
+    uploadLengthBytes: number,
+  ): Promise<VideoUploadSession> {
+    const expiresAt = new Date(
+      now().getTime() + options.resumableUploadExpirySeconds * 1_000,
+    ).toISOString();
+    const metadata = [
+      // The reservation is Capital Q's number, never the browser's.
+      `maxDurationSeconds ${base64(String(session.maxDurationSeconds))}`,
+      `expiry ${base64(expiresAt)}`,
+      `name ${base64(`${session.purpose} ${session.mediaAssetId}`)}`,
+      ...(session.requireSignedPlayback ? ["requiresignedurls"] : []),
+      ...(session.allowedOrigin === undefined
+        ? []
+        : [`allowedorigins ${base64(new URL(session.allowedOrigin).host)}`]),
+      ...(session.reservationKey === undefined
+        ? []
+        : [`${RESERVATION_METADATA_KEY} ${base64(session.reservationKey)}`]),
+    ].join(",");
+
+    const response = await send("upload", "POST", "?direct_user=true", {
+      "tus-resumable": TUS_VERSION,
+      "upload-length": String(uploadLengthBytes),
+      "upload-creator": session.mediaAssetId,
+      "upload-metadata": metadata,
+    });
+    const { providerCode } = await readEnvelope(response);
+    if (!response.ok) {
+      throw fail(
+        "upload",
+        response.status === 404
+          ? "REJECTED"
+          : classifyCloudflareStatus(response.status),
+        response.status,
+        providerCode,
+      );
+    }
+    const uid = ProviderAssetIdSchema.safeParse(
+      response.headers.get("stream-media-id"),
+    );
+    const target = uid.success
+      ? tusTarget(response.headers.get("location"), uid.data)
+      : null;
+    if (!uid.success || target === null) {
+      throw fail("upload", "MALFORMED_RESPONSE", response.status, null);
+    }
+    return VideoUploadSessionSchema.parse({
+      providerAssetId: uid.data,
+      uploadMode: "RESUMABLE",
+      uploadUrl: target,
+      expiresAt,
+      chunkSizeBytes: CLOUDFLARE_TUS_CHUNK_SIZE_BYTES,
+    });
+  }
+
+  /**
+   * The open tus target a retried reservation asked for, or null.
+   *
+   * Every condition is read from the vendor's own record: it names our
+   * asset as creator, carries the same reservation digest, has not
+   * received all its bytes, and has not lapsed. The resource address is
+   * then the one Stream issued at reservation — `/tus/<video id>` on its
+   * upload host, observed and asserted by `tusTarget` when it was issued —
+   * so nothing about it is stored on our side.
+   */
+  async function resumeUploadSession(
+    raw: ResumeVideoUploadSession,
+  ): Promise<VideoUploadSession | null> {
+    const input = ResumeVideoUploadSessionSchema.parse(raw);
+    const answer = await request(
+      "upload",
+      "GET",
+      `/${encodeURIComponent(input.providerAssetId)}`,
+      ResumableVideoSchema,
+    );
+    if (answer.kind === "NOT_FOUND") {
+      return null;
+    }
+    const video = answer.result;
+    const expiry =
+      typeof video.uploadExpiry === "string"
+        ? Date.parse(video.uploadExpiry)
+        : Number.NaN;
+    if (
+      video.uid !== input.providerAssetId ||
+      video.creator !== input.mediaAssetId ||
+      video.meta?.[RESERVATION_METADATA_KEY] !== input.reservationKey ||
+      video.status.state !== "pendingupload" ||
+      (!Number.isNaN(expiry) && expiry <= now().getTime())
+    ) {
+      return null;
+    }
+    return VideoUploadSessionSchema.parse({
+      providerAssetId: video.uid,
+      uploadMode: "RESUMABLE",
+      uploadUrl: `${TUS_UPLOAD_ORIGIN}/tus/${encodeURIComponent(video.uid)}?tusv2=true`,
+      ...(Number.isNaN(expiry)
+        ? {}
+        : { expiresAt: new Date(expiry).toISOString() }),
+      chunkSizeBytes: CLOUDFLARE_TUS_CHUNK_SIZE_BYTES,
     });
   }
 
@@ -565,11 +767,12 @@ export function createCloudflareStreamVideoProvider(
     id: CLOUDFLARE_STREAM_PROVIDER_ID,
     capabilities: {
       directUpload: true,
-      resumableUpload: false,
+      resumableUpload: true,
       signedPlayback: options.customerSubdomain !== undefined,
       captions: false,
     },
     createUploadSession,
+    resumeUploadSession,
     getAsset,
     createPlaybackAuthorization,
     deleteAsset,

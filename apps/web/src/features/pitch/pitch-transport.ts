@@ -1,5 +1,6 @@
 import {
   authorisePitchPlayback,
+  cancelPitchUpload,
   createPitchMediaAsset,
   createPitchUploadSession,
   getCompany,
@@ -38,12 +39,25 @@ export type PitchTransport = {
     companyId: string,
     replacesMediaAssetId: string | null,
   ) => Promise<CreateCompanyPitchResponse>;
-  /** `POST …/upload-session` — the one-time target, against the version seen. */
+  /**
+   * `POST …/upload-session` — the target, against the version seen. With
+   * `resumable` the server may issue a resumable target, and the same key
+   * and length again return the same open one.
+   */
   readonly reserve: (
     companyId: string,
     mediaAssetId: string,
     expectedVersion: number,
+    resumable?: {
+      readonly uploadLengthBytes: number;
+      readonly idempotencyKey: string;
+    },
   ) => Promise<MediaUploadSessionDto>;
+  /** `POST …/upload-session/cancel` — stop an unfinished upload. */
+  readonly cancel: (
+    companyId: string,
+    mediaAssetId: string,
+  ) => Promise<MediaAssetDto>;
   /** `POST …/sync` — where the bytes stand, as the server now records it. */
   readonly sync: (
     companyId: string,
@@ -78,10 +92,23 @@ export function apiPitchTransport(session: ApiSession): PitchTransport {
         companyId,
         replacesMediaAssetId === null ? {} : { replacesMediaAssetId },
       ),
-    reserve: (companyId, mediaAssetId, expectedVersion) =>
-      createPitchUploadSession(session, companyId, mediaAssetId, {
-        expectedVersion,
-      }),
+    reserve: (companyId, mediaAssetId, expectedVersion, resumable) =>
+      resumable === undefined
+        ? createPitchUploadSession(session, companyId, mediaAssetId, {
+            expectedVersion,
+          })
+        : createPitchUploadSession(
+            session,
+            companyId,
+            mediaAssetId,
+            {
+              expectedVersion,
+              uploadLengthBytes: resumable.uploadLengthBytes,
+            },
+            resumable.idempotencyKey,
+          ),
+    cancel: async (companyId, mediaAssetId) =>
+      (await cancelPitchUpload(session, companyId, mediaAssetId)).pitch,
     sync: async (companyId, mediaAssetId) =>
       (await syncPitch(session, companyId, mediaAssetId)).pitch,
     authorise: (companyId, mediaAssetId) =>

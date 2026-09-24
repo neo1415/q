@@ -41,7 +41,13 @@ type Call = {
 
 /** An HTTP double: records every call, answers from a script. */
 function httpDouble(
-  answer: (call: Call) => { status: number; body?: unknown } | Error,
+  answer: (call: Call) =>
+    | {
+        status: number;
+        body?: unknown;
+        headers?: Record<string, string>;
+      }
+    | Error,
 ) {
   const calls: Call[] = [];
   const doFetch: typeof fetch = (input, init) => {
@@ -71,7 +77,10 @@ function httpDouble(
         scripted.body === undefined ? null : JSON.stringify(scripted.body),
         {
           status: scripted.status,
-          headers: { "content-type": "application/json" },
+          headers: {
+            "content-type": "application/json",
+            ...scripted.headers,
+          },
         },
       ),
     );
@@ -516,5 +525,188 @@ describe("construction", () => {
     expect(() =>
       createCloudflareStreamVideoProvider({ accountId: ACCOUNT, apiToken: "" }),
     ).toThrow(/API token/);
+  });
+});
+
+describe("resumable (tus) upload", () => {
+  const KEY = "a".repeat(64);
+  const TUS_URL = `https://upload.cloudflarestream.com/tus/${UID}?tusv2=true`;
+  const reserve = (double: ReturnType<typeof httpDouble>) =>
+    provider(double, {
+      resumableUploadExpirySeconds: 3_600,
+    }).createUploadSession({
+      mediaAssetId: MEDIA_ASSET_ID,
+      purpose: "FOUNDER_PITCH",
+      maxDurationSeconds: 180,
+      requireSignedPlayback: true,
+      uploadLengthBytes: 6_291_456,
+      reservationKey: KEY,
+    });
+  const decode = (metadata: string): Record<string, string | true> => {
+    const decoded: Record<string, string | true> = {};
+    for (const pair of metadata.split(",")) {
+      const [key = "", value] = pair.split(" ");
+      decoded[key] =
+        value === undefined
+          ? true
+          : Buffer.from(value, "base64").toString("utf8");
+    }
+    return decoded;
+  };
+
+  it("asks Stream for a tus direct creator upload in the documented shape", async () => {
+    const double = httpDouble(() => ({
+      status: 201,
+      headers: { location: TUS_URL, "stream-media-id": UID },
+    }));
+    const session = await reserve(double);
+
+    expect(session).toEqual({
+      providerAssetId: UID,
+      uploadMode: "RESUMABLE",
+      uploadUrl: TUS_URL,
+      expiresAt: "2026-09-23T13:00:00.000Z",
+      chunkSizeBytes: 5 * 1024 * 1024,
+    });
+    const [call] = double.calls;
+    expect(call?.method).toBe("POST");
+    expect(call?.url).toBe(
+      `https://api.cloudflare.com/client/v4/accounts/${ACCOUNT}/stream?direct_user=true`,
+    );
+    expect(call?.body).toBeUndefined();
+    expect(call?.headers["authorization"]).toBe(`Bearer ${TOKEN}`);
+    expect(call?.headers["tus-resumable"]).toBe("1.0.0");
+    expect(call?.headers["upload-length"]).toBe("6291456");
+    // The creator reference is our asset id, never a person.
+    expect(call?.headers["upload-creator"]).toBe(MEDIA_ASSET_ID);
+    // Every term is the server's, base64-encoded as tus requires; the
+    // digest (never the client's key) rides along for retries.
+    expect(decode(call?.headers["upload-metadata"] ?? "")).toEqual({
+      maxDurationSeconds: "180",
+      expiry: "2026-09-23T13:00:00.000Z",
+      name: `FOUNDER_PITCH ${MEDIA_ASSET_ID}`,
+      requiresignedurls: true,
+      cqreservation: KEY,
+    });
+    expect(JSON.stringify(session)).not.toContain(TOKEN);
+  });
+
+  it("omits the signed-URL flag only for PUBLIC media, and the digest when there is none", async () => {
+    const double = httpDouble(() => ({
+      status: 201,
+      headers: { location: TUS_URL, "stream-media-id": UID },
+    }));
+    await provider(double).createUploadSession({
+      mediaAssetId: MEDIA_ASSET_ID,
+      purpose: "FOUNDER_PITCH",
+      maxDurationSeconds: 180,
+      requireSignedPlayback: false,
+      uploadLengthBytes: 1_000,
+    });
+    const metadata = decode(double.calls[0]?.headers["upload-metadata"] ?? "");
+    expect(metadata).not.toHaveProperty("requiresignedurls");
+    expect(metadata).not.toHaveProperty("cqreservation");
+  });
+
+  it.each([
+    ["no Location", { "stream-media-id": UID }],
+    ["no media id", { location: TUS_URL }],
+    [
+      "a Location on another host",
+      { location: `https://evil.example/tus/${UID}`, "stream-media-id": UID },
+    ],
+    [
+      "a Location for another video",
+      {
+        location:
+          "https://upload.cloudflarestream.com/tus/0000000000000000000000000000000a",
+        "stream-media-id": UID,
+      },
+    ],
+    [
+      "a plain-http Location",
+      {
+        location: `http://upload.cloudflarestream.com/tus/${UID}`,
+        "stream-media-id": UID,
+      },
+    ],
+  ])(
+    "refuses an answer with %s rather than hand it to a browser",
+    async (_, headers) => {
+      const double = httpDouble(() => ({ status: 201, headers }));
+      const failure = await reserve(double).catch((error: unknown) => error);
+      expect(failure).toBeInstanceOf(MediaProviderError);
+      expect((failure as MediaProviderError).failure).toBe(
+        "MALFORMED_RESPONSE",
+      );
+    },
+  );
+
+  it("classifies a refused reservation like any other vendor call", async () => {
+    const double = httpDouble(() => ({
+      status: 429,
+      body: envelope(null, [{ code: 10_011, message: "slow down" }]),
+    }));
+    const failure = await reserve(double).catch((error: unknown) => error);
+    expect((failure as MediaProviderError).failure).toBe("RATE_LIMITED");
+    expect((failure as MediaProviderError).providerCode).toBe("10011");
+  });
+
+  describe("resumeUploadSession", () => {
+    const pending = (overrides: Record<string, unknown> = {}) =>
+      envelope({
+        uid: UID,
+        creator: MEDIA_ASSET_ID,
+        meta: { name: `FOUNDER_PITCH ${MEDIA_ASSET_ID}`, cqreservation: KEY },
+        status: { state: "pendingupload", errorReasonCode: "" },
+        uploaded: "2026-09-23T11:59:00.000Z",
+        uploadExpiry: "2026-09-23T13:30:00.000Z",
+        ...overrides,
+      });
+    const resume = (double: ReturnType<typeof httpDouble>) =>
+      provider(double).resumeUploadSession({
+        mediaAssetId: MEDIA_ASSET_ID,
+        providerAssetId: UID,
+        reservationKey: KEY,
+      });
+
+    it("hands back the same tus resource while it is still open", async () => {
+      const double = httpDouble(() => ({ status: 200, body: pending() }));
+      expect(await resume(double)).toEqual({
+        providerAssetId: UID,
+        uploadMode: "RESUMABLE",
+        uploadUrl: TUS_URL,
+        expiresAt: "2026-09-23T13:30:00.000Z",
+        chunkSizeBytes: 5 * 1024 * 1024,
+      });
+      expect(double.calls[0]?.method).toBe("GET");
+      expect(double.calls[0]?.url).toBe(
+        `https://api.cloudflare.com/client/v4/accounts/${ACCOUNT}/stream/${UID}`,
+      );
+    });
+
+    it.each<[string, Record<string, unknown> | "gone"]>([
+      [
+        "another request's reservation",
+        { meta: { cqreservation: "b".repeat(64) } },
+      ],
+      ["no reservation at all", { meta: { name: "x" } }],
+      ["another creator", { creator: "someone-else" }],
+      ["bytes already complete", { status: { state: "queued" } }],
+      ["a lapsed target", { uploadExpiry: "2026-09-23T11:00:00.000Z" }],
+      ["a deleted asset", "gone"],
+    ])("refuses %s", async (_, change) => {
+      const double = httpDouble(() =>
+        change === "gone"
+          ? { status: 404, body: envelope(null, [{ code: 10_003 }]) }
+          : { status: 200, body: pending(change) },
+      );
+      expect(await resume(double)).toBeNull();
+    });
+  });
+
+  it("claims resumable upload as a capability", () => {
+    const double = httpDouble(() => ({ status: 200 }));
+    expect(provider(double).capabilities.resumableUpload).toBe(true);
   });
 });

@@ -40,6 +40,10 @@ export {
   type MediaProviderFailure,
 } from "./domain/errors.js";
 export {
+  MAX_PITCH_UPLOAD_BYTES,
+  uploadReservationKey,
+} from "./domain/upload-reservation.js";
+export {
   allowedTransitionsFrom,
   canTransition,
   isReady,
@@ -100,6 +104,8 @@ export {
 } from "./application/provider-status-use-cases.js";
 export {
   type AuthorisePlaybackQuery,
+  type CancelUploadCommand,
+  type CancelUploadResult,
   type CreateUploadSessionCommand,
   type PlaybackGrant,
   type SyncMediaAssetCommand,
@@ -138,6 +144,7 @@ export {
 } from "./infrastructure/postgres-media-repository.js";
 export {
   CLOUDFLARE_STREAM_PROVIDER_ID,
+  CLOUDFLARE_TUS_CHUNK_SIZE_BYTES,
   classifyCloudflareStatus,
   createCloudflareStreamVideoProvider,
   normalizeCloudflareVideo,

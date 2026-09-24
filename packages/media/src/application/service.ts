@@ -23,6 +23,7 @@ import {
 } from "./publish-use-cases.js";
 import {
   createAuthorisePlayback,
+  createCancelUpload,
   createCreateUploadSession,
   createSyncMediaAsset,
 } from "./upload-use-cases.js";
@@ -50,6 +51,7 @@ export type MediaService = {
   readonly setMediaStates: ReturnType<typeof createSetMediaStates>;
   /** The direct upload flow (CQ-MEDIA-011): reserve, sync, play. */
   readonly createUploadSession: ReturnType<typeof createCreateUploadSession>;
+  readonly cancelUpload: ReturnType<typeof createCancelUpload>;
   readonly syncMediaAsset: ReturnType<typeof createSyncMediaAsset>;
   readonly authorisePlayback: ReturnType<typeof createAuthorisePlayback>;
   /**
@@ -120,6 +122,7 @@ export function createMediaService(options: MediaServiceOptions): MediaService {
     recordProviderMetadata: createRecordProviderMetadata(dependencies),
     setMediaStates: createSetMediaStates(dependencies),
     createUploadSession: createCreateUploadSession(dependencies),
+    cancelUpload: createCancelUpload(dependencies),
     syncMediaAsset: createSyncMediaAsset(dependencies),
     authorisePlayback: createAuthorisePlayback(dependencies),
     applyProviderStatusReport: createApplyProviderStatusReport(dependencies),

@@ -20,15 +20,18 @@ import {
   MediaAssetIdSchema,
   MediaAssetNotFoundError,
   MediaOwnerNotFoundError,
+  MAX_PITCH_UPLOAD_BYTES,
   MediaProviderNotConfiguredError,
   MediaRuleError,
   transitionPath,
+  uploadReservationKey,
   type MediaAsset,
   type MediaAssetRepository,
   type MediaOwnerResolverRegistry,
   type MediaStatus,
   type VideoAssetStatus,
   type VideoProvider,
+  type VideoUploadSession,
 } from "../src/index.js";
 
 /**
@@ -58,6 +61,13 @@ const ASSET_ID = MediaAssetIdSchema.parse(
 );
 const UID = "cfuid00000000000000000000000000ff";
 const CORRELATION = "corr-0000000000000001" as CorrelationId;
+const TUS_SESSION: VideoUploadSession = {
+  providerAssetId: UID,
+  uploadMode: "RESUMABLE",
+  uploadUrl: `https://upload.provider.example/tus/${UID}`,
+  expiresAt: "2026-09-23T11:00:00.000Z",
+  chunkSizeBytes: 5 * 1024 * 1024,
+};
 
 const founder: ActorContext = {
   userId: FOUNDER,
@@ -185,24 +195,36 @@ function memoryRepository(initial: MediaAsset) {
 
 function scriptedProvider(script: {
   readonly status?: VideoAssetStatus | (() => VideoAssetStatus) | undefined;
+  readonly resumable?: boolean | undefined;
+  /** What resumeUploadSession answers; null means "not that request". */
+  readonly reopen?: VideoUploadSession | null | undefined;
+  readonly deleteFails?: boolean | undefined;
 }) {
   const calls: { readonly method: string; readonly input: unknown }[] = [];
   const provider: VideoProvider = {
     id: "SCRIPTED",
     capabilities: {
       directUpload: true,
-      resumableUpload: false,
+      resumableUpload: script.resumable ?? false,
       signedPlayback: true,
       captions: false,
     },
     createUploadSession: (input) => {
       calls.push({ method: "createUploadSession", input });
-      return Promise.resolve({
-        providerAssetId: UID,
-        uploadMode: "DIRECT",
-        uploadUrl: "https://upload.provider.example/one-time",
-        expiresAt: "2026-09-23T09:30:00.000Z",
-      });
+      return Promise.resolve(
+        input.uploadLengthBytes === undefined
+          ? {
+              providerAssetId: UID,
+              uploadMode: "DIRECT",
+              uploadUrl: "https://upload.provider.example/one-time",
+              expiresAt: "2026-09-23T09:30:00.000Z",
+            }
+          : TUS_SESSION,
+      );
+    },
+    resumeUploadSession: (input) => {
+      calls.push({ method: "resumeUploadSession", input });
+      return Promise.resolve(script.reopen ?? null);
     },
     getAsset: (providerAssetId) => {
       calls.push({ method: "getAsset", input: providerAssetId });
@@ -223,7 +245,12 @@ function scriptedProvider(script: {
         expiresAt: "2026-09-23T09:15:00.000Z",
       });
     },
-    deleteAsset: () => Promise.resolve(),
+    deleteAsset: (providerAssetId) => {
+      calls.push({ method: "deleteAsset", input: providerAssetId });
+      return script.deleteFails === true
+        ? Promise.reject(new Error("provider down"))
+        : Promise.resolve();
+    },
   };
   return { provider, calls };
 }
@@ -430,6 +457,271 @@ describe("createUploadSession", () => {
     );
     expect(h.repository.current()?.status).toBe("CREATED");
     expect(h.events).toHaveLength(0);
+  });
+});
+
+describe("createUploadSession, resumable (CQ-MEDIA-011)", () => {
+  const LENGTH = 6_291_456;
+  const KEY = "pitch-upload-0000-key";
+  const command = {
+    actor: founder,
+    companyId: COMPANY,
+    mediaAssetId: ASSET_ID,
+    expectedVersion: 1,
+    uploadLengthBytes: LENGTH,
+    idempotencyKey: KEY,
+    correlationId: CORRELATION,
+  };
+  const digest = uploadReservationKey({
+    mediaAssetId: ASSET_ID,
+    uploadLengthBytes: LENGTH,
+    idempotencyKey: KEY,
+  });
+
+  it("reserves a resumable target with the length and a digest, never the raw key", async () => {
+    const { provider, calls } = scriptedProvider({ resumable: true });
+    const h = harness({ asset: asset(), provider });
+    const result = await h.service.createUploadSession(command);
+
+    expect(calls[0]?.input).toEqual({
+      mediaAssetId: ASSET_ID,
+      purpose: "FOUNDER_PITCH",
+      maxDurationSeconds: 180,
+      requireSignedPlayback: true,
+      uploadLengthBytes: LENGTH,
+      reservationKey: digest,
+    });
+    expect(result.replayed).toBe(false);
+    expect(result.session).toEqual(TUS_SESSION);
+    expect(result.asset.status).toBe("UPLOAD_PENDING");
+    expect(statusEvents(h.events)).toEqual(["CREATED->UPLOAD_PENDING"]);
+    expect(h.audits).toMatchObject([
+      { metadata: { uploadMode: "RESUMABLE", uploadLengthBytes: LENGTH } },
+    ]);
+    // The key the client chose travels nowhere: not to the provider, not
+    // into the audit, not into an event.
+    const everything = JSON.stringify([calls, h.audits, h.events]);
+    expect(everything).not.toContain(KEY);
+    expect(JSON.stringify([h.audits, h.events])).not.toContain("tus/");
+  });
+
+  it("answers a retry of the same request with the same open target, changing nothing", async () => {
+    const { provider, calls } = scriptedProvider({ resumable: true });
+    const h = harness({ asset: asset(), provider });
+    await h.service.createUploadSession(command);
+    const afterFirst = {
+      row: h.repository.current(),
+      events: h.events.length,
+      audits: h.audits.length,
+    };
+
+    // The provider's record says this request opened the target.
+    const replaying = scriptedProvider({
+      resumable: true,
+      reopen: TUS_SESSION,
+    });
+    const again = harness({
+      asset: afterFirst.row ?? asset(),
+      provider: replaying.provider,
+    });
+    // The retry carries the version from before its own first attempt.
+    const replay = await again.service.createUploadSession(command);
+    expect(replay.replayed).toBe(true);
+    expect(replay.session.uploadUrl).toBe(TUS_SESSION.uploadUrl);
+    expect(replay.asset).toEqual(afterFirst.row);
+    expect(replaying.calls).toEqual([
+      {
+        method: "resumeUploadSession",
+        input: {
+          mediaAssetId: ASSET_ID,
+          providerAssetId: UID,
+          reservationKey: digest,
+        },
+      },
+    ]);
+    expect(again.events).toHaveLength(0);
+    expect(again.audits).toHaveLength(0);
+    expect(
+      calls.filter((c) => c.method === "createUploadSession"),
+    ).toHaveLength(1);
+  });
+
+  it("refuses a different request for an asset that already holds a target", async () => {
+    // Another key, another length, or a lapsed target: the provider's
+    // record does not match, and no second target is ever reserved.
+    const { provider, calls } = scriptedProvider({
+      resumable: true,
+      reopen: null,
+    });
+    const h = harness({
+      asset: asset({
+        status: "UPLOAD_PENDING",
+        provider: "CLOUDFLARE_STREAM",
+        providerAssetId: UID,
+        version: 3,
+      }),
+      provider,
+    });
+    await expect(
+      h.service.createUploadSession({
+        ...command,
+        idempotencyKey: "another-key-0",
+      }),
+    ).rejects.toBeInstanceOf(MediaRuleError);
+    expect(calls.map((c) => c.method)).toEqual(["resumeUploadSession"]);
+    expect(
+      (calls[0]?.input as { reservationKey: string }).reservationKey,
+    ).not.toBe(digest);
+  });
+
+  it("requires a key with a length, and refuses a length no pitch could be", async () => {
+    const { provider, calls } = scriptedProvider({ resumable: true });
+    const h = harness({ asset: asset(), provider });
+    await expect(
+      h.service.createUploadSession({ ...command, idempotencyKey: undefined }),
+    ).rejects.toBeInstanceOf(MediaRuleError);
+    await expect(
+      h.service.createUploadSession({
+        ...command,
+        uploadLengthBytes: MAX_PITCH_UPLOAD_BYTES + 1,
+      }),
+    ).rejects.toBeInstanceOf(MediaRuleError);
+    expect(calls).toHaveLength(0);
+    expect(h.repository.current()?.status).toBe("CREATED");
+  });
+
+  it("falls back to the one-shot target when the provider cannot resume", async () => {
+    const { provider, calls } = scriptedProvider({ resumable: false });
+    const h = harness({ asset: asset(), provider });
+    const result = await h.service.createUploadSession(command);
+    expect(result.session.uploadMode).toBe("DIRECT");
+    expect(calls[0]?.input).not.toHaveProperty("uploadLengthBytes");
+    expect(calls[0]?.input).not.toHaveProperty("reservationKey");
+  });
+
+  it("keeps authorization unchanged: another tenant is not found, no media.create is denied", async () => {
+    const { provider, calls } = scriptedProvider({
+      resumable: true,
+      reopen: TUS_SESSION,
+    });
+    const pendingAsset = asset({
+      status: "UPLOAD_PENDING",
+      provider: "CLOUDFLARE_STREAM",
+      providerAssetId: UID,
+      version: 3,
+    });
+    const foreign = harness({ asset: pendingAsset, provider });
+    await expect(
+      foreign.service.createUploadSession({ ...command, actor: investor }),
+    ).rejects.toBeInstanceOf(MediaOwnerNotFoundError);
+    const denied = harness({
+      asset: pendingAsset,
+      provider,
+      deny: ["media.create"],
+    });
+    await expect(
+      denied.service.createUploadSession(command),
+    ).rejects.toBeInstanceOf(AuthorizationDeniedError);
+    // A replay is still a request: nobody reaches the provider unchecked.
+    expect(calls).toHaveLength(0);
+  });
+});
+
+describe("cancelUpload", () => {
+  const command = {
+    actor: founder,
+    companyId: COMPANY,
+    mediaAssetId: ASSET_ID,
+    correlationId: CORRELATION,
+  };
+  const inFlight = (status: MediaStatus) =>
+    asset({
+      status,
+      provider: "CLOUDFLARE_STREAM",
+      providerAssetId: UID,
+      version: 3,
+    });
+
+  it.each<MediaStatus>(["UPLOAD_PENDING", "UPLOADING"])(
+    "ends a %s upload honestly as UPLOAD_FAILED and releases the provider's target",
+    async (status) => {
+      const { provider, calls } = scriptedProvider({});
+      const h = harness({ asset: inFlight(status), provider });
+      const result = await h.service.cancelUpload(command);
+
+      expect(result.asset.status).toBe("UPLOAD_FAILED");
+      expect(result.providerReleased).toBe(true);
+      expect(h.repository.current()?.status).toBe("UPLOAD_FAILED");
+      expect(statusEvents(h.events)).toEqual([`${status}->UPLOAD_FAILED`]);
+      expect(h.audits).toMatchObject([
+        {
+          actionType: "media.asset.upload_cancelled",
+          metadata: { previousStatus: status, reason: "CANCELLED_BY_CREATOR" },
+        },
+      ]);
+      expect(calls).toEqual([{ method: "deleteAsset", input: UID }]);
+      expect(JSON.stringify([h.audits, h.events])).not.toContain(UID);
+    },
+  );
+
+  it("is idempotent: a second cancel moves and emits nothing, and only retries the release", async () => {
+    const { provider, calls } = scriptedProvider({});
+    const h = harness({ asset: inFlight("UPLOAD_PENDING"), provider });
+    const first = await h.service.cancelUpload(command);
+    const second = await h.service.cancelUpload(command);
+    expect(second.asset).toEqual(first.asset);
+    expect(h.events).toHaveLength(1);
+    expect(h.audits).toHaveLength(1);
+    expect(calls.filter((c) => c.method === "deleteAsset")).toHaveLength(2);
+  });
+
+  it("keeps the record honest when the provider cannot let go yet", async () => {
+    const { provider } = scriptedProvider({ deleteFails: true });
+    const h = harness({ asset: inFlight("UPLOAD_PENDING"), provider });
+    const result = await h.service.cancelUpload(command);
+    expect(result.asset.status).toBe("UPLOAD_FAILED");
+    expect(result.providerReleased).toBe(false);
+  });
+
+  it.each<MediaStatus>(["CREATED", "PROCESSING", "READY", "DELETED"])(
+    "refuses to cancel a %s pitch: there is no upload in flight",
+    async (status) => {
+      const { provider, calls } = scriptedProvider({});
+      const h = harness({ asset: inFlight(status), provider });
+      await expect(h.service.cancelUpload(command)).rejects.toBeInstanceOf(
+        MediaRuleError,
+      );
+      expect(calls).toHaveLength(0);
+      expect(h.events).toHaveLength(0);
+    },
+  );
+
+  it("is not found in another tenant, and denied without media.create", async () => {
+    const { provider, calls } = scriptedProvider({});
+    const foreign = harness({ asset: inFlight("UPLOAD_PENDING"), provider });
+    await expect(
+      foreign.service.cancelUpload({ ...command, actor: investor }),
+    ).rejects.toBeInstanceOf(MediaOwnerNotFoundError);
+    const denied = harness({
+      asset: inFlight("UPLOAD_PENDING"),
+      provider,
+      deny: ["media.create"],
+    });
+    await expect(denied.service.cancelUpload(command)).rejects.toBeInstanceOf(
+      AuthorizationDeniedError,
+    );
+    expect(calls).toHaveLength(0);
+    expect(denied.repository.current()?.status).toBe("UPLOAD_PENDING");
+  });
+
+  it("a late 'ready' for a cancelled upload cannot walk it back", async () => {
+    const { provider } = scriptedProvider({
+      status: { providerAssetId: UID, status: "READY" },
+    });
+    const h = harness({ asset: inFlight("UPLOAD_PENDING"), provider });
+    await h.service.cancelUpload(command);
+    const synced = await h.service.syncMediaAsset(command);
+    expect(synced.status).toBe("UPLOAD_FAILED");
   });
 });
 

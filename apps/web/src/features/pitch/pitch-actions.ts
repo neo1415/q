@@ -4,11 +4,12 @@ import { z } from "zod";
 
 import { ApiProblemError, type ApiSession } from "@capital-q/api-client";
 import { loadWebServerConfig } from "@capital-q/config/web";
-import type {
-  CreateCompanyPitchResponse,
-  MediaAssetDto,
-  MediaUploadSessionDto,
-  PlaybackAuthorizationDto,
+import {
+  IdempotencyKeyHeaderSchema,
+  type CreateCompanyPitchResponse,
+  type MediaAssetDto,
+  type MediaUploadSessionDto,
+  type PlaybackAuthorizationDto,
 } from "@capital-q/contracts";
 
 import { getSessionAccessToken } from "@/auth/session";
@@ -132,19 +133,65 @@ export async function createPitchAction(
   return run((transport) => transport.create(companyId.data, replaces.data));
 }
 
+const ResumableInput = z
+  .object({
+    uploadLengthBytes: z.number().int().min(1).max(Number.MAX_SAFE_INTEGER),
+    idempotencyKey: IdempotencyKeyHeaderSchema,
+  })
+  .strict();
+
+/**
+ * Reserves the upload target. With `rawResumable` (the file's size and a
+ * key the browser made for this reservation) the server may answer with a
+ * resumable target, and asking again with the same pair returns the same
+ * one — which is how a lost answer or a reload carries on.
+ */
 export async function createUploadSessionAction(
   rawCompanyId: string,
   rawMediaAssetId: string,
   rawExpectedVersion: number,
+  rawResumable?: {
+    readonly uploadLengthBytes: number;
+    readonly idempotencyKey: string;
+  },
 ): Promise<PitchActionResult<MediaUploadSessionDto>> {
   const companyId = UuidInput.safeParse(rawCompanyId);
   const mediaAssetId = UuidInput.safeParse(rawMediaAssetId);
   const expectedVersion = VersionInput.safeParse(rawExpectedVersion);
-  if (!companyId.success || !mediaAssetId.success || !expectedVersion.success) {
+  const resumable =
+    rawResumable === undefined
+      ? { success: true as const, data: undefined }
+      : ResumableInput.safeParse(rawResumable);
+  if (
+    !companyId.success ||
+    !mediaAssetId.success ||
+    !expectedVersion.success ||
+    !resumable.success
+  ) {
     return { ok: false, message: "That request couldn't be made." };
   }
   return run((transport) =>
-    transport.reserve(companyId.data, mediaAssetId.data, expectedVersion.data),
+    transport.reserve(
+      companyId.data,
+      mediaAssetId.data,
+      expectedVersion.data,
+      resumable.data,
+    ),
+  );
+}
+
+/** Stops an unfinished upload; the record then says UPLOAD_FAILED. */
+export async function cancelUploadAction(
+  rawCompanyId: string,
+  rawMediaAssetId: string,
+): Promise<PitchActionResult<MediaAssetDto>> {
+  const companyId = UuidInput.safeParse(rawCompanyId);
+  const mediaAssetId = UuidInput.safeParse(rawMediaAssetId);
+  if (!companyId.success || !mediaAssetId.success) {
+    return { ok: false, message: NOT_HERE };
+  }
+  return run((transport) =>
+    transport.cancel(companyId.data, mediaAssetId.data),
   );
 }
 

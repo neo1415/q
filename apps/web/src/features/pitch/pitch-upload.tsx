@@ -28,6 +28,7 @@ import { prefersReducedMotion } from "@/features/discover/player/use-pitch-playb
 
 import {
   authorisePitchPlaybackAction,
+  cancelUploadAction,
   createPitchAction,
   createUploadSessionAction,
   loadPitchOverviewAction,
@@ -45,17 +46,31 @@ import {
   type ChosenFile,
   type PitchFlowState,
 } from "./pitch-state";
-import { uploadBytes } from "./upload-bytes";
+import { uploadResumable } from "./resumable-upload";
+import {
+  clearResume,
+  isSameFile,
+  loadResume,
+  saveResume,
+  type ResumeRecord,
+} from "./resume-store";
+import { uploadBytes, type UploadOutcome } from "./upload-bytes";
 
 /**
- * The founder's pitch upload (CQ-WEB-023; doc 17 §35; doc 20 §9–§14).
+ * The founder's pitch upload (CQ-WEB-023, CQ-MEDIA-011; doc 17 §35; doc
+ * 20 §9–§14).
  *
  * One file control, one honest status line, and a preview when there is
  * something to preview. The bytes go from this browser to the provider's
- * one-time target and nowhere else; every other step is a server action
- * under the founder's own session, and the screen only ever repeats what
- * the server's record says. Nothing here spins for effect: while the
- * provider encodes, the line says so and the page polls politely.
+ * target and nowhere else; every other step is a server action under the
+ * founder's own session, and the screen only ever repeats what the
+ * server's record says. Nothing here spins for effect: while the provider
+ * encodes, the line says so and the page polls politely.
+ *
+ * Uploads are resumable when the server says so. A dropped connection is
+ * retried quietly ("Reconnecting"); one that stays down pauses the upload
+ * with a Resume button; a reload offers to carry on once the same file is
+ * chosen again. Cancel stops the bytes and has the server record it.
  */
 
 export type PitchUploadProps = {
@@ -92,6 +107,19 @@ function subscribeReducedMotion(onChange: () => void): () => void {
 
 function chosen(file: File): ChosenFile {
   return { name: file.name, sizeBytes: file.size, mimeType: file.type };
+}
+
+function remembered(record: ResumeRecord): ChosenFile {
+  return {
+    name: record.name,
+    sizeBytes: record.sizeBytes,
+    mimeType: record.mimeType,
+  };
+}
+
+/** One key per intended reservation; reused, never regenerated, on retry. */
+function newIdempotencyKey(): string {
+  return `pitch-upload-${crypto.randomUUID()}`;
 }
 
 function formatBytes(bytes: number): string {
@@ -140,8 +168,12 @@ export function PitchUpload({ companyId }: PitchUploadProps) {
   const [preview, setPreview] = useState<Preview | null>(null);
   const [deciding, setDeciding] = useState(false);
   const [decisionNotice, setDecisionNotice] = useState<string | null>(null);
+  const [cancelling, setCancelling] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
   const uploadAbort = useRef<AbortController | null>(null);
+  // The file being sent, kept so a paused upload can resume without the
+  // founder choosing it again. Lost on reload, as browsers intend.
+  const currentFile = useRef<File | null>(null);
   // The OS preference, read as an external store: the server renders
   // "not reduced" and the client corrects it on hydration without a
   // state update of its own.
@@ -163,7 +195,16 @@ export function PitchUpload({ companyId }: PitchUploadProps) {
       }
       setLoadError(null);
       setCompany(result.value.company);
-      dispatch({ type: "LOADED", pitch: result.value.pitch });
+      const current = result.value.pitch;
+      const record =
+        current?.status === "UPLOAD_PENDING"
+          ? loadResume(current.mediaAssetId)
+          : null;
+      dispatch({
+        type: "LOADED",
+        pitch: current,
+        resumable: record === null ? null : remembered(record),
+      });
     });
     return () => {
       cancelled = true;
@@ -272,6 +313,91 @@ export function PitchUpload({ companyId }: PitchUploadProps) {
     [companyId],
   );
 
+  /**
+   * Steps 2 and 3 for a record that exists: reserve (or re-obtain) the
+   * target, then send the bytes. `resumeKey` is the key an earlier attempt
+   * reserved with; the server answers it with that same open target.
+   */
+  const reserveAndSend = useCallback(
+    async (file: File, record: MediaAssetDto, resumeKey: string | null) => {
+      // 2. The target, against the version this screen saw. The key is
+      //    remembered before asking, so an answer lost on the way back can
+      //    still be asked for again — here, or after a reload.
+      const idempotencyKey = resumeKey ?? newIdempotencyKey();
+      saveResume(record.mediaAssetId, idempotencyKey, file);
+      const reserved = await createUploadSessionAction(
+        companyId,
+        record.mediaAssetId,
+        record.version,
+        { uploadLengthBytes: file.size, idempotencyKey },
+      );
+      if (!reserved.ok) {
+        dispatch({ type: "REQUEST_FAILED", message: reserved.message });
+        return;
+      }
+      const session = reserved.value;
+      dispatch({ type: "RESERVED", pitch: session.pitch, session });
+
+      // 3. The bytes, browser → provider. Nothing of Capital Q's in between.
+      currentFile.current = file;
+      const controller = new AbortController();
+      uploadAbort.current = controller;
+      const onProgress = (progress: number) =>
+        dispatch({ type: "UPLOAD_PROGRESS", progress });
+      let outcome: UploadOutcome;
+      if (session.uploadMode === "RESUMABLE") {
+        outcome = await uploadResumable({
+          uploadUrl: session.uploadUrl,
+          file,
+          chunkSizeBytes: session.chunkSizeBytes ?? file.size,
+          signal: controller.signal,
+          onProgress,
+          onRetry: () => dispatch({ type: "UPLOAD_RETRYING" }),
+          onRecovered: () => dispatch({ type: "UPLOAD_RECOVERED" }),
+        });
+      } else {
+        // The server chose the one-shot target: nothing to resume later.
+        clearResume(record.mediaAssetId);
+        outcome = await uploadBytes({
+          uploadUrl: session.uploadUrl,
+          file,
+          signal: controller.signal,
+          onProgress,
+        });
+      }
+      if (uploadAbort.current === controller) uploadAbort.current = null;
+
+      switch (outcome.kind) {
+        case "DONE":
+          clearResume(record.mediaAssetId);
+          dispatch({ type: "UPLOADED" });
+          return;
+        case "ABORTED":
+          // Cancelled (the cancel path says so) or the page went away: the
+          // record stays UPLOAD_PENDING and this browser still remembers
+          // how to resume it.
+          return;
+        case "NETWORK":
+          if (session.uploadMode === "RESUMABLE") {
+            dispatch({ type: "UPLOAD_INTERRUPTED" });
+            return;
+          }
+          break;
+        case "REJECTED":
+          // The provider refused the target itself (cancelled, lapsed, or
+          // not this file's): there is nothing left to resume into.
+          clearResume(record.mediaAssetId);
+          break;
+      }
+      dispatch({
+        type: "REQUEST_FAILED",
+        message: "",
+        failure: "UPLOAD_FAILED",
+      });
+    },
+    [companyId],
+  );
+
   const onFile = useCallback(
     async (event: ChangeEvent<HTMLInputElement>) => {
       const file = event.target.files?.[0];
@@ -282,10 +408,39 @@ export function PitchUpload({ companyId }: PitchUploadProps) {
         setFileNotice(verdict.message);
         return;
       }
+
+      // A paused upload carries on only with the file it was sending.
+      if (flow.kind === "INTERRUPTED") {
+        const saved = loadResume(flow.pitch.mediaAssetId);
+        if (saved === null || !isSameFile(saved, file)) {
+          setFileNotice(
+            `That isn't the file that was uploading. Choose ${flow.file.name} to carry on, or cancel this upload.`,
+          );
+          return;
+        }
+        setFileNotice(null);
+        dispatch({ type: "FILE_CHOSEN", file: chosen(file) });
+        await reserveAndSend(file, flow.pitch, saved.idempotencyKey);
+        return;
+      }
+
       setFileNotice(null);
       const replaces = replaceablePitch(flow);
       const reuse = flow.kind === "CREATED" ? flow.pitch : null;
+      // A reservation whose answer never arrived is asked for again with
+      // the same key, so it resumes rather than being refused.
+      const pending =
+        flow.kind === "FAILED" &&
+        flow.failure === "REQUEST_FAILED" &&
+        flow.pitch !== null
+          ? flow.pitch
+          : null;
+      const saved = pending === null ? null : loadResume(pending.mediaAssetId);
       dispatch({ type: "FILE_CHOSEN", file: chosen(file) });
+      if (pending !== null && saved !== null && isSameFile(saved, file)) {
+        await reserveAndSend(file, pending, saved.idempotencyKey);
+        return;
+      }
 
       // 1. The record. Reused when a CREATED one already exists; created,
       //    replacing the current pitch by name, otherwise.
@@ -305,49 +460,46 @@ export function PitchUpload({ companyId }: PitchUploadProps) {
         record = created.value.pitch;
         dispatch({ type: "CREATED", pitch: record });
       }
-
-      // 2. The one-time target, against the version this screen saw.
-      const reserved = await createUploadSessionAction(
-        companyId,
-        record.mediaAssetId,
-        record.version,
-      );
-      if (!reserved.ok) {
-        dispatch({ type: "REQUEST_FAILED", message: reserved.message });
-        return;
-      }
-      dispatch({
-        type: "RESERVED",
-        pitch: reserved.value.pitch,
-        session: reserved.value,
-      });
-
-      // 3. The bytes, browser → provider. Nothing of Capital Q's in between.
-      const controller = new AbortController();
-      uploadAbort.current = controller;
-      const outcome = await uploadBytes({
-        uploadUrl: reserved.value.uploadUrl,
-        file,
-        signal: controller.signal,
-        onProgress: (progress) =>
-          dispatch({ type: "UPLOAD_PROGRESS", progress }),
-      });
-      uploadAbort.current = null;
-      if (outcome.kind === "DONE") {
-        dispatch({ type: "UPLOADED" });
-      } else if (outcome.kind === "ABORTED") {
-        // The person left; the record stays UPLOAD_PENDING and the next
-        // load says so honestly.
-        return;
-      } else {
-        dispatch({
-          type: "REQUEST_FAILED",
-          message: "",
-          failure: "UPLOAD_FAILED",
-        });
-      }
+      await reserveAndSend(file, record, null);
     },
-    [companyId, flow, guidance],
+    [companyId, flow, guidance, reserveAndSend],
+  );
+
+  /** Carry on with the file still in memory, or ask for it again. */
+  const resume = useCallback(async () => {
+    if (flow.kind !== "INTERRUPTED") return;
+    const file = currentFile.current;
+    const saved = loadResume(flow.pitch.mediaAssetId);
+    if (file === null || saved === null || !isSameFile(saved, file)) {
+      fileInput.current?.click();
+      return;
+    }
+    dispatch({ type: "FILE_CHOSEN", file: chosen(file) });
+    await reserveAndSend(file, flow.pitch, saved.idempotencyKey);
+  }, [flow, reserveAndSend]);
+
+  /**
+   * Stop the bytes, then have the server record it: the pitch ends
+   * UPLOAD_FAILED and the provider lets go of its target, so nothing is
+   * left pretending to upload.
+   */
+  const cancel = useCallback(
+    async (pitch: MediaAssetDto) => {
+      uploadAbort.current?.abort();
+      uploadAbort.current = null;
+      setCancelling(true);
+      setFileNotice(null);
+      const result = await cancelUploadAction(companyId, pitch.mediaAssetId);
+      setCancelling(false);
+      if (!result.ok) {
+        dispatch({ type: "REQUEST_FAILED", message: result.message });
+        return;
+      }
+      clearResume(pitch.mediaAssetId);
+      currentFile.current = null;
+      dispatch({ type: "CANCELLED", pitch: result.value });
+    },
+    [companyId],
   );
 
   useEffect(() => () => uploadAbort.current?.abort(), []);
@@ -387,16 +539,82 @@ export function PitchUpload({ companyId }: PitchUploadProps) {
           </header>
           <div className="cq-panel-body flex flex-col gap-4">
             {flow.kind === "UPLOADING" ? (
-              <Progress
-                label={`Uploading ${flow.file.name} (${formatBytes(flow.file.sizeBytes)})`}
-                value={Math.round(flow.progress * 100)}
-              />
+              <>
+                <Progress
+                  label={
+                    flow.reconnecting
+                      ? `Connection lost. Waiting to carry on with ${flow.file.name}`
+                      : `Uploading ${flow.file.name} (${formatBytes(flow.file.sizeBytes)})`
+                  }
+                  value={Math.round(flow.progress * 100)}
+                />
+                <div>
+                  <Button
+                    variant="quiet"
+                    disabled={cancelling}
+                    onClick={() => void cancel(flow.pitch)}
+                  >
+                    Cancel upload
+                  </Button>
+                </div>
+              </>
+            ) : null}
+            {flow.kind === "INTERRUPTED" ? (
+              <InlineNotice
+                tone="info"
+                title="Upload paused"
+                action={
+                  <span className="flex flex-wrap items-center gap-3">
+                    <Button
+                      variant="primary"
+                      disabled={cancelling}
+                      onClick={() => void resume()}
+                    >
+                      <Upload size={ICON_SIZE.regular} aria-hidden="true" />
+                      {flow.reason === "CONNECTION"
+                        ? "Resume upload"
+                        : "Choose the same file"}
+                    </Button>
+                    <Button
+                      variant="quiet"
+                      disabled={cancelling}
+                      onClick={() => void cancel(flow.pitch)}
+                    >
+                      Cancel upload
+                    </Button>
+                  </span>
+                }
+              >
+                {flow.reason === "CONNECTION"
+                  ? `The connection dropped while sending ${flow.file.name}. What already arrived is kept; resume to carry on from there.`
+                  : `${flow.file.name} was part-way up when this page closed. Choose the same file again to carry on from where it stopped.`}
+              </InlineNotice>
             ) : null}
             {flow.kind === "PROCESSING" ? (
               <Progress label="The video service is preparing your pitch" />
             ) : null}
             {flow.kind === "FAILED" ? (
-              <InlineNotice tone="warning" title="This pitch didn't make it">
+              <InlineNotice
+                tone={flow.failure === "CANCELLED" ? "info" : "warning"}
+                title={
+                  flow.failure === "CANCELLED"
+                    ? "Upload cancelled"
+                    : "This pitch didn't make it"
+                }
+                action={
+                  flow.failure === "TARGET_LOST" && flow.pitch !== null ? (
+                    <Button
+                      variant="quiet"
+                      disabled={cancelling}
+                      onClick={() => {
+                        if (flow.pitch !== null) void cancel(flow.pitch);
+                      }}
+                    >
+                      Cancel that upload
+                    </Button>
+                  ) : undefined
+                }
+              >
                 {flow.message}
               </InlineNotice>
             ) : null}
@@ -432,18 +650,20 @@ export function PitchUpload({ companyId }: PitchUploadProps) {
                 className="sr-only"
                 aria-label="Choose a pitch video"
                 onChange={(event) => void onFile(event)}
-                disabled={busy}
+                disabled={busy || cancelling}
               />
-              <Button
-                variant={flow.kind === "READY" ? "secondary" : "primary"}
-                disabled={busy}
-                onClick={() => fileInput.current?.click()}
-              >
-                <Upload size={ICON_SIZE.regular} aria-hidden="true" />
-                {flow.kind === "READY" || flow.kind === "FAILED"
-                  ? "Replace pitch"
-                  : "Choose a video"}
-              </Button>
+              {flow.kind === "INTERRUPTED" ? null : (
+                <Button
+                  variant={flow.kind === "READY" ? "secondary" : "primary"}
+                  disabled={busy || cancelling}
+                  onClick={() => fileInput.current?.click()}
+                >
+                  <Upload size={ICON_SIZE.regular} aria-hidden="true" />
+                  {flow.kind === "READY" || flow.kind === "FAILED"
+                    ? "Replace pitch"
+                    : "Choose a video"}
+                </Button>
+              )}
               <p className="cq-caption text-(--cq-text-tertiary)">
                 {guidance === null
                   ? "Portrait works best. Aim for 30 seconds to 2 minutes; 3 minutes at most."
@@ -548,7 +768,9 @@ function StatusLine({ flow }: { readonly flow: PitchFlowState }) {
       case "PREPARING":
         return "Preparing the upload";
       case "UPLOADING":
-        return `Uploading · ${String(Math.round(flow.progress * 100))}%`;
+        return `${flow.reconnecting ? "Reconnecting" : "Uploading"} · ${String(Math.round(flow.progress * 100))}%`;
+      case "INTERRUPTED":
+        return "Upload paused";
       case "PROCESSING":
         return "Processing";
       case "READY":

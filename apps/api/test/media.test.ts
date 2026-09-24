@@ -349,6 +349,7 @@ describe("POST /v1/companies/:companyId/pitch/:mediaAssetId/{upload-session,sync
             expiresAt: "2026-09-06T09:30:00.000Z",
           },
           maxDurationSeconds: 180,
+          replayed: false,
         });
       },
     });
@@ -530,6 +531,177 @@ describe("POST /v1/companies/:companyId/pitch/:mediaAssetId/{upload-session,sync
       });
       expect(response.statusCode, suffix).toBe(401);
     }
+    await app.close();
+  });
+});
+
+// Resumable upload and cancel (CQ-MEDIA-011). The service is a double;
+// what is proven is the boundary: a length needs an Idempotency-Key, the
+// key and length are the only additions that reach the service, a replay
+// is 200 rather than 201, and cancel answers with the pitch DTO only.
+describe("resumable upload-session and upload-session/cancel", () => {
+  const assetUrl = `${pitchUrl}/${ASSET_ID}`;
+  const TUS_URL = "https://upload.provider.example/tus/resource";
+  const KEY = "pitch-upload-key-0001";
+
+  const resumableService = (replayed: boolean) => {
+    const commands: unknown[] = [];
+    const { service } = fakeService({
+      createUploadSession: (command: unknown) => {
+        commands.push(command);
+        return Promise.resolve({
+          asset: { ...ASSET, status: "UPLOAD_PENDING", version: 3 },
+          session: {
+            providerAssetId: PROVIDER_SECRET,
+            uploadMode: "RESUMABLE",
+            uploadUrl: TUS_URL,
+            expiresAt: "2026-09-06T11:00:00.000Z",
+            chunkSizeBytes: 5_242_880,
+          },
+          maxDurationSeconds: 180,
+          replayed,
+        });
+      },
+    });
+    return { service, commands };
+  };
+
+  it("passes the length and the key to the service and answers with the chunk size", async () => {
+    const { service, commands } = resumableService(false);
+    const app = buildApp({ principal: PRINCIPAL, context: CONTEXT, service });
+    const response = await app.inject({
+      method: "POST",
+      url: `${assetUrl}/upload-session`,
+      headers: { "idempotency-key": KEY },
+      payload: { expectedVersion: 1, uploadLengthBytes: 6_291_456 },
+    });
+    expect(response.statusCode).toBe(201);
+    expect(response.json()).toMatchObject({
+      uploadMode: "RESUMABLE",
+      uploadUrl: TUS_URL,
+      chunkSizeBytes: 5_242_880,
+      pitch: { status: "UPLOAD_PENDING" },
+    });
+    expect(response.payload).not.toContain(PROVIDER_SECRET);
+    expect(commands[0]).toMatchObject({
+      expectedVersion: 1,
+      uploadLengthBytes: 6_291_456,
+      idempotencyKey: KEY,
+    });
+    await app.close();
+  });
+
+  it("answers a replayed reservation with 200, not a second creation", async () => {
+    const { service } = resumableService(true);
+    const app = buildApp({ principal: PRINCIPAL, context: CONTEXT, service });
+    const response = await app.inject({
+      method: "POST",
+      url: `${assetUrl}/upload-session`,
+      headers: { "idempotency-key": KEY },
+      payload: { expectedVersion: 1, uploadLengthBytes: 6_291_456 },
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.json<{ uploadUrl: string }>().uploadUrl).toBe(TUS_URL);
+    await app.close();
+  });
+
+  it("requires an Idempotency-Key with a length, and refuses a length that is not one", async () => {
+    const { service, commands } = resumableService(false);
+    const app = buildApp({ principal: PRINCIPAL, context: CONTEXT, service });
+    const cases = [
+      { headers: {}, payload: { expectedVersion: 1, uploadLengthBytes: 10 } },
+      {
+        headers: { "idempotency-key": "short" },
+        payload: { expectedVersion: 1, uploadLengthBytes: 10 },
+      },
+      {
+        headers: { "idempotency-key": KEY },
+        payload: { expectedVersion: 1, uploadLengthBytes: 0 },
+      },
+      {
+        headers: { "idempotency-key": KEY },
+        payload: { expectedVersion: 1, uploadLengthBytes: 1.5 },
+      },
+    ];
+    for (const { headers, payload } of cases) {
+      const response = await app.inject({
+        method: "POST",
+        url: `${assetUrl}/upload-session`,
+        headers,
+        payload,
+      });
+      expect(response.statusCode, JSON.stringify(payload)).toBe(422);
+    }
+    expect(commands).toHaveLength(0);
+    await app.close();
+  });
+
+  it("cancels through the service and answers with the pitch as it now is", async () => {
+    const commands: unknown[] = [];
+    const { service } = fakeService({
+      cancelUpload: (command: unknown) => {
+        commands.push(command);
+        return Promise.resolve({
+          asset: { ...ASSET, status: "UPLOAD_FAILED", version: 4 },
+          providerReleased: true,
+        });
+      },
+    });
+    const app = buildApp({ principal: PRINCIPAL, context: CONTEXT, service });
+    const response = await app.inject({
+      method: "POST",
+      url: `${assetUrl}/upload-session/cancel`,
+      payload: {},
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.headers["cache-control"]).toBe("no-store");
+    expect(
+      response.json<{ pitch: { status: string; version: number } }>().pitch,
+    ).toMatchObject({ status: "UPLOAD_FAILED", version: 4 });
+    expect(response.payload).not.toContain(PROVIDER_SECRET);
+    expect(Object.keys(commands[0] as object).sort()).toEqual([
+      "actor",
+      "companyId",
+      "correlationId",
+      "mediaAssetId",
+    ]);
+    await app.close();
+  });
+
+  it("refuses a cancel body that tries to say anything, and a caller with no session", async () => {
+    const { service } = fakeService({
+      cancelUpload: () => Promise.reject(new Error("must not be reached")),
+    });
+    const app = buildApp({ principal: PRINCIPAL, context: CONTEXT, service });
+    const loud = await app.inject({
+      method: "POST",
+      url: `${assetUrl}/upload-session/cancel`,
+      payload: { status: "DELETED" },
+    });
+    expect(loud.statusCode).toBe(422);
+    await app.close();
+
+    const anonymous = buildApp({ principal: null, service });
+    const refused = await anonymous.inject({
+      method: "POST",
+      url: `${assetUrl}/upload-session/cancel`,
+      payload: {},
+    });
+    expect(refused.statusCode).toBe(401);
+    await anonymous.close();
+  });
+
+  it("is not found for a stranger's asset", async () => {
+    const { service } = fakeService({
+      cancelUpload: () => Promise.reject(new MediaOwnerNotFoundError()),
+    });
+    const app = buildApp({ principal: PRINCIPAL, context: CONTEXT, service });
+    const response = await app.inject({
+      method: "POST",
+      url: `${assetUrl}/upload-session/cancel`,
+      payload: {},
+    });
+    expect(response.statusCode).toBe(404);
     await app.close();
   });
 });

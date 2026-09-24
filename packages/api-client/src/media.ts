@@ -1,12 +1,15 @@
 import {
+  CancelMediaUploadResponseSchema,
   COMPANIES_PATH,
   COMPANY_PITCH_SUFFIX,
   CompanyMediaListResponseSchema,
   CompanyPitchResponseSchema,
   CreateCompanyPitchResponseSchema,
+  IDEMPOTENCY_KEY_HEADER,
   MEDIA_PLAYBACK_POLICY_SUFFIX,
   MEDIA_PLAYBACK_SUFFIX,
   MEDIA_SYNC_SUFFIX,
+  MEDIA_UPLOAD_CANCEL_SUFFIX,
   MEDIA_UPLOAD_SESSION_SUFFIX,
   MediaUploadSessionDtoSchema,
   PlaybackAuthorizationDtoSchema,
@@ -90,24 +93,53 @@ export function deletePitchMediaAsset(
 }
 
 /**
- * `POST …/pitch/:mediaAssetId/upload-session` — reserve a one-time upload
- * target for a CREATED pitch. The browser then PUTs the file to
- * `uploadUrl` directly; the server's `maxDurationSeconds` is a reservation
- * the client may not exceed. The target is issued once: a lost URL means
- * replacing the pitch, not asking again.
+ * `POST …/pitch/:mediaAssetId/upload-session` — reserve an upload target
+ * for a CREATED pitch. The browser then sends the file to `uploadUrl`
+ * directly, in the answer's `uploadMode`; the server's
+ * `maxDurationSeconds` is a reservation the client may not exceed.
+ *
+ * Without `uploadLengthBytes` the target is one-shot and issued once. With
+ * it the target may be resumable, and `idempotencyKey` is required: the
+ * same key and length again return the same open target, so a lost answer
+ * or a reload resumes rather than replaces.
  */
 export function createPitchUploadSession(
   session: ApiSession,
   companyId: string,
   mediaAssetId: string,
   request: CreateMediaUploadSessionRequest,
+  idempotencyKey?: string,
 ) {
   return call(
     session,
     "POST",
     `${assetPath(companyId, mediaAssetId)}${MEDIA_UPLOAD_SESSION_SUFFIX}`,
     MediaUploadSessionDtoSchema,
-    { body: request },
+    {
+      body: request,
+      ...(idempotencyKey === undefined
+        ? {}
+        : { headers: { [IDEMPOTENCY_KEY_HEADER]: idempotencyKey } }),
+    },
+  );
+}
+
+/**
+ * `POST …/pitch/:mediaAssetId/upload-session/cancel` — stop an unfinished
+ * upload. The pitch ends UPLOAD_FAILED and the provider's target is
+ * released; repeating it is harmless.
+ */
+export function cancelPitchUpload(
+  session: ApiSession,
+  companyId: string,
+  mediaAssetId: string,
+) {
+  return call(
+    session,
+    "POST",
+    `${assetPath(companyId, mediaAssetId)}${MEDIA_UPLOAD_CANCEL_SUFFIX}`,
+    CancelMediaUploadResponseSchema,
+    { body: {} },
   );
 }
 
