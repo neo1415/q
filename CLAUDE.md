@@ -131,6 +131,8 @@ Capital Q should feel minimal, institutional, professional, consumer-grade easy 
 
 Prohibited AI-slop visuals: glowing brains or shields, robot heads, neural particles, floating hexagons, circuit lines, purple-blue AI gradients, holographic dashboards, fake terminals, agent-swarm visualisations, Sparkles as the Q icon, gradient headings, three-feature-card hero sections, `backdrop-blur` everywhere, cards around everything, badge spam, uppercase tracking-widest eyebrows.
 
+Founder amendments: `docs/adr/0017-founder-design-amendments.md` and `docs/design/ux-direction-2026-09.md` supersede the conflicting rules above (glow on Q only, Q Dock, Stage + Board, visible theme switcher); every other prohibition still holds.
+
 ## Engineering Rules
 
 - TypeScript strict. No casual `any`, no double assertions, no non-null assertions used to silence a real bug. `unknown` before validation.
