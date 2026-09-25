@@ -56,7 +56,7 @@ export const INTERVIEW_AGENT_V6: PromptDefinition<
     untrusted: [...INTERVIEW_AGENT_V5_UNTRUSTED],
   },
   version: 6,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   changeDescription:
     "Authority as a first-class input: the choices the person handed to Q and the recommendations they approved are read independently from their latest words and listed as trusted input; Q records the handed choices without asking again, says where they went, accepts exactly the approved recommendations, and holds suggestions otherwise.",
   effectiveFrom: "2026-09-25",

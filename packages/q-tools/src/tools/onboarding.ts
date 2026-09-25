@@ -33,6 +33,7 @@ export const ACCEPT_ONBOARDING_RECOMMENDATIONS =
   "onboarding.recommendations.accept" as const;
 export const FINISH_ONBOARDING = "onboarding.finish" as const;
 export const CORRECT_ONBOARDING_ANSWERS = "onboarding.answers.correct" as const;
+export const SET_ASIDE_ONBOARDING_STEPS = "onboarding.steps.set_aside" as const;
 
 const StepKeySchema = z.string().min(1).max(80);
 
@@ -136,6 +137,7 @@ export const OnboardingRecordResultSchema = z
     outcome: z.enum([
       "COMMITTED",
       "WITHDRAWN",
+      "SET_ASIDE",
       "REJECTED",
       "AMBIGUOUS",
       "NEEDS_FIRST",
@@ -280,6 +282,31 @@ export type CorrectOnboardingAnswersInput = z.infer<
   typeof CorrectOnboardingAnswersInputSchema
 >;
 
+/**
+ * A decline of an optional step ("no preference", "nothing applies",
+ * "rather not say") is an answer: the step is set aside, unknown stays
+ * unknown, and it is not asked again. Never a magic word the person must
+ * learn (ACC 2026-09-25).
+ */
+export const SetAsideOnboardingStepsInputSchema = z
+  .object({
+    steps: z
+      .array(
+        z
+          .object({
+            stepKey: StepKeySchema.describe("The optional step they declined."),
+            quote: QuoteSchema,
+          })
+          .strict(),
+      )
+      .min(1)
+      .max(12),
+  })
+  .strict();
+export type SetAsideOnboardingStepsInput = z.infer<
+  typeof SetAsideOnboardingStepsInputSchema
+>;
+
 export const FinishOnboardingOutputSchema = z
   .object({
     /** The journey is now complete. */
@@ -329,6 +356,10 @@ export type OnboardingToolPort = {
   /** Change or take back answers already given; history is kept. */
   readonly correct: (
     corrections: CorrectOnboardingAnswersInput["corrections"],
+  ) => Promise<readonly OnboardingRecordResult[]>;
+  /** Set aside optional steps the person declined. Writes no answer. */
+  readonly setAside: (
+    steps: SetAsideOnboardingStepsInput["steps"],
   ) => Promise<readonly OnboardingRecordResult[]>;
 };
 
@@ -492,6 +523,32 @@ export function createOnboardingTools(
       authorize,
       execute: async (input) =>
         withOpen(port, [...(await port.correct(input.corrections))]),
+    }),
+    defineQTool<
+      SetAsideOnboardingStepsInput,
+      RecordOnboardingAnswersOutput,
+      Grant
+    >({
+      id: SET_ASIDE_ONBOARDING_STEPS,
+      version: 1,
+      status: "ACTIVE",
+      providerName: "set_aside",
+      description:
+        "Sets aside optional steps the person has declined to answer (they have no preference, nothing applies, or they would rather not say), each with their own words as the quote. Nothing is recorded as their answer; the step is not asked again, and they can answer it later. SET_ASIDE is done; REJECTED says why (a required step cannot be set aside). Also returns what is still open.",
+      classification: "SIDE_EFFECT",
+      riskClass: "LOW_RISK_INTERNAL",
+      requiredCapabilities: [capability("onboarding.session.respond")],
+      supportedPurposes: [...PURPOSES],
+      requiredScopeKinds: ["OWN_ONBOARDING"],
+      approval: "NONE",
+      idempotency: "SAFE_TO_REPEAT",
+      owner: "onboarding",
+      visibleStage: null,
+      input: SetAsideOnboardingStepsInputSchema,
+      output: RecordOnboardingAnswersOutputSchema,
+      authorize,
+      execute: async (input) =>
+        withOpen(port, [...(await port.setAside(input.steps))]),
     }),
     defineQTool<Record<string, never>, FinishOnboardingOutput, Grant>({
       id: FINISH_ONBOARDING,
