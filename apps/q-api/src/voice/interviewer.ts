@@ -18,8 +18,14 @@ import {
   type OnboardingResponseValue,
   type OnboardingSessionView,
 } from "@capital-q/contracts";
-import { FOUNDER_DEFINITION_V2 } from "@capital-q/founder-onboarding";
-import { INVESTOR_DEFINITION_V1 } from "@capital-q/investor-onboarding";
+import {
+  FOUNDER_DEFINITION_V2,
+  FOUNDER_INTERVIEW_CUES,
+} from "@capital-q/founder-onboarding";
+import {
+  INVESTOR_DEFINITION_V1,
+  INVESTOR_INTERVIEW_CUES,
+} from "@capital-q/investor-onboarding";
 import type { OnboardingStepManifest } from "@capital-q/onboarding";
 import {
   isModelGatewayError,
@@ -65,6 +71,7 @@ import {
   type QPersonalityCode,
 } from "@capital-q/q-core";
 
+import { portrait, type PortraitEntry } from "./portrait.js";
 import { SPOKEN_QUESTIONS, stepNoun } from "./step-copy.js";
 /**
  * Q conducting the interview (CQ-Q-VOICE-001 rework).
@@ -314,103 +321,6 @@ function optionsSentence(view: OnboardingSessionView): string | null {
       ? `, and ${String(labels.length - shown.length)} more on screen`
       : "";
   return `${String(list)}${more}.`;
-}
-
-/**
- * How far along the interview is, in a sentence.
- *
- * Counted from the session's own progress. "Where are we so far?" is an
- * ordinary thing to ask halfway through a form, and the honest answer is
- * arithmetic — not something to look up, and not a reason to re-ask the
- * field they were on.
- */
-function progressSentence(
-  view: OnboardingSessionView,
-  steps: ReadonlyMap<string, OnboardingStepManifest>,
-): string {
-  const eligible = view.progress.eligibleSteps;
-  const done = eligible.filter((step) => step.status === "COMPLETED");
-  const left = Math.max(0, eligible.length - done.length);
-  /**
-   * Where they are, said the way Q would ask it.
-   *
-   * Through `askLabel` rather than the step's raw prompt, because the
-   * raw prompt is sometimes the platform's own vocabulary — live, this
-   * sentence ended "We are on this one: Which mandate are we defining",
-   * which is the exact internal term Q is not allowed to say. One place
-   * decides how a step is named to a person, and this is a caller of
-   * it, not an exception to it.
-   */
-  const currentStepManifest =
-    view.currentStep === null || view.currentStep === undefined
-      ? undefined
-      : steps.get(view.currentStep.stepKey);
-  const current = (
-    currentStepManifest === undefined
-      ? (view.currentStep?.prompt ?? "")
-      : askLabel(currentStepManifest)
-  ).trim();
-  // Only when the step's own prompt is actually a question. Some are
-  // bare labels — "Your firm" — and reading one out is the exact thing
-  // that made the live transcript unusable. A person who asks where they
-  // are is better served by the count alone than by a label read at them.
-  const asksSomething = /\?$/.test(view.currentStep?.prompt?.trim() ?? "");
-  const where =
-    asksSomething && current.length > 0
-      ? ` We are on this one: ${current.replace(/\?+$/, "")}.`
-      : "";
-  if (done.length === 0) {
-    return `Nothing is on your record yet — there are ${String(left)} to go.${where}`;
-  }
-
-  /**
-   * What is covered, named from the recorded answers themselves.
-   *
-   * Read from `view.responses`, which is the owning service's answer to
-   * "what do you hold", and never from anything the person said in
-   * conversation. The two came apart live: every provider was down, three
-   * answers went nowhere, and Q still reported "we have your type, which
-   * is Angel, and your firm, Zino Aviation" — from its own memory of the
-   * turns, against a session holding nothing at all.
-   */
-  const named = done
-    .map((step) => {
-      const recorded = view.responses.find((r) => r.stepKey === step.stepKey);
-      if (recorded === undefined) return null;
-      /**
-       * A reference the platform resolved is not something they
-       * answered.
-       *
-       * Live, this line read "Are we setting up your main investment
-       * strategy, or a different one: 1 recorded" — a count of rows,
-       * offered to a person as an account of their own progress, for a
-       * choice the platform made on their behalf because there was only
-       * one. Nothing about it belongs in an answer to "where are we?".
-       */
-      if (
-        recorded.value.type === "RESOURCE_REFERENCE" &&
-        recorded.value.resourceType !== "TAXONOMY_NODE"
-      ) {
-        return null;
-      }
-      const manifest = steps.get(step.stepKey);
-      const label = manifest === undefined ? undefined : askLabel(manifest);
-      const value = describeValue(
-        steps.get(step.stepKey),
-        recorded.value,
-        recordedCurrency(view, steps),
-      ).trim();
-      if (value.length === 0) return null;
-      return label === undefined || label.length === 0
-        ? value
-        : `${label.replace(/\?+$/, "")}: ${value}`;
-    })
-    .filter((line): line is string => line !== null)
-    .slice(0, 6);
-
-  const list =
-    named.length === 0 ? "" : ` On your record so far: ${named.join("; ")}.`;
-  return `${String(done.length)} of ${String(eligible.length)} answered, ${String(left)} to go.${list}${where}`;
 }
 
 /**
@@ -764,7 +674,7 @@ const PLAIN_QUESTIONS: Readonly<Record<string, string>> = {
  * is fine." — which is right when Q is asking and wrong when it already
  * has the answer in hand. Here the step is a noun.
  */
-function askLabel(step: OnboardingStepManifest): string {
+export function askLabel(step: OnboardingStepManifest): string {
   return (PLAIN_QUESTIONS[step.stepKey] ?? step.configuration.prompt).replace(
     /\?+$/,
     "",
@@ -930,7 +840,7 @@ function lookupQuestion(
   }
 }
 
-function definitionFor(journey: "founder" | "investor") {
+export function definitionFor(journey: "founder" | "investor") {
   return journey === "founder" ? FOUNDER_DEFINITION_V2 : INVESTOR_DEFINITION_V1;
 }
 
@@ -940,7 +850,9 @@ function stepsByKey(journey: "founder" | "investor") {
   );
 }
 
-function optionsOf(step: OnboardingStepManifest): readonly InterviewOption[] {
+export function optionsOf(
+  step: OnboardingStepManifest,
+): readonly InterviewOption[] {
   const configuration = step.configuration;
   if (
     configuration.stepType === "single_select" ||
@@ -1011,7 +923,7 @@ export function spokenMoney(value: number, currency: string | null): string {
   return `${symbol}${spokenFigure(value)}`;
 }
 
-function describeValue(
+export function describeValue(
   step: OnboardingStepManifest | undefined,
   value: OnboardingResponseValue,
   /** The currency the session has recorded, for money steps. */
@@ -1048,7 +960,7 @@ function describeValue(
  * not a reason to invent dollars: an unlabelled "50,000" is honest,
  * and "$50,000" against a naira mandate is not.
  */
-function recordedCurrency(
+export function recordedCurrency(
   view: OnboardingSessionView,
   steps: ReadonlyMap<string, OnboardingStepManifest>,
 ): string | null {
@@ -1081,7 +993,7 @@ function isTypeable(kind: InterviewOpenStep["kind"]): boolean {
   return kind === "NUMBER" || kind === "SHORT_TEXT" || kind === "LONG_TEXT";
 }
 
-function toOpenStep(
+export function toOpenStep(
   step: OnboardingStepManifest,
   view: OnboardingSessionView,
 ): InterviewOpenStep | null {
@@ -1287,14 +1199,18 @@ function asList(raw: string | readonly string[] | boolean): readonly string[] {
   return raw;
 }
 
-function isMaterial(step: OnboardingStepManifest): boolean {
-  if (MATERIAL_ANY_PATTERN.test(step.stepKey)) return true;
+function isChoiceStep(step: OnboardingStepManifest): boolean {
   const type = step.configuration.stepType;
-  const choice =
+  return (
     type === "single_select" ||
     type === "multi_select" ||
-    type === "reference_select";
-  return !choice && MATERIAL_FIGURE_PATTERN.test(step.stepKey);
+    type === "reference_select"
+  );
+}
+
+function isMaterial(step: OnboardingStepManifest): boolean {
+  if (MATERIAL_ANY_PATTERN.test(step.stepKey)) return true;
+  return !isChoiceStep(step) && MATERIAL_FIGURE_PATTERN.test(step.stepKey);
 }
 
 const NUMBER_WORDS: Readonly<Record<string, number>> = {
@@ -1434,7 +1350,7 @@ export function spokenUrl(text: string): string {
 }
 
 /** A model reading → the step's own value, or null when it does not fit. */
-function toResponseValue(
+export function toResponseValue(
   step: OnboardingStepManifest,
   raw: string | readonly string[] | boolean,
 ): OnboardingResponseValue | null {
@@ -1577,10 +1493,51 @@ type UnrestrictedOutcome =
   | { readonly kind: "SET_ASIDE" }
   | { readonly kind: "CANNOT" };
 
+/**
+ * The journeys' exclusion lists, each paired with its sibling (G, the
+ * acceptance directive of 2026-09-24).
+ *
+ * Declared by the journey itself: an EXCLUSION cue sits on the hard step
+ * and names its soft one. Nothing here reads a step key or a word; the
+ * pair is the definition's own statement that "never show me" and "I'd
+ * rather not see" are two representations of one concept.
+ */
+type ExclusionSibling = { readonly sibling: string; readonly hard: boolean };
+export const EXCLUSION_SIBLINGS: ReadonlyMap<string, ExclusionSibling> =
+  new Map<string, ExclusionSibling>(
+    Object.entries({ ...FOUNDER_INTERVIEW_CUES, ...INVESTOR_INTERVIEW_CUES })
+      .filter(([, cue]) => cue.kind === "EXCLUSION")
+      .flatMap(([hardKey, cue]) =>
+        cue.kind === "EXCLUSION"
+          ? [
+              [hardKey, { sibling: cue.softStepKey, hard: true }] as [
+                string,
+                ExclusionSibling,
+              ],
+              [cue.softStepKey, { sibling: hardKey, hard: false }] as [
+                string,
+                ExclusionSibling,
+              ],
+            ]
+          : [],
+      ),
+  );
+
 export function unrestrictedOutcome(
   step: OnboardingStepManifest,
 ): UnrestrictedOutcome {
   const c = step.configuration;
+  /**
+   * "Anything goes", said of a list of things to keep out, is nothing
+   * kept out. Recording every option — the right reading of "it can be
+   * anyone" for an investment role — turned "I don't mind what I see"
+   * into an investor who avoids gambling, tobacco, weapons, adult
+   * content, crypto, hardware, pre-product and solo founders (live,
+   * 2026-09-24). An exclusion list's empty value is its no-restriction.
+   */
+  if (EXCLUSION_SIBLINGS.has(step.stepKey)) {
+    return step.required ? { kind: "CANNOT" } : { kind: "SET_ASIDE" };
+  }
   switch (c.stepType) {
     case "multi_select": {
       const keys = c.options
@@ -1792,6 +1749,8 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
    * it still refuses waits for the next turn.
    */
   const carriedBySession = new Map<string, Candidate[]>();
+  /** The opening last kept per session, until the person next speaks. */
+  const openingKeptBySession = new Map<string, string>();
   const personality = personalityOf(dependencies.personality);
   /**
    * What is remembered, for this turn. A failed recall is an empty
@@ -2242,6 +2201,21 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
               ]),
         ];
         if (turns.length === 0) return;
+        /**
+         * One opening per arrival (B). A reload, a voice switch and a
+         * reconnect each open the interview again; with nothing said in
+         * between, the same question is not kept again (by step: the first
+         * opening may carry the type hint and the next not), so the thread
+         * never shows it stacked.
+         */
+        const lastOpening = openingKeptBySession.get(sessionId);
+        if (person.length === 0) {
+          const openingKey = stepNext ?? q;
+          if (lastOpening === openingKey) return;
+          openingKeptBySession.set(sessionId, openingKey);
+        } else {
+          openingKeptBySession.delete(sessionId);
+        }
         void appendOnboardingInterviewTurns(
           input.session,
           input.onboardingSessionId,
@@ -2330,8 +2304,19 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
           moreOptions: rest.options.length - SHORT_OPTIONS,
         };
       };
+      /**
+       * Steps set aside earlier stay answerable (G, the directive's
+       * fixture). "Nothing else" set the exclusion lists aside; "I don't
+       * want to see adult content" a moment later had nowhere to go, so
+       * nothing was written and the model's reply said it was taken. The
+       * journey accepts an answer to a step it set aside, so they are
+       * listed after the open ones — never to be asked again, only to
+       * receive what the person brings up.
+       */
+      const setAside: OnboardingStepManifest[] = [];
       for (const step of definitionFor(input.journeyType).steps) {
         const status = statuses.get(step.stepKey);
+        if (status === "SKIPPED") setAside.push(step);
         if (
           status === undefined ||
           status === "COMPLETED" ||
@@ -2343,6 +2328,18 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
         if (open !== null) openSteps.push(compact(open));
         if (openSteps.length >= MAX_OPEN_STEPS) break;
       }
+      for (const step of setAside) {
+        if (openSteps.length >= MAX_OPEN_STEPS) break;
+        const open = toOpenStep(step, view);
+        if (open !== null) openSteps.push(compact(open));
+      }
+      const setAsideLine =
+        setAside.length === 0
+          ? ""
+          : `SET ASIDE EARLIER, never ask these again; if they bring one up, record it as usual: ${setAside
+              .slice(0, 8)
+              .map((step) => step.stepKey)
+              .join(", ")}.`;
       const currency = recordedCurrency(view, steps);
       const knownAnswers = view.responses.map((r) => {
         const step = steps.get(r.stepKey);
@@ -2374,12 +2371,19 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
         | "environmentNotes"
       > = {
         asked: askedBlock(conversation),
-        conversation: conversationBlock(
-          conversation,
-          sessionId,
-          steps,
-          researchAvailable,
-        ),
+        conversation:
+          [
+            conversationBlock(
+              conversation,
+              sessionId,
+              steps,
+              researchAvailable,
+            ),
+            setAsideLine,
+          ]
+            .filter((line) => line.length > 0 && line !== "(nothing to note)")
+            .join("\n")
+            .slice(0, 2_000) || "(nothing to note)",
         journey: input.journeyType,
         channel: input.channel,
         personality: personality.manner,
@@ -2536,6 +2540,48 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
          * they answered earlier is still on the record, which this turn
          * has read and can stand behind.
          */
+        /**
+         * An opening needs no model (B). Nothing was said, so nothing was
+         * missed, and the question in hand comes from the session: live,
+         * three openings during a provider outage each said "I haven't
+         * taken that in, say it again" to somebody who had said nothing,
+         * and the thread kept all three as its live line.
+         */
+        if (input.utterance.trim().length === 0) {
+          const openKey =
+            conversation.asked?.topic ?? view.currentStep?.stepKey ?? null;
+          const openStep = openKey === null ? undefined : steps.get(openKey);
+          const open =
+            openStep === undefined ? null : toOpenStep(openStep, view);
+          if (openStep !== undefined && open !== null) {
+            const question = askWithChoices(openStep, input);
+            keepThread(question, null, openStep.stepKey);
+            return {
+              reply: question,
+              intent: "OPENING",
+              asking: {
+                stepKey: open.stepKey,
+                kind: open.kind,
+                options: open.options ?? [],
+                maxChoices: open.maxChoices,
+              },
+              recorded: [],
+              skipped: [],
+              questionForQ: null,
+              researching: null,
+              navigate: null,
+              handoff: null,
+              pronounce: null,
+              warnings: warningsBySession.get(input.onboardingSessionId) ?? 0,
+              view,
+              degraded: false,
+              reading: null,
+              resume: null,
+              qualitative: qualitativeBySession.get(sessionId) ?? [],
+              trace: null,
+            };
+          }
+        }
         dispatch({ type: "FAILED", operation: "MODEL" });
         const failures = conversation.failures.MODEL;
         if (input.utterance.trim().length > 0) {
@@ -2664,9 +2710,17 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
       };
       /** Steps whose value this turn the service refused as invalid. */
       const invalidValues = new Set<string>();
+      /** Soft exclusions this turn that the never-show list already holds. */
+      const coveredBySibling: string[] = [];
+      /** Items that could not move to the never-show list this turn. */
+      const blockedMoves: {
+        readonly stepKey: string;
+        readonly sibling: string;
+        readonly keys: readonly string[];
+      }[] = [];
       const commit = async (
         stepKey: string,
-        value: OnboardingResponseValue,
+        given: OnboardingResponseValue,
         /**
          * True for the ledger's background re-offers (Workstream A).
          *
@@ -2679,6 +2733,92 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
          */
         quietly = false,
       ) => {
+        let value = given;
+        /**
+         * One concept, one exclusion list (G, the directive's fixture).
+         *
+         * The journey keeps each red flag in exactly one of "rather not
+         * see" and "never show" and refuses a write that lists it in both
+         * ("Keep it in one list"). Live, adult content went in as something
+         * to avoid; every later attempt to hide it outright was refused as
+         * invalid, dropped, and the question came round again. A person
+         * who answers the never-show question with it is moving it, so it
+         * leaves the softer list first. The reverse is not a move: what is
+         * already never shown needs nothing softer, so it is left out of
+         * the softer write, and a write left with nothing is a restatement.
+         */
+        const pair = EXCLUSION_SIBLINGS.get(stepKey);
+        const siblingValue =
+          pair === undefined
+            ? undefined
+            : view.responses.find((r) => r.stepKey === pair.sibling)?.value;
+        if (
+          pair !== undefined &&
+          value.type === "MULTI_SELECT" &&
+          siblingValue?.type === "MULTI_SELECT"
+        ) {
+          const overlap = new Set(
+            value.optionKeys.filter((key) =>
+              siblingValue.optionKeys.includes(key),
+            ),
+          );
+          if (overlap.size > 0 && !pair.hard) {
+            const rest = value.optionKeys.filter((key) => !overlap.has(key));
+            if (rest.length === 0) {
+              coveredBySibling.push(stepKey);
+              return true;
+            }
+            value = { type: "MULTI_SELECT", optionKeys: rest };
+          } else if (overlap.size > 0) {
+            const kept = siblingValue.optionKeys.filter(
+              (key) => !overlap.has(key),
+            );
+            let moved = false;
+            if (kept.length > 0) {
+              try {
+                view = await submitOnboardingResponse(
+                  input.session,
+                  input.onboardingSessionId,
+                  {
+                    stepKey: pair.sibling,
+                    response: {
+                      value: { type: "MULTI_SELECT", optionKeys: kept },
+                    },
+                    expectedSessionVersion: view.session.version,
+                  },
+                  randomUUID(),
+                );
+                moved = true;
+              } catch (error: unknown) {
+                logger.warn(
+                  { err: error, stepKey, sibling: pair.sibling },
+                  "an exclusion was not moved out of its sibling list",
+                );
+              }
+            }
+            if (!moved) {
+              /**
+               * The softer list would be left empty, and the journey has no
+               * way to take a completed answer back (a skip refuses a
+               * completed step, and a list needs one item). So the item
+               * stays ranked lower, the rest of the answer is written, and
+               * the reply says so — never the refused write retried as a
+               * question.
+               */
+              blockedMoves.push({
+                stepKey,
+                sibling: pair.sibling,
+                keys: [...overlap],
+              });
+              const rest = value.optionKeys.filter((key) => !overlap.has(key));
+              if (rest.length === 0) {
+                coveredBySibling.push(stepKey);
+                return true;
+              }
+              value = { type: "MULTI_SELECT", optionKeys: rest };
+            }
+          }
+        }
         try {
           // Meaning kept beside the field rides with the value as the
           // response's own note: prose for people, never a filter.
@@ -2997,6 +3137,21 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
       const takingAnswers =
         disposition.write || disposition.confirm || questionCarriedValues;
       /**
+       * An exclusion given as the plain answer to the exclusion question Q
+       * asked is the person's own declaration (G, the directive's
+       * fixture). Reading it back was the loop: "Gambling then" → "Never
+       * show me: Gambling. Is that right?" → "Adult content." → the same
+       * read-back → "Stop asking me silly questions". The read-back stays
+       * for everything else that is material: a figure (a voice mishears
+       * amounts), and an exclusion that arrived any other way —
+       * volunteered earlier, inferred, or placed beside another question.
+       */
+      const declaredAsAsked = (step: OnboardingStepManifest): boolean =>
+        isChoiceStep(step) &&
+        reading.kind === "ANSWER" &&
+        reading.confidence === "HIGH" &&
+        step.stepKey === (conversation.asked?.topic ?? currentAtStart);
+      /**
        * Answers that only restate what is already on the record. Not
        * written, and not a failure either: "right, angel, and we're at
        * seed" is a person carrying on, and a turn made only of such
@@ -3066,7 +3221,29 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
           spokenUploads.push(step);
           continue;
         }
-        const value = toResponseValue(step, answer.value);
+        const read = toResponseValue(step, answer.value);
+        /**
+         * A further item for a list whose earlier items are held for a
+         * yes, answered rather than corrected ("Adult content" held, then
+         * "Gambling then"): the list is both, not the newer one alone.
+         */
+        const heldBefore =
+          reading.kind === "ANSWER"
+            ? pending.find((held) => held.stepKey === step.stepKey)
+            : undefined;
+        const value: OnboardingResponseValue | null =
+          read?.type === "MULTI_SELECT" &&
+          heldBefore?.value.type === "MULTI_SELECT"
+            ? {
+                type: "MULTI_SELECT",
+                optionKeys: [
+                  ...new Set([
+                    ...heldBefore.value.optionKeys,
+                    ...read.optionKeys,
+                  ]),
+                ],
+              }
+            : read;
         if (value === null) {
           /**
            * A reading the step will not take.
@@ -3162,7 +3339,8 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
           toResponseValue(askedStep, answer.value) !== null;
         if (
           misplaced ||
-          isMaterial(step) ||
+          (isMaterial(step) &&
+            !(answer.confidence === "HIGH" && declaredAsAsked(step))) ||
           confirmOnly ||
           tense.has(step.stepKey)
         ) {
@@ -3393,7 +3571,7 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
           }
           const spoken = describeValue(step, value, currency);
           dispatch({ type: "PROPOSAL_DECIDED", target: step.stepKey });
-          if (isMaterial(step) || confirmOnly) {
+          if ((isMaterial(step) && !declaredAsAsked(step)) || confirmOnly) {
             nextPending.push({
               stepKey: step.stepKey,
               question: step.configuration.prompt,
@@ -3446,7 +3624,11 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
         }
         selectionsThisTurn[step.stepKey] = resolved.keys;
         const spoken = labelsOf(resolved.keys, shownOptions).join(", ");
-        if (isMaterial(step) || confirmOnly || tense.has(step.stepKey)) {
+        if (
+          (isMaterial(step) && !declaredAsAsked(step)) ||
+          confirmOnly ||
+          tense.has(step.stepKey)
+        ) {
           nextPending.push({
             stepKey: step.stepKey,
             question: step.configuration.prompt,
@@ -3473,6 +3655,19 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
       const partlyPlaced: {
         readonly step: OnboardingStepManifest;
         readonly placed: readonly string[];
+        readonly unplaced: readonly string[];
+      }[] = [];
+      /**
+       * Phrases heard this turn of which none matched anything Capital Q
+       * can record (G, the directive's fixture). They were dropped without
+       * a word: "Adult content." for the sector exclusions went nowhere,
+       * the turn looked empty, and the repair ladder told the person "you
+       * did tell me, and I didn't get it down" about a question they had
+       * not been asked. Kept out of the ladder, so the claimed-versus-
+       * accounted check below says plainly that it is not down.
+       */
+      const notPlaced: {
+        readonly step: OnboardingStepManifest;
         readonly unplaced: readonly string[];
       }[] = [];
       const carriedPhrases = (phrasesBySession.get(sessionId) ?? []).filter(
@@ -3539,6 +3734,16 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
           phrasesHeld.push(step.stepKey);
           continue;
         }
+        if (
+          ids.length === 0 &&
+          unplacedPhrases.length > 0 &&
+          categoryPhrasesThisTurn.some(
+            (heard) => heard.stepKey === step.stepKey,
+          )
+        ) {
+          notPlaced.push({ step, unplaced: unplacedPhrases });
+          continue;
+        }
         if (ids.length > 0 && unplacedPhrases.length > 0) {
           partlyPlaced.push({
             step,
@@ -3595,7 +3800,7 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
            * another, and doing it never is how the answer disappeared.
            */
           const spoken = labels.join(", ");
-          if (isMaterial(step) || confirmOnly) {
+          if ((isMaterial(step) && !declaredAsAsked(step)) || confirmOnly) {
             nextPending.push({
               stepKey: step.stepKey,
               question: c.prompt,
@@ -3704,6 +3909,69 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
         }
       }
 
+      /**
+       * One hold per step (G, the directive's fixture). "Adult content"
+       * was held for a yes, then "Gambling then" was held beside it as a
+       * second value for the same list; the yes confirmed the first and
+       * the second was discarded as already decided. A list keeps both, in
+       * the order they were said; anything else keeps the latest.
+       */
+      const collapsed = new Map<string, Pending>();
+      // A step recorded this turn has nothing left to confirm: an older
+      // hold for it would overwrite the newer answer on a later yes.
+      for (const held of nextPending.filter(
+        (item) => !recorded.includes(item.stepKey),
+      )) {
+        const before = collapsed.get(held.stepKey);
+        if (before === undefined) {
+          collapsed.set(held.stepKey, held);
+          continue;
+        }
+        const step = steps.get(held.stepKey);
+        if (
+          before.value.type === "MULTI_SELECT" &&
+          held.value.type === "MULTI_SELECT"
+        ) {
+          const value: OnboardingResponseValue = {
+            type: "MULTI_SELECT",
+            optionKeys: [
+              ...new Set([
+                ...before.value.optionKeys,
+                ...held.value.optionKeys,
+              ]),
+            ],
+          };
+          collapsed.set(held.stepKey, {
+            ...before,
+            value,
+            spoken:
+              step === undefined
+                ? `${before.spoken}, ${held.spoken}`
+                : describeValue(step, value, currency),
+          });
+        } else if (
+          before.value.type === "RESOURCE_REFERENCE" &&
+          held.value.type === "RESOURCE_REFERENCE" &&
+          before.value.resourceType === held.value.resourceType
+        ) {
+          collapsed.set(held.stepKey, {
+            ...before,
+            value: {
+              ...before.value,
+              resourceIds: [
+                ...new Set([
+                  ...before.value.resourceIds,
+                  ...held.value.resourceIds,
+                ]),
+              ],
+            },
+            spoken: `${before.spoken}, ${held.spoken}`,
+          });
+        } else {
+          collapsed.set(held.stepKey, held);
+        }
+      }
+      nextPending.splice(0, nextPending.length, ...collapsed.values());
       pendingBySession.set(input.onboardingSessionId, nextPending.slice(-8));
 
       // 5. Conduct: a warning is counted here, never by the model; the
@@ -3859,7 +4127,127 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
         notCleared.length === 0 &&
         phrasesHeld.length === 0 &&
         restated === 0 &&
+        coveredBySibling.length === 0 &&
+        notPlaced.length === 0 &&
         !result.skipRemainingOptional;
+      /**
+       * Whether anything they said for this step is known not to have
+       * landed: words noted as not recorded, category phrases still
+       * waiting for the lookup, a value carried for the journey, or an
+       * answer this turn the step refused. Only then is "you did tell me"
+       * true.
+       */
+      const lostFor = (stepKey: string): boolean =>
+        (unrecordedBySession.get(input.onboardingSessionId) ?? []).some(
+          (item) => item.stepKey === stepKey,
+        ) ||
+        (phrasesBySession.get(input.onboardingSessionId) ?? []).some(
+          (item) => item.stepKey === stepKey,
+        ) ||
+        carriedFor(input.onboardingSessionId, view).some(
+          (item) => item.stepKey === stepKey,
+        ) ||
+        rejected.some((step) => step.stepKey === stepKey) ||
+        unresolved.some((item) => item.step.stepKey === stepKey);
+      /**
+       * Anything they said that is known not to be on the record yet, for
+       * any step: what makes "you did tell me, and I didn't get it down"
+       * true.
+       */
+      const somethingLost = (stepKey: string): boolean =>
+        lostFor(stepKey) ||
+        carriedFor(input.onboardingSessionId, view).length > 0 ||
+        (unrecordedBySession.get(input.onboardingSessionId) ?? []).length > 0;
+      /**
+       * "I just said so" at an exclusion list whose sibling already holds
+       * what they said (G, the directive's fixture).
+       *
+       * "I don't want to see adult content" went in as something to rank
+       * lower; the next question was the never-show list, and "I just
+       * said so" is the person telling Q the concept is answered. It is,
+       * under the other representation. So Q says where it is and asks
+       * the one question that separates the two (hide it outright?) as a
+       * hold their yes records. Asked once: insisting again, or a soft
+       * step the hard one already covers, sets the step aside with the
+       * record said plainly. Once an explicit answer is on the record, Q
+       * does not ask again just to fill another representation of it.
+       */
+      const reconcileInsistence = async (
+        wanted: OnboardingStepManifest,
+      ): Promise<string | null> => {
+        const pair = EXCLUSION_SIBLINGS.get(wanted.stepKey);
+        const siblingStep =
+          pair === undefined ? undefined : steps.get(pair.sibling);
+        if (pair === undefined || siblingStep === undefined) return null;
+        if (view.responses.some((r) => r.stepKey === wanted.stepKey)) {
+          return null;
+        }
+        if (lostFor(wanted.stepKey)) return null;
+        const stored = view.responses.find(
+          (r) => r.stepKey === pair.sibling,
+        )?.value;
+        if (stored?.type !== "MULTI_SELECT") return null;
+        const takes = new Set(optionsOf(wanted).map((o) => o.key));
+        const keys = stored.optionKeys.filter((key) => takes.has(key));
+        if (keys.length === 0) return null;
+        const said = describeValue(
+          siblingStep,
+          { type: "MULTI_SELECT", optionKeys: keys },
+          currency,
+        );
+        const askedBefore = conversation.repair?.topic === wanted.stepKey;
+        /**
+         * Several things ranked lower: which of them, if any, should be
+         * hidden outright is a real question, asked once. Whatever they
+         * name is then an answer to the never-show question and moves.
+         * One thing ranked lower cannot move — the journey cannot empty
+         * the softer list — so that is said instead of asked.
+         */
+        if (pair.hard && !askedBefore && keys.length > 1) {
+          repairAsk = wanted.stepKey;
+          dispatch({
+            type: "REPAIRED",
+            topic: wanted.stepKey,
+            strategy: "OFFER_INTERPRETATION",
+          });
+          repairUsed = "OFFER_INTERPRETATION";
+          return `${said} are on your record under your ${noun(siblingStep)}, so they're ranked lower but can still appear. Should any of them be never shown at all?`;
+        }
+        if (wanted.required) return null;
+        try {
+          view = await skipOnboardingStep(
+            input.session,
+            input.onboardingSessionId,
+            wanted.stepKey,
+            { expectedSessionVersion: view.session.version },
+            randomUUID(),
+          );
+          skipped.push(wanted.stepKey);
+          stopCarrying(input.onboardingSessionId, wanted.stepKey);
+        } catch (error: unknown) {
+          logger.warn(
+            { err: error, stepKey: wanted.stepKey },
+            "an exclusion step its sibling covers was not set aside",
+          );
+          return null;
+        }
+        const next = view.currentStep?.stepKey;
+        const nextStep = next === undefined ? undefined : steps.get(next);
+        repairAsk = nextStep?.stepKey ?? null;
+        const dropped = nextPending.filter(
+          (held) => held.stepKey !== wanted.stepKey,
+        );
+        nextPending.splice(0, nextPending.length, ...dropped);
+        pendingBySession.set(input.onboardingSessionId, nextPending.slice(-8));
+        const kept = pair.hard
+          ? keys.length === 1
+            ? `${said} is on your record under your ${noun(siblingStep)}, so it's ranked lower rather than hidden; I can't move it to your ${noun(wanted)} from here, so I've left those empty.`
+            : `${said} stay on your record under your ${noun(siblingStep)}, ranked lower rather than hidden, and I've left your ${noun(wanted)} empty.`
+          : `${said} is already never shown, so there's nothing to add to your ${noun(wanted)}.`;
+        return nextStep === undefined
+          ? kept
+          : `${kept} ${askAgain(nextStep, input)}`;
+      };
       if (needsScale !== undefined) {
         // Already answered above; the guards below are about a different
         // failure and saying both at once is two apologies in a row.
@@ -3908,18 +4296,74 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
            */
           repairAsk = wanted.stepKey;
           reply = askWithChoices(wanted, input);
+        } else if (
+          wanted !== undefined &&
+          pending.some((held) => held.stepKey === wanted.stepKey) &&
+          nextPending.some((held) => held.stepKey === wanted.stepKey) &&
+          !result.confirmations.some(
+            (decision) =>
+              decision.stepKey === wanted.stepKey &&
+              decision.decision !== "CONFIRMED",
+          )
+        ) {
+          /**
+           * "Stop asking me silly questions" to "Never show me: Gambling,
+           * Adult content. Is that right?" (G). The value was read back
+           * from their own earlier words, it is still what they said, and
+           * nothing this turn denies or changes it: the objection is to
+           * the read-back. It is written, and Q moves on.
+           */
+          const held = nextPending.find(
+            (item) => item.stepKey === wanted.stepKey,
+          );
+          const rest = nextPending.filter(
+            (item) => item.stepKey !== wanted.stepKey,
+          );
+          nextPending.splice(0, nextPending.length, ...rest);
+          pendingBySession.set(
+            input.onboardingSessionId,
+            nextPending.slice(-8),
+          );
+          if (held !== undefined && (await commit(held.stepKey, held.value))) {
+            const next = view.currentStep?.stepKey;
+            const nextStep =
+              next === undefined || next === held.stepKey
+                ? undefined
+                : steps.get(next);
+            repairAsk = nextStep?.stepKey ?? null;
+            reply = [
+              `Done: ${held.spoken} is on your record.`,
+              nextStep === undefined ? "" : askAgain(nextStep, input),
+            ]
+              .filter((part) => part.length > 0)
+              .join(" ");
+          } else if (held !== undefined) {
+            carry(input.onboardingSessionId, {
+              stepKey: held.stepKey,
+              value: held.value,
+              spoken: held.spoken,
+              attempts: 1,
+            });
+            reply = `I have ${held.spoken} and it goes on your record as soon as the setup can take it.`;
+          }
         } else if (wanted !== undefined) {
-          dispatch({
-            type: "REPAIRED",
-            topic: wanted.stepKey,
-            strategy: "NAME_THE_GAP",
-          });
-          dispatch({ type: "FAILED", operation: "PARSE" });
-          repairUsed = "NAME_THE_GAP";
-          repairAsk = wanted.stepKey;
-          reply = `You did tell me, and I didn't get it down. ${composeRepair(
-            "NAME_THE_GAP",
-            {
+          const outcome = await reconcileInsistence(wanted);
+          if (outcome !== null) {
+            reply = outcome;
+          } else {
+            dispatch({
+              type: "REPAIRED",
+              topic: wanted.stepKey,
+              strategy: "NAME_THE_GAP",
+            });
+            dispatch({ type: "FAILED", operation: "PARSE" });
+            repairUsed = "NAME_THE_GAP";
+            repairAsk = wanted.stepKey;
+            // "You did tell me" only when something they said is known
+            // not to have landed. Otherwise it is a claim
+            // about the conversation the platform cannot back: live, it
+            // was said about a question they had never answered.
+            const repair = composeRepair("NAME_THE_GAP", {
               label: repairLabel(wanted),
               question: askAgain(wanted, input),
               options: optionsOf(wanted).map((o) => o.label),
@@ -3927,8 +4371,11 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
                 (item) => item.spoken,
               ),
               optional: !wanted.required,
-            },
-          )}`;
+            });
+            reply = somethingLost(wanted.stepKey)
+              ? `You did tell me, and I didn't get it down. ${repair}`
+              : repair;
+          }
         }
       } else if (
         notCleared[0] !== undefined &&
@@ -4102,6 +4549,22 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
           result = { ...result, askNext: first.stepKey };
         }
       }
+      const blocked = blockedMoves[0];
+      if (blocked !== undefined) {
+        const hardStep = steps.get(blocked.stepKey);
+        const softStep = steps.get(blocked.sibling);
+        if (hardStep !== undefined && softStep !== undefined) {
+          const said = describeValue(
+            softStep,
+            { type: "MULTI_SELECT", optionKeys: [...blocked.keys] },
+            currency,
+          );
+          const line = `${said} is already on your record under your ${noun(softStep)}, and I can't move it to your ${noun(hardStep)} from here, so it stays ranked lower rather than hidden.`;
+          reply = recorded.includes(blocked.stepKey)
+            ? `${line} ${reply.trim()}`.trim()
+            : `${line} ${askAgain(steps.get(view.currentStep?.stepKey ?? "") ?? hardStep, input)}`;
+        }
+      }
       if (deferredUpload) {
         reply = `${reply.trim()} ${UPLOAD_LINE}`.trim();
         if (
@@ -4219,11 +4682,102 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
        * provider is down — which is exactly when somebody is most likely
        * to be asking where they have got to.
        */
+      /**
+       * "What do you have on me so far?" (H, the directive's fixture):
+       * a few plain sentences from what the session holds, what is left
+       * in words, then the question in hand — never "19 of 33 answered"
+       * and a list of field labels. A broad question about their own
+       * record ("describe who I am to you") is the same question.
+       */
+      /** The platform's own names for stored categories; none invented. */
+      const taxonomyNames = async (
+        ids: readonly string[],
+      ): Promise<string[]> => {
+        const names: string[] = [];
+        for (const id of ids.slice(0, 6)) {
+          try {
+            names.push((await getTaxonomyNode(input.session, id)).displayName);
+          } catch {
+            // A name that cannot be read is left out, never guessed.
+          }
+        }
+        return names;
+      };
+      const portraitNow = async (): Promise<string> => {
+        const entries: PortraitEntry[] = [];
+        for (const step of definitionFor(input.journeyType).steps) {
+          const stored = view.responses.find(
+            (r) => r.stepKey === step.stepKey,
+          )?.value;
+          if (stored === undefined) continue;
+          if (
+            stored.type === "RESOURCE_REFERENCE" &&
+            stored.resourceType !== "TAXONOMY_NODE"
+          ) {
+            continue;
+          }
+          const label = (key: string) =>
+            optionsOf(step).find((option) => option.key === key)?.label ?? key;
+          const items =
+            stored.type === "MULTI_SELECT"
+              ? stored.optionKeys.map(label)
+              : stored.type === "SINGLE_SELECT"
+                ? [label(stored.optionKey)]
+                : stored.type === "RESOURCE_REFERENCE"
+                  ? await taxonomyNames(stored.resourceIds)
+                  : [describeValue(step, stored, currency)];
+          entries.push({ stepKey: step.stepKey, items });
+        }
+        // A reference the platform resolves (the mandate being defined)
+        // is not something left for them to do, and its name is internal.
+        const internal = (key: string): boolean => {
+          const c = steps.get(key)?.configuration;
+          return (
+            c?.stepType === "reference_select" &&
+            c.resourceType !== "TAXONOMY_NODE"
+          );
+        };
+        const remaining = view.progress.eligibleSteps
+          .filter(
+            (item) =>
+              (item.status === "PENDING" || item.status === "IN_PROGRESS") &&
+              !internal(item.stepKey),
+          )
+          .map((item) => ({ stepKey: item.stepKey, required: item.required }));
+        const current =
+          view.currentStep === null || view.currentStep === undefined
+            ? undefined
+            : steps.get(view.currentStep.stepKey);
+        // A step outside the definition map is asked in its own words,
+        // and only when those words are a question.
+        const ownQuestion = view.currentStep?.prompt.trim() ?? "";
+        return [
+          portrait(input.journeyType, entries, remaining),
+          current !== undefined
+            ? askAgain(current, input)
+            : ownQuestion.endsWith("?")
+              ? ownQuestion
+              : "",
+        ]
+          .filter((part) => part.length > 0)
+          .join(" ");
+      };
+      // Broad: naming nothing, or more than a couple of steps of which the
+      // record holds some. Live, "describe who I am to you" named every
+      // step and was answered "Yes, your X is on your record" twelve times.
+      const aboutNamed = reading.question?.about ?? [];
+      const broadRecordsQuestion =
+        reading.question?.kind === "THEIR_OWN_RECORDS" &&
+        (aboutNamed.length === 0 ||
+          (aboutNamed.length > 2 &&
+            aboutNamed.some((key) =>
+              view.responses.some((r) => r.stepKey === key),
+            )));
       const fromState =
         result.answerFromState === "OPTIONS"
           ? optionsSentence(view)
-          : result.answerFromState === "PROGRESS"
-            ? progressSentence(view, steps)
+          : result.answerFromState === "PROGRESS" || broadRecordsQuestion
+            ? await portraitNow()
             : null;
       if (fromState !== null) {
         /**
@@ -4612,9 +5166,12 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
             : result.askNext;
         const next = nextKey === null ? undefined : steps.get(nextKey);
         if (next !== undefined && toOpenStep(next, view) !== null) {
-          const question = askWithChoices(next, input);
-          reply =
-            input.channel === "voice" ? `Welcome back. ${question}` : question;
+          // The question and nothing before it, on a call too (B, the
+          // directive's fixture). The welcome is the platform's single
+          // line, owned by the surface that shows it; an interviewer
+          // opener that also said "Welcome back." gave one restore three
+          // of them, and left one as the thread's live question.
+          reply = askWithChoices(next, input);
           result = { ...result, askNext: next.stepKey };
         }
       }
@@ -4946,12 +5503,32 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
        * held, carried or missing — then what this turn put down, then the
        * next question. The model's own words about those steps are not used.
        */
-      const aboutSteps = (reading.question?.about ?? [])
+      /**
+       * Only a question about their own answers is answered from the
+       * record (C, the directive's fixture). "What other questions do you
+       * want to know the answers to?" came back as six lines of "Not yet:
+       * nothing is on your record for … Want me to add it?" — a question
+       * about what is left, answered as an audit. A question of any other
+       * kind keeps its own answer, and a broad one that names many steps
+       * none of which holds anything is not about the record at all.
+       */
+      const carriedNow = carriedFor(input.onboardingSessionId, view);
+      const holdsSomething = (step: OnboardingStepManifest): boolean =>
+        view.responses.some((r) => r.stepKey === step.stepKey) ||
+        nextPending.some((h) => h.stepKey === step.stepKey) ||
+        carriedNow.some((c) => c.stepKey === step.stepKey);
+      const namedSteps = (reading.question?.about ?? [])
         .map((key) => steps.get(key))
         .filter((step): step is OnboardingStepManifest => step !== undefined);
+      const aboutSteps =
+        reading.question?.kind === "THEIR_OWN_RECORDS" &&
+        !broadRecordsQuestion &&
+        (namedSteps.length <= 2 || namedSteps.some(holdsSomething))
+          ? namedSteps
+          : [];
       if (aboutSteps.length > 0) {
-        const carriedNow = carriedFor(input.onboardingSessionId, view);
         const lines: string[] = [];
+        const missing: OnboardingStepManifest[] = [];
         for (const step of aboutSteps) {
           const stored = view.responses.find((r) => r.stepKey === step.stepKey);
           const held = nextPending.find((h) => h.stepKey === step.stepKey);
@@ -4977,10 +5554,18 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
           } else if (status === "SKIPPED") {
             lines.push(`Your ${noun(step)} is set aside for now.`);
           } else {
-            lines.push(
-              `Not yet: nothing is on your record for your ${noun(step)}. Want me to add it?`,
-            );
+            missing.push(step);
           }
+        }
+        // Said once, together: one offer, never a line per empty step.
+        if (missing.length === 1 && missing[0] !== undefined) {
+          lines.push(
+            `Not yet: nothing is on your record for your ${noun(missing[0])}. Want me to add it?`,
+          );
+        } else if (missing.length > 1) {
+          lines.push(
+            `Nothing is on your record yet for your ${joinWithAnd(missing.map((step) => noun(step)))}.`,
+          );
         }
         const aboutKeys = new Set(aboutSteps.map((step) => step.stepKey));
         const putDown = recorded
@@ -5166,6 +5751,13 @@ export function createInterviewer(dependencies: InterviewerDependencies) {
         "interview turn traced",
       );
       logger.debug({ trace: loggableTrace(trace) }, "interview turn trace");
+      // Once more at the very end: a model sentence put back after the
+      // substitution above (its answer to a question, a pause line) would
+      // otherwise reach the person as "through <them>" (live, H fixture).
+      reply = withKnownName(
+        reply,
+        subjectName ?? input.signup?.organisationName ?? null,
+      );
       keepThread(reply, inFrontAtStart, askOpen?.stepKey ?? null);
       // Parsed again: a double written for an older shape carries none.
       const offeredNow =

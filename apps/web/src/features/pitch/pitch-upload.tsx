@@ -36,11 +36,13 @@ import {
   syncPitchAction,
 } from "./pitch-actions";
 import {
+  awaitingReview,
   describeNetworkStanding,
   INITIAL_PITCH_FLOW,
   judgeFile,
   pitchFlowReducer,
   replaceablePitch,
+  REVIEW_MAX_ATTEMPTS,
   SYNC_MAX_ATTEMPTS,
   syncDelayMs,
   type ChosenFile,
@@ -234,6 +236,42 @@ export function PitchUpload({ companyId }: PitchUploadProps) {
     }, syncDelayMs(attempt));
     return () => clearTimeout(timer);
   }, [companyId, flow]);
+
+  // READY is not where the record stops moving: the platform's review
+  // follows and changes the version. Until it has, keep reading, so the
+  // founder decides against the record as it is (CQ-MLV-003). Bounded:
+  // with no reviewer running the version does not move, and the decision
+  // works on what the screen already holds.
+  const reviewAssetId = awaitingReview(flow)?.mediaAssetId ?? null;
+  useEffect(() => {
+    if (reviewAssetId === null) return;
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const ask = (attempt: number) => {
+      timer = setTimeout(() => {
+        void loadPitchOverviewAction(companyId).then((result) => {
+          if (cancelled) return;
+          const current = result.ok ? result.value.pitch : null;
+          if (
+            result.ok &&
+            current !== null &&
+            current.mediaAssetId === reviewAssetId &&
+            current.moderationStatus !== "NOT_REVIEWED"
+          ) {
+            setCompany(result.value.company);
+            dispatch({ type: "PITCH_UPDATED", pitch: current });
+            return;
+          }
+          if (attempt + 1 < REVIEW_MAX_ATTEMPTS) ask(attempt + 1);
+        });
+      }, syncDelayMs(attempt));
+    };
+    ask(0);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [companyId, reviewAssetId]);
 
   // Once READY, the company's own record decides what the screen may say
   // about investors, and the preview asks the server for a grant once —

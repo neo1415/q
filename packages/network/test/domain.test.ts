@@ -120,8 +120,8 @@ describe("relationship event registry", () => {
     RELATIONSHIP_EVENT_DEFINITIONS,
   );
 
-  it("registers discovered only, with private scopes only", () => {
-    expect(registry.types()).toEqual(["discovered"]);
+  it("registers discovered with private scopes only", () => {
+    expect(registry.types()).toEqual(["discovered", "interest_expressed"]);
     expect(DiscoveredRelationshipEvent.allowedVisibilityScopes).not.toContain(
       "relationship_shared",
     );
@@ -145,11 +145,7 @@ describe("relationship event registry", () => {
   });
 
   it("rejects unknown types, disallowed scopes, unknown keys and private-body fields", () => {
-    for (const eventType of [
-      "investment_won",
-      "interest_expressed",
-      "match_created",
-    ]) {
+    for (const eventType of ["investment_won", "match_created"]) {
       expect(() =>
         registry.validate({
           eventType,
@@ -175,6 +171,45 @@ describe("relationship event registry", () => {
         registry.validate({
           eventType: "discovered",
           visibilityScope: "investor_private",
+          payload,
+        }),
+      ).toThrow(ContractValidationError);
+    }
+  });
+
+  it("registers interest_expressed as relationship_shared only, naming the interest and nothing else (CQ-NET-010)", () => {
+    const interestId = "77777777-0000-4000-8000-000000000001";
+    expect(
+      registry.validate({
+        eventType: "interest_expressed",
+        visibilityScope: "relationship_shared",
+        payload: { interestId },
+      }),
+    ).toEqual({ interestId });
+    for (const scope of [
+      "investor_private",
+      "organisation_private",
+      "network_visible",
+      "public_external",
+    ] as const) {
+      expect(() =>
+        registry.validate({
+          eventType: "interest_expressed",
+          visibilityScope: scope,
+          payload: { interestId },
+        }),
+      ).toThrow(RelationshipEventVisibilityNotAllowedError);
+    }
+    for (const payload of [
+      {},
+      { interestId: "not-a-uuid" },
+      { interestId, message: "We love your deck" },
+      { interestId, matched: true },
+    ]) {
+      expect(() =>
+        registry.validate({
+          eventType: "interest_expressed",
+          visibilityScope: "relationship_shared",
           payload,
         }),
       ).toThrow(ContractValidationError);
@@ -251,10 +286,10 @@ describe("DTOs", () => {
 });
 
 describe("module surface", () => {
-  it("exposes no state setter, no history update or delete, and no relationship delete", () => {
+  it("exposes no state setter, no history update or delete, no relationship delete, no match and no interest withdrawal", () => {
     const names = Object.keys(network);
     for (const forbidden of names.filter((name) =>
-      /set.*state|update.*event|delete|remove|projector|interest|match/i.test(
+      /set.*state|update.*event|update.*interest|delete|remove|withdraw|projector|match/i.test(
         name,
       ),
     )) {
@@ -262,6 +297,8 @@ describe("module surface", () => {
     }
     expect(names).toContain("createEnsureRelationship");
     expect(names).toContain("createRelationshipEventAppender");
+    // CQ-NET-010: Express Interest is the one interest command.
+    expect(names).toContain("createExpressInterest");
   });
 });
 

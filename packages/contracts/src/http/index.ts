@@ -299,7 +299,13 @@ export {
 } from "./capital-objectives.js";
 
 export {
+  CompanyInterestStatusDtoSchema,
   DisclosureScopeSchema,
+  ExpressInterestRequestSchema,
+  ExpressInterestResultDtoSchema,
+  InterestDtoSchema,
+  NETWORK_COMPANY_EXPRESS_INTEREST_PATH,
+  NETWORK_COMPANY_INTEREST_PATH,
   RELATIONSHIP_CURRENT_STATES,
   RELATIONSHIP_EVENT_PAYLOAD_MAX_BYTES,
   RELATIONSHIP_SOURCE_TYPES,
@@ -310,7 +316,11 @@ export {
   RelationshipEventTypeSchema,
   RelationshipSourceIdSchema,
   RelationshipSourceTypeSchema,
+  type CompanyInterestStatusDto,
   type DisclosureScope,
+  type ExpressInterestRequest,
+  type ExpressInterestResultDto,
+  type InterestDto,
   type RelationshipDto,
   type RelationshipEventSummaryDto,
   type RelationshipSourceType,

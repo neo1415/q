@@ -177,7 +177,7 @@ export function VoiceStage({
       data-q-voice-stage={client.state}
     >
       {/* Top bar: who you're with, progress, the way out to the form. */}
-      <div className="flex items-center justify-between gap-3 px-5 pt-5 sm:px-8">
+      <div className="flex flex-none items-center justify-between gap-3 px-5 pt-[calc(20px+var(--cq-safe-top))] sm:px-8">
         <span className="cq-label text-(--cq-text-secondary)">Capital Q</span>
         <span className="cq-caption text-(--cq-text-tertiary)">
           {total > 0 ? `${String(done)} of ${String(total)} covered` : ""}
@@ -199,153 +199,170 @@ export function VoiceStage({
         </div>
       </div>
 
-      {/* The stage: presence, state, and what was just said. */}
-      <div className="flex flex-1 flex-col items-center justify-center gap-6 px-5 sm:px-8">
-        <StagePresence
-          state={client.state}
-          inputLevel={client.inputLevel}
-          outputLevel={client.outputLevel}
-        />
-        <div className="flex flex-col items-center gap-1" role="status">
-          <span className="cq-label text-(--cq-text-primary)">
-            {client.muted ? "Muted" : VOICE_STATE_LABELS[client.state]}
-          </span>
-          {thinkingNote !== null ? (
-            <span className="cq-caption text-(--cq-text-secondary)">
-              {thinkingNote}
+      {/*
+        The stage: presence, state, and what was just said. The one part
+        of the screen that grows -- a long answer, the options, the whole
+        transcript -- so it is the part that scrolls, between a top bar and
+        controls that never leave the screen. It used to be a fixed box
+        with nothing scrollable in it: a long answer pushed Mute, Type and
+        the volume below the bottom edge with no way to reach them. The
+        inner column centres while there is room and starts at the top
+        once there is not (a centred flex box would clip its own top).
+      */}
+      <div
+        className="cq-stage-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 sm:px-8"
+        data-q-voice-stage-body
+      >
+        <div className="flex min-h-full flex-col items-center justify-center gap-6 py-4">
+          <StagePresence
+            state={client.state}
+            inputLevel={client.inputLevel}
+            outputLevel={client.outputLevel}
+          />
+          <div className="flex flex-col items-center gap-1" role="status">
+            <span className="cq-label text-(--cq-text-primary)">
+              {client.muted ? "Muted" : VOICE_STATE_LABELS[client.state]}
             </span>
-          ) : null}
-        </div>
-
-        <div className="flex w-full max-w-2xl flex-col items-center gap-3 text-center">
-          {lastQ !== undefined ? (
-            <p className="cq-stage-said cq-prose text-balance text-lg leading-relaxed text-(--cq-text-primary) sm:text-xl">
-              {lastQ.text}
-            </p>
-          ) : null}
-          {lastPerson !== undefined ? (
-            <p className="cq-body text-(--cq-text-secondary)">
-              “{lastPerson.text}”
-            </p>
-          ) : null}
-          {lines.length > 2 ? (
-            <button
-              type="button"
-              className="cq-stage-quiet"
-              onClick={() => setShowAll((current) => !current)}
-            >
-              {showAll ? "Hide what we said" : "Everything we’ve said"}
-            </button>
-          ) : null}
-        </div>
-
-        {showAll ? (
-          <ol
-            ref={listRef}
-            className="cq-stage-scroll w-full max-w-2xl flex-none space-y-3 overflow-y-auto rounded-lg border border-(--cq-border-subtle) bg-(--cq-surface) p-4"
-            style={{ maxHeight: "32vh" }}
-            aria-label="Everything we've said"
-          >
-            {lines.map((line) => (
-              <li
-                key={line.id}
-                className={
-                  line.role === "user"
-                    ? "cq-body text-right text-(--cq-text-secondary)"
-                    : "cq-body text-(--cq-text-primary)"
-                }
-              >
-                {line.text}
-              </li>
-            ))}
-          </ol>
-        ) : null}
-
-        {uploadNote !== null && uploadNote !== undefined ? (
-          <span className="cq-caption text-(--cq-text-secondary)">
-            {uploadNote}
-          </span>
-        ) : null}
-        {notice !== null ? (
-          <div className="flex items-center gap-3 rounded-md border border-(--cq-border-subtle) bg-(--cq-surface) px-4 py-3">
-            <span className="cq-body text-(--cq-text-primary)">{notice}</span>
-            <button
-              type="button"
-              className="cq-stage-quiet"
-              onClick={onDismissNotice}
-            >
-              Dismiss
-            </button>
+            {thinkingNote !== null ? (
+              <span className="cq-caption text-(--cq-text-secondary)">
+                {thinkingNote}
+              </span>
+            ) : null}
           </div>
-        ) : null}
 
-        {showOptions && asking !== null ? (
-          <div
-            className="flex w-full max-w-2xl flex-col items-center gap-3"
-            data-q-stage-options
-          >
-            <div
-              className="flex flex-wrap justify-center gap-2"
-              role="group"
-              aria-label="Options"
-            >
-              {asking.options.map((option) => {
-                const key = option.key;
-                const selected = multi && picks.includes(key);
-                return (
-                  <button
-                    key={option.key}
-                    type="button"
-                    title={option.description}
-                    aria-pressed={multi ? selected : undefined}
-                    className={
-                      selected
-                        ? "cq-stage-option is-selected"
-                        : "cq-stage-option"
-                    }
-                    onClick={() => {
-                      if (!multi) {
-                        onSay(option.label);
-                        return;
-                      }
-                      setPicks((current) =>
-                        current.includes(key)
-                          ? current.filter((item) => item !== key)
-                          : [...current, key],
-                      );
-                    }}
-                  >
-                    {option.label}
-                  </button>
-                );
-              })}
-            </div>
-            {multi && picks.length > 0 ? (
+          <div className="flex w-full max-w-2xl flex-col items-center gap-3 text-center">
+            {lastQ !== undefined ? (
+              <p className="cq-stage-said cq-prose text-balance text-lg leading-relaxed text-(--cq-text-primary) sm:text-xl">
+                {lastQ.text}
+              </p>
+            ) : null}
+            {lastPerson !== undefined ? (
+              <p className="cq-body text-(--cq-text-secondary)">
+                “{lastPerson.text}”
+              </p>
+            ) : null}
+            {lines.length > 2 ? (
               <button
                 type="button"
-                className="cq-stage-primary"
-                onClick={() => {
-                  onSay(
-                    asking.options
-                      .filter((option) => picks.includes(option.key))
-                      .map((option) => option.label)
-                      .join(", "),
-                  );
-                  setPicks([]);
-                }}
+                className="cq-stage-quiet"
+                onClick={() => setShowAll((current) => !current)}
               >
-                That’s all of them
+                {showAll ? "Hide what we said" : "Everything we’ve said"}
               </button>
             ) : null}
-            <span className="cq-caption text-(--cq-text-tertiary)">
-              Tap one, or just say it.
-            </span>
           </div>
-        ) : null}
+
+          {showAll ? (
+            <ol
+              ref={listRef}
+              className="cq-stage-scroll w-full max-w-2xl flex-none space-y-3 overflow-y-auto rounded-lg border border-(--cq-border-subtle) bg-(--cq-surface) p-4"
+              style={{ maxHeight: "32vh" }}
+              aria-label="Everything we've said"
+            >
+              {lines.map((line) => (
+                <li
+                  key={line.id}
+                  className={
+                    line.role === "user"
+                      ? "cq-body text-right text-(--cq-text-secondary)"
+                      : "cq-body text-(--cq-text-primary)"
+                  }
+                >
+                  {line.text}
+                </li>
+              ))}
+            </ol>
+          ) : null}
+
+          {uploadNote !== null && uploadNote !== undefined ? (
+            <span className="cq-caption text-(--cq-text-secondary)">
+              {uploadNote}
+            </span>
+          ) : null}
+          {notice !== null ? (
+            <div className="flex items-center gap-3 rounded-md border border-(--cq-border-subtle) bg-(--cq-surface) px-4 py-3">
+              <span className="cq-body text-(--cq-text-primary)">{notice}</span>
+              <button
+                type="button"
+                className="cq-stage-quiet"
+                onClick={onDismissNotice}
+              >
+                Dismiss
+              </button>
+            </div>
+          ) : null}
+
+          {showOptions && asking !== null ? (
+            <div
+              className="flex w-full max-w-2xl flex-col items-center gap-3"
+              data-q-stage-options
+            >
+              <div
+                className="flex flex-wrap justify-center gap-2"
+                role="group"
+                aria-label="Options"
+              >
+                {asking.options.map((option) => {
+                  const key = option.key;
+                  const selected = multi && picks.includes(key);
+                  return (
+                    <button
+                      key={option.key}
+                      type="button"
+                      title={option.description}
+                      aria-pressed={multi ? selected : undefined}
+                      className={
+                        selected
+                          ? "cq-stage-option is-selected"
+                          : "cq-stage-option"
+                      }
+                      onClick={() => {
+                        if (!multi) {
+                          onSay(option.label);
+                          return;
+                        }
+                        setPicks((current) =>
+                          current.includes(key)
+                            ? current.filter((item) => item !== key)
+                            : [...current, key],
+                        );
+                      }}
+                    >
+                      {option.label}
+                    </button>
+                  );
+                })}
+              </div>
+              {multi && picks.length > 0 ? (
+                <button
+                  type="button"
+                  className="cq-stage-primary"
+                  onClick={() => {
+                    onSay(
+                      asking.options
+                        .filter((option) => picks.includes(option.key))
+                        .map((option) => option.label)
+                        .join(", "),
+                    );
+                    setPicks([]);
+                  }}
+                >
+                  That’s all of them
+                </button>
+              ) : null}
+              <span className="cq-caption text-(--cq-text-tertiary)">
+                Tap one, or just say it.
+              </span>
+            </div>
+          ) : null}
+        </div>
       </div>
 
-      {/* Controls. */}
-      <div className="flex flex-col items-center gap-4 px-5 pb-6 sm:px-8">
+      {/* Controls: always on screen, clear of the home indicator. */}
+      <div
+        className="flex flex-none flex-col items-center gap-4 border-t border-(--cq-border-subtle) px-5 pt-4 pb-[calc(24px+var(--cq-safe-bottom))] sm:px-8"
+        data-q-voice-stage-controls
+      >
         {typing ? (
           <form
             onSubmit={submitTyped}
@@ -361,7 +378,9 @@ export function VoiceStage({
               onChange={(event) => setDraft(event.target.value)}
               placeholder="Type instead"
               autoComplete="off"
-              className="cq-stage-input"
+              // min-w-0: an input's intrinsic width otherwise pushed Cancel
+              // off the right edge of a phone.
+              className="cq-stage-input min-w-0"
             />
             <button type="submit" className="cq-stage-primary">
               Send

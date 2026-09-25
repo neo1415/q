@@ -101,6 +101,16 @@ export { INTERVIEW_CONDUCTOR_V8 } from "./prompts/tasks/interview-conductor.v8.j
 export { INTERVIEW_CONDUCTOR_V9 } from "./prompts/tasks/interview-conductor.v9.js";
 export { INTERVIEW_CONDUCTOR_V10 } from "./prompts/tasks/interview-conductor.v10.js";
 export { INTERVIEW_CONDUCTOR_V11 } from "./prompts/tasks/interview-conductor.v11.js";
+export { INTERVIEW_AGENT_V1 } from "./prompts/tasks/interview-agent.v1.js";
+export { INTERVIEW_AGENT_V2 } from "./prompts/tasks/interview-agent.v2.js";
+export {
+  INTERVIEW_AGENT_SCHEMA_NAME,
+  INTERVIEW_AGENT_SCHEMA_VERSION,
+  InterviewAgentResultSchema,
+  InterviewAgentVariablesSchema,
+  type InterviewAgentResult,
+  type InterviewAgentVariables,
+} from "./prompts/schemas/interview-agent.js";
 export { DECISION_READER_V1 } from "./prompts/tasks/decision-reader.v1.js";
 export { TURN_READER_V1 } from "./prompts/tasks/turn-reader.v1.js";
 export { TURN_READER_V2 } from "./prompts/tasks/turn-reader.v2.js";
@@ -216,6 +226,7 @@ export { COMPANY_ANALYST_V6 } from "./prompts/tasks/company-analyst.v6.js";
 export { COMPANY_ANALYST_V7 } from "./prompts/tasks/company-analyst.v7.js";
 export { COMPANY_ANALYST_V8 } from "./prompts/tasks/company-analyst.v8.js";
 export { COMPANY_ANALYST_V9 } from "./prompts/tasks/company-analyst.v9.js";
+export { COMPANY_ANALYST_V10 } from "./prompts/tasks/company-analyst.v10.js";
 export { ARTIFACT_REVISION_V1 } from "./prompts/tasks/artifact-revision.v1.js";
 export {
   ARTIFACT_REVISION_BODY_MAX,

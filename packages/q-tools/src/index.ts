@@ -110,6 +110,15 @@ export {
 } from "./tools/discovery-slate.js";
 
 export {
+  createFindProspectiveInvestorsTool,
+  FIND_PROSPECTIVE_INVESTORS,
+  FindProspectiveInvestorsInputSchema,
+  FindProspectiveInvestorsOutputSchema,
+  type FindProspectiveInvestorsInput,
+  type FindProspectiveInvestorsOutput,
+} from "./tools/find-prospective-investors.js";
+
+export {
   createRecommendationExplanationTool,
   RECOMMENDATION_EXPLANATION,
   RecommendationExplanationInputSchema,
@@ -118,6 +127,35 @@ export {
   type RecommendationExplanationOutput,
 } from "./tools/recommendation-explanation.js";
 
+export {
+  ACCEPT_ONBOARDING_RECOMMENDATIONS,
+  AcceptOnboardingRecommendationsInputSchema,
+  createOnboardingTools,
+  FINISH_ONBOARDING,
+  FinishOnboardingOutputSchema,
+  type FinishOnboardingOutput,
+  GET_ONBOARDING_STATE,
+  OnboardingRecommendResultSchema,
+  RECOMMEND_ONBOARDING_ANSWERS,
+  RecommendOnboardingAnswersInputSchema,
+  RecommendOnboardingAnswersOutputSchema,
+  type AcceptOnboardingRecommendationsInput,
+  type OnboardingRecommendResult,
+  type RecommendOnboardingAnswersInput,
+  type RecommendOnboardingAnswersOutput,
+  OnboardingRecordResultSchema,
+  OnboardingStateSchema,
+  OnboardingStepStateSchema,
+  RECORD_ONBOARDING_ANSWERS,
+  RecordOnboardingAnswersInputSchema,
+  RecordOnboardingAnswersOutputSchema,
+  type OnboardingRecordResult,
+  type OnboardingState,
+  type OnboardingStepState,
+  type OnboardingToolPort,
+  type RecordOnboardingAnswersInput,
+  type RecordOnboardingAnswersOutput,
+} from "./tools/onboarding.js";
 export const PACKAGE_NAME = "@capital-q/q-tools" as const;
 export {
   createExtractPublicWebTool,

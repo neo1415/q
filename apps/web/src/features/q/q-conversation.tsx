@@ -25,9 +25,10 @@ import {
 } from "../onboarding-kit/material-actions";
 import { presenceStateFromVoice, type QPresenceState } from "../q-presence";
 import { destinationPath } from "../voice/destinations";
-import { VOICE_STATE_LABELS } from "../voice/session";
+import { upsertLine, VOICE_STATE_LABELS } from "../voice/session";
 import { useFollowTurn } from "../voice/use-follow-turn";
 import { useVoiceInterview } from "../voice/use-voice-interview";
+import { rememberActiveConversation } from "./active-conversation";
 import { ArtifactViewer } from "./artifact-viewer";
 import { navigationToFollow } from "./follow-navigation";
 import { QAnswer } from "./q-answer";
@@ -155,6 +156,16 @@ export function QConversationPanel({
   const turns = turnsFrom(q.state, q.pending);
   const endRef = useRef<HTMLDivElement>(null);
 
+  // Home's conversation for this tab, so the navigation's Home link comes
+  // back to it rather than to an empty new chat (./active-conversation).
+  // Written once the open has settled: a conversation the Q API refused to
+  // open is forgotten, and Home with none (New chat) is a new chat.
+  const activeConversation = q.conversationId;
+  const settledOpen = !q.loading;
+  useEffect(() => {
+    if (settledOpen) rememberActiveConversation("home", activeConversation);
+  }, [activeConversation, settledOpen]);
+
   /**
    * The document on screen beside Q, if any (QX-003E).
    *
@@ -233,10 +244,9 @@ export function QConversationPanel({
   };
   const voice = useVoiceInterview({
     onLine: (line) => {
-      setSpoken((current) => [
-        ...current,
-        { id: line.id, role: line.role, text: line.text },
-      ]);
+      setSpoken((current) =>
+        upsertLine(current, { id: line.id, role: line.role, text: line.text }),
+      );
     },
   });
   const talkWithQ = async () => {

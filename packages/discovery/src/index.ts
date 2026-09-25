@@ -52,6 +52,20 @@ export {
 } from "./domain/fit.js";
 
 export {
+  PROSPECT_FIT_VERSION,
+  PROSPECT_REASON_KINDS,
+  PROSPECT_WEIGHT,
+  prospectFit,
+  rankProspects,
+  TYPICAL_STAGES_BY_INVESTOR_TYPE,
+  type ProspectCompany,
+  type ProspectFit,
+  type ProspectInvestor,
+  type ProspectReason,
+  type ProspectReasonKind,
+} from "./domain/prospect-fit.js";
+
+export {
   PREFERENCE_WEIGHT,
   preferenceWeight,
   rankCompanies,

@@ -1,11 +1,26 @@
+import type { ActorContext } from "@capital-q/security";
+
+import type { Interest } from "../contracts/index.js";
 import {
   createRelationshipEventRegistry,
   RELATIONSHIP_EVENT_DEFINITIONS,
 } from "../domain/event-registry.js";
 import {
+  createPostgresInterestRepository,
+  createPostgresInterestRequestStore,
+} from "../infrastructure/postgres-interest-repositories.js";
+import {
   createPostgresRelationshipEventRepository,
   createPostgresRelationshipRepository,
 } from "../infrastructure/postgres-repositories.js";
+import {
+  createExpressInterest,
+  createGetOwnInterest,
+  createMayExpressInterest,
+  type ExpressInterestCommand,
+  type ExpressInterestDependencies,
+  type ExpressInterestResult,
+} from "./express-interest.js";
 import {
   createRelationshipEventAppender,
   type RelationshipEventAppender,
@@ -16,7 +31,11 @@ import {
   type EnsuredRelationship,
   type EnsureRelationshipCommand,
 } from "./ensure-relationship.js";
-import type { RelationshipQueryPort } from "./ports.js";
+import type {
+  InterestRepository,
+  InterestRequestStore,
+  RelationshipQueryPort,
+} from "./ports.js";
 
 /**
  * The Network application service consumed by later owning workflows
@@ -74,5 +93,53 @@ export function createNetworkService(
       getEventById: (relationshipEventId) =>
         repositories.events.findById(sql, relationshipEventId),
     },
+  };
+}
+
+/** Express Interest and the investor's own status read (CQ-NET-010). */
+export type InterestService = {
+  readonly expressInterest: (
+    command: ExpressInterestCommand,
+  ) => Promise<ExpressInterestResult>;
+  readonly getOwnInterest: (query: {
+    readonly actor: ActorContext;
+    readonly companyId: string;
+  }) => Promise<Interest | null>;
+  /** The command's authorisation only; writes nothing. */
+  readonly mayExpressInterest: (query: {
+    readonly actor: ActorContext;
+    readonly companyId: string;
+  }) => Promise<boolean>;
+};
+
+export type InterestServiceOptions = NetworkServiceOptions &
+  Pick<
+    ExpressInterestDependencies,
+    "authorization" | "investorSubject" | "companyVisibility"
+  > & {
+    readonly interests?: InterestRepository | undefined;
+    readonly interestRequests?: InterestRequestStore | undefined;
+  };
+
+export function createInterestService(
+  options: InterestServiceOptions,
+): InterestService {
+  const dependencies: ExpressInterestDependencies = {
+    ...options,
+    registry:
+      options.registry ??
+      createRelationshipEventRegistry(RELATIONSHIP_EVENT_DEFINITIONS),
+    repositories: options.repositories ?? {
+      relationships: createPostgresRelationshipRepository(),
+      events: createPostgresRelationshipEventRepository(),
+    },
+    interests: options.interests ?? createPostgresInterestRepository(),
+    interestRequests:
+      options.interestRequests ?? createPostgresInterestRequestStore(),
+  };
+  return {
+    expressInterest: createExpressInterest(dependencies),
+    getOwnInterest: createGetOwnInterest(dependencies),
+    mayExpressInterest: createMayExpressInterest(dependencies),
   };
 }

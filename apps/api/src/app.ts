@@ -30,6 +30,10 @@ import {
 } from "./http/media.js";
 import { registerMediaWebhookRoutes } from "./http/media-webhooks.js";
 import {
+  registerNetworkInterestRoutes,
+  type NetworkInterestRoutesDependencies,
+} from "./http/network-interests.js";
+import {
   registerRecommendationInteractionRoutes,
   type RecommendationInteractionRoutesDependencies,
 } from "./http/recommendation-interactions.js";
@@ -116,6 +120,9 @@ export type ApiModules = {
       })
     | undefined;
   readonly capital?: CapitalRoutesDependencies["capital"] | undefined;
+  /** CQ-NET-010: Express Interest. Absent: no interest route registers. */
+  readonly interests?:
+    NetworkInterestRoutesDependencies["interests"] | undefined;
   /** CQ-GATE-001: the investor organisation's inbound gateway. */
   readonly gateq?: GateQRoutesDependencies["gateq"] | undefined;
   /** CQ-GATE-002: the public applicant surface. Anonymous by design. */
@@ -241,6 +248,16 @@ export function createApp(
         interactions: modules.discovery.interactions,
       });
     }
+  }
+
+  // Express Interest (CQ-NET-010): the relationship spine's one command.
+  // Separate from discovery's Save/Pass on purpose: Interest ≠ Save.
+  if (modules.interests !== undefined) {
+    registerNetworkInterestRoutes(app, {
+      authenticator: security.authenticator,
+      resolver: security.resolver,
+      interests: modules.interests,
+    });
   }
 
   // GateQ (CQ-GATE-001): the organisation's front door. Its own prefix,

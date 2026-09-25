@@ -52,6 +52,7 @@ export const REFERENCE_CAPABILITIES = [
   "investor.gateway.view",
   "investor.gateway.edit",
   "investor.gateway.publish",
+  "investor.interest.express",
   "capital_objective.create",
   "capital_objective.view",
   "capital_objective.edit",

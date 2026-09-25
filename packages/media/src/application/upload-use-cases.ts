@@ -11,8 +11,7 @@ import type { ActorContext } from "@capital-q/security";
 
 import {
   DEFAULT_PITCH_DURATION_POLICY,
-  isPitchPlayable,
-  toCompanyPitch,
+  toDiscoverablePitch,
   type MediaAsset,
   type MediaAssetId,
   type MediaOwnerRef,
@@ -645,7 +644,8 @@ export type PlaybackGrant = {
  * and organisation — may preview their own pitch as soon as it is READY,
  * whatever its moderation or policy says, because it is theirs. Anyone
  * else is a viewer, and a viewer sees a pitch only when the asset is
- * publishable (READY, moderation ALLOWED, policy not PRIVATE) AND the
+ * publishable (the company's current pitch -- not superseded, not deleted
+ * -- READY, moderation ALLOWED, policy not PRIVATE) AND the
  * company is discoverable to them by the Recommendation context's own
  * rule. Every refusal on the viewer path is "not found": a pitch that
  * exists but is private must look exactly like one that does not exist.
@@ -705,12 +705,15 @@ export function createAuthorisePlayback(
       company.tenantId,
       query.mediaAssetId,
     );
+    // The feed's own rule, not a looser one: a viewer may be granted exactly
+    // the pitch the feed and the profile would show them. `isPitchPlayable`
+    // alone let a superseded pitch keep minting tokens for anyone holding
+    // its id -- during a replacement, and forever after it (CQ-MLV-001).
     if (
       asset === null ||
-      asset.ownerType !== "COMPANY" ||
       asset.ownerId !== query.companyId ||
       asset.ownerOrganisationId !== company.ownerOrganisationId ||
-      !isPitchPlayable(toCompanyPitch(asset))
+      toDiscoverablePitch(asset) === null
     ) {
       throw new MediaAssetNotFoundError();
     }

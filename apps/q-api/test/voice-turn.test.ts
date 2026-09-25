@@ -621,6 +621,76 @@ describe("a spoken question for Q", () => {
     expect(speaker.spoken.join(" ")).toContain("Seed rounds there");
   });
 
+  it("goes through the same tool-calling Q loop as a typed turn (ADR 0016, M5)", async () => {
+    const runtime = fakeRuntime();
+    const seen: {
+      channel: string;
+      actorUserId: string | undefined;
+      said: string;
+    }[] = [];
+    const outcomeOf = (reply: string) =>
+      ({
+        reply,
+        intent: "ANSWER",
+        asking: null,
+        recorded: ["F1.stage"],
+        skipped: [],
+        questionForQ: null,
+        researching: null,
+        navigate: null,
+        handoff: null,
+        pronounce: null,
+        warnings: 0,
+        view: view(),
+        degraded: false,
+        reading: null,
+        resume: null,
+        qualitative: [],
+        trace: null,
+      }) as const;
+    const handle = createVoiceTurnHandler({
+      qRuntime: runtime.service,
+      qStream: fakeStream([]),
+      onboarding: {
+        apiBaseUrl: "http://api.test",
+        fetch: () => Promise.resolve(Response.json(view())),
+      },
+      interviewer: {
+        turn: () => Promise.reject(new Error("the legacy path must not run")),
+      } as never,
+      interviewAgent: {
+        turn: (input) => {
+          seen.push({
+            channel: input.channel,
+            actorUserId: input.actor?.userId,
+            said: input.utterance,
+          });
+          return Promise.resolve(outcomeOf("Seed it is. Where are you based?"));
+        },
+      },
+      logger,
+    });
+    const speaker = fakeSpeaker();
+
+    const outcome = await handle(
+      binding({
+        conversationId: undefined,
+        subjects: undefined,
+        onboarding: { sessionId: SESSION_ID, journeyType: "founder" },
+      }),
+      [{ role: "user", content: "We're at seed." }],
+      new AbortController().signal,
+      speaker,
+    );
+
+    expect(outcome).toEqual({ kind: "SPOKEN", path: "INTERVIEW" });
+    expect(seen).toEqual([
+      { channel: "voice", actorUserId: CONTEXT.userId, said: "We're at seed." },
+    ]);
+    expect(speaker.spoken.join(" ")).toContain("Seed it is.");
+    expect(runtime.calls.createRun).toHaveLength(0);
+  });
+
   it("pauses at an interruption: nothing stale is spoken, the run keeps going, and 'go on' resumes the answer (rework)", async () => {
     const runtime = fakeRuntime();
     const controller = new AbortController();

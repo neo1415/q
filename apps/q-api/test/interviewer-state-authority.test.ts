@@ -202,12 +202,13 @@ describe("a progress answer comes from the session, not the conversation", () =>
       expect(outcome.reply).not.toContain("Angel");
       expect(outcome.reply).not.toContain("Zino Aviation");
       expect(outcome.reply).not.toContain("So far we have");
-      expect(outcome.reply).toContain("Nothing is on your record yet");
-      expect(outcome.reply).toContain("3 to go");
+      // What is left is named in words, and nothing is counted at them.
+      expect(outcome.reply).not.toMatch(/\d+ (?:of \d+|to go)/);
+      expect(outcome.reply).not.toMatch(/covers everything/i);
     });
   }
 
-  it("names what the session does hold, and counts it", async () => {
+  it("says what the session does hold, in sentences, without counting it", async () => {
     const interviewer = createInterviewer({
       gateway: gateway({ ...base, reply: "We have done nearly everything." }),
       logger,
@@ -215,9 +216,11 @@ describe("a progress answer comes from the session, not the conversation", () =>
     const outcome = await interviewer.turn(
       turn(api(["I0.investor_type", "I0.organisation_name"]), "where are we?"),
     );
-    expect(outcome.reply).toContain("2 of 3 answered");
-    expect(outcome.reply).toContain("1 to go");
+    expect(outcome.reply).not.toMatch(/\d+ (?:of \d+|to go)|answered/);
     expect(outcome.reply).toContain("Zino Aviation");
+    expect(outcome.reply).toContain("angel");
+    // A field dump reads label-colon-value; a synthesis does not.
+    expect(outcome.reply).not.toMatch(/How do you invest:|Your firm:/);
     // And the model's own sentence does not survive beside it.
     expect(outcome.reply).not.toContain("nearly everything");
   });

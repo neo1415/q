@@ -42,8 +42,27 @@ export type VoiceTranscriptLine = {
   readonly at: number;
 };
 
+/**
+ * A transcript line added, or put in place of the line with its id.
+ *
+ * The provider can report one utterance more than once as it grows; the
+ * session then sends the grown line under the id it already gave, and a
+ * consumer that appended every line showed one question as several.
+ */
+export function upsertLine<T extends { readonly id: string }>(
+  lines: readonly T[],
+  line: T,
+): readonly T[] {
+  return lines.some((item) => item.id === line.id)
+    ? lines.map((item) => (item.id === line.id ? line : item))
+    : [...lines, line];
+}
+
 export type VoiceSessionEvents = {
-  /** A completed transcript line from either side. */
+  /**
+   * A completed transcript line from either side. A line whose id was
+   * already sent replaces that line (see `upsertLine`).
+   */
   readonly onLine?: ((line: VoiceTranscriptLine) => void) | undefined;
   /** Q was interrupted by the person (D §46 INTERRUPTED). */
   readonly onInterrupted?: (() => void) | undefined;

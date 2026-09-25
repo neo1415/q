@@ -114,6 +114,7 @@ export type QApiModules = {
         | "bindings"
         | "now"
         | "interviewer"
+        | "interviewAgent"
         | "apiBaseUrl"
         | "board"
         | "welcome"
@@ -341,6 +342,7 @@ export function createApp(
         identity: security.identity,
         path: `${Q_INTERVIEW_PATH}${Q_INTERVIEW_TURN_SEGMENT}`,
         interviewer: typedInterviewer,
+        agent: modules.voice.interviewAgent,
         apiBaseUrl: interviewApiBaseUrl,
         correlation: () => randomUUID(),
       });

@@ -8,6 +8,7 @@ import { cx } from "@capital-q/ui";
 import { ContextIndicator } from "@capital-q/ui/context-indicator";
 import { ICON_SIZE, ICON_STROKE } from "@capital-q/ui/icons";
 
+import { useHomeHref } from "@/features/q/active-conversation";
 import { ChatsListForRoute } from "@/features/q/chats-list";
 
 import type { ShellContext } from "./app-shell";
@@ -31,12 +32,14 @@ export function DesktopSidebar({
   readonly context: ShellContext;
 }) {
   const pathname = usePathname();
+  // Home is the conversation this tab was in, not a new chat each visit.
+  const home = useHomeHref();
 
   return (
     <aside className="cq-shell-sidebar">
       <div className="px-5 pt-6 pb-4">
         <Link
-          href="/home"
+          href={home}
           className="cq-title-md inline-block rounded-xs text-(--cq-text-primary)"
         >
           Capital Q
@@ -48,7 +51,7 @@ export function DesktopSidebar({
           {PRIMARY_NAVIGATION.map((item) => (
             <li key={item.href}>
               <SidebarLink
-                href={item.href}
+                href={item.href === "/home" ? home : item.href}
                 label={item.label}
                 Icon={item.icon}
                 active={isActiveRoute(pathname, item.href)}

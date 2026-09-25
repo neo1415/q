@@ -5,6 +5,7 @@ import {
   RELATIONSHIP_EVENT_PAYLOAD_MAX_BYTES,
   RelationshipEventTypeSchema,
   RelationshipSourceIdSchema,
+  UuidSchema,
   type DisclosureScope,
 } from "@capital-q/contracts";
 
@@ -63,6 +64,35 @@ export const DiscoveredRelationshipEvent = defineRelationshipEvent({
   ],
   description:
     "The pair entered the network: one party discovered the other. Never shared with the other party by itself.",
+});
+
+/**
+ * An investor organisation expressed interest in the company (CQ-NET-010).
+ *
+ * Unilateral, and deliberately addressed to the other party: its purpose is
+ * to let the founders know the organisation would like to explore the
+ * company (doc 17 §70), so `relationship_shared` is its only scope. It is
+ * not a match and records no state; the payload names the interest record
+ * and nothing else.
+ */
+export const InterestExpressedPayloadSchema = z
+  .object({
+    interestId: UuidSchema,
+  })
+  .strict();
+export type InterestExpressedPayload = z.infer<
+  typeof InterestExpressedPayloadSchema
+>;
+
+export const RELATIONSHIP_EVENT_INTEREST_EXPRESSED =
+  "interest_expressed" as const;
+
+export const InterestExpressedRelationshipEvent = defineRelationshipEvent({
+  type: RELATIONSHIP_EVENT_INTEREST_EXPRESSED,
+  payloadSchema: InterestExpressedPayloadSchema,
+  allowedVisibilityScopes: ["relationship_shared"],
+  description:
+    "An investor organisation expressed interest in the company. Unilateral: not a match, not a commitment.",
 });
 
 export type RelationshipEventRegistry = {
@@ -128,6 +158,6 @@ export function createRelationshipEventRegistry(
   };
 }
 
-/** Production registry: the foundation registers `discovered` only. */
+/** Production registry: `discovered` (CQ-NET-001) and `interest_expressed` (CQ-NET-010). */
 export const RELATIONSHIP_EVENT_DEFINITIONS: readonly RelationshipEventDefinition[] =
-  [DiscoveredRelationshipEvent];
+  [DiscoveredRelationshipEvent, InterestExpressedRelationshipEvent];

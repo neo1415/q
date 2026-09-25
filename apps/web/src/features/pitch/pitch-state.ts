@@ -229,6 +229,27 @@ function failed(
   return { kind: "FAILED", failure, message, pitch };
 }
 
+/**
+ * The READY pitch this screen holds while the platform has not yet
+ * reviewed it, or null.
+ *
+ * Review lands moments after READY (the automated rule runs in a worker)
+ * and moves the record's version. A screen that stopped reading at READY
+ * then held a stale version, so the founder's first "Let investors play"
+ * was refused as a conflict and the standing line still said the video
+ * awaited review (CQ-MLV-003). While this answers a pitch, the page keeps
+ * re-reading the record.
+ */
+export function awaitingReview(state: PitchFlowState): MediaAssetDto | null {
+  return state.kind === "READY" &&
+    state.pitch.moderationStatus === "NOT_REVIEWED"
+    ? state.pitch
+    : null;
+}
+
+/** How many re-reads while review is pending before the page stops asking. */
+export const REVIEW_MAX_ATTEMPTS = 12;
+
 /** The pitch a FAILED or READY state would be replacing, if any. */
 export function replaceablePitch(state: PitchFlowState): MediaAssetDto | null {
   switch (state.kind) {

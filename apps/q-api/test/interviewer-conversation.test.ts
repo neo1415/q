@@ -83,6 +83,7 @@ describe("a question to Q is answered, not treated as a failed answer", () => {
           question: {
             kind: "ADVICE",
             text: "What do you think I should look for?",
+            about: [],
           },
         }),
       }),
@@ -380,7 +381,7 @@ describe("a correction after a misinterpretation reaches the record", () => {
             kind,
             question:
               kind === "QUESTION_TO_Q"
-                ? { kind: "ADVICE", text: "what would you do?" }
+                ? { kind: "ADVICE", text: "what would you do?", about: [] }
                 : null,
           }),
         }),
@@ -737,6 +738,7 @@ describe("one degraded subsystem never makes Q unusable", () => {
           question: {
             kind: "REAL_WORLD_EXAMPLE",
             text: "Can you give me an example of a real investor similar to me?",
+            about: [],
           },
         }),
       },
@@ -870,7 +872,7 @@ describe("what the live run taught the placement", () => {
           clears: ["I3.sectors_avoid"],
           question:
             kind === "QUESTION_TO_Q"
-              ? { kind: "ADVICE", text: "should I avoid anything?" }
+              ? { kind: "ADVICE", text: "should I avoid anything?", about: [] }
               : null,
         }),
       }) satisfies InterviewConductorResult;

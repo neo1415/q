@@ -28,6 +28,38 @@ import { usePitchPlayback } from "./use-pitch-playback";
  * saying ACTIVE; and audio is off until a person turns it on.
  */
 
+/**
+ * The frame a pitch is shown in: its CSS aspect ratio, and how wide it may
+ * be so that its height stays within `--cq-pitch-max-height`.
+ *
+ * Media stores a ratio as `W:H` ("4:3", "9:16"); CSS wants `W / H`. The
+ * stored form used to be handed to `style.aspectRatio` as it was, the
+ * browser rejected it, and the frame took whatever height the video
+ * happened to have loaded -- 150 px, then 570 px on a laptop, with Save,
+ * Pass and Ask Q pushed below the fold and the page shifting under the
+ * person as it arrived. Both spellings are read here; anything else falls
+ * back to the portrait default rather than to no frame at all.
+ *
+ * Capping the width, not the height, is what keeps the ratio: a max-height
+ * on a full-width box would crop the video instead of shrinking it.
+ */
+const DEFAULT_RATIO = { width: 9, height: 16 } as const;
+const RATIO = /^\s*(\d{1,3}(?:\.\d+)?)\s*(?::|\/)\s*(\d{1,3}(?:\.\d+)?)\s*$/;
+
+export function pitchFrame(aspectRatio: string | null | undefined): {
+  readonly aspectRatio: string;
+  readonly maxWidth: string;
+} {
+  const match = aspectRatio == null ? null : RATIO.exec(aspectRatio);
+  const width = match === null ? 0 : Number(match[1]);
+  const height = match === null ? 0 : Number(match[2]);
+  const ratio = width > 0 && height > 0 ? { width, height } : DEFAULT_RATIO;
+  return {
+    aspectRatio: `${String(ratio.width)} / ${String(ratio.height)}`,
+    maxWidth: `min(100%, calc(var(--cq-pitch-max-height) * ${String(ratio.width)} / ${String(ratio.height)}))`,
+  };
+}
+
 type PitchPlayerProps = {
   readonly company: DiscoveredCompanyDto;
   /** The tier this card is in, from the feed controller. */
@@ -94,17 +126,19 @@ export function PitchPlayer({
   const pitch = company.pitch;
   if (pitch === null) return null;
 
-  const aspectRatio = pitch.aspectRatio ?? "9 / 16";
+  const frame = pitchFrame(pitch.aspectRatio);
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="cq-pitch flex flex-col gap-3">
       {/*
         A known aspect ratio at all times, so a poster arriving or a source
-        attaching never moves the page (doc 20 §60, CLS).
+        attaching never moves the page (doc 20 §60, CLS), and a height that
+        leaves the decision controls on the first screen.
       */}
       <div
-        className="relative overflow-hidden rounded-lg bg-(--cq-surface-strong)"
-        style={{ aspectRatio }}
+        className="relative w-full overflow-hidden rounded-lg bg-(--cq-surface-strong)"
+        style={{ aspectRatio: frame.aspectRatio, maxWidth: frame.maxWidth }}
+        data-pitch-frame
       >
         <video
           ref={videoRef}

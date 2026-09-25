@@ -38,6 +38,7 @@ import {
 } from "@capital-q/contracts";
 import { createRequestDatabaseClient } from "@capital-q/database";
 import { createOutboxWriter } from "@capital-q/eventing";
+import { createOwnOnboardingSummaryReader } from "@capital-q/onboarding";
 import { createPostgresDocumentQueryPort } from "@capital-q/evidence";
 import {
   createPostgresInvestorMandateQueryPort,
@@ -45,10 +46,12 @@ import {
   createPostgresInvestorOrganisationRepository,
 } from "@capital-q/investors";
 import {
+  createInterestService,
   createPostgresRelationshipEventRepository,
   createPostgresRelationshipRepository,
   type RelationshipQueryPort,
 } from "@capital-q/network";
+import { NETWORK_EVENTS } from "@capital-q/network/events";
 import { modelProviderConfigStatus } from "@capital-q/config/model-providers";
 import { researchProviderConfigStatus } from "@capital-q/config/research-providers";
 import { speechProviderConfigStatus } from "@capital-q/config/speech-providers";
@@ -141,6 +144,7 @@ import {
   createProfileUpdateBoard,
 } from "./composition/company-profile-action.js";
 import { createCompanyVisibilitySetAction } from "./composition/company-visibility-action.js";
+import { createExpressInterestAction } from "./composition/express-interest-action.js";
 import { createInvestorFeedPort } from "./composition/investor-feed.js";
 import {
   createDiscoveryService,
@@ -159,6 +163,7 @@ import { composeResearch } from "./composition/research.js";
 import { createSupabaseRequestAuthenticator } from "./security/supabase-authenticator.js";
 import { attachVoiceChannel } from "./voice/attach.js";
 import { createVoiceSessionBindings } from "./voice/bindings.js";
+import { createInterviewAgent } from "./voice/interview-agent.js";
 import { createInterviewer } from "./voice/interviewer.js";
 import { createLoggingPronunciationTeacher } from "./voice/pronunciation.js";
 import { createElevenLabsPronunciationTeacher } from "./voice/providers/elevenlabs-pronunciation.js";
@@ -667,6 +672,36 @@ const companyService = createCompanyService({
 const profileBoard = createProfileUpdateBoard({ logger });
 const identity = createPostgresApplicationIdentityLookup({ sql: database.sql });
 const qActionRepositories = createPostgresQActionRepositories();
+// Express Interest (CQ-NET-010): the Network context's command, composed
+// as the application API composes it — the feed's investor subject, the
+// network-preview disclosure rule, the same capability, idempotency and
+// outbox — so Q's approved action and the feed button are one command.
+const interestService = createInterestService({
+  sql: database.sql,
+  transactions: database.transactions,
+  companies,
+  investors,
+  outbox: createOutboxWriter({
+    registry: createEventRegistry(NETWORK_EVENTS),
+  }),
+  audit: createPostgresMaterialActionAuditWriter(),
+  authorization,
+  investorSubject: slateRead.eligibilityPorts.investorSubject,
+  companyVisibility: {
+    isVisibleToInvestor: async (actor, companyId) => {
+      const decision = await disclosure.canDisclose({
+        principal: actorPrincipal(actor),
+        resource: { type: "company", id: companyId },
+        requestedAccess: "view",
+      });
+      return (
+        decision.outcome === "ALLOW" &&
+        (decision.reasonCode === "NETWORK_VISIBLE" ||
+          decision.reasonCode === "PUBLIC_EXTERNAL")
+      );
+    },
+  },
+});
 const qActionRegistry = createQActionRegistry([
   createCompanyProfileUpdateAction({
     profiles: companies,
@@ -682,6 +717,8 @@ const qActionRegistry = createQActionRegistry([
     authorization,
     logger,
   }),
+  // Express Interest: the feed button's own command, approved (CQ-NET-010).
+  createExpressInterestAction({ interests: interestService, logger }),
   // What Q calls the person: their own record, their own approval.
   createPersonProfileUpdateAction({
     people: {
@@ -753,6 +790,9 @@ void embeddings
 // after every run to propose memories and keep the conversation summary
 // current. Recall is composed into the prompts below; learning is hung on
 // the orchestrator further down.
+const ownOnboardingSummaries = createOwnOnboardingSummaryReader({
+  sql: database.sql,
+});
 const displayNameFor = async (actor: ActorContext): Promise<string | null> => {
   // A profile belongs to a person, not to a tenant: the predicate is the
   // acting user's own id, so this can only ever read the caller's name.
@@ -808,6 +848,15 @@ const qIntelligence = composeQIntelligence({
   statements: researchComposition.statements,
   profileUpdates: profileBoard,
   memory: memoryLearner.recall,
+  // Who the person is, from their own setup (CQ-QX-007): their name and
+  // their own onboarding sessions, read by their own user id only. The
+  // gateway asks only when the firewall granted OWN_ONBOARDING.
+  ownOnboarding: {
+    read: async (actor: ActorContext) => ({
+      name: await displayNameFor(actor),
+      journeys: await ownOnboardingSummaries.read(actor.userId),
+    }),
+  },
   // The same bus the run stream publishes from, so an answer reaches a
   // person as it is written rather than after it.
   deltas: liveDeltas,
@@ -1022,6 +1071,14 @@ const interviewer = createInterviewer({
       ),
   },
 });
+// The interview as a tool-calling Q run (ADR 0016): the same firewall,
+// tool pipeline and gateway as every Q answer.
+const interviewAgent = createInterviewAgent({
+  gateway: modelGateway,
+  firewall,
+  logger,
+  dataPosture: demoDataPosture,
+});
 const voiceTurnBoard = createVoiceTurnBoard();
 const welcomeHost = createWelcomeHost({
   gateway: modelGateway,
@@ -1051,6 +1108,7 @@ const voiceTurn = timedVoiceTurns(
     qRuntime,
     qStream,
     interviewer,
+    interviewAgent,
     board: voiceTurnBoard,
     welcome: welcomeHost,
     pronunciation,
@@ -1151,6 +1209,7 @@ const { app, logger: appLogger } = createApp(
             speech: speechSynthesis,
             bindings: voiceBindings,
             interviewer,
+            interviewAgent,
             apiBaseUrl: config.voice.apiBaseUrl,
             board: voiceTurnBoard,
             welcome: welcomeHost,

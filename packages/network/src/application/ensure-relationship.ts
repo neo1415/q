@@ -5,13 +5,17 @@ import {
   createAuditEventId,
   occurredNow,
 } from "@capital-q/audit";
-import type { CompanyId } from "@capital-q/companies";
+import type { CompanyId, CompanyIdentity } from "@capital-q/companies";
 import type {
   CorrelationId,
   DisclosureScope,
   RelationshipSourceType,
 } from "@capital-q/contracts";
-import type { InvestorOrganisationId } from "@capital-q/investors";
+import type { TransactionContext } from "@capital-q/database";
+import type {
+  InvestorOrganisationId,
+  InvestorOrganisationIdentity,
+} from "@capital-q/investors";
 import type { ActorContext } from "@capital-q/security";
 
 import type { Relationship } from "../contracts/index.js";
@@ -70,98 +74,138 @@ export type EnsuredRelationship = {
  * event, no second domain event, and first_discovered_at never moves.
  * Company and investor tenants may differ; that is expected.
  */
+/**
+ * The in-transaction half of `ensureRelationship`, for owning workflows
+ * (Express Interest) whose own write must commit with the relationship it
+ * may create: pair lock -> re-check -> insert + sequence-1 `discovered` +
+ * audit + outbox. Parties are already resolved canonically by the caller.
+ */
+export function createEnsureRelationshipInTransaction(
+  dependencies: NetworkServiceDependencies,
+) {
+  const { outbox, audit, repositories } = dependencies;
+  const appender = createRelationshipEventAppender(dependencies);
+
+  return async (
+    tx: TransactionContext,
+    command: EnsureRelationshipCommand,
+    parties: {
+      readonly company: CompanyIdentity;
+      readonly investor: InvestorOrganisationIdentity;
+    },
+  ): Promise<EnsuredRelationship> => {
+    const { company, investor } = parties;
+    await repositories.relationships.lockPair(tx, company.id, investor.id);
+    const raced = await repositories.relationships.findByParties(
+      tx.sql,
+      company.id,
+      investor.id,
+    );
+    if (raced !== null) {
+      return { relationship: raced, created: false };
+    }
+
+    const relationship = await repositories.relationships.insert(tx, {
+      tenantId: company.tenantId,
+      companyId: company.id,
+      investorOrganisationId: investor.id,
+    });
+    await appender.append(tx, {
+      relationshipId: relationship.id,
+      eventType: RELATIONSHIP_EVENT_DISCOVERED,
+      occurredAt: relationship.firstDiscoveredAt,
+      actor: { type: command.actor.actorType, id: command.actor.userId },
+      source: command.source,
+      visibilityScope: command.visibilityScope,
+      payload:
+        command.source.id === undefined
+          ? {}
+          : { sourceReference: command.source.id },
+      correlationId: command.correlationId,
+    });
+    await audit.record(tx, {
+      ...auditActorFromContext(command.actor),
+      auditEventId: createAuditEventId(),
+      actionType: ACTION_CREATED,
+      resourceType: RESOURCE_RELATIONSHIP,
+      resourceId: relationship.id,
+      occurredAt: occurredNow(),
+      outcome: "SUCCEEDED",
+      metadata: {
+        companyId: company.id,
+        investorOrganisationId: investor.id,
+        sourceType: command.source.type,
+      },
+      correlationId: command.correlationId,
+    });
+    await outbox.enqueue(
+      tx,
+      relationshipCreatedEvent({
+        tenantId: relationship.tenantId,
+        organisationId: command.actor.organisationId ?? company.organisationId,
+        actorUserId: command.actor.userId,
+        correlationId: command.correlationId,
+        relationshipId: relationship.id,
+        companyId: company.id,
+        investorOrganisationId: investor.id,
+      }),
+    );
+    const created = await repositories.relationships.findById(
+      tx.sql,
+      relationship.id,
+    );
+    return { relationship: created ?? relationship, created: true };
+  };
+}
+
+/** Resolve both parties canonically through the public query ports. */
+export async function resolveRelationshipParties(
+  dependencies: Pick<NetworkServiceDependencies, "companies" | "investors">,
+  companyId: CompanyId,
+  investorOrganisationId: InvestorOrganisationId,
+): Promise<{
+  readonly company: CompanyIdentity;
+  readonly investor: InvestorOrganisationIdentity;
+}> {
+  const company = await dependencies.companies.findCanonicalCompany(companyId);
+  if (company === null) {
+    throw new RelationshipPartyNotFoundError("company");
+  }
+  const investor =
+    await dependencies.investors.findCanonicalInvestorOrganisation(
+      investorOrganisationId,
+    );
+  if (investor === null) {
+    throw new RelationshipPartyNotFoundError("investor_organisation");
+  }
+  return { company, investor };
+}
+
 export function createEnsureRelationship(
   dependencies: NetworkServiceDependencies,
 ) {
-  const { transactions, companies, investors, outbox, audit, repositories } =
-    dependencies;
-  const appender = createRelationshipEventAppender(dependencies);
+  const { transactions, repositories } = dependencies;
+  const ensureInTransaction =
+    createEnsureRelationshipInTransaction(dependencies);
 
   return async (
     command: EnsureRelationshipCommand,
   ): Promise<EnsuredRelationship> => {
-    const company = await companies.findCanonicalCompany(command.companyId);
-    if (company === null) {
-      throw new RelationshipPartyNotFoundError("company");
-    }
-    const investor = await investors.findCanonicalInvestorOrganisation(
+    const parties = await resolveRelationshipParties(
+      dependencies,
+      command.companyId,
       command.investorOrganisationId,
     );
-    if (investor === null) {
-      throw new RelationshipPartyNotFoundError("investor_organisation");
-    }
 
     const existing = await repositories.relationships.findByParties(
       dependencies.sql,
-      company.id,
-      investor.id,
+      parties.company.id,
+      parties.investor.id,
     );
     if (existing !== null) {
       return { relationship: existing, created: false };
     }
 
-    return transactions.run(async (tx) => {
-      await repositories.relationships.lockPair(tx, company.id, investor.id);
-      const raced = await repositories.relationships.findByParties(
-        tx.sql,
-        company.id,
-        investor.id,
-      );
-      if (raced !== null) {
-        return { relationship: raced, created: false };
-      }
-
-      const relationship = await repositories.relationships.insert(tx, {
-        tenantId: company.tenantId,
-        companyId: company.id,
-        investorOrganisationId: investor.id,
-      });
-      await appender.append(tx, {
-        relationshipId: relationship.id,
-        eventType: RELATIONSHIP_EVENT_DISCOVERED,
-        occurredAt: relationship.firstDiscoveredAt,
-        actor: { type: command.actor.actorType, id: command.actor.userId },
-        source: command.source,
-        visibilityScope: command.visibilityScope,
-        payload:
-          command.source.id === undefined
-            ? {}
-            : { sourceReference: command.source.id },
-        correlationId: command.correlationId,
-      });
-      await audit.record(tx, {
-        ...auditActorFromContext(command.actor),
-        auditEventId: createAuditEventId(),
-        actionType: ACTION_CREATED,
-        resourceType: RESOURCE_RELATIONSHIP,
-        resourceId: relationship.id,
-        occurredAt: occurredNow(),
-        outcome: "SUCCEEDED",
-        metadata: {
-          companyId: company.id,
-          investorOrganisationId: investor.id,
-          sourceType: command.source.type,
-        },
-        correlationId: command.correlationId,
-      });
-      await outbox.enqueue(
-        tx,
-        relationshipCreatedEvent({
-          tenantId: relationship.tenantId,
-          organisationId:
-            command.actor.organisationId ?? company.organisationId,
-          actorUserId: command.actor.userId,
-          correlationId: command.correlationId,
-          relationshipId: relationship.id,
-          companyId: company.id,
-          investorOrganisationId: investor.id,
-        }),
-      );
-      const created = await repositories.relationships.findById(
-        tx.sql,
-        relationship.id,
-      );
-      return { relationship: created ?? relationship, created: true };
-    });
+    return transactions.run((tx) => ensureInTransaction(tx, command, parties));
   };
 }

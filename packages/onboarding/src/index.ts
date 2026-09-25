@@ -180,6 +180,11 @@ export {
 } from "./application/use-cases.js";
 export { getOnboardingMetrics } from "./application/metrics.js";
 export {
+  createOwnOnboardingSummaryReader,
+  type OwnOnboardingSummary,
+  type OwnOnboardingSummaryReader,
+} from "./application/own-summary.js";
+export {
   createOnboardingService,
   type OnboardingService,
   type OnboardingServiceOptions,

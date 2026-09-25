@@ -144,6 +144,17 @@
     font-weight: 500;
   }
 
+  /*
+   * How tall a pitch may be: what is left of the viewport once the page
+   * header above it and the company, its reasons and Save / Pass / Ask Q
+   * below it have their room, so a laptop screen shows the decision
+   * controls without scrolling. Never smaller than a legible thumbnail;
+   * the player keeps the ratio by narrowing, not by cropping.
+   */
+  .cq-pitch {
+    --cq-pitch-max-height: max(11rem, calc(100dvh - 30rem));
+  }
+
   .cq-discover-list > li + li {
     border-top: 1px solid var(--cq-border-subtle);
   }

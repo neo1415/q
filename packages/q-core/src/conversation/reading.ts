@@ -159,7 +159,11 @@ export const QuestionToQSchema = z
      * so Q cannot say "yes, that's recorded" about something that is not
      * (ACC round 3 #1). Empty for every other question.
      */
-    about: z.array(z.string().min(1).max(80)).max(6).default([]),
+    // Bounded by a journey's length, not by a guess at how many a
+    // question names: "what do you have on me?" names them all, and a
+    // bound of six refused the whole reading, four times, and Q said its
+    // reasoning service was unreachable (live, H fixture).
+    about: z.array(z.string().min(1).max(80)).max(60).default([]),
   })
   .strict();
 export type QuestionToQ = z.infer<typeof QuestionToQSchema>;

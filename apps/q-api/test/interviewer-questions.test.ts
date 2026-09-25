@@ -196,8 +196,10 @@ describe("QX-004 core gate §8 · questions the interview can answer itself", ()
     const outcome = await interviewer.turn(
       turn("where are we so far on this onboarding?"),
     );
-    expect(outcome.reply).toContain("3 of 5 answered");
-    expect(outcome.reply).toContain("2 to go");
+    // From the session, in words: what is held, what is left, no counts.
+    expect(outcome.reply).toMatch(/angel investor/i);
+    expect(outcome.reply).toContain("geography");
+    expect(outcome.reply).not.toMatch(/\d+ (?:of \d+|to go)/);
     expect(outcome.reply).toContain("Which sectors and product areas");
     expect(outcome.questionForQ).toBeNull();
     expect(outcome.recorded).toEqual([]);

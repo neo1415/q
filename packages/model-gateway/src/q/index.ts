@@ -74,6 +74,10 @@ import { acceptStructuredOutput } from "../policy/structured.js";
 import { withoutActionTalk } from "./action-talk.js";
 import { ownProfileFact } from "./own-profile.js";
 import {
+  ownOnboardingFacts,
+  type QOwnOnboardingPort,
+} from "./own-onboarding.js";
+import {
   analystResultBlocks,
   askedSubjects,
   ownInvestorOrganisationIn,
@@ -89,6 +93,12 @@ export {
 } from "./result-blocks.js";
 export { createQTurnReader, type QTurnReader } from "./turn-reader.js";
 export { mandateStatement, ownProfileFact } from "./own-profile.js";
+export {
+  ownOnboardingFacts,
+  type OwnOnboarding,
+  type OwnOnboardingJourney,
+  type QOwnOnboardingPort,
+} from "./own-onboarding.js";
 export {
   withoutActionTalk,
   type ActionTalkStripResult,
@@ -340,7 +350,7 @@ const SOURCE_CHANGE_NOTE: ModelMessage = {
 export const OWN_MANDATE_NOTE: ModelMessage = {
   role: "SYSTEM",
   content:
-    "Among the authorised facts is the person's own declared investor profile: their organisation, how they invest, whether they are deploying capital, and their mandate. Asked who they are or what their profile says, answer from it in plain words, never as a field list; a draft mandate is still being declared, so say so and name what it does not yet declare. Asked whether a company suits what they invest in, compare the company's profile with each declared criterion (matches, misses, not on record), with no score or verdict.",
+    "Among the authorised facts is what the person has told Capital Q about themselves: their name and role, their own setup (how far along, what is answered and what is not) and, for an investor, their declared profile and mandate. Asked who they are, what you know about them or what is missing, answer from these in plain words as a short picture of them, never as a field list or a count read out; a draft mandate or an unfinished setup is still being declared, so say so and name what matters most that is still open. Asked whether a company suits what they invest in, compare the company's profile with each declared criterion (matches, misses, not on record), with no score or verdict.",
 };
 
 /**
@@ -702,6 +712,11 @@ export type ModelGatewayQAnswerDependencies = {
   readonly artifacts?: QArtifactReviser | undefined;
   /** What Capital Q remembers about the person (ADR 0012). Absent: nothing is. */
   readonly memory?: QMemoryRecall | undefined;
+  /**
+   * The person's own onboarding (CQ-QX-007): read only when the plan holds
+   * the actor-wide OWN_ONBOARDING scope. Absent: not read.
+   */
+  readonly ownOnboarding?: QOwnOnboardingPort | undefined;
   /**
    * Where the answer goes as it is written. Absent means it goes out only
    * when it is finished, which is what happened before and is still what
@@ -1103,10 +1118,37 @@ export function createModelGatewayQAnswer(
         }
         took("mandate");
       }
-      const facts: readonly AuthorisedFact[] =
-        ownProfile === null
-          ? assembled.facts
-          : [ownProfile, ...assembled.facts];
+      /**
+       * Who they are, from their own setup (CQ-QX-007): their name, the
+       * role they gave, and how far along they are. Only when the firewall
+       * granted OWN_ONBOARDING, which it grants to nobody but the person;
+       * a read that fails costs this answer the facts, never the answer.
+       */
+      let onboardingFacts: readonly AuthorisedFact[] = [];
+      if (
+        dependencies.ownOnboarding !== undefined &&
+        plan.scopes.some(
+          (scope) =>
+            scope.kind === "OWN_ONBOARDING" && scope.subject === undefined,
+        )
+      ) {
+        try {
+          onboardingFacts = ownOnboardingFacts(
+            await dependencies.ownOnboarding.read(request.actor),
+          );
+        } catch (error: unknown) {
+          logger?.warn(
+            { err: error, qRunId: request.runId },
+            "the person's own onboarding was not read for this answer",
+          );
+        }
+        took("onboarding");
+      }
+      const facts: readonly AuthorisedFact[] = [
+        ...onboardingFacts,
+        ...(ownProfile === null ? [] : [ownProfile]),
+        ...assembled.facts,
+      ];
 
       const variables: Omit<
         CompanyAnalystV4Variables,
@@ -1409,9 +1451,9 @@ export function createModelGatewayQAnswer(
 
       if (ownProfileCall !== null) {
         toolCalls.push(ownProfileCall);
-        if (ownProfile !== null) {
-          messages = [...messages, OWN_MANDATE_NOTE];
-        }
+      }
+      if (ownProfile !== null || onboardingFacts.length > 0) {
+        messages = [...messages, OWN_MANDATE_NOTE];
       }
 
       type AnswerResult = Awaited<

@@ -180,7 +180,7 @@ describe("the platform's own vocabulary stays inside the platform", () => {
 
     const outcome = await interviewer.turn(turn(world, "where are we so far?"));
 
-    expect(outcome.reply).toContain("2 of 35 answered");
+    expect(outcome.reply).toContain("Zino");
     expect(outcome.reply).not.toMatch(/mandate/i);
     expect(outcome.reply).toContain("main investment strategy");
   });

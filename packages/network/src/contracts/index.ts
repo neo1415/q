@@ -5,6 +5,7 @@ import {
   createUuidIdSchema,
   type CorrelationId,
   type DisclosureScope,
+  type InterestDto,
   type RelationshipDto,
   type RelationshipEventSummaryDto,
   type RelationshipSourceType,
@@ -105,5 +106,43 @@ export function toRelationshipEventSummaryDto(
     sourceId: event.source.id,
     visibilityScope: event.visibilityScope,
     correlationId: event.correlationId,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Interest (CQ-NET-010)
+// ---------------------------------------------------------------------------
+
+/** The interest record's identifier. Never a RelationshipId or a history event id. */
+export const InterestIdSchema = createUuidIdSchema("InterestId");
+export type InterestId = z.infer<typeof InterestIdSchema>;
+
+/**
+ * An investor organisation's unilateral interest in a company, on the one
+ * canonical relationship. Interest ≠ Match: nothing here is bilateral, and
+ * the relationship's projected state is not changed by it.
+ */
+export type Interest = {
+  readonly id: InterestId;
+  /** The relationship's (company's) tenant anchor. */
+  readonly tenantId: TenantId;
+  readonly relationshipId: RelationshipId;
+  readonly companyId: CompanyId;
+  readonly investorOrganisationId: InvestorOrganisationId;
+  readonly expressedByParty: "INVESTOR";
+  readonly status: "EXPRESSED" | "WITHDRAWN";
+  readonly expressedByUserId: string;
+  readonly expressedInOrganisationId: string;
+  readonly relationshipEventId: RelationshipEventId;
+  readonly createdAt: UtcTimestamp;
+};
+
+export function toInterestDto(interest: Interest): InterestDto {
+  return {
+    interestId: interest.id,
+    relationshipId: interest.relationshipId,
+    companyId: interest.companyId,
+    status: interest.status,
+    expressedAt: interest.createdAt,
   };
 }

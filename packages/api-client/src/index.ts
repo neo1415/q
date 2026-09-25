@@ -171,6 +171,8 @@ export {
   unsaveCompany,
 } from "./discovery.js";
 
+export { expressInterest, getOwnInterest } from "./network.js";
+
 export {
   getCompanyVerification,
   requestCompanyVerification,

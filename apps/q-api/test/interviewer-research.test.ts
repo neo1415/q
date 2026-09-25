@@ -199,6 +199,7 @@ describe("CQ-QX-005 §11 · research runs only when asked for", () => {
         question: {
           kind: "REAL_WORLD_EXAMPLE",
           text: "Can you give me an example of a real investor similar to me?",
+          about: [],
         },
         suggestions: [],
         tensions: [],
@@ -240,6 +241,7 @@ describe("CQ-QX-005 §11 · research runs only when asked for", () => {
         question: {
           kind: "REAL_WORLD_EXAMPLE",
           text: "a real investor like me?",
+          about: [],
         },
         suggestions: [],
         tensions: [],
@@ -317,6 +319,7 @@ describe("CQ-QX-005 §11 · research runs only when asked for", () => {
         question: {
           kind: "REAL_WORLD_EXAMPLE",
           text: "Who invests in aviation startups like mine?",
+          about: [],
         },
         suggestions: [],
         tensions: [],

@@ -284,13 +284,38 @@ export type DeleteCompanyPitchCommand = {
  * governed by its own lineage rules rather than cascading from here.
  *
  * Deleting is consequential, so it needs `media.manage`, and it is audited.
+ *
+ * The bytes are a different matter from the record: once the row says
+ * DELETED, the provider's copy is deleted too (doc 20 §20.4), after the
+ * transaction and outside it, as the upload cancel does. It is best-effort
+ * and retried by repeating the delete: the record is already honest, the
+ * viewer path already refuses a DELETED asset, and a provider outage must
+ * not turn a founder's decision into an error.
  */
 export function createDeleteCompanyPitch(
   dependencies: MediaServiceDependencies,
 ) {
-  const { repositories, transactions, audit, outbox } = dependencies;
+  const { repositories, transactions, audit, outbox, videoProvider } =
+    dependencies;
+
+  const release = async (asset: MediaAsset): Promise<void> => {
+    if (asset.providerAssetId === null) return;
+    try {
+      await videoProvider.deleteAsset(asset.providerAssetId);
+    } catch {
+      // Left for the next delete of the same pitch to retry.
+    }
+  };
 
   return async (command: DeleteCompanyPitchCommand): Promise<MediaAsset> => {
+    const deleted = await deleteRecord(command);
+    await release(deleted);
+    return deleted;
+  };
+
+  async function deleteRecord(
+    command: DeleteCompanyPitchCommand,
+  ): Promise<MediaAsset> {
     const { actor } = command;
     const organisationId = activeOrganisation(actor);
     const owner = await ownedResource(
@@ -365,7 +390,7 @@ export function createDeleteCompanyPitch(
       );
       return deleted;
     });
-  };
+  }
 }
 
 /**

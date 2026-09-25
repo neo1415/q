@@ -25,7 +25,27 @@ const PLAIN_ERRORS = {
   connection:
     "The voice connection dropped. You can keep typing, or try again.",
   generic: "I lost the line there. Give me a second and I'll pick it back up.",
+  speech:
+    "I can't speak out loud right now, but I'm listening. My replies will show here, or you can type.",
 } as const;
+
+/**
+ * No silent dead starts (voice lane, 2026-09-25).
+ *
+ * A line can look alive and be dead in two ways: it never listens (the
+ * socket opened but the agent never applied its settings, so every audio
+ * frame waits in the SDK's queue while the screen says "Listening"), or it
+ * never speaks (the greeting or a reply produced no audio — the voice
+ * relay's vendor refused, as on Railway with an exhausted key). Each is
+ * given a bounded time and then said out loud, in one plain sentence, or
+ * handed to the reconnect upstairs. "Connected" is the socket; listening
+ * starts when the provider has applied the settings.
+ */
+const SETTINGS_WITHIN_MS = 10_000;
+/** The relay's slowest vendor, its fallback, and a margin. */
+const SPEECH_WITHIN_MS = 10_000;
+/** A working microphone produces frames continuously, silence included. */
+const FRAMES_WITHIN_MS = 4_000;
 
 /**
  * How long an injected message may wait for its echo before it is
@@ -38,19 +58,59 @@ const INPUT_SAMPLE_RATE = 16_000;
 const OUTPUT_SAMPLE_RATE = 24_000;
 
 /**
- * Telling a cough from a sentence. The provider reports "user started
- * speaking" on any sound; playback is cut only when the sound keeps going
- * across a short window. When Q was cut and no words followed within
- * a moment, the browser asks Q to carry on with a cue the server treats
- * as "go on" and the transcript never shows.
+ * Barge-in (acceptance J, 2026-09-24).
+ *
+ * The provider's "user started speaking" is the listening model deciding
+ * a turn has begun, and the agent stops Q's reply there and then. The
+ * speaker has to stop with it: it used to sample the microphone first and
+ * cut only for a loud, sustained sound, but echo cancellation keeps the
+ * level low while Q's own voice is in the room, so Q played on to the end
+ * of its answer while the person talked over it.
+ *
+ * A sound that produced no words (a cough) is repaired afterwards: once
+ * the microphone has been quiet for longer than the provider waits before
+ * ending a turn, and still no words have come, the browser asks Q to carry
+ * on with a cue the server treats as "go on" and the transcript never
+ * shows. It used to fire 1.6 s after the cut whatever the person was
+ * doing — mid-sentence, since words only arrive when the turn ends — and
+ * the provider folded the cue into their sentence: "[continue] I'm not
+ * saying…", answered as a separate turn each time the sentence grew.
  */
-const SUSTAINED_WINDOW_MS = 260;
-const SUSTAINED_SAMPLE_MS = 40;
-const SUSTAINED_LEVEL = 0.02;
-const SUSTAINED_FRACTION = 0.3;
-const FALSE_INTERRUPTION_MS = 1_600;
-const RECENT_AUDIO_MS = 900;
+const SPEECH_LEVEL = 0.02;
+/** The provider's end-of-turn timeout (3 s, deepgram.ts) plus a margin. */
+const REPAIR_AFTER_QUIET_MS = 3_400;
+const REPAIR_POLL_MS = 100;
+/** A repair not decided by then is dropped; the person can say "go on". */
+const REPAIR_GIVE_UP_MS = 20_000;
 const CONTINUE_SIGNAL = "[continue]";
+
+/** The person's words without the cue, or "" when the line was only the cue. */
+function withoutCue(text: string): string {
+  return text.split(CONTINUE_SIGNAL).join(" ").replace(/\s+/g, " ").trim();
+}
+
+const comparable = (text: string) =>
+  text
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s]/gu, "")
+    .replace(/\s+/g, " ")
+    .trim();
+
+/**
+ * Whether `next` is the provider reporting the same utterance again, grown
+ * or with its last words re-heard. The provider folds the person's
+ * consecutive messages into one, so a line that begins with most of the
+ * previous one is that line, not a second thing they said.
+ */
+function sameUtterance(previous: string, next: string): boolean {
+  const a = comparable(previous);
+  const b = comparable(next);
+  if (a.length === 0) return false;
+  if (b.startsWith(a)) return true;
+  let shared = 0;
+  while (shared < a.length && a[shared] === b[shared]) shared += 1;
+  return shared >= 24 && shared >= a.length * 0.8;
+}
 
 let counter = 0;
 const newId = () => `dg-${String(Date.now())}-${String((counter += 1))}`;
@@ -76,8 +136,15 @@ export function useDeepgramVoiceSession(
   }, [events]);
   const liveRef = useRef<Live | null>(null);
   const speakingRef = useRef(false);
-  const lastAudioAtRef = useRef(0);
+  /**
+   * Audio still arriving for a reply the person talked over. Dropped until
+   * the agent starts its next reply: the person must never hear the rest
+   * of an answer they interrupted.
+   */
+  const discardingRef = useRef(false);
   const lastUserTextAtRef = useRef(0);
+  /** The last line shown, so a re-reported utterance replaces it. */
+  const lastLineRef = useRef<VoiceTranscriptLine | null>(null);
   /**
    * Text this browser put into the session itself, waiting for the
    * provider to say it back.
@@ -121,14 +188,29 @@ export function useDeepgramVoiceSession(
   const addLine = useCallback((role: "user" | "q", text: string) => {
     const trimmed = text.trim();
     if (trimmed.length === 0) return;
+    const previous = lastLineRef.current;
+    // One utterance, one line: the same utterance reported again replaces
+    // the line it grew from, under the same id, so every consumer that
+    // keys lines by id shows it once.
+    const replacing =
+      role === "user" &&
+      previous?.role === "user" &&
+      sameUtterance(previous.text, trimmed)
+        ? previous
+        : null;
     const line: VoiceTranscriptLine = {
-      id: newId(),
+      id: replacing?.id ?? newId(),
       role,
       text: trimmed,
       partial: false,
       at: Date.now(),
     };
-    setTranscript((current) => [...current, line]);
+    lastLineRef.current = line;
+    setTranscript((current) =>
+      replacing === null
+        ? [...current, line]
+        : current.map((item) => (item.id === replacing.id ? line : item)),
+    );
     eventsRef.current.onLine?.(line);
   }, []);
 
@@ -142,9 +224,11 @@ export function useDeepgramVoiceSession(
       }
       teardown();
       setTranscript([]);
+      lastLineRef.current = null;
       injectedRef.current = [];
       setState("CONNECTING");
       speakingRef.current = false;
+      discardingRef.current = false;
 
       const token = credential.token;
       const session = new AgentSession({
@@ -167,10 +251,16 @@ export function useDeepgramVoiceSession(
        * prints one line every few seconds in the console. Nothing about
        * the audio itself is logged, only that it moved.
        */
-      const heard = { frames: 0, lastEvent: "none", lastEventAt: 0 };
+      const heard = {
+        frames: 0,
+        totalFrames: 0,
+        lastEvent: "none",
+        lastEventAt: 0,
+      };
       const microphone = new AgentMicrophone(
         (data) => {
           heard.frames += 1;
+          heard.totalFrames += 1;
           session.sendAudio(data);
         },
         { sampleRate: INPUT_SAMPLE_RATE, echoCancellation: true },
@@ -202,21 +292,76 @@ export function useDeepgramVoiceSession(
       const live: Live = { session, microphone, player };
       liveRef.current = live;
 
+      const greeting =
+        typeof settings.agent.greeting === "string" &&
+        settings.agent.greeting.trim().length > 0;
+      let settingsWatch: number | null = null;
+      let speechWatch: number | null = null;
+      let speechWarned = false;
+      const stopWatch = (handle: number | null) => {
+        if (handle !== null) window.clearTimeout(handle);
+        return null;
+      };
+      /** Q is about to be heard; if nothing comes out, say so once. */
+      const expectSpeech = () => {
+        if (speechWatch !== null || speechWarned) return;
+        speechWatch = window.setTimeout(() => {
+          speechWatch = null;
+          if (liveRef.current !== live) return;
+          speechWarned = true;
+          console.warn("[voice] no audio for a reply Q gave");
+          setState((current) =>
+            current === "Q_SPEAKING" || current === "THINKING"
+              ? "LISTENING"
+              : current,
+          );
+          eventsRef.current.onError?.(PLAIN_ERRORS.speech);
+        }, SPEECH_WITHIN_MS);
+      };
+      const speechHeard = () => {
+        speechWatch = stopWatch(speechWatch);
+      };
       session.on("connected", () => {
         setConnected(true);
-        setState("LISTENING");
+        // The socket, not the agent: until the settings are applied every
+        // frame waits in the SDK's queue and nobody is listening.
+        settingsWatch = stopWatch(settingsWatch);
+        settingsWatch = window.setTimeout(() => {
+          settingsWatch = null;
+          if (liveRef.current !== live) return;
+          console.warn("[voice] the agent never applied its settings");
+          fail(PLAIN_ERRORS.connection);
+        }, SETTINGS_WITHIN_MS);
+      });
+      session.on("settings-applied", () => {
+        noteEvent("settings-applied");
+        settingsWatch = stopWatch(settingsWatch);
+        setState((current) =>
+          current === "CONNECTING" ? "LISTENING" : current,
+        );
+        // Q speaks first on an explicit start; that greeting has to be heard.
+        if (greeting) expectSpeech();
+      });
+      session.on("warning", (message) => {
+        // For the log only; what the person is told comes from the
+        // watches, which judge by what was heard rather than by wording.
+        noteEvent("warning");
+        console.warn("voice agent warning", message.code, message.description);
       });
       session.on("conversation-text", (message) => {
         noteEvent(`conversation-text:${message.role}`);
         const role = message.role === "user" ? "user" : "q";
+        let content = message.content;
         if (role === "user") {
           lastUserTextAtRef.current = Date.now();
-          if (message.content.trim() === CONTINUE_SIGNAL) return;
+          // The cue is this browser's own signal, never the person's
+          // words, even when the provider folds it into them.
+          content = withoutCue(content);
+          if (content.length === 0) return;
           // Our own injected message coming back. It is already on screen;
           // adding it again is the duplicate turn.
-          const echoed = message.content.trim();
           const waiting = injectedRef.current.findIndex(
-            (item) => item.text === echoed,
+            (item) => item.text === content,
           );
           if (waiting !== -1) {
             injectedRef.current.splice(waiting, 1);
@@ -224,38 +369,41 @@ export function useDeepgramVoiceSession(
             return;
           }
         }
-        addLine(role, message.content);
+        addLine(role, content);
         if (role === "user") setState("THINKING");
+        else expectSpeech();
       });
-      const sustained = async (): Promise<boolean> => {
-        const samples = Math.max(
-          1,
-          Math.round(SUSTAINED_WINDOW_MS / SUSTAINED_SAMPLE_MS),
-        );
-        let loud = 0;
-        for (let i = 0; i < samples; i += 1) {
-          await new Promise((resolve) =>
-            window.setTimeout(resolve, SUSTAINED_SAMPLE_MS),
-          );
-          if (liveRef.current !== live) return false;
-          if (microphone.getInputVolume() >= SUSTAINED_LEVEL) loud += 1;
-        }
-        return loud / samples >= SUSTAINED_FRACTION;
+      /** The pending cough repair, if one is waiting. */
+      let repair: number | null = null;
+      const cancelRepair = () => {
+        if (repair !== null) window.clearInterval(repair);
+        repair = null;
       };
       const repairFalseInterruption = () => {
+        cancelRepair();
         const startedAt = Date.now();
-        window.setTimeout(() => {
-          if (liveRef.current !== live) return;
-          const wordsFollowed = lastUserTextAtRef.current >= startedAt;
-          const stillSpeaking =
-            Date.now() - lastAudioAtRef.current < RECENT_AUDIO_MS;
-          if (wordsFollowed || stillSpeaking) return;
+        let lastLoudAt = startedAt;
+        repair = window.setInterval(() => {
+          const now = Date.now();
+          if (
+            liveRef.current !== live ||
+            lastUserTextAtRef.current >= startedAt ||
+            now - startedAt > REPAIR_GIVE_UP_MS
+          ) {
+            cancelRepair();
+            return;
+          }
+          if (microphone.getInputVolume() >= SPEECH_LEVEL) lastLoudAt = now;
+          if (now - lastLoudAt < REPAIR_AFTER_QUIET_MS) return;
+          cancelRepair();
           session.injectUserMessage(CONTINUE_SIGNAL);
           setState("THINKING");
-        }, FALSE_INTERRUPTION_MS);
+        }, REPAIR_POLL_MS);
       };
       session.on("user-started-speaking", () => {
         noteEvent("user-started-speaking");
+        // The agent abandons its reply; its audio is not owed any more.
+        speechHeard();
         // "Speaking" is what the player is doing, not what the flag says:
         // the flag drops a bounded time after the provider finishes
         // sending, and a long answer is still coming out of the speaker
@@ -267,31 +415,46 @@ export function useDeepgramVoiceSession(
           setState("USER_SPEAKING");
           return;
         }
-        speakingRef.current = true;
-        // Q is talking: cut playback for a sound that keeps going. The
-        // window is short and the threshold low, because failing to stop
-        // when a person speaks is far worse than stopping for a cough —
-        // a false stop resumes itself a moment later.
-        void sustained().then((real) => {
-          if (liveRef.current !== live || !speakingRef.current) return;
-          if (!real) return;
-          player.interrupt();
-          speakingRef.current = false;
-          setState("INTERRUPTED");
-          eventsRef.current.onInterrupted?.();
-          repairFalseInterruption();
+        // Q stops the moment the person starts. The agent has already
+        // abandoned this reply; what is queued or still arriving for it is
+        // obsolete.
+        player.interrupt();
+        speakingRef.current = false;
+        discardingRef.current = true;
+        setState("INTERRUPTED");
+        eventsRef.current.onInterrupted?.();
+        repairFalseInterruption();
+      });
+      /**
+       * The provider's own measure of each turn (CQ-VOICE-010): from the
+       * end of the person's speech to Q's first audio, and its parts.
+       * q-api's "voice turn timed" line starts where this one's think
+       * stage starts, so the two together cover the whole turn. Seconds,
+       * as the provider reports them; nothing the person said.
+       */
+      session.on("latency-report", (report) => {
+        console.info("[voice] latency (s)", {
+          stt: report.stt_latency,
+          think: report.ttt_text_latency,
+          tts: report.tts_latency,
+          total: report.total_latency,
         });
       });
       session.on("agent-thinking", () => {
         noteEvent("agent-thinking");
+        discardingRef.current = false;
         setState("THINKING");
       });
       session.on("agent-started-speaking", () => {
+        cancelRepair();
+        expectSpeech();
+        discardingRef.current = false;
         speakingRef.current = true;
         setState("Q_SPEAKING");
       });
       session.on("audio", (chunk) => {
-        lastAudioAtRef.current = Date.now();
+        speechHeard();
+        if (discardingRef.current) return;
         player.queue(chunk);
       });
       session.on("agent-audio-done", () => {
@@ -378,6 +541,16 @@ export function useDeepgramVoiceSession(
         return;
       }
       if (muted) microphone.mute();
+      else {
+        // A capture that started but never delivers a frame is a
+        // microphone Q cannot hear through, whatever the screen says.
+        window.setTimeout(() => {
+          if (liveRef.current !== live || heard.totalFrames > 0) return;
+          if (microphone.muted) return;
+          console.warn("[voice] the microphone produced no audio");
+          eventsRef.current.onError?.(PLAIN_ERRORS.microphone);
+        }, FRAMES_WITHIN_MS);
+      }
       try {
         await session.connect();
       } catch {

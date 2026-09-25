@@ -7,10 +7,10 @@ import { MarketplaceVisibilitySchema } from "./companies.js";
 /**
  * Relationship contracts (CQ-NET-001).
  *
- * There is deliberately NO HTTP route for relationships in this packet: the
- * disclosure layer (CQ-PERM-001) has not decided what each party may see.
- * These are the safe vocabularies and DTO shapes later routes and consumers
- * will use. A relationship existing is not a disclosure permission, and no
+ * There is deliberately no generic relationship read route: the only HTTP
+ * surface is the investor's own Express Interest command and status
+ * (CQ-NET-010, below). These are the safe vocabularies and DTO shapes later
+ * routes and consumers will use. A relationship existing is not a disclosure permission, and no
  * DTO here carries an event payload.
  *
  *   Relationship ≠ Recommendation ≠ Impression ≠ Save ≠ Interest ≠ Match ≠ Deal
@@ -97,4 +97,71 @@ export const RelationshipEventSummaryDtoSchema = z.object({
 });
 export type RelationshipEventSummaryDto = z.infer<
   typeof RelationshipEventSummaryDtoSchema
+>;
+
+// ---------------------------------------------------------------------------
+// Express Interest (CQ-NET-010; doc 13 §29.1, doc 17 §70, doc 22 §42-§45)
+// ---------------------------------------------------------------------------
+
+/**
+ * `POST /v1/network/companies/:companyId/express-interest`.
+ *
+ * Keyed by company rather than by relationship: an investor expressing
+ * interest from the feed may be the reason the canonical relationship comes
+ * to exist, and a client never needs to know a relationship id to ask.
+ * Consequential, so an Idempotency-Key header is required
+ * (IDEMPOTENCY_KEY_HEADER); the same key and company return the original
+ * result, the same key with another company is IDEMPOTENCY_CONFLICT.
+ *
+ * Interest ≠ Match: this never creates a match or a connection, and it is
+ * not a Save — the feed's Save/Pass stay on `/v1/discovery`.
+ */
+export const NETWORK_COMPANY_EXPRESS_INTEREST_PATH =
+  "/v1/network/companies/:companyId/express-interest" as const;
+/** `GET`: the caller's own investor organisation's interest in this company, if any. */
+export const NETWORK_COMPANY_INTEREST_PATH =
+  "/v1/network/companies/:companyId/interest" as const;
+
+/**
+ * Where the person was. Provenance only: it becomes the relationship
+ * event's source and never widens who may act. There is no field for an
+ * organisation, a tenant or a relationship — those are the server's answers.
+ */
+export const ExpressInterestRequestSchema = z
+  .object({
+    surface: z.enum(["RECOMMENDATION_FEED", "COMPANY_PROFILE"]),
+  })
+  .strict();
+export type ExpressInterestRequest = z.infer<
+  typeof ExpressInterestRequestSchema
+>;
+
+/** Unilateral, and only ever EXPRESSED in this packet. */
+export const InterestDtoSchema = z
+  .object({
+    interestId: UuidSchema,
+    relationshipId: UuidSchema,
+    companyId: UuidSchema,
+    status: z.enum(["EXPRESSED", "WITHDRAWN"]),
+    expressedAt: UtcTimestampSchema,
+  })
+  .strict();
+export type InterestDto = z.infer<typeof InterestDtoSchema>;
+
+/** `deduplicated` is true when the interest already existed: nothing new was written. */
+export const ExpressInterestResultDtoSchema = z
+  .object({
+    interest: InterestDtoSchema,
+    deduplicated: z.boolean(),
+  })
+  .strict();
+export type ExpressInterestResultDto = z.infer<
+  typeof ExpressInterestResultDtoSchema
+>;
+
+export const CompanyInterestStatusDtoSchema = z
+  .object({ interest: InterestDtoSchema.nullable() })
+  .strict();
+export type CompanyInterestStatusDto = z.infer<
+  typeof CompanyInterestStatusDtoSchema
 >;

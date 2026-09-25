@@ -32,6 +32,37 @@ export class RelationshipEventTypeUnknownError extends Error {
   }
 }
 
+/**
+ * The actor cannot express interest: they are not acting for an investor
+ * organisation, or their role does not carry the capability. Safe to say:
+ * it describes the caller, never a company.
+ */
+export class InterestNotPermittedError extends Error {
+  constructor() {
+    super("Only a member of an investor organisation can express interest.");
+    this.name = "InterestNotPermittedError";
+  }
+}
+
+/**
+ * The company does not exist or is not visible to this investor. One error
+ * for both, so the command cannot be used to ask which.
+ */
+export class InterestCompanyNotFoundError extends Error {
+  constructor() {
+    super("The company was not found.");
+    this.name = "InterestCompanyNotFoundError";
+  }
+}
+
+/** The idempotency key was already used for a different Express Interest request. */
+export class InterestIdempotencyConflictError extends Error {
+  constructor() {
+    super("This idempotency key was already used with a different request.");
+    this.name = "InterestIdempotencyConflictError";
+  }
+}
+
 /** The chosen visibility scope is not allowed for this event type. */
 export class RelationshipEventVisibilityNotAllowedError extends Error {
   readonly eventType: string;

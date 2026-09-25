@@ -107,12 +107,22 @@ names HOME; the stage follows it.
 
 ## Pause, not stop
 
-An interruption never throws Q's words away. A reply cut off mid-way keeps
-its unsaid sentences; a Q answer (a lookup, a question) keeps running in
-the background and holds its text. "Go on", "you were saying", a bare
-"okay" resumes from where Q was; a new subject is answered first and a
-finished answer is offered after it ("And on what you asked earlier…").
-Held speech is per binding and process-local, like the bindings.
+An interruption never throws away words the person has begun to hear. A
+reply cut off mid-way keeps its unsaid sentences; a Q answer that had
+started to stream keeps running and holds its text. "Go on", "you were
+saying", a bare "okay" or the browser's `[continue]` cue resumes it.
+Anything else the person says supersedes it: the run is cancelled through
+`cancelRun` and its engine's signal aborted, so it never records an answer
+nobody asked for.
+
+A think dropped before any of its answer reached the person (they were
+still talking, or started again) is not paused: its run is cancelled at
+once. A line has at most one live Q run, and a newer think on the same
+line ends the older request (`voice/think.ts`). This is what makes one
+utterance one answer: the provider reports an utterance again as it grows,
+folded into one user message, and each report used to become a run that
+answered (hosted, 2026-09-24: five thinks, four answers). Held speech is
+per binding and process-local, like the bindings.
 
 ## Pronunciation
 
@@ -287,14 +297,27 @@ Q's destinations (a page, the form) are followed by `useFollowTurn`
 only once the client has stopped speaking or thinking, with a 1.5 s floor
 and a 12 s ceiling, so a goodbye is heard before the screen changes.
 
+No silent dead starts (Deepgram adapter). "Connected" is the socket; the
+stage says Listening only once the agent has applied its settings, and a
+line whose settings never apply within 10 s is handed to the reconnect. A
+greeting or a reply that produces no audio within 10 s is said once, in
+one plain sentence ("I can't speak out loud right now, but I'm
+listening…"), instead of leaving the person looking at "Speaking"; a reply
+the person talked over is not counted. A microphone that delivers no frame
+within 4 s is named as the microphone.
+
 ## Barge-in
 
-The provider reports "user started speaking" on any sound, so Q sampled
-the microphone before cutting playback — and the first threshold was set
-so high that Q carried on talking over people. It is now 260 ms at a low
-level: failing to stop when somebody speaks is far worse than stopping for
-a cough, because a false stop repairs itself a moment later through the
-hidden `[continue]` cue and a missed one does not.
+Q stops the moment the provider reports "user started speaking" while Q
+is audible: the player is flushed, and audio still arriving for that reply
+is dropped until the agent starts its next one. Sampling the microphone
+first let Q play on, because echo cancellation keeps the level low while
+Q's own voice is in the room.
+
+A sound that produced no words is repaired with the hidden `[continue]`
+cue, but only once the microphone has been quiet for longer than the
+provider's end-of-turn timeout and still no words came. Injected earlier,
+mid-sentence, the provider folded it into the person's words.
 
 ## Sounds, interruptions, endings and destinations
 
@@ -318,11 +341,9 @@ answer after the next reply, speaks only the unsaid part, after "Sorry, I
 got cut off. As I was saying," (`unsaidPartOf` in `turn.ts`). Nothing
 is repeated; an answer that had finished is not re-spoken.
 
-In the browser the Deepgram adapter no longer cuts playback on any sound:
-it samples the microphone for 420 ms and interrupts only for a sound that
-keeps going. When Q was cut and no words follow within 1.6 s, it injects
-`[continue]` as a user message; the server resumes and the transcript
-never shows the cue.
+The cue is stripped from whatever the provider reports as the person's
+words, on the server and in the browser, and an utterance the provider
+reports again as it grows replaces its line under the same id.
 
 ## Visibility by voice
 

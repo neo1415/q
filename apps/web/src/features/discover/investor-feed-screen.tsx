@@ -20,8 +20,9 @@ import { useReducedMotionPreference } from "./player/use-pitch-playback";
  *
  * One controller owns the feed; this is its surface. Moving between cards
  * is local — no request, no Q call, no beacon — because viewing is not
- * interest. Only Save and Pass talk to the server, and only because a
- * person asked them to.
+ * interest. Only Save, Pass and Express Interest talk to the server, and
+ * only because a person asked them to; the first two optimistically, the
+ * last only once the server has confirmed it (CQ-NET-010).
  */
 
 const NOTE_TEXT: Readonly<Record<DiscoveryNoteDto, string>> = {

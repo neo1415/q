@@ -33,6 +33,11 @@ import {
   InvestorRepresentativeNotFoundError,
   InvestorVersionConflictError,
 } from "@capital-q/investors";
+import {
+  InterestCompanyNotFoundError,
+  InterestIdempotencyConflictError,
+  InterestNotPermittedError,
+} from "@capital-q/network";
 import type { Logger } from "@capital-q/observability";
 import {
   OrganisationCreationConflictError,
@@ -293,9 +298,24 @@ function toProblem(
     error instanceof DocumentVersionNotFoundError ||
     error instanceof DocumentUploadSessionNotFoundError ||
     error instanceof MediaAssetNotFoundError ||
-    error instanceof MediaOwnerNotFoundError
+    error instanceof MediaOwnerNotFoundError ||
+    // Absent and not-visible are one answer (CQ-NET-010).
+    error instanceof InterestCompanyNotFoundError
   ) {
     return createProblemDetails({ code: "RESOURCE_NOT_FOUND", requestId });
+  }
+
+  // Describes the caller, never a company: safe to say plainly.
+  if (error instanceof InterestNotPermittedError) {
+    return createProblemDetails({
+      code: "PERMISSION_DENIED",
+      requestId,
+      detail: error.message,
+    });
+  }
+
+  if (error instanceof InterestIdempotencyConflictError) {
+    return createProblemDetails({ code: "IDEMPOTENCY_CONFLICT", requestId });
   }
 
   // A refused upload. The category is machine-readable so a client can say

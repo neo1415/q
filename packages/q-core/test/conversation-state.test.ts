@@ -64,6 +64,7 @@ describe("what a reading may do", () => {
         question: {
           kind: "ADVICE",
           text: "What do you think I should look for?",
+          about: [],
         },
       }),
     );
@@ -219,6 +220,7 @@ describe("the research policy", () => {
         question: {
           kind: "REAL_WORLD_EXAMPLE",
           text: "Can you give me an example of a real investor similar to me?",
+          about: [],
         },
       }),
       { available: true },
@@ -233,7 +235,11 @@ describe("the research policy", () => {
         asked,
         reading({
           kind: "QUESTION_TO_Q",
-          question: { kind: "ADVICE", text: "What else should I look for?" },
+          question: {
+            kind: "ADVICE",
+            text: "What else should I look for?",
+            about: [],
+          },
         }),
         { available: true },
       ),
@@ -246,6 +252,7 @@ describe("the research policy", () => {
       question: {
         kind: "THEIR_OWN_RECORDS",
         text: "Based on what you know about me, what fits?",
+        about: [],
       },
     });
     expect(decideResearch(asked, about, { available: true })).toEqual({
@@ -263,7 +270,11 @@ describe("the research policy", () => {
   it("stops asking a research route that is down, and never doubles a run in flight", () => {
     const example = reading({
       kind: "RESEARCH_REQUEST",
-      question: { kind: "REAL_WORLD_EXAMPLE", text: "a real example" },
+      question: {
+        kind: "REAL_WORLD_EXAMPLE",
+        text: "a real example",
+        about: [],
+      },
     });
     expect(decideResearch(asked, example, { available: false })).toEqual({
       run: false,

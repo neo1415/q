@@ -112,13 +112,24 @@ export function createQToolRegistry(
     if (!Number.isInteger(definition.version) || definition.version < 1) {
       throw new Error(`tool ${id} has an invalid version`);
     }
-    if (definition.riskClass !== "SAFE_READ") {
+    /**
+     * Two lanes, and only two (ADR 0016). SAFE_READ tools read. The one
+     * write lane is LOW_RISK_INTERNAL with a SIDE_EFFECT classification:
+     * a write to the caller's own record, at their own word, that the
+     * owning service validates again and that is idempotent there — an
+     * onboarding answer. Anything that needs approval (CONFIRM_REQUIRED
+     * and above) is an Approval Engine action, never a tool.
+     */
+    const read =
+      definition.riskClass === "SAFE_READ" &&
+      definition.classification === "READ_ONLY";
+    const ownWrite =
+      definition.riskClass === "LOW_RISK_INTERNAL" &&
+      definition.classification === "SIDE_EFFECT";
+    if (!read && !ownWrite) {
       throw new Error(
-        `tool ${id} is ${definition.riskClass}; only SAFE_READ tools can be registered before the approval engine exists`,
+        `tool ${id} is ${definition.riskClass}/${definition.classification}; a tool is SAFE_READ/READ_ONLY or LOW_RISK_INTERNAL/SIDE_EFFECT, and anything else is an approval-engine action`,
       );
-    }
-    if (definition.classification !== "READ_ONLY") {
-      throw new Error(`tool ${id} must be READ_ONLY to be SAFE_READ`);
     }
     const versionId = versionIdOf(id, definition.version);
     if (byVersion.has(versionId)) {

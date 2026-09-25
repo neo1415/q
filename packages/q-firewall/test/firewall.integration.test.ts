@@ -1038,11 +1038,19 @@ describe("@capital-q/q-firewall against local PostgreSQL", () => {
             // it does not travel.
             "OWN_PUBLIC_PRESENCE",
             "OWN_Q_CONVERSATION",
+            "OWN_ONBOARDING",
             "NETWORK_VISIBLE_DATA",
             "PUBLIC_EXTERNAL_DATA",
             "GENERAL_MODEL_KNOWLEDGE",
           ].sort(),
         );
+        // Their own onboarding: filtered to their own user id, personal.
+        const onboarding = answer.plan.scopes.find(
+          (s) => s.kind === "OWN_ONBOARDING",
+        );
+        expect(onboarding?.filter.userId).toBe(world.founderAlpha.userId);
+        expect(onboarding?.contextLabel).toBe("personal_private");
+        expect(onboarding?.subject).toBeUndefined();
         // Own evidence is admitted up to CONFIDENTIAL (a deck, not a
         // financial model), so a plain answer over it stays CONFIDENTIAL.
         expect(answer.plan.maxSensitivity).toBe("CONFIDENTIAL");

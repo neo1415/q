@@ -5,12 +5,14 @@
  * (network.relationships) and its append-only, sequence-ordered,
  * visibility-scoped history (network.relationship_events): identity, pair
  * uniqueness, ordering, provenance, the internal ensure primitive, the
- * transactional event appender and the permission-neutral query port.
+ * transactional event appender and the permission-neutral query port; and
+ * Express Interest (CQ-NET-010: network.interests, the authorised command,
+ * its idempotency record and `interest_expressed`).
  *
- * Does not own: interest (CQ-NET-010), match (CQ-NET-011), the state
- * projector (CQ-NET-012), disclosure (CQ-PERM-001), GateQ, meetings,
- * messaging, diligence, commitments, investment outcomes, recommendations,
- * the feed, or Q. No HTTP surface exists yet. Zero LLM calls.
+ * Does not own: match (CQ-NET-011), the state projector (CQ-NET-012),
+ * disclosure (CQ-PERM-001), GateQ, meetings, messaging, diligence,
+ * commitments, investment outcomes, recommendations, the feed, or Q. Zero
+ * LLM calls.
  *
  *   Relationship ≠ Recommendation ≠ Impression ≠ Save ≠ Interest ≠ Match ≠ Deal
  *   current_state ≠ history; relationship ≠ disclosure permission;
@@ -21,10 +23,14 @@
  */
 
 export {
+  InterestIdSchema,
   RelationshipEventIdSchema,
   RelationshipIdSchema,
+  toInterestDto,
   toRelationshipDto,
   toRelationshipEventSummaryDto,
+  type Interest,
+  type InterestId,
   type Relationship,
   type RelationshipEvent,
   type RelationshipEventActor,
@@ -33,6 +39,9 @@ export {
   type RelationshipId,
 } from "./contracts/index.js";
 export {
+  InterestCompanyNotFoundError,
+  InterestIdempotencyConflictError,
+  InterestNotPermittedError,
   RelationshipEventTypeUnknownError,
   RelationshipEventVisibilityNotAllowedError,
   RelationshipNotFoundError,
@@ -43,14 +52,20 @@ export {
   defineRelationshipEvent,
   DiscoveredPayloadSchema,
   DiscoveredRelationshipEvent,
+  InterestExpressedPayloadSchema,
+  InterestExpressedRelationshipEvent,
   RELATIONSHIP_EVENT_DEFINITIONS,
   RELATIONSHIP_EVENT_DISCOVERED,
+  RELATIONSHIP_EVENT_INTEREST_EXPRESSED,
   type DiscoveredPayload,
+  type InterestExpressedPayload,
   type RelationshipEventDefinition,
   type RelationshipEventRegistry,
 } from "./domain/event-registry.js";
 
 export type {
+  InterestRepository,
+  InterestRequestStore,
   NewRelationshipEvent,
   RelationshipEventRepository,
   RelationshipQueryPort,
@@ -69,7 +84,26 @@ export {
   type RelationshipEventAppender,
 } from "./application/append-event.js";
 export {
+  createEnsureRelationshipInTransaction,
+  resolveRelationshipParties,
+} from "./application/ensure-relationship.js";
+export {
+  createExpressInterest,
+  createGetOwnInterest,
+  createMayExpressInterest,
+  hashExpressInterestRequest,
+  hashInterestIdempotencyKey,
+  INVESTOR_INTEREST_EXPRESS,
+  type ExpressInterestCommand,
+  type ExpressInterestDependencies,
+  type ExpressInterestResult,
+  type InterestSurface,
+} from "./application/express-interest.js";
+export {
+  createInterestService,
   createNetworkService,
+  type InterestService,
+  type InterestServiceOptions,
   type NetworkService,
   type NetworkServiceOptions,
 } from "./application/service.js";
@@ -78,5 +112,9 @@ export {
   createPostgresRelationshipEventRepository,
   createPostgresRelationshipRepository,
 } from "./infrastructure/postgres-repositories.js";
+export {
+  createPostgresInterestRepository,
+  createPostgresInterestRequestStore,
+} from "./infrastructure/postgres-interest-repositories.js";
 
 export const PACKAGE_NAME = "@capital-q/network" as const;

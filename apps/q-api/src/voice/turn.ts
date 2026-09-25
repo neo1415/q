@@ -1,3 +1,4 @@
+import type { InterviewAgent } from "./interview-agent.js";
 import { randomUUID } from "node:crypto";
 
 import {
@@ -52,6 +53,7 @@ import {
   resumeAcknowledgement,
   spokenDestination,
   wantsToEndVoice,
+  withoutContinueSignal,
 } from "./navigation.js";
 import {
   profileEditDone,
@@ -114,6 +116,11 @@ export type VoiceTurnDependencies = {
    * remains only as the fallback when no model is composed.
    */
   readonly interviewer?: Interviewer | undefined;
+  /**
+   * The interview as a tool-calling Q run (ADR 0016). When present, a
+   * spoken interview turn goes through the same loop a typed one does.
+   */
+  readonly interviewAgent?: InterviewAgent | undefined;
   /** Where each turn's asking/navigation is posted for the screen. */
   readonly board?: VoiceTurnBoard | undefined;
   /** Q's first minute with a new person (welcome sessions). */
@@ -267,12 +274,17 @@ const VISIBILITY_DONE: Readonly<
 const END_LINE =
   "Alright, I'll stop talking. I'm right here if you want to type.";
 
-/** The person's latest words: the last user line, bounded like a typed turn. */
+/**
+ * The person's latest words: the last user line, bounded like a typed
+ * turn, without the browser's cue. The provider folds the person's
+ * consecutive messages into one, so the last line is the whole utterance
+ * so far, never a fragment of it.
+ */
 export function latestUtterance(
   transcript: readonly VoiceTranscriptTurn[],
 ): string | null {
   const last = [...transcript].reverse().find((turn) => turn.role === "user");
-  const text = last?.content.trim() ?? "";
+  const text = withoutContinueSignal(last?.content ?? "").trim();
   return text.length === 0 ? null : text.slice(0, VOICE_TURN_MAX_CHARS);
 }
 
@@ -316,6 +328,20 @@ type Held =
       readonly settled: Promise<void>;
     };
 const held = new WeakMap<VoiceSessionBinding, Held>();
+
+/**
+ * The Q run this line is waiting on, with the switch that stops its
+ * engine. At most one per line: a newer utterance makes the older run
+ * obsolete (acceptance B/J, 2026-09-24), and an obsolete run left going
+ * finishes and records an answer nobody asked for — the fixture's four
+ * answers to one question.
+ */
+type LiveRun = {
+  readonly runId: QRunRecord["id"];
+  readonly correlationId: CorrelationId;
+  readonly stop: AbortController;
+};
+const liveRuns = new WeakMap<VoiceSessionBinding, LiveRun>();
 
 const squash = (text: string) => text.replace(/\s+/g, " ").trim();
 
@@ -547,6 +573,38 @@ export function createVoiceTurnHandler(
   dependencies: VoiceTurnDependencies,
 ): VoiceTurnHandler {
   const { qRuntime, qStream, orchestration, logger } = dependencies;
+
+  /**
+   * End the run this line was waiting on, if any: through the runtime's
+   * own cancellation first, so the engine finds CANCEL_REQUESTED when its
+   * model call is aborted and ends the run as cancelled rather than
+   * failed. Nothing it would have said is spoken or recorded as an answer.
+   */
+  const supersede = (binding: VoiceSessionBinding, keep?: LiveRun): void => {
+    const live = liveRuns.get(binding);
+    if (live === undefined || live.runId === keep?.runId) return;
+    liveRuns.delete(binding);
+    if (held.get(binding)?.kind === "ANSWER") held.delete(binding);
+    void qRuntime
+      .cancelRun({
+        actor: binding.actor,
+        runId: live.runId,
+        correlationId: live.correlationId,
+      })
+      .catch((error: unknown) => {
+        // Already finished is the ordinary race; the log says which.
+        logger.debug(
+          { err: error, qRunId: live.runId },
+          "superseded voice run was not cancelled",
+        );
+      })
+      .finally(() => {
+        live.stop.abort();
+      });
+  };
+  const settleLive = (binding: VoiceSessionBinding, live: LiveRun): void => {
+    if (liveRuns.get(binding) === live) liveRuns.delete(binding);
+  };
 
   const speakLine = async (
     speaker: VoiceSpeaker,
@@ -801,9 +859,17 @@ export function createVoiceTurnHandler(
         .catch(() => undefined);
       return { kind: "INTERRUPTED", path: "Q" };
     }
+    // This run is now what the line is waiting on; any older one is not.
+    const live: LiveRun = {
+      runId,
+      correlationId,
+      stop: new AbortController(),
+    };
+    supersede(binding, live);
+    liveRuns.set(binding, live);
     if (result.created && orchestration?.autostart === true) {
       void orchestration.orchestrator
-        .start({ actor, runId, correlationId })
+        .start({ actor, runId, correlationId, signal: live.stop.signal })
         .catch((error: unknown) => {
           logger.error(
             { err: error, qRunId: runId, correlationId },
@@ -999,10 +1065,18 @@ export function createVoiceTurnHandler(
         );
       }
     } finally {
-      if (signal.aborted && !terminal) {
+      if (terminal) settleLive(binding, live);
+      if (signal.aborted && !terminal && !(streamedDeltas || answerGiven)) {
+        // Dropped before any of the answer reached the person: they were
+        // still talking, or started again. There is nothing to pause; the
+        // answer is to a sentence they had not finished, and the provider
+        // brings the whole of it as the next turn. The run is cancelled
+        // and its generation stopped (ADR 0010 §5).
+        supersede(binding);
+      } else if (signal.aborted && !terminal) {
         // Barge-in pauses the answer; it does not throw it away. The run
-        // finishes on its own and its text waits for "go on" or for the
-        // end of whatever the person moved on to.
+        // finishes on its own and its text waits for "go on"; anything
+        // else the person says next supersedes it.
         let settle: () => void = () => undefined;
         const item: Held = {
           kind: "ANSWER",
@@ -1047,6 +1121,7 @@ export function createVoiceTurnHandler(
             );
           } finally {
             clearTimeout(stop);
+            settleLive(binding, live);
             item.text = bounded(speakable(full.length > 0 ? full : item.text));
             item.done = true;
             settle();
@@ -1082,7 +1157,14 @@ export function createVoiceTurnHandler(
       // runtime, and answered in Q's own words; a question for Q becomes
       // a run in the bound conversation exactly as before.
       const recentTurns = transcriptOf(binding).slice(0, -1);
-      const outcome = await interviewer.turn({
+      const agent = dependencies.interviewAgent;
+      const conduct = (
+        turnInput: Parameters<Interviewer["turn"]>[0],
+      ): ReturnType<Interviewer["turn"]> =>
+        agent === undefined
+          ? interviewer.turn(turnInput)
+          : agent.turn({ ...turnInput, actor: binding.actor });
+      const outcome = await conduct({
         session,
         onboardingSessionId: onboarding.sessionId,
         journeyType: onboarding.journeyType,
@@ -1575,6 +1657,11 @@ export function createVoiceTurnHandler(
       return { kind: "NOTHING" };
     }
     rememberTranscript(binding, transcript);
+    // Anything but "carry on" makes the run this line was waiting on
+    // obsolete, whether it was cut off mid-answer or never heard at all.
+    const resuming =
+      isNonLexical(text) || (held.has(binding) && isContinueCue(text));
+    if (!resuming) supersede(binding);
     /**
      * "Yes, and change the website too": the decision is taken, and the
      * rest is the person's next turn, handled as if said on its own.

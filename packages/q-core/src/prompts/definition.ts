@@ -41,6 +41,8 @@ export const PROMPT_IDS = [
   "ARTIFACT_REVISION",
   /** CQ-QX-005: what one turn to Q was, before Q answers it. */
   "TURN_READER",
+  /** ADR 0016: the onboarding interview as a tool-calling Q run. */
+  "INTERVIEW_AGENT",
 ] as const;
 export type PromptId = (typeof PROMPT_IDS)[number];
 
@@ -60,6 +62,7 @@ export const PROMPT_SLUGS: Readonly<Record<PromptId, string>> = {
   GATEQ_INTERVIEWER: "gateq-interviewer",
   ARTIFACT_REVISION: "artifact-revision",
   TURN_READER: "turn-reader",
+  INTERVIEW_AGENT: "interview-agent",
 };
 
 export type PromptKind = "CHARTER" | "TASK";

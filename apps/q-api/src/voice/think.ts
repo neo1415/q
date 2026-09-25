@@ -6,6 +6,7 @@ import { z } from "zod";
 import type { Logger } from "@capital-q/observability";
 
 import type { VoiceSessionBindings } from "./bindings.js";
+import { withoutContinueSignal } from "./navigation.js";
 import type { VoiceSpeaker, VoiceTranscriptTurn } from "./provider.js";
 import { turnFailureLine, turnSucceeded } from "./turn-failure.js";
 import type { VoiceTurnHandler } from "./turn.js";
@@ -98,6 +99,17 @@ export function registerVoiceThinkRoute(
   dependencies: VoiceThinkDependencies,
 ): void {
   const { bindings, turn, logger } = dependencies;
+  /**
+   * The think in flight on each line, by voice session.
+   *
+   * The provider asks again when the person carries on after a pause, with
+   * the utterance as it has grown. The older request is then answering a
+   * sentence the person had not finished, and if it is still open its
+   * words are obsolete: it is ended here, which aborts its turn exactly as
+   * the provider dropping it would (hosted, 2026-09-24: five requests for
+   * one question, four answered).
+   */
+  const inFlight = new Map<string, AbortController>();
   const handler = async (request: FastifyRequest, reply: FastifyReply) => {
     const header = request.headers.authorization;
     const token =
@@ -162,7 +174,11 @@ export function registerVoiceThinkRoute(
     const transcript: VoiceTranscriptTurn[] = [];
     for (const message of parsed.data.messages) {
       if (message.role !== "user" && message.role !== "assistant") continue;
-      const text = contentText(message.content);
+      // The browser's cue is not the person's words (navigation.ts).
+      const text =
+        message.role === "user"
+          ? withoutContinueSignal(contentText(message.content))
+          : contentText(message.content);
       if (text.length === 0) continue;
       transcript.push({
         role: message.role === "user" ? "user" : "agent",
@@ -172,6 +188,9 @@ export function registerVoiceThinkRoute(
 
     const id = `chatcmpl-${randomUUID()}`;
     const controller = new AbortController();
+    const line = binding.voiceSessionId;
+    inFlight.get(line)?.abort();
+    inFlight.set(line, controller);
     reply.hijack();
     const raw = reply.raw;
     // The response closing before it finished is the provider dropping
@@ -272,6 +291,7 @@ export function registerVoiceThinkRoute(
         write(turnFailureLine(binding, error));
       }
     } finally {
+      if (inFlight.get(line) === controller) inFlight.delete(line);
       clearInterval(keepAlive);
       clearTimeout(beat);
       clearTimeout(deadline);

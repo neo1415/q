@@ -276,7 +276,7 @@ const advice: TurnReaderResult = {
   kind: "QUESTION_TO_Q",
   confidence: "HIGH",
   transcript: "CLEAR",
-  question: { kind: "ADVICE", text: "what else should I look for?" },
+  question: { kind: "ADVICE", text: "what else should I look for?", about: [] },
   aboutNamedOther: false,
   tool: null,
 };
@@ -299,7 +299,11 @@ describe("a general turn is read before it is answered", () => {
       said: "Give me a real investor like me",
       reading: {
         ...advice,
-        question: { kind: "REAL_WORLD_EXAMPLE", text: "a real investor" },
+        question: {
+          kind: "REAL_WORLD_EXAMPLE",
+          text: "a real investor",
+          about: [],
+        },
       },
       outcomes: [],
     });

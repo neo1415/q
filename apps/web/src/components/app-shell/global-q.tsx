@@ -17,6 +17,7 @@ import { SheetContent, SheetRoot } from "@capital-q/ui/sheet";
 import { Tooltip } from "@capital-q/ui/tooltip";
 
 import { QPresence, type QPresenceState } from "@/features/q-presence";
+import { useHomeHref } from "@/features/q/active-conversation";
 import { QSheetConversation } from "@/features/q/q-sheet";
 import {
   QSubjectProvider,
@@ -132,6 +133,7 @@ export function GlobalQTrigger({
 }) {
   const pathname = usePathname();
   const { open, setOpen, activity } = useContext(GlobalQContext);
+  const home = useHomeHref();
   const onHome = QUIET_ROUTES.some(
     (route) => pathname === route || pathname.startsWith(`${route}?`),
   );
@@ -143,10 +145,11 @@ export function GlobalQTrigger({
   );
   if (onHome) {
     // Home is Q. The press lands on the composer rather than opening a
-    // second Q beside the first.
+    // second Q beside the first -- in the conversation already open there;
+    // a bare `/home` here used to drop it and start a new chat.
     return (
       <Link
-        href="/home#home-q"
+        href={`${home}#home-q`}
         aria-label="Ask Q"
         className={cx(
           buttonClassName(

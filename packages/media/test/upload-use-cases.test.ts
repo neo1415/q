@@ -725,6 +725,78 @@ describe("cancelUpload", () => {
   });
 });
 
+// CQ-MLV-002 (doc 20 §20.4): deleting a pitch used to end at the row. The
+// record said DELETED and playback was refused, but the video stayed in the
+// provider account for good -- nothing ever called deleteAsset.
+describe("deleteCompanyPitch releases the provider's copy", () => {
+  const command = {
+    actor: founder,
+    companyId: COMPANY,
+    mediaAssetId: ASSET_ID,
+    correlationId: CORRELATION,
+  };
+  const published = () =>
+    asset({
+      status: "READY",
+      provider: "CLOUDFLARE_STREAM",
+      providerAssetId: UID,
+      readyAt: "2026-09-23T09:05:00.000Z",
+      moderationStatus: "ALLOWED",
+      playbackPolicy: "AUTHORISED",
+      version: 10,
+    });
+
+  it("deletes the record, then the provider asset", async () => {
+    const { provider, calls } = scriptedProvider({});
+    const h = harness({ asset: published(), provider });
+    const deleted = await h.service.deleteCompanyPitch(command);
+    expect(deleted.status).toBe("DELETED");
+    expect(h.repository.current()?.status).toBe("DELETED");
+    expect(calls).toEqual([{ method: "deleteAsset", input: UID }]);
+    expect(JSON.stringify([h.audits, h.events])).not.toContain(UID);
+  });
+
+  it("keeps the founder's decision when the provider is down, and retries on a repeat", async () => {
+    const failing = scriptedProvider({ deleteFails: true });
+    const h = harness({ asset: published(), provider: failing.provider });
+    const deleted = await h.service.deleteCompanyPitch(command);
+    expect(deleted.status).toBe("DELETED");
+    expect(failing.calls).toHaveLength(1);
+
+    const again = await h.service.deleteCompanyPitch(command);
+    expect(again).toEqual(deleted);
+    expect(failing.calls).toHaveLength(2);
+    // The repeat is a retry of the release, not a second deletion.
+    expect(h.events).toHaveLength(1);
+    expect(h.audits).toHaveLength(1);
+  });
+
+  it("asks the provider nothing for a pitch that never had bytes", async () => {
+    const { provider, calls } = scriptedProvider({});
+    const h = harness({ asset: asset({ status: "CREATED" }), provider });
+    await h.service.deleteCompanyPitch(command);
+    expect(calls).toHaveLength(0);
+  });
+
+  it("touches no provider asset when the caller may not delete", async () => {
+    const { provider, calls } = scriptedProvider({});
+    const denied = harness({
+      asset: published(),
+      provider,
+      deny: ["media.manage"],
+    });
+    await expect(
+      denied.service.deleteCompanyPitch(command),
+    ).rejects.toBeInstanceOf(AuthorizationDeniedError);
+    const foreign = harness({ asset: published(), provider });
+    await expect(
+      foreign.service.deleteCompanyPitch({ ...command, actor: investor }),
+    ).rejects.toBeInstanceOf(MediaOwnerNotFoundError);
+    expect(calls).toHaveLength(0);
+    expect(denied.repository.current()?.status).toBe("READY");
+  });
+});
+
 describe("syncMediaAsset", () => {
   const command = {
     actor: founder,
@@ -923,6 +995,19 @@ describe("authorisePlayback", () => {
     ],
     ["the pitch is BLOCKED", { moderationStatus: "BLOCKED" }, true],
     ["the pitch is not READY", { status: "PROCESSING", readyAt: null }, true],
+    // CQ-MLV-001: a replaced pitch stays READY, ALLOWED and AUTHORISED on
+    // its own row. The feed stops showing it the moment it is superseded;
+    // an investor still holding its id must not keep minting tokens for it.
+    [
+      "the pitch was superseded by a replacement",
+      { supersededAt: "2026-09-24T20:02:33.000Z" },
+      true,
+    ],
+    [
+      "the asset is not a founder pitch",
+      { purpose: "COMPANY_PRODUCT_DEMO" },
+      true,
+    ],
   ])(
     "refuses a viewer as not-found when %s",
     async (_label, overrides, viewable) => {

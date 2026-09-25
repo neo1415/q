@@ -14,7 +14,10 @@ import {
   isPlaybackUsable,
   playbackIntentFor,
 } from "../src/features/discover/player/pitch-playback";
-import { PitchPlayer } from "../src/features/discover/player/pitch-player";
+import {
+  PitchPlayer,
+  pitchFrame,
+} from "../src/features/discover/player/pitch-player";
 
 /**
  * The pitch player (CQ-WEB-021).
@@ -169,6 +172,60 @@ describe("playback authorization freshness", () => {
       expiresAt: new Date(nowMs - 1_000).toISOString(),
     });
     expect(isPlaybackUsable(stale, nowMs)).toBe(false);
+  });
+});
+
+describe("the frame a pitch is shown in (UX2 P1)", () => {
+  it("reads the ratio media stores (W:H) as a CSS ratio", () => {
+    // "4:3" is what media persists and the API serves; handed to CSS as
+    // it was, the browser dropped it and the frame took the video's own
+    // height, pushing Save / Pass / Ask Q below a laptop's fold.
+    expect(pitchFrame("4:3").aspectRatio).toBe("4 / 3");
+    expect(pitchFrame("16:9").aspectRatio).toBe("16 / 9");
+    expect(pitchFrame("9:16").aspectRatio).toBe("9 / 16");
+  });
+
+  it("still reads the CSS spelling", () => {
+    expect(pitchFrame("9 / 16").aspectRatio).toBe("9 / 16");
+  });
+
+  it("falls back to portrait, never to no frame, when the ratio is unknown or unusable", () => {
+    for (const value of [null, undefined, "", "wide", "0:9", "16:0"]) {
+      expect(pitchFrame(value).aspectRatio).toBe("9 / 16");
+    }
+  });
+
+  it("bounds the height by narrowing the frame, so the ratio is kept rather than cropped", () => {
+    expect(pitchFrame("4:3").maxWidth).toBe(
+      "min(100%, calc(var(--cq-pitch-max-height) * 4 / 3))",
+    );
+    expect(pitchFrame("9:16").maxWidth).toBe(
+      "min(100%, calc(var(--cq-pitch-max-height) * 9 / 16))",
+    );
+  });
+
+  it("puts the bounded frame on the element", () => {
+    const { container } = render(
+      <PitchPlayer
+        company={{
+          ...company(1),
+          pitch: {
+            mediaAssetId: MEDIA_ID,
+            aspectRatio: "4:3",
+            durationSeconds: 60,
+            captionState: "AVAILABLE",
+          },
+        }}
+        policy="NONE"
+        authorize={vi.fn(() => Promise.resolve(authorization()))}
+        reducedMotion={false}
+      />,
+    );
+    const frame = container.querySelector<HTMLElement>("[data-pitch-frame]");
+    expect(frame?.style.maxWidth).toBe(
+      "min(100%, calc(var(--cq-pitch-max-height) * 4 / 3))",
+    );
+    expect(frame?.closest(".cq-pitch")).not.toBeNull();
   });
 });
 

@@ -20,8 +20,13 @@ import { Tooltip } from "@capital-q/ui/tooltip";
 
 import { presenceStateFromVoice, type QPresenceState } from "../q-presence";
 import { QPresence } from "../q-presence";
-import { VOICE_STATE_LABELS } from "../voice/session";
+import { upsertLine, VOICE_STATE_LABELS } from "../voice/session";
 import { useVoiceInterview } from "../voice/use-voice-interview";
+import {
+  readActiveConversation,
+  rememberActiveConversation,
+  type QSurfaceKey,
+} from "./active-conversation";
 import { Q_CONVERSATION_PARAM } from "./chats-list";
 import { failureMessage, recoveryHint, turnsFrom } from "./conversation";
 import { QAnswer } from "./q-answer";
@@ -41,6 +46,18 @@ import { useQConversation } from "./use-q-conversation";
  * exactly as they do on Home.
  */
 
+/** One thread per subject the sheet is about; the person's own when none. */
+function sheetSurface(subject: QSubject): QSurfaceKey {
+  switch (subject.kind) {
+    case "COMPANY":
+      return `sheet:company:${subject.companyId}`;
+    case "INVESTOR_ORGANISATION":
+      return `sheet:investor:${subject.investorOrganisationId}`;
+    case "NONE":
+      return "sheet:none";
+  }
+}
+
 export function QSheetConversation({
   subject,
   connected,
@@ -54,28 +71,54 @@ export function QSheetConversation({
   /** A draft question to open with; the person edits or sends it. */
   readonly seed?: string | null | undefined;
 }) {
-  const [conversationId, setConversationId] = useState<string | null>(null);
   const companyId = subject.kind === "COMPANY" ? subject.companyId : undefined;
   const investorOrganisationId =
     subject.kind === "INVESTOR_ORGANISATION"
       ? subject.investorOrganisationId
       : undefined;
+  // The sheet's thread about this subject, for this tab: closing the sheet
+  // or reloading the page used to drop it, so the next "Ask Q" about the
+  // same company started a new chat. The sheet is only ever mounted by a
+  // press in the browser, so reading the pointer while initialising state
+  // cannot disagree with a server render.
+  const surface = sheetSurface(subject);
+  const [conversationId, setConversationId] = useState<string | null>(() =>
+    readActiveConversation(surface),
+  );
+  // A different subject is a different thread; adjusted during render, as
+  // React asks, so no effect writes one subject's thread under another's.
+  const [surfaceFor, setSurfaceFor] = useState(surface);
+  if (surfaceFor !== surface) {
+    setSurfaceFor(surface);
+    setConversationId(readActiveConversation(surface));
+  }
   const q = useQConversation({
     companyId,
     investorOrganisationId,
     conversationId,
     onConversation: setConversationId,
   });
+  const activeConversation = q.conversationId;
+  const settledOpen = !q.loading;
+  useEffect(() => {
+    if (!settledOpen) return;
+    if (activeConversation !== null && activeConversation === conversationId) {
+      rememberActiveConversation(surface, activeConversation);
+    } else if (activeConversation === null && conversationId !== null) {
+      // Asked to open one and it did not: the Q API refused it. Forgotten,
+      // so the next "Ask Q" here starts clean instead of failing again.
+      rememberActiveConversation(surface, null);
+    }
+  }, [surface, activeConversation, conversationId, settledOpen]);
   const turns = turnsFrom(q.state, q.pending);
   const endRef = useRef<HTMLDivElement>(null);
 
   const [spoken, setSpoken] = useState<readonly SpokenLine[]>([]);
   const voice = useVoiceInterview({
     onLine: (line) => {
-      setSpoken((current) => [
-        ...current,
-        { id: line.id, role: line.role, text: line.text },
-      ]);
+      setSpoken((current) =>
+        upsertLine(current, { id: line.id, role: line.role, text: line.text }),
+      );
     },
   });
   // The spoken turns live in a conversation the server names; once it

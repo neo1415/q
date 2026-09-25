@@ -51,6 +51,7 @@ import {
   createPostgresInvestorOrganisationQueryPort,
 } from "@capital-q/investors";
 import {
+  createInterestService,
   createPostgresRelationshipEventRepository,
   createPostgresRelationshipRepository,
   type RelationshipQueryPort,
@@ -602,27 +603,33 @@ const slates = createSlateReadPipeline({
  * applies, so the page and Q's answer cannot disagree about who may see
  * a company.
  */
+const isCompanyNetworkVisible = async (
+  actor: Parameters<typeof actorPrincipal>[0],
+  companyId: Parameters<
+    typeof disclosurePorts.companies.findCanonicalCompanyProfile
+  >[0],
+): Promise<boolean> => {
+  const decision = await disclosure.canDisclose({
+    principal: actorPrincipal(actor),
+    resource: { type: "company", id: companyId },
+    requestedAccess: "view",
+  });
+  return (
+    decision.outcome === "ALLOW" &&
+    (decision.reasonCode === "NETWORK_VISIBLE" ||
+      decision.reasonCode === "PUBLIC_EXTERNAL")
+  );
+};
 const companyNetworkView = {
   findNetworkVisible: async (
     actor: Parameters<typeof actorPrincipal>[0],
     companyId: Parameters<
       typeof disclosurePorts.companies.findCanonicalCompanyProfile
     >[0],
-  ) => {
-    const decision = await disclosure.canDisclose({
-      principal: actorPrincipal(actor),
-      resource: { type: "company", id: companyId },
-      requestedAccess: "view",
-    });
-    if (
-      decision.outcome !== "ALLOW" ||
-      (decision.reasonCode !== "NETWORK_VISIBLE" &&
-        decision.reasonCode !== "PUBLIC_EXTERNAL")
-    ) {
-      return null;
-    }
-    return disclosurePorts.companies.findCanonicalCompanyProfile(companyId);
-  },
+  ) =>
+    (await isCompanyNetworkVisible(actor, companyId))
+      ? disclosurePorts.companies.findCanonicalCompanyProfile(companyId)
+      : null,
 };
 
 /**
@@ -639,6 +646,26 @@ const interactions = createInteractionSignalService({
   eligibility: slates.eligibility,
   slates: slates.slates,
   repository: createPostgresInteractionRepository({ sql: database.sql }),
+});
+
+/**
+ * Express Interest (CQ-NET-010). Two rules it borrows rather than restates:
+ * "which investor organisation is this person acting for" is the feed's
+ * own investor subject, and "may they see this company" is the network
+ * preview's disclosure rule above. The command itself — capability,
+ * idempotency, the one canonical relationship, the history event and the
+ * outbox — is the Network context's.
+ */
+const interests = createInterestService({
+  sql: database.sql,
+  transactions: database.transactions,
+  companies: createPostgresCompanyQueryPort({ sql: database.sql }),
+  investors: createPostgresInvestorOrganisationQueryPort({ sql: database.sql }),
+  outbox,
+  audit,
+  authorization,
+  investorSubject: slates.eligibilityPorts.investorSubject,
+  companyVisibility: { isVisibleToInvestor: isCompanyNetworkVisible },
 });
 
 // Pitch media. Composed after discovery because a viewer's right to play
@@ -724,6 +751,7 @@ const { app, logger } = createApp(config, security, {
   // "what investors will see" is what the feed shows.
   companyPitches: discoverablePitches,
   companyNetworkView,
+  interests,
   gateq,
   gateqApply,
   capital,

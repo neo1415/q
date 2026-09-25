@@ -50,7 +50,7 @@ export const COMPANY_ANALYST_V9: PromptDefinition<
 > = {
   ...COMPANY_ANALYST_V8,
   version: 9,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   changeDescription:
     "Acceptance directive E: 'which investors would likely invest' is prospect identification — named prospects by fit, with reasons, labelled as likely fit, never as interest; evidenced interest reported separately and only from a source. v2's ban narrows from 'investor fit' to 'fit score'.",
   effectiveFrom: "2026-09-24",

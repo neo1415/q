@@ -288,6 +288,27 @@ describe("POST /v1/q/voice/sessions", () => {
     await app.close();
   });
 
+  it("speaks first when voice is switched on for the open thread (acceptance J)", async () => {
+    // Explicit activation: Q opens, then listens. Only a resumed line --
+    // a reconnect, or a line already on screen -- opens with nothing.
+    const app = buildApp({
+      principal: PRINCIPAL,
+      context: CONTEXT,
+      provider: fakeProvider(),
+      bindings: createVoiceSessionBindings(),
+    });
+    const opened = await app.inject({
+      method: "POST",
+      url: "/v1/q/voice/sessions",
+      headers: AUTH,
+      payload: { voice: "FEMALE" },
+    });
+    expect(opened.statusCode).toBe(201);
+    const first = opened.json<{ firstMessage?: string }>().firstMessage ?? "";
+    expect(first.trim().length).toBeGreaterThan(0);
+    await app.close();
+  });
+
   it("bounds how many sessions one person may hold (doc 15 §42)", async () => {
     const provider = fakeProvider();
     const app = buildApp({

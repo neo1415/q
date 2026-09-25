@@ -18,6 +18,7 @@ import { COMPANY_ANALYST_V6 } from "./tasks/company-analyst.v6.js";
 import { COMPANY_ANALYST_V7 } from "./tasks/company-analyst.v7.js";
 import { COMPANY_ANALYST_V8 } from "./tasks/company-analyst.v8.js";
 import { COMPANY_ANALYST_V9 } from "./tasks/company-analyst.v9.js";
+import { COMPANY_ANALYST_V10 } from "./tasks/company-analyst.v10.js";
 import { ARTIFACT_REVISION_V1 } from "./tasks/artifact-revision.v1.js";
 import { DECISION_READER_V1 } from "./tasks/decision-reader.v1.js";
 import { TURN_READER_V1 } from "./tasks/turn-reader.v1.js";
@@ -38,6 +39,8 @@ import { INTERVIEW_CONDUCTOR_V7 } from "./tasks/interview-conductor.v7.js";
 import { INTERVIEW_CONDUCTOR_V8 } from "./tasks/interview-conductor.v8.js";
 import { INTERVIEW_CONDUCTOR_V9 } from "./tasks/interview-conductor.v9.js";
 import { INTERVIEW_CONDUCTOR_V10 } from "./tasks/interview-conductor.v10.js";
+import { INTERVIEW_AGENT_V1 } from "./tasks/interview-agent.v1.js";
+import { INTERVIEW_AGENT_V2 } from "./tasks/interview-agent.v2.js";
 import { INTERVIEW_CONDUCTOR_V11 } from "./tasks/interview-conductor.v11.js";
 import { PRESENCE_READER_V1 } from "./tasks/presence-reader.v1.js";
 import { WELCOME_CONDUCTOR_V1 } from "./tasks/welcome-conductor.v1.js";
@@ -171,6 +174,8 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition<unknown, unknown>[] =
     INTERVIEW_CONDUCTOR_V9,
     INTERVIEW_CONDUCTOR_V10,
     INTERVIEW_CONDUCTOR_V11,
+    INTERVIEW_AGENT_V1,
+    INTERVIEW_AGENT_V2,
     WELCOME_CONDUCTOR_V1,
     CLAIM_EXTRACTION_V1,
     INVESTOR_MANDATE_SYNTHESIS_V1,
@@ -184,6 +189,7 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition<unknown, unknown>[] =
     COMPANY_ANALYST_V7,
     COMPANY_ANALYST_V8,
     COMPANY_ANALYST_V9,
+    COMPANY_ANALYST_V10,
     ARTIFACT_REVISION_V1,
     FIT_EXPLANATION_V1,
     PRESENCE_READER_V1,

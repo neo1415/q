@@ -54,6 +54,20 @@ vi.mock("../src/features/discover/feed/feed-actions", () => ({
   recordDecisionAction: (input: unknown) => recordDecisionAction(input),
 }));
 
+type InterestResult =
+  | { readonly ok: true; readonly value: unknown }
+  | {
+      readonly ok: false;
+      readonly message: string;
+      readonly retryable: boolean;
+    };
+const expressInterestAction =
+  vi.fn<(input: unknown) => Promise<InterestResult>>();
+
+vi.mock("../src/features/network/interest-actions", () => ({
+  expressInterestAction: (input: unknown) => expressInterestAction(input),
+}));
+
 vi.mock("../src/features/discover/feed/playback-source", () => ({
   authorisePlaybackAction: (companyId: string, mediaAssetId: string) =>
     authorisePlaybackAction(companyId, mediaAssetId),
@@ -142,6 +156,7 @@ beforeEach(() => {
 
   loadSlatePageAction.mockReset();
   recordDecisionAction.mockReset();
+  expressInterestAction.mockReset();
   authorisePlaybackAction.mockReset();
   setOpen.mockReset();
   declaredSubjects.length = 0;
@@ -447,6 +462,135 @@ describe("deciding", () => {
           .getAttribute("aria-pressed"),
       ).toBe("false"),
     );
+  });
+});
+
+describe("Express Interest (CQ-NET-010)", () => {
+  const INTEREST = {
+    interestId: "22222222-2222-4222-8222-222222222222",
+    relationshipId: "33333333-3333-4333-8333-333333333333",
+    companyId: companyId(1),
+    status: "EXPRESSED" as const,
+    expressedAt: "2026-09-24T10:00:00.000Z",
+  };
+
+  /** A promise the test resolves, so the pending state can be observed. */
+  function deferred<T>() {
+    let resolve: (value: T) => void = () => undefined;
+    const promise = new Promise<T>((settle) => {
+      resolve = settle;
+    });
+    return { promise, resolve };
+  }
+
+  async function confirmInterest() {
+    fireEvent.click(screen.getByRole("button", { name: "Express interest" }));
+    // Doc 17 §70: the consequence is stated before it happens.
+    expect(screen.getByText(/It is not a commitment to invest\./)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Express interest" }));
+  }
+
+  it("asks first, then shows sending, and says sent only when the server confirms", async () => {
+    const answer = deferred<InterestResult>();
+    expressInterestAction.mockReturnValue(answer.promise);
+    await renderFeed();
+
+    await confirmInterest();
+
+    expect(
+      await screen.findByRole("button", { name: "Sending interest…" }),
+    ).toBeTruthy();
+    expect(screen.queryByText(/Interest expressed/)).toBeNull();
+    expect(expressInterestAction).toHaveBeenCalledTimes(1);
+    expect(expressInterestAction.mock.calls[0]?.[0]).toMatchObject({
+      companyId: companyId(1),
+      surface: "RECOMMENDATION_FEED",
+    });
+
+    await act(async () => {
+      answer.resolve({
+        ok: true,
+        value: { interest: INTEREST, deduplicated: false },
+      });
+      await answer.promise;
+    });
+
+    expect(
+      await screen.findByText("Interest expressed in Company 1."),
+    ).toBeTruthy();
+    // Interest is not a Save: the optimistic decision path never ran.
+    expect(recordDecisionAction).not.toHaveBeenCalled();
+  });
+
+  it("says plainly when interest was already expressed", async () => {
+    expressInterestAction.mockResolvedValue({
+      ok: true,
+      value: { interest: INTEREST, deduplicated: true },
+    });
+    await renderFeed();
+
+    await confirmInterest();
+
+    expect(
+      await screen.findByText(
+        "Your organisation has already expressed interest in Company 1.",
+      ),
+    ).toBeTruthy();
+  });
+
+  it("shows a refusal honestly and never claims it was sent", async () => {
+    expressInterestAction.mockResolvedValue({
+      ok: false,
+      message:
+        "Only a member of an investor organisation can express interest.",
+      retryable: false,
+    });
+    await renderFeed();
+
+    await confirmInterest();
+
+    expect(
+      await screen.findByText(
+        "Only a member of an investor organisation can express interest.",
+      ),
+    ).toBeTruthy();
+    expect(screen.queryByText(/Interest expressed/)).toBeNull();
+    expect(screen.queryByRole("button", { name: "Try again" })).toBeNull();
+  });
+
+  it("retries a failed send with the same idempotency key", async () => {
+    expressInterestAction
+      .mockResolvedValueOnce({
+        ok: false,
+        message: "Your interest was not sent. Try again.",
+        retryable: true,
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        value: { interest: INTEREST, deduplicated: false },
+      });
+    await renderFeed();
+
+    await confirmInterest();
+    fireEvent.click(await screen.findByRole("button", { name: "Try again" }));
+
+    expect(
+      await screen.findByText("Interest expressed in Company 1."),
+    ).toBeTruthy();
+    expect(expressInterestAction).toHaveBeenCalledTimes(2);
+    const keys = expressInterestAction.mock.calls.map(
+      (call) => (call[0] as { idempotencyKey: string }).idempotencyKey,
+    );
+    expect(keys[0]).toBe(keys[1]);
+  });
+
+  it("is not sent by Save or Pass", async () => {
+    await renderFeed();
+
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(recordDecisionAction).toHaveBeenCalledTimes(1));
+
+    expect(expressInterestAction).not.toHaveBeenCalled();
   });
 });
 

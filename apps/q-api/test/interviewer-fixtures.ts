@@ -51,6 +51,11 @@ export type WorldOptions = {
    * — and it is the condition that used to destroy volunteered answers.
    */
   readonly refuseUntil?: Readonly<Record<string, string>> | undefined;
+  /**
+   * Refuse to set aside a step that holds an answer, as the real journey
+   * does (STEP_NOT_ELIGIBLE). Opt-in: the clears path's tests predate it.
+   */
+  readonly refuseSkipOfAnswered?: boolean | undefined;
   /** Taxonomy nodes the classifier returns, by phrase. */
   readonly taxonomy?: Readonly<Record<string, string>> | undefined;
   /** The mandate candidate context the view carries on the I1 step. */
@@ -107,6 +112,11 @@ export function investorSession(options: WorldOptions): InvestorWorld {
   const tried: string[] = [];
   let version = 1;
   let currentStepKey = options.currentStepKey;
+  let completed = false;
+  const canComplete = () =>
+    STEPS.filter((step) => step.required).every((step) =>
+      held.has(step.stepKey),
+    );
 
   const view = (): OnboardingSessionView =>
     ({
@@ -115,7 +125,7 @@ export function investorSession(options: WorldOptions): InvestorWorld {
         journeyType: "investor",
         definitionVersionId: "22222222-2222-4222-8222-222222222222",
         definitionVersion: 1,
-        status: "ACTIVE",
+        status: completed ? "COMPLETED" : "ACTIVE",
         subject: null,
         currentStepKey,
         version,
@@ -141,7 +151,7 @@ export function investorSession(options: WorldOptions): InvestorWorld {
         completedEligibleStepCount: held.size,
         canGoBack: true,
         canSkipCurrentStep: true,
-        canComplete: false,
+        canComplete: canComplete(),
       },
       pendingSuggestions: [],
       responses: [...held.entries()].map(([stepKey, value], index) => ({
@@ -269,7 +279,45 @@ export function investorSession(options: WorldOptions): InvestorWorld {
     const skip = /\/steps\/([^/]+)\/skip$/.exec(url);
     if (method === "POST" && skip !== null) {
       const stepKey = decodeURIComponent(skip[1] ?? "");
+      // The journey will not set aside a step it holds as answered.
+      if (options.refuseSkipOfAnswered === true && held.has(stepKey)) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              type: "urn:capitalq:problem:resource-conflict",
+              title:
+                "The request conflicts with the current state of the resource.",
+              status: 409,
+              detail:
+                "The onboarding session does not allow this action right now. (STEP_NOT_ELIGIBLE)",
+              code: "RESOURCE_CONFLICT",
+              requestId: "req_test",
+            }),
+            {
+              status: 409,
+              headers: { "content-type": "application/problem+json" },
+            },
+          ),
+        );
+      }
       setAside.add(stepKey);
+      version += 1;
+      // The real journey moves on from a step set aside, as it does from
+      // one answered.
+      if (stepKey === currentStepKey) {
+        const next = STEPS.find(
+          (step) => !held.has(step.stepKey) && !setAside.has(step.stepKey),
+        );
+        currentStepKey = next?.stepKey ?? currentStepKey;
+      }
+      return Promise.resolve(Response.json(view()));
+    }
+
+    if (method === "POST" && url.endsWith("/complete")) {
+      if (!canComplete()) {
+        return Promise.resolve(refusal("review"));
+      }
+      completed = true;
       version += 1;
       return Promise.resolve(Response.json(view()));
     }
@@ -283,6 +331,45 @@ export function investorSession(options: WorldOptions): InvestorWorld {
       const needs = options.refuseUntil?.[body.stepKey];
       if (needs !== undefined && !held.has(needs)) {
         return Promise.resolve(refusal(needs.split(".").at(-1) ?? needs));
+      }
+      // The journey keeps a red flag in one exclusion list, never both.
+      const sibling =
+        body.stepKey === "I7.avoid"
+          ? "I7.hard_exclusions"
+          : body.stepKey === "I7.hard_exclusions"
+            ? "I7.avoid"
+            : undefined;
+      const other = sibling === undefined ? undefined : held.get(sibling);
+      if (
+        other?.type === "MULTI_SELECT" &&
+        body.response.value.type === "MULTI_SELECT" &&
+        body.response.value.optionKeys.some((key) =>
+          other.optionKeys.includes(key),
+        )
+      ) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              type: "urn:capitalq:problem:validation-failed",
+              title: "The request is not valid.",
+              status: 422,
+              code: "VALIDATION_FAILED",
+              requestId: "req_test",
+              errors: [
+                {
+                  path: "value.optionKeys",
+                  code: "conflicting_exclusion",
+                  message:
+                    "Listed both as something to avoid and never to show.",
+                },
+              ],
+            }),
+            {
+              status: 422,
+              headers: { "content-type": "application/problem+json" },
+            },
+          ),
+        );
       }
       held.set(body.stepKey, body.response.value);
       version += 1;

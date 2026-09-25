@@ -280,6 +280,28 @@ describe("purpose policy", () => {
     }
   });
 
+  it("lets a person reach their own onboarding, and nobody else's (CQ-QX-007)", () => {
+    // Home Q told an onboarded investor it could not say who they were.
+    // Their own setup is actor-wide, filtered to their own user id, never
+    // shared and never network or public.
+    expect(actorWideScopeKinds("ANSWER")).toContain("OWN_ONBOARDING");
+    expect(actorWideScopeKinds("CLASSIFY")).not.toContain("OWN_ONBOARDING");
+    const spec = SCOPE_CATALOGUE["OWN_ONBOARDING"];
+    expect(spec.bound).toBe(false);
+    expect(spec.sharedVia).toBeNull();
+    expect(spec.defaultLabel).toBe("personal_private");
+    for (const kind of [
+      "COMPANY",
+      "INVESTOR_ORGANISATION",
+      "RELATIONSHIP",
+      "USER",
+    ] as const) {
+      expect(candidateScopeKinds("ANSWER", kind)).not.toContain(
+        "OWN_ONBOARDING",
+      );
+    }
+  });
+
   it("caps sensitivity by task and never admits RESTRICTED", () => {
     for (const taskClass of Q_TASK_CLASSES) {
       expect(sensitivityCeiling(taskClass)).not.toBe("RESTRICTED");

@@ -10,6 +10,7 @@ import { Button, buttonClassName } from "@capital-q/ui/button";
 import { Building2, Globe, ICON_SIZE } from "@capital-q/ui/icons";
 
 import { countryLabel, stageLabel } from "../company/declared-labels";
+import { ExpressInterest } from "../network/express-interest";
 
 import type { FeedPreloadPolicy } from "./feed/feed-state";
 import { actionPlaybackSource } from "./feed/action-feed-transport";
@@ -236,6 +237,16 @@ export function FeedCard({
           Open company
         </Link>
       </div>
+
+      {/*
+        Apart from Save and Pass on purpose: those are optimistic and this
+        is server-confirmed (CQ-NET-010), and Interest ≠ Save.
+      */}
+      <ExpressInterest
+        companyId={company.companyId}
+        companyName={company.canonicalName}
+        surface="RECOMMENDATION_FEED"
+      />
     </article>
   );
 }

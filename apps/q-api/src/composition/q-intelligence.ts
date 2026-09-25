@@ -8,6 +8,7 @@ import {
   type QProfileUpdateNotebook,
   type QUserStatementRecorder,
   type QMemoryRecall,
+  type QOwnOnboardingPort,
 } from "@capital-q/model-gateway/q";
 import type { ModelDataPosture } from "@capital-q/contracts";
 import type { Logger } from "@capital-q/observability";
@@ -105,6 +106,8 @@ export type QIntelligenceDependencies = {
   readonly profileUpdates?: QProfileUpdateNotebook | undefined;
   /** What Capital Q remembers about the person, for the prompts (ADR 0012). */
   readonly memory?: QMemoryRecall | undefined;
+  /** The person's own onboarding, for Home Q (CQ-QX-007). Absent: not read. */
+  readonly ownOnboarding?: QOwnOnboardingPort | undefined;
   /**
    * Where an answer goes as it is written. Absent means it goes out only
    * when it is finished; the stored message and its completion event are
@@ -232,6 +235,9 @@ export function composeQIntelligence(
     ...(dependencies.memory === undefined
       ? {}
       : { memory: dependencies.memory }),
+    ...(dependencies.ownOnboarding === undefined
+      ? {}
+      : { ownOnboarding: dependencies.ownOnboarding }),
     ...(dependencies.deltas === undefined
       ? {}
       : { deltas: dependencies.deltas }),

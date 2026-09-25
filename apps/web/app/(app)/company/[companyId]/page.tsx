@@ -1,7 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
-import { getCompanyNetworkPreview } from "@capital-q/api-client";
+import {
+  getCompanyNetworkPreview,
+  getOwnInterest,
+} from "@capital-q/api-client";
 import { buttonClassName } from "@capital-q/ui/button";
 import { ArrowLeft, Globe, ICON_SIZE } from "@capital-q/ui/icons";
 import { EmptyState } from "@capital-q/ui/states";
@@ -12,6 +15,7 @@ import {
 } from "@/components/app-shell/page-container";
 import { CompanyDeeperView } from "@/features/company/company-deeper-view";
 import { countryLabel, stageLabel } from "@/features/company/declared-labels";
+import { ExpressInterest } from "@/features/network/express-interest";
 import { apiSession } from "@/features/q/context";
 import { QPageSubject } from "@/features/q/q-subject";
 
@@ -57,6 +61,14 @@ export default async function CompanyPage({
     );
   }
 
+  // Only an investor organisation's member gets an answer here; anyone
+  // else (a founder, a person with no organisation) is refused by the API
+  // and simply sees no Express Interest control.
+  const interest =
+    session === null
+      ? null
+      : await getOwnInterest(session, company.companyId).catch(() => null);
+
   const place = [
     company.headquartersCity,
     countryLabel(company.headquartersCountry),
@@ -88,6 +100,15 @@ export default async function CompanyPage({
           ? {}
           : { description: company.shortDescription })}
       />
+
+      {interest === null ? null : (
+        <ExpressInterest
+          companyId={company.companyId}
+          companyName={company.canonicalName}
+          surface="COMPANY_PROFILE"
+          initialInterest={interest.interest}
+        />
+      )}
 
       <section className="cq-panel">
         <div className="cq-panel-body cq-panel-rows">

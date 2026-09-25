@@ -358,6 +358,9 @@ export function createContextFirewall(
           });
           break;
 
+        // Actor-wide only (actorWide below); never bound to a subject, so a
+        // subject can never widen whose onboarding is read.
+        case "OWN_ONBOARDING":
         case "NETWORK_VISIBLE_DATA":
         case "PUBLIC_EXTERNAL_DATA":
         case "GENERAL_MODEL_KNOWLEDGE":
@@ -376,7 +379,7 @@ export function createContextFirewall(
       subject: null,
       resource: null,
       filter:
-        kind === "OWN_Q_CONVERSATION"
+        kind === "OWN_Q_CONVERSATION" || kind === "OWN_ONBOARDING"
           ? { tenantId: actor.tenantId, userId: actor.userId }
           : { tenantId: actor.tenantId },
       labels: undefined,
@@ -765,6 +768,7 @@ function resourceTypeFor(
     case "OWN_PUBLIC_PRESENCE":
       return presenceResourceTypeFor(subject);
     case "OWN_Q_CONVERSATION":
+    case "OWN_ONBOARDING":
     case "NETWORK_VISIBLE_DATA":
     case "PUBLIC_EXTERNAL_DATA":
     case "GENERAL_MODEL_KNOWLEDGE":

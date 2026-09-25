@@ -42,9 +42,71 @@ export const RelationshipCreatedEvent = defineEvent({
     "A canonical Company ↔ Investor Organisation relationship was established. Carries identifiers only; origin, scope and payload stay in the private history.",
 });
 
+/**
+ * An investor organisation expressed interest in a company (CQ-NET-010).
+ * Identifiers only: who acted is on the envelope's actor, and the history
+ * row carries the rest. Not a match: nothing consuming this may treat it
+ * as bilateral.
+ */
+export const RelationshipInterestExpressedEvent = defineEvent({
+  name: "network.relationship.interest_expressed",
+  version: 1,
+  owner: NETWORK_EVENT_OWNER,
+  producer: NETWORK_EVENT_PRODUCER,
+  consumers: ["@capital-q/q"],
+  sensitivity: "INTERNAL",
+  replaySafety: "REPLAY_SAFE",
+  dataSchema: z
+    .object({
+      relationshipId: UuidSchema,
+      interestId: UuidSchema,
+      companyId: UuidSchema,
+      investorOrganisationId: UuidSchema,
+    })
+    .strict(),
+  description:
+    "An investor organisation expressed unilateral interest in a company on their canonical relationship. Not a match.",
+});
+
 export const NETWORK_EVENTS: readonly EventDefinition[] = [
   RelationshipCreatedEvent,
+  RelationshipInterestExpressedEvent,
 ];
+
+export function relationshipInterestExpressedEvent(input: {
+  readonly tenantId: string;
+  readonly organisationId: string;
+  readonly actorUserId: string;
+  readonly correlationId: CorrelationId;
+  readonly relationshipId: string;
+  readonly interestId: string;
+  readonly companyId: string;
+  readonly investorOrganisationId: string;
+}): CapitalQEvent<
+  z.infer<typeof RelationshipInterestExpressedEvent.dataSchema>
+> {
+  return {
+    specVersion: "1.0",
+    id: EventIdSchema.parse(randomUUID()),
+    type: RelationshipInterestExpressedEvent.name,
+    source: RelationshipInterestExpressedEvent.producer,
+    time: UtcTimestampSchema.parse(new Date().toISOString()),
+    subject: `relationship/${input.relationshipId}`,
+    dataContentType: "application/json",
+    eventVersion: RelationshipInterestExpressedEvent.version,
+    tenantId: input.tenantId,
+    organisationId: input.organisationId,
+    actor: { type: "HUMAN", id: input.actorUserId },
+    correlationId: input.correlationId,
+    aggregate: { type: "interest", id: input.interestId, version: 1 },
+    data: {
+      relationshipId: input.relationshipId,
+      interestId: input.interestId,
+      companyId: input.companyId,
+      investorOrganisationId: input.investorOrganisationId,
+    },
+  };
+}
 
 export function relationshipCreatedEvent(input: {
   readonly tenantId: string;

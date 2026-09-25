@@ -43,20 +43,31 @@ describe("research is intentional outside the interview too", () => {
           question: {
             kind: "REAL_WORLD_EXAMPLE",
             text: "a real investor like me?",
+            about: [],
           },
         }),
       ).mode,
     ).toBe("EXPLICIT");
     expect(
       directive(
-        read({ question: { kind: "PUBLIC_FACTS", text: "any news on Acme?" } }),
+        read({
+          question: {
+            kind: "PUBLIC_FACTS",
+            text: "any news on Acme?",
+            about: [],
+          },
+        }),
       ).mode,
     ).toBe("EXPLICIT");
     expect(
       directive(
         read({
           kind: "RESEARCH_REQUEST",
-          question: { kind: "PUBLIC_FACTS", text: "search the web for it" },
+          question: {
+            kind: "PUBLIC_FACTS",
+            text: "search the web for it",
+            about: [],
+          },
         }),
       ).mode,
     ).toBe("EXPLICIT");
@@ -66,7 +77,11 @@ describe("research is intentional outside the interview too", () => {
     expect(
       directive(
         read({
-          question: { kind: "ADVICE", text: "what else should I look for?" },
+          question: {
+            kind: "ADVICE",
+            text: "what else should I look for?",
+            about: [],
+          },
         }),
       ).mode,
     ).toBe("NEVER");
@@ -79,6 +94,7 @@ describe("research is intentional outside the interview too", () => {
           question: {
             kind: "THEIR_OWN_RECORDS",
             text: "based on what you know about me, what suits me?",
+            about: [],
           },
         }),
       ),
@@ -89,7 +105,11 @@ describe("research is intentional outside the interview too", () => {
     expect(
       directive(
         read({
-          question: { kind: "ADVICE", text: "what do you make of Acme?" },
+          question: {
+            kind: "ADVICE",
+            text: "what do you make of Acme?",
+            about: [],
+          },
           aboutNamedOther: true,
         }),
       ),
@@ -105,7 +125,7 @@ describe("research is intentional outside the interview too", () => {
       expect(directive(read({ kind })).mode, kind).toBe("NEVER");
     }
     const example = read({
-      question: { kind: "REAL_WORLD_EXAMPLE", text: "a real one?" },
+      question: { kind: "REAL_WORLD_EXAMPLE", text: "a real one?", about: [] },
     });
     expect(directive(example, false).mode).toBe("NEVER");
     const down = reduceConversation(

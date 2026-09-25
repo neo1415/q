@@ -192,6 +192,19 @@ export const SCOPE_CATALOGUE: Readonly<Record<QKnowledgeScopeKind, ScopeSpec>> =
       sharedVia: null,
       isEvidence: false,
     },
+    OWN_ONBOARDING: {
+      kind: "OWN_ONBOARDING",
+      bound: false,
+      // The person's own setup answers: theirs, and never anybody else's.
+      defaultLabel: "personal_private",
+      ownerSensitivity: "CONFIDENTIAL",
+      sharedSensitivity: "CONFIDENTIAL",
+      layer: "STRUCTURED_STATE",
+      factCategories: ["PERSONAL_CONTEXT"],
+      ownerCapability: null,
+      sharedVia: null,
+      isEvidence: false,
+    },
     OWN_PUBLIC_PRESENCE: {
       kind: "OWN_PUBLIC_PRESENCE",
       bound: true,

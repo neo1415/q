@@ -80,6 +80,22 @@ export function isNonLexical(text: string): boolean {
   return trimmed === CONTINUE_SIGNAL || NON_LEXICAL_RE.test(trimmed);
 }
 
+/**
+ * The person's words with the browser's cue taken out.
+ *
+ * The cue is this system's own control token, never something anybody
+ * said. The provider folds consecutive user messages into one, so a cue
+ * injected while the person was still talking came back glued to their
+ * words ("[continue] I'm not saying…") and was answered and stored as if
+ * they had said it (hosted, 2026-09-24). A message that was nothing but
+ * the cue stays the cue, so it is still read as "carry on".
+ */
+export function withoutContinueSignal(text: string): string {
+  if (!text.includes(CONTINUE_SIGNAL)) return text;
+  const words = text.split(CONTINUE_SIGNAL).join(" ").replace(/\s+/g, " ");
+  return words.trim().length === 0 ? CONTINUE_SIGNAL : words.trim();
+}
+
 /** Why a run stopped, in one spoken line that says what Q can still do. */
 const RECOVERY_LINES: Readonly<Record<string, readonly string[]>> = {
   EVIDENCE_UNAVAILABLE: [

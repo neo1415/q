@@ -69,6 +69,8 @@ insert into rls_inventory (schema_name, table_name, classification, authenticate
   ('core', 'capital_objective_creation_requests', 'INTERNAL_SERVER_ONLY', '{}'),
   ('network', 'relationships',            'INTERNAL_SERVER_ONLY', '{}'),
   ('network', 'relationship_events',      'INTERNAL_SERVER_ONLY', '{}'),
+  ('network', 'interests',                'INTERNAL_SERVER_ONLY', '{}'),
+  ('network', 'interest_requests',        'INTERNAL_SERVER_ONLY', '{}'),
   ('permissions', 'capabilities',          'PUBLIC_REFERENCE',     '{SELECT}'),
   ('permissions', 'roles',                 'PUBLIC_REFERENCE',     '{SELECT}'),
   ('permissions', 'role_capabilities',     'PUBLIC_REFERENCE',     '{SELECT}'),

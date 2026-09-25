@@ -9,6 +9,8 @@ import type { InvestorOrganisationId } from "@capital-q/investors";
 import type { ActorType, TenantId } from "@capital-q/security";
 
 import type {
+  Interest,
+  InterestId,
   Relationship,
   RelationshipEvent,
   RelationshipEventId,
@@ -102,6 +104,63 @@ export type RelationshipEventRepository = {
       readonly limit: number;
     },
   ) => Promise<readonly RelationshipEvent[]>;
+};
+
+/**
+ * Express Interest's own record (CQ-NET-010). Insert-only here: withdrawal
+ * belongs to a later packet, and nothing in this port changes a status.
+ */
+export type InterestRepository = {
+  readonly findById: (
+    executor: DatabaseExecutor,
+    interestId: InterestId,
+  ) => Promise<Interest | null>;
+  /** The investor party's open interest on this relationship, if any. */
+  readonly findOpenByRelationship: (
+    executor: DatabaseExecutor,
+    relationshipId: RelationshipId,
+  ) => Promise<Interest | null>;
+  readonly insert: (
+    tx: TransactionContext,
+    input: {
+      readonly id: InterestId;
+      readonly tenantId: TenantId;
+      readonly relationshipId: RelationshipId;
+      readonly expressedByUserId: string;
+      readonly expressedInOrganisationId: string;
+      readonly relationshipEventId: RelationshipEventId;
+    },
+  ) => Promise<Interest>;
+};
+
+/** Hashes only: (person, organisation, key hash) -> the interest the command resolved to. */
+export type InterestRequestStore = {
+  readonly lock: (
+    tx: TransactionContext,
+    userId: string,
+    organisationId: string,
+    idempotencyKeyHash: string,
+  ) => Promise<void>;
+  readonly find: (
+    tx: TransactionContext,
+    userId: string,
+    organisationId: string,
+    idempotencyKeyHash: string,
+  ) => Promise<{
+    readonly requestHash: string;
+    readonly interestId: InterestId;
+  } | null>;
+  readonly record: (
+    tx: TransactionContext,
+    input: {
+      readonly userId: string;
+      readonly organisationId: string;
+      readonly tenantId: TenantId;
+      readonly idempotencyKeyHash: string;
+      readonly requestHash: string;
+      readonly interestId: InterestId;
+    },
+  ) => Promise<void>;
 };
 
 /**

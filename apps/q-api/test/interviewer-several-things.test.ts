@@ -98,6 +98,7 @@ describe("E1 · one turn confirms, corrects and asks", () => {
           question: {
             kind: "ADVICE",
             text: "what would you look for in a company if you were me?",
+            about: [],
           },
         }),
       }),

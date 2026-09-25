@@ -166,6 +166,9 @@ export function actorWideScopeKinds(
     ? ["GENERAL_MODEL_KNOWLEDGE"]
     : [
         "OWN_Q_CONVERSATION",
+        // Who the person is, from their own onboarding (CQ-QX-007): Home Q
+        // told an onboarded investor it could not say who they were.
+        "OWN_ONBOARDING",
         "NETWORK_VISIBLE_DATA",
         "PUBLIC_EXTERNAL_DATA",
         "GENERAL_MODEL_KNOWLEDGE",

@@ -89,6 +89,14 @@ export const Q_KNOWLEDGE_SCOPE_KINDS = [
   /** The actor's own Q conversation (personal_private). */
   "OWN_Q_CONVERSATION",
   /**
+   * The actor's own onboarding: who they said they are (name, role), which
+   * steps are answered, which are left and where they are now. Owner only,
+   * personal_private, never shared — it is what they told Capital Q while
+   * setting up, and Home Q needs it to know the person it is talking to
+   * (CQ-QX-007).
+   */
+  "OWN_ONBOARDING",
+  /**
    * What Capital Q understands about a subject from that subject's own
    * public footprint: their site, their profile, what they publish.
    *

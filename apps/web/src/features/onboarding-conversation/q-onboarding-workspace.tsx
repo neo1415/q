@@ -32,6 +32,7 @@ import {
   onboardingThreadAction,
   onboardingThreadKeepAction,
 } from "./thread-actions";
+import { upsertLine } from "../voice/session";
 import { useVoiceInterview } from "../voice/use-voice-interview";
 import {
   materialListAction,
@@ -257,9 +258,14 @@ export function QOnboardingWorkspace({
   const qConversationId = useRef<string | undefined>(undefined);
   const streamAbort = useRef<AbortController | null>(null);
 
-  const push = useCallback((kind: Turn["kind"], text: string) => {
-    setTurns((current) => [...current, { id: newId(), kind, text }]);
-  }, []);
+  const push = useCallback(
+    (kind: Turn["kind"], text: string, id: string = newId()) => {
+      // A spoken line re-sent under its id (the provider reporting one
+      // utterance again as it grew) replaces the line it grew from.
+      setTurns((current) => upsertLine(current, { id, kind, text }));
+    },
+    [],
+  );
 
   // Voice (CQ-Q-VOICE-001 D §44-§50; E §67-§74): the same interview,
   // spoken. What the provider transcribes joins the thread as the person's
@@ -271,7 +277,7 @@ export function QOnboardingWorkspace({
   }, [actions.refresh]);
   const voice = useVoiceInterview({
     onLine: (line) => {
-      push(line.role === "user" ? "PERSON" : "Q", line.text);
+      push(line.role === "user" ? "PERSON" : "Q", line.text, line.id);
       if (line.role === "q") {
         void refreshRef.current();
       }

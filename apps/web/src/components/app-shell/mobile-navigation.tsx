@@ -6,6 +6,8 @@ import { usePathname } from "next/navigation";
 import { cx } from "@capital-q/ui";
 import { ICON_SIZE, ICON_STROKE } from "@capital-q/ui/icons";
 
+import { useHomeHref } from "@/features/q/active-conversation";
+
 import { isActiveRoute, MOBILE_NAVIGATION } from "./navigation";
 
 /**
@@ -15,6 +17,8 @@ import { isActiveRoute, MOBILE_NAVIGATION } from "./navigation";
  */
 export function MobileNavigation() {
   const pathname = usePathname();
+  // Home is the conversation this tab was in, not a new chat each visit.
+  const home = useHomeHref();
 
   return (
     <nav aria-label="Primary" className="cq-bottom-nav">
@@ -25,7 +29,7 @@ export function MobileNavigation() {
           return (
             <li key={item.href} className="min-w-0">
               <Link
-                href={item.href}
+                href={item.href === "/home" ? home : item.href}
                 aria-current={active ? "page" : undefined}
                 data-active={active ? "" : undefined}
                 className={cx(
