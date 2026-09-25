@@ -19,6 +19,7 @@ import {
   readQConversationAction,
   rejectQApprovalAction,
   type QStartedRun,
+  type QSubjectInput,
 } from "./actions";
 import type { PendingTurn } from "./conversation";
 import {
@@ -98,6 +99,8 @@ export type QConversationOptions = {
   readonly companyId?: string | undefined;
   /** Or the investor organisation, for an investor. Never both. */
   readonly investorOrganisationId?: string | undefined;
+  /** Or a relationship itself, for either of its parties (never with the others). */
+  readonly relationshipId?: string | undefined;
   /**
    * The conversation to open, from the URL. Null opens nothing: the next
    * question starts a new one, and `onConversation` says which.
@@ -106,6 +109,21 @@ export type QConversationOptions = {
   /** The server named (or changed) the conversation this surface is in. */
   readonly onConversation?: ((conversationId: string) => void) | undefined;
 };
+
+/** The one subject a surface names, in the order the options document. */
+function subjectInputOf(options: {
+  readonly companyId?: string | undefined;
+  readonly investorOrganisationId?: string | undefined;
+  readonly relationshipId?: string | undefined;
+}): QSubjectInput | undefined {
+  return options.companyId !== undefined
+    ? { companyId: options.companyId }
+    : options.investorOrganisationId !== undefined
+      ? { investorOrganisationId: options.investorOrganisationId }
+      : options.relationshipId !== undefined
+        ? { relationshipId: options.relationshipId }
+        : undefined;
+}
 
 export function useQConversation(
   options: QConversationOptions = {},
@@ -372,16 +390,19 @@ export function useQConversation(
             ...(options.investorOrganisationId === undefined
               ? {}
               : { investorOrganisationId: options.investorOrganisationId }),
+            ...(options.relationshipId === undefined
+              ? {}
+              : { relationshipId: options.relationshipId }),
           });
         }
         const started = await askQAction(
           text,
           conversationId.current ?? undefined,
-          options.companyId !== undefined
-            ? { companyId: options.companyId }
-            : options.investorOrganisationId !== undefined
-              ? { investorOrganisationId: options.investorOrganisationId }
-              : undefined,
+          subjectInputOf({
+            companyId: options.companyId,
+            investorOrganisationId: options.investorOrganisationId,
+            relationshipId: options.relationshipId,
+          }),
           idempotencyKey,
         );
         if (!started.ok) {
@@ -400,6 +421,7 @@ export function useQConversation(
       begin,
       options.companyId,
       options.investorOrganisationId,
+      options.relationshipId,
       streaming,
       submitting,
     ],
@@ -420,7 +442,8 @@ export function useQConversation(
       if (
         remembered === null ||
         remembered.companyId !== options.companyId ||
-        remembered.investorOrganisationId !== options.investorOrganisationId
+        remembered.investorOrganisationId !== options.investorOrganisationId ||
+        remembered.relationshipId !== options.relationshipId
       ) {
         return;
       }
@@ -434,11 +457,7 @@ export function useQConversation(
       void askQAction(
         remembered.text,
         undefined,
-        remembered.companyId !== undefined
-          ? { companyId: remembered.companyId }
-          : remembered.investorOrganisationId !== undefined
-            ? { investorOrganisationId: remembered.investorOrganisationId }
-            : undefined,
+        subjectInputOf(remembered),
         remembered.idempotencyKey,
       )
         .then((started) => {
@@ -456,7 +475,12 @@ export function useQConversation(
           setSubmitting(false);
         });
     };
-  }, [begin, options.companyId, options.investorOrganisationId]);
+  }, [
+    begin,
+    options.companyId,
+    options.investorOrganisationId,
+    options.relationshipId,
+  ]);
 
   const stop = useCallback(async () => {
     const open = openRun.current;

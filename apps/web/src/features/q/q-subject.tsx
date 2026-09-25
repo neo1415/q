@@ -39,6 +39,16 @@ export type QSubject =
       readonly label?: string | undefined;
       readonly scope: ContextScope;
     }
+  | {
+      /**
+       * A relationship itself, for either party. The Q API resolves it only
+       * for its two parties and answers from the asker's own side.
+       */
+      readonly kind: "RELATIONSHIP";
+      readonly relationshipId: string;
+      readonly label?: string | undefined;
+      readonly scope: ContextScope;
+    }
   | { readonly kind: "NONE"; readonly scope: "unset" };
 
 export const NO_SUBJECT: QSubject = { kind: "NONE", scope: "unset" };

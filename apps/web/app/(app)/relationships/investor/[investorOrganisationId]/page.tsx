@@ -6,6 +6,7 @@ import {
 } from "@capital-q/api-client";
 
 import { apiSession, resolveOwnContext } from "@/features/q/context";
+import { QPageSubject } from "@/features/q/q-subject";
 import { CompanyRelationshipActions } from "@/features/relationships/relationship-actions";
 import {
   RelationshipDetail,
@@ -71,17 +72,25 @@ export default async function CompanyRelationshipPage({
   const pending = fromThisInvestor.find((item) => item.response === "PENDING");
   const relationship = status?.relationship ?? null;
 
-  // No Q subject and no Ask Q here yet. The Q API resolves an investor
-  // organisation outside the company's tenant only when disclosure lets the
-  // company view it, and no disclosure rule does so for a counterparty, so
-  // declaring it would fail every question asked on this page ("couldn't
-  // find one of the subjects"). Q keeps the person's own company as its
-  // subject until that gap is closed (reported with CQ-WEB-030).
+  // The relationship itself is Q's subject here, not the investor
+  // organisation: the Q API resolves it for its two parties only and
+  // answers from the company's own fold, so nothing about the investor
+  // that is not shared with the company reaches Q through this page.
   return (
     <>
+      {relationship === null ? null : (
+        <QPageSubject
+          subject={{
+            kind: "RELATIONSHIP",
+            relationshipId: relationship.relationshipId,
+            label: latest.investorName,
+            scope: "relationship_shared",
+          }}
+        />
+      )}
       <RelationshipDetail
         side="COMPANY"
-        askQ={false}
+        askQ={relationship !== null}
         counterpart={latest.investorName}
         relationship={relationship}
         absentSentence="Where you stand couldn't load just now. Nothing has changed; try again in a moment."
