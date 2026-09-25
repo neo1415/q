@@ -750,6 +750,19 @@ export function createOnboardingPort(input: {
         };
       }
     }
+    // Confirming the journey's review activates what it set up: that is
+    // finishing, and only confirm_and_finish does it, all the way to a
+    // completed session (ACC 2026-09-25: a review confirmed on its own
+    // left the mandate ACTIVE and the session open).
+    const confirming = steps.get(answer.stepKey);
+    if (confirming?.configuration.stepType === "confirmation") {
+      return {
+        stepKey: confirming.stepKey,
+        outcome: "REJECTED",
+        reason:
+          "Confirming the review is finishing. When they confirm the record is right and want to finish, use confirm_and_finish; it completes their setup.",
+      };
+    }
     const resolved = await resolve(answer);
     if (!resolved.ok) return resolved.result;
     const refused = unsupported(resolved.step, resolved.value, answer);

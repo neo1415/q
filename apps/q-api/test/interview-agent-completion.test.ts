@@ -1,0 +1,166 @@
+import { describe, expect, it } from "vitest";
+
+import type { PermittedContextPlan } from "@capital-q/contracts";
+import { INVESTOR_DEFINITION_V1 } from "@capital-q/investor-onboarding";
+import type { ModelGateway } from "@capital-q/model-gateway";
+import { createLogger } from "@capital-q/observability";
+import type { ContextFirewallPort } from "@capital-q/q-runtime";
+import { ActorContextSchema } from "@capital-q/security";
+
+import { createInterviewAgent } from "../src/voice/interview-agent.js";
+
+import { readerOf, reading } from "./authority-fixtures.js";
+import { investorSession, turn } from "./interviewer-fixtures.js";
+
+/**
+ * Completion (ACC 2026-09-25): the mandate went ACTIVE while the session
+ * stayed open. Properties: finishing completes the session whenever every
+ * required step is done, however many optional steps are open or set
+ * aside; a review already confirmed (by another door, or an earlier turn)
+ * is finished, not left half-way; and the review is never confirmed by
+ * anything but finishing.
+ */
+
+const REQUIRED: Readonly<Record<string, string>> = Object.fromEntries(
+  INVESTOR_DEFINITION_V1.steps
+    .filter(
+      (step) => step.required && step.configuration.stepType !== "confirmation",
+    )
+    .map((step) => {
+      const c = step.configuration;
+      const value =
+        c.stepType === "single_select" || c.stepType === "multi_select"
+          ? (c.options[0]?.optionKey ?? "x")
+          : c.stepType === "range"
+            ? c.min
+            : c.stepType === "reference_select"
+              ? "a0000000-0000-4000-8000-000000000099"
+              : "value";
+      return [step.stepKey, value] as const;
+    }),
+);
+
+const OPTIONAL_ANSWERS: readonly Readonly<Record<string, string>>[] = [
+  {},
+  { "I7.avoid": "gambling" },
+  { "I3.sectors_avoid": "a0000000-0000-4000-8000-0000000000aa" },
+  { "I7.hard_exclusions": "weapons", "I2.cheque_typical": "50000" },
+];
+
+const logger = createLogger(
+  { serviceName: "q-api-test", environment: "test" },
+  { level: "silent" },
+);
+const actor = ActorContextSchema.parse({
+  userId: "b0000000-0000-4000-8000-000000000001",
+  tenantId: "c0000000-0000-4000-8000-000000000001",
+  actorType: "HUMAN",
+});
+function firewall(): ContextFirewallPort {
+  const plan = {
+    tenantId: actor.tenantId,
+    actor: { userId: actor.userId },
+    purpose: { capability: "ANSWER", taskClass: "GENERAL_QUESTION" },
+    subjects: [],
+    scopes: [
+      {
+        kind: "OWN_ONBOARDING",
+        filter: { tenantId: actor.tenantId, userId: actor.userId },
+        sensitivity: "CONFIDENTIAL",
+      },
+    ],
+    maxSensitivity: "CONFIDENTIAL",
+  } as unknown as PermittedContextPlan;
+  return { plan: () => Promise.resolve({ outcome: "AUTHORISED", plan }) };
+}
+
+function calling(name: string, args: unknown): ModelGateway {
+  let round = 0;
+  return {
+    execute: () => {
+      round += 1;
+      return Promise.resolve(
+        round === 1
+          ? {
+              output: {
+                kind: "TOOL_CALLS",
+                text: "",
+                calls: [{ callId: "c1", name, arguments: args }],
+              },
+            }
+          : {
+              output: {
+                kind: "TEXT",
+                text: JSON.stringify({ reply: "Ok.", asking: null }),
+              },
+            },
+      );
+    },
+  } as unknown as ModelGateway;
+}
+
+describe("finishing completes the session whenever every required step is done", () => {
+  it("whatever optional steps are open, answered or already confirmed", async () => {
+    for (const optional of OPTIONAL_ANSWERS) {
+      for (const reviewAlreadyConfirmed of [false, true]) {
+        const world = investorSession({
+          currentStepKey: "I11.review",
+          recorded: {
+            ...REQUIRED,
+            ...optional,
+            ...(reviewAlreadyConfirmed ? { "I11.review": "true" } : {}),
+          },
+        });
+        const outcome = await createInterviewAgent({
+          gateway: calling("confirm_and_finish", {}),
+          firewall: firewall(),
+          logger,
+          recommendations: world.recommendations,
+          delegation: readerOf(reading({ finishing: true })),
+        }).turn({ ...turn(world, "Yes, that's right. Let's finish."), actor });
+
+        const label = `${JSON.stringify(optional)} review=${String(reviewAlreadyConfirmed)}`;
+        expect(outcome.view.session.status, label).toBe("COMPLETED");
+        expect(outcome.navigate, label).toBe("DISCOVER");
+      }
+    }
+  });
+});
+
+describe("the review is confirmed only by finishing", () => {
+  it("record_answers and correct_answer never confirm a review step", async () => {
+    for (const [name, args] of [
+      [
+        "record_answers",
+        {
+          answers: [
+            { stepKey: "I11.review", value: true, quote: "Yes, that's right." },
+          ],
+        },
+      ],
+      [
+        "correct_answer",
+        {
+          corrections: [
+            { stepKey: "I11.review", value: true, quote: "Yes, that's right." },
+          ],
+        },
+      ],
+    ] as const) {
+      const world = investorSession({
+        currentStepKey: "I11.review",
+        recorded: REQUIRED,
+      });
+      const outcome = await createInterviewAgent({
+        gateway: calling(name, args),
+        firewall: firewall(),
+        logger,
+        recommendations: world.recommendations,
+        delegation: readerOf(reading({ stated: ["I11.review"] })),
+      }).turn({ ...turn(world, "Yes, that's right."), actor });
+
+      expect(world.recordedValue("I11.review"), name).toBeUndefined();
+      expect(outcome.view.session.status, name).toBe("ACTIVE");
+    }
+  });
+});
