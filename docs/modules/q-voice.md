@@ -279,9 +279,11 @@ expects silence to last. Three things keep it from feeling like a hang:
   when Q is quick.
 - The stage's status line grows a note after 5 s ("Working on it") and
   after 14 s ("Still on it. This one takes a moment.").
-- Deepgram's listener runs with `eot_threshold` 0.8 so a pause
-  mid-sentence is not taken as the end of a turn, which was cancelling
-  think requests in bursts.
+- Deepgram's listener runs with `eot_threshold` 0.85 and a 4 s
+  `eot_timeout_ms` so a pause mid-thought is not taken as the end of a
+  turn (measured in `design/voice-comparison/flux-end-of-turn.md`), and
+  an utterance the recogniser leaves open (no closing . ? or !) is held
+  1.5 s by the turn before Q acts on it.
 
 INTERVIEW_CONDUCTOR now forbids promising a later action ("I'll update
 your profile"): the platform records; Q says what it has taken from the

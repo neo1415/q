@@ -77,8 +77,8 @@ const OUTPUT_SAMPLE_RATE = 24_000;
  * saying…", answered as a separate turn each time the sentence grew.
  */
 const SPEECH_LEVEL = 0.02;
-/** The provider's end-of-turn timeout (3 s, deepgram.ts) plus a margin. */
-const REPAIR_AFTER_QUIET_MS = 3_400;
+/** The provider's end-of-turn timeout (4 s, deepgram.ts) plus a margin. */
+const REPAIR_AFTER_QUIET_MS = 4_400;
 const REPAIR_POLL_MS = 100;
 /** A repair not decided by then is dropped; the person can say "go on". */
 const REPAIR_GIVE_UP_MS = 20_000;

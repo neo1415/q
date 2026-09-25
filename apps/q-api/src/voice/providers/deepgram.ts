@@ -201,8 +201,19 @@ export function createDeepgramVoiceProvider(
             // before Q had even begun. The provider's own default is 0.7;
             // three seconds is the longest a person reads as "listening"
             // rather than "not working".
-            eot_threshold: 0.7,
-            eot_timeout_ms: 3_000,
+            //
+            // Then 0.7 split people thinking aloud into a turn per pause
+            // (live, 2026-09-25: twelve fragments of one thought). Measured
+            // on the same audio streamed to Flux in real time, 3 runs each
+            // (design/voice-comparison/flux-end-of-turn.md): 0.85 with a
+            // four-second ceiling kept a trailing-off thought whole that
+            // 0.7 and 0.8 split, and split a three-clause sentence in two
+            // rather than three, for about 0.4 s more on a finished
+            // sentence (end of speech to end of turn 0.9 s -> 1.3 s). 0.9
+            // split no less and cost another 0.4 s. What the recogniser
+            // still ends open is held by the turn (turn.ts, unfinished).
+            eot_threshold: 0.85,
+            eot_timeout_ms: 4_000,
           },
         },
         think: {
