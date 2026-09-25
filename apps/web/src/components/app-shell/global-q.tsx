@@ -16,7 +16,7 @@ import { buttonClassName } from "@capital-q/ui/button";
 import { SheetContent, SheetRoot } from "@capital-q/ui/sheet";
 import { Tooltip } from "@capital-q/ui/tooltip";
 
-import { QPresence, type QPresenceState } from "@/features/q-presence";
+import { QAperture, type QApertureState } from "@/features/q-aperture";
 import { useHomeHref } from "@/features/q/active-conversation";
 import { QSheetConversation } from "@/features/q/q-sheet";
 import {
@@ -39,8 +39,8 @@ import {
 type GlobalQValue = {
   readonly open: boolean;
   readonly setOpen: (open: boolean) => void;
-  readonly activity: QPresenceState;
-  readonly setActivity: (state: QPresenceState) => void;
+  readonly activity: QApertureState;
+  readonly setActivity: (state: QApertureState) => void;
   readonly connected: boolean;
   /** A draft question the sheet opens with; null for an empty composer. */
   readonly seed: string | null;
@@ -70,7 +70,7 @@ export function GlobalQProvider({
 }) {
   const [open, setOpenState] = useState(false);
   const [seed, setSeed] = useState<string | null>(null);
-  const [activity, setActivity] = useState<QPresenceState>("IDLE");
+  const [activity, setActivity] = useState<QApertureState>("IDLE");
   // A draft belongs to the opening that asked for it; closing drops it so
   // the next plain "Ask Q" starts empty.
   const setOpen = useCallback((next: boolean) => {
@@ -138,9 +138,9 @@ export function GlobalQTrigger({
     (route) => pathname === route || pathname.startsWith(`${route}?`),
   );
   const presence = (
-    <QPresence
+    <QAperture
       state={open ? activity : "IDLE"}
-      size={variant === "sidebar" ? 28 : 32}
+      size={variant === "sidebar" ? "chrome" : 32}
     />
   );
   if (onHome) {
@@ -195,7 +195,7 @@ function GlobalQSheet() {
     useContext(GlobalQContext);
   const subject = useQSubject();
   const onActivity = useCallback(
-    (state: QPresenceState) => setActivity(state),
+    (state: QApertureState) => setActivity(state),
     [setActivity],
   );
   const about =

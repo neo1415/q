@@ -23,11 +23,7 @@ import {
 } from "@capital-q/ui/popover";
 import { Tooltip } from "@capital-q/ui/tooltip";
 
-import {
-  QPresence,
-  useStagePresenceSize,
-  type QPresenceState,
-} from "../q-presence";
+import { QAperture, type QApertureState } from "../q-aperture";
 
 /**
  * The head of the Q surface: Q's presence, one word for what it is doing,
@@ -42,7 +38,7 @@ import {
  */
 
 export type QStageProps = {
-  readonly state: QPresenceState;
+  readonly state: QApertureState;
   readonly inputLevel: () => number;
   readonly outputLevel: () => number;
   /** The word under the presence; the state's own by default. */
@@ -134,7 +130,6 @@ export function QStage({
   onSay,
   className,
 }: QStageProps) {
-  const size = useStagePresenceSize();
   const [picks, setPicks] = useState<readonly string[]>([]);
   // A new step means fresh picks.
   const stepKey = asking?.stepKey ?? null;
@@ -159,9 +154,9 @@ export function QStage({
       className={cx("flex flex-col items-center gap-5", className)}
       data-q-stage={voiceActive ? "voice" : "ready"}
     >
-      <QPresence
+      <QAperture
         state={state}
-        size={size}
+        size="stage"
         inputLevel={inputLevel}
         outputLevel={outputLevel}
         label={label ?? true}

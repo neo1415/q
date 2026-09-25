@@ -36,6 +36,7 @@ export const Z_LAYERS = [
   "base",
   "sticky",
   "navigation",
+  "presence",
   "popover",
   "sheet",
   "modal",

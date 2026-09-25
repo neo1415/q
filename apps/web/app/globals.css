@@ -199,6 +199,190 @@
     width: 44px;
     height: 44px;
   }
+  /* The worded form (Q motion: Full · Calm · Off). */
+  .cq-theme-switch.is-text .cq-theme-switch-option {
+    width: auto;
+    min-width: 40px;
+    padding: 0 8px;
+    font: inherit;
+    font-size: 13px;
+  }
+  .cq-theme-switch.is-text.is-touch .cq-theme-switch-option {
+    min-width: 44px;
+  }
+
+  /*
+   * The Q Aperture (features/q-aperture; ADR 0017 F2). The mark's box holds
+   * the ring and its bloom; the label sits outside it, so no text is ever
+   * on the glow. The SVG ring is the first paint and the fallback; the
+   * canvas takes over once the shared renderer has drawn into it.
+   */
+  .cq-aperture {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    color: var(--cq-text-secondary);
+  }
+  .cq-aperture-mark {
+    position: relative;
+    flex: none;
+  }
+  .cq-aperture-mark > svg,
+  .cq-aperture-mark > canvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+    pointer-events: none;
+    user-select: none;
+  }
+  .cq-aperture[data-renderer="svg"] > .cq-aperture-mark > canvas {
+    visibility: hidden;
+  }
+  .cq-aperture[data-renderer="webgl"] > .cq-aperture-mark > svg {
+    visibility: hidden;
+  }
+  .cq-aperture-label {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    text-align: center;
+  }
+
+  .cq-aperture-svg-ring,
+  .cq-aperture-svg-bloom,
+  .cq-aperture-svg-sweep,
+  .cq-aperture-svg-arc {
+    stroke: var(--cq-q-light);
+  }
+  .cq-aperture-svg-bloom {
+    stroke: var(--cq-q-bloom);
+  }
+  .cq-aperture-svg-bloom > circle,
+  .cq-aperture-svg-bloom > line {
+    stroke-width: 0.12;
+  }
+  .cq-aperture-svg-bloom .is-fill {
+    fill: var(--cq-q-bloom);
+    stroke: none;
+    opacity: 0.5;
+  }
+  .cq-aperture-svg-sweep,
+  .cq-aperture-svg-arc {
+    stroke: var(--cq-q-sweep);
+  }
+  .cq-aperture-svg-core,
+  .cq-aperture-svg-flash {
+    stroke: var(--cq-q-core);
+  }
+  .cq-aperture-svg[data-state="ERROR"] .cq-aperture-svg-ring {
+    stroke: var(--cq-q-ember);
+  }
+  .cq-aperture-svg[data-state="ERROR"] .cq-aperture-svg-bloom {
+    opacity: 0.35;
+  }
+  .cq-aperture[data-bloom="off"] .cq-aperture-svg-bloom,
+  .cq-aperture[data-motion="off"] .cq-aperture-svg-bloom {
+    display: none;
+  }
+
+  /* The focus sweep: 1.4 s a turn for three turns (4.2 s), then a low
+     6 s sweep for as long as the work runs (WCAG 2.2.2). */
+  @keyframes cq-aperture-turn {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+  @keyframes cq-aperture-quieten {
+    to {
+      opacity: 0.4;
+    }
+  }
+  .cq-aperture[data-motion="full"] .cq-aperture-svg-sweep {
+    transform-origin: 0 0;
+    animation:
+      cq-aperture-turn 1.4s linear 3,
+      cq-aperture-turn 6s linear 4.2s infinite,
+      cq-aperture-quieten 600ms var(--cq-ease) 4.2s forwards;
+  }
+  /* The shutter: one short flash of the core, once, on completion. */
+  @keyframes cq-aperture-shutter {
+    from {
+      opacity: 1;
+    }
+    to {
+      opacity: 0;
+    }
+  }
+  .cq-aperture-svg-flash {
+    opacity: 0;
+  }
+  .cq-aperture[data-motion="full"] .cq-aperture-svg-flash {
+    animation: cq-aperture-shutter 240ms var(--cq-ease) both;
+  }
+  .cq-aperture[data-motion="calm"] .cq-aperture-svg-sweep {
+    opacity: 0.6;
+  }
+  .cq-aperture[data-motion="off"] .cq-aperture-svg-sweep {
+    display: none;
+  }
+
+  /* Windows High Contrast and other forced palettes: the SVG ring in
+     system colours, no bloom, no shader. */
+  @media (forced-colors: active) {
+    .cq-aperture-mark > canvas {
+      display: none;
+    }
+    .cq-aperture-mark > svg {
+      visibility: visible !important;
+    }
+    .cq-aperture-svg-ring,
+    .cq-aperture-svg[data-state] .cq-aperture-svg-ring {
+      stroke: CanvasText;
+    }
+    .cq-aperture-svg-sweep,
+    .cq-aperture-svg-arc,
+    .cq-aperture-svg-core {
+      stroke: Highlight;
+    }
+    .cq-aperture-svg-bloom {
+      display: none;
+    }
+  }
+
+  /*
+   * Q Lumen: the edge light on the dock's side while a voice session is
+   * open (spec §5.1). At most 24 px deep, under the safe-area inset, one
+   * hue, and never over text: it is a gradient into transparency.
+   */
+  .cq-q-lumen {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    width: calc(24px + var(--cq-safe-right));
+    z-index: var(--cq-z-presence);
+    pointer-events: none;
+    opacity: 0.55;
+  }
+  .cq-q-lumen[data-side="right"] {
+    right: 0;
+    background: linear-gradient(to left, var(--cq-q-bloom), transparent);
+  }
+  .cq-q-lumen[data-side="left"] {
+    left: 0;
+    width: calc(24px + var(--cq-safe-left));
+    background: linear-gradient(to right, var(--cq-q-bloom), transparent);
+  }
+  @media (prefers-reduced-transparency: reduce),
+    (prefers-contrast: more),
+    (forced-colors: active) {
+    .cq-q-lumen {
+      display: none;
+    }
+  }
 
   /*
    * How tall a pitch may be: what is left of the viewport once the page
@@ -255,6 +439,12 @@
     --cq-accent-hover: var(--cq-stage-text);
     --cq-accent-soft: var(--cq-stage-surface-strong);
     --cq-shadow-xs: none;
+    --cq-q-light: var(--cq-stage-q-light);
+    --cq-q-core: var(--cq-stage-q-core);
+    --cq-q-bloom: var(--cq-stage-q-bloom);
+    --cq-q-ember: var(--cq-stage-q-ember);
+    --cq-q-sweep: var(--cq-stage-q-core);
+    --cq-q-ink: 0;
   }
   .cq-stage-said {
     text-wrap: balance;

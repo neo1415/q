@@ -68,6 +68,9 @@
   --cq-z-base: 0;
   --cq-z-sticky: 10;
   --cq-z-navigation: 20;
+  /* Q's floating presence and its edge light (ADR 0017 C7): above the
+     navigation, below every popover, sheet and dialog. */
+  --cq-z-presence: 25;
   --cq-z-popover: 30;
   --cq-z-sheet: 40;
   --cq-z-modal: 50;
@@ -117,6 +120,27 @@
   --cq-stage-text: oklch(0.98 0.004 92);
   --cq-stage-text-muted: oklch(1 0 0 / 0.62);
   --cq-stage-accent: oklch(0.76 0.14 258);
+
+  /*
+   * The Q Aperture's light (ADR 0017 F2). One hue family -- the accent hue
+   * and a warm near-white core -- and on Q only: nothing else in the
+   * product glows. Light theme draws ink and light on paper (--cq-q-ink: 1:
+   * a deeper stroke, a tight bloom); dark and the stage draw additive light.
+   * --cq-q-light and --cq-q-ember hold >= 3:1 against every surface the
+   * aperture sits on (WCAG 1.4.11; asserted in apps/web/test).
+   */
+  --cq-q-light: oklch(0.5 0.2 258);
+  --cq-q-core: oklch(0.99 0.012 85);
+  --cq-q-bloom: oklch(0.62 0.19 258 / 0.42);
+  --cq-q-ember: oklch(0.5 0.035 258);
+  /* The focus sweep's highlight: the deeper stroke on paper, the core in light. */
+  --cq-q-sweep: var(--cq-q-light);
+  --cq-q-ink: 1;
+  /* The same light on the stage, which is one night in either theme. */
+  --cq-stage-q-light: oklch(0.8 0.13 258);
+  --cq-stage-q-core: oklch(0.985 0.014 85);
+  --cq-stage-q-bloom: oklch(0.7 0.17 258 / 0.6);
+  --cq-stage-q-ember: oklch(0.63 0.035 258);
 }
 
 @media (min-width: 640px) {
@@ -163,6 +187,12 @@
       0 1px 2px oklch(0.05 0.01 258 / 0.4),
       0 4px 12px -4px oklch(0.05 0.01 258 / 0.5);
     --cq-shadow-overlay: 0 12px 32px -8px oklch(0.05 0.01 258 / 0.7);
+    --cq-q-light: oklch(0.8 0.13 258);
+    --cq-q-core: oklch(0.985 0.014 85);
+    --cq-q-bloom: oklch(0.7 0.17 258 / 0.6);
+    --cq-q-ember: oklch(0.63 0.035 258);
+    --cq-q-sweep: var(--cq-q-core);
+    --cq-q-ink: 0;
   }
 }
 
@@ -196,6 +226,12 @@
     0 1px 2px oklch(0.05 0.01 258 / 0.4),
     0 4px 12px -4px oklch(0.05 0.01 258 / 0.5);
   --cq-shadow-overlay: 0 12px 32px -8px oklch(0.05 0.01 258 / 0.7);
+  --cq-q-light: oklch(0.8 0.13 258);
+  --cq-q-core: oklch(0.985 0.014 85);
+  --cq-q-bloom: oklch(0.7 0.17 258 / 0.6);
+  --cq-q-ember: oklch(0.63 0.035 258);
+  --cq-q-sweep: var(--cq-q-core);
+  --cq-q-ink: 0;
 }
 
 @layer base {

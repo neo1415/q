@@ -23,7 +23,7 @@ import {
   materialUploadCompleteAction,
   materialUploadTargetAction,
 } from "../onboarding-kit/material-actions";
-import { presenceStateFromVoice, type QPresenceState } from "../q-presence";
+import { apertureStateFor, QLumen, type QApertureState } from "../q-aperture";
 import { destinationPath } from "../voice/destinations";
 import { upsertLine, VOICE_STATE_LABELS } from "../voice/session";
 import { useFollowTurn } from "../voice/use-follow-turn";
@@ -401,17 +401,15 @@ export function QConversationPanel({
 
   // What the presence shows, and the word beside it. Voice, while it is
   // on, is the truth; otherwise the run's own state.
-  const presenceState: QPresenceState = voice.active
-    ? presenceStateFromVoice(voice.client.state)
-    : acting
-      ? "ACTION"
-      : q.working
-        ? "THINKING"
-        : settled
-          ? "SUCCESS"
-          : q.state.failure !== null
-            ? "ERROR"
-            : "IDLE";
+  const presenceState: QApertureState = apertureStateFor({
+    voice: voice.active ? voice.client.state : null,
+    asking: (voice.turn?.asking?.options.length ?? 0) > 0,
+    approvalPending: q.state.approval !== null,
+    working: q.working,
+    acting,
+    settled,
+    failed: q.state.failure !== null,
+  });
   const presenceLabel = voice.active
     ? voice.client.muted
       ? "Muted"
@@ -495,6 +493,11 @@ export function QConversationPanel({
           // listening — which is what Q is then doing.
           data-q-voice={voice.active ? voice.client.state : undefined}
         >
+          <QLumen
+            active={voice.active}
+            input={voice.client.inputLevel}
+            output={voice.client.outputLevel}
+          />
           <QStage
             state={presenceState}
             inputLevel={voice.client.inputLevel}

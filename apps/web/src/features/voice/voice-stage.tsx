@@ -5,11 +5,7 @@ import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 import type { QVoiceChoice, QVoiceTurnState } from "@capital-q/contracts";
 import { ICON_SIZE, MessageSquare, Mic, Upload, X } from "@capital-q/ui/icons";
 
-import {
-  QPresence,
-  presenceStateFromVoice,
-  useStagePresenceSize,
-} from "../q-presence";
+import { apertureStateFromVoice, QAperture } from "../q-aperture";
 import type { VoiceSessionClient, VoiceState } from "./session";
 import { VOICE_STATE_LABELS } from "./session";
 
@@ -66,12 +62,11 @@ function StagePresence({
   readonly inputLevel: () => number;
   readonly outputLevel: () => number;
 }) {
-  const size = useStagePresenceSize();
   return (
     <div data-q-stage-presence={state}>
-      <QPresence
-        state={presenceStateFromVoice(state)}
-        size={size}
+      <QAperture
+        state={apertureStateFromVoice(state)}
+        size="stage"
         inputLevel={inputLevel}
         outputLevel={outputLevel}
       />

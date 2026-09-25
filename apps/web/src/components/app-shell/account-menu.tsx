@@ -16,6 +16,7 @@ import {
 } from "@capital-q/ui/popover";
 
 import { ThemeToggle } from "@/features/appearance/theme-toggle";
+import { QMotionToggle } from "@/features/q-aperture";
 
 import { PROFILE_NAVIGATION } from "./navigation";
 
@@ -47,6 +48,10 @@ export function AccountMenu() {
           <div className="flex items-center justify-between gap-3">
             <span className="cq-label text-(--cq-text-primary)">Theme</span>
             <ThemeToggle display="icons" size="touch" />
+          </div>
+          <div className="flex items-center justify-between gap-3">
+            <span className="cq-label text-(--cq-text-primary)">Q motion</span>
+            <QMotionToggle size="touch" />
           </div>
           <Link
             href={PROFILE_NAVIGATION.href}

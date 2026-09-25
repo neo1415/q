@@ -18,8 +18,12 @@ import { QComposer } from "@capital-q/ui/q-composer";
 import { InlineNotice } from "@capital-q/ui/states";
 import { Tooltip } from "@capital-q/ui/tooltip";
 
-import { presenceStateFromVoice, type QPresenceState } from "../q-presence";
-import { QPresence } from "../q-presence";
+import {
+  apertureStateFor,
+  QAperture,
+  QLumen,
+  type QApertureState,
+} from "../q-aperture";
 import { upsertLine, VOICE_STATE_LABELS } from "../voice/session";
 import { useVoiceInterview } from "../voice/use-voice-interview";
 import {
@@ -67,7 +71,7 @@ export function QSheetConversation({
   readonly subject: QSubject;
   readonly connected: boolean;
   /** What Q is doing, for the presence in the chrome. */
-  readonly onActivity?: ((state: QPresenceState) => void) | undefined;
+  readonly onActivity?: ((state: QApertureState) => void) | undefined;
   /** A draft question to open with; the person edits or sends it. */
   readonly seed?: string | null | undefined;
 }) {
@@ -160,13 +164,15 @@ export function QSheetConversation({
     });
   };
 
-  const presenceState: QPresenceState = voice.active
-    ? presenceStateFromVoice(voice.client.state)
-    : q.working
-      ? "THINKING"
-      : q.state.failure !== null
-        ? "ERROR"
-        : "IDLE";
+  // Real state only: the voice session while it is on, then a waiting
+  // approval, then the run.
+  const presenceState: QApertureState = apertureStateFor({
+    voice: voice.active ? voice.client.state : null,
+    asking: (voice.turn?.asking?.options.length ?? 0) > 0,
+    approvalPending: q.state.approval !== null,
+    working: q.working,
+    failed: q.state.failure !== null,
+  });
   useEffect(() => {
     onActivity?.(presenceState);
   }, [presenceState, onActivity]);
@@ -195,10 +201,17 @@ export function QSheetConversation({
 
   return (
     <div className="flex min-h-full flex-col gap-4" data-q-sheet>
+      {/* Q is listening: the edge light on the sheet's side. */}
+      <QLumen
+        active={voice.active}
+        input={voice.client.inputLevel}
+        output={voice.client.outputLevel}
+        side="right"
+      />
       <div className="flex items-center gap-4">
-        <QPresence
+        <QAperture
           state={presenceState}
-          size="md"
+          size="panel"
           inputLevel={voice.client.inputLevel}
           outputLevel={voice.client.outputLevel}
         />

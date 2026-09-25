@@ -9,6 +9,7 @@ import { ContextIndicator } from "@capital-q/ui/context-indicator";
 import { ICON_SIZE, ICON_STROKE } from "@capital-q/ui/icons";
 
 import { ThemeToggle } from "@/features/appearance/theme-toggle";
+import { QMotionToggle } from "@/features/q-aperture";
 import { useHomeHref } from "@/features/q/active-conversation";
 import { ChatsListForRoute } from "@/features/q/chats-list";
 
@@ -86,6 +87,12 @@ export function DesktopSidebar({
         <div className="flex items-center justify-between gap-2 pl-3">
           <span className="cq-caption text-(--cq-text-secondary)">Theme</span>
           <ThemeToggle display="icons" />
+        </div>
+        <div className="flex items-center justify-between gap-2 pl-3">
+          <span className="cq-caption text-(--cq-text-secondary)">
+            Q motion
+          </span>
+          <QMotionToggle />
         </div>
         <SidebarLink
           href={PROFILE_NAVIGATION.href}

@@ -9,7 +9,7 @@ import { useFollowTurn } from "../voice/use-follow-turn";
 import { useQSpeech } from "../voice/use-q-speech";
 import { useVoiceInterview } from "../voice/use-voice-interview";
 import { VoiceStage } from "../voice/voice-stage";
-import { QPresence, useStagePresenceSize } from "../q-presence";
+import { QAperture } from "../q-aperture";
 
 /**
  * The first minute with Q (QX-002 §A1-§A7).
@@ -77,7 +77,6 @@ export function WelcomeScreen({
   const voice = useVoiceInterview();
   const speech = useQSpeech();
   const [started, setStarted] = useState(false);
-  const presenceSize = useStagePresenceSize();
 
   const lines = introduction(knownName);
   const spoken = lines.join(" ");
@@ -164,7 +163,7 @@ export function WelcomeScreen({
       <div className="mx-auto flex min-h-full max-w-2xl flex-col items-center justify-center gap-8">
         {/* Q's presence: speaking while the introduction is read aloud,
             thinking while it is fetched, otherwise still. */}
-        <QPresence
+        <QAperture
           state={
             speech.status === "speaking"
               ? "SPEAKING"
@@ -172,7 +171,7 @@ export function WelcomeScreen({
                 ? "THINKING"
                 : "IDLE"
           }
-          size={presenceSize}
+          size="stage"
         />
 
         {/* Q's introduction, readable without a microphone, a provider or

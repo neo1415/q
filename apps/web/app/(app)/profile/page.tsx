@@ -9,6 +9,7 @@ import { ContextIndicator } from "@capital-q/ui/context-indicator";
 import { getCurrentIdentity } from "@/auth/current-identity";
 import { getSessionUser } from "@/auth/session";
 import { SignOutButton } from "@/features/auth";
+import { QMotionToggle } from "@/features/q-aperture";
 import {
   PageContainer,
   PageHeader,
@@ -55,6 +56,9 @@ export default async function ProfilePage() {
         </ProfileRow>
         <ProfileRow term="Appearance">
           <ThemeToggle />
+        </ProfileRow>
+        <ProfileRow term="Q motion">
+          <QMotionToggle />
         </ProfileRow>
       </dl>
       <div className="flex flex-col gap-10 pt-10">
