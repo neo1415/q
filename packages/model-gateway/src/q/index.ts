@@ -73,6 +73,7 @@ import type { ModelGateway, ModelGatewayExecuteOptions } from "../gateway.js";
 import { acceptStructuredOutput } from "../policy/structured.js";
 import { withoutActionTalk } from "./action-talk.js";
 import { ownProfileFact } from "./own-profile.js";
+import { relationshipFact } from "./relationship-fact.js";
 import {
   ownOnboardingFacts,
   type QOwnOnboardingPort,
@@ -1119,6 +1120,48 @@ export function createModelGatewayQAnswer(
         took("mandate");
       }
       /**
+       * Where their own side stands with the counterparty the question is
+       * about (CQ-Q-030), read through the same tool the model could call,
+       * under the same plan: a company is asked about as an investor, an
+       * investor organisation as a company. A side the person is not on
+       * (a founder asking about a company) is refused by the tool and
+       * simply adds nothing.
+       */
+      let relationship: AuthorisedFact | null = null;
+      let relationshipCall: QToolCallObservation | null = null;
+      const counterparty = askedSubjects(request.subjects, plan).find(
+        (subject) =>
+          subject.kind === "COMPANY" ||
+          (subject.kind === "INVESTOR_ORGANISATION" &&
+            subject.investorOrganisationId !== ownInvestor),
+      );
+      if (counterparty !== undefined && offeredByName.has("get_relationship")) {
+        const call = {
+          callId: "q-relationship",
+          name: "get_relationship",
+          arguments:
+            counterparty.kind === "COMPANY"
+              ? { companyId: counterparty.companyId }
+              : counterparty.kind === "INVESTOR_ORGANISATION"
+                ? {
+                    investorOrganisationId: counterparty.investorOrganisationId,
+                  }
+                : {},
+        };
+        const outcome = await tools.execute(call, toolContext);
+        relationshipCall = {
+          toolName: outcome.toolName,
+          providerName: call.name,
+          status: outcome.status,
+          failureCode: outcome.failureCode,
+          latencyMs: outcome.latencyMs,
+        };
+        if (outcome.result.ok) {
+          relationship = relationshipFact(outcome.result.data);
+        }
+        took("relationship");
+      }
+      /**
        * Who they are, from their own setup (CQ-QX-007): their name, the
        * role they gave, and how far along they are. Only when the firewall
        * granted OWN_ONBOARDING, which it grants to nobody but the person;
@@ -1147,6 +1190,7 @@ export function createModelGatewayQAnswer(
       const facts: readonly AuthorisedFact[] = [
         ...onboardingFacts,
         ...(ownProfile === null ? [] : [ownProfile]),
+        ...(relationship === null ? [] : [relationship]),
         ...assembled.facts,
       ];
 
@@ -1451,6 +1495,9 @@ export function createModelGatewayQAnswer(
 
       if (ownProfileCall !== null) {
         toolCalls.push(ownProfileCall);
+      }
+      if (relationshipCall !== null) {
+        toolCalls.push(relationshipCall);
       }
       if (ownProfile !== null || onboardingFacts.length > 0) {
         messages = [...messages, OWN_MANDATE_NOTE];

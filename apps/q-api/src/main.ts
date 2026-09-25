@@ -146,6 +146,11 @@ import {
 import { createCompanyVisibilitySetAction } from "./composition/company-visibility-action.js";
 import { createExpressInterestAction } from "./composition/express-interest-action.js";
 import { createRespondToInterestAction } from "./composition/respond-to-interest-action.js";
+import {
+  chainProposers,
+  createRelationshipActionBoard,
+  createRelationshipIntelligencePort,
+} from "./composition/relationship-intelligence.js";
 import { createInvestorFeedPort } from "./composition/investor-feed.js";
 import {
   createDiscoveryService,
@@ -599,6 +604,42 @@ const currentSlateExplanations = createCurrentSlateExplanationService({
   logger,
 });
 
+// Express Interest (CQ-NET-010): the Network context's command, composed
+// as the application API composes it — the feed's investor subject, the
+// network-preview disclosure rule, the same capability, idempotency and
+// outbox — so Q's approved action and the feed button are one command.
+const interestService = createInterestService({
+  sql: database.sql,
+  transactions: database.transactions,
+  companies,
+  investors,
+  outbox: createOutboxWriter({
+    registry: createEventRegistry(NETWORK_EVENTS),
+  }),
+  audit: createPostgresMaterialActionAuditWriter(),
+  authorization,
+  investorSubject: slateRead.eligibilityPorts.investorSubject,
+  companyVisibility: {
+    isVisibleToInvestor: async (actor, companyId) => {
+      const decision = await disclosure.canDisclose({
+        principal: actorPrincipal(actor),
+        resource: { type: "company", id: companyId },
+        requestedAccess: "view",
+      });
+      return (
+        decision.outcome === "ALLOW" &&
+        (decision.reasonCode === "NETWORK_VISIBLE" ||
+          decision.reasonCode === "PUBLIC_EXTERNAL")
+      );
+    },
+  },
+});
+// Relationship intelligence (CQ-Q-030): Q reads where the person's own
+// side stands with a counterparty through the same InterestService, and
+// prepares relationship actions on this board for the Approval Engine --
+// it never executes one.
+const relationshipBoard = createRelationshipActionBoard({ logger });
+
 // The Tool Registry (CQ-Q-007): four SAFE_READ tools over the same public
 // query ports and the same two authorities the firewall uses, plus the two
 // bounded public-web research tools when a research provider is composed.
@@ -641,6 +682,10 @@ const qTools = createQTools({
     ...(researchComposition.profiles === undefined
       ? {}
       : { profiles: researchComposition.profiles }),
+    relationships: createRelationshipIntelligencePort({
+      interests: interestService,
+      board: relationshipBoard,
+    }),
   },
   logger,
 });
@@ -673,36 +718,6 @@ const companyService = createCompanyService({
 const profileBoard = createProfileUpdateBoard({ logger });
 const identity = createPostgresApplicationIdentityLookup({ sql: database.sql });
 const qActionRepositories = createPostgresQActionRepositories();
-// Express Interest (CQ-NET-010): the Network context's command, composed
-// as the application API composes it — the feed's investor subject, the
-// network-preview disclosure rule, the same capability, idempotency and
-// outbox — so Q's approved action and the feed button are one command.
-const interestService = createInterestService({
-  sql: database.sql,
-  transactions: database.transactions,
-  companies,
-  investors,
-  outbox: createOutboxWriter({
-    registry: createEventRegistry(NETWORK_EVENTS),
-  }),
-  audit: createPostgresMaterialActionAuditWriter(),
-  authorization,
-  investorSubject: slateRead.eligibilityPorts.investorSubject,
-  companyVisibility: {
-    isVisibleToInvestor: async (actor, companyId) => {
-      const decision = await disclosure.canDisclose({
-        principal: actorPrincipal(actor),
-        resource: { type: "company", id: companyId },
-        requestedAccess: "view",
-      });
-      return (
-        decision.outcome === "ALLOW" &&
-        (decision.reasonCode === "NETWORK_VISIBLE" ||
-          decision.reasonCode === "PUBLIC_EXTERNAL")
-      );
-    },
-  },
-});
 const qActionRegistry = createQActionRegistry([
   createCompanyProfileUpdateAction({
     profiles: companies,
@@ -748,7 +763,9 @@ const qActions = createQActionService({
 });
 const qActionPort = createQActionPort({
   service: qActions,
-  proposer: profileBoard,
+  // A relationship action Q prepared this run first (CQ-Q-030), then a
+  // profile change; one proposal per run either way.
+  proposer: chainProposers(relationshipBoard.proposer, profileBoard),
   // What Q says about an action is read from the records the engine
   // wrote, never from what a model intended (CQ-QACT-001).
   narrator: createQActionNarrator({
