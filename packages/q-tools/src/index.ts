@@ -53,7 +53,20 @@ export type {
   InvestorFeedDecision,
   InvestorFeedPort,
   QToolPorts,
+  RelationshipIntelligencePort,
 } from "./ports.js";
+export {
+  createRelationshipTools,
+  GET_RELATIONSHIP,
+  GetRelationshipInputSchema,
+  GetRelationshipOutputSchema,
+  LIST_INCOMING_INTEREST,
+  ListIncomingInterestOutputSchema,
+  PROPOSE_EXPRESS_INTEREST,
+  PROPOSE_INTEREST_ANSWER,
+  ProposalOutputSchema,
+  type GetRelationshipOutput,
+} from "./tools/relationships.js";
 export {
   createQToolRegistry,
   inputJsonSchemaOf,

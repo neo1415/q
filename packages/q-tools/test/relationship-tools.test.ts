@@ -1,0 +1,456 @@
+import { describe, expect, it } from "vitest";
+
+import type {
+  DisclosureScope,
+  IncomingInterestDto,
+  PermittedContextPlan,
+  RelationshipStatusDto,
+} from "@capital-q/contracts";
+import {
+  nextStepFor,
+  projectRelationshipState,
+  visibleToParty,
+  type ProjectableEvent,
+  type RelationshipParty,
+} from "@capital-q/network";
+import type { ActorContext } from "@capital-q/security";
+
+import {
+  createDefaultQTools,
+  createQToolExecutor,
+  createQToolRegistry,
+  type RelationshipIntelligencePort,
+} from "../src/index.js";
+import {
+  actorA,
+  actorB,
+  COMPANY_A,
+  COMPANY_B_NETWORK,
+  contextFor,
+  fakePorts,
+  INVESTOR_B,
+  planFor,
+  RUN,
+} from "./support.js";
+
+/**
+ * Relationship intelligence tools (CQ-Q-030), held to three properties:
+ *
+ *   1. a party's answer is the projector's fold of exactly the history that
+ *      party may see -- so another party's private facts never leak;
+ *   2. the firewall comes first: a counterparty the plan named but did not
+ *      admit is refused before the Network service is ever asked;
+ *   3. nothing is written but a prepared proposal: no tool can accept,
+ *      decline or express anything, and a refused precondition prepares
+ *      nothing.
+ *
+ * actorA founds COMPANY_A; actorB is a member of INVESTOR_B. The fake port
+ * folds a seeded random history with the real CQ-NET-012 projector.
+ */
+
+function generator(seed: number): () => number {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+const TYPES = [
+  "interest_expressed",
+  "connection_accepted",
+  "interest_declined",
+] as const;
+const SCOPES: readonly DisclosureScope[] = [
+  "investor_private",
+  "founder_private",
+  "relationship_shared",
+];
+
+function randomHistory(seed: number): ProjectableEvent[] {
+  const next = generator(seed);
+  const length = 1 + Math.floor(next() * 8);
+  const events: ProjectableEvent[] = [];
+  for (let sequence = 1; sequence <= length; sequence += 1) {
+    events.push({
+      sequence,
+      // Every pair starts with the investor's private discovery.
+      eventType:
+        sequence === 1
+          ? "discovered"
+          : (TYPES[Math.floor(next() * TYPES.length)] ?? "interest_expressed"),
+      occurredAt: new Date(Date.UTC(2026, 8, 1 + sequence)).toISOString(),
+      visibilityScope:
+        sequence === 1
+          ? "investor_private"
+          : (SCOPES[Math.floor(next() * SCOPES.length)] ??
+            "relationship_shared"),
+    });
+  }
+  return events;
+}
+
+function statusFor(
+  history: readonly ProjectableEvent[],
+  party: RelationshipParty,
+  companyId: string,
+): RelationshipStatusDto | null {
+  const projection = projectRelationshipState(visibleToParty(history, party));
+  return projection === null
+    ? null
+    : {
+        relationshipId: "88888888-0000-4000-8000-000000000001",
+        companyId,
+        investorOrganisationId: INVESTOR_B,
+        state: projection.state,
+        stateSince: projection.stateSince,
+        milestones: projection.milestones.map((m) => ({
+          state: m.state,
+          at: m.at,
+        })),
+        nextStep: nextStepFor(projection.state, party),
+        projectorVersion: projection.version,
+      };
+}
+
+type Calls = {
+  reads: string[];
+  prepared: {
+    actionType: string;
+    payload: Readonly<Record<string, string>>;
+  }[];
+};
+
+function fakeRelationships(
+  history: readonly ProjectableEvent[],
+  options: {
+    readonly mayExpress?: boolean;
+    readonly incoming?: readonly IncomingInterestDto[];
+  } = {},
+): { port: RelationshipIntelligencePort; calls: Calls } {
+  const calls: Calls = { reads: [], prepared: [] };
+  const port: RelationshipIntelligencePort = {
+    withCompany: (actor: ActorContext, companyId) => {
+      calls.reads.push(`withCompany:${companyId}`);
+      if (actor.userId !== actorB.userId) {
+        return Promise.reject(new Error("not an investor"));
+      }
+      return Promise.resolve(statusFor(history, "INVESTOR", companyId));
+    },
+    withInvestor: (actor: ActorContext) => {
+      calls.reads.push("withInvestor");
+      if (actor.userId !== actorA.userId) return Promise.resolve(null);
+      return Promise.resolve(statusFor(history, "COMPANY", COMPANY_A));
+    },
+    incomingInterest: (actor: ActorContext, companyId) => {
+      calls.reads.push(`incoming:${companyId}`);
+      if (actor.userId !== actorA.userId || companyId !== COMPANY_A) {
+        return Promise.reject(new Error("not this company's member"));
+      }
+      return Promise.resolve(options.incoming ?? []);
+    },
+    mayExpressInterest: () => Promise.resolve(options.mayExpress ?? true),
+    mayAnswerInterest: () => Promise.resolve(true),
+    prepareForApproval: (entry) => {
+      calls.prepared.push({
+        actionType: entry.actionType,
+        payload: entry.payload,
+      });
+      return "PREPARED";
+    },
+  };
+  return { port, calls };
+}
+
+function executorWith(port: RelationshipIntelligencePort) {
+  return createQToolExecutor({
+    registry: createQToolRegistry(
+      createDefaultQTools(fakePorts({ relationships: port })),
+    ),
+  });
+}
+
+const investorPlan = planFor(actorB, "GENERAL_QUESTION", [
+  { kind: "NETWORK_VISIBLE_DATA", sensitivity: "NETWORK_VISIBLE" },
+]);
+const founderPlan = planFor(actorA, "OWN_COMPANY_QUESTION", [
+  { kind: "COMPANY_PROFILE", sensitivity: "INTERNAL", companyId: COMPANY_A },
+  { kind: "NETWORK_VISIBLE_DATA", sensitivity: "NETWORK_VISIBLE" },
+]);
+
+type RelationshipData = {
+  yourSide: string;
+  counterpart: { name: string | null };
+  relationship: {
+    state: string;
+    milestones: { state: string; at: string }[];
+  } | null;
+};
+
+const SEEDS = Array.from({ length: 200 }, (_, i) => i + 1);
+
+describe("get_relationship", () => {
+  it("answers each side with the projector's fold of exactly what that side may see (200 random histories)", async () => {
+    for (const seed of SEEDS) {
+      const history = randomHistory(seed);
+      const { port } = fakeRelationships(history);
+      const tools = executorWith(port);
+
+      const asInvestor = await tools.execute(
+        {
+          callId: "r1",
+          name: "get_relationship",
+          arguments: { companyId: COMPANY_B_NETWORK },
+        },
+        contextFor(actorB, investorPlan),
+      );
+      const asCompany = await tools.execute(
+        {
+          callId: "r2",
+          name: "get_relationship",
+          arguments: { investorOrganisationId: INVESTOR_B },
+        },
+        contextFor(actorA, founderPlan),
+      );
+      for (const [outcome, party] of [
+        [asInvestor, "INVESTOR"],
+        [asCompany, "COMPANY"],
+      ] as const) {
+        expect(outcome.status, `seed ${seed} ${party}`).toBe("SUCCEEDED");
+        if (!outcome.result.ok) throw new Error("unreachable");
+        const data = outcome.result.data as RelationshipData;
+        const expected = projectRelationshipState(
+          visibleToParty(history, party),
+        );
+        expect(data.relationship?.state ?? null, `seed ${seed} ${party}`).toBe(
+          expected?.state ?? null,
+        );
+        expect(
+          data.relationship?.milestones ?? [],
+          `seed ${seed} ${party}`,
+        ).toEqual(
+          (expected?.milestones ?? []).map((m) => ({
+            state: m.state,
+            at: m.at,
+          })),
+        );
+      }
+
+      // The company never sees the investor's private events: no
+      // milestone dated at an investor-private event reaches it.
+      if (!asCompany.result.ok) throw new Error("unreachable");
+      const companyData = asCompany.result.data as RelationshipData;
+      const privateDates = new Set(
+        history
+          .filter((e) => e.visibilityScope === "investor_private")
+          .map((e) => e.occurredAt),
+      );
+      for (const milestone of companyData.relationship?.milestones ?? []) {
+        expect(privateDates.has(milestone.at), `seed ${seed}`).toBe(false);
+      }
+      // Nothing shared: the company learns neither a state nor a name.
+      if (companyData.relationship === null) {
+        expect(companyData.counterpart.name, `seed ${seed}`).toBeNull();
+      }
+    }
+  });
+
+  it("is refused before the Network service is asked when the firewall named the counterparty but did not admit it", async () => {
+    const { port, calls } = fakeRelationships(randomHistory(1));
+    const tools = executorWith(port);
+    // The run is about COMPANY_B_NETWORK, and the firewall bound no scope to it.
+    const denied: PermittedContextPlan = {
+      ...investorPlan,
+      subjects: [{ kind: "COMPANY", companyId: COMPANY_B_NETWORK }],
+    };
+    const outcome = await tools.execute(
+      {
+        callId: "r1",
+        name: "get_relationship",
+        arguments: { companyId: COMPANY_B_NETWORK },
+      },
+      contextFor(actorB, denied),
+    );
+    expect(outcome.status).toBe("DENIED");
+    expect(outcome.failureCode).toBe("NOT_AVAILABLE");
+    expect(calls.reads).toEqual([]);
+  });
+
+  it("answers only for the asker's own side: a founder asking as an investor is refused", async () => {
+    const { port } = fakeRelationships(randomHistory(2));
+    const outcome = await executorWith(port).execute(
+      {
+        callId: "r1",
+        name: "get_relationship",
+        arguments: { companyId: COMPANY_B_NETWORK },
+      },
+      contextFor(actorA, founderPlan),
+    );
+    expect(outcome.status).toBe("DENIED");
+  });
+
+  it("names exactly one counterparty", async () => {
+    const { port } = fakeRelationships(randomHistory(3));
+    const outcome = await executorWith(port).execute(
+      {
+        callId: "r1",
+        name: "get_relationship",
+        arguments: {
+          companyId: COMPANY_B_NETWORK,
+          investorOrganisationId: INVESTOR_B,
+        },
+      },
+      contextFor(actorB, investorPlan),
+    );
+    expect(outcome.status).toBe("FAILED");
+    expect(outcome.failureCode).toBe("INVALID_ARGUMENTS");
+  });
+});
+
+const PENDING: IncomingInterestDto = {
+  interestId: "77777777-0000-4000-8000-000000000001",
+  investorOrganisationId: INVESTOR_B,
+  investorName: "Beacon Ventures",
+  investorType: "VC",
+  expressedAt: "2026-09-25T10:00:00.000Z",
+  response: "PENDING",
+  respondedAt: null,
+  connection: null,
+};
+
+describe("proposal tools write nothing but a prepared proposal", () => {
+  it("propose_express_interest prepares exactly the approved action's payload and executes nothing", async () => {
+    const { port, calls } = fakeRelationships(randomHistory(4));
+    const outcome = await executorWith(port).execute(
+      {
+        callId: "p1",
+        name: "propose_express_interest",
+        arguments: { companyId: COMPANY_B_NETWORK },
+      },
+      contextFor(actorB, investorPlan),
+    );
+    expect(outcome.status).toBe("SUCCEEDED");
+    expect(outcome.result).toMatchObject({
+      ok: true,
+      data: { status: "PREPARED" },
+    });
+    expect(calls.prepared).toHaveLength(1);
+    const [prepared] = calls.prepared;
+    expect(prepared?.actionType).toBe("relationship.interest.express");
+    // Exactly the approved action's payload: the company and its name.
+    expect(Object.keys(prepared?.payload ?? {}).sort()).toEqual([
+      "companyId",
+      "companyName",
+    ]);
+    expect(prepared?.payload["companyId"]).toBe(COMPANY_B_NETWORK);
+  });
+
+  it("prepares nothing when the command itself would refuse", async () => {
+    const { port, calls } = fakeRelationships(randomHistory(5), {
+      mayExpress: false,
+    });
+    const outcome = await executorWith(port).execute(
+      {
+        callId: "p1",
+        name: "propose_express_interest",
+        arguments: { companyId: COMPANY_B_NETWORK },
+      },
+      contextFor(actorB, investorPlan),
+    );
+    expect(outcome.status).toBe("DENIED");
+    expect(calls.prepared).toEqual([]);
+  });
+
+  it("propose_interest_answer resolves the pending interest by code and prepares the answer the model chose", async () => {
+    const { port, calls } = fakeRelationships(randomHistory(6), {
+      incoming: [PENDING],
+    });
+    const tools = executorWith(port);
+    for (const decision of ["ACCEPTED", "DECLINED"] as const) {
+      calls.prepared.length = 0;
+      const outcome = await tools.execute(
+        {
+          callId: "p2",
+          name: "propose_interest_answer",
+          arguments: {
+            companyId: COMPANY_A,
+            investorOrganisationId: INVESTOR_B,
+            decision,
+          },
+        },
+        contextFor(actorA, founderPlan),
+      );
+      expect(outcome.status).toBe("SUCCEEDED");
+      expect(calls.prepared).toEqual([
+        {
+          actionType: "relationship.interest.respond",
+          payload: {
+            interestId: PENDING.interestId,
+            companyId: COMPANY_A,
+            decision,
+            investorName: "Beacon Ventures",
+          },
+        },
+      ]);
+    }
+  });
+
+  it("an interest already answered, or another company's inbox, prepares nothing", async () => {
+    const answered = fakeRelationships(randomHistory(7), {
+      incoming: [{ ...PENDING, response: "ACCEPTED" }],
+    });
+    const already = await executorWith(answered.port).execute(
+      {
+        callId: "p3",
+        name: "propose_interest_answer",
+        arguments: {
+          companyId: COMPANY_A,
+          investorOrganisationId: INVESTOR_B,
+          decision: "DECLINED",
+        },
+      },
+      contextFor(actorA, founderPlan),
+    );
+    expect(already.status).toBe("DENIED");
+    expect(answered.calls.prepared).toEqual([]);
+
+    const other = fakeRelationships(randomHistory(8), { incoming: [PENDING] });
+    const investorTry = await executorWith(other.port).execute(
+      {
+        callId: "p4",
+        name: "propose_interest_answer",
+        arguments: {
+          companyId: COMPANY_A,
+          investorOrganisationId: INVESTOR_B,
+          decision: "ACCEPTED",
+        },
+      },
+      contextFor(actorB, investorPlan),
+    );
+    expect(investorTry.status).toBe("DENIED");
+    expect(other.calls.prepared).toEqual([]);
+  });
+
+  it("offers the two proposal tools only in the one write lane, and no tool that accepts, declines or expresses", () => {
+    const { port } = fakeRelationships(randomHistory(9));
+    const registry = createQToolRegistry(
+      createDefaultQTools(fakePorts({ relationships: port })),
+    );
+    const relationshipTools = registry
+      .list()
+      .map((record) => record.definition)
+      .filter((definition) => definition.id.startsWith("relationship."));
+    expect(
+      relationshipTools.map((d) => [d.providerName, d.riskClass]).sort(),
+    ).toEqual([
+      ["get_relationship", "SAFE_READ"],
+      ["list_incoming_interest", "SAFE_READ"],
+      ["propose_express_interest", "LOW_RISK_INTERNAL"],
+      ["propose_interest_answer", "LOW_RISK_INTERNAL"],
+    ]);
+    expect(RUN).toBeTruthy();
+  });
+});

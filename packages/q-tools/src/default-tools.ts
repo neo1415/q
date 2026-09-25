@@ -14,6 +14,7 @@ import { createResearchPublicWebTool } from "./tools/research-public-web.js";
 import { createDiscoverySlateTool } from "./tools/discovery-slate.js";
 import { createFindProspectiveInvestorsTool } from "./tools/find-prospective-investors.js";
 import { createRecommendationExplanationTool } from "./tools/recommendation-explanation.js";
+import { createRelationshipTools } from "./tools/relationships.js";
 import { createSearchCompaniesTool } from "./tools/search-companies.js";
 
 /**
@@ -47,6 +48,10 @@ export function createDefaultQTools(
     ...(profiles === undefined
       ? []
       : [createLookupPublicProfileTool({ ...ports, profiles })]),
+    // CQ-Q-030: relationships, when the Network context is composed.
+    ...(ports.relationships === undefined
+      ? []
+      : createRelationshipTools(ports, ports.relationships)),
   ];
 }
 

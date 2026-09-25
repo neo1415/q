@@ -8,6 +8,10 @@ import type {
   InvestorMandateQueryPort,
   InvestorOrganisationQueryPort,
 } from "@capital-q/investors";
+import type {
+  IncomingInterestDto,
+  RelationshipStatusDto,
+} from "@capital-q/contracts";
 import type { DisclosureAccessService } from "@capital-q/permissions";
 import type {
   PublicProfileLookupProvider,
@@ -57,6 +61,54 @@ export type InvestorFeedPort = {
 };
 
 /**
+ * The Network context's relationship capabilities, for Q (CQ-Q-030).
+ *
+ * Every read answers for the actor's own side only, folded from the
+ * history that side may see (CQ-NET-012): a company never learns of an
+ * investor's private discovery through Q any more than through the page.
+ * The reads throw when the actor may not ask; `null` means nothing this
+ * side may see exists.
+ *
+ * `prepareForApproval` is the one write: it hands a relationship action
+ * to this run's Approval Engine proposer. It executes nothing -- the
+ * person approves the exact payload, and only then does the action run,
+ * through the same command the screen calls.
+ */
+export type RelationshipIntelligencePort = {
+  readonly withCompany: (
+    actor: ActorContext,
+    companyId: string,
+  ) => Promise<RelationshipStatusDto | null>;
+  readonly withInvestor: (
+    actor: ActorContext,
+    investorOrganisationId: string,
+  ) => Promise<RelationshipStatusDto | null>;
+  /** Interest addressed to the actor's own company, with its answers. */
+  readonly incomingInterest: (
+    actor: ActorContext,
+    companyId: string,
+  ) => Promise<readonly IncomingInterestDto[]>;
+  /** The Express Interest command's own authorisation; writes nothing. */
+  readonly mayExpressInterest: (
+    actor: ActorContext,
+    companyId: string,
+  ) => Promise<boolean>;
+  /** The answer command's own authorisation; writes nothing. */
+  readonly mayAnswerInterest: (
+    actor: ActorContext,
+    interestId: string,
+  ) => Promise<boolean>;
+  readonly prepareForApproval: (entry: {
+    readonly runId: string;
+    readonly tenantId: string;
+    readonly actorUserId: string;
+    readonly actionType:
+      "relationship.interest.express" | "relationship.interest.respond";
+    readonly payload: Readonly<Record<string, string>>;
+  }) => "PREPARED" | "ONE_PER_TURN";
+};
+
+/**
  * Everything the Safe Read tools may reach: the owning contexts' public
  * query ports and the two deterministic authorities. No executor, no
  * connection, no credential — a tool cannot compose a statement, only
@@ -95,4 +147,6 @@ export type QToolPorts = {
   readonly research?: PublicWebResearchService | undefined;
   /** Public LinkedIn pages by URL; absent means the lookup tool does not exist. */
   readonly profiles?: PublicProfileLookupProvider | undefined;
+  /** Relationships (CQ-Q-030); absent means no relationship tool exists. */
+  readonly relationships?: RelationshipIntelligencePort | undefined;
 };
