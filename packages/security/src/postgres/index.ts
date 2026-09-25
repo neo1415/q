@@ -34,3 +34,5 @@ export {
   type ApplicationIdentity,
   type ApplicationIdentityLookup,
 } from "./application-identity.js";
+
+export { createPostgresPersonProfileStore } from "./person-profile-store.js";

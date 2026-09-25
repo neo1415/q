@@ -44,10 +44,12 @@ import {
 } from "@capital-q/onboarding";
 import { createPostgresDocumentQueryPort } from "@capital-q/evidence";
 import {
+  createInvestorService,
   createPostgresInvestorMandateQueryPort,
   createPostgresInvestorOrganisationQueryPort,
   createPostgresInvestorOrganisationRepository,
 } from "@capital-q/investors";
+import { INVESTOR_EVENTS } from "@capital-q/investors/events";
 import {
   createInterestService,
   createPostgresRelationshipEventRepository,
@@ -134,6 +136,7 @@ import {
   createPostgresActorContextResolver,
   createPostgresApplicationIdentityLookup,
   createPostgresAuthorizationPolicySource,
+  createPostgresPersonProfileStore,
 } from "@capital-q/security/postgres";
 import { createSupabaseAccessTokenAuthenticator } from "@capital-q/security/supabase";
 
@@ -202,6 +205,7 @@ import {
 } from "./voice/turn-timing.js";
 import { createDecisionReader } from "./voice/decision.js";
 import { createPersonProfileUpdateAction } from "./composition/person-profile-action.js";
+import { createInvestorProfileUpdateAction } from "./composition/investor-profile-action.js";
 import {
   createConversationDigestPort,
   createMemoryLearner,
@@ -721,6 +725,22 @@ const companyService = createCompanyService({
 // on this board (ADR 0011); the Approval Engine does everything after.
 const profileBoard = createProfileUpdateBoard({ logger });
 const identity = createPostgresApplicationIdentityLookup({ sql: database.sql });
+// The person's own profile: the same store `PATCH /v1/me/profile` writes
+// through in the application API (BIZ-002), so the page and Q share it.
+const people = createPostgresPersonProfileStore({ sql: database.sql });
+// The investors context's own command surface, composed as the
+// application API composes it, for investor.profile.update (BIZ-002).
+const investorService = createInvestorService({
+  sql: database.sql,
+  transactions: database.transactions,
+  authorization,
+  organisations: createPostgresOrganisationQueryPort({ sql: database.sql }),
+  // Only the investors context's own events can leave this writer.
+  outbox: createOutboxWriter({
+    registry: createEventRegistry(INVESTOR_EVENTS),
+  }),
+  audit: createPostgresMaterialActionAuditWriter(),
+});
 const qActionRepositories = createPostgresQActionRepositories();
 const qActionRegistry = createQActionRegistry([
   createCompanyProfileUpdateAction({
@@ -741,13 +761,12 @@ const qActionRegistry = createQActionRegistry([
   createExpressInterestAction({ interests: interestService, logger }),
   // The company's answer: the inbox's own command, approved (CQ-NET-011).
   createRespondToInterestAction({ interests: interestService, logger }),
-  // What Q calls the person: their own record, their own approval.
-  createPersonProfileUpdateAction({
-    people: {
-      updateDisplayName: ({ userId, displayName }) =>
-        identity.updateDisplayNameOfUser?.(userId, displayName) ??
-        Promise.resolve(false),
-    },
+  // What Q shows about the person: their own record, their own approval.
+  createPersonProfileUpdateAction({ people, logger }),
+  // The investor organisation's declared profile (BIZ-002).
+  createInvestorProfileUpdateAction({
+    investors: investorService,
+    authorization,
     logger,
   }),
 ]);

@@ -41,6 +41,15 @@ export {
 } from "./identity/ids.js";
 
 export {
+  effectivePersonChanges,
+  PersonProfileNotFoundError,
+  PersonProfileVersionConflictError,
+  type PersonProfile,
+  type PersonProfileChanges,
+  type PersonProfileStore,
+} from "./identity/person-profile.js";
+
+export {
   AuthenticatedPrincipalSchema,
   type AuthenticatedPrincipal,
 } from "./identity/principal.js";

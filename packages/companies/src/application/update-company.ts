@@ -87,14 +87,18 @@ export function createUpdateCompany(dependencies: CompanyServiceDependencies) {
       if (current === null) {
         throw new CompanyNotFoundError();
       }
-      if (current.version !== command.input.expectedVersion) {
-        throw new CompanyVersionConflictError(current.version);
-      }
-
       const changes = effectiveChanges(current, command.input);
       const changedFields = Object.keys(changes) as CompanyEditableField[];
+      // Nothing differs: either a no-op, or a replay of a change that
+      // already landed (the version moved because of it). The requested
+      // state holds, so the retry succeeds without spending a version,
+      // an event or an audit row (BIZ-002: edits are idempotent). Any
+      // stale request that WOULD change something is still refused.
       if (changedFields.length === 0) {
         return current;
+      }
+      if (current.version !== command.input.expectedVersion) {
+        throw new CompanyVersionConflictError(current.version);
       }
 
       const updated = await repositories.companies.updateProfile(tx, {

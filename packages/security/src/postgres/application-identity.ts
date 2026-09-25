@@ -28,22 +28,8 @@ export type ApplicationIdentityLookup = {
   readonly lookup: (
     principal: AuthenticatedPrincipal,
   ) => Promise<ApplicationIdentity | null>;
-  /** Record what the person asks to be called; false when no active profile exists. */
-  readonly updateDisplayName?: (
-    principal: AuthenticatedPrincipal,
-    displayName: string,
-  ) => Promise<boolean>;
-  /**
-   * The same change keyed on the application user id, for a server-side
-   * caller acting under an approval the person gave (ADR 0011). The id
-   * must be the approver's own; the caller is responsible for that, and
-   * the Q action that uses this refuses any other. False when no active
-   * profile exists.
-   */
-  readonly updateDisplayNameOfUser?: (
-    userId: UserId,
-    displayName: string,
-  ) => Promise<boolean>;
+  // Edits to the person's profile go through the one person-profile store
+  // (person-profile-store.ts, BIZ-002), never through a lookup.
 };
 
 const RowSchema = z.object({
@@ -81,24 +67,6 @@ export function createPostgresApplicationIdentityLookup(options: {
         userId: parsed.data.id,
         displayName: parsed.data.display_name,
       };
-    },
-    updateDisplayNameOfUser: async (userId, displayName) => {
-      const rows = await sql`
-        update identity.user_profiles
-           set display_name = ${displayName}, updated_at = now()
-         where id = ${userId}
-           and status = 'active'
-        returning id`;
-      return rows.length > 0;
-    },
-    updateDisplayName: async (principal, displayName) => {
-      const rows = await sql`
-        update identity.user_profiles
-           set display_name = ${displayName}
-         where auth_user_id = ${principal.authUserId}
-           and status = 'active'
-        returning id`;
-      return rows.length > 0;
     },
   };
 }

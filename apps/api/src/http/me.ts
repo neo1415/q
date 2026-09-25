@@ -1,9 +1,14 @@
 import type { FastifyInstance } from "fastify";
 import {
   ME_PATH,
+  ME_PROFILE_PATH,
   MeResponseSchema,
+  PersonProfileDtoSchema,
   UpdateMeRequestSchema,
+  UpdatePersonProfileRequestSchema,
+  parseContract,
   type MeResponse,
+  type PersonProfileDto,
 } from "@capital-q/contracts";
 import {
   ActorContextDeniedError,
@@ -13,6 +18,9 @@ import {
   parseOrganisationSelector,
   resolveHumanActorContext,
   type ActorContextResolver,
+  type AuthenticatedPrincipal,
+  type PersonProfile,
+  type PersonProfileStore,
 } from "@capital-q/security";
 import type { ApplicationIdentityLookup } from "@capital-q/security/postgres";
 
@@ -26,7 +34,24 @@ export type MeRouteDependencies = {
   readonly authenticator: RequestAuthenticator;
   readonly resolver: ActorContextResolver;
   readonly identities: ApplicationIdentityLookup;
+  /**
+   * The person's own editable profile (BIZ-002): the same store Q's
+   * approved `person.profile.update` executes through, so the page and Q
+   * share one write path. Absent: the profile routes are not served and
+   * `PATCH /v1/me` refuses.
+   */
+  readonly people?: PersonProfileStore | undefined;
 };
+
+function toPersonProfileDto(profile: PersonProfile): PersonProfileDto {
+  return PersonProfileDtoSchema.parse({
+    userId: profile.userId,
+    displayName: profile.displayName,
+    headline: profile.headline,
+    version: profile.version,
+    updatedAt: profile.updatedAt,
+  });
+}
 
 /**
  * `GET /v1/me` -- the one place a client learns who the server thinks is
@@ -48,46 +73,100 @@ export function registerMeRoute(
   app: FastifyInstance,
   dependencies: MeRouteDependencies,
 ): void {
-  // `PATCH /v1/me` — the one thing a person may set about themselves
-  // here: what to call them. Under their own session, never on behalf
-  // of anyone, and never more than a name.
-  app.patch(
-    ME_PATH,
-    {
-      onRequest: requireAuthenticationHook({
-        authenticator: dependencies.authenticator,
-      }),
-    },
-    async (request, reply) => {
-      const principal = getPrincipal(request);
-      const parsed = UpdateMeRequestSchema.safeParse(request.body ?? {});
-      if (!parsed.success) {
-        return reply.code(400).send({
-          type: "about:blank",
-          title: "Bad Request",
-          status: 400,
-          detail: "A display name between 1 and 80 characters is required.",
+  const authenticated = requireAuthenticationHook({
+    authenticator: dependencies.authenticator,
+  });
+  const people = dependencies.people;
+
+  /**
+   * The acting person's own profile. The user id comes from the verified
+   * session and nowhere else; an absent, suspended or closed profile is
+   * one answer, the same as "no access".
+   */
+  const ownProfile = async (
+    principal: AuthenticatedPrincipal,
+  ): Promise<{
+    readonly store: PersonProfileStore;
+    profile: PersonProfile;
+  }> => {
+    const identity = await dependencies.identities.lookup(principal);
+    const profile =
+      identity === null || people === undefined
+        ? null
+        : await people.read(identity.userId);
+    if (profile === null || people === undefined) {
+      throw new ActorContextDeniedError();
+    }
+    return { store: people, profile };
+  };
+
+  // `PATCH /v1/me` — what to call the person, as it always was: no
+  // version, the latest request wins. Kept for the callers that predate
+  // the profile route; it writes through the same store.
+  app.patch(ME_PATH, { onRequest: authenticated }, async (request, reply) => {
+    const parsed = UpdateMeRequestSchema.safeParse(request.body ?? {});
+    if (!parsed.success) {
+      return reply.code(400).send({
+        type: "about:blank",
+        title: "Bad Request",
+        status: 400,
+        detail: "A display name between 1 and 80 characters is required.",
+      });
+    }
+    const { store, profile } = await ownProfile(getPrincipal(request));
+    await store.update({
+      userId: profile.userId,
+      expectedVersion: profile.version,
+      changes: { displayName: parsed.data.displayName },
+    });
+    return reply.code(204).send();
+  });
+
+  if (people !== undefined) {
+    app.get(
+      ME_PROFILE_PATH,
+      { onRequest: authenticated },
+      async (request, reply) => {
+        const { profile } = await ownProfile(getPrincipal(request));
+        void reply.header("Cache-Control", "no-store");
+        return toPersonProfileDto(profile);
+      },
+    );
+
+    // Optimistic and idempotent: a stale version is VERSION_CONFLICT, and
+    // a replay of a change that already landed answers with the profile as
+    // it stands (the store's rule, shared with Q's approved action).
+    app.patch(
+      ME_PROFILE_PATH,
+      { onRequest: authenticated },
+      async (request, reply) => {
+        const input = parseContract(
+          UpdatePersonProfileRequestSchema,
+          request.body,
+          "The profile update is not valid.",
+        );
+        const { store, profile } = await ownProfile(getPrincipal(request));
+        const updated = await store.update({
+          userId: profile.userId,
+          expectedVersion: input.expectedVersion,
+          changes: {
+            ...(input.displayName === undefined
+              ? {}
+              : { displayName: input.displayName }),
+            ...(input.headline === undefined
+              ? {}
+              : { headline: input.headline }),
+          },
         });
-      }
-      const update = dependencies.identities.updateDisplayName;
-      const updated =
-        update === undefined
-          ? false
-          : await update(principal, parsed.data.displayName);
-      if (!updated) {
-        throw new ActorContextDeniedError();
-      }
-      return reply.code(204).send();
-    },
-  );
+        void reply.header("Cache-Control", "no-store");
+        return toPersonProfileDto(updated);
+      },
+    );
+  }
 
   app.get(
     ME_PATH,
-    {
-      onRequest: requireAuthenticationHook({
-        authenticator: dependencies.authenticator,
-      }),
-    },
+    { onRequest: authenticated },
     async (request, reply): Promise<MeResponse> => {
       const principal = getPrincipal(request);
 

@@ -1,5 +1,8 @@
 import { z } from "zod";
 
+import { UtcTimestampSchema } from "../common/time.js";
+import { ResourceVersionSchema } from "../common/version.js";
+
 /**
  * `GET /v1/me` -- who is signed in, and where they are acting.
  *
@@ -53,3 +56,63 @@ export const UpdateMeRequestSchema = z
   })
   .strict();
 export type UpdateMeRequest = z.infer<typeof UpdateMeRequestSchema>;
+
+/**
+ * `GET|PATCH /v1/me/profile` — the person's own editable profile (BIZ-002).
+ *
+ * What Capital Q shows about the person themselves: what to call them and a
+ * one-line headline. Their own record only: there is no user id on the
+ * wire, so nobody can name anybody else's. Optimistic like every other
+ * editable profile: the caller sends the version it read, and a stale edit
+ * is refused with VERSION_CONFLICT rather than overwriting a newer one.
+ * The same store carries Q's approved `person.profile.update`, so the page
+ * and Q are two front doors onto one write path.
+ */
+export const ME_PROFILE_PATH = "/v1/me/profile" as const;
+
+export const PERSON_DISPLAY_NAME_MAX_LENGTH = 80;
+export const PERSON_HEADLINE_MAX_LENGTH = 160;
+
+export const PERSON_EDITABLE_FIELDS = ["displayName", "headline"] as const;
+export type PersonEditableField = (typeof PERSON_EDITABLE_FIELDS)[number];
+
+export const PersonDisplayNameSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(PERSON_DISPLAY_NAME_MAX_LENGTH);
+export const PersonHeadlineSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(PERSON_HEADLINE_MAX_LENGTH);
+
+export const PersonProfileDtoSchema = z
+  .object({
+    userId: z.string().uuid(),
+    /** Null until the person says what to call them. Never guessed. */
+    displayName: z.string().nullable(),
+    /** Null means not stated. */
+    headline: z.string().nullable(),
+    version: ResourceVersionSchema,
+    updatedAt: UtcTimestampSchema,
+  })
+  .strict();
+export type PersonProfileDto = z.infer<typeof PersonProfileDtoSchema>;
+
+export const UpdatePersonProfileRequestSchema = z
+  .object({
+    expectedVersion: ResourceVersionSchema,
+    displayName: PersonDisplayNameSchema.optional(),
+    /** `null` returns the headline to not stated. */
+    headline: PersonHeadlineSchema.nullable().optional(),
+  })
+  .strict()
+  .refine(
+    (value) =>
+      PERSON_EDITABLE_FIELDS.some((field) => value[field] !== undefined),
+    { message: "expected at least one field to update" },
+  );
+export type UpdatePersonProfileRequest = z.infer<
+  typeof UpdatePersonProfileRequestSchema
+>;
