@@ -1,0 +1,28 @@
+- [Claude app process tree kills servers](claude-app-process-tree-kills-servers.md) — start the demo stack detached (pnpm demo:detached), never from my shells
+- [Claude app MSIX virtualised AppData](claude-app-msix-virtualised-appdata.md) — pnpm shim and corepack cache live under Packages\Claude_*\LocalCache outside the app
+- [Turbo strict env drops overrides](turbo-strict-env-drops-overrides.md) — dev task uses envMode loose so pnpm demo --local overrides reach services
+- [Hosted Supabase state](hosted-supabase-state.md) — ref vcohxiqsmnkzxnvawgri, eu-central-1 pooler with sslmode=require; fully migrated 2026-09-22; it is the hosted dev/staging project and what Railway runs against
+- [No unnecessary builds](no-unnecessary-builds.md) — build a package only when a test or the running stack needs its dist; tsc --noEmit otherwise
+- [ADR 0011, no word lists](adr-0011-no-word-lists.md) — user rejected regex patches; model reads meaning into a schema, code validates/confirms/executes; profile changes go through the Approval Engine
+- [Railway staging, Render superseded](render-vercel-state.md) — api/q-api/workers AND web (capital-qweb-production.up.railway.app, since 2026-09-24) on Railway project Q; never give workers the synthetic-demo vars
+- [ADR 0012, memory and conversations](adr-0012-memory-conversations.md) — memory gate/learner/decision reader/chats sidebar; re-run docs/modules/q-memory-conversations-audit.md; 20260925 migrations need pushing to hosted
+- [Format check and graphify-out](format-check-graphify-out.md) — the 244 prettier warnings are all under untracked graphify-out/; tracked files pass
+- [Lint heap and root gates](lint-heap-and-gates.md) — eslint needs NODE_OPTIONS=--max-old-space-size=8192 and must run alone; run gates sequentially with the demo stack stopped; ignore .claude/** when an agent worktree exists
+- [Integration baseline posture](integration-baseline-posture.md) — since 2026-09-18 the reset-DB integration gate is fully green (demo Google posture reverted by 20260926, clock race fixed); any failure is a real regression
+- [Bash heredoc collapses backslashes](bash-heredoc-collapses-backslashes.md) — write scripts with backslashes via the Write tool, not inline heredocs; check for 0x08 bytes when a regex mysteriously fails
+- [Synthetic demo model routing](synthetic-demo-model-routing.md) — CQ_SYNTHETIC_DEMO_ROUTING=true lets demo work use Gemini instead of Groq free-tier limits; local/test + loopback DB only, real customer traffic unchanged
+- [Demo status and journey](demo-status-and-journey.md) — pnpm demo:status / demo:journey; nemkyc shares ports 3000-3001 and 404s during our restarts
+- [Vitest worker start timeout](vitest-worker-start-timeout.md) — "Failed to start forks worker" means those files never ran; 60s hard-coded, not a test defect
+- [GateQ intake state](gateq-intake-state.md) — applicant surface is live; guest document upload blocked on an Evidence authority decision, blocks GATE-003
+- [React Suspense rAF reveal](react-suspense-raf-reveal.md) — hidden tabs never reveal or hydrate streamed boundaries; check visibilityState before believing a blank render
+- [QX-003A hydration fix](qx-003a-hydration-fix.md) — open-guard set before the read it guarded, plus a vestigial Suspense boundary; preview:update wipes the tester's account
+- [Dev stack watch restarts](dev-stack-watch-restarts.md) — building any package restarts the stack; never poll demo.log for quiet, it never goes quiet
+
+- [Python file writes flip to CRLF](python-file-writes-flip-to-crlf.md) — io.open(p,"w") rewrites whole files; pass newline="" both ways
+- [Railway ElevenLabs key mismatch](railway-elevenlabs-key-mismatch.md) — silent Q on Railway = speak relay upstream 401 quota_exceeded; Railway held an exhausted free-tier key; compare key hashes before touching code; secret writes need the user
+- [Demo model policy: OpenAI primary](demo-model-policy-openai-primary.md) — user: any provided model may carry any task in the demo; OpenAI first, Gemini fallback, no Groq; stop re-raising data-policy gating
+- [Machine freeze: cap workers](machine-freeze-concurrency-cap.md) — about 4 useful workers at once (user-set); every worker kills the servers it started before starting another and when done
+- [No patching, architecture first](no-patching-architecture-first.md) — failures map to general capabilities, never phrase/step patches; test properties with paraphrases; E3 rebuild milestones M1–M5
+- [Founder design direction](design-direction-founder-2026-09-25.md) — futuristic AI glow OK, floating draggable Q + Q page, TikTok Discover, no ChatGPT chat UI, visible light/dark/system switch
+- [Git pack corruption 2026-09-25](git-pack-corruption-2026-09-25.md) — recovery rebuilt (head fe23440); don't gc; don't merge recovery into old agent branches; back up to GitHub often
+- [Business plan + decisions](business-plan-decisions-2026-09-25.md) — R1–R17, BIZ-001..012; PADL amend 'Ask Q aloud'; keep LinkedIn lookup; Gmail watch testing mode; 'Q Card'
