@@ -17,6 +17,9 @@ export default defineConfig({
   use: {
     baseURL: "http://localhost:3804",
     trace: "retain-on-failure",
+    // A click that never finds its target fails, rather than hanging the run.
+    actionTimeout: 60_000,
+    navigationTimeout: 120_000,
     screenshot: "only-on-failure",
     ...devices["Desktop Chrome"],
     viewport: { width: 1440, height: 900 },
