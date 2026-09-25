@@ -11,7 +11,6 @@ import {
 } from "@capital-q/contracts";
 import {
   acceptStructuredOutput,
-  isModelGatewayError,
   type ModelGateway,
 } from "@capital-q/model-gateway";
 import { toolResultMessage } from "@capital-q/model-gateway/q";
@@ -19,7 +18,7 @@ import type { Logger } from "@capital-q/observability";
 import {
   createDefaultPromptRegistry,
   DEFAULT_COMMUNICATION_PROFILE,
-  type InterviewAgentV3Variables,
+  type InterviewAgentV5Variables,
   InterviewAgentResultSchema,
   renderPrompt,
   type InterviewAgentResult,
@@ -67,15 +66,57 @@ import { createReplySentenceStream } from "./reply-stream.js";
 
 const MAX_ROUNDS = 4;
 const MAX_CALLS = 8;
-/** A person is waiting; each call gets this long before the next model. */
-const ATTEMPT_MS = 20_000;
+
+/**
+ * A person is waiting (ACC 2026-09-25: one luna attempt ran 5.5 minutes
+ * and the person got an HTTP 503). The whole turn ends by this deadline,
+ * inside the voice route's own; every model call in it is cut off by it.
+ */
+const TURN_DEADLINE_MS = 25_000;
+/** Tool rounds stop while this much is left, so the reply can be written. */
+const REPLY_RESERVE_MS = 7_000;
+/** Below this, no reply call is started; the turn degrades honestly. */
+const MIN_REPLY_MS = 2_000;
+/**
+ * The first model's patience when another waits behind it. The loop's own
+ * luna calls measured p95 5.1 s and never above 6.7 s locally; 8 s leaves
+ * room above every call seen, and then the next model takes the round.
+ */
+const FIRST_ATTEMPT_MS = 8_000;
 
 const BUDGET = {
-  maxAttempts: 3,
+  maxAttempts: 2,
   maxEstimatedCostUsd: 0.2,
   maxOutputTokens: 1_200,
-  attemptTimeoutMs: 45_000,
+  attemptTimeoutMs: 12_000,
 } as const;
+
+const THIS_TURN_MAX = 12_000;
+
+/** A tool result's content, as data: parsed JSON where it is JSON. */
+function resultOf(message: ModelMessage): unknown {
+  const content = message.content;
+  try {
+    return JSON.parse(content) as unknown;
+  } catch {
+    return content.slice(0, 2_000);
+  }
+}
+
+/**
+ * What Q has done this turn, for the next round's prompt. Oldest actions
+ * give way first when it is long: the newest results decide what is left.
+ */
+export function thisTurnText(
+  actions: readonly { tool: string; input: unknown; result: unknown }[],
+): string {
+  if (actions.length === 0) return "";
+  for (let from = 0; from < actions.length; from += 1) {
+    const text = JSON.stringify(actions.slice(from));
+    if (text.length <= THIS_TURN_MAX) return text;
+  }
+  return JSON.stringify(actions.slice(-1)).slice(0, THIS_TURN_MAX);
+}
 
 export type InterviewAgentTurnInput = InterviewTurnInput & {
   /** The person, as the route resolved them. Required for a Q run. */
@@ -105,6 +146,10 @@ export type InterviewAgentDependencies = {
    * suggestions (P0-2). Absent: recommend is refused honestly.
    */
   readonly recommendations?: RecommendationStore | undefined;
+  /** Milliseconds now; injectable so a test can run out the clock. */
+  readonly now?: (() => number) | undefined;
+  /** The whole turn's deadline; tests shorten it. */
+  readonly turnDeadlineMs?: number | undefined;
 };
 
 export type InterviewAgent = {
@@ -118,6 +163,8 @@ export function createInterviewAgent(
 ): InterviewAgent {
   const registry = dependencies.registry ?? createDefaultPromptRegistry();
   const { gateway, firewall, logger } = dependencies;
+  const now = dependencies.now ?? Date.now;
+  const deadlineMs = dependencies.turnDeadlineMs ?? TURN_DEADLINE_MS;
 
   const turn = async (
     input: InterviewAgentTurnInput,
@@ -236,30 +283,38 @@ export function createInterviewAgent(
       conversation: { latestUserText: utterance },
     };
     const offered = await tools.offer(context);
-    const state = await port.state();
+    let state = await port.state();
 
-    const rendered = renderPrompt<InterviewAgentV3Variables>(registry, {
-      task: "INTERVIEW_AGENT",
-      charter: input.channel === "voice" ? "Q_SYSTEM_VOICE" : "Q_SYSTEM",
-      operatingMode: "ASSESSMENT",
-      communicationProfile: loop.profile,
-      // Capital Q's authority statement for this loop (lead decision,
-      // 2026-09-25): a reversible write to the person's own onboarding, at
-      // their explicit delegation, is scoped delegation, not an action on
-      // Q's own account. Trusted text in the charter's frame.
-      environmentNotes:
-        "You change the person's onboarding only through your tools; a tool result is what happened. Capital Q grants scoped delegation here: when the person explicitly hands you a choice about their own onboarding and asks you to go ahead, recording your choice is acting on their instruction, reversible and theirs to change, and is permitted without a further approval step.",
-      variables: {
-        journey: input.journeyType,
-        channel: input.channel,
-        opening,
-        state: JSON.stringify(state).slice(0, 24_000),
-        conversation,
-        utterance,
-        memory: loop.memory.slice(0, 4_000),
-        earlier: (compacted.summary ?? "").slice(0, 2_200),
-      },
-    });
+    // Every round is rendered afresh from the onboarding state and what Q
+    // has already done this turn, never from a provider's native tool
+    // history: a fallback model cannot continue another provider's
+    // function-call history (Gemini refuses one it did not sign), and a
+    // turn must survive its first model failing half way.
+    const actions: { tool: string; input: unknown; result: unknown }[] = [];
+    const render = () =>
+      renderPrompt<InterviewAgentV5Variables>(registry, {
+        task: "INTERVIEW_AGENT",
+        charter: input.channel === "voice" ? "Q_SYSTEM_VOICE" : "Q_SYSTEM",
+        operatingMode: "ASSESSMENT",
+        communicationProfile: loop.profile,
+        // Capital Q's authority statement for this loop (lead decision,
+        // 2026-09-25): a reversible write to the person's own onboarding, at
+        // their explicit delegation, is scoped delegation, not an action on
+        // Q's own account. Trusted text in the charter's frame.
+        environmentNotes:
+          "You change the person's onboarding only through your tools; a tool result is what happened. Capital Q grants scoped delegation here: when the person explicitly hands you a choice about their own onboarding and asks you to go ahead, recording your choice is acting on their instruction, reversible and theirs to change, and is permitted without a further approval step.",
+        variables: {
+          journey: input.journeyType,
+          channel: input.channel,
+          opening,
+          state: JSON.stringify(state).slice(0, 24_000),
+          conversation,
+          utterance,
+          memory: loop.memory.slice(0, 4_000),
+          earlier: (compacted.summary ?? "").slice(0, 2_200),
+          thisTurn: thisTurnText(actions),
+        },
+      });
 
     const base = {
       taskClass: "NORMAL_DIALOGUE" as const,
@@ -276,27 +331,47 @@ export function createInterviewAgent(
         : { dataPosture: dependencies.dataPosture }),
     };
 
+    // A person is waiting: the whole turn has a deadline, and every model
+    // call inside it is cut off by it. Only the person leaving (the
+    // caller's own signal) is a cancellation; the deadline is a degraded
+    // turn, answered honestly.
+    const startedAt = now();
+    const remaining = () => deadlineMs - (now() - startedAt);
+    const deadline = new AbortController();
+    const timer = setTimeout(() => {
+      deadline.abort();
+    }, deadlineMs);
+    const signal =
+      input.signal === undefined
+        ? deadline.signal
+        : AbortSignal.any([input.signal, deadline.signal]);
+
     const stream =
       input.onSentence === undefined
         ? undefined
         : createReplySentenceStream(input.onSentence);
-    let messages: ModelMessage[] = [...rendered.messages];
     let result: InterviewAgentResult | undefined;
     let rounds = 0;
     let calls = 0;
+    let timedOut = false;
     try {
-      while (result === undefined && rounds < MAX_ROUNDS && calls < MAX_CALLS) {
+      while (
+        result === undefined &&
+        rounds < MAX_ROUNDS &&
+        calls < MAX_CALLS &&
+        remaining() > REPLY_RESERVE_MS
+      ) {
         rounds += 1;
         const response = await gateway.execute(
           {
             ...base,
-            messages,
+            messages: [...render().messages],
             output: { kind: "TEXT" },
             tools: offered.map((tool) => tool.definition),
           },
           {
-            firstAttemptTimeoutMs: ATTEMPT_MS,
-            ...(input.signal === undefined ? {} : { signal: input.signal }),
+            firstAttemptTimeoutMs: FIRST_ATTEMPT_MS,
+            signal,
             ...(stream === undefined ? {} : { onTextDelta: stream.push }),
           },
         );
@@ -310,33 +385,33 @@ export function createInterviewAgent(
         }
         if (response.output.kind !== "TOOL_CALLS") break;
         const proposals = response.output.calls.slice(0, MAX_CALLS - calls);
-        const results: ModelMessage[] = [];
         for (const call of proposals) {
           calls += 1;
           const outcome = await tools.execute(
             { callId: call.callId, name: call.name, arguments: call.arguments },
             context,
           );
-          results.push(toolResultMessage(call, outcome));
+          actions.push({
+            tool: call.name,
+            input: call.arguments,
+            result: resultOf(toolResultMessage(call, outcome)),
+          });
         }
-        messages = [
-          ...messages,
-          {
-            role: "ASSISTANT",
-            content: response.output.text,
-            toolCalls: [...proposals],
-          },
-          ...results,
-        ];
+        state = await port.state();
       }
-      if (result === undefined) {
+      if (result === undefined && remaining() > MIN_REPLY_MS) {
         // The reply, written after every result so far, with no tools left.
+        const rendered = render();
         const response = await gateway.execute<InterviewAgentResult>(
-          { ...base, messages, output: rendered.output },
+          {
+            ...base,
+            messages: [...rendered.messages],
+            output: rendered.output,
+          },
           {
             schema: InterviewAgentResultSchema,
-            firstAttemptTimeoutMs: ATTEMPT_MS,
-            ...(input.signal === undefined ? {} : { signal: input.signal }),
+            firstAttemptTimeoutMs: FIRST_ATTEMPT_MS,
+            signal,
           },
         );
         if (response.output.kind === "STRUCTURED") {
@@ -345,10 +420,14 @@ export function createInterviewAgent(
         }
       }
     } catch (error: unknown) {
-      if (isModelGatewayError(error) && error.failureClass === "CANCELLED") {
-        throw error;
-      }
-      logger.warn({ err: error, rounds, calls }, "interview Q run failed");
+      if (input.signal?.aborted === true) throw error;
+      timedOut = deadline.signal.aborted;
+      logger.warn(
+        { err: error, rounds, calls, timedOut },
+        "interview Q run failed",
+      );
+    } finally {
+      clearTimeout(timer);
     }
 
     const view = port.view() ?? (await port.state(), port.view());
@@ -434,6 +513,8 @@ export function createInterviewAgent(
         recorded,
         asking: stillOpen ? askedOpen?.stepKey : null,
         answered: result !== undefined,
+        timedOut,
+        ms: now() - startedAt,
       },
       "interview q run traced",
     );

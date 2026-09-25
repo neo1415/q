@@ -64,6 +64,27 @@ export const INTERVIEW_AGENT_V3_UNTRUSTED = [
   "earlier",
 ] as const;
 
+/**
+ * v5 variables: v3's, plus what Q has already done this turn — each tool
+ * call and Capital Q's result — as data (reliability, 2026-09-25). Every
+ * round is rendered afresh from the state and this list instead of
+ * replaying a provider's native tool history, so any eligible model can
+ * continue a turn another model began. UNTRUSTED: the results echo the
+ * person's words.
+ */
+export const InterviewAgentV5VariablesSchema =
+  InterviewAgentV3VariablesSchema.extend({
+    thisTurn: z.string().max(12_000).default(""),
+  }).strict();
+export type InterviewAgentV5Variables = z.infer<
+  typeof InterviewAgentV5VariablesSchema
+>;
+
+export const INTERVIEW_AGENT_V5_UNTRUSTED = [
+  ...INTERVIEW_AGENT_V3_UNTRUSTED,
+  "thisTurn",
+] as const;
+
 export const InterviewAgentResultSchema = z
   .object({
     /** What Q says. Grounded in the tool results of this turn. */
