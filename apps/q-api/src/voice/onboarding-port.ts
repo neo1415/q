@@ -6,6 +6,7 @@ import {
   skipOnboardingStep,
   getOnboardingSession,
   getTaxonomyNode,
+  listTaxonomyNodes,
   resolveOnboardingSuggestion,
   submitOnboardingResponse,
   withdrawOnboardingResponse,
@@ -366,6 +367,32 @@ export function createOnboardingPort(input: {
       }
     | { readonly ok: false; readonly result: OnboardingRecordResult };
 
+  /**
+   * The categories a taxonomy step records, by name: each vocabulary's
+   * top level. A category that cannot be read is left out, never guessed.
+   */
+  const categoriesOf = async (
+    vocabularyCodes: readonly string[],
+  ): Promise<string[]> => {
+    const names: string[] = [];
+    for (const code of vocabularyCodes.slice(0, 6)) {
+      try {
+        const page = await listTaxonomyNodes(input.session, code, {
+          roots: true,
+          limit: 40,
+        });
+        for (const node of page.items) {
+          if (!names.includes(node.displayName)) {
+            names.push(node.displayName.slice(0, 160));
+          }
+        }
+      } catch {
+        // A vocabulary that cannot be listed offers nothing.
+      }
+    }
+    return names.slice(0, 40);
+  };
+
   /** What the words resolve to for this step, validated; nothing written. */
   const resolve = async (answer: {
     readonly stepKey: string;
@@ -420,13 +447,22 @@ export function createOnboardingPort(input: {
         }
         if (!ids.includes(best.nodeId)) ids.push(best.nodeId);
       }
-      if (ids.length === 0) {
+      if (unmatched.length > 0) {
+        // Their words name no category: the categories Capital Q records
+        // go back to the model, which reads which one means what they
+        // said (ADR 0011). Nothing is recorded until it chooses one.
         return refuse({
           stepKey: step.stepKey,
-          outcome: "REJECTED",
-          reason: `No category Capital Q records matches ${unmatched
+          outcome: "UNMATCHED",
+          reason: `No category is named in ${unmatched
             .map((p) => `"${p.slice(0, 80)}"`)
-            .join(", ")}.`,
+            .join(
+              ", ",
+            )}. Choose the category below that means what they said and record it by its name; say which you chose. If none fits, ask them.`.slice(
+            0,
+            400,
+          ),
+          candidates: await categoriesOf([...c.vocabularyCodes]),
         });
       }
       value = {
@@ -434,21 +470,64 @@ export function createOnboardingPort(input: {
         resourceType: "TAXONOMY_NODE",
         resourceIds: ids.slice(0, c.maxItems),
       };
+    } else if (
+      c.stepType === "single_select" ||
+      c.stepType === "multi_select"
+    ) {
+      // An option is named by its key or its label, exactly; nothing else
+      // is guessed from a phrase (the legacy reader fell through to
+      // "Something else" for any unmatched text, recording a fact nobody
+      // stated). Meaning is the model's: UNMATCHED hands it the options.
+      const options = optionsOf(step);
+      const named = (text: string): string | undefined => {
+        const wanted = text.trim().toLowerCase();
+        return options.find(
+          (o) =>
+            o.key.toLowerCase() === wanted || o.label.toLowerCase() === wanted,
+        )?.key;
+      };
+      const phrases =
+        typeof answer.value === "object"
+          ? answer.value
+          : [String(answer.value)];
+      const keys: string[] = [];
+      for (const phrase of phrases) {
+        const key = named(phrase);
+        if (key !== undefined) keys.push(key);
+      }
+      const [only] = keys;
+      value =
+        keys.length !== phrases.length || only === undefined
+          ? null
+          : c.stepType === "single_select"
+            ? keys.length === 1
+              ? toResponseValue(step, only)
+              : null
+            : toResponseValue(step, keys);
     } else {
       const raw =
         typeof answer.value === "number" ? String(answer.value) : answer.value;
       value = toResponseValue(step, raw);
     }
     if (value === null) {
-      const options = optionsOf(step).map((o) => o.label);
-      return refuse({
-        stepKey: step.stepKey,
-        outcome: "REJECTED",
-        reason:
-          options.length > 0
-            ? `That is not one of this step's options (${options.slice(0, 10).join(", ")}).`
-            : "That does not fit what this step records.",
-      });
+      const options = optionsOf(step);
+      return refuse(
+        options.length > 0
+          ? {
+              stepKey: step.stepKey,
+              outcome: "UNMATCHED",
+              reason:
+                "That names none of this step's options. Choose the option below that means what they said and record it by its key; say which you chose. If none fits, ask them.",
+              candidates: options
+                .slice(0, 40)
+                .map((o) => `${o.label} (${o.key})`.slice(0, 160)),
+            }
+          : {
+              stepKey: step.stepKey,
+              outcome: "REJECTED",
+              reason: "That does not fit what this step records.",
+            },
+      );
     }
     return { ok: true, step, value };
   };

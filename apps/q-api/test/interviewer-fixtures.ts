@@ -68,6 +68,8 @@ export type WorldOptions = {
   readonly refuseSkipOfAnswered?: boolean | undefined;
   /** Taxonomy nodes the classifier returns, by phrase. */
   readonly taxonomy?: Readonly<Record<string, string>> | undefined;
+  /** Each vocabulary's top-level categories, by display name -> node id. */
+  readonly taxonomyRoots?: Readonly<Record<string, string>> | undefined;
   /** The mandate candidate context the view carries on the I1 step. */
   readonly mandates?:
     | {
@@ -256,6 +258,32 @@ export function investorSession(options: WorldOptions): InvestorWorld {
           ? input.toString()
           : input.url;
     const method = init?.method ?? "GET";
+
+    if (
+      method === "GET" &&
+      /\/taxonomy\/vocabularies\/[^/]+\/nodes/.test(url)
+    ) {
+      const code =
+        /\/vocabularies\/([^/]+)\/nodes/.exec(url)?.[1] ?? "industry";
+      return Promise.resolve(
+        Response.json({
+          items: Object.entries(options.taxonomyRoots ?? {}).map(
+            ([displayName, id]) => ({
+              id,
+              vocabularyCode: decodeURIComponent(code),
+              canonicalCode: displayName
+                .toLowerCase()
+                .replace(/[^a-z0-9]+/g, "_"),
+              displayName,
+              description: null,
+              parentNodeId: null,
+              depth: 0,
+              status: "ACTIVE",
+            }),
+          ),
+        }),
+      );
+    }
 
     if (url.includes("/taxonomy/candidates")) {
       const body = JSON.parse(readBody(init)) as {
