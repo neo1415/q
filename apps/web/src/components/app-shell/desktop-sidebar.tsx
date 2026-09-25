@@ -8,6 +8,7 @@ import { cx } from "@capital-q/ui";
 import { ContextIndicator } from "@capital-q/ui/context-indicator";
 import { ICON_SIZE, ICON_STROKE } from "@capital-q/ui/icons";
 
+import { ThemeToggle } from "@/features/appearance/theme-toggle";
 import { useHomeHref } from "@/features/q/active-conversation";
 import { ChatsListForRoute } from "@/features/q/chats-list";
 
@@ -79,7 +80,13 @@ export function DesktopSidebar({
         <GlobalQTrigger variant="sidebar" />
       </div>
 
-      <div className="mt-auto border-t border-(--cq-border-subtle) px-3 py-3">
+      <div className="mt-auto flex flex-col gap-2 border-t border-(--cq-border-subtle) px-3 py-3">
+        {/* The appearance choice lives in the chrome, visible without
+            opening anything (ADR 0017 F4). */}
+        <div className="flex items-center justify-between gap-2 pl-3">
+          <span className="cq-caption text-(--cq-text-secondary)">Theme</span>
+          <ThemeToggle display="icons" />
+        </div>
         <SidebarLink
           href={PROFILE_NAVIGATION.href}
           label={PROFILE_NAVIGATION.label}

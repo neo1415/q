@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
+import { ThemeToggle } from "@/features/appearance/theme-toggle";
+
 export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
@@ -30,6 +32,9 @@ export default function AuthLayout({
         >
           Capital Q
         </Link>
+        {/* The appearance choice is the visitor's before they sign in
+            (ADR 0017 F4). */}
+        <ThemeToggle display="icons" size="touch" />
       </header>
       <main id="main" className="cq-auth-main">
         {children}

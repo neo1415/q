@@ -52,7 +52,14 @@ export default function RootLayout({
   children: ReactNode;
 }): ReactNode {
   return (
-    <html lang="en" className={`${GeistSans.variable} ${GeistMono.variable}`}>
+    // suppressHydrationWarning: the boot script below sets `data-theme` on
+    // this element before React hydrates it, on purpose. It covers this
+    // element's own attributes only, never its children.
+    <html
+      lang="en"
+      className={`${GeistSans.variable} ${GeistMono.variable}`}
+      suppressHydrationWarning
+    >
       <head>
         {/*
          * The person's own appearance choice, applied before anything is
