@@ -225,6 +225,10 @@ export function QDock() {
     if (!placed.current || still || sameAnchor || springTo === null) {
       x.set(target.x);
       y.set(target.y);
+      // Written through as well: before Motion's element has subscribed to
+      // its values (first paint, a cold load) a set alone would not reach
+      // the DOM, and the dock would show at the corner of the screen.
+      box.style.transform = `translateX(${String(target.x)}px) translateY(${String(target.y)}px)`;
       placed.current = true;
       box.setAttribute("data-placed", "");
       return;

@@ -354,6 +354,123 @@
   }
 
   /*
+   * The Q page is the voice stage (founder direction, 2026-09-25): one
+   * quiet field, full height inside the shell, on the stage tokens in
+   * either theme. The aperture is the only light on it.
+   */
+  .cq-q-home {
+    min-height: calc(
+      100dvh - var(--cq-header-height) - var(--cq-safe-top) -
+        var(--cq-bottom-nav-height) - var(--cq-safe-bottom)
+    );
+    height: calc(
+      100dvh - var(--cq-header-height) - var(--cq-safe-top) -
+        var(--cq-bottom-nav-height) - var(--cq-safe-bottom)
+    );
+  }
+  @media (min-width: 1024px) {
+    .cq-q-home {
+      min-height: 100dvh;
+      height: 100dvh;
+    }
+  }
+  /* Captions: a few lines, then "Read all". */
+  .cq-q-caption {
+    max-width: 46ch;
+    white-space: pre-wrap;
+    font-weight: 500;
+  }
+  .cq-q-caption-clamp {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 4;
+    line-clamp: 4;
+    overflow: hidden;
+  }
+  /* Finished turns: history, faded, never bubbles. */
+  .cq-q-history {
+    display: flex;
+    max-height: 30vh;
+    flex-direction: column;
+    gap: 10px;
+    overflow-y: auto;
+    mask-image: linear-gradient(to bottom, transparent, black 40%);
+    padding-top: 24px;
+    scrollbar-width: thin;
+  }
+  .cq-q-history-person,
+  .cq-q-history-q {
+    font-size: 14px;
+    line-height: 1.45;
+    white-space: pre-wrap;
+  }
+  .cq-q-history-person {
+    align-self: flex-end;
+    max-width: 80%;
+    text-align: right;
+    color: var(--cq-text-tertiary);
+  }
+  .cq-q-history-q {
+    max-width: 90%;
+    color: var(--cq-text-secondary);
+  }
+  .cq-q-evidence {
+    width: 100%;
+    max-width: var(--cq-layout-narrow);
+    border-top: 1px solid var(--cq-border-subtle);
+    padding-top: 8px;
+  }
+  .cq-q-evidence-summary {
+    display: inline-flex;
+    min-height: 44px;
+    align-items: center;
+    gap: 4px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--cq-text-secondary);
+    list-style: none;
+  }
+  .cq-q-evidence-summary::-webkit-details-marker {
+    display: none;
+  }
+  .cq-q-evidence-summary::before {
+    content: "▸";
+    font-size: 11px;
+    transition: transform var(--cq-motion-fast) var(--cq-ease);
+  }
+  .cq-q-evidence[open] > .cq-q-evidence-summary::before {
+    transform: rotate(90deg);
+  }
+  .cq-q-history .cq-q-evidence {
+    border-top: none;
+    padding-top: 0;
+  }
+  /* Talk: the primary control on the stage, a 56 px target. */
+  .cq-q-talk {
+    display: inline-flex;
+    min-height: 56px;
+    align-items: center;
+    gap: 10px;
+    padding: 0 24px;
+    border: none;
+    border-radius: var(--cq-radius-full);
+    background: var(--cq-stage-text);
+    color: var(--cq-stage-canvas);
+    font: inherit;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .cq-q-talk:active {
+    transform: scale(0.97);
+  }
+  .cq-q-talk:disabled {
+    opacity: 0.5;
+    cursor: default;
+  }
+
+  /*
    * The Q Dock (features/q-dock; ADR 0017 F1). A fixed layer that takes no
    * pointer events itself; the dock inside it is placed by transform only
    * (Motion), so moving it never touches layout.

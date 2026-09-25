@@ -1,36 +1,16 @@
-import { Q_CONFIDENCE_LABELS, type QFindingType } from "@capital-q/contracts";
 import { QMark } from "@capital-q/ui/q-mark";
 
 import type { QTurn } from "./conversation";
+import { QEvidence, splitBlocks } from "./q-evidence";
 import { QResultBlocks } from "./q-result-blocks";
 
 /**
- * Q's answer on Home, laid out to be read rather than scrolled
- * (doc 17 §60-§63; doc 18 on quiet surfaces).
- *
- * The prose first, in a reading measure. Then, only when the server sent
- * them, the findings as one plain list with the type in words and the
- * confidence the contract labelled; then what Q could not settle and what
- * would settle it; then how many recorded sources the answer rests on.
- * Truth is never conveyed by colour alone, and nothing here invents a
+ * Q's answer where it is read rather than heard (the panel beside a page):
+ * the prose first, what can be acted on (a document Q made, a place to
+ * go), then everything the answer rests on behind one "Evidence"
+ * disclosure (founder direction, 2026-09-25). Nothing here invents a
  * percentage or a verdict the server did not send.
  */
-
-const FINDING_LABELS: Readonly<Record<QFindingType, string>> = {
-  FACT: "Fact",
-  OBSERVATION: "Observation",
-  INFERENCE: "Inference",
-  RISK: "Risk",
-  STRENGTH: "Strength",
-  GAP: "Gap",
-  RECOMMENDATION: "Recommendation",
-  UNCERTAINTY: "Open question",
-};
-
-function sources(count: number): string {
-  return count === 1 ? "1 source" : `${String(count)} sources`;
-}
-
 export function QAnswer({
   turn,
   onAsk,
@@ -41,9 +21,10 @@ export function QAnswer({
   readonly onAsk?: ((question: string) => void) | undefined;
   readonly onOpenArtifact?: ((artifactId: string) => void) | undefined;
 }) {
+  const { visible } = splitBlocks(turn.blocks);
   return (
     <div
-      className="cq-q-answer flex max-w-(--cq-layout-reading) flex-col gap-4"
+      className="cq-q-answer flex max-w-(--cq-layout-reading) flex-col gap-3"
       data-q-answer={turn.streaming ? "streaming" : "settled"}
     >
       {/* One Q, once: the mark is the label. */}
@@ -51,62 +32,12 @@ export function QAnswer({
       <p className="cq-body cq-prose whitespace-pre-wrap text-(--cq-text-primary)">
         {turn.text}
       </p>
-      {turn.findings.length > 0 ? (
-        <dl className="cq-q-answer-findings flex flex-col">
-          {turn.findings.map((finding) => (
-            <div
-              key={finding.id}
-              className="flex flex-col gap-1 py-3 sm:flex-row sm:gap-4"
-            >
-              <dt className="cq-label shrink-0 text-(--cq-text-tertiary) sm:w-28">
-                {FINDING_LABELS[finding.type]}
-              </dt>
-              <dd className="flex flex-col gap-1">
-                <span className="cq-body text-(--cq-text-primary)">
-                  {finding.statement}
-                </span>
-                <span className="cq-caption text-(--cq-text-secondary)">
-                  {Q_CONFIDENCE_LABELS[finding.confidence]}
-                  {finding.sourceCount > 0
-                    ? ` · ${sources(finding.sourceCount)}`
-                    : ""}
-                </span>
-              </dd>
-            </div>
-          ))}
-        </dl>
-      ) : null}
-      {turn.uncertainties.length > 0 ? (
-        <div className="flex flex-col gap-2">
-          <span className="cq-label text-(--cq-text-tertiary)">Still open</span>
-          <ul className="flex flex-col gap-2">
-            {turn.uncertainties.map((item) => (
-              <li key={item.statement} className="flex flex-col gap-0.5">
-                <span className="cq-body text-(--cq-text-primary)">
-                  {item.statement}
-                </span>
-                {item.missing.length > 0 ? (
-                  <span className="cq-caption text-(--cq-text-secondary)">
-                    Would settle it: {item.missing.join(", ")}.
-                  </span>
-                ) : null}
-              </li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
-      {turn.sourceCount > 0 ? (
-        <span className="cq-caption text-(--cq-text-secondary)">
-          Based on {sources(turn.sourceCount)} on record.
-        </span>
-      ) : null}
-      {/* The part of the answer you can act on. Prose above stays prose;
-          a card is for an object with an action (QX-001 §10). */}
       <QResultBlocks
-        blocks={turn.blocks}
+        blocks={visible}
         onAsk={onAsk}
         onOpenArtifact={onOpenArtifact}
       />
+      <QEvidence turn={turn} onAsk={onAsk} onOpenArtifact={onOpenArtifact} />
     </div>
   );
 }
