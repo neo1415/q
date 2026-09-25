@@ -381,6 +381,7 @@ const SuggestionRow = z.object({
   model_run_id: UuidSchema.nullable(),
   created_at: Timestamp,
   resolved_at: Timestamp.nullable(),
+  rationale: z.string().nullable().default(null),
 });
 
 function toSuggestion(row: unknown): OnboardingSuggestion {
@@ -397,13 +398,15 @@ function toSuggestion(row: unknown): OnboardingSuggestion {
     modelRunId: r.model_run_id,
     createdAt: r.created_at,
     resolvedAt: r.resolved_at,
+    rationale: r.rationale,
   };
 }
 
 function suggestionSelect(executor: DatabaseExecutor) {
   return executor`
     select g.id, g.session_id, g.step_key, g.target_field, g.suggested_value, g.source_refs,
-           g.confidence::text as confidence, g.status, g.model_run_id, g.created_at, g.resolved_at
+           g.confidence::text as confidence, g.status, g.model_run_id, g.created_at, g.resolved_at,
+           g.rationale
       from onboarding.suggestions g`;
 }
 
@@ -424,11 +427,11 @@ export function createPostgresOnboardingSuggestionRepository(): OnboardingSugges
     insert: async (tx, input) => {
       const rows = await tx.sql`
         insert into onboarding.suggestions
-          (session_id, step_key, target_field, suggested_value, source_refs, confidence, model_run_id)
+          (session_id, step_key, target_field, suggested_value, source_refs, confidence, model_run_id, rationale)
         values
           (${input.sessionId}, ${input.stepKey}, ${input.targetField},
            ${JSON.stringify(input.suggestedValue)}::text::jsonb, ${JSON.stringify(input.sourceRefs)}::text::jsonb,
-           ${input.confidence}::text::numeric, ${input.modelRunId})
+           ${input.confidence}::text::numeric, ${input.modelRunId}, ${input.rationale ?? null})
         returning id`;
       const id = z
         .object({ id: OnboardingSuggestionIdSchema })

@@ -251,6 +251,7 @@ export type NewOnboardingSuggestion = {
   readonly sourceRefs: readonly OnboardingSourceRef[];
   readonly confidence: string | null;
   readonly modelRunId: string | null;
+  readonly rationale?: string | null | undefined;
 };
 
 export type OnboardingSuggestionRepository = {

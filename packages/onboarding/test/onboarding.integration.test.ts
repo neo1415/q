@@ -30,6 +30,7 @@ import { createPostgresActorContextResolver } from "@capital-q/security/postgres
 import { ONBOARDING_EVENTS } from "../src/events/index.js";
 import {
   createCompanyOnboardingSubjectResolver,
+  createOnboardingQRecommendations,
   createOnboardingService,
   OnboardingDefinitionConflictError,
   OnboardingDefinitionInvalidError,
@@ -1254,6 +1255,94 @@ describe("@capital-q/onboarding against local PostgreSQL", () => {
   // -------------------------------------------------------------------------
   // Suggestions
   // -------------------------------------------------------------------------
+
+  it("Q's recommendations survive a restart and an approval writes exactly the recommended payload (CQ-QX-008 P0-2)", async () => {
+    await withWorld(async (world) => {
+      const { tx, service, adminA, adminC } = world;
+      const { view } = await start(world, adminA);
+      const id = view.session.id as OnboardingSessionId;
+      await submit(world, adminA, id, "intent", select("exploring"), 1);
+      const transactions = nestedTransactions(tx);
+      const first = await createOnboardingQRecommendations({
+        transactions,
+      }).recommend({
+        userId: adminA.userId,
+        sessionId: id,
+        stepKey: "sectors",
+        value: { type: "MULTI_SELECT", optionKeys: ["health"] },
+        rationale: "Health fits what you described.",
+        runId: null,
+      });
+      // A new port is a restart: the recommendation is still there, bound
+      // to the same payload.
+      const restarted = createOnboardingQRecommendations({ transactions });
+      const second = await restarted.recommend({
+        userId: adminA.userId,
+        sessionId: id,
+        stepKey: "sectors",
+        value: { type: "MULTI_SELECT", optionKeys: ["fintech"] },
+        rationale: "Payments fit better.",
+        runId: null,
+      });
+      const pending = await createOnboardingQRecommendations({
+        transactions,
+      }).pending({ userId: adminA.userId, sessionId: id });
+      expect(pending).toEqual([
+        {
+          id: second.id,
+          stepKey: "sectors",
+          value: { type: "MULTI_SELECT", optionKeys: ["fintech"] },
+          rationale: "Payments fit better.",
+          payloadSha256: second.payloadSha256,
+        },
+      ]);
+      expect(second.payloadSha256).not.toBe(first.payloadSha256);
+      const [superseded] = await tx.sql<{ status: string }[]>`
+        select status from onboarding.suggestions where id = ${first.id}`;
+      expect(superseded?.status).toBe("EXPIRED");
+
+      // Someone else can neither see nor make one on this session.
+      await expect(
+        restarted.pending({ userId: adminC.userId, sessionId: id }),
+      ).rejects.toBeInstanceOf(OnboardingSessionNotFoundError);
+      await expect(
+        restarted.recommend({
+          userId: adminC.userId,
+          sessionId: id,
+          stepKey: "sectors",
+          value: { type: "MULTI_SELECT", optionKeys: ["fintech"] },
+          rationale: "x",
+          runId: null,
+        }),
+      ).rejects.toBeInstanceOf(OnboardingSessionNotFoundError);
+
+      // Approval: the stored payload, exactly, becomes the answer.
+      const v = await service.runtime.getSession({
+        actor: adminA,
+        sessionId: id,
+      });
+      await service.runtime.resolveSuggestion({
+        actor: adminA,
+        sessionId: id,
+        suggestionId: second.id,
+        resolution: "ACCEPT",
+        expectedSessionVersion: v.session.version,
+        idempotencyKey: randomUUID(),
+        correlationId: CORRELATION(),
+      });
+      const [answer] = await tx.sql<
+        { source_modality: string; response_jsonb: unknown }[]
+      >`select source_modality, response_jsonb from onboarding.responses
+         where session_id = ${id} and step_key = 'sectors' and superseded_by_response_id is null`;
+      expect(answer).toEqual({
+        source_modality: "SUGGESTION_ACCEPT",
+        response_jsonb: { type: "MULTI_SELECT", optionKeys: ["fintech"] },
+      });
+      expect(
+        await restarted.pending({ userId: adminA.userId, sessionId: id }),
+      ).toEqual([]);
+    });
+  });
 
   it("suggestions are proposals: accept, edit, reject, expire, never twice (§117-121, §225-228, §236)", async () => {
     await withWorld(async (world) => {

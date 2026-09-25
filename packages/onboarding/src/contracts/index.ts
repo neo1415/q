@@ -248,6 +248,8 @@ export type OnboardingSuggestion = {
   readonly modelRunId: string | null;
   readonly createdAt: UtcTimestamp;
   readonly resolvedAt: UtcTimestamp | null;
+  /** Why it was proposed, as said to the person (Q recommendations). */
+  readonly rationale?: string | null | undefined;
 };
 
 // ---------------------------------------------------------------------------
