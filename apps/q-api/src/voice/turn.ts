@@ -44,6 +44,7 @@ import type { PresenceFound } from "./presence-trigger.js";
 import {
   declines,
   destinationLine,
+  endsUnfinished,
   fillerLine,
   spokenVisibility,
   type SpokenVisibility,
@@ -343,6 +344,17 @@ type LiveRun = {
   readonly stop: AbortController;
 };
 const liveRuns = new WeakMap<VoiceSessionBinding, LiveRun>();
+/** Runs already being cancelled, so a run is cancelled once. */
+const stopping = new WeakSet<LiveRun>();
+
+/**
+ * How long Q keeps listening after an utterance the recogniser left open
+ * before acting on it. Long enough for a breath and the next clause; short
+ * enough that a person who has stopped hears Q answer.
+ */
+const UNFINISHED_HOLD_MS = 1_500;
+/** Transcripts built here from a reply already acted on (never held). */
+const settledTranscripts = new WeakSet<readonly VoiceTranscriptTurn[]>();
 
 const squash = (text: string) => text.replace(/\s+/g, " ").trim();
 
@@ -581,11 +593,11 @@ export function createVoiceTurnHandler(
    * model call is aborted and ends the run as cancelled rather than
    * failed. Nothing it would have said is spoken or recorded as an answer.
    */
-  const supersede = (binding: VoiceSessionBinding, keep?: LiveRun): void => {
-    const live = liveRuns.get(binding);
-    if (live === undefined || live.runId === keep?.runId) return;
-    liveRuns.delete(binding);
-    if (held.get(binding)?.kind === "ANSWER") held.delete(binding);
+  /** Cancel one run, and only that one, whatever the line has moved on to. */
+  const stopRun = (binding: VoiceSessionBinding, live: LiveRun): void => {
+    if (liveRuns.get(binding) === live) liveRuns.delete(binding);
+    if (stopping.has(live)) return;
+    stopping.add(live);
     void qRuntime
       .cancelRun({
         actor: binding.actor,
@@ -602,6 +614,12 @@ export function createVoiceTurnHandler(
       .finally(() => {
         live.stop.abort();
       });
+  };
+  const supersede = (binding: VoiceSessionBinding, keep?: LiveRun): void => {
+    const live = liveRuns.get(binding);
+    if (live === undefined || live.runId === keep?.runId) return;
+    if (held.get(binding)?.kind === "ANSWER") held.delete(binding);
+    stopRun(binding, live);
   };
   const settleLive = (binding: VoiceSessionBinding, live: LiveRun): void => {
     if (liveRuns.get(binding) === live) liveRuns.delete(binding);
@@ -1073,7 +1091,8 @@ export function createVoiceTurnHandler(
         // answer is to a sentence they had not finished, and the provider
         // brings the whole of it as the next turn. The run is cancelled
         // and its generation stopped (ADR 0010 §5).
-        supersede(binding);
+        // This turn's own run: a newer turn may already be live on the line.
+        stopRun(binding, live);
       } else if (signal.aborted && !terminal) {
         // Barge-in pauses the answer; it does not throw it away. The run
         // finishes on its own and its text waits for "go on"; anything
@@ -1707,6 +1726,37 @@ export function createVoiceTurnHandler(
       isNonLexical(text) || (held.has(binding) && isContinueCue(text));
     if (!resuming) supersede(binding);
     /**
+     * An utterance the recogniser left open is not yet a turn.
+     *
+     * Live, a person thinking aloud ("This one. You know… So yes. See,
+     * you…") had each pause taken as the end of their turn: twelve
+     * growing fragments became twelve turns, and Q answered half-sentences
+     * with "I can't identify a clear question". When the recogniser did
+     * not close the sentence, Q keeps listening a moment longer before
+     * acting on it. If the person carries on, the provider drops this
+     * request and the whole utterance arrives as the next one; nothing was
+     * started, recorded or said for the fragment. If they do not, Q
+     * answers what it has, a moment later than it otherwise would.
+     */
+    if (
+      !resuming &&
+      !settledTranscripts.has(transcript) &&
+      endsUnfinished(text)
+    ) {
+      await new Promise<void>((resolve) => {
+        const timer = setTimeout(resolve, UNFINISHED_HOLD_MS);
+        signal.addEventListener(
+          "abort",
+          () => {
+            clearTimeout(timer);
+            resolve();
+          },
+          { once: true },
+        );
+      });
+      if (signal.aborted) return { kind: "NOTHING" };
+    }
+    /**
      * "Yes, and change the website too": the decision is taken, and the
      * rest is the person's next turn, handled as if said on its own.
      */
@@ -1717,12 +1767,14 @@ export function createVoiceTurnHandler(
       if (read.remainder === null || outcome.kind !== "SPOKEN") return outcome;
       const last = transcript.at(-1);
       if (last === undefined) return outcome;
-      return handle(
-        binding,
-        [...transcript.slice(0, -1), { ...last, content: read.remainder }],
-        signal,
-        speaker,
-      );
+      // The rest of a reply already acted on: not a fresh utterance, so
+      // it is not held for being unfinished.
+      const rest = [
+        ...transcript.slice(0, -1),
+        { ...last, content: read.remainder },
+      ];
+      settledTranscripts.add(rest);
+      return handle(binding, rest, signal, speaker);
     };
     // A proposal Q made, waiting for yes or no (CQ-Q-008, ADR 0011).
     const approvalWaiting = pendingApproval.get(binding);

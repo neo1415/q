@@ -81,6 +81,24 @@ export function isNonLexical(text: string): boolean {
 }
 
 /**
+ * Whether the recogniser left the utterance open (voice lane, unclear
+ * speech).
+ *
+ * The listening model punctuates what it hears from the speaker's own
+ * delivery: a sentence the person finished ends in a full stop, a question
+ * mark or an exclamation; one they trailed off from ends in a comma, a
+ * dash, an ellipsis or on a bare word. That is the recogniser's reading of
+ * the audio, not a reading of the words, and it is what separates "so
+ * yes. See, you…" from a question. Nothing here looks at vocabulary.
+ */
+export function endsUnfinished(text: string): boolean {
+  const trimmed = text.trim().replace(/["'”’)\]]+$/u, "");
+  if (trimmed.length === 0) return false;
+  if (/(?:\.\.\.|…)$/u.test(trimmed)) return true;
+  return !/[.?!]$/u.test(trimmed);
+}
+
+/**
  * The person's words with the browser's cue taken out.
  *
  * The cue is this system's own control token, never something anybody

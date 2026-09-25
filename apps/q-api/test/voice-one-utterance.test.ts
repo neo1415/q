@@ -367,7 +367,7 @@ describe("one utterance reported as several thinks", () => {
     const first = new AbortController();
     const pending = handle(
       bound,
-      [{ role: "user", content: "Tell me about seed rounds" }],
+      [{ role: "user", content: "Tell me about seed rounds." }],
       first.signal,
       speaker,
     );
@@ -385,7 +385,7 @@ describe("one utterance reported as several thinks", () => {
     const next = handle(
       bound,
       [
-        { role: "user", content: "Tell me about seed rounds" },
+        { role: "user", content: "Tell me about seed rounds." },
         { role: "agent", content: "Answer for 101." },
         { role: "user", content: "What about Series A in Lagos?" },
       ],
@@ -422,7 +422,7 @@ describe("one utterance reported as several thinks", () => {
     const first = new AbortController();
     const pending = handle(
       bound,
-      [{ role: "user", content: "Tell me about seed rounds" }],
+      [{ role: "user", content: "Tell me about seed rounds." }],
       first.signal,
       speaker,
     );
@@ -438,7 +438,7 @@ describe("one utterance reported as several thinks", () => {
     const resuming = handle(
       bound,
       [
-        { role: "user", content: "Tell me about seed rounds" },
+        { role: "user", content: "Tell me about seed rounds." },
         { role: "agent", content: "Answer for 101." },
         { role: "user", content: "[continue]" },
       ],
@@ -453,6 +453,79 @@ describe("one utterance reported as several thinks", () => {
     expect(q.cancelled).toEqual([]);
     expect(q.created).toHaveLength(1);
     expect(speaker.spoken.at(-1)).toContain("Second sentence.");
+  });
+});
+
+describe("an utterance the recogniser left open", () => {
+  // Live, 2026-09-25: "This one. You know… So yes. See, you…" arrived as
+  // twelve growing turns, each recorded, several answered with "I can't
+  // identify a clear question".
+  it("is not a turn while the person carries on: nothing is started or recorded for the fragment", async () => {
+    const q = world();
+    const handle = createVoiceTurnHandler({
+      qRuntime: q.runtime,
+      qStream: q.stream,
+      orchestration: { orchestrator: q.orchestrator, autostart: true },
+      logger,
+    });
+    const bound = binding();
+    const speaker = fakeSpeaker();
+    const fragment = new AbortController();
+    const held = handle(
+      bound,
+      [{ role: "user", content: "This one. You know… So yes. See, you…" }],
+      fragment.signal,
+      speaker,
+    );
+    await tick();
+    // The person carries on; the provider drops the request.
+    fragment.abort();
+    expect(await held).toEqual({ kind: "NOTHING" });
+    const whole = handle(
+      bound,
+      [
+        {
+          role: "user",
+          content:
+            "This one. You know… So yes. See, you could tell me who invests in aviation.",
+        },
+      ],
+      new AbortController().signal,
+      speaker,
+    );
+    await tick();
+    const run = q.created[0];
+    if (run === undefined) throw new Error("no run");
+    q.release(run.runId);
+    await whole;
+    expect(q.created).toHaveLength(1);
+    expect(q.created[0]?.text).toContain("who invests in aviation");
+    expect(speaker.spoken).toHaveLength(1);
+  });
+
+  it("is answered, a moment later, when the person has stopped", async () => {
+    const q = world();
+    const handle = createVoiceTurnHandler({
+      qRuntime: q.runtime,
+      qStream: q.stream,
+      orchestration: { orchestrator: q.orchestrator, autostart: true },
+      logger,
+    });
+    const speaker = fakeSpeaker();
+    const pending = handle(
+      binding(),
+      [{ role: "user", content: "Which investors would like aviation," }],
+      new AbortController().signal,
+      speaker,
+    );
+    await tick();
+    expect(q.created).toHaveLength(0);
+    await new Promise((resolve) => setTimeout(resolve, 1_600));
+    const run = q.created[0];
+    if (run === undefined) throw new Error("no run after the hold");
+    q.release(run.runId);
+    await pending;
+    expect(speaker.spoken.join(" ")).toContain("Answer for");
   });
 });
 
