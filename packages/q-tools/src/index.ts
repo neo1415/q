@@ -181,3 +181,13 @@ export {
   type ResearchPublicWebInput,
   type ResearchPublicWebOutput,
 } from "./tools/research-public-web.js";
+
+export {
+  createNotePreferenceTool,
+  NOTE_PREFERENCE,
+  NotePreferenceInputSchema,
+  NotePreferenceOutputSchema,
+  type NotePreferenceInput,
+  type NotePreferenceOutput,
+  type PreferenceNotePort,
+} from "./tools/note-preference.js";
