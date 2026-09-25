@@ -12,8 +12,11 @@ import {
   createPostgresInterestResponseRequestStore,
 } from "../infrastructure/postgres-interest-repositories.js";
 import {
+  createListRelationshipsForCompany,
+  createListRelationshipsForInvestor,
   createRelationshipForCompany,
   createRelationshipForInvestor,
+  type RelationshipListing,
   type RelationshipStatus,
 } from "./relationship-status.js";
 import {
@@ -151,6 +154,15 @@ export type InterestService = {
     readonly actor: ActorContext;
     readonly investorOrganisationId: string;
   }) => Promise<RelationshipStatus | null>;
+  /** An investor organisation's own relationships (CQ-WEB-030). */
+  readonly listRelationshipsForInvestor: (query: {
+    readonly actor: ActorContext;
+  }) => Promise<readonly RelationshipListing[]>;
+  /** A company's own relationships it can see anything of (CQ-WEB-030). */
+  readonly listRelationshipsForCompany: (query: {
+    readonly actor: ActorContext;
+    readonly companyId: string;
+  }) => Promise<readonly RelationshipListing[]>;
 };
 
 export type InterestServiceOptions = NetworkServiceOptions &
@@ -195,5 +207,9 @@ export function createInterestService(
     mayRespondToInterest: createMayRespondToInterest(dependencies),
     relationshipForInvestor: createRelationshipForInvestor(dependencies),
     relationshipForCompany: createRelationshipForCompany(dependencies),
+    listRelationshipsForInvestor:
+      createListRelationshipsForInvestor(dependencies),
+    listRelationshipsForCompany:
+      createListRelationshipsForCompany(dependencies),
   };
 }

@@ -2,6 +2,7 @@ import { CompanyIdSchema } from "@capital-q/companies";
 import {
   UtcTimestampSchema,
   type RelationshipStatusDto,
+  type RelationshipSummaryDto,
 } from "@capital-q/contracts";
 import { InvestorOrganisationIdSchema } from "@capital-q/investors";
 import {
@@ -78,6 +79,162 @@ function viewOf(
         projection,
         nextStep: nextStepFor(projection.state, party),
       };
+}
+
+/** One row of a party's list: the fold, plus the counterpart's name. */
+export type RelationshipListing = RelationshipStatus & {
+  readonly counterpartName: string;
+};
+
+const LIST_LIMIT = 200;
+
+/** An investor organisation's own relationships, each folded for its side. */
+export function createListRelationshipsForInvestor(
+  dependencies: ExpressInterestDependencies,
+) {
+  return async (query: {
+    readonly actor: ActorContext;
+  }): Promise<readonly RelationshipListing[]> => {
+    const { actor } = query;
+    if (actor.organisationId === undefined) {
+      throw new ActorContextRequiredError();
+    }
+    const subject =
+      await dependencies.investorSubject.investorOrganisationFor(actor);
+    if (subject === null) throw new InterestNotPermittedError();
+    const investorOrganisationId = InvestorOrganisationIdSchema.parse(
+      subject.investorOrganisationId,
+    );
+    await dependencies.authorization.requireCapability({
+      actor,
+      capability: INVESTOR_VIEW,
+      resource: {
+        kind: "RESOURCE",
+        tenantId: actor.tenantId,
+        organisationId: actor.organisationId,
+        resourceType: "investor_organisation",
+        resourceId: investorOrganisationId,
+      },
+    });
+    const relationships =
+      await dependencies.repositories.relationships.listByInvestorOrganisation(
+        dependencies.sql,
+        investorOrganisationId,
+        LIST_LIMIT,
+      );
+    const out: RelationshipListing[] = [];
+    for (const relationship of relationships) {
+      // The same rule as the single read: a company that has since gone
+      // out of this investor's sight is not listed.
+      if (
+        !(await dependencies.companyVisibility.isVisibleToInvestor(
+          actor,
+          relationship.companyId,
+        ))
+      ) {
+        continue;
+      }
+      const company = await dependencies.companies.findCanonicalCompany(
+        relationship.companyId,
+      );
+      const view = viewOf(
+        relationship,
+        await readHistory(dependencies, relationship.id),
+        "INVESTOR",
+      );
+      if (company !== null && view !== null) {
+        out.push({ ...view, counterpartName: company.canonicalName });
+      }
+    }
+    return out;
+  };
+}
+
+/** A company's own relationships: only those its side can see anything of. */
+export function createListRelationshipsForCompany(
+  dependencies: ExpressInterestDependencies,
+) {
+  return async (query: {
+    readonly actor: ActorContext;
+    readonly companyId: string;
+  }): Promise<readonly RelationshipListing[]> => {
+    const { actor } = query;
+    if (actor.organisationId === undefined) {
+      throw new ActorContextRequiredError();
+    }
+    const companyId = CompanyIdSchema.safeParse(query.companyId);
+    if (!companyId.success) throw new InterestCompanyNotFoundError();
+    const company = await dependencies.companies.findCanonicalCompany(
+      companyId.data,
+    );
+    if (
+      company === null ||
+      company.tenantId !== actor.tenantId ||
+      company.organisationId !== actor.organisationId
+    ) {
+      throw new InterestCompanyNotFoundError();
+    }
+    await dependencies.authorization.requireCapability({
+      actor,
+      capability: COMPANY_INTEREST_VIEW,
+      resource: {
+        kind: "RESOURCE",
+        tenantId: company.tenantId,
+        organisationId: company.organisationId,
+        resourceType: "company",
+        resourceId: company.id,
+      },
+    });
+    const relationships =
+      await dependencies.repositories.relationships.listByCompany(
+        dependencies.sql,
+        company.id,
+        LIST_LIMIT,
+      );
+    const out: RelationshipListing[] = [];
+    for (const relationship of relationships) {
+      const view = viewOf(
+        relationship,
+        await readHistory(dependencies, relationship.id),
+        "COMPANY",
+      );
+      // Nothing visible to the company: an investor's private discovery.
+      if (view === null) continue;
+      const investor =
+        await dependencies.investors.findCanonicalInvestorOrganisation(
+          relationship.investorOrganisationId,
+        );
+      if (investor !== null) {
+        out.push({ ...view, counterpartName: investor.displayName });
+      }
+    }
+    return out;
+  };
+}
+
+/** The wire row. */
+export function toRelationshipSummaryDto(
+  listing: RelationshipListing,
+  side: "INVESTOR" | "COMPANY",
+): RelationshipSummaryDto {
+  return {
+    relationshipId: listing.relationship.id,
+    counterpart:
+      side === "INVESTOR"
+        ? {
+            kind: "COMPANY",
+            id: listing.relationship.companyId,
+            name: listing.counterpartName,
+          }
+        : {
+            kind: "INVESTOR_ORGANISATION",
+            id: listing.relationship.investorOrganisationId,
+            name: listing.counterpartName,
+          },
+    state: listing.projection.state,
+    stateSince: UtcTimestampSchema.parse(listing.projection.stateSince),
+    nextStep: listing.nextStep,
+  };
 }
 
 /** The investor organisation's view of its relationship with a company. */

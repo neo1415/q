@@ -16,6 +16,9 @@ import {
   NETWORK_INTEREST_ACCEPT_PATH,
   NETWORK_INTEREST_DECLINE_PATH,
   NETWORK_INVESTOR_RELATIONSHIP_PATH,
+  NETWORK_INVESTOR_RELATIONSHIPS_PATH,
+  NETWORK_COMPANY_RELATIONSHIPS_PATH,
+  RelationshipListDtoSchema,
   parseContract,
   RelationshipStatusResponseDtoSchema,
   RespondToInterestRequestSchema,
@@ -24,6 +27,7 @@ import {
   toIncomingInterestDto,
   toInterestDto,
   toRelationshipStatusDto,
+  toRelationshipSummaryDto,
   type InterestService,
 } from "@capital-q/network";
 import { createCorrelationId } from "@capital-q/observability";
@@ -163,6 +167,39 @@ export function registerNetworkInterestRoutes(
       void reply.header("Cache-Control", "no-store");
       return RelationshipStatusResponseDtoSchema.parse({
         relationship: status === null ? null : toRelationshipStatusDto(status),
+      });
+    },
+  );
+
+  // Each side's own relationships (CQ-WEB-030), each row the per-party fold.
+  app.get(
+    NETWORK_INVESTOR_RELATIONSHIPS_PATH,
+    { onRequest: withContext },
+    async (request, reply) => {
+      const listings = await service.listRelationshipsForInvestor({
+        actor: getActorContext(request),
+      });
+      void reply.header("Cache-Control", "no-store");
+      return RelationshipListDtoSchema.parse({
+        items: listings.map((listing) =>
+          toRelationshipSummaryDto(listing, "INVESTOR"),
+        ),
+      });
+    },
+  );
+  app.get(
+    NETWORK_COMPANY_RELATIONSHIPS_PATH,
+    { onRequest: withContext },
+    async (request, reply) => {
+      const listings = await service.listRelationshipsForCompany({
+        actor: getActorContext(request),
+        companyId: companyIdOf(request),
+      });
+      void reply.header("Cache-Control", "no-store");
+      return RelationshipListDtoSchema.parse({
+        items: listings.map((listing) =>
+          toRelationshipSummaryDto(listing, "COMPANY"),
+        ),
       });
     },
   );

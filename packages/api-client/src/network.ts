@@ -79,6 +79,29 @@ export function answerInterest(
   );
 }
 
+/** `GET /v1/network/relationships` — an investor organisation's own relationships (CQ-WEB-030). */
+export function listInvestorRelationships(session: ApiSession) {
+  return call(
+    session,
+    "GET",
+    NETWORK_INVESTOR_RELATIONSHIPS_PATH,
+    RelationshipListDtoSchema,
+  );
+}
+
+/** `GET /v1/network/companies/:companyId/relationships` — a company's own relationships. */
+export function listCompanyRelationships(
+  session: ApiSession,
+  companyId: string,
+) {
+  return call(
+    session,
+    "GET",
+    companyPath(NETWORK_COMPANY_RELATIONSHIPS_PATH, companyId),
+    RelationshipListDtoSchema,
+  );
+}
+
 /** `GET /v1/network/companies/:companyId/relationship` — where an investor is with a company (CQ-NET-012). */
 export function getRelationshipWithCompany(
   session: ApiSession,

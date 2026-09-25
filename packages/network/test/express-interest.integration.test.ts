@@ -963,6 +963,73 @@ describe("Express Interest against local PostgreSQL", () => {
     });
   });
 
+  it("lists each side's own relationships, and a private discovery is not in the company's list (CQ-WEB-030)", async () => {
+    await withWorld(async (world) => {
+      const {
+        network,
+        interests,
+        founder,
+        otherFounder,
+        investorRep,
+        companyA,
+        companyB,
+        investorA,
+      } = world;
+      // Company B: the investor only discovered it, privately.
+      await network.ensureRelationship({
+        actor: investorRep,
+        companyId: companyB,
+        investorOrganisationId: investorA,
+        source: { type: "DISCOVER" },
+        visibilityScope: "investor_private",
+        correlationId: CORRELATION(),
+      });
+      // Company A: interest expressed.
+      await expressed(world);
+
+      const investorList = await interests.listRelationshipsForInvestor({
+        actor: investorRep,
+      });
+      expect(
+        investorList
+          .map((l) => [l.counterpartName, l.projection.state, l.nextStep])
+          .sort(),
+      ).toEqual([
+        ["Kora", "INTEREST_EXPRESSED", "AWAIT_ANSWER"],
+        ["Other Co", "DISCOVERED", "EXPRESS_INTEREST"],
+      ]);
+
+      const companyList = await interests.listRelationshipsForCompany({
+        actor: founder,
+        companyId: companyA,
+      });
+      expect(
+        companyList.map((l) => [
+          l.counterpartName,
+          l.projection.state,
+          l.nextStep,
+        ]),
+      ).toEqual([["Apex", "INTEREST_EXPRESSED", "ANSWER_INTEREST"]]);
+      // Company B's founder sees nothing: the discovery was private.
+      await expect(
+        interests.listRelationshipsForCompany({
+          actor: founder,
+          companyId: companyB,
+        }),
+      ).rejects.toBeInstanceOf(InterestCompanyNotFoundError);
+      expect(
+        await interests.listRelationshipsForCompany({
+          actor: otherFounder,
+          companyId: companyB,
+        }),
+      ).toEqual([]);
+      // Neither side can list as the other.
+      await expect(
+        interests.listRelationshipsForInvestor({ actor: founder }),
+      ).rejects.toBeInstanceOf(InterestNotPermittedError);
+    });
+  });
+
   it("an investor's private discovery is nothing to the company", async () => {
     await withWorld(
       async ({
