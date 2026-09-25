@@ -31,6 +31,7 @@ import { useDockMenu } from "../q-dock/use-dock-menu";
 import { homeHref } from "./active-conversation";
 import { failureMessage, recoveryHint } from "./conversation";
 import { QAnswer } from "./q-answer";
+import { QBoard } from "./q-board";
 import { useQSession } from "./q-session";
 
 /**
@@ -60,6 +61,18 @@ export function QSheetConversation({
   }, [turns.length, spokenOnly.length, q.state.partial?.text]);
 
   const label = presence.label ?? "Ready";
+  // What is being said now: the person's latest words (spoken or typed)
+  // and Q's answer to them, when it has come.
+  const lastPersonTurn = turns.findLast((turn) => turn.kind === "PERSON");
+  const lastSpoken = spokenOnly.findLast((line) => line.role === "user");
+  const lastPerson = lastSpoken?.text ?? lastPersonTurn?.text;
+  const latestQ = turns.findLast((turn) => turn.kind === "Q");
+  const latestAnswer =
+    latestQ?.kind === "Q" &&
+    turns.indexOf(latestQ) >
+      turns.findLastIndex((turn) => turn.kind === "PERSON")
+      ? latestQ
+      : undefined;
 
   return (
     <div className="flex min-h-full flex-col gap-4" data-q-sheet>
@@ -162,64 +175,36 @@ export function QSheetConversation({
               : `Ask Q about ${subject.label ?? "this"} — what it says, what is missing, what to do next.`}
           </p>
         ) : null}
-        {spokenOnly.length > 0 ? (
-          <ol className="flex flex-col gap-3" aria-label="Spoken">
-            {spokenOnly.map((line) => (
-              <li
-                key={line.id}
-                className={
-                  line.role === "user"
-                    ? "flex flex-col items-end gap-1"
-                    : "flex flex-col gap-1"
-                }
-              >
-                <span className="cq-label text-(--cq-text-tertiary)">
-                  {line.role === "user" ? "You" : "Q"}
-                </span>
-                <p
-                  className={
-                    line.role === "user"
-                      ? "cq-body-sm rounded-lg bg-(--cq-surface-subtle) px-3 py-2 text-(--cq-text-primary)"
-                      : "cq-body-sm whitespace-pre-wrap text-(--cq-text-primary)"
-                  }
-                >
-                  {line.text}
-                </p>
-              </li>
-            ))}
-          </ol>
+        {/* The current exchange, then the compact Board (spec §6.1): what
+            Q is saying now in full, what it has produced as objects. The
+            whole conversation is the Q page's Transcript. */}
+        {lastPerson !== undefined ? (
+          <p
+            className="cq-body-sm self-end rounded-lg bg-(--cq-surface-subtle) px-3 py-2 text-(--cq-text-primary)"
+            data-q-panel-person
+          >
+            <span className="sr-only">You: </span>
+            {lastPerson}
+          </p>
         ) : null}
-        {turns.length > 0 ? (
-          <ol className="flex flex-col gap-3" aria-live="polite">
-            {turns.map((turn) => (
-              <li
-                key={turn.id}
-                className={
-                  turn.kind === "PERSON"
-                    ? "flex flex-col items-end gap-1"
-                    : "flex flex-col gap-1"
-                }
-              >
-                {turn.kind === "PERSON" ? (
-                  <>
-                    <span className="cq-label text-(--cq-text-tertiary)">
-                      You
-                    </span>
-                    <p className="cq-body-sm rounded-lg bg-(--cq-surface-subtle) px-3 py-2 text-(--cq-text-primary)">
-                      {turn.text}
-                    </p>
-                  </>
-                ) : (
-                  <QAnswer
-                    turn={turn}
-                    onAsk={(question) => void q.ask(question)}
-                  />
-                )}
-              </li>
-            ))}
-            <div ref={endRef} />
-          </ol>
+        {latestAnswer !== undefined ? (
+          <div aria-live="polite">
+            <QAnswer
+              turn={latestAnswer}
+              onAsk={(question) => void q.ask(question)}
+              onOpenArtifact={session.openArtifact}
+            />
+          </div>
         ) : null}
+        <div ref={endRef} />
+        <QBoard
+          conversationId={q.conversationId}
+          turns={turns}
+          onAsk={(question) => void q.ask(question)}
+          onOpenArtifact={session.openArtifact}
+          compact
+          skipNoteOf={latestAnswer?.id}
+        />
         {q.state.failure !== null ? (
           <InlineNotice tone="warning" title="Q couldn't finish that">
             {failureMessage(q.state.failure)} {recoveryHint(q.state.failure)}

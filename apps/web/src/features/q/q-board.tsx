@@ -3,12 +3,14 @@
 import Link from "next/link";
 import { useEffect, useState, useSyncExternalStore } from "react";
 
+import { qArtifactExportFormats } from "@capital-q/contracts";
 import { cx } from "@capital-q/ui";
 import { buttonClassName } from "@capital-q/ui/button";
 import { ICON_SIZE, ICON_STROKE, Pin, PinOff, X } from "@capital-q/ui/icons";
 
 import { ViewTransition } from "@/components/view-transition";
 
+import { ArtifactDownloads } from "./artifact-download";
 import { slideSource } from "./artifact-viewer";
 import { arrangeBoard, boardObjects, type BoardObject } from "./board";
 import type { QTurn } from "./conversation";
@@ -236,16 +238,14 @@ function ObjectBody({
               >
                 Open
               </button>
-              {block.type === "PITCH_DECK" ? (
-                // Download is its own control, apart from Open (doc 17 §91).
-                <a
-                  className={buttonClassName("quiet", "compact")}
-                  href={`/api/q-artifact/${encodeURIComponent(block.artifactId)}/pdf`}
-                  data-q-board-download={block.artifactId}
-                >
-                  Download PDF
-                </a>
-              ) : null}
+              {/* Download is its own control, apart from Open (doc 17
+                  §91): a PDF for every type, PowerPoint for a deck
+                  (BIZ-001), through the same control the answer card uses. */}
+              <ArtifactDownloads
+                artifactId={block.artifactId}
+                formats={qArtifactExportFormats(block.type)}
+                version={null}
+              />
             </div>
           ) : null}
         </div>
@@ -263,16 +263,28 @@ function ObjectBody({
   }
 }
 
+/** How many objects the dock's compact Board shows before "Open Q". */
+const COMPACT_LIMIT = 4;
+
 export function QBoard({
   conversationId,
   turns,
   onAsk,
   onOpenArtifact,
+  compact = false,
+  skipNoteOf,
 }: {
   readonly conversationId: string | null;
   readonly turns: readonly QTurn[];
   readonly onAsk: (question: string) => void;
   readonly onOpenArtifact: (artifactId: string) => void;
+  /**
+   * The dock panel's Board (spec §6.1): the newest few objects, the rest
+   * one press away on the Q page.
+   */
+  readonly compact?: boolean | undefined;
+  /** An answer already shown in full beside the Board: not noted twice. */
+  readonly skipNoteOf?: string | undefined;
 }) {
   const key = conversationId ?? "new";
   const marks = useSyncExternalStore(
@@ -281,11 +293,15 @@ export function QBoard({
     () => EMPTY,
   );
   const [exchange, setExchange] = useState<string | null>(null);
-  const objects = arrangeBoard(
-    boardObjects(turns),
+  const arranged = arrangeBoard(
+    boardObjects(turns).filter(
+      (object) => !(object.kind === "NOTE" && object.turn.id === skipNoteOf),
+    ),
     marks.pinned,
     marks.dismissed,
   );
+  const objects = compact ? arranged.slice(0, COMPACT_LIMIT) : arranged;
+  const more = arranged.length - objects.length;
 
   const togglePin = (objectKey: string) => {
     const pinned = marks.pinned.includes(objectKey)
@@ -302,8 +318,12 @@ export function QBoard({
 
   return (
     <ViewTransition name="q-board" share="cq-q-morph" default="none">
-      <section aria-label="Board" className="flex flex-col gap-3" data-q-board>
-        {objects.length === 0 ? (
+      <section
+        aria-label="Board"
+        className="flex flex-col gap-3"
+        data-q-board={compact ? "compact" : "full"}
+      >
+        {compact && objects.length === 0 ? null : objects.length === 0 ? (
           <p className="cq-body-sm text-(--cq-text-secondary)">
             What Q finds and makes lands here: answers, companies, comparisons
             and documents, to open, pin or ask about.
@@ -396,6 +416,11 @@ export function QBoard({
             );
           })}
         </ul>
+        {more > 0 ? (
+          <p className="cq-caption text-(--cq-text-secondary)">
+            {more === 1 ? "1 more" : `${String(more)} more`} on the Q page.
+          </p>
+        ) : null}
       </section>
     </ViewTransition>
   );
