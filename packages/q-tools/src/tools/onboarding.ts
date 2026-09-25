@@ -62,6 +62,12 @@ export const OnboardingStepStateSchema = z
     maxChoices: z.number().int().min(1).max(50).optional(),
     /** A recommendation of Q's awaiting the person's decision. Never an answer. */
     pendingRecommendation: z.string().max(600).optional(),
+    /**
+     * An open optional step whose concept is already settled by another
+     * step's answer or decline (one concept, one answer): theirs to add
+     * to, never a question to ask again.
+     */
+    coveredBy: StepKeySchema.optional(),
   })
   .strict();
 export type OnboardingStepState = z.infer<typeof OnboardingStepStateSchema>;
@@ -404,7 +410,7 @@ export function createOnboardingTools(
       status: "ACTIVE",
       providerName: "get_onboarding_state",
       description:
-        "Returns the person's onboarding as it stands: every step with its question, whether it is answered, open or set aside, what is on the record, its options, and any pending recommendation. Call it after recording if you need the fresh picture.",
+        "Returns the person's onboarding as it stands: every step with its question, whether it is answered, open or set aside, what is on the record, its options, and any pending recommendation. An open step with coveredBy asks about a concept another answer already settled: never ask it again; record to it only what they add. Call it after recording if you need the fresh picture.",
       classification: "READ_ONLY",
       riskClass: "SAFE_READ",
       requiredCapabilities: [capability("onboarding.session.view")],
@@ -580,7 +586,10 @@ async function withOpen(
   results: OnboardingRecordResult[],
 ): Promise<RecordOnboardingAnswersOutput> {
   const after = await port.state();
-  const open = after.steps.filter((step) => step.status === "OPEN");
+  // A step whose concept another answer settled is not still open.
+  const open = after.steps.filter(
+    (step) => step.status === "OPEN" && step.coveredBy === undefined,
+  );
   return {
     results,
     stillOpen: [
