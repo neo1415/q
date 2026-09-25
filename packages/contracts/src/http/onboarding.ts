@@ -782,6 +782,46 @@ export const OnboardingSessionViewSchema = z.object({
 export type OnboardingSessionView = z.infer<typeof OnboardingSessionViewSchema>;
 
 /** The conversational interview's reply: the updated view and what was understood. */
+/**
+ * The steps Q's reply actually asks about, in order (CQ-QX-008): what a
+ * screen's choices and a test driver follow — Q, never the journey's step
+ * cursor. Empty when the reply asks nothing.
+ */
+export const OnboardingAskingAboutSchema = z
+  .array(z.string().max(80))
+  .max(6)
+  .default([]);
+
+/** What is waiting on the person's decision after a turn (CQ-QX-008). */
+export const OnboardingTurnPendingSchema = z
+  .object({
+    /** Q's recommendations not yet accepted or declined. */
+    recommendations: z
+      .array(
+        z
+          .object({
+            stepKey: z.string().max(80),
+            value: z.string().max(600),
+            rationale: z.string().max(300).nullable(),
+          })
+          .strict(),
+      )
+      .max(12),
+    /** Values held for the person's yes (legacy interviewer only). */
+    held: z
+      .array(
+        z
+          .object({
+            stepKey: z.string().max(80),
+            value: z.string().max(600),
+          })
+          .strict(),
+      )
+      .max(12),
+  })
+  .strict()
+  .default({ recommendations: [], held: [] });
+
 export const SayOnboardingResponseSchema = z
   .object({
     view: OnboardingSessionViewSchema,
@@ -828,6 +868,12 @@ export const SayOnboardingResponseSchema = z
     researching: z.string().max(200).nullable().default(null),
     /** True when Q answered without a model and said so plainly. */
     degraded: z.boolean(),
+    /**
+     * Forwarded from the interview turn so the screen's answer choices
+     * follow what Q asked, not the step cursor (they can differ).
+     */
+    askingAbout: OnboardingAskingAboutSchema,
+    pending: OnboardingTurnPendingSchema,
   })
   .strict();
 export type SayOnboardingResponse = z.infer<typeof SayOnboardingResponseSchema>;

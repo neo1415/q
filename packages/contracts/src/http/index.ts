@@ -457,6 +457,8 @@ export {
   OnboardingUnderstandingSchema,
   SayOnboardingRequestSchema,
   SayOnboardingResponseSchema,
+  OnboardingAskingAboutSchema,
+  OnboardingTurnPendingSchema,
   DismissOnboardingQuestionRequestSchema,
   OnboardingInterviewQuestionViewSchema,
   OnboardingQuestionOptionViewSchema,

@@ -1,6 +1,10 @@
 import { z } from "zod";
 
-import { OnboardingJourneyTypeSchema } from "../http/onboarding.js";
+import {
+  OnboardingAskingAboutSchema,
+  OnboardingJourneyTypeSchema,
+  OnboardingTurnPendingSchema,
+} from "../http/onboarding.js";
 
 /**
  * One turn of the Q interview, over HTTP (QX-004 core gate: one Q).
@@ -104,36 +108,9 @@ export const QInterviewTurnResponseSchema = z
      * the screen's choices and a test driver follow — Q, never the
      * journey's step cursor. Empty when the reply asks nothing.
      */
-    askingAbout: z.array(z.string().max(80)).max(6).default([]),
+    askingAbout: OnboardingAskingAboutSchema,
     /** What is waiting on the person's decision, as Q would say it. */
-    pending: z
-      .object({
-        /** Q's recommendations not yet accepted or declined. */
-        recommendations: z
-          .array(
-            z
-              .object({
-                stepKey: z.string().max(80),
-                value: z.string().max(600),
-                rationale: z.string().max(300).nullable(),
-              })
-              .strict(),
-          )
-          .max(12),
-        /** Values held for the person's yes (legacy interviewer only). */
-        held: z
-          .array(
-            z
-              .object({
-                stepKey: z.string().max(80),
-                value: z.string().max(600),
-              })
-              .strict(),
-          )
-          .max(12),
-      })
-      .strict()
-      .default({ recommendations: [], held: [] }),
+    pending: OnboardingTurnPendingSchema,
   })
   .strict();
 export type QInterviewTurnResponse = z.infer<

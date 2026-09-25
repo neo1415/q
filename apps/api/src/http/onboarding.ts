@@ -422,6 +422,8 @@ export function registerOnboardingRoutes(
         navigate: turn.navigate,
         researching: turn.researching,
         degraded: turn.degraded,
+        askingAbout: turn.askingAbout,
+        pending: turn.pending,
       });
     },
   );
