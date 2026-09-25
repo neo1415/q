@@ -1097,6 +1097,7 @@ const interviewAgent = createInterviewAgent({
   gateway: modelGateway,
   firewall,
   logger,
+  memory: memoryService,
   dataPosture: demoDataPosture,
 });
 const voiceTurnBoard = createVoiceTurnBoard();

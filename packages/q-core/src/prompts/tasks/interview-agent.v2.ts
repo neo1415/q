@@ -31,7 +31,7 @@ export const INTERVIEW_AGENT_V2: PromptDefinition<
 > = {
   ...INTERVIEW_AGENT_V1,
   version: 2,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   changeDescription:
     "ADR 0016 M3: Q's own recommendations are held with recommend and become the person's answer only through accept_recommendation, on their approval of a recommendation they have heard.",
   effectiveFrom: "2026-09-25",

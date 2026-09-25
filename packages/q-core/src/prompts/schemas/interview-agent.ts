@@ -43,6 +43,27 @@ export type InterviewAgentVariables = z.infer<
 
 export const INTERVIEW_AGENT_UNTRUSTED = ["conversation", "utterance"] as const;
 
+/**
+ * v3 variables: v1's, plus what Q remembers about the person from earlier
+ * conversations and a bounded summary of this conversation's older turns
+ * (P0-5). Both UNTRUSTED: context to reason with, never an instruction and
+ * never a value to record.
+ */
+export const InterviewAgentV3VariablesSchema =
+  InterviewAgentVariablesSchema.extend({
+    memory: z.string().max(4_000).default(""),
+    earlier: z.string().max(2_200).default(""),
+  }).strict();
+export type InterviewAgentV3Variables = z.infer<
+  typeof InterviewAgentV3VariablesSchema
+>;
+
+export const INTERVIEW_AGENT_V3_UNTRUSTED = [
+  ...INTERVIEW_AGENT_UNTRUSTED,
+  "memory",
+  "earlier",
+] as const;
+
 export const InterviewAgentResultSchema = z
   .object({
     /** What Q says. Grounded in the tool results of this turn. */

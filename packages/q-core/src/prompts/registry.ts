@@ -41,6 +41,7 @@ import { INTERVIEW_CONDUCTOR_V9 } from "./tasks/interview-conductor.v9.js";
 import { INTERVIEW_CONDUCTOR_V10 } from "./tasks/interview-conductor.v10.js";
 import { INTERVIEW_AGENT_V1 } from "./tasks/interview-agent.v1.js";
 import { INTERVIEW_AGENT_V2 } from "./tasks/interview-agent.v2.js";
+import { INTERVIEW_AGENT_V3 } from "./tasks/interview-agent.v3.js";
 import { INTERVIEW_CONDUCTOR_V11 } from "./tasks/interview-conductor.v11.js";
 import { PRESENCE_READER_V1 } from "./tasks/presence-reader.v1.js";
 import { WELCOME_CONDUCTOR_V1 } from "./tasks/welcome-conductor.v1.js";
@@ -176,6 +177,7 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition<unknown, unknown>[] =
     INTERVIEW_CONDUCTOR_V11,
     INTERVIEW_AGENT_V1,
     INTERVIEW_AGENT_V2,
+    INTERVIEW_AGENT_V3,
     WELCOME_CONDUCTOR_V1,
     CLAIM_EXTRACTION_V1,
     INVESTOR_MANDATE_SYNTHESIS_V1,

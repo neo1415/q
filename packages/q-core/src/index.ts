@@ -103,12 +103,15 @@ export { INTERVIEW_CONDUCTOR_V10 } from "./prompts/tasks/interview-conductor.v10
 export { INTERVIEW_CONDUCTOR_V11 } from "./prompts/tasks/interview-conductor.v11.js";
 export { INTERVIEW_AGENT_V1 } from "./prompts/tasks/interview-agent.v1.js";
 export { INTERVIEW_AGENT_V2 } from "./prompts/tasks/interview-agent.v2.js";
+export { INTERVIEW_AGENT_V3 } from "./prompts/tasks/interview-agent.v3.js";
 export {
   INTERVIEW_AGENT_SCHEMA_NAME,
   INTERVIEW_AGENT_SCHEMA_VERSION,
   InterviewAgentResultSchema,
+  InterviewAgentV3VariablesSchema,
   InterviewAgentVariablesSchema,
   type InterviewAgentResult,
+  type InterviewAgentV3Variables,
   type InterviewAgentVariables,
 } from "./prompts/schemas/interview-agent.js";
 export { DECISION_READER_V1 } from "./prompts/tasks/decision-reader.v1.js";

@@ -19,14 +19,22 @@ import type { Logger } from "@capital-q/observability";
 import {
   createDefaultPromptRegistry,
   DEFAULT_COMMUNICATION_PROFILE,
+  type InterviewAgentV3Variables,
   InterviewAgentResultSchema,
   renderPrompt,
   type InterviewAgentResult,
   type InterviewAgentVariables,
   type PromptRegistry,
 } from "@capital-q/q-core";
+import {
+  compactThread,
+  createLoopMemoryReader,
+  createPreferenceNotebook,
+  type MemoryService,
+} from "@capital-q/q-knowledge";
 import type { ContextFirewallPort } from "@capital-q/q-runtime";
 import {
+  createNotePreferenceTool,
   createOnboardingTools,
   createQToolExecutor,
   createQToolRegistry,
@@ -76,6 +84,12 @@ export type InterviewAgentDependencies = {
   readonly logger: Logger;
   readonly registry?: PromptRegistry | undefined;
   readonly dataPosture?: "REAL_CUSTOMER" | "SYNTHETIC_DEMO" | undefined;
+  /**
+   * The person's memory (ADR 0012, P0-5): recall and communication profile
+   * in, stated preferences out through the Write Gate. Absent: the default
+   * profile, nothing recalled, no note_preference tool.
+   */
+  readonly memory?: Pick<MemoryService, "recall" | "remember"> | undefined;
 };
 
 export type InterviewAgent = {
@@ -122,16 +136,22 @@ export function createInterviewAgent(
       logger.warn({ err: error }, "interview thread not read for the Q run");
       return null;
     });
-    const conversation: InterviewAgentVariables["conversation"] =
+    const thread =
       kept === null
         ? input.recentTurns.map((t) => ({
             role: t.role === "person" ? ("PERSON" as const) : ("Q" as const),
             text: t.text.slice(0, 2_000),
           }))
-        : kept.items.slice(-120).map((t) => ({
+        : kept.items.map((t) => ({
             role: t.role === "PERSON" ? ("PERSON" as const) : ("Q" as const),
             text: t.text.slice(0, 2_000),
           }));
+    // The newest turns verbatim, the older ones as a bounded summary
+    // (P0-5): the whole conversation, within a fixed budget.
+    const compacted = compactThread(thread);
+    const conversation: InterviewAgentVariables["conversation"] = [
+      ...compacted.recent,
+    ];
 
     const decision = await firewall.plan({
       actor,
@@ -145,11 +165,37 @@ export function createInterviewAgent(
         "the Context Firewall did not authorise this interview run",
       );
     }
+    const memory = dependencies.memory;
+    const loop =
+      memory === undefined
+        ? { memory: "", profile: DEFAULT_COMMUNICATION_PROFILE }
+        : await createLoopMemoryReader({ memory }).read({
+            actor,
+            plan: decision.plan,
+            sessionKey: input.onboardingSessionId,
+          });
+    // A stated preference is kept through the Write Gate, quote-checked
+    // against the person's own words in this conversation.
+    const noteTool =
+      memory === undefined
+        ? []
+        : [
+            createNotePreferenceTool(
+              createPreferenceNotebook({
+                memory,
+                actor,
+                sessionKey: input.onboardingSessionId,
+                priorUserTurns: thread
+                  .filter((t) => t.role === "PERSON")
+                  .map((t) => t.text),
+              }),
+            ),
+          ];
     const tools = createQToolExecutor({
       // Nothing said, nothing to write: an opening offers only reads, so
       // no answer can be recorded that the person did not give.
       registry: createQToolRegistry(
-        createOnboardingTools(port).filter(
+        [...createOnboardingTools(port), ...noteTool].filter(
           (tool) => !opening || tool.classification === "READ_ONLY",
         ),
       ),
@@ -167,11 +213,11 @@ export function createInterviewAgent(
     const offered = await tools.offer(context);
     const state = await port.state();
 
-    const rendered = renderPrompt<InterviewAgentVariables>(registry, {
+    const rendered = renderPrompt<InterviewAgentV3Variables>(registry, {
       task: "INTERVIEW_AGENT",
       charter: input.channel === "voice" ? "Q_SYSTEM_VOICE" : "Q_SYSTEM",
       operatingMode: "ASSESSMENT",
-      communicationProfile: DEFAULT_COMMUNICATION_PROFILE,
+      communicationProfile: loop.profile,
       environmentNotes:
         "You change the person's onboarding only through your tools; a tool result is what happened.",
       variables: {
@@ -181,6 +227,8 @@ export function createInterviewAgent(
         state: JSON.stringify(state).slice(0, 24_000),
         conversation,
         utterance,
+        memory: loop.memory.slice(0, 4_000),
+        earlier: (compacted.summary ?? "").slice(0, 2_200),
       },
     });
 
