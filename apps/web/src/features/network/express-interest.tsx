@@ -55,6 +55,7 @@ export function ExpressInterest({
   surface,
   initialInterest = null,
   express = expressInterestAction,
+  onConfirmed,
 }: {
   readonly companyId: string;
   readonly companyName: string;
@@ -62,6 +63,8 @@ export function ExpressInterest({
   /** The organisation's interest as the server last reported it, when known. */
   readonly initialInterest?: InterestDto | null;
   readonly express?: ExpressInterestPort;
+  /** Called once the server has confirmed the interest (CQ-WEB-030). */
+  readonly onConfirmed?: (() => void) | undefined;
 }) {
   const [phase, setPhase] = useState<Phase>(
     initialInterest === null
@@ -94,6 +97,7 @@ export function ExpressInterest({
         interest: result.value.interest,
         alreadySent: result.value.deduplicated,
       });
+      onConfirmed?.();
       return;
     }
     // A refusal that will not change on retry closes this attempt; the
@@ -104,7 +108,7 @@ export function ExpressInterest({
       message: result.message,
       retryable: result.retryable,
     });
-  }, [companyId, express, surface]);
+  }, [companyId, express, surface, onConfirmed]);
 
   switch (phase.kind) {
     case "IDLE":

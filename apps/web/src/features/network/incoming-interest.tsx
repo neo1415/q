@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useRef, useState } from "react";
 
 import type { IncomingInterestDto } from "@capital-q/contracts";
@@ -67,9 +68,11 @@ function when(timestamp: string): string {
 function Row({
   item,
   answer,
+  onAnswered,
 }: {
   readonly item: IncomingInterestDto;
   readonly answer: AnswerPort;
+  readonly onAnswered?: (() => void) | undefined;
 }) {
   const [current, setCurrent] = useState(item);
   const [phase, setPhase] = useState<RowPhase>({ kind: "IDLE" });
@@ -97,6 +100,7 @@ function Row({
       if (result.ok) {
         setCurrent(result.value.interest);
         setPhase({ kind: "IDLE" });
+        onAnswered?.();
         return;
       }
       if (!result.retryable) key.current = null;
@@ -107,7 +111,7 @@ function Row({
         retryable: result.retryable,
       });
     },
-    [answer, current.interestId],
+    [answer, current.interestId, onAnswered],
   );
 
   const name = current.investorName;
@@ -209,7 +213,12 @@ function Row({
       data-interest-id={current.interestId}
     >
       <div className="flex flex-col gap-0.5">
-        <p className="cq-title-sm text-(--cq-text-primary)">{name}</p>
+        <Link
+          href={`/relationships/investor/${current.investorOrganisationId}`}
+          className="cq-title-sm text-(--cq-text-primary) underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
+        >
+          {name}
+        </Link>
         <p className="cq-caption text-(--cq-text-tertiary)">
           {TYPE_LABELS[current.investorType] ?? current.investorType} ·
           expressed interest {when(current.expressedAt)}
@@ -223,9 +232,12 @@ function Row({
 export function IncomingInterest({
   items,
   answer = answerInterestAction,
+  onAnswered,
 }: {
   readonly items: readonly IncomingInterestDto[];
   readonly answer?: AnswerPort;
+  /** Called once the server has recorded an answer (CQ-WEB-030). */
+  readonly onAnswered?: (() => void) | undefined;
 }) {
   if (items.length === 0) {
     return (
@@ -241,7 +253,12 @@ export function IncomingInterest({
       className="cq-panel-rows flex flex-col"
     >
       {items.map((item) => (
-        <Row key={item.interestId} item={item} answer={answer} />
+        <Row
+          key={item.interestId}
+          item={item}
+          answer={answer}
+          onAnswered={onAnswered}
+        />
       ))}
     </ul>
   );
