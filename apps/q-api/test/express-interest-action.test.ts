@@ -94,6 +94,10 @@ function fakes(
     mayRespondToInterest: () => Promise.reject(new Error("not under test")),
     relationshipForInvestor: () => Promise.reject(new Error("not under test")),
     relationshipForCompany: () => Promise.reject(new Error("not under test")),
+    listRelationshipsForInvestor: () =>
+      Promise.reject(new Error("not under test")),
+    listRelationshipsForCompany: () =>
+      Promise.reject(new Error("not under test")),
   };
   return {
     commands,

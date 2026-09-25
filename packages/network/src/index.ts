@@ -140,7 +140,11 @@ export {
 export {
   createRelationshipForCompany,
   createRelationshipForInvestor,
+  createListRelationshipsForCompany,
+  createListRelationshipsForInvestor,
   toRelationshipStatusDto,
+  toRelationshipSummaryDto,
+  type RelationshipListing,
   type RelationshipStatus,
 } from "./application/relationship-status.js";
 export {

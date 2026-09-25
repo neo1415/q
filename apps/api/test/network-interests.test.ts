@@ -203,6 +203,18 @@ function buildApp(
         ? Promise.resolve(options.noRelationship === true ? null : STATUS)
         : Promise.reject(options.failWith);
     },
+    listRelationshipsForInvestor: (query) => {
+      reads.push({ side: "INVESTOR_LIST", ...query });
+      return options.failWith === undefined
+        ? Promise.resolve([{ ...STATUS, counterpartName: "Kora" }])
+        : Promise.reject(options.failWith);
+    },
+    listRelationshipsForCompany: (query) => {
+      reads.push({ side: "COMPANY_LIST", ...query });
+      return options.failWith === undefined
+        ? Promise.resolve([{ ...STATUS, counterpartName: "Beacon Ventures" }])
+        : Promise.reject(options.failWith);
+    },
   };
   const security: ApiSecurityDependencies = {
     authenticator: { authenticate: () => Promise.resolve(PRINCIPAL) },
@@ -513,6 +525,62 @@ describe("where are we (CQ-NET-012)", () => {
     const response = await app.inject({
       method: "GET",
       url: `/v1/network/companies/${COMPANY}/relationship`,
+    });
+    expect(response.statusCode).toBe(404);
+  });
+});
+
+describe("each side's own relationships (CQ-WEB-030)", () => {
+  it("lists an investor's relationships as summaries: counterpart, state, since, next step", async () => {
+    const { app, reads } = buildApp();
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/network/relationships",
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({
+      items: [
+        {
+          relationshipId: RELATIONSHIP.id,
+          counterpart: { kind: "COMPANY", id: COMPANY, name: "Kora" },
+          state: "CONNECTED",
+          stateSince: "2026-09-25T11:00:00.000Z",
+          nextStep: "SCHEDULE_MEETING",
+        },
+      ],
+    });
+    expect(reads[0]).toMatchObject({ side: "INVESTOR_LIST", actor: CONTEXT });
+  });
+
+  it("lists a company's relationships with investor organisations as the counterparts", async () => {
+    const { app, reads } = buildApp();
+    const response = await app.inject({
+      method: "GET",
+      url: `/v1/network/companies/${COMPANY}/relationships`,
+    });
+    expect(response.json()).toMatchObject({
+      items: [
+        {
+          counterpart: {
+            kind: "INVESTOR_ORGANISATION",
+            id: RELATIONSHIP.investorOrganisationId,
+            name: "Beacon Ventures",
+          },
+        },
+      ],
+    });
+    expect(reads[0]).toMatchObject({
+      side: "COMPANY_LIST",
+      companyId: COMPANY,
+    });
+    expect(response.body).not.toContain("milestones");
+  });
+
+  it("answers not-found for a company that is not the caller's own", async () => {
+    const { app } = buildApp({ failWith: new InterestCompanyNotFoundError() });
+    const response = await app.inject({
+      method: "GET",
+      url: `/v1/network/companies/${COMPANY}/relationships`,
     });
     expect(response.statusCode).toBe(404);
   });
