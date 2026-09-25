@@ -219,3 +219,27 @@ Setup: Kobo Logistics (a synthetic media fixture: NG, pre-seed, pitch READY / AL
 |---|---|---|---|---|
 | R8 | "honestly I'd say 20k typical, the second of those numbers I gave you" | typical 20k held for a yes | "Typical cheque: $20,000. Is that right?" | PASS |
 | R9 | "bet on it being mostly co-investing, we rarely lead. oh and did gambling go in as a hard no?" | Role co-invest recorded; a truthful answer about gambling | Q: "I'll take that as co-investing alongside a lead. And yes, betting and gambling apps are the hard no you mentioned." DB: **no investment_role and no exclusion constraint** (only stage). trace rec=[]. The held typical cheque was dropped from the conversation without a yes | FAIL: two false claims (E3) |
+
+## Property suite baseline — legacy step engine (head b860fa9, 2026-09-25)
+
+Suite: `tests/acceptance-product/` (projects `static`, `api`, `ui`). Many unseen paraphrases per property; each one is its own test. Assertions are on recorded answers (`onboarding.responses`), the mandate, artifacts, runs, and continuity. Q's prose is never compared. Four runs: the api groups were re-run after harness fixes (substring oracle, cancel content type, pool reuse, mover driver). The figures below are the latest run per group.
+
+| Property | Pass | Missing capability |
+|---|---|---|
+| static: wording-keyed rules | 2/3 | active prompt `turn-reader.v3.ts:32` quotes the fixture ("just give me the PDF") as a cue; `investor-mandate-synthesis.v2.ts:56` "early stage" (illustrative, borderline). Conversation code clean |
+| P1 explicit corrections | 2/7 | while a confirmation is pending, a correction to another fact (currency, investor type) is dropped; amount corrections are heard and held for a yes (150k, 10k, 250k), so nothing is recorded that turn |
+| P2 question + answer + correction | 0/5 | same pending-confirmation block; the carried question is answered with a record-status readout ("Not yet: … waiting for your yes") |
+| P3 acceptance authorises | 1/6 | a request for a recommendation (typical cheque, exclusions) gets a status readout, not a proposal; "yes, those" re-lists all 8 exclusion options; "Pick three … go with those" records nothing |
+| P4 no re-ask; mandate-ready settles | 0/5 | a "yes" to "Minimum cheque: 25,000. Is that right?" is re-asked; the review step rejects "yes" ("still missing your here's the mandate you've defined"); early "never show me betting or gambling" is never recorded. The mover is confounded by cursor ≠ question |
+| P5 advisory ≠ preference | 6/6 | — |
+| P7 leave and return | 5/5 | (3/5 in run 1: the pending step was not recorded after returning) |
+| P8 oblique phrasing | 1/7 | the model interprets ("I've got Ghana for geography", "a corporate venture arm") but holds the fact behind earlier steps ("can't put it on your record until the rest of the setup is in place") |
+| D1 "What do you know about me so far?" | 1/1 | — |
+| Interview completes into an ACTIVE mandate | 0/1 (x3 runs) | confirmation loop on cheque_min, and the review loop |
+| Home: who am I / memory 3 / Zino deck + "Just give me the PDF." / interrupt | 6/6 | — (who-am-I tells a form-completed ACTIVE investor that "setup is still in progress, 13 of 32") |
+| Home D5 fit candidates | 0/1 | one named candidate (Starburst); declines to name more |
+| Home P6 mandate or thesis PDF | 0/3 | "Which company should the brief be about?"; or "mandate still in progress, cannot export" |
+| UI: D7 reload, Home refresh keeps conversation + recall, incomplete returning, completed returning | 4/4 | — |
+| Voice barge-in | deferred | needs the deployed stack (live audio) |
+
+Structural finding: the say response exposes `view.currentStep` (the cursor), not Q's `asking`. The cursor diverges from the question Q actually asks (for example, the cursor sits on I0.business_title while Q asks "Maximum cheque: 100,000. Is that right?"). The web's answer chips follow the cursor.
