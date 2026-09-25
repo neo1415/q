@@ -169,6 +169,7 @@ export {
   type DismissOnboardingQuestionCommand,
   type SessionScopedQuery,
   type SkipOnboardingStepCommand,
+  type WithdrawOnboardingResponseCommand,
   type StartOnboardingSessionCommand,
   type StartOnboardingSessionResult,
   type SayOnboardingCommand,

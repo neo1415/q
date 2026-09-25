@@ -21,6 +21,8 @@ export const ONBOARDING_SESSIONS_SEGMENT = "/sessions";
 export const ONBOARDING_RESPONSES_SEGMENT = "/responses";
 export const ONBOARDING_STEPS_SEGMENT = "/steps";
 export const ONBOARDING_SKIP_SEGMENT = "/skip";
+/** Take a step's answer back without replacing it; its history is kept. */
+export const ONBOARDING_WITHDRAW_SEGMENT = "/withdraw";
 export const ONBOARDING_BACK_SEGMENT = "/back";
 export const ONBOARDING_COMPLETE_SEGMENT = "/complete";
 export const ONBOARDING_SUGGESTIONS_SEGMENT = "/suggestions";
@@ -294,6 +296,14 @@ export const SubmitOnboardingResponseRequestSchema = z
   .strict();
 export type SubmitOnboardingResponseRequest = z.infer<
   typeof SubmitOnboardingResponseRequestSchema
+>;
+
+/** `POST .../steps/:stepKey/withdraw` — the answer is taken back, never deleted. */
+export const WithdrawOnboardingResponseRequestSchema = z
+  .object({ expectedSessionVersion: SessionVersionSchema })
+  .strict();
+export type WithdrawOnboardingResponseRequest = z.infer<
+  typeof WithdrawOnboardingResponseRequestSchema
 >;
 
 export const SkipOnboardingStepRequestSchema = z

@@ -1124,5 +1124,20 @@ export function createInvestorWriteTargets(
         responseValues(context.currentResponses, response),
       );
     },
+    // Every handler recomputes its target from the whole set of current
+    // answers, so re-running it without the withdrawn one is exact
+    // (CQ-QX-008). Confirmation targets are never withdrawn: their steps
+    // are required, and the runtime refuses those first.
+    ...(targetKey === INVESTOR_WRITE_TARGETS.confirm
+      ? {}
+      : {
+          withdraw: async (context: OnboardingWriteContext) => {
+            await handler(
+              servicesFor(context.tx),
+              context,
+              responseValues(context.currentResponses),
+            );
+          },
+        }),
   }));
 }

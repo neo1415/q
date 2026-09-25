@@ -95,6 +95,10 @@ export const ONBOARDING_STATE_REASONS = [
   "CONTEXT_ALREADY_BOUND",
   "UNBOUND_START_NOT_ALLOWED",
   "SUBJECT_TYPE_MISMATCH",
+  /** Nothing is on the record for the step, so there is nothing to take back. */
+  "NOTHING_TO_WITHDRAW",
+  /** A target the step writes cannot yet represent the answer's absence. */
+  "STEP_NOT_WITHDRAWABLE",
 ] as const;
 export type OnboardingStateReason = (typeof ONBOARDING_STATE_REASONS)[number];
 

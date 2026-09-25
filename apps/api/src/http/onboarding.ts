@@ -26,6 +26,7 @@ import {
   ONBOARDING_RESPONSES_SEGMENT,
   ONBOARDING_SESSIONS_SEGMENT,
   ONBOARDING_SKIP_SEGMENT,
+  ONBOARDING_WITHDRAW_SEGMENT,
   ONBOARDING_STEPS_SEGMENT,
   ONBOARDING_SUGGESTIONS_SEGMENT,
   OnboardingBackRequestSchema,
@@ -34,6 +35,7 @@ import {
   parseContract,
   ResolveOnboardingSuggestionRequestSchema,
   SkipOnboardingStepRequestSchema,
+  WithdrawOnboardingResponseRequestSchema,
   StartOnboardingSessionRequestSchema,
   SubmitOnboardingResponseRequestSchema,
   type CorrelationId,
@@ -236,6 +238,29 @@ export function registerOnboardingRoutes(
         "The skip request is not valid.",
       );
       const view = await runtime.skipStep({
+        actor: getOnboardingActor(request),
+        sessionId: sessionIdParam(request),
+        stepKey: stepKeyParam(request),
+        expectedSessionVersion: input.expectedSessionVersion,
+        idempotencyKey: key,
+        correlationId: correlation(),
+      });
+      void reply.header("Cache-Control", "no-store");
+      return OnboardingSessionViewSchema.parse(view);
+    },
+  );
+
+  app.post(
+    `${byId}${ONBOARDING_STEPS_SEGMENT}/:stepKey${ONBOARDING_WITHDRAW_SEGMENT}`,
+    { onRequest: withActor },
+    async (request, reply) => {
+      const key = idempotencyKey(request, "withdraw an onboarding answer");
+      const input = parseContract(
+        WithdrawOnboardingResponseRequestSchema,
+        request.body,
+        "The withdrawal request is not valid.",
+      );
+      const view = await runtime.withdrawResponse({
         actor: getOnboardingActor(request),
         sessionId: sessionIdParam(request),
         stepKey: stepKeyParam(request),

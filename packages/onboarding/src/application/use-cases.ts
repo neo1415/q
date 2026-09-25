@@ -269,6 +269,14 @@ export type SkipOnboardingStepCommand = SessionScopedQuery & {
   readonly correlationId: CorrelationId;
 };
 
+/** Take an answer back without replacing it (CQ-QX-008). */
+export type WithdrawOnboardingResponseCommand = SessionScopedQuery & {
+  readonly stepKey: string;
+  readonly expectedSessionVersion: number;
+  readonly idempotencyKey: string;
+  readonly correlationId: CorrelationId;
+};
+
 export type OnboardingBackCommand = SessionScopedQuery & {
   readonly expectedSessionVersion: number;
   readonly targetStepKey?: string | undefined;
@@ -1110,6 +1118,151 @@ export function createOnboardingUseCases(
         journeyType: session.journeyType,
       });
       safeLog(runtime, "step.skipped", updated, { stepKey: step.stepKey });
+      return view(tx.sql, actor, updated);
+    });
+  };
+
+  /**
+   * Take an answer back, keeping its history (CQ-QX-008; lead decision
+   * 2026-09-25).
+   *
+   * The current response is marked withdrawn (never edited, never deleted),
+   * every target the step writes is re-derived without it, and the step is
+   * set aside as a skip is. Only an optional step can be emptied — the
+   * journey cannot do without a required one — and only when each of its
+   * targets can represent the answer's absence; otherwise it is refused and
+   * nothing changes.
+   */
+  const withdrawResponse = async (
+    raw: WithdrawOnboardingResponseCommand,
+  ): Promise<OnboardingSessionView> => {
+    const command = z
+      .object({
+        actor: ActorSchema,
+        sessionId: OnboardingSessionIdSchema,
+        stepKey: OnboardingStepKeySchema,
+        expectedSessionVersion: VersionSchema,
+        idempotencyKey: IdempotencyKeySchema,
+        correlationId: CorrelationIdSchema,
+      })
+      .strict()
+      .parse(raw);
+    const { actor } = command;
+    return transactions.run(async (tx) => {
+      const locked = await sessions.lockForUpdate(
+        tx,
+        command.sessionId,
+        actor.userId,
+      );
+      if (locked === null) {
+        throw new OnboardingSessionNotFoundError();
+      }
+      const idem = await replayOrRecordable(
+        runtime,
+        tx,
+        locked,
+        "withdraw",
+        command.idempotencyKey,
+        {
+          stepKey: command.stepKey,
+          expectedSessionVersion: command.expectedSessionVersion,
+        },
+      );
+      if (idem.replay) {
+        return view(tx.sql, actor, locked);
+      }
+      const session = await lockedActiveSession(
+        runtime,
+        tx,
+        actor,
+        command.sessionId,
+        command.expectedSessionVersion,
+      );
+      const aggregate = await aggregateOf(runtime, tx.sql, session);
+      const step = eligibleStep(aggregate, command.stepKey);
+      if (step.required) {
+        throw new OnboardingSessionStateError("STEP_REQUIRED");
+      }
+      const previous = aggregate.currentResponses.get(step.stepKey);
+      if (previous === undefined) {
+        throw new OnboardingSessionStateError("NOTHING_TO_WITHDRAW");
+      }
+      const handlers = step.writesTo.map((target) => {
+        const handler = runtime.writeTargets.get(target.targetKey);
+        if (handler === undefined) {
+          throw new OnboardingRuntimeConfigurationError(
+            "WRITE_TARGET_HANDLER_MISSING",
+            `step ${step.stepKey} writes to ${target.targetKey}`,
+          );
+        }
+        if (handler.withdraw === undefined) {
+          throw new OnboardingSessionStateError("STEP_NOT_WITHDRAWABLE");
+        }
+        return handler.withdraw;
+      });
+      const remaining = new Map(aggregate.currentResponses);
+      remaining.delete(step.stepKey);
+      for (const withdraw of handlers) {
+        await withdraw({
+          tx,
+          actor,
+          session,
+          step,
+          correlationId: command.correlationId,
+          currentResponses: remaining,
+          bindContext: () => {
+            throw new OnboardingSessionStateError("CONTEXT_ALREADY_BOUND");
+          },
+        });
+      }
+      if (!(await runtime.responses.withdraw(tx, previous.id))) {
+        throw new OnboardingMutationConflictError();
+      }
+      // No fake answer: the step stands set aside, as an unanswered skip.
+      await stepStates.upsert(tx, {
+        sessionId: session.id,
+        stepKey: step.stepKey,
+        status: "SKIPPED",
+      });
+      const states = new Map(
+        (await stepStates.listBySession(tx.sql, session.id)).map((s) => [
+          s.stepKey,
+          s,
+        ]),
+      );
+      const pathAfter = computeActivePath(
+        aggregate.definition.steps,
+        remaining,
+      );
+      const next = nextIncompleteStep(pathAfter, states);
+      if (next !== null && !states.has(next.stepKey)) {
+        await stepStates.upsert(tx, {
+          sessionId: session.id,
+          stepKey: next.stepKey,
+          status: "IN_PROGRESS",
+        });
+      }
+      const updated = await sessions.commit(tx, session.id, session.version, {
+        currentStepKey: next?.stepKey ?? step.stepKey,
+      });
+      await idempotency.recordMutation(tx, {
+        sessionId: session.id,
+        keyHash: idem.keyHash,
+        operation: "withdraw",
+        requestHash: idem.requestHash,
+        resultVersion: updated.version,
+      });
+      await outbox.enqueue(
+        tx,
+        stepSkippedEvent({
+          session: updated,
+          correlationId: command.correlationId,
+          stepKey: step.stepKey,
+        }),
+      );
+      safeLog(runtime, "response.withdrawn", updated, {
+        stepKey: step.stepKey,
+      });
       return view(tx.sql, actor, updated);
     });
   };
@@ -2509,6 +2662,7 @@ export function createOnboardingUseCases(
     bindSessionContext,
     submitResponse,
     skipStep,
+    withdrawResponse,
     goBack,
     completeSession,
     createSuggestion,

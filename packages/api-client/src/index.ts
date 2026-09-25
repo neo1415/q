@@ -100,6 +100,7 @@ export {
   goBackInOnboarding,
   resolveOnboardingSuggestion,
   skipOnboardingStep,
+  withdrawOnboardingResponse,
   startOnboardingSession,
   submitOnboardingResponse,
 } from "./onboarding.js";

@@ -18,6 +18,7 @@ import {
   ONBOARDING_RESPONSES_SEGMENT,
   ONBOARDING_SESSIONS_SEGMENT,
   ONBOARDING_SKIP_SEGMENT,
+  ONBOARDING_WITHDRAW_SEGMENT,
   ONBOARDING_STEPS_SEGMENT,
   ONBOARDING_SUGGESTIONS_SEGMENT,
   OnboardingSessionViewSchema,
@@ -28,6 +29,7 @@ import {
   type OnboardingBackRequest,
   type ResolveOnboardingSuggestionRequest,
   type SkipOnboardingStepRequest,
+  type WithdrawOnboardingResponseRequest,
   type StartOnboardingSessionRequest,
   type SubmitOnboardingResponseRequest,
 } from "@capital-q/contracts";
@@ -106,6 +108,23 @@ export function skipOnboardingStep(
     session,
     "POST",
     `${byId(sessionId)}${ONBOARDING_STEPS_SEGMENT}/${encodeURIComponent(stepKey)}${ONBOARDING_SKIP_SEGMENT}`,
+    OnboardingSessionViewSchema,
+    { body: request, ...idempotent(idempotencyKey) },
+  );
+}
+
+/** `POST /v1/onboarding/sessions/:sessionId/steps/:stepKey/withdraw` */
+export function withdrawOnboardingResponse(
+  session: ApiSession,
+  sessionId: string,
+  stepKey: string,
+  request: WithdrawOnboardingResponseRequest,
+  idempotencyKey: string,
+) {
+  return call(
+    session,
+    "POST",
+    `${byId(sessionId)}${ONBOARDING_STEPS_SEGMENT}/${encodeURIComponent(stepKey)}${ONBOARDING_WITHDRAW_SEGMENT}`,
     OnboardingSessionViewSchema,
     { body: request, ...idempotent(idempotencyKey) },
   );

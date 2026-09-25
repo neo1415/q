@@ -281,6 +281,7 @@ const ResponseRow = z.object({
   source_modality: OnboardingSourceModalitySchema,
   created_at: Timestamp,
   superseded_by_response_id: OnboardingResponseIdSchema.nullable(),
+  withdrawn_at: Timestamp.nullable(),
 });
 
 function toResponse(row: unknown): OnboardingResponse {
@@ -296,13 +297,15 @@ function toResponse(row: unknown): OnboardingResponse {
     sourceModality: r.source_modality,
     createdAt: r.created_at,
     supersededByResponseId: r.superseded_by_response_id,
+    withdrawnAt: r.withdrawn_at,
   };
 }
 
 function responseSelect(executor: DatabaseExecutor) {
   return executor`
     select r.id, r.session_id, r.step_key, r.response_type, r.response_jsonb, r.raw_text,
-           r.note, r.source_modality, r.created_at, r.superseded_by_response_id
+           r.note, r.source_modality, r.created_at, r.superseded_by_response_id,
+           r.withdrawn_at
       from onboarding.responses r`;
 }
 
@@ -311,7 +314,9 @@ export function createPostgresOnboardingResponseRepository(): OnboardingResponse
     listCurrent: async (executor, sessionId) => {
       const rows = await executor`
         ${responseSelect(executor)}
-         where r.session_id = ${sessionId} and r.superseded_by_response_id is null
+         where r.session_id = ${sessionId}
+           and r.superseded_by_response_id is null
+           and r.withdrawn_at is null
          order by r.step_key`;
       return rows.map(toResponse);
     },
@@ -336,14 +341,26 @@ export function createPostgresOnboardingResponseRepository(): OnboardingResponse
           (${input.responseId}, ${input.sessionId}, ${response.stepKey}, ${response.responseType},
            ${JSON.stringify(response.value)}::text::jsonb, ${response.rawText}, ${response.note}, ${response.sourceModality})
         returning id, session_id, step_key, response_type, response_jsonb, raw_text, note, source_modality,
-                  created_at, superseded_by_response_id`;
+                  created_at, superseded_by_response_id, withdrawn_at`;
       return toResponse(rows[0]);
     },
     supersede: async (tx, previousResponseId, replacementResponseId) => {
       await tx.sql`
         update onboarding.responses r
            set superseded_by_response_id = ${replacementResponseId}
-         where r.id = ${previousResponseId} and r.superseded_by_response_id is null`;
+         where r.id = ${previousResponseId}
+           and r.superseded_by_response_id is null
+           and r.withdrawn_at is null`;
+    },
+    withdraw: async (tx, responseId) => {
+      const rows = await tx.sql`
+        update onboarding.responses r
+           set withdrawn_at = clock_timestamp()
+         where r.id = ${responseId}
+           and r.superseded_by_response_id is null
+           and r.withdrawn_at is null
+        returning r.id`;
+      return rows.length === 1;
     },
   };
 }

@@ -233,6 +233,14 @@ export type OnboardingResponseRepository = {
     previousResponseId: OnboardingResponseId,
     replacementResponseId: OnboardingResponseId,
   ) => Promise<void>;
+  /**
+   * Marks the current response withdrawn, once. Never touches its content
+   * and never deletes it. False when it was not current.
+   */
+  readonly withdraw: (
+    tx: TransactionContext,
+    responseId: OnboardingResponseId,
+  ) => Promise<boolean>;
 };
 
 export type NewOnboardingSuggestion = {
@@ -485,6 +493,13 @@ export type OnboardingWriteTargetHandler = {
     context: OnboardingWriteContext,
     response: ValidatedOnboardingResponse,
   ) => Promise<void>;
+  /**
+   * Re-derive the target without the withdrawn step's answer: the context's
+   * current responses no longer hold it. Absent when the target cannot
+   * represent the answer's absence; the step is then not withdrawable.
+   */
+  readonly withdraw?:
+    ((context: OnboardingWriteContext) => Promise<void>) | undefined;
 };
 
 export type OnboardingWriteTargetRegistry = {

@@ -253,6 +253,7 @@ describe("@capital-q/investor-onboarding against local PostgreSQL", () => {
       value: OnboardingResponseValue,
     ) => Promise<OnboardingSessionView>;
     readonly skip: (stepKey: string) => Promise<OnboardingSessionView>;
+    readonly withdraw: (stepKey: string) => Promise<OnboardingSessionView>;
     readonly back: (targetStepKey?: string) => Promise<OnboardingSessionView>;
     readonly refresh: () => Promise<OnboardingSessionView>;
   };
@@ -292,6 +293,17 @@ describe("@capital-q/investor-onboarding against local PostgreSQL", () => {
       skip: async (stepKey) =>
         remember(
           await runtime.skipStep({
+            actor,
+            sessionId: id(),
+            stepKey,
+            expectedSessionVersion: current.session.version,
+            idempotencyKey: randomUUID(),
+            correlationId: CORRELATION(),
+          }),
+        ),
+      withdraw: async (stepKey) =>
+        remember(
+          await runtime.withdrawResponse({
             actor,
             sessionId: id(),
             stepKey,
@@ -635,6 +647,41 @@ describe("@capital-q/investor-onboarding against local PostgreSQL", () => {
           value_jsonb: { kind: "codes", values: ["gambling"] },
         },
       ]);
+      // CQ-QX-008: an answer taken back leaves the mandate as if it was
+      // never given, and its history stays; a required step cannot be
+      // emptied; a new answer after a withdrawal is a new current row.
+      await journey.withdraw(INVESTOR_STEPS.avoid);
+      const afterWithdrawal = (await constraints(tx, mandateId)).filter(
+        (c) => c.dimension === "red_flag",
+      );
+      expect(afterWithdrawal.map((c) => c.importance)).toEqual([
+        "HARD_EXCLUSION",
+      ]);
+      expect(
+        journey
+          .view()
+          .responses.some((r) => r.stepKey === INVESTOR_STEPS.avoid),
+      ).toBe(false);
+      const history = await tx.sql<{ withdrawn: boolean }[]>`
+        select withdrawn_at is not null as withdrawn from onboarding.responses
+         where session_id = ${journey.view().session.id} and step_key = ${INVESTOR_STEPS.avoid}`;
+      expect(history).toEqual([{ withdrawn: true }]);
+      await expect(journey.withdraw(INVESTOR_STEPS.avoid)).rejects.toThrow();
+      await expect(journey.withdraw(INVESTOR_STEPS.stages)).rejects.toThrow();
+      // The move that motivated it: the only red flag on the softer list
+      // can now go to never-show.
+      await journey.submit(
+        INVESTOR_STEPS.hardExclusions,
+        multi(["gambling", "hardware_heavy"]),
+      );
+      await journey.submit(INVESTOR_STEPS.hardExclusions, multi(["gambling"]));
+      await journey.submit(INVESTOR_STEPS.avoid, multi(["hardware_heavy"]));
+      expect(
+        (await constraints(tx, mandateId))
+          .filter((c) => c.dimension === "red_flag")
+          .map((c) => c.importance),
+      ).toEqual(["AVOID", "HARD_EXCLUSION"]);
+
       expect(all.find((c) => c.dimension === "green_flag")).toMatchObject({
         importance: "STRONG",
         value_jsonb: {

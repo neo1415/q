@@ -202,6 +202,8 @@ export type OnboardingResponse = {
   readonly sourceModality: OnboardingSourceModality;
   readonly createdAt: UtcTimestamp;
   readonly supersededByResponseId: OnboardingResponseId | null;
+  /** When the person took this answer back without replacing it; history only. */
+  readonly withdrawnAt?: UtcTimestamp | null | undefined;
 };
 
 /** A validated, step-compatible response ready to persist. */
