@@ -150,6 +150,8 @@ export function QSessionProvider({
     subject.kind === "INVESTOR_ORGANISATION"
       ? subject.investorOrganisationId
       : undefined;
+  const relationshipId =
+    subject.kind === "RELATIONSHIP" ? subject.relationshipId : undefined;
 
   const [conversationId, setConversationId] = useState<string | null>(
     initialConversation,
@@ -161,6 +163,7 @@ export function QSessionProvider({
   const q = useQConversation({
     companyId,
     investorOrganisationId,
+    relationshipId,
     conversationId,
     onConversation,
   });
@@ -230,13 +233,25 @@ export function QSessionProvider({
                     },
                   ],
                 }
-              : {}),
+              : relationshipId !== undefined
+                ? {
+                    subjects: [
+                      { kind: "RELATIONSHIP" as const, relationshipId },
+                    ],
+                  }
+                : {}),
           ...(named === undefined ? {} : { conversationId: named }),
         },
         firstMessage: greeting ?? "I'm listening. What would you like to know?",
       });
     },
-    [companyId, investorOrganisationId, q.conversationId, voice],
+    [
+      companyId,
+      investorOrganisationId,
+      relationshipId,
+      q.conversationId,
+      voice,
+    ],
   );
 
   /**

@@ -28,6 +28,7 @@ export type PendingAsk = {
   readonly at: string;
   readonly companyId?: string | undefined;
   readonly investorOrganisationId?: string | undefined;
+  readonly relationshipId?: string | undefined;
 };
 
 export function rememberPendingAsk(ask: PendingAsk): void {
@@ -81,6 +82,9 @@ export function readPendingAsk(now = Date.now()): PendingAsk | null {
         : {}),
       ...(typeof ask["investorOrganisationId"] === "string"
         ? { investorOrganisationId: ask["investorOrganisationId"] }
+        : {}),
+      ...(typeof ask["relationshipId"] === "string"
+        ? { relationshipId: ask["relationshipId"] }
         : {}),
     };
   } catch {

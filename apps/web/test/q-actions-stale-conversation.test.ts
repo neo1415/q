@@ -64,6 +64,17 @@ describe("askQAction and a conversation that is no longer reachable", () => {
     expect(second.conversationId).toBeUndefined();
   });
 
+  it("sends a relationship subject as the RELATIONSHIP kind, and nothing else", async () => {
+    createQRun.mockResolvedValueOnce({ runId: RUN, conversationId: NEW });
+    const relationshipId = "c0000000-0000-4000-8000-000000000004";
+    await askQAction("where are we?", undefined, { relationshipId });
+    const [, sent] = createQRun.mock.calls[0] as [
+      unknown,
+      { subjects?: unknown },
+    ];
+    expect(sent.subjects).toEqual([{ kind: "RELATIONSHIP", relationshipId }]);
+  });
+
   it("does not retry a new conversation that was refused", async () => {
     createQRun.mockRejectedValueOnce(notFound());
     const result = await askQAction("who else invests in logistics?");

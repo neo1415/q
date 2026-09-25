@@ -130,11 +130,14 @@ async function run<T>(
  * resolves and authorises it again before the run reaches any context.
  */
 export type QSubjectInput =
-  { readonly companyId: string } | { readonly investorOrganisationId: string };
+  | { readonly companyId: string }
+  | { readonly investorOrganisationId: string }
+  | { readonly relationshipId: string };
 
 const SubjectInputSchema = z.union([
   z.object({ companyId: z.string().uuid() }).strict(),
   z.object({ investorOrganisationId: z.string().uuid() }).strict(),
+  z.object({ relationshipId: z.string().uuid() }).strict(),
 ]);
 
 export type QStartedRun = {
@@ -221,12 +224,19 @@ export async function askQAction(
       ? undefined
       : "companyId" in subject
         ? [{ kind: "COMPANY" as const, companyId: subject.companyId }]
-        : [
-            {
-              kind: "INVESTOR_ORGANISATION" as const,
-              investorOrganisationId: subject.investorOrganisationId,
-            },
-          ];
+        : "relationshipId" in subject
+          ? [
+              {
+                kind: "RELATIONSHIP" as const,
+                relationshipId: subject.relationshipId,
+              },
+            ]
+          : [
+              {
+                kind: "INVESTOR_ORGANISATION" as const,
+                investorOrganisationId: subject.investorOrganisationId,
+              },
+            ];
 
   const idempotencyKey =
     rawIdempotencyKey === undefined

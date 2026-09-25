@@ -67,12 +67,21 @@ export default async function InvestorRelationshipPage({
   return (
     <>
       <QPageSubject
-        subject={{
-          kind: "COMPANY",
-          companyId: company.companyId,
-          label: company.canonicalName,
-          scope: "relationship_shared",
-        }}
+        subject={
+          relationship === null
+            ? {
+                kind: "COMPANY",
+                companyId: company.companyId,
+                label: company.canonicalName,
+                scope: "network_visible",
+              }
+            : {
+                kind: "RELATIONSHIP",
+                relationshipId: relationship.relationshipId,
+                label: company.canonicalName,
+                scope: "relationship_shared",
+              }
+        }
       />
       <RelationshipDetail
         side="INVESTOR"

@@ -47,11 +47,7 @@ export function RelationshipDetail({
   readonly actions: ReactNode;
   /** Said when nothing is on record that this side can see. */
   readonly absentSentence: string;
-  /**
-   * Whether Q can be asked about this relationship from here. False where
-   * the Q API cannot yet take the counterparty as a subject (see the
-   * company-side page).
-   */
+  /** Whether Q can be asked about it: false when nothing is on record to ask about. */
   readonly askQ?: boolean | undefined;
 }) {
   return (
