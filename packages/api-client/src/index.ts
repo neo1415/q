@@ -21,7 +21,13 @@ export {
 
 export const PACKAGE_NAME = "@capital-q/api-client" as const;
 
-export { fetchMe, updateMe, type FetchMeInput } from "./me.js";
+export {
+  fetchMe,
+  getMyProfile,
+  updateMe,
+  updateMyProfile,
+  type FetchMeInput,
+} from "./me.js";
 
 export {
   activateOrganisation,
@@ -135,6 +141,7 @@ export {
   getQConversation,
   getQArtifact,
   getQArtifactVersion,
+  getProfileFindings,
   listQArtifacts,
   listQConversations,
   createQVoiceSession,

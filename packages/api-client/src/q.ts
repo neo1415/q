@@ -26,6 +26,9 @@ import {
   type CreateQRunRequest,
   type CreateQVoiceSessionRequest,
   type RejectQApprovalRequest,
+  ProfileFindingsResponseSchema,
+  Q_PROFILE_FINDINGS_PATH,
+  type ProfileFindingsQuery,
 } from "@capital-q/contracts";
 
 import { readProblemResponse } from "./problem.js";
@@ -274,5 +277,25 @@ export function getQArtifactVersion(
     "GET",
     `${artifactPath(artifactId)}${Q_ARTIFACT_VERSIONS_SUFFIX}/${String(version)}`,
     QArtifactDetailSchema,
+  );
+}
+
+/**
+ * `GET /v1/q/profile-findings` -- what Q found on the public web about the
+ * caller's own profile subject (BIZ-002). A Q API session.
+ */
+export function getProfileFindings(
+  session: ApiSession,
+  query: ProfileFindingsQuery,
+) {
+  const params = new URLSearchParams({
+    subjectType: query.subjectType,
+    subjectId: query.subjectId,
+  });
+  return call(
+    session,
+    "GET",
+    `${Q_PROFILE_FINDINGS_PATH}?${params.toString()}`,
+    ProfileFindingsResponseSchema,
   );
 }

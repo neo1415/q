@@ -124,7 +124,9 @@ import {
   neverPause,
 } from "@capital-q/q-runtime";
 import {
+  createKnowledgeQueryService,
   createMemoryService,
+  createPostgresKnowledgeRepository,
   createPostgresMemoryRepository,
 } from "@capital-q/q-knowledge";
 import {
@@ -207,6 +209,7 @@ import { createDecisionReader } from "./voice/decision.js";
 import { createPersonProfileUpdateAction } from "./composition/person-profile-action.js";
 import { createInvestorProfileUpdateAction } from "./composition/investor-profile-action.js";
 import { createProfileChangeBoard } from "./composition/profile-change-board.js";
+import { createProfileFindingsReader } from "./composition/profile-findings.js";
 import {
   createConversationDigestPort,
   createMemoryLearner,
@@ -1245,6 +1248,20 @@ const { app, logger: appLogger } = createApp(
     qRuntime,
     artifacts: qArtifacts.service,
     recommendationExplanations,
+    // The profile page's "Q found" column (BIZ-002): firewall first, then
+    // the own-public-presence envelope, then the cited pages.
+    profileFindings: createProfileFindingsReader({
+      companies,
+      investors,
+      firewall,
+      knowledge: createKnowledgeQueryService({
+        sql: database.sql,
+        knowledge: createPostgresKnowledgeRepository(),
+        logger,
+      }),
+      evidence: researchComposition.evidence,
+      logger,
+    }),
     orchestration: { orchestrator, autostart: Q_ORCHESTRATION_AUTOSTART },
     qActions,
     qStream: { service: qStream },

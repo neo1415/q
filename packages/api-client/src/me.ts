@@ -3,6 +3,9 @@ import {
   MeResponseSchema,
   type MeResponse,
   type UpdateMeRequest,
+  ME_PROFILE_PATH,
+  PersonProfileDtoSchema,
+  type UpdatePersonProfileRequest,
 } from "@capital-q/contracts";
 
 import {
@@ -10,6 +13,7 @@ import {
   readProblemResponse,
   UNEXPECTED_API_RESPONSE,
 } from "./problem.js";
+import { call, type ApiSession } from "./request.js";
 
 /**
  * `GET /v1/me`.
@@ -104,4 +108,19 @@ export async function updateMe(
   if (!response.ok) {
     throw await readProblemResponse(response);
   }
+}
+
+/** `GET /v1/me/profile` -- the person's own editable profile (BIZ-002). */
+export function getMyProfile(session: ApiSession) {
+  return call(session, "GET", ME_PROFILE_PATH, PersonProfileDtoSchema);
+}
+
+/** `PATCH /v1/me/profile` with the version the client read. */
+export function updateMyProfile(
+  session: ApiSession,
+  input: UpdatePersonProfileRequest,
+) {
+  return call(session, "PATCH", ME_PROFILE_PATH, PersonProfileDtoSchema, {
+    body: input,
+  });
 }

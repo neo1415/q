@@ -559,3 +559,21 @@ export {
   type QInterviewTurnRequest,
   type QInterviewTurnResponse,
 } from "./interview.js";
+
+export {
+  PROFILE_FINDING_KEYS,
+  PROFILE_FINDING_SUBJECT_TYPES,
+  ProfileFindingKeySchema,
+  ProfileFindingSchema,
+  ProfileFindingSourceSchema,
+  ProfileFindingSubjectTypeSchema,
+  ProfileFindingsQuerySchema,
+  ProfileFindingsResponseSchema,
+  Q_PROFILE_FINDINGS_PATH,
+  type ProfileFinding,
+  type ProfileFindingKey,
+  type ProfileFindingSource,
+  type ProfileFindingSubjectType,
+  type ProfileFindingsQuery,
+  type ProfileFindingsResponse,
+} from "./profile-findings.js";
