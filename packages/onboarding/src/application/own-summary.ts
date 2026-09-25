@@ -3,9 +3,16 @@ import type {
   OnboardingResponseValue,
 } from "@capital-q/contracts";
 import type { DatabaseExecutor } from "@capital-q/database";
+import {
+  createPostgresInvestorMandateRepository,
+  InvestorOrganisationIdSchema,
+} from "@capital-q/investors";
 import type { UserId } from "@capital-q/security";
 
-import type { OnboardingStepDefinition } from "../contracts/index.js";
+import type {
+  OnboardingSession,
+  OnboardingStepDefinition,
+} from "../contracts/index.js";
 import { computeProgress } from "../runtime/path.js";
 import { createPostgresOnboardingDefinitionRepository } from "../infrastructure/postgres-definition-repository.js";
 import {
@@ -33,7 +40,15 @@ import { createDefinitionCache, loadAggregate } from "./view.js";
  */
 export type OwnOnboardingSummary = {
   readonly journeyType: OnboardingJourneyType;
+  /**
+   * Whether their setup is done, from the authoritative record: COMPLETED
+   * when any of their sessions for the journey completed, or when what
+   * the journey exists to produce is already live (an investor's ACTIVE
+   * mandate) — however they got there, form or conversation.
+   */
   readonly status: "ACTIVE" | "COMPLETED" | "CANCELLED";
+  /** What made it complete; null while it is not. */
+  readonly completedBy: OwnOnboardingCompletion;
   /** What they said their role is, where the journey asks (I0 / F4). */
   readonly role: string | null;
   readonly answeredCount: number;
@@ -45,6 +60,33 @@ export type OwnOnboardingSummary = {
   /** Questions on their path not answered yet (skipped ones included). */
   readonly open: readonly string[];
 };
+
+export type OwnOnboardingCompletion = "SESSION" | "ACTIVE_MANDATE" | null;
+
+/**
+ * The completion of a journey, from the authoritative state. The latest
+ * session is navigation, not the outcome: a person who finished by the
+ * form has an ACTIVE mandate while a session they never closed still
+ * counts questions (ACC 2026-09-25: "setup still in progress, 13 of 32"
+ * to an investor whose mandate was live). A cancelled session never
+ * completes anything by itself, but it cannot undo an outcome either.
+ */
+export function settleOwnCompletion(input: {
+  readonly latestStatus: "ACTIVE" | "COMPLETED" | "CANCELLED";
+  readonly anyCompletedSession: boolean;
+  readonly activeMandate: boolean;
+}): {
+  readonly status: "ACTIVE" | "COMPLETED" | "CANCELLED";
+  readonly completedBy: OwnOnboardingCompletion;
+} {
+  if (input.latestStatus === "COMPLETED" || input.anyCompletedSession) {
+    return { status: "COMPLETED", completedBy: "SESSION" };
+  }
+  if (input.activeMandate) {
+    return { status: "COMPLETED", completedBy: "ACTIVE_MANDATE" };
+  }
+  return { status: input.latestStatus, completedBy: null };
+}
 
 export type OwnOnboardingSummaryReader = {
   readonly read: (userId: UserId) => Promise<readonly OwnOnboardingSummary[]>;
@@ -103,6 +145,47 @@ export function createOwnOnboardingSummaryReader(options: {
     suggestions: createPostgresOnboardingSuggestionRepository(),
   };
   const loadDefinition = createDefinitionCache(dependencies.definitions);
+  const mandates = createPostgresInvestorMandateRepository();
+
+  /** Their own sessions only: the predicate is the caller's user id. */
+  const anyCompleted = async (
+    userId: UserId,
+    journeyType: OnboardingJourneyType,
+  ): Promise<boolean> => {
+    const rows = await options.sql`
+      select 1 from onboarding.sessions s
+       where s.user_id = ${userId}
+         and s.journey_type = ${journeyType}
+         and s.status = 'COMPLETED'
+       limit 1`;
+    return rows.length > 0;
+  };
+
+  /**
+   * Whether the investor organisation their own session is bound to has
+   * an ACTIVE mandate. Read through the investors context's public
+   * repository, by the session's own tenant and subject; only the status
+   * is used, never the mandate's content.
+   */
+  const activeMandate = async (
+    session: OnboardingSession,
+  ): Promise<boolean> => {
+    if (session.journeyType !== "investor") return false;
+    if (session.tenantId === null || session.subject === null) return false;
+    if (session.subject.subjectType !== "INVESTOR_ORGANISATION") return false;
+    const organisation = InvestorOrganisationIdSchema.safeParse(
+      session.subject.subjectId,
+    );
+    if (!organisation.success) return false;
+    const active = await mandates.list(
+      options.sql,
+      session.tenantId,
+      organisation.data,
+      { status: "ACTIVE", limit: 1 },
+    );
+    return active.length > 0;
+  };
+
   return {
     read: async (userId) => {
       const summaries: OwnOnboardingSummary[] = [];
@@ -133,9 +216,18 @@ export function createOwnOnboardingSummaryReader(options: {
           else open.push(prompt);
         }
         const roleKey = ROLE_STEP_KEYS[journeyType];
+        const completion = settleOwnCompletion({
+          latestStatus: session.status,
+          anyCompletedSession:
+            session.status !== "COMPLETED" &&
+            (await anyCompleted(userId, journeyType)),
+          activeMandate:
+            session.status !== "COMPLETED" && (await activeMandate(session)),
+        });
         summaries.push({
           journeyType,
-          status: session.status,
+          status: completion.status,
+          completedBy: completion.completedBy,
           role:
             roleKey === undefined
               ? null
@@ -146,7 +238,7 @@ export function createOwnOnboardingSummaryReader(options: {
           answeredCount: progress.completedEligibleStepCount,
           eligibleCount: progress.eligibleStepCount,
           currentStep:
-            session.status === "ACTIVE" && session.currentStepKey !== null
+            completion.status === "ACTIVE" && session.currentStepKey !== null
               ? promptOf(aggregate.stepsByKey.get(session.currentStepKey))
               : null,
           answered: answered.slice(0, LIST_MAX),

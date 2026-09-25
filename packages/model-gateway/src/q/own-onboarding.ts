@@ -18,6 +18,11 @@ import type { AuthorisedFact } from "@capital-q/q-core";
 export type OwnOnboardingJourney = {
   readonly journeyType: string;
   readonly status: string;
+  /**
+   * What made the setup complete (SESSION, ACTIVE_MANDATE), from the
+   * authoritative record; null or absent while it is not complete.
+   */
+  readonly completedBy?: string | null | undefined;
   readonly role: string | null;
   readonly answeredCount: number;
   readonly eligibleCount: number;
@@ -73,11 +78,20 @@ export function ownOnboardingFacts(
     });
   }
   for (const journey of onboarding.journeys) {
+    // A completed setup is not a progress bar: questions left unanswered
+    // are optional detail they can add, not what stands between them and
+    // being set up (ACC 2026-09-25).
+    const complete = journey.status === "COMPLETED";
     const parts = [
       `${journeyWords(journey.journeyType)}, ${statusWords(journey.status)}`,
+      ...(complete && journey.completedBy === "ACTIVE_MANDATE"
+        ? ["their investment mandate is active"]
+        : []),
       ...(journey.role === null ? [] : [`role they gave: ${journey.role}`]),
-      `${String(journey.answeredCount)} of ${String(journey.eligibleCount)} questions answered`,
-      ...(journey.currentStep === null
+      complete
+        ? `${String(journey.answeredCount)} questions answered`
+        : `${String(journey.answeredCount)} of ${String(journey.eligibleCount)} questions answered`,
+      ...(journey.currentStep === null || complete
         ? []
         : [`the question they are on: "${journey.currentStep}"`]),
       ...(journey.answered.length === 0
@@ -85,7 +99,11 @@ export function ownOnboardingFacts(
         : [`answered: ${quoted(journey.answered)}`]),
       ...(journey.open.length === 0
         ? []
-        : [`not answered yet: ${quoted(journey.open)}`]),
+        : complete
+          ? [
+              `optional detail they have not given, which they can add at any time: ${quoted(journey.open)}`,
+            ]
+          : [`not answered yet: ${quoted(journey.open)}`]),
     ];
     facts.push({
       scope: "OWN_ONBOARDING",
