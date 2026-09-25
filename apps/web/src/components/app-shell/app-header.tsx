@@ -4,12 +4,11 @@ import { ContextIndicator } from "@capital-q/ui/context-indicator";
 
 import { AccountMenu } from "./account-menu";
 import type { ShellContext } from "./app-shell";
-import { GlobalQTrigger } from "./global-q";
 
 /**
- * Compact mobile top bar: wordmark, the current context, Q and the account
- * menu (whose first row is the theme). Hidden on desktop, where the
- * sidebar carries all of them.
+ * Compact mobile top bar: wordmark, the current context and the account
+ * menu (whose first row is the theme). Q is the floating dock on a phone
+ * (ADR 0017 F1), not a header button. Hidden on desktop.
  */
 export function AppHeader({ context }: { readonly context: ShellContext }) {
   return (
@@ -27,7 +26,6 @@ export function AppHeader({ context }: { readonly context: ShellContext }) {
             detail={context.label}
             compact
           />
-          <GlobalQTrigger variant="header" />
           <AccountMenu />
         </div>
       </div>

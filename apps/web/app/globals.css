@@ -354,6 +354,182 @@
   }
 
   /*
+   * The Q Dock (features/q-dock; ADR 0017 F1). A fixed layer that takes no
+   * pointer events itself; the dock inside it is placed by transform only
+   * (Motion), so moving it never touches layout.
+   */
+  .cq-q-dock-layer {
+    position: fixed;
+    inset: 0;
+    z-index: var(--cq-z-presence);
+    pointer-events: none;
+  }
+  .cq-q-dock {
+    position: absolute;
+    top: 0;
+    left: 0;
+    display: flex;
+    pointer-events: auto;
+    touch-action: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+  }
+  .cq-q-dock:not([data-placed]) {
+    visibility: hidden;
+  }
+  .cq-q-dock-button {
+    position: relative;
+    display: inline-flex;
+    width: 44px;
+    height: 44px;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--cq-border-subtle);
+    border-radius: var(--cq-radius-full);
+    background: var(--cq-surface-raised);
+    box-shadow: var(--cq-shadow-sm);
+    cursor: pointer;
+  }
+  .cq-q-dock-button:active,
+  .cq-q-dock-pill-open:active {
+    transform: scale(0.97);
+  }
+  /* The word appears on hover or focus, beside the dock, never on it. */
+  .cq-q-dock-tip {
+    position: absolute;
+    top: 50%;
+    right: calc(100% + 8px);
+    transform: translateY(-50%);
+    padding: 4px 10px;
+    border-radius: var(--cq-radius-sm);
+    background: var(--cq-text-primary);
+    color: var(--cq-text-inverse);
+    font-size: 12px;
+    line-height: 1.35;
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity var(--cq-motion-fast) var(--cq-ease);
+  }
+  [data-q-dock-placement^="left"] .cq-q-dock-tip {
+    right: auto;
+    left: calc(100% + 8px);
+  }
+  @media (hover: hover) and (pointer: fine) {
+    .cq-q-dock-button:hover .cq-q-dock-tip {
+      opacity: 1;
+    }
+  }
+  .cq-q-dock-button:focus-visible .cq-q-dock-tip {
+    opacity: 1;
+  }
+  .cq-q-dock-pill {
+    display: inline-flex;
+    max-width: 320px;
+    height: 44px;
+    align-items: center;
+    gap: 2px;
+    padding: 0 4px 0 0;
+    border: 1px solid var(--cq-border-subtle);
+    border-radius: var(--cq-radius-full);
+    background: var(--cq-surface-raised);
+    box-shadow: var(--cq-shadow-sm);
+  }
+  .cq-q-dock-pill-open {
+    display: inline-flex;
+    min-width: 0;
+    height: 42px;
+    align-items: center;
+    gap: 8px;
+    padding: 0 10px 0 3px;
+    border: none;
+    border-radius: var(--cq-radius-full);
+    background: transparent;
+    text-align: left;
+    cursor: pointer;
+  }
+  .cq-q-dock-mic {
+    display: inline-flex;
+    flex: none;
+    width: 24px;
+    height: 24px;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--cq-radius-full);
+    background: var(--cq-accent-soft);
+    color: var(--cq-accent);
+  }
+  .cq-q-dock-stop {
+    display: inline-flex;
+    flex: none;
+    width: 36px;
+    height: 36px;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--cq-border);
+    border-radius: var(--cq-radius-full);
+    background: var(--cq-surface);
+    color: var(--cq-text-primary);
+    cursor: pointer;
+  }
+  .cq-q-dock-stop:hover {
+    background: var(--cq-surface-subtle);
+  }
+  /* Stashed: a sliver of the light against the edge, still 44 px tall. */
+  .cq-q-dock-stash {
+    position: relative;
+    display: block;
+    width: 12px;
+    height: 44px;
+    border: 1px solid var(--cq-border-subtle);
+    background: linear-gradient(
+      to right,
+      var(--cq-q-light),
+      var(--cq-surface-raised)
+    );
+    cursor: pointer;
+  }
+  .cq-q-dock-stash[data-side="right"] {
+    border-right: none;
+    border-radius: var(--cq-radius-sm) 0 0 var(--cq-radius-sm);
+  }
+  .cq-q-dock-stash[data-side="left"] {
+    border-left: none;
+    border-radius: 0 var(--cq-radius-sm) var(--cq-radius-sm) 0;
+    background: linear-gradient(
+      to left,
+      var(--cq-q-light),
+      var(--cq-surface-raised)
+    );
+  }
+  /* The stashed tab's 12 px is visual; its hit area is 44 px wide. */
+  .cq-q-dock-stash::before {
+    content: "";
+    position: absolute;
+    inset: 0 -16px;
+  }
+
+  /*
+   * The aperture's hand-off between the dock, the panel and the Q page
+   * (spec §6.4): the same object moving, one short morph, and none at all
+   * when motion is reduced.
+   */
+  ::view-transition-group(.cq-q-morph) {
+    animation-duration: var(--cq-motion-slow);
+    animation-timing-function: var(--cq-ease);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    ::view-transition-group(*),
+    ::view-transition-old(*),
+    ::view-transition-new(*) {
+      animation-duration: 0s !important;
+    }
+  }
+  ::view-transition {
+    pointer-events: none;
+  }
+
+  /*
    * Q Lumen: the edge light on the dock's side while a voice session is
    * open (spec §5.1). At most 24 px deep, under the safe-area inset, one
    * hue, and never over text: it is a gradient into transparency.

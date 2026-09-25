@@ -54,6 +54,10 @@
       "types": "./dist/components/menu.d.ts",
       "default": "./dist/components/menu.js"
     },
+    "./context-menu": {
+      "types": "./dist/components/context-menu.d.ts",
+      "default": "./dist/components/context-menu.js"
+    },
     "./popover": {
       "types": "./dist/components/popover.d.ts",
       "default": "./dist/components/popover.js"

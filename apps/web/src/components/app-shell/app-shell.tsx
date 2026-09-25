@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 
 import type { ContextScope } from "@capital-q/ui/tokens";
 
+import { QDock } from "@/features/q-dock";
 import { NO_SUBJECT, type QSubject } from "@/features/q/q-subject";
 
 import { AppHeader } from "./app-header";
@@ -44,7 +45,7 @@ export function AppShell({
   readonly qConnected?: boolean | undefined;
 }) {
   return (
-    <GlobalQProvider subject={subject} connected={qConnected}>
+    <GlobalQProvider subject={subject} connected={qConnected} dock={<QDock />}>
       <div className="cq-shell">
         <a
           href="#main"
