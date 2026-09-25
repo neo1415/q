@@ -83,6 +83,8 @@ const REPAIR_POLL_MS = 100;
 /** A repair not decided by then is dropped; the person can say "go on". */
 const REPAIR_GIVE_UP_MS = 20_000;
 const CONTINUE_SIGNAL = "[continue]";
+/** Audio in flight when the agent stopped arrives within this. */
+const STALE_AUDIO_MS = 700;
 
 /** The person's words without the cue, or "" when the line was only the cue. */
 function withoutCue(text: string): string {
@@ -137,11 +139,19 @@ export function useDeepgramVoiceSession(
   const liveRef = useRef<Live | null>(null);
   const speakingRef = useRef(false);
   /**
-   * Audio still arriving for a reply the person talked over. Dropped until
-   * the agent starts its next reply: the person must never hear the rest
-   * of an answer they interrupted.
+   * Until when audio still arriving for a reply the person talked over is
+   * dropped: the person must never hear the rest of an answer they
+   * interrupted.
+   *
+   * Bounded in time as well as ended by the agent's next reply. It used to
+   * last until the agent announced a new reply, and a reply the agent went
+   * on speaking (a sound it did not take as an interruption), or one it
+   * never announced, was dropped whole: Q's words on screen, no sound,
+   * for as long as the line lasted (live, 2026-09-25). Audio that was in
+   * flight when the agent stopped arrives within a round trip; anything
+   * later is the agent speaking, and is played.
    */
-  const discardingRef = useRef(false);
+  const discardUntilRef = useRef(0);
   const lastUserTextAtRef = useRef(0);
   /** The last line shown, so a re-reported utterance replaces it. */
   const lastLineRef = useRef<VoiceTranscriptLine | null>(null);
@@ -228,7 +238,7 @@ export function useDeepgramVoiceSession(
       injectedRef.current = [];
       setState("CONNECTING");
       speakingRef.current = false;
-      discardingRef.current = false;
+      discardUntilRef.current = 0;
 
       const token = credential.token;
       const session = new AgentSession({
@@ -350,6 +360,9 @@ export function useDeepgramVoiceSession(
       });
       session.on("conversation-text", (message) => {
         noteEvent(`conversation-text:${message.role}`);
+        // A new line from either side: whatever follows is not the reply
+        // that was talked over.
+        discardUntilRef.current = 0;
         const role = message.role === "user" ? "user" : "q";
         let content = message.content;
         if (role === "user") {
@@ -420,7 +433,7 @@ export function useDeepgramVoiceSession(
         // obsolete.
         player.interrupt();
         speakingRef.current = false;
-        discardingRef.current = true;
+        discardUntilRef.current = Date.now() + STALE_AUDIO_MS;
         setState("INTERRUPTED");
         eventsRef.current.onInterrupted?.();
         repairFalseInterruption();
@@ -442,19 +455,22 @@ export function useDeepgramVoiceSession(
       });
       session.on("agent-thinking", () => {
         noteEvent("agent-thinking");
-        discardingRef.current = false;
+        discardUntilRef.current = 0;
         setState("THINKING");
       });
       session.on("agent-started-speaking", () => {
         cancelRepair();
         expectSpeech();
-        discardingRef.current = false;
+        discardUntilRef.current = 0;
         speakingRef.current = true;
         setState("Q_SPEAKING");
       });
       session.on("audio", (chunk) => {
         speechHeard();
-        if (discardingRef.current) return;
+        if (Date.now() < discardUntilRef.current) return;
+        // Audio after the stale window: the agent is still speaking, so
+        // nothing needs repairing.
+        cancelRepair();
         player.queue(chunk);
       });
       session.on("agent-audio-done", () => {

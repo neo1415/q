@@ -7,6 +7,7 @@ import type { Logger } from "@capital-q/observability";
 
 import type { VoiceSessionBindings } from "./bindings.js";
 import { withoutContinueSignal } from "./navigation.js";
+import { sentences } from "./speech.js";
 import type { VoiceSpeaker, VoiceTranscriptTurn } from "./provider.js";
 import { turnFailureLine, turnSucceeded } from "./turn-failure.js";
 import type { VoiceTurnHandler } from "./turn.js";
@@ -263,7 +264,11 @@ export function registerVoiceThinkRoute(
       },
       speak: async (response) => {
         if (typeof response === "string") {
-          write(`${response} `);
+          // Sentence by sentence even when handed whole (a look-up's
+          // answer, an interview reply), as a streamed answer is: the agent
+          // asks the voice for what it is given, and one long request is
+          // slower to first sound and, past the relay's bound, silent.
+          for (const part of sentences(response)) write(`${part} `);
           return;
         }
         for await (const part of response) {

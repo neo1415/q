@@ -350,6 +350,25 @@ describe("the relay route", () => {
     await server.close();
   });
 
+  it("voices a whole spoken answer asked for in one request (answers but doesn't talk)", async () => {
+    // The relay used the one-way speech route's 600-character bound, so a
+    // whole answer the agent asked for at once came back 400: the words
+    // were on screen and nothing was heard.
+    const { fetch: fetchFake, calls } = recordingFetch(mp3Response);
+    const server = await relayApp(binding("FEMALE"), fetchFake);
+    const answer = "This is one sentence of a longer answer. ".repeat(29);
+    expect(answer.length).toBeGreaterThan(1_000);
+    const response = await server.inject({
+      method: "POST",
+      url: Q_VOICE_SPEAK_RELAY_PATH,
+      headers: { authorization: `Bearer ${THINK_TOKEN}` },
+      payload: { text: answer },
+    });
+    expect(response.statusCode).toBe(200);
+    expect(calls).toHaveLength(1);
+    await server.close();
+  });
+
   it("cancels the vendor call when the agent hangs up mid-sentence", async () => {
     // Barge-in: the person speaks over Q and the agent drops the request.
     // The vendor call must be cancelled with it — an uncancelled one is a
