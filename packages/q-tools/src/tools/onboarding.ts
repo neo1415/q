@@ -146,6 +146,7 @@ export const OnboardingRecordResultSchema = z
       "SET_ASIDE",
       "REJECTED",
       "AMBIGUOUS",
+      "UNMATCHED",
       "NEEDS_FIRST",
     ]),
     /** COMMITTED: what is now on the record, as a person would say it. */
@@ -166,8 +167,12 @@ export const OnboardingRecordResultSchema = z
       .optional(),
     /** REJECTED / NEEDS_FIRST: why, in the owning service's terms. */
     reason: z.string().max(400).optional(),
-    /** AMBIGUOUS: what the words could mean; ask which. */
-    candidates: z.array(z.string().max(160)).max(8).optional(),
+    /**
+     * AMBIGUOUS: what the words could mean; ask which. UNMATCHED: every
+     * choice the step records, since none is named in their words; choose
+     * the one that means what they said.
+     */
+    candidates: z.array(z.string().max(160)).max(40).optional(),
     /** NEEDS_FIRST: the step that has to be answered before this one. */
     needsStepKey: StepKeySchema.optional(),
   })
@@ -435,7 +440,7 @@ export function createOnboardingTools(
       status: "ACTIVE",
       providerName: "record_answers",
       description:
-        "Records what the person has told you, for any steps at once, each with their own words as the quote. Each result says COMMITTED (now on the record, with what was recorded), REJECTED (with the reason), AMBIGUOUS (with candidates: ask which) or NEEDS_FIRST (another step must be answered first). Only a COMMITTED result is on the record. Also returns what is still open afterwards, required first.",
+        "Records what the person has told you, for any steps at once, each with their own words as the quote. Each result says COMMITTED (now on the record, with what was recorded), REJECTED (with the reason), AMBIGUOUS (with candidates: ask which), UNMATCHED (their words name none of the step's choices; candidates lists every choice: record again with the one that means what they said, by its name, and say which you chose, or ask them when none fits) or NEEDS_FIRST (another step must be answered first). Only a COMMITTED result is on the record. Also returns what is still open afterwards, required first.",
       classification: "SIDE_EFFECT",
       riskClass: "LOW_RISK_INTERNAL",
       requiredCapabilities: [capability("onboarding.session.respond")],
