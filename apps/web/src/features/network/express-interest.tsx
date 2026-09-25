@@ -148,11 +148,18 @@ export function ExpressInterest({
       );
 
     case "SENT":
+      // The company's answer, as the server reported it (CQ-NET-011).
+      // Institutional words only: no celebration, and a decline is said
+      // plainly without a reason, because none is recorded.
       return (
         <p className="cq-status-line" role="status">
-          {phase.alreadySent
-            ? `Your organisation has already expressed interest in ${companyName}.`
-            : `Interest expressed in ${companyName}.`}
+          {phase.interest.response === "ACCEPTED"
+            ? `Connected with ${companyName}. Both sides have agreed to connect.`
+            : phase.interest.response === "DECLINED"
+              ? `${companyName} has not taken this forward.`
+              : phase.alreadySent
+                ? `Your organisation has already expressed interest in ${companyName}.`
+                : `Interest expressed in ${companyName}.`}
         </p>
       );
 

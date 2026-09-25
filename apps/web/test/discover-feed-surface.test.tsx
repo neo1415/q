@@ -540,6 +540,34 @@ describe("Express Interest (CQ-NET-010)", () => {
     ).toBeTruthy();
   });
 
+  it("says connected, from the server, once the company has accepted (CQ-NET-011)", async () => {
+    expressInterestAction.mockResolvedValue({
+      ok: true,
+      value: {
+        interest: {
+          ...INTEREST,
+          response: "ACCEPTED",
+          respondedAt: "2026-09-25T10:00:00.000Z",
+          connection: {
+            connectionId: "44444444-4444-4444-8444-444444444444",
+            status: "ACTIVE",
+            connectedAt: "2026-09-25T10:00:00.000Z",
+          },
+        },
+        deduplicated: true,
+      },
+    });
+    await renderFeed();
+
+    await confirmInterest();
+
+    expect(
+      await screen.findByText(
+        "Connected with Company 1. Both sides have agreed to connect.",
+      ),
+    ).toBeTruthy();
+  });
+
   it("shows a refusal honestly and never claims it was sent", async () => {
     expressInterestAction.mockResolvedValue({
       ok: false,

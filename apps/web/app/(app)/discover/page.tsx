@@ -99,6 +99,13 @@ export default async function DiscoverPage() {
         title="Discover"
         description="Investors who chose to be discoverable, and what each one has said publicly."
       />
+      {/* Interest already addressed to the company (CQ-NET-011). */}
+      <Link
+        href="/company/interest"
+        className={buttonClassName("secondary", "compact")}
+      >
+        Investor interest in your company
+      </Link>
       {slate === null ? (
         <EmptyState
           title="Discover couldn't load."
