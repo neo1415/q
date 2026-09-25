@@ -11,7 +11,8 @@ test.describe("desktop application shell", () => {
     await expect(sidebar).toBeVisible();
     const nav = sidebar.getByRole("navigation", { name: "Primary" });
     await expect(nav.getByRole("link")).toHaveCount(3);
-    await expect(nav.getByRole("link", { name: "Home" })).toHaveAttribute(
+    // The Q page's entry is labelled "Q" (ADR 0017; route still /home).
+    await expect(nav.getByRole("link", { name: "Q" })).toHaveAttribute(
       "aria-current",
       "page",
     );

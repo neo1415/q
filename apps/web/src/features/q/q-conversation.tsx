@@ -6,6 +6,7 @@ import {
   useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
   type ReactNode,
 } from "react";
 
@@ -15,7 +16,9 @@ import { cx } from "@capital-q/ui";
 import { Button } from "@capital-q/ui/button";
 import {
   Download,
+  FileText,
   History,
+  PanelRight,
   ICON_SIZE,
   ICON_STROKE,
   Mic,
@@ -23,6 +26,7 @@ import {
   Square,
 } from "@capital-q/ui/icons";
 import { QComposer } from "@capital-q/ui/q-composer";
+import { SheetContent, SheetRoot } from "@capital-q/ui/sheet";
 import type { ContextScope } from "@capital-q/ui/tokens";
 
 import { ViewTransition } from "@/components/view-transition";
@@ -40,8 +44,10 @@ import {
   workingLabel,
   type QTurn,
 } from "./conversation";
+import { QBoard } from "./q-board";
 import { QEvidence, splitBlocks } from "./q-evidence";
 import { QHistorySheet } from "./q-history-sheet";
+import { QNow } from "./q-now";
 import { QResultBlocks } from "./q-result-blocks";
 import { useQSession } from "./q-session";
 import { QSurfaceToolsContext, type QSurfaceTools } from "./q-surface-tools";
@@ -156,6 +162,21 @@ function words(text: string): string {
     .trim();
 }
 
+function subscribeWide(onChange: () => void): () => void {
+  const query = window.matchMedia("(min-width: 1024px)");
+  query.addEventListener("change", onChange);
+  return () => query.removeEventListener("change", onChange);
+}
+
+/** The desktop layout: the Board beside the stage rather than a sheet. */
+function useWide(): boolean {
+  return useSyncExternalStore(
+    subscribeWide,
+    () => window.matchMedia("(min-width: 1024px)").matches,
+    () => false,
+  );
+}
+
 /** A line of the ambient transcript. */
 type Line = {
   readonly id: string;
@@ -224,7 +245,7 @@ export function QConversationPanel({
   welcomeLine,
 }: QConversationPanelProps) {
   const session = useQSession();
-  const { q, turns, voice, spoken, spokenOnly, presence, act } = session;
+  const { q, turns, voice, spoken, spokenOnly, presence } = session;
   const client = voice.client;
 
   // The page names the conversation (its URL); the store holds it, so
@@ -424,7 +445,9 @@ export function QConversationPanel({
       : lastPersonAt >= 0
         ? lastPersonAt
         : settledLines.length;
-  const history = settledLines.slice(0, firstCurrent);
+  // Ambient, not a log: the two lines before the current exchange, faded.
+  // All of it is the Transcript view.
+  const history = settledLines.slice(0, firstCurrent).slice(-2);
 
   // The newest words are where the eye is: the stage keeps its end in view.
   const bodyRef = useRef<HTMLDivElement>(null);
@@ -433,11 +456,9 @@ export function QConversationPanel({
     const body = bodyRef.current;
     if (body !== null) body.scrollTop = body.scrollHeight;
   }, [newest]);
-  const historyRef = useRef<HTMLOListElement>(null);
-  useEffect(() => {
-    const list = historyRef.current;
-    if (list !== null) list.scrollTop = list.scrollHeight;
-  }, [history.length]);
+  const wide = useWide();
+  const [view, setView] = useState<"stage" | "transcript">("stage");
+  const [boardOpen, setBoardOpen] = useState(false);
 
   const stage = workingLabel(q.state);
   const showWelcome = welcome !== undefined && lines.length === 0 && !q.loading;
@@ -470,6 +491,17 @@ export function QConversationPanel({
           anchor.click();
           URL.revokeObjectURL(url);
         };
+
+  // One way to say something to Q from the page: down the open line when
+  // there is one (answered aloud), otherwise as a question.
+  const sendText = client.sendText;
+  const sayOrAsk = useCallback(
+    (text: string) => {
+      if (voiceActive) sendText(text);
+      else void q.ask(text);
+    },
+    [voiceActive, sendText, q],
+  );
 
   // What the welcome's cards do, in this surface rather than elsewhere.
   const qAsk = q.ask;
@@ -518,6 +550,43 @@ export function QConversationPanel({
             <div className="flex items-center gap-1">
               <button
                 type="button"
+                className={
+                  view === "transcript"
+                    ? "cq-stage-quiet is-active"
+                    : "cq-stage-quiet"
+                }
+                aria-pressed={view === "transcript"}
+                onClick={() =>
+                  setView((current) =>
+                    current === "transcript" ? "stage" : "transcript",
+                  )
+                }
+                data-q-control="transcript"
+              >
+                <FileText
+                  aria-hidden="true"
+                  size={ICON_SIZE.compact}
+                  strokeWidth={ICON_STROKE}
+                />
+                <span className="max-sm:sr-only">Transcript</span>
+              </button>
+              {wide ? null : (
+                <button
+                  type="button"
+                  className="cq-stage-quiet"
+                  onClick={() => setBoardOpen(true)}
+                  data-q-control="board"
+                >
+                  <PanelRight
+                    aria-hidden="true"
+                    size={ICON_SIZE.compact}
+                    strokeWidth={ICON_STROKE}
+                  />
+                  <span className="max-sm:sr-only">Board</span>
+                </button>
+              )}
+              <button
+                type="button"
                 className="cq-stage-quiet"
                 onClick={() => setHistoryOpen(true)}
                 data-q-control="history"
@@ -527,7 +596,7 @@ export function QConversationPanel({
                   size={ICON_SIZE.compact}
                   strokeWidth={ICON_STROKE}
                 />
-                Conversations
+                <span className="max-sm:sr-only">Conversations</span>
               </button>
               {download === undefined ? null : (
                 <button
@@ -560,273 +629,248 @@ export function QConversationPanel({
             className="cq-stage-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 sm:px-8"
             data-q-voice-stage-body
           >
-            <div className="mx-auto flex min-h-full w-full max-w-2xl flex-col items-center justify-center gap-6 py-6">
-              {history.length > 0 ? (
-                <ol
-                  ref={historyRef}
-                  className="cq-q-history w-full"
-                  aria-label="Earlier in this conversation"
-                >
-                  {history.map((line) => (
-                    <li
-                      key={line.id}
-                      className={
-                        line.role === "person"
-                          ? "cq-q-history-person"
-                          : "cq-q-history-q"
-                      }
-                      {...(line.turn === undefined
-                        ? {}
-                        : { "data-q-answer": "settled" })}
-                    >
-                      <span className="sr-only">
-                        {line.role === "person" ? "You: " : "Q: "}
-                      </span>
+            {view === "transcript" ? (
+              <ol
+                className="mx-auto flex w-full max-w-2xl flex-col gap-5 py-6"
+                aria-label="Transcript"
+                data-q-transcript
+              >
+                {lines.length === 0 ? (
+                  <li className="cq-body-sm text-(--cq-text-secondary)">
+                    Nothing has been said yet.
+                  </li>
+                ) : null}
+                {lines.map((line) => (
+                  <li key={line.id} className="flex flex-col gap-1">
+                    <span className="cq-label text-(--cq-text-tertiary)">
+                      {line.role === "person" ? "You" : "Q"}
+                    </span>
+                    <p className="cq-body whitespace-pre-wrap text-(--cq-text-primary)">
                       {line.text}
-                      {line.turn === undefined ? null : (
-                        <QEvidence
-                          turn={line.turn}
-                          onAsk={(question) => void q.ask(question)}
-                          onOpenArtifact={showArtifact}
-                        />
-                      )}
-                    </li>
-                  ))}
-                </ol>
-              ) : null}
-
-              <ViewTransition
-                name="q-aperture"
-                share="cq-q-morph"
-                default="none"
-              >
-                <QAperture
-                  state={presence.state}
-                  // Full size to begin with; smaller once there is a
-                  // conversation to read beside it.
-                  size={lines.length > 0 || liveIsPerson ? 120 : "stage"}
-                  inputLevel={client.inputLevel}
-                  outputLevel={client.outputLevel}
-                />
-              </ViewTransition>
-              <div className="flex flex-col items-center gap-1" role="status">
-                <span className="cq-label text-(--cq-text-primary)">
-                  {stateLabel}
-                </span>
-                {!voice.active && q.working && stage !== undefined ? (
-                  <span className="cq-caption text-(--cq-text-secondary)">
-                    {stage}
-                  </span>
-                ) : null}
-              </div>
-
-              {showWelcome ? (
-                <div
-                  className="flex w-full flex-col items-center"
-                  data-q-welcome-line
-                >
-                  {welcome}
-                </div>
-              ) : null}
-
-              {/* What is being said: Q's words, then the person's. */}
-              <div
-                className="flex w-full flex-col items-center gap-3 text-center"
-                aria-live="polite"
-                data-q-captions
-              >
-                {currentPerson !== undefined ? (
-                  <p
-                    className="cq-body-lg text-balance text-(--cq-text-secondary)"
-                    data-q-live-line={liveIsPerson ? "" : undefined}
-                  >
-                    “{currentPerson.text}”
-                  </p>
-                ) : null}
-                {currentQ !== undefined ? (
-                  <div
-                    className="flex flex-col items-center gap-2"
-                    {...(currentTurn === undefined
-                      ? {}
-                      : {
-                          "data-q-answer": currentTurn.streaming
-                            ? "streaming"
-                            : "settled",
-                        })}
-                  >
-                    <Caption
-                      key={currentQ.id}
-                      text={currentQ.text}
-                      className="cq-q-caption cq-title-md text-balance text-(--cq-text-primary)"
-                    />
-                  </div>
-                ) : null}
-              </div>
-
-              {currentTurn !== undefined && currentParts !== null ? (
-                <div className="flex w-full flex-col items-center gap-3">
-                  {currentParts.visible.length > 0 ? (
-                    <div className="w-full max-w-(--cq-layout-narrow)">
-                      <QResultBlocks
-                        blocks={currentParts.visible}
+                    </p>
+                    {line.turn === undefined ? null : (
+                      <QEvidence
+                        turn={line.turn}
                         onAsk={(question) => void q.ask(question)}
                         onOpenArtifact={showArtifact}
                       />
+                    )}
+                  </li>
+                ))}
+              </ol>
+            ) : (
+              <div className="mx-auto flex min-h-full w-full max-w-2xl flex-col items-center justify-center gap-6 py-6">
+                {history.length > 0 ? (
+                  <ol className="cq-q-history w-full" aria-label="Just before">
+                    {history.map((line) => (
+                      <li
+                        key={line.id}
+                        className={
+                          line.role === "person"
+                            ? "cq-q-history-person"
+                            : "cq-q-history-q"
+                        }
+                        {...(line.turn === undefined
+                          ? {}
+                          : { "data-q-answer": "settled" })}
+                      >
+                        <span className="sr-only">
+                          {line.role === "person" ? "You: " : "Q: "}
+                        </span>
+                        {line.text}
+                      </li>
+                    ))}
+                  </ol>
+                ) : null}
+
+                <ViewTransition
+                  name="q-aperture"
+                  share="cq-q-morph"
+                  default="none"
+                >
+                  <QAperture
+                    state={presence.state}
+                    // Full size to begin with; smaller once there is a
+                    // conversation to read beside it.
+                    size={lines.length > 0 || liveIsPerson ? 120 : "stage"}
+                    inputLevel={client.inputLevel}
+                    outputLevel={client.outputLevel}
+                  />
+                </ViewTransition>
+                <div className="flex flex-col items-center gap-1" role="status">
+                  <span className="cq-label text-(--cq-text-primary)">
+                    {stateLabel}
+                  </span>
+                  {!voice.active && q.working && stage !== undefined ? (
+                    <span className="cq-caption text-(--cq-text-secondary)">
+                      {stage}
+                    </span>
+                  ) : null}
+                </div>
+
+                {showWelcome ? (
+                  <div
+                    className="flex w-full flex-col items-center"
+                    data-q-welcome-line
+                  >
+                    {welcome}
+                  </div>
+                ) : null}
+
+                {/* What is being said: Q's words, then the person's. */}
+                <div
+                  className="flex w-full flex-col items-center gap-3 text-center"
+                  aria-live="polite"
+                  data-q-captions
+                >
+                  {currentPerson !== undefined ? (
+                    <p
+                      className="cq-body-lg text-balance text-(--cq-text-secondary)"
+                      data-q-live-line={liveIsPerson ? "" : undefined}
+                    >
+                      “{currentPerson.text}”
+                    </p>
+                  ) : null}
+                  {currentQ !== undefined ? (
+                    <div
+                      className="flex flex-col items-center gap-2"
+                      {...(currentTurn === undefined
+                        ? {}
+                        : {
+                            "data-q-answer": currentTurn.streaming
+                              ? "streaming"
+                              : "settled",
+                          })}
+                    >
+                      <Caption
+                        key={currentQ.id}
+                        text={currentQ.text}
+                        className="cq-q-caption cq-title-md text-balance text-(--cq-text-primary)"
+                      />
                     </div>
                   ) : null}
-                  <QEvidence
-                    turn={currentTurn}
-                    onAsk={(question) => void q.ask(question)}
-                    onOpenArtifact={showArtifact}
-                  />
                 </div>
-              ) : null}
 
-              {showSuggestions ? (
-                <ul
-                  aria-label="Suggested questions"
-                  className="flex flex-wrap justify-center gap-2"
-                  data-q-suggestions
-                >
-                  {context.suggestions.map((suggestion) => (
-                    <li key={suggestion}>
+                {currentTurn !== undefined && currentParts !== null ? (
+                  <div className="flex w-full flex-col items-center gap-3">
+                    {!wide && currentParts.visible.length > 0 ? (
+                      <div className="w-full max-w-(--cq-layout-narrow)">
+                        <QResultBlocks
+                          blocks={currentParts.visible}
+                          onAsk={(question) => void q.ask(question)}
+                          onOpenArtifact={showArtifact}
+                        />
+                      </div>
+                    ) : null}
+                    <QEvidence
+                      turn={currentTurn}
+                      onAsk={(question) => void q.ask(question)}
+                      onOpenArtifact={showArtifact}
+                    />
+                  </div>
+                ) : null}
+
+                {showSuggestions ? (
+                  <ul
+                    aria-label="Suggested questions"
+                    className="flex flex-wrap justify-center gap-2"
+                    data-q-suggestions
+                  >
+                    {context.suggestions.map((suggestion) => (
+                      <li key={suggestion}>
+                        <button
+                          type="button"
+                          className="cq-stage-option"
+                          onClick={() => {
+                            if (voice.active) client.sendText(suggestion);
+                            else void q.ask(suggestion);
+                          }}
+                        >
+                          {suggestion}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+
+                {voice.active &&
+                voice.turn?.asking !== null &&
+                voice.turn?.asking !== undefined &&
+                voice.turn.asking.options.length > 0 ? (
+                  <div
+                    className="flex flex-wrap justify-center gap-2"
+                    role="group"
+                    aria-label="Options"
+                    data-q-stage-options
+                  >
+                    {voice.turn.asking.options.map((option) => (
                       <button
+                        key={option.key}
                         type="button"
                         className="cq-stage-option"
-                        onClick={() => {
-                          if (voice.active) client.sendText(suggestion);
-                          else void q.ask(suggestion);
-                        }}
+                        title={option.description}
+                        onClick={() => client.sendText(option.label)}
                       >
-                        {suggestion}
+                        {option.label}
                       </button>
-                    </li>
-                  ))}
-                </ul>
-              ) : null}
+                    ))}
+                  </div>
+                ) : null}
 
-              {voice.active &&
-              voice.turn?.asking !== null &&
-              voice.turn?.asking !== undefined &&
-              voice.turn.asking.options.length > 0 ? (
-                <div
-                  className="flex flex-wrap justify-center gap-2"
-                  role="group"
-                  aria-label="Options"
-                  data-q-stage-options
-                >
-                  {voice.turn.asking.options.map((option) => (
+                {q.loading && lines.length === 0 ? (
+                  <p className="cq-body-sm text-(--cq-text-secondary)">
+                    Opening your conversation…
+                  </p>
+                ) : null}
+
+                {wide ? null : (
+                  <div className="w-full max-w-(--cq-layout-narrow)">
+                    <QNow session={session} onAct={sayOrAsk} />
+                  </div>
+                )}
+
+                {q.transport === "RECONNECTING" ? (
+                  <p className="cq-caption text-(--cq-text-secondary)">
+                    {describeQStreamTransport(q.transport)} Your conversation is
+                    saved.
+                  </p>
+                ) : null}
+                {q.state.failure !== null ? (
+                  <StageNotice title="Q couldn't finish that">
+                    {failureMessage(q.state.failure)}{" "}
+                    {recoveryHint(q.state.failure)}
+                  </StageNotice>
+                ) : null}
+                {q.notice !== null && q.state.failure === null ? (
+                  <StageNotice title="That didn't go through">
+                    {q.notice}
+                  </StageNotice>
+                ) : null}
+                {voice.notice !== null ? (
+                  <div className="flex items-center gap-3 rounded-md border border-(--cq-border-subtle) bg-(--cq-surface) px-4 py-3">
+                    <span className="cq-body text-(--cq-text-primary)">
+                      {voice.notice}
+                    </span>
                     <button
-                      key={option.key}
                       type="button"
-                      className="cq-stage-option"
-                      title={option.description}
-                      onClick={() => client.sendText(option.label)}
+                      className="cq-stage-quiet"
+                      onClick={voice.clearNotice}
                     >
-                      {option.label}
+                      Dismiss
                     </button>
-                  ))}
-                </div>
-              ) : null}
-
-              {q.loading && lines.length === 0 ? (
-                <p className="cq-body-sm text-(--cq-text-secondary)">
-                  Opening your conversation…
-                </p>
-              ) : null}
-
-              {q.state.approval !== null
-                ? (() => {
-                    // What Q has prepared and is waiting on (CQ-Q-008). The
-                    // server's own words for the exact payload the decision
-                    // binds to; one yes applies it, one no leaves it.
-                    const approval = q.state.approval;
-                    const proposal = q.state.proposals.find(
-                      (candidate) =>
-                        candidate.proposalId === approval.proposalId,
-                    );
-                    return (
-                      <div
-                        className="flex w-full max-w-(--cq-layout-narrow) flex-col gap-3 rounded-lg border border-(--cq-border) bg-(--cq-surface) p-4"
-                        data-q-approval
-                      >
-                        <span className="cq-label text-(--cq-text-secondary)">
-                          Needs you
-                        </span>
-                        <p className="cq-body font-medium text-(--cq-text-primary)">
-                          {proposal?.summary ??
-                            "Q has prepared something for you to approve."}
-                        </p>
-                        {proposal?.preview !== undefined ? (
-                          <pre className="cq-body-sm whitespace-pre-wrap font-sans text-(--cq-text-secondary)">
-                            {proposal.preview}
-                          </pre>
-                        ) : null}
-                        <div className="flex flex-wrap gap-2">
-                          <button
-                            type="button"
-                            className="cq-stage-primary"
-                            onClick={() => {
-                              act();
-                              void q.approve();
-                            }}
-                          >
-                            Approve
-                          </button>
-                          <button
-                            type="button"
-                            className="cq-stage-control"
-                            onClick={() => void q.decline()}
-                          >
-                            Decline
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })()
-                : null}
-
-              {q.transport === "RECONNECTING" ? (
-                <p className="cq-caption text-(--cq-text-secondary)">
-                  {describeQStreamTransport(q.transport)} Your conversation is
-                  saved.
-                </p>
-              ) : null}
-              {q.state.failure !== null ? (
-                <StageNotice title="Q couldn't finish that">
-                  {failureMessage(q.state.failure)}{" "}
-                  {recoveryHint(q.state.failure)}
-                </StageNotice>
-              ) : null}
-              {q.notice !== null && q.state.failure === null ? (
-                <StageNotice title="That didn't go through">
-                  {q.notice}
-                </StageNotice>
-              ) : null}
-              {voice.notice !== null ? (
-                <div className="flex items-center gap-3 rounded-md border border-(--cq-border-subtle) bg-(--cq-surface) px-4 py-3">
-                  <span className="cq-body text-(--cq-text-primary)">
-                    {voice.notice}
-                  </span>
+                  </div>
+                ) : null}
+                {speech.status === "blocked" ? (
                   <button
                     type="button"
-                    className="cq-stage-quiet"
-                    onClick={voice.clearNotice}
+                    className="cq-stage-control"
+                    onClick={speech.play}
                   >
-                    Dismiss
+                    Play Q’s answer
                   </button>
-                </div>
-              ) : null}
-              {speech.status === "blocked" ? (
-                <button
-                  type="button"
-                  className="cq-stage-control"
-                  onClick={speech.play}
-                >
-                  Play Q’s answer
-                </button>
-              ) : null}
-            </div>
+                ) : null}
+              </div>
+            )}
           </div>
 
           {/* The controls: always on screen. Talking is the way in; typing
@@ -944,6 +988,41 @@ export function QConversationPanel({
             </div>
           </div>
         </section>
+
+        {wide ? (
+          <aside
+            aria-label="Now and Board"
+            className="cq-q-aside flex w-[400px] flex-none flex-col gap-6 overflow-y-auto border-l border-(--cq-border-subtle) px-5 py-5"
+            data-q-aside
+          >
+            <QNow session={session} onAct={sayOrAsk} />
+            <QBoard
+              conversationId={q.conversationId}
+              turns={turns}
+              onAsk={sayOrAsk}
+              onOpenArtifact={showArtifact}
+            />
+          </aside>
+        ) : (
+          <SheetRoot open={boardOpen} onOpenChange={setBoardOpen}>
+            {boardOpen ? (
+              <SheetContent side="bottom" title="Board">
+                <QBoard
+                  conversationId={q.conversationId}
+                  turns={turns}
+                  onAsk={(question) => {
+                    setBoardOpen(false);
+                    sayOrAsk(question);
+                  }}
+                  onOpenArtifact={(artifactId) => {
+                    setBoardOpen(false);
+                    showArtifact(artifactId);
+                  }}
+                />
+              </SheetContent>
+            ) : null}
+          </SheetRoot>
+        )}
 
         {openArtifact === null ? null : (
           <div className="flex min-w-0 flex-1 flex-col p-4 lg:sticky lg:top-0 lg:max-h-dvh">

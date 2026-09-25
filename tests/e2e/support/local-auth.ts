@@ -23,12 +23,18 @@ export async function signUpThroughUi(
   page: Page,
   email: string,
   password = TEST_PASSWORD,
+  name = "Synthetic Tester",
 ): Promise<void> {
   await page.goto("/auth/sign-up");
+  // Sign-up asks what Q should call the person; it is required.
+  await page.getByLabel("Your name").fill(name);
   await page.getByLabel("Email").fill(email);
   await page.getByLabel("Password").fill(password);
   await page.getByRole("button", { name: "Create account" }).click();
-  await expect(page).toHaveURL(/\/home$/);
+  // A new account lands on the first-run welcome; a returning one on Q.
+  await expect(page).toHaveURL(/\/(welcome|home)(\?.*)?$/, {
+    timeout: 60_000,
+  });
 }
 
 export async function signInThroughUi(

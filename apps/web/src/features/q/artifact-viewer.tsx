@@ -81,7 +81,7 @@ function deckUrl(
 }
 
 /** An SVG slide the browser can show without being allowed to run it. */
-function slideSource(svg: string): string {
+export function slideSource(svg: string): string {
   return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
 }
 

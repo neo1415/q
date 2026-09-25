@@ -1,11 +1,14 @@
 import type { ComponentType } from "react";
 
-import { CircleUser, Compass, Home, Landmark } from "@capital-q/ui/icons";
+import { CircleUser, Compass, Landmark } from "@capital-q/ui/icons";
+
+import { QNavIcon } from "./q-nav-icon";
 
 /**
- * The information architecture (doc 17 §§6–8). Exactly three primary areas
- * plus Profile; Q is reached through Home and contextual actions, never as
- * a fifth tab or a floating bubble.
+ * The information architecture (doc 17 §§6–8, as amended by ADR 0017).
+ * Three primary areas plus Profile. The first is Q's own page, labelled
+ * "Q" (lead decision, 2026-09-25); its route stays /home so every
+ * `/home?c=` link keeps working. Q is also the floating dock (F1).
  */
 
 export type NavigationItem = {
@@ -20,7 +23,7 @@ export type NavigationItem = {
 };
 
 export const PRIMARY_NAVIGATION: readonly NavigationItem[] = [
-  { href: "/home", label: "Home", icon: Home },
+  { href: "/home", label: "Q", icon: QNavIcon },
   { href: "/discover", label: "Discover", icon: Compass },
   { href: "/capital", label: "Capital", icon: Landmark },
 ];

@@ -83,7 +83,7 @@ describe("the per-tab pointer", () => {
 describe("the navigation's Home", () => {
   it("returns to the conversation Home is in, and follows it when it changes", () => {
     render(<MobileNavigation />);
-    const home = () => screen.getByRole("link", { name: /Home/ });
+    const home = () => screen.getByRole("link", { name: "Q" });
     expect(home().getAttribute("href")).toBe("/home");
 
     act(() => rememberActiveConversation("home", A));

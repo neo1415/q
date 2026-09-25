@@ -446,6 +446,104 @@
     border-top: none;
     padding-top: 0;
   }
+  /*
+   * The Board and Now (ADR 0017 F3): objects Q produced, on the stage's
+   * surfaces. Cards here are objects, each with its own actions.
+   */
+  .cq-q-aside {
+    background: var(--cq-stage-canvas);
+    scrollbar-width: thin;
+  }
+  .cq-q-board-object {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 12px 14px;
+    border: 1px solid var(--cq-border-subtle);
+    border-radius: var(--cq-radius-lg);
+    background: var(--cq-surface);
+  }
+  .cq-q-board-object.is-pinned {
+    border-color: var(--cq-border-strong);
+  }
+  .cq-q-board-note {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 5;
+    line-clamp: 5;
+    overflow: hidden;
+    white-space: pre-wrap;
+  }
+  .cq-q-board-icon {
+    display: inline-flex;
+    width: 36px;
+    height: 36px;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    border-radius: var(--cq-radius-sm);
+    background: transparent;
+    color: var(--cq-text-secondary);
+    cursor: pointer;
+  }
+  .cq-q-board-icon:hover,
+  .cq-q-board-icon[aria-pressed="true"] {
+    color: var(--cq-text-primary);
+    background: var(--cq-surface-subtle);
+  }
+  /* 36 px icons keep a 44 px hit area. */
+  .cq-q-board-icon {
+    position: relative;
+  }
+  .cq-q-board-icon::before {
+    content: "";
+    position: absolute;
+    inset: -4px;
+  }
+  .cq-q-board-exchange {
+    align-self: flex-start;
+    min-height: 32px;
+    padding: 0;
+    border: none;
+    background: transparent;
+    color: var(--cq-text-secondary);
+    font: inherit;
+    font-size: 12px;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    cursor: pointer;
+  }
+  .cq-q-board-slide-button {
+    display: block;
+    padding: 0;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+  }
+  .cq-q-board-slide {
+    display: block;
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    border: 1px solid var(--cq-border-subtle);
+    border-radius: var(--cq-radius-md);
+    background: var(--cq-surface-subtle);
+    object-fit: contain;
+  }
+  .cq-q-now-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 12px 14px;
+    border: 1px solid var(--cq-border);
+    border-radius: var(--cq-radius-lg);
+    background: var(--cq-surface);
+  }
+  .cq-stage-quiet.is-active {
+    color: var(--cq-stage-text);
+    background: var(--cq-stage-surface-strong);
+  }
+
   /* Talk: the primary control on the stage, a 56 px target. */
   .cq-q-talk {
     display: inline-flex;
