@@ -3,10 +3,10 @@ import type { Logger } from "@capital-q/observability";
 import {
   createDefaultPromptRegistry,
   DEFAULT_COMMUNICATION_PROFILE,
-  DelegationReaderResultSchema,
+  DelegationReaderV2ResultSchema,
   renderPrompt,
-  type DelegationReaderResult,
-  type DelegationReaderVariables,
+  type DelegationReaderV2Result,
+  type DelegationReaderV2Variables,
   type PromptRegistry,
 } from "@capital-q/q-core";
 
@@ -25,10 +25,28 @@ import type { ModelGateway } from "../gateway.js";
  * which is always safe.
  */
 export type QTurnAuthority = {
+  /**
+   * Steps whose answer their latest words state about themselves (give,
+   * change or take back). A STATED write needs its step here.
+   */
+  readonly stated: ReadonlySet<string>;
+  /** Optional steps they declined to answer. */
+  readonly declined: ReadonlySet<string>;
   /** Steps whose choice they handed to Q. */
   readonly handed: ReadonlySet<string>;
   /** Steps whose pending recommendation they approved. */
   readonly approved: ReadonlySet<string>;
+  /** They confirmed the record and want to finish now. */
+  readonly finishing: boolean;
+};
+
+/** Nothing established: what an opening, or nothing said, reads as. */
+export const NO_TURN_AUTHORITY: QTurnAuthority = {
+  stated: new Set(),
+  declined: new Set(),
+  handed: new Set(),
+  approved: new Set(),
+  finishing: false,
 };
 
 export type QDelegationReader = {
@@ -40,6 +58,7 @@ export type QDelegationReader = {
       readonly question: string;
       /** What an answer means, in the journey's own words. */
       readonly about: string;
+      readonly required: boolean;
     }[];
     readonly pending: readonly {
       readonly stepKey: string;
@@ -76,22 +95,24 @@ export function createQDelegationReader(dependencies: {
   return {
     read: async (input) => {
       const utterance = input.utterance.trim().slice(0, 2_000);
-      if (utterance.length === 0) {
-        return { handed: new Set(), approved: new Set() };
-      }
+      if (utterance.length === 0) return NO_TURN_AUTHORITY;
       const steps = input.steps.slice(0, 60).map((step) => ({
         stepKey: step.stepKey.slice(0, 80),
         question: step.question.slice(0, 300),
         about: step.about.slice(0, 300),
+        required: step.required,
       }));
       const pending = input.pending.slice(0, 12).map((item) => ({
         stepKey: item.stepKey.slice(0, 80),
         recommended: item.recommended.slice(0, 600),
       }));
       const known = new Set(steps.map((step) => step.stepKey));
+      const optional = new Set(
+        steps.filter((step) => !step.required).map((step) => step.stepKey),
+      );
       const recommended = new Set(pending.map((item) => item.stepKey));
       try {
-        const rendered = renderPrompt<DelegationReaderVariables>(registry, {
+        const rendered = renderPrompt<DelegationReaderV2Variables>(registry, {
           task: "DELEGATION_READER",
           charter: "Q_SYSTEM",
           operatingMode: "ASSESSMENT",
@@ -105,7 +126,7 @@ export function createQDelegationReader(dependencies: {
             utterance,
           },
         });
-        const response = await gateway.execute<DelegationReaderResult>(
+        const response = await gateway.execute<DelegationReaderV2Result>(
           {
             taskClass: "FAST_CLASSIFICATION",
             reasoning: "LOW",
@@ -119,16 +140,27 @@ export function createQDelegationReader(dependencies: {
               : { dataPosture: dependencies.dataPosture }),
           },
           {
-            schema: DelegationReaderResultSchema,
+            schema: DelegationReaderV2ResultSchema,
             ...(input.signal === undefined ? {} : { signal: input.signal }),
           },
         );
         if (response.output.kind !== "STRUCTURED") return null;
-        const parsed = DelegationReaderResultSchema.safeParse(
+        const parsed = DelegationReaderV2ResultSchema.safeParse(
           (response.output as { readonly value: unknown }).value,
         );
         if (!parsed.success) return null;
+        const keys = (
+          items: readonly { readonly stepKey: string }[],
+          allowed: ReadonlySet<string>,
+        ) =>
+          new Set(
+            items.map((item) => item.stepKey).filter((key) => allowed.has(key)),
+          );
         return {
+          stated: keys(parsed.data.stated, known),
+          // A required step is never declined, whatever the reading says.
+          declined: keys(parsed.data.declined, optional),
+          finishing: parsed.data.finishing,
           handed: new Set(
             parsed.data.delegated
               .map((item) => item.stepKey)

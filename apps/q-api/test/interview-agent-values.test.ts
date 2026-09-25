@@ -8,6 +8,7 @@ import { ActorContextSchema } from "@capital-q/security";
 
 import { createInterviewAgent } from "../src/voice/interview-agent.js";
 
+import { readerOf, reading } from "./authority-fixtures.js";
 import { investorSession, turn } from "./interviewer-fixtures.js";
 
 /**
@@ -100,13 +101,16 @@ async function run(
     firewall: firewall(),
     logger,
     recommendations: world.recommendations,
-    delegation: {
-      read: () =>
-        Promise.resolve({
-          handed: new Set(handed),
-          approved: new Set<string>(),
-        }),
-    },
+    // The reading finds every STATED item stated, so these tests isolate
+    // the value-support layer; the self-statement gate has its own.
+    delegation: readerOf(
+      reading({
+        handed,
+        stated: answers
+          .filter((a) => a.basis !== "DELEGATED")
+          .map((a) => a.stepKey),
+      }),
+    ),
   });
   const outcome = await agent.turn({
     ...turn(world, utterance),

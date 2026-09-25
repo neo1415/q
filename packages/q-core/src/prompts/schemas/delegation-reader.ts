@@ -67,3 +67,58 @@ export const DelegationReaderResultSchema = z
 export type DelegationReaderResult = z.infer<
   typeof DelegationReaderResultSchema
 >;
+
+/**
+ * v2 — the whole of what the person's latest words establish, not only
+ * the authority they give (ACC 2026-09-25: an advisory turn recorded
+ * "selectively deploying" nobody said, and geography = Kenya from "which
+ * sectors are pulling seed money in Kenya"). A STATED write is permitted
+ * only for a step their latest words state about themselves; a decline
+ * sets an optional step aside; finishing is their decision, read here.
+ */
+export const DELEGATION_READER_V2_SCHEMA_VERSION = 2;
+
+export const DelegationReaderV2VariablesSchema = z
+  .object({
+    ...TaskFrameSchema,
+    steps: z
+      .array(
+        z.object({
+          stepKey: z.string().max(80),
+          question: z.string().max(300),
+          about: z.string().max(300),
+          required: z.boolean(),
+        }),
+      )
+      .max(60),
+    pending: z
+      .array(
+        z.object({
+          stepKey: z.string().max(80),
+          recommended: z.string().max(600),
+        }),
+      )
+      .max(12),
+    lastQ: z.string().max(2_000),
+    utterance: z.string().trim().min(1).max(2_000),
+  })
+  .strict();
+export type DelegationReaderV2Variables = z.infer<
+  typeof DelegationReaderV2VariablesSchema
+>;
+
+export const DelegationReaderV2ResultSchema = z
+  .object({
+    /** Steps whose answer their latest words give, change or take back, about themselves. */
+    stated: z.array(StepRefSchema).max(40).default([]),
+    /** Optional steps they decline to answer. */
+    declined: z.array(StepRefSchema).max(40).default([]),
+    delegated: z.array(StepRefSchema).max(12).default([]),
+    approved: z.array(StepRefSchema).max(12).default([]),
+    /** They confirm what is on the record and want to finish now. */
+    finishing: z.boolean().default(false),
+  })
+  .strict();
+export type DelegationReaderV2Result = z.infer<
+  typeof DelegationReaderV2ResultSchema
+>;

@@ -9,6 +9,7 @@ import { ActorContextSchema } from "@capital-q/security";
 
 import { createInterviewAgent } from "../src/voice/interview-agent.js";
 
+import { readerOf, reading } from "./authority-fixtures.js";
 import { investorSession, turn } from "./interviewer-fixtures.js";
 
 /**
@@ -34,26 +35,12 @@ function handedOver(
   stepKeys: readonly string[],
   heard: { utterance?: string; lastQ?: string }[] = [],
 ): QDelegationReader {
-  return {
-    read: (input) => {
-      heard.push({ utterance: input.utterance, lastQ: input.lastQ });
-      return Promise.resolve({
-        handed: new Set(stepKeys),
-        approved: new Set<string>(),
-      });
-    },
-  };
+  return readerOf(reading({ handed: stepKeys }), heard);
 }
 
 /** A reading in which the person approves these pending recommendations. */
 function approves(stepKeys: readonly string[]): QDelegationReader {
-  return {
-    read: () =>
-      Promise.resolve({
-        handed: new Set<string>(),
-        approved: new Set(stepKeys),
-      }),
-  };
+  return readerOf(reading({ approved: stepKeys }));
 }
 
 /** The Context Firewall's plan for the owner: their OWN_ONBOARDING scope. */
@@ -379,13 +366,9 @@ describe("ADR 0016 · M3 · a recommendation becomes an answer only on approval"
       firewall: firewall(),
       logger,
       recommendations: world.recommendations,
-      delegation: {
-        read: () =>
-          Promise.resolve({
-            handed: new Set<string>(),
-            approved: new Set(approving ? ["I7.hard_exclusions"] : []),
-          }),
-      },
+      delegation: readerOf(() =>
+        reading({ approved: approving ? ["I7.hard_exclusions"] : [] }),
+      ),
     });
 
     const first = await agent.turn({
@@ -680,17 +663,7 @@ describe("P0-2 · every write traces to the person's own words", () => {
         firewall: firewall(),
         logger,
         recommendations: world.recommendations,
-        delegation: {
-          read: () =>
-            Promise.resolve(
-              handed === null
-                ? null
-                : {
-                    handed: new Set<string>(handed),
-                    approved: new Set<string>(),
-                  },
-            ),
-        },
+        delegation: readerOf(handed === null ? null : reading({ handed })),
       });
 
       await agent.turn({ ...turn(world, said), actor });

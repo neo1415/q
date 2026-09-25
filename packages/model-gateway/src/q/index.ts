@@ -95,6 +95,7 @@ export {
 export { createQTurnReader, type QTurnReader } from "./turn-reader.js";
 export {
   createQDelegationReader,
+  NO_TURN_AUTHORITY,
   type QDelegationReader,
   type QTurnAuthority,
 } from "./delegation-reader.js";
