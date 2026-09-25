@@ -57,6 +57,13 @@ export default async function InvestorRelationshipPage({
     getOwnInterest(session, company.companyId).catch(() => null),
   ]);
 
+  // The investor's one action is expressing interest. Once it is
+  // expressed, the state line already says where things stand, so the
+  // control would only repeat it.
+  const relationship = status?.relationship ?? null;
+  const mayExpress =
+    relationship === null || relationship.nextStep === "EXPRESS_INTEREST";
+
   return (
     <>
       <QPageSubject
@@ -70,14 +77,14 @@ export default async function InvestorRelationshipPage({
       <RelationshipDetail
         side="INVESTOR"
         counterpart={company.canonicalName}
-        relationship={status?.relationship ?? null}
+        relationship={relationship}
         absentSentence={
           status === null
             ? "Where you stand couldn't load just now. Nothing has changed; try again in a moment."
             : `Nothing is on record yet between your organisation and ${company.canonicalName}.`
         }
         actions={
-          own === null ? null : (
+          own === null || !mayExpress ? null : (
             <InvestorRelationshipActions
               companyId={company.companyId}
               companyName={company.canonicalName}

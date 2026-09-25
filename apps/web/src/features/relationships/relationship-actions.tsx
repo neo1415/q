@@ -57,6 +57,11 @@ export function CompanyRelationshipActions({
  * with a question already drafted. The page declares the counterparty as
  * Q's subject, so Q reads where the person's own side stands through
  * get_relationship (CQ-Q-030) -- the same per-party fold as this page.
+ *
+ * The draft asks about the relationship, not the company's progress. On an
+ * investor's page the subject is a company, and a question phrased as
+ * "what should I do" reads to the Q API as a question about the company
+ * itself, which a path without the relationship answers.
  */
 export function AskQAboutRelationship({
   counterpart,
@@ -69,7 +74,7 @@ export function AskQAboutRelationship({
       variant="secondary"
       onClick={() =>
         askAbout(
-          `Where are we with ${counterpart}, what has happened so far, and what should I do next?`,
+          `Where does our relationship with ${counterpart} stand, what has happened so far, and what comes next?`,
         )
       }
     >
