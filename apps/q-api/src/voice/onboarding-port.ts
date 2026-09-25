@@ -67,6 +67,14 @@ export type BoundOnboardingPort = OnboardingToolPort & {
   readonly view: () => OnboardingSessionView | null;
   /** Steps this port wrote, in order. */
   readonly recorded: () => readonly string[];
+  /** Q's recommendations still waiting on the person, as Q would say them. */
+  readonly pendingRecommendations: () => Promise<
+    readonly {
+      readonly stepKey: string;
+      readonly value: string;
+      readonly rationale: string | null;
+    }[]
+  >;
 };
 
 export function createOnboardingPort(input: {
@@ -805,5 +813,24 @@ export function createOnboardingPort(input: {
     },
     view: () => latest,
     recorded: () => [...written],
+    pendingRecommendations: async () => {
+      const view = await current();
+      const list = await pendingNow().catch(() => []);
+      const out: {
+        stepKey: string;
+        value: string;
+        rationale: string | null;
+      }[] = [];
+      for (const item of list) {
+        const step = steps.get(item.stepKey);
+        if (step === undefined) continue;
+        out.push({
+          stepKey: item.stepKey,
+          value: (await spoken(step, item.value, view)).slice(0, 600),
+          rationale: item.rationale,
+        });
+      }
+      return out;
+    },
   };
 }

@@ -134,6 +134,14 @@ export function registerQInterviewRoute(
         navigate: outcome.navigate,
         handoff: outcome.handoff,
         degraded: outcome.degraded,
+        askingAbout: [
+          ...(outcome.askingAbout ??
+            (outcome.asking === null ? [] : [outcome.asking.stepKey])),
+        ],
+        pending: {
+          recommendations: [...(outcome.pending?.recommendations ?? [])],
+          held: [...(outcome.pending?.held ?? [])],
+        },
       });
     },
   );

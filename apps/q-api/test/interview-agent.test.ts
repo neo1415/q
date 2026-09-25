@@ -162,6 +162,7 @@ describe("ADR 0016 · M1 · one freeform turn writes several answers", () => {
       "I1.deployment_status",
     ]);
     expect(outcome.reply).toBe("Good — pre-seed next?");
+    expect(outcome.askingAbout).toEqual(["I2.stages"]);
     // The model saw the whole state, and the tool results before replying.
     expect([...(seen[0]?.tools ?? [])].sort()).toEqual([
       "accept_recommendation",
@@ -357,6 +358,10 @@ describe("ADR 0016 · M3 · a recommendation becomes an answer only on approval"
     });
     expect(world.recordedValue("I7.hard_exclusions")).toBeUndefined();
     expect(first.recorded).toEqual([]);
+    // The surface follows Q: what waits on the person is in the outcome.
+    expect(first.pending?.recommendations.map((r) => r.stepKey)).toEqual([
+      "I7.hard_exclusions",
+    ]);
 
     const second = await agent.turn({
       ...turn(world, "Yes, go with those."),

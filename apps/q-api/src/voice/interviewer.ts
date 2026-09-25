@@ -279,6 +279,22 @@ export type InterviewTurnOutcome = {
   readonly qualitative: readonly QualitativeMeaning[];
   /** raw STT → normalised → classification → extracted → persisted. */
   readonly trace: TurnTrace | null;
+  /** The steps the reply asks about, in order (CQ-QX-008). */
+  readonly askingAbout?: readonly string[] | undefined;
+  /** What waits on the person's decision (CQ-QX-008). */
+  readonly pending?:
+    | {
+        readonly recommendations: readonly {
+          readonly stepKey: string;
+          readonly value: string;
+          readonly rationale: string | null;
+        }[];
+        readonly held: readonly {
+          readonly stepKey: string;
+          readonly value: string;
+        }[];
+      }
+    | undefined;
   /**
    * How the reply should sound, as the model asked (CQ-VOICE-010). For the
    * speech layer only. It is never part of `reply`, the thread or memory.

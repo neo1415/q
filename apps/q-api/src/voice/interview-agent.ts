@@ -450,6 +450,11 @@ export function createInterviewAgent(
       resume: null,
       qualitative: [],
       trace: null,
+      askingAbout: stillOpen && askedOpen !== null ? [askedOpen.stepKey] : [],
+      pending: {
+        recommendations: await port.pendingRecommendations().catch(() => []),
+        held: [],
+      },
     };
   };
 

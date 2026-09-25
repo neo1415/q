@@ -99,6 +99,41 @@ export const QInterviewTurnResponseSchema = z
     handoff: z.literal("FORM").nullable(),
     /** True when no model could be reached and Q said so plainly. */
     degraded: z.boolean(),
+    /**
+     * The steps Q's reply actually asks about, in order (CQ-QX-008): what
+     * the screen's choices and a test driver follow — Q, never the
+     * journey's step cursor. Empty when the reply asks nothing.
+     */
+    askingAbout: z.array(z.string().max(80)).max(6).default([]),
+    /** What is waiting on the person's decision, as Q would say it. */
+    pending: z
+      .object({
+        /** Q's recommendations not yet accepted or declined. */
+        recommendations: z
+          .array(
+            z
+              .object({
+                stepKey: z.string().max(80),
+                value: z.string().max(600),
+                rationale: z.string().max(300).nullable(),
+              })
+              .strict(),
+          )
+          .max(12),
+        /** Values held for the person's yes (legacy interviewer only). */
+        held: z
+          .array(
+            z
+              .object({
+                stepKey: z.string().max(80),
+                value: z.string().max(600),
+              })
+              .strict(),
+          )
+          .max(12),
+      })
+      .strict()
+      .default({ recommendations: [], held: [] }),
   })
   .strict();
 export type QInterviewTurnResponse = z.infer<
