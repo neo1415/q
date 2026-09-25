@@ -93,6 +93,11 @@ export {
   type AnalystResultLike,
 } from "./result-blocks.js";
 export { createQTurnReader, type QTurnReader } from "./turn-reader.js";
+export {
+  createQDelegationReader,
+  type QDelegationReader,
+  type QTurnAuthority,
+} from "./delegation-reader.js";
 export { mandateStatement, ownProfileFact } from "./own-profile.js";
 export {
   ownOnboardingFacts,

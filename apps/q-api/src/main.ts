@@ -73,6 +73,7 @@ import {
   type ModelProvider,
 } from "@capital-q/model-gateway";
 import { withTestRouting } from "@capital-q/model-gateway";
+import { createQDelegationReader } from "@capital-q/model-gateway/q";
 import { createGoogleModelProvider } from "@capital-q/model-gateway/providers/google";
 import { createGroqModelProvider } from "@capital-q/model-gateway/providers/groq";
 import { createOpenAIModelProvider } from "@capital-q/model-gateway/providers/openai";
@@ -1103,6 +1104,13 @@ const interviewAgent = createInterviewAgent({
   memory: memoryService,
   recommendations: createOnboardingQRecommendations({
     transactions: database.transactions,
+  }),
+  // Which choices the person handed to Q, read independently of the
+  // acting model: a delegated write is permitted only for those.
+  delegation: createQDelegationReader({
+    gateway: modelGateway,
+    logger,
+    dataPosture: demoDataPosture,
   }),
   dataPosture: demoDataPosture,
 });

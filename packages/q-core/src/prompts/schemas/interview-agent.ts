@@ -85,6 +85,22 @@ export const INTERVIEW_AGENT_V5_UNTRUSTED = [
   "thisTurn",
 ] as const;
 
+/**
+ * v6 variables: v5's, plus the choices the person has just handed to Q,
+ * read independently from their latest words (DELEGATION_READER).
+ * TRUSTED: Capital Q's reading, rendered from journey step questions,
+ * never the person's text.
+ */
+export const InterviewAgentV6VariablesSchema =
+  InterviewAgentV5VariablesSchema.extend({
+    delegated: z.string().max(2_000).default(""),
+    /** The pending recommendations they approved in their latest words. TRUSTED. */
+    approved: z.string().max(2_000).default(""),
+  }).strict();
+export type InterviewAgentV6Variables = z.infer<
+  typeof InterviewAgentV6VariablesSchema
+>;
+
 export const InterviewAgentResultSchema = z
   .object({
     /** What Q says. Grounded in the tool results of this turn. */

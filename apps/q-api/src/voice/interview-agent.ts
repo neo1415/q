@@ -13,12 +13,16 @@ import {
   acceptStructuredOutput,
   type ModelGateway,
 } from "@capital-q/model-gateway";
-import { toolResultMessage } from "@capital-q/model-gateway/q";
+import {
+  toolResultMessage,
+  type QDelegationReader,
+  type QTurnAuthority,
+} from "@capital-q/model-gateway/q";
 import type { Logger } from "@capital-q/observability";
 import {
   createDefaultPromptRegistry,
   DEFAULT_COMMUNICATION_PROFILE,
-  type InterviewAgentV5Variables,
+  type InterviewAgentV6Variables,
   InterviewAgentResultSchema,
   renderPrompt,
   type InterviewAgentResult,
@@ -52,6 +56,7 @@ import {
   type RecommendationStore,
 } from "./onboarding-port.js";
 import { createReplySentenceStream } from "./reply-stream.js";
+import { SPOKEN_QUESTIONS } from "./step-copy.js";
 
 /**
  * The onboarding interview as a tool-calling Q run (ADR 0016).
@@ -103,6 +108,46 @@ function resultOf(message: ModelMessage): unknown {
   }
 }
 
+/** Step, basis and outcome of each write this turn, for the trace. */
+function decisionsOf(
+  actions: readonly { tool: string; input: unknown; result: unknown }[],
+): readonly string[] {
+  const out: string[] = [];
+  for (const action of actions) {
+    const items =
+      typeof action.input === "object" && action.input !== null
+        ? Object.values(action.input).find(Array.isArray)
+        : undefined;
+    const data =
+      typeof action.result === "object" &&
+      action.result !== null &&
+      "data" in action.result
+        ? action.result.data
+        : undefined;
+    const results =
+      typeof data === "object" &&
+      data !== null &&
+      "results" in data &&
+      Array.isArray(data.results)
+        ? (data.results as unknown[])
+        : [];
+    for (const [index, result] of results.entries()) {
+      const item: unknown = Array.isArray(items) ? items[index] : undefined;
+      const field = (from: unknown, key: string): string =>
+        typeof from === "object" &&
+        from !== null &&
+        key in from &&
+        typeof (from as Record<string, unknown>)[key] === "string"
+          ? String((from as Record<string, unknown>)[key]).slice(0, 80)
+          : "-";
+      out.push(
+        `${action.tool}:${field(result, "stepKey")}:${field(item, "basis")}:${field(result, "outcome")}`,
+      );
+    }
+  }
+  return out.slice(0, 40);
+}
+
 /**
  * What Q has done this turn, for the next round's prompt. Oldest actions
  * give way first when it is long: the newest results decide what is left.
@@ -146,6 +191,12 @@ export type InterviewAgentDependencies = {
    * suggestions (P0-2). Absent: recommend is refused honestly.
    */
   readonly recommendations?: RecommendationStore | undefined;
+  /**
+   * Which choices the person handed to Q this turn, read independently
+   * of the acting model. Absent: nothing is ever handed over, and Q
+   * recommends instead of recording on anyone's behalf.
+   */
+  readonly delegation?: QDelegationReader | undefined;
   /** Milliseconds now; injectable so a test can run out the clock. */
   readonly now?: (() => number) | undefined;
   /** The whole turn's deadline; tests shorten it. */
@@ -173,6 +224,9 @@ export function createInterviewAgent(
     if (actor === undefined) {
       throw new Error("an interview Q run needs the person's actor context");
     }
+    // The person is waiting from the moment they spoke: the deadline
+    // counts the reading, the state and the tools, not only the model.
+    const startedAt = now();
     const utterance = input.utterance.trim();
     const opening = utterance.length === 0;
     const runId = QRunIdSchema.parse(randomUUID());
@@ -201,6 +255,13 @@ export function createInterviewAgent(
             role: t.role === "PERSON" ? ("PERSON" as const) : ("Q" as const),
             text: t.text.slice(0, 2_000),
           }));
+    const lastQTurn = thread.findLast((t) => t.role === "Q")?.text;
+    const journeySteps = definitionFor(input.journeyType).steps;
+    // Read once the plan authorises the run; nothing handed over until then.
+    let delegationRead: Promise<QTurnAuthority | null> = Promise.resolve({
+      handed: new Set<string>(),
+      approved: new Set<string>(),
+    });
     const port = createOnboardingPort({
       session: input.session,
       onboardingSessionId: input.onboardingSessionId,
@@ -215,6 +276,8 @@ export function createInterviewAgent(
           .map((t) => t.text)
           .reverse(),
       ],
+      lastQTurn,
+      delegated: () => delegationRead,
       recommendations: dependencies.recommendations,
       runId,
     });
@@ -236,6 +299,30 @@ export function createInterviewAgent(
       throw new Error(
         "the Context Firewall did not authorise this interview run",
       );
+    }
+    const reader = dependencies.delegation;
+    if (!opening && reader !== undefined) {
+      const pending = await port.pendingRecommendations().catch(() => []);
+      delegationRead = reader.read({
+        utterance,
+        lastQ: lastQTurn ?? "",
+        steps: journeySteps.map((step) => ({
+          stepKey: step.stepKey,
+          question: SPOKEN_QUESTIONS[step.stepKey] ?? step.configuration.prompt,
+          about: step.configuration.supportingText ?? "",
+        })),
+        pending: pending.map((item) => ({
+          stepKey: item.stepKey,
+          recommended: item.value,
+        })),
+        attribution: {
+          tenantId: actor.tenantId,
+          userId: actor.userId,
+          qRunId: runId,
+          correlationId,
+        },
+        signal: input.signal,
+      });
     }
     const memory = dependencies.memory;
     const loop =
@@ -284,6 +371,25 @@ export function createInterviewAgent(
     };
     const offered = await tools.offer(context);
     let state = await port.state();
+    const authority = (await delegationRead) ?? {
+      handed: new Set<string>(),
+      approved: new Set<string>(),
+    };
+    const listed = (keys: ReadonlySet<string>): string =>
+      keys.size === 0
+        ? "none"
+        : JSON.stringify(
+            journeySteps
+              .filter((step) => keys.has(step.stepKey))
+              .map((step) => ({
+                stepKey: step.stepKey,
+                question: (
+                  SPOKEN_QUESTIONS[step.stepKey] ?? step.configuration.prompt
+                ).slice(0, 300),
+              })),
+          ).slice(0, 2_000);
+    const delegated = listed(authority.handed);
+    const approved = listed(authority.approved);
 
     // Every round is rendered afresh from the onboarding state and what Q
     // has already done this turn, never from a provider's native tool
@@ -292,7 +398,7 @@ export function createInterviewAgent(
     // turn must survive its first model failing half way.
     const actions: { tool: string; input: unknown; result: unknown }[] = [];
     const render = () =>
-      renderPrompt<InterviewAgentV5Variables>(registry, {
+      renderPrompt<InterviewAgentV6Variables>(registry, {
         task: "INTERVIEW_AGENT",
         charter: input.channel === "voice" ? "Q_SYSTEM_VOICE" : "Q_SYSTEM",
         operatingMode: "ASSESSMENT",
@@ -313,6 +419,8 @@ export function createInterviewAgent(
           memory: loop.memory.slice(0, 4_000),
           earlier: (compacted.summary ?? "").slice(0, 2_200),
           thisTurn: thisTurnText(actions),
+          delegated,
+          approved,
         },
       });
 
@@ -335,12 +443,14 @@ export function createInterviewAgent(
     // call inside it is cut off by it. Only the person leaving (the
     // caller's own signal) is a cancellation; the deadline is a degraded
     // turn, answered honestly.
-    const startedAt = now();
     const remaining = () => deadlineMs - (now() - startedAt);
     const deadline = new AbortController();
-    const timer = setTimeout(() => {
-      deadline.abort();
-    }, deadlineMs);
+    const timer = setTimeout(
+      () => {
+        deadline.abort();
+      },
+      Math.max(0, remaining()),
+    );
     const signal =
       input.signal === undefined
         ? deadline.signal
@@ -513,6 +623,11 @@ export function createInterviewAgent(
         recorded,
         asking: stillOpen ? askedOpen?.stepKey : null,
         answered: result !== undefined,
+        // What each write decided, by step and basis: never a value or a
+        // quote, which are the person's words.
+        decisions: decisionsOf(actions),
+        handed: [...authority.handed],
+        approved: [...authority.approved],
         timedOut,
         ms: now() - startedAt,
       },

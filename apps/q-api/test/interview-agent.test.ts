@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { PermittedContextPlan } from "@capital-q/contracts";
 import type { ModelGateway } from "@capital-q/model-gateway";
+import type { QDelegationReader } from "@capital-q/model-gateway/q";
 import { createLogger } from "@capital-q/observability";
 import type { ContextFirewallPort } from "@capital-q/q-runtime";
 import { ActorContextSchema } from "@capital-q/security";
@@ -27,6 +28,33 @@ const actor = ActorContextSchema.parse({
   tenantId: "c0000000-0000-4000-8000-000000000001",
   actorType: "HUMAN",
 });
+
+/** Capital Q's independent reading of what the person handed over. */
+function handedOver(
+  stepKeys: readonly string[],
+  heard: { utterance?: string; lastQ?: string }[] = [],
+): QDelegationReader {
+  return {
+    read: (input) => {
+      heard.push({ utterance: input.utterance, lastQ: input.lastQ });
+      return Promise.resolve({
+        handed: new Set(stepKeys),
+        approved: new Set<string>(),
+      });
+    },
+  };
+}
+
+/** A reading in which the person approves these pending recommendations. */
+function approves(stepKeys: readonly string[]): QDelegationReader {
+  return {
+    read: () =>
+      Promise.resolve({
+        handed: new Set<string>(),
+        approved: new Set(stepKeys),
+      }),
+  };
+}
 
 /** The Context Firewall's plan for the owner: their OWN_ONBOARDING scope. */
 function firewall(withScope = true): ContextFirewallPort {
@@ -345,11 +373,19 @@ describe("ADR 0016 · M3 · a recommendation becomes an answer only on approval"
       },
       { reply: "Done." },
     ]);
+    let approving = false;
     const agent = createInterviewAgent({
       gateway,
       firewall: firewall(),
       logger,
       recommendations: world.recommendations,
+      delegation: {
+        read: () =>
+          Promise.resolve({
+            handed: new Set<string>(),
+            approved: new Set(approving ? ["I7.hard_exclusions"] : []),
+          }),
+      },
     });
 
     const first = await agent.turn({
@@ -363,6 +399,7 @@ describe("ADR 0016 · M3 · a recommendation becomes an answer only on approval"
       "I7.hard_exclusions",
     ]);
 
+    approving = true;
     const second = await agent.turn({
       ...turn(world, "Yes, go with those."),
       actor,
@@ -562,11 +599,13 @@ describe("P0-2 · every write traces to the person's own words", () => {
       },
       { reply: "Hidden: gambling, tobacco and weapons. Change them any time." },
     ]);
+    const heard: { utterance?: string; lastQ?: string }[] = [];
     const agent = createInterviewAgent({
       gateway,
       firewall: firewall(),
       logger,
       recommendations: world.recommendations,
+      delegation: handedOver(["I7.hard_exclusions"], heard),
     });
 
     await agent.turn({ ...turn(world, said), actor });
@@ -575,6 +614,92 @@ describe("P0-2 · every write traces to the person's own words", () => {
       type: "MULTI_SELECT",
       optionKeys: ["gambling", "tobacco", "weapons"],
     });
+    // Read from their own latest words, once.
+    expect(heard).toHaveLength(1);
+    expect(heard[0]?.utterance).toBe(said);
+  });
+
+  it("the loop is told, as trusted input, which choices were handed to it", async () => {
+    const world = investorSession({
+      currentStepKey: "I7.hard_exclusions",
+      recorded: SO_FAR,
+    });
+    const { gateway, seen } = model([{ reply: "Done." }]);
+    const agent = createInterviewAgent({
+      gateway,
+      firewall: firewall(),
+      logger,
+      recommendations: world.recommendations,
+      delegation: handedOver(["I7.hard_exclusions"]),
+    });
+
+    await agent.turn({
+      ...turn(
+        world,
+        "Pick three exclusions you think fit me and go with those.",
+      ),
+      actor,
+    });
+
+    const prompt = seen[0]?.text ?? "";
+    const section = prompt.slice(prompt.indexOf("CHOICES HANDED TO YOU"));
+    expect(section).toContain('"stepKey":"I7.hard_exclusions"');
+  });
+
+  it("a DELEGATED label the independent reading does not support writes nothing", async () => {
+    // Property: whatever the acting model labels, a delegated write needs
+    // the reading to have found that very step handed over.
+    for (const handed of [[], ["I7.avoid"], null] as const) {
+      const world = investorSession({
+        currentStepKey: "I7.hard_exclusions",
+        recorded: SO_FAR,
+      });
+      const said = "What do most investors like me exclude?";
+      const { gateway } = model([
+        {
+          calls: [
+            {
+              name: "record_answers",
+              arguments: {
+                answers: [
+                  {
+                    stepKey: "I7.hard_exclusions",
+                    value: ["gambling"],
+                    quote: said,
+                    basis: "DELEGATED",
+                  },
+                ],
+              },
+            },
+          ],
+        },
+        { reply: "Most exclude gambling." },
+      ]);
+      const agent = createInterviewAgent({
+        gateway,
+        firewall: firewall(),
+        logger,
+        recommendations: world.recommendations,
+        delegation: {
+          read: () =>
+            Promise.resolve(
+              handed === null
+                ? null
+                : {
+                    handed: new Set<string>(handed),
+                    approved: new Set<string>(),
+                  },
+            ),
+        },
+      });
+
+      await agent.turn({ ...turn(world, said), actor });
+
+      expect(
+        world.recordedValue("I7.hard_exclusions"),
+        JSON.stringify(handed),
+      ).toBeUndefined();
+    }
   });
 
   it("a recommendation made this turn cannot be accepted this turn", async () => {
@@ -610,6 +735,9 @@ describe("P0-2 · every write traces to the person's own words", () => {
       firewall: firewall(),
       logger,
       recommendations: world.recommendations,
+      // Even a reading that found approval cannot approve what the person
+      // has not yet heard.
+      delegation: approves(["I7.avoid"]),
     });
 
     await agent.turn({ ...turn(world, "What would you suggest?"), actor });
@@ -667,12 +795,69 @@ describe("P0-2 · every write traces to the person's own words", () => {
       firewall: firewall(),
       logger,
       recommendations: world.recommendations,
+      delegation: approves(["I7.avoid"]),
     }).turn({ ...turn(world, "Yes, go with those."), actor });
 
     expect(world.recordedValue("I7.avoid")).toEqual({
       type: "MULTI_SELECT",
       optionKeys: ["gambling", "tobacco"],
     });
+  });
+
+  it("an instruction about something else never approves a pending recommendation", async () => {
+    // Live, 2026-09-25: Q recommended a typical cheque, the person then
+    // asked for exclusions, and the acting model accepted the cheque.
+    const world = investorSession({
+      currentStepKey: "I7.avoid",
+      recorded: SO_FAR,
+    });
+    await createInterviewAgent({
+      gateway: model([
+        {
+          calls: [
+            {
+              name: "recommend",
+              arguments: {
+                recommendations: [
+                  {
+                    stepKey: "I7.avoid",
+                    value: ["gambling"],
+                    because: "It rarely fits an education thesis.",
+                  },
+                ],
+              },
+            },
+          ],
+        },
+        { reply: "I would suggest gambling. Shall I?" },
+      ]).gateway,
+      firewall: firewall(),
+      logger,
+      recommendations: world.recommendations,
+    }).turn({ ...turn(world, "What would you suggest?"), actor });
+
+    await createInterviewAgent({
+      gateway: model([
+        {
+          calls: [
+            {
+              name: "accept_recommendation",
+              arguments: { stepKeys: ["I7.avoid"] },
+            },
+          ],
+        },
+        { reply: "Done." },
+      ]).gateway,
+      firewall: firewall(),
+      logger,
+      recommendations: world.recommendations,
+      delegation: approves([]),
+    }).turn({
+      ...turn(world, "What discovery setting do most angels use?"),
+      actor,
+    });
+
+    expect(world.recordedValue("I7.avoid")).toBeUndefined();
   });
 });
 
