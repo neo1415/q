@@ -486,7 +486,9 @@ describe("Express Interest (CQ-NET-010)", () => {
   async function confirmInterest() {
     fireEvent.click(screen.getByRole("button", { name: "Express interest" }));
     // Doc 17 §70: the consequence is stated before it happens.
-    expect(screen.getByText(/It is not a commitment to invest\./)).toBeTruthy();
+    expect(
+      await screen.findByText(/It is not a commitment to invest\./),
+    ).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Express interest" }));
   }
 

@@ -278,8 +278,8 @@ describe("Express Interest against local PostgreSQL", () => {
             },
           },
           companyVisibility: {
-            isVisibleToInvestor: async (_actor, companyId) =>
-              visible.has(companyId),
+            isVisibleToInvestor: (_actor, companyId) =>
+              Promise.resolve(visible.has(companyId)),
           },
         });
         await work({
