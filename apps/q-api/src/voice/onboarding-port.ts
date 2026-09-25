@@ -16,6 +16,7 @@ import type {
   OnboardingSessionView,
   TaxonomyCandidateResponse,
 } from "@capital-q/contracts";
+import { INVESTOR_CONCEPT_FAMILIES } from "@capital-q/investor-onboarding";
 import type {
   OnboardingQRecommendations,
   OnboardingStepManifest,
@@ -84,6 +85,41 @@ export type BoundOnboardingPort = OnboardingToolPort & {
     }[]
   >;
 };
+
+/**
+ * One concept, one answer (G): an open optional step in a concept family
+ * another member of which is answered or set aside is covered by it.
+ * Journey data names the families; nothing here reads a sentence.
+ */
+export function settleFamilies(
+  rows: readonly OnboardingStepState[],
+  journeyType: "investor" | "founder",
+): OnboardingStepState[] {
+  const families = journeyType === "investor" ? INVESTOR_CONCEPT_FAMILIES : [];
+  const coveredBy = new Map<string, string>();
+  for (const family of families) {
+    const settled = rows.find(
+      (row) =>
+        family.stepKeys.includes(row.stepKey) &&
+        (row.status === "ANSWERED" || row.status === "SET_ASIDE"),
+    );
+    if (settled === undefined) continue;
+    for (const row of rows) {
+      if (
+        row.stepKey !== settled.stepKey &&
+        family.stepKeys.includes(row.stepKey) &&
+        row.status === "OPEN" &&
+        !row.required
+      ) {
+        coveredBy.set(row.stepKey, settled.stepKey);
+      }
+    }
+  }
+  return rows.map((row) => {
+    const by = coveredBy.get(row.stepKey);
+    return by === undefined ? row : { ...row, coveredBy: by };
+  });
+}
 
 export function createOnboardingPort(input: {
   readonly session: ApiSession;
@@ -293,7 +329,7 @@ export function createOnboardingPort(input: {
       currentStepKey: view.currentStep?.stepKey ?? null,
       canComplete: view.progress.canComplete,
       completed: view.session.status === "COMPLETED",
-      steps: rows,
+      steps: settleFamilies(rows, input.journeyType),
     };
   };
 

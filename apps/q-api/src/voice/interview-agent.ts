@@ -572,8 +572,17 @@ export function createInterviewAgent(
       result?.asking === null || result?.asking === undefined
         ? undefined
         : steps.get(result.asking);
+    // A step whose concept is settled is never offered as the question,
+    // whatever the reply asked (one concept, one answer).
+    const covered = new Set(
+      (await port.state().catch(() => null))?.steps
+        .filter((row) => row.coveredBy !== undefined)
+        .map((row) => row.stepKey) ?? [],
+    );
     const askedOpen =
-      askedStep === undefined ? null : toOpenStep(askedStep, view);
+      askedStep === undefined || covered.has(askedStep.stepKey)
+        ? null
+        : toOpenStep(askedStep, view);
     const stillOpen =
       askedOpen !== null &&
       view.progress.eligibleSteps.some(

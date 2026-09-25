@@ -74,3 +74,7 @@ export function createInvestorOnboardingIntegration(
 export const PACKAGE_NAME = "@capital-q/investor-onboarding" as const;
 export * from "./intelligence/index.js";
 export { INVESTOR_INTERVIEW_CUES } from "./definition/interview-cues.js";
+export {
+  INVESTOR_CONCEPT_FAMILIES,
+  type ConceptFamily,
+} from "./definition/concept-families.js";
