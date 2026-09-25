@@ -12,6 +12,11 @@ import {
   createPostgresInterestResponseRequestStore,
 } from "../infrastructure/postgres-interest-repositories.js";
 import {
+  createRelationshipForCompany,
+  createRelationshipForInvestor,
+  type RelationshipStatus,
+} from "./relationship-status.js";
+import {
   createListIncomingInterest,
   createMayRespondToInterest,
   createRespondToInterest,
@@ -136,6 +141,16 @@ export type InterestService = {
     readonly actor: ActorContext;
     readonly interestId: string;
   }) => Promise<boolean>;
+  /** "Where are we with this company?", for an investor (CQ-NET-012). */
+  readonly relationshipForInvestor: (query: {
+    readonly actor: ActorContext;
+    readonly companyId: string;
+  }) => Promise<RelationshipStatus | null>;
+  /** "Where are we with this investor?", for a company (CQ-NET-012). */
+  readonly relationshipForCompany: (query: {
+    readonly actor: ActorContext;
+    readonly investorOrganisationId: string;
+  }) => Promise<RelationshipStatus | null>;
 };
 
 export type InterestServiceOptions = NetworkServiceOptions &
@@ -178,5 +193,7 @@ export function createInterestService(
     listIncomingInterest: createListIncomingInterest(dependencies),
     respondToInterest: createRespondToInterest(dependencies),
     mayRespondToInterest: createMayRespondToInterest(dependencies),
+    relationshipForInvestor: createRelationshipForInvestor(dependencies),
+    relationshipForCompany: createRelationshipForCompany(dependencies),
   };
 }

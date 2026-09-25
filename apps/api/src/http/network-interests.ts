@@ -12,14 +12,18 @@ import {
   NETWORK_COMPANY_EXPRESS_INTEREST_PATH,
   NETWORK_COMPANY_INCOMING_INTEREST_PATH,
   NETWORK_COMPANY_INTEREST_PATH,
+  NETWORK_COMPANY_RELATIONSHIP_PATH,
   NETWORK_INTEREST_ACCEPT_PATH,
   NETWORK_INTEREST_DECLINE_PATH,
+  NETWORK_INVESTOR_RELATIONSHIP_PATH,
   parseContract,
+  RelationshipStatusResponseDtoSchema,
   RespondToInterestRequestSchema,
 } from "@capital-q/contracts";
 import {
   toIncomingInterestDto,
   toInterestDto,
+  toRelationshipStatusDto,
   type InterestService,
 } from "@capital-q/network";
 import { createCorrelationId } from "@capital-q/observability";
@@ -127,6 +131,38 @@ export function registerNetworkInterestRoutes(
       void reply.header("Cache-Control", "no-store");
       return CompanyInterestStatusDtoSchema.parse({
         interest: interest === null ? null : toInterestDto(interest),
+      });
+    },
+  );
+
+  // Where are we (CQ-NET-012): each party's view, folded from what it may read.
+  app.get(
+    NETWORK_COMPANY_RELATIONSHIP_PATH,
+    { onRequest: withContext },
+    async (request, reply) => {
+      const status = await service.relationshipForInvestor({
+        actor: getActorContext(request),
+        companyId: companyIdOf(request),
+      });
+      void reply.header("Cache-Control", "no-store");
+      return RelationshipStatusResponseDtoSchema.parse({
+        relationship: status === null ? null : toRelationshipStatusDto(status),
+      });
+    },
+  );
+  app.get(
+    NETWORK_INVESTOR_RELATIONSHIP_PATH,
+    { onRequest: withContext },
+    async (request, reply) => {
+      const raw = (request.params as { investorOrganisationId?: unknown })
+        .investorOrganisationId;
+      const status = await service.relationshipForCompany({
+        actor: getActorContext(request),
+        investorOrganisationId: typeof raw === "string" ? raw : "",
+      });
+      void reply.header("Cache-Control", "no-store");
+      return RelationshipStatusResponseDtoSchema.parse({
+        relationship: status === null ? null : toRelationshipStatusDto(status),
       });
     },
   );

@@ -9,6 +9,9 @@ import {
   NETWORK_COMPANY_INTEREST_PATH,
   NETWORK_INTEREST_ACCEPT_PATH,
   NETWORK_INTEREST_DECLINE_PATH,
+  NETWORK_COMPANY_RELATIONSHIP_PATH,
+  NETWORK_INVESTOR_RELATIONSHIP_PATH,
+  RelationshipStatusResponseDtoSchema,
   type ExpressInterestRequest,
 } from "@capital-q/contracts";
 
@@ -73,6 +76,35 @@ export function answerInterest(
     template.replace(":interestId", encodeURIComponent(interestId)),
     InterestResponseResultDtoSchema,
     { body: {}, headers: { [IDEMPOTENCY_KEY_HEADER]: idempotencyKey } },
+  );
+}
+
+/** `GET /v1/network/companies/:companyId/relationship` — where an investor is with a company (CQ-NET-012). */
+export function getRelationshipWithCompany(
+  session: ApiSession,
+  companyId: string,
+) {
+  return call(
+    session,
+    "GET",
+    companyPath(NETWORK_COMPANY_RELATIONSHIP_PATH, companyId),
+    RelationshipStatusResponseDtoSchema,
+  );
+}
+
+/** `GET /v1/network/investors/:investorOrganisationId/relationship` — where a company is with an investor. */
+export function getRelationshipWithInvestor(
+  session: ApiSession,
+  investorOrganisationId: string,
+) {
+  return call(
+    session,
+    "GET",
+    NETWORK_INVESTOR_RELATIONSHIP_PATH.replace(
+      ":investorOrganisationId",
+      encodeURIComponent(investorOrganisationId),
+    ),
+    RelationshipStatusResponseDtoSchema,
   );
 }
 

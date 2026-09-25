@@ -77,10 +77,23 @@ never documents, transcripts, messages, tokens or prompts.
 
 ## Current state
 
-`current_state` is a derived projection. This packet writes `DISCOVERED`
-at creation and nothing else; no state setter exists in the repositories or
-the package exports. CQ-NET-012 will replay the ordered history to compute
-later states without touching it.
+`current_state` is a derived projection (CQ-NET-012). The pure,
+versioned projector `relationship-state.v1` folds the ordered history:
+DISCOVERED → INTEREST_EXPRESSED → CONNECTED | DECLINED (DECLINED →
+INTEREST_EXPRESSED on a new interest; CONNECTED has no exit in v1). A
+registered event that is not a legal move is kept as an anomaly and
+changes nothing; an unknown type is skipped and counted. The workers'
+domain-event consumer re-reads the whole history on every Network
+announcement and writes the cache compare-and-set on
+`projected_sequence`/`projector_version`, so replays and reordering
+converge and nothing moves backwards. `apps/workers/src/dev/
+rebuild-relationship-states.ts [--all]` rebuilds from history. Commands
+never set a state.
+
+"Where are we" (`/v1/network/companies/:id/relationship` for an
+investor, `/v1/network/investors/:id/relationship` for a company) folds
+only the history the asking party may read, so an investor's private
+discovery is never a relationship the company can see.
 
 ## Application surface
 

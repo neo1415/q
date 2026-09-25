@@ -175,6 +175,8 @@ export {
   answerInterest,
   expressInterest,
   getOwnInterest,
+  getRelationshipWithCompany,
+  getRelationshipWithInvestor,
   listIncomingInterest,
 } from "./network.js";
 

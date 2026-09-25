@@ -139,6 +139,34 @@ export function createPostgresRelationshipRepository(): RelationshipRepository {
          limit ${limit}`;
       return rows.map(toRelationship);
     },
+    recordProjection: async (executor, input) => {
+      // One statement, so it needs no transaction: the predicate is the
+      // compare-and-set that keeps a replayed or late projection from ever
+      // overwriting one that folded further.
+      const rows = await executor`
+        update network.relationships r
+           set current_state = ${input.state},
+               state_updated_at = ${input.stateSince}::text::timestamptz,
+               projected_sequence = ${input.throughSequence},
+               projector_version = ${input.version},
+               projected_at = clock_timestamp()
+         where r.id = ${input.relationshipId}
+           and ${input.throughSequence} <= r.last_event_sequence
+           and (r.projected_sequence < ${input.throughSequence}
+                or (r.projected_sequence = ${input.throughSequence}
+                    and r.projector_version <> ${input.version}))
+        returning r.id`;
+      return rows.length > 0;
+    },
+    listIdsForProjection: async (executor, page) => {
+      const rows = await executor`
+        select r.id from network.relationships r
+         where (${page.after}::uuid is null or r.id > ${page.after}::uuid)
+           and (not ${page.onlyBehind} or r.projected_sequence < r.last_event_sequence)
+         order by r.id
+         limit ${page.limit}`;
+      return rows.map((row) => RelationshipIdSchema.parse(row["id"]));
+    },
   };
 }
 

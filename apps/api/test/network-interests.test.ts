@@ -17,6 +17,7 @@ import {
   type ExpressInterestCommand,
   type Interest,
   type InterestService,
+  type RelationshipStatus,
   type RespondToInterestCommand,
 } from "@capital-q/network";
 import { CompanyIdSchema } from "@capital-q/companies";
@@ -97,6 +98,41 @@ const ACCEPTED: Interest = {
   },
 };
 
+const RELATIONSHIP = {
+  id: RelationshipIdSchema.parse("88888888-0000-4000-8000-000000000001"),
+  tenantId: TenantIdSchema.parse("22222222-0000-4000-8000-000000000001"),
+  companyId: CompanyIdSchema.parse(COMPANY),
+  investorOrganisationId: InvestorOrganisationIdSchema.parse(
+    "11111111-0000-4000-8000-000000000013",
+  ),
+  currentState: "CONNECTED",
+  stateUpdatedAt: UtcTimestampSchema.parse("2026-09-25T11:00:00.000Z"),
+  firstDiscoveredAt: UtcTimestampSchema.parse("2026-09-25T09:00:00.000Z"),
+  lastEventSequence: 3,
+  createdAt: UtcTimestampSchema.parse("2026-09-25T09:00:00.000Z"),
+};
+
+const STATUS: RelationshipStatus = {
+  relationship: RELATIONSHIP,
+  projection: {
+    version: "relationship-state.v1",
+    state: "CONNECTED",
+    stateSince: "2026-09-25T11:00:00.000Z",
+    throughSequence: 3,
+    milestones: [
+      {
+        state: "INTEREST_EXPRESSED",
+        at: "2026-09-25T10:00:00.000Z",
+        sequence: 2,
+      },
+      { state: "CONNECTED", at: "2026-09-25T11:00:00.000Z", sequence: 3 },
+    ],
+    anomalies: [],
+    unrecognised: 0,
+  },
+  nextStep: "SCHEDULE_MEETING",
+};
+
 const INVESTOR = {
   id: InvestorOrganisationIdSchema.parse(
     "11111111-0000-4000-8000-000000000013",
@@ -114,14 +150,17 @@ function buildApp(
   options: {
     readonly failWith?: Error | undefined;
     readonly deduplicated?: boolean | undefined;
+    readonly noRelationship?: boolean | undefined;
   } = {},
 ): {
   readonly app: FastifyInstance;
   readonly calls: ExpressInterestCommand[];
   readonly answers: RespondToInterestCommand[];
+  readonly reads: Record<string, unknown>[];
 } {
   const calls: ExpressInterestCommand[] = [];
   const answers: RespondToInterestCommand[] = [];
+  const reads: Record<string, unknown>[] = [];
   const interests: InterestService = {
     expressInterest: (command) => {
       calls.push(command);
@@ -152,6 +191,18 @@ function buildApp(
         : Promise.reject(options.failWith);
     },
     mayRespondToInterest: () => Promise.resolve(options.failWith === undefined),
+    relationshipForInvestor: (query) => {
+      reads.push({ side: "INVESTOR", ...query });
+      return options.failWith === undefined
+        ? Promise.resolve(STATUS)
+        : Promise.reject(options.failWith);
+    },
+    relationshipForCompany: (query) => {
+      reads.push({ side: "COMPANY", ...query });
+      return options.failWith === undefined
+        ? Promise.resolve(options.noRelationship === true ? null : STATUS)
+        : Promise.reject(options.failWith);
+    },
   };
   const security: ApiSecurityDependencies = {
     authenticator: { authenticate: () => Promise.resolve(PRINCIPAL) },
@@ -164,7 +215,7 @@ function buildApp(
   const { app } = createApp(parseApiConfig({ NODE_ENV: "test" }), security, {
     interests,
   });
-  return { app, calls, answers };
+  return { app, calls, answers, reads };
 }
 
 const post = (
@@ -395,5 +446,74 @@ describe("the company's side (CQ-NET-011)", () => {
     expect(response.json()).toMatchObject({
       interest: { response: "PENDING", connection: null },
     });
+  });
+});
+
+describe("where are we (CQ-NET-012)", () => {
+  it("answers the investor's question about a company with state, milestones and the next step", async () => {
+    const { app, reads } = buildApp();
+    const response = await app.inject({
+      method: "GET",
+      url: `/v1/network/companies/${COMPANY}/relationship`,
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.headers["cache-control"]).toBe("no-store");
+    expect(response.json()).toEqual({
+      relationship: {
+        relationshipId: RELATIONSHIP.id,
+        companyId: COMPANY,
+        investorOrganisationId: RELATIONSHIP.investorOrganisationId,
+        state: "CONNECTED",
+        stateSince: "2026-09-25T11:00:00.000Z",
+        milestones: [
+          { state: "INTEREST_EXPRESSED", at: "2026-09-25T10:00:00.000Z" },
+          { state: "CONNECTED", at: "2026-09-25T11:00:00.000Z" },
+        ],
+        nextStep: "SCHEDULE_MEETING",
+        projectorVersion: "relationship-state.v1",
+      },
+    });
+    expect(reads[0]).toMatchObject({
+      side: "INVESTOR",
+      actor: CONTEXT,
+      companyId: COMPANY,
+    });
+  });
+
+  it("answers the company's question about an investor, and null when nothing visible exists", async () => {
+    const investorId = RELATIONSHIP.investorOrganisationId;
+    const found = await buildApp().app.inject({
+      method: "GET",
+      url: `/v1/network/investors/${investorId}/relationship`,
+    });
+    expect(found.json()).toMatchObject({
+      relationship: { state: "CONNECTED" },
+    });
+    const none = await buildApp({ noRelationship: true }).app.inject({
+      method: "GET",
+      url: `/v1/network/investors/${investorId}/relationship`,
+    });
+    expect(none.statusCode).toBe(200);
+    expect(none.json()).toEqual({ relationship: null });
+  });
+
+  it("carries no anomaly counts, sequences or payloads", async () => {
+    const response = await buildApp().app.inject({
+      method: "GET",
+      url: `/v1/network/companies/${COMPANY}/relationship`,
+    });
+    const text = response.body;
+    expect(text).not.toContain("anomal");
+    expect(text).not.toContain("sequence");
+    expect(text).not.toContain("payload");
+  });
+
+  it("answers not-found for a company the investor may not see", async () => {
+    const { app } = buildApp({ failWith: new InterestCompanyNotFoundError() });
+    const response = await app.inject({
+      method: "GET",
+      url: `/v1/network/companies/${COMPANY}/relationship`,
+    });
+    expect(response.statusCode).toBe(404);
   });
 });

@@ -294,7 +294,7 @@ describe("module surface", () => {
   it("exposes no state setter, no history update or delete, no relationship delete, no answer overwrite, no match ending and no interest withdrawal", () => {
     const names = Object.keys(network);
     for (const forbidden of names.filter((name) =>
-      /set.*state|update|delete|remove|withdraw|projector|end.*match|overwrite/i.test(
+      /set.*state|update|delete|remove|withdraw|end.*match|overwrite/i.test(
         name,
       ),
     )) {
@@ -306,6 +306,8 @@ describe("module surface", () => {
     // only interest commands.
     expect(names).toContain("createExpressInterest");
     expect(names).toContain("createRespondToInterest");
+    // CQ-NET-012: state is written only by the deterministic projector.
+    expect(names).toContain("createRelationshipStateProjector");
   });
 });
 

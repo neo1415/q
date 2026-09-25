@@ -78,6 +78,7 @@ import {
 import {
   createPostgresRelationshipEventRepository,
   createPostgresRelationshipRepository,
+  createRelationshipStateProjector,
   type RelationshipQueryPort,
 } from "@capital-q/network";
 import {
@@ -143,6 +144,7 @@ import { createDomainEventHandler } from "./events/document-processing-handler.j
 import { createProductionEventRegistry } from "./event-registry.js";
 import { withVerificationDecisions } from "./verification/decide-handler.js";
 import { withReadinessAfterVerification } from "./verification/readiness-handler.js";
+import { withRelationshipProjection } from "./network/relationship-projection-handler.js";
 import { createOutboxPublisherRunner } from "./outbox-runner.js";
 import { createParserSandbox } from "./parser/sandbox.js";
 import { composeWorkerPresence } from "./presence/composition.js";
@@ -603,54 +605,70 @@ const readinessCompanies = createCompanyService({
   verification: createVerificationClaimsReadinessPort({ sql: database.sql }),
 });
 
+/**
+ * CQ-NET-012: relationship state follows its history. Every Network
+ * announcement wakes the deterministic projector for the relationship it
+ * names; the projector re-reads the whole history, so redelivery and
+ * reordering converge, and the cache is written compare-and-set.
+ */
+const relationshipProjector = createRelationshipStateProjector({
+  sql: database.sql,
+  repositories: {
+    relationships: createPostgresRelationshipRepository(),
+    events: createPostgresRelationshipEventRepository(),
+  },
+});
 const documentEvents = createQueueRunner({
   queue: DOMAIN_EVENTS_QUEUE,
   client: queues,
-  handle: withReadinessAfterVerification(
-    withVerificationDecisions(
-      createDomainEventHandler({
-        registry,
-        queues,
-        pipelineVersion: config.documents.pipelineVersion,
-        mediaModeration: {
-          onReady: (event) => {
-            // The message names the asset; the decision re-reads it. An id that
-            // is not one is archived by the handler's own outcome, not thrown.
-            const mediaAssetId = MediaAssetIdSchema.safeParse(
-              event.mediaAssetId,
-            );
-            if (!mediaAssetId.success) {
-              return Promise.resolve({ kind: "SKIPPED" });
-            }
-            return mediaModeration({
-              tenantId: event.tenantId,
-              mediaAssetId: mediaAssetId.data,
-              correlationId: CorrelationIdSchema.parse(
-                event.correlationId ?? `cor_${randomUUID()}`,
-              ),
-            });
+  handle: withRelationshipProjection(
+    withReadinessAfterVerification(
+      withVerificationDecisions(
+        createDomainEventHandler({
+          registry,
+          queues,
+          pipelineVersion: config.documents.pipelineVersion,
+          mediaModeration: {
+            onReady: (event) => {
+              // The message names the asset; the decision re-reads it. An id that
+              // is not one is archived by the handler's own outcome, not thrown.
+              const mediaAssetId = MediaAssetIdSchema.safeParse(
+                event.mediaAssetId,
+              );
+              if (!mediaAssetId.success) {
+                return Promise.resolve({ kind: "SKIPPED" });
+              }
+              return mediaModeration({
+                tenantId: event.tenantId,
+                mediaAssetId: mediaAssetId.data,
+                correlationId: CorrelationIdSchema.parse(
+                  event.correlationId ?? `cor_${randomUUID()}`,
+                ),
+              });
+            },
           },
-        },
-        ...(founderReview === undefined ? {} : { founderReview }),
-        ...(mandateReview === undefined ? {} : { mandateReview }),
-        ...(presenceResearch === undefined ? {} : { presenceResearch }),
-        recommendations: {
-          onEvent: (event) =>
-            slateInvalidation.apply(refreshDirectiveFor(event), {
-              correlationId: event.correlationId,
-              causationId: `cau_${event.id}`,
-            }),
-        },
+          ...(founderReview === undefined ? {} : { founderReview }),
+          ...(mandateReview === undefined ? {} : { mandateReview }),
+          ...(presenceResearch === undefined ? {} : { presenceResearch }),
+          recommendations: {
+            onEvent: (event) =>
+              slateInvalidation.apply(refreshDirectiveFor(event), {
+                correlationId: event.correlationId,
+                causationId: `cau_${event.id}`,
+              }),
+          },
+          logger,
+        }),
+        { registry, decide: verificationDecider, logger },
+      ),
+      {
+        registry,
+        ownerOf: createDecidedClaimOwnerLookup({ sql: database.sql }),
+        reconcile: readinessCompanies.reconcileMarketplaceReadinessAsSystem,
         logger,
-      }),
-      { registry, decide: verificationDecider, logger },
+      },
     ),
-    {
-      registry,
-      ownerOf: createDecidedClaimOwnerLookup({ sql: database.sql }),
-      reconcile: readinessCompanies.reconcileMarketplaceReadinessAsSystem,
-      logger,
-    },
+    { registry, projector: relationshipProjector, logger },
   ),
   batchSize: config.documents.batchSize,
   pollIntervalMs: config.documents.pollIntervalMs,

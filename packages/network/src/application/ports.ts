@@ -73,6 +73,32 @@ export type RelationshipRepository = {
     investorOrganisationId: InvestorOrganisationId,
     limit: number,
   ) => Promise<readonly Relationship[]>;
+  /**
+   * The projector's write (CQ-NET-012), and the only writer of
+   * `current_state`. Applied only when the fold reaches further than the
+   * cached one, or equally far under another projector version (a
+   * rebuild): a replayed or out-of-order projection can never move the
+   * cache backwards. True when the row changed.
+   */
+  readonly recordProjection: (
+    executor: DatabaseExecutor,
+    input: {
+      readonly relationshipId: RelationshipId;
+      readonly state: string;
+      readonly stateSince: string;
+      readonly throughSequence: number;
+      readonly version: string;
+    },
+  ) => Promise<boolean>;
+  /** Keyset page of relationship ids, optionally only those whose projection is behind. */
+  readonly listIdsForProjection: (
+    executor: DatabaseExecutor,
+    page: {
+      readonly after: RelationshipId | null;
+      readonly limit: number;
+      readonly onlyBehind: boolean;
+    },
+  ) => Promise<readonly RelationshipId[]>;
 };
 
 export type NewRelationshipEvent = {

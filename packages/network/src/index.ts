@@ -133,6 +133,28 @@ export {
   type RespondToInterestResult,
 } from "./application/respond-to-interest.js";
 export {
+  createRelationshipStateProjector,
+  readHistory,
+  type RelationshipStateProjector,
+} from "./application/relationship-projection.js";
+export {
+  createRelationshipForCompany,
+  createRelationshipForInvestor,
+  toRelationshipStatusDto,
+  type RelationshipStatus,
+} from "./application/relationship-status.js";
+export {
+  nextStepFor,
+  projectRelationshipState,
+  RELATIONSHIP_PROJECTOR_VERSION,
+  RELATIONSHIP_STATE_TRANSITIONS,
+  visibleToParty,
+  type ProjectableEvent,
+  type RelationshipNextStep,
+  type RelationshipParty,
+  type RelationshipProjection,
+} from "./domain/state-projector.js";
+export {
   createInterestService,
   createNetworkService,
   type InterestService,

@@ -39,6 +39,9 @@ import { NETWORK_EVENTS } from "../src/events/index.js";
 import {
   createInterestService,
   createNetworkService,
+  createPostgresRelationshipEventRepository,
+  createPostgresRelationshipRepository,
+  createRelationshipStateProjector,
   InterestAlreadyAnsweredError,
   InterestCompanyNotFoundError,
   InterestIdempotencyConflictError,
@@ -810,6 +813,191 @@ describe("Express Interest against local PostgreSQL", () => {
       expect(own?.response?.decision).toBe("DECLINED");
       expect(own?.connection).toBeNull();
     });
+  });
+
+  // -------------------------------------------------------------------------
+  // CQ-NET-012: the state projection, and "where are we"
+  // -------------------------------------------------------------------------
+
+  it("projects state from history: idempotent, compare-and-set, rebuildable, and each party sees only its own history", async () => {
+    await withWorld(async (world) => {
+      const {
+        tx,
+        interests,
+        founder,
+        otherFounder,
+        investorRep,
+        companyA,
+        investorA,
+      } = world;
+      const relationships = createPostgresRelationshipRepository();
+      const projector = createRelationshipStateProjector({
+        sql: tx.sql,
+        repositories: {
+          relationships,
+          events: createPostgresRelationshipEventRepository(),
+        },
+      });
+      const cached = async (relationshipId: string) =>
+        (
+          await tx.sql<
+            {
+              current_state: string;
+              projected_sequence: number;
+              projector_version: string;
+              state_updated_at: Date;
+            }[]
+          >`
+            select current_state, projected_sequence::int as projected_sequence,
+                   projector_version, state_updated_at
+              from network.relationships where id = ${relationshipId}`
+        )[0];
+
+      const interest = await expressed(world);
+      const relationshipId = interest.relationshipId;
+
+      // Nothing projected yet: the command wrote history, not state.
+      expect(await cached(relationshipId)).toMatchObject({
+        current_state: "DISCOVERED",
+        projected_sequence: 0,
+        projector_version: "none",
+      });
+
+      // Each party's view is folded from what that party may read.
+      expect(
+        await interests.relationshipForCompany({
+          actor: founder,
+          investorOrganisationId: investorA,
+        }),
+      ).toMatchObject({
+        projection: { state: "INTEREST_EXPRESSED" },
+        nextStep: "ANSWER_INTEREST",
+      });
+      const investorView = await interests.relationshipForInvestor({
+        actor: investorRep,
+        companyId: companyA,
+      });
+      expect(investorView).toMatchObject({
+        projection: { state: "INTEREST_EXPRESSED" },
+        nextStep: "AWAIT_ANSWER",
+      });
+      // The investor's story starts at its private discovery; the company's does not.
+      expect(investorView?.projection.milestones.map((m) => m.state)).toEqual([
+        "DISCOVERED",
+        "INTEREST_EXPRESSED",
+      ]);
+      expect(
+        await interests.relationshipForCompany({
+          actor: otherFounder,
+          investorOrganisationId: investorA,
+        }),
+      ).toBeNull();
+
+      await interests.respondToInterest({
+        actor: founder,
+        interestId: interest.id,
+        decision: "ACCEPTED",
+        surface: "INBOX",
+        idempotencyKey: `answer:${randomUUID()}`,
+        correlationId: CORRELATION(),
+      });
+
+      // The projector folds the whole history, once.
+      const first = await projector.project(relationshipId);
+      expect(first.changed).toBe(true);
+      expect(first.projection?.state).toBe("CONNECTED");
+      const row = await cached(relationshipId);
+      expect(row).toMatchObject({
+        current_state: "CONNECTED",
+        projected_sequence: 3,
+        projector_version: "relationship-state.v1",
+      });
+      expect(row?.state_updated_at.toISOString()).toBe(
+        first.projection?.stateSince,
+      );
+
+      // Replay: nothing changes.
+      expect((await projector.project(relationshipId)).changed).toBe(false);
+
+      // A late, shorter fold can never move the cache backwards.
+      expect(
+        await relationships.recordProjection(tx.sql, {
+          relationshipId,
+          state: "INTEREST_EXPRESSED",
+          stateSince: new Date().toISOString(),
+          throughSequence: 2,
+          version: "relationship-state.v1",
+        }),
+      ).toBe(false);
+      expect((await cached(relationshipId))?.current_state).toBe("CONNECTED");
+
+      // Rebuild from history: wipe the cache (as a new projector version
+      // would find it) and fold again.
+      await tx.sql`
+        update network.relationships
+           set current_state = 'DISCOVERED', projected_sequence = 0, projector_version = 'none'
+         where id = ${relationshipId}`;
+      const rebuilt = await projector.rebuild({ batchSize: 50 });
+      expect(rebuilt.scanned).toBeGreaterThanOrEqual(1);
+      expect(await cached(relationshipId)).toMatchObject({
+        current_state: "CONNECTED",
+        projected_sequence: 3,
+      });
+
+      // Both parties now read connected, and the same next step.
+      for (const view of [
+        await interests.relationshipForCompany({
+          actor: founder,
+          investorOrganisationId: investorA,
+        }),
+        await interests.relationshipForInvestor({
+          actor: investorRep,
+          companyId: companyA,
+        }),
+      ]) {
+        expect(view).toMatchObject({
+          projection: { state: "CONNECTED" },
+          nextStep: "SCHEDULE_MEETING",
+        });
+      }
+    });
+  });
+
+  it("an investor's private discovery is nothing to the company", async () => {
+    await withWorld(
+      async ({
+        network,
+        interests,
+        founder,
+        investorRep,
+        companyA,
+        investorA,
+      }) => {
+        await network.ensureRelationship({
+          actor: investorRep,
+          companyId: companyA,
+          investorOrganisationId: investorA,
+          source: { type: "DISCOVER" },
+          visibilityScope: "investor_private",
+          correlationId: CORRELATION(),
+        });
+        expect(
+          await interests.relationshipForCompany({
+            actor: founder,
+            investorOrganisationId: investorA,
+          }),
+        ).toBeNull();
+        expect(
+          await interests.relationshipForInvestor({
+            actor: investorRep,
+            companyId: companyA,
+          }),
+        ).toMatchObject({
+          projection: { state: "DISCOVERED" },
+          nextStep: "EXPRESS_INTEREST",
+        });
+      },
+    );
   });
 
   it("only the company's own members with the capability may see or answer; everyone else writes nothing", async () => {
