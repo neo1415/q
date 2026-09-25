@@ -217,6 +217,25 @@ describe("barge-in", () => {
     expect(player.queued.length).toBe(before + 1);
   });
 
+  it("plays a reply the agent goes on speaking, rather than silencing it for good (answers but doesn't talk)", async () => {
+    // Live: Q's words on screen and no sound. The agent did not take the
+    // sound as an interruption and kept speaking the same reply, with no
+    // new announcement; the browser dropped all of it.
+    const { session, player } = await started();
+    qIsTalking(session);
+    act(() => {
+      session.emit("user-started-speaking");
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1_000);
+    });
+    const before = player.queued.length;
+    act(() => {
+      session.emit("audio", new ArrayBuffer(8));
+    });
+    expect(player.queued.length).toBe(before + 1);
+  });
+
   it("does not inject the go-on cue while the person is still talking", async () => {
     const { session } = await started();
     qIsTalking(session);

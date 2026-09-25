@@ -9,7 +9,6 @@ import {
   CreateQVoiceSessionRequestSchema,
   CreateQVoiceSessionResponseSchema,
   parseContract,
-  Q_SPEECH_MAX_CHARS,
   Q_VOICE_SESSIONS_PATH,
   Q_VOICE_SPEECH_PATH,
   Q_VOICE_TURN_PATH,
@@ -35,6 +34,14 @@ import {
 import type { Interviewer } from "./interviewer.js";
 import type { RealtimeVoiceProvider } from "./provider.js";
 import { bounded, speakable } from "./speech.js";
+
+/**
+ * The most the speak relay voices in one request: a whole spoken answer
+ * (`SPOKEN_MAX_CHARS`, 1,200) and a line after it, such as a look-up
+ * offered and the question it returns to. 2,000 is also the most Aura-2,
+ * the last-resort voice, takes in one request.
+ */
+const RELAY_MAX_CHARS = 2_000;
 import type {
   DeepgramAgentSettings,
   DeepgramVoiceProvider,
@@ -295,7 +302,16 @@ export function registerQVoiceRoutes(
         typeof (body as { text?: unknown }).text === "string"
           ? (body as { text: string }).text
           : "";
-      if (text.trim().length === 0 || text.length > Q_SPEECH_MAX_CHARS) {
+      // Bounded by what Q can say in one turn, not by the one-way speech
+      // route's per-request limit. The agent decides how much text it asks
+      // for at once, and a whole spoken answer (up to SPOKEN_MAX_CHARS) sent
+      // as one request used to be refused here: Q's words on screen, no
+      // sound, and nothing in the log.
+      if (text.trim().length === 0 || text.length > RELAY_MAX_CHARS) {
+        request.log.warn(
+          { reason: "SPEAK_TEXT_OUT_OF_BOUNDS", characters: text.length },
+          "voice speak relay refused",
+        );
         return reply.code(400).send({
           type: "about:blank",
           title: "Bad Request",
