@@ -452,7 +452,7 @@ export const MOVER: Readonly<Record<string, string>> = {
   "I0.organisation_name": "Harrow Road Capital",
   "I0.business_title": "managing partner",
   "I1.deployment_status": "actively investing",
-  "I1.mandate_context": "no document, let's skip that",
+  "I1.mandate_context": "this is my main investment strategy",
   "I2.stages": "pre-seed and seed",
   "I2.currency": "US dollars",
   "I2.cheque_min": "25 thousand",

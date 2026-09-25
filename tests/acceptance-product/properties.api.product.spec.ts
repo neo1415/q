@@ -16,6 +16,8 @@ import {
   artifactsFor,
   closeDb,
   lastQStep,
+  openSteps,
+  unfinishedSteps,
   mandateFor,
   read,
   runsFor,
@@ -161,24 +163,32 @@ function done(interview: Interview): boolean {
 }
 
 /**
- * The mover is a fixture DRIVER (it only walks the interview to the state a
- * property needs), so it answers what Q asked, the way a person reading
- * the screen would. Neither the session cursor nor the persisted turn's
- * step says what Q asked (baseline finding: cursor on I0.business_title
- * while Q asks "Maximum cheque: 100,000. Is that right?"; the say response
- * does not expose Q's `asking`). So a confirmation question is answered
- * with a yes, and anything else with the cursor step's fixture value.
- * Properties are never judged through the mover's own turns.
+ * The mover is a fixture DRIVER: it only walks the interview to the state a
+ * property needs, and no property is judged through its turns.
+ *
+ * It works from RECORDED STATE, not from what Q happens to be asking. Until
+ * the turn response exposes Q's `asking` (approved, E3 owns it), neither
+ * the session cursor nor a persisted turn's step says what Q asked. On the
+ * tool-calling loop Q picks the question itself, and it can record an
+ * answer to any step in any turn. So the mover acts like a person working
+ * through their own list: it volunteers the first step that is neither
+ * completed nor skipped, and it answers a plain confirmation question
+ * ("Is that right?", "Does it look right?") with a yes.
  */
-function moverAnswer(step: string, lastReply: string): string {
-  if (/\bis that right\?\s*$/i.test(lastReply.trim()))
+function moverAnswer(next: string, lastReply: string): string {
+  if (
+    /\b(is that right|does (that|this|it) look right|is that correct)\?\s*$/i.test(
+      lastReply.trim(),
+    )
+  )
     return "yes, that's right";
-  return MOVER[step] ?? "skip that one";
+  return MOVER[next] ?? "skip that one";
 }
 
 /**
  * Walk the interview with plain answers until `stop` holds or it completes.
- * Throws a capability failure when Q asks the same step four times running.
+ * A stall is the same next step with nothing new recorded four turns
+ * running; that is a capability failure (the plain answer is not taken).
  */
 async function move(
   interview: Interview,
@@ -187,24 +197,38 @@ async function move(
   let same = 0;
   let previous: string | null = null;
   let recordedBefore = -1;
+  // An OPTIONAL step Q leaves open after the person declines it is
+  // legitimately unknown ("I'll leave sectors-to-avoid blank"), so after one
+  // attempt the mover moves on. Only a REQUIRED step can stall.
+  const attempts = new Map<string, number>();
+  const leftOpen = new Set<string>();
   for (let i = 0; i < (options.maxTurns ?? 40); i += 1) {
     if (done(interview)) return;
-    const step = await askedStep(interview);
-    if (step === null) return;
-    if (options.stop?.(step) === true) return;
-    // A stall is the same step with nothing new recorded: the cursor can
-    // sit still while Q confirms and records other facts.
+    const open = (await openSteps(interview.sessionId)).filter(
+      (s) => !leftOpen.has(s.step),
+    );
+    const next = open[0] ?? null;
+    if (next === null) return;
+    if (options.stop?.(next.step) === true) return;
     const recordedNow = (await answers(interview.sessionId)).size;
-    same = step === previous && recordedNow === recordedBefore ? same + 1 : 0;
-    previous = step;
+    same =
+      next.step === previous && recordedNow === recordedBefore ? same + 1 : 0;
+    previous = next.step;
     recordedBefore = recordedNow;
+    const tried = (attempts.get(next.step) ?? 0) + 1;
+    attempts.set(next.step, tried);
+    if (!next.required && tried > 1) {
+      leftOpen.add(next.step);
+      note("optional step left open", next.step);
+      continue;
+    }
     if (same >= 3) {
       note("transcript", transcript(interview));
       throw new Error(
-        `CAPABILITY: progress past a step with a plain answer — Q asked ${step} four times running`,
+        `CAPABILITY: take a plain answer — required ${next.step} still open after four turns answering it`,
       );
     }
-    await interview.say(moverAnswer(step, interview.lastReply));
+    await interview.say(moverAnswer(next.step, interview.lastReply));
   }
 }
 
@@ -386,14 +410,23 @@ test.describe("P4 persisted exclusions are not re-asked; mandate-ready settles",
       await setup(interview, INVESTOR_SETUP);
       if (c.when === "early") await interview.say(c.say);
       else {
-        await move(interview, { stop: (s) => s.startsWith("I7.") });
+        // "At the exclusion question": the first open step is an exclusion
+        // step (recorded state; Q's own `asking` is not exposed yet).
+        await move(interview, {
+          stop: (s) => s.startsWith("I7."),
+          maxTurns: 70,
+        });
+        // The mover stops at the first open exclusion step once the optional
+        // steps it declined are set aside; an exclusion step must be open.
         expect(
-          await askedStep(interview),
+          (await unfinishedSteps(interview.sessionId)).filter((s) =>
+            s.startsWith("I7."),
+          ),
           "CAPABILITY: reach the exclusion question",
-        ).toMatch(/^I7\./);
+        ).not.toEqual([]);
         await interview.say(c.say);
       }
-      await move(interview, { maxTurns: 45 });
+      await move(interview, { maxTurns: 70 });
       note("transcript", transcript(interview));
 
       const persisted = await read<{ at: string }>(
@@ -407,6 +440,11 @@ test.describe("P4 persisted exclusions are not re-asked; mandate-ready settles",
         at,
         `CAPABILITY: record "${c.code}" as an exclusion from the person's phrasing`,
       ).not.toBeNull();
+      // Re-asks and handoff repeats are read from the step key on Q's
+      // persisted turns. On the tool-calling loop that key is the session
+      // cursor, not what Q asked, so until the turn response carries Q's
+      // `asking` these are REPORTED, not asserted. Loops are still caught
+      // by the mover's stall check and by the completion assertion below.
       if (at !== null) {
         const reasked = await read<{ step_key: string; text: string }>(
           `select step_key, left(text, 160) text from onboarding.interview_turns
@@ -415,24 +453,20 @@ test.describe("P4 persisted exclusions are not re-asked; mandate-ready settles",
             order by created_at`,
           [interview.sessionId, at],
         );
-        expect
-          .soft(
-            reasked.map((r) => `${r.step_key}: ${r.text}`),
-            "CAPABILITY: know an exclusion is already answered across the exclusion representations",
-          )
-          .toEqual([]);
+        note(
+          "exclusion-step turns after persistence (cursor-keyed, unasserted)",
+          reasked.map((r) => `${r.step_key}: ${r.text}`).join("\n") || "none",
+        );
       }
       const handoffAsks = await read<{ n: string }>(
         `select count(*)::text n from onboarding.interview_turns
           where session_id = $1 and role = 'Q' and step_key = 'I12.handoff'`,
         [interview.sessionId],
       );
-      expect
-        .soft(
-          Number(handoffAsks[0]?.n ?? 0),
-          "CAPABILITY: settle 'mandate ready' without looping",
-        )
-        .toBeLessThanOrEqual(2);
+      note(
+        "handoff-keyed Q turns (cursor-keyed, unasserted)",
+        handoffAsks[0]?.n ?? "0",
+      );
       expect
         .soft(
           done(interview),
@@ -624,17 +658,21 @@ test.describe("interview completion", () => {
   test("plain answers complete the interview into an ACTIVE mandate", async () => {
     const interview = await start("complete");
     await setup(interview, INVESTOR_SETUP);
-    await move(interview, { maxTurns: 50 });
+    await move(interview, { maxTurns: 70 });
     note("transcript", transcript(interview));
     const mandate = await mandateFor(interview.who.email);
+    // Two separate outcomes: the mandate is confirmed (ACTIVE), and the
+    // onboarding session itself is marked complete. Returning-person
+    // routing and "who am I" read the session, so both matter.
+    expect
+      .soft(mandate.status, "CAPABILITY: completion yields an ACTIVE mandate")
+      .toBe("ACTIVE");
     expect(
       done(interview),
-      "CAPABILITY: complete the interview with plain answers",
+      mandate.status === "ACTIVE"
+        ? "CAPABILITY: mark the onboarding session completed once the mandate is confirmed (mandate ACTIVE, session still open)"
+        : "CAPABILITY: complete the interview with plain answers",
     ).toBe(true);
-    expect(
-      mandate.status,
-      "CAPABILITY: completion yields an ACTIVE mandate",
-    ).toBe("ACTIVE");
   });
 });
 

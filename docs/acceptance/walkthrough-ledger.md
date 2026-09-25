@@ -243,3 +243,28 @@ Suite: `tests/acceptance-product/` (projects `static`, `api`, `ui`). Many unseen
 | Voice barge-in | deferred | needs the deployed stack (live audio) |
 
 Structural finding: the say response exposes `view.currentStep` (the cursor), not Q's `asking`. The cursor diverges from the question Q actually asks (for example, the cursor sits on I0.business_title while Q asks "Maximum cheque: 100,000. Is that right?"). The web's answer chips follow the cursor.
+
+## Property suite — ADR 0016 tool-calling loop (acc-suite-v2 = fe23440 + suite, 2026-09-25)
+
+Same suite, with the lead's oracle: an explicit value must be recorded that turn and read back. Latest run per case; P4, completion and the P3 directive were re-run after driver fixes and 503s.
+
+| Property | Legacy | Loop | Missing capability on the loop |
+|---|---|---|---|
+| static wording rules | 2/3 | 2/3 | same two hits (turn-reader.v3:32, investor-mandate-synthesis.v2:56); interview-agent prompts clean |
+| P1 explicit corrections | 2/7 | 7/7 | — |
+| P2 question + answer + correction | 0/5 | 5/5 | — |
+| P3 acceptance authorises | 1/6 | 5/6 | "Pick three … go with those": Q picks three, then asks "preference or hard exclusion?" instead of executing the delegation |
+| P4 exclusions (recorded, carried into mandate) | 0/5 | 5/5 recorded; 0/5 overall | session never marked COMPLETED (see completion). Re-ask check is cursor-keyed and unasserted until `asking` lands |
+| P5 advisory ≠ preference | 6/6 | 4/6 | an advisory turn writes facts nobody stated: `I2.cheque_typical = 62500` (the midpoint of 25k–100k) and `I0.business_title = "Angel investor"` |
+| P7 leave and return | 5/5 | 1/5 | the tangent turn writes the same unstated facts; the return itself works |
+| P8 oblique phrasing | 1/7 | 5/7 | "helps smallholder farmers grow more food" → "couldn't record that as a sector category"; "employer's venture arm, a big telco" → nothing recorded |
+| D1 synthesis | 1/1 | 1/1 | — |
+| Interview completion | 0/1 | 0/1 | mandate ACTIVE and every required step COMPLETED, but `onboarding.sessions.status` stays ACTIVE (cursor on an open optional step) |
+| Home (who am I, memory ×3, Zino deck, interrupt) | 6/6 | 6/6 | — |
+| Home D5 fit candidates | 0/1 | 0/1 | names none |
+| Home P6 mandate/thesis PDF | 0/3 | 0/3 | unchanged (separate owner) |
+| UI continuity (4) | 4/4 | 4/4 | — |
+
+Loop reliability (these are defects, not flakes): an OpenAI attempt ran 5.5 min before TIMEOUT against a 12 s attempt budget. The Gemini fallback then refuses the tool-calling history ("Function call is missing a thought_signature … `record_answers`"), so a luna failure mid-interview reaches the person as HTTP 503 (4 across the runs). Two other stalls were Modern Standby (09:38–10:35, and earlier 06:04–06:22).
+
+Declining an optional step ("no preference", "nothing to avoid") leaves it open rather than skipped. Q says so honestly ("I'll leave sector avoidances open"), so the mover sets such steps aside.

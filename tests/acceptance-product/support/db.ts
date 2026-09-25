@@ -93,6 +93,33 @@ export async function lastQStep(sessionId: string): Promise<string | null> {
   return rows[0]?.step_key ?? null;
 }
 
+/**
+ * Steps neither completed nor skipped, in the definition's order. This is
+ * recorded state, so it stays meaningful when Q (not a cursor) chooses what
+ * to ask next.
+ */
+export async function unfinishedSteps(sessionId: string): Promise<string[]> {
+  return (await openSteps(sessionId)).map((s) => s.step);
+}
+
+/** As `unfinishedSteps`, with whether the definition requires each one. */
+export async function openSteps(
+  sessionId: string,
+): Promise<{ step: string; required: boolean }[]> {
+  const rows = await read<{ step_key: string; required: boolean }>(
+    `select st.step_key, st.required
+       from onboarding.sessions s
+       join onboarding.steps st on st.definition_version_id = s.definition_version_id
+       left join onboarding.step_states ss
+              on ss.session_id = s.id and ss.step_key = st.step_key
+      where s.id = $1
+        and coalesce(ss.status, 'NOT_STARTED') not in ('COMPLETED', 'SKIPPED')
+      order by st.sequence_order`,
+    [sessionId],
+  );
+  return rows.map((r) => ({ step: r.step_key, required: r.required }));
+}
+
 /** Current (non-superseded) responses by step key. */
 export async function responses(
   sessionId: string,
