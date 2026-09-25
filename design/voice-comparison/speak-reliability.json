@@ -1,0 +1,758 @@
+{
+  "subscription": {
+    "tier": "creator",
+    "used": 16767,
+    "limit": 131000
+  },
+  "summary": [
+    {
+      "engine": "el-v3-conversational",
+      "requests": 24,
+      "failures": 0,
+      "ttfaP50": 307,
+      "ttfaP95": 464,
+      "totalP50": 910,
+      "statuses": []
+    },
+    {
+      "engine": "el-turbo-v2.5",
+      "requests": 24,
+      "failures": 0,
+      "ttfaP50": 338,
+      "ttfaP95": 512,
+      "totalP50": 517,
+      "statuses": []
+    },
+    {
+      "engine": "dg-aura-2",
+      "requests": 24,
+      "failures": 0,
+      "ttfaP50": 397,
+      "ttfaP95": 609,
+      "totalP50": 2055,
+      "statuses": []
+    }
+  ],
+  "rows": [
+    {
+      "engine": "el-v3-conversational",
+      "round": 0,
+      "chars": 27,
+      "ok": true,
+      "status": 200,
+      "ttfaMs": 307,
+      "totalMs": 789,
+      "bytes": 96000
+    },
+    {
+      "engine": "el-turbo-v2.5",
+      "round": 0,
+      "chars": 27,
+      "ok": true,
+      "status": 200,
+      "ttfaMs": 346,
+      "totalMs": 586,
+      "bytes": 62416
+    },
+    {
+      "engine": "dg-aura-2",
+      "round": 0,
+      "chars": 27,
+      "ok": true,
+      "status": 200,
+      "ttfaMs": 394,
+      "totalMs": 1507,
+      "bytes": 90240
+    },
+    {
+      "engine": "el-v3-conversational",
+      "round": 0,
+      "chars": 68,
+      "ok": true,
+      "status": 200,
+      "ttfaMs": 288,
+      "totalMs": 904,
+      "bytes": 222720
+    },
+    {
+      "engine": "el-turbo-v2.5",
+      "round": 0,
+      "chars": 68,
+      "ok": true,
+      "status": 200,
+      "ttfaMs": 327,
+      "totalMs": 623,
+      "bytes": 198392
+    },
+    {
+      "engine": "dg-aura-2",
+      "round": 0,
+      "chars": 68,
+      "ok": true,
+      "status": 200,
+      "ttfaMs": 407,
+      "totalMs": 2055,
+      "bytes": 178560
+    },
+    {
+      "engine": "el-v3-conversational",
+      "round": 0,
+      "chars": 76,
+      "ok": true,
+      "status": 200,
+      "ttfaMs": 257,
+      "totalMs": 1035,
+      "bytes": 288000
+    },
+    {
+      "engine": "el-turbo-v2.5",
+      "round": 0,
+      "chars": 76,
+      "ok": true,
+      "status": 200,
+      "ttfaMs": 397,
+      "totalMs": 573,
+      "bytes": 225140
+    },
+    {
+      "engine": "dg-aura-2",
+      "round": 0,
+      "chars": 76,
+      "ok": true,
+      "status": 200,
+      "ttfaMs": 424,
+      "totalMs": 2578,
+      "bytes": 234240
+    },
+    {
+      "engine": "el-v3-conversational",
+      "round": 0,
+      "chars": 73,
+      "ok": true,
+      "status": 200,
+      "ttfaMs": 305,
+      "totalMs": 936,
+      "bytes": 238080
+    },
+    {
+      "engine": "el-turbo-v2.5",
+      "round": 0,
+      "chars": 73,
+      "ok": true,
+      "status": 200,
+      "ttfaMs": 340,
+      "totalMs": 456,
+      "bytes": 213996
+    },
+    {
+      "engine": "dg-aura-2",
+      "round": 0,
+      "chars": 73,
+      "ok": true,
+      "status": 200,
+      "ttfaMs": 397,
+      "totalMs": 2400,
+      "bytes": 213120
+    },
+    {
+      "engine": "el-v3-conversational",
+      "round": 0,
+      "chars": 38,
+      "ok": true,
+      "status": 200,
+      "ttfaMs": 305,
+      "totalMs": 741,
+      "bytes": 138240
+    },
+    {
+      "engine": "el-turbo-v2.5",
+      "round": 0,
+      "chars": 38,
+      "ok": true,
+      "status": 200,
+      "ttfaMs": 393,
+      "totalMs": 437,
+      "bytes": 102540
+    },
+    {
+      "engine": "dg-aura-2",
+      "round": 0,
+      "chars": 38,
+      "ok": true,
+      "status": 200,
+      "ttfaMs": 413,
+      "totalMs": 1300,
+      "bytes": 97920
+    },
+    {
+      "engine": "el-v3-conversational",
+      "round": 0,
+      "chars": 34,
+      "ok": true,
+      "status": 200,
+      "ttfaMs": 283,
+      "totalMs": 623,
+      "bytes": 115200
+    },
+    {
+      "engine": "el-turbo-v2.5",
+      "round": 0,
+      "chars": 34,
+      "ok": true,
+      "status": 200,
+      "ttfaMs": 272,
+      "totalMs": 502,
+      "bytes": 93622
+    },
+    {
+      "engine": "dg-aura-2",
+      "round": 0,
+      "chars": 34,
+      "ok": true,
+      "status": 200,
+      "ttfaMs": 390,
+      "totalMs": 1380,
+      "bytes": 109440
+    },
+    {
+      "engine": "el-v3-conversational",
+      "round": 0,
+      "chars": 51,
+      "ok": true,
+      "status": 200,
+      "ttfaMs": 308,
+      "totalMs": 802,
+      "bytes": 134400
+    },
+    {
+      "engine": "el-turbo-v2.5",
+      "round": 0,
+      "chars": 51,
+      "ok": true,
+      "status": 200,
+      "ttfaMs": 318,
+      "totalMs": 717,
+      "bytes": 124830
+    },
+    {
+      "engine": "dg-aura-2",
+      "round": 0,
+      "chars": 51,
+      "ok": true,
+      "status": 200,
+      "ttfaMs": 368,
+      "totalMs": 1548,
+      "bytes": 128640
+    },
+    {
+      "engine": "el-v3-conversational",
+      "round": 0,
+      "chars": 76,
+      "ok": true,
+      "status": 200,
+      "ttfaMs": 356,
+      "totalMs": 1165,
+      "bytes": 245760
+    },
+    {
+      "engine": "el-turbo-v2.5",
+      "round": 0,
+      "chars": 76,
+      "ok": true,
+      "status": 200,
+      "ttfaMs": 303,
+      "totalMs": 510,
+      "bytes": 205078
+    },
+    {
+      "engine": "dg-aura-2",
+      "round": 0,
+      "chars": 76,
+      "ok": true,
+      "status": 200,
+      "ttfaMs": 374,
+      "totalMs": 2308,
+      "bytes": 209280
+    },
+    {
+      "engine": "el-v3-conversational",
+      "round": 1,
+      "chars": 27,
+      "ok": true,
+      "status": 200,
+      "ttfaMs": 269,
+      "totalMs": 666,
+      "bytes": 96000
+    },
+    {
+      "engine": "el-turbo-v2.5",
+      "round": 1,
+      "chars": 27,
+      "ok": true,
+      "status": 200,
+      "ttfaMs": 300,
+      "totalMs": 314,
+      "bytes": 62416
+    },
+    {
+      "engine": "dg-aura-2",
+      "round": 1,
+      "chars": 27,
+      "ok": true,
+      "status": 200,
+      "ttfaMs": 397,
+      "totalMs": 1186,
+      "bytes": 90240
+    },
+    {
+      "engine": "el-v3-conversational",
+      "round": 1,
+      "chars": 68,
+      "ok": true,
+      "status": 200,
+      "ttfaMs": 353,
+      "totalMs": 865,
+      "bytes": 245760
+    },
+    {
+      "engine": "el-turbo-v2.5",
+      "round": 1,
+      "chars": 68,
+      "ok": true,
+      "status": 200,
+      "ttfaMs": 408,
+      "totalMs": 513,
+      "bytes": 180558
+    },
+    {
+      "engine": "dg-aura-2",
+      "round": 1,
+      "chars": 68,
+      "ok": true,
+      "status": 200,
+      "ttfaMs": 417,
+      "totalMs": 2288,
+      "bytes": 205440
+    },
+    {
+      "engine": "el-v3-conversational",
+      "round": 1,
+      "chars": 76,
+      "ok": true,
+      "status": 200,
+      "ttfaMs": 372,
+      "totalMs": 1189,
+      "bytes": 238080
+    },
+    {
+      "engine": "el-turbo-v2.5",
+      "round": 1,
+      "chars": 76,
+      "ok": true,
+      "status": 200,
+      "ttfaMs": 296,
+      "totalMs": 517,
+      "bytes": 220682
+    },
+    {
+      "engine": "dg-aura-2",
+      "round": 1,
+      "chars": 76,
+      "ok": true,
+      "status": 200,
+      "ttfaMs": 373,
+      "totalMs": 2441,
+      "bytes": 226560
+    },
+    {
+      "engine": "el-v3-conversational",
+      "round": 1,
+      "chars": 73,
+      "ok": true,
+      "status": 200,
+      "ttfaMs": 310,
+      "totalMs": 1132,
+      "bytes": 241920
+    },
+    {
+      "engine": "el-turbo-v2.5",
+      "round": 1,
+      "chars": 73,
+      "ok": true,
+      "status": 200,
+      "ttfaMs": 417,
+      "totalMs": 772,
+      "bytes": 205078
+    },
+    {
+      "engine": "dg-aura-2",
+      "round": 1,
+      "chars": 73,
+      "ok": true,
+      "status": 200,
+      "ttfaMs": 465,
+      "totalMs": 2349,
+      "bytes": 216960
+    },
+    {
+      "engine": "el-v3-conversational",
+      "round": 1,
+      "chars": 38,
+      "ok": true,
+      "status": 200,
+      "ttfaMs": 464,
+      "totalMs": 842,
+      "bytes": 134400
+    },
+    {
+      "engine": "el-turbo-v2.5",
+      "round": 1,
+      "chars": 38,
+      "ok": true,
+      "status": 200,
+      "ttfaMs": 338,
+      "totalMs": 396,
+      "bytes": 100310
+    },
+    {
+      "engine": "dg-aura-2",
+      "round": 1,
+      "chars": 38,
+      "ok": true,
+      "status": 200,
+      "ttfaMs": 374,
+      "totalMs": 1332,
+      "bytes": 107520
+    },
+    {
+      "engine": "el-v3-conversational",
+      "round": 1,
+      "chars": 34,
+      "ok": true,
+      "status": 200,
+      "ttfaMs": 293,
+      "totalMs": 707,
+      "bytes": 126720
+    },
+    {
+      "engine": "el-turbo-v2.5",
+      "round": 1,
+      "chars": 34,
+      "ok": true,
+      "status": 200,
+      "ttfaMs": 366,
+      "totalMs": 407,
+      "bytes": 95852
+    },
+    {
+      "engine": "dg-aura-2",
+      "round": 1,
+      "chars": 34,
+      "ok": true,
+      "status": 200,
+      "ttfaMs": 511,
+      "totalMs": 1431,
+      "bytes": 111360
+    },
+    {
+      "engine": "el-v3-conversational",
+      "round": 1,
+      "chars": 51,
+      "ok": true,
+      "status": 200,
+      "ttfaMs": 308,
+      "totalMs": 1027,
+      "bytes": 161280
+    },
+    {
+      "engine": "el-turbo-v2.5",
+      "round": 1,
+      "chars": 51,
+      "ok": true,
+      "status": 200,
+      "ttfaMs": 371,
+      "totalMs": 629,
+      "bytes": 120372
+    },
+    {
+      "engine": "dg-aura-2",
+      "round": 1,
+      "chars": 51,
+      "ok": true,
+      "status": 200,
+      "ttfaMs": 391,
+      "totalMs": 1627,
+      "bytes": 130560
+    },
+    {
+      "engine": "el-v3-conversational",
+      "round": 1,
+      "chars": 76,
+      "ok": true,
+      "status": 200,
+      "ttfaMs": 301,
+      "totalMs": 1089,
+      "bytes": 226560
+    },
+    {
+      "engine": "el-turbo-v2.5",
+      "round": 1,
+      "chars": 76,
+      "ok": true,
+      "status": 200,
+      "ttfaMs": 438,
+      "totalMs": 1125,
+      "bytes": 247432
+    },
+    {
+      "engine": "dg-aura-2",
+      "round": 1,
+      "chars": 76,
+      "ok": true,
+      "status": 200,
+      "ttfaMs": 609,
+      "totalMs": 2952,
+      "bytes": 249600
+    },
+    {
+      "engine": "el-v3-conversational",
+      "round": 2,
+      "chars": 27,
+      "ok": true,
+      "status": 200,
+      "ttfaMs": 532,
+      "totalMs": 1084,
+      "bytes": 92160
+    },
+    {
+      "engine": "el-turbo-v2.5",
+      "round": 2,
+      "chars": 27,
+      "ok": true,
+      "status": 200,
+      "ttfaMs": 512,
+      "totalMs": 809,
+      "bytes": 71332
+    },
+    {
+      "engine": "dg-aura-2",
+      "round": 2,
+      "chars": 27,
+      "ok": true,
+      "status": 200,
+      "ttfaMs": 423,
+      "totalMs": 1305,
+      "bytes": 96000
+    },
+    {
+      "engine": "el-v3-conversational",
+      "round": 2,
+      "chars": 68,
+      "ok": true,
+      "status": 200,
+      "ttfaMs": 286,
+      "totalMs": 910,
+      "bytes": 215040
+    },
+    {
+      "engine": "el-turbo-v2.5",
+      "round": 2,
+      "chars": 68,
+      "ok": true,
+      "status": 200,
+      "ttfaMs": 292,
+      "totalMs": 551,
+      "bytes": 213996
+    },
+    {
+      "engine": "dg-aura-2",
+      "round": 2,
+      "chars": 68,
+      "ok": true,
+      "status": 200,
+      "ttfaMs": 393,
+      "totalMs": 2100,
+      "bytes": 186240
+    },
+    {
+      "engine": "el-v3-conversational",
+      "round": 2,
+      "chars": 76,
+      "ok": true,
+      "status": 200,
+      "ttfaMs": 318,
+      "totalMs": 919,
+      "bytes": 249600
+    },
+    {
+      "engine": "el-turbo-v2.5",
+      "round": 2,
+      "chars": 76,
+      "ok": true,
+      "status": 200,
+      "ttfaMs": 322,
+      "totalMs": 525,
+      "bytes": 207308
+    },
+    {
+      "engine": "dg-aura-2",
+      "round": 2,
+      "chars": 76,
+      "ok": true,
+      "status": 200,
+      "ttfaMs": 1070,
+      "totalMs": 3168,
+      "bytes": 226560
+    },
+    {
+      "engine": "el-v3-conversational",
+      "round": 2,
+      "chars": 73,
+      "ok": true,
+      "status": 200,
+      "ttfaMs": 269,
+      "totalMs": 980,
+      "bytes": 264960
+    },
+    {
+      "engine": "el-turbo-v2.5",
+      "round": 2,
+      "chars": 73,
+      "ok": true,
+      "status": 200,
+      "ttfaMs": 600,
+      "totalMs": 1070,
+      "bytes": 202850
+    },
+    {
+      "engine": "dg-aura-2",
+      "round": 2,
+      "chars": 73,
+      "ok": true,
+      "status": 200,
+      "ttfaMs": 400,
+      "totalMs": 2614,
+      "bytes": 240000
+    },
+    {
+      "engine": "el-v3-conversational",
+      "round": 2,
+      "chars": 38,
+      "ok": true,
+      "status": 200,
+      "ttfaMs": 249,
+      "totalMs": 883,
+      "bytes": 119040
+    },
+    {
+      "engine": "el-turbo-v2.5",
+      "round": 2,
+      "chars": 38,
+      "ok": true,
+      "status": 200,
+      "ttfaMs": 299,
+      "totalMs": 352,
+      "bytes": 102540
+    },
+    {
+      "engine": "dg-aura-2",
+      "round": 2,
+      "chars": 38,
+      "ok": true,
+      "status": 200,
+      "ttfaMs": 392,
+      "totalMs": 1315,
+      "bytes": 101760
+    },
+    {
+      "engine": "el-v3-conversational",
+      "round": 2,
+      "chars": 34,
+      "ok": true,
+      "status": 200,
+      "ttfaMs": 307,
+      "totalMs": 824,
+      "bytes": 145920
+    },
+    {
+      "engine": "el-turbo-v2.5",
+      "round": 2,
+      "chars": 34,
+      "ok": true,
+      "status": 200,
+      "ttfaMs": 301,
+      "totalMs": 323,
+      "bytes": 82478
+    },
+    {
+      "engine": "dg-aura-2",
+      "round": 2,
+      "chars": 34,
+      "ok": true,
+      "status": 200,
+      "ttfaMs": 386,
+      "totalMs": 1230,
+      "bytes": 94080
+    },
+    {
+      "engine": "el-v3-conversational",
+      "round": 2,
+      "chars": 51,
+      "ok": true,
+      "status": 200,
+      "ttfaMs": 335,
+      "totalMs": 900,
+      "bytes": 161280
+    },
+    {
+      "engine": "el-turbo-v2.5",
+      "round": 2,
+      "chars": 51,
+      "ok": true,
+      "status": 200,
+      "ttfaMs": 279,
+      "totalMs": 359,
+      "bytes": 120372
+    },
+    {
+      "engine": "dg-aura-2",
+      "round": 2,
+      "chars": 51,
+      "ok": true,
+      "status": 200,
+      "ttfaMs": 374,
+      "totalMs": 1482,
+      "bytes": 124800
+    },
+    {
+      "engine": "el-v3-conversational",
+      "round": 2,
+      "chars": 76,
+      "ok": true,
+      "status": 200,
+      "ttfaMs": 260,
+      "totalMs": 977,
+      "bytes": 241920
+    },
+    {
+      "engine": "el-turbo-v2.5",
+      "round": 2,
+      "chars": 76,
+      "ok": true,
+      "status": 200,
+      "ttfaMs": 301,
+      "totalMs": 492,
+      "bytes": 216224
+    },
+    {
+      "engine": "dg-aura-2",
+      "round": 2,
+      "chars": 76,
+      "ok": true,
+      "status": 200,
+      "ttfaMs": 430,
+      "totalMs": 2189,
+      "bytes": 190080
+    }
+  ]
+}
