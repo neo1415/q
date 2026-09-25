@@ -144,6 +144,7 @@ import {
   createPostgresActorContextResolver,
   createPostgresApplicationIdentityLookup,
   createPostgresAuthorizationPolicySource,
+  createPostgresPersonProfileStore,
 } from "@capital-q/security/postgres";
 import { createSupabaseAccessTokenAuthenticator } from "@capital-q/security/supabase";
 
@@ -172,6 +173,9 @@ const security = {
   ),
   resolver: createPostgresActorContextResolver({ sql: database.sql }),
   identities: createPostgresApplicationIdentityLookup({ sql: database.sql }),
+  // The person's own profile (BIZ-002); q-api composes the same store for
+  // Q's approved person.profile.update.
+  people: createPostgresPersonProfileStore({ sql: database.sql }),
 };
 
 // Domain modules. Authorization, audit and events are the shared ports;

@@ -79,6 +79,8 @@ import {
   AuthenticationRequiredError,
   AuthorizationDeniedError,
   AuthorizationRequirementError,
+  PersonProfileNotFoundError,
+  PersonProfileVersionConflictError,
 } from "@capital-q/security";
 import {
   OnboardingContextRequiredError,
@@ -196,7 +198,12 @@ function toProblem(
     return createProblemDetails({ code: "AUTHENTICATION_REQUIRED", requestId });
   }
 
-  if (error instanceof ActorContextDeniedError) {
+  // A profile that vanished between read and write is the same answer as
+  // one that never existed: no access, nothing about why.
+  if (
+    error instanceof ActorContextDeniedError ||
+    error instanceof PersonProfileNotFoundError
+  ) {
     return createProblemDetails({
       code: "PERMISSION_DENIED",
       requestId,
@@ -503,7 +510,8 @@ function toProblem(
     error instanceof CompanyVersionConflictError ||
     error instanceof TeamVersionConflictError ||
     error instanceof InvestorVersionConflictError ||
-    error instanceof CapitalObjectiveVersionConflictError
+    error instanceof CapitalObjectiveVersionConflictError ||
+    error instanceof PersonProfileVersionConflictError
   ) {
     return createProblemDetails({
       code: "VERSION_CONFLICT",

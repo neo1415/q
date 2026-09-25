@@ -615,6 +615,23 @@ describe("@capital-q/companies against local PostgreSQL", () => {
         version: 2,
       });
 
+      // A replay of the change that already landed (a retried request with
+      // the version it was sent with) is idempotent: the requested state
+      // holds, so it succeeds without a new version, event or audit row
+      // (BIZ-002). Only a stale request that would change something is a
+      // conflict.
+      const replayCorrelation = CORRELATION();
+      const replay = await service.updateCompany({
+        actor: adminA,
+        companyId: a.id,
+        input: { expectedVersion: 1, shortDescription: "Rail intelligence." },
+        correlationId: replayCorrelation,
+      });
+      expect(replay.version).toBe(2);
+      const replayEvents = await tx.sql`
+        select 1 from events.outbox where payload ->> 'correlationId' = ${replayCorrelation}`;
+      expect(replayEvents).toHaveLength(0);
+
       // Cross-tenant: A's admin on B's company.
       await expect(
         service.updateCompany({

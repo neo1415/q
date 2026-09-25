@@ -33,6 +33,17 @@ export {
   type MeContext,
   type MeResponse,
   type MeUser,
+  ME_PROFILE_PATH,
+  PERSON_DISPLAY_NAME_MAX_LENGTH,
+  PERSON_EDITABLE_FIELDS,
+  PERSON_HEADLINE_MAX_LENGTH,
+  PersonDisplayNameSchema,
+  PersonHeadlineSchema,
+  PersonProfileDtoSchema,
+  UpdatePersonProfileRequestSchema,
+  type PersonEditableField,
+  type PersonProfileDto,
+  type UpdatePersonProfileRequest,
 } from "./me.js";
 
 export {

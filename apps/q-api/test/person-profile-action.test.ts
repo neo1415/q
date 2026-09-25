@@ -5,8 +5,12 @@ import type { QActionPrepareContext } from "@capital-q/q-runtime";
 import {
   OrganisationIdSchema,
   TenantIdSchema,
+  PersonProfileNotFoundError,
   UserIdSchema,
   type ActorContext,
+  type PersonProfile,
+  type PersonProfileChanges,
+  type PersonProfileStore,
 } from "@capital-q/security";
 
 import { createProfileUpdateBoard } from "../src/composition/company-profile-action.js";
@@ -36,15 +40,41 @@ const PERSON: ActorContext = {
 };
 
 function fakes() {
-  const renamed: { userId: string; displayName: string }[] = [];
-  const action = createPersonProfileUpdateAction({
-    people: {
-      updateDisplayName: (input) => {
-        renamed.push(input);
-        return Promise.resolve(input.userId === USER);
-      },
+  const renamed: {
+    userId: string;
+    expectedVersion: number;
+    changes: PersonProfileChanges;
+  }[] = [];
+  let stored: PersonProfile = {
+    userId: UserIdSchema.parse(USER),
+    displayName: "Daniel",
+    headline: null,
+    version: 3,
+    updatedAt: "2026-09-25T09:00:00.000Z",
+  };
+  // The person-profile store the application API's PATCH /v1/me/profile
+  // writes through: one write path for the page and for Q.
+  const people: PersonProfileStore = {
+    read: (userId) => Promise.resolve(userId === USER ? stored : null),
+    update: (input) => {
+      renamed.push(input);
+      if (input.userId !== USER) {
+        return Promise.reject(new PersonProfileNotFoundError());
+      }
+      stored = {
+        ...stored,
+        ...(input.changes.displayName === undefined
+          ? {}
+          : { displayName: input.changes.displayName }),
+        ...(input.changes.headline === undefined
+          ? {}
+          : { headline: input.changes.headline }),
+        version: stored.version + 1,
+      };
+      return Promise.resolve(stored);
     },
-  });
+  };
+  const action = createPersonProfileUpdateAction({ people });
   return { action, renamed };
 }
 
@@ -121,9 +151,12 @@ describe("person.profile.update", () => {
     );
     expect(ok).toEqual({
       outcome: "EXECUTED",
-      result: { userId: USER, displayName: "John" },
+      result: { userId: USER, displayName: "John", headline: null, version: 4 },
     });
-    expect(renamed).toEqual([{ userId: USER, displayName: "John" }]);
+    // Applied at the version the store holds now, never one the payload carried.
+    expect(renamed).toEqual([
+      { userId: USER, expectedVersion: 3, changes: { displayName: "John" } },
+    ]);
 
     const refused = await action.executor.execute(
       {
@@ -139,6 +172,59 @@ describe("person.profile.update", () => {
     });
     // Nobody else was touched.
     expect(renamed).toHaveLength(1);
+  });
+});
+
+describe("person.profile.update, headline (BIZ-002)", () => {
+  it("accepts a headline or a cleared headline, keeps v1 payloads valid, and refuses an empty change", () => {
+    const { action } = fakes();
+    expect(
+      action.payload.safeParse({ userId: USER, headline: "Angel investor" })
+        .success,
+    ).toBe(true);
+    expect(
+      action.payload.safeParse({ userId: USER, headline: null }).success,
+    ).toBe(true);
+    // v1's shape, from approvals requested before the headline existed.
+    expect(
+      action.payload.safeParse({ userId: USER, displayName: "John" }).success,
+    ).toBe(true);
+    expect(action.payload.safeParse({ userId: USER }).success).toBe(false);
+    expect(
+      action.payload.safeParse({ userId: USER, headline: "x".repeat(161) })
+        .success,
+    ).toBe(false);
+    expect(
+      action.describe({ userId: USER, headline: "Angel investor" }, [
+        { kind: "USER", userId: USER },
+      ]).preview,
+    ).toBe("Headline: Angel investor");
+  });
+
+  it("executes a headline change through the same store as the profile page", async () => {
+    const { action, renamed } = fakes();
+    const result = await action.executor.execute(
+      {
+        actionId: "11111111-1111-4111-8111-111111111111",
+        runId: RUN,
+        tenantId: TENANT,
+        organisationId: ORG,
+        actionType: PERSON_PROFILE_UPDATE,
+        actionVersion: 1,
+        idempotencyKey: "k",
+        payloadHash: "h",
+        approvalId: "22222222-2222-4222-8222-222222222222",
+        approvedByUserId: USER,
+        payload: { userId: USER, headline: "Angel investor" },
+        targets: [{ kind: "USER", userId: USER }],
+      } as never,
+      { approver: PERSON, correlationId: "cor_test", attempt: 1 },
+    );
+    expect(result).toMatchObject({
+      outcome: "EXECUTED",
+      result: { headline: "Angel investor", displayName: "Daniel" },
+    });
+    expect(renamed[0]?.changes).toEqual({ headline: "Angel investor" });
   });
 });
 

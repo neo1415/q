@@ -817,6 +817,16 @@ describe("@capital-q/investors against local PostgreSQL", () => {
         >`select deployment_state, version from core.investor_organisations where id = ${a.id}`;
         expect(row).toEqual({ deployment_state: "PAUSED", version: 2 });
 
+        // A replay of the change that already landed is idempotent: it
+        // succeeds at the current version and spends nothing (BIZ-002).
+        const replay = await service.updateInvestorOrganisation({
+          actor: admin,
+          investorOrganisationId: a.id,
+          input: { expectedVersion: 1, deploymentState: "PAUSED" },
+          correlationId: CORRELATION(),
+        });
+        expect(replay.version).toBe(2);
+
         // Returning the answer to unknown is an explicit, versioned change.
         const cleared = await service.updateInvestorOrganisation({
           actor: admin,
