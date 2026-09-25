@@ -67,7 +67,9 @@ export type PersonProfileUpdateResult = z.infer<
   typeof PersonProfileUpdateResultSchema
 >;
 
-function describeChanges(payload: PersonProfileUpdatePayload): {
+export function describePersonProfileChanges(
+  payload: PersonProfileUpdatePayload,
+): {
   readonly summary: string;
   readonly preview: string;
 } {
@@ -110,9 +112,9 @@ export function createPersonProfileUpdateAction(
     targets: (payload): readonly QSubjectRef[] => [
       { kind: "USER", userId: payload.userId },
     ],
-    describe: describeChanges,
+    describe: describePersonProfileChanges,
     confirm: (payload) =>
-      `Done. Your profile now reads: ${describeChanges(payload).preview.split("\n").join("; ")}.`,
+      `Done. Your profile now reads: ${describePersonProfileChanges(payload).preview.split("\n").join("; ")}.`,
     authorize: (payload, actor) => {
       if (actor.actorType !== "HUMAN") {
         return Promise.resolve({ outcome: "DENY", code: "NOT_A_PERSON" });

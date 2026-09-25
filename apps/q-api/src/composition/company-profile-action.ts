@@ -111,7 +111,9 @@ function changedFields(
   );
 }
 
-function describeChanges(changes: CompanyProfileUpdatePayload["changes"]): {
+export function describeCompanyProfileChanges(
+  changes: CompanyProfileUpdatePayload["changes"],
+): {
   readonly summary: string;
   readonly preview: string;
 } {
@@ -149,7 +151,7 @@ const FIELD_SHAPES: Readonly<Record<CompanyEditableField, string>> = {
   shortDescription: "the short description is longer than the profile holds",
 };
 
-function refusedFields(
+export function refusedFields(
   issues: readonly { readonly path: readonly PropertyKey[] }[],
 ): readonly CompanyEditableField[] {
   const fields = new Set<CompanyEditableField>();
@@ -196,10 +198,10 @@ export function createCompanyProfileUpdateAction(
       targets: (payload): readonly QSubjectRef[] => [
         { kind: "COMPANY", companyId: payload.companyId },
       ],
-      describe: (payload) => describeChanges(payload.changes),
+      describe: (payload) => describeCompanyProfileChanges(payload.changes),
       // Said after the gate persisted EXECUTED, from the approved payload.
       confirm: (payload) =>
-        `Done. Your company profile now reads: ${describeChanges(payload.changes).preview.split("\n").join("; ")}.`,
+        `Done. Your company profile now reads: ${describeCompanyProfileChanges(payload.changes).preview.split("\n").join("; ")}.`,
       authorize: async (payload, actor) => {
         if (actor.actorType !== "HUMAN") {
           return { outcome: "DENY", code: "NOT_A_PERSON" };

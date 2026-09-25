@@ -52,9 +52,19 @@ export type {
   InvestorFeedCompany,
   InvestorFeedDecision,
   InvestorFeedPort,
+  ProfileChangePort,
   QToolPorts,
   RelationshipIntelligencePort,
 } from "./ports.js";
+export {
+  createProposeProfileChangeTool,
+  FIELDS_BY_PROFILE,
+  PROPOSE_PROFILE_CHANGE,
+  ProposeProfileChangeInputSchema,
+  ProposeProfileChangeOutputSchema,
+  type ProposeProfileChangeInput,
+  type ProposeProfileChangeOutput,
+} from "./tools/profile-change.js";
 export {
   createRelationshipTools,
   GET_RELATIONSHIP,

@@ -83,7 +83,9 @@ function changedFields(
   );
 }
 
-function describeChanges(changes: InvestorProfileUpdatePayload["changes"]): {
+export function describeInvestorProfileChanges(
+  changes: InvestorProfileUpdatePayload["changes"],
+): {
   readonly summary: string;
   readonly preview: string;
 } {
@@ -130,9 +132,9 @@ export function createInvestorProfileUpdateAction(
         investorOrganisationId: payload.investorOrganisationId,
       },
     ],
-    describe: (payload) => describeChanges(payload.changes),
+    describe: (payload) => describeInvestorProfileChanges(payload.changes),
     confirm: (payload) =>
-      `Done. Your investor profile now reads: ${describeChanges(payload.changes).preview.split("\n").join("; ")}.`,
+      `Done. Your investor profile now reads: ${describeInvestorProfileChanges(payload.changes).preview.split("\n").join("; ")}.`,
     authorize: async (payload, actor) => {
       if (actor.actorType !== "HUMAN") {
         return { outcome: "DENY", code: "NOT_A_PERSON" };
