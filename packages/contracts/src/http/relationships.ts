@@ -17,10 +17,22 @@ import { MarketplaceVisibilitySchema } from "./companies.js";
  */
 
 /**
- * Derived projection vocabulary. Only DISCOVERED exists in this foundation;
- * CQ-NET-012 owns the projector and extends the vocabulary. Bounded text.
+ * Derived projection vocabulary, relationship-state.v1 (CQ-NET-012): the
+ * deterministic projector folds the history into one of these. Stored as
+ * bounded text, so a later projector version can extend it without an
+ * enum migration.
+ *
+ *   DISCOVERED -> INTEREST_EXPRESSED -> CONNECTED
+ *                                    -> DECLINED -> INTEREST_EXPRESSED
  */
-export const RELATIONSHIP_CURRENT_STATES = ["DISCOVERED"] as const;
+export const RELATIONSHIP_CURRENT_STATES = [
+  "DISCOVERED",
+  "INTEREST_EXPRESSED",
+  "CONNECTED",
+  "DECLINED",
+] as const;
+export const RelationshipStateV1Schema = z.enum(RELATIONSHIP_CURRENT_STATES);
+export type RelationshipStateV1 = z.infer<typeof RelationshipStateV1Schema>;
 export const RelationshipCurrentStateSchema = z
   .string()
   .regex(/^[A-Z][A-Z_]{0,31}$/);
@@ -194,6 +206,70 @@ export const CompanyInterestStatusDtoSchema = z
   .strict();
 export type CompanyInterestStatusDto = z.infer<
   typeof CompanyInterestStatusDtoSchema
+>;
+
+// ---------------------------------------------------------------------------
+// Where are we (CQ-NET-012; doc 25 §120-§121, doc 17 §83, §197)
+// ---------------------------------------------------------------------------
+
+/**
+ * `GET /v1/network/companies/:companyId/relationship` — an investor asks
+ * about a company; `GET /v1/network/investors/:investorOrganisationId/
+ * relationship` — a company asks about an investor organisation.
+ *
+ * Each party's answer is folded only from the history that party may see:
+ * an investor's private discovery never becomes a relationship the company
+ * can see ("Apex viewed your company"). `null` means nothing this party
+ * may see exists — never "no relationship", which would be a disclosure.
+ */
+export const NETWORK_COMPANY_RELATIONSHIP_PATH =
+  "/v1/network/companies/:companyId/relationship" as const;
+export const NETWORK_INVESTOR_RELATIONSHIP_PATH =
+  "/v1/network/investors/:investorOrganisationId/relationship" as const;
+
+/** What happened, in order: one entry per state the relationship reached. */
+export const RelationshipMilestoneDtoSchema = z
+  .object({
+    state: RelationshipStateV1Schema,
+    at: UtcTimestampSchema,
+  })
+  .strict();
+
+/**
+ * What is next, for the party asking — a plain step, never a score. There
+ * is no MEETING state yet (CQ-MTG-001); SCHEDULE_MEETING is doc 17 §86's
+ * post-match primary action, offered as the next step, not recorded.
+ */
+export const RELATIONSHIP_NEXT_STEPS = [
+  "EXPRESS_INTEREST",
+  "AWAIT_ANSWER",
+  "ANSWER_INTEREST",
+  "SCHEDULE_MEETING",
+  "NONE",
+] as const;
+
+export const RelationshipStatusDtoSchema = z
+  .object({
+    relationshipId: UuidSchema,
+    companyId: UuidSchema,
+    investorOrganisationId: UuidSchema,
+    /** Where are we. */
+    state: RelationshipStateV1Schema,
+    stateSince: UtcTimestampSchema,
+    /** What happened. */
+    milestones: z.array(RelationshipMilestoneDtoSchema).max(64),
+    /** What is next, for this party. */
+    nextStep: z.enum(RELATIONSHIP_NEXT_STEPS),
+    projectorVersion: z.string().min(1).max(64),
+  })
+  .strict();
+export type RelationshipStatusDto = z.infer<typeof RelationshipStatusDtoSchema>;
+
+export const RelationshipStatusResponseDtoSchema = z
+  .object({ relationship: RelationshipStatusDtoSchema.nullable() })
+  .strict();
+export type RelationshipStatusResponseDto = z.infer<
+  typeof RelationshipStatusResponseDtoSchema
 >;
 
 // ---------------------------------------------------------------------------
