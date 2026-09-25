@@ -691,6 +691,89 @@ describe("a spoken question for Q", () => {
     expect(runtime.calls.createRun).toHaveLength(0);
   });
 
+  it("speaks the loop's reply as it is written, before the turn ends, and says nothing twice (voice latency)", async () => {
+    // Live: 8 to 11 s from the end of the person's turn to Q's first
+    // sound, because the whole loop finished before a word was spoken.
+    const timeline: string[] = [];
+    const outcomeOf = (reply: string) =>
+      ({
+        reply,
+        intent: "ANSWER",
+        asking: null,
+        recorded: [],
+        skipped: [],
+        questionForQ: null,
+        researching: null,
+        navigate: null,
+        handoff: null,
+        pronounce: null,
+        warnings: 0,
+        view: view(),
+        degraded: false,
+        reading: null,
+        resume: null,
+        qualitative: [],
+        trace: null,
+      }) as const;
+    const handle = createVoiceTurnHandler({
+      qRuntime: fakeRuntime().service,
+      qStream: fakeStream([]),
+      onboarding: {
+        apiBaseUrl: "http://api.test",
+        fetch: () => Promise.resolve(Response.json(view())),
+      },
+      interviewer: {
+        turn: () => Promise.reject(new Error("the legacy path must not run")),
+      } as never,
+      interviewAgent: {
+        turn: async (input) => {
+          input.onSentence?.("Seed it is.");
+          // The model is still writing; the first sentence is already out.
+          await new Promise((resolve) => setTimeout(resolve, 20));
+          timeline.push("model still writing");
+          input.onSentence?.("Where are you based?");
+          timeline.push("turn ends");
+          return outcomeOf("Seed it is. Where are you based?");
+        },
+      },
+      logger,
+    });
+    const speaker: VoiceSpeaker = {
+      providerConversationId: "conv_1",
+      isOpen: true,
+      speak: async (response) => {
+        if (typeof response === "string") {
+          timeline.push(`spoke: ${response.trim()}`);
+          return;
+        }
+        for await (const part of response) {
+          timeline.push(`spoke: ${part.trim()}`);
+        }
+      },
+      close: () => undefined,
+    };
+    const outcome = await handle(
+      binding({
+        conversationId: undefined,
+        subjects: undefined,
+        onboarding: { sessionId: SESSION_ID, journeyType: "founder" },
+      }),
+      [{ role: "user", content: "We're at seed." }],
+      new AbortController().signal,
+      speaker,
+    );
+    expect(outcome).toEqual({ kind: "SPOKEN", path: "INTERVIEW" });
+    // The first sentence was voiced while the model was still writing.
+    expect(timeline.indexOf("spoke: Seed it is.")).toBeLessThan(
+      timeline.indexOf("model still writing"),
+    );
+    // Every sentence once.
+    expect(timeline.filter((line) => line.startsWith("spoke:"))).toEqual([
+      "spoke: Seed it is.",
+      "spoke: Where are you based?",
+    ]);
+  });
+
   it("pauses at an interruption: nothing stale is spoken, the run keeps going, and 'go on' resumes the answer (rework)", async () => {
     const runtime = fakeRuntime();
     const controller = new AbortController();
