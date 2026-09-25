@@ -152,6 +152,10 @@ function currentStep(interview: Interview): string | null {
  * question.
  */
 async function askedStep(interview: Interview): Promise<string | null> {
+  // Q's own `askingAbout` (CQ-QX-008) when the turn carries it; the
+  // persisted turn's step is only a fallback for an engine that does not.
+  const asking = interview.turns.at(-1)?.askingAbout ?? [];
+  if (asking.length > 0) return asking[0] ?? null;
   return (await lastQStep(interview.sessionId)) ?? currentStep(interview);
 }
 
@@ -166,29 +170,21 @@ function done(interview: Interview): boolean {
  * The mover is a fixture DRIVER: it only walks the interview to the state a
  * property needs, and no property is judged through its turns.
  *
- * It works from RECORDED STATE, not from what Q happens to be asking. Until
- * the turn response exposes Q's `asking` (approved, E3 owns it), neither
- * the session cursor nor a persisted turn's step says what Q asked. On the
- * tool-calling loop Q picks the question itself, and it can record an
- * answer to any step in any turn. So the mover acts like a person working
- * through their own list: it volunteers the first step that is neither
- * completed nor skipped, and it answers a plain confirmation question
- * ("Is that right?", "Does it look right?") with a yes.
+ * It answers what Q ASKED: the turn's `askingAbout` (CQ-QX-008), the steps
+ * Q's reply actually asks about. When Q asks about nothing it can use, it
+ * falls back to recorded state and volunteers the first step that is
+ * neither completed nor skipped, setting aside an optional step Q has
+ * already left open once, as a person working through their own list would.
  */
-function moverAnswer(next: string, lastReply: string): string {
-  if (
-    /\b(is that right|does (that|this|it) look right|is that correct)\?\s*$/i.test(
-      lastReply.trim(),
-    )
-  )
-    return "yes, that's right";
-  return MOVER[next] ?? "skip that one";
+function moverAnswer(step: string): string {
+  return MOVER[step] ?? "skip that one";
 }
 
 /**
  * Walk the interview with plain answers until `stop` holds or it completes.
- * A stall is the same next step with nothing new recorded four turns
- * running; that is a capability failure (the plain answer is not taken).
+ * A stall means Q asks the same step four turns running while nothing new
+ * is recorded: the plain answer is not being taken, which is a capability
+ * failure.
  */
 async function move(
   interview: Interview,
@@ -197,38 +193,41 @@ async function move(
   let same = 0;
   let previous: string | null = null;
   let recordedBefore = -1;
-  // An OPTIONAL step Q leaves open after the person declines it is
-  // legitimately unknown ("I'll leave sectors-to-avoid blank"), so after one
-  // attempt the mover moves on. Only a REQUIRED step can stall.
   const attempts = new Map<string, number>();
   const leftOpen = new Set<string>();
   for (let i = 0; i < (options.maxTurns ?? 40); i += 1) {
     if (done(interview)) return;
-    const open = (await openSteps(interview.sessionId)).filter(
-      (s) => !leftOpen.has(s.step),
+    const asked = (interview.turns.at(-1)?.askingAbout ?? []).find(
+      (s) => MOVER[s] !== undefined,
     );
-    const next = open[0] ?? null;
-    if (next === null) return;
-    if (options.stop?.(next.step) === true) return;
-    const recordedNow = (await answers(interview.sessionId)).size;
-    same =
-      next.step === previous && recordedNow === recordedBefore ? same + 1 : 0;
-    previous = next.step;
-    recordedBefore = recordedNow;
-    const tried = (attempts.get(next.step) ?? 0) + 1;
-    attempts.set(next.step, tried);
-    if (!next.required && tried > 1) {
-      leftOpen.add(next.step);
-      note("optional step left open", next.step);
-      continue;
+    let next: string | null = asked ?? null;
+    if (next === null) {
+      const open = (await openSteps(interview.sessionId)).filter(
+        (s) => !leftOpen.has(s.step),
+      );
+      const first = open[0];
+      if (first === undefined) return;
+      next = first.step;
+      const tried = (attempts.get(next) ?? 0) + 1;
+      attempts.set(next, tried);
+      if (!first.required && tried > 1) {
+        leftOpen.add(next);
+        note("optional step left open", next);
+        continue;
+      }
     }
+    if (options.stop?.(next) === true) return;
+    const recordedNow = (await answers(interview.sessionId)).size;
+    same = next === previous && recordedNow === recordedBefore ? same + 1 : 0;
+    previous = next;
+    recordedBefore = recordedNow;
     if (same >= 3) {
       note("transcript", transcript(interview));
       throw new Error(
-        `CAPABILITY: take a plain answer — required ${next.step} still open after four turns answering it`,
+        `CAPABILITY: take a plain answer — Q asked ${next} four turns running and nothing new was recorded`,
       );
     }
-    await interview.say(moverAnswer(next.step, interview.lastReply));
+    await interview.say(moverAnswer(next));
   }
 }
 
@@ -408,24 +407,22 @@ test.describe("P4 persisted exclusions are not re-asked; mandate-ready settles",
     test(c.id, async () => {
       const interview = await start(`p4-${c.id}`);
       await setup(interview, INVESTOR_SETUP);
-      if (c.when === "early") await interview.say(c.say);
-      else {
-        // "At the exclusion question": the first open step is an exclusion
-        // step (recorded state; Q's own `asking` is not exposed yet).
-        await move(interview, {
-          stop: (s) => s.startsWith("I7."),
-          maxTurns: 70,
-        });
-        // The mover stops at the first open exclusion step once the optional
-        // steps it declined are set aside; an exclusion step must be open.
+      const isExclusion = (s: string) => s.startsWith("I7.");
+      if (c.when === "at") {
+        // "At the exclusion question": Q's own `askingAbout` names an
+        // exclusion step (or, when Q asks nothing, one is the first open).
+        await move(interview, { stop: isExclusion, maxTurns: 70 });
+        const asked = interview.turns.at(-1)?.askingAbout ?? [];
+        const open = await unfinishedSteps(interview.sessionId);
         expect(
-          (await unfinishedSteps(interview.sessionId)).filter((s) =>
-            s.startsWith("I7."),
-          ),
+          asked.some(isExclusion) || open.some(isExclusion),
           "CAPABILITY: reach the exclusion question",
-        ).not.toEqual([]);
-        await interview.say(c.say);
+        ).toBe(true);
       }
+      await interview.say(c.say);
+      // The turn the person stated the exclusion in; Q may ask about it in
+      // that same reply, but never again afterwards.
+      const statedAt = interview.turns.length - 1;
       await move(interview, { maxTurns: 70 });
       note("transcript", transcript(interview));
 
@@ -440,33 +437,29 @@ test.describe("P4 persisted exclusions are not re-asked; mandate-ready settles",
         at,
         `CAPABILITY: record "${c.code}" as an exclusion from the person's phrasing`,
       ).not.toBeNull();
-      // Re-asks and handoff repeats are read from the step key on Q's
-      // persisted turns. On the tool-calling loop that key is the session
-      // cursor, not what Q asked, so until the turn response carries Q's
-      // `asking` these are REPORTED, not asserted. Loops are still caught
-      // by the mover's stall check and by the completion assertion below.
+      // Re-asks and handoff repeats are read from what Q ASKED each turn
+      // (`askingAbout`), never from the journey cursor.
       if (at !== null) {
-        const reasked = await read<{ step_key: string; text: string }>(
-          `select step_key, left(text, 160) text from onboarding.interview_turns
-            where session_id = $1 and role = 'Q' and step_key like 'I7.%'
-              and created_at > $2::timestamptz + interval '1 second'
-            order by created_at`,
-          [interview.sessionId, at],
-        );
-        note(
-          "exclusion-step turns after persistence (cursor-keyed, unasserted)",
-          reasked.map((r) => `${r.step_key}: ${r.text}`).join("\n") || "none",
-        );
+        const reasked = interview.turns
+          .slice(statedAt + 1)
+          .filter((t) => t.askingAbout.some(isExclusion))
+          .map(
+            (t) =>
+              `[${t.askingAbout.join(",")}] ${(t.reply ?? "").slice(0, 160)}`,
+          );
+        expect
+          .soft(
+            reasked,
+            "CAPABILITY: know an exclusion is already answered across the exclusion representations",
+          )
+          .toEqual([]);
       }
-      const handoffAsks = await read<{ n: string }>(
-        `select count(*)::text n from onboarding.interview_turns
-          where session_id = $1 and role = 'Q' and step_key = 'I12.handoff'`,
-        [interview.sessionId],
-      );
-      note(
-        "handoff-keyed Q turns (cursor-keyed, unasserted)",
-        handoffAsks[0]?.n ?? "0",
-      );
+      const handoffAsks = interview.turns.filter((t) =>
+        t.askingAbout.includes("I12.handoff"),
+      ).length;
+      expect
+        .soft(handoffAsks, "CAPABILITY: settle 'mandate ready' without looping")
+        .toBeLessThanOrEqual(2);
       expect
         .soft(
           done(interview),

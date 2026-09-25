@@ -121,12 +121,28 @@ type SessionView = {
 export type InterviewTurn = {
   readonly said: string;
   readonly reply: string | null;
+  /** The journey's step cursor after the turn (NOT what Q asked). */
   readonly stepAfter: string | null;
   readonly status: string;
+  /** The steps Q's reply actually asks about, in order (CQ-QX-008). */
+  readonly askingAbout: readonly string[];
+  /** Q's recommendations waiting on the person's decision. */
+  readonly pendingRecommendations: readonly {
+    stepKey: string;
+    value: string;
+  }[];
+  /** What the runtime says it recorded this turn (never read from prose). */
+  readonly recorded: readonly string[];
+};
+
+type QTurnResponse = {
+  reply: string;
+  recorded?: string[];
+  askingAbout?: string[];
+  pending?: { recommendations?: { stepKey: string; value: string }[] };
 };
 
 export class Interview {
-  private version = 0;
   private readonly recent: { role: "person" | "q"; text: string }[] = [];
   readonly turns: InterviewTurn[] = [];
 
@@ -157,63 +173,71 @@ export class Interview {
       "start onboarding",
     )) as SessionView;
     const interview = new Interview(person, view.session.id, journey);
-    interview.version = view.session.version;
     // Q opens: an empty turn is the opening question, nothing recorded.
     await interview.say("");
     return interview;
   }
 
-  /** One turn. Retries once on a version race (the worker may have moved it). */
+  /**
+   * One turn.
+   *
+   * It goes to the q-api interview turn route, under the person's own
+   * bearer, which is exactly the call the api's `/say` makes on the web's
+   * behalf. `/say` adds only a session-version check and a session read, and
+   * it DROPS `askingAbout` and `pending` (baseline finding, 2026-09-25: the
+   * public say response does not carry them, so the web cannot follow Q
+   * either). The session is read here afterwards, as `/say` does.
+   */
   async say(text: string): Promise<InterviewTurn> {
     for (let attempt = 0; attempt < 3; attempt += 1) {
-      const response = await fetch(
-        `${API}/v1/onboarding/sessions/${this.sessionId}/say`,
-        {
-          method: "POST",
-          headers: headers(this.person, true),
-          body: JSON.stringify({
-            text,
-            expectedSessionVersion: this.version,
-            recentTurns: this.recent.slice(-16),
-          }),
+      const response = await fetch(`${QAPI}/v1/q/interview/turn`, {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${this.person.token}`,
+          "content-type": "application/json",
         },
-      );
-      if (response.status === 409) {
-        await this.refresh();
-        continue;
-      }
+        body: JSON.stringify({
+          onboardingSessionId: this.sessionId,
+          journeyType: this.journey,
+          utterance: text,
+          channel: "text",
+          recentTurns: this.recent.slice(-16),
+        }),
+      });
       if (response.status === 401) {
         this.person = await signIn(this.person);
         continue;
       }
-      const body = (await json(response, `say "${text.slice(0, 40)}"`)) as {
-        view: SessionView;
-        reply: string | null;
-      };
-      this.version = body.view.session.version;
+      const body = (await json(
+        response,
+        `say "${text.slice(0, 40)}"`,
+      )) as QTurnResponse;
+      const view = await this.view();
       if (text.length > 0) this.recent.push({ role: "person", text });
-      if (body.reply !== null)
+      if (body.reply.length > 0)
         this.recent.push({ role: "q", text: body.reply });
       const turn: InterviewTurn = {
         said: text,
         reply: body.reply,
-        stepAfter: body.view.currentStep?.stepKey ?? null,
-        status: body.view.session.status,
+        stepAfter: view.currentStep?.stepKey ?? null,
+        status: view.session.status,
+        askingAbout: body.askingAbout ?? [],
+        pendingRecommendations: body.pending?.recommendations ?? [],
+        recorded: body.recorded ?? [],
       };
       this.turns.push(turn);
       return turn;
     }
-    throw new Error(`say "${text.slice(0, 40)}": version races did not settle`);
+    throw new Error(`say "${text.slice(0, 40)}": could not authenticate`);
   }
 
-  async refresh(): Promise<void> {
-    const view = (await json(
+  private async view(): Promise<SessionView> {
+    return (await json(
       await fetch(`${API}/v1/onboarding/sessions/${this.sessionId}`, {
         headers: headers(this.person),
       }),
       "read session",
     )) as SessionView;
-    this.version = view.session.version;
   }
 
   get lastReply(): string {
