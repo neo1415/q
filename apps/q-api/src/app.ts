@@ -25,6 +25,10 @@ import {
   registerRecommendationExplanationRoutes,
   type RecommendationExplanationRoutesDependencies,
 } from "./http/recommendation-explanations.js";
+import {
+  registerProfileFindingsRoutes,
+  type ProfileFindingsRoutesDependencies,
+} from "./http/profile-findings.js";
 import { registerQMcpRoute, type QMcpRouteDependencies } from "./http/q-mcp.js";
 import {
   registerQApprovalRoutes,
@@ -81,6 +85,9 @@ export type QApiModules = {
    */
   readonly recommendationExplanations?:
     RecommendationExplanationRoutesDependencies["explanations"] | undefined;
+  /** What Q found about the actor's own profile subject (BIZ-002). */
+  readonly profileFindings?:
+    ProfileFindingsRoutesDependencies["findings"] | undefined;
   readonly qRuntime?: QRunRoutesDependencies["qRuntime"] | undefined;
   /** Reading what Q composed, when the artifact context is composed (ADR 0013). */
   readonly artifacts?: ArtifactService | undefined;
@@ -261,6 +268,20 @@ export function createApp(
       authenticator: security.authenticator,
       resolver: security.resolver,
       explanations: modules.recommendationExplanations,
+    });
+  }
+
+  // What Q found about the actor's own profile subject (BIZ-002).
+  if (modules.profileFindings !== undefined) {
+    if (security.resolver === undefined) {
+      throw new Error(
+        "q-api: profile findings require an actor context resolver",
+      );
+    }
+    registerProfileFindingsRoutes(app, {
+      authenticator: security.authenticator,
+      resolver: security.resolver,
+      findings: modules.profileFindings,
     });
   }
 
