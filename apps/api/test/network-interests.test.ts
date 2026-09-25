@@ -203,6 +203,7 @@ function buildApp(
         ? Promise.resolve(options.noRelationship === true ? null : STATUS)
         : Promise.reject(options.failWith);
     },
+    relationshipById: () => Promise.reject(new Error("not under test")),
     listRelationshipsForInvestor: (query) => {
       reads.push({ side: "INVESTOR_LIST", ...query });
       return options.failWith === undefined

@@ -322,7 +322,7 @@ const subjects = createQSubjectResolverRegistry([
   createSelfUserQSubjectResolver(),
   createCapitalObjectiveQSubjectResolver(capital),
   createDocumentQSubjectResolver(documents),
-  createRelationshipQSubjectResolver(relationships),
+  createRelationshipQSubjectResolver(relationships, relationshipParties),
 ]);
 
 // The Context Firewall: the deterministic boundary between what the

@@ -37,6 +37,8 @@ import { TENANT, testCatalog, USER } from "./fixtures.js";
 const RUN = randomUUID();
 const CONVERSATION = randomUUID();
 const COMPANY = randomUUID();
+const RELATIONSHIP = randomUUID();
+const INVESTOR = randomUUID();
 
 const RELATIONSHIP_TOOL: QOfferedTool = {
   toolName: "relationship.get",
@@ -67,7 +69,14 @@ const CONNECTED = {
   source: "Capital Q relationship history",
 };
 
-function build(read: { status: "SUCCEEDED" | "DENIED"; data?: unknown }) {
+type Subject =
+  | { readonly kind: "COMPANY"; readonly companyId: string }
+  | { readonly kind: "RELATIONSHIP"; readonly relationshipId: string };
+
+function build(
+  read: { status: "SUCCEEDED" | "DENIED"; data?: unknown },
+  subject: Subject = { kind: "COMPANY", companyId: COMPANY },
+) {
   const alpha = createFakeModelProvider({
     code: "alpha",
     script: [
@@ -156,7 +165,6 @@ function build(read: { status: "SUCCEEDED" | "DENIED"; data?: unknown }) {
     transactions: { run: (work) => work({} as never) },
     tools,
   });
-  const subject = { kind: "COMPANY" as const, companyId: COMPANY };
   const request = {
     runId: RUN,
     tenantId: TENANT,
@@ -176,10 +184,21 @@ function build(read: { status: "SUCCEEDED" | "DENIED"; data?: unknown }) {
       actor: { userId: USER },
       purpose: {
         capability: "ANSWER",
-        taskClass: "COUNTERPARTY_COMPANY_QUESTION",
+        taskClass:
+          subject.kind === "RELATIONSHIP"
+            ? "RELATIONSHIP_QUESTION"
+            : "COUNTERPARTY_COMPANY_QUESTION",
       },
       subjects: [subject],
-      scopes: [{ kind: "COMPANY_PROFILE", subject }],
+      scopes: [
+        {
+          kind:
+            subject.kind === "RELATIONSHIP"
+              ? "RELATIONSHIP_CONTEXT"
+              : "COMPANY_PROFILE",
+          subject,
+        },
+      ],
       denied: [],
       // The test catalogue routes PUBLIC only, as the own-profile test does.
       maxSensitivity: "PUBLIC",
@@ -212,6 +231,35 @@ describe("Home Q knows where the person stands with the counterparty", () => {
     // Words, not a field dump.
     expect(facts).not.toContain("nextStep");
     expect(facts).not.toContain("SCHEDULE_MEETING");
+  });
+
+  it("reads a relationship subject by its id, for the founder's own side", async () => {
+    const founderView = {
+      ...CONNECTED,
+      yourSide: "COMPANY",
+      counterpart: {
+        kind: "INVESTOR_ORGANISATION",
+        id: INVESTOR,
+        name: "Beacon Ventures",
+      },
+      relationship: {
+        ...CONNECTED.relationship,
+        // The company's fold: no private discovery.
+        milestones: CONNECTED.relationship.milestones.slice(1),
+      },
+    };
+    const { seam, request, alpha, executed } = build(
+      { status: "SUCCEEDED", data: founderView },
+      { kind: "RELATIONSHIP", relationshipId: RELATIONSHIP },
+    );
+    expect((await seam.answer(request)).kind).toBe("ANSWERED");
+    expect(executed.map((call) => [call.name, call.arguments])).toEqual([
+      ["get_relationship", { relationshipId: RELATIONSHIP }],
+    ]);
+    const sent = sentTo(alpha);
+    const facts = sent.slice(sent.indexOf("AUTHORISED FACTS"));
+    expect(facts).toContain("own relationship with Beacon Ventures");
+    expect(facts).not.toContain("discovered 2026-09-20");
   });
 
   it("adds nothing when the read is refused, or when nothing is on record", async () => {

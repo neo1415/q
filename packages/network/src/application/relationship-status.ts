@@ -11,7 +11,7 @@ import {
   type ActorContext,
 } from "@capital-q/security";
 
-import type { Relationship } from "../contracts/index.js";
+import { RelationshipIdSchema, type Relationship } from "../contracts/index.js";
 import {
   InterestCompanyNotFoundError,
   InterestNotPermittedError,
@@ -288,6 +288,82 @@ export function createRelationshipForInvestor(
       await readHistory(dependencies, relationship.id),
       "INVESTOR",
     );
+  };
+}
+
+/** A relationship named by id, as the asking party sees it. */
+export type RelationshipPartyView = {
+  readonly side: RelationshipParty;
+  readonly counterpart:
+    | { readonly kind: "COMPANY"; readonly id: string }
+    | { readonly kind: "INVESTOR_ORGANISATION"; readonly id: string };
+  /** Null: nothing on record that this side may see. */
+  readonly status: RelationshipStatus | null;
+};
+
+/**
+ * One relationship, named by its id, for whichever party is asking (the
+ * RELATIONSHIP Q subject). The id grants nothing: the actor's side is
+ * decided here from their own membership, and the answer is exactly that
+ * side's own view (the same use cases the screens call), so a company
+ * reading by id still never sees an investor's private discovery. A
+ * relationship the actor is not a party to is null, the same as one that
+ * does not exist.
+ */
+export function createRelationshipById(
+  dependencies: ExpressInterestDependencies,
+) {
+  const forInvestor = createRelationshipForInvestor(dependencies);
+  const forCompany = createRelationshipForCompany(dependencies);
+  return async (query: {
+    readonly actor: ActorContext;
+    readonly relationshipId: string;
+  }): Promise<RelationshipPartyView | null> => {
+    const { actor } = query;
+    if (actor.organisationId === undefined) {
+      throw new ActorContextRequiredError();
+    }
+    const id = RelationshipIdSchema.safeParse(query.relationshipId);
+    if (!id.success) return null;
+    const relationship = await dependencies.repositories.relationships.findById(
+      dependencies.sql,
+      id.data,
+    );
+    if (relationship === null) return null;
+
+    const company = await dependencies.companies.findCanonicalCompany(
+      relationship.companyId,
+    );
+    if (
+      company !== null &&
+      company.tenantId === actor.tenantId &&
+      company.organisationId === actor.organisationId
+    ) {
+      return {
+        side: "COMPANY",
+        counterpart: {
+          kind: "INVESTOR_ORGANISATION",
+          id: relationship.investorOrganisationId,
+        },
+        status: await forCompany({
+          actor,
+          investorOrganisationId: relationship.investorOrganisationId,
+        }),
+      };
+    }
+
+    const investor =
+      await dependencies.investorSubject.investorOrganisationFor(actor);
+    if (
+      investor?.investorOrganisationId === relationship.investorOrganisationId
+    ) {
+      return {
+        side: "INVESTOR",
+        counterpart: { kind: "COMPANY", id: relationship.companyId },
+        status: await forInvestor({ actor, companyId: relationship.companyId }),
+      };
+    }
+    return null;
   };
 }
 

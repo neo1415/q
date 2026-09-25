@@ -120,13 +120,22 @@ export const GetRelationshipInputSchema = z
     investorOrganisationId: UuidSchema.optional().describe(
       "Ask as a company: the investor organisation's id, as given in the conversation context.",
     ),
+    relationshipId: UuidSchema.optional().describe(
+      "When the conversation is about a relationship itself: its id, as given in the conversation context. Works for either side.",
+    ),
   })
   .strict()
   .refine(
     (input) =>
-      (input.companyId === undefined) !==
-      (input.investorOrganisationId === undefined),
-    { message: "name exactly one of companyId or investorOrganisationId" },
+      [
+        input.companyId,
+        input.investorOrganisationId,
+        input.relationshipId,
+      ].filter((id) => id !== undefined).length === 1,
+    {
+      message:
+        "name exactly one of companyId, investorOrganisationId or relationshipId",
+    },
   );
 export type GetRelationshipInput = z.infer<typeof GetRelationshipInputSchema>;
 
@@ -198,7 +207,7 @@ function createGetRelationshipTool(
     status: "ACTIVE",
     providerName: "get_relationship",
     description:
-      "Where the person's own side stands with one counterparty on Capital Q: the relationship's state (discovered, interest expressed, connected, declined), when it got there, what happened in order with dates, and the next step for them. Pass companyId when the person is an investor asking about a company, or investorOrganisationId when they are a company asking about an investor. Call it whenever a question touches their dealings with a specific counterparty. A null relationship means nothing is on record that they can see.",
+      "Where the person's own side stands with one counterparty on Capital Q: the relationship's state (discovered, interest expressed, connected, declined), when it got there, what happened in order with dates, and the next step for them. Pass companyId when the person is an investor asking about a company, investorOrganisationId when they are a company asking about an investor, or relationshipId when the conversation is about a relationship itself. Call it whenever a question touches their dealings with a specific counterparty. A null relationship means nothing is on record that they can see.",
     classification: "READ_ONLY",
     riskClass: "SAFE_READ",
     requiredCapabilities: [
@@ -215,6 +224,54 @@ function createGetRelationshipTool(
     output: GetRelationshipOutputSchema,
     authorize: async (input, { actor, plan }) => {
       try {
+        if (input.relationshipId !== undefined) {
+          // Only a relationship the firewall bound for this run: it has
+          // already decided the actor is a party. The Network context then
+          // answers for the actor's own side, whatever the id names.
+          const id = input.relationshipId;
+          if (
+            boundScopeFor(
+              plan,
+              "RELATIONSHIP_CONTEXT",
+              (filter) => filter.relationshipIds?.includes(id) === true,
+            ) === undefined
+          ) {
+            return deny("NOT_AVAILABLE");
+          }
+          const view = await relationships.byRelationship(actor, id);
+          if (view === null) return deny("NOT_AVAILABLE");
+          if (view.counterpart.kind === "COMPANY") {
+            const profile = await ports.companies.findCanonicalCompanyProfile(
+              CompanyIdSchema.parse(view.counterpart.id),
+            );
+            return allow("CONFIDENTIAL", {
+              side: view.side,
+              counterpart: {
+                kind: "COMPANY",
+                id: view.counterpart.id,
+                name: profile?.canonicalName ?? null,
+              },
+              status: view.status,
+            });
+          }
+          // The same naming rule as below: an investor is named to a
+          // company only when the company can see something of them.
+          const investor =
+            view.status === null
+              ? null
+              : await ports.investors.findCanonicalInvestorOrganisation(
+                  InvestorOrganisationIdSchema.parse(view.counterpart.id),
+                );
+          return allow("CONFIDENTIAL", {
+            side: view.side,
+            counterpart: {
+              kind: "INVESTOR_ORGANISATION",
+              id: view.counterpart.id,
+              name: investor?.displayName ?? null,
+            },
+            status: view.status,
+          });
+        }
         if (input.companyId !== undefined) {
           if (!admitted(plan, { kind: "COMPANY", id: input.companyId })) {
             return deny("NOT_AVAILABLE");

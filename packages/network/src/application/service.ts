@@ -14,9 +14,11 @@ import {
 import {
   createListRelationshipsForCompany,
   createListRelationshipsForInvestor,
+  createRelationshipById,
   createRelationshipForCompany,
   createRelationshipForInvestor,
   type RelationshipListing,
+  type RelationshipPartyView,
   type RelationshipStatus,
 } from "./relationship-status.js";
 import {
@@ -154,6 +156,11 @@ export type InterestService = {
     readonly actor: ActorContext;
     readonly investorOrganisationId: string;
   }) => Promise<RelationshipStatus | null>;
+  /** One relationship by id, as the asking party sees it; null for a non-party. */
+  readonly relationshipById: (query: {
+    readonly actor: ActorContext;
+    readonly relationshipId: string;
+  }) => Promise<RelationshipPartyView | null>;
   /** An investor organisation's own relationships (CQ-WEB-030). */
   readonly listRelationshipsForInvestor: (query: {
     readonly actor: ActorContext;
@@ -207,6 +214,7 @@ export function createInterestService(
     mayRespondToInterest: createMayRespondToInterest(dependencies),
     relationshipForInvestor: createRelationshipForInvestor(dependencies),
     relationshipForCompany: createRelationshipForCompany(dependencies),
+    relationshipById: createRelationshipById(dependencies),
     listRelationshipsForInvestor:
       createListRelationshipsForInvestor(dependencies),
     listRelationshipsForCompany:

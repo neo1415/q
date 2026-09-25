@@ -79,6 +79,7 @@ export {
   createQSubjectResolverRegistry,
   createRelationshipQSubjectResolver,
   createSelfUserQSubjectResolver,
+  type QRelationshipPartiesPort,
   type QSubjectResolver,
   type QSubjectResolverRegistry,
   type QSubjectViewPort,

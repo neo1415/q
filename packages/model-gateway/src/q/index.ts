@@ -1130,28 +1130,36 @@ export function createModelGatewayQAnswer(
        * under the same plan: a company is asked about as an investor, an
        * investor organisation as a company. A side the person is not on
        * (a founder asking about a company) is refused by the tool and
-       * simply adds nothing.
+       * simply adds nothing. A relationship itself as the subject is read
+       * by its id, for whichever side the person is on; it comes first,
+       * because it names exactly what the person is asking about.
        */
       let relationship: AuthorisedFact | null = null;
       let relationshipCall: QToolCallObservation | null = null;
-      const counterparty = askedSubjects(request.subjects, plan).find(
-        (subject) =>
-          subject.kind === "COMPANY" ||
-          (subject.kind === "INVESTOR_ORGANISATION" &&
-            subject.investorOrganisationId !== ownInvestor),
-      );
+      const asked = askedSubjects(request.subjects, plan);
+      const counterparty =
+        asked.find((subject) => subject.kind === "RELATIONSHIP") ??
+        asked.find(
+          (subject) =>
+            subject.kind === "COMPANY" ||
+            (subject.kind === "INVESTOR_ORGANISATION" &&
+              subject.investorOrganisationId !== ownInvestor),
+        );
       if (counterparty !== undefined && offeredByName.has("get_relationship")) {
         const call = {
           callId: "q-relationship",
           name: "get_relationship",
           arguments:
-            counterparty.kind === "COMPANY"
-              ? { companyId: counterparty.companyId }
-              : counterparty.kind === "INVESTOR_ORGANISATION"
-                ? {
-                    investorOrganisationId: counterparty.investorOrganisationId,
-                  }
-                : {},
+            counterparty.kind === "RELATIONSHIP"
+              ? { relationshipId: counterparty.relationshipId }
+              : counterparty.kind === "COMPANY"
+                ? { companyId: counterparty.companyId }
+                : counterparty.kind === "INVESTOR_ORGANISATION"
+                  ? {
+                      investorOrganisationId:
+                        counterparty.investorOrganisationId,
+                    }
+                  : {},
         };
         const outcome = await tools.execute(call, toolContext);
         relationshipCall = {
