@@ -268,3 +268,26 @@ Same suite, with the lead's oracle: an explicit value must be recorded that turn
 Loop reliability (these are defects, not flakes): an OpenAI attempt ran 5.5 min before TIMEOUT against a 12 s attempt budget. The Gemini fallback then refuses the tool-calling history ("Function call is missing a thought_signature … `record_answers`"), so a luna failure mid-interview reaches the person as HTTP 503 (4 across the runs). Two other stalls were Modern Standby (09:38–10:35, and earlier 06:04–06:22).
 
 Declining an optional step ("no preference", "nothing to avoid") leaves it open rather than skipped. Q says so honestly ("I'll leave sector avoidances open"), so the mover sets such steps aside.
+
+## Property suite — deployed head fc57f3a (acc-suite-v3, 2026-09-25)
+
+The driver and P4 follow Q's `askingAbout` (CQ-QX-008). Interview turns go to the q-api turn route, because the public `/say` response drops `askingAbout`/`pending`. The static check scans ACTIVE prompt versions (turn-reader v4 is active; v3 is not).
+
+**OpenAI credits ran out at 15:35:33 UTC** ("429 You have no credits remaining"; 684 OpenAI calls served before, none after, and Gemini timing out and in outage at the same time). The full run ended about 15:26, so the interview and static rows below are valid. The Home/UI re-run began at 15:34, so its model-dependent failures are NOT product results.
+
+| Property | Legacy | fe23440 | fc57f3a | Missing capability on fc57f3a |
+|---|---|---|---|---|
+| static wording rules | 2/3 | 2/3 | 2/3 | only investor-mandate-synthesis.v2:56 ("early stage", illustrative); turn-reader v4 clean |
+| P1 corrections | 2/7 | 7/7 | 7/7 | — |
+| P2 multi-intent | 0/5 | 5/5 | 5/5 | — |
+| P3 acceptance | 1/6 | 5/6 | 5/6 | delegation ("pick three … go with those") still ends in a clarifying question; lead: FAIL |
+| P4 exclusions | 0/5 | 0/5 | 1/5 | a real re-ask (askingAbout): after gambling was recorded, Q asks again whether gambling should be excluded outright; "no preference" on customer types is refused ("say 'skip'") and stalls; session never completes |
+| P5 advisory | 6/6 | 4/6 | 2/6 | unstated facts written on advisory turns: business_title "Angel investor", deployment_status "selective", a mandate_context reference; "which sectors pull seed money in Kenya" records geography=kenya |
+| P7 leave/return | 5/5 | 1/5 | 1/5 | the tangent turn records facts ("I've recorded you as selectively deploying capital", never said) |
+| P8 oblique | 1/7 | 5/7 | 4/7 | "quarter of a million quid" loses the currency; farmers → no sector; employer's venture arm → "other" |
+| D1 synthesis | 1/1 | 1/1 | 1/1 | — |
+| Completion | 0/1 | 0/1 | 0/1 | mandate ACTIVE, session stays open |
+| Home | 6/10 | 6/10 | inconclusive | who-am-I, "passed-on" memory, interrupt PASS; memory ×2, P6 and Zino FAILED on provider errors (credit exhaustion) |
+| UI continuity | 4/4 | 4/4 | 2 pass, 2 inconclusive | D7 reload and incomplete-returning PASS; refresh and completed-returning failed inside the form-completion helper during the outage |
+
+Local harness note: web on this head first returned 500 on /auth ("Export Monitor doesn't exist in @capital-q/ui/icons") because web's package dist was stale on my machine. Building web's dependencies fixed it; this is not a product issue.
