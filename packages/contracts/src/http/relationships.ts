@@ -265,6 +265,45 @@ export const RelationshipStatusDtoSchema = z
   .strict();
 export type RelationshipStatusDto = z.infer<typeof RelationshipStatusDtoSchema>;
 
+/**
+ * The person's own side's relationships (CQ-WEB-030): a list to open,
+ * each row the same per-party fold as the single read, so a list and its
+ * detail can never disagree.
+ *
+ *   `GET /v1/network/relationships` — an investor organisation's own.
+ *   `GET /v1/network/companies/:companyId/relationships` — a company's own;
+ *   a relationship that is only an investor's private discovery is not in
+ *   it, because it is nothing the company can see.
+ */
+export const NETWORK_INVESTOR_RELATIONSHIPS_PATH =
+  "/v1/network/relationships" as const;
+export const NETWORK_COMPANY_RELATIONSHIPS_PATH =
+  "/v1/network/companies/:companyId/relationships" as const;
+
+export const RelationshipSummaryDtoSchema = z
+  .object({
+    relationshipId: UuidSchema,
+    counterpart: z
+      .object({
+        kind: z.enum(["COMPANY", "INVESTOR_ORGANISATION"]),
+        id: UuidSchema,
+        name: z.string().min(1).max(200),
+      })
+      .strict(),
+    state: RelationshipStateV1Schema,
+    stateSince: UtcTimestampSchema,
+    nextStep: z.enum(RELATIONSHIP_NEXT_STEPS),
+  })
+  .strict();
+export type RelationshipSummaryDto = z.infer<
+  typeof RelationshipSummaryDtoSchema
+>;
+
+export const RelationshipListDtoSchema = z
+  .object({ items: z.array(RelationshipSummaryDtoSchema).max(200) })
+  .strict();
+export type RelationshipListDto = z.infer<typeof RelationshipListDtoSchema>;
+
 export const RelationshipStatusResponseDtoSchema = z
   .object({ relationship: RelationshipStatusDtoSchema.nullable() })
   .strict();
