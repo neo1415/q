@@ -13,12 +13,19 @@ import {
 import type {
   OnboardingResponseValue,
   OnboardingSessionView,
+  TaxonomyCandidateResponse,
 } from "@capital-q/contracts";
 import type {
   OnboardingQRecommendations,
   OnboardingStepManifest,
 } from "@capital-q/onboarding";
 import { quoteOccursIn } from "@capital-q/q-knowledge";
+
+import {
+  figureCountIn,
+  figureStatedIn,
+  textStatedIn,
+} from "./value-support.js";
 import type { UserId } from "@capital-q/security";
 import type {
   FinishOnboardingOutput,
@@ -88,6 +95,22 @@ export function createOnboardingPort(input: {
    * pages or documents.
    */
   readonly personTurns: readonly string[];
+  /**
+   * What Q said just before the person's latest words: a figure Q read
+   * back there, which they then confirmed, is theirs to record.
+   */
+  readonly lastQTurn?: string | undefined;
+  /**
+   * The steps the person handed to Q in their latest words, read
+   * independently of the acting model (DELEGATION_READER); null when it
+   * could not be read. A DELEGATED write is permitted only for these.
+   */
+  readonly delegated?:
+    | (() => Promise<{
+        readonly handed: ReadonlySet<string>;
+        readonly approved: ReadonlySet<string>;
+      } | null>)
+    | undefined;
   readonly recommendations?: RecommendationStore | undefined;
   /** The Q run, for a recommendation's provenance. */
   readonly runId?: string | undefined;
@@ -323,16 +346,20 @@ export function createOnboardingPort(input: {
       c.stepType === "reference_select" &&
       c.resourceType === "TAXONOMY_NODE"
     ) {
+      // typeof, not Array.isArray: the latter widens a readonly list to any[].
       const phrases = (
-        Array.isArray(answer.value) ? answer.value : [String(answer.value)]
+        typeof answer.value === "object" ? answer.value : [String(answer.value)]
       ).slice(0, 8);
       const ids: string[] = [];
       const unmatched: string[] = [];
       for (const phrase of phrases) {
-        const found = await findTaxonomyCandidates(input.session, {
-          text: phrase,
-          vocabularyCodes: [...c.vocabularyCodes],
-        });
+        const found: TaxonomyCandidateResponse = await findTaxonomyCandidates(
+          input.session,
+          {
+            text: phrase,
+            vocabularyCodes: [...c.vocabularyCodes],
+          },
+        );
         const best = found.candidates[0];
         if (best === undefined) {
           unmatched.push(phrase);
@@ -366,9 +393,7 @@ export function createOnboardingPort(input: {
       };
     } else {
       const raw =
-        typeof answer.value === "number"
-          ? String(answer.value)
-          : (answer.value as string | readonly string[] | boolean);
+        typeof answer.value === "number" ? String(answer.value) : answer.value;
       value = toResponseValue(step, raw);
     }
     if (value === null) {
@@ -540,16 +565,131 @@ export function createOnboardingPort(input: {
     }
   };
 
+  /**
+   * A STATED value must be one its quote gives (unknown stays unknown):
+   * a figure they stated, or read back to them and confirmed; free text
+   * in their own words. Which option or category the words mean stays the
+   * model's reading. A DELEGATED item's quote is the instruction, so its
+   * value is Q's choice by their authority, not something they said.
+   */
+  const unsupported = (
+    step: OnboardingStepManifest,
+    value: OnboardingResponseValue,
+    answer: { readonly quote: string; readonly basis?: string | undefined },
+  ): OnboardingRecordResult | null => {
+    if (answer.basis === "DELEGATED") return null;
+    const refuse = (reason: string): OnboardingRecordResult => ({
+      stepKey: step.stepKey,
+      outcome: "REJECTED",
+      question: (
+        SPOKEN_QUESTIONS[step.stepKey] ?? step.configuration.prompt
+      ).slice(0, 400),
+      reason,
+    });
+    if (value.type === "RANGE") {
+      const stated = figureStatedIn(value.value, answer.quote);
+      if (stated === true) {
+        // One stated figure answers one step: the same figure from the
+        // same words already filled another step this turn.
+        const key = `${answer.quote.trim().toLowerCase()}\u0000${value.value}`;
+        const used = figuresUsed.get(key) ?? [];
+        if (
+          used.some((other) => other !== step.stepKey) &&
+          used.filter((other) => other !== step.stepKey).length >=
+            figureCountIn(value.value, answer.quote)
+        ) {
+          const other = steps.get(used[0] ?? "");
+          return refuse(
+            `That figure is what they gave for ${(other === undefined ? "another question" : (SPOKEN_QUESTIONS[other.stepKey] ?? other.configuration.prompt)).slice(0, 200)}; they have not said it for this one, so nothing was recorded.`,
+          );
+        }
+        return null;
+      }
+      if (
+        stated === null &&
+        input.lastQTurn !== undefined &&
+        figureStatedIn(value.value, input.lastQTurn) === true &&
+        input.personTurns[0] !== undefined &&
+        quoteOccursIn(answer.quote, input.personTurns[0])
+      ) {
+        return null;
+      }
+      return refuse(
+        stated === false
+          ? "That figure is not one they stated, so nothing was recorded. Record only a figure they gave; a range they gave is its two ends, never a point you work out inside it."
+          : "They gave no figure in digits here, so nothing was recorded. Say the number back to them and record it when they confirm it.",
+      );
+    }
+    // An address said aloud is rewritten into its written form by the
+    // step itself ("bridge dot com"), so it is not the words verbatim.
+    if (
+      value.type === "TEXT" &&
+      !step.stepKey.endsWith(".website") &&
+      !textStatedIn(value.text, answer.quote)
+    ) {
+      return refuse(
+        "That text is not in their words, so nothing was recorded. Free text is recorded in the person's own words, and only for the question it answers.",
+      );
+    }
+    return null;
+  };
+
+  /** Figures committed this turn, by the words and value that gave them. */
+  const figuresUsed = new Map<string, string[]>();
+  const noteFigure = (
+    step: OnboardingStepManifest,
+    value: OnboardingResponseValue,
+    quote: string,
+  ) => {
+    if (value.type !== "RANGE") return;
+    const key = `${quote.trim().toLowerCase()}\u0000${value.value}`;
+    const used = figuresUsed.get(key) ?? [];
+    if (!used.includes(step.stepKey)) used.push(step.stepKey);
+    figuresUsed.set(key, used);
+  };
+
   const recordOne = async (answer: {
     readonly stepKey: string;
     readonly value: string | readonly string[] | number | boolean;
     readonly quote: string;
+    readonly basis?: "STATED" | "DELEGATED" | undefined;
   }): Promise<OnboardingRecordResult> => {
     if (!said(answer.quote)) return unsaid(answer.stepKey);
+    // A delegation is an instruction given now, "in the same instruction"
+    // (lead decision, 2026-09-25): an earlier question or remark is not
+    // the person handing Q this choice.
+    if (
+      answer.basis === "DELEGATED" &&
+      (input.personTurns[0] === undefined ||
+        !quoteOccursIn(answer.quote, input.personTurns[0]))
+    ) {
+      return {
+        stepKey: answer.stepKey.slice(0, 80),
+        outcome: "REJECTED",
+        reason:
+          "A choice is delegated only by what they say now, handing it to you; that quote is not from their latest words, so nothing was recorded.",
+      };
+    }
+    if (answer.basis === "DELEGATED") {
+      const authority = (await input.delegated?.()) ?? null;
+      if (authority === null || !authority.handed.has(answer.stepKey)) {
+        return {
+          stepKey: answer.stepKey.slice(0, 80),
+          outcome: "REJECTED",
+          reason:
+            "They have not handed you this choice, so nothing was recorded. Hold it with recommend, say what you suggest and why, and let them decide.",
+        };
+      }
+    }
     const resolved = await resolve(answer);
-    return resolved.ok
-      ? await write(resolved.step, resolved.value)
-      : resolved.result;
+    if (!resolved.ok) return resolved.result;
+    const refused = unsupported(resolved.step, resolved.value, answer);
+    if (refused !== null) return refused;
+    const written = await write(resolved.step, resolved.value);
+    if (written.outcome === "COMMITTED") {
+      noteFigure(resolved.step, resolved.value, answer.quote);
+    }
+    return written;
   };
 
   return {
@@ -621,6 +761,20 @@ export function createOnboardingPort(input: {
             stepKey: stepKey.slice(0, 80),
             outcome: "REJECTED",
             reason: "There is no pending recommendation for that step.",
+          });
+          continue;
+        }
+        // Approval is the person's, read from their latest words
+        // independently of the acting model: another instruction is not
+        // an approval of an earlier recommendation (ACC/E3 live,
+        // 2026-09-25).
+        const authority = (await input.delegated?.()) ?? null;
+        if (authority === null || !authority.approved.has(stepKey)) {
+          results.push({
+            stepKey,
+            outcome: "REJECTED",
+            reason:
+              "They have not approved that recommendation in what they just said, so nothing was recorded. It stays pending for their decision.",
           });
           continue;
         }

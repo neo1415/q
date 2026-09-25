@@ -46,7 +46,7 @@ export const INTERVIEW_AGENT_V5: PromptDefinition<
     untrusted: [...INTERVIEW_AGENT_V5_UNTRUSTED],
   },
   version: 5,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   changeDescription:
     "Reliability: each round is rendered from the onboarding state and this turn's actions with their results, never from a provider's native tool history, so a fallback model can continue a turn another model began.",
   effectiveFrom: "2026-09-25",

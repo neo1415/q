@@ -103,6 +103,8 @@ describe("registry", () => {
         "TURN_READER",
         // ADR 0016: the onboarding interview as a tool-calling Q run.
         "INTERVIEW_AGENT",
+        // Which onboarding choices the person just handed to Q.
+        "DELEGATION_READER",
       ].sort(),
     );
     for (const id of PROMPT_IDS) {
