@@ -107,7 +107,10 @@ describe("a declined optional step is set aside, never recorded as a value", () 
   it("sets aside each kind of optional step, however they decline it", async () => {
     for (const stepKey of OPTIONAL) {
       for (const said of DECLINES) {
-        const world = investorSession({ currentStepKey: stepKey, recorded: SO_FAR });
+        const world = investorSession({
+          currentStepKey: stepKey,
+          recorded: SO_FAR,
+        });
         const { gateway, seen } = settingAside(stepKey, said);
         const agent = createInterviewAgent({
           gateway,
@@ -160,7 +163,10 @@ describe("a declined optional step is set aside, never recorded as a value", () 
       ["I3.geography", []],
       ["I3.geography", ["I3.sectors"]],
     ] as const) {
-      const world = investorSession({ currentStepKey: stepKey, recorded: SO_FAR });
+      const world = investorSession({
+        currentStepKey: stepKey,
+        recorded: SO_FAR,
+      });
       const { gateway, seen } = settingAside(stepKey, "no preference");
       await createInterviewAgent({
         gateway,
@@ -176,7 +182,10 @@ describe("a declined optional step is set aside, never recorded as a value", () 
   });
 
   it("an unreadable turn sets nothing aside", async () => {
-    const world = investorSession({ currentStepKey: "I3.geography", recorded: SO_FAR });
+    const world = investorSession({
+      currentStepKey: "I3.geography",
+      recorded: SO_FAR,
+    });
     const { gateway } = settingAside("I3.geography", "no preference");
     await createInterviewAgent({
       gateway,
