@@ -136,7 +136,34 @@ export type ExpressInterestRequest = z.infer<
   typeof ExpressInterestRequestSchema
 >;
 
-/** Unilateral, and only ever EXPRESSED in this packet. */
+/**
+ * The company's answer to an interest (CQ-NET-011). PENDING until the
+ * company answers; there is no reason field, by design — a decline is
+ * recorded honestly and carries nothing harsh or private.
+ */
+export const INTEREST_RESPONSES = ["PENDING", "ACCEPTED", "DECLINED"] as const;
+export const InterestResponseStatusSchema = z.enum(INTEREST_RESPONSES);
+export type InterestResponseStatus = z.infer<
+  typeof InterestResponseStatusSchema
+>;
+
+/**
+ * The formal bilateral connection (doc 13's `network.matches` row) opened
+ * by an acceptance: both sides have agreed to connect. Not an investment.
+ */
+export const ConnectionDtoSchema = z
+  .object({
+    connectionId: UuidSchema,
+    status: z.enum(["ACTIVE", "ENDED"]),
+    connectedAt: UtcTimestampSchema,
+  })
+  .strict();
+export type ConnectionDto = z.infer<typeof ConnectionDtoSchema>;
+
+/**
+ * Unilateral. `response` and `connection` (CQ-NET-011) say how the company
+ * answered; they default so a NET-010 reader keeps parsing.
+ */
 export const InterestDtoSchema = z
   .object({
     interestId: UuidSchema,
@@ -144,6 +171,9 @@ export const InterestDtoSchema = z
     companyId: UuidSchema,
     status: z.enum(["EXPRESSED", "WITHDRAWN"]),
     expressedAt: UtcTimestampSchema,
+    response: InterestResponseStatusSchema.default("PENDING"),
+    respondedAt: UtcTimestampSchema.nullable().default(null),
+    connection: ConnectionDtoSchema.nullable().default(null),
   })
   .strict();
 export type InterestDto = z.infer<typeof InterestDtoSchema>;
@@ -164,4 +194,72 @@ export const CompanyInterestStatusDtoSchema = z
   .strict();
 export type CompanyInterestStatusDto = z.infer<
   typeof CompanyInterestStatusDtoSchema
+>;
+
+// ---------------------------------------------------------------------------
+// Connection Acceptance (CQ-NET-011; doc 13 §29.2, doc 17 §85, doc 25 §119)
+// ---------------------------------------------------------------------------
+
+/**
+ * `GET /v1/network/companies/:companyId/incoming-interest` — the company's
+ * inbox: investor organisations that expressed interest, and how the
+ * company answered. Authorised to the company's own members holding
+ * `company.interest.view`; anyone else gets not-found.
+ */
+export const NETWORK_COMPANY_INCOMING_INTEREST_PATH =
+  "/v1/network/companies/:companyId/incoming-interest" as const;
+/**
+ * `POST /v1/network/interests/:interestId/{accept|decline}` — the
+ * company's answer. The verb is in the path, so a body cannot change its
+ * meaning. Consequential: an Idempotency-Key header is required; the same
+ * key and answer return the original result, and an interest already
+ * answered the other way is RESOURCE_CONFLICT.
+ */
+export const NETWORK_INTEREST_ACCEPT_PATH =
+  "/v1/network/interests/:interestId/accept" as const;
+export const NETWORK_INTEREST_DECLINE_PATH =
+  "/v1/network/interests/:interestId/decline" as const;
+
+/** Nothing to say but the verb: no reason, no message (CQ-COMM-001 is deferred). */
+export const RespondToInterestRequestSchema = z.object({}).strict();
+export type RespondToInterestRequest = z.infer<
+  typeof RespondToInterestRequestSchema
+>;
+
+/**
+ * One incoming interest, as the company sees it. The investor
+ * organisation is named because expressing interest is addressed to the
+ * company; who at the organisation acted, and anything the investor keeps
+ * private, is not here.
+ */
+export const IncomingInterestDtoSchema = z
+  .object({
+    interestId: UuidSchema,
+    investorOrganisationId: UuidSchema,
+    investorName: z.string().min(1).max(200),
+    investorType: z.string().min(1).max(64),
+    expressedAt: UtcTimestampSchema,
+    response: InterestResponseStatusSchema,
+    respondedAt: UtcTimestampSchema.nullable(),
+    connection: ConnectionDtoSchema.nullable(),
+  })
+  .strict();
+export type IncomingInterestDto = z.infer<typeof IncomingInterestDtoSchema>;
+
+export const IncomingInterestListDtoSchema = z
+  .object({ items: z.array(IncomingInterestDtoSchema).max(200) })
+  .strict();
+export type IncomingInterestListDto = z.infer<
+  typeof IncomingInterestListDtoSchema
+>;
+
+/** `deduplicated` is true when this answer had already been recorded. */
+export const InterestResponseResultDtoSchema = z
+  .object({
+    interest: IncomingInterestDtoSchema,
+    deduplicated: z.boolean(),
+  })
+  .strict();
+export type InterestResponseResultDto = z.infer<
+  typeof InterestResponseResultDtoSchema
 >;
