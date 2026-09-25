@@ -984,7 +984,11 @@ export function createOnboardingPort(input: {
             );
           }
           written.push(step.stepKey);
-          results.push({ stepKey: step.stepKey, outcome: "SET_ASIDE", question });
+          results.push({
+            stepKey: step.stepKey,
+            outcome: "SET_ASIDE",
+            question,
+          });
         } catch (error: unknown) {
           results.push(refused(step.stepKey, error));
         }

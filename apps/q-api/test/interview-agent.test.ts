@@ -186,6 +186,7 @@ describe("ADR 0016 · M1 · one freeform turn writes several answers", () => {
       "get_onboarding_state",
       "recommend",
       "record_answers",
+      "set_aside",
     ]);
     expect(seen[0]?.text).toContain("I7.hard_exclusions");
     expect(seen[1]?.text).toContain("COMMITTED");
