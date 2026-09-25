@@ -91,10 +91,11 @@ select throws_ok($$ select * from network.relationships $$, '42501', null, 'serv
 select pg_temp.act_as_privileged();
 select is((select count(*)::int from network.relationships where tenant_id = pg_temp.rls_id('tenant_a')), 1, 'privileged: the server role reads the relationship (infrastructure, not authorisation)');
 select is((select count(*)::int from network.relationship_events where tenant_id = pg_temp.rls_id('tenant_a')), 2, 'privileged: the server role reads the history');
--- network.interests arrives with CQ-NET-010 (490_network_interests); a
--- match is CQ-NET-011's, and a deal or opportunity table is never ours.
-select is((select count(*)::int from information_schema.tables where table_schema = 'network' and table_name in ('matches', 'deals', 'opportunities')), 0,
-  'no match, deal or opportunity table exists');
+-- network.interests arrives with CQ-NET-010 (490_network_interests) and
+-- network.matches with CQ-NET-011 (500_network_matches); a deal or
+-- opportunity table is never ours.
+select is((select count(*)::int from information_schema.tables where table_schema = 'network' and table_name in ('deals', 'opportunities')), 0,
+  'no deal or opportunity table exists');
 
 select * from finish();
 

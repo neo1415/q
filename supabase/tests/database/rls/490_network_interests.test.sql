@@ -43,8 +43,8 @@ select is((select count(*)::int from pg_policies where schemaname = 'network' an
 select is((select status from network.interests where id = '00000000-0000-4000-8000-000000001b21'), 'EXPRESSED', 'a new interest is EXPRESSED');
 select is((select current_state from network.relationships where id = '00000000-0000-4000-8000-000000001b01'), 'DISCOVERED',
   'an interest does not set relationship state (the projector owns it)');
-select is((select count(*)::int from information_schema.tables where table_schema = 'network' and table_name in ('matches', 'deals', 'opportunities')), 0,
-  'interest brings no match, deal or opportunity table');
+select is((select count(*)::int from information_schema.tables where table_schema = 'network' and table_name in ('deals', 'opportunities')), 0,
+  'interest brings no deal or opportunity table');
 
 -- Invariants -----------------------------------------------------------------------
 select throws_ok(
