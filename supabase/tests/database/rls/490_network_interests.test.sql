@@ -115,7 +115,7 @@ select throws_ok($$ select * from network.interest_requests $$, '42501', null, '
 
 -- Privileged server role: EXPECTED DB BEHAVIOUR; DB BYPASS ≠ BUSINESS AUTHORISATION.
 select pg_temp.act_as_privileged();
-select is((select count(*)::int from network.interests), 1, 'privileged: the server role reads the interest (infrastructure, not authorisation)');
+select is((select count(*)::int from network.interests where tenant_id = pg_temp.rls_id('tenant_a')), 1, 'privileged: the server role reads the interest (infrastructure, not authorisation)');
 
 select * from finish();
 
