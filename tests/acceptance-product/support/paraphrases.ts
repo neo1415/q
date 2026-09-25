@@ -16,7 +16,42 @@ export type Expect = {
   readonly anyOf?: readonly string[];
   /** None of these values is recorded for the step. */
   readonly noneOf?: readonly string[];
+  /**
+   * An explicit value the person stated must be recorded THAT turn and read
+   * back in Q's reply (lead decision 2026-09-25: holding a person's own
+   * explicit answer for a yes is a failure). Any one of these forms counts;
+   * the reply is compared with thousands separators removed. A loose
+   * oracle on the reply, alongside the authoritative recorded value.
+   */
+  readonly readBack?: readonly string[];
 };
+
+const READ_150K = [
+  "150000",
+  "150k",
+  "150 thousand",
+  "hundred and fifty thousand",
+  "hundred fifty thousand",
+];
+const READ_10K = ["10000", "10k", "10 thousand", "ten thousand"];
+const READ_250K = [
+  "250000",
+  "250k",
+  "250 thousand",
+  "quarter of a million",
+  "quarter million",
+  "two hundred and fifty thousand",
+  "two hundred fifty thousand",
+];
+const READ_200K = ["200000", "200k", "200 thousand", "two hundred thousand"];
+const READ_50K = ["50000", "50k", "50 thousand", "fifty thousand"];
+const READ_120K = [
+  "120000",
+  "120k",
+  "120 thousand",
+  "hundred and twenty thousand",
+  "hundred twenty thousand",
+];
 
 // ---------------------------------------------------------------------------
 // Shared setup: an angel who has already said a few things.
@@ -41,7 +76,7 @@ export const CORRECTIONS: readonly CorrectionCase[] = [
   {
     id: "max-cheque-shorthand",
     correction: "wait no, the top end is 150k, not 100. my bad",
-    expect: [{ step: "I2.cheque_max", anyOf: ["150000"] }],
+    expect: [{ step: "I2.cheque_max", anyOf: ["150000"], readBack: READ_150K }],
   },
   {
     id: "currency-misspoke",
@@ -66,7 +101,7 @@ export const CORRECTIONS: readonly CorrectionCase[] = [
   {
     id: "min-disfluent",
     correction: "uh, the minimum. did I say 25? it's ten. ten grand. sorry",
-    expect: [{ step: "I2.cheque_min", anyOf: ["10000"] }],
+    expect: [{ step: "I2.cheque_min", anyOf: ["10000"], readBack: READ_10K }],
   },
   {
     id: "firm-rename",
@@ -78,7 +113,7 @@ export const CORRECTIONS: readonly CorrectionCase[] = [
     id: "max-words",
     correction:
       "on the upper cheque, scratch that, call it a quarter of a million",
-    expect: [{ step: "I2.cheque_max", anyOf: ["250000"] }],
+    expect: [{ step: "I2.cheque_max", anyOf: ["250000"], readBack: READ_250K }],
   },
 ];
 
@@ -103,7 +138,7 @@ export const MULTI_INTENT: readonly MultiIntentCase[] = [
     turn: "quick q — is series A even in scope for someone like me? anyway put us down as seed, and the 100k max I gave you is wrong, it's 200k",
     expect: [
       { step: "I2.stages", anyOf: ["seed"] },
-      { step: "I2.cheque_max", anyOf: ["200000"] },
+      { step: "I2.cheque_max", anyOf: ["200000"], readBack: READ_200K },
     ],
     topic: ["series a", "series-a"],
   },
@@ -121,7 +156,7 @@ export const MULTI_INTENT: readonly MultiIntentCase[] = [
     id: "min-with-cadence-question",
     setup: INVESTOR_SETUP,
     turn: "how many companies will I actually see a week? oh and the minimum is 50k — not 25 like I said before",
-    expect: [{ step: "I2.cheque_min", anyOf: ["50000"] }],
+    expect: [{ step: "I2.cheque_min", anyOf: ["50000"], readBack: READ_50K }],
     topic: ["week", "companies", "feed", "see"],
   },
   {
@@ -140,7 +175,7 @@ export const MULTI_INTENT: readonly MultiIntentCase[] = [
     turn: "can I change all this later? and actually drop Kenya — just Nigeria. oh and max is 120 not 100",
     expect: [
       { step: "I3.geography", anyOf: ["nigeria"], noneOf: ["kenya"] },
-      { step: "I2.cheque_max", anyOf: ["120000"] },
+      { step: "I2.cheque_max", anyOf: ["120000"], readBack: READ_120K },
     ],
     topic: ["change", "later", "update", "edit", "anytime", "any time"],
   },
@@ -345,7 +380,7 @@ export const OBLIQUE: readonly {
     id: "quarter-million-quid",
     say: "cheques top out at a quarter of a million quid",
     expect: [
-      { step: "I2.cheque_max", anyOf: ["250000"] },
+      { step: "I2.cheque_max", anyOf: ["250000"], readBack: READ_250K },
       { step: "I2.currency", anyOf: ["gbp"] },
     ],
   },
@@ -367,7 +402,7 @@ export const OBLIQUE: readonly {
   {
     id: "half-hundred",
     say: "smallest cheque I'd write is half of a hundred grand, in dollars",
-    expect: [{ step: "I2.cheque_min", anyOf: ["50000"] }],
+    expect: [{ step: "I2.cheque_min", anyOf: ["50000"], readBack: READ_50K }],
   },
   {
     id: "employer-arm",

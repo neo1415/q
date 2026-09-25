@@ -81,6 +81,31 @@ function mismatch(recorded: Map<string, string[]>, e: Expect): string | null {
   return null;
 }
 
+/**
+ * Recorded-state mismatches, plus (lead decision 2026-09-25) an explicit
+ * value that was not read back in Q's reply for that turn. The recorded
+ * value is the authoritative check; the read-back is the loose one.
+ */
+function judge(
+  recorded: Map<string, string[]>,
+  expected: readonly Expect[],
+  reply: string | null,
+): string[] {
+  const said = (reply ?? "").toLowerCase().replace(/(\d),(?=\d{3}\b)/g, "$1");
+  const failures: string[] = [];
+  for (const e of expected) {
+    const miss = mismatch(recorded, e);
+    if (miss !== null) failures.push(miss);
+    if (
+      e.readBack !== undefined &&
+      !e.readBack.some((form) => said.includes(form))
+    ) {
+      failures.push(`${e.step}: not read back in Q's reply`);
+    }
+  }
+  return failures;
+}
+
 function snapshot(map: Map<string, string[]>): Record<string, string> {
   return Object.fromEntries(
     [...map].map(([k, v]) => [k, [...v].sort().join("|")]),
@@ -235,12 +260,10 @@ test.describe("P1 corrections update the intended fact", () => {
       const interview = await start(`p1-${c.id}`);
       await setup(interview, INVESTOR_SETUP);
       const pending = await pendingConfirmation(interview);
-      await interview.say(c.correction);
+      const said = await interview.say(c.correction);
       const recorded = await answers(interview.sessionId);
       note("transcript", transcript(interview));
-      const failures = c.expect
-        .map((e) => mismatch(recorded, e))
-        .filter((m) => m !== null);
+      const failures = judge(recorded, c.expect, said.reply);
       expect(
         failures,
         capability(
@@ -266,9 +289,7 @@ test.describe("P2 one turn: question + answer + correction", () => {
       const turn = await interview.say(c.turn);
       const recorded = await answers(interview.sessionId);
       note("transcript", transcript(interview));
-      const failures = c.expect
-        .map((e) => mismatch(recorded, e))
-        .filter((m) => m !== null);
+      const failures = judge(recorded, c.expect, turn.reply);
       expect
         .soft(
           failures,
@@ -516,12 +537,10 @@ test.describe("P8 oblique phrasing is interpreted, not matched", () => {
         !(await answers(interview.sessionId)).has(asking)
           ? asking
           : null;
-      await interview.say(c.say);
+      const said = await interview.say(c.say);
       const recorded = await answers(interview.sessionId);
       note("transcript", transcript(interview));
-      const failures = c.expect
-        .map((e) => mismatch(recorded, e))
-        .filter((m) => m !== null);
+      const failures = judge(recorded, c.expect, said.reply);
       expect(
         failures,
         failures.length > 0 && gate !== null
