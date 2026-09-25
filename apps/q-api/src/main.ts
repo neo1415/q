@@ -38,7 +38,10 @@ import {
 } from "@capital-q/contracts";
 import { createRequestDatabaseClient } from "@capital-q/database";
 import { createOutboxWriter } from "@capital-q/eventing";
-import { createOwnOnboardingSummaryReader } from "@capital-q/onboarding";
+import {
+  createOnboardingQRecommendations,
+  createOwnOnboardingSummaryReader,
+} from "@capital-q/onboarding";
 import { createPostgresDocumentQueryPort } from "@capital-q/evidence";
 import {
   createPostgresInvestorMandateQueryPort,
@@ -1098,6 +1101,9 @@ const interviewAgent = createInterviewAgent({
   firewall,
   logger,
   memory: memoryService,
+  recommendations: createOnboardingQRecommendations({
+    transactions: database.transactions,
+  }),
   dataPosture: demoDataPosture,
 });
 const voiceTurnBoard = createVoiceTurnBoard();

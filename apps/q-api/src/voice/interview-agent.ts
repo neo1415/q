@@ -48,7 +48,10 @@ import {
   type InterviewTurnInput,
   type InterviewTurnOutcome,
 } from "./interviewer.js";
-import { createOnboardingPort } from "./onboarding-port.js";
+import {
+  createOnboardingPort,
+  type RecommendationStore,
+} from "./onboarding-port.js";
 
 /**
  * The onboarding interview as a tool-calling Q run (ADR 0016).
@@ -90,6 +93,11 @@ export type InterviewAgentDependencies = {
    * profile, nothing recalled, no note_preference tool.
    */
   readonly memory?: Pick<MemoryService, "recall" | "remember"> | undefined;
+  /**
+   * Where Q's recommendations are kept: the onboarding service's
+   * suggestions (P0-2). Absent: recommend is refused honestly.
+   */
+  readonly recommendations?: RecommendationStore | undefined;
 };
 
 export type InterviewAgent = {
@@ -120,13 +128,6 @@ export function createInterviewAgent(
       ? CorrelationIdSchema.parse(input.attribution.correlationId)
       : CorrelationIdSchema.parse(`cor_${randomUUID()}`);
 
-    const port = createOnboardingPort({
-      session: input.session,
-      onboardingSessionId: input.onboardingSessionId,
-      journeyType: input.journeyType,
-      ownerUserId: actor.userId,
-    });
-
     // The whole conversation, from the kept thread; the browser's recent
     // turns only when the thread cannot be read.
     const kept = await listOnboardingInterviewTurns(
@@ -146,6 +147,23 @@ export function createInterviewAgent(
             role: t.role === "PERSON" ? ("PERSON" as const) : ("Q" as const),
             text: t.text.slice(0, 2_000),
           }));
+    const port = createOnboardingPort({
+      session: input.session,
+      onboardingSessionId: input.onboardingSessionId,
+      journeyType: input.journeyType,
+      ownerUserId: actor.userId,
+      // Only the person's own words can carry a write (P0-2): what they
+      // just said, then what they said earlier in this conversation.
+      personTurns: [
+        ...(utterance.length === 0 ? [] : [utterance]),
+        ...thread
+          .filter((t) => t.role === "PERSON")
+          .map((t) => t.text)
+          .reverse(),
+      ],
+      recommendations: dependencies.recommendations,
+      runId,
+    });
     // The newest turns verbatim, the older ones as a bounded summary
     // (P0-5): the whole conversation, within a fixed budget.
     const compacted = compactThread(thread);
@@ -218,8 +236,12 @@ export function createInterviewAgent(
       charter: input.channel === "voice" ? "Q_SYSTEM_VOICE" : "Q_SYSTEM",
       operatingMode: "ASSESSMENT",
       communicationProfile: loop.profile,
+      // Capital Q's authority statement for this loop (lead decision,
+      // 2026-09-25): a reversible write to the person's own onboarding, at
+      // their explicit delegation, is scoped delegation, not an action on
+      // Q's own account. Trusted text in the charter's frame.
       environmentNotes:
-        "You change the person's onboarding only through your tools; a tool result is what happened.",
+        "You change the person's onboarding only through your tools; a tool result is what happened. Capital Q grants scoped delegation here: when the person explicitly hands you a choice about their own onboarding and asks you to go ahead, recording your choice is acting on their instruction, reversible and theirs to change, and is permitted without a further approval step.",
       variables: {
         journey: input.journeyType,
         channel: input.channel,

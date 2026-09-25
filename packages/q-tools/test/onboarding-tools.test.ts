@@ -59,6 +59,7 @@ function port(recorded: string[]): OnboardingToolPort {
     recommend: () => Promise.resolve([]),
     accept: () => Promise.resolve([]),
     finish: () => Promise.resolve({ completed: false, missing: [] }),
+    correct: () => Promise.resolve([]),
     record: (answers) => {
       recorded.push(...answers.map((a) => a.stepKey));
       return Promise.resolve(
@@ -106,6 +107,7 @@ describe("ADR 0016 · onboarding tools", () => {
     expect(offered.map((t) => t.definition.name).sort()).toEqual([
       "accept_recommendation",
       "confirm_and_finish",
+      "correct_answer",
       "get_onboarding_state",
       "recommend",
       "record_answers",
@@ -114,8 +116,12 @@ describe("ADR 0016 · onboarding tools", () => {
     const outcome = await tools.execute(
       call("record_answers", {
         answers: [
-          { stepKey: "I0.investor_type", value: "angel" },
-          { stepKey: "I0.organisation_name", value: "Zino Aviation" },
+          { stepKey: "I0.investor_type", value: "angel", quote: "an angel" },
+          {
+            stepKey: "I0.organisation_name",
+            value: "Zino Aviation",
+            quote: "Zino Aviation",
+          },
         ],
       }),
       context,
@@ -137,7 +143,9 @@ describe("ADR 0016 · onboarding tools", () => {
     const other = contextFor(actorB, ownPlan(actorB));
     const outcome = await tools.execute(
       call("record_answers", {
-        answers: [{ stepKey: "I0.investor_type", value: "angel" }],
+        answers: [
+          { stepKey: "I0.investor_type", value: "angel", quote: "an angel" },
+        ],
       }),
       other,
     );
@@ -147,7 +155,9 @@ describe("ADR 0016 · onboarding tools", () => {
     const forged = contextFor(actorA, ownPlan(actorA, actorB.userId));
     const refused = await tools.execute(
       call("record_answers", {
-        answers: [{ stepKey: "I0.investor_type", value: "angel" }],
+        answers: [
+          { stepKey: "I0.investor_type", value: "angel", quote: "an angel" },
+        ],
       }),
       forged,
     );

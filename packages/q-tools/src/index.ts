@@ -143,6 +143,9 @@ export {
 export {
   ACCEPT_ONBOARDING_RECOMMENDATIONS,
   AcceptOnboardingRecommendationsInputSchema,
+  CORRECT_ONBOARDING_ANSWERS,
+  CorrectOnboardingAnswersInputSchema,
+  type CorrectOnboardingAnswersInput,
   createOnboardingTools,
   FINISH_ONBOARDING,
   FinishOnboardingOutputSchema,

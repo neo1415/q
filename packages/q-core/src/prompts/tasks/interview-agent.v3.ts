@@ -45,7 +45,7 @@ export const INTERVIEW_AGENT_V3: PromptDefinition<
   owner: INTERVIEW_AGENT_V2.owner,
   output: INTERVIEW_AGENT_V2.output,
   version: 3,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   changeDescription:
     "P0-5: what Q remembers about the person and a bounded summary of older turns arrive as untrusted context; stated communication preferences are kept with note_preference.",
   effectiveFrom: "2026-09-25",

@@ -126,6 +126,7 @@ function fakeRuntime(overrides: Partial<Runtime> = {}) {
       }),
     ),
     skipStep: record("skipStep", () => Promise.resolve(VIEW)),
+    withdrawResponse: record("withdrawResponse", () => Promise.resolve(VIEW)),
     goBack: record("goBack", () => Promise.resolve(VIEW)),
     completeSession: record("completeSession", () => Promise.resolve(VIEW)),
     resolveSuggestion: record("resolveSuggestion", () => Promise.resolve(VIEW)),

@@ -5,14 +5,21 @@ import {
   findTaxonomyCandidates,
   getOnboardingSession,
   getTaxonomyNode,
+  resolveOnboardingSuggestion,
   submitOnboardingResponse,
+  withdrawOnboardingResponse,
   type ApiSession,
 } from "@capital-q/api-client";
 import type {
   OnboardingResponseValue,
   OnboardingSessionView,
 } from "@capital-q/contracts";
-import type { OnboardingStepManifest } from "@capital-q/onboarding";
+import type {
+  OnboardingQRecommendations,
+  OnboardingStepManifest,
+} from "@capital-q/onboarding";
+import { quoteOccursIn } from "@capital-q/q-knowledge";
+import type { UserId } from "@capital-q/security";
 import type {
   FinishOnboardingOutput,
   OnboardingRecommendResult,
@@ -45,38 +52,15 @@ import { SPOKEN_QUESTIONS } from "./step-copy.js";
  * did that when it chose what to record.
  */
 /**
- * Q's pending recommendations, per onboarding session (ADR 0016).
- *
- * Held by the q-api process for the life of the conversation: the
- * onboarding service offers no client route to create a suggestion, so a
- * durable home for Q's own recommendations is an open lead-owned
- * decision. A recommendation is never an answer; only acceptance writes
- * it, and then exactly as recommended.
+ * Q's recommendations live in the onboarding service as suggestions with a
+ * Q_RECOMMENDATION source (P0-2): durable, owner-checked, the payload
+ * immutable. Composed from packages/onboarding in production; a fake in
+ * tests.
  */
-type PendingRecommendation = {
-  readonly value: OnboardingResponseValue;
-  readonly spoken: string;
-  readonly because: string;
-};
-const recommendationsBySession = new Map<
-  string,
-  Map<string, PendingRecommendation>
->();
-function recommendations(
-  sessionId: string,
-): Map<string, PendingRecommendation> {
-  let held = recommendationsBySession.get(sessionId);
-  if (held === undefined) {
-    held = new Map();
-    recommendationsBySession.set(sessionId, held);
-    // Bounded: the oldest sessions go first.
-    if (recommendationsBySession.size > 5_000) {
-      const oldest = recommendationsBySession.keys().next().value;
-      if (oldest !== undefined) recommendationsBySession.delete(oldest);
-    }
-  }
-  return held;
-}
+export type RecommendationStore = Pick<
+  OnboardingQRecommendations,
+  "recommend" | "pending"
+>;
 
 export type BoundOnboardingPort = OnboardingToolPort & {
   /** The latest view this port saw, for the caller's outcome. */
@@ -90,6 +74,15 @@ export function createOnboardingPort(input: {
   readonly onboardingSessionId: string;
   readonly journeyType: "investor" | "founder";
   readonly ownerUserId: string;
+  /**
+   * What the person has said in this conversation, newest first: the only
+   * text a write's quote may come from (P0-2). Never tool results, web
+   * pages or documents.
+   */
+  readonly personTurns: readonly string[];
+  readonly recommendations?: RecommendationStore | undefined;
+  /** The Q run, for a recommendation's provenance. */
+  readonly runId?: string | undefined;
 }): BoundOnboardingPort {
   const steps = new Map(
     definitionFor(input.journeyType).steps.map(
@@ -98,6 +91,27 @@ export function createOnboardingPort(input: {
   );
   let latest: OnboardingSessionView | null = null;
   const written: string[] = [];
+  const userId = input.ownerUserId as UserId;
+  const store = input.recommendations;
+  const pendingNow = async () =>
+    store === undefined
+      ? []
+      : await store.pending({ userId, sessionId: input.onboardingSessionId });
+  /**
+   * What the person has heard: the recommendations pending when this turn
+   * began. Only those may be accepted — one made in this very turn has
+   * not been said to anybody yet.
+   */
+  const heard = pendingNow().catch(() => []);
+  /** The person's own words carry this write, or it does not happen. */
+  const said = (quote: string): boolean =>
+    input.personTurns.some((turn) => quoteOccursIn(quote, turn));
+  const unsaid = (stepKey: string): OnboardingRecordResult => ({
+    stepKey: stepKey.slice(0, 80),
+    outcome: "REJECTED",
+    reason:
+      "That quote is not in anything the person said here, so nothing was recorded. Only their own words can put an answer on the record.",
+  });
 
   /**
    * The journey's own preselection, recorded (ADR 0016).
@@ -172,6 +186,7 @@ export function createOnboardingPort(input: {
 
   const state = async (): Promise<OnboardingState> => {
     const view = await fresh();
+    const pendingList = await pendingNow().catch(() => []);
     const rows: OnboardingStepState[] = [];
     for (const eligible of view.progress.eligibleSteps) {
       const step = steps.get(eligible.stepKey);
@@ -221,16 +236,18 @@ export function createOnboardingPort(input: {
         ...(open?.maxChoices === undefined
           ? {}
           : { maxChoices: open.maxChoices }),
-        ...(recommendations(input.onboardingSessionId).get(step.stepKey) ===
-        undefined
-          ? {}
-          : {
-              pendingRecommendation:
-                `${recommendations(input.onboardingSessionId).get(step.stepKey)?.spoken ?? ""} (because ${recommendations(input.onboardingSessionId).get(step.stepKey)?.because ?? ""})`.slice(
-                  0,
-                  600,
-                ),
-            }),
+        ...(await (async () => {
+          const held = pendingList.find((r) => r.stepKey === step.stepKey);
+          if (held === undefined) return {};
+          const heardIt = (await heard).some((r) => r.id === held.id);
+          return {
+            pendingRecommendation:
+              `${await spoken(step, held.value, view)}${held.rationale === null ? "" : ` (because ${held.rationale})`}${heardIt ? "" : " (not yet said to them)"}`.slice(
+                0,
+                600,
+              ),
+          };
+        })()),
       });
     }
     return {
@@ -360,66 +377,141 @@ export function createOnboardingPort(input: {
     return { ok: true, step, value };
   };
 
-  /** Write a resolved value: one concept in one exclusion list, then submit. */
-  const write = async (
+  const withdraw = async (stepKey: string): Promise<void> => {
+    const view = await current();
+    latest = await settle(
+      await withdrawOnboardingResponse(
+        input.session,
+        input.onboardingSessionId,
+        stepKey,
+        { expectedSessionVersion: view.session.version },
+        randomUUID(),
+      ),
+    );
+  };
+
+  /**
+   * One concept, one exclusion list: the journey keeps a red flag in one of
+   * the two and refuses a write that lists it in both. A never-show answer
+   * moves the item off the softer list (withdrawing that list when it was
+   * the last item); a softer answer leaves out what is already never shown.
+   */
+  const prepareSiblings = async (
     step: OnboardingStepManifest,
     resolvedValue: OnboardingResponseValue,
-  ): Promise<OnboardingRecordResult> => {
+  ): Promise<
+    | {
+        readonly ok: true;
+        readonly value: OnboardingResponseValue;
+        readonly movedFrom?: OnboardingRecordResult["movedFrom"];
+      }
+    | { readonly ok: false; readonly result: OnboardingRecordResult }
+  > => {
     const view = await current();
-    let value = resolvedValue;
-
-    // One concept, one exclusion list: the journey keeps a red flag in
-    // one of the two and refuses a write that lists it in both.
     const pair = EXCLUSION_SIBLINGS.get(step.stepKey);
     const sibling =
       pair === undefined
         ? undefined
         : view.responses.find((r) => r.stepKey === pair.sibling)?.value;
     if (
-      pair !== undefined &&
-      value.type === "MULTI_SELECT" &&
-      sibling?.type === "MULTI_SELECT"
+      pair === undefined ||
+      resolvedValue.type !== "MULTI_SELECT" ||
+      sibling?.type !== "MULTI_SELECT"
     ) {
-      const overlap = value.optionKeys.filter((key) =>
-        sibling.optionKeys.includes(key),
-      );
-      if (overlap.length > 0 && !pair.hard) {
-        // Already never shown: nothing softer to add for those.
-        const rest = value.optionKeys.filter((key) => !overlap.includes(key));
-        if (rest.length === 0) {
-          return {
-            stepKey: step.stepKey,
-            outcome: "REJECTED",
-            reason: `${describeValue(step, value)} is already on the never-show list.`,
-          };
-        }
-        value = { type: "MULTI_SELECT", optionKeys: rest };
-      } else if (overlap.length > 0) {
-        const kept = sibling.optionKeys.filter((key) => !overlap.includes(key));
-        if (kept.length === 0) {
-          return {
-            stepKey: step.stepKey,
-            outcome: "REJECTED",
-            reason: `${describeValue(step, { type: "MULTI_SELECT", optionKeys: overlap })} is the only thing on the rank-lower list, and a list cannot be emptied from here, so it cannot move to never-show.`,
-          };
-        }
-        try {
-          await submit(pair.sibling, {
-            type: "MULTI_SELECT",
-            optionKeys: kept,
-          });
-        } catch (error: unknown) {
-          return {
-            stepKey: step.stepKey,
-            outcome: "REJECTED",
-            reason:
-              readRefusal(error).because ??
-              "It could not be moved off the rank-lower list.",
-          };
-        }
-      }
+      return { ok: true, value: resolvedValue };
     }
+    const overlap = resolvedValue.optionKeys.filter((key) =>
+      sibling.optionKeys.includes(key),
+    );
+    if (overlap.length === 0) return { ok: true, value: resolvedValue };
+    if (!pair.hard) {
+      const rest = resolvedValue.optionKeys.filter(
+        (key) => !overlap.includes(key),
+      );
+      if (rest.length === 0) {
+        return {
+          ok: false,
+          result: {
+            stepKey: step.stepKey,
+            outcome: "REJECTED",
+            reason: `${describeValue(step, resolvedValue)} is already on the never-show list.`,
+          },
+        };
+      }
+      return { ok: true, value: { type: "MULTI_SELECT", optionKeys: rest } };
+    }
+    const kept = sibling.optionKeys.filter((key) => !overlap.includes(key));
+    try {
+      // Moving the last item empties the softer list: that is a
+      // withdrawal, with its history kept.
+      if (kept.length === 0) await withdraw(pair.sibling);
+      else
+        await submit(pair.sibling, { type: "MULTI_SELECT", optionKeys: kept });
+    } catch (error: unknown) {
+      return {
+        ok: false,
+        result: {
+          stepKey: step.stepKey,
+          outcome: "REJECTED",
+          reason: (
+            readRefusal(error).because ??
+            "It could not be moved off the rank-lower list."
+          ).slice(0, 400),
+        },
+      };
+    }
+    const siblingStep = steps.get(pair.sibling);
+    return {
+      ok: true,
+      value: resolvedValue,
+      ...(siblingStep === undefined
+        ? {}
+        : {
+            movedFrom: {
+              stepKey: pair.sibling,
+              question: (
+                SPOKEN_QUESTIONS[pair.sibling] ??
+                siblingStep.configuration.prompt
+              ).slice(0, 400),
+              items: describeValue(siblingStep, {
+                type: "MULTI_SELECT",
+                optionKeys: overlap,
+              }).slice(0, 600),
+            },
+          }),
+    };
+  };
 
+  /** Where the service refuses, its own reason, and the step it needs first. */
+  const refused = (stepKey: string, error: unknown): OnboardingRecordResult => {
+    const refusal = readRefusal(error);
+    const needs = stepNamed(refusal.needs);
+    return needs !== undefined
+      ? {
+          stepKey,
+          outcome: "NEEDS_FIRST",
+          needsStepKey: needs,
+          ...(refusal.because === null
+            ? {}
+            : { reason: refusal.because.slice(0, 400) }),
+        }
+      : {
+          stepKey,
+          outcome: "REJECTED",
+          reason: (
+            refusal.because ?? "The onboarding service did not accept it."
+          ).slice(0, 400),
+        };
+  };
+
+  /** Write a resolved value: one concept in one exclusion list, then submit. */
+  const write = async (
+    step: OnboardingStepManifest,
+    resolvedValue: OnboardingResponseValue,
+  ): Promise<OnboardingRecordResult> => {
+    const prepared = await prepareSiblings(step, resolvedValue);
+    if (!prepared.ok) return prepared.result;
+    const value = prepared.value;
     try {
       await submit(step.stepKey, value);
       written.push(step.stepKey);
@@ -427,41 +519,30 @@ export function createOnboardingPort(input: {
       return {
         stepKey: step.stepKey,
         outcome: "COMMITTED",
+        question: (
+          SPOKEN_QUESTIONS[step.stepKey] ?? step.configuration.prompt
+        ).slice(0, 400),
         recorded: (await spoken(step, value, after)).slice(0, 600),
+        ...(prepared.movedFrom === undefined
+          ? {}
+          : { movedFrom: prepared.movedFrom }),
       };
     } catch (error: unknown) {
-      const refusal = readRefusal(error);
-      const needs = stepNamed(refusal.needs);
-      return needs !== undefined
-        ? {
-            stepKey: step.stepKey,
-            outcome: "NEEDS_FIRST",
-            needsStepKey: needs,
-            ...(refusal.because === null
-              ? {}
-              : { reason: refusal.because.slice(0, 400) }),
-          }
-        : {
-            stepKey: step.stepKey,
-            outcome: "REJECTED",
-            reason: (
-              refusal.because ?? "The onboarding service did not accept it."
-            ).slice(0, 400),
-          };
+      return refused(step.stepKey, error);
     }
   };
 
   const recordOne = async (answer: {
     readonly stepKey: string;
     readonly value: string | readonly string[] | number | boolean;
+    readonly quote: string;
   }): Promise<OnboardingRecordResult> => {
+    if (!said(answer.quote)) return unsaid(answer.stepKey);
     const resolved = await resolve(answer);
     return resolved.ok
       ? await write(resolved.step, resolved.value)
       : resolved.result;
   };
-
-  const pending = recommendations(input.onboardingSessionId);
 
   return {
     ownerUserId: input.ownerUserId,
@@ -469,6 +550,14 @@ export function createOnboardingPort(input: {
     recommend: async (items) => {
       const results: OnboardingRecommendResult[] = [];
       for (const item of items) {
+        if (store === undefined) {
+          results.push({
+            stepKey: item.stepKey.slice(0, 80),
+            outcome: "REJECTED",
+            reason: "Recommendations cannot be kept right now.",
+          });
+          continue;
+        }
         const resolved = await resolve(item);
         if (!resolved.ok) {
           results.push({
@@ -483,30 +572,43 @@ export function createOnboardingPort(input: {
           });
           continue;
         }
-        const said = await spoken(
-          resolved.step,
-          resolved.value,
-          await current(),
-        );
-        pending.set(resolved.step.stepKey, {
-          value: resolved.value,
-          spoken: said,
-          because: item.because.slice(0, 300),
-        });
-        results.push({
-          stepKey: resolved.step.stepKey,
-          outcome: "RECOMMENDED",
-          recommended: said.slice(0, 600),
-        });
+        try {
+          const kept = await store.recommend({
+            userId,
+            sessionId: input.onboardingSessionId,
+            stepKey: resolved.step.stepKey,
+            value: resolved.value,
+            rationale: item.because,
+            runId: input.runId ?? null,
+          });
+          results.push({
+            stepKey: kept.stepKey,
+            outcome: "RECOMMENDED",
+            recommended: (
+              await spoken(resolved.step, kept.value, await current())
+            ).slice(0, 600),
+          });
+        } catch (error: unknown) {
+          results.push({
+            stepKey: resolved.step.stepKey,
+            outcome: "REJECTED",
+            reason: (
+              readRefusal(error).because ??
+              "That recommendation could not be kept."
+            ).slice(0, 400),
+          });
+        }
       }
       return results;
     },
     accept: async (stepKeys) => {
       const results: OnboardingRecordResult[] = [];
+      const heardList = await heard;
+      const stillPending = await pendingNow();
       for (const stepKey of stepKeys) {
-        const held = pending.get(stepKey);
         const step = steps.get(stepKey);
-        if (held === undefined || step === undefined) {
+        const held = stillPending.find((r) => r.stepKey === stepKey);
+        if (step === undefined || held === undefined) {
           results.push({
             stepKey: stepKey.slice(0, 80),
             outcome: "REJECTED",
@@ -514,10 +616,105 @@ export function createOnboardingPort(input: {
           });
           continue;
         }
-        // The approval binds to exactly what was recommended.
-        const result = await write(step, held.value);
-        if (result.outcome === "COMMITTED") pending.delete(stepKey);
-        results.push(result);
+        if (!heardList.some((r) => r.id === held.id)) {
+          results.push({
+            stepKey,
+            outcome: "REJECTED",
+            reason:
+              "That recommendation has not been said to the person yet; tell them what it is and let them decide.",
+          });
+          continue;
+        }
+        // The approval binds to exactly what was recommended: if the
+        // journey would need to change it, it is not accepted.
+        const prepared = await prepareSiblings(step, held.value);
+        if (!prepared.ok) {
+          results.push(prepared.result);
+          continue;
+        }
+        if (JSON.stringify(prepared.value) !== JSON.stringify(held.value)) {
+          results.push({
+            stepKey,
+            outcome: "REJECTED",
+            reason:
+              "Part of that recommendation is already on the never-show list, so it cannot be accepted as it stands.",
+          });
+          continue;
+        }
+        try {
+          const view = await current();
+          latest = await settle(
+            await resolveOnboardingSuggestion(
+              input.session,
+              input.onboardingSessionId,
+              held.id,
+              {
+                resolution: "ACCEPT",
+                expectedSessionVersion: view.session.version,
+              },
+              randomUUID(),
+            ),
+          );
+          written.push(stepKey);
+          results.push({
+            stepKey,
+            outcome: "COMMITTED",
+            question: (
+              SPOKEN_QUESTIONS[step.stepKey] ?? step.configuration.prompt
+            ).slice(0, 400),
+            recorded: (await spoken(step, held.value, await current())).slice(
+              0,
+              600,
+            ),
+            ...(prepared.movedFrom === undefined
+              ? {}
+              : { movedFrom: prepared.movedFrom }),
+          });
+        } catch (error: unknown) {
+          results.push(refused(stepKey, error));
+        }
+      }
+      return results;
+    },
+    correct: async (corrections) => {
+      const results: OnboardingRecordResult[] = [];
+      for (const correction of corrections) {
+        if (!said(correction.quote)) {
+          results.push(unsaid(correction.stepKey));
+          continue;
+        }
+        const step = steps.get(correction.stepKey);
+        if (correction.value !== null) {
+          results.push(
+            await recordOne({
+              stepKey: correction.stepKey,
+              value: correction.value,
+              quote: correction.quote,
+            }),
+          );
+          continue;
+        }
+        if (step === undefined) {
+          results.push({
+            stepKey: correction.stepKey.slice(0, 80),
+            outcome: "REJECTED",
+            reason: "There is no such step in this onboarding.",
+          });
+          continue;
+        }
+        try {
+          await withdraw(step.stepKey);
+          written.push(step.stepKey);
+          results.push({
+            stepKey: step.stepKey,
+            outcome: "WITHDRAWN",
+            question: (
+              SPOKEN_QUESTIONS[step.stepKey] ?? step.configuration.prompt
+            ).slice(0, 400),
+          });
+        } catch (error: unknown) {
+          results.push(refused(step.stepKey, error));
+        }
       }
       return results;
     },

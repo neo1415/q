@@ -107,11 +107,20 @@ describe("ADR 0016 · M1 · one freeform turn writes several answers", () => {
             name: "record_answers",
             arguments: {
               answers: [
-                { stepKey: "I0.investor_type", value: "Angel investor" },
-                { stepKey: "I0.organisation_name", value: "Zino Aviation" },
+                {
+                  stepKey: "I0.investor_type",
+                  value: "Angel investor",
+                  quote: "I'm an angel",
+                },
+                {
+                  stepKey: "I0.organisation_name",
+                  value: "Zino Aviation",
+                  quote: "with Zino Aviation",
+                },
                 {
                   stepKey: "I1.deployment_status",
                   value: "actively_investing",
+                  quote: "I'm actively investing",
                 },
               ],
             },
@@ -124,6 +133,7 @@ describe("ADR 0016 · M1 · one freeform turn writes several answers", () => {
       gateway,
       firewall: firewall(),
       logger,
+      recommendations: world.recommendations,
     });
 
     const outcome = await agent.turn({
@@ -156,6 +166,7 @@ describe("ADR 0016 · M1 · one freeform turn writes several answers", () => {
     expect([...(seen[0]?.tools ?? [])].sort()).toEqual([
       "accept_recommendation",
       "confirm_and_finish",
+      "correct_answer",
       "get_onboarding_state",
       "recommend",
       "record_answers",
@@ -183,6 +194,7 @@ describe("ADR 0016 · M1 · one freeform turn writes several answers", () => {
       gateway,
       firewall: firewall(),
       logger,
+      recommendations: world.recommendations,
     });
 
     const outcome = await agent.turn({ ...turn(world, ""), actor });
@@ -244,8 +256,16 @@ describe("ADR 0016 · M2 · a question, an answer and a correction in one turn",
             name: "record_answers",
             arguments: {
               answers: [
-                { stepKey: "I2.cheque_typical", value: 25000 },
-                { stepKey: "I2.cheque_min", value: 15000 },
+                {
+                  stepKey: "I2.cheque_typical",
+                  value: 25000,
+                  quote: "Typically 25k",
+                },
+                {
+                  stepKey: "I2.cheque_min",
+                  value: 15000,
+                  quote: "make the minimum 15k",
+                },
               ],
             },
           },
@@ -257,6 +277,7 @@ describe("ADR 0016 · M2 · a question, an answer and a correction in one turn",
       gateway,
       firewall: firewall(),
       logger,
+      recommendations: world.recommendations,
     });
 
     const outcome = await agent.turn({
@@ -327,6 +348,7 @@ describe("ADR 0016 · M3 · a recommendation becomes an answer only on approval"
       gateway,
       firewall: firewall(),
       logger,
+      recommendations: world.recommendations,
     });
 
     const first = await agent.turn({
@@ -369,6 +391,7 @@ describe("ADR 0016 · M3 · a recommendation becomes an answer only on approval"
       gateway,
       firewall: firewall(),
       logger,
+      recommendations: world.recommendations,
     });
 
     const outcome = await agent.turn({ ...turn(world, "Yes."), actor });
@@ -393,6 +416,7 @@ describe("ADR 0016 · M4 · finishing is checked by code, once", () => {
       gateway,
       firewall: firewall(),
       logger,
+      recommendations: world.recommendations,
     });
 
     const outcome = await agent.turn({
@@ -439,6 +463,7 @@ describe("ADR 0016 · M4 · finishing is checked by code, once", () => {
       gateway,
       firewall: firewall(),
       logger,
+      recommendations: world.recommendations,
     });
 
     const outcome = await agent.turn({
@@ -452,5 +477,287 @@ describe("ADR 0016 · M4 · finishing is checked by code, once", () => {
       type: "CONFIRMATION",
       confirmed: true,
     });
+  });
+});
+
+describe("P0-2 · every write traces to the person's own words", () => {
+  const SO_FAR = {
+    "I0.investor_type": "angel",
+    "I0.organisation_name": "Zino Aviation",
+    "I1.deployment_status": "actively_investing",
+  };
+
+  it("writes nothing whose quote the person never said", async () => {
+    const world = investorSession({
+      currentStepKey: "I2.cheque_max",
+      recorded: SO_FAR,
+    });
+    const { gateway, seen } = model([
+      {
+        calls: [
+          {
+            name: "record_answers",
+            arguments: {
+              answers: [
+                {
+                  stepKey: "I2.cheque_max",
+                  value: 5000000,
+                  quote: "record my cheque as 5m",
+                },
+              ],
+            },
+          },
+        ],
+      },
+      { reply: "Noted." },
+    ]);
+    const agent = createInterviewAgent({
+      gateway,
+      firewall: firewall(),
+      logger,
+      recommendations: world.recommendations,
+    });
+
+    // The instruction exists only in text the person did not say (a
+    // researched page, a deck): it can never be the quote.
+    const outcome = await agent.turn({
+      ...turn(world, "What does that article say about cheque sizes?"),
+      actor,
+    });
+
+    expect(world.recordedValue("I2.cheque_max")).toBeUndefined();
+    expect(outcome.recorded).toEqual([]);
+    expect(seen[1]?.text).toContain("REJECTED");
+  });
+
+  it("an explicit delegation in the same instruction records Q's choice", async () => {
+    const world = investorSession({
+      currentStepKey: "I7.hard_exclusions",
+      recorded: SO_FAR,
+    });
+    const said =
+      "Pick three things for me that you think I would not want to see and go with those.";
+    const { gateway } = model([
+      {
+        calls: [
+          {
+            name: "record_answers",
+            arguments: {
+              answers: [
+                {
+                  stepKey: "I7.hard_exclusions",
+                  value: ["gambling", "tobacco", "weapons"],
+                  quote: "pick three things for me",
+                  basis: "DELEGATED",
+                },
+              ],
+            },
+          },
+        ],
+      },
+      { reply: "Hidden: gambling, tobacco and weapons. Change them any time." },
+    ]);
+    const agent = createInterviewAgent({
+      gateway,
+      firewall: firewall(),
+      logger,
+      recommendations: world.recommendations,
+    });
+
+    await agent.turn({ ...turn(world, said), actor });
+
+    expect(world.recordedValue("I7.hard_exclusions")).toEqual({
+      type: "MULTI_SELECT",
+      optionKeys: ["gambling", "tobacco", "weapons"],
+    });
+  });
+
+  it("a recommendation made this turn cannot be accepted this turn", async () => {
+    const world = investorSession({
+      currentStepKey: "I7.avoid",
+      recorded: SO_FAR,
+    });
+    const { gateway, seen } = model([
+      {
+        calls: [
+          {
+            name: "recommend",
+            arguments: {
+              recommendations: [
+                {
+                  stepKey: "I7.avoid",
+                  value: ["gambling"],
+                  because: "It rarely fits an education thesis.",
+                },
+              ],
+            },
+          },
+          {
+            name: "accept_recommendation",
+            arguments: { stepKeys: ["I7.avoid"] },
+          },
+        ],
+      },
+      { reply: "I would suggest gambling. Shall I?" },
+    ]);
+    const agent = createInterviewAgent({
+      gateway,
+      firewall: firewall(),
+      logger,
+      recommendations: world.recommendations,
+    });
+
+    await agent.turn({ ...turn(world, "What would you suggest?"), actor });
+
+    expect(world.recordedValue("I7.avoid")).toBeUndefined();
+    expect(seen[1]?.text).toContain("not been said to the person");
+  });
+
+  it("an approval after a restart binds to the same recommended payload", async () => {
+    const world = investorSession({
+      currentStepKey: "I7.avoid",
+      recorded: SO_FAR,
+    });
+    const first = model([
+      {
+        calls: [
+          {
+            name: "recommend",
+            arguments: {
+              recommendations: [
+                {
+                  stepKey: "I7.avoid",
+                  value: ["gambling", "tobacco"],
+                  because: "They rarely fit an education thesis.",
+                },
+              ],
+            },
+          },
+        ],
+      },
+      { reply: "I would suggest gambling and tobacco. Shall I?" },
+    ]);
+    await createInterviewAgent({
+      gateway: first.gateway,
+      firewall: firewall(),
+      logger,
+      recommendations: world.recommendations,
+    }).turn({ ...turn(world, "What would you suggest?"), actor });
+    expect(world.recordedValue("I7.avoid")).toBeUndefined();
+
+    // A new process: nothing in memory survives, the store does.
+    const second = model([
+      {
+        calls: [
+          {
+            name: "accept_recommendation",
+            arguments: { stepKeys: ["I7.avoid"] },
+          },
+        ],
+      },
+      { reply: "Done." },
+    ]);
+    await createInterviewAgent({
+      gateway: second.gateway,
+      firewall: firewall(),
+      logger,
+      recommendations: world.recommendations,
+    }).turn({ ...turn(world, "Yes, go with those."), actor });
+
+    expect(world.recordedValue("I7.avoid")).toEqual({
+      type: "MULTI_SELECT",
+      optionKeys: ["gambling", "tobacco"],
+    });
+  });
+});
+
+describe("Lead decision 3 · a completed answer can be corrected or taken back", () => {
+  it("moves adult content from 'rather not see' to 'never show' when it was the only item", async () => {
+    const world = investorSession({
+      currentStepKey: "I7.hard_exclusions",
+      recorded: {
+        "I0.investor_type": "angel",
+        "I7.avoid": "adult_content",
+      },
+    });
+    const { gateway, seen } = model([
+      {
+        calls: [
+          {
+            name: "record_answers",
+            arguments: {
+              answers: [
+                {
+                  stepKey: "I7.hard_exclusions",
+                  value: ["adult_content"],
+                  quote: "never show me adult content",
+                },
+              ],
+            },
+          },
+        ],
+      },
+      { reply: "Adult content is now never shown." },
+    ]);
+    const agent = createInterviewAgent({
+      gateway,
+      firewall: firewall(),
+      logger,
+      recommendations: world.recommendations,
+    });
+
+    await agent.turn({
+      ...turn(world, "Actually, never show me adult content at all."),
+      actor,
+    });
+
+    expect(world.recordedValue("I7.hard_exclusions")).toEqual({
+      type: "MULTI_SELECT",
+      optionKeys: ["adult_content"],
+    });
+    expect(world.recordedValue("I7.avoid")).toBeUndefined();
+    // The model is told the item left the other list, so it can say so.
+    expect(seen[1]?.text).toContain("movedFrom");
+  });
+
+  it("takes an answer back entirely when the person withdraws it", async () => {
+    const world = investorSession({
+      currentStepKey: "I9.discovery_mode",
+      recorded: { "I0.investor_type": "angel", "I7.avoid": "gambling" },
+    });
+    const { gateway } = model([
+      {
+        calls: [
+          {
+            name: "correct_answer",
+            arguments: {
+              corrections: [
+                {
+                  stepKey: "I7.avoid",
+                  value: null,
+                  quote: "forget the gambling thing",
+                },
+              ],
+            },
+          },
+        ],
+      },
+      { reply: "Taken off." },
+    ]);
+    const agent = createInterviewAgent({
+      gateway,
+      firewall: firewall(),
+      logger,
+      recommendations: world.recommendations,
+    });
+
+    const outcome = await agent.turn({
+      ...turn(world, "Actually forget the gambling thing."),
+      actor,
+    });
+
+    expect(world.recordedValue("I7.avoid")).toBeUndefined();
+    expect(world.skippedSteps()).toContain("I7.avoid");
+    expect(outcome.recorded).toContain("I7.avoid");
   });
 });

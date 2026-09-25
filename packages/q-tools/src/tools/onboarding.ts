@@ -32,6 +32,7 @@ export const RECOMMEND_ONBOARDING_ANSWERS =
 export const ACCEPT_ONBOARDING_RECOMMENDATIONS =
   "onboarding.recommendations.accept" as const;
 export const FINISH_ONBOARDING = "onboarding.finish" as const;
+export const CORRECT_ONBOARDING_ANSWERS = "onboarding.answers.correct" as const;
 
 const StepKeySchema = z.string().min(1).max(80);
 
@@ -77,6 +78,21 @@ export const OnboardingStateSchema = z
   .strict();
 export type OnboardingState = z.infer<typeof OnboardingStateSchema>;
 
+/**
+ * The person's own words that carry a write (P0-2). Code checks them
+ * against what the person actually said in this conversation; words that
+ * came from anywhere else — a web page, a deck, a tool result — can never
+ * cause a write.
+ */
+const QuoteSchema = z
+  .string()
+  .trim()
+  .min(3)
+  .max(400)
+  .describe(
+    "The person's exact words, verbatim, that give this answer, or that delegate the choice to you.",
+  );
+
 const AnswerValueSchema = z.union([
   z.string().min(1).max(2_000),
   z.array(z.string().min(1).max(200)).min(1).max(20),
@@ -96,6 +112,13 @@ export const RecordOnboardingAnswersInputSchema = z
             value: AnswerValueSchema.describe(
               "The answer in the person's terms: an option key or label, a list of them, a number (plain, in the step's unit), free text, or category words for a CATEGORIES step.",
             ),
+            quote: QuoteSchema,
+            basis: z
+              .enum(["STATED", "DELEGATED"])
+              .default("STATED")
+              .describe(
+                "STATED: they said this answer. DELEGATED: they explicitly asked you to choose it for them in the same instruction; the quote is that instruction.",
+              ),
           })
           .strict(),
       )
@@ -110,9 +133,29 @@ export type RecordOnboardingAnswersInput = z.infer<
 export const OnboardingRecordResultSchema = z
   .object({
     stepKey: StepKeySchema,
-    outcome: z.enum(["COMMITTED", "REJECTED", "AMBIGUOUS", "NEEDS_FIRST"]),
+    outcome: z.enum([
+      "COMMITTED",
+      "WITHDRAWN",
+      "REJECTED",
+      "AMBIGUOUS",
+      "NEEDS_FIRST",
+    ]),
     /** COMMITTED: what is now on the record, as a person would say it. */
     recorded: z.string().max(600).optional(),
+    /** The step's question, so a reply names the right one. */
+    question: z.string().max(400).optional(),
+    /**
+     * COMMITTED: items this write took off another step, because a concept
+     * lives on one step only (a never-show item leaves "rather not see").
+     */
+    movedFrom: z
+      .object({
+        stepKey: StepKeySchema,
+        question: z.string().max(400),
+        items: z.string().max(600),
+      })
+      .strict()
+      .optional(),
     /** REJECTED / NEEDS_FIRST: why, in the owning service's terms. */
     reason: z.string().max(400).optional(),
     /** AMBIGUOUS: what the words could mean; ask which. */
@@ -215,6 +258,28 @@ export type AcceptOnboardingRecommendationsInput = z.infer<
   typeof AcceptOnboardingRecommendationsInputSchema
 >;
 
+export const CorrectOnboardingAnswersInputSchema = z
+  .object({
+    corrections: z
+      .array(
+        z
+          .object({
+            stepKey: StepKeySchema.describe("The step whose answer changes."),
+            value: AnswerValueSchema.nullable().describe(
+              "The new answer in the person's terms, or null when they take the answer back entirely.",
+            ),
+            quote: QuoteSchema,
+          })
+          .strict(),
+      )
+      .min(1)
+      .max(6),
+  })
+  .strict();
+export type CorrectOnboardingAnswersInput = z.infer<
+  typeof CorrectOnboardingAnswersInputSchema
+>;
+
 export const FinishOnboardingOutputSchema = z
   .object({
     /** The journey is now complete. */
@@ -261,6 +326,10 @@ export type OnboardingToolPort = {
    * completes the journey once — or says exactly what is missing.
    */
   readonly finish: () => Promise<FinishOnboardingOutput>;
+  /** Change or take back answers already given; history is kept. */
+  readonly correct: (
+    corrections: CorrectOnboardingAnswersInput["corrections"],
+  ) => Promise<readonly OnboardingRecordResult[]>;
 };
 
 type Grant = { readonly userId: string };
@@ -329,7 +398,7 @@ export function createOnboardingTools(
       status: "ACTIVE",
       providerName: "record_answers",
       description:
-        "Records what the person has told you, for any steps at once. Each result says COMMITTED (now on the record, with what was recorded), REJECTED (with the reason), AMBIGUOUS (with candidates: ask which) or NEEDS_FIRST (another step must be answered first). Only a COMMITTED result is on the record. Also returns what is still open afterwards, required first.",
+        "Records what the person has told you, for any steps at once, each with their own words as the quote. Each result says COMMITTED (now on the record, with what was recorded), REJECTED (with the reason), AMBIGUOUS (with candidates: ask which) or NEEDS_FIRST (another step must be answered first). Only a COMMITTED result is on the record. Also returns what is still open afterwards, required first.",
       classification: "SIDE_EFFECT",
       riskClass: "LOW_RISK_INTERNAL",
       requiredCapabilities: [capability("onboarding.session.respond")],
@@ -397,6 +466,32 @@ export function createOnboardingTools(
       authorize,
       execute: async (input) =>
         withOpen(port, [...(await port.accept(input.stepKeys))]),
+    }),
+    defineQTool<
+      CorrectOnboardingAnswersInput,
+      RecordOnboardingAnswersOutput,
+      Grant
+    >({
+      id: CORRECT_ONBOARDING_ANSWERS,
+      version: 1,
+      status: "ACTIVE",
+      providerName: "correct_answer",
+      description:
+        "Changes an answer already on the record, or takes it back entirely (value null), when the person corrects themselves. The earlier answer is kept as history, never erased. Results are like record_answers.",
+      classification: "SIDE_EFFECT",
+      riskClass: "LOW_RISK_INTERNAL",
+      requiredCapabilities: [capability("onboarding.session.respond")],
+      supportedPurposes: [...PURPOSES],
+      requiredScopeKinds: ["OWN_ONBOARDING"],
+      approval: "NONE",
+      idempotency: "SAFE_TO_REPEAT",
+      owner: "onboarding",
+      visibleStage: null,
+      input: CorrectOnboardingAnswersInputSchema,
+      output: RecordOnboardingAnswersOutputSchema,
+      authorize,
+      execute: async (input) =>
+        withOpen(port, [...(await port.correct(input.corrections))]),
     }),
     defineQTool<Record<string, never>, FinishOnboardingOutput, Grant>({
       id: FINISH_ONBOARDING,

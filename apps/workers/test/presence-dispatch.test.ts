@@ -112,6 +112,7 @@ function fakeResponses(
     findById: notUsed,
     insert: notUsed,
     supersede: notUsed,
+    withdraw: notUsed,
   };
 }
 

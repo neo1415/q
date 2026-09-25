@@ -5,10 +5,13 @@ import type {
 import { INVESTOR_DEFINITION_V1 } from "@capital-q/investor-onboarding";
 import type { InterviewConductorResult } from "@capital-q/q-core";
 
+import { OnboardingSuggestionIdSchema } from "@capital-q/onboarding";
+
 import type {
   InterviewGateway,
   InterviewTurnInput,
 } from "../src/voice/interviewer.js";
+import type { RecommendationStore } from "../src/voice/onboarding-port.js";
 
 /**
  * A standing-in investor onboarding session for the interviewer tests.
@@ -38,6 +41,13 @@ export type InvestorWorld = {
   readonly skippedSteps: () => readonly string[];
   /** Every submission attempt, accepted or not, in order. */
   readonly attempts: () => readonly string[];
+  /**
+   * Q's recommendations as the onboarding service keeps them (P0-2): a
+   * durable store the world owns, so a second interviewer instance (a
+   * restart) sees the same ones, and acceptance goes through the
+   * session's resolve route exactly as in production.
+   */
+  readonly recommendations: RecommendationStore;
 };
 
 export type WorldOptions = {
@@ -112,6 +122,14 @@ export function investorSession(options: WorldOptions): InvestorWorld {
   const tried: string[] = [];
   let version = 1;
   let currentStepKey = options.currentStepKey;
+  type Kept = {
+    readonly id: string;
+    readonly stepKey: string;
+    readonly value: OnboardingResponseValue;
+    readonly rationale: string | null;
+    status: "PENDING" | "ACCEPTED" | "EXPIRED";
+  };
+  const kept: Kept[] = [];
   let completed = false;
   const canComplete = () =>
     STEPS.filter((step) => step.required).every((step) =>
@@ -276,6 +294,49 @@ export function investorSession(options: WorldOptions): InvestorWorld {
       );
     }
 
+    const withdraw = /\/steps\/([^/]+)\/withdraw$/.exec(url);
+    if (method === "POST" && withdraw !== null) {
+      const stepKey = decodeURIComponent(withdraw[1] ?? "");
+      const step = STEPS.find((s) => s.stepKey === stepKey);
+      if (step === undefined || step.required || !held.has(stepKey)) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              type: "urn:capitalq:problem:resource-conflict",
+              title:
+                "The request conflicts with the current state of the resource.",
+              status: 409,
+              detail: "Not withdrawable. (NOTHING_TO_WITHDRAW)",
+              code: "RESOURCE_CONFLICT",
+              requestId: "req_test",
+            }),
+            {
+              status: 409,
+              headers: { "content-type": "application/problem+json" },
+            },
+          ),
+        );
+      }
+      held.delete(stepKey);
+      setAside.add(stepKey);
+      version += 1;
+      return Promise.resolve(Response.json(view()));
+    }
+
+    const resolveSuggestion = /\/suggestions\/([^/]+)\/resolve$/.exec(url);
+    if (method === "POST" && resolveSuggestion !== null) {
+      const id = decodeURIComponent(resolveSuggestion[1] ?? "");
+      const suggestion = kept.find((k) => k.id === id);
+      if (suggestion === undefined || suggestion.status !== "PENDING") {
+        return Promise.resolve(refusal("suggestion"));
+      }
+      suggestion.status = "ACCEPTED";
+      held.set(suggestion.stepKey, suggestion.value);
+      tried.push(suggestion.stepKey);
+      version += 1;
+      return Promise.resolve(Response.json(view()));
+    }
+
     const skip = /\/steps\/([^/]+)\/skip$/.exec(url);
     if (method === "POST" && skip !== null) {
       const stepKey = decodeURIComponent(skip[1] ?? "");
@@ -392,6 +453,45 @@ export function investorSession(options: WorldOptions): InvestorWorld {
     },
     skippedSteps: () => [...setAside],
     attempts: () => [...tried],
+    recommendations: {
+      recommend: (input) => {
+        for (const earlier of kept) {
+          if (
+            earlier.stepKey === input.stepKey &&
+            earlier.status === "PENDING"
+          ) {
+            earlier.status = "EXPIRED";
+          }
+        }
+        const item: Kept = {
+          id: `a0000000-0000-4000-8000-${String(kept.length + 1).padStart(12, "0")}`,
+          stepKey: input.stepKey,
+          value: input.value,
+          rationale: input.rationale,
+          status: "PENDING",
+        };
+        kept.push(item);
+        return Promise.resolve({
+          id: OnboardingSuggestionIdSchema.parse(item.id),
+          stepKey: item.stepKey,
+          value: item.value,
+          rationale: item.rationale,
+          payloadSha256: JSON.stringify(item.value),
+        });
+      },
+      pending: () =>
+        Promise.resolve(
+          kept
+            .filter((k) => k.status === "PENDING")
+            .map((k) => ({
+              id: OnboardingSuggestionIdSchema.parse(k.id),
+              stepKey: k.stepKey,
+              value: k.value,
+              rationale: k.rationale,
+              payloadSha256: JSON.stringify(k.value),
+            })),
+        ),
+    },
   };
 }
 
