@@ -97,4 +97,18 @@ describe("model provider configuration", () => {
       expect(String(error)).not.toContain("   ");
     }
   });
+
+  it("reads an empty key as not configured, so a launch env can switch a paid provider off", () => {
+    const config = parseQApiConfig({
+      ...base,
+      GEMINI_API_KEY: GEMINI,
+      OPENAI_API_KEY: "",
+      OPEN_AI_API_KEY: "  ",
+    });
+    expect(config.secrets.modelProviders.openai).toBeUndefined();
+    expect(
+      modelProviderConfigStatus(config.secrets.modelProviders).openai,
+    ).toBe("unconfigured");
+    expect(config.secrets.modelProviders.google?.reveal()).toBe(GEMINI);
+  });
 });

@@ -53,11 +53,19 @@ export class ProviderCredential {
  * Keys are opaque strings of a vendor's choosing; the only validation that
  * does not embed a vendor's format is "present and not obviously blank".
  */
-const apiKey = z
-  .string()
-  .trim()
-  .min(16, "expected a provider API key")
-  .max(512, "expected a provider API key");
+// An empty variable means "not configured" (e.g. OPENAI_API_KEY= in a local
+// launch env to keep a paid provider out of development traffic), so the
+// gateway routes around it instead of the service refusing to start.
+const apiKey = z.preprocess(
+  (value) =>
+    typeof value === "string" && value.trim() === "" ? undefined : value,
+  z
+    .string()
+    .trim()
+    .min(16, "expected a provider API key")
+    .max(512, "expected a provider API key")
+    .optional(),
+);
 
 /**
  * The operator's opt-in for synthetic-demo model routing (doc 15 §62,
