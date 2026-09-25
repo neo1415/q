@@ -101,14 +101,20 @@ export function createOnboardingPort(input: {
    */
   readonly lastQTurn?: string | undefined;
   /**
-   * The steps the person handed to Q in their latest words, read
-   * independently of the acting model (DELEGATION_READER); null when it
-   * could not be read. A DELEGATED write is permitted only for these.
+   * What the person's latest words establish, read independently of the
+   * acting model (DELEGATION_READER): the steps they state about
+   * themselves, decline, hand to Q or approve, and whether they want to
+   * finish. Null when it could not be read: then nothing is established
+   * and nothing is written (fail closed). Absent only where no reader is
+   * composed (legacy callers and tests of other properties).
    */
-  readonly delegated?:
+  readonly authority?:
     | (() => Promise<{
+        readonly stated: ReadonlySet<string>;
+        readonly declined: ReadonlySet<string>;
         readonly handed: ReadonlySet<string>;
         readonly approved: ReadonlySet<string>;
+        readonly finishing: boolean;
       } | null>)
     | undefined;
   readonly recommendations?: RecommendationStore | undefined;
@@ -634,6 +640,28 @@ export function createOnboardingPort(input: {
     return null;
   };
 
+  /**
+   * The self-statement gate (ACC 2026-09-25): an answer is theirs only
+   * when their latest words state it about themselves. A question, advice
+   * or a mention of a place, sector or amount never is, however the
+   * acting model labels it. Null: permitted.
+   */
+  const notStated = async (
+    stepKey: string,
+  ): Promise<OnboardingRecordResult | null> => {
+    if (input.authority === undefined) return null;
+    const authority = await input.authority();
+    if (authority?.stated.has(stepKey) === true) return null;
+    return {
+      stepKey: stepKey.slice(0, 80),
+      outcome: "REJECTED",
+      reason:
+        authority === null
+          ? "What they just said could not be confirmed, so nothing was recorded. Ask them to say it again."
+          : "Their latest words do not state this about themselves, so nothing was recorded. A question, advice or a mention is never their answer; ask them if you want to know.",
+    };
+  };
+
   /** Figures committed this turn, by the words and value that gave them. */
   const figuresUsed = new Map<string, string[]>();
   const noteFigure = (
@@ -670,8 +698,12 @@ export function createOnboardingPort(input: {
           "A choice is delegated only by what they say now, handing it to you; that quote is not from their latest words, so nothing was recorded.",
       };
     }
+    if (answer.basis !== "DELEGATED") {
+      const refused = await notStated(answer.stepKey);
+      if (refused !== null) return refused;
+    }
     if (answer.basis === "DELEGATED") {
-      const authority = (await input.delegated?.()) ?? null;
+      const authority = (await input.authority?.()) ?? null;
       if (authority === null || !authority.handed.has(answer.stepKey)) {
         return {
           stepKey: answer.stepKey.slice(0, 80),
@@ -768,7 +800,7 @@ export function createOnboardingPort(input: {
         // independently of the acting model: another instruction is not
         // an approval of an earlier recommendation (ACC/E3 live,
         // 2026-09-25).
-        const authority = (await input.delegated?.()) ?? null;
+        const authority = (await input.authority?.()) ?? null;
         if (authority === null || !authority.approved.has(stepKey)) {
           results.push({
             stepKey,
@@ -864,6 +896,11 @@ export function createOnboardingPort(input: {
           });
           continue;
         }
+        const unstated = await notStated(step.stepKey);
+        if (unstated !== null) {
+          results.push(unstated);
+          continue;
+        }
         try {
           await withdraw(step.stepKey);
           written.push(step.stepKey);
@@ -899,6 +936,19 @@ export function createOnboardingPort(input: {
       let view = await fresh();
       if (view.session.status === "COMPLETED") {
         return { completed: true, missing: [] };
+      }
+      // Confirming the review activates their mandate: it is their
+      // decision, read from their latest words, never the acting model's.
+      if (input.authority !== undefined) {
+        const authority = await input.authority();
+        if (authority?.finishing !== true) {
+          return {
+            completed: false,
+            missing: [],
+            reason:
+              "They have not confirmed that the record is right and that they want to finish, so nothing was completed. Ask them.",
+          };
+        }
       }
       const gaps = missing(view);
       if (gaps.length > 0) return { completed: false, missing: gaps };

@@ -14,6 +14,7 @@ import {
   type ModelGateway,
 } from "@capital-q/model-gateway";
 import {
+  NO_TURN_AUTHORITY,
   toolResultMessage,
   type QDelegationReader,
   type QTurnAuthority,
@@ -258,10 +259,8 @@ export function createInterviewAgent(
     const lastQTurn = thread.findLast((t) => t.role === "Q")?.text;
     const journeySteps = definitionFor(input.journeyType).steps;
     // Read once the plan authorises the run; nothing handed over until then.
-    let delegationRead: Promise<QTurnAuthority | null> = Promise.resolve({
-      handed: new Set<string>(),
-      approved: new Set<string>(),
-    });
+    let delegationRead: Promise<QTurnAuthority | null> =
+      Promise.resolve(NO_TURN_AUTHORITY);
     const port = createOnboardingPort({
       session: input.session,
       onboardingSessionId: input.onboardingSessionId,
@@ -277,7 +276,10 @@ export function createInterviewAgent(
           .reverse(),
       ],
       lastQTurn,
-      delegated: () => delegationRead,
+      authority:
+        dependencies.delegation === undefined
+          ? undefined
+          : () => delegationRead,
       recommendations: dependencies.recommendations,
       runId,
     });
@@ -310,6 +312,7 @@ export function createInterviewAgent(
           stepKey: step.stepKey,
           question: SPOKEN_QUESTIONS[step.stepKey] ?? step.configuration.prompt,
           about: step.configuration.supportingText ?? "",
+          required: step.required,
         })),
         pending: pending.map((item) => ({
           stepKey: item.stepKey,
@@ -371,10 +374,7 @@ export function createInterviewAgent(
     };
     const offered = await tools.offer(context);
     let state = await port.state();
-    const authority = (await delegationRead) ?? {
-      handed: new Set<string>(),
-      approved: new Set<string>(),
-    };
+    const authority = (await delegationRead) ?? NO_TURN_AUTHORITY;
     const listed = (keys: ReadonlySet<string>): string =>
       keys.size === 0
         ? "none"
@@ -626,8 +626,11 @@ export function createInterviewAgent(
         // What each write decided, by step and basis: never a value or a
         // quote, which are the person's words.
         decisions: decisionsOf(actions),
+        stated: [...authority.stated],
+        declined: [...authority.declined],
         handed: [...authority.handed],
         approved: [...authority.approved],
+        finishing: authority.finishing,
         timedOut,
         ms: now() - startedAt,
       },

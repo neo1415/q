@@ -22,11 +22,19 @@ const STEPS = [
     stepKey: "I7.hard_exclusions",
     question: "What should never be shown?",
     about: "A hard exclusion: not shown.",
+    required: false,
   },
   {
     stepKey: "I7.avoid",
     question: "What would you rather not see?",
     about: "A soft negative: ranked lower.",
+    required: false,
+  },
+  {
+    stepKey: "I2.stages",
+    question: "Which stages do you invest at?",
+    about: "",
+    required: true,
   },
 ];
 const PENDING = [{ stepKey: "I7.avoid", recommended: "Gambling" }];
@@ -79,6 +87,34 @@ describe("the delegation reading", () => {
       "I7.avoid",
     ]);
     expect(calls.n).toBe(1);
+  });
+
+  it("stated is limited to offered steps, and a required step is never declined", async () => {
+    const reader = createQDelegationReader({
+      gateway: gatewayReturning(
+        {
+          stated: [{ stepKey: "I2.stages" }, { stepKey: "I3.geography" }],
+          declined: [{ stepKey: "I7.avoid" }, { stepKey: "I2.stages" }],
+          finishing: true,
+        },
+        { n: 0 },
+      ),
+      logger,
+    });
+    const authority = await reader.read({
+      utterance: "Seed only, and nothing I'd rather not see. That's all.",
+      lastQ: "",
+      steps: STEPS,
+      pending: [],
+      attribution: ATTRIBUTION,
+    });
+    expect(authority === null ? null : [...authority.stated]).toEqual([
+      "I2.stages",
+    ]);
+    expect(authority === null ? null : [...authority.declined]).toEqual([
+      "I7.avoid",
+    ]);
+    expect(authority?.finishing).toBe(true);
   });
 
   it("an unreadable turn is null, which hands nothing over", async () => {
