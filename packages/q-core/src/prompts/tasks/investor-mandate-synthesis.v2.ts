@@ -80,7 +80,7 @@ export const INVESTOR_MANDATE_SYNTHESIS_V2: PromptDefinition<
 > = {
   id: "INVESTOR_MANDATE_SYNTHESIS",
   version: 2,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   kind: "TASK",
   taskClass: "STRUCTURED_EXTRACTION",
   owner: "q-core",
