@@ -56,7 +56,7 @@ export const INTERVIEW_AGENT_V4: PromptDefinition<
   output: INTERVIEW_AGENT_V3.output,
   variables: INTERVIEW_AGENT_V3.variables,
   version: 4,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   changeDescription:
     "P0-2 and lead decisions: every write quotes the person's own words; explicit delegation is authorisation, suggestions stay recommend-then-approve; corrections and withdrawals go through correct_answer; explicit values are recorded the turn they are said.",
   effectiveFrom: "2026-09-25",
