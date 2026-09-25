@@ -64,6 +64,8 @@ const INTEREST: Interest = {
     "99999999-0000-4000-8000-000000000001",
   ),
   createdAt: UtcTimestampSchema.parse("2026-09-25T10:00:00.000Z"),
+  response: null,
+  connection: null,
 };
 
 function fakes(
@@ -87,6 +89,9 @@ function fakes(
       asked.push(query);
       return Promise.resolve(options.may ?? true);
     },
+    listIncomingInterest: () => Promise.reject(new Error("not under test")),
+    respondToInterest: () => Promise.reject(new Error("not under test")),
+    mayRespondToInterest: () => Promise.reject(new Error("not under test")),
   };
   return {
     commands,

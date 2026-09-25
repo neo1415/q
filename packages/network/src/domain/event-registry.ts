@@ -95,6 +95,53 @@ export const InterestExpressedRelationshipEvent = defineRelationshipEvent({
     "An investor organisation expressed interest in the company. Unilateral: not a match, not a commitment.",
 });
 
+/**
+ * The company accepted the investor's interest, and the formal bilateral
+ * connection -- the match -- opened (CQ-NET-011; doc 17 §85: "both sides
+ * have agreed to connect"). Shared, because both sides are its subject.
+ */
+export const ConnectionAcceptedPayloadSchema = z
+  .object({
+    interestId: UuidSchema,
+    matchId: UuidSchema,
+  })
+  .strict();
+export type ConnectionAcceptedPayload = z.infer<
+  typeof ConnectionAcceptedPayloadSchema
+>;
+export const RELATIONSHIP_EVENT_CONNECTION_ACCEPTED =
+  "connection_accepted" as const;
+export const ConnectionAcceptedRelationshipEvent = defineRelationshipEvent({
+  type: RELATIONSHIP_EVENT_CONNECTION_ACCEPTED,
+  payloadSchema: ConnectionAcceptedPayloadSchema,
+  allowedVisibilityScopes: ["relationship_shared"],
+  description:
+    "The company accepted the investor organisation's interest; both sides have agreed to connect. Not an investment.",
+});
+
+/**
+ * The company declined the investor's interest (CQ-NET-011). Shared and
+ * honest -- the investor is not left waiting on something already decided
+ * -- and carries no reason: nothing harsh, nothing private.
+ */
+export const InterestDeclinedPayloadSchema = z
+  .object({
+    interestId: UuidSchema,
+  })
+  .strict();
+export type InterestDeclinedPayload = z.infer<
+  typeof InterestDeclinedPayloadSchema
+>;
+export const RELATIONSHIP_EVENT_INTEREST_DECLINED =
+  "interest_declined" as const;
+export const InterestDeclinedRelationshipEvent = defineRelationshipEvent({
+  type: RELATIONSHIP_EVENT_INTEREST_DECLINED,
+  payloadSchema: InterestDeclinedPayloadSchema,
+  allowedVisibilityScopes: ["relationship_shared"],
+  description:
+    "The company has not taken the investor organisation's interest forward. No reason is recorded.",
+});
+
 export type RelationshipEventRegistry = {
   readonly get: (eventType: string) => RelationshipEventDefinition | undefined;
   readonly types: () => readonly string[];
@@ -158,6 +205,14 @@ export function createRelationshipEventRegistry(
   };
 }
 
-/** Production registry: `discovered` (CQ-NET-001) and `interest_expressed` (CQ-NET-010). */
+/**
+ * Production registry: `discovered` (CQ-NET-001), `interest_expressed`
+ * (CQ-NET-010), `connection_accepted` and `interest_declined` (CQ-NET-011).
+ */
 export const RELATIONSHIP_EVENT_DEFINITIONS: readonly RelationshipEventDefinition[] =
-  [DiscoveredRelationshipEvent, InterestExpressedRelationshipEvent];
+  [
+    DiscoveredRelationshipEvent,
+    InterestExpressedRelationshipEvent,
+    ConnectionAcceptedRelationshipEvent,
+    InterestDeclinedRelationshipEvent,
+  ];

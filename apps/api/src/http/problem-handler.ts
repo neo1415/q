@@ -34,8 +34,10 @@ import {
   InvestorVersionConflictError,
 } from "@capital-q/investors";
 import {
+  InterestAlreadyAnsweredError,
   InterestCompanyNotFoundError,
   InterestIdempotencyConflictError,
+  InterestNotFoundError,
   InterestNotPermittedError,
 } from "@capital-q/network";
 import type { Logger } from "@capital-q/observability";
@@ -300,7 +302,9 @@ function toProblem(
     error instanceof MediaAssetNotFoundError ||
     error instanceof MediaOwnerNotFoundError ||
     // Absent and not-visible are one answer (CQ-NET-010).
-    error instanceof InterestCompanyNotFoundError
+    error instanceof InterestCompanyNotFoundError ||
+    // Absent, withdrawn and another company's are one answer (CQ-NET-011).
+    error instanceof InterestNotFoundError
   ) {
     return createProblemDetails({ code: "RESOURCE_NOT_FOUND", requestId });
   }
@@ -316,6 +320,16 @@ function toProblem(
 
   if (error instanceof InterestIdempotencyConflictError) {
     return createProblemDetails({ code: "IDEMPOTENCY_CONFLICT", requestId });
+  }
+
+  // An answer is never overwritten; saying so is safe to the one party
+  // allowed to answer.
+  if (error instanceof InterestAlreadyAnsweredError) {
+    return createProblemDetails({
+      code: "RESOURCE_CONFLICT",
+      requestId,
+      detail: error.message,
+    });
   }
 
   // A refused upload. The category is machine-readable so a client can say

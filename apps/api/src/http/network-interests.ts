@@ -7,11 +7,21 @@ import {
   ExpressInterestResultDtoSchema,
   IDEMPOTENCY_KEY_HEADER,
   IdempotencyKeyHeaderSchema,
+  IncomingInterestListDtoSchema,
+  InterestResponseResultDtoSchema,
   NETWORK_COMPANY_EXPRESS_INTEREST_PATH,
+  NETWORK_COMPANY_INCOMING_INTEREST_PATH,
   NETWORK_COMPANY_INTEREST_PATH,
+  NETWORK_INTEREST_ACCEPT_PATH,
+  NETWORK_INTEREST_DECLINE_PATH,
   parseContract,
+  RespondToInterestRequestSchema,
 } from "@capital-q/contracts";
-import { toInterestDto, type InterestService } from "@capital-q/network";
+import {
+  toIncomingInterestDto,
+  toInterestDto,
+  type InterestService,
+} from "@capital-q/network";
 import { createCorrelationId } from "@capital-q/observability";
 
 import {
@@ -30,8 +40,13 @@ import {
  * this person, for their investor organisation, may act on it. A company
  * they may not see and one that does not exist are the same 404.
  *
+ * CQ-NET-011 adds the company's side: its inbox of incoming interest and
+ * the two answers, each a verb in the path. The interest id is input; the
+ * service answers only for the company's own members with the capability,
+ * and every other caller gets the same 404.
+ *
  * Deliberately not here: Save and Pass (`/v1/discovery`, analytics of a
- * recommendation), a match or connection (CQ-NET-011), and any read of the
+ * recommendation), messaging (CQ-COMM-001), and any read of the
  * relationship's history.
  */
 
@@ -44,6 +59,20 @@ function companyIdOf(request: FastifyRequest): string {
   // the same not-found as an unknown one.
   const raw = (request.params as { companyId?: unknown }).companyId;
   return typeof raw === "string" ? raw : "";
+}
+
+function interestIdOf(request: FastifyRequest): string {
+  const raw = (request.params as { interestId?: unknown }).interestId;
+  return typeof raw === "string" ? raw : "";
+}
+
+function idempotencyKeyOf(request: FastifyRequest): string {
+  const rawKey = request.headers[IDEMPOTENCY_KEY_HEADER];
+  return parseContract(
+    IdempotencyKeyHeaderSchema,
+    typeof rawKey === "string" ? rawKey : undefined,
+    "An Idempotency-Key header is required to answer an interest.",
+  );
 }
 
 export function registerNetworkInterestRoutes(
@@ -101,4 +130,52 @@ export function registerNetworkInterestRoutes(
       });
     },
   );
+
+  // The company's inbox (CQ-NET-011).
+  app.get(
+    NETWORK_COMPANY_INCOMING_INTEREST_PATH,
+    { onRequest: withContext },
+    async (request, reply) => {
+      const incoming = await service.listIncomingInterest({
+        actor: getActorContext(request),
+        companyId: companyIdOf(request),
+      });
+      void reply.header("Cache-Control", "no-store");
+      return IncomingInterestListDtoSchema.parse({
+        items: incoming.map(({ interest, investor }) =>
+          toIncomingInterestDto(interest, investor),
+        ),
+      });
+    },
+  );
+
+  // The company's answer: the verb is the path, never a body field.
+  for (const [path, decision] of [
+    [NETWORK_INTEREST_ACCEPT_PATH, "ACCEPTED"],
+    [NETWORK_INTEREST_DECLINE_PATH, "DECLINED"],
+  ] as const) {
+    app.post(path, { onRequest: withContext }, async (request, reply) => {
+      const idempotencyKey = idempotencyKeyOf(request);
+      parseContract(
+        RespondToInterestRequestSchema,
+        request.body ?? {},
+        "An answer carries no body.",
+      );
+      const result = await service.respondToInterest({
+        actor: getActorContext(request),
+        interestId: interestIdOf(request),
+        decision,
+        surface: "INBOX",
+        idempotencyKey,
+        correlationId: CorrelationIdSchema.parse(createCorrelationId()),
+      });
+      void reply
+        .status(result.deduplicated ? 200 : 201)
+        .header("Cache-Control", "no-store");
+      return InterestResponseResultDtoSchema.parse({
+        interest: toIncomingInterestDto(result.interest, result.investor),
+        deduplicated: result.deduplicated,
+      });
+    });
+  }
 }

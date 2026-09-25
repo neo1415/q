@@ -6,13 +6,18 @@ import { UtcTimestampSchema } from "@capital-q/contracts";
 import {
   InterestCompanyNotFoundError,
   InterestIdempotencyConflictError,
+  InterestAlreadyAnsweredError,
   InterestIdSchema,
+  InterestNotFoundError,
   InterestNotPermittedError,
+  InterestResponseIdSchema,
+  MatchIdSchema,
   RelationshipEventIdSchema,
   RelationshipIdSchema,
   type ExpressInterestCommand,
   type Interest,
   type InterestService,
+  type RespondToInterestCommand,
 } from "@capital-q/network";
 import { CompanyIdSchema } from "@capital-q/companies";
 import { InvestorOrganisationIdSchema } from "@capital-q/investors";
@@ -74,15 +79,49 @@ const INTEREST: Interest = {
     "99999999-0000-4000-8000-000000000001",
   ),
   createdAt: UtcTimestampSchema.parse("2026-09-24T10:00:00.000Z"),
+  response: null,
+  connection: null,
 };
+
+const ACCEPTED: Interest = {
+  ...INTEREST,
+  response: {
+    id: InterestResponseIdSchema.parse("66666666-0000-4000-8000-000000000001"),
+    decision: "ACCEPTED",
+    respondedAt: UtcTimestampSchema.parse("2026-09-25T10:00:00.000Z"),
+  },
+  connection: {
+    id: MatchIdSchema.parse("55555555-0000-4000-8000-000000000001"),
+    status: "ACTIVE",
+    connectedAt: UtcTimestampSchema.parse("2026-09-25T10:00:00.000Z"),
+  },
+};
+
+const INVESTOR = {
+  id: InvestorOrganisationIdSchema.parse(
+    "11111111-0000-4000-8000-000000000013",
+  ),
+  tenantId: TenantIdSchema.parse("33333333-0000-4000-8000-000000000001"),
+  organisationId: OrganisationIdSchema.parse(
+    "d0000000-0000-4000-8000-000000000002",
+  ),
+  investorType: "VC",
+  displayName: "Apex Ventures",
+  deploymentState: null,
+} as const;
 
 function buildApp(
   options: {
     readonly failWith?: Error | undefined;
     readonly deduplicated?: boolean | undefined;
   } = {},
-): { readonly app: FastifyInstance; readonly calls: ExpressInterestCommand[] } {
+): {
+  readonly app: FastifyInstance;
+  readonly calls: ExpressInterestCommand[];
+  readonly answers: RespondToInterestCommand[];
+} {
   const calls: ExpressInterestCommand[] = [];
+  const answers: RespondToInterestCommand[] = [];
   const interests: InterestService = {
     expressInterest: (command) => {
       calls.push(command);
@@ -98,6 +137,21 @@ function buildApp(
         ? Promise.resolve(INTEREST)
         : Promise.reject(options.failWith),
     mayExpressInterest: () => Promise.resolve(options.failWith === undefined),
+    listIncomingInterest: () =>
+      options.failWith === undefined
+        ? Promise.resolve([{ interest: INTEREST, investor: INVESTOR }])
+        : Promise.reject(options.failWith),
+    respondToInterest: (command) => {
+      answers.push(command);
+      return options.failWith === undefined
+        ? Promise.resolve({
+            interest: command.decision === "ACCEPTED" ? ACCEPTED : INTEREST,
+            investor: INVESTOR,
+            deduplicated: options.deduplicated ?? false,
+          })
+        : Promise.reject(options.failWith);
+    },
+    mayRespondToInterest: () => Promise.resolve(options.failWith === undefined),
   };
   const security: ApiSecurityDependencies = {
     authenticator: { authenticate: () => Promise.resolve(PRINCIPAL) },
@@ -110,7 +164,7 @@ function buildApp(
   const { app } = createApp(parseApiConfig({ NODE_ENV: "test" }), security, {
     interests,
   });
-  return { app, calls };
+  return { app, calls, answers };
 }
 
 const post = (
@@ -139,6 +193,9 @@ describe("POST /v1/network/companies/:companyId/express-interest", () => {
         companyId: COMPANY,
         status: "EXPRESSED",
         expressedAt: INTEREST.createdAt,
+        response: "PENDING",
+        respondedAt: null,
+        connection: null,
       },
       deduplicated: false,
     });
@@ -222,5 +279,121 @@ describe("GET /v1/network/companies/:companyId/interest", () => {
       url: `/v1/network/companies/${COMPANY}/interest`,
     });
     expect(response.statusCode).toBe(404);
+  });
+});
+
+describe("the company's side (CQ-NET-011)", () => {
+  const INTEREST_ID = "77777777-0000-4000-8000-000000000001";
+
+  it("lists incoming interest with the investor organisation's name and nothing about who acted", async () => {
+    const { app } = buildApp();
+    const response = await app.inject({
+      method: "GET",
+      url: `/v1/network/companies/${COMPANY}/incoming-interest`,
+    });
+    expect(response.statusCode).toBe(200);
+    const body = response.json<{ items: Record<string, unknown>[] }>();
+    expect(body.items).toEqual([
+      {
+        interestId: INTEREST_ID,
+        investorOrganisationId: INVESTOR.id,
+        investorName: "Apex Ventures",
+        investorType: "VC",
+        expressedAt: INTEREST.createdAt,
+        response: "PENDING",
+        respondedAt: null,
+        connection: null,
+      },
+    ]);
+    expect(JSON.stringify(body)).not.toContain(CONTEXT.userId);
+  });
+
+  it("accepts as the server-resolved actor: 201 with the connection", async () => {
+    const { app, answers } = buildApp();
+    const response = await app.inject({
+      method: "POST",
+      url: `/v1/network/interests/${INTEREST_ID}/accept`,
+      headers: { "idempotency-key": KEY },
+      payload: {},
+    });
+    expect(response.statusCode).toBe(201);
+    expect(response.json()).toMatchObject({
+      interest: {
+        response: "ACCEPTED",
+        connection: { connectionId: ACCEPTED.connection?.id, status: "ACTIVE" },
+      },
+      deduplicated: false,
+    });
+    expect(answers[0]).toMatchObject({
+      actor: CONTEXT,
+      interestId: INTEREST_ID,
+      decision: "ACCEPTED",
+      surface: "INBOX",
+      idempotencyKey: KEY,
+    });
+  });
+
+  it("the verb is the path: decline records DECLINED, and a body cannot carry a reason or a decision", async () => {
+    const { app, answers } = buildApp();
+    const declined = await app.inject({
+      method: "POST",
+      url: `/v1/network/interests/${INTEREST_ID}/decline`,
+      headers: { "idempotency-key": KEY },
+    });
+    expect(declined.statusCode).toBe(201);
+    expect(answers[0]?.decision).toBe("DECLINED");
+    for (const payload of [{ reason: "weak team" }, { decision: "ACCEPTED" }]) {
+      const refused = await app.inject({
+        method: "POST",
+        url: `/v1/network/interests/${INTEREST_ID}/decline`,
+        headers: { "idempotency-key": KEY },
+        payload,
+      });
+      expect(refused.statusCode).toBe(422);
+    }
+    expect(answers).toHaveLength(1);
+  });
+
+  it("requires an Idempotency-Key", async () => {
+    const { app, answers } = buildApp();
+    const response = await app.inject({
+      method: "POST",
+      url: `/v1/network/interests/${INTEREST_ID}/accept`,
+      payload: {},
+    });
+    expect(response.statusCode).toBe(422);
+    expect(answers).toHaveLength(0);
+  });
+
+  it.each([
+    [new InterestNotFoundError(), 404, "RESOURCE_NOT_FOUND"],
+    [new InterestAlreadyAnsweredError(), 409, "RESOURCE_CONFLICT"],
+    [new InterestIdempotencyConflictError(), 409, "IDEMPOTENCY_CONFLICT"],
+    [
+      new AuthorizationDeniedError("NO_MATCHING_GRANT"),
+      403,
+      "PERMISSION_DENIED",
+    ],
+  ] as const)("maps %s to a stable problem", async (error, status, code) => {
+    const { app } = buildApp({ failWith: error });
+    const response = await app.inject({
+      method: "POST",
+      url: `/v1/network/interests/${INTEREST_ID}/accept`,
+      headers: { "idempotency-key": KEY },
+      payload: {},
+    });
+    expect(response.statusCode).toBe(status);
+    expect(response.json()).toMatchObject({ code });
+  });
+
+  it("the investor's own read carries the answer from the server", async () => {
+    const { app } = buildApp();
+    const response = await app.inject({
+      method: "GET",
+      url: `/v1/network/companies/${COMPANY}/interest`,
+    });
+    expect(response.json()).toMatchObject({
+      interest: { response: "PENDING", connection: null },
+    });
   });
 });

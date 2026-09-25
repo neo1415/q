@@ -8,7 +8,17 @@ import {
 import {
   createPostgresInterestRepository,
   createPostgresInterestRequestStore,
+  createPostgresInterestResponseRepository,
+  createPostgresInterestResponseRequestStore,
 } from "../infrastructure/postgres-interest-repositories.js";
+import {
+  createListIncomingInterest,
+  createMayRespondToInterest,
+  createRespondToInterest,
+  type IncomingInterest,
+  type RespondToInterestCommand,
+  type RespondToInterestResult,
+} from "./respond-to-interest.js";
 import {
   createPostgresRelationshipEventRepository,
   createPostgresRelationshipRepository,
@@ -34,6 +44,8 @@ import {
 import type {
   InterestRepository,
   InterestRequestStore,
+  InterestResponseRepository,
+  InterestResponseRequestStore,
   RelationshipQueryPort,
 } from "./ports.js";
 
@@ -110,6 +122,20 @@ export type InterestService = {
     readonly actor: ActorContext;
     readonly companyId: string;
   }) => Promise<boolean>;
+  /** The company's inbox (CQ-NET-011). */
+  readonly listIncomingInterest: (query: {
+    readonly actor: ActorContext;
+    readonly companyId: string;
+  }) => Promise<readonly IncomingInterest[]>;
+  /** Accept or decline, as the company (CQ-NET-011). */
+  readonly respondToInterest: (
+    command: RespondToInterestCommand,
+  ) => Promise<RespondToInterestResult>;
+  /** The answer's authorisation only; writes nothing. */
+  readonly mayRespondToInterest: (query: {
+    readonly actor: ActorContext;
+    readonly interestId: string;
+  }) => Promise<boolean>;
 };
 
 export type InterestServiceOptions = NetworkServiceOptions &
@@ -119,6 +145,9 @@ export type InterestServiceOptions = NetworkServiceOptions &
   > & {
     readonly interests?: InterestRepository | undefined;
     readonly interestRequests?: InterestRequestStore | undefined;
+    readonly interestResponses?: InterestResponseRepository | undefined;
+    readonly interestResponseRequests?:
+      InterestResponseRequestStore | undefined;
   };
 
 export function createInterestService(
@@ -136,10 +165,18 @@ export function createInterestService(
     interests: options.interests ?? createPostgresInterestRepository(),
     interestRequests:
       options.interestRequests ?? createPostgresInterestRequestStore(),
+    interestResponses:
+      options.interestResponses ?? createPostgresInterestResponseRepository(),
+    interestResponseRequests:
+      options.interestResponseRequests ??
+      createPostgresInterestResponseRequestStore(),
   };
   return {
     expressInterest: createExpressInterest(dependencies),
     getOwnInterest: createGetOwnInterest(dependencies),
     mayExpressInterest: createMayExpressInterest(dependencies),
+    listIncomingInterest: createListIncomingInterest(dependencies),
+    respondToInterest: createRespondToInterest(dependencies),
+    mayRespondToInterest: createMayRespondToInterest(dependencies),
   };
 }

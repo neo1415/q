@@ -2,8 +2,13 @@ import {
   CompanyInterestStatusDtoSchema,
   ExpressInterestResultDtoSchema,
   IDEMPOTENCY_KEY_HEADER,
+  IncomingInterestListDtoSchema,
+  InterestResponseResultDtoSchema,
   NETWORK_COMPANY_EXPRESS_INTEREST_PATH,
+  NETWORK_COMPANY_INCOMING_INTEREST_PATH,
   NETWORK_COMPANY_INTEREST_PATH,
+  NETWORK_INTEREST_ACCEPT_PATH,
+  NETWORK_INTEREST_DECLINE_PATH,
   type ExpressInterestRequest,
 } from "@capital-q/contracts";
 
@@ -34,6 +39,40 @@ export function expressInterest(
     companyPath(NETWORK_COMPANY_EXPRESS_INTEREST_PATH, companyId),
     ExpressInterestResultDtoSchema,
     { body, headers: { [IDEMPOTENCY_KEY_HEADER]: idempotencyKey } },
+  );
+}
+
+/** `GET /v1/network/companies/:companyId/incoming-interest` — the company's inbox (CQ-NET-011). */
+export function listIncomingInterest(session: ApiSession, companyId: string) {
+  return call(
+    session,
+    "GET",
+    companyPath(NETWORK_COMPANY_INCOMING_INTEREST_PATH, companyId),
+    IncomingInterestListDtoSchema,
+  );
+}
+
+/**
+ * `POST /v1/network/interests/:interestId/{accept|decline}` — the
+ * company's answer. Server-confirmed; the key is generated once per
+ * intended answer and reused on retry.
+ */
+export function answerInterest(
+  session: ApiSession,
+  interestId: string,
+  decision: "ACCEPTED" | "DECLINED",
+  idempotencyKey: string,
+) {
+  const template =
+    decision === "ACCEPTED"
+      ? NETWORK_INTEREST_ACCEPT_PATH
+      : NETWORK_INTEREST_DECLINE_PATH;
+  return call(
+    session,
+    "POST",
+    template.replace(":interestId", encodeURIComponent(interestId)),
+    InterestResponseResultDtoSchema,
+    { body: {}, headers: { [IDEMPOTENCY_KEY_HEADER]: idempotencyKey } },
   );
 }
 

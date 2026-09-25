@@ -121,7 +121,12 @@ describe("relationship event registry", () => {
   );
 
   it("registers discovered with private scopes only", () => {
-    expect(registry.types()).toEqual(["discovered", "interest_expressed"]);
+    expect(registry.types()).toEqual([
+      "discovered",
+      "interest_expressed",
+      "connection_accepted",
+      "interest_declined",
+    ]);
     expect(DiscoveredRelationshipEvent.allowedVisibilityScopes).not.toContain(
       "relationship_shared",
     );
@@ -286,10 +291,10 @@ describe("DTOs", () => {
 });
 
 describe("module surface", () => {
-  it("exposes no state setter, no history update or delete, no relationship delete, no match and no interest withdrawal", () => {
+  it("exposes no state setter, no history update or delete, no relationship delete, no answer overwrite, no match ending and no interest withdrawal", () => {
     const names = Object.keys(network);
     for (const forbidden of names.filter((name) =>
-      /set.*state|update.*event|update.*interest|delete|remove|withdraw|projector|match/i.test(
+      /set.*state|update|delete|remove|withdraw|projector|end.*match|overwrite/i.test(
         name,
       ),
     )) {
@@ -297,8 +302,10 @@ describe("module surface", () => {
     }
     expect(names).toContain("createEnsureRelationship");
     expect(names).toContain("createRelationshipEventAppender");
-    // CQ-NET-010: Express Interest is the one interest command.
+    // CQ-NET-010/011: Express Interest and the company's answer are the
+    // only interest commands.
     expect(names).toContain("createExpressInterest");
+    expect(names).toContain("createRespondToInterest");
   });
 });
 

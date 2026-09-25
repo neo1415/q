@@ -418,12 +418,14 @@ describe("@capital-q/network against local PostgreSQL", () => {
           companyId: companyA,
           investorOrganisationId: investorA,
         });
-        // Nothing beyond the relationship and Express Interest's own record
-        // (CQ-NET-010): no match, meeting or deal tables exist.
+        // Nothing beyond the relationship, Express Interest's own record
+        // (CQ-NET-010) and the company's answer and match (CQ-NET-011): no
+        // meeting or deal tables exist.
         const tables = await tx.sql<{ n: string }[]>`
           select table_name as n from information_schema.tables
            where table_schema = 'network'
-             and table_name not in ('relationships', 'relationship_events', 'interests', 'interest_requests')`;
+             and table_name not in ('relationships', 'relationship_events', 'interests', 'interest_requests',
+                                    'interest_responses', 'interest_response_requests', 'matches')`;
         expect(tables).toEqual([]);
         // Ensuring a relationship expresses no interest.
         expect(

@@ -35,7 +35,12 @@ import {
   createEnsureRelationshipInTransaction,
   resolveRelationshipParties,
 } from "./ensure-relationship.js";
-import type { InterestRepository, InterestRequestStore } from "./ports.js";
+import type {
+  InterestRepository,
+  InterestRequestStore,
+  InterestResponseRepository,
+  InterestResponseRequestStore,
+} from "./ports.js";
 
 export const INVESTOR_INTEREST_EXPRESS = capability(
   "investor.interest.express",
@@ -100,6 +105,9 @@ export type ExpressInterestDependencies = NetworkServiceDependencies & {
   };
   readonly interests: InterestRepository;
   readonly interestRequests: InterestRequestStore;
+  /** The company's answer (CQ-NET-011). */
+  readonly interestResponses: InterestResponseRepository;
+  readonly interestResponseRequests: InterestResponseRequestStore;
 };
 
 function sha256Hex(value: string): string {

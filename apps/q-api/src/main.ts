@@ -145,6 +145,7 @@ import {
 } from "./composition/company-profile-action.js";
 import { createCompanyVisibilitySetAction } from "./composition/company-visibility-action.js";
 import { createExpressInterestAction } from "./composition/express-interest-action.js";
+import { createRespondToInterestAction } from "./composition/respond-to-interest-action.js";
 import { createInvestorFeedPort } from "./composition/investor-feed.js";
 import {
   createDiscoveryService,
@@ -719,6 +720,8 @@ const qActionRegistry = createQActionRegistry([
   }),
   // Express Interest: the feed button's own command, approved (CQ-NET-010).
   createExpressInterestAction({ interests: interestService, logger }),
+  // The company's answer: the inbox's own command, approved (CQ-NET-011).
+  createRespondToInterestAction({ interests: interestService, logger }),
   // What Q calls the person: their own record, their own approval.
   createPersonProfileUpdateAction({
     people: {

@@ -39,8 +39,10 @@ import { NETWORK_EVENTS } from "../src/events/index.js";
 import {
   createInterestService,
   createNetworkService,
+  InterestAlreadyAnsweredError,
   InterestCompanyNotFoundError,
   InterestIdempotencyConflictError,
+  InterestNotFoundError,
   InterestNotPermittedError,
   type InterestService,
   type NetworkService,
@@ -77,6 +79,10 @@ type World = {
   readonly network: NetworkService;
   readonly visible: Set<string>;
   readonly founder: ActorContext;
+  /** A member of the company's organisation with no role. */
+  readonly companyViewer: ActorContext;
+  /** The founder of another company in the same tenant. */
+  readonly otherFounder: ActorContext;
   readonly investorRep: ActorContext;
   readonly investorViewer: ActorContext;
   readonly tenantC: string;
@@ -237,6 +243,14 @@ describe("Express Interest against local PostgreSQL", () => {
           tx,
           await insertMember(tx, tenantC, companyOrg, "organisation_admin"),
         );
+        const companyViewer = await resolveActor(
+          tx,
+          await insertMember(tx, tenantC, companyOrg, null),
+        );
+        const otherFounder = await resolveActor(
+          tx,
+          await insertMember(tx, tenantC, companyOrgB, "organisation_admin"),
+        );
         const investorRep = await resolveActor(
           tx,
           await insertMember(tx, tenantI, investorOrg, "organisation_member"),
@@ -288,6 +302,8 @@ describe("Express Interest against local PostgreSQL", () => {
           network: createNetworkService(base),
           visible,
           founder,
+          companyViewer,
+          otherFounder,
           investorRep,
           investorViewer,
           tenantC,
@@ -612,5 +628,260 @@ describe("Express Interest against local PostgreSQL", () => {
         ).toBeNull();
       },
     );
+  });
+
+  // -------------------------------------------------------------------------
+  // CQ-NET-011: the company's answer
+  // -------------------------------------------------------------------------
+
+  const expressed = async (world: World) =>
+    (
+      await world.interests.expressInterest({
+        actor: world.investorRep,
+        companyId: world.companyA,
+        surface: "RECOMMENDATION_FEED",
+        idempotencyKey: `interest:${randomUUID()}`,
+        correlationId: CORRELATION(),
+      })
+    ).interest;
+
+  const history = async (tx: TransactionContext, relationshipId: string) =>
+    tx.sql<
+      {
+        sequence: number;
+        event_type: string;
+        visibility_scope: string;
+        payload: unknown;
+      }[]
+    >`
+      select e.sequence::int as sequence, e.event_type, e.visibility_scope, e.payload
+        from network.relationship_events e
+       where e.relationship_id = ${relationshipId}
+       order by e.sequence`;
+
+  it("the founder sees the interest pending and accepts it: one connection_accepted on the SAME relationship, one match, and the investor sees connected", async () => {
+    await withWorld(async (world) => {
+      const { tx, interests, founder, investorRep, companyA } = world;
+      const interest = await expressed(world);
+
+      const inbox = await interests.listIncomingInterest({
+        actor: founder,
+        companyId: companyA,
+      });
+      expect(inbox).toHaveLength(1);
+      expect(inbox[0]?.interest.id).toBe(interest.id);
+      expect(inbox[0]?.interest.response).toBeNull();
+      expect(inbox[0]?.investor.displayName).toBe("Apex");
+
+      const correlationId = CORRELATION();
+      const key = `answer:${randomUUID()}`;
+      const accepted = await interests.respondToInterest({
+        actor: founder,
+        interestId: interest.id,
+        decision: "ACCEPTED",
+        surface: "INBOX",
+        idempotencyKey: key,
+        correlationId,
+      });
+      expect(accepted.deduplicated).toBe(false);
+      expect(accepted.interest.relationshipId).toBe(interest.relationshipId);
+      expect(accepted.interest.response?.decision).toBe("ACCEPTED");
+      expect(accepted.interest.connection?.status).toBe("ACTIVE");
+
+      const events = await history(tx, interest.relationshipId);
+      expect(events.map((e) => e.event_type)).toEqual([
+        "discovered",
+        "interest_expressed",
+        "connection_accepted",
+      ]);
+      expect(events[2]).toMatchObject({
+        sequence: 3,
+        visibility_scope: "relationship_shared",
+        payload: {
+          interestId: interest.id,
+          matchId: accepted.interest.connection?.id,
+        },
+      });
+      const [rows] = await tx.sql<
+        {
+          relationships: number;
+          matches: number;
+          responses: number;
+          outbox: number;
+          current_state: string;
+        }[]
+      >`
+        select (select count(*)::int from network.relationships where company_id = ${companyA}) as relationships,
+               (select count(*)::int from network.matches where relationship_id = ${interest.relationshipId}) as matches,
+               (select count(*)::int from network.interest_responses where interest_id = ${interest.id}) as responses,
+               (select count(*)::int from events.outbox where event_type = 'network.relationship.matched'
+                  and payload -> 'data' ->> 'interestId' = ${interest.id}) as outbox,
+               (select current_state from network.relationships where id = ${interest.relationshipId}) as current_state`;
+      expect(rows).toEqual({
+        relationships: 1,
+        matches: 1,
+        responses: 1,
+        outbox: 1,
+        // Nothing here computes state: the projector (CQ-NET-012) will.
+        current_state: "DISCOVERED",
+      });
+      const audits = await tx.sql<{ action_type: string }[]>`
+        select action_type from audit.material_actions where correlation_id = ${correlationId.slice(4)}::uuid`;
+      expect(audits.map((a) => a.action_type)).toEqual([
+        "relationship.interest_accepted",
+      ]);
+
+      // The investor reads the answer from the server.
+      const own = await interests.getOwnInterest({
+        actor: investorRep,
+        companyId: companyA,
+      });
+      expect(own?.response?.decision).toBe("ACCEPTED");
+      expect(own?.connection?.id).toBe(accepted.interest.connection?.id);
+
+      // Replay and a second key: the same answer, nothing new.
+      for (const idempotencyKey of [key, `answer:${randomUUID()}`]) {
+        const again = await interests.respondToInterest({
+          actor: founder,
+          interestId: interest.id,
+          decision: "ACCEPTED",
+          surface: "INBOX",
+          idempotencyKey,
+          correlationId: CORRELATION(),
+        });
+        expect(again.deduplicated).toBe(true);
+        expect(again.interest.connection?.id).toBe(
+          accepted.interest.connection?.id,
+        );
+      }
+      expect(await history(tx, interest.relationshipId)).toHaveLength(3);
+
+      // An answer is never overwritten, and a key cannot change its meaning.
+      await expect(
+        interests.respondToInterest({
+          actor: founder,
+          interestId: interest.id,
+          decision: "DECLINED",
+          surface: "INBOX",
+          idempotencyKey: `answer:${randomUUID()}`,
+          correlationId: CORRELATION(),
+        }),
+      ).rejects.toBeInstanceOf(InterestAlreadyAnsweredError);
+      await expect(
+        interests.respondToInterest({
+          actor: founder,
+          interestId: interest.id,
+          decision: "DECLINED",
+          surface: "INBOX",
+          idempotencyKey: key,
+          correlationId: CORRELATION(),
+        }),
+      ).rejects.toBeInstanceOf(InterestIdempotencyConflictError);
+    });
+  });
+
+  it("a decline is recorded honestly, carries no reason, and opens nothing", async () => {
+    await withWorld(async (world) => {
+      const { tx, interests, founder, investorRep, companyA } = world;
+      const interest = await expressed(world);
+      const declined = await interests.respondToInterest({
+        actor: founder,
+        interestId: interest.id,
+        decision: "DECLINED",
+        surface: "INBOX",
+        idempotencyKey: `answer:${randomUUID()}`,
+        correlationId: CORRELATION(),
+      });
+      expect(declined.interest.response?.decision).toBe("DECLINED");
+      expect(declined.interest.connection).toBeNull();
+      const events = await history(tx, interest.relationshipId);
+      expect(events.at(-1)).toMatchObject({
+        event_type: "interest_declined",
+        visibility_scope: "relationship_shared",
+        payload: { interestId: interest.id },
+      });
+      const [row] = await tx.sql<{ n: number }[]>`
+        select count(*)::int as n from network.matches where relationship_id = ${interest.relationshipId}`;
+      expect(row?.n).toBe(0);
+      const own = await interests.getOwnInterest({
+        actor: investorRep,
+        companyId: companyA,
+      });
+      expect(own?.response?.decision).toBe("DECLINED");
+      expect(own?.connection).toBeNull();
+    });
+  });
+
+  it("only the company's own members with the capability may see or answer; everyone else writes nothing", async () => {
+    await withWorld(async (world) => {
+      const {
+        tx,
+        interests,
+        founder,
+        companyViewer,
+        otherFounder,
+        investorRep,
+        companyA,
+      } = world;
+      const interest = await expressed(world);
+      const attempt = (actor: ActorContext) =>
+        interests.respondToInterest({
+          actor,
+          interestId: interest.id,
+          decision: "ACCEPTED",
+          surface: "INBOX",
+          idempotencyKey: `answer:${randomUUID()}`,
+          correlationId: CORRELATION(),
+        });
+
+      // The investor, and a founder of another company: not-found, not "forbidden".
+      await expect(attempt(investorRep)).rejects.toBeInstanceOf(
+        InterestNotFoundError,
+      );
+      await expect(attempt(otherFounder)).rejects.toBeInstanceOf(
+        InterestNotFoundError,
+      );
+      await expect(
+        interests.listIncomingInterest({
+          actor: otherFounder,
+          companyId: companyA,
+        }),
+      ).rejects.toBeInstanceOf(InterestNotFoundError);
+      // A member of the right organisation without the capability.
+      await expect(attempt(companyViewer)).rejects.toBeInstanceOf(
+        AuthorizationDeniedError,
+      );
+      // Unknown and malformed interests are the same not-found.
+      for (const interestId of [randomUUID(), "not-a-uuid"]) {
+        await expect(
+          interests.respondToInterest({
+            actor: founder,
+            interestId,
+            decision: "DECLINED",
+            surface: "INBOX",
+            idempotencyKey: `answer:${randomUUID()}`,
+            correlationId: CORRELATION(),
+          }),
+        ).rejects.toBeInstanceOf(InterestNotFoundError);
+      }
+      // Q's gate asks the same question.
+      expect(
+        await interests.mayRespondToInterest({
+          actor: founder,
+          interestId: interest.id,
+        }),
+      ).toBe(true);
+      for (const actor of [investorRep, otherFounder, companyViewer]) {
+        expect(
+          await interests.mayRespondToInterest({
+            actor,
+            interestId: interest.id,
+          }),
+        ).toBe(false);
+      }
+      const [row] = await tx.sql<{ n: number }[]>`
+        select count(*)::int as n from network.interest_responses where interest_id = ${interest.id}`;
+      expect(row?.n).toBe(0);
+    });
   });
 });

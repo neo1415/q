@@ -10,7 +10,10 @@ import type { ActorType, TenantId } from "@capital-q/security";
 
 import type {
   Interest,
+  InterestDecision,
   InterestId,
+  InterestResponseId,
+  MatchId,
   Relationship,
   RelationshipEvent,
   RelationshipEventId,
@@ -120,6 +123,12 @@ export type InterestRepository = {
     executor: DatabaseExecutor,
     relationshipId: RelationshipId,
   ) => Promise<Interest | null>;
+  /** Open interests addressed to one company, newest first, with their answers. */
+  readonly listByCompany: (
+    executor: DatabaseExecutor,
+    companyId: CompanyId,
+    limit: number,
+  ) => Promise<readonly Interest[]>;
   readonly insert: (
     tx: TransactionContext,
     input: {
@@ -159,6 +168,65 @@ export type InterestRequestStore = {
       readonly idempotencyKeyHash: string;
       readonly requestHash: string;
       readonly interestId: InterestId;
+    },
+  ) => Promise<void>;
+};
+
+/**
+ * The company's answer (CQ-NET-011). Insert-only: one answer per interest
+ * (the database refuses a second), and a match only for an acceptance.
+ */
+export type InterestResponseRepository = {
+  readonly insert: (
+    tx: TransactionContext,
+    input: {
+      readonly id: InterestResponseId;
+      readonly tenantId: TenantId;
+      readonly relationshipId: RelationshipId;
+      readonly interestId: InterestId;
+      readonly decision: InterestDecision;
+      readonly respondedByUserId: string;
+      readonly respondedInOrganisationId: string;
+      readonly relationshipEventId: RelationshipEventId;
+    },
+  ) => Promise<void>;
+  readonly insertMatch: (
+    tx: TransactionContext,
+    input: {
+      readonly id: MatchId;
+      readonly tenantId: TenantId;
+      readonly relationshipId: RelationshipId;
+      readonly interestResponseId: InterestResponseId;
+    },
+  ) => Promise<void>;
+};
+
+/** Hashes only: (person, organisation, key hash) -> the interest answered. */
+export type InterestResponseRequestStore = {
+  readonly lock: (
+    tx: TransactionContext,
+    userId: string,
+    organisationId: string,
+    idempotencyKeyHash: string,
+  ) => Promise<void>;
+  readonly find: (
+    tx: TransactionContext,
+    userId: string,
+    organisationId: string,
+    idempotencyKeyHash: string,
+  ) => Promise<{
+    readonly requestHash: string;
+    readonly interestId: InterestId;
+  } | null>;
+  readonly record: (
+    tx: TransactionContext,
+    input: {
+      readonly userId: string;
+      readonly organisationId: string;
+      readonly tenantId: TenantId;
+      readonly idempotencyKeyHash: string;
+      readonly requestHash: string;
+      readonly interestResponseId: InterestResponseId;
     },
   ) => Promise<void>;
 };

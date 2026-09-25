@@ -63,6 +63,26 @@ export class InterestIdempotencyConflictError extends Error {
   }
 }
 
+/**
+ * No interest the caller may answer: absent, withdrawn, or addressed to a
+ * company the caller's organisation does not own. One error for all, so
+ * the command cannot be used to ask which (CQ-NET-011).
+ */
+export class InterestNotFoundError extends Error {
+  constructor() {
+    super("The interest was not found.");
+    this.name = "InterestNotFoundError";
+  }
+}
+
+/** The interest was already answered the other way; an answer is never overwritten. */
+export class InterestAlreadyAnsweredError extends Error {
+  constructor() {
+    super("This interest has already been answered.");
+    this.name = "InterestAlreadyAnsweredError";
+  }
+}
+
 /** The chosen visibility scope is not allowed for this event type. */
 export class RelationshipEventVisibilityNotAllowedError extends Error {
   readonly eventType: string;
