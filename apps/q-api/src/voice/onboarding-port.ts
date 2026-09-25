@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import {
   completeOnboardingSession,
   findTaxonomyCandidates,
+  skipOnboardingStep,
   getOnboardingSession,
   getTaxonomyNode,
   resolveOnboardingSuggestion,
@@ -911,6 +912,79 @@ export function createOnboardingPort(input: {
               SPOKEN_QUESTIONS[step.stepKey] ?? step.configuration.prompt
             ).slice(0, 400),
           });
+        } catch (error: unknown) {
+          results.push(refused(step.stepKey, error));
+        }
+      }
+      return results;
+    },
+    setAside: async (declined) => {
+      const results: OnboardingRecordResult[] = [];
+      for (const item of declined) {
+        const step = steps.get(item.stepKey);
+        if (step === undefined) {
+          results.push({
+            stepKey: item.stepKey.slice(0, 80),
+            outcome: "REJECTED",
+            reason: "There is no such step in this onboarding.",
+          });
+          continue;
+        }
+        const question = (
+          SPOKEN_QUESTIONS[step.stepKey] ?? step.configuration.prompt
+        ).slice(0, 400);
+        if (step.required) {
+          results.push({
+            stepKey: step.stepKey,
+            outcome: "REJECTED",
+            question,
+            reason:
+              "This one is needed to set them up, so it cannot be set aside. Say briefly why it matters and ask it plainly.",
+          });
+          continue;
+        }
+        if (!said(item.quote)) {
+          results.push(unsaid(step.stepKey));
+          continue;
+        }
+        // A decline is theirs only when their latest words decline it.
+        if (input.authority !== undefined) {
+          const authority = await input.authority();
+          if (authority?.declined.has(step.stepKey) !== true) {
+            results.push({
+              stepKey: step.stepKey,
+              outcome: "REJECTED",
+              question,
+              reason:
+                authority === null
+                  ? "What they just said could not be confirmed, so nothing was set aside."
+                  : "Their latest words do not decline this one, so nothing was set aside.",
+            });
+            continue;
+          }
+        }
+        try {
+          const view = await current();
+          const answered = view.responses.some(
+            (r) => r.stepKey === step.stepKey,
+          );
+          if (answered) {
+            // Declining what they had answered takes it back, with its
+            // history kept; the service sets the step aside.
+            await withdraw(step.stepKey);
+          } else {
+            latest = await settle(
+              await skipOnboardingStep(
+                input.session,
+                input.onboardingSessionId,
+                step.stepKey,
+                { expectedSessionVersion: view.session.version },
+                randomUUID(),
+              ),
+            );
+          }
+          written.push(step.stepKey);
+          results.push({ stepKey: step.stepKey, outcome: "SET_ASIDE", question });
         } catch (error: unknown) {
           results.push(refused(step.stepKey, error));
         }

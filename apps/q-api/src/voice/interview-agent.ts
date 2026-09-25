@@ -23,7 +23,7 @@ import type { Logger } from "@capital-q/observability";
 import {
   createDefaultPromptRegistry,
   DEFAULT_COMMUNICATION_PROFILE,
-  type InterviewAgentV6Variables,
+  type InterviewAgentV7Variables,
   InterviewAgentResultSchema,
   renderPrompt,
   type InterviewAgentResult,
@@ -390,6 +390,7 @@ export function createInterviewAgent(
           ).slice(0, 2_000);
     const delegated = listed(authority.handed);
     const approved = listed(authority.approved);
+    const declined = listed(authority.declined);
 
     // Every round is rendered afresh from the onboarding state and what Q
     // has already done this turn, never from a provider's native tool
@@ -398,7 +399,7 @@ export function createInterviewAgent(
     // turn must survive its first model failing half way.
     const actions: { tool: string; input: unknown; result: unknown }[] = [];
     const render = () =>
-      renderPrompt<InterviewAgentV6Variables>(registry, {
+      renderPrompt<InterviewAgentV7Variables>(registry, {
         task: "INTERVIEW_AGENT",
         charter: input.channel === "voice" ? "Q_SYSTEM_VOICE" : "Q_SYSTEM",
         operatingMode: "ASSESSMENT",
@@ -421,6 +422,7 @@ export function createInterviewAgent(
           thisTurn: thisTurnText(actions),
           delegated,
           approved,
+          declined,
         },
       });
 

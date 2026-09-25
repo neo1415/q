@@ -101,6 +101,19 @@ export type InterviewAgentV6Variables = z.infer<
   typeof InterviewAgentV6VariablesSchema
 >;
 
+/**
+ * v7 variables: v6's, plus the optional steps the person declined in
+ * their latest words (DELEGATION_READER). TRUSTED: rendered from journey
+ * step questions, never the person's text.
+ */
+export const InterviewAgentV7VariablesSchema =
+  InterviewAgentV6VariablesSchema.extend({
+    declined: z.string().max(2_000).default(""),
+  }).strict();
+export type InterviewAgentV7Variables = z.infer<
+  typeof InterviewAgentV7VariablesSchema
+>;
+
 export const InterviewAgentResultSchema = z
   .object({
     /** What Q says. Grounded in the tool results of this turn. */
