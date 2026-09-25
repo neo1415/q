@@ -14,18 +14,20 @@ async function expectNoHorizontalOverflow(page: Page) {
 }
 
 test.describe("mobile application shell", () => {
-  test("Home loads with bottom navigation, no sidebar, and a focusable Q composer", async ({
+  test("the Q page loads with bottom navigation, no sidebar, and a focusable Q composer", async ({
     page,
   }) => {
     await page.goto("/home");
+    // The Q page is Q's stage (ADR 0017 F3): the aperture and Talk.
+    await expect(page.locator("[data-q-workspace] .cq-aperture")).toBeVisible();
     await expect(
-      page.getByRole("heading", { name: "Home", level: 1 }),
+      page.getByRole("button", { name: "Talk with Q" }),
     ).toBeVisible();
 
     const nav = page.getByRole("navigation", { name: "Primary" });
     await expect(nav).toBeVisible();
     await expect(nav.getByRole("link")).toHaveCount(4);
-    await expect(nav.getByRole("link", { name: "Home" })).toHaveAttribute(
+    await expect(nav.getByRole("link", { name: "Q" })).toHaveAttribute(
       "aria-current",
       "page",
     );
@@ -66,7 +68,7 @@ test.describe("mobile application shell", () => {
     );
 
     // Every tab is a comfortable touch target.
-    for (const name of ["Home", "Discover", "Capital", "Profile"]) {
+    for (const name of ["Q", "Discover", "Capital", "Profile"]) {
       const box = await nav.getByRole("link", { name }).boundingBox();
       expect(box?.height ?? 0).toBeGreaterThanOrEqual(44);
       expect(box?.width ?? 0).toBeGreaterThanOrEqual(44);
@@ -75,7 +77,7 @@ test.describe("mobile application shell", () => {
     await expectNoHorizontalOverflow(page);
   });
 
-  test("navigates Home → Discover → Capital → Profile → Home by tapping the tabs", async ({
+  test("navigates Q → Discover → Capital → Profile → Q by tapping the tabs", async ({
     page,
   }) => {
     await page.goto("/home");
@@ -112,8 +114,9 @@ test.describe("mobile application shell", () => {
     ).toBeVisible();
     await expectNoHorizontalOverflow(page);
 
-    await nav.getByRole("link", { name: "Home" }).tap();
-    await expect(page).toHaveURL(/\/home$/);
+    await nav.getByRole("link", { name: "Q" }).tap();
+    // Back to the Q page, in the conversation this tab was in, if any.
+    await expect(page).toHaveURL(/\/home(\?c=[0-9a-f-]+)?$/);
     await expect(page.getByRole("textbox", { name: "Ask Q" })).toBeVisible();
   });
 
@@ -130,18 +133,17 @@ test.describe("mobile application shell", () => {
     await send.tap();
 
     // The question is the person's turn, verbatim; the composer clears.
-    const thread = page.locator("[data-q-workspace] ol");
-    await expect(thread).toContainText(
+    // Said on the stage as the current exchange, not a chat thread.
+    const said = page.locator("[data-q-captions]");
+    await expect(said).toContainText(
       "What should I prepare before a Series A?",
     );
     await expect(composer).toHaveValue("");
-    // What comes back is what Capital Q knows, never an invented persona:
-    // this synthetic account has no organisation, so Q says exactly that.
+    // What comes back is Q's answer from the Q API, spoken and captioned
+    // on the stage -- whatever the model says, never a canned reply.
     await expect(
-      page.getByRole("status").filter({
-        hasText: "not working inside an organisation yet",
-      }),
-    ).toBeVisible({ timeout: 60_000 });
+      page.locator('[data-q-captions] [data-q-answer="settled"]'),
+    ).toBeVisible({ timeout: 90_000 });
     await expect(page.getByText(/agent|thinking\.\.\./i)).toHaveCount(0);
   });
 
@@ -155,13 +157,7 @@ test.describe("mobile application shell", () => {
         chip.textContent =
           "Relationship shared · Northwind Capital Partners International Holdings Limited";
       }
-      const heading = document.querySelector("h1");
-      if (heading !== null) {
-        heading.textContent =
-          "Home for a very long organisation name that keeps going and going";
-      }
     });
-    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
     await expectNoHorizontalOverflow(page);
     const wordmark = await page
       .getByRole("banner")

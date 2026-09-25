@@ -19,7 +19,7 @@ describe("MobileNavigation", () => {
     const links = nav.querySelectorAll("a");
     expect(links).toHaveLength(4);
     expect([...links].map((link) => link.textContent)).toEqual([
-      "Home",
+      "Q",
       "Discover",
       "Capital",
       "Profile",
@@ -33,7 +33,7 @@ describe("MobileNavigation", () => {
         .getByRole("link", { name: "Discover" })
         .getAttribute("aria-current"),
     ).toBe("page");
-    for (const name of ["Home", "Capital", "Profile"]) {
+    for (const name of ["Q", "Capital", "Profile"]) {
       expect(
         screen.getByRole("link", { name }).hasAttribute("aria-current"),
       ).toBe(false);

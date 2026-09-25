@@ -214,10 +214,17 @@ test("hands the conversation to the Q page with no second read", async ({
   await page.waitForTimeout(2000);
   expect(during.filter((id) => reads.includes(id))).toEqual([]);
   // ...and the aperture moved as one object into the stage.
-  const vt = (await page.evaluate(() => Reflect.get(window, "__vt"))) as {
-    starts: number;
-    groups: string[];
-  };
+  const vt = await page.evaluate(() => {
+    const record: unknown = Reflect.get(window, "__vt");
+    const starts: unknown = Reflect.get(Object(record), "starts");
+    const groups: unknown = Reflect.get(Object(record), "groups");
+    return {
+      starts: typeof starts === "number" ? starts : 0,
+      groups: Array.isArray(groups)
+        ? groups.filter((group): group is string => typeof group === "string")
+        : [],
+    };
+  });
   expect(vt.starts).toBeGreaterThan(0);
   expect(vt.groups.some((group) => group.includes("q-aperture"))).toBe(true);
   // What the panel held is on the page.
