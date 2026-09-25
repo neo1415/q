@@ -76,6 +76,7 @@ import {
   type SpeechPerformanceBoard,
 } from "./speech-performance.js";
 import type { WelcomeHost } from "./welcome.js";
+import { createLiveReply } from "./live-reply.js";
 import type { VoiceSpeaker, VoiceTranscriptTurn } from "./provider.js";
 import {
   bounded,
@@ -1158,42 +1159,85 @@ export function createVoiceTurnHandler(
       // a run in the bound conversation exactly as before.
       const recentTurns = transcriptOf(binding).slice(0, -1);
       const agent = dependencies.interviewAgent;
+      /**
+       * The loop's reply is spoken as it is written (latency, voice lane):
+       * each finished sentence goes to the speaker at once instead of
+       * after the whole turn. The legacy interviewer has no stream and is
+       * spoken whole, as before.
+       */
+      const live = agent === undefined ? null : createLiveReply();
+      const voicing =
+        live === null
+          ? Promise.resolve()
+          : speaker.speak(
+              tap(live.spoken, (part) => {
+                rememberSpoken(binding, part);
+              }),
+            );
       const conduct = (
         turnInput: Parameters<Interviewer["turn"]>[0],
       ): ReturnType<Interviewer["turn"]> =>
         agent === undefined
           ? interviewer.turn(turnInput)
-          : agent.turn({ ...turnInput, actor: binding.actor });
-      const outcome = await conduct({
-        session,
-        onboardingSessionId: onboarding.sessionId,
-        journeyType: onboarding.journeyType,
-        // What they typed at sign-up, from their own token. A candidate
-        // for confirmation, never an answer.
-        signup: signupContextFromToken(binding.accessToken),
-        channel: "voice",
-        attribution: {
-          tenantId: binding.actor.tenantId,
-          userId: binding.actor.userId,
-          correlationId: createCorrelationId(),
-        },
-        utterance: text,
-        recentTurns,
-        signal,
-      });
+          : agent.turn({
+              ...turnInput,
+              actor: binding.actor,
+              ...(live === null
+                ? {}
+                : {
+                    onSentence: (sentence: string) => {
+                      if (!signal.aborted) live.push(sentence);
+                    },
+                  }),
+            });
+      let conducted: Awaited<ReturnType<Interviewer["turn"]>>;
+      try {
+        conducted = await conduct({
+          session,
+          onboardingSessionId: onboarding.sessionId,
+          journeyType: onboarding.journeyType,
+          // What they typed at sign-up, from their own token. A candidate
+          // for confirmation, never an answer.
+          signup: signupContextFromToken(binding.accessToken),
+          channel: "voice",
+          attribution: {
+            tenantId: binding.actor.tenantId,
+            userId: binding.actor.userId,
+            correlationId: createCorrelationId(),
+          },
+          utterance: text,
+          recentTurns,
+          signal,
+        });
+      } finally {
+        // Whatever happened, the speaker is released: a stream nobody
+        // closes holds the think request open until its deadline.
+        live?.close();
+        await voicing;
+      }
       if (signal.aborted) {
         return { kind: "INTERRUPTED", path: "INTERVIEW" };
       }
+      // What the stream already said is not said again; a reply that was
+      // not streamed at all is spoken whole, below, as before.
+      const streamed = live !== null && live.said().length > 0;
+      const outcome = streamed
+        ? { ...conducted, reply: live.remainderOf(conducted.reply) }
+        : conducted;
       // How the reply should sound (CQ-VOICE-010), anchored to the
       // sentences about to be spoken and handed to the speak relay. The
-      // reply itself goes out, and is kept, exactly as written.
-      dependencies.performance?.perform(
-        binding.voiceSessionId,
-        anchorCues(
-          sentences(bounded(speakable(outcome.reply))),
-          outcome.delivery,
-        ),
-      );
+      // reply itself goes out, and is kept, exactly as written. Streamed
+      // sentences were voiced before their cues existed and go without:
+      // the cues index the whole reply, and a remainder would misplace them.
+      if (!streamed) {
+        dependencies.performance?.perform(
+          binding.voiceSessionId,
+          anchorCues(
+            sentences(bounded(speakable(outcome.reply))),
+            outcome.delivery,
+          ),
+        );
+      }
       // Capital Q may now know enough to look this company up, and the
       // person who named it. Detached: the read happens while they keep
       // talking, and what it finds waits here for the next gap.
