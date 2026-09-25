@@ -11,6 +11,9 @@ import {
   NETWORK_INTEREST_DECLINE_PATH,
   NETWORK_COMPANY_RELATIONSHIP_PATH,
   NETWORK_INVESTOR_RELATIONSHIP_PATH,
+  NETWORK_INVESTOR_RELATIONSHIPS_PATH,
+  NETWORK_COMPANY_RELATIONSHIPS_PATH,
+  RelationshipListDtoSchema,
   RelationshipStatusResponseDtoSchema,
   type ExpressInterestRequest,
 } from "@capital-q/contracts";
