@@ -83,6 +83,21 @@ export type RelationshipIntelligencePort = {
     actor: ActorContext,
     investorOrganisationId: string,
   ) => Promise<RelationshipStatusDto | null>;
+  /**
+   * One relationship named by id (the RELATIONSHIP subject), as the
+   * actor's own side sees it. The side is decided by the Network context
+   * from the actor's membership; null when the actor is not a party.
+   */
+  readonly byRelationship: (
+    actor: ActorContext,
+    relationshipId: string,
+  ) => Promise<{
+    readonly side: "INVESTOR" | "COMPANY";
+    readonly counterpart:
+      | { readonly kind: "COMPANY"; readonly id: string }
+      | { readonly kind: "INVESTOR_ORGANISATION"; readonly id: string };
+    readonly status: RelationshipStatusDto | null;
+  } | null>;
   /** Interest addressed to the actor's own company, with its answers. */
   readonly incomingInterest: (
     actor: ActorContext,

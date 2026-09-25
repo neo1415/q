@@ -1067,6 +1067,63 @@ describe("Express Interest against local PostgreSQL", () => {
     );
   });
 
+  it("a relationship named by id answers each party with its own fold, and a non-party with nothing (the RELATIONSHIP Q subject)", async () => {
+    await withWorld(async (world) => {
+      const {
+        network,
+        interests,
+        founder,
+        otherFounder,
+        investorRep,
+        companyA,
+        investorA,
+      } = world;
+      const { relationship } = await network.ensureRelationship({
+        actor: investorRep,
+        companyId: companyA,
+        investorOrganisationId: investorA,
+        source: { type: "DISCOVER" },
+        visibilityScope: "investor_private",
+        correlationId: CORRELATION(),
+      });
+      const byId = (actor: typeof founder) =>
+        interests.relationshipById({ actor, relationshipId: relationship.id });
+
+      // Only the private discovery: the company is a party but sees nothing.
+      expect(await byId(founder)).toEqual({
+        side: "COMPANY",
+        counterpart: { kind: "INVESTOR_ORGANISATION", id: investorA },
+        status: null,
+      });
+      expect(await byId(investorRep)).toMatchObject({
+        side: "INVESTOR",
+        counterpart: { kind: "COMPANY", id: companyA },
+        status: { projection: { state: "DISCOVERED" } },
+      });
+      // Not a party: the same answer as an id that does not exist.
+      expect(await byId(otherFounder)).toBeNull();
+      expect(
+        await interests.relationshipById({
+          actor: founder,
+          relationshipId: randomUUID(),
+        }),
+      ).toBeNull();
+
+      await expressed(world);
+      const companyView = await byId(founder);
+      // The company's story starts at the interest, never the discovery.
+      expect(
+        companyView?.status?.projection.milestones.map((m) => m.state),
+      ).toEqual(["INTEREST_EXPRESSED"]);
+      expect(companyView?.status?.nextStep).toBe("ANSWER_INTEREST");
+      expect(
+        (await byId(investorRep))?.status?.projection.milestones.map(
+          (m) => m.state,
+        ),
+      ).toEqual(["DISCOVERED", "INTEREST_EXPRESSED"]);
+    });
+  });
+
   it("only the company's own members with the capability may see or answer; everyone else writes nothing", async () => {
     await withWorld(async (world) => {
       const {

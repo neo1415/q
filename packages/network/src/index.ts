@@ -138,6 +138,7 @@ export {
   type RelationshipStateProjector,
 } from "./application/relationship-projection.js";
 export {
+  createRelationshipById,
   createRelationshipForCompany,
   createRelationshipForInvestor,
   createListRelationshipsForCompany,
@@ -145,6 +146,7 @@ export {
   toRelationshipStatusDto,
   toRelationshipSummaryDto,
   type RelationshipListing,
+  type RelationshipPartyView,
   type RelationshipStatus,
 } from "./application/relationship-status.js";
 export {

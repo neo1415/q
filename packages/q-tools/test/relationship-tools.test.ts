@@ -145,6 +145,28 @@ function fakeRelationships(
       if (actor.userId !== actorA.userId) return Promise.resolve(null);
       return Promise.resolve(statusFor(history, "COMPANY", COMPANY_A));
     },
+    byRelationship: (actor: ActorContext, relationshipId) => {
+      calls.reads.push(`byRelationship:${relationshipId}`);
+      if (relationshipId !== RELATIONSHIP) return Promise.resolve(null);
+      if (actor.userId === actorA.userId) {
+        return Promise.resolve({
+          side: "COMPANY" as const,
+          counterpart: {
+            kind: "INVESTOR_ORGANISATION" as const,
+            id: INVESTOR_B,
+          },
+          status: statusFor(history, "COMPANY", COMPANY_A),
+        });
+      }
+      if (actor.userId === actorB.userId) {
+        return Promise.resolve({
+          side: "INVESTOR" as const,
+          counterpart: { kind: "COMPANY" as const, id: COMPANY_B_NETWORK },
+          status: statusFor(history, "INVESTOR", COMPANY_B_NETWORK),
+        });
+      }
+      return Promise.resolve(null);
+    },
     incomingInterest: (actor: ActorContext, companyId) => {
       calls.reads.push(`incoming:${companyId}`);
       if (actor.userId !== actorA.userId || companyId !== COMPANY_A) {
@@ -191,6 +213,46 @@ type RelationshipData = {
 };
 
 const SEEDS = Array.from({ length: 200 }, (_, i) => i + 1);
+
+const RELATIONSHIP = "88888888-0000-4000-8000-000000000001";
+
+/**
+ * A plan the firewall made for a RELATIONSHIP subject: one
+ * RELATIONSHIP_CONTEXT scope bound to that relationship, labelled for the
+ * asker's own side (q-firewall relationshipLabelsFor).
+ */
+function relationshipPlan(
+  base: PermittedContextPlan,
+  side: "COMPANY" | "INVESTOR",
+): PermittedContextPlan {
+  const template = base.scopes[0];
+  if (template === undefined) throw new Error("plan has no scope");
+  return {
+    ...base,
+    purpose: { ...base.purpose, taskClass: "RELATIONSHIP_QUESTION" },
+    subjects: [{ kind: "RELATIONSHIP", relationshipId: RELATIONSHIP }],
+    scopes: [
+      ...base.scopes,
+      {
+        ...template,
+        kind: "RELATIONSHIP_CONTEXT",
+        subject: { kind: "RELATIONSHIP", relationshipId: RELATIONSHIP },
+        contextLabel: "relationship_shared",
+        filter: {
+          tenantId: base.tenantId,
+          relationshipIds: [RELATIONSHIP],
+          contextLabels: [
+            side === "COMPANY" ? "founder_private" : "investor_private",
+            "relationship_shared",
+            "specifically_shared",
+            "network_visible",
+            "public_external",
+          ],
+        },
+      },
+    ],
+  };
+}
 
 describe("get_relationship", () => {
   it("answers each side with the projector's fold of exactly what that side may see (200 random histories)", async () => {
@@ -307,6 +369,109 @@ describe("get_relationship", () => {
     );
     expect(outcome.status).toBe("FAILED");
     expect(outcome.failureCode).toBe("INVALID_ARGUMENTS");
+  });
+});
+
+describe("get_relationship by relationship (the RELATIONSHIP subject)", () => {
+  it("a founder asking by relationship id gets exactly the company's fold and never an investor-private fact (200 random histories)", async () => {
+    const plan = relationshipPlan(founderPlan, "COMPANY");
+    for (const seed of SEEDS) {
+      const history = randomHistory(seed);
+      const { port } = fakeRelationships(history);
+      const outcome = await executorWith(port).execute(
+        {
+          callId: "r1",
+          name: "get_relationship",
+          arguments: { relationshipId: RELATIONSHIP },
+        },
+        contextFor(actorA, plan),
+      );
+      expect(outcome.status, `seed ${seed}`).toBe("SUCCEEDED");
+      if (!outcome.result.ok) throw new Error("unreachable");
+      const data = outcome.result.data as RelationshipData;
+      expect(data.yourSide, `seed ${seed}`).toBe("COMPANY");
+
+      const expected = projectRelationshipState(
+        visibleToParty(history, "COMPANY"),
+      );
+      expect(data.relationship?.state ?? null, `seed ${seed}`).toBe(
+        expected?.state ?? null,
+      );
+      const privateDates = new Set(
+        history
+          .filter((e) => e.visibilityScope === "investor_private")
+          .map((e) => e.occurredAt),
+      );
+      for (const milestone of data.relationship?.milestones ?? []) {
+        expect(privateDates.has(milestone.at), `seed ${seed}`).toBe(false);
+        expect(milestone.state, `seed ${seed}`).not.toBe("DISCOVERED");
+      }
+      // The company's answer does not move when the investor's private
+      // events do: dropping them all leaves it identical.
+      const withoutPrivate = history.filter(
+        (e) => e.visibilityScope !== "investor_private",
+      );
+      expect(
+        projectRelationshipState(visibleToParty(withoutPrivate, "COMPANY")),
+        `seed ${seed}`,
+      ).toEqual(expected);
+      if (data.relationship === null) {
+        expect(data.counterpart.name, `seed ${seed}`).toBeNull();
+      }
+    }
+  });
+
+  it("an investor asking by relationship id gets the investor's own fold", async () => {
+    const history = randomHistory(7);
+    const { port } = fakeRelationships(history);
+    const outcome = await executorWith(port).execute(
+      {
+        callId: "r1",
+        name: "get_relationship",
+        arguments: { relationshipId: RELATIONSHIP },
+      },
+      contextFor(actorB, relationshipPlan(investorPlan, "INVESTOR")),
+    );
+    expect(outcome.status).toBe("SUCCEEDED");
+    if (!outcome.result.ok) throw new Error("unreachable");
+    const data = outcome.result.data as RelationshipData;
+    expect(data.yourSide).toBe("INVESTOR");
+    expect(data.relationship?.state ?? null).toBe(
+      projectRelationshipState(visibleToParty(history, "INVESTOR"))?.state ??
+        null,
+    );
+  });
+
+  it("is refused before the Network service is asked when the firewall bound no scope to that relationship", async () => {
+    const { port, calls } = fakeRelationships(randomHistory(8));
+    const outcome = await executorWith(port).execute(
+      {
+        callId: "r1",
+        name: "get_relationship",
+        arguments: { relationshipId: RELATIONSHIP },
+      },
+      contextFor(actorA, founderPlan),
+    );
+    expect(outcome.status).toBe("DENIED");
+    expect(outcome.failureCode).toBe("NOT_AVAILABLE");
+    expect(calls.reads).toEqual([]);
+  });
+
+  it("is refused when the Network context says the actor is not a party", async () => {
+    const { port } = fakeRelationships(randomHistory(9));
+    const outsider: ActorContext = {
+      ...actorA,
+      userId: "99999999-0000-4000-8000-000000000009" as ActorContext["userId"],
+    };
+    const outcome = await executorWith(port).execute(
+      {
+        callId: "r1",
+        name: "get_relationship",
+        arguments: { relationshipId: RELATIONSHIP },
+      },
+      contextFor(outsider, relationshipPlan(founderPlan, "COMPANY")),
+    );
+    expect(outcome.status).toBe("DENIED");
   });
 });
 

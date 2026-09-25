@@ -155,6 +155,19 @@ export function createRelationshipIntelligencePort(dependencies: {
       });
       return status === null ? null : toRelationshipStatusDto(status);
     },
+    byRelationship: async (actor, relationshipId) => {
+      const view = await interests.relationshipById({ actor, relationshipId });
+      return view === null
+        ? null
+        : {
+            side: view.side,
+            counterpart: view.counterpart,
+            status:
+              view.status === null
+                ? null
+                : toRelationshipStatusDto(view.status),
+          };
+    },
     incomingInterest: async (actor, companyId) =>
       (await interests.listIncomingInterest({ actor, companyId })).map(
         ({ interest, investor }) => toIncomingInterestDto(interest, investor),
