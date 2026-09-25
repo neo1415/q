@@ -1,9 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 
-import { QConversationIdSchema } from "@capital-q/contracts";
 import { cx } from "@capital-q/ui";
 import { Button, IconButton } from "@capital-q/ui/button";
 import { ContextIndicator } from "@capital-q/ui/context-indicator";
@@ -12,196 +11,59 @@ import {
   ICON_STROKE,
   Mic,
   MicOff,
+  Move,
   Square,
 } from "@capital-q/ui/icons";
+import {
+  MenuContent,
+  MenuItem,
+  MenuRoot,
+  MenuTrigger,
+} from "@capital-q/ui/menu";
 import { QComposer } from "@capital-q/ui/q-composer";
 import { InlineNotice } from "@capital-q/ui/states";
 import { Tooltip } from "@capital-q/ui/tooltip";
 
-import {
-  apertureStateFor,
-  QAperture,
-  QLumen,
-  type QApertureState,
-} from "../q-aperture";
-import { upsertLine, VOICE_STATE_LABELS } from "../voice/session";
-import { useVoiceInterview } from "../voice/use-voice-interview";
-import {
-  readActiveConversation,
-  rememberActiveConversation,
-  type QSurfaceKey,
-} from "./active-conversation";
-import { Q_CONVERSATION_PARAM } from "./chats-list";
-import { failureMessage, recoveryHint, turnsFrom } from "./conversation";
+import { ViewTransition } from "@/components/view-transition";
+
+import { QAperture, QLumen } from "../q-aperture";
+import { useDockMenu } from "../q-dock/use-dock-menu";
+import { homeHref } from "./active-conversation";
+import { failureMessage, recoveryHint } from "./conversation";
 import { QAnswer } from "./q-answer";
-import type { QSubject } from "./q-subject";
-import { spokenNotYetStored, type SpokenLine } from "./spoken";
-import { useQConversation } from "./use-q-conversation";
+import { useQSession } from "./q-session";
 
 /**
- * Q from anywhere: the same conversation runtime as Home, in a sheet,
- * about whatever the page is looking at.
+ * Q beside the page: the dock's expanded view of the one conversation
+ * store (ADR 0017 F1; spec §6.1, §6.4).
  *
- * The subject is the page's declaration or the person's own, handed in
- * by the shell; it is an input the Q API resolves and authorises again,
- * never a grant. The conversation the server names is kept only while
- * the sheet is open, and "Open in Home" carries it to the full surface
- * — one thread, wherever it was started. Voice and typing share it here
- * exactly as they do on Home.
+ * The same conversation the Q page shows, about whatever this page is
+ * looking at. "Open Q" carries it to the Q page with nothing read again:
+ * the aperture here becomes the stage's, and a voice line stays open.
  */
 
-/** One thread per subject the sheet is about; the person's own when none. */
-function sheetSurface(subject: QSubject): QSurfaceKey {
-  switch (subject.kind) {
-    case "COMPANY":
-      return `sheet:company:${subject.companyId}`;
-    case "INVESTOR_ORGANISATION":
-      return `sheet:investor:${subject.investorOrganisationId}`;
-    case "NONE":
-      return "sheet:none";
-  }
-}
-
 export function QSheetConversation({
-  subject,
   connected,
-  onActivity,
   seed = null,
 }: {
-  readonly subject: QSubject;
   readonly connected: boolean;
-  /** What Q is doing, for the presence in the chrome. */
-  readonly onActivity?: ((state: QApertureState) => void) | undefined;
   /** A draft question to open with; the person edits or sends it. */
   readonly seed?: string | null | undefined;
 }) {
-  const companyId = subject.kind === "COMPANY" ? subject.companyId : undefined;
-  const investorOrganisationId =
-    subject.kind === "INVESTOR_ORGANISATION"
-      ? subject.investorOrganisationId
-      : undefined;
-  // The sheet's thread about this subject, for this tab: closing the sheet
-  // or reloading the page used to drop it, so the next "Ask Q" about the
-  // same company started a new chat. The sheet is only ever mounted by a
-  // press in the browser, so reading the pointer while initialising state
-  // cannot disagree with a server render.
-  const surface = sheetSurface(subject);
-  const [conversationId, setConversationId] = useState<string | null>(() =>
-    readActiveConversation(surface),
-  );
-  // A different subject is a different thread; adjusted during render, as
-  // React asks, so no effect writes one subject's thread under another's.
-  const [surfaceFor, setSurfaceFor] = useState(surface);
-  if (surfaceFor !== surface) {
-    setSurfaceFor(surface);
-    setConversationId(readActiveConversation(surface));
-  }
-  const q = useQConversation({
-    companyId,
-    investorOrganisationId,
-    conversationId,
-    onConversation: setConversationId,
-  });
-  const activeConversation = q.conversationId;
-  const settledOpen = !q.loading;
-  useEffect(() => {
-    if (!settledOpen) return;
-    if (activeConversation !== null && activeConversation === conversationId) {
-      rememberActiveConversation(surface, activeConversation);
-    } else if (activeConversation === null && conversationId !== null) {
-      // Asked to open one and it did not: the Q API refused it. Forgotten,
-      // so the next "Ask Q" here starts clean instead of failing again.
-      rememberActiveConversation(surface, null);
-    }
-  }, [surface, activeConversation, conversationId, settledOpen]);
-  const turns = turnsFrom(q.state, q.pending);
+  const session = useQSession();
+  const { q, turns, voice, subject, presence, spokenOnly } = session;
   const endRef = useRef<HTMLDivElement>(null);
-
-  const [spoken, setSpoken] = useState<readonly SpokenLine[]>([]);
-  const voice = useVoiceInterview({
-    onLine: (line) => {
-      setSpoken((current) =>
-        upsertLine(current, { id: line.id, role: line.role, text: line.text }),
-      );
-    },
-  });
-  // The spoken turns live in a conversation the server names; once it
-  // does, this sheet is in that conversation too. Adjusted during render,
-  // as React asks, so the hook below sees it on the same pass.
-  const voiceConversationId = voice.turn?.conversationId;
-  if (
-    voiceConversationId !== undefined &&
-    voiceConversationId !== conversationId
-  ) {
-    setConversationId(voiceConversationId);
-  }
-  // The line ends with the sheet; a microphone left open behind a closed
-  // panel is exactly the thing a person would not expect.
-  const endVoice = voice.end;
-  useEffect(() => () => void endVoice(), [endVoice]);
-
-  const talk = async () => {
-    const named = QConversationIdSchema.safeParse(
-      q.conversationId ?? undefined,
-    ).data;
-    await voice.talk({
-      thread: {
-        ...(companyId !== undefined
-          ? { subjects: [{ kind: "COMPANY" as const, companyId }] }
-          : investorOrganisationId !== undefined
-            ? {
-                subjects: [
-                  {
-                    kind: "INVESTOR_ORGANISATION" as const,
-                    investorOrganisationId,
-                  },
-                ],
-              }
-            : {}),
-        ...(named === undefined ? {} : { conversationId: named }),
-      },
-      firstMessage: "I'm listening. What would you like to know?",
-    });
-  };
-
-  // Real state only: the voice session while it is on, then a waiting
-  // approval, then the run.
-  const presenceState: QApertureState = apertureStateFor({
-    voice: voice.active ? voice.client.state : null,
-    asking: (voice.turn?.asking?.options.length ?? 0) > 0,
-    approvalPending: q.state.approval !== null,
-    working: q.working,
-    failed: q.state.failure !== null,
-  });
-  useEffect(() => {
-    onActivity?.(presenceState);
-  }, [presenceState, onActivity]);
-  const presenceLabel = voice.active
-    ? voice.client.muted
-      ? "Muted"
-      : VOICE_STATE_LABELS[voice.client.state]
-    : q.working
-      ? "Thinking"
-      : q.state.failure !== null
-        ? "Couldn't finish that"
-        : "Ready";
+  const dockMenu = useDockMenu();
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ block: "nearest" });
-  }, [turns.length, spoken.length, q.state.partial?.text]);
+  }, [turns.length, spokenOnly.length, q.state.partial?.text]);
 
-  const spokenOnly = spokenNotYetStored(
-    spoken,
-    turns.map((turn) => turn.text),
-  );
-  const openInHome =
-    q.conversationId === null
-      ? "/home"
-      : `/home?${Q_CONVERSATION_PARAM}=${encodeURIComponent(q.conversationId)}`;
+  const label = presence.label ?? "Ready";
 
   return (
     <div className="flex min-h-full flex-col gap-4" data-q-sheet>
-      {/* Q is listening: the edge light on the sheet's side. */}
+      {/* Q is listening: the edge light on the panel's side. */}
       <QLumen
         active={voice.active}
         input={voice.client.inputLevel}
@@ -209,15 +71,17 @@ export function QSheetConversation({
         side="right"
       />
       <div className="flex items-center gap-4">
-        <QAperture
-          state={presenceState}
-          size="panel"
-          inputLevel={voice.client.inputLevel}
-          outputLevel={voice.client.outputLevel}
-        />
+        <ViewTransition name="q-aperture" share="cq-q-morph" default="none">
+          <QAperture
+            state={presence.state}
+            size="panel"
+            inputLevel={voice.client.inputLevel}
+            outputLevel={voice.client.outputLevel}
+          />
+        </ViewTransition>
         <div className="flex min-w-0 flex-1 flex-col gap-1">
           <span className="cq-label text-(--cq-text-primary)" role="status">
-            {presenceLabel}
+            {label}
           </span>
           <ContextIndicator
             scope={subject.scope}
@@ -231,7 +95,9 @@ export function QSheetConversation({
               variant={voice.active ? "secondary" : "primary"}
               className="rounded-full"
               onClick={
-                voice.active ? () => void voice.end() : () => void talk()
+                voice.active
+                  ? () => void voice.end()
+                  : () => void session.talk()
               }
               data-q-control={voice.active ? "end" : "talk"}
             >
@@ -388,12 +254,36 @@ export function QSheetConversation({
               }
             : {})}
         />
-        <div className="flex justify-end">
+        <div className="flex items-center justify-between gap-2">
+          <MenuRoot>
+            <MenuTrigger>
+              <button
+                type="button"
+                className="inline-flex min-h-11 items-center gap-1.5 rounded-md px-2 cq-caption text-(--cq-text-secondary) hover:bg-(--cq-surface-subtle) hover:text-(--cq-text-primary)"
+                data-q-dock-menu
+              >
+                <Move
+                  aria-hidden="true"
+                  size={ICON_SIZE.compact}
+                  strokeWidth={ICON_STROKE}
+                />
+                Move Q
+              </button>
+            </MenuTrigger>
+            <MenuContent>
+              {dockMenu.items.map((item) => (
+                <MenuItem key={item.label} onClick={item.run}>
+                  {item.label}
+                </MenuItem>
+              ))}
+            </MenuContent>
+          </MenuRoot>
           <Link
-            href={openInHome}
-            className="cq-caption text-(--cq-text-secondary) underline-offset-2 hover:underline"
+            href={homeHref(q.conversationId)}
+            className="inline-flex min-h-11 items-center rounded-md px-2 cq-label text-(--cq-accent) underline-offset-2 hover:underline"
+            data-q-open-page
           >
-            Open in Home
+            Open Q
           </Link>
         </div>
       </div>

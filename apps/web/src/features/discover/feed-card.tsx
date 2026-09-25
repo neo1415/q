@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRef } from "react";
 
 import type {
   DiscoveredCompanyDto,
@@ -11,6 +12,7 @@ import { Building2, Globe, ICON_SIZE } from "@capital-q/ui/icons";
 
 import { countryLabel, stageLabel } from "../company/declared-labels";
 import { ExpressInterest } from "../network/express-interest";
+import { useDockAvoid } from "../q-dock";
 
 import type { FeedPreloadPolicy } from "./feed/feed-state";
 import { actionPlaybackSource } from "./feed/action-feed-transport";
@@ -149,6 +151,8 @@ export function FeedCard({
   ]
     .filter((part): part is string => part !== null)
     .join(" · ");
+  const decisions = useRef<HTMLDivElement>(null);
+  useDockAvoid(decisions);
 
   return (
     <article
@@ -214,7 +218,8 @@ export function FeedCard({
         )}
       </div>
 
-      <div className="flex flex-wrap items-center gap-2">
+      {/* The decision row: the Q Dock never sits on it (spec §6.2). */}
+      <div ref={decisions} className="flex flex-wrap items-center gap-2">
         <Button
           variant={saved ? "secondary" : "primary"}
           aria-pressed={saved}

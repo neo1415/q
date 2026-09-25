@@ -1,18 +1,9 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type ReactNode,
-} from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import { describeQStreamTransport } from "@capital-q/api-client";
 import { cx } from "@capital-q/ui";
-import { QConversationIdSchema } from "@capital-q/contracts";
 import { Button } from "@capital-q/ui/button";
 import { QComposer } from "@capital-q/ui/q-composer";
 import { QStateIndicator } from "@capital-q/ui/q-state";
@@ -23,31 +14,20 @@ import {
   materialUploadCompleteAction,
   materialUploadTargetAction,
 } from "../onboarding-kit/material-actions";
-import { apertureStateFor, QLumen, type QApertureState } from "../q-aperture";
-import { destinationPath } from "../voice/destinations";
-import { upsertLine, VOICE_STATE_LABELS } from "../voice/session";
-import { useFollowTurn } from "../voice/use-follow-turn";
-import { useVoiceInterview } from "../voice/use-voice-interview";
-import { rememberActiveConversation } from "./active-conversation";
+import { QLumen } from "../q-aperture";
 import { ArtifactViewer } from "./artifact-viewer";
-import { navigationToFollow } from "./follow-navigation";
 import { QAnswer } from "./q-answer";
 import { QHistorySheet } from "./q-history-sheet";
 import { QStage } from "./q-stage";
 import { QSurfaceToolsContext, type QSurfaceTools } from "./q-surface-tools";
-import { spokenNotYetStored, type SpokenLine } from "./spoken";
+import { useQSession } from "./q-session";
+import type { SpokenLine } from "./spoken";
 import {
   failureMessage,
   recoveryHint,
-  turnsFrom,
   workingLabel,
   type QTurn,
 } from "./conversation";
-import { Q_CONVERSATION_PARAM } from "./chats-list";
-import {
-  announceConversationsChanged,
-  useQConversation,
-} from "./use-q-conversation";
 
 /**
  * Q, in the browser (CQ-C5-R1 §13-§19; CQ-PRE-REC-001 §12-§13), voice
@@ -107,10 +87,6 @@ export type QConversationPanelProps = {
   readonly welcomeLine?: string | undefined;
 };
 
-/** How long the settle after an answer, and the sweep of an action, are shown. */
-const SUCCESS_MS = 900;
-const ACTION_MS = 700;
-
 const COMPOSER_ID = "home-q";
 
 /** The conversation as plain text, for saving. */
@@ -134,59 +110,21 @@ export function QConversationPanel({
   welcome,
   welcomeLine,
 }: QConversationPanelProps) {
-  const router = useRouter();
-  // Which conversation this surface is in comes from the URL (ADR 0012),
-  // so a refresh, a link and the chats list all open the same thread. A
-  // conversation the server names for the first time is written back to
-  // the URL without a navigation, so nothing on screen is disturbed.
-  const conversationParam = openConversationId;
-  const onConversation = useCallback((conversationId: string) => {
-    // Written back without a navigation, so naming a conversation for
-    // the first time does not disturb anything on screen.
-    const next = new URLSearchParams(window.location.search);
-    next.set(Q_CONVERSATION_PARAM, conversationId);
-    window.history.replaceState(null, "", `/home?${next.toString()}`);
-  }, []);
-  const q = useQConversation({
-    companyId: context.companyId,
-    investorOrganisationId: context.investorOrganisationId,
-    conversationId: conversationParam,
-    onConversation,
-  });
-  const turns = turnsFrom(q.state, q.pending);
+  const session = useQSession();
+  const { q, turns, voice, spoken, spokenOnly, presence, act } = session;
   const endRef = useRef<HTMLDivElement>(null);
 
-  // Home's conversation for this tab, so the navigation's Home link comes
-  // back to it rather than to an empty new chat (./active-conversation).
-  // Written once the open has settled: a conversation the Q API refused to
-  // open is forgotten, and Home with none (New chat) is a new chat.
-  const activeConversation = q.conversationId;
-  const settledOpen = !q.loading;
+  // The page names the conversation (its URL); the store holds it, so
+  // arriving from the dock in the same conversation reads nothing again
+  // (ADR 0017 F1, spec §6.4). A bare /home is a new conversation.
+  const openConversation = session.open;
   useEffect(() => {
-    if (settledOpen) rememberActiveConversation("home", activeConversation);
-  }, [activeConversation, settledOpen]);
+    openConversation(openConversationId);
+  }, [openConversation, openConversationId]);
 
-  /**
-   * The document on screen beside Q, if any (QX-003E).
-   *
-   * Kept here rather than in a route so the conversation stays mounted
-   * and reachable: "Edit with Q" is the next sentence in the same thread,
-   * not a navigation away and back. Below the desktop breakpoint the
-   * viewer takes the column instead, with its own way back.
-   */
-  const [openArtifact, setOpenArtifact] = useState<string | null>(null);
-  const showArtifact = useCallback((artifactId: string) => {
-    setOpenArtifact(artifactId);
-  }, []);
-  const closeArtifact = useCallback(() => {
-    setOpenArtifact(null);
-  }, []);
-
-  // Voice (CQ-Q-VOICE-001): the same Q conversation, spoken. The credential
-  // is bound on the server to this person, this subject and the
-  // conversation this tab is already in; what is said either way is one
-  // thread. Spoken lines are shown as they are transcribed.
-  const [spoken, setSpoken] = useState<readonly SpokenLine[]>([]);
+  const openArtifact = session.artifactId;
+  const showArtifact = session.openArtifact;
+  const closeArtifact = session.closeArtifact;
 
   /**
    * Attaching a document to this conversation (QX-001 §5).
@@ -242,129 +180,15 @@ export function QConversationPanel({
     );
     settle(completed.ok ? "attached" : completed.message);
   };
-  const voice = useVoiceInterview({
-    onLine: (line) => {
-      setSpoken((current) =>
-        upsertLine(current, { id: line.id, role: line.role, text: line.text }),
-      );
-    },
-  });
   const talkWithQ = async () => {
-    const conversationId = QConversationIdSchema.safeParse(
-      q.conversationId ?? undefined,
-    ).data;
     // Over a welcome still on screen, Q says that welcome and nothing
     // before it: one greeting, not the page's and then the call's.
     const greeting =
       welcomeLine !== undefined && turns.length === 0 && spoken.length === 0
         ? welcomeLine
         : undefined;
-    await voice.talk({
-      ...(greeting === undefined ? {} : { resume: true }),
-      thread: {
-        ...(context.companyId !== undefined
-          ? {
-              subjects: [
-                { kind: "COMPANY" as const, companyId: context.companyId },
-              ],
-            }
-          : context.investorOrganisationId !== undefined
-            ? {
-                subjects: [
-                  {
-                    kind: "INVESTOR_ORGANISATION" as const,
-                    investorOrganisationId: context.investorOrganisationId,
-                  },
-                ],
-              }
-            : {}),
-        ...(conversationId === undefined ? {} : { conversationId }),
-      },
-      firstMessage: greeting ?? "I'm listening. What would you like to know?",
-    });
+    await session.talk(greeting === undefined ? undefined : { greeting });
   };
-
-  // The spoken turns live in a conversation the server names; once it
-  // does, the screen is in that conversation too, so a refresh and the
-  // chats list find what was said aloud.
-  const voiceConversationId = voice.turn?.conversationId;
-  useEffect(() => {
-    if (
-      voiceConversationId !== undefined &&
-      voiceConversationId !== conversationParam
-    ) {
-      onConversation(voiceConversationId);
-      announceConversationsChanged();
-      router.replace(
-        `/home?${Q_CONVERSATION_PARAM}=${encodeURIComponent(voiceConversationId)}`,
-      );
-    }
-  }, [voiceConversationId, conversationParam, onConversation, router]);
-
-  /**
-   * Two moments the presence shows and nothing else does: the settle
-   * after an answer lands, and the sweep when Q acts on something —
-   * follows a spoken "take me to…", or applies what was approved. Both
-   * are brief and time out on their own.
-   */
-  const [settled, setSettled] = useState(false);
-  const [acting, setActing] = useState(false);
-  const wasWorking = useRef(false);
-  useEffect(() => {
-    const finished = wasWorking.current && !q.working;
-    wasWorking.current = q.working;
-    if (!finished || q.state.failure !== null) return;
-    setSettled(true);
-    const timer = window.setTimeout(() => setSettled(false), SUCCESS_MS);
-    return () => window.clearTimeout(timer);
-  }, [q.working, q.state.failure]);
-  const act = useCallback(() => {
-    setActing(true);
-    window.setTimeout(() => setActing(false), ACTION_MS);
-  }, []);
-
-  // "Take me to my profile", said on Home: followed once Q has said so.
-  const voiceEnd = voice.end;
-  useFollowTurn(voice.turn, voice.client, (followed) => {
-    if (followed.handoff === "CHAT") {
-      void voiceEnd();
-      return;
-    }
-    const path = destinationPath(followed.navigate);
-    if (path !== null) {
-      act();
-      void voiceEnd();
-      router.push(path);
-    }
-  });
-
-  /**
-   * "Take me to Discover", typed (CQ-QACT-001): Q's answer carries a
-   * NAVIGATE intent and the screen follows it, exactly as it follows the
-   * spoken request, through the same route map. What was already on
-   * screen when the conversation opened is never followed.
-   */
-  const followedTurns = useRef<Set<string> | null>(null);
-  useEffect(() => {
-    if (q.loading) {
-      // A conversation being (re)opened: whatever it brings is history.
-      followedTurns.current = null;
-      return;
-    }
-    if (followedTurns.current === null) {
-      followedTurns.current = new Set(
-        turns.filter((turn) => turn.kind === "Q").map((turn) => turn.id),
-      );
-      return;
-    }
-    const path = destinationPath(
-      navigationToFollow(turns, followedTurns.current),
-    );
-    if (path !== null) {
-      act();
-      router.push(path);
-    }
-  }, [turns, q.loading, act, router]);
 
   useEffect(() => {
     // Follow the answer as it arrives, and respect a reader who has asked
@@ -377,12 +201,6 @@ export function QConversationPanel({
       block: "nearest",
     });
   }, [turns.length, spoken.length, q.state.partial?.text]);
-
-  // Spoken lines only until the same words are stored (see ./spoken).
-  const spokenOnly = spokenNotYetStored(
-    spoken,
-    turns.map((turn) => turn.text),
-  );
 
   const stage = workingLabel(q.state);
   // Suggestions are an on-ramp, not a feature: gone after the first turn.
@@ -399,28 +217,8 @@ export function QConversationPanel({
     !q.loading &&
     q.state.failure === null;
 
-  // What the presence shows, and the word beside it. Voice, while it is
-  // on, is the truth; otherwise the run's own state.
-  const presenceState: QApertureState = apertureStateFor({
-    voice: voice.active ? voice.client.state : null,
-    asking: (voice.turn?.asking?.options.length ?? 0) > 0,
-    approvalPending: q.state.approval !== null,
-    working: q.working,
-    acting,
-    settled,
-    failed: q.state.failure !== null,
-  });
-  const presenceLabel = voice.active
-    ? voice.client.muted
-      ? "Muted"
-      : VOICE_STATE_LABELS[voice.client.state]
-    : q.working
-      ? "Thinking"
-      : q.state.failure !== null
-        ? "Couldn't finish that"
-        : settled
-          ? "Done"
-          : undefined;
+  const presenceState = presence.state;
+  const presenceLabel = presence.label;
   const presenceDetail = voice.active
     ? undefined
     : q.working

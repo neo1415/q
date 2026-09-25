@@ -23,6 +23,8 @@ import {
 } from "@capital-q/ui/popover";
 import { Tooltip } from "@capital-q/ui/tooltip";
 
+import { ViewTransition } from "@/components/view-transition";
+
 import { QAperture, type QApertureState } from "../q-aperture";
 
 /**
@@ -154,14 +156,17 @@ export function QStage({
       className={cx("flex flex-col items-center gap-5", className)}
       data-q-stage={voiceActive ? "voice" : "ready"}
     >
-      <QAperture
-        state={state}
-        size="stage"
-        inputLevel={inputLevel}
-        outputLevel={outputLevel}
-        label={label ?? true}
-        detail={detail}
-      />
+      {/* The dock's aperture, grown: the same object on the Q page. */}
+      <ViewTransition name="q-aperture" share="cq-q-morph" default="none">
+        <QAperture
+          state={state}
+          size="stage"
+          inputLevel={inputLevel}
+          outputLevel={outputLevel}
+          label={label ?? true}
+          detail={detail}
+        />
+      </ViewTransition>
 
       {showOptions && asking !== null ? (
         <div

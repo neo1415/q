@@ -7,10 +7,15 @@ import { afterEach, describe, expect, it, vi } from "vitest";
  * (CQ-WEB-024) — not a second Q surface — and the draft belongs to that
  * opening only: close the sheet and the next plain "Ask Q" starts empty.
  *
- * The conversation itself is mocked; what is under test is the shell's
- * hand-off of the draft to it.
+ * The conversation itself is mocked (the one store, and the panel that
+ * renders it); what is under test is the shell's hand-off of the draft.
  */
 
+vi.mock("next/navigation", () => ({ usePathname: () => "/discover" }));
+vi.mock("@/features/q/q-session", () => ({
+  QSessionProvider: ({ children }: { children: React.ReactNode }) => children,
+  useQSessionOptional: () => null,
+}));
 vi.mock("@/features/q/q-sheet", () => ({
   QSheetConversation: ({ seed }: { seed?: string | null }) => (
     <p data-testid="sheet-seed">{seed ?? "(empty)"}</p>
