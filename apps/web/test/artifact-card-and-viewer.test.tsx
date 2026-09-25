@@ -141,8 +141,12 @@ describe("QX-003E · the card in an answer", () => {
     expect(onOpenArtifact).toHaveBeenCalledWith(ARTIFACT);
     await userEvent.click(screen.getByText("Edit with Q"));
     expect(onAsk).toHaveBeenCalled();
-    // No download: there are no bytes, so there is no button.
-    expect(screen.queryByText(/download/i)).toBeNull();
+    // A brief downloads as a PDF from the card (BIZ-001), and only as a
+    // PDF: there is no PowerPoint of a document that has no slides.
+    expect(screen.getByText("PDF").getAttribute("href")).toBe(
+      `/api/q-artifact/${ARTIFACT}/pdf`,
+    );
+    expect(screen.queryByText("PowerPoint")).toBeNull();
   });
 
   it("offers nothing to open while it is still being prepared", () => {
@@ -164,6 +168,8 @@ describe("QX-003E · the card in an answer", () => {
     expect(screen.getByText(/still preparing/i)).toBeTruthy();
     expect(screen.queryByText("View")).toBeNull();
     expect(screen.queryByText("Edit with Q")).toBeNull();
+    // No bytes exist yet, so there is no download to offer.
+    expect(screen.queryByText("PDF")).toBeNull();
   });
 
   it("says so, rather than nothing, when preparing failed", () => {
@@ -424,7 +430,7 @@ describe("QX-004 · the deck in the viewer", () => {
     expect(screen.queryByAltText("Slide 1")).toBeNull();
   });
 
-  it("calls a deck a deck on the card, not a document", () => {
+  it("calls a deck a deck on the card, and offers both of its files there (BIZ-001)", () => {
     render(
       <QResultBlocks
         blocks={[
@@ -441,11 +447,15 @@ describe("QX-004 · the deck in the viewer", () => {
       />,
     );
     expect(screen.getByText("Investor deck")).toBeTruthy();
-    // The download lives beside the slides, not on a card in a thread.
-    expect(screen.queryByText("PowerPoint")).toBeNull();
+    expect(screen.getByText("PDF").getAttribute("href")).toBe(
+      `/api/q-artifact/${ARTIFACT}/pdf`,
+    );
+    expect(screen.getByText("PowerPoint").getAttribute("href")).toBe(
+      `/api/q-artifact/${ARTIFACT}/pptx`,
+    );
   });
 
-  it("offers no download on a document that has no slides", async () => {
+  it("offers a brief as a PDF in the viewer, and no PowerPoint of a document with no slides", async () => {
     readQArtifactAction.mockResolvedValue({
       ok: true,
       value: detail(2, "Short and plain."),
@@ -454,9 +464,139 @@ describe("QX-004 · the deck in the viewer", () => {
     await waitFor(() => {
       expect(screen.getByText("Short and plain.")).toBeTruthy();
     });
+    // Was: no download at all, so a founder who asked for a PDF of their
+    // brief had none. The version on screen is the version downloaded.
+    expect(screen.getByText("PDF").getAttribute("href")).toBe(
+      `/api/q-artifact/${ARTIFACT}/pdf?version=2`,
+    );
     // A button to nowhere is worse than the absence of one: a brief has
     // no slides, so there is nothing to write a PPTX from.
     expect(screen.queryByText("PowerPoint")).toBeNull();
+    // And no slides are asked for.
     expect(asked).toEqual([]);
+  });
+});
+
+/**
+ * BIZ-001 · a download that fails says why, where the person is.
+ *
+ * The links used to navigate to the file route, so a refusal opened a
+ * page of JSON: a dead end. A click now fetches, saves the file under the
+ * server's name when it arrives, and otherwise shows the route's own
+ * sentence beside the button.
+ */
+describe("BIZ-001 · downloading from the card", () => {
+  const card = (type: string) => (
+    <QResultBlocks
+      blocks={[
+        {
+          kind: "ARTIFACT_REFERENCE",
+          artifactId: ARTIFACT,
+          type,
+          status: "READY",
+          title: "Investment brief — Northstar Logistics",
+        },
+      ]}
+      onAsk={vi.fn()}
+      onOpenArtifact={vi.fn()}
+    />
+  );
+
+  it("saves the file under the name the server gave it", async () => {
+    const saved: { name: string; href: string }[] = [];
+    // jsdom has no object URLs; the browser's own download is the anchor
+    // click, observed rather than performed.
+    const createObjectURL = vi.fn(() => "blob:q-artifact");
+    const original = {
+      create: URL.createObjectURL,
+      revoke: URL.revokeObjectURL,
+    };
+    URL.createObjectURL = createObjectURL;
+    URL.revokeObjectURL = vi.fn();
+    const click = vi
+      .spyOn(HTMLAnchorElement.prototype, "click")
+      .mockImplementation(function (this: HTMLAnchorElement) {
+        saved.push({ name: this.download, href: this.href });
+      });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() =>
+        Promise.resolve(
+          new Response(new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d]), {
+            status: 200,
+            headers: {
+              "content-type": "application/pdf",
+              "content-disposition":
+                'attachment; filename="Investment-brief-Northstar-Logistics.pdf"',
+            },
+          }),
+        ),
+      ),
+    );
+
+    render(card("INVESTMENT_BRIEF"));
+    await userEvent.click(screen.getByText("PDF"));
+    await waitFor(() => {
+      expect(saved).toHaveLength(1);
+    });
+    expect(saved[0]).toEqual({
+      name: "Investment-brief-Northstar-Logistics.pdf",
+      href: "blob:q-artifact",
+    });
+    expect(createObjectURL).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText("That file didn't download")).toBeNull();
+    click.mockRestore();
+    URL.createObjectURL = original.create;
+    URL.revokeObjectURL = original.revoke;
+  });
+
+  it("says the route's sentence beside the button when the file cannot be made, and stays put", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() =>
+        Promise.resolve(
+          new Response(
+            JSON.stringify({
+              message:
+                "That document isn't ready yet. Q is still preparing it.",
+            }),
+            { status: 409, headers: { "content-type": "application/json" } },
+          ),
+        ),
+      ),
+    );
+    render(card("INVESTMENT_BRIEF"));
+    await userEvent.click(screen.getByText("PDF"));
+    await waitFor(() => {
+      expect(screen.getByText("That file didn't download")).toBeTruthy();
+    });
+    expect(
+      screen.getByText(
+        "That document isn't ready yet. Q is still preparing it.",
+      ),
+    ).toBeTruthy();
+    // Still on the card, and the button is still there to try again.
+    expect(screen.getByText("PDF")).toBeTruthy();
+    expect(screen.getByText("View")).toBeTruthy();
+  });
+
+  it("says the connection dropped when the request never came back", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => Promise.reject(new Error("offline"))),
+    );
+    render(card("PITCH_DECK"));
+    await userEvent.click(screen.getByText("PowerPoint"));
+    await waitFor(() => {
+      expect(
+        screen.getByText("I lost the connection to Q. Please try again."),
+      ).toBeTruthy();
+    });
+  });
+
+  it("offers a PDF for a type this build has not heard of", () => {
+    render(card("INVESTMENT_MEMO"));
+    expect(screen.getByText("PDF")).toBeTruthy();
+    expect(screen.queryByText("PowerPoint")).toBeNull();
   });
 });

@@ -7,6 +7,7 @@ import { buttonClassName } from "@capital-q/ui/button";
 import { InlineNotice } from "@capital-q/ui/states";
 
 import { readQArtifactAction, readQArtifactVersionAction } from "./actions";
+import { ArtifactDownloads, artifactFileUrl } from "./artifact-download";
 
 /**
  * Reading what Q composed (QX-003E).
@@ -62,22 +63,6 @@ function typeLabel(type: string): string {
   if (type === "INVESTMENT_BRIEF") return "Investment brief";
   if (type === "PITCH_DECK") return "Investor deck";
   return "Document";
-}
-
-/**
- * Where the browser asks for a drawing of this deck.
- *
- * One narrow server route, because the Q API's token is in an HttpOnly
- * cookie and no script here can read it. The version travels with the
- * request: somebody looking at V1 downloads V1.
- */
-function deckUrl(
-  artifactId: string,
-  format: "slides" | "pptx" | "pdf",
-  version: number | null,
-): string {
-  const query = version === null ? "" : `?version=${String(version)}`;
-  return `/api/q-artifact/${encodeURIComponent(artifactId)}/${format}${query}`;
 }
 
 /** An SVG slide the browser can show without being allowed to run it. */
@@ -169,9 +154,12 @@ export function ArtifactViewer({
     const controller = new AbortController();
     void (async () => {
       try {
-        const response = await fetch(deckUrl(artifactId, "slides", version), {
-          signal: controller.signal,
-        });
+        const response = await fetch(
+          artifactFileUrl(artifactId, "slides", version),
+          {
+            signal: controller.signal,
+          },
+        );
         if (!response.ok) {
           // The document is readable and the prose is already on screen; a
           // drawing that did not arrive is not a reason to hide it.
@@ -295,32 +283,22 @@ export function ArtifactViewer({
         </nav>
       ) : null}
 
-      {isDeck && version !== null ? (
+      {version !== null ? (
         <div
           className="flex flex-wrap items-center gap-2"
           data-q-artifact-export
         >
           <span className="cq-label text-(--cq-text-tertiary)">Download</span>
           {/*
-            A plain link, so the browser downloads it the way it downloads
-            anything: the session cookie travels on its own, nothing is
-            held in memory here, and the file's name is the one the server
-            put on it.
+            Every document downloads as a PDF, and a deck as PowerPoint too
+            (BIZ-001). Decided by what this version holds rather than by its
+            type code, so the offer and the file cannot disagree.
           */}
-          <a
-            className={buttonClassName("secondary", "compact")}
-            href={deckUrl(artifactId, "pptx", version)}
-            data-q-artifact-download="pptx"
-          >
-            PowerPoint
-          </a>
-          <a
-            className={buttonClassName("secondary", "compact")}
-            href={deckUrl(artifactId, "pdf", version)}
-            data-q-artifact-download="pdf"
-          >
-            PDF
-          </a>
+          <ArtifactDownloads
+            artifactId={artifactId}
+            formats={isDeck ? ["pdf", "pptx"] : ["pdf"]}
+            version={version}
+          />
         </div>
       ) : null}
 

@@ -392,10 +392,9 @@ export function createSpecialistQAnswer(
     });
     if (existing !== null) {
       return {
-        content:
-          ask.documentType === "PITCH_DECK"
-            ? "Here it is. The PDF is one tap away on the card."
-            : "Here it is.",
+        // Every artifact downloads as a PDF from its card (BIZ-001), so
+        // "give me the PDF of my brief" is answered with the file too.
+        content: "Here it is. The PDF is one tap away on the card.",
         blocks: [existing],
       };
     }
@@ -509,8 +508,8 @@ export function createSpecialistQAnswer(
             : "";
         const pdf =
           ask.documentType === "PITCH_DECK"
-            ? " Download the PDF from the card."
-            : "";
+            ? " Download the PDF or PowerPoint from the card."
+            : " Download the PDF from the card.";
         return {
           content: `Here's the ${noun} for ${name}.${origin}${pdf}`,
           blocks: [card],
