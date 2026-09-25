@@ -272,3 +272,34 @@ export {
   type RememberCommand,
 } from "./memory/service.js";
 export { MEMORY_TEXT_MAX, renderMemoryBundle } from "./memory/render.js";
+
+export {
+  COMMUNICATION_ASPECTS,
+  communicationPreferenceKey,
+  communicationProfileFromMemory,
+  createLoopMemoryReader,
+  NOTHING_RECALLED,
+  planAdmitsOwnMemory,
+  PREFERENCE_PERSISTENCES,
+  type CommunicationAspect,
+  type LoopMemory,
+  type LoopMemoryReader,
+  type PreferencePersistence,
+} from "./memory/communication.js";
+
+export {
+  createPreferenceNotebook,
+  type PreferenceNote,
+  type PreferenceNoteResult,
+} from "./memory/preference-notebook.js";
+
+export {
+  compactThread,
+  openingOf,
+  THREAD_EXCERPT_MAX_CHARS,
+  THREAD_RECENT_TURNS,
+  THREAD_SUMMARY_MAX_CHARS,
+  type CompactedThread,
+  type CompactThreadOptions,
+  type ThreadTurn,
+} from "./memory/thread.js";
