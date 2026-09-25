@@ -4,8 +4,13 @@ import type { ReactNode } from "react";
 import {
   ApiProblemError,
   getCurrentCapitalObjective,
+  listCompanyRelationships,
+  listInvestorRelationships,
 } from "@capital-q/api-client";
-import type { CapitalObjectiveDto } from "@capital-q/contracts";
+import type {
+  CapitalObjectiveDto,
+  RelationshipSummaryDto,
+} from "@capital-q/contracts";
 import {
   INSTRUMENT_OPTIONS,
   STAGE_OPTIONS,
@@ -16,6 +21,7 @@ import { formatAmountForDisplay } from "@capital-q/ui/money-input";
 
 import { PageSection } from "@/components/app-shell/page-container";
 import { apiSession, resolveOwnContext } from "@/features/q/context";
+import { RelationshipList } from "@/features/relationships/relationship-list";
 
 /**
  * Capital: the objective and the relationships behind it (doc 17 §§105-107;
@@ -24,9 +30,9 @@ import { apiSession, resolveOwnContext } from "@/features/q/context";
  * Rendered on the server under the person's own session. The objective is
  * the company's current capital objective as the API returns it — the same
  * row F6 created — shown as one dossier panel. Relationships are hairline
- * rows once they exist; today there is no relationship read, so the section
- * says so in one quiet sentence rather than drawing a frame around nothing.
- * Nothing here is a counter, a score or a pipeline.
+ * rows from the side's own per-party fold (CQ-WEB-030): where each stands,
+ * since when, and what is next. Nothing here is a counter, a score or a
+ * pipeline.
  */
 
 const STAGE_LABELS: ReadonlyMap<string, string> = new Map(
@@ -80,12 +86,35 @@ async function currentObjective(
   }
 }
 
+/**
+ * The side's relationships, or undefined when they couldn't be read. A
+ * person with neither a company nor an organisation has none.
+ */
+async function ownRelationships(
+  context: Awaited<ReturnType<typeof resolveOwnContext>>,
+): Promise<readonly RelationshipSummaryDto[] | undefined> {
+  if (context.kind !== "FOUNDER" && context.kind !== "INVESTOR") return [];
+  const session = await apiSession();
+  if (session === null) return undefined;
+  try {
+    const list =
+      context.kind === "FOUNDER"
+        ? await listCompanyRelationships(session, context.companyId)
+        : await listInvestorRelationships(session);
+    return list.items;
+  } catch {
+    return undefined;
+  }
+}
+
 export async function CapitalScreen() {
   const context = await resolveOwnContext();
-  const objective =
+  const [objective, relationships] = await Promise.all([
     context.kind === "FOUNDER"
-      ? await currentObjective(context.companyId)
-      : null;
+      ? currentObjective(context.companyId)
+      : Promise.resolve(null),
+    ownRelationships(context),
+  ]);
 
   return (
     <div className="flex flex-col gap-10">
@@ -130,15 +159,24 @@ export async function CapitalScreen() {
       <PageSection
         id="relationships"
         title="Relationships"
-        description="Investor relationships, meetings and diligence gather here as they happen."
+        description={
+          context.kind === "INVESTOR"
+            ? "Companies your organisation has discovered or approached, and where each stands."
+            : "Investor organisations that have approached your company, and where each stands."
+        }
       >
-        <QuietEmpty
-          sentence={
-            context.kind === "INVESTOR"
-              ? "No founder relationships yet."
-              : "No investor relationships yet."
-          }
-        />
+        {relationships === undefined ? (
+          <QuietEmpty sentence="Your relationships couldn't be read just now." />
+        ) : (
+          <RelationshipList
+            items={relationships}
+            emptySentence={
+              context.kind === "INVESTOR"
+                ? "No company relationships yet. Expressing interest from Discover starts one."
+                : "No investor relationships yet. When an investor organisation expresses interest, it appears here."
+            }
+          />
+        )}
       </PageSection>
     </div>
   );

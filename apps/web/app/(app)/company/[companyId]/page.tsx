@@ -6,7 +6,7 @@ import {
   getOwnInterest,
 } from "@capital-q/api-client";
 import { buttonClassName } from "@capital-q/ui/button";
-import { ArrowLeft, Globe, ICON_SIZE } from "@capital-q/ui/icons";
+import { ArrowLeft, ChevronRight, Globe, ICON_SIZE } from "@capital-q/ui/icons";
 import { EmptyState } from "@capital-q/ui/states";
 
 import {
@@ -102,12 +102,22 @@ export default async function CompanyPage({
       />
 
       {interest === null ? null : (
-        <ExpressInterest
-          companyId={company.companyId}
-          companyName={company.canonicalName}
-          surface="COMPANY_PROFILE"
-          initialInterest={interest.interest}
-        />
+        <div className="flex flex-wrap items-center gap-2">
+          <ExpressInterest
+            companyId={company.companyId}
+            companyName={company.canonicalName}
+            surface="COMPANY_PROFILE"
+            initialInterest={interest.interest}
+          />
+          {/* Where the organisation stands with this company (CQ-WEB-030). */}
+          <Link
+            href={`/relationships/company/${company.companyId}`}
+            className={buttonClassName("quiet")}
+          >
+            Your relationship
+            <ChevronRight size={ICON_SIZE.compact} aria-hidden="true" />
+          </Link>
+        </div>
       )}
 
       <section className="cq-panel">
