@@ -206,6 +206,7 @@ import {
 import { createDecisionReader } from "./voice/decision.js";
 import { createPersonProfileUpdateAction } from "./composition/person-profile-action.js";
 import { createInvestorProfileUpdateAction } from "./composition/investor-profile-action.js";
+import { createProfileChangeBoard } from "./composition/profile-change-board.js";
 import {
   createConversationDigestPort,
   createMemoryLearner,
@@ -647,6 +648,8 @@ const interestService = createInterestService({
 // prepares relationship actions on this board for the Approval Engine --
 // it never executes one.
 const relationshipBoard = createRelationshipActionBoard({ logger });
+// A profile change the person asked Q for waits here for approval (BIZ-002).
+const profileChangeBoard = createProfileChangeBoard({ logger });
 
 // The Tool Registry (CQ-Q-007): four SAFE_READ tools over the same public
 // query ports and the same two authorities the firewall uses, plus the two
@@ -694,6 +697,8 @@ const qTools = createQTools({
       interests: interestService,
       board: relationshipBoard,
     }),
+    // BIZ-002: every profile field the page edits, Q can prepare.
+    profileChanges: profileChangeBoard,
   },
   logger,
 });
@@ -788,7 +793,11 @@ const qActionPort = createQActionPort({
   service: qActions,
   // A relationship action Q prepared this run first (CQ-Q-030), then a
   // profile change; one proposal per run either way.
-  proposer: chainProposers(relationshipBoard.proposer, profileBoard),
+  proposer: chainProposers(
+    relationshipBoard.proposer,
+    profileChangeBoard.proposer,
+    profileBoard,
+  ),
   // What Q says about an action is read from the records the engine
   // wrote, never from what a model intended (CQ-QACT-001).
   narrator: createQActionNarrator({

@@ -164,4 +164,32 @@ export type QToolPorts = {
   readonly profiles?: PublicProfileLookupProvider | undefined;
   /** Relationships (CQ-Q-030); absent means no relationship tool exists. */
   readonly relationships?: RelationshipIntelligencePort | undefined;
+  /** Profile changes for approval (BIZ-002); absent means the tool does not exist. */
+  readonly profileChanges?: ProfileChangePort | undefined;
+};
+
+/**
+ * Where a proposed profile change waits for the run's Approval Engine
+ * proposer (BIZ-002). The composition validates the change against the
+ * action's own payload schema -- normalising the way the profile page's
+ * write path does -- and answers REFUSED with the person-facing reason
+ * when it does not fit. Nothing here executes.
+ */
+export type ProfileChangePort = {
+  readonly prepareForApproval: (entry: {
+    readonly runId: string;
+    readonly tenantId: string;
+    readonly actorUserId: string;
+    readonly profile: "PERSON" | "COMPANY" | "INVESTOR_ORGANISATION";
+    /** Resolved by the tool from the actor and the plan, never by the model. */
+    readonly subjectId: string;
+    readonly changes: readonly {
+      readonly field: string;
+      readonly value: string | null;
+    }[];
+  }) => Promise<{
+    readonly status: "PREPARED" | "ONE_PER_TURN" | "REFUSED";
+    readonly awaitingApprovalOf: string | null;
+    readonly reason: string | null;
+  }>;
 };

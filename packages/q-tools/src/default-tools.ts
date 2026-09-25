@@ -14,6 +14,7 @@ import { createResearchPublicWebTool } from "./tools/research-public-web.js";
 import { createDiscoverySlateTool } from "./tools/discovery-slate.js";
 import { createFindProspectiveInvestorsTool } from "./tools/find-prospective-investors.js";
 import { createRecommendationExplanationTool } from "./tools/recommendation-explanation.js";
+import { createProposeProfileChangeTool } from "./tools/profile-change.js";
 import { createRelationshipTools } from "./tools/relationships.js";
 import { createSearchCompaniesTool } from "./tools/search-companies.js";
 
@@ -52,6 +53,10 @@ export function createDefaultQTools(
     ...(ports.relationships === undefined
       ? []
       : createRelationshipTools(ports, ports.relationships)),
+    // BIZ-002: every profile field the page edits, Q can prepare.
+    ...(ports.profileChanges === undefined
+      ? []
+      : [createProposeProfileChangeTool(ports, ports.profileChanges)]),
   ];
 }
 
