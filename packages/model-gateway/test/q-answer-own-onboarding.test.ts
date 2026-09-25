@@ -73,6 +73,27 @@ describe("the person's own onboarding as facts", () => {
     }
   });
 
+  it("a completed setup is stated as complete, never as progress", () => {
+    for (const completedBy of ["SESSION", "ACTIVE_MANDATE"] as const) {
+      const journey = ZINO.journeys[0];
+      if (journey === undefined) throw new Error("fixture");
+      const facts = ownOnboardingFacts({
+        ...ZINO,
+        journeys: [{ ...journey, status: "COMPLETED", completedBy }],
+      });
+      const statement = facts[1]?.statement ?? "";
+      expect(statement).toContain("investor setup, completed");
+      expect(statement).not.toContain("in progress");
+      expect(statement).not.toContain(" of 33 ");
+      expect(statement).not.toContain("the question they are on");
+      expect(statement).not.toContain("not answered yet");
+      expect(statement).toContain('"Where do you invest?"');
+      expect(statement.includes("mandate is active")).toBe(
+        completedBy === "ACTIVE_MANDATE",
+      );
+    }
+  });
+
   it("says nothing when nothing is on record", () => {
     expect(ownOnboardingFacts({ name: null, journeys: [] })).toEqual([]);
   });

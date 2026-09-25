@@ -182,6 +182,8 @@ export {
 export { getOnboardingMetrics } from "./application/metrics.js";
 export {
   createOwnOnboardingSummaryReader,
+  settleOwnCompletion,
+  type OwnOnboardingCompletion,
   type OwnOnboardingSummary,
   type OwnOnboardingSummaryReader,
 } from "./application/own-summary.js";
