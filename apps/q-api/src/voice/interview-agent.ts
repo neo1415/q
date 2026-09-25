@@ -52,6 +52,7 @@ import {
   createOnboardingPort,
   type RecommendationStore,
 } from "./onboarding-port.js";
+import { createReplySentenceStream } from "./reply-stream.js";
 
 /**
  * The onboarding interview as a tool-calling Q run (ADR 0016).
@@ -79,6 +80,12 @@ const BUDGET = {
 export type InterviewAgentTurnInput = InterviewTurnInput & {
   /** The person, as the route resolved them. Required for a Q run. */
   readonly actor?: ActorContext | undefined;
+  /**
+   * Each complete sentence of the final reply, once, in order, as the
+   * model writes it (P0-3): what a voice speaks before the turn ends.
+   * The returned outcome still carries the whole reply.
+   */
+  readonly onSentence?: ((sentence: string) => void) | undefined;
 };
 
 export type InterviewAgentDependencies = {
@@ -269,6 +276,10 @@ export function createInterviewAgent(
         : { dataPosture: dependencies.dataPosture }),
     };
 
+    const stream =
+      input.onSentence === undefined
+        ? undefined
+        : createReplySentenceStream(input.onSentence);
     let messages: ModelMessage[] = [...rendered.messages];
     let result: InterviewAgentResult | undefined;
     let rounds = 0;
@@ -286,6 +297,7 @@ export function createInterviewAgent(
           {
             firstAttemptTimeoutMs: ATTEMPT_MS,
             ...(input.signal === undefined ? {} : { signal: input.signal }),
+            ...(stream === undefined ? {} : { onTextDelta: stream.push }),
           },
         );
         if (response.output.kind === "TEXT") {
@@ -342,6 +354,15 @@ export function createInterviewAgent(
     const view = port.view() ?? (await port.state(), port.view());
     if (view === null) {
       throw new Error("the onboarding session could not be read");
+    }
+    if (stream !== undefined && result !== undefined) {
+      const { diverged } = stream.finish(result.reply);
+      if (diverged) {
+        logger.warn(
+          { rounds },
+          "the streamed reply and the settled reply differ; the rest was not streamed",
+        );
+      }
     }
     const recorded = port.recorded();
     const reply =

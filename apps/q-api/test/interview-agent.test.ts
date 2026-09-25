@@ -766,3 +766,41 @@ describe("Lead decision 3 · a completed answer can be corrected or taken back",
     expect(outcome.recorded).toContain("I7.avoid");
   });
 });
+
+describe("P0-3 · the loop streams its final reply as sentences", () => {
+  it("hands each sentence to onSentence while the model writes, and still returns the whole reply", async () => {
+    const world = investorSession({ currentStepKey: "I2.stages" });
+    const reply = "Pre-seed it is. Which geography do you focus on?";
+    const json = JSON.stringify({ reply, asking: "I3.geography" });
+    const gateway = {
+      execute: (
+        _request: unknown,
+        options?: { readonly onTextDelta?: (text: string) => void },
+      ) => {
+        for (let at = 0; at < json.length; at += 7) {
+          options?.onTextDelta?.(json.slice(at, at + 7));
+        }
+        return Promise.resolve({ output: { kind: "TEXT", text: json } });
+      },
+    } as unknown as ModelGateway;
+    const agent = createInterviewAgent({
+      gateway,
+      firewall: firewall(),
+      logger,
+      recommendations: world.recommendations,
+    });
+    const sentences: string[] = [];
+
+    const outcome = await agent.turn({
+      ...turn(world, "Pre-seed."),
+      actor,
+      onSentence: (sentence) => sentences.push(sentence),
+    });
+
+    expect(sentences).toEqual([
+      "Pre-seed it is.",
+      "Which geography do you focus on?",
+    ]);
+    expect(outcome.reply).toBe(reply);
+  });
+});
