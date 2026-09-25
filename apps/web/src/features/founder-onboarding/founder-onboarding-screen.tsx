@@ -28,10 +28,13 @@ export function FounderOnboardingScreen({
   adapter,
   seed,
   startTalking = false,
+  greeted: arrivedGreeted = false,
   openReview = false,
 }: {
   /** Open already talking with Q (arrival hands over with the voice on). */
   readonly startTalking?: boolean | undefined;
+  /** Q welcomed them on the way here; the screen does not welcome again. */
+  readonly greeted?: boolean | undefined;
   /** Open the review of a finished setup, to change what the profile says. */
   readonly openReview?: boolean | undefined;
   readonly adapter: FounderOnboardingAdapter;
@@ -49,6 +52,12 @@ export function FounderOnboardingScreen({
   // Set when the person asks for Q's voice from the form: the workspace
   // opens already talking, then this is cleared so it happens once.
   const [talkOnOpen, setTalkOnOpen] = useState(startTalking);
+  // One welcome per visit: arriving already welcomed, or having been
+  // welcomed here once before stepping out to the form and back.
+  const [greeted, setGreeted] = useState(arrivedGreeted);
+  if (mode === "form" && !greeted) {
+    setGreeted(true);
+  }
   // A finished setup asked to be reviewed opens its review step once.
   const reviewOpened = useRef(false);
   const sessionStatus = state.session?.status;
@@ -174,6 +183,7 @@ export function FounderOnboardingScreen({
           busy={state.busy}
           errorMessage={state.errorMessage}
           talkOnOpen={talkOnOpen}
+          greeted={greeted}
           onEdit={(editorId) => {
             setTalkOnOpen(false);
             setMode("form");

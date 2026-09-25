@@ -19,6 +19,8 @@ vi.mock("../src/features/q/actions", () => ({
 
 const { ReturningWelcome } =
   await import("../src/features/home/returning-welcome");
+const { QSurfaceToolsContext } =
+  await import("../src/features/q/q-surface-tools");
 const { chooseReturningCards, returningGreeting } =
   await import("../src/features/home/returning");
 
@@ -109,5 +111,75 @@ describe("ReturningWelcome", () => {
     ).toBeTruthy();
     expect(push).not.toHaveBeenCalled();
     expect((button as HTMLButtonElement).disabled).toBe(false);
+  });
+});
+
+describe("ReturningWelcome inside the Q surface (K)", () => {
+  const ARTIFACT = "33333333-3333-4333-8333-333333333333";
+
+  it("asks Q in this conversation and opens Q's deck beside it -- no page change", async () => {
+    const ask = vi.fn();
+    const openArtifact = vi.fn();
+    const withDeck = {
+      ...facts,
+      deck: { kind: "PREPARED", artifactId: ARTIFACT },
+    } as const;
+    render(
+      <QSurfaceToolsContext.Provider value={{ ask, openArtifact }}>
+        <ReturningWelcome
+          greeting={returningGreeting(withDeck)}
+          cards={chooseReturningCards(withDeck)}
+          subject={{ companyId: COMPANY }}
+        />
+      </QSurfaceToolsContext.Provider>,
+    );
+    await userEvent.click(
+      screen.getByRole("button", { name: /Your investor deck/ }),
+    );
+    expect(openArtifact).toHaveBeenCalledWith(ARTIFACT);
+    expect(push).not.toHaveBeenCalled();
+    expect(askQAction).not.toHaveBeenCalled();
+  });
+
+  it("an ask card is asked of the conversation underneath", async () => {
+    const ask = vi.fn();
+    render(
+      <QSurfaceToolsContext.Provider value={{ ask, openArtifact: vi.fn() }}>
+        <ReturningWelcome
+          greeting={returningGreeting(facts)}
+          cards={chooseReturningCards(facts)}
+          subject={{ companyId: COMPANY }}
+        />
+      </QSurfaceToolsContext.Provider>,
+    );
+    await userEvent.click(
+      screen.getByRole("button", { name: /Create your investor deck/ }),
+    );
+    expect(ask).toHaveBeenCalledWith("Create an investor deck for my company.");
+    expect(askQAction).not.toHaveBeenCalled();
+    expect(push).not.toHaveBeenCalled();
+  });
+
+  it("an unfinished setup shows where it left off in Q's own words, and one welcome", () => {
+    const partway = {
+      ...facts,
+      unfinished: "founder",
+      setup: {
+        covered: ["Company"],
+        pending: "Which stage are you at right now?",
+      },
+    } as const;
+    render(
+      <ReturningWelcome
+        greeting={returningGreeting(partway)}
+        cards={chooseReturningCards(partway)}
+        subject={{ companyId: COMPANY }}
+      />,
+    );
+    expect(screen.getByText("Which stage are you at right now?")).toBeTruthy();
+    expect(screen.getAllByText(/welcome back/i)).toHaveLength(1);
+    expect(
+      screen.getByRole("link", { name: /Continue setup/ }).getAttribute("href"),
+    ).toBe("/onboarding/founder?from=home");
   });
 });

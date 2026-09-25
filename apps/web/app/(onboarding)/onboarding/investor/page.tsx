@@ -25,6 +25,9 @@ export default async function InvestorOnboardingPage({
   const config = loadWebServerConfig();
   const params = await searchParams;
   const startTalking = params["talk"] === "1";
+  // Arriving from Q (Home's welcome, or a spoken "let's finish my setup"):
+  // Q has already welcomed them, and the screen does not do it twice.
+  const greeted = startTalking || params["from"] === "home";
   const rawSeed = params["fixture"];
   const seed =
     config.founderOnboardingAdapter === "fixture" && typeof rawSeed === "string"
@@ -36,6 +39,7 @@ export default async function InvestorOnboardingPage({
       adapter={config.founderOnboardingAdapter}
       seed={seed}
       startTalking={startTalking}
+      greeted={greeted}
     />
   );
 }

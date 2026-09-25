@@ -51,7 +51,7 @@ vi.mock("../src/features/voice/use-voice-session", () => ({
   },
 }));
 
-const { useVoiceInterview } =
+const { useVoiceInterview, withGreeting } =
   await import("../src/features/voice/use-voice-interview");
 
 beforeEach(() => {
@@ -89,5 +89,54 @@ describe("voice reconnect budget", () => {
     expect(startVoiceSessionAction).toHaveBeenCalledTimes(4);
     expect(result.current.active).toBe(false);
     expect(result.current.notice).toMatch(/couldn't get the line back/);
+  });
+
+  it("a line coming back is the same thread resumed: no second opening, no greeting", async () => {
+    // The acceptance fixture: every reconnect composed and recorded
+    // another "Welcome back. <question>" -- three for one arrival.
+    const { result } = renderHook(() => useVoiceInterview());
+    await act(async () => {
+      await result.current.talk({ thread: { welcome: true } });
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(10_000);
+    });
+    const calls = startVoiceSessionAction.mock.calls.map(
+      (call) => call[0] as { resume?: true },
+    );
+    expect(calls.length).toBeGreaterThanOrEqual(2);
+    // The arrival opens; every retry resumes.
+    expect(calls[0]?.resume).toBeUndefined();
+    for (const retry of calls.slice(1)) {
+      expect(retry.resume).toBe(true);
+    }
+  });
+});
+
+describe("withGreeting", () => {
+  const credential = {
+    voiceSessionId: "00000000-0000-4000-8000-000000000001",
+    providerConversationId: "dg_1",
+    token: "t",
+    voice: "FEMALE" as const,
+    expiresAt: "2026-09-24T22:00:00.000Z",
+    provider: "deepgram" as const,
+    deepgram: {
+      agent: { language: "en", greeting: "Welcome back. Old line." },
+      audio: {},
+    },
+  };
+
+  it("says the line already on screen, and only that", () => {
+    expect(
+      withGreeting(credential, "What's a typical cheque for you?").deepgram
+        ?.agent,
+    ).toEqual({ language: "en", greeting: "What's a typical cheque for you?" });
+  });
+
+  it("with no line, Q waits for the person rather than greeting again", () => {
+    expect(withGreeting(credential, undefined).deepgram?.agent).toEqual({
+      language: "en",
+    });
   });
 });

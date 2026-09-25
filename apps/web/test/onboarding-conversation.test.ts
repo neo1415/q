@@ -9,6 +9,7 @@ import {
   acknowledgeValue,
   gapValue,
   pauseIntent,
+  pendingQuestion,
   progressLines,
   promptFor,
   RESUME_AFTER_MS,
@@ -316,6 +317,49 @@ describe("welcomeBack", () => {
       responses: [],
     });
     expect(welcomeBack(fresh, VOCABULARY)).toBeNull();
+  });
+});
+
+describe("pendingQuestion: a reload redraws, it does not re-open", () => {
+  const at = (iso: string) => iso;
+  const asked = {
+    role: "Q" as const,
+    text: "What's a typical cheque for you?",
+    createdAt: at("2026-09-24T22:03:00.000Z"),
+  };
+
+  it("Q's last line is still the question when nothing moved since", () => {
+    expect(pendingQuestion([asked], "2026-09-24T22:02:59.000Z")).toBe(
+      "What's a typical cheque for you?",
+    );
+    expect(pendingQuestion([asked], asked.createdAt)).toBe(
+      "What's a typical cheque for you?",
+    );
+  });
+
+  it("an answer, tap or skip after Q spoke means Q opens again", () => {
+    expect(pendingQuestion([asked], "2026-09-24T22:05:00.000Z")).toBeNull();
+  });
+
+  it("a thread that ends on the person, or no thread, is not pending", () => {
+    expect(
+      pendingQuestion(
+        [
+          asked,
+          {
+            role: "PERSON",
+            text: "fifty thousand",
+            createdAt: "2026-09-24T22:04:00.000Z",
+          },
+        ],
+        "2026-09-24T22:02:00.000Z",
+      ),
+    ).toBeNull();
+    expect(pendingQuestion([], "2026-09-24T22:02:00.000Z")).toBeNull();
+  });
+
+  it("an unreadable time is never taken as 'nothing moved'", () => {
+    expect(pendingQuestion([asked], "not a time")).toBeNull();
   });
 });
 

@@ -5,15 +5,24 @@ import {
   discoverInvestors,
   fetchMe,
   getCompanyPitch,
+  getCurrentOnboardingSession,
   listDocuments,
+  listOnboardingInterviewTurns,
   listQArtifacts,
   type ApiSession,
 } from "@capital-q/api-client";
 import { loadWebServerConfig } from "@capital-q/config/web";
 
+import { accountDetails } from "@/auth/account-details";
+import { FOUNDER_VOCABULARY } from "@/features/founder-onboarding/conversation-adapter";
+import { INVESTOR_VOCABULARY } from "@/features/investor-onboarding/conversation-adapter";
+import {
+  pendingQuestion,
+  progressLines,
+} from "@/features/onboarding-conversation/conversation";
 import { apiSession, type OwnContext } from "@/features/q/context";
 
-import type { DeckFact, Known, ReturningFacts } from "./returning";
+import type { DeckFact, Known, ReturningFacts, SetupFacts } from "./returning";
 
 /**
  * What Home knows about a returning person, read on the server under
@@ -106,6 +115,40 @@ async function deckFact(
     : { kind: "UNKNOWN" };
 }
 
+/**
+ * Where an unfinished setup stands (A: "says naturally where they left
+ * off"): the parts the session holds as settled, in the journey's own
+ * group names, and the question Q is still waiting on, verbatim from the
+ * interview thread the server kept. Read with the same rules the setup
+ * screen uses, so Home and the interview describe one state one way.
+ */
+async function setupFacts(
+  session: ApiSession,
+  journey: "founder" | "investor",
+): Promise<SetupFacts | undefined> {
+  const view = await within(() =>
+    getCurrentOnboardingSession(session, journey),
+  );
+  if (view === undefined || view.session.status !== "ACTIVE") {
+    return undefined;
+  }
+  const thread = await within(() =>
+    listOnboardingInterviewTurns(session, view.session.id, 5),
+  );
+  const vocabulary =
+    journey === "investor" ? INVESTOR_VOCABULARY : FOUNDER_VOCABULARY;
+  const covered = progressLines(view, vocabulary)
+    .filter((line) => line.total > 0 && line.done === line.total)
+    .map((line) => line.label);
+  return {
+    covered,
+    pending:
+      thread === undefined
+        ? null
+        : pendingQuestion(thread.items, view.session.lastActivityAt),
+  };
+}
+
 export async function resolveReturningFacts(
   context: OwnContext,
   unfinished: ReturningFacts["unfinished"],
@@ -121,18 +164,27 @@ export async function resolveReturningFacts(
       deck: { kind: "UNKNOWN" },
     };
   }
-  const [me, feed, pitch, deck] = await Promise.all([
+  const [me, signedUpWith, feed, pitch, deck, setup] = await Promise.all([
     within(() => fetchMe(session)),
+    accountDetails(),
     feedFact(session, context),
     pitchFact(session, context),
     deckFact(session, context),
+    unfinished === null
+      ? Promise.resolve(undefined)
+      : setupFacts(session, unfinished),
   ]);
   return {
     context,
     unfinished,
-    name: me?.user.displayName ?? null,
+    // The name they gave at sign-up, until the profile holds one of its
+    // own: a person who never passed through the first-run welcome was
+    // being greeted as a stranger ("Welcome back.") by a product that
+    // knew what to call them.
+    name: me?.user.displayName ?? signedUpWith.displayName,
     feed,
     pitch,
     deck,
+    setup,
   };
 }

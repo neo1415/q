@@ -5,28 +5,30 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { ChevronRight, ICON_SIZE, ICON_STROKE } from "@capital-q/ui/icons";
-import { QMark } from "@capital-q/ui/q-mark";
 
 import { askQAction, type QSubjectInput } from "@/features/q/actions";
+import { useQSurfaceTools } from "@/features/q/q-surface-tools";
 
 import type { ReturningCard, ReturningGreeting } from "./returning";
 
 /**
- * Q welcoming somebody back (CQ-WEB-030).
+ * Q welcoming somebody back (CQ-WEB-030; acceptance A and K).
  *
- * Q's greeting in its own words, and a few places to go next, chosen on
- * the server from what Capital Q knows about this person. The
- * conversation is directly underneath: the cards are shortcuts into the
- * product, never a replacement for asking.
+ * Said under Q's presence, the way the first-run welcome is: Q's greeting
+ * from what Capital Q holds, where an unfinished setup left off in Q's
+ * own last words, and a few small choices. It sits inside the Q surface
+ * rather than above it as a page heading with a dashboard of cards, so
+ * the welcome, the conversation and whatever Q makes are one place.
  *
- * A card goes somewhere real or asks Q something real. Asking starts an
- * ordinary run through the same server action the composer uses, then
- * opens that conversation on Home, where the panel follows the run from
- * its cursor -- nothing is answered here and nothing is simulated.
+ * A card goes somewhere real, asks Q something real, or opens a document
+ * Q already made. Inside the Q surface, asking happens in this
+ * conversation and a document opens beside it; elsewhere a card falls
+ * back to starting an ordinary run and opening it on Home -- nothing is
+ * answered here and nothing is simulated.
  */
 
 const CARD_CLASS = [
-  "group flex min-h-11 w-full items-center gap-3 rounded-md border border-(--cq-border) bg-(--cq-surface) px-4 py-3 text-left",
+  "group flex min-h-11 w-full items-center gap-3 rounded-md border border-(--cq-border-subtle) bg-(--cq-surface) px-3.5 py-2.5 text-left",
   "transition-colors duration-(--cq-motion-fast) hover:border-(--cq-border-strong) hover:bg-(--cq-surface-subtle)",
   "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--cq-focus-ring)",
   "disabled:cursor-progress disabled:opacity-70",
@@ -35,11 +37,11 @@ const CARD_CLASS = [
 function CardBody({ card }: { readonly card: ReturningCard }) {
   return (
     <>
-      <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-        <span className="cq-body font-medium text-(--cq-text-primary)">
+      <span className="flex min-w-0 flex-1 flex-col">
+        <span className="cq-body-sm font-medium text-(--cq-text-primary)">
           {card.title}
         </span>
-        <span className="cq-body-sm text-(--cq-text-secondary)">
+        <span className="cq-caption text-(--cq-text-secondary)">
           {card.description}
         </span>
       </span>
@@ -64,11 +66,17 @@ export function ReturningWelcome({
   readonly subject: QSubjectInput | undefined;
 }) {
   const router = useRouter();
+  const tools = useQSurfaceTools();
   const [asking, setAsking] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
   const ask = async (card: ReturningCard, prompt: string) => {
     if (asking !== null) return;
+    if (tools !== null) {
+      // The conversation right underneath takes it: same run, same place.
+      tools.ask(prompt);
+      return;
+    }
     setAsking(card.id);
     setNotice(null);
     const result = await askQAction(prompt, undefined, subject);
@@ -91,51 +99,48 @@ export function ReturningWelcome({
   return (
     <section
       aria-labelledby="returning-headline"
-      // The 16 px phone gutter; from `sm` the column lines up with the
-      // composer below it instead.
-      className="mx-auto flex w-full max-w-(--cq-layout-reading) flex-col gap-5 px-4 sm:px-0"
+      className="flex w-full flex-col items-center gap-5"
       data-q-returning
     >
-      <div className="flex items-start gap-3">
-        <span className="mt-1 shrink-0">
-          <QMark size="md" />
-        </span>
-        <div className="flex min-w-0 flex-col gap-1">
-          <h1
-            id="returning-headline"
-            className="cq-title-lg text-balance text-(--cq-text-primary)"
-          >
-            {greeting.headline}
-          </h1>
-          <p className="cq-body-lg text-(--cq-text-secondary)">
-            {greeting.question}
-          </p>
-        </div>
+      <div className="flex flex-col items-center gap-2 text-center">
+        <h1
+          id="returning-headline"
+          className="cq-title-lg text-balance text-(--cq-text-primary)"
+        >
+          {greeting.headline}
+        </h1>
+        <p className="cq-body-lg cq-prose text-balance text-(--cq-text-secondary)">
+          {greeting.question}
+        </p>
       </div>
+
+      {greeting.leftOff === null ? null : (
+        // Q's own last question, as Q asked it: where they left off is
+        // shown, not paraphrased.
+        <figure
+          className="flex w-full max-w-(--cq-layout-narrow) flex-col gap-1 border-l-2 border-(--cq-border-strong) pl-3"
+          data-q-left-off
+        >
+          <figcaption className="cq-caption text-(--cq-text-tertiary)">
+            Where we left off
+          </figcaption>
+          <blockquote className="cq-body text-(--cq-text-primary)">
+            {greeting.leftOff}
+          </blockquote>
+        </figure>
+      )}
 
       {cards.length > 0 ? (
         <ul
           aria-label="Where to start"
-          className="grid gap-3 sm:grid-cols-2"
+          className="grid w-full gap-2 sm:grid-cols-2"
           data-q-returning-cards
         >
           {cards.map((card) => {
             const action = card.action;
             return (
               <li key={card.id} className="flex">
-                {action.kind === "NAVIGATE" &&
-                action.href.startsWith("/api/") ? (
-                  // A document the server renders (a prepared deck), not an
-                  // application route: a plain link, so the router does not
-                  // try to fetch it as a page first.
-                  <a
-                    href={action.href}
-                    className={CARD_CLASS}
-                    data-returning-card={card.id}
-                  >
-                    <CardBody card={card} />
-                  </a>
-                ) : action.kind === "NAVIGATE" ? (
+                {action.kind === "NAVIGATE" ? (
                   <Link
                     href={action.href}
                     className={CARD_CLASS}
@@ -143,11 +148,27 @@ export function ReturningWelcome({
                   >
                     <CardBody card={card} />
                   </Link>
+                ) : action.kind === "OPEN_ARTIFACT" && tools === null ? (
+                  // Outside a Q surface there is no viewer to open it in;
+                  // the slides the server renders are the way in.
+                  <a
+                    href={`/api/q-artifact/${encodeURIComponent(action.artifactId)}/slides`}
+                    className={CARD_CLASS}
+                    data-returning-card={card.id}
+                  >
+                    <CardBody card={card} />
+                  </a>
                 ) : (
                   <button
                     type="button"
                     className={CARD_CLASS}
-                    onClick={() => void ask(card, action.prompt)}
+                    onClick={() => {
+                      if (action.kind === "OPEN_ARTIFACT") {
+                        tools?.openArtifact(action.artifactId);
+                      } else if (action.kind === "ASK_Q") {
+                        void ask(card, action.prompt);
+                      }
+                    }}
                     disabled={asking !== null}
                     aria-busy={asking === card.id}
                     data-returning-card={card.id}

@@ -91,6 +91,50 @@ describe("the greeting", () => {
     ).toMatch(/setup is part-way through/);
   });
 
+  it("says where an unfinished setup left off, from its own state", () => {
+    const greeting = returningGreeting({
+      ...investor,
+      unfinished: "investor",
+      setup: {
+        covered: ["Mandate", "Stage"],
+        pending: "What's a typical cheque for you? Just the number is fine.",
+      },
+    });
+    expect(greeting.question).toMatch(/covered mandate and stage/);
+    // Q's own last question, verbatim, never paraphrased into the greeting.
+    expect(greeting.leftOff).toBe(
+      "What's a typical cheque for you? Just the number is fine.",
+    );
+    expect(greeting.question).not.toContain("typical cheque");
+  });
+
+  it("claims nothing about progress it was not given", () => {
+    const greeting = returningGreeting({ ...investor, unfinished: "investor" });
+    expect(greeting.question).not.toMatch(/covered/);
+    expect(greeting.leftOff).toBeNull();
+  });
+
+  it("a completed setup has no left-off line, even if one was read", () => {
+    expect(
+      returningGreeting({
+        ...investor,
+        setup: { covered: ["Mandate"], pending: "Anything else?" },
+      }).leftOff,
+    ).toBeNull();
+  });
+
+  it("is one welcome, said the same way aloud", () => {
+    const greeting = returningGreeting(investor);
+    expect(greeting.spoken).toBe(`${greeting.headline} ${greeting.question}`);
+    expect(greeting.spoken.match(/welcome back/gi)).toHaveLength(1);
+  });
+
+  it("a completed investor with nothing matching hears that, not a generic question", () => {
+    expect(returningGreeting({ ...investor, feed: "NO" }).question).toMatch(
+      /nothing on Capital Q matches it yet/,
+    );
+  });
+
   it("mentions the feed only when it has something in it", () => {
     expect(returningGreeting(investor).question).toMatch(/in your feed/);
     for (const feed of ["NO", "UNKNOWN"] as const) {
@@ -111,9 +155,13 @@ describe("the greeting", () => {
 });
 
 describe("chooseReturningCards", () => {
-  it("an investor: the feed and the mandate", () => {
+  it("an investor: the feed, the mandate, and who can see them", () => {
     const cards = chooseReturningCards(investor);
-    expect(ids(cards)).toEqual(["feed", "mandate"]);
+    expect(ids(cards)).toEqual(["feed", "mandate", "visibility"]);
+    expect(card(cards, "visibility")?.action).toEqual({
+      kind: "NAVIGATE",
+      href: "/company/visibility",
+    });
     expect(card(cards, "feed")?.action).toEqual({
       kind: "NAVIGATE",
       href: "/discover",
@@ -137,10 +185,21 @@ describe("chooseReturningCards", () => {
 
   it("an unfinished mandate comes first", () => {
     const cards = chooseReturningCards({ ...investor, unfinished: "investor" });
-    expect(ids(cards)).toEqual(["continue-setup", "feed", "mandate"]);
+    expect(ids(cards)).toEqual([
+      "continue-setup",
+      "talk-setup",
+      "feed",
+      "mandate",
+    ]);
+    // Both tell the setup screen Q has already welcomed them here, so it
+    // goes to the question rather than welcoming them a second time.
     expect(cards[0]?.action).toEqual({
       kind: "NAVIGATE",
-      href: "/onboarding/investor",
+      href: "/onboarding/investor?from=home",
+    });
+    expect(cards[1]?.action).toEqual({
+      kind: "NAVIGATE",
+      href: "/onboarding/investor?talk=1",
     });
   });
 
@@ -182,7 +241,7 @@ describe("chooseReturningCards", () => {
     expect(deck?.action.kind).toBe("ASK_Q");
   });
 
-  it("a deck Q prepared opens", () => {
+  it("a deck Q prepared opens beside the conversation, not as a page", () => {
     const deck = card(
       chooseReturningCards({
         ...founder,
@@ -192,7 +251,7 @@ describe("chooseReturningCards", () => {
     );
     expect(deck).toMatchObject({
       title: "Your investor deck",
-      action: { kind: "NAVIGATE", href: `/api/q-artifact/${ARTIFACT}/slides` },
+      action: { kind: "OPEN_ARTIFACT", artifactId: ARTIFACT },
     });
   });
 
@@ -207,10 +266,15 @@ describe("chooseReturningCards", () => {
   it("never more than four, with an unfinished setup kept first", () => {
     const cards = chooseReturningCards({ ...founder, unfinished: "founder" });
     expect(cards).toHaveLength(MAX_RETURNING_CARDS);
-    expect(ids(cards)).toEqual(["continue-setup", "company", "pitch", "deck"]);
+    expect(ids(cards)).toEqual([
+      "continue-setup",
+      "talk-setup",
+      "company",
+      "pitch",
+    ]);
     expect(cards[0]?.action).toEqual({
       kind: "NAVIGATE",
-      href: "/onboarding/founder",
+      href: "/onboarding/founder?from=home",
     });
   });
 
@@ -222,7 +286,7 @@ describe("chooseReturningCards", () => {
       pitch: "UNKNOWN",
       deck: { kind: "UNKNOWN" },
     });
-    expect(ids(cards)).toEqual(["continue-setup", "ask"]);
+    expect(ids(cards)).toEqual(["continue-setup", "talk-setup", "ask"]);
   });
 
   it("a first-time person gets no cards: they are choosing a side", () => {
@@ -247,8 +311,10 @@ describe("chooseReturningCards", () => {
       for (const each of chooseReturningCards(facts)) {
         if (each.action.kind === "NAVIGATE") {
           expect(each.action.href).toMatch(/^\/[a-z]/);
-        } else {
+        } else if (each.action.kind === "ASK_Q") {
           expect(each.action.prompt.trim().length).toBeGreaterThan(0);
+        } else {
+          expect(each.action.artifactId).toBe(ARTIFACT);
         }
       }
     }

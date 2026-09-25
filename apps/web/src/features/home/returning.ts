@@ -33,6 +33,25 @@ export type ReturningFacts = {
   readonly pitch: Known;
   /** Founder only. */
   readonly deck: DeckFact;
+  /**
+   * Where the unfinished setup stands, read from the session and the
+   * interview thread the server kept. Absent when there is no unfinished
+   * setup or the read did not answer; nothing is then said about it
+   * beyond "part-way through".
+   */
+  readonly setup?: SetupFacts | undefined;
+};
+
+/** An unfinished setup, as its own state tells it. */
+export type SetupFacts = {
+  /** The parts of the journey that are settled, in the journey's words. */
+  readonly covered: readonly string[];
+  /**
+   * The question Q asked last and is still waiting on, verbatim -- Q's own
+   * sentence from the interview, never one composed here. Null when the
+   * person has moved on since, or Q had not asked anything yet.
+   */
+  readonly pending: string | null;
 };
 
 /**
@@ -67,12 +86,33 @@ export type ReturningGreeting = {
   readonly headline: string;
   /** Q's question: what they would like to do, in terms of where they are. */
   readonly question: string;
+  /**
+   * Where an unfinished setup left off: Q's own last question, shown as
+   * itself. Null when there is none to show.
+   */
+  readonly leftOff: string | null;
+  /**
+   * The greeting as Q says it when the person turns voice on over it:
+   * the same words, once. Voice then continues this welcome rather than
+   * opening with a second one.
+   */
+  readonly spoken: string;
 };
 
 export function returningGreeting(facts: ReturningFacts): ReturningGreeting {
   const name = firstName(facts.name);
   const headline = name === null ? "Welcome back." : `Welcome back, ${name}.`;
-  return { headline, question: questionFor(facts) };
+  const question = questionFor(facts);
+  const leftOff =
+    facts.unfinished === null ? null : (facts.setup?.pending ?? null);
+  return { headline, question, leftOff, spoken: `${headline} ${question}` };
+}
+
+/** "mandate", "mandate and stage", "mandate, cheque and stage". */
+function joinParts(parts: readonly string[]): string {
+  const lower = parts.map((part) => part.toLowerCase());
+  if (lower.length <= 1) return lower[0] ?? "";
+  return `${lower.slice(0, -1).join(", ")} and ${lower.at(-1) ?? ""}`;
 }
 
 /**
@@ -82,15 +122,23 @@ export function returningGreeting(facts: ReturningFacts): ReturningGreeting {
  */
 function questionFor(facts: ReturningFacts): string {
   const { unfinished } = facts;
-  if (unfinished === "investor") {
-    return "Your mandate is part-way through. Shall we finish it, or would you rather look around first?";
-  }
-  if (unfinished === "founder") {
-    return "Your company setup is part-way through. Shall we pick it up where you left off?";
+  if (unfinished !== null) {
+    // Where they left off, in the journey's own terms: what is settled,
+    // then the offer. The question Q was on is shown beside this as Q's
+    // own sentence (`leftOff`), not paraphrased into it.
+    const covered = facts.setup?.covered ?? [];
+    const done =
+      covered.length === 0 ? "" : `We've covered ${joinParts(covered)}. `;
+    return unfinished === "investor"
+      ? `${done}Your mandate is part-way through — shall we pick it up where we left off, or would you rather look around first?`
+      : `${done}Your company setup is part-way through — shall we pick it up where we left off?`;
   }
   const role = roleOf(facts);
   if (role === "INVESTOR" && facts.feed === "YES") {
     return "There are companies in your feed, ranked against your mandate. Where would you like to start?";
+  }
+  if (role === "INVESTOR" && facts.feed === "NO") {
+    return "Your mandate is set, and nothing on Capital Q matches it yet. Shall we look at what's close, or go over the mandate together?";
   }
   if (role === "FOUNDER" && facts.pitch === "NO") {
     return "Investors watch a pitch before they read anything else. Would you like to record yours, or work on something else?";
@@ -114,12 +162,15 @@ function roleOf(facts: ReturningFacts): "FOUNDER" | "INVESTOR" | null {
 }
 
 /**
- * A card either goes somewhere real or asks Q something real through the
- * ordinary Q path. There is no third kind: nothing here pretends to act.
+ * A card goes somewhere real, asks Q something real through the ordinary
+ * Q path, or opens a document Q already made beside the conversation.
+ * Nothing here pretends to act.
  */
 export type ReturningCardAction =
   | { readonly kind: "NAVIGATE"; readonly href: string }
-  | { readonly kind: "ASK_Q"; readonly prompt: string };
+  | { readonly kind: "ASK_Q"; readonly prompt: string }
+  /** Opened in the Q surface's own viewer: Q work stays with Q (K). */
+  | { readonly kind: "OPEN_ARTIFACT"; readonly artifactId: string };
 
 export type ReturningCard = {
   readonly id: string;
@@ -138,7 +189,7 @@ export function chooseReturningCards(
   // A setup left part-way comes first: it is the one thing only they can
   // finish, and everything else works better once it is done.
   if (facts.unfinished !== null) {
-    cards.push(continueCard(facts.unfinished));
+    cards.push(...continueCards(facts.unfinished));
   }
   switch (facts.context.kind) {
     case "INVESTOR":
@@ -165,22 +216,28 @@ export function chooseReturningCards(
   return cards.slice(0, MAX_RETURNING_CARDS);
 }
 
-function continueCard(journey: "founder" | "investor"): ReturningCard {
-  return journey === "investor"
-    ? {
-        id: "continue-setup",
-        title: "Continue your mandate",
-        description:
-          "Q picks up where you left off and asks only for what is missing.",
-        action: { kind: "NAVIGATE", href: "/onboarding/investor" },
-      }
-    : {
-        id: "continue-setup",
-        title: "Continue onboarding",
-        description:
-          "Q picks up where you left off and asks only for what is missing.",
-        action: { kind: "NAVIGATE", href: "/onboarding/founder" },
-      };
+/**
+ * Picking the setup back up, typed or spoken. Both say `from=home` or
+ * `talk=1`, which tell the setup screen Q has already welcomed them here,
+ * so it goes straight to the question instead of welcoming them again.
+ */
+function continueCards(journey: "founder" | "investor"): ReturningCard[] {
+  const path = `/onboarding/${journey}`;
+  return [
+    {
+      id: "continue-setup",
+      title:
+        journey === "investor" ? "Continue your mandate" : "Continue setup",
+      description: "Pick up at the question we were on.",
+      action: { kind: "NAVIGATE", href: `${path}?from=home` },
+    },
+    {
+      id: "talk-setup",
+      title: "Talk it through",
+      description: "Carry on out loud; Q asks, you answer.",
+      action: { kind: "NAVIGATE", href: `${path}?talk=1` },
+    },
+  ];
 }
 
 function investorCards(facts: ReturningFacts): ReturningCard[] {
@@ -201,6 +258,13 @@ function investorCards(facts: ReturningFacts): ReturningCard[] {
       title: "Your mandate",
       description: "Ask Q what you have told Capital Q you invest in.",
       action: { kind: "ASK_Q", prompt: "What is my mandate?" },
+    },
+    {
+      id: "visibility",
+      title: "Who can see you",
+      description:
+        "Whether founders can find you, and what they would see. Nothing is visible until you choose.",
+      action: { kind: "NAVIGATE", href: "/company/visibility" },
     },
   ];
 }
@@ -267,10 +331,8 @@ function deckCard(facts: ReturningFacts): ReturningCard | null {
         title: "Your investor deck",
         description:
           "The deck Q prepared with you. Open it, or ask Q to change it.",
-        action: {
-          kind: "NAVIGATE",
-          href: `/api/q-artifact/${encodeURIComponent(facts.deck.artifactId)}/slides`,
-        },
+        // Beside the conversation, in Q's own viewer, not a separate page.
+        action: { kind: "OPEN_ARTIFACT", artifactId: facts.deck.artifactId },
       };
     case "UPLOADED":
       return {

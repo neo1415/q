@@ -581,6 +581,38 @@ export function welcomeBack(
   return `Welcome back. ${parts.join(" ")}`.trim();
 }
 
+/**
+ * Q's last line, when it is still the question on the table (ACC
+ * adversarial: "reload mid-onboarding → one coherent resume greeting").
+ *
+ * The thread the server kept ends on Q, and nothing has moved on the
+ * session since Q said it: no answer, no tap, no skip. Q is then still
+ * asking exactly that, and opening the interview again would only record
+ * a second copy of the same question -- one more per reload, which is how
+ * a returning person met a stack of openings. Anything later on the
+ * session, or a thread that ends on the person, and Q opens as usual.
+ */
+export function pendingQuestion(
+  turns: readonly {
+    readonly role: "Q" | "PERSON";
+    readonly text: string;
+    readonly createdAt: string;
+  }[],
+  lastActivityAt: string,
+): string | null {
+  const last = turns.at(-1);
+  if (last === undefined || last.role !== "Q") {
+    return null;
+  }
+  const said = Date.parse(last.createdAt);
+  const moved = Date.parse(lastActivityAt);
+  if (Number.isNaN(said) || Number.isNaN(moved) || said < moved) {
+    return null;
+  }
+  const text = last.text.trim();
+  return text.length === 0 ? null : text;
+}
+
 function joinNames(names: readonly string[]): string {
   if (names.length <= 1) {
     return names[0] ?? "";

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import type {
   CreateQVoiceSessionRequest,
+  CreateQVoiceSessionResponse,
   QVoiceChoice,
   QVoiceTurnState,
 } from "@capital-q/contracts";
@@ -46,6 +47,11 @@ export type VoiceInterview = {
     readonly thread: VoiceInterviewThread;
     readonly firstMessage?: string | undefined;
     readonly voice?: QVoiceChoice | undefined;
+    /**
+     * The thread is already open: Q composes no opening of its own and
+     * says `firstMessage` (a line already on screen), or nothing.
+     */
+    readonly resume?: boolean | undefined;
   }) => Promise<void>;
   readonly end: () => Promise<void>;
   readonly chooseVoice: (voice: QVoiceChoice) => Promise<void>;
@@ -82,6 +88,33 @@ const RECONNECT_DELAYS_MS = [1_200, 3_000, 8_000] as const;
 const STABLE_LINE_MS = 20_000;
 const GAVE_UP =
   "I couldn't get the line back. You can keep typing, or start voice again when you're ready.";
+
+/** What the provider accepts as a first line. */
+const GREETING_MAX = 700;
+
+/**
+ * The credential with the browser's own first line as the Deepgram
+ * greeting, or with none. Only for a resumed thread: the server composed
+ * no opening, and the line on screen is the one Q is already asking.
+ */
+export function withGreeting(
+  credential: CreateQVoiceSessionResponse,
+  line: string | undefined,
+): CreateQVoiceSessionResponse {
+  const settings = credential.deepgram;
+  if (settings === undefined) return credential;
+  const agent = Object.fromEntries(
+    Object.entries(settings.agent).filter(([key]) => key !== "greeting"),
+  );
+  const said = line?.trim().slice(0, GREETING_MAX) ?? "";
+  return {
+    ...credential,
+    deepgram: {
+      ...settings,
+      agent: said.length === 0 ? agent : { ...agent, greeting: said },
+    },
+  };
+}
 
 export function useVoiceInterview(
   events: VoiceSessionEvents = {},
@@ -136,8 +169,14 @@ export function useVoiceInterview(
     reconnectAttempts.current += 1;
     setNotice("The line dropped. Picking it back up…");
     // `talk` clears the notice as it starts and sets its own on failure.
+    // The same line coming back, not a new arrival: no greeting, and no
+    // second opening recorded (the fixture's repeated "Welcome back").
     window.setTimeout(() => {
-      void again({ thread: last.thread, firstMessage: undefined });
+      void again({
+        thread: last.thread,
+        firstMessage: undefined,
+        resume: true,
+      });
     }, delay);
   };
   // The poll below needs the latest of these without re-subscribing on
@@ -160,11 +199,12 @@ export function useVoiceInterview(
   });
 
   const talk = useCallback<VoiceInterview["talk"]>(
-    async ({ thread, firstMessage, voice: requested }) => {
+    async ({ thread, firstMessage, voice: requested, resume = false }) => {
       const chosen = requested ?? voice;
       setNotice(null);
       lastStart.current = { thread, firstMessage };
       const started = await startVoiceSessionAction({
+        ...(resume ? { resume: true } : {}),
         ...(thread.welcome === true ? { welcome: true } : {}),
         ...(thread.onboarding === undefined
           ? {}
@@ -188,9 +228,13 @@ export function useVoiceInterview(
       setActive(true);
       upSince.current = Date.now();
       // Q composes its own opening from the interview's state; the caller's
-      // line is only a fallback when the server had none to give.
+      // line is only a fallback when the server had none to give. On a
+      // resumed thread the server composes none, and what Q says first is
+      // the caller's line -- already on screen -- or nothing at all.
       await client.start({
-        credential: started.value,
+        credential: resume
+          ? withGreeting(started.value, firstMessage)
+          : started.value,
         firstMessage: started.value.firstMessage ?? firstMessage,
       });
     },
@@ -267,6 +311,7 @@ export function useVoiceInterview(
         thread: last.thread,
         firstMessage: undefined,
         voice: next,
+        resume: true,
       });
     },
     [voice, active, client, talk],

@@ -1,10 +1,8 @@
-import Link from "next/link";
+import type { ReactNode } from "react";
 
 import { loadWebServerConfig } from "@capital-q/config/web";
-import { buttonClassName } from "@capital-q/ui/button";
 
-import { PageSection } from "@/components/app-shell/page-container";
-
+import { accountDetails } from "@/auth/account-details";
 import {
   resolveOwnContext,
   resolveUnfinishedSetup,
@@ -20,25 +18,26 @@ import type { QSubjectInput } from "@/features/q/actions";
 import {
   arrivalFor,
   chooseReturningCards,
+  firstName,
   returningGreeting,
 } from "./returning";
 import { resolveReturningFacts } from "./returning-facts";
 import { ReturningWelcome } from "./returning-welcome";
 
 /**
- * Home is Q (QX-001 §4; doc 17 §60-§63).
+ * Home is Q (QX-001 §4; doc 17 §60-§63; acceptance A and K).
  *
  * Not a dashboard with a chatbot in the corner, and not a dashboard at
- * all. Q is the surface: the conversation occupies the centre of the
- * screen, the composer is the thing your eye lands on, and everything
- * else on this page has to earn its place underneath.
+ * all. Home is the same living Q a new person meets at first run: its
+ * presence at the head of the workspace, Q's welcome said beneath it with
+ * a few small choices, then the conversation and the composer. Typing,
+ * talking, research, the documents Q makes and the history of what was
+ * said all happen here, in this one surface.
  *
- * What earns it, and nothing else does: a setup left part-way, the
- * visibility control that decides who can see you, and — for somebody
- * Capital Q knows nothing about yet — the choice of which side of the
- * table they are on. There is no counter reading zero, no empty activity
- * feed, no "0 matches" panel. A new account sees Q offering a real
- * starting point rather than an empty product pretending to be full.
+ * What used to sit underneath -- "Finish setting up", "Visibility &
+ * Discovery", the choice of side under a heading -- is now what Q offers
+ * in its welcome, so a returning person meets one greeting that knows
+ * where they are, instead of a page of sections around a chat box.
  *
  * Whether this build can reach Q is a server-side fact, resolved here and
  * passed down as a boolean — the browser is told what is available, never
@@ -84,14 +83,6 @@ function surfaceContext(context: OwnContext): QSurfaceContext {
   }
 }
 
-/**
- * Everything under the Q surface sits in the same reading column, with the
- * page gutter, so a section never starts at the workspace edge while Q is
- * centred above it.
- */
-const SECTION_COLUMN =
-  "mx-auto w-full max-w-(--cq-layout-reading) px-4 sm:px-6 lg:px-8";
-
 /** The person's own subject, for a question a welcome card asks Q. */
 function askSubject(context: OwnContext): QSubjectInput | undefined {
   switch (context.kind) {
@@ -120,6 +111,39 @@ function openingLine(context: OwnContext): string {
   }
 }
 
+/** First-run words, the same ones the arrival welcome uses for its choice. */
+const FIRST_RUN_QUESTION = "Are you here to raise capital, or to invest it?";
+
+/**
+ * Somebody Capital Q knows nothing about yet, who came to Home rather than
+ * through the first-run welcome: Q introduces itself and asks the one
+ * question that decides everything after it, with both answers on screen.
+ */
+function FirstRunWelcome({ name }: { readonly name: string | null }) {
+  return (
+    <section
+      aria-labelledby="first-run-headline"
+      className="flex w-full flex-col items-center gap-5"
+      data-q-first-run
+    >
+      <div className="flex flex-col items-center gap-2 text-center">
+        <h1
+          id="first-run-headline"
+          className="cq-title-lg text-balance text-(--cq-text-primary)"
+        >
+          {name === null ? "Hi, I'm Q." : `Hi ${name}, I'm Q.`}
+        </h1>
+        <p className="cq-body-lg text-balance text-(--cq-text-secondary)">
+          {FIRST_RUN_QUESTION}
+        </p>
+      </div>
+      <div className="w-full">
+        <PersonaCards />
+      </div>
+    </section>
+  );
+}
+
 export async function HomeScreen({
   conversationId = null,
 }: {
@@ -137,122 +161,64 @@ export async function HomeScreen({
   // back rather than new (CQ-WEB-030).
   const unfinished = qConnected ? await resolveUnfinishedSetup() : null;
   const arrival = arrivalFor(context, unfinished);
+
   /*
-    Welcome back: Q's greeting and a few places to go, for a person
-    Capital Q already knows. Not over an open conversation, which is
-    what they came to Home for. A first-time person keeps the first-run
-    welcome and the choice of side below.
+    Q's welcome, once, and only before a conversation: an open
+    conversation is what they came to Home for, and it is not greeted
+    over. Returning: what Capital Q knows about where they are. First
+    time: who Q is and which side of the table they are on. Otherwise
+    the one line under Q.
   */
-  const welcome =
-    arrival === "RETURNING" && conversationId === null
-      ? await resolveReturningFacts(context, unfinished)
-      : null;
+  let welcome: ReactNode = undefined;
+  let welcomeLine: string | undefined = undefined;
+  if (conversationId === null) {
+    if (arrival === "RETURNING") {
+      const facts = await resolveReturningFacts(context, unfinished);
+      const greeting = returningGreeting(facts);
+      welcome = (
+        <ReturningWelcome
+          greeting={greeting}
+          cards={chooseReturningCards(facts)}
+          subject={askSubject(context)}
+        />
+      );
+      welcomeLine = greeting.spoken;
+    } else if (arrival === "FIRST_TIME" && qConnected) {
+      const name = firstName((await accountDetails()).displayName);
+      welcome = <FirstRunWelcome name={name} />;
+      welcomeLine = `${name === null ? "Hi, I'm Q." : `Hi ${name}, I'm Q.`} ${FIRST_RUN_QUESTION}`;
+    } else {
+      welcome = (
+        <p className="cq-body text-center text-balance text-(--cq-text-secondary)">
+          {openingLine(context)}
+        </p>
+      );
+    }
+  }
 
   return (
-    <div className="flex flex-col gap-10 py-6 sm:py-10">
+    <div className="flex flex-col py-4 sm:py-8">
       {/*
         The Q surface. Deliberately not a PageHeader and a card: a heading
         reading "Home" above a boxed chat is the dashboard composition
-        this packet exists to replace.
+        this packet exists to replace. Previous conversations are one
+        control away (the history control here, the collapsible list in
+        the sidebar), never a list above the composer.
+
+        Deliberately not inside a Suspense boundary (QX-003A): React
+        reveals a streamed boundary on a requestAnimationFrame, which never
+        fires in a hidden tab, and Home's whole Q surface stayed blank in a
+        background tab until it was removed.
       */}
-      <section
-        aria-label="Ask Q"
-        className="flex flex-col gap-5"
-        data-q-surface
-      >
-        {/* Previous conversations live in the sidebar on desktop and behind
-            the history control on the Q surface everywhere (QX-001 §7;
-            design/visual-debt.md P0): never a list above the composer. */}
-        {welcome !== null ? (
-          <ReturningWelcome
-            greeting={returningGreeting(welcome)}
-            cards={chooseReturningCards(welcome)}
-            subject={askSubject(context)}
-          />
-        ) : (
-          <p className="cq-body mx-auto w-full max-w-(--cq-layout-reading) text-center text-(--cq-text-secondary)">
-            {openingLine(context)}
-          </p>
-        )}
-
-        {/*
-          Deliberately not inside a Suspense boundary (QX-003A).
-
-          Nothing here is async: the panel is a client component and the
-          conversation it opens is already resolved above. A boundary was
-          needed only while the panel read the parameter with
-          `useSearchParams`, and it outlived that read.
-
-          It is not free. React streams a boundary's content into a hidden
-          holder and reveals it on a `requestAnimationFrame`, which never
-          fires while the tab is hidden. Home's whole Q surface therefore
-          stayed blank in a background tab — and in any automated browser
-          whose page is not visible, which is what made this bug look for
-          a long time like history that hydrated and was then destroyed.
-          In the shell it is parsed in place and hydrates with the root.
-        */}
+      <section aria-label="Ask Q" className="flex flex-col" data-q-surface>
         <QConversationPanel
           connected={qConnected}
           context={surfaceContext(context)}
           conversationId={conversationId}
+          welcome={welcome}
+          welcomeLine={welcomeLine}
         />
       </section>
-
-      {arrival === "FIRST_TIME" ? (
-        <PageSection
-          id="setup"
-          title="What are you here to do?"
-          description="Q works from whatever you already have, and asks only for what is missing."
-          className={SECTION_COLUMN}
-        >
-          <PersonaCards />
-        </PageSection>
-      ) : null}
-
-      {/* The welcome's first card already offers this. */}
-      {unfinished !== null && welcome === null ? (
-        <PageSection
-          id="continue-setup"
-          title="Finish setting up"
-          className={SECTION_COLUMN}
-          description={
-            unfinished === "founder"
-              ? "Your company setup is part-way through. Q picks up exactly where you left off, and asks only for what is still missing."
-              : "Your mandate is part-way through. Q picks up exactly where you left off, and asks only for what is still missing."
-          }
-        >
-          <div>
-            <Link
-              href={`/onboarding/${unfinished}`}
-              className={buttonClassName("secondary", "regular")}
-            >
-              Continue setup
-            </Link>
-          </div>
-        </PageSection>
-      ) : null}
-
-      {context.kind !== "NONE" ? (
-        <PageSection
-          id="visibility"
-          title="Visibility & Discovery"
-          className={SECTION_COLUMN}
-          description={
-            context.kind === "INVESTOR"
-              ? "Who can see your investor profile, what founders would see, and whether they can find you. Nothing becomes visible until you choose."
-              : "Who can see your company, what investors would see, and whether they can find you. Nothing becomes visible until you choose."
-          }
-        >
-          <div>
-            <Link
-              href="/company/visibility"
-              className={buttonClassName("secondary", "regular")}
-            >
-              Manage visibility
-            </Link>
-          </div>
-        </PageSection>
-      ) : null}
     </div>
   );
 }

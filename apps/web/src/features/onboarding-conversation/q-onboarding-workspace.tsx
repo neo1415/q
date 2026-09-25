@@ -57,6 +57,7 @@ import {
   reviewLines,
   stillNeeded,
   taxonomyProposal,
+  pendingQuestion,
   welcomeBack,
   type JourneyVocabulary,
   type QPrompt,
@@ -139,6 +140,12 @@ export type QOnboardingWorkspaceProps = {
    * else (the form, say), so the stage starts without another tap.
    */
   readonly talkOnOpen?: boolean | undefined;
+  /**
+   * Q has already welcomed this person on the way here -- Home's resume
+   * greeting, or a spoken conversation that brought them. The screen then
+   * does not say "Welcome back" again: one arrival, one welcome.
+   */
+  readonly greeted?: boolean | undefined;
 };
 
 type Turn = {
@@ -198,14 +205,16 @@ export function QOnboardingWorkspace({
   qSubject,
   contextLabel,
   talkOnOpen = false,
+  greeted = false,
 }: QOnboardingWorkspaceProps) {
   const view = session.raw;
   const router = useRouter();
   // The greeting is read once, from persisted state, when the workspace
   // opens — and only after a genuine absence, measured from the session's
   // own last activity (§26). Never from anything the browser remembers.
+  // Not at all when Q welcomed them on the way in: that was the welcome.
   const [greeting] = useState<string | null>(() =>
-    view === undefined ? null : welcomeBack(view, vocabulary),
+    view === undefined || greeted ? null : welcomeBack(view, vocabulary),
   );
   const [turns, setTurns] = useState<readonly Turn[]>([]);
   /**
@@ -489,6 +498,8 @@ export function QOnboardingWorkspace({
    * mid-conversation is not interrupted.
    */
   const openedFor = useRef<string | null>(null);
+  /** Q's opening has settled (said, restored, or failed): voice may start. */
+  const [opened, setOpened] = useState(false);
   useEffect(() => {
     const sessionId = view?.session.id;
     if (
@@ -500,6 +511,7 @@ export function QOnboardingWorkspace({
       return;
     }
     openedFor.current = sessionId;
+    const lastActivityAt = view?.session.lastActivityAt ?? "";
     /**
      * The thread first, then Q (CQ-QX-006; adversarial round 1, #7).
      *
@@ -520,24 +532,40 @@ export function QOnboardingWorkspace({
           // A turn typed while the thread loaded stays after it.
           setTurns((current) => [...restored, ...current]);
         }
-        return actions.say(
-          "",
-          restored.slice(-12).map((turn) => ({
-            role: turn.kind === "Q" ? ("q" as const) : ("person" as const),
-            text: turn.text.slice(0, 1500),
-          })),
-        );
+        // Q is still asking what it last said: that line is the question,
+        // and the interview is not opened a second time (see
+        // `pendingQuestion`). A reload redraws; it does not re-greet.
+        const pending = pendingQuestion(kept, lastActivityAt);
+        if (pending !== null) {
+          return pending;
+        }
+        return actions
+          .say(
+            "",
+            restored.slice(-12).map((turn) => ({
+              role: turn.kind === "Q" ? ("q" as const) : ("person" as const),
+              text: turn.text.slice(0, 1500),
+            })),
+          )
+          .then((turn) => turn?.reply ?? null);
       })
-      .then((turn) => {
-        if (turn?.reply != null) {
-          pendingReply.current = turn.reply;
+      .then((reply) => {
+        if (reply !== null) {
+          pendingReply.current = reply;
           // The prompt may not change, so bind it here as well as in the
           // effect that watches for a new step.
-          setQQuestion({ stepKey: prompt.stepKey, text: turn.reply });
+          setQQuestion({ stepKey: prompt.stepKey, text: reply });
           pendingReply.current = null;
         }
-      });
-  }, [view?.session.id, prompt, turns.length, actions]);
+      })
+      .finally(() => setOpened(true));
+  }, [
+    view?.session.id,
+    view?.session.lastActivityAt,
+    prompt,
+    turns.length,
+    actions,
+  ]);
 
   const settleReading = useCallback(() => {
     setReading(false);
@@ -1045,10 +1073,28 @@ export function QOnboardingWorkspace({
     }
   };
 
-  const talkWithQ = async () => {
+  /**
+   * Voice on, over an interview that is already open (restore half of B).
+   *
+   * When Q's own question is on screen, voice does not open the interview
+   * a second time: the server composes and records nothing, and Q says the
+   * question it is already asking -- after the screen's welcome, if the
+   * person has not yet had one read to them. Only a screen with no line of
+   * Q's yet (the opening failed) asks the server to open.
+   */
+  const talkWithQ = async (
+    options: { readonly withGreeting?: boolean } = {},
+  ) => {
     if (view === undefined) {
       return;
     }
+    const asking =
+      prompt !== null &&
+      !isFinal &&
+      qQuestion !== null &&
+      (qQuestion.stepKey === prompt.stepKey || silentStep)
+        ? qQuestion.text
+        : null;
     const conversationId = QConversationIdSchema.safeParse(
       qConversationId.current,
     ).data;
@@ -1072,8 +1118,20 @@ export function QOnboardingWorkspace({
             }),
         ...(conversationId === undefined ? {} : { conversationId }),
       },
-      firstMessage:
-        prompt === null || isFinal ? undefined : (liveQuestion ?? undefined),
+      ...(asking === null
+        ? {
+            firstMessage:
+              prompt === null || isFinal
+                ? undefined
+                : (liveQuestion ?? undefined),
+          }
+        : {
+            resume: true,
+            firstMessage:
+              options.withGreeting === true && greeting !== null
+                ? `${greeting} ${asking}`
+                : asking,
+          }),
     });
   };
 
@@ -1184,17 +1242,34 @@ export function QOnboardingWorkspace({
     }
   });
 
-  // Asked to open talking: start once, as soon as the session is here.
+  // Asked to open talking: start once, when Q's opening has settled -- so
+  // there is one opening, which voice then says, instead of a typed one
+  // and a spoken one composed side by side (the fixture's 19:47:33 and
+  // 19:47:48 lines).
   const talkedOnOpen = useRef(false);
+  // Voice asked for while Q's opening is still on its way (seen in the
+  // browser run: Talk tapped a few seconds after arrival started a second,
+  // spoken opening beside the typed one). The request waits for the
+  // opening and then continues it, rather than racing it.
+  const [talkWhenOpened, setTalkWhenOpened] = useState(false);
   useEffect(() => {
-    if (!talkOnOpen || talkedOnOpen.current || view === undefined) {
+    const onArrival = talkOnOpen && !talkedOnOpen.current;
+    if ((!onArrival && !talkWhenOpened) || view === undefined || !opened) {
       return;
     }
     talkedOnOpen.current = true;
-    void talkWithQ();
-    // talkWithQ is recreated each render; the guard makes this run once.
+    setTalkWhenOpened(false);
+    void talkWithQ({ withGreeting: onArrival });
+    // talkWithQ is recreated each render; the guards make this run once.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [talkOnOpen, view]);
+  }, [talkOnOpen, talkWhenOpened, view, opened]);
+  const requestTalk = () => {
+    if (opened) {
+      void talkWithQ();
+    } else {
+      setTalkWhenOpened(true);
+    }
+  };
 
   if (view === undefined) {
     return (
@@ -1773,9 +1848,7 @@ export function QOnboardingWorkspace({
           placeholder={composerPlaceholder}
           disabled={working}
           onSubmit={say}
-          onVoice={
-            prompt !== null && !isFinal ? () => void talkWithQ() : undefined
-          }
+          onVoice={prompt !== null && !isFinal ? requestTalk : undefined}
         />
       </div>
     </div>
