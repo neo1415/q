@@ -197,7 +197,7 @@ export async function HomeScreen({
   }
 
   return (
-    <div className="flex flex-col py-4 sm:py-8">
+    <div className="flex flex-col">
       {/*
         The Q surface. Deliberately not a PageHeader and a card: a heading
         reading "Home" above a boxed chat is the dashboard composition

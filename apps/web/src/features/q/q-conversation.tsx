@@ -1,51 +1,75 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 
 import { describeQStreamTransport } from "@capital-q/api-client";
+import { Q_SPEECH_MAX_CHARS, type QVoiceChoice } from "@capital-q/contracts";
 import { cx } from "@capital-q/ui";
 import { Button } from "@capital-q/ui/button";
+import {
+  Download,
+  History,
+  ICON_SIZE,
+  ICON_STROKE,
+  Mic,
+  MicOff,
+  Square,
+} from "@capital-q/ui/icons";
 import { QComposer } from "@capital-q/ui/q-composer";
-import { QStateIndicator } from "@capital-q/ui/q-state";
-import { InlineNotice } from "@capital-q/ui/states";
 import type { ContextScope } from "@capital-q/ui/tokens";
+
+import { ViewTransition } from "@/components/view-transition";
 
 import {
   materialUploadCompleteAction,
   materialUploadTargetAction,
 } from "../onboarding-kit/material-actions";
-import { QLumen } from "../q-aperture";
+import { QAperture, QLumen } from "../q-aperture";
+import { useQSpeech } from "../voice/use-q-speech";
 import { ArtifactViewer } from "./artifact-viewer";
-import { QAnswer } from "./q-answer";
-import { QHistorySheet } from "./q-history-sheet";
-import { QStage } from "./q-stage";
-import { QSurfaceToolsContext, type QSurfaceTools } from "./q-surface-tools";
-import { useQSession } from "./q-session";
-import type { SpokenLine } from "./spoken";
 import {
   failureMessage,
   recoveryHint,
   workingLabel,
   type QTurn,
 } from "./conversation";
+import { QEvidence, splitBlocks } from "./q-evidence";
+import { QHistorySheet } from "./q-history-sheet";
+import { QResultBlocks } from "./q-result-blocks";
+import { useQSession } from "./q-session";
+import { QSurfaceToolsContext, type QSurfaceTools } from "./q-surface-tools";
+import type { SpokenLine } from "./spoken";
 
 /**
- * Q, in the browser (CQ-C5-R1 §13-§19; CQ-PRE-REC-001 §12-§13), voice
- * first.
+ * The Q page: talking with Q (founder direction, 2026-09-25; ADR 0017 F3).
  *
- * The screen is Q: its presence at the top, alive to what is happening;
- * one word for what it is doing; the controls a hand needs; then the
- * conversation, and the composer docked beneath it. Talking happens in
- * place — the presence listens, thinks and speaks where it stands, and
- * the thread fills in beneath — rather than behind a modal, so typing and
- * speaking are visibly one conversation. The composer stays reachable,
- * sticky at the bottom of the workspace above the mobile navigation, so
- * a long answer never pushes the next question off the screen.
+ * The page is the voice stage. Arriving, Q speaks first and then listens;
+ * the aperture is the only light on a quiet field, and what is being said
+ * is a caption beneath it -- Q's words large, the person's words smaller,
+ * and the utterance still in progress as one line that updates in place.
+ * Finished turns become a faded history above, never a chat log of
+ * bubbles. Answers are spoken; their text is a short caption, and the
+ * structure behind an answer (findings, what is still open, what Q needs
+ * to know, the sources) sits behind one "Evidence" disclosure.
  *
- * What is deliberately absent: a local reply of any kind. There is no
- * fixture, no canned response, no simulated typing and no fabricated
- * progress. When Q is not connected on this build the composer says exactly
- * that and sends nothing.
+ * Typing is a secondary control on the same stage: while the line is open
+ * typed words go down it and are answered aloud; without it they are a
+ * question like any other, and the answer is read out.
+ *
+ * Mic: Q starts the line on arrival only where this browser has already
+ * granted the microphone -- the permission prompt itself is only ever the
+ * answer to pressing Talk (doc 17 §54). The person's End is remembered for
+ * this tab, so the page does not reopen a line they closed.
+ *
+ * The conversation is the one store's (features/q/q-session), so the dock
+ * and the panel are the same conversation and nothing is read again.
  */
 
 export type QSurfaceContext = {
@@ -64,30 +88,23 @@ export type QConversationPanelProps = {
   /** False when this build has no Q API configured. */
   readonly connected: boolean;
   readonly context: QSurfaceContext;
-  /**
-   * The conversation the URL names, resolved on the server (QX-003A).
-   *
-   * Read here rather than with `useSearchParams` because reading it in
-   * the browser remounted this component as the parameter resolved: the
-   * instance that had hydrated the conversation was discarded and the
-   * one left on screen had fetched nothing. The turns were restored
-   * correctly and thrown away.
-   */
+  /** The conversation the URL names, resolved on the server (QX-003A). */
   readonly conversationId?: string | null | undefined;
-  /**
-   * Q's welcome, said under the presence before the first turn (A, K):
-   * the greeting and its few choices, resolved on the server. Replaces the
-   * suggestion chips, which would otherwise offer the same things twice.
-   */
+  /** Q's welcome, shown on the stage before the first turn (A, K). */
   readonly welcome?: ReactNode | undefined;
-  /**
-   * The welcome as Q says it when voice is turned on over it. Voice then
-   * continues this welcome instead of opening with another one.
-   */
+  /** The welcome as Q says it: the line Q opens with. */
   readonly welcomeLine?: string | undefined;
 };
 
 const COMPOSER_ID = "home-q";
+const ENDED_KEY = "cq.q.voice-ended";
+/** A caption is short: more than this is behind "Read all". */
+const CAPTION_CHARS = 220;
+
+const VOICE_LABELS: Readonly<Record<QVoiceChoice, string>> = {
+  FEMALE: "Female",
+  MALE: "Male",
+};
 
 /** The conversation as plain text, for saving. */
 function transcriptText(
@@ -103,6 +120,102 @@ function transcriptText(
   return lines.join("\n\n");
 }
 
+function endedThisTab(): boolean {
+  try {
+    return window.sessionStorage.getItem(ENDED_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function rememberEnded(ended: boolean): void {
+  try {
+    if (ended) window.sessionStorage.setItem(ENDED_KEY, "1");
+    else window.sessionStorage.removeItem(ENDED_KEY);
+  } catch {
+    // Not remembered: the next visit simply offers the line again.
+  }
+}
+
+/** Whether the microphone is already granted, without ever prompting. */
+async function microphoneGranted(): Promise<boolean> {
+  try {
+    const status = await navigator.permissions.query({
+      name: "microphone",
+    });
+    return status.state === "granted";
+  } catch {
+    return false;
+  }
+}
+
+function words(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .trim();
+}
+
+/** A line of the ambient transcript. */
+type Line = {
+  readonly id: string;
+  readonly role: "person" | "q";
+  readonly text: string;
+  /** The Q turn behind it, when it is a stored answer. */
+  readonly turn?: Extract<QTurn, { kind: "Q" }> | undefined;
+};
+
+/**
+ * A notice on the stage: the stage's own surface and words, not the app's
+ * tinted notice, whose light fill does not belong on the dark field.
+ */
+function StageNotice({
+  title,
+  children,
+}: {
+  readonly title: string;
+  readonly children: ReactNode;
+}) {
+  return (
+    <div
+      role="status"
+      className="flex w-full max-w-(--cq-layout-narrow) flex-col gap-1 rounded-md border border-(--cq-border) bg-(--cq-surface) px-4 py-3 text-left"
+    >
+      <span className="cq-label text-(--cq-text-primary)">{title}</span>
+      <span className="cq-body-sm text-(--cq-text-secondary)">{children}</span>
+    </div>
+  );
+}
+
+function Caption({
+  text,
+  className,
+}: {
+  readonly text: string;
+  readonly className: string;
+}) {
+  const [all, setAll] = useState(false);
+  const long = text.length > CAPTION_CHARS;
+  // A caption is a few lines; the rest is one press away.
+  return (
+    <div className="flex flex-col items-center gap-1">
+      <p className={cx(className, long && !all ? "cq-q-caption-clamp" : "")}>
+        {text}
+      </p>
+      {long ? (
+        <button
+          type="button"
+          className="cq-stage-quiet"
+          aria-expanded={all}
+          onClick={() => setAll((current) => !current)}
+        >
+          {all ? "Show less" : "Read all"}
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
 export function QConversationPanel({
   connected,
   context,
@@ -112,7 +225,7 @@ export function QConversationPanel({
 }: QConversationPanelProps) {
   const session = useQSession();
   const { q, turns, voice, spoken, spokenOnly, presence, act } = session;
-  const endRef = useRef<HTMLDivElement>(null);
+  const client = voice.client;
 
   // The page names the conversation (its URL); the store holds it, so
   // arriving from the dock in the same conversation reads nothing again
@@ -127,17 +240,9 @@ export function QConversationPanel({
   const closeArtifact = session.closeArtifact;
 
   /**
-   * Attaching a document to this conversation (QX-001 §5).
-   *
-   * The same three-step Evidence upload onboarding uses: ask permission,
-   * put the bytes straight into private storage from the browser, let the
-   * server verify what actually landed. Nothing new, and the bytes never
-   * pass through the application server.
-   *
-   * It appears only for a founder with a company, because that is the
-   * only subject Evidence can own a document against today. An investor
-   * sees no control rather than one that refuses — the packet's rule
-   * about dead buttons, and the honest thing besides.
+   * Attaching a document to this conversation (QX-001 §5): permission,
+   * then the bytes straight into private storage, then the server checks
+   * what landed. Only for a founder with a company.
    */
   const [attachments, setAttachments] = useState<readonly string[]>([]);
   const attach = async (file: File) => {
@@ -170,8 +275,6 @@ export function QConversationPanel({
       body: file,
     });
     if (!put.ok) {
-      // The bytes did not land; the session is left unfinished rather
-      // than completed over nothing.
       settle("could not be uploaded");
       return;
     }
@@ -180,59 +283,179 @@ export function QConversationPanel({
     );
     settle(completed.ok ? "attached" : completed.message);
   };
-  const talkWithQ = async () => {
+
+  // --- Talking --------------------------------------------------------------
+
+  const sessionTalk = session.talk;
+  const talk = useCallback(async () => {
+    rememberEnded(false);
     // Over a welcome still on screen, Q says that welcome and nothing
     // before it: one greeting, not the page's and then the call's.
     const greeting =
       welcomeLine !== undefined && turns.length === 0 && spoken.length === 0
         ? welcomeLine
         : undefined;
-    await session.talk(greeting === undefined ? undefined : { greeting });
-  };
+    await sessionTalk(greeting === undefined ? undefined : { greeting });
+  }, [sessionTalk, welcomeLine, turns.length, spoken.length]);
 
+  const endVoice = voice.end;
+  const end = useCallback(() => {
+    rememberEnded(true);
+    void endVoice();
+  }, [endVoice]);
+
+  // Q speaks first: on arrival the line opens by itself where the
+  // microphone is already this site's, and the person has not ended it in
+  // this tab. Anywhere else the stage offers Talk, one press away.
+  // Once per visit to the page: a ref, not state, so trying does not
+  // re-run (and cancel) the attempt it is part of.
+  const autoTried = useRef(false);
+  const talkRef = useRef(talk);
   useEffect(() => {
-    // Follow the answer as it arrives, and respect a reader who has asked
-    // for less motion. `nearest` scrolls only when the end of the
-    // conversation has actually gone out of view.
-    endRef.current?.scrollIntoView({
-      behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches
-        ? "auto"
-        : "smooth",
-      block: "nearest",
-    });
-  }, [turns.length, spoken.length, q.state.partial?.text]);
+    talkRef.current = talk;
+  }, [talk]);
+  const voiceActive = voice.active;
+  useEffect(() => {
+    if (autoTried.current || !connected || voiceActive) return;
+    let left = false;
+    // A task later, so an effect React runs twice in development (and
+    // cleans up in between) tries once, not never.
+    const timer = window.setTimeout(() => {
+      autoTried.current = true;
+      void (async () => {
+        if (endedThisTab()) return;
+        if (!(await microphoneGranted()) || left) return;
+        await talkRef.current();
+      })();
+    }, 0);
+    return () => {
+      // Left the page before the permission answer: no line opens.
+      left = true;
+      window.clearTimeout(timer);
+    };
+  }, [connected, voiceActive]);
+
+  // An answer that arrived while the line was closed is read aloud all the
+  // same (one-way speech, no microphone): answers on this page are heard.
+  const speech = useQSpeech();
+  const say = speech.say;
+  const stopSpeech = speech.stop;
+  const heard = useRef<Set<string> | null>(null);
+  useEffect(() => {
+    if (q.loading) {
+      heard.current = null;
+      return;
+    }
+    if (heard.current === null) {
+      heard.current = new Set(turns.map((turn) => turn.id));
+      return;
+    }
+    const latest = turns.findLast((turn) => turn.kind === "Q");
+    if (
+      latest === undefined ||
+      latest.kind !== "Q" ||
+      latest.streaming ||
+      heard.current.has(latest.id)
+    ) {
+      return;
+    }
+    heard.current.add(latest.id);
+    if (voice.active) return;
+    void say(latest.text.slice(0, Q_SPEECH_MAX_CHARS), voice.voice);
+  }, [turns, q.loading, voice.active, voice.voice, say]);
+  useEffect(() => {
+    if (voice.active) stopSpeech();
+  }, [voice.active, stopSpeech]);
+
+  // --- The ambient transcript --------------------------------------------------
+
+  // The live line: what is being said right now, one line that grows in
+  // place under its id, until the next one starts.
+  const live = client.transcript.at(-1);
+  const liveIsPerson =
+    voice.active &&
+    live !== undefined &&
+    live.role === "user" &&
+    (live.partial ||
+      client.state === "USER_SPEAKING" ||
+      client.state === "LISTENING" ||
+      client.state === "THINKING");
+
+  const stored: Line[] = turns.map((turn) =>
+    turn.kind === "PERSON"
+      ? { id: turn.id, role: "person", text: turn.text }
+      : { id: turn.id, role: "q", text: turn.text, turn },
+  );
+  const lines: Line[] = [
+    ...stored,
+    ...spokenOnly.map((line): Line => ({
+      id: line.id,
+      role: line.role === "user" ? "person" : "q",
+      text: line.text,
+    })),
+  ];
+  // The current exchange: the person's latest words and, once it has
+  // come, Q's answer to them. Everything before it is history. While the
+  // person is speaking, their words are the live line, growing in place.
+  const liveWords = liveIsPerson ? words(live.text) : null;
+  const settledLines =
+    liveWords === null
+      ? lines
+      : lines.filter(
+          (line) => !(line.role === "person" && words(line.text) === liveWords),
+        );
+  const lastPersonAt = settledLines.findLastIndex(
+    (line) => line.role === "person",
+  );
+  const lastQAt = settledLines.findLastIndex((line) => line.role === "q");
+  const currentQ =
+    liveIsPerson || lastQAt < lastPersonAt ? undefined : settledLines[lastQAt];
+  const currentPerson = liveIsPerson
+    ? { id: live.id, text: live.text }
+    : lastPersonAt >= 0 && (currentQ === undefined || lastPersonAt < lastQAt)
+      ? settledLines[lastPersonAt]
+      : undefined;
+  const firstCurrent = liveIsPerson
+    ? settledLines.length
+    : currentQ !== undefined
+      ? lastPersonAt >= 0 && lastPersonAt < lastQAt
+        ? lastPersonAt
+        : lastQAt
+      : lastPersonAt >= 0
+        ? lastPersonAt
+        : settledLines.length;
+  const history = settledLines.slice(0, firstCurrent);
+
+  // The newest words are where the eye is: the stage keeps its end in view.
+  const bodyRef = useRef<HTMLDivElement>(null);
+  const newest = `${String(lines.length)}:${live?.text ?? ""}:${currentQ?.text.length ?? 0}`;
+  useEffect(() => {
+    const body = bodyRef.current;
+    if (body !== null) body.scrollTop = body.scrollHeight;
+  }, [newest]);
+  const historyRef = useRef<HTMLOListElement>(null);
+  useEffect(() => {
+    const list = historyRef.current;
+    if (list !== null) list.scrollTop = list.scrollHeight;
+  }, [history.length]);
 
   const stage = workingLabel(q.state);
-  // Suggestions are an on-ramp, not a feature: gone after the first turn.
-  const showWelcome =
-    welcome !== undefined &&
-    turns.length === 0 &&
-    spokenOnly.length === 0 &&
-    !q.loading;
+  const showWelcome = welcome !== undefined && lines.length === 0 && !q.loading;
   const showSuggestions =
     welcome === undefined &&
     connected &&
-    turns.length === 0 &&
+    lines.length === 0 &&
     !q.working &&
     !q.loading &&
     q.state.failure === null;
 
-  const presenceState = presence.state;
-  const presenceLabel = presence.label;
-  const presenceDetail = voice.active
-    ? undefined
-    : q.working
-      ? stage
-      : context.label;
+  const stateLabel = voice.active
+    ? client.muted
+      ? "Muted"
+      : (presence.label ?? "Listening")
+    : (presence.label ?? (connected ? "Ready when you are" : "Q"));
 
   const [historyOpen, setHistoryOpen] = useState(false);
-  const focusComposer = () => {
-    const element = document.getElementById(COMPOSER_ID);
-    if (element instanceof HTMLTextAreaElement) {
-      element.focus();
-      element.scrollIntoView({ block: "nearest" });
-    }
-  };
   const download =
     turns.length === 0 && spoken.length === 0
       ? undefined
@@ -260,300 +483,473 @@ export function QConversationPanel({
     [qAsk, showArtifact],
   );
 
+  const currentTurn = currentQ?.turn;
+  const currentParts =
+    currentTurn === undefined ? null : splitBlocks(currentTurn.blocks);
+
   return (
     <QSurfaceToolsContext.Provider value={tools}>
       <div
-        className="flex flex-col gap-4 lg:flex-row lg:items-start lg:gap-6"
+        className="cq-stage cq-q-home flex flex-col lg:flex-row"
         data-q-surface-split
       >
-        <div
+        <section
+          aria-label="Q"
           className={cx(
-            // The thread reads at reading measure, centred, until a document
-            // opens beside it and the two share the workspace.
-            "flex min-w-0 flex-1 flex-col gap-4",
-            openArtifact === null
-              ? "mx-auto w-full max-w-(--cq-layout-reading)"
-              : "",
-            // On a narrow screen the document takes the column rather than
-            // squeezing beside the conversation; "Back to Q" brings this
-            // back, and the conversation is never unmounted, so nothing it
-            // was holding is lost.
+            "flex min-h-0 min-w-0 flex-1 flex-col",
             openArtifact === null ? "" : "hidden lg:flex",
           )}
           data-q-workspace
-          // How many turns are on screen. A test hook rather than decoration:
-          // "the conversation reopened" is otherwise only assertable by
-          // counting rendered children, which changes whenever the answer
-          // layout does.
+          data-q-stage={voice.active ? "voice" : "ready"}
           data-q-turns={String(turns.length)}
-          // The raw voice state, for the same reason: "Q was interrupted"
-          // is not otherwise visible, since the presence shows it as
-          // listening — which is what Q is then doing.
-          data-q-voice={voice.active ? voice.client.state : undefined}
+          data-q-voice={voice.active ? client.state : undefined}
         >
           <QLumen
             active={voice.active}
-            input={voice.client.inputLevel}
-            output={voice.client.outputLevel}
+            input={client.inputLevel}
+            output={client.outputLevel}
           />
-          <QStage
-            state={presenceState}
-            inputLevel={voice.client.inputLevel}
-            outputLevel={voice.client.outputLevel}
-            label={presenceLabel}
-            detail={presenceDetail}
-            connected={connected}
-            voiceActive={voice.active}
-            muted={voice.client.muted}
-            voice={voice.voice}
-            voices={["FEMALE", "MALE"]}
-            onTalk={() => void talkWithQ()}
-            onEnd={() => void voice.end()}
-            onMute={(muted) => voice.client.setMuted(muted)}
-            onVolume={(volume) => voice.client.setVolume(volume)}
-            onChooseVoice={(choice) => void voice.chooseVoice(choice)}
-            onType={focusComposer}
-            onHistory={() => setHistoryOpen(true)}
-            onDownload={download}
-            asking={voice.turn?.asking ?? null}
-            onSay={(text) => voice.client.sendText(text)}
-            className="py-2 sm:py-4"
-          />
+
+          {/* The top line: history and the saved transcript, quiet. */}
+          <div className="flex flex-none items-center justify-between gap-3 px-5 pt-4 sm:px-8">
+            <span className="cq-label text-(--cq-text-secondary)">
+              {context.label ?? "Q"}
+            </span>
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                className="cq-stage-quiet"
+                onClick={() => setHistoryOpen(true)}
+                data-q-control="history"
+              >
+                <History
+                  aria-hidden="true"
+                  size={ICON_SIZE.compact}
+                  strokeWidth={ICON_STROKE}
+                />
+                Conversations
+              </button>
+              {download === undefined ? null : (
+                <button
+                  type="button"
+                  className="cq-stage-quiet"
+                  onClick={download}
+                  aria-label="Save this conversation"
+                  data-q-control="download"
+                >
+                  <Download
+                    aria-hidden="true"
+                    size={ICON_SIZE.compact}
+                    strokeWidth={ICON_STROKE}
+                  />
+                </button>
+              )}
+            </div>
+          </div>
           <QHistorySheet
             open={historyOpen}
             onOpenChange={setHistoryOpen}
             active={q.conversationId}
           />
 
-          {voice.notice !== null ? (
-            <InlineNotice tone="warning" title={voice.notice}>
-              <Button
-                size="compact"
-                variant="quiet"
-                onClick={voice.clearNotice}
-              >
-                Dismiss
-              </Button>
-            </InlineNotice>
-          ) : null}
-
-          {showWelcome ? (
-            // The 16 px phone gutter; from `sm` the reading column has its own.
-            <div
-              className="flex flex-col items-center px-4 sm:px-0"
-              data-q-welcome-line
-            >
-              {welcome}
-            </div>
-          ) : null}
-
-          {showSuggestions ? (
-            <ul
-              aria-label="Suggested questions"
-              className="flex flex-wrap justify-center gap-2"
-              data-q-suggestions
-            >
-              {context.suggestions.map((suggestion) => (
-                <li key={suggestion}>
-                  <Button
-                    variant="secondary"
-                    size="compact"
-                    onClick={() => void q.ask(suggestion)}
-                  >
-                    {suggestion}
-                  </Button>
-                </li>
-              ))}
-            </ul>
-          ) : null}
-
-          {spokenOnly.length > 0 ? (
-            <ol className="flex flex-col gap-4" aria-label="Spoken">
-              {spokenOnly.map((line) => (
-                <li
-                  key={line.id}
-                  className={
-                    line.role === "user"
-                      ? "flex flex-col items-end gap-1"
-                      : "flex flex-col gap-1"
-                  }
+          {/* The stage. The one part that grows, so it is the part that
+              scrolls, between the top line and controls that never leave
+              the screen. */}
+          <div
+            ref={bodyRef}
+            className="cq-stage-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 sm:px-8"
+            data-q-voice-stage-body
+          >
+            <div className="mx-auto flex min-h-full w-full max-w-2xl flex-col items-center justify-center gap-6 py-6">
+              {history.length > 0 ? (
+                <ol
+                  ref={historyRef}
+                  className="cq-q-history w-full"
+                  aria-label="Earlier in this conversation"
                 >
-                  <span className="cq-label text-(--cq-text-tertiary)">
-                    {line.role === "user" ? "You" : "Q"}
-                  </span>
-                  <p
-                    className={
-                      line.role === "user"
-                        ? "cq-body max-w-(--cq-layout-narrow) rounded-md bg-(--cq-surface-sunken) px-3 py-2 text-(--cq-text-primary)"
-                        : "cq-body cq-prose whitespace-pre-wrap text-(--cq-text-primary)"
-                    }
-                  >
-                    {line.text}
-                  </p>
-                </li>
-              ))}
-            </ol>
-          ) : null}
-          {turns.length > 0 ? (
-            <ol className="flex flex-col gap-4" aria-live="polite">
-              {turns.map((turn) => (
-                <li
-                  key={turn.id}
-                  className={
-                    turn.kind === "PERSON"
-                      ? "flex flex-col items-end gap-1"
-                      : "flex flex-col gap-1"
-                  }
-                >
-                  {turn.kind === "PERSON" ? (
-                    <>
-                      <span className="cq-label text-(--cq-text-tertiary)">
-                        You
+                  {history.map((line) => (
+                    <li
+                      key={line.id}
+                      className={
+                        line.role === "person"
+                          ? "cq-q-history-person"
+                          : "cq-q-history-q"
+                      }
+                      {...(line.turn === undefined
+                        ? {}
+                        : { "data-q-answer": "settled" })}
+                    >
+                      <span className="sr-only">
+                        {line.role === "person" ? "You: " : "Q: "}
                       </span>
-                      <p
-                        className="cq-body max-w-(--cq-layout-narrow) rounded-md bg-(--cq-surface-sunken) px-3 py-2 text-(--cq-text-primary)"
-                        data-unconfirmed={turn.unconfirmed ? "true" : undefined}
-                      >
-                        {turn.text}
-                      </p>
-                    </>
-                  ) : (
-                    <QAnswer
-                      turn={turn}
-                      onAsk={(question) => void q.ask(question)}
-                      onOpenArtifact={showArtifact}
-                    />
-                  )}
-                </li>
-              ))}
-              <div ref={endRef} />
-            </ol>
-          ) : null}
+                      {line.text}
+                      {line.turn === undefined ? null : (
+                        <QEvidence
+                          turn={line.turn}
+                          onAsk={(question) => void q.ask(question)}
+                          onOpenArtifact={showArtifact}
+                        />
+                      )}
+                    </li>
+                  ))}
+                </ol>
+              ) : null}
 
-          {q.loading && turns.length === 0 ? (
-            <p className="cq-body-sm text-center text-(--cq-text-tertiary)">
-              Opening your conversation…
-            </p>
-          ) : null}
-
-          {q.working ? (
-            <div className="flex items-center justify-between gap-3">
-              <QStateIndicator state="WORKING" detail={stage} />
-              <Button
-                variant="quiet"
-                size="compact"
-                onClick={() => void q.stop()}
+              <ViewTransition
+                name="q-aperture"
+                share="cq-q-morph"
+                default="none"
               >
-                Stop
-              </Button>
-            </div>
-          ) : null}
+                <QAperture
+                  state={presence.state}
+                  // Full size to begin with; smaller once there is a
+                  // conversation to read beside it.
+                  size={lines.length > 0 || liveIsPerson ? 120 : "stage"}
+                  inputLevel={client.inputLevel}
+                  outputLevel={client.outputLevel}
+                />
+              </ViewTransition>
+              <div className="flex flex-col items-center gap-1" role="status">
+                <span className="cq-label text-(--cq-text-primary)">
+                  {stateLabel}
+                </span>
+                {!voice.active && q.working && stage !== undefined ? (
+                  <span className="cq-caption text-(--cq-text-secondary)">
+                    {stage}
+                  </span>
+                ) : null}
+              </div>
 
-          {q.transport === "RECONNECTING" ? (
-            <InlineNotice
-              tone="info"
-              title={describeQStreamTransport(q.transport)}
-            >
-              Your conversation is saved. This is the connection, not the
-              answer.
-            </InlineNotice>
-          ) : null}
+              {showWelcome ? (
+                <div
+                  className="flex w-full flex-col items-center"
+                  data-q-welcome-line
+                >
+                  {welcome}
+                </div>
+              ) : null}
 
-          {q.state.failure !== null ? (
-            <InlineNotice tone="warning" title="Q couldn't finish that">
-              {failureMessage(q.state.failure)} {recoveryHint(q.state.failure)}
-            </InlineNotice>
-          ) : null}
-
-          {q.state.approval !== null
-            ? (() => {
-                // What Q has prepared and is waiting on (CQ-Q-008, ADR 0011).
-                // The summary and preview are the server's own words for the
-                // exact payload the decision binds to; nothing here rewrites
-                // them. One yes applies it; one no leaves everything as it was.
-                const approval = q.state.approval;
-                const proposal = q.state.proposals.find(
-                  (candidate) => candidate.proposalId === approval.proposalId,
-                );
-                return (
-                  <InlineNotice
-                    tone="info"
-                    title={
-                      proposal?.summary ??
-                      "Q has prepared something for you to approve."
-                    }
+              {/* What is being said: Q's words, then the person's. */}
+              <div
+                className="flex w-full flex-col items-center gap-3 text-center"
+                aria-live="polite"
+                data-q-captions
+              >
+                {currentPerson !== undefined ? (
+                  <p
+                    className="cq-body-lg text-balance text-(--cq-text-secondary)"
+                    data-q-live-line={liveIsPerson ? "" : undefined}
                   >
-                    <div className="flex flex-col gap-3" data-q-approval>
-                      {proposal?.preview !== undefined ? (
-                        <pre className="cq-body whitespace-pre-wrap font-sans">
-                          {proposal.preview}
-                        </pre>
-                      ) : null}
-                      <div className="flex flex-wrap gap-2">
-                        <Button
-                          size="compact"
-                          onClick={() => {
-                            act();
-                            void q.approve();
-                          }}
-                        >
-                          Approve
-                        </Button>
-                        <Button
-                          size="compact"
-                          variant="secondary"
-                          onClick={() => void q.decline()}
-                        >
-                          Decline
-                        </Button>
-                      </div>
+                    “{currentPerson.text}”
+                  </p>
+                ) : null}
+                {currentQ !== undefined ? (
+                  <div
+                    className="flex flex-col items-center gap-2"
+                    {...(currentTurn === undefined
+                      ? {}
+                      : {
+                          "data-q-answer": currentTurn.streaming
+                            ? "streaming"
+                            : "settled",
+                        })}
+                  >
+                    <Caption
+                      key={currentQ.id}
+                      text={currentQ.text}
+                      className="cq-q-caption cq-title-md text-balance text-(--cq-text-primary)"
+                    />
+                  </div>
+                ) : null}
+              </div>
+
+              {currentTurn !== undefined && currentParts !== null ? (
+                <div className="flex w-full flex-col items-center gap-3">
+                  {currentParts.visible.length > 0 ? (
+                    <div className="w-full max-w-(--cq-layout-narrow)">
+                      <QResultBlocks
+                        blocks={currentParts.visible}
+                        onAsk={(question) => void q.ask(question)}
+                        onOpenArtifact={showArtifact}
+                      />
                     </div>
-                  </InlineNotice>
-                );
-              })()
-            : null}
+                  ) : null}
+                  <QEvidence
+                    turn={currentTurn}
+                    onAsk={(question) => void q.ask(question)}
+                    onOpenArtifact={showArtifact}
+                  />
+                </div>
+              ) : null}
 
-          {q.notice !== null && q.state.failure === null ? (
-            <InlineNotice tone="warning" title="That didn't go through">
-              {q.notice}
-            </InlineNotice>
-          ) : null}
+              {showSuggestions ? (
+                <ul
+                  aria-label="Suggested questions"
+                  className="flex flex-wrap justify-center gap-2"
+                  data-q-suggestions
+                >
+                  {context.suggestions.map((suggestion) => (
+                    <li key={suggestion}>
+                      <button
+                        type="button"
+                        className="cq-stage-option"
+                        onClick={() => {
+                          if (voice.active) client.sendText(suggestion);
+                          else void q.ask(suggestion);
+                        }}
+                      >
+                        {suggestion}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
 
-          <div className="cq-q-composer-dock">
-            <QComposer
-              id={COMPOSER_ID}
-              contextScope={context.scope}
-              contextDetail={context.label}
-              disabled={q.working}
-              placeholder={
-                voice.active
-                  ? "Type instead — Q hears this too"
-                  : "Or type to Q"
-              }
-              attachments={attachments}
-              {...(connected && context.companyId !== undefined
-                ? { onAttach: attach, attachLabel: "Attach a document" }
-                : {})}
-              {...(connected
-                ? {
-                    onSubmit: voice.active
-                      ? (text: string) => {
-                          voice.client.sendText(text);
-                        }
-                      : q.ask,
-                  }
-                : {})}
-            />
+              {voice.active &&
+              voice.turn?.asking !== null &&
+              voice.turn?.asking !== undefined &&
+              voice.turn.asking.options.length > 0 ? (
+                <div
+                  className="flex flex-wrap justify-center gap-2"
+                  role="group"
+                  aria-label="Options"
+                  data-q-stage-options
+                >
+                  {voice.turn.asking.options.map((option) => (
+                    <button
+                      key={option.key}
+                      type="button"
+                      className="cq-stage-option"
+                      title={option.description}
+                      onClick={() => client.sendText(option.label)}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+
+              {q.loading && lines.length === 0 ? (
+                <p className="cq-body-sm text-(--cq-text-secondary)">
+                  Opening your conversation…
+                </p>
+              ) : null}
+
+              {q.state.approval !== null
+                ? (() => {
+                    // What Q has prepared and is waiting on (CQ-Q-008). The
+                    // server's own words for the exact payload the decision
+                    // binds to; one yes applies it, one no leaves it.
+                    const approval = q.state.approval;
+                    const proposal = q.state.proposals.find(
+                      (candidate) =>
+                        candidate.proposalId === approval.proposalId,
+                    );
+                    return (
+                      <div
+                        className="flex w-full max-w-(--cq-layout-narrow) flex-col gap-3 rounded-lg border border-(--cq-border) bg-(--cq-surface) p-4"
+                        data-q-approval
+                      >
+                        <span className="cq-label text-(--cq-text-secondary)">
+                          Needs you
+                        </span>
+                        <p className="cq-body font-medium text-(--cq-text-primary)">
+                          {proposal?.summary ??
+                            "Q has prepared something for you to approve."}
+                        </p>
+                        {proposal?.preview !== undefined ? (
+                          <pre className="cq-body-sm whitespace-pre-wrap font-sans text-(--cq-text-secondary)">
+                            {proposal.preview}
+                          </pre>
+                        ) : null}
+                        <div className="flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            className="cq-stage-primary"
+                            onClick={() => {
+                              act();
+                              void q.approve();
+                            }}
+                          >
+                            Approve
+                          </button>
+                          <button
+                            type="button"
+                            className="cq-stage-control"
+                            onClick={() => void q.decline()}
+                          >
+                            Decline
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })()
+                : null}
+
+              {q.transport === "RECONNECTING" ? (
+                <p className="cq-caption text-(--cq-text-secondary)">
+                  {describeQStreamTransport(q.transport)} Your conversation is
+                  saved.
+                </p>
+              ) : null}
+              {q.state.failure !== null ? (
+                <StageNotice title="Q couldn't finish that">
+                  {failureMessage(q.state.failure)}{" "}
+                  {recoveryHint(q.state.failure)}
+                </StageNotice>
+              ) : null}
+              {q.notice !== null && q.state.failure === null ? (
+                <StageNotice title="That didn't go through">
+                  {q.notice}
+                </StageNotice>
+              ) : null}
+              {voice.notice !== null ? (
+                <div className="flex items-center gap-3 rounded-md border border-(--cq-border-subtle) bg-(--cq-surface) px-4 py-3">
+                  <span className="cq-body text-(--cq-text-primary)">
+                    {voice.notice}
+                  </span>
+                  <button
+                    type="button"
+                    className="cq-stage-quiet"
+                    onClick={voice.clearNotice}
+                  >
+                    Dismiss
+                  </button>
+                </div>
+              ) : null}
+              {speech.status === "blocked" ? (
+                <button
+                  type="button"
+                  className="cq-stage-control"
+                  onClick={speech.play}
+                >
+                  Play Q’s answer
+                </button>
+              ) : null}
+            </div>
           </div>
-        </div>
+
+          {/* The controls: always on screen. Talking is the way in; typing
+              is beside it, on the same stage. */}
+          <div
+            className="flex flex-none flex-col items-center gap-3 border-t border-(--cq-border-subtle) px-5 pt-4 pb-5 sm:px-8"
+            data-q-voice-stage-controls
+          >
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              {voice.active ? (
+                <>
+                  <button
+                    type="button"
+                    className={
+                      client.muted
+                        ? "cq-stage-control is-active"
+                        : "cq-stage-control"
+                    }
+                    aria-pressed={client.muted}
+                    disabled={!client.connected}
+                    onClick={() => client.setMuted(!client.muted)}
+                    data-q-control="mute"
+                  >
+                    {client.muted ? (
+                      <MicOff size={ICON_SIZE.compact} aria-hidden="true" />
+                    ) : (
+                      <Mic size={ICON_SIZE.compact} aria-hidden="true" />
+                    )}
+                    {client.muted ? "Unmute" : "Mute"}
+                  </button>
+                  <button
+                    type="button"
+                    className="cq-stage-primary inline-flex items-center gap-2"
+                    onClick={end}
+                    data-q-control="end"
+                  >
+                    <Square size={ICON_SIZE.compact} aria-hidden="true" />
+                    End
+                  </button>
+                  <div
+                    className="flex items-center gap-1"
+                    role="group"
+                    aria-label="Q's voice"
+                  >
+                    {(["FEMALE", "MALE"] as const).map((choice) => (
+                      <button
+                        key={choice}
+                        type="button"
+                        className={
+                          choice === voice.voice
+                            ? "cq-stage-control is-active"
+                            : "cq-stage-control"
+                        }
+                        aria-pressed={choice === voice.voice}
+                        onClick={() => void voice.chooseVoice(choice)}
+                      >
+                        {VOICE_LABELS[choice]}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              ) : (
+                <button
+                  type="button"
+                  className="cq-q-talk"
+                  disabled={!connected}
+                  onClick={() => void talk()}
+                  data-q-control="talk"
+                >
+                  <Mic
+                    size={ICON_SIZE.prominent}
+                    strokeWidth={2}
+                    aria-hidden="true"
+                  />
+                  {connected
+                    ? "Talk with Q"
+                    : "Q isn't connected on this build"}
+                </button>
+              )}
+              {q.working ? (
+                <Button
+                  variant="quiet"
+                  size="compact"
+                  onClick={() => void q.stop()}
+                >
+                  Stop
+                </Button>
+              ) : null}
+            </div>
+            <div className="w-full max-w-2xl">
+              <QComposer
+                id={COMPOSER_ID}
+                contextScope={context.scope}
+                contextDetail={context.label}
+                disabled={q.working && !voice.active}
+                placeholder={
+                  voice.active
+                    ? "Type instead — Q hears this too"
+                    : "Or type to Q"
+                }
+                attachments={attachments}
+                {...(connected && context.companyId !== undefined
+                  ? { onAttach: attach, attachLabel: "Attach a document" }
+                  : {})}
+                {...(connected
+                  ? {
+                      onSubmit: voice.active
+                        ? (text: string) => {
+                            client.sendText(text);
+                          }
+                        : q.ask,
+                    }
+                  : {})}
+              />
+            </div>
+          </div>
+        </section>
 
         {openArtifact === null ? null : (
-          <div className="flex min-w-0 flex-1 flex-col lg:sticky lg:top-6 lg:max-h-[calc(100vh-6rem)]">
+          <div className="flex min-w-0 flex-1 flex-col p-4 lg:sticky lg:top-0 lg:max-h-dvh">
             <ArtifactViewer
               artifactId={openArtifact}
               onClose={closeArtifact}
-              // The latest answer that put this document in front of them:
-              // a revision Q just wrote changes it, and the viewer follows.
               revision={
                 turns.findLast(
                   (turn) =>
