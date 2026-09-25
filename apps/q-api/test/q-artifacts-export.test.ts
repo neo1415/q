@@ -34,8 +34,9 @@ import { createApp, type QApiSecurityDependencies } from "../src/app.js";
  *   - the bytes are really a PPTX and really a PDF, because a route that
  *     returns a plausible content type and an unopenable file is worse
  *     than one that fails;
- *   - an artifact with no deck is a 409 and not an empty deck — an
- *     investment brief is not a slide that failed to draw;
+ *   - an artifact with no deck has no slides and no PowerPoint (409 with
+ *     a code), and is still a PDF (BIZ-001) — an investment brief is not
+ *     a slide that failed to draw, and not a file that cannot exist;
  *   - the actor comes from the verified session, and anything that is not
  *     theirs is the same 404 as one that does not exist.
  */
@@ -131,6 +132,7 @@ function detail(withDeck: boolean): QArtifactDetail {
 function buildApp(options: {
   readonly withDeck?: boolean | undefined;
   readonly missing?: boolean | undefined;
+  readonly preparing?: boolean | undefined;
   readonly principal?: AuthenticatedPrincipal | null | undefined;
 }) {
   const actors: ActorContext[] = [];
@@ -139,7 +141,16 @@ function buildApp(options: {
     if (options.missing === true) {
       return Promise.reject(new ArtifactNotFoundError());
     }
-    return Promise.resolve(detail(options.withDeck ?? true));
+    const found = detail(options.withDeck ?? true);
+    if (options.preparing === true) {
+      // PREPARING: the artifact exists and has no version to draw yet.
+      const { current: _current, ...rest } = found;
+      return Promise.resolve({
+        ...rest,
+        artifact: { ...found.artifact, status: "PREPARING", currentVersion: 0 },
+      });
+    }
+    return Promise.resolve(found);
   };
   const artifacts = {
     read: (actor: ActorContext) => read(actor),
@@ -227,16 +238,55 @@ describe("drawing a stored deck", () => {
     await app.close();
   });
 
-  it("refuses to draw a document that has no slides", async () => {
+  it("writes a brief as a PDF document instead of refusing it (BIZ-001)", async () => {
     const { app } = buildApp({ withDeck: false });
+    const response = await app.inject({
+      method: "GET",
+      url: `/v1/q/artifacts/${ARTIFACT}/export/pdf`,
+    });
+    // Was a 409 "That document has no slides": the founder asked for a
+    // PDF of their brief and got a refusal.
+    expect(response.statusCode).toBe(200);
+    expect(response.headers["content-type"]).toBe("application/pdf");
+    expect(response.headers["content-disposition"]).toBe(
+      'attachment; filename="Northstar-Logistics-investor-deck.pdf"',
+    );
+    expect(response.rawPayload.subarray(0, 5).toString("ascii")).toBe("%PDF-");
+    await app.close();
+  });
+
+  it("says a brief has no slides and no PowerPoint, with a code the web can say plainly", async () => {
+    const { app } = buildApp({ withDeck: false });
+    const slides = await app.inject({
+      method: "GET",
+      url: `/v1/q/artifacts/${ARTIFACT}/slides`,
+    });
+    // Not an empty deck, and not a 404: they are already reading this
+    // artifact, so "it is not a deck" tells them nothing new.
+    expect(slides.statusCode).toBe(409);
+    expect(slides.json()).toMatchObject({ code: "FORMAT_NOT_AVAILABLE" });
+
+    const pptx = await app.inject({
+      method: "GET",
+      url: `/v1/q/artifacts/${ARTIFACT}/export/pptx`,
+    });
+    expect(pptx.statusCode).toBe(409);
+    expect(pptx.json()).toMatchObject({
+      code: "FORMAT_NOT_AVAILABLE",
+      detail: "PowerPoint is for decks; that document downloads as a PDF.",
+    });
+    await app.close();
+  });
+
+  it("says a document still being prepared is not ready, rather than that it has no slides", async () => {
+    const { app } = buildApp({ preparing: true });
     for (const url of [
+      `/v1/q/artifacts/${ARTIFACT}/export/pdf`,
       `/v1/q/artifacts/${ARTIFACT}/slides`,
-      `/v1/q/artifacts/${ARTIFACT}/export/pptx`,
     ]) {
       const response = await app.inject({ method: "GET", url });
-      // Not an empty deck, and not a 404: they are already reading this
-      // artifact, so "it is not a deck" tells them nothing new.
       expect(response.statusCode).toBe(409);
+      expect(response.json()).toMatchObject({ code: "ARTIFACT_NOT_READY" });
     }
     await app.close();
   });

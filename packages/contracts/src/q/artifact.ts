@@ -415,6 +415,51 @@ export type ListQArtifactsResponse = z.infer<
   typeof ListQArtifactsResponseSchema
 >;
 
+/**
+ * The files an artifact can be downloaded as (BIZ-001).
+ *
+ * Every artifact type exports as a PDF: a deck as one page per slide,
+ * everything else as a printed document. PowerPoint is for types whose
+ * content is slides. The set is closed on purpose — a route that takes a
+ * format from the URL must be able to refuse anything else before it
+ * opens a socket.
+ */
+export const Q_ARTIFACT_EXPORT_FORMATS = ["pdf", "pptx"] as const;
+export type QArtifactExportFormat = (typeof Q_ARTIFACT_EXPORT_FORMATS)[number];
+export const QArtifactExportFormatSchema = z.enum(Q_ARTIFACT_EXPORT_FORMATS);
+export const Q_ARTIFACT_EXPORT_SUFFIX = "/export" as const;
+
+/** Types whose content is slides, and so also write as PowerPoint. */
+const Q_ARTIFACT_TYPES_WITH_SLIDES: ReadonlySet<string> = new Set([
+  "PITCH_DECK",
+]);
+
+/**
+ * What a card may offer for a type it knows only by code. The Q API still
+ * decides from the stored content, and says so plainly if they disagree.
+ */
+export function qArtifactExportFormats(
+  type: string,
+): readonly QArtifactExportFormat[] {
+  return Q_ARTIFACT_TYPES_WITH_SLIDES.has(type) ? ["pdf", "pptx"] : ["pdf"];
+}
+
+/**
+ * Why an export was refused, in the problem document's `code`.
+ *
+ * Two refusals a person can act on and that are not "not found": the
+ * artifact is still being prepared (or preparing failed), or it has no
+ * such file (PowerPoint for a brief). The web turns each into its own
+ * sentence rather than one generic failure.
+ */
+export const Q_ARTIFACT_EXPORT_REFUSALS = [
+  "ARTIFACT_NOT_READY",
+  "FORMAT_NOT_AVAILABLE",
+] as const;
+export type QArtifactExportRefusal =
+  (typeof Q_ARTIFACT_EXPORT_REFUSALS)[number];
+export const QArtifactExportRefusalSchema = z.enum(Q_ARTIFACT_EXPORT_REFUSALS);
+
 export const ListQArtifactsQuerySchema = z
   .object({
     limit: z.coerce.number().int().min(1).max(100).default(20),

@@ -1,15 +1,19 @@
 import { NextResponse, type NextRequest } from "next/server";
 
-import { Q_ARTIFACTS_PATH } from "@capital-q/contracts";
+import {
+  Q_ARTIFACTS_PATH,
+  QArtifactExportRefusalSchema,
+} from "@capital-q/contracts";
 import { loadWebServerConfig } from "@capital-q/config/web";
 
 import { getSessionAccessToken } from "@/auth/session";
 
 /**
- * A deck, drawn (QX-004 §5-§7).
+ * An artifact, drawn (QX-004 §5-§7; BIZ-001).
  *
- * Three things a person wants from a deck Q composed: to see it, to open
- * it in PowerPoint, and to attach it to an email. All three are the same
+ * Three things a person wants from a document Q composed: to see it, to
+ * open it in PowerPoint when it is a deck, and to attach a PDF of it —
+ * any type — to an email. All three are the same
  * read, and they are here for the same reason the run stream is — the Q
  * API authenticates with a bearer token, Capital Q keeps that token in an
  * HttpOnly cookie so no script can read it, and therefore the browser
@@ -52,6 +56,38 @@ function plain(status: number, message: string): NextResponse {
   const response = NextResponse.json({ message }, { status });
   response.headers.set("Cache-Control", "no-store");
   return response;
+}
+
+/**
+ * Which of the two refusals a 409 is, as a sentence this person can act on
+ * (BIZ-001). "That document has no slides" was the only 409 sentence, and
+ * it was what a founder read when they asked for a PDF of their brief.
+ */
+async function refusalSentence(
+  upstream: Response,
+  format: Format,
+): Promise<string> {
+  let body: unknown = null;
+  try {
+    body = await upstream.json();
+  } catch {
+    // Not a problem document; fall through to the format's own sentence.
+  }
+  const code = QArtifactExportRefusalSchema.safeParse(
+    typeof body === "object" && body !== null && "code" in body
+      ? body.code
+      : undefined,
+  );
+  if (code.success && code.data === "ARTIFACT_NOT_READY") {
+    return "That document isn't ready yet. Q is still preparing it.";
+  }
+  if (format === "pptx") {
+    return "PowerPoint is for decks. This document downloads as a PDF.";
+  }
+  if (format === "slides") {
+    return "That document has no slides.";
+  }
+  return "I couldn't prepare that file. Please try again.";
 }
 
 /** `?version=N`, bounded, or nothing. An artifact has few versions. */
@@ -114,7 +150,7 @@ export async function GET(
       return plain(404, "I couldn't find that document.");
     }
     if (upstream.status === 409) {
-      return plain(409, "That document has no slides.");
+      return plain(409, await refusalSentence(upstream, format));
     }
     return plain(502, "I couldn't prepare that file. Please try again.");
   }

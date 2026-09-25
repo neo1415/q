@@ -1,5 +1,5 @@
 /**
- * Deck rendering (QX-004 §5, §6, §7).
+ * Deck and document rendering (QX-004 §5, §6, §7; BIZ-001).
  *
  * One deterministic layout over a composed deck, inspected for the faults
  * a slide can have, and drawn from that same layout as SVG, PPTX and PDF.
@@ -35,10 +35,31 @@ export { deckToSvg, slideToSvg } from "./svg.js";
 export { deckToPptx } from "./pptx.js";
 export { deckToPdf } from "./pdf.js";
 
+/**
+ * Every other artifact as a document (BIZ-001): one renderer for any type
+ * made of sections and gaps, and one function that picks the renderer.
+ */
+export {
+  artifactKindName,
+  documentFromArtifact,
+  documentToPdf,
+  DOCUMENT_PAGE,
+  type ArtifactDocument,
+  type DocumentFinding,
+  type DocumentSection,
+} from "./document.js";
+export {
+  exportFormatsForVersion,
+  renderArtifactFile,
+  EXPORT_CONTENT_TYPES,
+  type ArtifactFile,
+} from "./export.js";
+
 export {
   themeFor,
   MARGIN,
   SLIDE_HEIGHT,
   SLIDE_WIDTH,
+  type BrandInput,
   type DeckTheme,
 } from "./theme.js";

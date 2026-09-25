@@ -2,10 +2,15 @@
 
 import Link from "next/link";
 
-import type { QSubjectRef, QUiIntent } from "@capital-q/contracts";
+import {
+  qArtifactExportFormats,
+  type QSubjectRef,
+  type QUiIntent,
+} from "@capital-q/contracts";
 import { buttonClassName } from "@capital-q/ui/button";
 
 import { destinationPath } from "../voice/destinations";
+import { ArtifactDownloads } from "./artifact-download";
 import type { QTurnObjectBlock } from "./conversation";
 
 /**
@@ -336,10 +341,10 @@ export function QResultBlocks({
              * The status is on the card because "prepared" and "still
              * being prepared" are different things to somebody about to
              * send a document to an investor, and an absence would make
-             * them guess. A deck's PDF is on the card (CQ-QACT-002: "just
+             * them guess. The files are on the card (CQ-QACT-002: "just
              * give me the PDF" is answered with the PDF, not a trip into a
-             * viewer); PowerPoint and older versions stay beside the
-             * slides, where the choice is made while looking (QX-004 §7).
+             * viewer): a PDF for every type and PowerPoint for a deck
+             * (BIZ-001). Older versions stay in the viewer.
              */
             const ready = block.status === "READY";
             return (
@@ -367,19 +372,18 @@ export function QResultBlocks({
                         View
                       </button>
                     ) : null}
-                    {ready && block.type === "PITCH_DECK" ? (
-                      // "Just give me the PDF" (CQ-QACT-002): the file the
-                      // person asked for is one tap from the answer that
-                      // made it, not behind the viewer. The current version,
-                      // through the same narrow route the viewer uses, so
-                      // the session cookie is the only authority it carries.
-                      <a
-                        className={buttonClassName("secondary", "compact")}
-                        href={`/api/q-artifact/${encodeURIComponent(block.artifactId)}/pdf`}
-                        data-q-artifact-card-pdf={block.artifactId}
-                      >
-                        PDF
-                      </a>
+                    {ready ? (
+                      // "Just give me the PDF" (CQ-QACT-002), for every
+                      // type (BIZ-001): the file the person asked for is one
+                      // tap from the answer that made it, not behind the
+                      // viewer. The current version, through the same narrow
+                      // route the viewer uses, so the session cookie is the
+                      // only authority it carries.
+                      <ArtifactDownloads
+                        artifactId={block.artifactId}
+                        formats={qArtifactExportFormats(block.type)}
+                        version={null}
+                      />
                     ) : null}
                     {ready && onAsk !== undefined ? (
                       <button

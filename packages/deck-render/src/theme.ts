@@ -87,6 +87,20 @@ const BY_DIRECTION: Readonly<Record<string, DeckTheme>> = {
 };
 
 /**
+ * A company's own look, when one is known (BIZ-001; filled by BIZ-005).
+ *
+ * The one seam through which a brand kit reaches a rendered artifact:
+ * a direction and an accent, both optional, both overriding what the
+ * composed content carries. It is content about the company — it colours
+ * the company's own files and never the Capital Q application chrome,
+ * whose `--cq-*` tokens stay the product's visual truth (ADR-001 D3).
+ */
+export type BrandInput = {
+  readonly direction?: string | undefined;
+  readonly accent?: string | undefined;
+};
+
+/**
  * The theme for a direction, with the founder's own accent applied.
  *
  * A direction this build has never heard of falls back to the

@@ -5,6 +5,7 @@ import {
   SLIDE_HEIGHT,
   SLIDE_WIDTH,
   themeFor,
+  type BrandInput,
   type DeckTheme,
 } from "./theme.js";
 
@@ -482,8 +483,11 @@ function layOutSlide(
  * after the floor keeps its dropped content recorded, and the inspector
  * reports it as a fault for the composer to answer — by saying less.
  */
-export function layOutDeck(deck: QDeck): LaidOutDeck {
-  const theme = themeFor(deck.direction, deck.accent);
+export function layOutDeck(deck: QDeck, brand?: BrandInput): LaidOutDeck {
+  const theme = themeFor(
+    brand?.direction ?? deck.direction,
+    brand?.accent ?? deck.accent,
+  );
   const slides = deck.slides.map((slide, index) => {
     let laid = layOutSlide(slide, index, theme, 1);
     for (const scale of [0.9, 0.8]) {

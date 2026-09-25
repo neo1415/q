@@ -132,6 +132,9 @@ describe("QX-004 §7 · the files are real", () => {
     expect(reopened.getPageCount()).toBe(laid.slides.length);
   });
 
+  // Since BIZ-001 these characters are drawn, not stripped; `export.test.ts`
+  // reads them back out of the file. This keeps the original guarantee:
+  // an unusual character never fails the render.
   it("does not fail on a character the standard fonts cannot draw", async () => {
     const withEmDash = layOutDeck({
       ...deck,

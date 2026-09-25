@@ -4,18 +4,22 @@ import {
   ListQArtifactsQuerySchema,
   ListQArtifactsResponseSchema,
   parseContract,
+  Q_ARTIFACT_EXPORT_SUFFIX,
   Q_ARTIFACT_VERSIONS_SUFFIX,
   Q_ARTIFACTS_PATH,
   QArtifactDetailSchema,
+  QArtifactExportFormatSchema,
   UuidSchema,
   type QArtifactDetail,
-  type QDeck,
+  type QArtifactExportFormat,
+  type QArtifactExportRefusal,
+  type QArtifactVersion,
 } from "@capital-q/contracts";
 import {
-  deckToPdf,
-  deckToPptx,
   deckToSvg,
   layOutDeck,
+  renderArtifactFile,
+  type ArtifactFile,
 } from "@capital-q/deck-render";
 import {
   ArtifactNotFoundError,
@@ -44,8 +48,9 @@ import {
  * message re-resolves through these same checks, so a person who has lost
  * access to a company loses the brief about it at the same moment.
  *
- * Two of these routes draw a deck rather than describe one (QX-004 §5-§7).
- * They are reads for the same reason the others are: the bytes carry only
+ * Two of these routes draw an artifact rather than describe one (QX-004
+ * §5-§7; BIZ-001 for every type, not only decks). They are reads for the
+ * same reason the others are: the bytes carry only
  * what the stored version already says, to the one person who could
  * already read it. ADR 0013 puts the consequential boundary at publish,
  * share and send, and nothing here does any of those — a founder
@@ -86,49 +91,53 @@ function notFound(): {
 }
 
 /**
- * The artifact carries a deck, but this one does not.
+ * This artifact has no drawing of that kind.
  *
  * A separate answer from "no such artifact" on purpose: the caller is
  * already reading this artifact, so telling them it is a brief rather than
- * a deck discloses nothing they cannot see on the page.
+ * a deck discloses nothing they cannot see on the page. The `code` says
+ * which refusal it is, so the web can say the right sentence.
  */
-function notADeck(): {
+function refused(
+  code: QArtifactExportRefusal,
+  detail: string,
+): {
   readonly type: string;
   readonly title: string;
   readonly status: number;
   readonly detail: string;
+  readonly code: QArtifactExportRefusal;
 } {
   return {
     type: "about:blank",
-    title: "Nothing to draw",
+    title: "Not available",
     status: 409,
-    detail: "That document has no slides.",
+    detail,
+    code,
   };
 }
 
+const notReady = () =>
+  refused("ARTIFACT_NOT_READY", "That document isn't ready yet.");
+const noSlides = () =>
+  refused("FORMAT_NOT_AVAILABLE", "That document has no slides.");
+const pdfOnly = () =>
+  refused(
+    "FORMAT_NOT_AVAILABLE",
+    "PowerPoint is for decks; that document downloads as a PDF.",
+  );
+
 /**
- * Where a deck can be drawn from, and in what.
+ * Where an artifact can be drawn from, and in what.
  *
  * `slides` is for the viewer and `export` is for everywhere else; the two
  * exist separately because one is a page and the other is a file somebody
  * attaches to an email.
  */
 export const Q_ARTIFACT_SLIDES_SUFFIX = "/slides" as const;
-export const Q_ARTIFACT_EXPORT_SUFFIX = "/export" as const;
 
-/** What a deck may be written as, and what each one is on the wire. */
-const EXPORT_FORMATS = {
-  pptx: {
-    contentType:
-      "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-    extension: "pptx",
-  },
-  pdf: { contentType: "application/pdf", extension: "pdf" },
-} as const;
-type ExportFormat = keyof typeof EXPORT_FORMATS;
-
-function isExportFormat(value: unknown): value is ExportFormat {
-  return value === "pptx" || value === "pdf";
+function isExportFormat(value: unknown): value is QArtifactExportFormat {
+  return QArtifactExportFormatSchema.safeParse(value).success;
 }
 
 /**
@@ -207,12 +216,16 @@ export function registerQArtifactRoutes(
 
   /**
    * The version to draw, re-resolved through the service under this
-   * person's own actor. A deck in an old card is not a grant.
+   * person's own actor. An artifact id in an old card is not a grant.
    */
-  const deckFor = async (
+  const versionFor = async (
     request: FastifyRequest,
   ): Promise<
-    | { readonly ok: true; readonly deck: QDeck; readonly title: string }
+    | {
+        readonly ok: true;
+        readonly type: string;
+        readonly version: QArtifactVersion;
+      }
     | { readonly ok: false; readonly status: 404 | 409 }
   > => {
     const version = versionQuery(request);
@@ -239,37 +252,44 @@ export function registerQArtifactRoutes(
       throw error;
     }
     const current = detail.current;
-    const deck = current?.content.deck;
-    if (current === undefined || deck === undefined) {
+    if (current === undefined) {
+      // Still being prepared, or preparing failed: nothing to draw yet.
       return { ok: false, status: 409 };
     }
-    return { ok: true, deck, title: current.title };
+    return { ok: true, type: detail.artifact.type, version: current };
   };
 
   /**
-   * The deck as slides the viewer can show, drawn from the same layout the
-   * file is drawn from so the two cannot diverge.
+   * A deck as slides the viewer can show, drawn from the same layout the
+   * file is drawn from so the two cannot diverge. A brief has no slides:
+   * the viewer shows its prose, and its file is the document PDF.
    */
   app.get(
     `${artifactPath}${Q_ARTIFACT_SLIDES_SUFFIX}`,
     { onRequest: withContext },
     async (request, reply) => {
-      const found = await deckFor(request);
+      const found = await versionFor(request);
       if (!found.ok) {
         return reply
           .code(found.status)
-          .send(found.status === 404 ? notFound() : notADeck());
+          .send(found.status === 404 ? notFound() : notReady());
+      }
+      const deck = found.version.content.deck;
+      if (deck === undefined) {
+        return reply.code(409).send(noSlides());
       }
       return reply
         .code(200)
         .header("cache-control", "no-store")
-        .send({ slides: [...deckToSvg(layOutDeck(found.deck))] });
+        .send({ slides: [...deckToSvg(layOutDeck(deck))] });
     },
   );
 
   /**
-   * The deck as a file: what a founder attaches to an email, opens in
-   * PowerPoint or Keynote, and keeps after they leave Capital Q.
+   * Any artifact as a file (BIZ-001): what a founder attaches to an email,
+   * opens in PowerPoint or a PDF reader, and keeps after they leave
+   * Capital Q. Every type is a PDF — a deck one page per slide, anything
+   * else a printed document — and a deck is also a PowerPoint.
    */
   app.get(
     `${artifactPath}${Q_ARTIFACT_EXPORT_SUFFIX}/:format`,
@@ -280,28 +300,46 @@ export function registerQArtifactRoutes(
       if (!isExportFormat(format)) {
         return reply.code(404).send(notFound());
       }
-      const found = await deckFor(request);
+      const found = await versionFor(request);
       if (!found.ok) {
         return reply
           .code(found.status)
-          .send(found.status === 404 ? notFound() : notADeck());
+          .send(found.status === 404 ? notFound() : notReady());
       }
-      const laid = layOutDeck(found.deck);
-      const meta = { title: found.title };
-      const bytes =
-        format === "pptx"
-          ? await deckToPptx(laid, meta)
-          : await deckToPdf(laid, meta);
-      const { contentType, extension } = EXPORT_FORMATS[format];
+      let file: ArtifactFile | null;
+      try {
+        file = await renderArtifactFile({
+          type: found.type,
+          version: found.version,
+          format,
+        });
+      } catch (error) {
+        // The stored version is intact and nothing was written: a renderer
+        // failed. Said as that, so the person retries rather than assumes
+        // the document is gone; the cause goes to the operator's log.
+        request.log.error(
+          { err: error, artifactType: found.type, format },
+          "artifact export failed to render",
+        );
+        return reply.code(500).send({
+          type: "about:blank",
+          title: "Could not draw the file",
+          status: 500,
+          detail: "The file could not be drawn. Please try again.",
+        });
+      }
+      if (file === null) {
+        return reply.code(409).send(pdfOnly());
+      }
       return reply
         .code(200)
-        .header("content-type", contentType)
+        .header("content-type", file.contentType)
         .header("cache-control", "no-store")
         .header(
           "content-disposition",
-          `attachment; filename="${fileNameFor(found.title, extension)}"`,
+          `attachment; filename="${fileNameFor(found.version.title, file.extension)}"`,
         )
-        .send(Buffer.from(bytes));
+        .send(Buffer.from(file.bytes));
     },
   );
 
