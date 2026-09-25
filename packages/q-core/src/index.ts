@@ -271,6 +271,7 @@ export { FOUNDER_ONBOARDING_EXTRACTION_V1 } from "./prompts/tasks/founder-onboar
 export { FOUNDER_ONBOARDING_EXTRACTION_V2 } from "./prompts/tasks/founder-onboarding-extraction.v2.js";
 export { INVESTOR_MANDATE_SYNTHESIS_V1 } from "./prompts/tasks/investor-mandate-synthesis.v1.js";
 export { INVESTOR_MANDATE_SYNTHESIS_V2 } from "./prompts/tasks/investor-mandate-synthesis.v2.js";
+export { INVESTOR_MANDATE_SYNTHESIS_V3 } from "./prompts/tasks/investor-mandate-synthesis.v3.js";
 export { FIT_EXPLANATION_V1 } from "./prompts/tasks/fit-explanation.v1.js";
 
 export {

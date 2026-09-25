@@ -54,6 +54,7 @@ import { PRESENCE_READER_V1 } from "./tasks/presence-reader.v1.js";
 import { WELCOME_CONDUCTOR_V1 } from "./tasks/welcome-conductor.v1.js";
 import { INVESTOR_MANDATE_SYNTHESIS_V1 } from "./tasks/investor-mandate-synthesis.v1.js";
 import { INVESTOR_MANDATE_SYNTHESIS_V2 } from "./tasks/investor-mandate-synthesis.v2.js";
+import { INVESTOR_MANDATE_SYNTHESIS_V3 } from "./tasks/investor-mandate-synthesis.v3.js";
 
 /**
  * The Prompt Registry (CQ-Q-006 §16-§21): source-controlled, immutable
@@ -195,6 +196,7 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition<unknown, unknown>[] =
     CLAIM_EXTRACTION_V1,
     INVESTOR_MANDATE_SYNTHESIS_V1,
     INVESTOR_MANDATE_SYNTHESIS_V2,
+    INVESTOR_MANDATE_SYNTHESIS_V3,
     COMPANY_ANALYST_V1,
     COMPANY_ANALYST_V2,
     COMPANY_ANALYST_V3,
