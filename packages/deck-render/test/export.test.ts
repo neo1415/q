@@ -40,7 +40,6 @@ import {
 async function pdfText(bytes: Uint8Array): Promise<readonly string[]> {
   const task = getDocument({
     data: bytes.slice(),
-    isEvalSupported: false,
     disableFontFace: true,
     useSystemFonts: false,
     verbosity: 0,
@@ -277,12 +276,9 @@ describe("BIZ-001 · a brief is a document you can download", () => {
           object instanceof PDFDict &&
           object.get(PDFName.of("Type")) === PDFName.of("FontDescriptor"),
       )
-      .map((descriptor) =>
-        pdf.context.lookup(
-          descriptor.get(PDFName.of("FontFile2")),
-          PDFRawStream,
-        ),
-      )
+      .map((descriptor) => descriptor.get(PDFName.of("FontFile2")))
+      .filter((ref) => ref !== undefined)
+      .map((ref) => pdf.context.lookup(ref, PDFRawStream))
       .map((stream) => decodePDFRawStream(stream).decode().byteLength);
     const bundled = await Promise.all(
       ["NotoSans-Regular.ttf", "NotoSans-Bold.ttf"].map(

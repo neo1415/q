@@ -106,7 +106,7 @@ function toolCalls(round: number, call: { name: string; arguments: unknown }) {
     output: {
       kind: "TOOL_CALLS",
       text: "",
-      calls: [{ callId: `call_${String(round)}`, name: call.name, ...call }],
+      calls: [{ callId: `call_${String(round)}`, ...call }],
     },
   });
 }

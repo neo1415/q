@@ -320,6 +320,8 @@ describe("a spoken interview answer", () => {
           navigate: null,
           researching: null,
           degraded: false,
+          askingAbout: [],
+          pending: { recommendations: [], held: [] },
         };
         return Promise.resolve(Response.json(body));
       }
@@ -395,6 +397,8 @@ describe("a spoken interview answer", () => {
           navigate: null,
           researching: null,
           degraded: false,
+          askingAbout: [],
+          pending: { recommendations: [], held: [] },
         };
         return Promise.resolve(Response.json(body));
       }
@@ -591,6 +595,8 @@ describe("a spoken question for Q", () => {
           navigate: null,
           researching: null,
           degraded: false,
+          askingAbout: [],
+          pending: { recommendations: [], held: [] },
         };
         return Promise.resolve(Response.json(body));
       }
