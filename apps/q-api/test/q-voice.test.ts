@@ -28,6 +28,7 @@ import type {
   VoiceChannelHandlers,
   VoiceSpeaker,
 } from "../src/voice/provider.js";
+import type { Interviewer } from "../src/voice/interviewer.js";
 import type { VoiceTurnHandler } from "../src/voice/turn.js";
 
 /**
@@ -120,6 +121,7 @@ function buildApp(options: {
   readonly context?: ActorContext | undefined;
   readonly provider: RealtimeVoiceProvider;
   readonly bindings: VoiceSessionBindings;
+  readonly interviewer?: Interviewer | undefined;
 }): FastifyInstance {
   const security: QApiSecurityDependencies = {
     authenticator: { authenticate: () => Promise.resolve(options.principal) },
@@ -135,7 +137,18 @@ function buildApp(options: {
   return createApp(
     parseQApiConfig({ NODE_ENV: "test", ELEVENLABS_API_KEY: PROVIDER_KEY }),
     security,
-    { voice: { provider: options.provider, bindings: options.bindings } },
+    {
+      voice: {
+        provider: options.provider,
+        bindings: options.bindings,
+        ...(options.interviewer === undefined
+          ? {}
+          : {
+              interviewer: options.interviewer,
+              apiBaseUrl: "http://api.invalid",
+            }),
+      },
+    },
   ).app;
 }
 
@@ -219,6 +232,59 @@ describe("POST /v1/q/voice/sessions", () => {
     });
     expect(response.statusCode).toBe(422);
     expect(provider.issued).toHaveLength(0);
+    await app.close();
+  });
+
+  it("opens an interview once: a resumed line composes, records and says no opening of its own", async () => {
+    // The acceptance fixture: a text opener, a voice opener, then one more
+    // per dropped line -- three "Welcome back"s for one arrival. A resumed
+    // line (a reconnect, a voice switch, voice turned on over a question
+    // already on screen) must not ask the interviewer to open again, and
+    // the opening is what the interviewer records.
+    const openings: string[] = [];
+    const interviewer = {
+      turn: (input: { readonly utterance: string }) => {
+        openings.push(input.utterance);
+        return Promise.resolve({
+          reply: "Welcome back. What's a typical cheque for you?",
+        });
+      },
+    } as unknown as Interviewer;
+    const app = buildApp({
+      principal: PRINCIPAL,
+      context: CONTEXT,
+      provider: fakeProvider(),
+      bindings: createVoiceSessionBindings(),
+      interviewer,
+    });
+    const onboarding = {
+      sessionId: "f0000000-0000-4000-8000-000000000011",
+      journeyType: "investor",
+    };
+    const first = await app.inject({
+      method: "POST",
+      url: "/v1/q/voice/sessions",
+      headers: AUTH,
+      payload: { onboarding },
+    });
+    expect(first.statusCode).toBe(201);
+    expect(first.json<{ firstMessage?: string }>().firstMessage).toContain(
+      "typical cheque",
+    );
+    expect(openings).toHaveLength(1);
+
+    const resumed = await app.inject({
+      method: "POST",
+      url: "/v1/q/voice/sessions",
+      headers: AUTH,
+      payload: { onboarding, resume: true },
+    });
+    expect(resumed.statusCode).toBe(201);
+    // No second opening was composed, and no greeting invented in its place.
+    expect(openings).toHaveLength(1);
+    expect(
+      resumed.json<{ firstMessage?: string }>().firstMessage,
+    ).toBeUndefined();
     await app.close();
   });
 

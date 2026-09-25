@@ -142,6 +142,18 @@ export const CreateQVoiceSessionRequestSchema = z
      * can create or join one.
      */
     organisationHint: z.string().trim().min(1).max(120).optional(),
+    /**
+     * The thread is already open, so Q does not open it again.
+     *
+     * Set when a dropped line comes back, when the voice is switched, and
+     * when the person turns voice on over a conversation whose question
+     * is already on screen. Q composes no opening line and records none:
+     * an opening per restore path is how one arrival produced three
+     * "Welcome back"s (acceptance fixture, 2026-09-24). What Q says first,
+     * if anything, is the line already on screen, supplied by the
+     * browser that shows it.
+     */
+    resume: z.literal(true).optional(),
   })
   .strict();
 

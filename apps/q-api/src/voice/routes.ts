@@ -437,11 +437,20 @@ export function registerQVoiceRoutes(
       // Q opens the interview in its own words: a greeting and the live
       // question, from the session's state. Composed here so the browser
       // can hand it to the provider as the first thing Q says.
+      // A thread that is already open is not opened again (resume): no
+      // opening line is composed, none is recorded, and Q greets nobody a
+      // second time. What Q says first, if anything, is the line the
+      // person already has on screen, which the browser hands the provider.
+      const resume = input.resume === true;
       let firstMessage: string | undefined;
       const interviewer = dependencies.interviewer;
       const apiBaseUrl = dependencies.apiBaseUrl;
       let knownName: string | null = null;
-      if (apiBaseUrl !== undefined && input.onboarding === undefined) {
+      if (
+        !resume &&
+        apiBaseUrl !== undefined &&
+        input.onboarding === undefined
+      ) {
         try {
           const me = await fetchMe({ baseUrl: apiBaseUrl, accessToken });
           knownName = me.user.displayName;
@@ -449,7 +458,11 @@ export function registerQVoiceRoutes(
           // Unknown name is a fine state to open from.
         }
       }
-      if (input.welcome === true && dependencies.welcome !== undefined) {
+      if (
+        !resume &&
+        input.welcome === true &&
+        dependencies.welcome !== undefined
+      ) {
         try {
           const opening = await dependencies.welcome.turn({
             attribution: {
@@ -467,6 +480,7 @@ export function registerQVoiceRoutes(
           request.log.warn({ err: error }, "welcome opening line unavailable");
         }
       } else if (
+        !resume &&
         input.onboarding !== undefined &&
         interviewer !== undefined &&
         apiBaseUrl !== undefined
@@ -507,7 +521,7 @@ export function registerQVoiceRoutes(
         firstMessage = spoken.length === 0 ? undefined : spoken;
       }
 
-      if (firstMessage === undefined) {
+      if (firstMessage === undefined && !resume) {
         // Q always speaks first. On the open thread there is no interview
         // state to open from, so the line is a plain greeting.
         const first = knownName?.trim().split(/\s+/)[0];
@@ -600,6 +614,7 @@ export function registerQVoiceRoutes(
           qVoiceSessionId: voiceSessionId,
           voice,
           thread: input.onboarding === undefined ? "conversation" : "interview",
+          resume,
         },
         "voice session issued",
       );
