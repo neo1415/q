@@ -45,7 +45,7 @@ export const TURN_READER_V3: PromptDefinition<
 > = {
   ...TURN_READER_V2,
   version: 3,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   changeDescription:
     "CQ-QACT-002: PREPARE_DOCUMENT is one of Q's own hands — a request to produce a pitch deck or brief now, with the company as the person named it (in this turn or the recent ones) — so Capital Q researches, composes, renders and files it instead of describing what it would contain.",
   effectiveFrom: "2026-09-25",
