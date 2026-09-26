@@ -73,7 +73,8 @@ export type FictionalCompany = {
     readonly functions: readonly string[];
   };
   /** F5: early stage answers signal/pilots; later stage revenue/customers/growth. */
-  readonly signal?: "pilots" | "lois" | "waitlist" | "users" | "none" | undefined;
+  readonly signal?:
+    "pilots" | "lois" | "waitlist" | "users" | "none" | undefined;
   readonly pilots?: number | undefined;
   readonly revenueStatus?:
     "recurring" | "recurring_flat" | "project" | "early" | undefined;
@@ -102,7 +103,8 @@ export type FictionalCompany = {
   };
   readonly claims: readonly FictionalClaim[];
   readonly deck: readonly DeckLine[];
-  readonly direction?: "MINIMAL_INSTITUTIONAL" | "DARK_TECHNICAL" | "WARM_GROWTH";
+  readonly direction?:
+    "MINIMAL_INSTITUTIONAL" | "DARK_TECHNICAL" | "WARM_GROWTH";
 };
 
 export type FictionalInvestor = {
@@ -117,7 +119,11 @@ export type FictionalInvestor = {
   };
   readonly stages: readonly ("pre_seed" | "seed" | "series_a" | "series_b")[];
   readonly currencyOption: "usd" | "ngn" | "kes" | "zar";
-  readonly cheque: { readonly min: string; readonly typical: string; readonly max: string };
+  readonly cheque: {
+    readonly min: string;
+    readonly typical: string;
+    readonly max: string;
+  };
   readonly roles: readonly ("lead" | "co_invest" | "follow")[];
   /** Canonical geography codes. */
   readonly geographies: readonly string[];

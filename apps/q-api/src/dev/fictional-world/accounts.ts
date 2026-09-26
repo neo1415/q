@@ -68,7 +68,9 @@ const multi = (optionKeys: readonly string[]): Answer =>
   optionKeys.length === 0
     ? "skip"
     : { value: { type: "MULTI_SELECT", optionKeys: [...optionKeys] } };
-const text = (value: string): Answer => ({ value: { type: "TEXT", text: value } });
+const text = (value: string): Answer => ({
+  value: { type: "TEXT", text: value },
+});
 const range = (value: number | string): Answer => ({
   value: { type: "RANGE", value: String(value) },
 });
@@ -84,8 +86,22 @@ const nodes = (resourceType: string, ids: readonly string[]): Answer =>
         } as ResponseValue,
       };
 
-/** Canonical taxonomy code → node id, read once through the taxonomy route. */
-export async function loadTaxonomy(
+/**
+ * Canonical taxonomy code → node id, read once through the taxonomy route
+ * by the first person who needs it. Reading taxonomy needs an organisation
+ * context, so it is loaded lazily, after a journey has created one.
+ */
+export type Taxonomy = (token: string) => Promise<ReadonlyMap<string, string>>;
+
+export function lazyTaxonomy(http: SeedHttp): Taxonomy {
+  let loaded: Promise<ReadonlyMap<string, string>> | null = null;
+  return (token) => {
+    loaded ??= loadTaxonomy(http, token);
+    return loaded;
+  };
+}
+
+async function loadTaxonomy(
   http: SeedHttp,
   token: string,
 ): Promise<ReadonlyMap<string, string>> {
@@ -152,7 +168,7 @@ async function driveJourney(
   http: SeedHttp,
   token: string,
   journeyType: "founder" | "investor",
-  answerFor: (view: OnboardingSessionView) => Answer,
+  answerFor: (view: OnboardingSessionView, token: string) => Promise<Answer>,
   log: SeedLog,
 ): Promise<OnboardingSessionView> {
   const current = await http.api(
@@ -184,7 +200,7 @@ async function driveJourney(
     }
     const step = view.currentStep;
     if (step === null) break;
-    const answer = answerFor(view);
+    const answer = await answerFor(view, token);
     if (answer === null && step.required) {
       throw new SeedError(
         `${journeyType} step ${step.stepKey} (${step.stepType}) is required and has no scripted answer`,
@@ -219,9 +235,9 @@ async function driveJourney(
 
 function founderAnswers(
   company: FictionalCompany,
-  taxonomy: ReadonlyMap<string, string>,
-): (view: OnboardingSessionView) => Answer {
-  return (view) => {
+  taxonomy: Taxonomy,
+): (view: OnboardingSessionView, token: string) => Promise<Answer> {
+  return async (view, token) => {
     const step = view.currentStep;
     if (step === null) return null;
     switch (step.stepKey) {
@@ -238,7 +254,10 @@ function founderAnswers(
       case "F1.description":
         return text(company.shortDescription);
       case "F1.categories":
-        return nodes("TAXONOMY_NODE", idsFor(taxonomy, company.categories));
+        return nodes(
+          "TAXONOMY_NODE",
+          idsFor(await taxonomy(token), company.categories),
+        );
       case "F2.materials":
         return "skip";
       case "F3.review":
@@ -262,7 +281,9 @@ function founderAnswers(
       case "F5.revenue_status":
         return select(company.revenueStatus ?? "early");
       case "F5.customers":
-        return company.customers === undefined ? "skip" : range(company.customers);
+        return company.customers === undefined
+          ? "skip"
+          : range(company.customers);
       case "F5.growth":
         return company.growth === undefined ? "skip" : select(company.growth);
       case "F6.raising":
@@ -287,9 +308,9 @@ function founderAnswers(
 
 function investorAnswers(
   investor: FictionalInvestor,
-  taxonomy: ReadonlyMap<string, string>,
-): (view: OnboardingSessionView) => Answer {
-  return (view) => {
+  taxonomy: Taxonomy,
+): (view: OnboardingSessionView, token: string) => Promise<Answer> {
+  return async (view, token) => {
     const step = view.currentStep;
     if (step === null) return null;
     switch (step.stepKey) {
@@ -306,20 +327,27 @@ function investorAnswers(
         // one it suggests (the mandate I1 just ensured) is taken.
         const context = step.context ?? {};
         const suggested = Object.entries(context)
-          .filter(([key, value]) => /^suggested.*Id$/.test(key) && typeof value === "string")
+          .filter(
+            ([key, value]) =>
+              /^suggested.*Id$/.test(key) && typeof value === "string",
+          )
           .map(([, value]) => value as string);
         const candidates = Array.isArray(context["candidates"])
           ? context["candidates"]
               .map((candidate) => asRecord(candidate))
-              .map((candidate) =>
-                Object.entries(candidate).find(
-                  ([key, value]) => /Id$|^id$/.test(key) && typeof value === "string",
-                )?.[1],
+              .map(
+                (candidate) =>
+                  Object.entries(candidate).find(
+                    ([key, value]) =>
+                      /Id$|^id$/.test(key) && typeof value === "string",
+                  )?.[1],
               )
               .filter((id): id is string => typeof id === "string")
           : [];
         const ids = suggested.length > 0 ? suggested : candidates.slice(0, 1);
-        return ids.length === 0 ? null : nodes("INVESTOR_MANDATE", ids.slice(0, 1));
+        return ids.length === 0
+          ? null
+          : nodes("INVESTOR_MANDATE", ids.slice(0, 1));
       }
       case "I2.stages":
         return multi(investor.stages);
@@ -334,12 +362,18 @@ function investorAnswers(
       case "I2.investment_role":
         return multi(investor.roles);
       case "I3.geography":
-        return nodes("TAXONOMY_NODE", idsFor(taxonomy, investor.geographies));
+        return nodes(
+          "TAXONOMY_NODE",
+          idsFor(await taxonomy(token), investor.geographies),
+        );
       case "I3.geography_strength":
       case "I3.sector_strength":
         return select("strong");
       case "I3.sectors":
-        return nodes("TAXONOMY_NODE", idsFor(taxonomy, investor.sectors));
+        return nodes(
+          "TAXONOMY_NODE",
+          idsFor(await taxonomy(token), investor.sectors),
+        );
       case "I4.capital_intensity":
         return select("any");
       case "I4.regulatory_appetite":
@@ -388,6 +422,30 @@ async function ensurePersonProfile(
   });
 }
 
+/**
+ * Read, compare, and PATCH only what differs, under the version read: the
+ * product's own optimistic-concurrency contract for an editable record.
+ */
+async function patchIfChanged(
+  http: SeedHttp,
+  token: string,
+  path: string,
+  wanted: Readonly<Record<string, unknown>>,
+): Promise<void> {
+  const current = await http.api(token, "GET", path);
+  const body = current.status === 200 ? asRecord(current.body) : {};
+  const changes = Object.fromEntries(
+    Object.entries(wanted).filter(([field, value]) => body[field] !== value),
+  );
+  if (Object.keys(changes).length === 0) return;
+  await http.apiOk(token, "PATCH", path, {
+    ...(typeof body["version"] === "number"
+      ? { expectedVersion: body["version"] }
+      : {}),
+    ...changes,
+  });
+}
+
 /** The long profile text: the story, marked fictional in its first line. */
 export function storyText(company: FictionalCompany): string {
   const s = company.story;
@@ -416,7 +474,7 @@ export type SeededCompany = {
 export async function seedCompany(
   http: SeedHttp,
   company: FictionalCompany,
-  taxonomy: ReadonlyMap<string, string>,
+  taxonomy: Taxonomy,
   password: string,
   log: SeedLog,
 ): Promise<SeededCompany> {
@@ -427,7 +485,9 @@ export async function seedCompany(
     password,
     seedKey: company.key,
   });
-  log(`  ${company.name} — ${email} (${account.created ? "created" : "existing"})`);
+  log(
+    `  ${company.name} — ${email} (${account.created ? "created" : "existing"})`,
+  );
   const token = await http.sessionFor(email);
   await ensurePersonProfile(http, token, company.founder);
 
@@ -440,7 +500,9 @@ export async function seedCompany(
   );
   const companyId = view.session.subject?.id;
   if (companyId === undefined) {
-    throw new SeedError(`${company.name}: the founder journey bound no company`);
+    throw new SeedError(
+      `${company.name}: the founder journey bound no company`,
+    );
   }
   const base = `${COMPANIES_PATH}/${companyId}`;
 
@@ -481,11 +543,16 @@ export async function seedCompany(
     businessTitle: company.founder.businessTitle,
     isFounder: true,
   });
-  await http.apiOk(token, "PATCH", `${base}${COMPANY_FOUNDER_PROFILE_ME_SUFFIX}`, {
-    professionalSummary: company.founder.professionalSummary,
-    backgroundSummary: company.founder.backgroundSummary,
-  });
-  await http.apiOk(token, "PATCH", `${base}${COMPANY_TEAM_FACTS_SUFFIX}`, {
+  await patchIfChanged(
+    http,
+    token,
+    `${base}${COMPANY_FOUNDER_PROFILE_ME_SUFFIX}`,
+    {
+      professionalSummary: company.founder.professionalSummary,
+      backgroundSummary: company.founder.backgroundSummary,
+    },
+  );
+  await patchIfChanged(http, token, `${base}${COMPANY_TEAM_FACTS_SUFFIX}`, {
     founderCount: company.team.founderCount,
     fullTimeFounderCount: company.team.fullTimeFounderCount,
     teamSize: company.team.teamSize,
@@ -508,7 +575,13 @@ export async function seedCompany(
     await http.apiOk(token, "POST", `${base}/verification/requests`, undefined);
     log("    verification requested");
   }
-  return { key: company.key, companyId, authUserId: account.authUserId, email, token };
+  return {
+    key: company.key,
+    companyId,
+    authUserId: account.authUserId,
+    email,
+    token,
+  };
 }
 
 export type SeededInvestor = {
@@ -523,7 +596,7 @@ export type SeededInvestor = {
 export async function seedInvestor(
   http: SeedHttp,
   investor: FictionalInvestor,
-  taxonomy: ReadonlyMap<string, string>,
+  taxonomy: Taxonomy,
   password: string,
   log: SeedLog,
 ): Promise<SeededInvestor> {
@@ -534,18 +607,31 @@ export async function seedInvestor(
     password,
     seedKey: investor.key,
   });
-  log(`  ${investor.name} — ${email} (${account.created ? "created" : "existing"})`);
+  log(
+    `  ${investor.name} — ${email} (${account.created ? "created" : "existing"})`,
+  );
   const token = await http.sessionFor(email);
   await ensurePersonProfile(http, token, investor.person);
-  await driveJourney(http, token, "investor", investorAnswers(investor, taxonomy), log);
+  await driveJourney(
+    http,
+    token,
+    "investor",
+    investorAnswers(investor, taxonomy),
+    log,
+  );
 
   const organisation = InvestorOrganisationDtoSchema.parse(
     await http.apiOk(token, "GET", INVESTORS_CURRENT_PATH),
   );
   const byId = `${INVESTORS_PATH}/${organisation.id}`;
-  await http.apiOk(token, "PUT", `${byId}${INVESTOR_REPRESENTATIVE_ME_SUFFIX}`, {
-    businessTitle: investor.person.businessTitle,
-  });
+  await http.apiOk(
+    token,
+    "PUT",
+    `${byId}${INVESTOR_REPRESENTATIVE_ME_SUFFIX}`,
+    {
+      businessTitle: investor.person.businessTitle,
+    },
+  );
   if (organisation.visibility !== "network_visible") {
     await http.apiOk(token, "POST", `${byId}${INVESTOR_VISIBILITY_SEGMENT}`, {
       visibility: "network_visible",
@@ -570,7 +656,10 @@ export async function seedInvestor(
     const detail = asRecord(await http.apiOk(token, "GET", mandatePath));
     const name = `${investor.name.replace(/ \(fictional\)$/, "")} mandate`;
     let version = detail["version"];
-    if (detail["rawMandateText"] !== investor.thesis || detail["name"] !== name) {
+    if (
+      detail["rawMandateText"] !== investor.thesis ||
+      detail["name"] !== name
+    ) {
       const updated = asRecord(
         await http.apiOk(token, "PATCH", mandatePath, {
           expectedVersion: version,
@@ -581,9 +670,14 @@ export async function seedInvestor(
       version = updated["version"];
     }
     if (mandate.status === "DRAFT") {
-      await http.apiOk(token, "POST", `${mandatePath}${INVESTOR_MANDATE_ACTIVATE_SUFFIX}`, {
-        expectedVersion: version,
-      });
+      await http.apiOk(
+        token,
+        "POST",
+        `${mandatePath}${INVESTOR_MANDATE_ACTIVATE_SUFFIX}`,
+        {
+          expectedVersion: version,
+        },
+      );
     }
   } else {
     log("    no mandate found after the journey");
@@ -620,7 +714,10 @@ export async function seedInterest(
   const expressed = await http.api(
     investor.token,
     "POST",
-    NETWORK_COMPANY_EXPRESS_INTEREST_PATH.replace(":companyId", company.companyId),
+    NETWORK_COMPANY_EXPRESS_INTEREST_PATH.replace(
+      ":companyId",
+      company.companyId,
+    ),
     { surface: "COMPANY_PROFILE" },
     // Stable, so a rerun is the same request and the product deduplicates it.
     `seed-fictional-interest-${interest.investorKey}-${interest.companyKey}`,
@@ -634,14 +731,19 @@ export async function seedInterest(
     await http.apiOk(
       company.token,
       "GET",
-      NETWORK_COMPANY_INCOMING_INTEREST_PATH.replace(":companyId", company.companyId),
+      NETWORK_COMPANY_INCOMING_INTEREST_PATH.replace(
+        ":companyId",
+        company.companyId,
+      ),
     ),
   );
   const item = inbox.items.find(
     (entry) => entry.investorOrganisationId === investor.investorOrganisationId,
   );
   if (item === undefined) {
-    log(`    ${interest.investorKey} -> ${interest.companyKey}: not in the founder's inbox`);
+    log(
+      `    ${interest.investorKey} -> ${interest.companyKey}: not in the founder's inbox`,
+    );
     return { ...interest, interestId: null, response: "UNSEEN" };
   }
   let response: string = item.response;

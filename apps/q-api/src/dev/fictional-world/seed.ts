@@ -3,12 +3,14 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 import { loadDatabaseConfig } from "@capital-q/config/database";
-import { Q_ARTIFACTS_PATH, Q_ARTIFACT_EXPORT_SUFFIX } from "@capital-q/contracts";
+import {
+  Q_ARTIFACTS_PATH,
+  Q_ARTIFACT_EXPORT_SUFFIX,
+} from "@capital-q/contracts";
 import { createRequestDatabaseClient } from "@capital-q/database";
 
 import {
-  founderEmail,
-  loadTaxonomy,
+  lazyTaxonomy,
   seedCompany,
   seedInterest,
   seedInvestor,
@@ -51,7 +53,9 @@ function argument(name: string): string | undefined {
 function required(name: string): string {
   const value = process.env[name]?.trim();
   if (value === undefined || value.length === 0) {
-    throw new SeedError(`${name} is required (the seed never guesses its target)`);
+    throw new SeedError(
+      `${name} is required (the seed never guesses its target)`,
+    );
   }
   return value;
 }
@@ -104,30 +108,25 @@ async function main(): Promise<number> {
 
     console.log(`companies (${String(FICTIONAL_COMPANIES.length)}):`);
     const companies = new Map<string, SeededCompany>();
-    // Any signed-in person may read the taxonomy; the first founder does.
-    const first = FICTIONAL_COMPANIES[0];
-    if (first === undefined) throw new SeedError("no companies to seed");
-    await http.ensureAccount({
-      email: founderEmail(first.key),
-      displayName: first.founder.displayName,
-      password,
-      seedKey: first.key,
-    });
-    const taxonomy = await loadTaxonomy(
-      http,
-      await http.sessionFor(founderEmail(first.key)),
-    );
+    const taxonomy = lazyTaxonomy(http);
     for (const company of FICTIONAL_COMPANIES) {
       companies.set(
         company.key,
-        await seedCompany(http, company, taxonomy, password, (l) => console.log(l)),
+        await seedCompany(http, company, taxonomy, password, (l) =>
+          console.log(l),
+        ),
       );
     }
 
     console.log(`investors (${String(FICTIONAL_INVESTORS.length)}):`);
     const investors = new Map<string, SeededInvestor>();
     for (const investor of FICTIONAL_INVESTORS) {
-      investors.set(investor.key, await seedInvestor(http, investor, taxonomy, password, (l) => console.log(l)));
+      investors.set(
+        investor.key,
+        await seedInvestor(http, investor, taxonomy, password, (l) =>
+          console.log(l),
+        ),
+      );
     }
 
     console.log("claims and decks:");
@@ -139,7 +138,11 @@ async function main(): Promise<number> {
       const actor = await records.actorFor(seeded.authUserId);
       const claims = await records.seedClaims(actor, seeded.companyId, company);
       const deck = await records.seedDeck(actor, seeded.companyId, company);
-      const files = await records.renderDeck(actor, deck.artifactId, company.name);
+      const files = await records.renderDeck(
+        actor,
+        deck.artifactId,
+        company.name,
+      );
       const dir = join(outDir, company.key);
       mkdirSync(dir, { recursive: true });
       writeFileSync(join(dir, "deck.pdf"), files.pdf);
@@ -164,7 +167,10 @@ async function main(): Promise<number> {
             pdf: `${Q_ARTIFACTS_PATH}/${deck.artifactId}${Q_ARTIFACT_EXPORT_SUFFIX}/pdf`,
             pptx: `${Q_ARTIFACTS_PATH}/${deck.artifactId}${Q_ARTIFACT_EXPORT_SUFFIX}/pptx`,
           },
-          files: { pdf: join(company.key, "deck.pdf"), pptx: join(company.key, "deck.pptx") },
+          files: {
+            pdf: join(company.key, "deck.pdf"),
+            pptx: join(company.key, "deck.pptx"),
+          },
           // What a narrated-deck video step reads aloud, slide by slide.
           slides: (files.version.content.deck?.slides ?? []).map((slide) => ({
             layout: slide.layout,
@@ -183,11 +189,17 @@ async function main(): Promise<number> {
       const company = companies.get(interest.companyKey);
       if (investor === undefined || company === undefined) continue;
       try {
-        interests.push(await seedInterest(http, interest, investor, company, (l) => console.log(l)));
+        interests.push(
+          await seedInterest(http, interest, investor, company, (l) =>
+            console.log(l),
+          ),
+        );
       } catch (error) {
         // One refused interest (the company not yet discoverable to this
         // investor, say) is reported, not fatal to the rest of the world.
-        console.log(`    ${interest.investorKey} -> ${interest.companyKey}: ${error instanceof Error ? error.message : String(error)}`);
+        console.log(
+          `    ${interest.investorKey} -> ${interest.companyKey}: ${error instanceof Error ? error.message : String(error)}`,
+        );
         interests.push({ ...interest, interestId: null, response: "REFUSED" });
       }
     }
@@ -197,21 +209,31 @@ async function main(): Promise<number> {
       version: 1,
       generatedAt: new Date().toISOString(),
       note: "Fictional demo data. Every company, person and figure is invented.",
-      target: { supabaseHost: new URL(target.supabaseUrl).host, apiHost: new URL(target.apiUrl).host },
+      target: {
+        supabaseHost: new URL(target.supabaseUrl).host,
+        apiHost: new URL(target.apiUrl).host,
+      },
       companies: manifestCompanies,
       investors: FICTIONAL_INVESTORS.map((investor) => ({
         key: investor.key,
         name: investor.name,
-        investorOrganisationId: investors.get(investor.key)?.investorOrganisationId ?? null,
+        investorOrganisationId:
+          investors.get(investor.key)?.investorOrganisationId ?? null,
         mandateId: investors.get(investor.key)?.mandateId ?? null,
         email: investors.get(investor.key)?.email ?? null,
       })),
       interests,
     };
-    writeFileSync(join(outDir, "manifest.json"), `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
+    writeFileSync(
+      join(outDir, "manifest.json"),
+      `${JSON.stringify(manifest, null, 2)}\n`,
+      "utf8",
+    );
     console.log(`manifest: ${join(outDir, "manifest.json")}`);
     if (!hosted) {
-      console.log(`sign in as any founder.<key>@ / investor.<key>@fictional.capitalq.local with the local synthetic password (dev:bootstrap's).`);
+      console.log(
+        `sign in as any founder.<key>@ / investor.<key>@fictional.capitalq.local with the local synthetic password (dev:bootstrap's).`,
+      );
     }
     return 0;
   } finally {
@@ -224,7 +246,9 @@ main().then(
     process.exitCode = code;
   },
   (error: unknown) => {
-    console.error(`fictional world: ${error instanceof Error ? error.message : String(error)}`);
+    console.error(
+      `fictional world: ${error instanceof Error ? error.message : String(error)}`,
+    );
     process.exitCode = 1;
   },
 );

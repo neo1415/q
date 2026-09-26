@@ -113,7 +113,11 @@ export function createSeedRecords(database: RequestDatabase) {
   const relationships: RelationshipQueryPort = {
     getById: (id) => relationshipRepository.findById(sql, id),
     findByParties: (companyId, investorOrganisationId) =>
-      relationshipRepository.findByParties(sql, companyId, investorOrganisationId),
+      relationshipRepository.findByParties(
+        sql,
+        companyId,
+        investorOrganisationId,
+      ),
     listEvents: (id, page = {}) =>
       relationshipEvents.listByRelationship(sql, id, {
         afterSequence: page.afterSequence,
@@ -121,7 +125,13 @@ export function createSeedRecords(database: RequestDatabase) {
       }),
     getEventById: (id) => relationshipEvents.findById(sql, id),
   };
-  const disclosurePorts = { companies, investors, mandates, capital, relationships };
+  const disclosurePorts = {
+    companies,
+    investors,
+    mandates,
+    capital,
+    relationships,
+  };
   const resolvers = createDisclosureResourceResolverRegistry(
     createDefaultDisclosureResolvers(disclosurePorts),
   );
@@ -178,9 +188,13 @@ export function createSeedRecords(database: RequestDatabase) {
         actor,
         correlationId: correlation(),
         input: {
-          sourceType: claim.documentTitle === undefined ? "USER_STATEMENT" : "DOCUMENT",
+          sourceType:
+            claim.documentTitle === undefined ? "USER_STATEMENT" : "DOCUMENT",
           subject,
-          title: (claim.documentTitle ?? `${company.name} founder statement (fictional)`).slice(0, 200),
+          title: (
+            claim.documentTitle ??
+            `${company.name} founder statement (fictional)`
+          ).slice(0, 200),
           metadata: { fictionalDemo: true, seed: "fictional-world" },
         },
       });
@@ -192,7 +206,10 @@ export function createSeedRecords(database: RequestDatabase) {
           claimType: claim.claimType,
           claimKey: claim.claimKey,
           statement: claim.statement,
-          structuredValue: claim.structuredValue === undefined ? null : { ...claim.structuredValue },
+          structuredValue:
+            claim.structuredValue === undefined
+              ? null
+              : { ...claim.structuredValue },
           truthClass: claim.truthClass,
           evidenceStatus: claim.evidenceStatus,
           lifecycleStatus: claim.lifecycleStatus ?? "CURRENT",
@@ -208,7 +225,10 @@ export function createSeedRecords(database: RequestDatabase) {
             sourceId: source.id,
             evidenceType: `${claim.claimType}.reported`,
             summary: claim.statement,
-            structuredValue: claim.structuredValue === undefined ? null : { ...claim.structuredValue },
+            structuredValue:
+              claim.structuredValue === undefined
+                ? null
+                : { ...claim.structuredValue },
             locator: { kind: "statement" },
             evidenceStatus: "DOCUMENT_SUPPORTED",
           },
@@ -216,7 +236,11 @@ export function createSeedRecords(database: RequestDatabase) {
         await evidence.linkClaimEvidence({
           actor,
           correlationId: correlation(),
-          input: { claimId: statedClaim.id, evidenceItemId: item.id, relationship: "SUPPORTS" },
+          input: {
+            claimId: statedClaim.id,
+            evidenceItemId: item.id,
+            relationship: "SUPPORTS",
+          },
         });
         // A figure that disagrees with the company's other figure is linked
         // to it as CONTRADICTS. Both stay; neither is chosen.
@@ -231,7 +255,11 @@ export function createSeedRecords(database: RequestDatabase) {
               await evidence.linkClaimEvidence({
                 actor,
                 correlationId: correlation(),
-                input: { claimId: otherId, evidenceItemId: item.id, relationship: "CONTRADICTS" },
+                input: {
+                  claimId: otherId,
+                  evidenceItemId: item.id,
+                  relationship: "CONTRADICTS",
+                },
               });
             }
           }
@@ -248,14 +276,19 @@ export function createSeedRecords(database: RequestDatabase) {
     companyId: string,
     company: FictionalCompany,
   ): Promise<{ readonly artifactId: string; readonly created: boolean }> => {
-    const listed = await artifacts.list(actor, { limit: 100, subjectId: companyId });
+    const listed = await artifacts.list(actor, {
+      limit: 100,
+      subjectId: companyId,
+    });
     const found = listed.items.find((item) => item.type === "PITCH_DECK");
     if (found !== undefined) {
       return { artifactId: found.artifactId, created: false };
     }
     // Provenance: a stable run id per company. No Q run was executed; the
     // plan below is the firewall's real decision for that id.
-    const runId = QRunIdSchema.parse(stableUuid(`fictional-world:deck:${company.key}`));
+    const runId = QRunIdSchema.parse(
+      stableUuid(`fictional-world:deck:${company.key}`),
+    );
     const subject = { kind: "COMPANY" as const, companyId };
     const decision = await firewall.plan({
       actor,
@@ -265,7 +298,9 @@ export function createSeedRecords(database: RequestDatabase) {
       subjects: [subject],
     });
     if (decision.outcome !== "AUTHORISED") {
-      throw new SeedError(`${company.name}: firewall ${decision.outcome} (${decision.reason})`);
+      throw new SeedError(
+        `${company.name}: firewall ${decision.outcome} (${decision.reason})`,
+      );
     }
     const composed = composePitchDeck({
       companyName: company.name,
@@ -298,10 +333,22 @@ export function createSeedRecords(database: RequestDatabase) {
   }> => {
     const detail = await artifacts.read(actor, artifactId);
     const version = detail.current;
-    if (version === null || version === undefined) throw new SeedError(`${companyName}: deck has no version`);
-    const pdf = await renderArtifactFile({ type: "PITCH_DECK", version, format: "pdf", company: companyName });
-    const pptx = await renderArtifactFile({ type: "PITCH_DECK", version, format: "pptx", company: companyName });
-    if (pdf === null || pptx === null) throw new SeedError(`${companyName}: deck did not render`);
+    if (version === null || version === undefined)
+      throw new SeedError(`${companyName}: deck has no version`);
+    const pdf = await renderArtifactFile({
+      type: "PITCH_DECK",
+      version,
+      format: "pdf",
+      company: companyName,
+    });
+    const pptx = await renderArtifactFile({
+      type: "PITCH_DECK",
+      version,
+      format: "pptx",
+      company: companyName,
+    });
+    if (pdf === null || pptx === null)
+      throw new SeedError(`${companyName}: deck did not render`);
     return { version, pdf: pdf.bytes, pptx: pptx.bytes };
   };
 
@@ -316,7 +363,9 @@ function intelligenceFrom(
 ): CompanyIntelligenceResult {
   const findings: CompanyFinding[] = company.deck.map((line, index) => ({
     ...QInternalFindingSchema.parse({
-      findingId: stableUuid(`fictional-world:finding:${company.key}:${String(index)}`),
+      findingId: stableUuid(
+        `fictional-world:finding:${company.key}:${String(index)}`,
+      ),
       type: "FACT",
       statement: line.statement,
       truthClass: line.truthClass ?? "USER_CLAIM",
@@ -351,9 +400,14 @@ function intelligenceFrom(
         ? []
         : [
             {
-              contradictionSetId: stableUuid(`fictional-world:contradiction:${company.key}`),
+              contradictionSetId: stableUuid(
+                `fictional-world:contradiction:${company.key}`,
+              ),
               knowledgeKey: contradictory[0]?.claimKey ?? "contradiction",
-              dimension: contradictory[0]?.claimType === "customers" ? "CUSTOMERS" : "TRACTION",
+              dimension:
+                contradictory[0]?.claimType === "customers"
+                  ? "CUSTOMERS"
+                  : "TRACTION",
               statements: contradictory.map((claim) => claim.statement),
               evidenceRefs: [],
             },
