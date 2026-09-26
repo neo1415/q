@@ -411,6 +411,16 @@ const runtimeDependencies = {
     );
     return found === null ? null : found.id;
   },
+  // A founder's own company, the default "my company" (CQ-QX-008).
+  ownCompany: async (actor: ActorContext) => {
+    if (actor.organisationId === undefined) return null;
+    const found =
+      (await companies.findOrganisationCompany?.(
+        actor.tenantId,
+        actor.organisationId,
+      )) ?? null;
+    return found === null ? null : found.id;
+  },
 };
 const qRuntime = createQRuntimeService({
   ...runtimeDependencies,

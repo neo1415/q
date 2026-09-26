@@ -49,4 +49,11 @@ export type QRuntimeDependencies = {
         ) => Promise<boolean>;
       }
     | undefined;
+  /**
+   * The actor's own company, from their membership, on the server: what
+   * "my company" means on a turn that names none (CQ-QX-008). Absent: no
+   * run gains it.
+   */
+  readonly ownCompany?:
+    ((actor: ActorContext) => Promise<string | null>) | undefined;
 };

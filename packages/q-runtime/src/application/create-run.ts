@@ -68,59 +68,70 @@ export type CreateQRunResult = {
  * that. There is no model, no retrieval, no tool and no answer.
  */
 /**
- * An investor asking about a company carries their own firm as context
- * (CQ-QX-007).
+ * The actor's own context on every turn (CQ-QX-007, generalised in
+ * CQ-QX-008).
  *
- * "Is this one worth my time given what I invest in?", asked from a
- * company's page, declared the company alone, so the investor's own
- * mandate was never a candidate and Q answered that it knew nothing of
- * their thesis. Their own investor organisation is added here, on the
- * server, from their membership — a subject a client declares is input,
- * never proof — and only after it resolves in their tenant as belonging
- * to their own organisation. What it may contribute is still decided per
- * run by the Context Firewall: owner scopes for their own firm, and
- * nothing about the company changes, because its task class does not
- * (q-firewall purpose policy).
+ * A founder asking for "a PDF describing my company" from Home Q was asked
+ * "which company?": the turn named no subject, so no company was in the
+ * run and nothing said whose company "my company" is. An investor asking
+ * whether a company fits what they invest in was told their thesis was
+ * unknown for the same reason. Their own company and their own investor
+ * organisation are added here, on the server, from their membership — a
+ * subject a client declares is input, never proof — and only after each
+ * resolves in their tenant as belonging to their own organisation. What
+ * either may contribute is still decided per run by the Context Firewall.
  *
- * Not added when the turn already names an investor or a relationship:
- * that question is about those, and it is not this function's to widen.
+ * Their company is added when the turn is about no company (a question
+ * about somebody else's keeps that one alone); their investor
+ * organisation whenever the turn names no investor or relationship.
  */
-async function withOwnInvestorOrganisation(
+async function withOwnContext(
   dependencies: QRuntimeDependencies,
   actor: ActorContext,
   refs: readonly QSubjectRef[],
 ): Promise<readonly QSubjectRef[]> {
-  const lookup = dependencies.ownInvestorOrganisation;
+  if (actor.organisationId === undefined) return refs;
+  let out = refs;
+  const own = async (ref: QSubjectRef): Promise<QSubjectRef | null> => {
+    if (!dependencies.subjects.supports(ref.kind)) return null;
+    const resolved = await dependencies.subjects.resolve(actor, ref);
+    return resolved !== null &&
+      resolved.tenantId === actor.tenantId &&
+      resolved.organisationId === actor.organisationId
+      ? ref
+      : null;
+  };
   if (
-    lookup === undefined ||
-    actor.organisationId === undefined ||
-    refs.length >= Q_SUBJECTS_MAX ||
-    !refs.some((ref) => ref.kind === "COMPANY") ||
-    refs.some(
+    dependencies.ownCompany !== undefined &&
+    out.length < Q_SUBJECTS_MAX &&
+    !out.some((ref) => ref.kind === "COMPANY") &&
+    !out.some((ref) => ref.kind === "RELATIONSHIP")
+  ) {
+    const companyId = await dependencies.ownCompany(actor);
+    const ref =
+      companyId === null ? null : await own({ kind: "COMPANY", companyId });
+    if (ref !== null) out = [...out, ref];
+  }
+  if (
+    dependencies.ownInvestorOrganisation !== undefined &&
+    out.length < Q_SUBJECTS_MAX &&
+    !out.some(
       (ref) =>
         ref.kind === "INVESTOR_ORGANISATION" || ref.kind === "RELATIONSHIP",
-    ) ||
-    !dependencies.subjects.supports("INVESTOR_ORGANISATION")
+    )
   ) {
-    return refs;
+    const investorOrganisationId =
+      await dependencies.ownInvestorOrganisation(actor);
+    const ref =
+      investorOrganisationId === null
+        ? null
+        : await own({
+            kind: "INVESTOR_ORGANISATION",
+            investorOrganisationId,
+          });
+    if (ref !== null) out = [...out, ref];
   }
-  const investorOrganisationId = await lookup(actor);
-  if (investorOrganisationId === null) {
-    return refs;
-  }
-  const ref: QSubjectRef = {
-    kind: "INVESTOR_ORGANISATION",
-    investorOrganisationId,
-  };
-  const resolved = await dependencies.subjects.resolve(actor, ref);
-  if (
-    resolved === null ||
-    resolved.tenantId !== actor.tenantId ||
-    resolved.organisationId !== actor.organisationId
-  ) {
-    return refs;
-  }
-  return [...refs, ref];
+  return out;
 }
 
 export function createCreateQRun(dependencies: QRuntimeDependencies) {
@@ -227,7 +238,7 @@ export function createCreateQRun(dependencies: QRuntimeDependencies) {
       }
     }
 
-    refs = await withOwnInvestorOrganisation(dependencies, actor, refs);
+    refs = await withOwnContext(dependencies, actor, refs);
 
     const keyHash = hashRunIdempotencyKey(command.idempotencyKey);
     const requestHash = hashCreateQRunRequest(input);

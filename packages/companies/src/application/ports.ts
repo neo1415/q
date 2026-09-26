@@ -225,6 +225,16 @@ export type CompanyQueryPort = {
   readonly searchCompanies: (
     query: CompanySearchQuery,
   ) => Promise<CompanySearchPage>;
+  /**
+   * The one company an organisation owns, for its own members' context
+   * (Q knowing whose company "my company" is). Null when the organisation
+   * owns none, or more than one, since then "my company" names nothing.
+   * Permission-neutral; callers authorise separately.
+   */
+  readonly findOrganisationCompany?: (
+    tenantId: TenantId,
+    organisationId: OrganisationId,
+  ) => Promise<CompanyIdentity | null>;
 };
 
 /** Profile core + trusted ownership/classification. Permission-neutral. */

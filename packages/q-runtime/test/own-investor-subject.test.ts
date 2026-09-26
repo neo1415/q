@@ -139,7 +139,7 @@ describe("an investor's own firm rides along with a company question", () => {
     expect(h.runs[0]?.subjects).toEqual([company]);
   });
 
-  it("widens nothing when the turn already names an investor, or names no company", async () => {
+  it("widens nothing when the turn already names an investor; a turn about no company carries their firm too (CQ-QX-008)", async () => {
     const other: QSubjectRef = {
       kind: "INVESTOR_ORGANISATION",
       investorOrganisationId: randomUUID(),
@@ -148,8 +148,8 @@ describe("an investor's own firm rides along with a company question", () => {
     await h.ask([company, other]);
     await h.ask([]);
     expect(h.runs[0]?.subjects).toEqual([company, other]);
-    expect(h.runs[1]?.subjects).toEqual([]);
-    expect(h.lookups).toHaveLength(0);
+    expect(h.runs[1]?.subjects).toEqual([ownFirm]);
+    expect(h.lookups).toHaveLength(1);
   });
 
   it("does nothing in a composition without the lookup", async () => {
