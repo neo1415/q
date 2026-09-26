@@ -104,10 +104,12 @@ export {
   Q_MESSAGE_TEXT_MAX_LENGTH,
   QRequestEnvelopeSchema,
   QUserMessageInputSchema,
+  QWatchingSchema,
   type AppendQRunMessageRequest,
   type CreateQRunRequest,
   type QRequestEnvelope,
   type QUserMessageInput,
+  type QWatching,
 } from "./request.js";
 
 export {
