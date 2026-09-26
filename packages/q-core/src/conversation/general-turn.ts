@@ -35,6 +35,14 @@ export type ResearchDirective = {
   readonly mode: "EXPLICIT" | "ONLY_IF_EMPTY" | "NEVER";
   /** True when Q must say it is leaving authorised context for the web. */
   readonly announceSourceChange: boolean;
+  /**
+   * The turn is a question to Q and research is up (not unavailable, not
+   * exhausted, not already running): when the answer path asked the
+   * platform a question the world can also answer (prospective investors)
+   * and the platform came back empty or thin, public sources may fill the
+   * gap. Never on an answer, a remark or small talk.
+   */
+  readonly fallback?: boolean | undefined;
 };
 
 export const NO_RESEARCH: ResearchDirective = {
@@ -87,7 +95,14 @@ export function researchDirectiveFor(
     available: environment.available,
     ...(ownRecords ? { contextSufficient: false } : {}),
   });
-  if (!decision.run) return NO_RESEARCH;
+  if (!decision.run) {
+    const fallback =
+      reading.kind === "QUESTION_TO_Q" &&
+      environment.available &&
+      !isExhausted(state.failures, "RESEARCH") &&
+      state.research === null;
+    return fallback ? { ...NO_RESEARCH, fallback: true } : NO_RESEARCH;
+  }
   return ownRecords
     ? { mode: "ONLY_IF_EMPTY", announceSourceChange: true }
     : { mode: "EXPLICIT", announceSourceChange: false };
