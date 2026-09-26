@@ -231,3 +231,20 @@ export const TurnReaderV5ResultSchema = TurnReaderResultSchema.extend({
   tool: TurnToolV5Schema.nullable().default(null),
 }).strict();
 export type TurnReaderV5Result = z.infer<typeof TurnReaderV5ResultSchema>;
+
+/**
+ * v7 variables: v1's, plus the other actions this run can take (name and
+ * what it does), built by code from what is offered. Trusted.
+ */
+export const TurnReaderV7VariablesSchema = TurnReaderVariablesSchema.extend({
+  actions: z
+    .array(
+      z.object({
+        name: z.string().max(80),
+        does: z.string().max(240),
+      }),
+    )
+    .max(30)
+    .default([]),
+}).strict();
+export type TurnReaderV7Variables = z.infer<typeof TurnReaderV7VariablesSchema>;

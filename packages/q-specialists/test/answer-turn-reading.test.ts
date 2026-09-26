@@ -78,6 +78,7 @@ function seam(options: {
   readonly visibility?: {
     noteVisibility: (entry: Record<string, unknown>) => void;
   };
+  readonly actions?: readonly { name: string; does: string }[];
 }) {
   const message: QConversationMessage = {
     id: randomUUID() as QConversationMessage["id"],
@@ -93,10 +94,12 @@ function seam(options: {
   const unread: boolean[] = [];
   const capabilities: unknown[] = [];
   let reads = 0;
+  const heardActions: unknown[] = [];
   const outcomes = [...options.outcomes];
   const turns: QTurnReader = {
-    read: () => {
+    read: (input) => {
       reads += 1;
+      heardActions.push(input.actions ?? []);
       return Promise.resolve(
         typeof options.reading === "function"
           ? options.reading()
@@ -163,6 +166,9 @@ function seam(options: {
     sql: {} as never,
     transactions: { run: (work) => work({} as never) },
     turns,
+    ...(options.actions === undefined
+      ? {}
+      : { offeredActions: () => Promise.resolve(options.actions ?? []) }),
   });
   return {
     answer,
@@ -173,6 +179,7 @@ function seam(options: {
     unread,
     capabilities,
     reads: () => reads,
+    heardActions,
   };
 }
 
@@ -516,5 +523,33 @@ describe("the answer is told what this run can do (CQ-QX-008)", () => {
         visibilityChange: false,
       },
     ]);
+  });
+});
+
+describe("an action the run offers is never filed as a document (BIZ-004 founder live)", () => {
+  const HANDLE = {
+    name: "propose_handle_claim",
+    does: "Proposes a Capital Q handle and Q card for their own organisation.",
+  };
+
+  it("hands the offered actions to the reader, and an action request goes to the model that holds it", async () => {
+    const run = seam({
+      said: "Make a Q card for Zino Aviation with the handle zino-aviation",
+      reading: {
+        kind: "TOOL_REQUEST",
+        confidence: "HIGH",
+        transcript: "CLEAR",
+        question: null,
+        aboutNamedOther: false,
+        tool: null,
+      },
+      outcomes: [],
+      actions: [HANDLE],
+    });
+    await run.answer.answer(request());
+    expect(run.heardActions).toEqual([[HANDLE]]);
+    // No document was prepared here; the answer's model took the turn.
+    expect(run.delegated()).toBe(1);
+    expect(run.stored).toHaveLength(0);
   });
 });

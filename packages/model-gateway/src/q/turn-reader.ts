@@ -7,7 +7,7 @@ import {
   TurnReaderV5ResultSchema,
   type PromptRegistry,
   type TurnReaderV5Result,
-  type TurnReaderVariables,
+  type TurnReaderV7Variables,
 } from "@capital-q/q-core";
 
 import { isModelGatewayError } from "../errors.js";
@@ -30,6 +30,12 @@ export type QTurnReader = {
       readonly text: string;
     }[];
     readonly modality: "VOICE" | "TEXT";
+    /**
+     * The other actions this run can take, from what is offered: a request
+     * for one of them is never read as a document (founder live, BIZ-004).
+     */
+    readonly actions?:
+      readonly { readonly name: string; readonly does: string }[] | undefined;
     readonly attribution: {
       readonly tenantId: string;
       readonly userId: string;
@@ -68,7 +74,7 @@ export function createQTurnReader(dependencies: {
       const utterance = input.utterance.trim().slice(0, 2_000);
       if (utterance.length === 0) return null;
       const variables: Omit<
-        TurnReaderVariables,
+        TurnReaderV7Variables,
         | "operatingMode"
         | "communicationProfile"
         | "communicationGuidance"
@@ -80,9 +86,13 @@ export function createQTurnReader(dependencies: {
         })),
         utterance,
         modality: input.modality,
+        actions: (input.actions ?? []).slice(0, 30).map((action) => ({
+          name: action.name.slice(0, 80),
+          does: action.does.slice(0, 240),
+        })),
       };
       try {
-        const rendered = renderPrompt<TurnReaderVariables>(registry, {
+        const rendered = renderPrompt<TurnReaderV7Variables>(registry, {
           task: "TURN_READER",
           charter: "Q_SYSTEM",
           operatingMode: "ASSESSMENT",
