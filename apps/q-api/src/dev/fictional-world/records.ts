@@ -356,7 +356,7 @@ export function createSeedRecords(database: RequestDatabase) {
 }
 
 /** The handwritten story, in the shape Company Intelligence hands the composer. */
-function intelligenceFrom(
+export function intelligenceFrom(
   companyId: string,
   company: FictionalCompany,
   runId: string,
