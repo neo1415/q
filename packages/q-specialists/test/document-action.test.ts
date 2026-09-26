@@ -9,7 +9,8 @@ import {
   type QResultBlock,
 } from "@capital-q/contracts";
 import type { QTurnReader } from "@capital-q/model-gateway/q";
-import type { TurnReaderV3Result } from "@capital-q/q-core";
+import type { TurnReaderV5Result as TurnReaderV3Result } from "@capital-q/q-core";
+import type { GetInvestorMandateOutput } from "@capital-q/q-tools";
 import type {
   QAnswerRequest,
   QConversationMessage,
@@ -187,6 +188,8 @@ function seam(options: {
   readonly result?: CompanyIntelligenceResult;
   /** The artifact service fails when asked to file the document. */
   readonly prepareFails?: boolean;
+  /** The person's own mandate, as the tool would return it. */
+  readonly ownMandate?: GetInvestorMandateOutput | "NOT_AN_INVESTOR" | null;
 }) {
   const investigated: CompanyIntelligenceRequest[] = [];
   const prepared: Record<string, unknown>[] = [];
@@ -223,6 +226,13 @@ function seam(options: {
       },
     },
     artifacts,
+    ...(options.ownMandate === undefined
+      ? {}
+      : {
+          ownMandate: {
+            read: () => Promise.resolve(options.ownMandate ?? null),
+          },
+        }),
     delegate: {
       answer: () => {
         delegated += 1;
@@ -435,5 +445,89 @@ describe("the deterministic checks behind it", () => {
         subjectName: "Kivu Freight",
       }),
     ).toBeNull();
+  });
+});
+
+function ownMandateReading(): TurnReaderV3Result {
+  return {
+    kind: "TOOL_REQUEST",
+    confidence: "HIGH",
+    transcript: "CLEAR",
+    question: null,
+    aboutNamedOther: false,
+    tool: {
+      kind: "PREPARE_DOCUMENT",
+      destination: null,
+      visibility: null,
+      documentType: "OWN_MANDATE",
+      subjectName: null,
+    },
+  };
+}
+
+function mandateRecord(status: "ACTIVE" | "DRAFT"): GetInvestorMandateOutput {
+  return {
+    investorOrganisationId: "a0000000-0000-4000-8000-0000000000aa",
+    displayName: "Harrow Road Capital",
+    investorType: "angel",
+    deploymentState: "actively_investing",
+    truncated: false,
+    mandates: [
+      {
+        mandateId: "a0000000-0000-4000-8000-0000000000bb",
+        status,
+        version: 1,
+        discoveryMode: null,
+        cheque: { currency: "USD", min: "25000", max: "100000" },
+        stage: { minStageCode: "seed", maxStageCode: "seed" },
+        constraints: [],
+        taxonomyPreferences: [],
+        truthClass: "USER_CLAIM",
+      },
+    ],
+  };
+}
+
+describe("gap 3 · a document of the person's own mandate", () => {
+  it("files it from their record as their private artifact, marked a draft until confirmed, with the card", async () => {
+    for (const status of ["ACTIVE", "DRAFT"] as const) {
+      const s = seam({
+        history: [message("USER", "Give me my mandate as a PDF.")],
+        reading: ownMandateReading(),
+        ownMandate: mandateRecord(status),
+      });
+      await s.run();
+      expect(s.delegated(), status).toBe(0);
+      // Built from the record: no company investigated, no research.
+      expect(s.investigated, status).toHaveLength(0);
+      expect(s.prepared, status).toHaveLength(1);
+      expect(s.prepared[0]?.["artifactType"]).toBe("INVESTOR_MANDATE");
+      expect(s.prepared[0]?.["subject"]).toBeUndefined();
+      const content = s.prepared[0]?.["content"] as { title: string };
+      expect(content.title.includes("(draft)"), status).toBe(
+        status === "DRAFT",
+      );
+      expect(s.stored[0]?.blocks).toEqual([
+        expect.objectContaining({ kind: "ARTIFACT_REFERENCE" }),
+      ]);
+      expect(s.stored[0]?.content.toLowerCase().includes("draft"), status).toBe(
+        status === "DRAFT",
+      );
+    }
+  });
+
+  it("never asks which company, and says plainly when there is no mandate or no investor", async () => {
+    for (const record of ["NOT_AN_INVESTOR", null] as const) {
+      const s = seam({
+        history: [message("USER", "Export my investment thesis.")],
+        reading: ownMandateReading(),
+        ownMandate: record,
+      });
+      await s.run();
+      expect(s.delegated()).toBe(0);
+      expect(s.prepared).toHaveLength(0);
+      expect(s.stored).toHaveLength(1);
+      expect(s.stored[0]?.content).not.toMatch(/which company/i);
+    }
   });
 });

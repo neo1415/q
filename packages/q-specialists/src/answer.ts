@@ -16,8 +16,14 @@ import {
   withoutRecommendationClaims,
   type ConversationState,
   type FailureOperation,
-  type TurnToolV3,
+  type TurnToolV5,
 } from "@capital-q/q-core";
+import type { GetInvestorMandateOutput } from "@capital-q/q-tools";
+
+import {
+  composeOwnMandateDocument,
+  OWN_MANDATE_ARTIFACT_TYPE,
+} from "./own-mandate-document.js";
 import type { DatabaseExecutor, TransactionManager } from "@capital-q/database";
 import type { Logger } from "@capital-q/observability";
 import {
@@ -106,6 +112,19 @@ export type SpecialistQAnswerDependencies = {
    * proposer (CQ-QACT-001). Absent: such a turn is answered like any other.
    */
   readonly visibility?: QVisibilityNotebook | undefined;
+  /**
+   * The person's own investment mandate, read under this run's plan (the
+   * firewall binds it only to the investor's own organisation). NOT_AN_
+   * INVESTOR: the person has no investor organisation in this run. Absent:
+   * a mandate document is answered without one, never invented.
+   */
+  readonly ownMandate?:
+    | {
+        readonly read: (
+          request: QAnswerRequest,
+        ) => Promise<GetInvestorMandateOutput | "NOT_AN_INVESTOR" | null>;
+      }
+    | undefined;
 };
 
 /** The proposer's side of a visibility reading; nothing here applies it. */
@@ -536,6 +555,76 @@ export function createSpecialistQAnswer(
   }
 
   /**
+   * A document of the person's own mandate, from their record (gap 3).
+   * Composed by code from what they declared, filed as their private
+   * artifact; a mandate still being defined is filed and named as a draft.
+   * It exports as a PDF like every artifact (BIZ-001).
+   */
+  async function prepareOwnMandate(
+    request: QAnswerRequest,
+    conversationId: QConversationMessage["conversationId"],
+    preparation: ArtifactPreparation,
+  ): Promise<QAnswerOutcome> {
+    const port = dependencies.ownMandate;
+    const record = port === undefined ? null : await port.read(request);
+    if (record === "NOT_AN_INVESTOR") {
+      return recordAnswer(
+        request,
+        conversationId,
+        "A mandate document is for an investor's own mandate, and there isn't one set up for you here.",
+      );
+    }
+    const document = record === null ? null : composeOwnMandateDocument(record);
+    if (document === null) {
+      return recordAnswer(
+        request,
+        conversationId,
+        "There's no mandate on your record yet, so there's nothing to put in a document. Set it up with me and I'll make it.",
+      );
+    }
+    try {
+      const summary = await preparation.port.prepare({
+        actorContext: request.actor,
+        permittedContextPlan: request.plan,
+        qRunId: request.runId,
+        artifactType: OWN_MANDATE_ARTIFACT_TYPE,
+        content: {
+          title: document.title,
+          summary: document.summary,
+          content: document.content,
+        },
+      });
+      return recordAnswer(
+        request,
+        conversationId,
+        document.draft
+          ? "Here's your mandate as it stands. It's marked as a draft because it isn't confirmed yet. Download the PDF from the card."
+          : "Here's your mandate. Download the PDF from the card.",
+        [
+          {
+            kind: "ARTIFACT_REFERENCE",
+            artifactId: summary.artifactId,
+            type: summary.type,
+            status: summary.status,
+            title: summary.title,
+          },
+        ],
+      );
+    } catch (error: unknown) {
+      if (request.signal?.aborted === true) throw error;
+      logger?.warn(
+        { err: error, qRunId: request.runId },
+        "the mandate document could not be filed",
+      );
+      return recordAnswer(
+        request,
+        conversationId,
+        "I couldn't prepare your mandate document just now. Ask me again in a moment and I'll make it.",
+      );
+    }
+  }
+
+  /**
    * One of Q's own hands, from the turn's reading (CQ-QACT-001).
    *
    * NAVIGATE: the message carries a UI_INTENT the screen follows through
@@ -552,19 +641,33 @@ export function createSpecialistQAnswer(
   async function actOnTool(
     request: QAnswerRequest,
     conversationId: QConversationMessage["conversationId"],
-    tool: TurnToolV3,
+    tool: TurnToolV5,
     history: readonly QConversationMessage[],
   ): Promise<QAnswerOutcome | null> {
     const company = request.subjects.find(
       (subject) => subject.kind === "COMPANY",
     );
-    if (tool.kind === "PREPARE_DOCUMENT" && tool.documentType !== null) {
+    if (
+      tool.kind === "PREPARE_DOCUMENT" &&
+      tool.documentType === "OWN_MANDATE"
+    ) {
+      if (artifacts === undefined || dependencies.ownMandate === undefined) {
+        return null;
+      }
+      return prepareOwnMandate(request, conversationId, artifacts);
+    }
+    const companyDocument =
+      tool.documentType === "PITCH_DECK" ||
+      tool.documentType === "INVESTMENT_BRIEF"
+        ? tool.documentType
+        : null;
+    if (tool.kind === "PREPARE_DOCUMENT" && companyDocument !== null) {
       if (artifacts === undefined) return null;
-      const noun = tool.documentType === "PITCH_DECK" ? "deck" : "brief";
+      const noun = companyDocument === "PITCH_DECK" ? "deck" : "brief";
       let done: Awaited<ReturnType<typeof prepareDocument>>;
       try {
         done = await prepareDocument(request, history, {
-          documentType: tool.documentType,
+          documentType: companyDocument,
           subjectName: tool.subjectName,
         });
       } catch (error: unknown) {

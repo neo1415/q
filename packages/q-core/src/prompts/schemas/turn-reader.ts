@@ -175,3 +175,59 @@ export const TurnReaderV3ResultSchema = TurnReaderResultSchema.extend({
   tool: TurnToolV3Schema.nullable().default(null),
 }).strict();
 export type TurnReaderV3Result = z.infer<typeof TurnReaderV3ResultSchema>;
+
+/**
+ * v5 (gap 3, ACC 2026-09-25): a document about the person's OWN investment
+ * mandate. "Give me my mandate as a PDF" was read as a deck or brief about
+ * some company and answered "which company?". OWN_MANDATE names it: built
+ * from their own authoritative record, never from research.
+ */
+export const TURN_DOCUMENT_TYPES_V5 = [
+  "PITCH_DECK",
+  "INVESTMENT_BRIEF",
+  "OWN_MANDATE",
+] as const;
+
+export const TurnToolV5Schema = z
+  .object({
+    kind: z.enum(TURN_TOOL_V3_KINDS),
+    destination: QNavigateDestinationSchema.nullable().default(null),
+    visibility: z.enum(TURN_TOOL_VISIBILITIES).nullable().default(null),
+    documentType: z.enum(TURN_DOCUMENT_TYPES_V5).nullable().default(null),
+    /** The company as the person named it; null when it is plainly their own, and for OWN_MANDATE. */
+    subjectName: z.string().trim().min(1).max(120).nullable().default(null),
+  })
+  .strict()
+  .refine(
+    (tool) => {
+      switch (tool.kind) {
+        case "NAVIGATE":
+          return (
+            tool.destination !== null &&
+            tool.visibility === null &&
+            tool.documentType === null
+          );
+        case "SET_VISIBILITY":
+          return (
+            tool.visibility !== null &&
+            tool.destination === null &&
+            tool.documentType === null
+          );
+        case "PREPARE_DOCUMENT":
+          return (
+            tool.documentType !== null &&
+            tool.destination === null &&
+            tool.visibility === null
+          );
+      }
+    },
+    { message: "a tool carries exactly its own parameters" },
+  );
+export type TurnToolV5 = z.infer<typeof TurnToolV5Schema>;
+
+export const TURN_READER_V5_SCHEMA_VERSION = 5;
+
+export const TurnReaderV5ResultSchema = TurnReaderResultSchema.extend({
+  tool: TurnToolV5Schema.nullable().default(null),
+}).strict();
+export type TurnReaderV5Result = z.infer<typeof TurnReaderV5ResultSchema>;
