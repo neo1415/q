@@ -8,6 +8,7 @@ import {
 } from "../src/index.js";
 import {
   COMPANY_A,
+  RUN,
   COMPANY_B_NETWORK,
   INVESTOR_B,
   actorA,
@@ -79,7 +80,7 @@ describe("propose_profile_change", () => {
     expect(outcome.status).toBe("SUCCEEDED");
     expect(prepared).toEqual([
       {
-        runId: expect.any(String),
+        runId: RUN,
         tenantId: actorA.tenantId,
         actorUserId: actorA.userId,
         profile: "PERSON",
