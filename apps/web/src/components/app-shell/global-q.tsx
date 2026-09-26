@@ -286,7 +286,11 @@ function GlobalQSheet() {
     <SheetRoot open={open} onOpenChange={setOpen}>
       {open ? (
         <SheetContent side="side" title="Q" description={about}>
-          <QSheetConversation connected={connected} seed={seed} />
+          <QSheetConversation
+            connected={connected}
+            seed={seed}
+            moment={moment}
+          />
         </SheetContent>
       ) : null}
     </SheetRoot>

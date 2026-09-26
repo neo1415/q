@@ -22,6 +22,7 @@ import { loadWebServerConfig } from "@capital-q/config/web";
 import {
   Q_MESSAGE_TEXT_MAX_LENGTH,
   QConversationIdSchema,
+  QViewingMomentSchema,
   type ListQConversationsResponse,
   type QArtifactDetail,
   type QConversationDetail,
@@ -200,6 +201,14 @@ export async function askQAction(
    * person and refuses one reused for a different request.
    */
   rawIdempotencyKey?: string,
+  /**
+   * Where in a pitch the person was when they asked (R18). A request,
+   * never authority: the Q API authorises the asset for this person with
+   * the playback rule and the company's visibility, and drops it when
+   * refused. Anything malformed is dropped here rather than failing the
+   * question.
+   */
+  rawViewing?: unknown,
 ): Promise<QActionResult<QStartedRun>> {
   const parsed = QuestionSchema.safeParse(rawQuestion);
   if (!parsed.success) {
@@ -238,6 +247,11 @@ export async function askQAction(
               },
             ];
 
+  const viewing =
+    rawViewing === undefined
+      ? undefined
+      : QViewingMomentSchema.safeParse(rawViewing).data;
+
   const idempotencyKey =
     rawIdempotencyKey === undefined
       ? undefined
@@ -255,6 +269,7 @@ export async function askQAction(
           message: { text: parsed.data },
           modality: "TEXT",
           ...(subjects === undefined ? {} : { subjects }),
+          ...(viewing === undefined ? {} : { viewing }),
           ...(inConversation === undefined
             ? {}
             : { conversationId: inConversation }),

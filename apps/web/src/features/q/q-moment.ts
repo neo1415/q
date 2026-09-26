@@ -8,10 +8,8 @@
  * and a later backend packet authorises the pitch before reading anything
  * said in it.
  *
- * Today the Q run contract (`CreateQRunRequest`) carries subjects only, so
- * the moment travels to the run as the words of the draft question, and
- * the sheet shows it. The pitch id and the position are held here, typed,
- * for the contract addition that will carry them (see the UX-05 report).
+ * It travels to the run as `viewing` on `CreateQRunRequest` (R18) and, for
+ * a person reading the draft, as its opening words.
  */
 export type QPitchMoment = {
   readonly kind: "PITCH_MOMENT";
@@ -23,6 +21,27 @@ export type QPitchMoment = {
 };
 
 export type QMoment = QPitchMoment;
+
+/**
+ * The moment as the Q run contract carries it (R18 `viewing`). The label
+ * stays on the client: the server names the company itself.
+ */
+export function viewingOf(moment: QMoment): {
+  readonly kind: "PITCH_PLAYBACK";
+  readonly companyId: string;
+  readonly mediaAssetId: string;
+  readonly positionSeconds: number;
+} {
+  return {
+    kind: "PITCH_PLAYBACK",
+    companyId: moment.companyId,
+    mediaAssetId: moment.mediaAssetId,
+    positionSeconds: Math.min(
+      7200,
+      Math.max(0, Math.floor(moment.positionSeconds)),
+    ),
+  };
+}
 
 /** A page's way of saying what is on screen right now, read when Q opens. */
 export type QMomentSource = () => QMoment | null;

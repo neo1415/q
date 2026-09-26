@@ -32,6 +32,7 @@ import { homeHref } from "./active-conversation";
 import { failureMessage, recoveryHint } from "./conversation";
 import { QAnswer } from "./q-answer";
 import { QBoard } from "./q-board";
+import { viewingOf, type QMoment } from "./q-moment";
 import { useQSession } from "./q-session";
 
 /**
@@ -46,10 +47,13 @@ import { useQSession } from "./q-session";
 export function QSheetConversation({
   connected,
   seed = null,
+  moment = null,
 }: {
   readonly connected: boolean;
   /** A draft question to open with; the person edits or sends it. */
   readonly seed?: string | null | undefined;
+  /** Where in a pitch the person was when this opening happened. */
+  readonly moment?: QMoment | null | undefined;
 }) {
   const session = useQSession();
   const { q, turns, voice, subject, presence, spokenOnly } = session;
@@ -235,7 +239,13 @@ export function QSheetConversation({
                   ? (text: string) => {
                       voice.client.sendText(text);
                     }
-                  : q.ask,
+                  : (text: string) =>
+                      q.ask(
+                        text,
+                        moment === null
+                          ? undefined
+                          : { viewing: viewingOf(moment) },
+                      ),
               }
             : {})}
         />

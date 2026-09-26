@@ -9,7 +9,11 @@ import {
   type QStreamState,
   type QStreamTransportStatus,
 } from "@capital-q/api-client";
-import { isTerminalQStreamEvent, type QMessage } from "@capital-q/contracts";
+import {
+  isTerminalQStreamEvent,
+  type QMessage,
+  type QViewingMoment,
+} from "@capital-q/contracts";
 
 import {
   approveQApprovalAction,
@@ -87,7 +91,11 @@ export type QConversation = {
   readonly runId: string | null;
   /** The conversation this surface is in, once the server has named it. */
   readonly conversationId: string | null;
-  readonly ask: (question: string) => Promise<void>;
+  /** `viewing`: where in a pitch the person was; sent only when a run starts. */
+  readonly ask: (
+    question: string,
+    extras?: { readonly viewing?: QViewingMoment | undefined },
+  ) => Promise<void>;
   readonly stop: () => Promise<void>;
   /**
    * Read the open conversation back from the server. For turns recorded
@@ -350,7 +358,10 @@ export function useQConversation(
   );
 
   const ask = useCallback(
-    async (question: string) => {
+    async (
+      question: string,
+      extras?: { readonly viewing?: QViewingMoment | undefined },
+    ) => {
       const text = question.trim();
       if (text.length === 0 || submitting || streaming) {
         return;
@@ -412,6 +423,7 @@ export function useQConversation(
             relationshipId: options.relationshipId,
           }),
           idempotencyKey,
+          extras?.viewing,
         );
         if (!started.ok) {
           forgetPendingAsk(idempotencyKey);
