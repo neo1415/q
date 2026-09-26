@@ -116,6 +116,7 @@ insert into rls_inventory (schema_name, table_name, classification, authenticate
   ('evidence', 'document_upload_requests',  'INTERNAL_SERVER_ONLY', '{}'),
   ('evidence', 'document_extractions',      'INTERNAL_SERVER_ONLY', '{}'),
   ('media',    'media_assets',              'INTERNAL_SERVER_ONLY', '{}'),
+  ('media',    'pitch_requests',            'INTERNAL_SERVER_ONLY', '{}'),
   ('q_runtime', 'conversations',            'INTERNAL_SERVER_ONLY', '{}'),
   ('q_runtime', 'conversation_messages',    'INTERNAL_SERVER_ONLY', '{}'),
   ('q_runtime', 'runs',                     'INTERNAL_SERVER_ONLY', '{}'),
