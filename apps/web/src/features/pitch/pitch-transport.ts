@@ -3,8 +3,10 @@ import {
   cancelPitchUpload,
   createPitchMediaAsset,
   createPitchUploadSession,
+  deletePitchMediaAsset,
   getCompany,
   getCompanyPitch,
+  listCompanyMedia,
   setPitchPlaybackPolicy,
   syncPitch,
   type ApiSession,
@@ -34,11 +36,22 @@ export type PitchOverview = {
 
 export type PitchTransport = {
   readonly load: (companyId: string) => Promise<PitchOverview>;
-  /** `POST /pitch` — a record in state CREATED, replacing one by naming it. */
+  /**
+   * `POST /pitch` — a record in state CREATED, replacing one by naming it,
+   * under the key that makes a retry return the same record.
+   */
   readonly create: (
     companyId: string,
     replacesMediaAssetId: string | null,
+    idempotencyKey: string,
   ) => Promise<CreateCompanyPitchResponse>;
+  /** `GET /media` — every version, newest first, superseded and deleted included. */
+  readonly list: (companyId: string) => Promise<readonly MediaAssetDto[]>;
+  /** `DELETE /pitch/:id` — withdraw one version; the record is kept. */
+  readonly remove: (
+    companyId: string,
+    mediaAssetId: string,
+  ) => Promise<MediaAssetDto>;
   /**
    * `POST …/upload-session` — the target, against the version seen. With
    * `resumable` the server may issue a resumable target, and the same key
@@ -86,12 +99,26 @@ export function apiPitchTransport(session: ApiSession): PitchTransport {
       ]);
       return { company, pitch: current.pitch };
     },
-    create: (companyId, replacesMediaAssetId) =>
+    create: (companyId, replacesMediaAssetId, idempotencyKey) =>
       createPitchMediaAsset(
         session,
         companyId,
         replacesMediaAssetId === null ? {} : { replacesMediaAssetId },
+        idempotencyKey,
       ),
+    list: async (companyId) =>
+      (await listCompanyMedia(session, companyId)).media,
+    remove: async (companyId, mediaAssetId) => {
+      const answer = await deletePitchMediaAsset(
+        session,
+        companyId,
+        mediaAssetId,
+      );
+      if (answer.pitch === null) {
+        throw new Error("The server answered a deletion without the record.");
+      }
+      return answer.pitch;
+    },
     reserve: (companyId, mediaAssetId, expectedVersion, resumable) =>
       resumable === undefined
         ? createPitchUploadSession(session, companyId, mediaAssetId, {

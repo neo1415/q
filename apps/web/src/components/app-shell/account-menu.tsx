@@ -18,7 +18,7 @@ import {
 import { ThemeToggle } from "@/features/appearance/theme-toggle";
 import { QMotionToggle } from "@/features/q-aperture";
 
-import { PROFILE_NAVIGATION } from "./navigation";
+import { FOUNDER_MEDIA_NAVIGATION, PROFILE_NAVIGATION } from "./navigation";
 
 /**
  * The mobile header's account menu. Its first row is the theme, so the
@@ -26,7 +26,12 @@ import { PROFILE_NAVIGATION } from "./navigation";
  * deep in Profile (ADR 0017 F4); Profile itself stays the bottom tab and
  * is linked here as well.
  */
-export function AccountMenu() {
+export function AccountMenu({
+  founder = false,
+}: {
+  /** A founder's context: their pitch is one tap away too (VID). */
+  readonly founder?: boolean | undefined;
+}) {
   return (
     <PopoverRoot>
       <PopoverTrigger>
@@ -53,6 +58,19 @@ export function AccountMenu() {
             <span className="cq-label text-(--cq-text-primary)">Q motion</span>
             <QMotionToggle size="touch" />
           </div>
+          {founder ? (
+            <Link
+              href={FOUNDER_MEDIA_NAVIGATION.href}
+              className="-mx-2 flex min-h-11 items-center justify-between rounded-md border-t border-(--cq-border-subtle) px-2 cq-body-sm text-(--cq-text-primary) hover:bg-(--cq-surface-subtle)"
+            >
+              {FOUNDER_MEDIA_NAVIGATION.label}
+              <ChevronRight
+                aria-hidden="true"
+                size={ICON_SIZE.compact}
+                strokeWidth={ICON_STROKE}
+              />
+            </Link>
+          ) : null}
           <Link
             href={PROFILE_NAVIGATION.href}
             className="-mx-2 flex min-h-11 items-center justify-between rounded-md border-t border-(--cq-border-subtle) px-2 cq-body-sm text-(--cq-text-primary) hover:bg-(--cq-surface-subtle)"

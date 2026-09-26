@@ -118,19 +118,59 @@ export async function loadPitchOverviewAction(
   return run((transport) => transport.load(companyId.data));
 }
 
+/**
+ * Creates the pitch record, or replaces the current one by naming it. The
+ * browser makes one key per intended change and reuses it on retry, so a
+ * lost answer returns the same record instead of a conflict.
+ */
 export async function createPitchAction(
   rawCompanyId: string,
   rawReplacesMediaAssetId: string | null,
+  rawIdempotencyKey: string,
 ): Promise<PitchActionResult<CreateCompanyPitchResponse>> {
   const companyId = UuidInput.safeParse(rawCompanyId);
   const replaces =
     rawReplacesMediaAssetId === null
       ? { success: true as const, data: null }
       : UuidInput.safeParse(rawReplacesMediaAssetId);
+  const key = IdempotencyKeyHeaderSchema.safeParse(rawIdempotencyKey);
   if (!companyId.success || !replaces.success) {
     return { ok: false, message: NOT_HERE };
   }
-  return run((transport) => transport.create(companyId.data, replaces.data));
+  if (!key.success) {
+    return { ok: false, message: "That request couldn't be made." };
+  }
+  return run((transport) =>
+    transport.create(companyId.data, replaces.data, key.data),
+  );
+}
+
+/** Every version of the company's pitch, newest first. */
+export async function listPitchMediaAction(
+  rawCompanyId: string,
+): Promise<PitchActionResult<readonly MediaAssetDto[]>> {
+  const companyId = UuidInput.safeParse(rawCompanyId);
+  if (!companyId.success) return { ok: false, message: NOT_HERE };
+  return run((transport) => transport.list(companyId.data));
+}
+
+/**
+ * Withdraws one version. The server keeps the record and its audit
+ * history, then asks the video service to let go of the bytes; asking
+ * again is harmless and retries that release. Needs `media.manage`.
+ */
+export async function deletePitchMediaAction(
+  rawCompanyId: string,
+  rawMediaAssetId: string,
+): Promise<PitchActionResult<MediaAssetDto>> {
+  const companyId = UuidInput.safeParse(rawCompanyId);
+  const mediaAssetId = UuidInput.safeParse(rawMediaAssetId);
+  if (!companyId.success || !mediaAssetId.success) {
+    return { ok: false, message: NOT_HERE };
+  }
+  return run((transport) =>
+    transport.remove(companyId.data, mediaAssetId.data),
+  );
 }
 
 const ResumableInput = z

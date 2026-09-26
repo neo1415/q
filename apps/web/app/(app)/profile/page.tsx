@@ -264,6 +264,21 @@ export default async function ProfilePage() {
           <Unavailable what="your organisation's profile" />
         ) : null}
 
+        {/* The company's pitch and its versions (VID). */}
+        {company !== null ? (
+          <PageSection
+            id="pitch-media"
+            title="Pitch & media"
+            description="Your pitch video: upload, replace, preview, publish or withdraw it, and every earlier version."
+          >
+            <div>
+              <Link href="/pitch" className={buttonClassName("secondary")}>
+                Manage pitch &amp; media
+              </Link>
+            </div>
+          </PageSection>
+        ) : null}
+
         {/* The shareable identity (BIZ-004). */}
         {company !== null || investor !== null ? (
           <PageSection

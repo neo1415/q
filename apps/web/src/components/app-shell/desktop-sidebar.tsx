@@ -16,6 +16,7 @@ import { ChatsListForRoute } from "@/features/q/chats-list";
 import type { ShellContext } from "./app-shell";
 import { GlobalQTrigger } from "./global-q";
 import {
+  FOUNDER_MEDIA_NAVIGATION,
   isActiveRoute,
   PRIMARY_NAVIGATION,
   PROFILE_NAVIGATION,
@@ -60,6 +61,19 @@ export function DesktopSidebar({
               />
             </li>
           ))}
+          {context.scope === "founder_private" ? (
+            <li>
+              <SidebarLink
+                href={FOUNDER_MEDIA_NAVIGATION.href}
+                label={FOUNDER_MEDIA_NAVIGATION.label}
+                Icon={FOUNDER_MEDIA_NAVIGATION.icon}
+                active={isActiveRoute(
+                  pathname,
+                  FOUNDER_MEDIA_NAVIGATION.href,
+                )}
+              />
+            </li>
+          ) : null}
         </ul>
       </nav>
 

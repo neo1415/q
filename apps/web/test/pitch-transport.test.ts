@@ -145,10 +145,15 @@ describe("apiPitchTransport", () => {
     });
     const transport = apiPitchTransport(session);
 
-    const created = await transport.create(COMPANY, null);
+    const created = await transport.create(COMPANY, null, "pitch-create-1");
     expect(created.pitch.status).toBe("CREATED");
     expect(created.guidance.hardMaxSeconds).toBe(180);
-    await transport.create(COMPANY, ASSET);
+    await transport.create(COMPANY, ASSET, "pitch-replace-1");
+    // Both creations carry the browser's key; a replacement must.
+    expect(calls.slice(0, 2).map((call) => call.idempotencyKey)).toEqual([
+      "pitch-create-1",
+      "pitch-replace-1",
+    ]);
 
     const reserved = await transport.reserve(COMPANY, ASSET, 1);
     expect(reserved.uploadUrl).toBe("https://upload.provider.example/one-time");

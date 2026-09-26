@@ -13,7 +13,6 @@ import {
 
 import type {
   CompanyDto,
-  DiscoveredCompanyDto,
   MediaAssetDto,
   PitchGuidance,
   PlaybackAuthorizationDto,
@@ -35,6 +34,7 @@ import {
   setPitchPlaybackPolicyAction,
   syncPitchAction,
 } from "./pitch-actions";
+import { asDiscovered } from "./pitch-library-state";
 import {
   awaitingReview,
   describeNetworkStanding,
@@ -77,6 +77,11 @@ import { uploadBytes, type UploadOutcome } from "./upload-bytes";
 
 export type PitchUploadProps = {
   readonly companyId: string;
+  /**
+   * Told whenever the record this screen shows changes (a new version, a
+   * status, a decision), so the history beside it can re-read the server.
+   */
+  readonly onRecordChanged?: (() => void) | undefined;
 };
 
 /**
@@ -138,30 +143,7 @@ function formatDuration(seconds: number | null): string | null {
     : `${String(minutes)}m ${String(rest).padStart(2, "0")}s`;
 }
 
-/** The feed's view of this company, for the player it shares with Discover. */
-function asDiscovered(
-  company: CompanyDto,
-  pitch: MediaAssetDto,
-): DiscoveredCompanyDto {
-  return {
-    companyId: company.id,
-    canonicalName: company.canonicalName,
-    websiteUrl: company.websiteUrl,
-    headquartersCountry: company.headquartersCountry,
-    currentStageCode: company.currentStageCode,
-    shortDescription: company.shortDescription,
-    reasons: [],
-    reasonCodes: [],
-    pitch: {
-      mediaAssetId: pitch.mediaAssetId,
-      aspectRatio: pitch.aspectRatio,
-      durationSeconds: pitch.durationSeconds,
-      captionState: pitch.captionState,
-    },
-  };
-}
-
-export function PitchUpload({ companyId }: PitchUploadProps) {
+export function PitchUpload({ companyId, onRecordChanged }: PitchUploadProps) {
   const [flow, dispatch] = useReducer(pitchFlowReducer, INITIAL_PITCH_FLOW);
   const [company, setCompany] = useState<CompanyDto | null>(null);
   const [guidance, setGuidance] = useState<PitchGuidance | null>(null);
@@ -489,6 +471,7 @@ export function PitchUpload({ companyId }: PitchUploadProps) {
           replaces === null || replaces.status === "CREATED"
             ? null
             : replaces.mediaAssetId,
+          `pitch-create-${crypto.randomUUID()}`,
         );
         if (!created.ok) {
           dispatch({ type: "REQUEST_FAILED", message: created.message });
@@ -541,6 +524,21 @@ export function PitchUpload({ companyId }: PitchUploadProps) {
   );
 
   useEffect(() => () => uploadAbort.current?.abort(), []);
+
+  // One signature per record state the server holds; the history re-reads
+  // when it moves, and not on every progress tick.
+  const shown = "pitch" in flow ? flow.pitch : null;
+  const signature =
+    shown === null
+      ? flow.kind
+      : `${shown.mediaAssetId}:${shown.status}:${String(shown.version)}`;
+  const notified = useRef<string | null>(null);
+  useEffect(() => {
+    if (flow.kind === "LOADING" || notified.current === signature) return;
+    const first = notified.current === null;
+    notified.current = signature;
+    if (!first) onRecordChanged?.();
+  }, [flow.kind, signature, onRecordChanged]);
 
   if (loadError !== null) {
     return (
@@ -697,9 +695,11 @@ export function PitchUpload({ companyId }: PitchUploadProps) {
                   onClick={() => fileInput.current?.click()}
                 >
                   <Upload size={ICON_SIZE.regular} aria-hidden="true" />
-                  {flow.kind === "READY" || flow.kind === "FAILED"
+                  {flow.kind === "READY"
                     ? "Replace pitch"
-                    : "Choose a video"}
+                    : flow.kind === "FAILED"
+                      ? "Upload again"
+                      : "Choose a video"}
                 </Button>
               )}
               <p className="cq-caption text-(--cq-text-tertiary)">
