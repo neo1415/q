@@ -35,7 +35,7 @@ The founder does these in claude.ai/code environment settings before or at the s
 - [ ] **GitHub access**: the cloud environment connected to the repo with push rights (the lead pushes `recovery/2026-09-12` and backup branches).
 - [ ] **Network access**: github.com, the npm registry, PyPI (graphify), `*.supabase.co` and `*.pooler.supabase.com`, `*.railway.app` and `backboard.railway.app`, Docker Hub / `public.ecr.aws` (Supabase images). Full network access is simplest.
 - [ ] **Monthly spend limit** at claude.ai → Settings → Usage (the hard cap behind the $250).
-- [ ] **Sunday authority** (the founder is away all day): give the lead a standing yes, or a no, for hosted migration pushes on Sunday (always dry-run first, applied before the code that needs them, logged in the ledger). Without a standing yes, the lead merges only code that needs no new hosted migration and queues the rest for Monday morning. Railway variable changes stay founder-only.
+- [x] **Sunday authority: GRANTED on 2026-09-26.** The founder said "apply whatever migrations need to be applied please... i want it all to be autonomous". This is a standing yes for hosted migration pushes, under three conditions: dry-run first; additive or fix-forward only (a migration that drops or rewrites data, or loosens RLS/grants, still waits for the founder); applied before the code that needs it, then logged in the ledger. Railway variable and secret changes stay founder-only.
 - [ ] Before the switch, the **local lead pushes every in-flight branch** (section 7) to GitHub.
 
 ## 2. Read order (do not read more than this up front)
@@ -191,7 +191,7 @@ This is playbook section 0, in the same order, with the state at handoff. Finish
 - **Embeddings local-only:** semantic search runs on local Docker only; Railway is keyword retrieval (the 1 GB cap cannot run the embedding runtime).
 - **Deploy often** so the founder can test: build all four deployables first (`pnpm deploy:build:web` etc. or `turbo run build --filter=@capital-q/{web,api,q-api,workers}...`), then push recovery.
 - **Commit and push discipline:** small commits; after each merge push recovery, fetch, confirm local HEAD equals the remote head, and record both SHAs (CLAUDE.md Git Continuity). If a push fails, report `IMPLEMENTED BUT REMOTE BACKUP BLOCKED` and stop there.
-- **Hosted DB:** the founder approves hosted migration pushes. Dry-run first, apply **before** pushing code that needs the migration. Never `supabase db reset` against hosted; never read hosted user rows; never use hosted for tests.
+- **Hosted DB:** standing founder approval (2026-09-26) for additive or fix-forward migrations. Dry-run first, apply **before** pushing code that needs the migration; destructive or permission-loosening migrations wait for the founder. Never `supabase db reset` against hosted; never read hosted user rows; never use hosted for tests.
 - **Railway variables:** never change them without the founder. Never set `CQ_SYNTHETIC_DEMO_ROUTING` on Railway; never give workers the synthetic attestation variables.
 - **No ngrok** (Railway's q-api domain is `Q_API_PUBLIC_URL`). **No `db reset`** on any shared database. **No `git gc`** on the laptop repo (does not apply to a fresh cloud clone).
 - Commits end with `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.
@@ -217,8 +217,8 @@ pnpm test:integration                               # needs local Supabase (pnpm
 
 ```bash
 DATABASE_URL="$HOSTED_POOLER_URL" node scripts/handoff/hosted-migrations-status.mjs   # exit 0 = up to date
-pnpm exec supabase db push --db-url "$DATABASE_MIGRATION_URL" --dry-run               # show the founder
-pnpm exec supabase db push --db-url "$DATABASE_MIGRATION_URL"                         # only after the founder says yes
+pnpm exec supabase db push --db-url "$DATABASE_MIGRATION_URL" --dry-run               # read the list; open each new file
+pnpm exec supabase db push --db-url "$DATABASE_MIGRATION_URL" --yes                   # standing approval: additive/fix-forward only
 ```
 
 The URL needs `?sslmode=require` for the CLI (memory `hosted-supabase-state.md`). `scripts/db-push.mjs` (`pnpm db:push`) wraps the same and refuses a local URL. `scripts/handoff/recent-artifacts.mjs` lists the latest hosted artifacts (id, type, status, time) to prove a "make me a PDF" turn really produced one.
@@ -236,9 +236,54 @@ curl -sI https://capital-qweb-production.up.railway.app | head -n 5   # expect 3
 
 "Deployed" on Railway is not health: `/health/ready` must answer with the right `service` name. Workers have no listener; they are healthy when RUNNING and the log shows the outbox and document loops started. Silent Q on Railway with no think failure means the speak relay upstream (ElevenLabs quota or key): check `railway logs` for `speak relay` before touching code (memory `railway-elevenlabs-key-mismatch.md`).
 
+## 10a. Don't break what works (safety rails, binding)
+
+The founder has seen this product working and is testing it live. Saving money never justifies breaking it, and neither does missing context. When unsure, read the relevant memory note, ADR, vault decision or transcript passage (grep) **before** changing anything.
+
+**Context to consult before touching an area:**
+
+- `docs/handoff/vault/decisions.md` (the laptop engineering decisions log, verbatim) and `docs/handoff/vault/logs/` (per-packet session logs).
+- `docs/handoff/memory/*.md`: hard-won lessons, for example Turbo strict env, the vitest worker timeout, the React Suspense rAF reveal, git pack corruption, and CRLF writes.
+- `docs/adr/`: especially 0011 and 0016 (no word lists, the tool-calling Q loop) and 0017 (founder design).
+- `docs/handoff/transcripts/INDEX.md` for what the founder actually said. Grep, never read whole.
+
+**Merge rules:**
+
+- Cherry-pick worker commits onto `recovery/2026-09-12`. Never merge recovery into worker branches, never force-push, never rewrite history.
+- Before pushing recovery:
+  - build the dependencies of every touched app;
+  - run `tsc --noEmit` on api, q-api and web;
+  - run the touched and neighbouring test files;
+  - run lint on the changed files.
+  - Rerun "Failed to start forks worker" files individually.
+- Resolve conflicts by keeping both sides' intent. Re-read the result before `git add`. A dropped hunk from another packet is a regression.
+- Push only green. A red check is fixed or the commit is left out, never pushed "to see".
+
+**After every deploy (mandatory):**
+
+- Wait for all four Railway services to reach SUCCESS on the new SHA.
+- api and q-api `/health/ready` return 200; web returns 307.
+- Walk the smoke journey on the deployed site in the built-in browser: sign in as the demo investor and the demo founder, open Home Q, ask one typed question and get an answer, open Discover and see a pitch play, open the profile, and download one PDF artifact (`scripts/artifact-download-check.mjs`).
+
+**If a deploy breaks something:**
+
+1. Fix forward within about 20 minutes. Otherwise `git revert` the offending commit(s) on recovery and push, so the site returns to the last good state.
+2. Log it in the ledger. Never leave the live site broken while building the next thing.
+3. Migrations are never reverted: fix forward with a new migration.
+
+**Invariants that must never regress** (release-blocking):
+
+- Context Firewall and founder-private isolation.
+- RLS and tenant isolation.
+- Approval before consequential actions.
+- One canonical company, investor and relationship.
+- No live provider calls from tests.
+- No secrets in git.
+
 ## 11. Session hygiene
 
 - Ledger (`docs/handoff/research/ledger.md`): one dated line per merge, deploy, founder decision and spend check.
 - Session logs go in `docs/handoff/logs/YYYY-MM-DD-<topic>.md` (template in `CLAUDE-GLOBAL-NOTES.md`), under 40 lines. Durable decisions go in the ledger or an ADR, not only in a log.
+- Vault: the laptop vault is copied verbatim to `docs/handoff/vault/`. Append new durable decisions to `docs/handoff/vault/decisions.md`.
 - Memory: the cloud has no `~/.claude` memory from the laptop. `docs/handoff/memory/` is the copy; add new durable lessons there as files and to its `MEMORY.md` index.
 - Run `/compact` after each merge-and-deploy cycle with the current queue, open branches and pending decisions as focus.

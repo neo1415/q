@@ -35,3 +35,4 @@ packages/taxonomy/evals/reports/
 # kept byte-for-byte as exported, so tooling must not reflow them.
 docs/handoff/memory
 docs/handoff/transcripts
+docs/handoff/vault
