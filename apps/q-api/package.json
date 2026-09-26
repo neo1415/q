@@ -31,6 +31,7 @@
     "@capital-q/onboarding": "workspace:*",
     "@capital-q/organisations": "workspace:*",
     "@capital-q/public-identity": "workspace:*",
+    "@capital-q/verification": "workspace:*",
     "@capital-q/permissions": "workspace:*",
     "@capital-q/q-actions": "workspace:*",
     "@capital-q/q-artifacts": "workspace:*",

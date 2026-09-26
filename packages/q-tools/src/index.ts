@@ -52,11 +52,20 @@ export type {
   InvestorFeedCompany,
   InvestorFeedDecision,
   InvestorFeedPort,
+  HandleClaimPort,
   ProfileChangePort,
   QToolPorts,
   RelationshipIntelligencePort,
   VisibilityIntelligencePort,
 } from "./ports.js";
+export {
+  createProposeHandleClaimTool,
+  PROPOSE_HANDLE_CLAIM,
+  ProposeHandleClaimInputSchema,
+  ProposeHandleClaimOutputSchema,
+  type ProposeHandleClaimInput,
+  type ProposeHandleClaimOutput,
+} from "./tools/handle-claim.js";
 export {
   createProposeProfileChangeTool,
   FIELDS_BY_PROFILE,

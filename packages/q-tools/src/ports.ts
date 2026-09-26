@@ -191,6 +191,29 @@ export type QToolPorts = {
   readonly profileChanges?: ProfileChangePort | undefined;
   /** Who can see what (CQ-BIZ-003); absent means no visibility tool exists. */
   readonly visibility?: VisibilityIntelligencePort | undefined;
+  /** Handle claims for approval (BIZ-004); absent means the tool does not exist. */
+  readonly handleClaims?: HandleClaimPort | undefined;
+};
+
+/**
+ * Where a proposed handle waits for the run's Approval Engine proposer
+ * (BIZ-004). The composition checks the handle's shape, the reserved list
+ * and availability, and answers REFUSED with a person-facing reason.
+ */
+export type HandleClaimPort = {
+  readonly prepareHandleClaim: (entry: {
+    readonly runId: string;
+    readonly tenantId: string;
+    readonly actorUserId: string;
+    readonly subjectType: "COMPANY" | "INVESTOR_ORGANISATION";
+    /** Resolved by the tool from the actor and the plan, never by the model. */
+    readonly subjectId: string;
+    readonly handle: string;
+  }) => Promise<{
+    readonly status: "PREPARED" | "ONE_PER_TURN" | "REFUSED";
+    readonly awaitingApprovalOf: string | null;
+    readonly reason: string | null;
+  }>;
 };
 
 /**

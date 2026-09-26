@@ -48,6 +48,7 @@ import {
   createPostgresInvestorMandateQueryPort,
   createPostgresInvestorOrganisationQueryPort,
   createPostgresInvestorOrganisationRepository,
+  createPostgresInvestorProfileQueryPort,
 } from "@capital-q/investors";
 import { INVESTOR_EVENTS } from "@capital-q/investors/events";
 import {
@@ -134,6 +135,8 @@ import {
 } from "@capital-q/q-knowledge";
 import {
   ActorContextSchema,
+  OrganisationIdSchema,
+  TenantIdSchema,
   createAuthorizationService,
   type ActorContext,
 } from "@capital-q/security";
@@ -218,6 +221,14 @@ import { createPersonProfileUpdateAction } from "./composition/person-profile-ac
 import { createInvestorProfileUpdateAction } from "./composition/investor-profile-action.js";
 import { createProfileChangeBoard } from "./composition/profile-change-board.js";
 import { createProfileFindingsReader } from "./composition/profile-findings.js";
+import { createHandleClaimAction } from "./composition/handle-claim-action.js";
+import { createHandleClaimBoard } from "./composition/handle-claim-board.js";
+import {
+  createPostgresPublicIdentityRepository,
+  createPublicIdentityService,
+  createSubjectDirectory,
+} from "@capital-q/public-identity";
+import { createVerificationClaimsReadinessPort } from "@capital-q/verification";
 import {
   createConversationDigestPort,
   createMemoryLearner,
@@ -661,6 +672,43 @@ const interestService = createInterestService({
 const relationshipBoard = createRelationshipActionBoard({ logger });
 // A profile change the person asked Q for waits here for approval (BIZ-002).
 const profileChangeBoard = createProfileChangeBoard({ logger });
+// Handles and the Q Card (BIZ-004), composed as the application API
+// composes them: the same service, the same allowlisted subject facts.
+const cardVerification = createVerificationClaimsReadinessPort({
+  sql: database.sql,
+});
+const cardInvestorFacts = createPostgresInvestorProfileQueryPort({
+  sql: database.sql,
+});
+const cardSubjects = createSubjectDirectory({
+  findCompany: async (companyId) => {
+    const id = CompanyIdSchema.safeParse(companyId);
+    return id.success ? companies.findCanonicalCompanyProfile(id.data) : null;
+  },
+  findInvestor: (investorOrganisationId) =>
+    cardInvestorFacts.findCanonicalInvestorProfile(investorOrganisationId),
+  companyVerification: async (subject) => {
+    const standings = await cardVerification.currentStandings({
+      tenantId: TenantIdSchema.parse(subject.tenantId),
+      organisationId: OrganisationIdSchema.parse(subject.organisationId),
+      companyId: CompanyIdSchema.parse(subject.companyId),
+    });
+    return {
+      organisation: standings.organisationIdentity === "VERIFIED",
+      founderIdentity: standings.founderIdentity === "VERIFIED",
+    };
+  },
+});
+const publicIdentity = createPublicIdentityService({
+  sql: database.sql,
+  transactions: database.transactions,
+  authorization,
+  audit: createPostgresMaterialActionAuditWriter(),
+  repository: createPostgresPublicIdentityRepository(),
+  subjects: cardSubjects,
+});
+// "Make me a Q card" waits here for approval (BIZ-004).
+const handleClaimBoard = createHandleClaimBoard({ publicIdentity, logger });
 
 // Who can see what (CQ-BIZ-003): the permissions context's visibility
 // centre, composed as the application API composes it -- the same
@@ -749,6 +797,7 @@ const qTools = createQTools({
       state: (actor, companyId) => visibilityCentre.state({ actor, companyId }),
       prepareForApproval: visibilityBoard.prepareForApproval,
     },
+    handleClaims: handleClaimBoard,
   },
   logger,
 });
@@ -830,6 +879,13 @@ const qActionRegistry = createQActionRegistry([
   // What Q shows about the person: their own record, their own approval.
   createPersonProfileUpdateAction({ people, logger }),
   // The investor organisation's declared profile (BIZ-002).
+  // The organisation's public handle and Q Card (BIZ-004).
+  createHandleClaimAction({
+    publicIdentity,
+    subjects: cardSubjects,
+    authorization,
+    logger,
+  }),
   createInvestorProfileUpdateAction({
     investors: investorService,
     authorization,
@@ -858,6 +914,7 @@ const qActionPort = createQActionPort({
     relationshipBoard.proposer,
     profileChangeBoard.proposer,
     visibilityBoard.proposer,
+    handleClaimBoard.proposer,
     profileBoard,
   ),
   // What Q says about an action is read from the records the engine

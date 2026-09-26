@@ -240,6 +240,9 @@ importers:
       '@capital-q/security':
         specifier: workspace:*
         version: link:../../packages/security
+      '@capital-q/verification':
+        specifier: workspace:*
+        version: link:../../packages/verification
       '@elevenlabs/elevenlabs-js':
         specifier: 2.68.0
         version: 2.68.0

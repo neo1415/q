@@ -14,6 +14,7 @@ import { createResearchPublicWebTool } from "./tools/research-public-web.js";
 import { createDiscoverySlateTool } from "./tools/discovery-slate.js";
 import { createFindProspectiveInvestorsTool } from "./tools/find-prospective-investors.js";
 import { createRecommendationExplanationTool } from "./tools/recommendation-explanation.js";
+import { createProposeHandleClaimTool } from "./tools/handle-claim.js";
 import { createProposeProfileChangeTool } from "./tools/profile-change.js";
 import { createRelationshipTools } from "./tools/relationships.js";
 import { createVisibilityTools } from "./tools/visibility.js";
@@ -62,6 +63,10 @@ export function createDefaultQTools(
     ...(ports.visibility === undefined
       ? []
       : createVisibilityTools(ports.visibility)),
+    // BIZ-004: "make me a Q card" / "change our handle".
+    ...(ports.handleClaims === undefined
+      ? []
+      : [createProposeHandleClaimTool(ports, ports.handleClaims)]),
   ];
 }
 
