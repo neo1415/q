@@ -762,7 +762,8 @@ export async function seedInterest(
         `seed-fictional-answer-${interest.investorKey}-${interest.companyKey}`,
       ),
     );
-    response = String(asRecord(answered["interest"])["response"] ?? response);
+    const answeredResponse = asRecord(answered["interest"])["response"];
+    if (typeof answeredResponse === "string") response = answeredResponse;
   }
   log(`    ${interest.investorKey} -> ${interest.companyKey}: ${response}`);
   return { ...interest, interestId: item.interestId, response };
