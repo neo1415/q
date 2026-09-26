@@ -28,17 +28,21 @@ export const QUserMessageInputSchema = z
 export type QUserMessageInput = z.infer<typeof QUserMessageInputSchema>;
 
 /**
- * What the person is watching as they ask (R18): a pitch and the playback
- * position. Input, never authority -- the Q runtime re-authorises the
- * pitch for the asker with the playback rule before anything is read.
+ * What the person is watching as they ask (R18: Q watches the video with
+ * us): a pitch and the playback position. A request, never authority --
+ * the Q API authorises the asset for the asker with the pitch playback
+ * rule and the company's visibility before anything enters the run's
+ * context, and drops it silently when refused, exactly as if absent.
  */
-export const QWatchingSchema = z
+export const QViewingMomentSchema = z
   .object({
-    pitchId: UuidSchema,
-    atSeconds: z.number().int().min(0).max(86_400),
+    kind: z.literal("PITCH_PLAYBACK"),
+    companyId: UuidSchema,
+    mediaAssetId: UuidSchema,
+    positionSeconds: z.number().int().min(0).max(7200),
   })
   .strict();
-export type QWatching = z.infer<typeof QWatchingSchema>;
+export type QViewingMoment = z.infer<typeof QViewingMomentSchema>;
 
 /**
  * PUBLIC. The body a client sends to start a Q run (doc 22 §67).
@@ -66,8 +70,8 @@ export const CreateQRunRequestSchema = z
     modality: QClientModalitySchema,
     locale: QLocaleSchema.optional(),
     conversationId: QConversationIdSchema.optional(),
-    /** R18: asked while watching a pitch. */
-    watching: QWatchingSchema.optional(),
+    /** R18: asked while watching a pitch; authorised server-side or dropped. */
+    viewing: QViewingMomentSchema.optional(),
   })
   .strict();
 

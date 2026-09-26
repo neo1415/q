@@ -3,6 +3,7 @@ import { z } from "zod";
 import { UuidSchema } from "../common/ids.js";
 import { UtcTimestampSchema } from "../common/time.js";
 import { QConversationIdSchema } from "./ids.js";
+import { QViewingMomentSchema } from "./request.js";
 import { QSubjectRefsSchema } from "./subject.js";
 
 /**
@@ -112,6 +113,11 @@ export const CreateQVoiceSessionRequestSchema = z
     conversationId: QConversationIdSchema.optional(),
     /** The platform subjects spoken questions are about, resolved and authorised server-side. */
     subjects: QSubjectRefsSchema.optional(),
+    /**
+     * R18: the pitch being watched while speaking. Authorised server-side
+     * with the playback rule, or dropped as if absent.
+     */
+    viewing: QViewingMomentSchema.optional(),
     /**
      * The interview the person is in, so spoken answers reach the same
      * onboarding session their typed answers do. Ownership is enforced by
