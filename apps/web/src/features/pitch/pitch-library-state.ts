@@ -140,10 +140,16 @@ export function toPitchVersionRows(
       pitch.status === "READY" &&
       pitch.moderationStatus === "ALLOWED" &&
       pitch.playbackPolicy !== "PRIVATE";
+    // An upload still in flight on a version that was since replaced will
+    // never finish: the record keeps its last honest state, and the words
+    // say what that means rather than "Uploading" forever.
+    const abandoned =
+      !isCurrent &&
+      (phase === "WAITING" || phase === "UPLOADING" || phase === "PROCESSING");
     return {
       pitch,
       phase,
-      phaseLabel: PHASE_LABEL[phase],
+      phaseLabel: abandoned ? "Upload not completed" : PHASE_LABEL[phase],
       isCurrent,
       isPublished,
       standing: standingOf(pitch, isCurrent, isPublished),
