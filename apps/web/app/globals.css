@@ -569,6 +569,211 @@
   }
 
   /*
+   * Discover, immersive (spec §9; ADR 0017 C4/C5). One stage on the stage
+   * tokens in either theme -- the video carries the cinema, the chrome
+   * stays out of its way.
+   *
+   * Phone: the pitch fills the screen between the top and the bottom
+   * navigation (the header hides; the bottom navigation stays), the
+   * company and its decisions float over it on a scrim, the action rail
+   * runs down the right. Desktop: a 9:16 stage at the full height of the
+   * workspace, never stretched, with the company and the decisions in an
+   * intelligence panel beside it.
+   */
+  .cq-shell:has([data-feed-immersive]) [data-q-dock] {
+    display: none;
+  }
+  @media (max-width: 1023px) {
+    .cq-shell:has([data-feed-immersive]) .cq-shell-header {
+      display: none;
+    }
+  }
+  .cq-feed {
+    height: calc(100svh - var(--cq-bottom-nav-height) - var(--cq-safe-bottom));
+    overflow: hidden;
+  }
+  .cq-feed-stage {
+    position: relative;
+    height: 100%;
+    overflow: hidden;
+    touch-action: none;
+  }
+  .cq-feed-media {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    background: var(--cq-stage-canvas);
+  }
+  .cq-feed-slot {
+    position: absolute;
+    inset: 0;
+    transition: transform var(--cq-motion-emphasis) var(--cq-ease);
+    will-change: transform;
+  }
+  [data-reduced-motion] .cq-feed-slot {
+    transition: none;
+  }
+  .cq-feed-player,
+  .cq-feed-video {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+  }
+  .cq-feed-video {
+    object-fit: cover;
+    background: var(--cq-stage-canvas);
+  }
+  .cq-feed-player-controls {
+    position: absolute;
+    top: calc(12px + var(--cq-safe-top));
+    left: 12px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+  }
+  .cq-feed-still {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 24px;
+    text-align: center;
+  }
+  /* Over the pitch on a phone: a scrim only where the words are. */
+  .cq-feed-overlay {
+    position: absolute;
+    inset: auto 0 0 0;
+    display: flex;
+    max-height: 72%;
+    flex-direction: column;
+    gap: 8px;
+    padding: 48px 16px 16px;
+    background: linear-gradient(
+      to top,
+      var(--cq-stage-canvas) 0%,
+      transparent 100%
+    );
+    overflow-y: auto;
+    scrollbar-width: none;
+  }
+  .cq-feed-card {
+    gap: 12px;
+  }
+  .cq-feed-card .cq-feed-info {
+    padding-right: 84px;
+  }
+  .cq-feed-info .cq-body {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    overflow: hidden;
+  }
+  .cq-feed-rail {
+    position: absolute;
+    right: 8px;
+    bottom: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .cq-feed-rail-button {
+    display: inline-flex;
+    width: 72px;
+    min-height: 56px;
+    height: auto;
+    flex-direction: column;
+    gap: 2px;
+    padding: 6px 4px;
+    font-size: 12px;
+    white-space: normal;
+    text-align: center;
+  }
+  .cq-feed-nav {
+    position: absolute;
+    top: calc(12px + var(--cq-safe-top));
+    right: 12px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+  }
+  .cq-feed-nav-button {
+    display: inline-flex;
+    width: 44px;
+    height: 44px;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--cq-stage-border);
+    border-radius: var(--cq-radius-full);
+    background: var(--cq-stage-surface);
+    color: var(--cq-stage-text);
+    cursor: pointer;
+  }
+  .cq-feed-nav-button:disabled {
+    opacity: 0.4;
+    cursor: default;
+  }
+
+  @media (min-width: 1024px) {
+    .cq-feed {
+      height: 100dvh;
+    }
+    /* The stage and the panel side by side; the stage is the pitch's own
+       9:16, the full height of the workspace less the gutters. */
+    .cq-feed-stage {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 440px;
+      gap: 24px;
+      padding: 24px;
+    }
+    .cq-feed-media {
+      position: relative;
+      inset: auto;
+      justify-self: center;
+      height: calc(100dvh - 48px);
+      aspect-ratio: 9 / 16;
+      border-radius: var(--cq-radius-lg);
+    }
+    .cq-feed-overlay {
+      position: static;
+      max-height: none;
+      padding: 0;
+      background: none;
+      overflow-y: auto;
+    }
+    .cq-feed-card .cq-feed-info {
+      padding-right: 0;
+    }
+    .cq-feed-info .cq-body {
+      display: block;
+    }
+    .cq-feed-rail {
+      position: static;
+      flex-direction: row;
+      flex-wrap: wrap;
+    }
+    .cq-feed-rail-button {
+      width: auto;
+      min-height: 44px;
+      flex-direction: row;
+      gap: 8px;
+      padding: 0 14px;
+      font-size: 14px;
+    }
+    .cq-feed-nav {
+      top: 50%;
+      right: calc(440px + 48px);
+      transform: translateY(-50%);
+    }
+  }
+
+  /*
    * The Q Dock (features/q-dock; ADR 0017 F1). A fixed layer that takes no
    * pointer events itself; the dock inside it is placed by transform only
    * (Motion), so moving it never touches layout.

@@ -81,14 +81,14 @@ export default async function DiscoverPage() {
       the controller owns loading so that paging, position and the preload
       budget have a single owner (CQ-WEB-020/021).
     */
+    // The feed is immersive (spec §9; ADR 0017 C4/C5): the stage is the
+    // page, so it takes the whole workspace rather than a reading column.
+    // The heading is kept for assistive technology and the tab title.
     return (
-      <PageContainer>
-        <PageHeader
-          title="Discover"
-          description="Companies that chose to be discoverable, ordered against the mandate you declared."
-        />
+      <>
+        <h1 className="sr-only">Discover</h1>
         <InvestorFeedScreen />
-      </PageContainer>
+      </>
     );
   }
 

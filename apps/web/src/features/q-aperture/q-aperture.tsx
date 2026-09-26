@@ -65,6 +65,8 @@ export type QApertureProps = {
 export function useStageApertureSize(): 160 | 224 {
   const [size, setSize] = useState<160 | 224>(160);
   useEffect(() => {
+    // A host with no media queries (a test DOM) keeps the phone size.
+    if (typeof window.matchMedia !== "function") return;
     const query = window.matchMedia("(min-width: 1024px)");
     const apply = () => setSize(query.matches ? 224 : 160);
     apply();

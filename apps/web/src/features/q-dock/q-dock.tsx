@@ -173,6 +173,8 @@ export function QDock() {
     voice !== undefined &&
     (q.working || approval !== null || voice.active);
   const stashed = chosen.stashed && !compact;
+  // Where the investor feed is on screen the dock merges into its action
+  // rail (spec §6.2): hidden in CSS while `[data-feed-immersive]` exists.
   const visible = session !== null && !onQPage && !hidden;
 
   // Re-place on anything that moves the chrome or a registered control.
