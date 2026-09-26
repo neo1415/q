@@ -49,8 +49,10 @@ import { INTERVIEW_AGENT_V5 } from "./tasks/interview-agent.v5.js";
 import { INTERVIEW_AGENT_V6 } from "./tasks/interview-agent.v6.js";
 import { INTERVIEW_AGENT_V7 } from "./tasks/interview-agent.v7.js";
 import { INTERVIEW_AGENT_V8 } from "./tasks/interview-agent.v8.js";
+import { INTERVIEW_AGENT_V9 } from "./tasks/interview-agent.v9.js";
 import { DELEGATION_READER_V1 } from "./tasks/delegation-reader.v1.js";
 import { DELEGATION_READER_V2 } from "./tasks/delegation-reader.v2.js";
+import { DELEGATION_READER_V3 } from "./tasks/delegation-reader.v3.js";
 import { INTERVIEW_CONDUCTOR_V11 } from "./tasks/interview-conductor.v11.js";
 import { PRESENCE_READER_V1 } from "./tasks/presence-reader.v1.js";
 import { WELCOME_CONDUCTOR_V1 } from "./tasks/welcome-conductor.v1.js";
@@ -193,8 +195,10 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition<unknown, unknown>[] =
     INTERVIEW_AGENT_V6,
     INTERVIEW_AGENT_V7,
     INTERVIEW_AGENT_V8,
+    INTERVIEW_AGENT_V9,
     DELEGATION_READER_V1,
     DELEGATION_READER_V2,
+    DELEGATION_READER_V3,
     WELCOME_CONDUCTOR_V1,
     CLAIM_EXTRACTION_V1,
     INVESTOR_MANDATE_SYNTHESIS_V1,

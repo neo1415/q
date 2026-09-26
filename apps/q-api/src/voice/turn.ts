@@ -1320,7 +1320,8 @@ export function createVoiceTurnHandler(
             proactive: false,
           },
         );
-        interviewer.researchEnded(
+        // The engine that handed the look-up over is told how it ended.
+        (agent ?? interviewer).researchEnded(
           onboarding.sessionId,
           lastRunFailed.get(binding) !== true,
         );

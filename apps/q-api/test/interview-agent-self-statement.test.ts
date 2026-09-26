@@ -188,7 +188,8 @@ describe("an answer is recorded only when their latest words state it about them
         }
       }
     }
-  });
+    // 72 full turns: a property, not a slow test.
+  }, 30_000);
 
   it("the same write goes through when the reading finds that step stated", async () => {
     const declarative: readonly [Write, string][] = [

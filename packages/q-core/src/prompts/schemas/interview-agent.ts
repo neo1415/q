@@ -114,6 +114,19 @@ export type InterviewAgentV7Variables = z.infer<
   typeof InterviewAgentV7VariablesSchema
 >;
 
+/**
+ * v9 variables: v7's, plus trusted notes on what else the turn asks (a
+ * pause, a look-up after the reply, look-ups unavailable, a corrected
+ * pronunciation), composed by code from the independent reading.
+ */
+export const InterviewAgentV9VariablesSchema =
+  InterviewAgentV7VariablesSchema.extend({
+    turnNotes: z.string().max(1_500).default(""),
+  }).strict();
+export type InterviewAgentV9Variables = z.infer<
+  typeof InterviewAgentV9VariablesSchema
+>;
+
 export const InterviewAgentResultSchema = z
   .object({
     /** What Q says. Grounded in the tool results of this turn. */

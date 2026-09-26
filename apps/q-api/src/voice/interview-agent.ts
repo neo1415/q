@@ -23,7 +23,11 @@ import type { Logger } from "@capital-q/observability";
 import {
   createDefaultPromptRegistry,
   DEFAULT_COMMUNICATION_PROFILE,
-  type InterviewAgentV7Variables,
+  type InterviewAgentV9Variables,
+  INITIAL_CONVERSATION_STATE,
+  isExhausted,
+  reduceConversation,
+  type ConversationState,
   InterviewAgentResultSchema,
   renderPrompt,
   type InterviewAgentResult,
@@ -58,6 +62,7 @@ import {
 } from "./onboarding-port.js";
 import { createReplySentenceStream } from "./reply-stream.js";
 import { SPOKEN_QUESTIONS } from "./step-copy.js";
+import { textStatedIn } from "./value-support.js";
 
 /**
  * The onboarding interview as a tool-calling Q run (ADR 0016).
@@ -203,6 +208,12 @@ export type InterviewAgentDependencies = {
    * session, so each is raised once. Default: kept in this process.
    */
   readonly raisedChecks?: RaisedChecks | undefined;
+  /**
+   * Whether a question needing a look-up can be handed to Q's research
+   * (the caller runs it and reports back through researchEnded). Default:
+   * available.
+   */
+  readonly researchAvailable?: boolean | undefined;
   /** Milliseconds now; injectable so a test can run out the clock. */
   readonly now?: (() => number) | undefined;
   /** The whole turn's deadline; tests shorten it. */
@@ -241,7 +252,60 @@ export type InterviewAgent = {
   readonly turn: (
     input: InterviewAgentTurnInput,
   ) => Promise<InterviewTurnOutcome>;
+  /**
+   * How a look-up this loop handed over ended (the caller ran it as a Q
+   * run): a route that keeps failing stops being offered, and the next
+   * look-up may start (CQ-QX-005's failure ledger).
+   */
+  readonly researchEnded: (onboardingSessionId: string, ok: boolean) => void;
 };
+
+/**
+ * The trusted notes on what else a turn asks, from the independent
+ * reading and the research ledger. Code composes the facts; the loop says
+ * them in its own words.
+ */
+export function turnNotesFor(input: {
+  readonly pausing: boolean;
+  readonly lookup:
+    | { readonly kind: "RUN"; readonly question: string }
+    | { readonly kind: "RUNNING" }
+    | { readonly kind: "UNAVAILABLE" }
+    | null;
+  readonly pronounce: { readonly term: string; readonly sayAs: string } | null;
+}): string {
+  const notes: string[] = [];
+  if (input.pausing) {
+    notes.push(
+      "They want to pause and come back later: acknowledge it in one short sentence, say their answers are kept, and ask nothing.",
+    );
+  }
+  switch (input.lookup?.kind) {
+    case "RUN":
+      notes.push(
+        `A look-up will run right after your reply for their question: "${input.lookup.question.slice(0, 300)}". Say in a few words that you will look it up; do not answer it yourself, and ask nothing now: the conversation returns to the open question afterwards.`,
+      );
+      break;
+    case "RUNNING":
+      notes.push(
+        "They asked something that needs looking up, and the last look-up is still running: say you will bring it back when it lands, then carry on.",
+      );
+      break;
+    case "UNAVAILABLE":
+      notes.push(
+        "They asked something that needs looking up, and looking things up is not available right now: say so in one short sentence, then carry on.",
+      );
+      break;
+    case undefined:
+      break;
+  }
+  if (input.pronounce !== null) {
+    notes.push(
+      `They corrected how to say "${input.pronounce.term.slice(0, 80)}": say it as "${input.pronounce.sayAs.slice(0, 120)}" from now on, and acknowledge it in a few words.`,
+    );
+  }
+  return notes.length === 0 ? "none" : notes.join("\n");
+}
 
 export function createInterviewAgent(
   dependencies: InterviewAgentDependencies,
@@ -252,6 +316,20 @@ export function createInterviewAgent(
   const deadlineMs = dependencies.turnDeadlineMs ?? TURN_DEADLINE_MS;
   const raisedChecks =
     dependencies.raisedChecks ?? createInMemoryRaisedChecks();
+  const researchAvailable = dependencies.researchAvailable ?? true;
+  /** The conversation core's state per session: the research ledger. */
+  const conversations = new Map<string, ConversationState>();
+  const conversationOf = (id: string) =>
+    conversations.get(id) ?? INITIAL_CONVERSATION_STATE;
+  const remember = (id: string, state: ConversationState) => {
+    conversations.delete(id);
+    conversations.set(id, state);
+    while (conversations.size > 2_000) {
+      const oldest = conversations.keys().next().value;
+      if (oldest === undefined) break;
+      conversations.delete(oldest);
+    }
+  };
 
   const turn = async (
     input: InterviewAgentTurnInput,
@@ -428,6 +506,36 @@ export function createInterviewAgent(
     const approved = listed(authority.approved);
     const declined = listed(authority.declined);
 
+    // What else the turn asks, from the independent reading. A look-up
+    // question goes on in the person's own words, never a model's; the
+    // research ledger decides whether it may run.
+    const ledger = conversationOf(input.onboardingSessionId);
+    const lookupWords =
+      authority.lookup === null
+        ? null
+        : textStatedIn(authority.lookup, utterance)
+          ? authority.lookup
+          : utterance.slice(0, 400);
+    const lookup =
+      lookupWords === null || opening
+        ? null
+        : !researchAvailable || isExhausted(ledger.failures, "RESEARCH")
+          ? ({ kind: "UNAVAILABLE" } as const)
+          : ledger.research !== null
+            ? ({ kind: "RUNNING" } as const)
+            : ({ kind: "RUN", question: lookupWords } as const);
+    // A corrected pronunciation must come from what they said; the term
+    // may be one Q just said.
+    const pronounce =
+      authority.pronounce !== null &&
+      textStatedIn(authority.pronounce.sayAs, utterance) &&
+      (textStatedIn(authority.pronounce.term, utterance) ||
+        textStatedIn(authority.pronounce.term, lastQTurn ?? ""))
+        ? authority.pronounce
+        : null;
+    const pausing = authority.pausing && !opening;
+    const turnNotes = turnNotesFor({ pausing, lookup, pronounce });
+
     // Every round is rendered afresh from the onboarding state and what Q
     // has already done this turn, never from a provider's native tool
     // history: a fallback model cannot continue another provider's
@@ -435,7 +543,7 @@ export function createInterviewAgent(
     // turn must survive its first model failing half way.
     const actions: { tool: string; input: unknown; result: unknown }[] = [];
     const render = () =>
-      renderPrompt<InterviewAgentV7Variables>(registry, {
+      renderPrompt<InterviewAgentV9Variables>(registry, {
         task: "INTERVIEW_AGENT",
         charter: input.channel === "voice" ? "Q_SYSTEM_VOICE" : "Q_SYSTEM",
         operatingMode: "ASSESSMENT",
@@ -459,6 +567,7 @@ export function createInterviewAgent(
           delegated,
           approved,
           declined,
+          turnNotes,
         },
       });
 
@@ -622,10 +731,38 @@ export function createInterviewAgent(
         .filter((row) => row.coveredBy !== undefined)
         .map((row) => row.stepKey) ?? [],
     );
+    const handingOver = lookup?.kind === "RUN";
     const askedOpen =
-      askedStep === undefined || covered.has(askedStep.stepKey)
+      askedStep === undefined ||
+      covered.has(askedStep.stepKey) ||
+      handingOver ||
+      pausing
         ? null
         : toOpenStep(askedStep, view);
+    // Where the conversation returns once the look-up is done: the open
+    // question the journey would ask next, required first.
+    const resumeStep = handingOver
+      ? (view.progress.eligibleSteps
+          .filter(
+            (e) =>
+              e.status !== "COMPLETED" &&
+              e.status !== "SKIPPED" &&
+              !covered.has(e.stepKey),
+          )
+          .sort((a, b) => Number(b.required) - Number(a.required))
+          .map((e) => steps.get(e.stepKey))
+          .find((step) => step !== undefined) ?? null)
+      : null;
+    if (handingOver) {
+      remember(
+        input.onboardingSessionId,
+        reduceConversation(ledger, {
+          type: "RESEARCH_STARTED",
+          question: lookup.question,
+          resumeTopic: resumeStep?.stepKey ?? null,
+        }),
+      );
+    }
     const stillOpen =
       askedOpen !== null &&
       view.progress.eligibleSteps.some(
@@ -705,8 +842,8 @@ export function createInterviewAgent(
           : null,
       recorded,
       skipped: [],
-      questionForQ: null,
-      researching: null,
+      questionForQ: handingOver ? lookup.question : null,
+      researching: handingOver ? lookup.question.slice(0, 200) : null,
       // A completed journey goes where the screen's own button goes: an
       // investor to the companies they set it up to see, a founder home.
       navigate:
@@ -716,12 +853,21 @@ export function createInterviewAgent(
             : "HOME"
           : null,
       handoff: null,
-      pronounce: null,
+      pronounce,
       warnings: 0,
       view,
       degraded: result === undefined,
       reading: null,
-      resume: null,
+      resume:
+        resumeStep === null
+          ? null
+          : {
+              stepKey: resumeStep.stepKey,
+              question: (
+                SPOKEN_QUESTIONS[resumeStep.stepKey] ??
+                resumeStep.configuration.prompt
+              ).slice(0, 400),
+            },
       qualitative: [],
       trace: null,
       askingAbout: stillOpen && askedOpen !== null ? [askedOpen.stepKey] : [],
@@ -732,5 +878,18 @@ export function createInterviewAgent(
     };
   };
 
-  return { turn };
+  const researchEnded = (onboardingSessionId: string, ok: boolean): void => {
+    const finished = reduceConversation(conversationOf(onboardingSessionId), {
+      type: "RESEARCH_FINISHED",
+    });
+    remember(
+      onboardingSessionId,
+      reduceConversation(finished, {
+        type: ok ? "SUCCEEDED" : "FAILED",
+        operation: "RESEARCH",
+      }),
+    );
+  };
+
+  return { turn, researchEnded };
 }

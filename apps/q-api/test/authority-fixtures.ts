@@ -15,6 +15,12 @@ export function reading(
     readonly handed?: readonly string[];
     readonly approved?: readonly string[];
     readonly finishing?: boolean;
+    readonly lookup?: string | null;
+    readonly pausing?: boolean;
+    readonly pronounce?: {
+      readonly term: string;
+      readonly sayAs: string;
+    } | null;
   } = {},
 ): QTurnAuthority {
   return {
@@ -23,6 +29,9 @@ export function reading(
     handed: new Set(partial.handed ?? []),
     approved: new Set(partial.approved ?? []),
     finishing: partial.finishing ?? false,
+    lookup: partial.lookup ?? null,
+    pausing: partial.pausing ?? false,
+    pronounce: partial.pronounce ?? null,
   };
 }
 

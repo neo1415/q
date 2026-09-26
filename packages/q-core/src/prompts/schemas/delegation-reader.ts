@@ -122,3 +122,35 @@ export const DelegationReaderV2ResultSchema = z
 export type DelegationReaderV2Result = z.infer<
   typeof DelegationReaderV2ResultSchema
 >;
+
+/**
+ * v3 — what else the latest words ask of the conversation itself (P0-1:
+ * the capabilities the legacy conductor read with its own model and, for
+ * pause, a word list): a question that needs looking up beyond their own
+ * setup, a wish to pause, and a correction of how Q says a name or term.
+ */
+export const DELEGATION_READER_V3_SCHEMA_VERSION = 3;
+
+export const DelegationReaderV3ResultSchema =
+  DelegationReaderV2ResultSchema.extend({
+    /**
+     * A question of theirs that needs Capital Q's records beyond their own
+     * setup or public sources (a company, a market, other investors), in
+     * their words; null when there is none.
+     */
+    lookup: z.string().trim().min(1).max(400).nullable().default(null),
+    /** They want to stop for now and come back to it later. */
+    pausing: z.boolean().default(false),
+    /** How Q should say a name or term, as they corrected it; null when not. */
+    pronounce: z
+      .object({
+        term: z.string().trim().min(1).max(80),
+        sayAs: z.string().trim().min(1).max(120),
+      })
+      .strict()
+      .nullable()
+      .default(null),
+  }).strict();
+export type DelegationReaderV3Result = z.infer<
+  typeof DelegationReaderV3ResultSchema
+>;

@@ -36,7 +36,7 @@ export const INTERVIEW_AGENT_V8: PromptDefinition<
 > = {
   ...INTERVIEW_AGENT_V7,
   version: 8,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   changeDescription:
     "Consistency checks: code lists inconsistencies in what is on the record; Q raises each once as a question with the values, never corrects a value, records a change or confirm_as_stated, and names the checks it raised.",
   effectiveFrom: "2026-09-25",

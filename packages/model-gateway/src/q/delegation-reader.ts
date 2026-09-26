@@ -3,9 +3,9 @@ import type { Logger } from "@capital-q/observability";
 import {
   createDefaultPromptRegistry,
   DEFAULT_COMMUNICATION_PROFILE,
-  DelegationReaderV2ResultSchema,
+  DelegationReaderV3ResultSchema,
   renderPrompt,
-  type DelegationReaderV2Result,
+  type DelegationReaderV3Result,
   type DelegationReaderV2Variables,
   type PromptRegistry,
 } from "@capital-q/q-core";
@@ -38,6 +38,12 @@ export type QTurnAuthority = {
   readonly approved: ReadonlySet<string>;
   /** They confirmed the record and want to finish now. */
   readonly finishing: boolean;
+  /** A question needing a look-up beyond their setup, in their words. */
+  readonly lookup: string | null;
+  /** They want to stop for now and come back later. */
+  readonly pausing: boolean;
+  /** How Q should say a name or term, as they corrected it. */
+  readonly pronounce: { readonly term: string; readonly sayAs: string } | null;
 };
 
 /** Nothing established: what an opening, or nothing said, reads as. */
@@ -47,6 +53,9 @@ export const NO_TURN_AUTHORITY: QTurnAuthority = {
   handed: new Set(),
   approved: new Set(),
   finishing: false,
+  lookup: null,
+  pausing: false,
+  pronounce: null,
 };
 
 export type QDelegationReader = {
@@ -126,7 +135,7 @@ export function createQDelegationReader(dependencies: {
             utterance,
           },
         });
-        const response = await gateway.execute<DelegationReaderV2Result>(
+        const response = await gateway.execute<DelegationReaderV3Result>(
           {
             taskClass: "FAST_CLASSIFICATION",
             reasoning: "LOW",
@@ -140,12 +149,12 @@ export function createQDelegationReader(dependencies: {
               : { dataPosture: dependencies.dataPosture }),
           },
           {
-            schema: DelegationReaderV2ResultSchema,
+            schema: DelegationReaderV3ResultSchema,
             ...(input.signal === undefined ? {} : { signal: input.signal }),
           },
         );
         if (response.output.kind !== "STRUCTURED") return null;
-        const parsed = DelegationReaderV2ResultSchema.safeParse(
+        const parsed = DelegationReaderV3ResultSchema.safeParse(
           (response.output as { readonly value: unknown }).value,
         );
         if (!parsed.success) return null;
@@ -161,6 +170,9 @@ export function createQDelegationReader(dependencies: {
           // A required step is never declined, whatever the reading says.
           declined: keys(parsed.data.declined, optional),
           finishing: parsed.data.finishing,
+          lookup: parsed.data.lookup,
+          pausing: parsed.data.pausing,
+          pronounce: parsed.data.pronounce,
           handed: new Set(
             parsed.data.delegated
               .map((item) => item.stepKey)

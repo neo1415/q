@@ -47,7 +47,7 @@ export const DELEGATION_READER_V2: PromptDefinition<
 > = {
   id: DELEGATION_READER_V1.id,
   version: 2,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   kind: "TASK",
   taskClass: "FAST_CLASSIFICATION",
   owner: "q-core",
