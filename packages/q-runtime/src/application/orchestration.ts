@@ -194,6 +194,12 @@ export type QAnswerRequest = QOrchestrationSubjectContext & {
 export type QResearchDirective = {
   readonly mode: "EXPLICIT" | "ONLY_IF_EMPTY" | "NEVER";
   readonly announceSourceChange: boolean;
+  /**
+   * A question to Q with research up: a platform lookup the world can also
+   * answer (prospective investors) that came back empty or thin may fall
+   * back to public sources.
+   */
+  readonly fallback?: boolean | undefined;
 };
 
 export type QAnswerOutcome =

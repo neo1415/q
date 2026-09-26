@@ -301,8 +301,11 @@ describe("a general turn is read before it is answered", () => {
       outcomes: [],
     });
     await answer.answer(request());
+    // The model never holds the web on this turn. The fallback only lets
+    // code read public sources after the platform's own prospects lookup
+    // comes back thin (gap 1); it is not a research directive.
     expect(directives).toEqual([
-      { mode: "NEVER", announceSourceChange: false },
+      { mode: "NEVER", announceSourceChange: false, fallback: true },
     ]);
   });
 

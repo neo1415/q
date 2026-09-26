@@ -157,3 +157,49 @@ describe("a failed answer is named once, by its subsystem", () => {
     }
   });
 });
+
+describe("the prospects fallback (gap 1)", () => {
+  it("is allowed exactly for a question to Q with research up", () => {
+    const kinds = [
+      "QUESTION_TO_Q",
+      "ANSWER",
+      "CORRECTION",
+      "SMALL_TALK",
+      "OFF_TOPIC",
+    ] as const;
+    for (const kind of kinds) {
+      for (const available of [true, false]) {
+        const result = directive(
+          read({
+            kind,
+            question:
+              kind === "QUESTION_TO_Q"
+                ? { kind: "ADVICE", text: "Who would likely invest in us?" }
+                : null,
+          }),
+          available,
+        );
+        expect(result.mode, `${kind}/${String(available)}`).toBe("NEVER");
+        expect(result.fallback === true, `${kind}/${String(available)}`).toBe(
+          kind === "QUESTION_TO_Q" && available,
+        );
+      }
+    }
+  });
+
+  it("is withheld once research is exhausted", () => {
+    let state = INITIAL_CONVERSATION_STATE;
+    for (let i = 0; i < 5; i += 1) {
+      state = reduceConversation(state, {
+        type: "FAILED",
+        operation: "RESEARCH",
+      });
+    }
+    const result = directive(
+      read({ question: { kind: "ADVICE", text: "Who would invest in us?" } }),
+      true,
+      state,
+    );
+    expect(result.fallback === true).toBe(false);
+  });
+});

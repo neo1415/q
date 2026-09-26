@@ -32,6 +32,7 @@ import {
   createModelGatewayQAnswer,
   ENVIRONMENT_NOTES_MAX_CHARS,
   environmentNotesFor,
+  PROSPECT_RESEARCH_NOTE,
   RESEARCH_NOTE,
   type QUserStatementRecorder,
 } from "../src/q/index.js";
@@ -657,5 +658,120 @@ describe("answer seam: public-web research", () => {
     });
     await noRecorder.seam.answer(noRecorder.request);
     expect(noRecorder.messages.at(-1)?.content).toBe("none");
+  });
+});
+
+const PROSPECTS: QOfferedTool = {
+  toolName: "investor.prospects",
+  toolVersion: 1,
+  classification: "READ_ONLY",
+  definition: {
+    name: "find_prospective_investors",
+    description: "Finds likely-fit investors on Capital Q.",
+    inputJsonSchema: { type: "object", properties: {} },
+  },
+  visibleStage: "COMPARING_OPPORTUNITIES",
+};
+
+function prospectsOutcome(
+  proposal: QToolProposal,
+  count: number,
+): QToolCallOutcome {
+  return {
+    callId: proposal.callId,
+    toolName: "investor.prospects",
+    toolVersion: 1,
+    classification: "READ_ONLY",
+    status: "SUCCEEDED",
+    failureCode: null,
+    sensitivity: "INTERNAL",
+    result: {
+      ok: true,
+      data: {
+        fitVersion: 1,
+        companySource: "CONVERSATION",
+        compared: { countryCode: "NG", stageCode: "seed" },
+        prospects: Array.from({ length: count }, (_, i) => ({
+          investorOrganisationId: randomUUID(),
+          name: `Investor ${String(i)}`,
+          investorType: "vc",
+          hqCountry: "NG",
+          publicDescription: null,
+          websiteUrl: null,
+          deploymentState: null,
+          reasons: [],
+          label: "likely fit, not evidence of interest",
+        })),
+        notes: [],
+      },
+    },
+    latencyMs: 3,
+  };
+}
+
+const prospectsCall: FakeBehaviour = {
+  kind: "TOOL_CALLS",
+  calls: [
+    {
+      callId: "p1",
+      name: "find_prospective_investors",
+      arguments: { company: { countryCode: "NG", stageCode: "seed" } },
+    },
+  ],
+};
+
+describe("gap 1 · prospects: the platform first, then cited public research", () => {
+  it("researches publicly exactly when the platform holds too few, under any directive that allows it", async () => {
+    const directives = [
+      { mode: "NEVER", announceSourceChange: false, fallback: true },
+      { mode: "NEVER", announceSourceChange: false },
+      { mode: "ONLY_IF_EMPTY", announceSourceChange: false },
+    ] as const;
+    for (const count of [0, 1, 2, 3, 6]) {
+      for (const directive of directives) {
+        const tools = toolPort([PROSPECTS, RESEARCH], (p) =>
+          p.name === "find_prospective_investors"
+            ? prospectsOutcome(p, count)
+            : researchOutcome(
+                p,
+                "Kestrel Ventures backs seed fintech in Lagos.",
+              ),
+        );
+        const run = build({
+          script: [prospectsCall, { kind: "JSON", value: analystResult("x") }],
+          tools: tools.port,
+          userText: "Who would likely invest in Zino Aviation?",
+          subjects: [],
+        });
+        await run.seam.answer({
+          ...run.request,
+          research: Promise.resolve(directive),
+        });
+        const researched = tools.executed.some(
+          (e) => e.proposal.name === "research_public_web",
+        );
+        const allowed =
+          directive.mode !== "NEVER" ||
+          ("fallback" in directive && directive.fallback);
+        const label = `${String(count)} prospects, ${JSON.stringify(directive)}`;
+        expect(researched, label).toBe(count < 3 && allowed);
+        // The model is told what the sources are for and how to label
+        // every candidate, whenever they were read for prospects.
+        const final = run.alpha.calls.at(-1)?.request.messages ?? [];
+        expect(
+          final.some((m) => m.content === PROSPECT_RESEARCH_NOTE.content),
+          label,
+        ).toBe(researched);
+        // On a NEVER turn the model itself never holds the research tool.
+        if (directive.mode === "NEVER") {
+          for (const call of run.alpha.calls) {
+            expect(
+              (call.request.tools ?? []).map((t) => t.name),
+              label,
+            ).not.toContain("research_public_web");
+          }
+        }
+      }
+    }
   });
 });

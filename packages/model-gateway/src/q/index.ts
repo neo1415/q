@@ -343,6 +343,23 @@ const TOOLS_FIRST_NOTE: ModelMessage = {
 };
 
 /** Said when an answer about their own records had to use the public web. */
+/**
+ * Below this many platform prospects, public research names candidates
+ * too (gap 1, ACC 2026-09-25: with no network-visible match, Q named
+ * nobody). Versioned with the prospect fit it reads.
+ */
+export const PROSPECT_RESEARCH_BELOW = 3;
+
+/**
+ * Trusted text beside public sources read for prospects: what they are for
+ * and how every candidate is labelled. Never a script.
+ */
+export const PROSPECT_RESEARCH_NOTE: ModelMessage = {
+  role: "SYSTEM",
+  content:
+    "Capital Q holds few or no investors on the platform who fit, so public sources were read to name candidates. Name each investor these sources support as a likely fit for this company, cite the source for each (title, domain, date, link), and say plainly that each is a likely fit to check, not evidence of interest. Keep investors on Capital Q apart from those found publicly. Never name an investor no source here supports.",
+};
+
 const SOURCE_CHANGE_NOTE: ModelMessage = {
   role: "SYSTEM",
   content:
@@ -1434,8 +1451,20 @@ export function createModelGatewayQAnswer(
       // no information" without looking is the failure people actually
       // hit. Set from the tool's own result, never from the model's words.
       let platformLookupFoundNothing = false;
+      // Prospecting the platform could not answer well: the model asked who
+      // might invest, and Capital Q holds fewer than a handful who fit.
+      let prospectsThin = false;
       const notePlatformLookup = (outcome: QToolCallOutcome): void => {
         if (!outcome.result.ok) return;
+        if (outcome.toolName === "investor.prospects") {
+          const data = outcome.result.data as {
+            prospects?: readonly unknown[];
+          };
+          if ((data.prospects?.length ?? 0) < PROSPECT_RESEARCH_BELOW) {
+            prospectsThin = true;
+          }
+          return;
+        }
         if (
           outcome.toolName !== "company.search" &&
           outcome.toolName !== "discovery.slate"
@@ -1693,7 +1722,16 @@ export function createModelGatewayQAnswer(
         // tool composes the outbound query from the person's words and
         // authorised identity; the result joins the transcript as data,
         // never as instruction.
-        const researchTool = offeredByName.get("research_public_web");
+        // On a NEVER turn the model never holds the research tool; the
+        // prospects fallback is code's decision, from the platform's own
+        // thin result, so code takes it from the run's offer.
+        const researchTool =
+          offeredByName.get("research_public_web") ??
+          (prospectsThin && research?.fallback === true
+            ? offeredForRun.find(
+                (tool) => tool.definition.name === "research_public_web",
+              )
+            : undefined);
         if (
           analyst === undefined &&
           researchTool !== undefined &&
@@ -1703,7 +1741,11 @@ export function createModelGatewayQAnswer(
           // by three seconds on the web for nothing.
           (research?.mode === "EXPLICIT" ||
             (research?.mode === "ONLY_IF_EMPTY" &&
-              platformLookupFoundNothing)) &&
+              platformLookupFoundNothing) ||
+            // The model asked the platform who might invest; it holds too
+            // few. Investors exist in the world, so the world is asked too.
+            (prospectsThin &&
+              (research?.mode !== "NEVER" || research.fallback === true))) &&
           !toolCalls.some((call) => call.providerName === "research_public_web")
         ) {
           if (
@@ -1718,7 +1760,8 @@ export function createModelGatewayQAnswer(
             // Two sources: enough to compare, small enough for the final call.
             arguments: {
               query: latest.content.trim().slice(0, 200),
-              maxSources: 2,
+              // Candidates need more than two sources to be named at all.
+              maxSources: prospectsThin ? 4 : 2,
             },
           };
           took("beforeResearch");
@@ -1732,7 +1775,13 @@ export function createModelGatewayQAnswer(
             latencyMs: outcome.latencyMs,
           });
           collectSources(outcome);
-          messages = [...messages, fetchedForYouMessage(call.name, outcome)];
+          messages = [
+            ...messages,
+            fetchedForYouMessage(call.name, outcome),
+            ...(prospectsThin && outcome.result.ok
+              ? [PROSPECT_RESEARCH_NOTE]
+              : []),
+          ];
           if (request.signal?.aborted === true) {
             return { kind: "FAILED", diagnosticCode: "RUN_CANCELLED" };
           }
