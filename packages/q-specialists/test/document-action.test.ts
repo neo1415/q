@@ -185,6 +185,8 @@ function seam(options: {
   readonly history: readonly QConversationMessage[];
   readonly reading: TurnReaderV3Result;
   readonly result?: CompanyIntelligenceResult;
+  /** The artifact service fails when asked to file the document. */
+  readonly prepareFails?: boolean;
 }) {
   const investigated: CompanyIntelligenceRequest[] = [];
   const prepared: Record<string, unknown>[] = [];
@@ -195,6 +197,9 @@ function seam(options: {
     port: {
       prepare: (input) => {
         prepared.push(input);
+        if (options.prepareFails === true) {
+          return Promise.reject(new Error("artifact store unavailable"));
+        }
         return Promise.resolve({
           artifactId: ARTIFACT,
           type: "PITCH_DECK",
@@ -306,6 +311,20 @@ describe("a document request is done, not described (CQ-QACT-002)", () => {
     ]);
     expect(reply?.content.length).toBeLessThan(260);
     expect(reply?.content).not.toContain("A long explanation");
+  });
+
+  it("says it could not prepare the document, by name, when filing it fails; never answers as chat (B1)", async () => {
+    const s = seam({
+      history: [message("USER", ASK)],
+      reading: prepareReading("Zino Aviation"),
+      prepareFails: true,
+    });
+    const outcome = await s.run();
+    expect(outcome.kind).toBe("ANSWERED");
+    expect(s.delegated()).toBe(0);
+    expect(s.stored).toHaveLength(1);
+    expect(s.stored[0]?.content).toContain("deck");
+    expect(s.stored[0]?.blocks ?? []).toEqual([]);
   });
 
   it("acts on a request read as research too, and on 'just give me the PDF' after the company was named", async () => {

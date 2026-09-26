@@ -527,6 +527,13 @@ export function clearsOnPurpose(update: {
   );
 }
 
+/**
+ * Capital Q could not read this turn (the reader's model was unavailable
+ * twice). Trusted text: what the run can and cannot do, never a script.
+ */
+export const TURN_UNREAD_NOTE =
+  "CAPITAL Q COULD NOT READ WHAT KIND OF REQUEST THIS MESSAGE IS just now, so no document, file, screen change or record change can be started on this turn. If they asked for any of those, say plainly that you could not start it just now and that asking again in a moment should work. Never write a requested document's content into the chat instead, and never say it is done.";
+
 export function environmentNotesFor(
   facts: readonly AuthorisedFact[],
   tools: readonly QOfferedTool[] = [],
@@ -540,6 +547,8 @@ export function environmentNotesFor(
      * conversation, supplied by the server, never named by a model.
      */
     readonly openDocumentTitle?: string | undefined;
+    /** The turn could not be read: nothing can be started this turn. */
+    readonly turnUnread?: boolean | undefined;
   } = {},
 ): string {
   const factsNote =
@@ -574,6 +583,10 @@ export function environmentNotesFor(
       // cut. A model that does not know a document exists reads "make the
       // summary shorter" as being about its own answer, says it has done
       // it, and nothing is written (QX-003F).
+      // First of all, for the same reason: a request for a document read
+      // as ordinary chat was answered with the document's content in the
+      // chat, or nothing, and no file (B1).
+      ...(options.turnUnread === true ? [TURN_UNREAD_NOTE] : []),
       ...(options.openDocumentTitle === undefined
         ? []
         : [
@@ -1235,6 +1248,7 @@ export function createModelGatewayQAnswer(
               (scope) => scope.kind === "GENERAL_MODEL_KNOWLEDGE",
             ),
             ...(openDocumentTitle === undefined ? {} : { openDocumentTitle }),
+            ...(request.turnUnread === true ? { turnUnread: true } : {}),
           },
         ),
         variables,

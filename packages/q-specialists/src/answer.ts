@@ -560,10 +560,31 @@ export function createSpecialistQAnswer(
     );
     if (tool.kind === "PREPARE_DOCUMENT" && tool.documentType !== null) {
       if (artifacts === undefined) return null;
-      const done = await prepareDocument(request, history, {
-        documentType: tool.documentType,
-        subjectName: tool.subjectName,
-      });
+      const noun = tool.documentType === "PITCH_DECK" ? "deck" : "brief";
+      let done: Awaited<ReturnType<typeof prepareDocument>>;
+      try {
+        done = await prepareDocument(request, history, {
+          documentType: tool.documentType,
+          subjectName: tool.subjectName,
+        });
+      } catch (error: unknown) {
+        if (request.signal?.aborted === true) throw error;
+        // Asked for a document and not given one: said so, by name, never
+        // answered as if nothing had been asked (B1).
+        logger?.warn(
+          {
+            err: error,
+            qRunId: request.runId,
+            documentType: tool.documentType,
+          },
+          "a document Q was asked for could not be prepared",
+        );
+        return recordAnswer(
+          request,
+          conversationId,
+          `I couldn't prepare the ${noun} just now. Ask me again in a moment and I'll make it.`,
+        );
+      }
       return recordAnswer(request, conversationId, done.content, done.blocks);
     }
     if (tool.kind === "NAVIGATE" && tool.destination !== null) {
@@ -656,8 +677,8 @@ export function createSpecialistQAnswer(
      * path already waited on it, so only the conversational path pays
      * the one classification it was already making.
      */
-    const read = await turns
-      .read({
+    const readTurn = () =>
+      turns.read({
         utterance: latest.content,
         recentTurns: history
           .filter((m) => m.id !== latest.id)
@@ -673,8 +694,21 @@ export function createSpecialistQAnswer(
           correlationId: request.correlationId,
         },
         signal: request.signal,
-      })
-      .catch(() => null);
+      });
+    // A reading that failed is tried once more: the gateway has parked the
+    // provider that failed, so the second try goes to the fallback model.
+    // A request to make something must never be dropped because one model
+    // was down (B1, 2026-09-25).
+    let read = await readTurn().catch(() => null);
+    let turnUnread = false;
+    if (read === null && request.signal?.aborted !== true) {
+      read = await readTurn().catch(() => null);
+      turnUnread = read === null;
+      logger?.warn(
+        { qRunId: request.runId, recovered: read !== null },
+        "a turn to Q was not read on the first try",
+      );
+    }
     const research: Promise<QResearchDirective> = Promise.resolve(
       read === null
         ? NO_RESEARCH
@@ -743,7 +777,11 @@ export function createSpecialistQAnswer(
         return acted;
       }
     }
-    const outcome = await answerOnce({ ...request, research });
+    const outcome = await answerOnce({
+      ...request,
+      research,
+      ...(turnUnread ? { turnUnread: true } : {}),
+    });
     if (outcome.kind === "FAILED") {
       const operation = operationOf(outcome.diagnosticCode);
       if (operation !== null) {

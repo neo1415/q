@@ -210,3 +210,13 @@ describe("Home Q reads the person's own onboarding", () => {
     expect(reads).toEqual([]);
   });
 });
+
+describe("a turn Capital Q could not read (B1)", () => {
+  it("puts the statement that nothing can be started first, and only then", async () => {
+    const { environmentNotesFor, TURN_UNREAD_NOTE } =
+      await import("../src/q/index.js");
+    const unread = environmentNotesFor([], [], [], { turnUnread: true });
+    expect(unread.startsWith(TURN_UNREAD_NOTE)).toBe(true);
+    expect(environmentNotesFor([], [], [])).not.toContain(TURN_UNREAD_NOTE);
+  });
+});
