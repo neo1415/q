@@ -108,6 +108,7 @@ export { INTERVIEW_AGENT_V4 } from "./prompts/tasks/interview-agent.v4.js";
 export { INTERVIEW_AGENT_V5 } from "./prompts/tasks/interview-agent.v5.js";
 export { INTERVIEW_AGENT_V6 } from "./prompts/tasks/interview-agent.v6.js";
 export { INTERVIEW_AGENT_V7 } from "./prompts/tasks/interview-agent.v7.js";
+export { INTERVIEW_AGENT_V8 } from "./prompts/tasks/interview-agent.v8.js";
 export { DELEGATION_READER_V1 } from "./prompts/tasks/delegation-reader.v1.js";
 export { DELEGATION_READER_V2 } from "./prompts/tasks/delegation-reader.v2.js";
 export {

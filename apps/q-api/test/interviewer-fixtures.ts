@@ -121,6 +121,8 @@ export function investorSession(options: WorldOptions): InvestorWorld {
     ]),
   );
   const setAside = new Set<string>();
+  /** Notes kept with the current response, by step. */
+  const notes = new Map<string, string>();
   const tried: string[] = [];
   let version = 1;
   let currentStepKey = options.currentStepKey;
@@ -191,6 +193,7 @@ export function investorSession(options: WorldOptions): InvestorWorld {
                     : "TEXT",
         value,
         sourceModality: "TYPED_TEXT",
+        note: notes.get(stepKey) ?? null,
         createdAt: NOW,
       })),
       pendingQuestions: [],
@@ -414,7 +417,7 @@ export function investorSession(options: WorldOptions): InvestorWorld {
     if (method === "POST" && url.endsWith("/responses")) {
       const body = JSON.parse(readBody(init)) as {
         stepKey: string;
-        response: { value: OnboardingResponseValue };
+        response: { value: OnboardingResponseValue; note?: string };
       };
       tried.push(body.stepKey);
       const needs = options.refuseUntil?.[body.stepKey];
@@ -461,6 +464,8 @@ export function investorSession(options: WorldOptions): InvestorWorld {
         );
       }
       held.set(body.stepKey, body.response.value);
+      if (body.response.note === undefined) notes.delete(body.stepKey);
+      else notes.set(body.stepKey, body.response.note);
       version += 1;
       const next = STEPS.find(
         (step) => !held.has(step.stepKey) && !setAside.has(step.stepKey),

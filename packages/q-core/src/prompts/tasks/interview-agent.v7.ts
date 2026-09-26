@@ -48,7 +48,7 @@ export const INTERVIEW_AGENT_V7: PromptDefinition<
     untrusted: [...INTERVIEW_AGENT_V5_UNTRUSTED],
   },
   version: 7,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   changeDescription:
     "Declines as answers: optional steps the person declined, read from their latest words, are listed as trusted input and set aside with set_aside; Q never asks for a particular word to decline.",
   effectiveFrom: "2026-09-25",
