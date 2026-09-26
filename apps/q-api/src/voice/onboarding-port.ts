@@ -17,7 +17,10 @@ import type {
   OnboardingSessionView,
   TaxonomyCandidateResponse,
 } from "@capital-q/contracts";
-import { INVESTOR_CONCEPT_FAMILIES } from "@capital-q/investor-onboarding";
+import {
+  INVESTOR_CONCEPT_FAMILIES,
+  investorPlausibility,
+} from "@capital-q/investor-onboarding";
 import type {
   OnboardingQRecommendations,
   OnboardingStepManifest,
@@ -156,6 +159,11 @@ export function createOnboardingPort(input: {
       } | null>)
     | undefined;
   readonly recommendations?: RecommendationStore | undefined;
+  /**
+   * The checks already put to the person in this conversation, by id, so
+   * each is raised once. Absent: none remembered.
+   */
+  readonly raisedChecks?: ReadonlySet<string> | undefined;
   /** The Q run, for a recommendation's provenance. */
   readonly runId?: string | undefined;
 }): BoundOnboardingPort {
@@ -259,6 +267,24 @@ export function createOnboardingPort(input: {
     return describeValue(step, value, recordedCurrency(view, steps)).trim();
   };
 
+  /** The note that settles a check: prose, with the code's own check id. */
+  const settledNote = (checkId: string) =>
+    `They confirmed this is right as it stands when asked (check ${checkId}).`;
+
+  /** Checks on what is on the record that the person has not settled. */
+  const openChecks = (view: OnboardingSessionView) => {
+    if (input.journeyType !== "investor") return [];
+    const values = new Map(view.responses.map((r) => [r.stepKey, r.value]));
+    return investorPlausibility(values).filter(
+      (check) =>
+        !check.stepKeys.some((key) =>
+          (view.responses.find((r) => r.stepKey === key)?.note ?? "").includes(
+            `(check ${check.id})`,
+          ),
+        ),
+    );
+  };
+
   const state = async (): Promise<OnboardingState> => {
     const view = await fresh();
     const pendingList = await pendingNow().catch(() => []);
@@ -331,12 +357,21 @@ export function createOnboardingPort(input: {
       canComplete: view.progress.canComplete,
       completed: view.session.status === "COMPLETED",
       steps: settleFamilies(rows, input.journeyType),
+      checks: openChecks(view)
+        .slice(0, 8)
+        .map((check) => ({
+          checkId: check.id.slice(0, 200),
+          fact: check.fact.slice(0, 400),
+          stepKeys: [...check.stepKeys].slice(0, 4),
+          raised: input.raisedChecks?.has(check.id) === true,
+        })),
     };
   };
 
   const submit = async (
     stepKey: string,
     value: OnboardingResponseValue,
+    note?: string,
   ): Promise<void> => {
     const view = await current();
     latest = await settle(
@@ -345,7 +380,7 @@ export function createOnboardingPort(input: {
         input.onboardingSessionId,
         {
           stepKey,
-          response: { value },
+          response: { value, ...(note === undefined ? {} : { note }) },
           expectedSessionVersion: view.session.version,
         },
         randomUUID(),
@@ -1045,6 +1080,55 @@ export function createOnboardingPort(input: {
         }
       }
       return results;
+    },
+    confirmAsStated: async ({ checkId, quote }) => {
+      const view = await fresh();
+      const check = openChecks(view).find((c) => c.id === checkId);
+      if (check === undefined) {
+        return [
+          {
+            stepKey: "-",
+            outcome: "REJECTED",
+            reason: "There is no such open check; nothing was changed.",
+          },
+        ];
+      }
+      const [stepKey = "-"] = check.stepKeys;
+      if (!said(quote)) return [unsaid(stepKey)];
+      // Their word about their own values, read independently: confirming
+      // what Q just put to them states those steps.
+      if (input.authority !== undefined) {
+        const authority = await input.authority();
+        if (!check.stepKeys.some((k) => authority?.stated.has(k) === true)) {
+          return [
+            {
+              stepKey,
+              outcome: "REJECTED",
+              reason:
+                "Their latest words do not confirm these values, so nothing was changed.",
+            },
+          ];
+        }
+      }
+      const held = view.responses.find((r) => r.stepKey === stepKey);
+      if (held === undefined) {
+        return [
+          {
+            stepKey,
+            outcome: "REJECTED",
+            reason: "That value is no longer on the record.",
+          },
+        ];
+      }
+      try {
+        // The same value, re-recorded with the note that settles the
+        // check: history kept, nothing changed but the settlement.
+        await submit(stepKey, held.value, settledNote(check.id));
+        written.push(stepKey);
+        return [{ stepKey, outcome: "CONFIRMED_AS_STATED" }];
+      } catch (error: unknown) {
+        return [refused(stepKey, error)];
+      }
     },
     setAside: async (declined) => {
       const results: OnboardingRecordResult[] = [];

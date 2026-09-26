@@ -61,6 +61,7 @@ function port(recorded: string[]): OnboardingToolPort {
     finish: () => Promise.resolve({ completed: false, missing: [] }),
     correct: () => Promise.resolve([]),
     setAside: () => Promise.resolve([]),
+    confirmAsStated: () => Promise.resolve([]),
     record: (answers) => {
       recorded.push(...answers.map((a) => a.stepKey));
       return Promise.resolve(
@@ -108,6 +109,7 @@ describe("ADR 0016 · onboarding tools", () => {
     expect(offered.map((t) => t.definition.name).sort()).toEqual([
       "accept_recommendation",
       "confirm_and_finish",
+      "confirm_as_stated",
       "correct_answer",
       "get_onboarding_state",
       "recommend",

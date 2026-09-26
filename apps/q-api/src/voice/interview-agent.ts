@@ -198,11 +198,44 @@ export type InterviewAgentDependencies = {
    * recommends instead of recording on anyone's behalf.
    */
   readonly delegation?: QDelegationReader | undefined;
+  /**
+   * Which consistency checks have been put to the person, per onboarding
+   * session, so each is raised once. Default: kept in this process.
+   */
+  readonly raisedChecks?: RaisedChecks | undefined;
   /** Milliseconds now; injectable so a test can run out the clock. */
   readonly now?: (() => number) | undefined;
   /** The whole turn's deadline; tests shorten it. */
   readonly turnDeadlineMs?: number | undefined;
 };
+
+export type RaisedChecks = {
+  readonly get: (onboardingSessionId: string) => ReadonlySet<string>;
+  readonly add: (onboardingSessionId: string, ids: readonly string[]) => void;
+};
+
+/**
+ * Raised checks kept in this process (bounded). A restart forgets them and
+ * a check may be put once more; the settlement itself is durable, on the
+ * record (confirm_as_stated's note).
+ */
+export function createInMemoryRaisedChecks(maxSessions = 2_000): RaisedChecks {
+  const bySession = new Map<string, Set<string>>();
+  return {
+    get: (id) => bySession.get(id) ?? new Set(),
+    add: (id, ids) => {
+      const set = bySession.get(id) ?? new Set<string>();
+      for (const check of ids) set.add(check);
+      bySession.delete(id);
+      bySession.set(id, set);
+      while (bySession.size > maxSessions) {
+        const oldest = bySession.keys().next().value;
+        if (oldest === undefined) break;
+        bySession.delete(oldest);
+      }
+    },
+  };
+}
 
 export type InterviewAgent = {
   readonly turn: (
@@ -217,6 +250,8 @@ export function createInterviewAgent(
   const { gateway, firewall, logger } = dependencies;
   const now = dependencies.now ?? Date.now;
   const deadlineMs = dependencies.turnDeadlineMs ?? TURN_DEADLINE_MS;
+  const raisedChecks =
+    dependencies.raisedChecks ?? createInMemoryRaisedChecks();
 
   const turn = async (
     input: InterviewAgentTurnInput,
@@ -281,6 +316,7 @@ export function createInterviewAgent(
           ? undefined
           : () => delegationRead,
       recommendations: dependencies.recommendations,
+      raisedChecks: raisedChecks.get(input.onboardingSessionId),
       runId,
     });
     // The newest turns verbatim, the older ones as a bounded summary
@@ -554,6 +590,13 @@ export function createInterviewAgent(
           "the streamed reply and the settled reply differ; the rest was not streamed",
         );
       }
+    }
+    if (result !== undefined && result.raised.length > 0) {
+      const open = new Set(state.checks.map((check) => check.checkId));
+      raisedChecks.add(
+        input.onboardingSessionId,
+        result.raised.filter((id) => open.has(id)),
+      );
     }
     const recorded = port.recorded();
     const reply =

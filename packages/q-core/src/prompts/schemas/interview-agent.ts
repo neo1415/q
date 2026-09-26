@@ -123,6 +123,8 @@ export const InterviewAgentResultSchema = z
      * null when it asks nothing. Code checks it is a step still open.
      */
     asking: z.string().max(80).nullable().default(null),
+    /** The consistency checks the reply puts to the person, by id (v8). */
+    raised: z.array(z.string().max(200)).max(8).default([]),
   })
   .strict();
 export type InterviewAgentResult = z.infer<typeof InterviewAgentResultSchema>;

@@ -47,6 +47,7 @@ import { INTERVIEW_AGENT_V4 } from "./tasks/interview-agent.v4.js";
 import { INTERVIEW_AGENT_V5 } from "./tasks/interview-agent.v5.js";
 import { INTERVIEW_AGENT_V6 } from "./tasks/interview-agent.v6.js";
 import { INTERVIEW_AGENT_V7 } from "./tasks/interview-agent.v7.js";
+import { INTERVIEW_AGENT_V8 } from "./tasks/interview-agent.v8.js";
 import { DELEGATION_READER_V1 } from "./tasks/delegation-reader.v1.js";
 import { DELEGATION_READER_V2 } from "./tasks/delegation-reader.v2.js";
 import { INTERVIEW_CONDUCTOR_V11 } from "./tasks/interview-conductor.v11.js";
@@ -190,6 +191,7 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition<unknown, unknown>[] =
     INTERVIEW_AGENT_V5,
     INTERVIEW_AGENT_V6,
     INTERVIEW_AGENT_V7,
+    INTERVIEW_AGENT_V8,
     DELEGATION_READER_V1,
     DELEGATION_READER_V2,
     WELCOME_CONDUCTOR_V1,

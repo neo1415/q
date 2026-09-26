@@ -34,6 +34,8 @@ export const ACCEPT_ONBOARDING_RECOMMENDATIONS =
 export const FINISH_ONBOARDING = "onboarding.finish" as const;
 export const CORRECT_ONBOARDING_ANSWERS = "onboarding.answers.correct" as const;
 export const SET_ASIDE_ONBOARDING_STEPS = "onboarding.steps.set_aside" as const;
+export const CONFIRM_ONBOARDING_AS_STATED =
+  "onboarding.checks.confirm_as_stated" as const;
 
 const StepKeySchema = z.string().min(1).max(80);
 
@@ -81,6 +83,25 @@ export const OnboardingStateSchema = z
     canComplete: z.boolean(),
     completed: z.boolean(),
     steps: z.array(OnboardingStepStateSchema).max(80),
+    /**
+     * Inconsistencies Capital Q found in what is on the record, computed by
+     * code, not yet settled by the person. Raise each once; never correct
+     * a value yourself.
+     */
+    checks: z
+      .array(
+        z
+          .object({
+            checkId: z.string().max(200),
+            fact: z.string().max(400),
+            stepKeys: z.array(StepKeySchema).max(4),
+            /** Already put to them in this conversation: do not raise again. */
+            raised: z.boolean(),
+          })
+          .strict(),
+      )
+      .max(8)
+      .default([]),
   })
   .strict();
 export type OnboardingState = z.infer<typeof OnboardingStateSchema>;
@@ -144,6 +165,7 @@ export const OnboardingRecordResultSchema = z
       "COMMITTED",
       "WITHDRAWN",
       "SET_ASIDE",
+      "CONFIRMED_AS_STATED",
       "REJECTED",
       "AMBIGUOUS",
       "UNMATCHED",
@@ -318,6 +340,17 @@ export type SetAsideOnboardingStepsInput = z.infer<
   typeof SetAsideOnboardingStepsInputSchema
 >;
 
+/** The person says the values a check questioned are right as they stand. */
+export const ConfirmOnboardingAsStatedInputSchema = z
+  .object({
+    checkId: z.string().min(1).max(200),
+    quote: QuoteSchema,
+  })
+  .strict();
+export type ConfirmOnboardingAsStatedInput = z.infer<
+  typeof ConfirmOnboardingAsStatedInputSchema
+>;
+
 export const FinishOnboardingOutputSchema = z
   .object({
     /** The journey is now complete. */
@@ -367,6 +400,10 @@ export type OnboardingToolPort = {
   /** Change or take back answers already given; history is kept. */
   readonly correct: (
     corrections: CorrectOnboardingAnswersInput["corrections"],
+  ) => Promise<readonly OnboardingRecordResult[]>;
+  /** Keep the values a check questioned, on the person's word. */
+  readonly confirmAsStated: (
+    input: ConfirmOnboardingAsStatedInput,
   ) => Promise<readonly OnboardingRecordResult[]>;
   /** Set aside optional steps the person declined. Writes no answer. */
   readonly setAside: (
@@ -560,6 +597,32 @@ export function createOnboardingTools(
       authorize,
       execute: async (input) =>
         withOpen(port, [...(await port.setAside(input.steps))]),
+    }),
+    defineQTool<
+      ConfirmOnboardingAsStatedInput,
+      RecordOnboardingAnswersOutput,
+      Grant
+    >({
+      id: CONFIRM_ONBOARDING_AS_STATED,
+      version: 1,
+      status: "ACTIVE",
+      providerName: "confirm_as_stated",
+      description:
+        "Records that the person says the values a check questioned are right as they stand (their words as the quote). The values are unchanged; the check is settled and not raised again. When they change a value instead, record the new value with correct_answer or record_answers.",
+      classification: "SIDE_EFFECT",
+      riskClass: "LOW_RISK_INTERNAL",
+      requiredCapabilities: [capability("onboarding.session.respond")],
+      supportedPurposes: [...PURPOSES],
+      requiredScopeKinds: ["OWN_ONBOARDING"],
+      approval: "NONE",
+      idempotency: "SAFE_TO_REPEAT",
+      owner: "onboarding",
+      visibleStage: null,
+      input: ConfirmOnboardingAsStatedInputSchema,
+      output: RecordOnboardingAnswersOutputSchema,
+      authorize,
+      execute: async (input) =>
+        withOpen(port, [...(await port.confirmAsStated(input))]),
     }),
     defineQTool<Record<string, never>, FinishOnboardingOutput, Grant>({
       id: FINISH_ONBOARDING,

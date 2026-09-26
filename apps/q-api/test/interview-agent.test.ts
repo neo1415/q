@@ -182,6 +182,7 @@ describe("ADR 0016 · M1 · one freeform turn writes several answers", () => {
     expect([...(seen[0]?.tools ?? [])].sort()).toEqual([
       "accept_recommendation",
       "confirm_and_finish",
+      "confirm_as_stated",
       "correct_answer",
       "get_onboarding_state",
       "recommend",

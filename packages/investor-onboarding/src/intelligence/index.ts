@@ -50,3 +50,8 @@ export {
   type MandateSynthesisRequest,
   type MandateTaxonomyPort,
 } from "./synthesis.js";
+export {
+  INVESTOR_CHEQUE_PLAUSIBILITY_V1,
+  investorPlausibility,
+  type PlausibilityTension,
+} from "./plausibility.js";
