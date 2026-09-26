@@ -213,7 +213,35 @@ export type VideoProvider = {
   ) => Promise<PlaybackAuthorization>;
   /** Idempotent: deleting an asset the provider no longer has is success. */
   readonly deleteAsset: (providerAssetId: string) => Promise<void>;
+  /**
+   * Ask the provider to generate captions for a READY asset in one
+   * language (R18). Idempotent: asking again for a language it already
+   * has, or is making, answers its current state. Present only when
+   * `capabilities.captions` is true.
+   */
+  readonly requestGeneratedCaptions?:
+    | ((
+        providerAssetId: string,
+        language: string,
+      ) => Promise<GeneratedCaptionsStatus>)
+    | undefined;
+  /** The generated captions in one language, with the WebVTT once READY. */
+  readonly getGeneratedCaptions?:
+    | ((
+        providerAssetId: string,
+        language: string,
+      ) => Promise<GeneratedCaptions>)
+    | undefined;
 };
+
+/**
+ * Generated captions, as the provider reports them. NONE: never asked for
+ * in that language. Nothing here is a transcript until it is READY.
+ */
+export type GeneratedCaptionsStatus = "NONE" | "PENDING" | "READY" | "FAILED";
+export type GeneratedCaptions =
+  | { readonly status: "NONE" | "PENDING" | "FAILED" }
+  | { readonly status: "READY"; readonly vtt: string };
 
 /** Re-exported so an adapter needs one import for the whole boundary. */
 export type { MediaAssetId, MediaPurpose, MediaStatus, PlaybackPolicy };

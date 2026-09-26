@@ -13,6 +13,7 @@ import type {
   DiscoverablePitchQueryPort,
   MediaAssetRepository,
   MediaRepositories,
+  PitchTranscriptRepository,
 } from "../application/ports.js";
 import {
   CaptionStateSchema,
@@ -310,8 +311,67 @@ export function createPostgresMediaAssetRepository(): MediaAssetRepository {
   };
 }
 
+const TranscriptRow = z.object({
+  media_asset_id: MediaAssetIdSchema,
+  language: z.string(),
+  source: z.literal("PROVIDER_GENERATED"),
+  cues: z.array(
+    z
+      .object({
+        startMs: z.number().int(),
+        endMs: z.number().int(),
+        text: z.string(),
+      })
+      .strict(),
+  ),
+  vtt: z.string(),
+  created_at: Timestamp,
+});
+
+export function createPostgresPitchTranscriptRepository(): PitchTranscriptRepository {
+  return {
+    find: async (executor, tenantId, mediaAssetId) => {
+      // One language today; the earliest written is the transcript.
+      const rows = await executor`
+        select media_asset_id, language, source, cues, vtt, created_at
+          from media.pitch_transcripts
+         where tenant_id = ${tenantId} and media_asset_id = ${mediaAssetId}
+         order by created_at
+         limit 1`;
+      if (rows.length === 0) return null;
+      const r = TranscriptRow.parse(rows[0]);
+      return {
+        mediaAssetId: r.media_asset_id,
+        language: r.language,
+        source: r.source,
+        cues: r.cues,
+        vtt: r.vtt,
+        createdAt: r.created_at,
+      };
+    },
+    insert: async (tx, input) => {
+      await tx.sql`
+        insert into media.pitch_transcripts
+          (tenant_id, media_asset_id, language, source, cues, vtt)
+        values (${input.tenantId}, ${input.mediaAssetId}, ${input.language},
+                ${input.source}, ${tx.sql.json(input.cues)}, ${input.vtt})
+        on conflict (media_asset_id, language) do nothing`;
+    },
+    findOwnerCompany: async (executor, mediaAssetId) => {
+      const rows = await executor`
+        select owner_id from media.media_assets
+         where id = ${mediaAssetId} and owner_type = 'COMPANY'`;
+      const row = rows[0] as { owner_id?: unknown } | undefined;
+      return typeof row?.owner_id === "string" ? row.owner_id : null;
+    },
+  };
+}
+
 export function createPostgresMediaRepositories(): MediaRepositories {
-  return { mediaAssets: createPostgresMediaAssetRepository() };
+  return {
+    mediaAssets: createPostgresMediaAssetRepository(),
+    pitchTranscripts: createPostgresPitchTranscriptRepository(),
+  };
 }
 
 /**

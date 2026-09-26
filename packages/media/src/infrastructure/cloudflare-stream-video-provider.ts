@@ -10,6 +10,8 @@ import {
   VideoAssetStatusSchema,
   VideoUploadSessionSchema,
   type CreateVideoUploadSession,
+  type GeneratedCaptions,
+  type GeneratedCaptionsStatus,
   type PlaybackAuthorization,
   type PlaybackAuthorizationRequest,
   type ResumeVideoUploadSession,
@@ -763,18 +765,108 @@ export function createCloudflareStreamVideoProvider(
     );
   }
 
+  // -------------------------------------------------------------------------
+  // Generated captions (R18). Stream's AI captions are included in Stream at
+  // no additional cost (Cloudflare, June 2024); videos must be under two
+  // hours. POST .../captions/<lang>/generate asks; GET .../captions lists
+  // each language's state; GET .../captions/<lang>/vtt is the WebVTT.
+  // -------------------------------------------------------------------------
+
+  const CaptionListSchema = z.array(
+    z
+      .object({
+        language: z.string(),
+        generated: z.boolean().optional(),
+        status: z.string().optional(),
+      })
+      .passthrough(),
+  );
+  const LanguageSchema = z.string().regex(/^[a-z]{2,3}(-[A-Za-z0-9]{2,8})*$/);
+
+  function captionStatus(status: string | undefined): GeneratedCaptionsStatus {
+    // A caption uploaded by hand has no status and is ready.
+    if (status === undefined || status === "ready") return "READY";
+    if (status === "inprogress") return "PENDING";
+    return "FAILED";
+  }
+
+  async function getGeneratedCaptions(
+    providerAssetId: string,
+    language: string,
+  ): Promise<GeneratedCaptions> {
+    const uid = ProviderAssetIdSchema.parse(providerAssetId);
+    const lang = LanguageSchema.parse(language);
+    const answer = await request(
+      "captions",
+      "GET",
+      `/${encodeURIComponent(uid)}/captions`,
+      CaptionListSchema,
+    );
+    if (answer.kind === "NOT_FOUND") return { status: "NONE" };
+    const entry = answer.result.find((c) => c.language === lang);
+    if (entry === undefined) return { status: "NONE" };
+    const status = captionStatus(entry.status);
+    if (status !== "READY") return { status };
+    const response = await send(
+      "captions",
+      "GET",
+      `/${encodeURIComponent(uid)}/captions/${encodeURIComponent(lang)}/vtt`,
+      { accept: "text/vtt" },
+    );
+    if (response.status === 404) return { status: "PENDING" };
+    if (!response.ok) {
+      throw fail(
+        "captions",
+        classifyCloudflareStatus(response.status),
+        response.status,
+      );
+    }
+    const vtt = await response.text();
+    if (!vtt.startsWith("WEBVTT")) {
+      throw fail("captions", "MALFORMED_RESPONSE", response.status);
+    }
+    return { status: "READY", vtt };
+  }
+
+  async function requestGeneratedCaptions(
+    providerAssetId: string,
+    language: string,
+  ): Promise<GeneratedCaptionsStatus> {
+    const uid = ProviderAssetIdSchema.parse(providerAssetId);
+    const lang = LanguageSchema.parse(language);
+    try {
+      const answer = await request(
+        "captions",
+        "POST",
+        `/${encodeURIComponent(uid)}/captions/${encodeURIComponent(lang)}/generate`,
+        z.object({ status: z.string().optional() }).passthrough(),
+      );
+      if (answer.kind === "NOT_FOUND") return "FAILED";
+      return captionStatus(answer.result.status);
+    } catch (error) {
+      // Asking twice for a language it already has or is making is not a
+      // failure of this call: answer its current state instead.
+      if (error instanceof MediaProviderError && error.failure === "REJECTED") {
+        return (await getGeneratedCaptions(uid, lang)).status;
+      }
+      throw error;
+    }
+  }
+
   return {
     id: CLOUDFLARE_STREAM_PROVIDER_ID,
     capabilities: {
       directUpload: true,
       resumableUpload: true,
       signedPlayback: options.customerSubdomain !== undefined,
-      captions: false,
+      captions: true,
     },
     createUploadSession,
     resumeUploadSession,
     getAsset,
     createPlaybackAuthorization,
     deleteAsset,
+    requestGeneratedCaptions,
+    getGeneratedCaptions,
   };
 }
