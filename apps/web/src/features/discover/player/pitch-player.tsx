@@ -2,7 +2,10 @@
 
 import { useEffect, useRef, useState } from "react";
 
-import type { DiscoveredCompanyDto } from "@capital-q/contracts";
+import type {
+  DiscoveredCompanyDto,
+  PlaybackAuthorizationDto,
+} from "@capital-q/contracts";
 import { Button } from "@capital-q/ui/button";
 
 import type { FeedPreloadPolicy } from "../feed/feed-state";
@@ -83,6 +86,8 @@ type PitchPlayerProps = {
   /** Controlled sound, so one choice carries from card to card. */
   readonly muted?: boolean | undefined;
   readonly onMutedChange?: ((muted: boolean) => void) | undefined;
+  /** The server's authorization for the first card, so its poster is SSR'd. */
+  readonly initialAuthorization?: PlaybackAuthorizationDto | null | undefined;
 };
 
 export function PitchPlayer({
@@ -95,6 +100,7 @@ export function PitchPlayer({
   hold = false,
   muted: controlledMuted,
   onMutedChange,
+  initialAuthorization = null,
 }: PitchPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [ownMuted, setOwnMuted] = useState(true);
@@ -110,6 +116,7 @@ export function PitchPlayer({
     policy,
     authorize,
     reducedMotion,
+    initialAuthorization,
   });
 
   // Attaching and detaching is the strategy's job, including cancelling an

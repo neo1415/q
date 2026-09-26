@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { render, screen, waitFor } from "@testing-library/react";
 import { StrictMode } from "react";
+import { renderToString } from "react-dom/server";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -32,6 +33,8 @@ import {
  */
 
 const MEDIA_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+/** The pitch `company(1)` carries. */
+const FIRST_PITCH_ID = "aaaaaaa1-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 
 function company(n: number, withPitch = true): DiscoveredCompanyDto {
   return {
@@ -308,6 +311,47 @@ describe("the player element", () => {
     // The billable part is what must not happen.
     expect(video.getAttribute("src")).toBeNull();
     expect(play).not.toHaveBeenCalled();
+  });
+
+  it("puts a server-obtained poster in the server HTML without asking again", () => {
+    const authorize = vi.fn(() => Promise.resolve(authorization()));
+    const seed = authorization({
+      mediaAssetId: FIRST_PITCH_ID,
+    });
+    const html = renderToString(
+      <PitchPlayer
+        company={company(1)}
+        policy="ACTIVE"
+        authorize={authorize}
+        reducedMotion={false}
+        variant="stage"
+        initialAuthorization={seed}
+      />,
+    );
+
+    // The poster is the feed's LCP, so it has to be in the first bytes.
+    expect(html).toContain('poster="https://cdn.test/sample.jpg"');
+    // Only the element attaches media, after hydration, never the HTML.
+    expect(html).not.toContain("sample.mp4");
+    expect(authorize).not.toHaveBeenCalled();
+  });
+
+  it("ignores a server authorization for a different pitch", async () => {
+    const authorize = vi.fn(() =>
+      Promise.resolve(authorization({ mediaAssetId: FIRST_PITCH_ID })),
+    );
+    render(
+      <PitchPlayer
+        company={company(1)}
+        policy="POSTER"
+        authorize={authorize}
+        reducedMotion={false}
+        initialAuthorization={authorization({ mediaAssetId: MEDIA_ID })}
+      />,
+    );
+
+    // Someone else's URL is never shown for this company; it asks for its own.
+    await waitFor(() => expect(authorize).toHaveBeenCalledTimes(1));
   });
 
   it("renders nothing at all for a company with no pitch", () => {

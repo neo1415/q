@@ -2,7 +2,10 @@
 
 import { useCallback, useEffect, useMemo, useReducer, useRef } from "react";
 
-import type { DiscoveredCompanyDto } from "@capital-q/contracts";
+import type {
+  DiscoveredCompanyDto,
+  DiscoveryCompanySlateDto,
+} from "@capital-q/contracts";
 
 import {
   browserFeedPositionStore,
@@ -67,6 +70,16 @@ export type UseInvestorFeedOptions = {
   readonly positionStore?: FeedPositionStore | null;
   readonly loadMoreThreshold?: number;
   readonly newClientEventId?: () => string;
+  /**
+   * The first page, when the server already fetched it for this render.
+   *
+   * The feed's first paint is its first poster (spec §9.5: the poster is
+   * the LCP), and a poster cannot be in the server HTML if the slate only
+   * arrives after hydration. The server hands the controller the page it
+   * read under the same session; the controller still owns every page
+   * after it, the position and the preload window.
+   */
+  readonly initialSlate?: DiscoveryCompanySlateDto | null;
 };
 
 export type InvestorFeed = {
@@ -96,7 +109,16 @@ export function useInvestorFeed(options: UseInvestorFeedOptions): InvestorFeed {
     newClientEventId = defaultClientEventId,
   } = options;
 
-  const [state, dispatch] = useReducer(feedReducer, INITIAL_FEED_STATE);
+  const [state, dispatch] = useReducer(
+    feedReducer,
+    options.initialSlate ?? null,
+    (slate): FeedState =>
+      slate === null
+        ? INITIAL_FEED_STATE
+        : feedReducer(INITIAL_FEED_STATE, { type: "PAGE_LOADED", slate }),
+  );
+  // Read once: a seed is for the first render, not a prop to follow.
+  const seededRef = useRef(state.status === "READY");
 
   // Resolved once: reading `sessionStorage` during render would differ
   // between the server pass and the client one.
@@ -153,11 +175,12 @@ export function useInvestorFeed(options: UseInvestorFeedOptions): InvestorFeed {
     transportRef.current = transport;
   }, [transport]);
 
-  // First page.
+  // First page, unless the server already supplied it. The abort scope is
+  // opened either way: later pages need it.
   useEffect(() => {
     const controller = new AbortController();
     abortRef.current = controller;
-    loadPage(null, controller.signal);
+    if (!seededRef.current) loadPage(null, controller.signal);
     return () => {
       controller.abort();
       abortRef.current = null;

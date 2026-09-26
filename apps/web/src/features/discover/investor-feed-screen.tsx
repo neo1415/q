@@ -12,7 +12,9 @@ import {
 
 import type {
   DiscoveredCompanyDto,
+  DiscoveryCompanySlateDto,
   DiscoveryNoteDto,
+  PlaybackAuthorizationDto,
 } from "@capital-q/contracts";
 import { Button, buttonClassName } from "@capital-q/ui/button";
 import {
@@ -86,7 +88,9 @@ function FeedMedia({
   hold,
   muted,
   onMutedChange,
+  initialAuthorization,
 }: {
+  readonly initialAuthorization: PlaybackAuthorizationDto | null;
   readonly items: readonly DiscoveredCompanyDto[];
   readonly index: number;
   readonly policyFor: (companyId: string) => FeedPreloadPolicy;
@@ -138,6 +142,11 @@ function FeedMedia({
               hold={offset !== 0 || hold}
               muted={muted}
               onMutedChange={onMutedChange}
+              initialAuthorization={
+                initialAuthorization?.mediaAssetId === item.pitch.mediaAssetId
+                  ? initialAuthorization
+                  : null
+              }
             />
           )}
         </div>
@@ -161,11 +170,29 @@ function subscribeWide(onChange: () => void): () => void {
   return () => query?.removeEventListener("change", onChange);
 }
 
-export function InvestorFeedScreen() {
+/**
+ * What the server read for this render: the slate's first page and, when
+ * its first company has a pitch, this viewer's playback authorization for
+ * it -- together they put the first poster in the HTML (spec §9.5).
+ */
+export type InvestorFeedInitial = {
+  readonly slate: DiscoveryCompanySlateDto;
+  readonly authorization: PlaybackAuthorizationDto | null;
+};
+
+export function InvestorFeedScreen({
+  initial = null,
+}: {
+  readonly initial?: InvestorFeedInitial | null;
+} = {}) {
   const transport = useMemo(() => actionFeedTransport(), []);
   const reducedMotion = useReducedMotionPreference();
   const budget = useFeedBudget();
-  const feed = useInvestorFeed({ transport, budget });
+  const feed = useInvestorFeed({
+    transport,
+    budget,
+    initialSlate: initial?.slate ?? null,
+  });
   const { setOpen, open: qOpen } = useGlobalQ();
   const session = useQSessionOptional();
   const [muted, setMuted] = useState(true);
@@ -404,6 +431,7 @@ export function InvestorFeedScreen() {
           hold={hold}
           muted={muted}
           onMutedChange={setMuted}
+          initialAuthorization={initial?.authorization ?? null}
         />
 
         <div className="cq-feed-overlay">

@@ -809,3 +809,17 @@ describe("degraded and empty states", () => {
     expect(setOpen).toHaveBeenCalledWith(true);
   });
 });
+
+describe("a first page from the server", () => {
+  it("shows the first company on the first render and does not fetch it again", () => {
+    render(
+      <InvestorFeedScreen
+        initial={{ slate: slate([1, 2]).value, authorization: null }}
+      />,
+    );
+
+    // Synchronously present: this is what puts the first card in the HTML.
+    expect(screen.getByRole("heading", { name: "Company 1" })).toBeTruthy();
+    expect(loadSlatePageAction).not.toHaveBeenCalled();
+  });
+});

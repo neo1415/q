@@ -63,6 +63,12 @@ export type UsePitchPlaybackOptions = {
   readonly reducedMotion: boolean;
   /** Injectable clock, so expiry is tested without waiting for it. */
   readonly now?: () => number;
+  /**
+   * An authorization the server obtained for this viewer while rendering
+   * the page, so the first poster is in the HTML. Honoured only for the
+   * asset it names, and only while it is fresh; otherwise ignored.
+   */
+  readonly initialAuthorization?: PlaybackAuthorizationDto | null;
 };
 
 export type PitchPlayback = {
@@ -99,7 +105,12 @@ export function usePitchPlayback(
   const [held, setHeld] = useState<{
     readonly mediaAssetId: string;
     readonly authorization: PlaybackAuthorizationDto;
-  } | null>(null);
+  } | null>(() => {
+    const seed = options.initialAuthorization ?? null;
+    return seed !== null && seed.mediaAssetId === mediaAssetId
+      ? { mediaAssetId: seed.mediaAssetId, authorization: seed }
+      : null;
+  });
   const [refused, setRefused] = useState<string | null>(null);
   const [authorizingFor, setAuthorizingFor] = useState<string | null>(null);
 
