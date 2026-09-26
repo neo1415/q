@@ -9,6 +9,7 @@ import {
 } from "@capital-q/capital";
 import {
   CompanyIdSchema,
+  CompanyNotFoundError,
   createPostgresCompanyQueryPort,
   FounderProfileIdSchema,
   type CompanyId,
@@ -62,6 +63,7 @@ import {
   createDisclosureResourceResolverRegistry,
   createPermissionsService,
   createRelationshipPartyResolver,
+  createVisibilityCentre,
   DisclosureDeniedError,
   DisclosurePolicyConflictError,
   DisclosurePolicyIdSchema,
@@ -1539,6 +1541,265 @@ describe("@capital-q/permissions against local PostgreSQL", () => {
       expect(
         CapitalObjectiveIdSchema.safeParse(world.capitalObjectiveId).success,
       ).toBe(true);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // The visibility control centre (CQ-BIZ-003)
+  // -------------------------------------------------------------------------
+
+  function centreFor(world: World, visible: readonly string[]) {
+    const sql = world.tx.sql;
+    const companies = createPostgresCompanyQueryPort({ sql });
+    const investors = createPostgresInvestorOrganisationQueryPort({ sql });
+    const capital = createPostgresCapitalObjectiveQueryPort({ sql });
+    return createVisibilityCentre({
+      access: world.service.access,
+      inspect: world.service.inspectResourceDisclosure,
+      policies: world.service.policies,
+      authorization: world.authorization,
+      companies,
+      capital,
+      relationshipParties: createRelationshipPartyResolver({
+        companies,
+        investors,
+        mandates: createPostgresInvestorMandateQueryPort({ sql }),
+        capital,
+        relationships: world.network.query,
+      }),
+      // The company side's own list, as the Network context gives it: only
+      // relationships the company can see anything of (a private discovery
+      // is not one). Stated per test.
+      relationshipsOf: () =>
+        Promise.resolve(
+          [
+            {
+              relationshipId: world.relationshipApex,
+              investorOrganisationId: world.investorApex,
+              name: "Apex Ventures",
+            },
+            {
+              relationshipId: world.relationshipHorizon,
+              investorOrganisationId: world.investorHorizon,
+              name: "Horizon Capital",
+            },
+          ].filter((r) => visible.includes(r.relationshipId)),
+        ),
+    });
+  }
+
+  it("previews the company as each audience sees it, through the disclosure evaluator; the raise never reaches the public or the network", async () => {
+    await withWorld(async (world) => {
+      const { tx, founderAlpha, companyAlpha } = world;
+      const centre = centreFor(world, [world.relationshipApex]);
+      const preview = (
+        audience: "PUBLIC" | "NETWORK" | "INVESTOR" | "ONLY_US",
+        relationshipId?: string,
+      ) =>
+        centre.preview({
+          actor: founderAlpha,
+          companyId: companyAlpha,
+          audience,
+          relationshipId,
+        });
+      const seen = async () => ({
+        PUBLIC: await preview("PUBLIC"),
+        NETWORK: await preview("NETWORK"),
+        INVESTOR: await preview("INVESTOR", world.relationshipApex),
+        ONLY_US: await preview("ONLY_US"),
+      });
+
+      // Private to the organisation: only the organisation sees anything.
+      let now = await seen();
+      expect(now.PUBLIC).toMatchObject({
+        profile: null,
+        capitalObjective: null,
+      });
+      expect(now.NETWORK).toMatchObject({
+        profile: null,
+        capitalObjective: null,
+      });
+      expect(now.INVESTOR).toMatchObject({
+        profile: null,
+        capitalObjective: null,
+      });
+      expect(now.ONLY_US.profile?.canonicalName).toBe("Alpha Robotics");
+      expect(now.ONLY_US.capitalObjective?.target).toEqual({
+        amount: "5000000",
+        currency: "USD",
+      });
+
+      // Network-visible: the network and a related investor see the
+      // profile; the public still sees nothing; the raise stays private.
+      await tx.sql`update core.companies set marketplace_visibility = 'network_visible' where id = ${companyAlpha}`;
+      now = await seen();
+      expect(now.PUBLIC.profile).toBeNull();
+      expect(now.NETWORK.profile?.canonicalName).toBe("Alpha Robotics");
+      expect(now.INVESTOR.profile?.canonicalName).toBe("Alpha Robotics");
+      expect(now.NETWORK.capitalObjective).toBeNull();
+      expect(now.INVESTOR.capitalObjective).toBeNull();
+
+      // Shared with Apex: Apex sees the raise; nobody else does.
+      const shared = await centre.share({
+        actor: founderAlpha,
+        companyId: companyAlpha,
+        object: "CAPITAL_OBJECTIVE",
+        relationshipId: world.relationshipApex,
+        correlationId: CORRELATION(),
+      });
+      expect(shared.outcome).toBe("CREATED");
+      now = await seen();
+      expect(now.INVESTOR.capitalObjective?.target.amount).toBe("5000000");
+      expect(now.NETWORK.capitalObjective).toBeNull();
+      expect(now.PUBLIC.capitalObjective).toBeNull();
+
+      // Public: the profile reaches the public; the raise still does not.
+      await tx.sql`update core.companies set marketplace_visibility = 'public_external' where id = ${companyAlpha}`;
+      now = await seen();
+      expect(now.PUBLIC.profile?.canonicalName).toBe("Alpha Robotics");
+      expect(now.PUBLIC.capitalObjective).toBeNull();
+
+      // The narrative is never carried by any audience's preview.
+      for (const view of Object.values(now)) {
+        expect(JSON.stringify(view)).not.toContain("Use of funds");
+      }
+    });
+  });
+
+  it("lists shares with their recipient, revokes them (history kept), and refuses a relationship the company cannot see", async () => {
+    await withWorld(async (world) => {
+      const { founderAlpha, companyAlpha } = world;
+      const centre = centreFor(world, [world.relationshipApex]);
+
+      const before = await centre.state({
+        actor: founderAlpha,
+        companyId: companyAlpha,
+      });
+      expect(
+        before.objects.map((o) => [o.object, o.scope, o.shareable]),
+      ).toEqual([
+        ["COMPANY_PROFILE", "organisation_private", false],
+        ["CAPITAL_OBJECTIVE", "founder_private", true],
+      ]);
+      expect(before.shares).toEqual([]);
+      // Horizon only discovered the company privately: it is not listed.
+      expect(before.relationships.map((r) => r.name)).toEqual([
+        "Apex Ventures",
+      ]);
+
+      const created = await centre.share({
+        actor: founderAlpha,
+        companyId: companyAlpha,
+        object: "CAPITAL_OBJECTIVE",
+        relationshipId: world.relationshipApex,
+        correlationId: CORRELATION(),
+      });
+      const again = await centre.share({
+        actor: founderAlpha,
+        companyId: companyAlpha,
+        object: "CAPITAL_OBJECTIVE",
+        relationshipId: world.relationshipApex,
+        correlationId: CORRELATION(),
+      });
+      expect(again.outcome).toBe("EXISTING");
+      const state = await centre.state({
+        actor: founderAlpha,
+        companyId: companyAlpha,
+      });
+      expect(state.shares).toHaveLength(1);
+      expect(state.shares[0]).toMatchObject({
+        object: "CAPITAL_OBJECTIVE",
+        relationshipId: world.relationshipApex,
+        recipientName: "Apex Ventures",
+        accessLevel: "view",
+      });
+
+      await expect(
+        centre.share({
+          actor: founderAlpha,
+          companyId: companyAlpha,
+          object: "CAPITAL_OBJECTIVE",
+          relationshipId: world.relationshipHorizon,
+          correlationId: CORRELATION(),
+        }),
+      ).rejects.toBeInstanceOf(CompanyNotFoundError);
+      await expect(
+        centre.preview({
+          actor: founderAlpha,
+          companyId: companyAlpha,
+          audience: "INVESTOR",
+          relationshipId: world.relationshipHorizon,
+        }),
+      ).rejects.toBeInstanceOf(CompanyNotFoundError);
+
+      const policyId = created.share?.policyId ?? "";
+      expect(
+        (
+          await centre.revoke({
+            actor: founderAlpha,
+            companyId: companyAlpha,
+            policyId,
+            correlationId: CORRELATION(),
+          })
+        ).outcome,
+      ).toBe("REVOKED");
+      expect(
+        (
+          await centre.revoke({
+            actor: founderAlpha,
+            companyId: companyAlpha,
+            policyId,
+            correlationId: CORRELATION(),
+          })
+        ).outcome,
+      ).toBe("ALREADY_REVOKED");
+      expect(
+        (await centre.state({ actor: founderAlpha, companyId: companyAlpha }))
+          .shares,
+      ).toEqual([]);
+      expect(
+        (
+          await centre.preview({
+            actor: founderAlpha,
+            companyId: companyAlpha,
+            audience: "INVESTOR",
+            relationshipId: world.relationshipApex,
+          })
+        ).capitalObjective,
+      ).toBeNull();
+      // Revocation is a timestamp, never a delete.
+      expect(
+        await count(
+          world.tx.sql<{ count: number }[]>`
+            select count(*)::int as count from permissions.disclosure_policies
+             where id = ${policyId} and revoked_at is not null`,
+        ),
+      ).toBe(1);
+    });
+  });
+
+  it("answers only the company's own organisation holding disclosure.inspect; everyone else gets not-found", async () => {
+    await withWorld(async (world) => {
+      const centre = centreFor(world, [world.relationshipApex]);
+      for (const actor of [
+        world.apexAdmin,
+        world.horizonAdmin,
+        world.alphaColleague,
+      ]) {
+        await expect(
+          centre.state({ actor, companyId: world.companyAlpha }),
+        ).rejects.toBeInstanceOf(CompanyNotFoundError);
+        await expect(
+          centre.preview({
+            actor,
+            companyId: world.companyAlpha,
+            audience: "ONLY_US",
+          }),
+        ).rejects.toBeInstanceOf(CompanyNotFoundError);
+      }
+      await expect(
+        centre.state({ actor: world.founderAlpha, companyId: randomUUID() }),
+      ).rejects.toBeInstanceOf(CompanyNotFoundError);
     });
   });
 });
