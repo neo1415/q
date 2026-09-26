@@ -82,6 +82,8 @@ export type PitchUploadProps = {
    * status, a decision), so the history beside it can re-read the server.
    */
   readonly onRecordChanged?: (() => void) | undefined;
+  /** Pause this screen's preview while another player on the page plays. */
+  readonly holdPreview?: boolean | undefined;
 };
 
 /**
@@ -143,7 +145,11 @@ function formatDuration(seconds: number | null): string | null {
     : `${String(minutes)}m ${String(rest).padStart(2, "0")}s`;
 }
 
-export function PitchUpload({ companyId, onRecordChanged }: PitchUploadProps) {
+export function PitchUpload({
+  companyId,
+  onRecordChanged,
+  holdPreview = false,
+}: PitchUploadProps) {
   const [flow, dispatch] = useReducer(pitchFlowReducer, INITIAL_PITCH_FLOW);
   const [company, setCompany] = useState<CompanyDto | null>(null);
   const [guidance, setGuidance] = useState<PitchGuidance | null>(null);
@@ -732,6 +738,7 @@ export function PitchUpload({ companyId, onRecordChanged }: PitchUploadProps) {
                 policy="ACTIVE"
                 authorize={authorize}
                 reducedMotion={reducedMotion}
+                hold={holdPreview}
               />
             </div>
           )}

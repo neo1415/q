@@ -23,6 +23,9 @@ export function PitchStudio({ companyId }: { readonly companyId: string }) {
   const [company, setCompany] = useState<CompanyDto | null>(null);
   const [historyKey, setHistoryKey] = useState(0);
   const [uploadKey, setUploadKey] = useState(0);
+  // One active player on the page: a version previewed in the history
+  // holds the current pitch's preview above it.
+  const [historyPreviewing, setHistoryPreviewing] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -49,6 +52,7 @@ export function PitchStudio({ companyId }: { readonly companyId: string }) {
         key={uploadKey}
         companyId={companyId}
         onRecordChanged={onRecordChanged}
+        holdPreview={historyPreviewing}
       />
       <PageSection
         id="pitch-history"
@@ -60,6 +64,7 @@ export function PitchStudio({ companyId }: { readonly companyId: string }) {
           company={company}
           refreshKey={historyKey}
           onCurrentChanged={onCurrentChanged}
+          onPreviewChange={setHistoryPreviewing}
         />
       </PageSection>
     </div>
