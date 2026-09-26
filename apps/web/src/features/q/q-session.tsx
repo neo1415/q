@@ -102,6 +102,8 @@ export function useQSession(): QSessionValue {
 /** How long the settle after an answer, and the sweep of an action, show. */
 const SUCCESS_MS = 900;
 const ACTION_MS = 700;
+/** A second read of the record after a voice turn, once its run is surely stored. */
+const VOICE_REREAD_MS = 2_500;
 
 const Q_PAGE = "/home";
 
@@ -202,6 +204,31 @@ export function QSessionProvider({
       writeToQPageUrl(voiceConversationId);
     }
   }, [voiceConversationId, pathname]);
+
+  /*
+   * A spoken answer is recorded as a Q message with its result blocks --
+   * "here's your mandate, download the PDF from the card" -- but it
+   * arrives here only as speech and transcript text. Without reading the
+   * record back, the card it names never reached the stage or the Board
+   * (founder bug on 164fc5c). So each completed voice turn reads the
+   * conversation again, once when the turn completes and once more after
+   * Q has finished saying it, by which time the run has certainly been
+   * recorded.
+   */
+  const voiceSequence = voice.turn?.sequence ?? 0;
+  const qRefresh = q.refresh;
+  useEffect(() => {
+    if (voiceSequence === 0) return;
+    void qRefresh();
+    const again = window.setTimeout(() => void qRefresh(), VOICE_REREAD_MS);
+    return () => window.clearTimeout(again);
+  }, [voiceSequence, qRefresh]);
+  const voiceSpeaking = voice.client.state === "Q_SPEAKING";
+  const wasSpeaking = useRef(false);
+  useEffect(() => {
+    if (wasSpeaking.current && !voiceSpeaking) void qRefresh();
+    wasSpeaking.current = voiceSpeaking;
+  }, [voiceSpeaking, qRefresh]);
 
   const open = useCallback((next: string | null) => {
     setConversationId((current) => {

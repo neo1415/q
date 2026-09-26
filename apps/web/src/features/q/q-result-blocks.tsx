@@ -10,6 +10,7 @@ import {
 import { buttonClassName } from "@capital-q/ui/button";
 
 import { destinationPath } from "../voice/destinations";
+import { artifactTypeLabel } from "./artifact-type";
 import { ArtifactDownloads } from "./artifact-download";
 import type { QTurnObjectBlock } from "./conversation";
 
@@ -350,13 +351,7 @@ export function QResultBlocks({
             return (
               <QResultCard
                 key={key}
-                label={
-                  block.type === "INVESTMENT_BRIEF"
-                    ? "Investment brief"
-                    : block.type === "PITCH_DECK"
-                      ? "Investor deck"
-                      : "Document"
-                }
+                label={artifactTypeLabel(block.type)}
                 title={block.title}
                 actions={
                   <>
