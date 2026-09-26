@@ -194,7 +194,12 @@ export type QAnswerOutcome =
   | {
       /** The Q message the gateway produced, and the routing policy it ran under. */
       readonly kind: "ANSWERED";
-      readonly messageId: string;
+      /**
+       * Null when Q deliberately says nothing: a turn it could not make out,
+       * right after it already asked them to say it again. The run still
+       * completes; a voice keeps listening.
+       */
+      readonly messageId: string | null;
       readonly modelPolicyVersion: string;
       /** The prompt bundle that produced the answer (CQ-Q-006). */
       readonly promptBundleVersion: string;

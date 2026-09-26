@@ -73,7 +73,7 @@ function request(): QAnswerRequest {
 
 function seam(options: {
   readonly said: string;
-  readonly reading: TurnReaderResult | null;
+  readonly reading: TurnReaderResult | null | (() => TurnReaderResult | null);
   readonly outcomes: readonly QAnswerOutcome[];
   readonly visibility?: {
     noteVisibility: (entry: Record<string, unknown>) => void;
@@ -92,7 +92,12 @@ function seam(options: {
   const directives: (QResearchDirective | undefined)[] = [];
   const outcomes = [...options.outcomes];
   const turns: QTurnReader = {
-    read: () => Promise.resolve(options.reading),
+    read: () =>
+      Promise.resolve(
+        typeof options.reading === "function"
+          ? options.reading()
+          : options.reading,
+      ),
   };
   const stored: QConversationMessage[] = [];
   const events: { type: string; data: unknown }[] = [];
@@ -355,5 +360,70 @@ describe("a failed answer is named once, by its subsystem", () => {
     const turn = request();
     await answer.answer(turn);
     expect(answer.failureNotice?.(turn.runId)).toBeUndefined();
+  });
+});
+
+describe("words Q could not make out (lead 2026-09-25)", () => {
+  function unclear(
+    kind: TurnReaderResult["kind"],
+    transcript: TurnReaderResult["transcript"],
+  ): TurnReaderResult {
+    return {
+      kind,
+      confidence: "LOW",
+      transcript,
+      question: null,
+      aboutNamedOther: false,
+      tool: null,
+    };
+  }
+
+  it("asks no model: one brief prompt, then silence, never the prompt twice in a row", async () => {
+    for (const reading of [
+      unclear("UNCLEAR_TRANSCRIPT", "FRAGMENT"),
+      unclear("UNCLEAR_TRANSCRIPT", "NOISY"),
+      unclear("QUESTION_TO_Q", "FRAGMENT"),
+    ]) {
+      const run = seam({ said: "the uh which", reading, outcomes: [] });
+      const first = await run.answer.answer(request());
+      const second = await run.answer.answer(request());
+      const third = await run.answer.answer(request());
+      const label = `${reading.kind}/${reading.transcript}`;
+      expect(run.delegated(), label).toBe(0);
+      expect(first.kind, label).toBe("ANSWERED");
+      expect(run.stored, label).toHaveLength(1);
+      const line = run.stored[0]?.content ?? "";
+      // Brief, and never a statement about what Q could not identify.
+      expect(line.split(/\s+/).length, label).toBeLessThanOrEqual(5);
+      expect(second.kind === "ANSWERED" && second.messageId, label).toBeNull();
+      expect(third.kind === "ANSWERED" && third.messageId, label).toBeNull();
+    }
+  });
+
+  it("a clear turn resets it: the next unclear turn gets its prompt again", async () => {
+    const readings: (TurnReaderResult | null)[] = [
+      unclear("UNCLEAR_TRANSCRIPT", "NOISY"),
+      {
+        kind: "QUESTION_TO_Q",
+        confidence: "HIGH",
+        transcript: "CLEAR",
+        question: null,
+        aboutNamedOther: false,
+        tool: null,
+      },
+      unclear("UNCLEAR_TRANSCRIPT", "NOISY"),
+    ];
+    const run = seam({
+      said: "x",
+      reading: () => readings.shift() ?? null,
+      outcomes: [],
+    });
+    await run.answer.answer(request());
+    await run.answer.answer(request());
+    await run.answer.answer(request());
+    // Two prompts written (one before, one after the clear turn), and the
+    // clear turn went to the model as usual.
+    expect(run.stored).toHaveLength(2);
+    expect(run.delegated()).toBe(1);
   });
 });
