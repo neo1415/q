@@ -132,6 +132,7 @@ function grantFor(mediaAssetId: string): PlaybackAuthorizationDto {
 }
 
 let play: ReturnType<typeof vi.fn>;
+let pause: ReturnType<typeof vi.fn>;
 let reducedMotion = false;
 
 function setConnection(value: unknown) {
@@ -151,6 +152,7 @@ beforeEach(() => {
   );
 
   play = vi.fn(() => Promise.resolve());
+  pause = vi.fn();
   Object.defineProperty(HTMLMediaElement.prototype, "play", {
     configurable: true,
     writable: true,
@@ -159,7 +161,7 @@ beforeEach(() => {
   Object.defineProperty(HTMLMediaElement.prototype, "pause", {
     configurable: true,
     writable: true,
-    value: vi.fn(),
+    value: pause,
   });
   Object.defineProperty(HTMLMediaElement.prototype, "load", {
     configurable: true,
@@ -444,7 +446,6 @@ describe("playback", () => {
   it("holds while the tab is hidden", async () => {
     await renderFeed();
     await waitFor(() => expect(play).toHaveBeenCalled());
-    const pause = vi.mocked(HTMLMediaElement.prototype.pause);
     const active = document.querySelector<HTMLVideoElement>(
       "[data-slot-active] video",
     );
@@ -504,7 +505,6 @@ describe("Q watches the pitch with the person", () => {
 
   it("keeps the pitch playing, muted, while Q is open", async () => {
     globalQ.open = true;
-    const pause = vi.mocked(HTMLMediaElement.prototype.pause);
     const { container } = await renderFeed();
     await waitFor(() => expect(play).toHaveBeenCalled());
     const active = container.querySelector<HTMLVideoElement>(

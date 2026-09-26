@@ -222,6 +222,10 @@ function PosterWarmer({
   });
   if (posterUrl === null) return null;
   return (
+    // A plain image on purpose: next/image would fetch the poster through
+    // this app's optimiser, and media bytes never pass through the app
+    // origin. It is also never displayed, so it is not an LCP candidate.
+    // eslint-disable-next-line @next/next/no-img-element
     <img
       src={posterUrl}
       alt=""
