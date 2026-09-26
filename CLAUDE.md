@@ -2,6 +2,20 @@
 
 Persistent instructions for Claude Code in this repository. Read fully before the first edit of any packet.
 
+## Budget — Not a Blank Cheque (founder rule, applies to every session and every agent)
+
+**Claude credits.** The cloud budget is **$250 total and must last 4–5 days**: pace at **≤ $50/day**. Speed still matters, so spend where it moves the product, never on waste.
+
+- Check spend at least twice a day and log it in `docs/handoff/research/ledger.md`. When ahead of pace, cut concurrent workers (default 3, max 4) before anything else.
+- Navigate with graphify first (`graphify query`, `explain`, `path`), then read only the file ranges you need. Never read the transcripts in `docs/handoff/transcripts/` end to end: grep them.
+- Workers: Opus 5.5, medium effort, with tight prompts naming the exact files and requirement ids. Resume a stalled agent instead of re-spawning it. No duplicate agents on the same topic.
+- Run targeted tests. Full gates only before merging to the deploy branch. No sleep-polling loops; use background notification. Don't rebuild packages nobody needs.
+
+**The founder's API credits are off-limits.** OpenAI (a $5 top-up), Gemini, ElevenLabs, Deepgram, Cloudflare Stream, Bright Data and any other provider are paid by the founder.
+
+- Tests, evals and local stacks make **no live provider calls**. Set every provider key to a **non-empty** disabled value such as `disabled-locally-000000000000`. An empty value lets `.env.local` supply the real key.
+- A live call needs a stated reason, the smallest possible size, and the lead's approval, and it is reported with its cost.
+
 ## Product Identity
 
 Capital Q is an AI-native Investment Intelligence Operating System for private capital.
