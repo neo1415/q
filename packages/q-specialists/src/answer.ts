@@ -6,11 +6,13 @@ import type {
 } from "@capital-q/contracts";
 import {
   INITIAL_CONVERSATION_STATE,
+  isUnclearTurn,
   NO_RESEARCH,
   noteAnswerFailure,
   readingFromTurnReader,
   reduceConversation,
   researchDirectiveFor,
+  unclearTurnReply,
   withoutRecommendationClaims,
   type ConversationState,
   type FailureOperation,
@@ -619,6 +621,9 @@ export function createSpecialistQAnswer(
    * read; how the answer ended is noted against the conversation, so a
    * failing subsystem is named once and never in the same words twice.
    */
+  /** Unclear turns in a row, per conversation (bounded with the rest). */
+  const unclearInARow = new Map<string, number>();
+
   const answerTurn = async (
     request: QAnswerRequest,
   ): Promise<QAnswerOutcome> => {
@@ -692,6 +697,28 @@ export function createSpecialistQAnswer(
         "q turn read",
       );
     }
+    // Words that could not be made out are a transcription matter, not a
+    // question: no model is asked (it answered with a meta-statement).
+    // One brief prompt; a second unclear turn in a row gets silence, so
+    // the prompt is never repeated. A clear turn resets the count.
+    if (read !== null && isUnclearTurn(read)) {
+      const before = unclearInARow.get(conversationId) ?? 0;
+      unclearInARow.set(conversationId, before + 1);
+      const reply = unclearTurnReply(read, before);
+      logger?.info(
+        { qRunId: request.runId, unclearInARow: before + 1, reply: reply.kind },
+        "q turn unclear",
+      );
+      return reply.kind === "PROMPT"
+        ? recordAnswer(request, conversationId, reply.line)
+        : {
+            kind: "ANSWERED",
+            messageId: null,
+            modelPolicyVersion: "none",
+            promptBundleVersion: "none",
+          };
+    }
+    unclearInARow.delete(conversationId);
     // A LOW reading is a guess, and a guess never moves anybody's screen or
     // prepares a change: it is answered like any other turn. A document
     // asked for "from what you can find publicly" may be read as a

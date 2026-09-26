@@ -82,3 +82,8 @@ export {
   researchDirectiveFor,
   type ResearchDirective,
 } from "./general-turn.js";
+export {
+  isUnclearTurn,
+  unclearTurnReply,
+  type UnclearTurnReply,
+} from "./unclear.js";
