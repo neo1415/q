@@ -211,23 +211,25 @@ export function PitchLibrary({
               data-phase={row.phase}
             >
               <div className="flex gap-4">
-                <div
-                  className="relative aspect-9/16 w-16 shrink-0 overflow-hidden rounded-(--cq-radius-sm) bg-(--cq-surface-subtle)"
-                  aria-hidden="true"
-                >
-                  {poster !== null ? (
-                    // A signed poster straight from the video service: no
-                    // media through the app's image optimiser (doc 20).
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={poster}
-                      alt=""
-                      className="size-full object-cover"
-                      loading="lazy"
-                      decoding="async"
-                    />
-                  ) : null}
-                </div>
+                {row.previewable ? (
+                  <div
+                    className="relative aspect-9/16 w-16 shrink-0 overflow-hidden rounded-(--cq-radius-sm) bg-(--cq-surface-subtle)"
+                    aria-hidden="true"
+                  >
+                    {poster !== null ? (
+                      // A signed poster straight from the video service: no
+                      // media through the app's image optimiser (doc 20).
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={poster}
+                        alt=""
+                        className="size-full object-cover"
+                        loading="lazy"
+                        decoding="async"
+                      />
+                    ) : null}
+                  </div>
+                ) : null}
                 <div className="flex min-w-0 flex-1 flex-col gap-1">
                   <p className="flex flex-wrap items-center gap-x-3 gap-y-1">
                     <span className="cq-body font-medium text-(--cq-text-primary)">

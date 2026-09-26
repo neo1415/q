@@ -107,4 +107,21 @@ describe("toPitchVersionRows", () => {
     });
     expect(byId.get(OLD)?.isCurrent).toBe(false);
   });
+
+  it("says a replaced version's unfinished upload will not complete", () => {
+    const rows = toPitchVersionRows([
+      version({ mediaAssetId: OLD, status: "UPLOAD_PENDING", readyAt: null }),
+      version({
+        mediaAssetId: NEW,
+        status: "UPLOAD_PENDING",
+        readyAt: null,
+        replacesMediaAssetId: OLD,
+        createdAt: "2026-09-24T09:00:00.000Z",
+      }),
+    ]);
+    expect(rows.map((row) => row.phaseLabel)).toEqual([
+      "Uploading",
+      "Upload not completed",
+    ]);
+  });
 });
