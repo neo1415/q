@@ -31,6 +31,7 @@ export {
   MEDIA_PROVIDER_FAILURES,
   MediaAssetConflictError,
   MediaAssetNotFoundError,
+  MediaIdempotencyConflictError,
   MediaOwnerNotFoundError,
   MediaProviderError,
   MediaProviderNotConfiguredError,
@@ -71,6 +72,7 @@ export type {
   MediaAssetRepository,
   MediaRepositories,
   PitchTranscriptRepository,
+  PitchRequestStore,
   PitchViewerAccessPort,
   StoredPitchTranscript,
 } from "./application/ports.js";
@@ -130,6 +132,7 @@ export {
 } from "./application/upload-use-cases.js";
 export {
   CreateCompanyPitchInputSchema,
+  hashPitchIdempotencyKey,
   type CompanyPitchResult,
   type CreateCompanyPitchCommand,
   type CreateCompanyPitchInput,
@@ -159,6 +162,7 @@ export {
   createPostgresMediaAssetRepository,
   createPostgresMediaRepositories,
   createPostgresPitchTranscriptRepository,
+  createPostgresPitchRequestStore,
 } from "./infrastructure/postgres-media-repository.js";
 export {
   CLOUDFLARE_STREAM_PROVIDER_ID,

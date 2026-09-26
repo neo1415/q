@@ -215,10 +215,52 @@ export type PitchTranscriptRepository = {
   ) => Promise<string | null>;
 };
 
+/**
+ * The idempotency record for creating or replacing a pitch (doc 22 §43).
+ * Keyed by person, organisation and the hash of the client's key; holds
+ * the hash of what the request meant and the asset it created. Every
+ * method runs inside the creation transaction.
+ */
+export type PitchRequestStore = {
+  /** Serialises two requests carrying the same key until commit. */
+  readonly lock: (
+    tx: TransactionContext,
+    userId: string,
+    organisationId: string,
+    idempotencyKeyHash: string,
+  ) => Promise<void>;
+  readonly find: (
+    tx: TransactionContext,
+    userId: string,
+    organisationId: string,
+    idempotencyKeyHash: string,
+  ) => Promise<{
+    readonly requestHash: string;
+    readonly mediaAssetId: MediaAssetId;
+  } | null>;
+  readonly record: (
+    tx: TransactionContext,
+    input: {
+      readonly userId: string;
+      readonly organisationId: string;
+      readonly tenantId: TenantId;
+      readonly idempotencyKeyHash: string;
+      readonly requestHash: string;
+      readonly mediaAssetId: MediaAssetId;
+    },
+  ) => Promise<void>;
+};
+
 export type MediaRepositories = {
   readonly mediaAssets: MediaAssetRepository;
   /** R18. Absent: no transcript is ever stored or read (unknown, not empty). */
   readonly pitchTranscripts?: PitchTranscriptRepository | undefined;
+  /**
+   * Absent in a composition without one (unit doubles): a request that
+   * carries an idempotency key is then refused rather than run without the
+   * guarantee it asked for.
+   */
+  readonly pitchRequests?: PitchRequestStore | undefined;
 };
 
 /**

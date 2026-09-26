@@ -5,6 +5,7 @@ import { parseApiConfig } from "@capital-q/config/api";
 import {
   MediaAssetConflictError,
   MediaAssetNotFoundError,
+  MediaIdempotencyConflictError,
   MediaOwnerNotFoundError,
   MediaProviderError,
   MediaProviderNotConfiguredError,
@@ -93,7 +94,7 @@ function fakeService(overrides: Partial<MediaService> = {}) {
   const service = {
     createCompanyPitch: (command: unknown) => {
       calls["create"]?.push(command);
-      return Promise.resolve({ asset: ASSET, replaced: null });
+      return Promise.resolve({ asset: ASSET, replaced: null, replayed: false });
     },
     getCompanyPitch: (query: unknown) => {
       calls["get"]?.push(query);
@@ -207,9 +208,64 @@ describe("POST /v1/companies/:companyId/pitch", () => {
     const response = await app.inject({
       method: "POST",
       url: pitchUrl,
+      headers: { "idempotency-key": "replace-key-0001" },
       payload: { replacesMediaAssetId: ASSET_ID },
     });
-    expect(response.statusCode).toBeGreaterThanOrEqual(400);
+    expect(response.statusCode).toBe(409);
+    await app.close();
+  });
+
+  it("refuses a replacement that carries no Idempotency-Key", async () => {
+    const { service, calls } = fakeService();
+    const app = buildApp({ principal: PRINCIPAL, context: CONTEXT, service });
+    const response = await app.inject({
+      method: "POST",
+      url: pitchUrl,
+      payload: { replacesMediaAssetId: ASSET_ID },
+    });
+    expect(response.statusCode).toBe(422);
+    expect(response.headers["content-type"]).toContain(
+      "application/problem+json",
+    );
+    expect(calls["create"]).toHaveLength(0);
+    await app.close();
+  });
+
+  it("passes the key through and answers a replayed replacement with 200", async () => {
+    const { service, calls } = fakeService({
+      createCompanyPitch: (command) => {
+        calls["create"]?.push(command);
+        return Promise.resolve({ asset: ASSET, replaced: null, replayed: true });
+      },
+    });
+    const app = buildApp({ principal: PRINCIPAL, context: CONTEXT, service });
+    const response = await app.inject({
+      method: "POST",
+      url: pitchUrl,
+      headers: { "idempotency-key": "replace-key-0002" },
+      payload: { replacesMediaAssetId: ASSET_ID },
+    });
+    expect(response.statusCode).toBe(200);
+    expect(calls["create"]).toEqual([
+      expect.objectContaining({ idempotencyKey: "replace-key-0002" }),
+    ]);
+    await app.close();
+  });
+
+  it("reports a key reused for a different request as an idempotency conflict", async () => {
+    const { service } = fakeService({
+      createCompanyPitch: () =>
+        Promise.reject(new MediaIdempotencyConflictError()),
+    });
+    const app = buildApp({ principal: PRINCIPAL, context: CONTEXT, service });
+    const response = await app.inject({
+      method: "POST",
+      url: pitchUrl,
+      headers: { "idempotency-key": "replace-key-0003" },
+      payload: { replacesMediaAssetId: ASSET_ID },
+    });
+    expect(response.statusCode).toBe(409);
+    expect(response.json<{ code: string }>().code).toBe("IDEMPOTENCY_CONFLICT");
     await app.close();
   });
 

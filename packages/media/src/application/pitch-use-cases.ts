@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 import { z } from "zod";
 
 import {
@@ -21,7 +23,9 @@ import {
 } from "../contracts/index.js";
 import {
   MediaAssetNotFoundError,
+  MediaIdempotencyConflictError,
   MediaReplacementConflictError,
+  MediaRuleError,
 } from "../domain/errors.js";
 import {
   mediaAssetCreatedEvent,
@@ -79,6 +83,12 @@ export type CreateCompanyPitchCommand = {
   readonly actor: ActorContext;
   readonly companyId: string;
   readonly input: CreateCompanyPitchInput;
+  /**
+   * The client's key for this intended change, reused on retry. With it a
+   * retry whose first answer was lost gets that same asset back instead of
+   * a conflict (or, worse, a second replacement).
+   */
+  readonly idempotencyKey?: string | undefined;
   readonly correlationId: CorrelationId;
 };
 
@@ -86,7 +96,31 @@ export type CompanyPitchResult = {
   readonly asset: MediaAsset;
   /** The predecessor, when this call replaced one. */
   readonly replaced: MediaAsset | null;
+  /** True when a retried request was answered with what it created. */
+  readonly replayed: boolean;
 };
+
+function sha256Hex(value: string): string {
+  return createHash("sha256").update(value, "utf8").digest("hex");
+}
+
+/** Namespaced so a key reused for another command can never collide. */
+export function hashPitchIdempotencyKey(key: string): string {
+  return sha256Hex(`media.pitch.create:${key}`);
+}
+
+/** What the request meant: which company, and which pitch it replaces. */
+function hashCreatePitchRequest(
+  companyId: string,
+  replacesMediaAssetId: string | undefined,
+): string {
+  return sha256Hex(
+    JSON.stringify({
+      companyId,
+      replacesMediaAssetId: replacesMediaAssetId ?? null,
+    }),
+  );
+}
 
 function companyRef(companyId: string): MediaOwnerRef {
   return { ownerType: "COMPANY", ownerId: companyId };
@@ -123,7 +157,50 @@ export function createCreateCompanyPitch(
       resource: ownerScope(actor, owner),
     });
 
+    const requests = repositories.pitchRequests;
+    const key = command.idempotencyKey;
+    if (key !== undefined && requests === undefined) {
+      throw new MediaRuleError(
+        "This deployment cannot honour an idempotency key for a pitch.",
+      );
+    }
+
     return transactions.run(async (tx: TransactionContext) => {
+      const keyHash = key === undefined ? null : hashPitchIdempotencyKey(key);
+      const requestHash = hashCreatePitchRequest(
+        owner.ownerId,
+        input.replacesMediaAssetId,
+      );
+      if (keyHash !== null && requests !== undefined) {
+        await requests.lock(tx, actor.userId, organisationId, keyHash);
+        const previous = await requests.find(
+          tx,
+          actor.userId,
+          organisationId,
+          keyHash,
+        );
+        if (previous !== null) {
+          if (previous.requestHash !== requestHash) {
+            throw new MediaIdempotencyConflictError();
+          }
+          const asset = await repositories.mediaAssets.findById(
+            tx.sql,
+            owner.tenantId,
+            previous.mediaAssetId,
+          );
+          if (asset === null) throw new MediaIdempotencyConflictError();
+          const replaced =
+            asset.replacesMediaAssetId === null
+              ? null
+              : await repositories.mediaAssets.findById(
+                  tx.sql,
+                  owner.tenantId,
+                  asset.replacesMediaAssetId,
+                );
+          return { asset, replaced, replayed: true };
+        }
+      }
+
       const current = await repositories.mediaAssets.lockCurrentForOwner(
         tx,
         owner.tenantId,
@@ -169,6 +246,16 @@ export function createCreateCompanyPitch(
         createdByUserId: actor.userId,
         ...(current === null ? {} : { replacesMediaAssetId: current.id }),
       });
+      if (keyHash !== null && requests !== undefined) {
+        await requests.record(tx, {
+          userId: actor.userId,
+          organisationId,
+          tenantId: owner.tenantId,
+          idempotencyKeyHash: keyHash,
+          requestHash,
+          mediaAssetId: asset.id,
+        });
+      }
 
       await audit.record(tx, {
         ...auditActorFromContext(actor),
@@ -212,7 +299,7 @@ export function createCreateCompanyPitch(
             }),
       );
 
-      return { asset, replaced: current };
+      return { asset, replaced: current, replayed: false };
     });
   };
 }

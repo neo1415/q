@@ -14,6 +14,7 @@ import type {
   MediaAssetRepository,
   MediaRepositories,
   PitchTranscriptRepository,
+  PitchRequestStore,
 } from "../application/ports.js";
 import {
   CaptionStateSchema,
@@ -367,10 +368,50 @@ export function createPostgresPitchTranscriptRepository(): PitchTranscriptReposi
   };
 }
 
+const PitchRequestRow = z.object({
+  request_hash: z.string(),
+  media_asset_id: MediaAssetIdSchema,
+});
+
+/** `media.pitch_requests`: hashes only, in the creation transaction. */
+export function createPostgresPitchRequestStore(): PitchRequestStore {
+  return {
+    lock: async (tx, userId, organisationId, idempotencyKeyHash) => {
+      await tx.sql`
+        select pg_advisory_xact_lock(
+          hashtext(${userId}::text || ':pitch:' || ${organisationId}::text),
+          hashtext(${idempotencyKeyHash}))`;
+    },
+    find: async (tx, userId, organisationId, idempotencyKeyHash) => {
+      const rows = await tx.sql`
+        select r.request_hash, r.media_asset_id
+          from media.pitch_requests r
+         where r.user_id = ${userId}
+           and r.organisation_id = ${organisationId}
+           and r.idempotency_key_hash = ${idempotencyKeyHash}`;
+      if (rows.length === 0) return null;
+      const parsed = PitchRequestRow.parse(rows[0]);
+      return {
+        requestHash: parsed.request_hash,
+        mediaAssetId: parsed.media_asset_id,
+      };
+    },
+    record: async (tx, input) => {
+      await tx.sql`
+        insert into media.pitch_requests
+          (user_id, organisation_id, tenant_id, idempotency_key_hash, request_hash, media_asset_id)
+        values
+          (${input.userId}, ${input.organisationId}, ${input.tenantId},
+           ${input.idempotencyKeyHash}, ${input.requestHash}, ${input.mediaAssetId})`;
+    },
+  };
+}
+
 export function createPostgresMediaRepositories(): MediaRepositories {
   return {
     mediaAssets: createPostgresMediaAssetRepository(),
     pitchTranscripts: createPostgresPitchTranscriptRepository(),
+    pitchRequests: createPostgresPitchRequestStore(),
   };
 }
 
