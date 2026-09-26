@@ -144,7 +144,10 @@ export function VisibilityCentre({
   }
 
   return (
-    <div className="flex flex-col gap-10" data-visibility-centre>
+    <div
+      className="flex max-w-(--cq-layout-reading) flex-col gap-10"
+      data-visibility-centre
+    >
       {notice !== null ? (
         <InlineNotice tone="positive" title="Done">
           {notice}
@@ -159,9 +162,11 @@ export function VisibilityCentre({
         companyId={companyId}
         state={state}
         onChanged={async (message) => {
+          // The list is re-read before the notice, so "done" never sits
+          // beside a ledger that still says otherwise.
+          await load();
           setNotice(message);
           setError(null);
-          await load();
         }}
         onError={setError}
       />
@@ -504,7 +509,11 @@ function AudiencePreview({
           <InlineNotice tone="danger" title="That preview couldn't load">
             {error}
           </InlineNotice>
-        ) : !ready ? null : preview === null ? (
+        ) : !ready ? null : preview === null ||
+          // Never show one audience's preview under another's tab while
+          // the right one loads.
+          preview.audience !== audience ||
+          (needsInvestor && preview.relationshipId !== relationshipId) ? (
           <Skeleton lines={3} />
         ) : (
           <PreviewBody preview={preview} />

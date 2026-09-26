@@ -179,6 +179,27 @@ describe("VisibilityCentre", () => {
     ).toHaveLength(1);
   });
 
+  it("never shows one audience's preview under another audience's tab while it loads", async () => {
+    setUp();
+    const panel = await screen.findByRole("tabpanel");
+    await within(panel).findByText("Alpha Robotics");
+    let release: () => void = () => undefined;
+    actions.loadAudiencePreviewAction.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          release = () => resolve({ ok: true, value: previews["PUBLIC"] });
+        }),
+    );
+    fireEvent.click(screen.getByRole("tab", { name: "Public" }));
+    expect(screen.getByRole("tabpanel").textContent).not.toContain(
+      "Alpha Robotics",
+    );
+    release();
+    await within(screen.getByRole("tabpanel")).findByText(
+      /sees nothing of your company/,
+    );
+  });
+
   it("lists shares from the server and revokes with honest wording", async () => {
     setUp();
     actions.revokeShareAction.mockResolvedValue({
