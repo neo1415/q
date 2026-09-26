@@ -1,5 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { Suspense } from "react";
+
+import type { ProfileFindingSubjectType } from "@capital-q/contracts";
 
 import { Avatar } from "@capital-q/ui/avatar";
 import { buttonClassName } from "@capital-q/ui/button";
@@ -12,7 +15,10 @@ import {
 import { ThemeToggle } from "@/features/appearance/theme-toggle";
 import { SignOutButton } from "@/features/auth";
 import { EditableProfile } from "@/features/profile/editable-profile";
-import { loadProfilePage } from "@/features/profile/profile-data";
+import {
+  loadProfileFindings,
+  loadProfilePage,
+} from "@/features/profile/profile-data";
 import {
   ProfileFindings,
   ProfileQEntry,
@@ -134,7 +140,13 @@ export default async function ProfilePage() {
           }
           aside={
             <>
-              <ProfileFindings subjectLabel="me" state={data.personFindings} />
+              {person === null ? null : (
+                <FindingsSlot
+                  subjectType="PERSON"
+                  subjectId={person.userId}
+                  subjectLabel="me"
+                />
+              )}
               <ProfileQEntry
                 subject="your profile"
                 editDraft="Change my headline to "
@@ -168,9 +180,10 @@ export default async function ProfilePage() {
             }
             aside={
               <>
-                <ProfileFindings
+                <FindingsSlot
+                  subjectType="COMPANY"
+                  subjectId={company.id}
                   subjectLabel={company.canonicalName}
-                  state={data.organisationFindings}
                 />
                 <ProfileVerification state={data.verification} />
                 <ProfileQEntry
@@ -203,9 +216,10 @@ export default async function ProfilePage() {
             }
             aside={
               <>
-                <ProfileFindings
+                <FindingsSlot
+                  subjectType="INVESTOR_ORGANISATION"
+                  subjectId={investor.id}
                   subjectLabel={investor.displayName}
-                  state={data.organisationFindings}
                 />
                 <section aria-labelledby="investor-verified">
                   <h3
@@ -325,6 +339,42 @@ function ProfileBlock({
       </div>
     </PageSection>
   );
+}
+
+/**
+ * What Q found, streamed: the declared profile paints at once and the
+ * findings arrive when the Q API has planned and read them.
+ */
+function FindingsSlot(props: {
+  readonly subjectType: ProfileFindingSubjectType;
+  readonly subjectId: string;
+  readonly subjectLabel: string;
+}) {
+  return (
+    <Suspense
+      fallback={
+        <ProfileFindings
+          subjectLabel={props.subjectLabel}
+          state={{ status: "LOADING" }}
+        />
+      }
+    >
+      <FindingsRead {...props} />
+    </Suspense>
+  );
+}
+
+async function FindingsRead({
+  subjectType,
+  subjectId,
+  subjectLabel,
+}: {
+  readonly subjectType: ProfileFindingSubjectType;
+  readonly subjectId: string;
+  readonly subjectLabel: string;
+}) {
+  const state = await loadProfileFindings(subjectType, subjectId);
+  return <ProfileFindings subjectLabel={subjectLabel} state={state} />;
 }
 
 function SettingRow({

@@ -97,6 +97,7 @@ export function findingQuestion(
 
 export type FindingsState =
   | { readonly status: "READ"; readonly findings: readonly ProfileFinding[] }
+  | { readonly status: "LOADING" }
   | { readonly status: "UNAVAILABLE" };
 
 export function ProfileFindings({
@@ -118,7 +119,14 @@ export function ProfileFindings({
         Q&apos;s reading of public pages. Not on your profile until you confirm
         it.
       </p>
-      {state.status === "UNAVAILABLE" ? (
+      {state.status === "LOADING" ? (
+        <p
+          className="cq-body-sm pt-3 text-(--cq-text-secondary)"
+          aria-busy="true"
+        >
+          Reading what Q found…
+        </p>
+      ) : state.status === "UNAVAILABLE" ? (
         <p className="cq-body-sm pt-3 text-(--cq-text-secondary)">
           Couldn&apos;t be read just now.
         </p>

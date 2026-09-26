@@ -30,11 +30,20 @@ import type { FindingsState, VerificationState } from "./profile-enrichment";
  */
 
 const READ_BUDGET_MS = 2500;
+/**
+ * Findings stream in their own Suspense boundary and hold nothing else, so
+ * they may take longer: the Q API plans each read through the Context
+ * Firewall before it touches a row.
+ */
+const FINDINGS_BUDGET_MS = 8000;
 
-async function within<T>(read: () => Promise<T>): Promise<T | undefined> {
+async function within<T>(
+  read: () => Promise<T>,
+  budgetMs: number = READ_BUDGET_MS,
+): Promise<T | undefined> {
   let timer: ReturnType<typeof setTimeout> | undefined;
   const late = new Promise<undefined>((resolve) => {
-    timer = setTimeout(() => resolve(undefined), READ_BUDGET_MS);
+    timer = setTimeout(() => resolve(undefined), budgetMs);
   });
   try {
     return await Promise.race([read(), late]);
@@ -47,21 +56,28 @@ async function within<T>(read: () => Promise<T>): Promise<T | undefined> {
 
 export type ProfilePageData = {
   readonly person: PersonProfileDto | null;
-  readonly personFindings: FindingsState;
   readonly company: CompanyDto | null;
   readonly investor: InvestorOrganisationDto | null;
-  readonly organisationFindings: FindingsState;
   readonly verification: VerificationState;
 };
 
-async function findings(
-  qSession: ApiSession | null,
+/** What Q found about one of the person's own subjects, under their Q API session. */
+export async function loadProfileFindings(
   subjectType: ProfileFindingSubjectType,
   subjectId: string,
 ): Promise<FindingsState> {
-  if (qSession === null) return { status: "UNAVAILABLE" };
-  const read = await within(() =>
-    getProfileFindings(qSession, { subjectType, subjectId }),
+  const { qApiBaseUrl } = loadWebServerConfig();
+  const accessToken = await getSessionAccessToken();
+  if (qApiBaseUrl === undefined || accessToken === null) {
+    return { status: "UNAVAILABLE" };
+  }
+  const read = await within(
+    () =>
+      getProfileFindings(
+        { baseUrl: qApiBaseUrl, accessToken },
+        { subjectType, subjectId },
+      ),
+    FINDINGS_BUDGET_MS,
   );
   return read === undefined
     ? { status: "UNAVAILABLE" }
@@ -72,20 +88,10 @@ export async function loadProfilePage(
   session: ApiSession | null,
   context: OwnContext,
 ): Promise<ProfilePageData> {
-  const { qApiBaseUrl } = loadWebServerConfig();
-  const accessToken = await getSessionAccessToken();
-  const qSession: ApiSession | null =
-    qApiBaseUrl === undefined || accessToken === null
-      ? null
-      : { baseUrl: qApiBaseUrl, accessToken };
-
-  const person =
-    session === null ? undefined : await within(() => getMyProfile(session));
-
-  const [personFindings, company, investor] = await Promise.all([
-    person === undefined
-      ? Promise.resolve<FindingsState>({ status: "UNAVAILABLE" })
-      : findings(qSession, "PERSON", person.userId),
+  const [person, company, investor] = await Promise.all([
+    session === null
+      ? Promise.resolve(undefined)
+      : within(() => getMyProfile(session)),
     session !== null && context.kind === "FOUNDER"
       ? within(() => getCompany(session, context.companyId))
       : Promise.resolve(undefined),
@@ -94,29 +100,20 @@ export async function loadProfilePage(
       : Promise.resolve(undefined),
   ]);
 
-  const [organisationFindings, verification] = await Promise.all([
-    company !== undefined
-      ? findings(qSession, "COMPANY", company.id)
-      : investor !== undefined
-        ? findings(qSession, "INVESTOR_ORGANISATION", investor.id)
-        : Promise.resolve<FindingsState>({ status: "READ", findings: [] }),
-    (async (): Promise<VerificationState> => {
-      if (session === null || company === undefined) return { status: "NONE" };
-      const read = await within(() =>
-        getCompanyVerification(session, company.id),
-      );
-      return read === undefined
-        ? { status: "UNAVAILABLE" }
-        : { status: "READ", standings: read.standings };
-    })(),
-  ]);
+  const verification = await (async (): Promise<VerificationState> => {
+    if (session === null || company === undefined) return { status: "NONE" };
+    const read = await within(() =>
+      getCompanyVerification(session, company.id),
+    );
+    return read === undefined
+      ? { status: "UNAVAILABLE" }
+      : { status: "READ", standings: read.standings };
+  })();
 
   return {
     person: person ?? null,
-    personFindings,
     company: company ?? null,
     investor: investor ?? null,
-    organisationFindings,
     verification,
   };
 }

@@ -350,14 +350,13 @@ function FieldEditor({
       ) : (
         <Input
           {...common}
-          type={
-            spec.input.kind === "date"
-              ? "date"
-              : spec.input.kind === "url"
-                ? "url"
-                : "text"
-          }
+          // A website is a text field with the URL keyboard, not type="url":
+          // the browser's own URL check refuses "northstar.example", which
+          // the write path accepts and reads as https.
+          type={spec.input.kind === "date" ? "date" : "text"}
           inputMode={spec.input.kind === "url" ? "url" : undefined}
+          autoCapitalize={spec.input.kind === "url" ? "none" : undefined}
+          spellCheck={spec.input.kind === "url" ? false : undefined}
           value={draft}
           maxLength={spec.input.kind === "text" ? spec.input.maxLength : 2048}
           autoFocus
