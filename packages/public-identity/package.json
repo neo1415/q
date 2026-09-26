@@ -1,0 +1,36 @@
+{
+  "name": "@capital-q/public-identity",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Public identity bounded context: global handles (display routes, never identifiers) and the Q Card, the owner's choice of which declared profile fields are shown publicly or to the network. A presentation over canonical profiles; holds no profile data.",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "clean": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\""
+  },
+  "dependencies": {
+    "@capital-q/audit": "workspace:*",
+    "@capital-q/contracts": "workspace:*",
+    "@capital-q/database": "workspace:*",
+    "@capital-q/security": "workspace:*",
+    "zod": "4.5.4"
+  },
+  "devDependencies": {
+    "@capital-q/config": "workspace:*",
+    "@types/node": "^24.13.3",
+    "typescript": "5.9.3"
+  }
+}
