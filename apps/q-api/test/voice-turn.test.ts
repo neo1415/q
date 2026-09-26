@@ -780,6 +780,76 @@ describe("a spoken question for Q", () => {
     ]);
   });
 
+  it("hands a look-up to Q, reports how it ended to the loop, and returns to the open question (P0-1)", async () => {
+    const runtime = fakeRuntime();
+    const ended: [string, boolean][] = [];
+    const handle = createVoiceTurnHandler({
+      qRuntime: runtime.service,
+      qStream: fakeStream([
+        event("q.message.delta", {
+          messageId: "m1",
+          text: "Three funds back seed fintech in Lagos.",
+        }),
+        event("q.run.completed", { status: "COMPLETED", completedAt: NOW }),
+      ]),
+      onboarding: {
+        apiBaseUrl: "http://api.test",
+        fetch: () => Promise.resolve(Response.json(view())),
+      },
+      interviewer: {
+        turn: () => Promise.reject(new Error("the legacy path must not run")),
+        researchEnded: () => {
+          throw new Error("the legacy engine must not be told");
+        },
+      } as never,
+      interviewAgent: {
+        turn: () =>
+          Promise.resolve({
+            reply: "Let me look that up.",
+            intent: "ANSWER",
+            asking: null,
+            recorded: [],
+            skipped: [],
+            questionForQ: "who backs seed fintech in Lagos?",
+            researching: "who backs seed fintech in Lagos?",
+            navigate: null,
+            handoff: null,
+            pronounce: null,
+            warnings: 0,
+            view: view(),
+            degraded: false,
+            reading: null,
+            resume: { stepKey: "F2.stage", question: "What stage are you at?" },
+            qualitative: [],
+            trace: null,
+          }),
+        researchEnded: (sessionId, ok) => {
+          ended.push([sessionId, ok]);
+        },
+      },
+      logger,
+    });
+    const speaker = fakeSpeaker();
+
+    const outcome = await handle(
+      binding({
+        conversationId: undefined,
+        subjects: undefined,
+        onboarding: { sessionId: SESSION_ID, journeyType: "founder" },
+      }),
+      [{ role: "user", content: "Who backs seed fintech in Lagos?" }],
+      new AbortController().signal,
+      speaker,
+    );
+
+    expect(outcome.kind).toBe("SPOKEN");
+    expect(runtime.calls.createRun).toHaveLength(1);
+    expect(ended).toEqual([[SESSION_ID, true]]);
+    const said = speaker.spoken.join(" ");
+    expect(said).toContain("Let me look that up.");
+    expect(said).toContain("What stage are you at?");
+  });
+
   it("pauses at an interruption: nothing stale is spoken, the run keeps going, and 'go on' resumes the answer (rework)", async () => {
     const runtime = fakeRuntime();
     const controller = new AbortController();
