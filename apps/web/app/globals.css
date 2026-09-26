@@ -589,6 +589,16 @@
       display: none;
     }
   }
+  /* The bottom navigation stays on Discover, on stage tokens (ADR 0017 C5),
+     so a light theme does not put a white bar under the pitch. */
+  body:has([data-feed-immersive]) .cq-bottom-nav {
+    color-scheme: dark;
+    --cq-surface: var(--cq-stage-canvas);
+    --cq-border-subtle: var(--cq-stage-border);
+    --cq-text-secondary: var(--cq-stage-text-muted);
+    --cq-accent: var(--cq-stage-accent);
+    background-color: var(--cq-stage-canvas);
+  }
   .cq-feed {
     height: calc(100svh - var(--cq-bottom-nav-height) - var(--cq-safe-bottom));
     overflow: hidden;
