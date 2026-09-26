@@ -200,3 +200,11 @@ export {
   revokeVisibilityShare,
   shareWithRelationship,
 } from "./visibility.js";
+
+export {
+  claimHandle,
+  getPublicHandle,
+  getQCard,
+  resolveCardCode,
+  updateQCard,
+} from "./q-cards.js";

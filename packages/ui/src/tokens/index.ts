@@ -16,6 +16,19 @@ export const THEME_COLORS = {
 } as const;
 
 /**
+ * sRGB renderings of the light-theme surface, text and border tokens, for
+ * raster renderers that cannot read a custom property -- the Q Card's
+ * link-preview image (next/og, BIZ-004). Mirrors tokens.css; nothing that
+ * can read `--cq-*` should use these.
+ */
+export const RASTER_COLORS = {
+  surface: "#fefdfb",
+  textPrimary: "#0f141b",
+  textSecondary: "#50565f",
+  border: "#d3d6db",
+} as const;
+
+/**
  * Motion timing in seconds, for the rare script-driven animation (Web
  * Animations API, a future Motion for React) that cannot read a custom
  * property. Mirrors `--cq-motion-*` and `--cq-ease*` in tokens.css exactly;

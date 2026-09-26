@@ -29,6 +29,7 @@ import {
   INVESTOR_FIELDS,
   PERSON_FIELDS,
 } from "@/features/profile/profile-fields";
+import { QCardSection } from "@/features/q-card/q-card-section";
 import { QMotionToggle } from "@/features/q-aperture";
 import { apiSession, resolveOwnContext } from "@/features/q/context";
 import { QPageSubject } from "@/features/q/q-subject";
@@ -263,8 +264,33 @@ export default async function ProfilePage() {
           <Unavailable what="your organisation's profile" />
         ) : null}
 
-        {/* BIZ-003 (visibility centre) and BIZ-004 (handle and Q Card) take
-            this slot: who sees which field, and the shareable identity. */}
+        {/* The shareable identity (BIZ-004). */}
+        {company !== null || investor !== null ? (
+          <PageSection
+            id="q-card"
+            title="Q Card"
+            description="Your shareable digital business card: a link and QR that open a page showing only what you choose."
+          >
+            {company !== null ? (
+              <QCardSection
+                subjectType="COMPANY"
+                subjectId={company.id}
+                name={company.canonicalName}
+                tagline={company.shortDescription}
+              />
+            ) : investor !== null ? (
+              <QCardSection
+                subjectType="INVESTOR_ORGANISATION"
+                subjectId={investor.id}
+                name={investor.displayName}
+                tagline={investor.publicDescription}
+              />
+            ) : null}
+          </PageSection>
+        ) : null}
+
+        {/* BIZ-003 (visibility centre) takes this slot: who sees which
+            field of the profile itself. */}
         <PageSection
           id="visibility"
           title="Visibility & Discovery"

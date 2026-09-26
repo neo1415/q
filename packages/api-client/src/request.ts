@@ -37,7 +37,11 @@ export async function call<TSchema extends z.ZodType>(
   const doFetch = session.fetch ?? fetch;
   const headers: Record<string, string> = {
     accept: "application/json",
-    authorization: `Bearer ${session.accessToken}`,
+    // An anonymous public read (BIZ-004) carries no credential at all,
+    // rather than an empty one.
+    ...(session.accessToken === ""
+      ? {}
+      : { authorization: `Bearer ${session.accessToken}` }),
     ...(session.organisationId === undefined
       ? {}
       : { "x-organisation-id": session.organisationId }),

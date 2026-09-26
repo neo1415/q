@@ -20,6 +20,16 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  // `/@handle` is the Q Card's public address (BIZ-004). An `@` segment is
+  // a parallel-route slot in the App Router, so the page lives at
+  // `/u/[handle]` and the public address is a rewrite onto it. The vCard
+  // rule comes first so `.vcf` is never read as part of a handle.
+  rewrites() {
+    return Promise.resolve([
+      { source: "/@:handle([a-z0-9-]+).vcf", destination: "/u/:handle/vcard" },
+      { source: "/@:handle([A-Za-z0-9-]+)", destination: "/u/:handle" },
+    ]);
+  },
   headers() {
     return Promise.resolve([
       { source: "/(.*)", headers: securityHeaders },
