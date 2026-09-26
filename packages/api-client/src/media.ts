@@ -44,18 +44,27 @@ const assetPath = (companyId: string, mediaAssetId: string) =>
  * `POST /v1/companies/:companyId/pitch` — create the company's pitch media
  * asset, or replace the current one by naming it. The asset comes back in
  * state CREATED: it is a record, not a video.
+ *
+ * `idempotencyKey` is required by the server for a replacement and honoured
+ * for a creation: the same key again returns the asset it created.
  */
 export function createPitchMediaAsset(
   session: ApiSession,
   companyId: string,
   request: CreateCompanyPitchRequest = {},
+  idempotencyKey?: string,
 ) {
   return call(
     session,
     "POST",
     pitchPath(companyId),
     CreateCompanyPitchResponseSchema,
-    { body: request },
+    {
+      body: request,
+      ...(idempotencyKey === undefined
+        ? {}
+        : { headers: { [IDEMPOTENCY_KEY_HEADER]: idempotencyKey } }),
+    },
   );
 }
 

@@ -79,6 +79,7 @@ import {
 import {
   MediaAssetConflictError,
   MediaAssetNotFoundError,
+  MediaIdempotencyConflictError,
   MediaOwnerNotFoundError,
   MediaReplacementConflictError,
   MediaRuleError,
@@ -415,6 +416,10 @@ function toProblem(
 
   if (error instanceof ClaimRevisionConflictError) {
     return createProblemDetails({ code: "VERSION_CONFLICT", requestId });
+  }
+
+  if (error instanceof MediaIdempotencyConflictError) {
+    return createProblemDetails({ code: "IDEMPOTENCY_CONFLICT", requestId });
   }
 
   // Someone else changed the media asset first, or the pitch being replaced

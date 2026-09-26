@@ -175,9 +175,24 @@ function registerPitchRoutes(
       "The pitch request is not valid.",
     );
 
+    // Replacing supersedes the current pitch, so it is consequential and
+    // must name the intended change: a retry whose answer was lost then
+    // gets the same new asset back rather than a conflict or a second
+    // replacement. A first creation may carry one too, for the same reason.
+    const rawKey = request.headers[IDEMPOTENCY_KEY_HEADER];
+    const idempotencyKey =
+      rawKey === undefined && input.replacesMediaAssetId === undefined
+        ? undefined
+        : parseContract(
+            IdempotencyKeyHeaderSchema,
+            typeof rawKey === "string" ? rawKey : undefined,
+            "An Idempotency-Key header is required to replace a pitch.",
+          );
+
     const result = await service.createCompanyPitch({
       actor,
       companyId: companyIdParam(request),
+      ...(idempotencyKey === undefined ? {} : { idempotencyKey }),
       input: {
         ...(input.replacesMediaAssetId === undefined
           ? {}
@@ -191,7 +206,7 @@ function registerPitchRoutes(
     });
 
     return reply
-      .code(201)
+      .code(result.replayed ? 200 : 201)
       .header("Cache-Control", "no-store")
       .header(
         "Location",

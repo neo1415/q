@@ -59,6 +59,20 @@ export class MediaReplacementConflictError extends Error {
   }
 }
 
+/**
+ * An idempotency key already used for a different pitch request. Refused:
+ * a key names one intended change, and replaying it as another would turn
+ * a retry into a decision nobody made.
+ */
+export class MediaIdempotencyConflictError extends Error {
+  constructor(
+    message = "That idempotency key was already used for a different request.",
+  ) {
+    super(message);
+    this.name = "MediaIdempotencyConflictError";
+  }
+}
+
 /** A rule about the asset itself, not about who asked. */
 export class MediaRuleError extends Error {
   constructor(message: string) {
