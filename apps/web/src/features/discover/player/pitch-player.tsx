@@ -68,6 +68,21 @@ type PitchPlayerProps = {
   readonly reducedMotion: boolean;
   /** Swappable for an MSE engine; the native path is the default. */
   readonly attachSource?: AttachSource;
+  /**
+   * `inline`: a framed player in a page (the founder's own review).
+   * `stage`: the Discover feed's full-bleed slot, which sizes the video;
+   * the controls float over it (spec §9).
+   */
+  readonly variant?: "inline" | "stage" | undefined;
+  /**
+   * Hold playback even where the tier says ACTIVE: while the feed is
+   * still settling on this card, while Q is speaking, or while a sheet
+   * covers the stage (spec §9.4-§9.5).
+   */
+  readonly hold?: boolean | undefined;
+  /** Controlled sound, so one choice carries from card to card. */
+  readonly muted?: boolean | undefined;
+  readonly onMutedChange?: ((muted: boolean) => void) | undefined;
 };
 
 export function PitchPlayer({
@@ -76,9 +91,18 @@ export function PitchPlayer({
   authorize,
   reducedMotion,
   attachSource = attachNativeSource,
+  variant = "inline",
+  hold = false,
+  muted: controlledMuted,
+  onMutedChange,
 }: PitchPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
-  const [muted, setMuted] = useState(true);
+  const [ownMuted, setOwnMuted] = useState(true);
+  const muted = controlledMuted ?? ownMuted;
+  const setMuted = (next: boolean) => {
+    if (onMutedChange !== undefined) onMutedChange(next);
+    else setOwnMuted(next);
+  };
   const [playing, setPlaying] = useState(false);
 
   const { intent, posterUrl, playbackUrl, failed } = usePitchPlayback({
@@ -103,7 +127,7 @@ export function PitchPlayer({
     const video = videoRef.current;
     if (video === null) return;
 
-    if (!intent.autoplay || playbackUrl === null) {
+    if (!intent.autoplay || playbackUrl === null || hold) {
       if (!video.paused) video.pause();
       return;
     }
@@ -113,7 +137,7 @@ export function PitchPlayer({
     // the same fact as a video that is running, and a browser may refuse
     // autoplay under its own policy without either of them being wrong.
     void video.play().catch(() => undefined);
-  }, [intent.autoplay, playbackUrl]);
+  }, [intent.autoplay, playbackUrl, hold]);
 
   // Muting is a property, not an attribute: React sets the attribute on
   // first render only, and the element's own state is what the browser
@@ -127,6 +151,58 @@ export function PitchPlayer({
   if (pitch === null) return null;
 
   const frame = pitchFrame(pitch.aspectRatio);
+
+  if (variant === "stage") {
+    return (
+      <div className="cq-feed-player" data-pitch-frame>
+        <video
+          ref={videoRef}
+          className="cq-feed-video"
+          playsInline
+          muted={muted}
+          loop
+          {...(intent.preload === null ? {} : { preload: intent.preload })}
+          {...(posterUrl === null ? {} : { poster: posterUrl })}
+          aria-label={`Pitch from ${company.canonicalName}`}
+          data-policy={policy}
+          data-playing={playing ? "true" : "false"}
+          onPlay={() => setPlaying(true)}
+          onPause={() => setPlaying(false)}
+        />
+        {intent.attach || failed ? (
+          <div className="cq-feed-player-controls">
+            {intent.requiresExplicitPlay && !playing ? (
+              <button
+                type="button"
+                className="cq-stage-control"
+                onClick={() => {
+                  void videoRef.current?.play().catch(() => undefined);
+                }}
+                disabled={playbackUrl === null}
+              >
+                Play
+              </button>
+            ) : null}
+            {intent.attach ? (
+              <button
+                type="button"
+                className="cq-stage-control"
+                aria-pressed={!muted}
+                onClick={() => setMuted(!muted)}
+              >
+                {muted ? "Unmute" : "Mute"}
+              </button>
+            ) : null}
+            {failed ? (
+              <span className="cq-caption text-(--cq-text-secondary)">
+                This pitch could not be loaded right now.
+              </span>
+            ) : null}
+          </div>
+        ) : null}
+      </div>
+    );
+  }
 
   return (
     <div className="cq-pitch flex flex-col gap-3">
@@ -188,7 +264,7 @@ export function PitchPlayer({
             variant="quiet"
             size="compact"
             aria-pressed={!muted}
-            onClick={() => setMuted((previous) => !previous)}
+            onClick={() => setMuted(!muted)}
           >
             {muted ? "Unmute" : "Mute"}
           </Button>

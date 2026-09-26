@@ -71,7 +71,10 @@ function subscribe(onChange: () => void): () => void {
     if (event.key === Q_MOTION_STORAGE_KEY) onChange();
   };
   window.addEventListener("storage", fromAnotherTab);
-  const media = Object.values(QUERIES).map((query) => window.matchMedia(query));
+  const media =
+    typeof window.matchMedia === "function"
+      ? Object.values(QUERIES).map((query) => window.matchMedia(query))
+      : [];
   for (const list of media) list.addEventListener("change", onChange);
   return () => {
     listeners.delete(onChange);
@@ -109,7 +112,9 @@ const cache = new Map<string, QMotionEnvironment>();
 
 function snapshot(): QMotionEnvironment {
   const choice = readStoredQMotion();
-  const matches = (query: string) => window.matchMedia(query).matches;
+  // A host with no media queries (a test DOM) asks for nothing special.
+  const matches = (query: string) =>
+    typeof window.matchMedia === "function" && window.matchMedia(query).matches;
   const forced = matches(QUERIES.forcedColors);
   const motion: QMotion =
     choice === "full" && matches(QUERIES.reducedMotion) ? "calm" : choice;

@@ -7,12 +7,16 @@
  */
 export {
   AlertTriangle,
+  ArrowDown,
   ArrowLeft,
   ArrowUp,
+  Bookmark,
+  BookmarkCheck,
   Building2,
   Check,
   ChevronDown,
   ChevronRight,
+  ChevronUp,
   CircleAlert,
   CircleUser,
   Compass,

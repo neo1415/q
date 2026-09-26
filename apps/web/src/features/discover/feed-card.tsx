@@ -1,14 +1,22 @@
 "use client";
 
 import Link from "next/link";
-import { useRef } from "react";
+import { useRef, type ReactNode } from "react";
 
 import type {
   DiscoveredCompanyDto,
   DiscoveryReasonDto,
 } from "@capital-q/contracts";
 import { Button, buttonClassName } from "@capital-q/ui/button";
-import { Building2, Globe, ICON_SIZE } from "@capital-q/ui/icons";
+import {
+  ArrowDown,
+  Bookmark,
+  BookmarkCheck,
+  Building2,
+  Globe,
+  ICON_SIZE,
+  ICON_STROKE,
+} from "@capital-q/ui/icons";
 
 import { countryLabel, stageLabel } from "../company/declared-labels";
 import { ExpressInterest } from "../network/express-interest";
@@ -135,6 +143,8 @@ export function FeedCard({
   onSave,
   onPass,
   onAskQ,
+  showMedia = true,
+  askQMark,
 }: {
   readonly company: DiscoveredCompanyDto;
   readonly policy: FeedPreloadPolicy;
@@ -144,6 +154,14 @@ export function FeedCard({
   readonly onSave: () => void;
   readonly onPass: () => void;
   readonly onAskQ: () => void;
+  /**
+   * False inside the immersive feed, whose stage owns the players (three
+   * recycled elements, spec §9.5); the card is then the company and its
+   * decisions, over the stage on a phone and beside it on a desktop.
+   */
+  readonly showMedia?: boolean | undefined;
+  /** Q's aperture in the Ask Q control: the dock merged into the rail. */
+  readonly askQMark?: ReactNode;
 }) {
   const place = [
     countryLabel(company.headquartersCountry),
@@ -156,7 +174,7 @@ export function FeedCard({
 
   return (
     <article
-      className="flex h-full w-full flex-col gap-5"
+      className="cq-feed-card flex h-full w-full flex-col gap-5"
       aria-label={company.canonicalName}
       data-company-id={company.companyId}
     >
@@ -167,7 +185,7 @@ export function FeedCard({
         "broken empty video screen" the first viewport showed an investor
         (CQ-ACCEPT-001). Without a pitch, the company leads.
       */}
-      {company.pitch === null ? null : (
+      {company.pitch === null || !showMedia ? null : (
         <PitchPlayer
           company={company}
           policy={policy}
@@ -177,7 +195,7 @@ export function FeedCard({
         />
       )}
 
-      <div className="flex flex-col gap-3">
+      <div className="cq-feed-info flex flex-col gap-3">
         <div className="flex items-center gap-2">
           <Building2 size={ICON_SIZE.regular} aria-hidden="true" />
           <h2 className="cq-title-sm text-(--cq-text-primary)">
@@ -218,27 +236,72 @@ export function FeedCard({
         )}
       </div>
 
-      {/* The decision row: the Q Dock never sits on it (spec §6.2). */}
-      <div ref={decisions} className="flex flex-wrap items-center gap-2">
+      {/*
+        The action rail (spec §9.1; ADR 0017 C4): labelled, no counters,
+        no like or share. On a phone it runs down the right of the stage;
+        on a desktop it is a row in the intelligence panel. The Q Dock
+        never sits on it (spec §6.2).
+      */}
+      <div
+        ref={decisions}
+        className="cq-feed-rail"
+        role="group"
+        aria-label="Decide"
+      >
         <Button
           variant={saved ? "secondary" : "primary"}
           aria-pressed={saved}
           disabled={deciding}
           onClick={onSave}
+          className="cq-feed-rail-button"
         >
+          {saved ? (
+            <BookmarkCheck
+              aria-hidden="true"
+              size={ICON_SIZE.prominent}
+              strokeWidth={ICON_STROKE}
+            />
+          ) : (
+            <Bookmark
+              aria-hidden="true"
+              size={ICON_SIZE.prominent}
+              strokeWidth={ICON_STROKE}
+            />
+          )}
           {saved ? "Saved" : "Save"}
         </Button>
         {/* Pass is neutral: quiet, never danger, never red. */}
-        <Button variant="quiet" disabled={deciding} onClick={onPass}>
+        <Button
+          variant="quiet"
+          disabled={deciding}
+          onClick={onPass}
+          className="cq-feed-rail-button"
+        >
+          <ArrowDown
+            aria-hidden="true"
+            size={ICON_SIZE.prominent}
+            strokeWidth={ICON_STROKE}
+          />
           Pass
         </Button>
-        <Button variant="secondary" onClick={onAskQ}>
+        <Button
+          variant="secondary"
+          onClick={onAskQ}
+          className="cq-feed-rail-button"
+          data-feed-ask-q
+        >
+          {askQMark}
           Ask Q
         </Button>
         <Link
           href={`/company/${company.companyId}`}
-          className={buttonClassName("quiet")}
+          className={buttonClassName("quiet", "regular", "cq-feed-rail-button")}
         >
+          <Building2
+            aria-hidden="true"
+            size={ICON_SIZE.prominent}
+            strokeWidth={ICON_STROKE}
+          />
           Open company
         </Link>
       </div>
@@ -247,11 +310,13 @@ export function FeedCard({
         Apart from Save and Pass on purpose: those are optimistic and this
         is server-confirmed (CQ-NET-010), and Interest ≠ Save.
       */}
-      <ExpressInterest
-        companyId={company.companyId}
-        companyName={company.canonicalName}
-        surface="RECOMMENDATION_FEED"
-      />
+      <div className="cq-feed-interest">
+        <ExpressInterest
+          companyId={company.companyId}
+          companyName={company.canonicalName}
+          surface="RECOMMENDATION_FEED"
+        />
+      </div>
     </article>
   );
 }
