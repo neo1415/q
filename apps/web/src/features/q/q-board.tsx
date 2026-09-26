@@ -10,6 +10,7 @@ import { ICON_SIZE, ICON_STROKE, Pin, PinOff, X } from "@capital-q/ui/icons";
 
 import { ViewTransition } from "@/components/view-transition";
 
+import { artifactTypeLabel } from "./artifact-type";
 import { ArtifactDownloads } from "./artifact-download";
 import { slideSource } from "./artifact-viewer";
 import { arrangeBoard, boardObjects, type BoardObject } from "./board";
@@ -341,7 +342,10 @@ export function QBoard({
                 <div className="flex items-center justify-between gap-2">
                   <span className="cq-label text-(--cq-text-secondary)">
                     {pinned ? "Pinned · " : ""}
-                    {LABELS[object.kind]}
+                    {object.kind === "ARTIFACT" &&
+                    object.blocks[0]?.kind === "ARTIFACT_REFERENCE"
+                      ? artifactTypeLabel(object.blocks[0].type)
+                      : LABELS[object.kind]}
                   </span>
                   <span className="flex items-center">
                     <button

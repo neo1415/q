@@ -6,6 +6,7 @@ import type { QArtifactDetail } from "@capital-q/contracts";
 import { buttonClassName } from "@capital-q/ui/button";
 import { InlineNotice } from "@capital-q/ui/states";
 
+import { artifactTypeLabel } from "./artifact-type";
 import { readQArtifactAction, readQArtifactVersionAction } from "./actions";
 import { ArtifactDownloads, artifactFileUrl } from "./artifact-download";
 
@@ -59,11 +60,7 @@ function whenLabel(iso: string): string {
   });
 }
 
-function typeLabel(type: string): string {
-  if (type === "INVESTMENT_BRIEF") return "Investment brief";
-  if (type === "PITCH_DECK") return "Investor deck";
-  return "Document";
-}
+const typeLabel = artifactTypeLabel;
 
 /** An SVG slide the browser can show without being allowed to run it. */
 export function slideSource(svg: string): string {

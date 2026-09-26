@@ -89,6 +89,14 @@ export type QConversation = {
   readonly conversationId: string | null;
   readonly ask: (question: string) => Promise<void>;
   readonly stop: () => Promise<void>;
+  /**
+   * Read the open conversation back from the server. For turns recorded
+   * by another channel -- a voice line -- which this surface's stream
+   * never carried, so their result blocks (a document card, companies)
+   * reach the stage and the Board. Does nothing while a typed run is
+   * still streaming: that stream is the source of truth for it.
+   */
+  readonly refresh: () => Promise<void>;
   /** Decide on what Q has prepared and is waiting for (CQ-Q-008). */
   readonly approve: () => Promise<void>;
   readonly decline: () => Promise<void>;
@@ -522,6 +530,21 @@ export function useQConversation(
   const approve = useCallback(() => decide("APPROVE"), [decide]);
   const decline = useCallback(() => decide("REJECT"), [decide]);
 
+  const refresh = useCallback(async () => {
+    const id = conversationId.current;
+    if (id === null || !finished.current) return;
+    const result = await readQConversationAction(id);
+    // Only if nothing moved while the read was out: same conversation, and
+    // no typed run started in the meantime.
+    if (!result.ok || conversationId.current !== id || !finished.current) {
+      return;
+    }
+    setHistory(result.value.messages);
+    // Every finished run's messages are in the record now; keeping the
+    // streamed copy as well would show them twice.
+    setRunState(createQStreamState());
+  }, []);
+
   return {
     state: { ...runState, messages: [...history, ...runState.messages] },
     pending,
@@ -537,5 +560,6 @@ export function useQConversation(
     stop,
     approve,
     decline,
+    refresh,
   };
 }
