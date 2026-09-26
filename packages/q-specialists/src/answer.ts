@@ -1,8 +1,9 @@
-import type {
-  QNavigateDestination,
-  QResponseMessage,
-  QResultBlock,
-  QVisibleStage,
+import {
+  Q_NAVIGATE_DESTINATIONS,
+  type QNavigateDestination,
+  type QResponseMessage,
+  type QResultBlock,
+  type QVisibleStage,
 } from "@capital-q/contracts";
 import {
   INITIAL_CONVERSATION_STATE,
@@ -19,6 +20,7 @@ import {
   type TurnToolV5,
 } from "@capital-q/q-core";
 import type { GetInvestorMandateOutput } from "@capital-q/q-tools";
+import { ownInvestorOrganisationIn } from "@capital-q/model-gateway/q";
 
 import {
   composeOwnMandateDocument,
@@ -32,6 +34,7 @@ import {
   type QAnswerOutcome,
   type QAnswerPort,
   type QAnswerRequest,
+  type QCapabilityManifest,
   type QConversationMessage,
   type QResearchDirective,
   type QRuntimeRepositories,
@@ -745,6 +748,34 @@ export function createSpecialistQAnswer(
    * read; how the answer ended is noted against the conversation, so a
    * failing subsystem is named once and never in the same words twice.
    */
+  /**
+   * What this run can do beyond the model's tools, from what is composed
+   * here and what the plan holds (CQ-QX-008). Built by code, so Q can
+   * neither deny a capability it has nor claim one it has not.
+   */
+  const capabilitiesFor = (request: QAnswerRequest): QCapabilityManifest => {
+    const company = request.subjects.some(
+      (subject) => subject.kind === "COMPANY",
+    );
+    return {
+      navigate: Q_NAVIGATE_DESTINATIONS.filter(
+        (destination) => destination !== "COMPANY_VISIBILITY" || company,
+      ),
+      documents:
+        artifacts === undefined
+          ? []
+          : [
+              "PITCH_DECK",
+              "INVESTMENT_BRIEF",
+              ...(dependencies.ownMandate !== undefined &&
+              ownInvestorOrganisationIn(request.plan) !== null
+                ? ["OWN_MANDATE"]
+                : []),
+            ],
+      visibilityChange: dependencies.visibility !== undefined && company,
+    };
+  };
+
   /** Unclear turns in a row, per conversation (bounded with the rest). */
   const unclearInARow = new Map<string, number>();
 
@@ -882,6 +913,7 @@ export function createSpecialistQAnswer(
     const outcome = await answerOnce({
       ...request,
       research,
+      capabilities: capabilitiesFor(request),
       ...(turnUnread ? { turnUnread: true } : {}),
     });
     if (outcome.kind === "FAILED") {

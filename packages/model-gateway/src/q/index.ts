@@ -95,6 +95,18 @@ export {
 } from "./result-blocks.js";
 export { createQTurnReader, type QTurnReader } from "./turn-reader.js";
 export {
+  capabilityNote,
+  collectReceipts,
+  type QCapabilityManifest,
+  type QReceipt,
+  type QReceiptPort,
+} from "./conversation-receipts.js";
+import {
+  capabilityNote,
+  collectReceipts,
+  type QReceiptPort,
+} from "./conversation-receipts.js";
+export {
   createQDelegationReader,
   NO_TURN_AUTHORITY,
   type QDelegationReader,
@@ -748,6 +760,12 @@ export type ModelGatewayQAnswerDependencies = {
   readonly profileUpdates?: QProfileUpdateNotebook | undefined;
   /** Changing a document Q already prepared (ADR 0013). */
   readonly artifacts?: QArtifactReviser | undefined;
+  /**
+   * The owning records of what this conversation produced (documents,
+   * action proposals), read back as the person, current status included
+   * (CQ-QX-008). Absent: no receipts are claimed.
+   */
+  readonly receipts?: QReceiptPort | undefined;
   /** What Capital Q remembers about the person (ADR 0012). Absent: nothing is. */
   readonly memory?: QMemoryRecall | undefined;
   /**
@@ -1574,10 +1592,29 @@ export function createModelGatewayQAnswer(
       let modelCalls = 0;
       // The order matters more than the words: a model handed tools and a
       // response shape at once reaches for the shape first.
+      // What this run can do and what the conversation already produced,
+      // as facts: the model claims neither more nor less (CQ-QX-008).
+      // Right after the prompt, so the tools-first note stays last.
+      const receipts =
+        dependencies.receipts === undefined
+          ? []
+          : await collectReceipts(
+              history,
+              dependencies.receipts,
+              request.actor,
+            );
+      const capabilities = capabilityNote(
+        request.capabilities,
+        offered.map((tool) => ({
+          name: tool.definition.name,
+          description: tool.definition.description,
+        })),
+        receipts,
+      );
       let messages: ModelMessage[] =
         offered.length === 0
-          ? [...rendered.messages]
-          : [...rendered.messages, TOOLS_FIRST_NOTE];
+          ? [...rendered.messages, capabilities]
+          : [...rendered.messages, capabilities, TOOLS_FIRST_NOTE];
 
       if (ownProfileCall !== null) {
         toolCalls.push(ownProfileCall);

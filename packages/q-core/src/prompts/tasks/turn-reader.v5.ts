@@ -29,7 +29,7 @@ export const TURN_READER_V5: PromptDefinition<
 > = {
   ...TURN_READER_V4,
   version: 5,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   changeDescription:
     "Gap 3: PREPARE_DOCUMENT gains OWN_MANDATE, a document of the person's own investment mandate or thesis built from their record; subjectName null for it.",
   effectiveFrom: "2026-09-26",

@@ -141,6 +141,7 @@ export {
   type QAnswerOutcome,
   type QAnswerPort,
   type QAnswerRequest,
+  type QCapabilityManifest,
   type QResearchDirective,
   type QCancelInput,
   type QOrchestrationInput,

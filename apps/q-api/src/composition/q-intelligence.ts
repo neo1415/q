@@ -5,6 +5,7 @@ import {
   createModelGatewayQAnswer,
   createQTurnReader,
   type QArtifactReviser,
+  type QReceiptPort,
   type QProfileUpdateNotebook,
   type QUserStatementRecorder,
   type QMemoryRecall,
@@ -126,6 +127,8 @@ export type QIntelligenceDependencies = {
    * investigation, so it never reaches the specialist seam.
    */
   readonly artifactReviser?: QArtifactReviser | undefined;
+  /** What this conversation produced, read back from the owning records. */
+  readonly receipts?: QReceiptPort | undefined;
   /**
    * Where a turn read as "show / hide my company" goes to be proposed
    * (CQ-QACT-001). Absent: such a turn is answered like any other.
@@ -248,6 +251,9 @@ export function composeQIntelligence(
     ...(dependencies.artifactReviser === undefined
       ? {}
       : { artifacts: dependencies.artifactReviser }),
+    ...(dependencies.receipts === undefined
+      ? {}
+      : { receipts: dependencies.receipts }),
     ...(logger === undefined ? {} : { logger }),
   });
 

@@ -72,6 +72,7 @@ import { modelProviderConfigStatus } from "@capital-q/config/model-providers";
 import { researchProviderConfigStatus } from "@capital-q/config/research-providers";
 import { speechProviderConfigStatus } from "@capital-q/config/speech-providers";
 import {
+  QActionProposalIdSchema,
   Q_VOICE_SPEECH_PATH,
   Q_VOICE_THINK_PATH,
   Q_VOICE_WS_PATH,
@@ -1148,6 +1149,22 @@ const qIntelligence = composeQIntelligence({
   deltas: liveDeltas,
   artifacts: qArtifacts.preparation,
   artifactReviser: qArtifacts.reviser,
+  // What this conversation already produced, read back from the owning
+  // records as the person (CQ-QX-008): a document through the artifact
+  // service (owner-scoped), an action through its approval record.
+  receipts: {
+    artifact: async (actor: ActorContext, artifactId: string) => {
+      const detail = await qArtifacts.service.read(actor, artifactId);
+      return { status: detail.artifact.status };
+    },
+    action: async (actor: ActorContext, proposalId: string) => {
+      const approval = await qActions.findApprovalForAction(
+        actor.tenantId,
+        QActionProposalIdSchema.parse(proposalId),
+      );
+      return approval === null ? null : { status: approval.status };
+    },
+  },
   visibility: profileBoard,
   logger,
 });

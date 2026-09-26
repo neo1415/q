@@ -91,6 +91,7 @@ function seam(options: {
   };
   const directives: (QResearchDirective | undefined)[] = [];
   const unread: boolean[] = [];
+  const capabilities: unknown[] = [];
   let reads = 0;
   const outcomes = [...options.outcomes];
   const turns: QTurnReader = {
@@ -120,6 +121,7 @@ function seam(options: {
       answer: async (req) => {
         delegated += 1;
         unread.push(req.turnUnread === true);
+        capabilities.push(req.capabilities);
         directives.push(
           req.research === undefined ? undefined : await req.research,
         );
@@ -169,6 +171,7 @@ function seam(options: {
     events,
     delegated: () => delegated,
     unread,
+    capabilities,
     reads: () => reads,
   };
 }
@@ -486,5 +489,32 @@ describe("a turn whose reading fails is never silently answered as chat (B1)", (
     await run.answer.answer(request());
     expect(run.reads()).toBe(1);
     expect(run.unread).toEqual([false]);
+  });
+});
+
+describe("the answer is told what this run can do (CQ-QX-008)", () => {
+  it("hands on a manifest built from what is composed and what the plan holds", async () => {
+    const run = seam({
+      said: "what can you do for me?",
+      reading: {
+        kind: "QUESTION_TO_Q",
+        confidence: "HIGH",
+        transcript: "CLEAR",
+        question: null,
+        aboutNamedOther: false,
+        tool: null,
+      },
+      outcomes: [],
+    });
+    await run.answer.answer(request());
+    // No company in the run, no artifact service composed here, no
+    // visibility notebook: screens only, and never the visibility one.
+    expect(run.capabilities).toEqual([
+      {
+        navigate: ["HOME", "PROFILE", "CAPITAL", "DISCOVER"],
+        documents: [],
+        visibilityChange: false,
+      },
+    ]);
   });
 });

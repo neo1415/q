@@ -1,3 +1,4 @@
+import type { QNavigateDestination } from "@capital-q/contracts";
 import type {
   CorrelationId,
   ModelToolDefinition,
@@ -192,6 +193,19 @@ export type QAnswerRequest = QOrchestrationSubjectContext & {
    * answer as if nothing had been asked (B1, 2026-09-25).
    */
   readonly turnUnread?: boolean | undefined;
+  /**
+   * What this run can do beyond the tools the model is offered, built by
+   * code from what is composed (CQ-QX-008): the screens Capital Q opens,
+   * the documents it prepares, whether a visibility change can be
+   * prepared. The answer tells the model; it never guesses.
+   */
+  readonly capabilities?: QCapabilityManifest | undefined;
+};
+
+export type QCapabilityManifest = {
+  readonly navigate: readonly QNavigateDestination[];
+  readonly documents: readonly string[];
+  readonly visibilityChange: boolean;
 };
 
 export type QResearchDirective = {
