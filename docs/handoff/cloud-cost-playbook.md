@@ -15,11 +15,11 @@ Every number and setting below was checked on 2026-09-26 against the official do
 
 Prices per million tokens:
 
-| Model | Input | 5-min cache write | 1-hour cache write | Cache read | Output |
-|---|---|---|---|---|---|
-| Opus 5.5 | $4 | $5 | $8 | **$0.20** (0.05×) | $20 |
-| Sonnet 5 | $2 | $2.50 | $4 | $0.20 | $10 |
-| Haiku 4.5 | $1 | $1.25 | $2 | $0.10 | $5 |
+| Model     | Input | 5-min cache write | 1-hour cache write | Cache read        | Output |
+| --------- | ----- | ----------------- | ------------------ | ----------------- | ------ |
+| Opus 5.5  | $4    | $5                | $8                 | **$0.20** (0.05×) | $20    |
+| Sonnet 5  | $2    | $2.50             | $4                 | $0.20             | $10    |
+| Haiku 4.5 | $1    | $1.25             | $2                 | $0.10             | $5     |
 
 Claude Code re-sends the whole conversation on **every** request, and each tool call is another request.
 
