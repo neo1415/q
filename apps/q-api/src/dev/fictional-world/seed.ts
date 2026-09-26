@@ -168,8 +168,9 @@ async function main(): Promise<number> {
             pptx: `${Q_ARTIFACTS_PATH}/${deck.artifactId}${Q_ARTIFACT_EXPORT_SUFFIX}/pptx`,
           },
           files: {
-            pdf: join(company.key, "deck.pdf"),
-            pptx: join(company.key, "deck.pptx"),
+            // Relative to the manifest, with forward slashes on every OS.
+            pdf: `${company.key}/deck.pdf`,
+            pptx: `${company.key}/deck.pptx`,
           },
           // What a narrated-deck video step reads aloud, slide by slide.
           slides: (files.version.content.deck?.slides ?? []).map((slide) => ({
