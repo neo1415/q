@@ -39,7 +39,8 @@ import type {
 } from "@capital-q/q-runtime";
 
 import type { VoiceSessionBinding } from "./bindings.js";
-import { signupContextFromToken, type Interviewer } from "./interviewer.js";
+import { signupContextFromToken } from "./interview-steps.js";
+import type { Interviewer } from "./interviewer.js";
 import type { PresenceFound } from "./presence-trigger.js";
 import {
   declines,

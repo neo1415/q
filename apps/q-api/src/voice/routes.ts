@@ -17,7 +17,7 @@ import {
 import { fetchMe } from "@capital-q/api-client";
 import { createCorrelationId, getMeter } from "@capital-q/observability";
 import { AuthenticationRequiredError } from "@capital-q/security";
-import { signupContextFromToken } from "./interviewer.js";
+import { signupContextFromToken } from "./interview-steps.js";
 import { extractBearerToken } from "@capital-q/security/supabase";
 
 import {

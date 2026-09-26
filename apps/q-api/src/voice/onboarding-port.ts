@@ -51,7 +51,7 @@ import {
   recordedCurrency,
   toOpenStep,
   toResponseValue,
-} from "./interviewer.js";
+} from "./interview-steps.js";
 import { SPOKEN_QUESTIONS } from "./step-copy.js";
 
 /**

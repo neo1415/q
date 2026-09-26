@@ -16,7 +16,8 @@ import {
 } from "../security/actor-context.js";
 import type { QVoiceRoutesDependencies } from "./routes.js";
 import type { InterviewAgent } from "./interview-agent.js";
-import { signupContextFromToken, type Interviewer } from "./interviewer.js";
+import { signupContextFromToken } from "./interview-steps.js";
+import type { Interviewer } from "./interviewer.js";
 
 /**
  * One turn of the Q interview, over HTTP (QX-004 core gate: one Q).

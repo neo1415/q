@@ -11,7 +11,7 @@ import {
   type WelcomeConductorVariables,
 } from "@capital-q/q-core";
 
-import type { InterviewGateway } from "./interviewer.js";
+import type { InterviewGateway } from "./interview-steps.js";
 
 /**
  * Q's first minute with a new person (CQ-Q-VOICE-001 rework, "arrival").
