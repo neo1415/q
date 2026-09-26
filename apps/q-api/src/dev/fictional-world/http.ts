@@ -67,13 +67,16 @@ export function createSeedHttp(target: SeedTarget) {
     for (let page = 1; page <= 200; page += 1) {
       const response = await admin(`/users?page=${String(page)}&per_page=200`);
       if (!response.ok) {
-        throw new SeedError(`admin list users: HTTP ${String(response.status)}`);
+        throw new SeedError(
+          `admin list users: HTTP ${String(response.status)}`,
+        );
       }
       const users = record(await readJson(response))["users"];
       const list = Array.isArray(users) ? users : [];
       for (const user of list) {
         const email = record(user)["email"];
-        if (typeof email === "string") found.set(email.toLowerCase(), record(user));
+        if (typeof email === "string")
+          found.set(email.toLowerCase(), record(user));
       }
       if (list.length < 200) break;
     }
@@ -135,7 +138,8 @@ export function createSeedHttp(target: SeedTarget) {
       );
     }
     const id = body["id"];
-    if (typeof id !== "string") throw new SeedError("created account without id");
+    if (typeof id !== "string")
+      throw new SeedError("created account without id");
     users.set(input.email.toLowerCase(), body);
     return { authUserId: id, created: true };
   };
@@ -151,7 +155,8 @@ export function createSeedHttp(target: SeedTarget) {
     }
     const linkBody = record(await readJson(link));
     const tokenHash =
-      linkBody["hashed_token"] ?? record(linkBody["properties"])["hashed_token"];
+      linkBody["hashed_token"] ??
+      record(linkBody["properties"])["hashed_token"];
     const verified = await fetch(`${target.supabaseUrl}/auth/v1/verify`, {
       method: "POST",
       headers: {
@@ -187,7 +192,9 @@ export function createSeedHttp(target: SeedTarget) {
         ...(body === undefined ? {} : { "content-type": "application/json" }),
         ...(method === "GET"
           ? {}
-          : { [IDEMPOTENCY_KEY_HEADER]: idempotencyKey ?? crypto.randomUUID() }),
+          : {
+              [IDEMPOTENCY_KEY_HEADER]: idempotencyKey ?? crypto.randomUUID(),
+            }),
       },
       ...(body === undefined ? {} : { body: JSON.stringify(body) }),
     });

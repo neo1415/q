@@ -23,7 +23,12 @@ export const FICTIONAL_COMPANIES: readonly FictionalCompany[] = [
     stageOption: "seed",
     shortDescription:
       "Working-capital loans for Lagos market traders, underwritten from the bookkeeping app they already use every day.",
-    categories: ["fintech", "digital_lending", "lending_platform", "small_business"],
+    categories: [
+      "fintech",
+      "digital_lending",
+      "lending_platform",
+      "small_business",
+    ],
     founder: {
       displayName: "Adaeze Nwachukwu",
       headline: "CEO, Ledgerfold (fictional demo founder)",
@@ -58,8 +63,7 @@ export const FICTIONAL_COMPANIES: readonly FictionalCompany[] = [
         "A free bookkeeping app for traders (sales, stock, debtors) that, after 90 days of records, offers 14- to 60-day working-capital loans priced from the trader's own cash-flow history. Repayment is collected from daily sales through agency banking partners.",
       traction:
         "6,400 active traders keep their books in the app; 2,150 have borrowed. Loan book of USD 410,000 outstanding in March 2026, up from USD 150,000 in September 2025. Reported 30-day portfolio-at-risk of 3.8%. Monthly revenue around USD 38,000.",
-      team:
-        "Adaeze Nwachukwu (CEO, ex-microfinance lending ops) and Obinna Eze (CTO, previously built payments back-ends at a fictional pan-African fintech). 19 staff, 7 of them field agents in Balogun, Oshodi and Mile 12 markets.",
+      team: "Adaeze Nwachukwu (CEO, ex-microfinance lending ops) and Obinna Eze (CTO, previously built payments back-ends at a fictional pan-African fintech). 19 staff, 7 of them field agents in Balogun, Oshodi and Mile 12 markets.",
       market:
         "An estimated 3 million market traders in Lagos State alone; the company sizes the Nigerian micro-merchant working-capital gap at USD 4bn (company estimate, not independently checked).",
       competition:
@@ -77,7 +81,8 @@ export const FICTIONAL_COMPANIES: readonly FictionalCompany[] = [
       {
         claimKey: "traction.active_customers",
         claimType: "traction",
-        statement: "6,400 traders actively keep their books in Ledgerfold (March 2026).",
+        statement:
+          "6,400 traders actively keep their books in Ledgerfold (March 2026).",
         structuredValue: { kind: "COUNT", value: 6400, asOf: "2026-03-31" },
         truthClass: "USER_CLAIM",
         evidenceStatus: "SELF_REPORTED",
@@ -86,7 +91,12 @@ export const FICTIONAL_COMPANIES: readonly FictionalCompany[] = [
         claimKey: "financial.loan_book",
         claimType: "financial",
         statement: "Outstanding loan book of USD 410,000 at 31 March 2026.",
-        structuredValue: { kind: "MONEY", amount: "410000", currency: "USD", asOf: "2026-03-31" },
+        structuredValue: {
+          kind: "MONEY",
+          amount: "410000",
+          currency: "USD",
+          asOf: "2026-03-31",
+        },
         truthClass: "USER_CLAIM",
         evidenceStatus: "DOCUMENT_SUPPORTED",
         documentTitle: "Ledgerfold loan tape, March 2026 (fictional)",
@@ -103,15 +113,25 @@ export const FICTIONAL_COMPANIES: readonly FictionalCompany[] = [
         claimKey: "financial.monthly_revenue",
         claimType: "financial",
         statement: "Monthly revenue of about USD 38,000 (March 2026).",
-        structuredValue: { kind: "MONEY", amount: "38000", currency: "USD", period: "month" },
+        structuredValue: {
+          kind: "MONEY",
+          amount: "38000",
+          currency: "USD",
+          period: "month",
+        },
         truthClass: "USER_CLAIM",
         evidenceStatus: "SELF_REPORTED",
       },
       {
         claimKey: "market.size",
         claimType: "market",
-        statement: "Nigerian micro-merchant working-capital gap estimated at USD 4bn.",
-        structuredValue: { kind: "MONEY", amount: "4000000000", currency: "USD" },
+        statement:
+          "Nigerian micro-merchant working-capital gap estimated at USD 4bn.",
+        structuredValue: {
+          kind: "MONEY",
+          amount: "4000000000",
+          currency: "USD",
+        },
         truthClass: "ESTIMATE",
         evidenceStatus: "SELF_REPORTED",
       },
@@ -124,19 +144,69 @@ export const FICTIONAL_COMPANIES: readonly FictionalCompany[] = [
       },
     ],
     deck: [
-      { dimension: "DESCRIPTION", statement: "Ledgerfold lends working capital to Lagos market traders, underwritten from the bookkeeping app they use every day." },
-      { dimension: "PRODUCT", statement: "A free bookkeeping app for sales, stock and debtors; after 90 days of records it offers 14- to 60-day loans." },
-      { dimension: "PRODUCT", statement: "Repayments are collected from daily sales through agency-banking partners." },
-      { dimension: "MARKET", statement: "Around 3 million market traders in Lagos State; a USD 4bn micro-merchant working-capital gap nationally.", truthClass: "ESTIMATE" },
-      { dimension: "BUSINESS_MODEL", statement: "Interest and a flat facility fee on each loan; the bookkeeping app stays free." },
-      { dimension: "TRACTION", statement: "Loan book of $150,000 in September 2025." },
-      { dimension: "TRACTION", statement: "Loan book of $260,000 in December 2025." },
-      { dimension: "TRACTION", statement: "Loan book of $410,000 in March 2026." },
-      { dimension: "CUSTOMERS", statement: "6,400 traders keep their books in the app; 2,150 have borrowed at least once." },
-      { dimension: "FINANCIAL", statement: "Monthly revenue of about $38,000; 30-day portfolio-at-risk of 3.8%." },
-      { dimension: "TEAM", statement: "Adaeze Nwachukwu (CEO) ran SME lending operations for five years; Obinna Eze (CTO) built payments back-ends." },
-      { dimension: "STRATEGY", statement: "Add a debt partner for on-lending, build a risk team, open Onitsha and Aba markets next." },
-      { dimension: "CAPITAL_OBJECTIVE", statement: "Raising $2,500,000 priced seed for loan-book growth, risk hires and two new markets." },
+      {
+        dimension: "DESCRIPTION",
+        statement:
+          "Ledgerfold lends working capital to Lagos market traders, underwritten from the bookkeeping app they use every day.",
+      },
+      {
+        dimension: "PRODUCT",
+        statement:
+          "A free bookkeeping app for sales, stock and debtors; after 90 days of records it offers 14- to 60-day loans.",
+      },
+      {
+        dimension: "PRODUCT",
+        statement:
+          "Repayments are collected from daily sales through agency-banking partners.",
+      },
+      {
+        dimension: "MARKET",
+        statement:
+          "Around 3 million market traders in Lagos State; a USD 4bn micro-merchant working-capital gap nationally.",
+        truthClass: "ESTIMATE",
+      },
+      {
+        dimension: "BUSINESS_MODEL",
+        statement:
+          "Interest and a flat facility fee on each loan; the bookkeeping app stays free.",
+      },
+      {
+        dimension: "TRACTION",
+        statement: "Loan book of $150,000 in September 2025.",
+      },
+      {
+        dimension: "TRACTION",
+        statement: "Loan book of $260,000 in December 2025.",
+      },
+      {
+        dimension: "TRACTION",
+        statement: "Loan book of $410,000 in March 2026.",
+      },
+      {
+        dimension: "CUSTOMERS",
+        statement:
+          "6,400 traders keep their books in the app; 2,150 have borrowed at least once.",
+      },
+      {
+        dimension: "FINANCIAL",
+        statement:
+          "Monthly revenue of about $38,000; 30-day portfolio-at-risk of 3.8%.",
+      },
+      {
+        dimension: "TEAM",
+        statement:
+          "Adaeze Nwachukwu (CEO) ran SME lending operations for five years; Obinna Eze (CTO) built payments back-ends.",
+      },
+      {
+        dimension: "STRATEGY",
+        statement:
+          "Add a debt partner for on-lending, build a risk team, open Onitsha and Aba markets next.",
+      },
+      {
+        dimension: "CAPITAL_OBJECTIVE",
+        statement:
+          "Raising $2,500,000 priced seed for loan-book growth, risk hires and two new markets.",
+      },
     ],
   },
   {
@@ -150,7 +220,12 @@ export const FICTIONAL_COMPANIES: readonly FictionalCompany[] = [
     stageOption: "series_a",
     shortDescription:
       "A middle-mile freight marketplace matching FMCG and agro shippers with verified truck owners on the Kano–Lagos–Port Harcourt corridors.",
-    categories: ["logistics", "supply_chain", "fleet_management", "marketplace"],
+    categories: [
+      "logistics",
+      "supply_chain",
+      "fleet_management",
+      "marketplace",
+    ],
     founder: {
       displayName: "Musa Garba-Lawal",
       headline: "CEO, Tarmacly (fictional demo founder)",
@@ -185,8 +260,7 @@ export const FICTIONAL_COMPANIES: readonly FictionalCompany[] = [
         "Shippers post loads; Tarmacly matches them to vetted truck owners, handles pricing, tracking and proof of delivery, and pays carriers within 48 hours through invoice financing from a partner bank.",
       traction:
         "180 contracted shippers, 2,300 onboarded trucks. Gross merchandise value of about USD 1.1m per month in Q1 2026 (company figure). Take rate around 9%. The operations dashboard shows 1,450 trips in March 2026.",
-      team:
-        "Musa Garba-Lawal (CEO, fleet ops), Ifeoma Okafor-Reed (COO, ex-FMCG distribution) and Kehinde Salako (CTO). 64 staff across Kano, Lagos and Port Harcourt.",
+      team: "Musa Garba-Lawal (CEO, fleet ops), Ifeoma Okafor-Reed (COO, ex-FMCG distribution) and Kehinde Salako (CTO). 64 staff across Kano, Lagos and Port Harcourt.",
       market:
         "Nigerian road freight is estimated at USD 20bn a year (company estimate). The Kano–Lagos corridor alone carries a large share of agricultural produce heading south.",
       competition:
@@ -195,14 +269,23 @@ export const FICTIONAL_COMPANIES: readonly FictionalCompany[] = [
         "Fuel price swings, road security on northern routes, working-capital intensity of paying carriers before shippers pay, and concentration: the top three shippers are a large share of GMV.",
       raise:
         "Raising a USD 8m Series A to open the Abuja–Onitsha corridor, extend carrier financing and build route pricing.",
-      unknowns: ["Carrier retention by cohort", "Share of GMV from the top three shippers"],
+      unknowns: [
+        "Carrier retention by cohort",
+        "Share of GMV from the top three shippers",
+      ],
     },
     claims: [
       {
         claimKey: "traction.monthly_gmv",
         claimType: "traction",
-        statement: "Gross merchandise value of about USD 1.1m per month in Q1 2026 (pitch deck figure).",
-        structuredValue: { kind: "MONEY", amount: "1100000", currency: "USD", period: "month" },
+        statement:
+          "Gross merchandise value of about USD 1.1m per month in Q1 2026 (pitch deck figure).",
+        structuredValue: {
+          kind: "MONEY",
+          amount: "1100000",
+          currency: "USD",
+          period: "month",
+        },
         truthClass: "USER_CLAIM",
         evidenceStatus: "SELF_REPORTED",
         lifecycleStatus: "CONTRADICTORY",
@@ -210,8 +293,14 @@ export const FICTIONAL_COMPANIES: readonly FictionalCompany[] = [
       {
         claimKey: "traction.monthly_gmv_accounts",
         claimType: "traction",
-        statement: "Management accounts show March 2026 GMV of USD 780,000, not USD 1.1m; the difference has not been explained.",
-        structuredValue: { kind: "MONEY", amount: "780000", currency: "USD", period: "month" },
+        statement:
+          "Management accounts show March 2026 GMV of USD 780,000, not USD 1.1m; the difference has not been explained.",
+        structuredValue: {
+          kind: "MONEY",
+          amount: "780000",
+          currency: "USD",
+          period: "month",
+        },
         truthClass: "USER_CLAIM",
         evidenceStatus: "DOCUMENT_SUPPORTED",
         lifecycleStatus: "CONTRADICTORY",
@@ -237,31 +326,82 @@ export const FICTIONAL_COMPANIES: readonly FictionalCompany[] = [
         claimKey: "market.size",
         claimType: "market",
         statement: "Nigerian road freight market estimated at USD 20bn a year.",
-        structuredValue: { kind: "MONEY", amount: "20000000000", currency: "USD", period: "year" },
+        structuredValue: {
+          kind: "MONEY",
+          amount: "20000000000",
+          currency: "USD",
+          period: "year",
+        },
         truthClass: "ESTIMATE",
         evidenceStatus: "SELF_REPORTED",
       },
       {
         claimKey: "customers.concentration",
         claimType: "customers",
-        statement: "Share of GMV from the top three shippers has not been disclosed.",
+        statement:
+          "Share of GMV from the top three shippers has not been disclosed.",
         truthClass: "UNKNOWN",
         evidenceStatus: "NO_EVIDENCE",
       },
     ],
     deck: [
-      { dimension: "DESCRIPTION", statement: "Tarmacly is a middle-mile freight marketplace on the Kano–Lagos–Port Harcourt corridors." },
-      { dimension: "PRODUCT", statement: "Shippers post loads; Tarmacly matches vetted trucks, prices the trip, tracks it and confirms delivery." },
-      { dimension: "PRODUCT", statement: "Carriers are paid within 48 hours through invoice financing from a partner bank." },
-      { dimension: "MARKET", statement: "Nigerian road freight is a USD 20bn a year market, most of it still booked by phone.", truthClass: "ESTIMATE" },
-      { dimension: "BUSINESS_MODEL", statement: "A take rate of around 9% on each trip, plus a financing margin on early carrier payment." },
-      { dimension: "TRACTION", statement: "Completed 820 trips in September 2025." },
-      { dimension: "TRACTION", statement: "Completed 1,120 trips in December 2025." },
-      { dimension: "TRACTION", statement: "Completed 1,450 trips in March 2026." },
-      { dimension: "CUSTOMERS", statement: "180 shippers under contract and 2,300 onboarded trucks." },
-      { dimension: "TEAM", statement: "Three founders: fleet operations, FMCG distribution and engineering; 64 staff in three cities." },
-      { dimension: "STRATEGY", statement: "Open the Abuja–Onitsha corridor and build route-level pricing." },
-      { dimension: "CAPITAL_OBJECTIVE", statement: "Raising $8,000,000 Series A for a new corridor, carrier financing and pricing." },
+      {
+        dimension: "DESCRIPTION",
+        statement:
+          "Tarmacly is a middle-mile freight marketplace on the Kano–Lagos–Port Harcourt corridors.",
+      },
+      {
+        dimension: "PRODUCT",
+        statement:
+          "Shippers post loads; Tarmacly matches vetted trucks, prices the trip, tracks it and confirms delivery.",
+      },
+      {
+        dimension: "PRODUCT",
+        statement:
+          "Carriers are paid within 48 hours through invoice financing from a partner bank.",
+      },
+      {
+        dimension: "MARKET",
+        statement:
+          "Nigerian road freight is a USD 20bn a year market, most of it still booked by phone.",
+        truthClass: "ESTIMATE",
+      },
+      {
+        dimension: "BUSINESS_MODEL",
+        statement:
+          "A take rate of around 9% on each trip, plus a financing margin on early carrier payment.",
+      },
+      {
+        dimension: "TRACTION",
+        statement: "Completed 820 trips in September 2025.",
+      },
+      {
+        dimension: "TRACTION",
+        statement: "Completed 1,120 trips in December 2025.",
+      },
+      {
+        dimension: "TRACTION",
+        statement: "Completed 1,450 trips in March 2026.",
+      },
+      {
+        dimension: "CUSTOMERS",
+        statement: "180 shippers under contract and 2,300 onboarded trucks.",
+      },
+      {
+        dimension: "TEAM",
+        statement:
+          "Three founders: fleet operations, FMCG distribution and engineering; 64 staff in three cities.",
+      },
+      {
+        dimension: "STRATEGY",
+        statement:
+          "Open the Abuja–Onitsha corridor and build route-level pricing.",
+      },
+      {
+        dimension: "CAPITAL_OBJECTIVE",
+        statement:
+          "Raising $8,000,000 Series A for a new corridor, carrier financing and pricing.",
+      },
     ],
     direction: "DARK_TECHNICAL",
   },
@@ -309,8 +449,7 @@ export const FICTIONAL_COMPANIES: readonly FictionalCompany[] = [
         "Container-sized solar cold rooms placed at rural markets. Farmers pay per crate per day through mobile money, and Yamfield buys a share of stored produce at an agreed floor price for sale to Abuja and Lagos buyers.",
       traction:
         "Two pilot cold rooms running since August 2025 in Zaki-Biam and Daudu. 310 farmers have stored produce at least once. Pilot revenue of NGN 9.6m over seven months (company figure).",
-      team:
-        "Terna Iorliam (CEO, post-harvest loss programmes) and a part-time co-founder engineer, Ngozi Agbo, who designs the cold-room controllers. Six people in total.",
+      team: "Terna Iorliam (CEO, post-harvest loss programmes) and a part-time co-founder engineer, Ngozi Agbo, who designs the cold-room controllers. Six people in total.",
       market:
         "Post-harvest loss of fruit and vegetables in Nigeria is widely estimated in the billions of dollars a year; Yamfield has not produced its own bottom-up sizing yet.",
       competition:
@@ -346,7 +485,12 @@ export const FICTIONAL_COMPANIES: readonly FictionalCompany[] = [
         claimKey: "financial.pilot_revenue",
         claimType: "financial",
         statement: "Pilot revenue of NGN 9,600,000 over seven months.",
-        structuredValue: { kind: "MONEY", amount: "9600000", currency: "NGN", period: "2025-08..2026-02" },
+        structuredValue: {
+          kind: "MONEY",
+          amount: "9600000",
+          currency: "NGN",
+          period: "2025-08..2026-02",
+        },
         truthClass: "USER_CLAIM",
         evidenceStatus: "SELF_REPORTED",
       },
@@ -359,14 +503,46 @@ export const FICTIONAL_COMPANIES: readonly FictionalCompany[] = [
       },
     ],
     deck: [
-      { dimension: "DESCRIPTION", statement: "Yamfield Agro puts solar cold rooms at rural Benue markets and buys stored produce at a floor price." },
-      { dimension: "PRODUCT", statement: "Container cold rooms, paid per crate per day by mobile money." },
-      { dimension: "MARKET", statement: "Farmers lose 30-40% of tomatoes after harvest for lack of nearby cold storage.", truthClass: "ESTIMATE" },
-      { dimension: "BUSINESS_MODEL", statement: "Storage fees per crate, plus a trading margin on produce bought at the floor price." },
-      { dimension: "TRACTION", statement: "Two pilot cold rooms since August 2025; 310 farmers have stored produce." },
-      { dimension: "TEAM", statement: "Terna Iorliam ran post-harvest loss programmes for four years; engineer co-founder Ngozi Agbo is part-time." },
-      { dimension: "STRATEGY", statement: "Eight more cold rooms in Benue, then Nasarawa, once unit economics per site are proven." },
-      { dimension: "CAPITAL_OBJECTIVE", statement: "Raising $400,000 on a SAFE to build eight cold rooms." },
+      {
+        dimension: "DESCRIPTION",
+        statement:
+          "Yamfield Agro puts solar cold rooms at rural Benue markets and buys stored produce at a floor price.",
+      },
+      {
+        dimension: "PRODUCT",
+        statement:
+          "Container cold rooms, paid per crate per day by mobile money.",
+      },
+      {
+        dimension: "MARKET",
+        statement:
+          "Farmers lose 30-40% of tomatoes after harvest for lack of nearby cold storage.",
+        truthClass: "ESTIMATE",
+      },
+      {
+        dimension: "BUSINESS_MODEL",
+        statement:
+          "Storage fees per crate, plus a trading margin on produce bought at the floor price.",
+      },
+      {
+        dimension: "TRACTION",
+        statement:
+          "Two pilot cold rooms since August 2025; 310 farmers have stored produce.",
+      },
+      {
+        dimension: "TEAM",
+        statement:
+          "Terna Iorliam ran post-harvest loss programmes for four years; engineer co-founder Ngozi Agbo is part-time.",
+      },
+      {
+        dimension: "STRATEGY",
+        statement:
+          "Eight more cold rooms in Benue, then Nasarawa, once unit economics per site are proven.",
+      },
+      {
+        dimension: "CAPITAL_OBJECTIVE",
+        statement: "Raising $400,000 on a SAFE to build eight cold rooms.",
+      },
     ],
     direction: "WARM_GROWTH",
   },
@@ -381,7 +557,12 @@ export const FICTIONAL_COMPANIES: readonly FictionalCompany[] = [
     stageOption: "seed",
     shortDescription:
       "Inventory software and next-day restocking of essential medicines for primary-care clinics and pharmacies in south-west Nigeria.",
-    categories: ["digital_health", "healthcare", "supply_chain", "small_business"],
+    categories: [
+      "digital_health",
+      "healthcare",
+      "supply_chain",
+      "small_business",
+    ],
     founder: {
       displayName: "Dr. Folake Adebayo-Hart",
       headline: "CEO, Clinicrest (fictional demo founder)",
@@ -389,7 +570,8 @@ export const FICTIONAL_COMPANIES: readonly FictionalCompany[] = [
       businessTitle: "Co-founder and CEO",
       professionalSummary:
         "Physician who ran a network of fictional community clinics in Oyo State before starting Clinicrest.",
-      backgroundSummary: "Trained at a teaching hospital in Ibadan; public-health master's degree.",
+      backgroundSummary:
+        "Trained at a teaching hospital in Ibadan; public-health master's degree.",
     },
     team: {
       founderCount: 2,
@@ -415,22 +597,26 @@ export const FICTIONAL_COMPANIES: readonly FictionalCompany[] = [
         "A tablet inventory app that forecasts what each clinic will need, plus next-day delivery from Clinicrest's own licensed warehouse in Ibadan, sourced only from registered distributors.",
       traction:
         "The pitch deck says 340 active clinics and pharmacies; the latest management accounts list 212 paying accounts. Clinicrest says the gap is clinics on free trial, but has not shown the split. Monthly revenue around USD 95,000 (management accounts).",
-      team:
-        "Dr. Folake Adebayo-Hart (CEO) and Segun Olatunji (COO, pharmaceutical distribution). 27 staff including two licensed pharmacists.",
+      team: "Dr. Folake Adebayo-Hart (CEO) and Segun Olatunji (COO, pharmaceutical distribution). 27 staff including two licensed pharmacists.",
       market:
         "Nigeria has tens of thousands of primary healthcare facilities and patent-medicine vendors (company estimate: 30,000 private outlets in the south-west).",
       competition:
         "Other B2B pharma distribution platforms and traditional wholesalers. Clinicrest positions on verified sourcing and forecasting.",
       risks:
         "Working capital tied up in inventory, regulatory licensing, thin distribution margins, and the unreconciled active-clinic figure.",
-      raise: "Raising USD 1.8m priced seed to open Abeokuta and Osogbo depots and extend credit terms to clinics.",
-      unknowns: ["Split of paying versus trial clinics", "Gross margin by product category"],
+      raise:
+        "Raising USD 1.8m priced seed to open Abeokuta and Osogbo depots and extend credit terms to clinics.",
+      unknowns: [
+        "Split of paying versus trial clinics",
+        "Gross margin by product category",
+      ],
     },
     claims: [
       {
         claimKey: "customers.active_clinics_deck",
         claimType: "customers",
-        statement: "340 active clinics and pharmacies (pitch deck, February 2026).",
+        statement:
+          "340 active clinics and pharmacies (pitch deck, February 2026).",
         structuredValue: { kind: "COUNT", value: 340, asOf: "2026-02-28" },
         truthClass: "USER_CLAIM",
         evidenceStatus: "SELF_REPORTED",
@@ -439,26 +625,35 @@ export const FICTIONAL_COMPANIES: readonly FictionalCompany[] = [
       {
         claimKey: "customers.paying_accounts",
         claimType: "customers",
-        statement: "212 paying clinic and pharmacy accounts (management accounts, February 2026).",
+        statement:
+          "212 paying clinic and pharmacy accounts (management accounts, February 2026).",
         structuredValue: { kind: "COUNT", value: 212, asOf: "2026-02-28" },
         truthClass: "USER_CLAIM",
         evidenceStatus: "DOCUMENT_SUPPORTED",
         lifecycleStatus: "CONTRADICTORY",
-        documentTitle: "Clinicrest management accounts, February 2026 (fictional)",
+        documentTitle:
+          "Clinicrest management accounts, February 2026 (fictional)",
       },
       {
         claimKey: "financial.monthly_revenue",
         claimType: "financial",
         statement: "Monthly revenue of about USD 95,000 (February 2026).",
-        structuredValue: { kind: "MONEY", amount: "95000", currency: "USD", period: "month" },
+        structuredValue: {
+          kind: "MONEY",
+          amount: "95000",
+          currency: "USD",
+          period: "month",
+        },
         truthClass: "USER_CLAIM",
         evidenceStatus: "DOCUMENT_SUPPORTED",
-        documentTitle: "Clinicrest management accounts, February 2026 (fictional)",
+        documentTitle:
+          "Clinicrest management accounts, February 2026 (fictional)",
       },
       {
         claimKey: "market.outlets",
         claimType: "market",
-        statement: "Around 30,000 private medicine outlets in south-west Nigeria.",
+        statement:
+          "Around 30,000 private medicine outlets in south-west Nigeria.",
         structuredValue: { kind: "COUNT", value: 30000 },
         truthClass: "ESTIMATE",
         evidenceStatus: "SELF_REPORTED",
@@ -472,15 +667,50 @@ export const FICTIONAL_COMPANIES: readonly FictionalCompany[] = [
       },
     ],
     deck: [
-      { dimension: "DESCRIPTION", statement: "Clinicrest keeps primary clinics stocked with genuine essential medicines, delivered next day." },
-      { dimension: "PRODUCT", statement: "A tablet inventory app that forecasts each clinic's needs, tied to a licensed Ibadan warehouse." },
-      { dimension: "MARKET", statement: "Around 30,000 private medicine outlets in south-west Nigeria.", truthClass: "ESTIMATE" },
-      { dimension: "BUSINESS_MODEL", statement: "Distribution margin on medicines plus a monthly software subscription per clinic." },
-      { dimension: "CUSTOMERS", statement: "212 paying clinic and pharmacy accounts in February 2026." },
-      { dimension: "FINANCIAL", statement: "Monthly revenue of about $95,000 in February 2026." },
-      { dimension: "TEAM", statement: "A physician CEO and a pharmaceutical-distribution COO; two licensed pharmacists on staff." },
-      { dimension: "STRATEGY", statement: "Depots in Abeokuta and Osogbo, and credit terms for clinics." },
-      { dimension: "CAPITAL_OBJECTIVE", statement: "Raising $1,800,000 priced seed for two depots and clinic credit." },
+      {
+        dimension: "DESCRIPTION",
+        statement:
+          "Clinicrest keeps primary clinics stocked with genuine essential medicines, delivered next day.",
+      },
+      {
+        dimension: "PRODUCT",
+        statement:
+          "A tablet inventory app that forecasts each clinic's needs, tied to a licensed Ibadan warehouse.",
+      },
+      {
+        dimension: "MARKET",
+        statement:
+          "Around 30,000 private medicine outlets in south-west Nigeria.",
+        truthClass: "ESTIMATE",
+      },
+      {
+        dimension: "BUSINESS_MODEL",
+        statement:
+          "Distribution margin on medicines plus a monthly software subscription per clinic.",
+      },
+      {
+        dimension: "CUSTOMERS",
+        statement: "212 paying clinic and pharmacy accounts in February 2026.",
+      },
+      {
+        dimension: "FINANCIAL",
+        statement: "Monthly revenue of about $95,000 in February 2026.",
+      },
+      {
+        dimension: "TEAM",
+        statement:
+          "A physician CEO and a pharmaceutical-distribution COO; two licensed pharmacists on staff.",
+      },
+      {
+        dimension: "STRATEGY",
+        statement:
+          "Depots in Abeokuta and Osogbo, and credit terms for clinics.",
+      },
+      {
+        dimension: "CAPITAL_OBJECTIVE",
+        statement:
+          "Raising $1,800,000 priced seed for two depots and clinic credit.",
+      },
     ],
   },
   {
@@ -494,7 +724,12 @@ export const FICTIONAL_COMPANIES: readonly FictionalCompany[] = [
     stageOption: "series_a",
     shortDescription:
       "Pay-as-you-go solar mini-grids that replace diesel generators in Nigerian market clusters, billed per kilowatt-hour by smart meter.",
-    categories: ["clean_energy", "energy_access", "energy_management", "small_business"],
+    categories: [
+      "clean_energy",
+      "energy_access",
+      "energy_management",
+      "small_business",
+    ],
     founder: {
       displayName: "Hauwa Bello-Idris",
       headline: "CEO, Marketlight Grids (fictional demo founder)",
@@ -528,8 +763,7 @@ export const FICTIONAL_COMPANIES: readonly FictionalCompany[] = [
         "Solar and battery mini-grids built for a market cluster, with smart prepaid meters per shop. Traders top up by mobile money; Marketlight owns and maintains the asset under a 15-year concession with the market association.",
       traction:
         "14 mini-grids live across FCT, Nasarawa and Niger States serving 4,100 shops. Installed capacity 2.1 MW. Reported collection rate 96%. Annualised revenue of about USD 1.9m (company figure).",
-      team:
-        "Hauwa Bello-Idris (CEO) and Chukwuemeka Obi (CFO, previously project finance at a fictional infrastructure fund). 58 staff, most in field operations.",
+      team: "Hauwa Bello-Idris (CEO) and Chukwuemeka Obi (CFO, previously project finance at a fictional infrastructure fund). 58 staff, most in field operations.",
       market:
         "Nigeria's installed generator base is estimated to be larger than the grid itself (company framing, not independently checked).",
       competition:
@@ -538,7 +772,9 @@ export const FICTIONAL_COMPANIES: readonly FictionalCompany[] = [
         "Currency mismatch between Naira revenue and USD-priced equipment, tariff regulation, subsidy timing, theft and vandalism.",
       raise:
         "Raising USD 12m (equity, alongside a separate debt facility under negotiation) to build 30 more mini-grids.",
-      unknowns: ["Project-level IRR in Naira terms after the 2024-25 devaluation"],
+      unknowns: [
+        "Project-level IRR in Naira terms after the 2024-25 devaluation",
+      ],
     },
     claims: [
       {
@@ -562,7 +798,12 @@ export const FICTIONAL_COMPANIES: readonly FictionalCompany[] = [
         claimKey: "financial.annualised_revenue",
         claimType: "financial",
         statement: "Annualised revenue of about USD 1.9m.",
-        structuredValue: { kind: "MONEY", amount: "1900000", currency: "USD", period: "annualised" },
+        structuredValue: {
+          kind: "MONEY",
+          amount: "1900000",
+          currency: "USD",
+          period: "annualised",
+        },
         truthClass: "USER_CLAIM",
         evidenceStatus: "SELF_REPORTED",
       },
@@ -577,23 +818,57 @@ export const FICTIONAL_COMPANIES: readonly FictionalCompany[] = [
       {
         claimKey: "financial.project_irr",
         claimType: "financial",
-        statement: "Project-level IRR in Naira terms after devaluation is not known.",
+        statement:
+          "Project-level IRR in Naira terms after devaluation is not known.",
         truthClass: "UNKNOWN",
         evidenceStatus: "NO_EVIDENCE",
       },
     ],
     deck: [
-      { dimension: "DESCRIPTION", statement: "Marketlight Grids replaces diesel generators in Nigerian markets with solar mini-grids." },
-      { dimension: "PRODUCT", statement: "Solar and battery mini-grids with a prepaid smart meter in every shop, topped up by mobile money." },
-      { dimension: "MARKET", statement: "Nigerian traders pay roughly three times grid prices for generator power.", truthClass: "ESTIMATE" },
-      { dimension: "BUSINESS_MODEL", statement: "Per-kWh tariffs under 15-year concessions with market associations; Marketlight owns the assets." },
+      {
+        dimension: "DESCRIPTION",
+        statement:
+          "Marketlight Grids replaces diesel generators in Nigerian markets with solar mini-grids.",
+      },
+      {
+        dimension: "PRODUCT",
+        statement:
+          "Solar and battery mini-grids with a prepaid smart meter in every shop, topped up by mobile money.",
+      },
+      {
+        dimension: "MARKET",
+        statement:
+          "Nigerian traders pay roughly three times grid prices for generator power.",
+        truthClass: "ESTIMATE",
+      },
+      {
+        dimension: "BUSINESS_MODEL",
+        statement:
+          "Per-kWh tariffs under 15-year concessions with market associations; Marketlight owns the assets.",
+      },
       { dimension: "TRACTION", statement: "6 mini-grids live in March 2024." },
       { dimension: "TRACTION", statement: "10 mini-grids live in March 2025." },
       { dimension: "TRACTION", statement: "14 mini-grids live in March 2026." },
-      { dimension: "FINANCIAL", statement: "Annualised revenue of about $1,900,000; collection rate of 96%." },
-      { dimension: "TEAM", statement: "An engineer CEO from rural electrification and a project-finance CFO; 58 staff." },
-      { dimension: "STRATEGY", statement: "30 more mini-grids across the North Central zone, financed with equity and project debt." },
-      { dimension: "CAPITAL_OBJECTIVE", statement: "Raising $12,000,000 in equity alongside a separate debt facility." },
+      {
+        dimension: "FINANCIAL",
+        statement:
+          "Annualised revenue of about $1,900,000; collection rate of 96%.",
+      },
+      {
+        dimension: "TEAM",
+        statement:
+          "An engineer CEO from rural electrification and a project-finance CFO; 58 staff.",
+      },
+      {
+        dimension: "STRATEGY",
+        statement:
+          "30 more mini-grids across the North Central zone, financed with equity and project debt.",
+      },
+      {
+        dimension: "CAPITAL_OBJECTIVE",
+        statement:
+          "Raising $12,000,000 in equity alongside a separate debt facility.",
+      },
     ],
     direction: "WARM_GROWTH",
   },
@@ -608,7 +883,12 @@ export const FICTIONAL_COMPANIES: readonly FictionalCompany[] = [
     stageOption: "series_b",
     shortDescription:
       "Payroll, PAYE, pension and HR compliance software for mid-sized Nigerian and Ghanaian employers.",
-    categories: ["enterprise_software", "hr_technology", "b2b_saas", "mid_market"],
+    categories: [
+      "enterprise_software",
+      "hr_technology",
+      "b2b_saas",
+      "mid_market",
+    ],
     founder: {
       displayName: "Babajide Coker",
       headline: "CEO, Tallyloom (fictional demo founder)",
@@ -616,7 +896,8 @@ export const FICTIONAL_COMPANIES: readonly FictionalCompany[] = [
       businessTitle: "Co-founder and CEO",
       professionalSummary:
         "Chartered accountant; led payroll outsourcing at a fictional Big-Four-style firm in Lagos for nine years.",
-      backgroundSummary: "Second-time founder; his first company, a fictional expense-tracking tool, was acquired in 2018.",
+      backgroundSummary:
+        "Second-time founder; his first company, a fictional expense-tracking tool, was acquired in 2018.",
     },
     team: {
       founderCount: 3,
@@ -642,8 +923,7 @@ export const FICTIONAL_COMPANIES: readonly FictionalCompany[] = [
         "Cloud payroll that computes and files statutory deductions, pays staff through bank integrations, and keeps an audit trail for tax inspections; HR modules for leave, expenses and contracts.",
       traction:
         "1,250 employer customers paying for 186,000 employee seats. Annual recurring revenue of USD 6.4m at December 2025, audited (fictional audit). Net revenue retention reported at 118%.",
-      team:
-        "Babajide Coker (CEO), Esi Mensah-Owusu (COO, leads Ghana) and Rotimi Balogun (CTO). 140 staff in Lagos and Accra.",
+      team: "Babajide Coker (CEO), Esi Mensah-Owusu (COO, leads Ghana) and Rotimi Balogun (CTO). 140 staff in Lagos and Accra.",
       market:
         "An estimated 60,000 formal employers with 20-1,000 staff across Nigeria and Ghana (company estimate).",
       competition:
@@ -659,7 +939,12 @@ export const FICTIONAL_COMPANIES: readonly FictionalCompany[] = [
         claimKey: "financial.arr",
         claimType: "financial",
         statement: "Annual recurring revenue of USD 6.4m at 31 December 2025.",
-        structuredValue: { kind: "MONEY", amount: "6400000", currency: "USD", asOf: "2025-12-31" },
+        structuredValue: {
+          kind: "MONEY",
+          amount: "6400000",
+          currency: "USD",
+          asOf: "2025-12-31",
+        },
         truthClass: "USER_CLAIM",
         evidenceStatus: "DOCUMENT_SUPPORTED",
         documentTitle: "Tallyloom audited accounts FY2025 (fictional)",
@@ -667,7 +952,8 @@ export const FICTIONAL_COMPANIES: readonly FictionalCompany[] = [
       {
         claimKey: "customers.employers",
         claimType: "customers",
-        statement: "1,250 employer customers paying for 186,000 employee seats.",
+        statement:
+          "1,250 employer customers paying for 186,000 employee seats.",
         structuredValue: { kind: "COUNT", value: 1250, seats: 186000 },
         truthClass: "USER_CLAIM",
         evidenceStatus: "SELF_REPORTED",
@@ -683,7 +969,8 @@ export const FICTIONAL_COMPANIES: readonly FictionalCompany[] = [
       {
         claimKey: "market.employers",
         claimType: "market",
-        statement: "Around 60,000 formal employers with 20-1,000 staff across Nigeria and Ghana.",
+        statement:
+          "Around 60,000 formal employers with 20-1,000 staff across Nigeria and Ghana.",
         structuredValue: { kind: "COUNT", value: 60000 },
         truthClass: "ESTIMATE",
         evidenceStatus: "SELF_REPORTED",
@@ -697,17 +984,59 @@ export const FICTIONAL_COMPANIES: readonly FictionalCompany[] = [
       },
     ],
     deck: [
-      { dimension: "DESCRIPTION", statement: "Tallyloom runs payroll and statutory compliance for mid-sized employers in Nigeria and Ghana." },
-      { dimension: "PRODUCT", statement: "Computes and files PAYE, pension and NHF, pays staff through bank integrations, and keeps an inspection-ready audit trail." },
-      { dimension: "MARKET", statement: "Around 60,000 formal employers with 20-1,000 staff across Nigeria and Ghana.", truthClass: "ESTIMATE" },
-      { dimension: "BUSINESS_MODEL", statement: "Per-employee-per-month subscription, with HR modules as upsell." },
-      { dimension: "TRACTION", statement: "ARR of $2,100,000 in December 2023." },
-      { dimension: "TRACTION", statement: "ARR of $3,900,000 in December 2024." },
-      { dimension: "TRACTION", statement: "ARR of $6,400,000 in December 2025." },
-      { dimension: "CUSTOMERS", statement: "1,250 employers paying for 186,000 employee seats; net revenue retention of 118%." },
-      { dimension: "TEAM", statement: "A second-time founder CEO with nine years in payroll outsourcing; 140 staff in Lagos and Accra." },
-      { dimension: "STRATEGY", statement: "Enter Kenya, add embedded salary advances with a bank partner, and grow enterprise sales." },
-      { dimension: "CAPITAL_OBJECTIVE", statement: "Raising $22,000,000 Series B for Kenya, embedded finance and enterprise sales." },
+      {
+        dimension: "DESCRIPTION",
+        statement:
+          "Tallyloom runs payroll and statutory compliance for mid-sized employers in Nigeria and Ghana.",
+      },
+      {
+        dimension: "PRODUCT",
+        statement:
+          "Computes and files PAYE, pension and NHF, pays staff through bank integrations, and keeps an inspection-ready audit trail.",
+      },
+      {
+        dimension: "MARKET",
+        statement:
+          "Around 60,000 formal employers with 20-1,000 staff across Nigeria and Ghana.",
+        truthClass: "ESTIMATE",
+      },
+      {
+        dimension: "BUSINESS_MODEL",
+        statement:
+          "Per-employee-per-month subscription, with HR modules as upsell.",
+      },
+      {
+        dimension: "TRACTION",
+        statement: "ARR of $2,100,000 in December 2023.",
+      },
+      {
+        dimension: "TRACTION",
+        statement: "ARR of $3,900,000 in December 2024.",
+      },
+      {
+        dimension: "TRACTION",
+        statement: "ARR of $6,400,000 in December 2025.",
+      },
+      {
+        dimension: "CUSTOMERS",
+        statement:
+          "1,250 employers paying for 186,000 employee seats; net revenue retention of 118%.",
+      },
+      {
+        dimension: "TEAM",
+        statement:
+          "A second-time founder CEO with nine years in payroll outsourcing; 140 staff in Lagos and Accra.",
+      },
+      {
+        dimension: "STRATEGY",
+        statement:
+          "Enter Kenya, add embedded salary advances with a bank partner, and grow enterprise sales.",
+      },
+      {
+        dimension: "CAPITAL_OBJECTIVE",
+        statement:
+          "Raising $22,000,000 Series B for Kenya, embedded finance and enterprise sales.",
+      },
     ],
   },
   {
@@ -729,7 +1058,8 @@ export const FICTIONAL_COMPANIES: readonly FictionalCompany[] = [
       businessTitle: "Co-founder and CEO",
       professionalSummary:
         "Product manager; previously ran growth for a fictional ride-hailing driver wallet in Lagos.",
-      backgroundSummary: "Grew up watching her aunt run a 40-person ajo circle from a notebook.",
+      backgroundSummary:
+        "Grew up watching her aunt run a 40-person ajo circle from a notebook.",
     },
     team: {
       founderCount: 2,
@@ -755,22 +1085,27 @@ export const FICTIONAL_COMPANIES: readonly FictionalCompany[] = [
         "Ajopot runs the circle: members commit to a schedule, contributions are auto-debited, the payout order is fixed up front, and funds sit in a licensed partner bank. A member's reliability score follows them to the next circle.",
       traction:
         "52,000 registered users, 18,700 active in March 2026, in 3,900 circles. Monthly contributions of about NGN 610m flow through the app (company figure). Revenue is still small: a 1% payout fee.",
-      team:
-        "Temitope Alade (CEO, product growth) and Yusuf Danladi (CTO). 14 staff.",
+      team: "Temitope Alade (CEO, product growth) and Yusuf Danladi (CTO). 14 staff.",
       market:
         "Rotating savings are widespread across Nigeria; Ajopot has not published a market size it stands behind.",
       competition:
         "Digital savings apps, neobanks adding group savings, and informal collectors. Ajopot's bet is the social circle, not the individual saver.",
       risks:
         "Consumer acquisition cost, default handling inside circles, dependence on one partner bank's licence, and thin revenue so far.",
-      raise: "Raising NGN 1.2bn on a SAFE to grow in Abuja and Port Harcourt and launch small loans against circle history.",
-      unknowns: ["Customer acquisition cost", "Default rate inside circles", "Market size"],
+      raise:
+        "Raising NGN 1.2bn on a SAFE to grow in Abuja and Port Harcourt and launch small loans against circle history.",
+      unknowns: [
+        "Customer acquisition cost",
+        "Default rate inside circles",
+        "Market size",
+      ],
     },
     claims: [
       {
         claimKey: "traction.active_users",
         claimType: "traction",
-        statement: "18,700 active users in March 2026 out of 52,000 registered.",
+        statement:
+          "18,700 active users in March 2026 out of 52,000 registered.",
         structuredValue: { kind: "COUNT", value: 18700, registered: 52000 },
         truthClass: "USER_CLAIM",
         evidenceStatus: "SELF_REPORTED",
@@ -778,8 +1113,14 @@ export const FICTIONAL_COMPANIES: readonly FictionalCompany[] = [
       {
         claimKey: "traction.monthly_contributions",
         claimType: "traction",
-        statement: "About NGN 610m in monthly contributions through the app (March 2026).",
-        structuredValue: { kind: "MONEY", amount: "610000000", currency: "NGN", period: "month" },
+        statement:
+          "About NGN 610m in monthly contributions through the app (March 2026).",
+        structuredValue: {
+          kind: "MONEY",
+          amount: "610000000",
+          currency: "NGN",
+          period: "month",
+        },
         truthClass: "USER_CLAIM",
         evidenceStatus: "SELF_REPORTED",
       },
@@ -799,16 +1140,52 @@ export const FICTIONAL_COMPANIES: readonly FictionalCompany[] = [
       },
     ],
     deck: [
-      { dimension: "DESCRIPTION", statement: "Ajopot digitises ajo rotating savings circles, with funds held at a licensed partner bank." },
-      { dimension: "PRODUCT", statement: "Fixed payout order, auto-debited contributions and a reliability score that follows each member." },
-      { dimension: "BUSINESS_MODEL", statement: "A 1% fee on each payout today; small loans against circle history next." },
-      { dimension: "TRACTION", statement: "Monthly active users of 4,200 in September 2025." },
-      { dimension: "TRACTION", statement: "Monthly active users of 11,300 in December 2025." },
-      { dimension: "TRACTION", statement: "Monthly active users of 18,700 in March 2026." },
-      { dimension: "CUSTOMERS", statement: "52,000 registered users in 3,900 circles." },
-      { dimension: "TEAM", statement: "A product-growth CEO from a driver-wallet app and an engineering CTO; 14 staff." },
-      { dimension: "STRATEGY", statement: "Grow in Abuja and Port Harcourt; launch small loans against circle history." },
-      { dimension: "CAPITAL_OBJECTIVE", statement: "Raising NGN 1,200,000,000 on a SAFE for growth and lending." },
+      {
+        dimension: "DESCRIPTION",
+        statement:
+          "Ajopot digitises ajo rotating savings circles, with funds held at a licensed partner bank.",
+      },
+      {
+        dimension: "PRODUCT",
+        statement:
+          "Fixed payout order, auto-debited contributions and a reliability score that follows each member.",
+      },
+      {
+        dimension: "BUSINESS_MODEL",
+        statement:
+          "A 1% fee on each payout today; small loans against circle history next.",
+      },
+      {
+        dimension: "TRACTION",
+        statement: "Monthly active users of 4,200 in September 2025.",
+      },
+      {
+        dimension: "TRACTION",
+        statement: "Monthly active users of 11,300 in December 2025.",
+      },
+      {
+        dimension: "TRACTION",
+        statement: "Monthly active users of 18,700 in March 2026.",
+      },
+      {
+        dimension: "CUSTOMERS",
+        statement: "52,000 registered users in 3,900 circles.",
+      },
+      {
+        dimension: "TEAM",
+        statement:
+          "A product-growth CEO from a driver-wallet app and an engineering CTO; 14 staff.",
+      },
+      {
+        dimension: "STRATEGY",
+        statement:
+          "Grow in Abuja and Port Harcourt; launch small loans against circle history.",
+      },
+      {
+        dimension: "CAPITAL_OBJECTIVE",
+        statement:
+          "Raising NGN 1,200,000,000 on a SAFE for growth and lending.",
+      },
     ],
   },
   {
@@ -822,7 +1199,12 @@ export const FICTIONAL_COMPANIES: readonly FictionalCompany[] = [
     stageOption: "seed",
     shortDescription:
       "Solar-pumped, IoT-metered water kiosks in Nairobi's informal settlements, selling clean water by the litre via M-Pesa tokens.",
-    categories: ["clean_energy", "energy_access", "data_analytics_platform", "consumer"],
+    categories: [
+      "clean_energy",
+      "energy_access",
+      "data_analytics_platform",
+      "consumer",
+    ],
     founder: {
       displayName: "Wanjiru Kamau",
       headline: "CEO, Maji Loop (fictional demo founder)",
@@ -830,7 +1212,8 @@ export const FICTIONAL_COMPANIES: readonly FictionalCompany[] = [
       businessTitle: "Founder and CEO",
       professionalSummary:
         "Water engineer; managed kiosk programmes for a fictional county water utility for seven years.",
-      backgroundSummary: "Grew up in Kibera; studied civil engineering in Nairobi.",
+      backgroundSummary:
+        "Grew up in Kibera; studied civil engineering in Nairobi.",
     },
     team: {
       founderCount: 2,
@@ -861,7 +1244,8 @@ export const FICTIONAL_COMPANIES: readonly FictionalCompany[] = [
         "Nairobi alone has more than two million people in informal settlements (company estimate from public figures).",
       competition: "Private water vendors, NGO kiosks and utility standpipes.",
       risks: "Utility contract renewal, vandalism, and hardware reliability.",
-      raise: "Raising USD 1.5m priced seed for 150 more kiosks in Nairobi and Mombasa.",
+      raise:
+        "Raising USD 1.5m priced seed for 150 more kiosks in Nairobi and Mombasa.",
       unknowns: ["Kiosk-level margin after utility revenue share"],
     },
     claims: [
@@ -876,8 +1260,14 @@ export const FICTIONAL_COMPANIES: readonly FictionalCompany[] = [
       {
         claimKey: "traction.litres_2025",
         claimType: "traction",
-        statement: "41 million litres sold in 2025, reconciled with the utility's meter reads.",
-        structuredValue: { kind: "QUANTITY", value: "41000000", unit: "litre", period: "2025" },
+        statement:
+          "41 million litres sold in 2025, reconciled with the utility's meter reads.",
+        structuredValue: {
+          kind: "QUANTITY",
+          value: "41000000",
+          unit: "litre",
+          period: "2025",
+        },
         truthClass: "USER_CLAIM",
         evidenceStatus: "DOCUMENT_SUPPORTED",
         documentTitle: "Utility meter reconciliation 2025 (fictional)",
@@ -886,29 +1276,62 @@ export const FICTIONAL_COMPANIES: readonly FictionalCompany[] = [
         claimKey: "financial.revenue_2025",
         claimType: "financial",
         statement: "Revenue of KES 58m in 2025.",
-        structuredValue: { kind: "MONEY", amount: "58000000", currency: "KES", period: "2025" },
+        structuredValue: {
+          kind: "MONEY",
+          amount: "58000000",
+          currency: "KES",
+          period: "2025",
+        },
         truthClass: "USER_CLAIM",
         evidenceStatus: "SELF_REPORTED",
       },
       {
         claimKey: "financial.kiosk_margin",
         claimType: "financial",
-        statement: "Kiosk-level margin after the utility revenue share is not known.",
+        statement:
+          "Kiosk-level margin after the utility revenue share is not known.",
         truthClass: "UNKNOWN",
         evidenceStatus: "NO_EVIDENCE",
       },
     ],
     deck: [
-      { dimension: "DESCRIPTION", statement: "Maji Loop sells clean water by the litre from solar-pumped, metered kiosks in Nairobi." },
-      { dimension: "PRODUCT", statement: "Solar pumping, filtration and a smart dispenser; residents pay by M-Pesa or tag." },
-      { dimension: "MARKET", statement: "More than two million people live in Nairobi's informal settlements.", truthClass: "ESTIMATE" },
-      { dimension: "BUSINESS_MODEL", statement: "Per-litre sales with a revenue share to the utility under a service contract." },
+      {
+        dimension: "DESCRIPTION",
+        statement:
+          "Maji Loop sells clean water by the litre from solar-pumped, metered kiosks in Nairobi.",
+      },
+      {
+        dimension: "PRODUCT",
+        statement:
+          "Solar pumping, filtration and a smart dispenser; residents pay by M-Pesa or tag.",
+      },
+      {
+        dimension: "MARKET",
+        statement:
+          "More than two million people live in Nairobi's informal settlements.",
+        truthClass: "ESTIMATE",
+      },
+      {
+        dimension: "BUSINESS_MODEL",
+        statement:
+          "Per-litre sales with a revenue share to the utility under a service contract.",
+      },
       { dimension: "TRACTION", statement: "38 kiosks live in 2023." },
       { dimension: "TRACTION", statement: "64 kiosks live in 2024." },
       { dimension: "TRACTION", statement: "96 kiosks live in 2025." },
-      { dimension: "TEAM", statement: "A water-engineer CEO from a county utility and an embedded-hardware CTO; 22 staff." },
-      { dimension: "STRATEGY", statement: "150 more kiosks in Nairobi and Mombasa." },
-      { dimension: "CAPITAL_OBJECTIVE", statement: "Raising $1,500,000 priced seed for 150 kiosks." },
+      {
+        dimension: "TEAM",
+        statement:
+          "A water-engineer CEO from a county utility and an embedded-hardware CTO; 22 staff.",
+      },
+      {
+        dimension: "STRATEGY",
+        statement: "150 more kiosks in Nairobi and Mombasa.",
+      },
+      {
+        dimension: "CAPITAL_OBJECTIVE",
+        statement: "Raising $1,500,000 priced seed for 150 kiosks.",
+      },
     ],
   },
   {
@@ -922,7 +1345,12 @@ export const FICTIONAL_COMPANIES: readonly FictionalCompany[] = [
     stageOption: "pre_seed",
     shortDescription:
       "Solar ice-making and insulated crates rented to fish traders at Ghana's landing beaches, cutting spoilage between the canoe and the market.",
-    categories: ["supply_chain", "energy_access", "logistics", "small_business"],
+    categories: [
+      "supply_chain",
+      "energy_access",
+      "logistics",
+      "small_business",
+    ],
     founder: {
       displayName: "Kwabena Asante-Mensah",
       headline: "Founder, Nsuo Labs (fictional demo founder)",
@@ -930,7 +1358,8 @@ export const FICTIONAL_COMPANIES: readonly FictionalCompany[] = [
       businessTitle: "Founder and CEO",
       professionalSummary:
         "Mechanical engineer; previously designed refrigeration units for a fictional Accra cold-chain contractor.",
-      backgroundSummary: "His grandmother was a fish trader at Tema New Town beach.",
+      backgroundSummary:
+        "His grandmother was a fish trader at Tema New Town beach.",
     },
     team: {
       founderCount: 1,
@@ -958,15 +1387,18 @@ export const FICTIONAL_COMPANIES: readonly FictionalCompany[] = [
       team: "Kwabena Asante-Mensah (founder, refrigeration engineer) and four staff. No co-founder yet.",
       market: "Nsuo Labs has not produced a market size it stands behind.",
       competition: "Block-ice sellers and cold stores in town.",
-      risks: "Single founder, one pilot site, hardware cost, and seasonal catches.",
-      raise: "Raising USD 600,000 on a SAFE for five more beach sites and a co-founder hire.",
+      risks:
+        "Single founder, one pilot site, hardware cost, and seasonal catches.",
+      raise:
+        "Raising USD 600,000 on a SAFE for five more beach sites and a co-founder hire.",
       unknowns: ["Market size", "Unit economics per site", "Revenue to date"],
     },
     claims: [
       {
         claimKey: "traction.pilot_customers",
         claimType: "traction",
-        statement: "140 regular trader customers at one pilot site since November 2025.",
+        statement:
+          "140 regular trader customers at one pilot site since November 2025.",
         structuredValue: { kind: "COUNT", value: 140 },
         truthClass: "USER_CLAIM",
         evidenceStatus: "SELF_REPORTED",
@@ -974,7 +1406,8 @@ export const FICTIONAL_COMPANIES: readonly FictionalCompany[] = [
       {
         claimKey: "impact.spoilage",
         claimType: "impact",
-        statement: "Traders report spoilage falling from about 25% to under 10% of the catch (small self-reported survey).",
+        statement:
+          "Traders report spoilage falling from about 25% to under 10% of the catch (small self-reported survey).",
         structuredValue: { kind: "PERCENT_CHANGE", from: "25", to: "10" },
         truthClass: "USER_CLAIM",
         evidenceStatus: "SELF_REPORTED",
@@ -988,13 +1421,40 @@ export const FICTIONAL_COMPANIES: readonly FictionalCompany[] = [
       },
     ],
     deck: [
-      { dimension: "DESCRIPTION", statement: "Nsuo Labs makes ice with solar power at Ghana's landing beaches and rents insulated crates to fish traders." },
-      { dimension: "PRODUCT", statement: "A beach-side solar ice plant plus crates rented per day through trader groups." },
-      { dimension: "CUSTOMERS", statement: "140 regular trader customers at the Tema pilot site." },
-      { dimension: "TRACTION", statement: "Traders report spoilage falling from about 25% to under 10% of the catch." },
-      { dimension: "TEAM", statement: "A refrigeration-engineer founder and four staff; a co-founder hire is planned." },
-      { dimension: "STRATEGY", statement: "Five more beach sites along the Greater Accra and Central coasts." },
-      { dimension: "CAPITAL_OBJECTIVE", statement: "Raising $600,000 on a SAFE for five sites and a co-founder." },
+      {
+        dimension: "DESCRIPTION",
+        statement:
+          "Nsuo Labs makes ice with solar power at Ghana's landing beaches and rents insulated crates to fish traders.",
+      },
+      {
+        dimension: "PRODUCT",
+        statement:
+          "A beach-side solar ice plant plus crates rented per day through trader groups.",
+      },
+      {
+        dimension: "CUSTOMERS",
+        statement: "140 regular trader customers at the Tema pilot site.",
+      },
+      {
+        dimension: "TRACTION",
+        statement:
+          "Traders report spoilage falling from about 25% to under 10% of the catch.",
+      },
+      {
+        dimension: "TEAM",
+        statement:
+          "A refrigeration-engineer founder and four staff; a co-founder hire is planned.",
+      },
+      {
+        dimension: "STRATEGY",
+        statement:
+          "Five more beach sites along the Greater Accra and Central coasts.",
+      },
+      {
+        dimension: "CAPITAL_OBJECTIVE",
+        statement:
+          "Raising $600,000 on a SAFE for five sites and a co-founder.",
+      },
     ],
     direction: "WARM_GROWTH",
   },
@@ -1009,7 +1469,12 @@ export const FICTIONAL_COMPANIES: readonly FictionalCompany[] = [
     stageOption: "series_b",
     shortDescription:
       "Rooftop solar and battery systems for South African SMEs on a no-upfront-cost monthly subscription, designed around load-shedding.",
-    categories: ["clean_energy", "energy_management", "usage_based", "small_business"],
+    categories: [
+      "clean_energy",
+      "energy_management",
+      "usage_based",
+      "small_business",
+    ],
     founder: {
       displayName: "Thandiwe Mokoena",
       headline: "CEO, Brightkloof Energy (fictional demo founder)",
@@ -1017,7 +1482,8 @@ export const FICTIONAL_COMPANIES: readonly FictionalCompany[] = [
       businessTitle: "Co-founder and CEO",
       professionalSummary:
         "Former energy-sector investment banker at a fictional Johannesburg bank; co-founded Brightkloof in 2018.",
-      backgroundSummary: "Actuarial science degree; chartered financial analyst.",
+      backgroundSummary:
+        "Actuarial science degree; chartered financial analyst.",
     },
     team: {
       founderCount: 2,
@@ -1043,8 +1509,7 @@ export const FICTIONAL_COMPANIES: readonly FictionalCompany[] = [
         "Brightkloof designs, installs, monitors and maintains rooftop solar plus batteries; the business pays a fixed monthly fee for 10 years and never owns the risk of a failed inverter.",
       traction:
         "2,900 SME sites contracted, 38 MWp installed. Contracted annual recurring revenue of ZAR 214m (fictional audited accounts FY2025). Growth has slowed as load-shedding eased in 2025.",
-      team:
-        "Thandiwe Mokoena (CEO) and Pieter van Wyk (CTO, electrical engineering). 210 staff including in-house installation crews.",
+      team: "Thandiwe Mokoena (CEO) and Pieter van Wyk (CTO, electrical engineering). 210 staff including in-house installation crews.",
       market:
         "South Africa has several hundred thousand formal SMEs with rooftops suitable for solar (company estimate).",
       competition:
@@ -1053,14 +1518,21 @@ export const FICTIONAL_COMPANIES: readonly FictionalCompany[] = [
         "Demand sensitivity to load-shedding, equipment import costs, credit risk of SME customers over 10 years, and financing cost.",
       raise:
         "Raising ZAR 280m Series B equity to expand into KwaZulu-Natal and the Western Cape and warehouse contracts before securitisation.",
-      unknowns: ["Churn and default rate on subscriptions older than five years"],
+      unknowns: [
+        "Churn and default rate on subscriptions older than five years",
+      ],
     },
     claims: [
       {
         claimKey: "financial.contracted_arr",
         claimType: "financial",
         statement: "Contracted annual recurring revenue of ZAR 214m (FY2025).",
-        structuredValue: { kind: "MONEY", amount: "214000000", currency: "ZAR", period: "FY2025" },
+        structuredValue: {
+          kind: "MONEY",
+          amount: "214000000",
+          currency: "ZAR",
+          period: "FY2025",
+        },
         truthClass: "USER_CLAIM",
         evidenceStatus: "DOCUMENT_SUPPORTED",
         documentTitle: "Brightkloof audited accounts FY2025 (fictional)",
@@ -1076,30 +1548,69 @@ export const FICTIONAL_COMPANIES: readonly FictionalCompany[] = [
       {
         claimKey: "traction.growth_slowdown",
         claimType: "traction",
-        statement: "New contract growth slowed in 2025 as load-shedding eased (company statement).",
+        statement:
+          "New contract growth slowed in 2025 as load-shedding eased (company statement).",
         truthClass: "USER_CLAIM",
         evidenceStatus: "SELF_REPORTED",
       },
       {
         claimKey: "risk.long_tail_default",
         claimType: "risk",
-        statement: "Churn and default on subscriptions older than five years are not known.",
+        statement:
+          "Churn and default on subscriptions older than five years are not known.",
         truthClass: "UNKNOWN",
         evidenceStatus: "NO_EVIDENCE",
       },
     ],
     deck: [
-      { dimension: "DESCRIPTION", statement: "Brightkloof Energy puts solar and batteries on SME rooftops for a fixed monthly fee, with no upfront cost." },
-      { dimension: "PRODUCT", statement: "Design, installation, monitoring and maintenance included for 10 years." },
-      { dimension: "MARKET", statement: "Several hundred thousand South African SMEs have rooftops suitable for solar.", truthClass: "ESTIMATE" },
-      { dimension: "BUSINESS_MODEL", statement: "Ten-year subscriptions, later sold into securitised pools to recycle capital." },
+      {
+        dimension: "DESCRIPTION",
+        statement:
+          "Brightkloof Energy puts solar and batteries on SME rooftops for a fixed monthly fee, with no upfront cost.",
+      },
+      {
+        dimension: "PRODUCT",
+        statement:
+          "Design, installation, monitoring and maintenance included for 10 years.",
+      },
+      {
+        dimension: "MARKET",
+        statement:
+          "Several hundred thousand South African SMEs have rooftops suitable for solar.",
+        truthClass: "ESTIMATE",
+      },
+      {
+        dimension: "BUSINESS_MODEL",
+        statement:
+          "Ten-year subscriptions, later sold into securitised pools to recycle capital.",
+      },
       { dimension: "TRACTION", statement: "Contracted ARR of R96m in FY2023." },
-      { dimension: "TRACTION", statement: "Contracted ARR of R168m in FY2024." },
-      { dimension: "TRACTION", statement: "Contracted ARR of R214m in FY2025." },
-      { dimension: "CUSTOMERS", statement: "2,900 SME sites and 38 MWp installed." },
-      { dimension: "TEAM", statement: "A former energy banker CEO and an electrical-engineering CTO; 210 staff with in-house crews." },
-      { dimension: "STRATEGY", statement: "Expand to KwaZulu-Natal and the Western Cape; securitise mature contracts." },
-      { dimension: "CAPITAL_OBJECTIVE", statement: "Raising R280,000,000 Series B equity." },
+      {
+        dimension: "TRACTION",
+        statement: "Contracted ARR of R168m in FY2024.",
+      },
+      {
+        dimension: "TRACTION",
+        statement: "Contracted ARR of R214m in FY2025.",
+      },
+      {
+        dimension: "CUSTOMERS",
+        statement: "2,900 SME sites and 38 MWp installed.",
+      },
+      {
+        dimension: "TEAM",
+        statement:
+          "A former energy banker CEO and an electrical-engineering CTO; 210 staff with in-house crews.",
+      },
+      {
+        dimension: "STRATEGY",
+        statement:
+          "Expand to KwaZulu-Natal and the Western Cape; securitise mature contracts.",
+      },
+      {
+        dimension: "CAPITAL_OBJECTIVE",
+        statement: "Raising R280,000,000 Series B equity.",
+      },
     ],
   },
   {
@@ -1113,7 +1624,12 @@ export const FICTIONAL_COMPANIES: readonly FictionalCompany[] = [
     stageOption: "series_a",
     shortDescription:
       "Ordering, inventory and supplier credit software for Cairo's neighbourhood kiosks and mini-markets.",
-    categories: ["retail_technology", "b2b_saas", "embedded_finance", "small_business"],
+    categories: [
+      "retail_technology",
+      "b2b_saas",
+      "embedded_finance",
+      "small_business",
+    ],
     founder: {
       displayName: "Mariam El-Sayed",
       headline: "CEO, Souqsheet (fictional demo founder)",
@@ -1148,10 +1664,14 @@ export const FICTIONAL_COMPANIES: readonly FictionalCompany[] = [
       traction:
         "9,800 kiosks placing orders monthly across Greater Cairo and Alexandria. Gross order value of about USD 4.2m a month (company figure). Software and credit revenue of roughly USD 190,000 a month.",
       team: "Mariam El-Sayed (CEO) and Karim Fawzy (CTO). 75 staff.",
-      market: "Egypt has an estimated several hundred thousand traditional grocery outlets (company estimate).",
-      competition: "B2B e-commerce platforms that hold inventory, distributor apps, and paper ordering.",
-      risks: "Egyptian pound devaluation, credit losses on supplier credit, and distributor dependence.",
-      raise: "Raising USD 6m Series A to reach Upper Egypt and scale supplier credit.",
+      market:
+        "Egypt has an estimated several hundred thousand traditional grocery outlets (company estimate).",
+      competition:
+        "B2B e-commerce platforms that hold inventory, distributor apps, and paper ordering.",
+      risks:
+        "Egyptian pound devaluation, credit losses on supplier credit, and distributor dependence.",
+      raise:
+        "Raising USD 6m Series A to reach Upper Egypt and scale supplier credit.",
       unknowns: ["Credit loss rate on 7-day supplier credit"],
     },
     claims: [
@@ -1167,15 +1687,26 @@ export const FICTIONAL_COMPANIES: readonly FictionalCompany[] = [
         claimKey: "traction.monthly_gov",
         claimType: "traction",
         statement: "Gross order value of about USD 4.2m a month.",
-        structuredValue: { kind: "MONEY", amount: "4200000", currency: "USD", period: "month" },
+        structuredValue: {
+          kind: "MONEY",
+          amount: "4200000",
+          currency: "USD",
+          period: "month",
+        },
         truthClass: "USER_CLAIM",
         evidenceStatus: "SELF_REPORTED",
       },
       {
         claimKey: "financial.monthly_revenue",
         claimType: "financial",
-        statement: "Monthly software and credit revenue of roughly USD 190,000.",
-        structuredValue: { kind: "MONEY", amount: "190000", currency: "USD", period: "month" },
+        statement:
+          "Monthly software and credit revenue of roughly USD 190,000.",
+        structuredValue: {
+          kind: "MONEY",
+          amount: "190000",
+          currency: "USD",
+          period: "month",
+        },
         truthClass: "USER_CLAIM",
         evidenceStatus: "DOCUMENT_SUPPORTED",
         documentTitle: "Souqsheet revenue report, February 2026 (fictional)",
@@ -1183,22 +1714,58 @@ export const FICTIONAL_COMPANIES: readonly FictionalCompany[] = [
       {
         claimKey: "risk.credit_loss",
         claimType: "risk",
-        statement: "Credit loss rate on 7-day supplier credit has not been disclosed.",
+        statement:
+          "Credit loss rate on 7-day supplier credit has not been disclosed.",
         truthClass: "UNKNOWN",
         evidenceStatus: "NO_EVIDENCE",
       },
     ],
     deck: [
-      { dimension: "DESCRIPTION", statement: "Souqsheet gives Cairo's kiosks one app to order from every distributor, track stock and get supplier credit." },
-      { dimension: "PRODUCT", statement: "Android ordering across distributors, simple stock tracking, and 7-day supplier credit via a partner bank." },
-      { dimension: "BUSINESS_MODEL", statement: "Distributor subscription fees plus a margin on supplier credit." },
-      { dimension: "TRACTION", statement: "Gross order value of $1,600,000 a month in February 2024." },
-      { dimension: "TRACTION", statement: "Gross order value of $2,700,000 a month in February 2025." },
-      { dimension: "TRACTION", statement: "Gross order value of $4,200,000 a month in February 2026." },
-      { dimension: "CUSTOMERS", statement: "9,800 kiosks order every month across Greater Cairo and Alexandria." },
-      { dimension: "TEAM", statement: "An FMCG trade-marketing CEO and an engineering CTO; 75 staff." },
-      { dimension: "STRATEGY", statement: "Reach Upper Egypt and scale supplier credit." },
-      { dimension: "CAPITAL_OBJECTIVE", statement: "Raising $6,000,000 Series A." },
+      {
+        dimension: "DESCRIPTION",
+        statement:
+          "Souqsheet gives Cairo's kiosks one app to order from every distributor, track stock and get supplier credit.",
+      },
+      {
+        dimension: "PRODUCT",
+        statement:
+          "Android ordering across distributors, simple stock tracking, and 7-day supplier credit via a partner bank.",
+      },
+      {
+        dimension: "BUSINESS_MODEL",
+        statement:
+          "Distributor subscription fees plus a margin on supplier credit.",
+      },
+      {
+        dimension: "TRACTION",
+        statement: "Gross order value of $1,600,000 a month in February 2024.",
+      },
+      {
+        dimension: "TRACTION",
+        statement: "Gross order value of $2,700,000 a month in February 2025.",
+      },
+      {
+        dimension: "TRACTION",
+        statement: "Gross order value of $4,200,000 a month in February 2026.",
+      },
+      {
+        dimension: "CUSTOMERS",
+        statement:
+          "9,800 kiosks order every month across Greater Cairo and Alexandria.",
+      },
+      {
+        dimension: "TEAM",
+        statement:
+          "An FMCG trade-marketing CEO and an engineering CTO; 75 staff.",
+      },
+      {
+        dimension: "STRATEGY",
+        statement: "Reach Upper Egypt and scale supplier credit.",
+      },
+      {
+        dimension: "CAPITAL_OBJECTIVE",
+        statement: "Raising $6,000,000 Series A.",
+      },
     ],
     direction: "DARK_TECHNICAL",
   },
@@ -1213,7 +1780,12 @@ export const FICTIONAL_COMPANIES: readonly FictionalCompany[] = [
     stageOption: "pre_seed",
     shortDescription:
       "Job costing, quoting and M-Pesa payments for Kenya's informal building contractors — fundis — on a basic Android phone.",
-    categories: ["enterprise_software", "workflow_automation", "b2b_saas", "small_business"],
+    categories: [
+      "enterprise_software",
+      "workflow_automation",
+      "b2b_saas",
+      "small_business",
+    ],
     founder: {
       displayName: "Brian Mwangi",
       headline: "Co-founder, Kazikit (fictional demo founder)",
@@ -1221,7 +1793,8 @@ export const FICTIONAL_COMPANIES: readonly FictionalCompany[] = [
       businessTitle: "Co-founder and CTO",
       professionalSummary:
         "Software engineer; built field-sales apps for a fictional Nairobi FMCG distributor.",
-      backgroundSummary: "His father is a mason who quotes jobs on the back of cement bags.",
+      backgroundSummary:
+        "His father is a mason who quotes jobs on the back of cement bags.",
     },
     team: {
       founderCount: 2,
@@ -1246,17 +1819,24 @@ export const FICTIONAL_COMPANIES: readonly FictionalCompany[] = [
       traction:
         "1,900 contractors have signed up since a September 2025 launch; about 600 use it weekly. No revenue yet: a paid tier is planned for mid-2026.",
       team: "Brian Mwangi (CTO) and Grace Achieng (CEO, previously ran a hardware-store chain's credit desk). Four people.",
-      market: "Kenya's construction sector employs a very large informal workforce; Kazikit has not sized its own market yet.",
+      market:
+        "Kenya's construction sector employs a very large informal workforce; Kazikit has not sized its own market yet.",
       competition: "Paper, WhatsApp and generic invoicing apps.",
       risks: "Monetising a price-sensitive user base, and very early product.",
-      raise: "Raising USD 350,000 on a SAFE to launch the paid tier and a materials marketplace with hardware stores.",
-      unknowns: ["Willingness to pay", "Market size", "Retention beyond three months"],
+      raise:
+        "Raising USD 350,000 on a SAFE to launch the paid tier and a materials marketplace with hardware stores.",
+      unknowns: [
+        "Willingness to pay",
+        "Market size",
+        "Retention beyond three months",
+      ],
     },
     claims: [
       {
         claimKey: "traction.signups",
         claimType: "traction",
-        statement: "1,900 contractors signed up since September 2025; about 600 weekly active.",
+        statement:
+          "1,900 contractors signed up since September 2025; about 600 weekly active.",
         structuredValue: { kind: "COUNT", value: 1900, weeklyActive: 600 },
         truthClass: "USER_CLAIM",
         evidenceStatus: "SELF_REPORTED",
@@ -1277,12 +1857,36 @@ export const FICTIONAL_COMPANIES: readonly FictionalCompany[] = [
       },
     ],
     deck: [
-      { dimension: "DESCRIPTION", statement: "Kazikit helps Kenya's informal building contractors quote, cost and get paid from a basic Android phone." },
-      { dimension: "PRODUCT", statement: "Quotes with local material prices, spend tracking per job, and M-Pesa payment requests." },
-      { dimension: "TRACTION", statement: "1,900 contractors signed up since September 2025; about 600 use it weekly." },
-      { dimension: "BUSINESS_MODEL", statement: "A paid tier from mid-2026 and a materials marketplace with hardware stores." },
-      { dimension: "TEAM", statement: "A software-engineer CTO and a CEO who ran a hardware chain's credit desk." },
-      { dimension: "CAPITAL_OBJECTIVE", statement: "Raising $350,000 on a SAFE for the paid tier and marketplace." },
+      {
+        dimension: "DESCRIPTION",
+        statement:
+          "Kazikit helps Kenya's informal building contractors quote, cost and get paid from a basic Android phone.",
+      },
+      {
+        dimension: "PRODUCT",
+        statement:
+          "Quotes with local material prices, spend tracking per job, and M-Pesa payment requests.",
+      },
+      {
+        dimension: "TRACTION",
+        statement:
+          "1,900 contractors signed up since September 2025; about 600 use it weekly.",
+      },
+      {
+        dimension: "BUSINESS_MODEL",
+        statement:
+          "A paid tier from mid-2026 and a materials marketplace with hardware stores.",
+      },
+      {
+        dimension: "TEAM",
+        statement:
+          "A software-engineer CTO and a CEO who ran a hardware chain's credit desk.",
+      },
+      {
+        dimension: "CAPITAL_OBJECTIVE",
+        statement:
+          "Raising $350,000 on a SAFE for the paid tier and marketplace.",
+      },
     ],
   },
 ];

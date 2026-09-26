@@ -70,7 +70,8 @@ export const FICTIONAL_INVESTORS: readonly FictionalInvestor[] = [
     typeOption: "vc",
     person: {
       displayName: "Daniel Otieno-Brooks",
-      headline: "General Partner, Equator Line Capital (fictional demo investor)",
+      headline:
+        "General Partner, Equator Line Capital (fictional demo investor)",
       businessTitle: "General Partner",
     },
     stages: ["series_a"],
@@ -89,7 +90,8 @@ export const FICTIONAL_INVESTORS: readonly FictionalInvestor[] = [
     typeOption: "vc",
     person: {
       displayName: "Sipho Ndlovu-Carter",
-      headline: "Managing Partner, Tidewater Growth Partners (fictional demo investor)",
+      headline:
+        "Managing Partner, Tidewater Growth Partners (fictional demo investor)",
       businessTitle: "Managing Partner",
     },
     stages: ["series_a", "series_b"],
@@ -97,7 +99,12 @@ export const FICTIONAL_INVESTORS: readonly FictionalInvestor[] = [
     cheque: { min: "5000000", typical: "10000000", max: "20000000" },
     roles: ["lead", "co_invest"],
     geographies: ["nigeria", "kenya", "south_africa", "egypt"],
-    sectors: ["enterprise_software", "fintech", "clean_energy", "retail_technology"],
+    sectors: [
+      "enterprise_software",
+      "fintech",
+      "clean_energy",
+      "retail_technology",
+    ],
     thesis:
       "Fictional growth fund for Series A and B companies in Africa's four largest tech markets with USD 3m+ ARR, strong retention and a route to profitability.",
     discoveryMode: "balanced",
@@ -127,7 +134,8 @@ export const FICTIONAL_INVESTORS: readonly FictionalInvestor[] = [
     typeOption: "cvc",
     person: {
       displayName: "Rania Haddad-Okoro",
-      headline: "Head of Ventures, Transcoastal Telecom (fictional demo investor)",
+      headline:
+        "Head of Ventures, Transcoastal Telecom (fictional demo investor)",
       businessTitle: "Head of Ventures",
     },
     stages: ["seed", "series_a"],
@@ -154,7 +162,12 @@ export const FICTIONAL_INVESTORS: readonly FictionalInvestor[] = [
     cheque: { min: "150000", typical: "400000", max: "750000" },
     roles: ["lead", "co_invest"],
     geographies: ["east_africa", "kenya"],
-    sectors: ["agritech", "clean_energy", "digital_health", "enterprise_software"],
+    sectors: [
+      "agritech",
+      "clean_energy",
+      "digital_health",
+      "enterprise_software",
+    ],
     thesis:
       "Fictional East African seed fund for founders solving everyday infrastructure gaps — water, energy, food and health — with hardware-light models where possible.",
     discoveryMode: "balanced",
@@ -162,12 +175,44 @@ export const FICTIONAL_INVESTORS: readonly FictionalInvestor[] = [
 ];
 
 export const FICTIONAL_INTERESTS: readonly FictionalInterest[] = [
-  { investorKey: "savanna-seed", companyKey: "ledgerfold", founderAnswer: "accept" },
-  { investorKey: "equator-line", companyKey: "tarmacly", founderAnswer: "accept" },
-  { investorKey: "pacdf", companyKey: "marketlight-grids", founderAnswer: "pending" },
-  { investorKey: "tidewater-growth", companyKey: "tallyloom", founderAnswer: "accept" },
-  { investorKey: "lagoon-angels", companyKey: "ajopot", founderAnswer: "decline" },
-  { investorKey: "rift-valley-seed", companyKey: "maji-loop", founderAnswer: "pending" },
-  { investorKey: "transcoastal-ventures", companyKey: "souqsheet", founderAnswer: "accept" },
-  { investorKey: "chidi-nwosu-angel", companyKey: "yamfield-agro", founderAnswer: "pending" },
+  {
+    investorKey: "savanna-seed",
+    companyKey: "ledgerfold",
+    founderAnswer: "accept",
+  },
+  {
+    investorKey: "equator-line",
+    companyKey: "tarmacly",
+    founderAnswer: "accept",
+  },
+  {
+    investorKey: "pacdf",
+    companyKey: "marketlight-grids",
+    founderAnswer: "pending",
+  },
+  {
+    investorKey: "tidewater-growth",
+    companyKey: "tallyloom",
+    founderAnswer: "accept",
+  },
+  {
+    investorKey: "lagoon-angels",
+    companyKey: "ajopot",
+    founderAnswer: "decline",
+  },
+  {
+    investorKey: "rift-valley-seed",
+    companyKey: "maji-loop",
+    founderAnswer: "pending",
+  },
+  {
+    investorKey: "transcoastal-ventures",
+    companyKey: "souqsheet",
+    founderAnswer: "accept",
+  },
+  {
+    investorKey: "chidi-nwosu-angel",
+    companyKey: "yamfield-agro",
+    founderAnswer: "pending",
+  },
 ];
