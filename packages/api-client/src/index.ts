@@ -187,3 +187,9 @@ export {
   getCompanyVerification,
   requestCompanyVerification,
 } from "./verification.js";
+export {
+  getAudiencePreview,
+  getVisibilityState,
+  revokeVisibilityShare,
+  shareWithRelationship,
+} from "./visibility.js";

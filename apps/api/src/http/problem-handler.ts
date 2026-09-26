@@ -40,6 +40,10 @@ import {
   InterestNotFoundError,
   InterestNotPermittedError,
 } from "@capital-q/network";
+import {
+  DisclosurePolicyNotFoundError,
+  DisclosureResourceNotFoundError,
+} from "@capital-q/permissions";
 import type { Logger } from "@capital-q/observability";
 import {
   OrganisationCreationConflictError,
@@ -304,7 +308,10 @@ function toProblem(
     // Absent and not-visible are one answer (CQ-NET-010).
     error instanceof InterestCompanyNotFoundError ||
     // Absent, withdrawn and another company's are one answer (CQ-NET-011).
-    error instanceof InterestNotFoundError
+    error instanceof InterestNotFoundError ||
+    // A share that is not on this company's own objects (CQ-BIZ-003).
+    error instanceof DisclosurePolicyNotFoundError ||
+    error instanceof DisclosureResourceNotFoundError
   ) {
     return createProblemDetails({ code: "RESOURCE_NOT_FOUND", requestId });
   }

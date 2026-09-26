@@ -61,8 +61,10 @@ import {
   createDefaultDisclosureResolvers,
   createDisclosureAccessService,
   createDisclosureResourceResolverRegistry,
+  createPermissionsService,
   createPostgresDisclosurePolicyRepository,
   createRelationshipPartyResolver,
+  createVisibilityCentre,
   systemDisclosureClock,
 } from "@capital-q/permissions";
 import {
@@ -735,6 +737,41 @@ const discoverablePitches = createPostgresDiscoverablePitchQueryPort({
   sql: database.sql,
 });
 
+/**
+ * The visibility control centre (CQ-BIZ-003). The same disclosure layer
+ * the reads above use, plus its policy manager for shares and revokes;
+ * the company's relationships are the Network context's own list for the
+ * company's side, so a private discovery is never one of them.
+ */
+const permissions = createPermissionsService({
+  sql: database.sql,
+  transactions: database.transactions,
+  authorization,
+  outbox,
+  audit,
+  resolvers: createDisclosureResourceResolverRegistry(
+    createDefaultDisclosureResolvers(disclosurePorts),
+  ),
+  relationshipParties: createRelationshipPartyResolver(disclosurePorts),
+});
+const visibility = createVisibilityCentre({
+  access: permissions.access,
+  inspect: permissions.inspectResourceDisclosure,
+  policies: permissions.policies,
+  authorization,
+  companies: disclosurePorts.companies,
+  capital: disclosurePorts.capital,
+  relationshipParties: createRelationshipPartyResolver(disclosurePorts),
+  relationshipsOf: async (actor, companyId) =>
+    (await interests.listRelationshipsForCompany({ actor, companyId })).map(
+      (listing) => ({
+        relationshipId: listing.relationship.id,
+        investorOrganisationId: listing.relationship.investorOrganisationId,
+        name: listing.counterpartName,
+      }),
+    ),
+});
+
 const { app, logger } = createApp(config, security, {
   organisations,
   companies,
@@ -763,6 +800,7 @@ const { app, logger } = createApp(config, security, {
   evidence,
   media,
   verification,
+  visibility,
 });
 
 app.addHook("onClose", async () => {

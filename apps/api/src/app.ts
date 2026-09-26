@@ -34,6 +34,10 @@ import {
   type NetworkInterestRoutesDependencies,
 } from "./http/network-interests.js";
 import {
+  registerVisibilityRoutes,
+  type VisibilityRoutesDependencies,
+} from "./http/visibility.js";
+import {
   registerRecommendationInteractionRoutes,
   type RecommendationInteractionRoutesDependencies,
 } from "./http/recommendation-interactions.js";
@@ -134,6 +138,8 @@ export type ApiModules = {
   /** CQ-VERIFY-001: a founder asks and reads; nothing here decides. */
   readonly verification?:
     VerificationRoutesDependencies["verification"] | undefined;
+  /** CQ-BIZ-003: the visibility control centre. */
+  readonly visibility?: VisibilityRoutesDependencies["visibility"] | undefined;
 };
 
 /**
@@ -350,6 +356,14 @@ export function createApp(
       authenticator: security.authenticator,
       resolver: security.resolver,
       verification: modules.verification,
+    });
+  }
+
+  if (modules.visibility !== undefined) {
+    registerVisibilityRoutes(app, {
+      authenticator: security.authenticator,
+      resolver: security.resolver,
+      visibility: modules.visibility,
     });
   }
 
