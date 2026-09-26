@@ -36,11 +36,11 @@ export type FeedPlaybackAuthorizations = {
 export function feedPlaybackAuthorizations(
   authorise: AuthorisePlayback,
   options: {
-    /** What the server read for the first card while rendering the page. */
-    readonly seed?: {
+    /** What the server read for the first cards while rendering the page. */
+    readonly seed?: readonly {
       readonly companyId: string;
       readonly authorization: PlaybackAuthorizationDto;
-    } | null;
+    }[];
     readonly now?: () => number;
   } = {},
 ): FeedPlaybackAuthorizations {
@@ -54,8 +54,7 @@ export function feedPlaybackAuthorizations(
   const keyOf = (companyId: string, mediaAssetId: string) =>
     `${companyId}\u0000${mediaAssetId}`;
 
-  const seed = options.seed ?? null;
-  if (seed !== null) {
+  for (const seed of options.seed ?? []) {
     held.set(
       keyOf(seed.companyId, seed.authorization.mediaAssetId),
       seed.authorization,

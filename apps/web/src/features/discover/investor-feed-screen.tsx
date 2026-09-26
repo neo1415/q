@@ -247,6 +247,11 @@ function subscribeVisibility(onChange: () => void): () => void {
 export type InvestorFeedInitial = {
   readonly slate: DiscoveryCompanySlateDto;
   readonly authorization: PlaybackAuthorizationDto | null;
+  /** The first cards' grants, read in parallel on the server. */
+  readonly warm?: readonly {
+    readonly companyId: string;
+    readonly authorization: PlaybackAuthorizationDto;
+  }[];
 };
 
 export function InvestorFeedScreen({
@@ -271,10 +276,17 @@ export function InvestorFeedScreen({
   const firstCompanyId = initial?.slate.items[0]?.companyId ?? null;
   const [authorizations] = useState<FeedPlaybackAuthorizations>(() =>
     feedPlaybackAuthorizations(authorisePlaybackViaAction, {
-      seed:
-        initialAuthorization === null || firstCompanyId === null
-          ? null
-          : { companyId: firstCompanyId, authorization: initialAuthorization },
+      seed: [
+        ...(initial?.warm ?? []),
+        ...(initialAuthorization === null || firstCompanyId === null
+          ? []
+          : [
+              {
+                companyId: firstCompanyId,
+                authorization: initialAuthorization,
+              },
+            ]),
+      ],
     }),
   );
 

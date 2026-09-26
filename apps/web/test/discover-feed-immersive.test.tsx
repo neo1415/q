@@ -514,3 +514,36 @@ describe("Q watches the pitch with the person", () => {
     expect(pause).not.toHaveBeenCalled();
   });
 });
+
+describe("the first cards' grants from the server", () => {
+  it("asks nothing on the client for cards the server already authorised", async () => {
+    const page = slate([1, 2, 3, 4, 5]).value;
+    const warm = [1, 2, 3].map((n) => ({
+      companyId: companyId(n),
+      authorization: grantFor(assetId(n)),
+    }));
+    const { container } = render(
+      <InvestorFeedScreen
+        initial={{
+          slate: page,
+          authorization: grantFor(assetId(1)),
+          warm,
+        }}
+      />,
+    );
+    await waitFor(() =>
+      expect(
+        container
+          .querySelector('video[aria-label="Pitch from Company 2"]')
+          ?.getAttribute("poster"),
+      ).toBe(`https://cdn.test/${assetId(2)}/poster.jpg`),
+    );
+    await waitFor(() =>
+      expect(
+        container.querySelector(`img[data-poster-warm="${companyId(3)}"]`),
+      ).not.toBeNull(),
+    );
+    expect(authorisePlaybackAction).not.toHaveBeenCalled();
+    expect(loadSlatePageAction).not.toHaveBeenCalled();
+  });
+});

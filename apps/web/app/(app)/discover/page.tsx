@@ -91,15 +91,40 @@ export default async function DiscoverPage() {
       before; neither is fatal to the page.
     */
     const slate = await discoverCompanies(session, {}).catch(() => null);
+    /*
+     * The cards the preload window can reach first (spec §9.5: active, the
+     * next one buffering, the one after a poster) are authorised here, in
+     * parallel, under the same session. On the client each of those asks
+     * is a server action, and Next.js runs a page's actions one at a time:
+     * measured on the local stack, the next card's startup buffer began
+     * about four seconds after hydration, queued behind the others. An
+     * authorization is a short metadata call, never media; nothing here is
+     * fetched from the CDN except the first poster, below.
+     */
+    const reach = (slate?.items ?? []).slice(0, 3);
+    const grants = await Promise.all(
+      reach.map((item) =>
+        item.pitch === null
+          ? Promise.resolve(null)
+          : authorisePitchPlayback(
+              session,
+              item.companyId,
+              item.pitch.mediaAssetId,
+            )
+              .then((authorization) => ({
+                companyId: item.companyId,
+                authorization,
+              }))
+              .catch(() => null),
+      ),
+    );
+    const warm = grants.filter((grant) => grant !== null);
     const first = slate?.items[0];
     const authorization =
-      first?.pitch == null
+      first === undefined
         ? null
-        : await authorisePitchPlayback(
-            session,
-            first.companyId,
-            first.pitch.mediaAssetId,
-          ).catch(() => null);
+        : (warm.find((grant) => grant.companyId === first.companyId)
+            ?.authorization ?? null);
     if (authorization?.posterUrl != null) {
       // The poster is on the CDN; the browser should ask for it before it
       // has parsed the rest of the page.
@@ -112,7 +137,7 @@ export default async function DiscoverPage() {
       <>
         <h1 className="sr-only">Discover</h1>
         <InvestorFeedScreen
-          initial={slate === null ? null : { slate, authorization }}
+          initial={slate === null ? null : { slate, authorization, warm }}
         />
       </>
     );

@@ -105,7 +105,7 @@ describe("feed playback authorizations", () => {
     const authorise = vi.fn();
     const seeded = grant("asset-1", 10, "ssr");
     const cache = feedPlaybackAuthorizations(authorise, {
-      seed: { companyId: "company-1", authorization: seeded },
+      seed: [{ companyId: "company-1", authorization: seeded }],
       now: () => NOW,
     });
 
