@@ -151,7 +151,7 @@ export function registerQCardRoutes(
    */
   app.get(`${PUBLIC_HANDLES_PATH}/:handle`, async (request, reply) => {
     const raw = (request.params as { handle?: string }).handle ?? "";
-    let participant = false;
+    let participant: boolean;
     try {
       const principal = await dependencies.authenticator.authenticate(request);
       participant =
