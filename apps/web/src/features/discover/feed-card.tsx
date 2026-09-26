@@ -296,13 +296,16 @@ export function FeedCard({
         <Link
           href={`/company/${company.companyId}`}
           className={buttonClassName("quiet", "regular", "cq-feed-rail-button")}
+          // One word fits the rail's column; the name keeps the verb and
+          // still contains the visible label (WCAG 2.5.3).
+          aria-label="Open company"
         >
           <Building2
             aria-hidden="true"
             size={ICON_SIZE.prominent}
             strokeWidth={ICON_STROKE}
           />
-          <span className="cq-feed-rail-label">Open company</span>
+          <span className="cq-feed-rail-label">Company</span>
         </Link>
       </div>
 

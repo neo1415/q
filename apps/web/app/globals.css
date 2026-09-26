@@ -708,6 +708,7 @@
     text-shadow: 0 1px 2px var(--cq-stage-canvas);
   }
   .cq-feed-rail-button > svg {
+    flex: none;
     filter: drop-shadow(0 1px 1px var(--cq-stage-canvas));
   }
   /* A landscape pitch is shown whole on the portrait stage, never cropped
