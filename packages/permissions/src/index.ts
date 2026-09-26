@@ -159,3 +159,8 @@ export {
 export { createPostgresDisclosurePolicyRepository } from "./infrastructure/postgres-disclosure-policy-repository.js";
 
 export const PACKAGE_NAME = "@capital-q/permissions" as const;
+export {
+  createVisibilityCentre,
+  type VisibilityCentre,
+  type VisibilityCentrePorts,
+} from "./application/visibility-centre.js";
