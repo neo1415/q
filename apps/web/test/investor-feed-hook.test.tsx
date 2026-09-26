@@ -407,4 +407,37 @@ describe("the feed controller over the discovery endpoint", () => {
 
     expect(result.current.activeCompanyId).toBe(companyId(2));
   });
+
+  it("starts from a first page the server already read, without asking again", async () => {
+    const { session, calls } = apiDouble();
+    const seed = {
+      slateId: SLATE_ID,
+      rankingVersion: "declared.v1",
+      items: [company(1), company(2)],
+      notes: [],
+      nextCursor: "cursor-2",
+    };
+    const { result } = renderHook(() =>
+      useInvestorFeed({
+        transport: transportFor(session),
+        positionStore: memoryStore(),
+        newClientEventId,
+        loadMoreThreshold: 0,
+        initialSlate: seed,
+      }),
+    );
+
+    // Ready on the very first render: that is what lets the first poster
+    // be in the server's HTML.
+    expect(result.current.state.status).toBe("READY");
+    expect(result.current.activeCompanyId).toBe(companyId(1));
+    expect(result.current.prefetch.policyByCompanyId[companyId(1)]).toBe(
+      "ACTIVE",
+    );
+
+    // The seeded page is not fetched again; the cursor after it still is.
+    act(() => result.current.next());
+    await waitFor(() => expect(result.current.state.items).toHaveLength(4));
+    expect(calls.filter((call) => call.method === "GET")).toHaveLength(1);
+  });
 });

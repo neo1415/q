@@ -1,7 +1,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
-import { discoverInvestors } from "@capital-q/api-client";
+import { preload } from "react-dom";
+
+import {
+  authorisePitchPlayback,
+  discoverCompanies,
+  discoverInvestors,
+} from "@capital-q/api-client";
 import { buttonClassName } from "@capital-q/ui/button";
 import { EmptyState } from "@capital-q/ui/states";
 
@@ -77,17 +83,37 @@ export default async function DiscoverPage() {
   if (context.kind === "INVESTOR") {
     /*
       An investor gets the feed: one card at a time, one player, position
-      kept across a visit to a company. The slate is not fetched here --
-      the controller owns loading so that paging, position and the preload
-      budget have a single owner (CQ-WEB-020/021).
+      kept across a visit to a company. The first page is read here, under
+      the person's own session, only so the first poster can be in the
+      HTML and be the page's LCP (spec §9.5). The controller is seeded with
+      it and owns every page after, the position and the preload budget
+      (CQ-WEB-020/021). Either read failing just means the client loads as
+      before; neither is fatal to the page.
     */
+    const slate = await discoverCompanies(session, {}).catch(() => null);
+    const first = slate?.items[0];
+    const authorization =
+      first?.pitch == null
+        ? null
+        : await authorisePitchPlayback(
+            session,
+            first.companyId,
+            first.pitch.mediaAssetId,
+          ).catch(() => null);
+    if (authorization?.posterUrl != null) {
+      // The poster is on the CDN; the browser should ask for it before it
+      // has parsed the rest of the page.
+      preload(authorization.posterUrl, { as: "image", fetchPriority: "high" });
+    }
     // The feed is immersive (spec §9; ADR 0017 C4/C5): the stage is the
     // page, so it takes the whole workspace rather than a reading column.
     // The heading is kept for assistive technology and the tab title.
     return (
       <>
         <h1 className="sr-only">Discover</h1>
-        <InvestorFeedScreen />
+        <InvestorFeedScreen
+          initial={slate === null ? null : { slate, authorization }}
+        />
       </>
     );
   }
