@@ -54,6 +54,7 @@ export type {
   InvestorFeedPort,
   QToolPorts,
   RelationshipIntelligencePort,
+  VisibilityIntelligencePort,
 } from "./ports.js";
 export {
   createRelationshipTools,
@@ -67,6 +68,13 @@ export {
   ProposalOutputSchema,
   type GetRelationshipOutput,
 } from "./tools/relationships.js";
+export {
+  GET_DISCLOSURE_STATE,
+  GetDisclosureStateOutputSchema,
+  PROPOSE_REVOKE_SHARE,
+  PROPOSE_SHARE_RAISE,
+  type GetDisclosureStateOutput,
+} from "./tools/visibility.js";
 export {
   createQToolRegistry,
   inputJsonSchemaOf,

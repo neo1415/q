@@ -15,6 +15,7 @@ import { createDiscoverySlateTool } from "./tools/discovery-slate.js";
 import { createFindProspectiveInvestorsTool } from "./tools/find-prospective-investors.js";
 import { createRecommendationExplanationTool } from "./tools/recommendation-explanation.js";
 import { createRelationshipTools } from "./tools/relationships.js";
+import { createVisibilityTools } from "./tools/visibility.js";
 import { createSearchCompaniesTool } from "./tools/search-companies.js";
 
 /**
@@ -52,6 +53,10 @@ export function createDefaultQTools(
     ...(ports.relationships === undefined
       ? []
       : createRelationshipTools(ports, ports.relationships)),
+    // CQ-BIZ-003: who can see what, and sharing, prepared for approval.
+    ...(ports.visibility === undefined
+      ? []
+      : createVisibilityTools(ports.visibility)),
   ];
 }
 

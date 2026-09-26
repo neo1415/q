@@ -11,6 +11,7 @@ import type {
 import type {
   IncomingInterestDto,
   RelationshipStatusDto,
+  VisibilityStateDto,
 } from "@capital-q/contracts";
 import type { DisclosureAccessService } from "@capital-q/permissions";
 import type {
@@ -124,6 +125,28 @@ export type RelationshipIntelligencePort = {
 };
 
 /**
+ * Who can see what of the person's own company (CQ-BIZ-003), through the
+ * permissions context's visibility centre -- the same answers as the
+ * visibility page. The two proposal tools write one thing: a note to this
+ * run's Approval Engine proposer. Sharing and revoking run only as the
+ * approved action, through the same centre, under the approver.
+ */
+export type VisibilityIntelligencePort = {
+  /** Throws for anyone but the company's own organisation with disclosure.inspect. */
+  readonly state: (
+    actor: ActorContext,
+    companyId: string,
+  ) => Promise<VisibilityStateDto>;
+  readonly prepareForApproval: (entry: {
+    readonly runId: string;
+    readonly tenantId: string;
+    readonly actorUserId: string;
+    readonly actionType: "disclosure.raise.share" | "disclosure.share.revoke";
+    readonly payload: Readonly<Record<string, string>>;
+  }) => "PREPARED" | "ONE_PER_TURN";
+};
+
+/**
  * Everything the Safe Read tools may reach: the owning contexts' public
  * query ports and the two deterministic authorities. No executor, no
  * connection, no credential — a tool cannot compose a statement, only
@@ -164,4 +187,6 @@ export type QToolPorts = {
   readonly profiles?: PublicProfileLookupProvider | undefined;
   /** Relationships (CQ-Q-030); absent means no relationship tool exists. */
   readonly relationships?: RelationshipIntelligencePort | undefined;
+  /** Who can see what (CQ-BIZ-003); absent means no visibility tool exists. */
+  readonly visibility?: VisibilityIntelligencePort | undefined;
 };
