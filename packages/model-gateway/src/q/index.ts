@@ -73,6 +73,7 @@ import type { ModelGateway, ModelGatewayExecuteOptions } from "../gateway.js";
 import { acceptStructuredOutput } from "../policy/structured.js";
 import { withoutActionTalk } from "./action-talk.js";
 import { ownProfileFact } from "./own-profile.js";
+import { pitchMomentFact } from "./pitch-moment-fact.js";
 import { relationshipFact } from "./relationship-fact.js";
 import {
   ownOnboardingFacts,
@@ -1206,6 +1207,33 @@ export function createModelGatewayQAnswer(
         took("relationship");
       }
       /**
+       * Where the person is in the pitch they are watching, and what is
+       * said there (R18). Only when the plan carries the viewing moment --
+       * the Q API authorised that pitch for this person and the firewall
+       * bound its company -- and read through get_pitch_moment itself, so
+       * the media context applies the playback rule once more. A refusal
+       * adds nothing; no transcript adds a fact that says so.
+       */
+      let pitchMoment: AuthorisedFact | null = null;
+      if (plan.viewing !== undefined && offeredByName.has("get_pitch_moment")) {
+        const outcome = await tools.execute(
+          {
+            callId: "q-pitch-moment",
+            name: "get_pitch_moment",
+            arguments: {
+              pitchId: plan.viewing.mediaAssetId,
+              atSeconds: plan.viewing.positionSeconds,
+              windowSeconds: 20,
+            },
+          },
+          toolContext,
+        );
+        if (outcome.result.ok) {
+          pitchMoment = pitchMomentFact(outcome.result.data, null);
+        }
+        took("pitch-moment");
+      }
+      /**
        * Who they are, from their own setup (CQ-QX-007): their name, the
        * role they gave, and how far along they are. Only when the firewall
        * granted OWN_ONBOARDING, which it grants to nobody but the person;
@@ -1235,6 +1263,7 @@ export function createModelGatewayQAnswer(
         ...onboardingFacts,
         ...(ownProfile === null ? [] : [ownProfile]),
         ...(relationship === null ? [] : [relationship]),
+        ...(pitchMoment === null ? [] : [pitchMoment]),
         ...assembled.facts,
       ];
 

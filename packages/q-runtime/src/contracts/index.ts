@@ -26,6 +26,7 @@ import {
   type UtcTimestamp,
   type QResultBlock,
 } from "@capital-q/contracts";
+import type { QViewingMoment } from "@capital-q/contracts";
 import type { OrganisationId, TenantId, UserId } from "@capital-q/security";
 
 /**
@@ -99,6 +100,11 @@ export type QRunRecord = {
   readonly consequenceClass: QConsequenceClass;
   readonly status: QRunStatus;
   readonly subjects: readonly QSubjectRef[];
+  /**
+   * R18: the pitch moment the person was viewing, only when the Q API
+   * authorised it for them at creation; null (or absent) otherwise.
+   */
+  readonly viewing?: QViewingMoment | null | undefined;
   /** NULL until the orchestrator, prompt registry and model policy exist. */
   readonly orchestrationVersion: string | null;
   readonly promptBundleVersion: string | null;
@@ -123,6 +129,8 @@ export type NewQRun = {
   readonly capability: QCapability;
   readonly consequenceClass: QConsequenceClass;
   readonly subjects: readonly QSubjectRef[];
+  /** R18: already authorised for the actor; never a client's word. */
+  readonly viewing?: QViewingMoment | null | undefined;
   readonly correlationId: CorrelationId;
 };
 

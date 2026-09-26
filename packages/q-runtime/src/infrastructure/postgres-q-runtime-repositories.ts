@@ -13,6 +13,7 @@ import {
   QStreamEventIdSchema,
   QStreamEventTypeSchema,
   QSubjectRefsSchema,
+  QViewingMomentSchema,
   QVisibleStageSchema,
   UtcTimestampSchema,
   QResultBlocksSchema,
@@ -104,6 +105,7 @@ const RunRow = z.object({
   consequence_class: QConsequenceClassSchema,
   status: QRunStatusSchema,
   subject_refs: QSubjectRefsSchema,
+  viewing: QViewingMomentSchema.nullable(),
   orchestration_version: z.string().nullable(),
   prompt_bundle_version: z.string().nullable(),
   model_policy_version: z.string().nullable(),
@@ -129,6 +131,7 @@ function toRun(row: unknown): QRunRecord {
     consequenceClass: r.consequence_class,
     status: r.status,
     subjects: r.subject_refs,
+    viewing: r.viewing,
     orchestrationVersion: r.orchestration_version,
     promptBundleVersion: r.prompt_bundle_version,
     modelPolicyVersion: r.model_policy_version,
@@ -221,7 +224,7 @@ function selectRun(executor: DatabaseExecutor) {
   return executor`
     select r.id, r.tenant_id, r.actor_user_id, r.actor_organisation_id,
            r.conversation_id, r.objective, r.capability, r.consequence_class,
-           r.status, r.subject_refs, r.orchestration_version,
+           r.status, r.subject_refs, r.viewing, r.orchestration_version,
            r.prompt_bundle_version, r.model_policy_version, r.correlation_id,
            r.created_at, r.started_at, r.completed_at, r.failure_code,
            r.version, r.last_event_sequence
@@ -365,10 +368,12 @@ export function createPostgresQRuntimeRepositories(): QRuntimeRepositories {
         const rows = await tx.sql`
           insert into q_runtime.runs
             (tenant_id, actor_user_id, actor_organisation_id, conversation_id,
-             objective, capability, consequence_class, subject_refs, correlation_id)
+             objective, capability, consequence_class, subject_refs, viewing,
+             correlation_id)
           values (${input.tenantId}, ${input.actorUserId}, ${input.actorOrganisationId},
                   ${input.conversationId}, ${input.objective}, ${input.capability},
                   ${input.consequenceClass}, ${JSON.stringify(input.subjects)}::text::jsonb,
+                  ${input.viewing == null ? null : JSON.stringify(input.viewing)}::text::jsonb,
                   ${input.correlationId})
           returning id`;
         const { id } = IdRow.parse(rows[0]);

@@ -177,6 +177,9 @@ importers:
       '@capital-q/investors':
         specifier: workspace:*
         version: link:../../packages/investors
+      '@capital-q/media':
+        specifier: workspace:*
+        version: link:../../packages/media
       '@capital-q/model-gateway':
         specifier: workspace:*
         version: link:../../packages/model-gateway

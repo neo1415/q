@@ -29,12 +29,22 @@ import { createPostgresCapitalObjectiveQueryPort } from "@capital-q/capital";
 import {
   CompanyIdSchema,
   createCompanyService,
+  createPostgresCompanyMarketplaceQueryPort,
   createPostgresCompanyQueryPort,
 } from "@capital-q/companies";
+import {
+  createCompanyMediaOwnerResolver,
+  createMediaOwnerResolverRegistry,
+  createMediaService,
+  cuesAround,
+  MediaAssetIdSchema,
+} from "@capital-q/media";
+import { MEDIA_EVENTS } from "@capital-q/media/events";
 import { COMPANY_EVENTS } from "@capital-q/companies/events";
 import {
   createEventRegistry,
   type ModelDataPosture,
+  type QViewingMoment,
 } from "@capital-q/contracts";
 import { createRequestDatabaseClient } from "@capital-q/database";
 import { createOutboxWriter } from "@capital-q/eventing";
@@ -377,6 +387,21 @@ const runtimeDependencies = {
   logger,
   // An investor asking about a company carries their own firm as context,
   // resolved from their membership on the server (CQ-QX-007).
+  // R18: what the person was viewing is kept on a run only when the media
+  // context says they may play that pitch now (the playback rule, which
+  // includes the company's visibility to them). Composed below.
+  viewing: {
+    authorise: (actor: ActorContext, viewing: QViewingMoment) => {
+      const mediaAssetId = MediaAssetIdSchema.safeParse(viewing.mediaAssetId);
+      return mediaAssetId.success
+        ? pitchMedia.mayPlayPitch({
+            actor,
+            companyId: viewing.companyId,
+            mediaAssetId: mediaAssetId.data,
+          })
+        : Promise.resolve(false);
+    },
+  },
   ownInvestorOrganisation: async (actor: ActorContext) => {
     if (actor.organisationId === undefined) return null;
     const found = await ownInvestorOrganisations.findByOrganisation(
@@ -603,6 +628,69 @@ const slateRead = createSlateReadPipeline({
   disclosure,
   logger,
 });
+
+/**
+ * Pitch media for Q (R18: "Q watches the video with us"): the Media
+ * context composed as the application API composes it, with the same
+ * viewer rule -- the feed's own REC-001 eligibility -- so Q can read a
+ * pitch's transcript exactly when the person could play the pitch, and
+ * never otherwise. Q never syncs, uploads or plays anything; it reads.
+ */
+const pitchMarketplaceFacts = createPostgresCompanyMarketplaceQueryPort({
+  sql: database.sql,
+});
+const pitchMedia = createMediaService({
+  sql: database.sql,
+  transactions: database.transactions,
+  authorization,
+  owners: createMediaOwnerResolverRegistry([
+    createCompanyMediaOwnerResolver(companies),
+  ]),
+  outbox: createOutboxWriter({ registry: createEventRegistry(MEDIA_EVENTS) }),
+  audit: createPostgresMaterialActionAuditWriter(),
+  viewers: {
+    resolveViewableCompany: async (actor, companyId) => {
+      const investor =
+        await slateRead.eligibilityPorts.investorSubject.investorOrganisationFor(
+          actor,
+        );
+      if (investor === null) return null;
+      const mandate = await slateRead.eligibilityPorts.mandates.activeMandate({
+        tenantId: actor.tenantId,
+        investorOrganisationId: investor.investorOrganisationId,
+        mandateId: null,
+      });
+      if (mandate.kind !== "FOUND" || mandate.mandate.status !== "ACTIVE") {
+        return null;
+      }
+      const parsed = CompanyIdSchema.safeParse(companyId);
+      if (!parsed.success) return null;
+      const evaluation = await slateRead.eligibility.evaluate({
+        actor,
+        mode: "INVESTOR_DISCOVER",
+        mandateId: mandate.mandate.mandateId,
+        companyIds: [parsed.data],
+      });
+      if (
+        !evaluation.results.some(
+          (result) =>
+            result.companyId === parsed.data && result.decision === "ELIGIBLE",
+        )
+      ) {
+        return null;
+      }
+      const [facts] = await pitchMarketplaceFacts.findCanonicalMarketplaceFacts(
+        [parsed.data],
+      );
+      return facts === undefined
+        ? null
+        : {
+            tenantId: facts.tenantId,
+            ownerOrganisationId: facts.organisationId,
+          };
+    },
+  },
+});
 const recommendationExplanations = createRecommendationExplanationService({
   ports: slateRead.eligibilityPorts,
   slates: slateRead.slates,
@@ -791,6 +879,23 @@ const qTools = createQTools({
       interests: interestService,
       board: relationshipBoard,
     }),
+    // R18: what is said in the pitch around a moment, under the playback rule.
+    pitchMoments: {
+      momentAround: async (actor, query) => {
+        const mediaAssetId = MediaAssetIdSchema.safeParse(query.pitchId);
+        if (!mediaAssetId.success) return null;
+        const view = await pitchMedia
+          .getPitchTranscriptByPitch({ actor, mediaAssetId: mediaAssetId.data })
+          .catch(() => null);
+        if (view === null) return null;
+        return view.status === "AVAILABLE"
+          ? {
+              status: "AVAILABLE",
+              cues: cuesAround(view.cues, query.atMs, query.windowMs),
+            }
+          : { status: view.status };
+      },
+    },
     // BIZ-002: every profile field the page edits, Q can prepare.
     profileChanges: profileChangeBoard,
     visibility: {

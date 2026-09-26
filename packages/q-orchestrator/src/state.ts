@@ -11,6 +11,7 @@ import {
   QRunIdSchema,
   QSensitivityClassSchema,
   QSubjectRefsSchema,
+  QViewingMomentSchema,
   QTaskClassSchema,
   UtcTimestampSchema,
   UuidSchema,
@@ -94,6 +95,8 @@ export const QGraphStateSchema = z
     conversationId: QConversationIdSchema.nullable(),
     capability: QCapabilitySchema,
     subjects: QSubjectRefsSchema.readonly(),
+    /** R18: the run's authorised viewing moment; null for most runs and older checkpoints. */
+    viewing: QViewingMomentSchema.nullable().default(null),
     orchestrationVersion: z.string().min(1).max(64),
     correlationId: CorrelationIdSchema,
     /** Set by the nodes as they complete; null until then. */
@@ -130,6 +133,7 @@ export const QGraphAnnotation = Annotation.Root({
   conversationId: Annotation<QGraphState["conversationId"]>,
   capability: Annotation<QGraphState["capability"]>,
   subjects: Annotation<QGraphState["subjects"]>,
+  viewing: Annotation<QGraphState["viewing"]>,
   orchestrationVersion: Annotation<QGraphState["orchestrationVersion"]>,
   correlationId: Annotation<QGraphState["correlationId"]>,
   preflight: Annotation<QGraphState["preflight"]>,

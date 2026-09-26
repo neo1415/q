@@ -352,6 +352,7 @@ export function createLangGraphQOrchestrator(
         actorMembershipId: input.actor.membershipId ?? null,
         capability: run.capability,
         subjects: run.subjects,
+        viewing: run.viewing ?? null,
         orchestrationVersion: Q_ORCHESTRATION_VERSION,
         correlationId: run.correlationId,
         preflight: null,

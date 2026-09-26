@@ -1,6 +1,7 @@
 import type { SecurityEventWriter } from "@capital-q/audit";
 import type { DatabaseExecutor, TransactionManager } from "@capital-q/database";
 import type { Logger } from "@capital-q/observability";
+import type { QViewingMoment } from "@capital-q/contracts";
 import type { ActorContext } from "@capital-q/security";
 
 import type { QSubjectResolverRegistry } from "../domain/subjects.js";
@@ -35,4 +36,17 @@ export type QRuntimeDependencies = {
    */
   readonly ownInvestorOrganisation?:
     ((actor: ActorContext) => Promise<string | null>) | undefined;
+  /**
+   * R18: may this actor be viewing this pitch moment -- the pitch playback
+   * rule plus the company's visibility, answered by the media context.
+   * Absent: no run carries a viewing moment, whatever the client sent.
+   */
+  readonly viewing?:
+    | {
+        readonly authorise: (
+          actor: ActorContext,
+          viewing: QViewingMoment,
+        ) => Promise<boolean>;
+      }
+    | undefined;
 };

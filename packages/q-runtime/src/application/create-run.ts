@@ -5,6 +5,7 @@ import {
   type CorrelationId,
   type CreateQRunRequest,
   type QSubjectRef,
+  type QViewingMoment,
 } from "@capital-q/contracts";
 import type { ActorContext } from "@capital-q/security";
 
@@ -198,6 +199,34 @@ export function createCreateQRun(dependencies: QRuntimeDependencies) {
       refs = carried;
     }
 
+    // R18: what the person was viewing is a request, never authority. It
+    // is kept only when the media context says this actor may play this
+    // pitch now and the company resolves for them as a subject; otherwise
+    // it is dropped silently, exactly as if it had not been sent.
+    let viewing: QViewingMoment | null = null;
+    if (input.viewing !== undefined && dependencies.viewing !== undefined) {
+      const allowed = await dependencies.viewing
+        .authorise(actor, input.viewing)
+        .catch(() => false);
+      const company: QSubjectRef = {
+        kind: "COMPANY",
+        companyId: input.viewing.companyId,
+      };
+      const named = refs.some(
+        (ref) =>
+          ref.kind === "COMPANY" && ref.companyId === input.viewing?.companyId,
+      );
+      if (
+        allowed &&
+        (named ||
+          (refs.length < Q_SUBJECTS_MAX &&
+            (await subjects.resolve(actor, company)) !== null))
+      ) {
+        viewing = input.viewing;
+        if (!named) refs = [...refs, company];
+      }
+    }
+
     refs = await withOwnInvestorOrganisation(dependencies, actor, refs);
 
     const keyHash = hashRunIdempotencyKey(command.idempotencyKey);
@@ -247,6 +276,7 @@ export function createCreateQRun(dependencies: QRuntimeDependencies) {
         capability: input.capability,
         consequenceClass: consequenceClassFor(input.capability),
         subjects: refs,
+        viewing,
         correlationId: command.correlationId,
       });
 

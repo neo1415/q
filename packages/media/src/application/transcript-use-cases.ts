@@ -1,7 +1,11 @@
 import type { ActorContext, TenantId } from "@capital-q/security";
 
 import type { CaptionState, MediaAssetId } from "../contracts/index.js";
-import { MediaAssetNotFoundError } from "../domain/errors.js";
+import {
+  MediaAssetNotFoundError,
+  MediaOwnerNotFoundError,
+  MediaRuleError,
+} from "../domain/errors.js";
 import { cuesAround, parseWebVtt, type TimedCue } from "../domain/web-vtt.js";
 import type { MediaServiceDependencies } from "./dependencies.js";
 import { createResolvePlayableAsset } from "./upload-use-cases.js";
@@ -206,3 +210,32 @@ export function createGetPitchTranscriptByPitch(
 }
 
 export { cuesAround };
+
+/**
+ * "May this actor play this pitch of this company right now?" as a yes or
+ * no, for a caller that must drop a request rather than fail it -- the Q
+ * API deciding whether a question's viewing moment is real (R18). The
+ * same rule as the playback token; every refusal is simply false.
+ */
+export function createMayPlayPitch(dependencies: MediaServiceDependencies) {
+  const playable = createResolvePlayableAsset(dependencies);
+  return async (query: {
+    readonly actor: ActorContext;
+    readonly companyId: string;
+    readonly mediaAssetId: MediaAssetId;
+  }): Promise<boolean> => {
+    try {
+      await playable(query);
+      return true;
+    } catch (error) {
+      if (
+        error instanceof MediaAssetNotFoundError ||
+        error instanceof MediaOwnerNotFoundError ||
+        error instanceof MediaRuleError
+      ) {
+        return false;
+      }
+      throw error;
+    }
+  };
+}

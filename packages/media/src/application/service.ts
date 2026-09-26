@@ -24,6 +24,7 @@ import {
 import {
   createGetPitchTranscript,
   createGetPitchTranscriptByPitch,
+  createMayPlayPitch,
   createSyncPitchTranscript,
 } from "./transcript-use-cases.js";
 import {
@@ -67,6 +68,8 @@ export type MediaService = {
   readonly getPitchTranscriptByPitch: ReturnType<
     typeof createGetPitchTranscriptByPitch
   >;
+  /** The playback rule as a yes or no (R18: the Q API's viewing check). */
+  readonly mayPlayPitch: ReturnType<typeof createMayPlayPitch>;
   /** Trusted: advance one pitch's transcript a step. Never a browser route. */
   readonly syncPitchTranscript: ReturnType<typeof createSyncPitchTranscript>;
   /**
@@ -143,6 +146,7 @@ export function createMediaService(options: MediaServiceOptions): MediaService {
     getPitchTranscript: createGetPitchTranscript(dependencies),
     getPitchTranscriptByPitch: createGetPitchTranscriptByPitch(dependencies),
     syncPitchTranscript: createSyncPitchTranscript(dependencies),
+    mayPlayPitch: createMayPlayPitch(dependencies),
     applyProviderStatusReport: createApplyProviderStatusReport(dependencies),
     setPitchPlaybackPolicy: createSetPitchPlaybackPolicy(dependencies),
     applyAutomatedModeration: createApplyAutomatedModeration(dependencies),

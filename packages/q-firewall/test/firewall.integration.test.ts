@@ -503,6 +503,49 @@ describe("@capital-q/q-firewall against local PostgreSQL", () => {
     });
   });
 
+  it("R18 viewing: the plan carries the viewed pitch moment only when the company is bound for the asker", async () => {
+    await withWorld(async (world) => {
+      const viewing = {
+        kind: "PITCH_PLAYBACK" as const,
+        companyId: world.companyAlpha,
+        mediaAssetId: randomUUID(),
+        positionSeconds: 102,
+      };
+      // Not visible to the investor yet: no plan binds the company, so no
+      // viewing moment rides along either.
+      const hidden = await world.firewall.plan({
+        ...ask(world.apexAdmin, "ANSWER", [company(world.companyAlpha)]),
+        viewing,
+      });
+      if (hidden.outcome === "AUTHORISED") {
+        expect(hidden.plan.viewing).toBeUndefined();
+      }
+      await makeNetworkVisible(world);
+      const visible = await world.firewall.plan({
+        ...ask(world.apexAdmin, "ANSWER", [company(world.companyAlpha)]),
+        viewing,
+      });
+      expect(visible.outcome).toBe("AUTHORISED");
+      if (visible.outcome !== "AUTHORISED") return;
+      expect(visible.plan.viewing).toEqual(viewing);
+      // A viewing moment for a company not among the subjects is not carried.
+      const elsewhere = await world.firewall.plan({
+        ...ask(world.apexAdmin, "ANSWER", [company(world.companyAlpha)]),
+        viewing: { ...viewing, companyId: randomUUID() },
+      });
+      if (elsewhere.outcome === "AUTHORISED") {
+        expect(elsewhere.plan.viewing).toBeUndefined();
+      }
+      // Without one, nothing.
+      const none = await world.firewall.plan(
+        ask(world.apexAdmin, "ANSWER", [company(world.companyAlpha)]),
+      );
+      if (none.outcome === "AUTHORISED") {
+        expect(none.plan.viewing).toBeUndefined();
+      }
+    });
+  });
+
   it("CQ-QX-007 fit: an investor asking about a company with their own firm alongside gets their own mandate and still nothing founder-private", async () => {
     await withWorld(async (world) => {
       await makeNetworkVisible(world);

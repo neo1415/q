@@ -929,7 +929,11 @@ export function createSpecialistQAnswer(
       subjects: askedSubjects(request.subjects, request.plan),
       question: latest.content,
     };
-    if (!specialist.supports(probe)) {
+    // R18: a question asked while watching a pitch is about the moment in
+    // the video, which the conversational path reads (get_pitch_moment);
+    // the company analysis has no transcript. Decided by the structured
+    // context the Q API authorised, never by the question's words.
+    if (request.plan.viewing !== undefined || !specialist.supports(probe)) {
       return delegate.answer(request);
     }
     const company = request.subjects.find(

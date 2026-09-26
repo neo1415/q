@@ -182,6 +182,7 @@ function fingerprintOf(
     actor: plan.actor,
     purpose: plan.purpose,
     subjects: plan.subjects,
+    viewing: plan.viewing ?? null,
     scopes: [...plan.scopes].sort((a, b) =>
       `${a.kind}:${JSON.stringify(a.subject ?? null)}`.localeCompare(
         `${b.kind}:${JSON.stringify(b.subject ?? null)}`,
@@ -732,6 +733,19 @@ export function createContextFirewall(
       },
       purpose: { capability: request.capability, taskClass },
       subjects: [...request.subjects],
+      // R18: the viewed pitch moment rides on the plan only when the
+      // company it belongs to is bound for this actor; the Q API already
+      // authorised the pitch itself with the playback rule.
+      ...(request.viewing !== undefined &&
+      request.viewing !== null &&
+      permitted.some(
+        (scope) =>
+          scope.kind === "COMPANY_PROFILE" &&
+          scope.subject !== undefined &&
+          scope.filter.companyId === request.viewing?.companyId,
+      )
+        ? { viewing: request.viewing }
+        : {}),
       scopes: permitted,
       denied: denied.slice(0, 64),
       maxSensitivity,

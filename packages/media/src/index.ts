@@ -107,6 +107,7 @@ export {
 export {
   createGetPitchTranscript,
   createGetPitchTranscriptByPitch,
+  createMayPlayPitch,
   createSyncPitchTranscript,
   PITCH_TRANSCRIPT_LANGUAGE,
   type PitchTranscriptView,

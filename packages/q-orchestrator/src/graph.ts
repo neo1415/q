@@ -220,6 +220,7 @@ export function buildQGraph(
       correlationId: state.correlationId,
       capability: state.capability,
       subjects: state.subjects,
+      viewing: state.viewing,
     });
   }
 
