@@ -8,15 +8,17 @@ import {
   PageContainer,
   PageHeader,
 } from "@/components/app-shell/page-container";
-import { PitchUpload } from "@/features/pitch/pitch-upload";
+import { PitchStudio } from "@/features/pitch/pitch-studio";
 import { resolveOwnContext } from "@/features/q/context";
 
-export const metadata: Metadata = { title: "Your pitch" };
+export const metadata: Metadata = { title: "Pitch & media" };
 
 export const dynamic = "force-dynamic";
 
 /**
- * The founder's pitch (CQ-WEB-023; doc 17 §35).
+ * Pitch & media (CQ-WEB-023, VID; doc 17 §35): the founder's one place to
+ * upload, replace, publish, unpublish, preview and withdraw their pitch,
+ * with every earlier version kept in view.
  *
  * The person's own company is resolved on the server from their founder
  * journey; the screen then reads and changes the pitch through the API
@@ -28,11 +30,11 @@ export default async function PitchPage() {
   return (
     <PageContainer>
       <PageHeader
-        title="Your pitch"
+        title="Pitch & media"
         description="A short video investors watch before they read anything else. Portrait, under three minutes, in your own words."
       />
       {context.kind === "FOUNDER" ? (
-        <PitchUpload companyId={context.companyId} />
+        <PitchStudio companyId={context.companyId} />
       ) : context.kind === "NONE" && context.unavailable === true ? (
         // Not known to have no company: Capital Q did not answer.
         <EmptyState

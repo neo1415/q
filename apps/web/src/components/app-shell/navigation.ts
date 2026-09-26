@@ -1,6 +1,6 @@
 import type { ComponentType } from "react";
 
-import { CircleUser, Compass, Landmark } from "@capital-q/ui/icons";
+import { CircleUser, Compass, Landmark, Play } from "@capital-q/ui/icons";
 
 import { QNavIcon } from "./q-nav-icon";
 
@@ -12,7 +12,7 @@ import { QNavIcon } from "./q-nav-icon";
  */
 
 export type NavigationItem = {
-  readonly href: "/home" | "/discover" | "/capital" | "/profile";
+  readonly href: "/home" | "/discover" | "/capital" | "/profile" | "/pitch";
   readonly label: string;
   readonly icon: ComponentType<{
     readonly size?: number;
@@ -32,6 +32,18 @@ export const PROFILE_NAVIGATION: NavigationItem = {
   href: "/profile",
   label: "Profile",
   icon: CircleUser,
+};
+
+/**
+ * A founder's own pitch and its versions (VID). Secondary, not a fourth
+ * primary area: it belongs to the founder's company, so the shell shows it
+ * only in a founder's context, and the server refuses it to anyone else
+ * whatever the navigation shows.
+ */
+export const FOUNDER_MEDIA_NAVIGATION: NavigationItem = {
+  href: "/pitch",
+  label: "Pitch & media",
+  icon: Play,
 };
 
 /** Mobile carries Profile as the fourth and last tab. */

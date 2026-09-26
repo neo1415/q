@@ -26,7 +26,7 @@ export function AppHeader({ context }: { readonly context: ShellContext }) {
             detail={context.label}
             compact
           />
-          <AccountMenu />
+          <AccountMenu founder={context.scope === "founder_private"} />
         </div>
       </div>
     </header>
