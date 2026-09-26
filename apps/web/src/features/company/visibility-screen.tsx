@@ -8,13 +8,13 @@ import type {
   CompanyNetworkPreview,
   MarketplaceReadinessAssessment,
 } from "@capital-q/contracts";
-import { COUNTRY_OPTIONS, STAGE_OPTIONS } from "@capital-q/founder-onboarding";
 import { Badge } from "@capital-q/ui/badge";
 import { Button, buttonClassName } from "@capital-q/ui/button";
 import { ContextIndicator } from "@capital-q/ui/context-indicator";
 import { Eye, ICON_SIZE, ICON_STROKE, Lock } from "@capital-q/ui/icons";
 import { InlineNotice, Skeleton } from "@capital-q/ui/states";
 
+import { VisibilityCentre } from "./visibility-centre";
 import {
   assessMarketplaceReadinessAction,
   loadVisibilityOverviewAction,
@@ -42,27 +42,6 @@ type Loaded = {
   readonly preview: CompanyNetworkPreview;
   readonly readiness: MarketplaceReadinessAssessment | null;
 };
-
-// The labels investors read come from the same definition the founder
-// answered against, so a code never reaches the screen as a code.
-const STAGE_LABELS: ReadonlyMap<string, string> = new Map(
-  STAGE_OPTIONS.map((option) => [option.optionKey, option.label]),
-);
-const COUNTRY_LABELS: ReadonlyMap<string, string> = new Map(
-  COUNTRY_OPTIONS.map((option) => [option.optionKey, option.label]),
-);
-
-function stageLabel(code: string | null): string | null {
-  return code === null
-    ? null
-    : (STAGE_LABELS.get(code) ?? code.replace(/_/g, " "));
-}
-
-function countryLabel(code: string | null): string | null {
-  return code === null
-    ? null
-    : (COUNTRY_LABELS.get(code.toLowerCase()) ?? code);
-}
 
 export function VisibilityScreen({ companyId }: VisibilityScreenProps) {
   const [loaded, setLoaded] = useState<Loaded | null>(null);
@@ -259,50 +238,6 @@ export function VisibilityScreen({ companyId }: VisibilityScreenProps) {
       </section>
 
       <section
-        aria-labelledby="visibility-summary"
-        className="flex flex-col gap-3"
-      >
-        <h2
-          id="visibility-summary"
-          className="cq-title-md text-(--cq-text-primary)"
-        >
-          Who can see what
-        </h2>
-        <dl className="flex max-w-(--cq-layout-reading) flex-col divide-y divide-(--cq-border-subtle) border-y border-(--cq-border-subtle)">
-          <div className="flex flex-col gap-1 py-3">
-            <dt className="cq-label text-(--cq-text-primary)">
-              Private to you and your organisation
-            </dt>
-            <dd className="cq-body-sm text-(--cq-text-secondary)">
-              Your setup answers, uploaded documents, what Q read from them,
-              your conversations with Q, and your capital objective. None of
-              this is visible to investors, whatever you choose above.
-            </dd>
-          </div>
-          <div className="flex flex-col gap-1 py-3">
-            <dt className="cq-label text-(--cq-text-primary)">
-              Visible to investors{" "}
-              {visible ? "now" : "once you choose to publish"}
-            </dt>
-            <dd className="cq-body-sm text-(--cq-text-secondary)">
-              The company profile as previewed here: name, website, where you
-              are based, stage, founding date, status and your descriptions.
-            </dd>
-          </div>
-          <div className="flex flex-col gap-1 py-3">
-            <dt className="cq-label text-(--cq-text-primary)">
-              Shared with a specific investor
-            </dt>
-            <dd className="cq-body-sm text-(--cq-text-secondary)">
-              Not available yet. Sharing documents with one investor arrives
-              with relationships and the data room; nothing is shared that way
-              today.
-            </dd>
-          </div>
-        </dl>
-      </section>
-
-      <section
         aria-labelledby="visibility-discovery"
         className="flex flex-col gap-4"
       >
@@ -385,50 +320,17 @@ export function VisibilityScreen({ companyId }: VisibilityScreenProps) {
         </div>
       </section>
 
-      <section
-        aria-labelledby="visibility-preview"
-        className="flex flex-col gap-3"
-      >
-        <div className="flex flex-col gap-1">
-          <h2
-            id="visibility-preview"
-            className="cq-title-md text-(--cq-text-primary)"
-          >
-            What investors will see
-          </h2>
-          <p className="cq-status-line">
-            This is the exact profile Q gives an investor who asks about your
-            company{visible ? "." : " once it is visible."}
-          </p>
-        </div>
-        {/* The preview is the dossier an investor would open: one panel,
-            hairline rows, no card inside it. */}
-        <dl
-          className="cq-panel cq-panel-rows max-w-(--cq-layout-reading)"
-          data-network-preview
-        >
-          <PreviewRow label="Company" value={preview.canonicalName} />
-          <PreviewRow label="Legal name" value={preview.legalName} />
-          <PreviewRow label="Website" value={preview.websiteUrl} />
-          <PreviewRow
-            label="Based in"
-            value={
-              [
-                preview.headquartersCity,
-                countryLabel(preview.headquartersCountry),
-              ]
-                .filter((part): part is string => part !== null)
-                .join(", ") || null
-            }
-          />
-          <PreviewRow
-            label="Stage"
-            value={stageLabel(preview.currentStageCode)}
-          />
-          <PreviewRow label="Founded" value={preview.foundedDate} numeric />
-          <PreviewRow label="In short" value={preview.shortDescription} />
-          <PreviewRow label="Description" value={preview.primaryDescription} />
-        </dl>
+      {/*
+        The visibility control centre (CQ-BIZ-003): who can see each
+        thing, the shares with named investors, and the company previewed
+        as each audience, all from the server.
+      */}
+      <VisibilityCentre
+        companyId={companyId}
+        refreshKey={String(company.version)}
+      />
+
+      <section aria-label="Related" className="flex flex-col gap-3">
         <div className="flex flex-wrap items-center gap-3">
           {/* The pitch video is part of what investors see; it has its own
               flow (CQ-MEDIA), founder-only. */}
@@ -445,37 +347,6 @@ export function VisibilityScreen({ companyId }: VisibilityScreenProps) {
           </Link>
         </div>
       </section>
-    </div>
-  );
-}
-
-function PreviewRow({
-  label,
-  value,
-  numeric = false,
-}: {
-  readonly label: string;
-  readonly value: string | null;
-  readonly numeric?: boolean | undefined;
-}) {
-  return (
-    <div className="flex flex-col gap-0.5 px-5 py-3 sm:flex-row sm:gap-4">
-      <dt className="cq-label shrink-0 text-(--cq-text-secondary) sm:w-32">
-        {label}
-      </dt>
-      <dd
-        className={
-          numeric
-            ? "cq-body cq-numeric text-(--cq-text-primary)"
-            : "cq-body text-(--cq-text-primary)"
-        }
-      >
-        {value === null || value.length === 0 ? (
-          <span className="text-(--cq-text-tertiary)">Not shared</span>
-        ) : (
-          value
-        )}
-      </dd>
     </div>
   );
 }

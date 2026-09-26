@@ -7,16 +7,25 @@ import {
   assessMarketplaceReadiness,
   getCompany,
   getCompanyNetworkPreview,
+  getAudiencePreview,
   getMarketplaceReadiness,
+  getVisibilityState,
+  revokeVisibilityShare,
   setCompanyVisibility,
+  shareWithRelationship,
   type ApiSession,
 } from "@capital-q/api-client";
 import { loadWebServerConfig } from "@capital-q/config/web";
-import type {
-  CompanyDto,
-  CompanyNetworkPreview,
-  CompanyVisibilityChoice,
-  MarketplaceReadinessAssessment,
+import {
+  VisibilityAudienceSchema,
+  type AudiencePreviewDto,
+  type CompanyDto,
+  type CompanyNetworkPreview,
+  type CompanyVisibilityChoice,
+  type MarketplaceReadinessAssessment,
+  type VisibilityRevokeResultDto,
+  type VisibilityShareResultDto,
+  type VisibilityStateDto,
 } from "@capital-q/contracts";
 
 import { getSessionAccessToken } from "@/auth/session";
@@ -166,4 +175,101 @@ export async function assessMarketplaceReadinessAction(
   } catch (error) {
     return translate(error);
   }
+}
+
+// ---------------------------------------------------------------------------
+// The visibility control centre (CQ-BIZ-003)
+// ---------------------------------------------------------------------------
+
+const UuidInput = z.string().uuid();
+
+async function withSession<T>(
+  work: (current: ApiSession) => Promise<T>,
+): Promise<VisibilityActionResult<T>> {
+  const current = await session();
+  if (current === null) {
+    return { ok: false, message: "Please sign in again to continue." };
+  }
+  try {
+    return { ok: true, value: await work(current) };
+  } catch (error) {
+    return translate(error);
+  }
+}
+
+/** Objects, scopes, active shares and the relationships a share can go to. */
+export async function loadVisibilityStateAction(
+  rawCompanyId: string,
+): Promise<VisibilityActionResult<VisibilityStateDto>> {
+  const companyId = CompanyIdInput.safeParse(rawCompanyId);
+  if (!companyId.success) {
+    return { ok: false, message: "That company isn't available here." };
+  }
+  return withSession((current) => getVisibilityState(current, companyId.data));
+}
+
+/** The company as one audience sees it, decided by the server. */
+export async function loadAudiencePreviewAction(
+  rawCompanyId: string,
+  rawAudience: string,
+  rawRelationshipId?: string,
+): Promise<VisibilityActionResult<AudiencePreviewDto>> {
+  const companyId = CompanyIdInput.safeParse(rawCompanyId);
+  const audience = VisibilityAudienceSchema.safeParse(rawAudience);
+  const relationshipId =
+    rawRelationshipId === undefined
+      ? undefined
+      : UuidInput.safeParse(rawRelationshipId);
+  if (
+    !companyId.success ||
+    !audience.success ||
+    (relationshipId !== undefined && !relationshipId.success)
+  ) {
+    return { ok: false, message: "That preview couldn't be made." };
+  }
+  return withSession((current) =>
+    getAudiencePreview(
+      current,
+      companyId.data,
+      audience.data,
+      relationshipId?.data,
+    ),
+  );
+}
+
+/** Share the current raise with one relationship's investor organisation. */
+export async function shareRaiseAction(
+  rawCompanyId: string,
+  rawRelationshipId: string,
+  rawIdempotencyKey: string,
+): Promise<VisibilityActionResult<VisibilityShareResultDto>> {
+  const companyId = CompanyIdInput.safeParse(rawCompanyId);
+  const relationshipId = UuidInput.safeParse(rawRelationshipId);
+  const key = z.string().min(8).max(255).safeParse(rawIdempotencyKey);
+  if (!companyId.success || !relationshipId.success || !key.success) {
+    return { ok: false, message: "That request couldn't be made." };
+  }
+  return withSession((current) =>
+    shareWithRelationship(
+      current,
+      companyId.data,
+      relationshipId.data,
+      key.data,
+    ),
+  );
+}
+
+/** Revoke one share: future access removed. */
+export async function revokeShareAction(
+  rawCompanyId: string,
+  rawPolicyId: string,
+): Promise<VisibilityActionResult<VisibilityRevokeResultDto>> {
+  const companyId = CompanyIdInput.safeParse(rawCompanyId);
+  const policyId = UuidInput.safeParse(rawPolicyId);
+  if (!companyId.success || !policyId.success) {
+    return { ok: false, message: "That request couldn't be made." };
+  }
+  return withSession((current) =>
+    revokeVisibilityShare(current, companyId.data, policyId.data),
+  );
 }
