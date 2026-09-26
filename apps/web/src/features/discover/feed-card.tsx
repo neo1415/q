@@ -268,7 +268,7 @@ export function FeedCard({
               strokeWidth={ICON_STROKE}
             />
           )}
-          {saved ? "Saved" : "Save"}
+          <span className="cq-feed-rail-label">{saved ? "Saved" : "Save"}</span>
         </Button>
         {/* Pass is neutral: quiet, never danger, never red. */}
         <Button
@@ -282,7 +282,7 @@ export function FeedCard({
             size={ICON_SIZE.prominent}
             strokeWidth={ICON_STROKE}
           />
-          Pass
+          <span className="cq-feed-rail-label">Pass</span>
         </Button>
         <Button
           variant="secondary"
@@ -291,7 +291,7 @@ export function FeedCard({
           data-feed-ask-q
         >
           {askQMark}
-          Ask Q
+          <span className="cq-feed-rail-label">Ask Q</span>
         </Button>
         <Link
           href={`/company/${company.companyId}`}
@@ -302,7 +302,7 @@ export function FeedCard({
             size={ICON_SIZE.prominent}
             strokeWidth={ICON_STROKE}
           />
-          Open company
+          <span className="cq-feed-rail-label">Open company</span>
         </Link>
       </div>
 

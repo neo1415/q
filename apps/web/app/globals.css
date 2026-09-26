@@ -580,7 +580,8 @@
    * workspace, never stretched, with the company and the decisions in an
    * intelligence panel beside it.
    */
-  .cq-shell:has([data-feed-immersive]) [data-q-dock] {
+  /* The dock is a sibling of the shell, so the page is asked from the body. */
+  body:has([data-feed-immersive]) [data-q-dock] {
     display: none;
   }
   @media (max-width: 1023px) {
@@ -610,7 +611,9 @@
     transition: transform var(--cq-motion-emphasis) var(--cq-ease);
     will-change: transform;
   }
-  [data-reduced-motion] .cq-feed-slot {
+  /* A finger holds the cards; the settle runs only once it lets go. */
+  [data-reduced-motion] .cq-feed-slot,
+  .cq-feed-media[data-dragging] .cq-feed-slot {
     transition: none;
   }
   .cq-feed-player,
@@ -644,12 +647,16 @@
     padding: 24px;
     text-align: center;
   }
-  /* Over the pitch on a phone: a scrim only where the words are. */
+  /*
+   * Over the pitch on a phone: a scrim only where the words are. Not a
+   * scroll container: the rail is positioned against it and is taller
+   * than a short card, and a clipping overlay cut the top of the rail
+   * off. The description is clamped instead, so the words stay short.
+   */
   .cq-feed-overlay {
     position: absolute;
     inset: auto 0 0 0;
     display: flex;
-    max-height: 72%;
     flex-direction: column;
     gap: 8px;
     padding: 48px 16px 16px;
@@ -658,8 +665,6 @@
       var(--cq-stage-canvas) 0%,
       transparent 100%
     );
-    overflow-y: auto;
-    scrollbar-width: none;
   }
   .cq-feed-card {
     gap: 12px;
@@ -691,8 +696,24 @@
     gap: 2px;
     padding: 6px 4px;
     font-size: 12px;
-    white-space: normal;
     text-align: center;
+  }
+  /* The label wraps inside the 72 px column (the button itself is nowrap). */
+  .cq-feed-rail-label {
+    white-space: normal;
+    line-height: 1.2;
+  }
+  /* Legible over any frame of a pitch, without a box around each control. */
+  .cq-feed-rail .cq-feed-rail-label {
+    text-shadow: 0 1px 2px var(--cq-stage-canvas);
+  }
+  .cq-feed-rail-button > svg {
+    filter: drop-shadow(0 1px 1px var(--cq-stage-canvas));
+  }
+  /* A landscape pitch is shown whole on the portrait stage, never cropped
+     to a sliver of its middle. */
+  .cq-feed-player[data-orientation="landscape"] .cq-feed-video {
+    object-fit: contain;
   }
   .cq-feed-nav {
     position: absolute;
@@ -738,14 +759,21 @@
       justify-self: center;
       height: calc(100dvh - 48px);
       aspect-ratio: 9 / 16;
+      border: 1px solid var(--cq-stage-border);
       border-radius: var(--cq-radius-lg);
     }
     .cq-feed-overlay {
       position: static;
-      max-height: none;
+      align-self: center;
+      max-height: calc(100dvh - 48px);
       padding: 0;
       background: none;
       overflow-y: auto;
+    }
+    .cq-feed-rail .cq-feed-rail-label,
+    .cq-feed-rail-button > svg {
+      text-shadow: none;
+      filter: none;
     }
     .cq-feed-card .cq-feed-info {
       padding-right: 0;

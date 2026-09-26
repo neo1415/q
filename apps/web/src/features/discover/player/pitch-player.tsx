@@ -160,8 +160,14 @@ export function PitchPlayer({
   const frame = pitchFrame(pitch.aspectRatio);
 
   if (variant === "stage") {
+    // The stage is portrait; a landscape pitch is letterboxed, not cropped.
+    const [w = 9, h = 16] = frame.aspectRatio.split("/").map(Number);
     return (
-      <div className="cq-feed-player" data-pitch-frame>
+      <div
+        className="cq-feed-player"
+        data-pitch-frame
+        data-orientation={w > h ? "landscape" : "portrait"}
+      >
         <video
           ref={videoRef}
           className="cq-feed-video"

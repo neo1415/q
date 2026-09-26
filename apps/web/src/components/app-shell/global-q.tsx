@@ -8,6 +8,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -17,6 +18,12 @@ import { SheetContent, SheetRoot } from "@capital-q/ui/sheet";
 
 import { QAperture } from "@/features/q-aperture";
 import { useHomeHref } from "@/features/q/active-conversation";
+import {
+  describeMoment,
+  momentDraft,
+  type QMoment,
+  type QMomentSource,
+} from "@/features/q/q-moment";
 import { QSheetConversation } from "@/features/q/q-sheet";
 import { QSessionProvider, useQSessionOptional } from "@/features/q/q-session";
 import {
@@ -43,6 +50,9 @@ type GlobalQValue = {
   /** A draft question the panel opens with; null for an empty composer. */
   readonly seed: string | null;
   readonly askAbout: (seed: string) => void;
+  /** Where in a pitch the person was when this opening happened. */
+  readonly moment: QMoment | null;
+  readonly registerMomentSource: (source: QMomentSource | null) => void;
 };
 
 const GlobalQContext = createContext<GlobalQValue>({
@@ -51,6 +61,8 @@ const GlobalQContext = createContext<GlobalQValue>({
   connected: false,
   seed: null,
   askAbout: () => undefined,
+  moment: null,
+  registerMomentSource: () => undefined,
 });
 
 const Q_PAGE = "/home";
@@ -73,16 +85,43 @@ export function GlobalQProvider({
   const onQPage = pathname === Q_PAGE;
   const [requested, setRequested] = useState(false);
   const [seed, setSeed] = useState<string | null>(null);
-  // A draft belongs to the opening that asked for it; closing drops it so
-  // the next plain "Ask Q" starts empty.
-  const setOpen = useCallback((next: boolean) => {
-    setRequested(next);
-    if (!next) setSeed(null);
+  const [moment, setMoment] = useState<QMoment | null>(null);
+  /**
+   * What the page says is on screen, asked at the instant Q opens --
+   * whichever way it was opened (the rail, the dock, Ctrl/Cmd+K). Read
+   * then and not tracked, because a playback position changes every frame
+   * and only the one at the moment of asking means anything.
+   */
+  const momentSource = useRef<QMomentSource | null>(null);
+  const registerMomentSource = useCallback((source: QMomentSource | null) => {
+    momentSource.current = source;
   }, []);
-  const askAbout = useCallback((next: string) => {
-    setSeed(next);
+  const openWith = useCallback((explicitSeed: string | null) => {
+    const at = momentSource.current?.() ?? null;
+    setMoment(at);
+    setSeed(explicitSeed ?? (at === null ? null : momentDraft(at)));
     setRequested(true);
   }, []);
+  // A draft and a moment belong to the opening that asked for them;
+  // closing drops both so the next plain "Ask Q" starts empty.
+  const setOpen = useCallback(
+    (next: boolean) => {
+      if (next) {
+        openWith(null);
+        return;
+      }
+      setRequested(false);
+      setSeed(null);
+      setMoment(null);
+    },
+    [openWith],
+  );
+  const askAbout = useCallback(
+    (next: string) => {
+      openWith(next);
+    },
+    [openWith],
+  );
   // Arriving on the Q page closes the panel: the page is the same
   // conversation in full. Derived, so the panel is gone in the very
   // render that shows the page -- which is what lets the aperture morph
@@ -94,6 +133,7 @@ export function GlobalQProvider({
     if (onQPage && requested) {
       setRequested(false);
       setSeed(null);
+      setMoment(null);
     }
   }
 
@@ -108,15 +148,23 @@ export function GlobalQProvider({
         document.getElementById("home-q")?.focus();
         return;
       }
-      setRequested(true);
+      openWith(null);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, []);
+  }, [openWith]);
 
   const value = useMemo<GlobalQValue>(
-    () => ({ open, setOpen, connected, seed, askAbout }),
-    [open, setOpen, connected, seed, askAbout],
+    () => ({
+      open,
+      setOpen,
+      connected,
+      seed,
+      askAbout,
+      moment,
+      registerMomentSource,
+    }),
+    [open, setOpen, connected, seed, askAbout, moment, registerMomentSource],
   );
   return (
     <QSubjectProvider own={subject}>
@@ -146,6 +194,28 @@ export function useGlobalQ(): {
 } {
   const { open, setOpen, askAbout } = useContext(GlobalQContext);
   return { open, setOpen, askAbout };
+}
+
+/**
+ * Let Q know where in a pitch the person is, whenever they open it from
+ * this page. The source is read at the instant of opening; it is cleared
+ * when the page unmounts.
+ */
+export function useQMomentSource(source: QMomentSource): void {
+  const { registerMomentSource } = useContext(GlobalQContext);
+  const latest = useRef(source);
+  useEffect(() => {
+    latest.current = source;
+  }, [source]);
+  useEffect(() => {
+    registerMomentSource(() => latest.current());
+    return () => registerMomentSource(null);
+  }, [registerMomentSource]);
+}
+
+/** The opening's moment, for the Q surface to show. */
+export function useQMoment(): QMoment | null {
+  return useContext(GlobalQContext).moment;
 }
 
 /** The sidebar's Q entry: it stays beside the dock (ADR 0017 F1). */
@@ -204,12 +274,14 @@ export function GlobalQTrigger({
 }
 
 function GlobalQSheet() {
-  const { open, setOpen, connected, seed } = useContext(GlobalQContext);
+  const { open, setOpen, connected, seed, moment } = useContext(GlobalQContext);
   const subject = useQSubject();
   const about =
-    subject.kind === "NONE"
-      ? "About what you're looking at."
-      : `About ${subject.label ?? "this"}.`;
+    moment !== null
+      ? `${describeMoment(moment)}.`
+      : subject.kind === "NONE"
+        ? "About what you're looking at."
+        : `About ${subject.label ?? "this"}.`;
   return (
     <SheetRoot open={open} onOpenChange={setOpen}>
       {open ? (

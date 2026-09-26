@@ -75,6 +75,7 @@ vi.mock("../src/features/discover/feed/playback-source", () => ({
 
 vi.mock("@/components/app-shell/global-q", () => ({
   useGlobalQ: () => ({ open: false, setOpen }),
+  useQMomentSource: () => undefined,
 }));
 
 vi.mock("@/features/q/q-subject", () => ({

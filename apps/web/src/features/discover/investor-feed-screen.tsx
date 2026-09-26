@@ -25,7 +25,7 @@ import {
 } from "@capital-q/ui/icons";
 import { EmptyState } from "@capital-q/ui/states";
 
-import { useGlobalQ } from "@/components/app-shell/global-q";
+import { useGlobalQ, useQMomentSource } from "@/components/app-shell/global-q";
 import { QAperture } from "@/features/q-aperture";
 import { useQSessionOptional } from "@/features/q/q-session";
 import { QPageSubject } from "@/features/q/q-subject";
@@ -33,20 +33,37 @@ import { QPageSubject } from "@/features/q/q-subject";
 import { FeedCard } from "./feed-card";
 import {
   actionFeedTransport,
-  actionPlaybackSource,
+  authorisePlaybackViaAction,
 } from "./feed/action-feed-transport";
 import type { FeedPreloadPolicy } from "./feed/feed-state";
+import {
+  feedPlaybackAuthorizations,
+  type FeedPlaybackAuthorizations,
+} from "./feed/playback-authorizations";
 import { useFeedBudget } from "./feed/use-feed-budget";
 import { useInvestorFeed } from "./feed/use-investor-feed";
+import type { PlaybackSource } from "./player/pitch-playback";
 import { attachHlsOrNativeSource } from "./player/hls-source";
 import { PitchPlayer } from "./player/pitch-player";
-import { useReducedMotionPreference } from "./player/use-pitch-playback";
+import {
+  usePitchPlayback,
+  useReducedMotionPreference,
+} from "./player/use-pitch-playback";
 
 /** One swipe's settle (spec §9.3); instant under reduced motion. */
 const SETTLE_MS = 280;
-/** A wheel gesture is one item, then a short lockout (spec §9.3). */
+/**
+ * A wheel gesture is one item (spec §9.3). The deltas of one gesture are
+ * summed until they cross the threshold; after a move, the wheel stays
+ * locked until it has been quiet for the lockout -- a trackpad keeps
+ * sending inertial deltas for a second or more after the fingers lift,
+ * and a fixed lockout from the first move read that tail as a second
+ * gesture and skipped a company.
+ */
 const WHEEL_THRESHOLD = 60;
 const WHEEL_LOCK_MS = 350;
+/** A drag this far, in CSS pixels, is a swipe rather than a tap or a nudge. */
+const SWIPE_THRESHOLD = 48;
 
 /**
  * Discover, for an investor (CQ-WEB-022).
@@ -79,25 +96,34 @@ const NOTE_TEXT: Readonly<Record<DiscoveryNoteDto, string>> = {
  * next card's element -- already holding its startup buffer -- becomes the
  * active one in place, and only the slot that fell two behind is handed
  * the new next card. The preload tier of each is the controller's.
+ *
+ * A card the controller has put in the POSTER tier but that has no slot
+ * (the one after next, on a link that affords the full window) gets its
+ * poster warmed as an image and no `<video>` at all: three media elements
+ * is the ceiling, and a poster is not media.
  */
 function FeedMedia({
   items,
   index,
   policyFor,
+  sourceFor,
   reducedMotion,
   hold,
   muted,
   onMutedChange,
   initialAuthorization,
+  mediaRef,
 }: {
   readonly initialAuthorization: PlaybackAuthorizationDto | null;
   readonly items: readonly DiscoveredCompanyDto[];
   readonly index: number;
   readonly policyFor: (companyId: string) => FeedPreloadPolicy;
+  readonly sourceFor: (companyId: string) => PlaybackSource;
   readonly reducedMotion: boolean;
   readonly hold: boolean;
   readonly muted: boolean;
   readonly onMutedChange: (muted: boolean) => void;
+  readonly mediaRef: React.Ref<HTMLDivElement>;
 }) {
   const slots: {
     readonly key: string;
@@ -109,13 +135,23 @@ function FeedMedia({
     const item = items[at];
     if (item !== undefined) slots.push({ key: String(at % 3), offset, item });
   }
+  const warm = items.filter(
+    (item, at) =>
+      Math.abs(at - index) > 1 &&
+      item.pitch !== null &&
+      policyFor(item.companyId) === "POSTER",
+  );
   return (
-    <div className="cq-feed-media" aria-hidden={false}>
+    <div ref={mediaRef} className="cq-feed-media">
       {slots.map(({ key, offset, item }) => (
         <div
           key={key}
           className="cq-feed-slot"
-          style={{ transform: `translateY(${String(offset * 100)}%)` }}
+          style={{
+            // The drag offset is written by the gesture straight onto the
+            // media layer, so following a finger re-renders nothing.
+            transform: `translateY(calc(${String(offset * 100)}% + var(--cq-feed-drag, 0px)))`,
+          }}
           data-slot-offset={offset}
           {...(offset === 0 ? { "data-slot-active": "" } : {})}
           // Neighbours are a glimpse, not controls: nothing in them is
@@ -135,7 +171,7 @@ function FeedMedia({
             <PitchPlayer
               company={item}
               policy={policyFor(item.companyId)}
-              authorize={actionPlaybackSource(item.companyId)}
+              authorize={sourceFor(item.companyId)}
               reducedMotion={reducedMotion}
               attachSource={attachHlsOrNativeSource}
               variant="stage"
@@ -151,23 +187,56 @@ function FeedMedia({
           )}
         </div>
       ))}
+      {warm.map((item) => (
+        <PosterWarmer
+          key={item.companyId}
+          company={item}
+          authorize={sourceFor(item.companyId)}
+          reducedMotion={reducedMotion}
+        />
+      ))}
     </div>
   );
 }
 
-const WIDE = "(min-width: 1024px)";
-
-/** A host without media queries (a test DOM) is a narrow one. */
-function wideQuery(): MediaQueryList | null {
-  return typeof window.matchMedia === "function"
-    ? window.matchMedia(WIDE)
-    : null;
+/**
+ * The POSTER tier for a card with no player yet: authorise, then let the
+ * browser fetch the poster from the CDN so it is in cache when the card's
+ * slot is handed to it. `hidden` keeps it out of layout and the
+ * accessibility tree; an image that is not displayed is still fetched.
+ */
+function PosterWarmer({
+  company,
+  authorize,
+  reducedMotion,
+}: {
+  readonly company: DiscoveredCompanyDto;
+  readonly authorize: PlaybackSource;
+  readonly reducedMotion: boolean;
+}) {
+  const { posterUrl } = usePitchPlayback({
+    mediaAssetId: company.pitch?.mediaAssetId ?? null,
+    policy: "POSTER",
+    authorize,
+    reducedMotion,
+  });
+  if (posterUrl === null) return null;
+  return (
+    <img
+      src={posterUrl}
+      alt=""
+      hidden
+      decoding="async"
+      fetchPriority="low"
+      data-poster-warm={company.companyId}
+    />
+  );
 }
 
-function subscribeWide(onChange: () => void): () => void {
-  const query = wideQuery();
-  query?.addEventListener("change", onChange);
-  return () => query?.removeEventListener("change", onChange);
+/** A hidden tab plays nothing (spec §9.5 4). */
+function subscribeVisibility(onChange: () => void): () => void {
+  document.addEventListener("visibilitychange", onChange);
+  return () => document.removeEventListener("visibilitychange", onChange);
 }
 
 /**
@@ -196,11 +265,49 @@ export function InvestorFeedScreen({
   const { setOpen, open: qOpen } = useGlobalQ();
   const session = useQSessionOptional();
   const [muted, setMuted] = useState(true);
+  // One owner for this feed's playback authorizations, seeded with the one
+  // the server read for the first card (see playback-authorizations.ts).
+  const initialAuthorization = initial?.authorization ?? null;
+  const firstCompanyId = initial?.slate.items[0]?.companyId ?? null;
+  const [authorizations] = useState<FeedPlaybackAuthorizations>(() =>
+    feedPlaybackAuthorizations(authorisePlaybackViaAction, {
+      seed:
+        initialAuthorization === null || firstCompanyId === null
+          ? null
+          : { companyId: firstCompanyId, authorization: initialAuthorization },
+    }),
+  );
 
   const stageRef = useRef<HTMLDivElement>(null);
-  const touchStartY = useRef<number | null>(null);
+  const mediaRef = useRef<HTMLDivElement>(null);
+  const drag = useRef<{ readonly startY: number; dy: number } | null>(null);
 
   const { next, previous } = feed;
+
+  /*
+   * Where in the pitch the person is when they open Q, however they open
+   * it: the rail's Ask Q, the dock, or Ctrl/Cmd+K. Read from the element at
+   * that instant (it is the truth about the position), never tracked.
+   */
+  const cardRef = useRef(feed.card);
+  useEffect(() => {
+    cardRef.current = feed.card;
+  }, [feed.card]);
+  useQMomentSource(() => {
+    const current = cardRef.current;
+    if (current === null || current.pitch === null) return null;
+    const video = stageRef.current?.querySelector<HTMLVideoElement>(
+      "[data-slot-active] video",
+    );
+    if (video === null || video === undefined) return null;
+    return {
+      kind: "PITCH_MOMENT",
+      companyId: current.companyId,
+      companyLabel: current.canonicalName,
+      mediaAssetId: current.pitch.mediaAssetId,
+      positionSeconds: Math.max(0, Math.floor(video.currentTime || 0)),
+    };
+  });
 
   /**
    * Settling: a card becomes ACTIVE for playback only once the move to it
@@ -218,15 +325,22 @@ export function InvestorFeedScreen({
     return () => window.clearTimeout(timer);
   }, [index, settledAt, reducedMotion]);
 
-  // Playback waits while Q is speaking, and while Q covers the stage on a
-  // phone (spec §9.5 4).
-  const wide = useSyncExternalStore(
-    subscribeWide,
-    () => wideQuery()?.matches ?? false,
+  /*
+   * Q watches the pitch with the person (founder direction, 2026-09-26):
+   * opening Q does not stop the video. It keeps playing behind the sheet,
+   * muted, until the person pauses it; the sound comes back when Q closes
+   * if they had turned it on. Q speaking mutes it the same way. This
+   * supersedes spec §9.5 4's pause-while-Q-speaks and the mobile sheet
+   * pause. Playback still waits for a move to settle and for a hidden tab.
+   */
+  const tabHidden = useSyncExternalStore(
+    subscribeVisibility,
+    () => document.visibilityState === "hidden",
     () => false,
   );
   const qSpeaking = session?.voice.client.state === "Q_SPEAKING";
-  const hold = settledAt !== index || qSpeaking || (qOpen && !wide);
+  const hold = settledAt !== index || tabHidden;
+  const effectiveMuted = muted || qOpen || qSpeaking;
 
   /** Space plays or pauses the pitch in view; the element is the truth. */
   const togglePlay = useCallback(() => {
@@ -239,16 +353,26 @@ export function InvestorFeedScreen({
   }, []);
 
   // Wheel and trackpad: one item per gesture (spec §9.3).
-  const wheel = useRef({ sum: 0, lockedUntil: 0 });
+  const wheel = useRef({ sum: 0, last: -Infinity, lockedUntil: 0 });
   const onWheel = useCallback(
     (event: React.WheelEvent) => {
-      const now = performance.now();
-      if (now < wheel.current.lockedUntil) return;
-      wheel.current.sum += event.deltaY;
-      if (Math.abs(wheel.current.sum) < WHEEL_THRESHOLD) return;
-      if (wheel.current.sum > 0) next();
+      const now = event.timeStamp;
+      const state = wheel.current;
+      if (now < state.lockedUntil) {
+        // Still the gesture that moved: its tail extends the lock.
+        state.lockedUntil = now + WHEEL_LOCK_MS;
+        state.last = now;
+        return;
+      }
+      // A pause starts a new gesture; stray deltas from minutes ago do not
+      // add up to a move.
+      if (now - state.last > WHEEL_LOCK_MS) state.sum = 0;
+      state.last = now;
+      state.sum += event.deltaY;
+      if (Math.abs(state.sum) < WHEEL_THRESHOLD) return;
+      if (state.sum > 0) next();
       else previous();
-      wheel.current = { sum: 0, lockedUntil: now + WHEEL_LOCK_MS };
+      wheel.current = { sum: 0, last: now, lockedUntil: now + WHEEL_LOCK_MS };
     },
     [next, previous],
   );
@@ -308,26 +432,66 @@ export function InvestorFeedScreen({
     if (hasCard) stageRef.current?.focus({ preventScroll: true });
   }, [hasCard]);
 
-  const onTouchStart = useCallback((event: React.TouchEvent) => {
-    touchStartY.current = event.touches[0]?.clientY ?? null;
+  /**
+   * Swipe, linked to the finger (spec §9.3): the cards follow the drag,
+   * and on release either settle back or move on with the 280 ms settle.
+   * No bounce at either end -- the first card does not pull down and the
+   * last does not pull up. The offset is written as a custom property on
+   * the media layer rather than held in state, so a drag re-renders
+   * nothing.
+   */
+  const setDrag = useCallback((dy: number | null) => {
+    const media = mediaRef.current;
+    if (media === null) return;
+    if (dy === null) {
+      media.style.removeProperty("--cq-feed-drag");
+      delete media.dataset["dragging"];
+    } else {
+      media.style.setProperty("--cq-feed-drag", `${String(dy)}px`);
+      media.dataset["dragging"] = "";
+    }
   }, []);
+
+  const { canAdvance, canRetreat } = feed;
+  const onTouchStart = useCallback((event: React.TouchEvent) => {
+    const y = event.touches[0]?.clientY;
+    drag.current = y === undefined ? null : { startY: y, dy: 0 };
+  }, []);
+
+  const onTouchMove = useCallback(
+    (event: React.TouchEvent) => {
+      const current = drag.current;
+      const y = event.touches[0]?.clientY;
+      if (current === null || y === undefined) return;
+      let dy = y - current.startY;
+      if ((dy > 0 && !canRetreat) || (dy < 0 && !canAdvance)) dy = 0;
+      current.dy = dy;
+      setDrag(dy);
+    },
+    [canAdvance, canRetreat, setDrag],
+  );
 
   const onTouchEnd = useCallback(
     (event: React.TouchEvent) => {
-      const start = touchStartY.current;
-      touchStartY.current = null;
-      if (start === null) return;
+      const current = drag.current;
+      drag.current = null;
+      setDrag(null);
+      if (current === null) return;
       const end = event.changedTouches[0]?.clientY;
-      if (end === undefined) return;
+      const travelled = end === undefined ? -current.dy : current.startY - end;
 
       // A swipe, not a tap or a scroll nudge.
-      const travelled = start - end;
-      if (Math.abs(travelled) < 48) return;
+      if (Math.abs(travelled) < SWIPE_THRESHOLD) return;
       if (travelled > 0) next();
       else previous();
     },
-    [next, previous],
+    [next, previous, setDrag],
   );
+
+  const onTouchCancel = useCallback(() => {
+    drag.current = null;
+    setDrag(null);
+  }, [setDrag]);
 
   const card = feed.card;
   const notes = feed.state.notes;
@@ -411,7 +575,9 @@ export function InvestorFeedScreen({
       <div
         ref={stageRef}
         onTouchStart={onTouchStart}
+        onTouchMove={onTouchMove}
         onTouchEnd={onTouchEnd}
+        onTouchCancel={onTouchCancel}
         onKeyDown={onKeyDown}
         onWheel={onWheel}
         // Programmatically focusable, not a tab stop: the controls inside
@@ -427,11 +593,13 @@ export function InvestorFeedScreen({
           items={feed.state.items}
           index={index}
           policyFor={(companyId) => policyByCompanyId[companyId] ?? "NONE"}
+          sourceFor={authorizations.sourceFor}
           reducedMotion={reducedMotion}
           hold={hold}
-          muted={muted}
+          muted={effectiveMuted}
           onMutedChange={setMuted}
-          initialAuthorization={initial?.authorization ?? null}
+          initialAuthorization={initialAuthorization}
+          mediaRef={mediaRef}
         />
 
         <div className="cq-feed-overlay">

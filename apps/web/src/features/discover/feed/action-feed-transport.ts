@@ -1,6 +1,7 @@
 import type { FeedTransport } from "./feed-transport";
 import { loadSlatePageAction, recordDecisionAction } from "./feed-actions";
 import { authorisePlaybackAction } from "./playback-source";
+import type { AuthorisePlayback } from "./playback-authorizations";
 import type { PlaybackSource } from "../player/pitch-playback";
 
 /**
@@ -35,11 +36,18 @@ export function actionFeedTransport(): FeedTransport {
   };
 }
 
+/** Asking for one company's playback, resolved the same way. */
+export const authorisePlaybackViaAction: AuthorisePlayback = async (
+  companyId,
+  mediaAssetId,
+) => {
+  const result = await authorisePlaybackAction(companyId, mediaAssetId);
+  if (!result.ok) throw new Error(result.message);
+  return result.value;
+};
+
 /** The player's port, resolved the same way. */
 export function actionPlaybackSource(companyId: string): PlaybackSource {
-  return async (mediaAssetId: string) => {
-    const result = await authorisePlaybackAction(companyId, mediaAssetId);
-    if (!result.ok) throw new Error(result.message);
-    return result.value;
-  };
+  return (mediaAssetId: string) =>
+    authorisePlaybackViaAction(companyId, mediaAssetId);
 }
