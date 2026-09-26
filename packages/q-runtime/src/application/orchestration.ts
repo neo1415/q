@@ -182,6 +182,13 @@ export type QAnswerRequest = QOrchestrationSubjectContext & {
    * answer path forces no research of its own.
    */
   readonly research?: Promise<QResearchDirective> | undefined;
+  /**
+   * The turn could not be read, even on a second try (the reader's model
+   * was unavailable). No document, screen change or record change can be
+   * started on this turn, and the answer must say so plainly rather than
+   * answer as if nothing had been asked (B1, 2026-09-25).
+   */
+  readonly turnUnread?: boolean | undefined;
 };
 
 export type QResearchDirective = {

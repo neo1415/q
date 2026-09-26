@@ -90,14 +90,18 @@ function seam(options: {
     createdAt: new Date().toISOString(),
   };
   const directives: (QResearchDirective | undefined)[] = [];
+  const unread: boolean[] = [];
+  let reads = 0;
   const outcomes = [...options.outcomes];
   const turns: QTurnReader = {
-    read: () =>
-      Promise.resolve(
+    read: () => {
+      reads += 1;
+      return Promise.resolve(
         typeof options.reading === "function"
           ? options.reading()
           : options.reading,
-      ),
+      );
+    },
   };
   const stored: QConversationMessage[] = [];
   const events: { type: string; data: unknown }[] = [];
@@ -115,6 +119,7 @@ function seam(options: {
     delegate: {
       answer: async (req) => {
         delegated += 1;
+        unread.push(req.turnUnread === true);
         directives.push(
           req.research === undefined ? undefined : await req.research,
         );
@@ -163,6 +168,8 @@ function seam(options: {
     stored,
     events,
     delegated: () => delegated,
+    unread,
+    reads: () => reads,
   };
 }
 
@@ -425,5 +432,56 @@ describe("words Q could not make out (lead 2026-09-25)", () => {
     // clear turn went to the model as usual.
     expect(run.stored).toHaveLength(2);
     expect(run.delegated()).toBe(1);
+  });
+});
+
+describe("a turn whose reading fails is never silently answered as chat (B1)", () => {
+  it("tries the reading again, and acts on it when the second try reads it", async () => {
+    const readings: (TurnReaderResult | null)[] = [
+      null,
+      toolReading({
+        kind: "NAVIGATE",
+        destination: "DISCOVER",
+        visibility: null,
+      }),
+    ];
+    const run = seam({
+      said: "take me to discover",
+      reading: () => readings.shift() ?? null,
+      outcomes: [],
+    });
+    await run.answer.answer(request());
+    expect(run.reads()).toBe(2);
+    expect(run.delegated()).toBe(0);
+    expect(run.stored[0]?.blocks?.[0]).toMatchObject({ kind: "UI_INTENT" });
+  });
+
+  it("tells the answer the turn was not read when both tries fail", async () => {
+    const run = seam({
+      said: "make me a pdf of my thesis",
+      reading: null,
+      outcomes: [],
+    });
+    await run.answer.answer(request());
+    expect(run.reads()).toBe(2);
+    expect(run.unread).toEqual([true]);
+  });
+
+  it("a read turn is never marked unread", async () => {
+    const run = seam({
+      said: "what do you know about fintech in Lagos?",
+      reading: {
+        kind: "QUESTION_TO_Q",
+        confidence: "HIGH",
+        transcript: "CLEAR",
+        question: null,
+        aboutNamedOther: false,
+        tool: null,
+      },
+      outcomes: [],
+    });
+    await run.answer.answer(request());
+    expect(run.reads()).toBe(1);
+    expect(run.unread).toEqual([false]);
   });
 });
