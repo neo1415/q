@@ -10,13 +10,16 @@ import {
   createProblemDetails,
   IDEMPOTENCY_KEY_HEADER,
   IdempotencyKeyHeaderSchema,
+  MEDIA_CAPTIONS_VTT_SUFFIX,
   MEDIA_PLAYBACK_POLICY_SUFFIX,
   MEDIA_PLAYBACK_SUFFIX,
+  MEDIA_TRANSCRIPT_SUFFIX,
   MEDIA_SYNC_SUFFIX,
   MEDIA_UPLOAD_CANCEL_SUFFIX,
   MEDIA_UPLOAD_SESSION_SUFFIX,
   MediaUploadSessionDtoSchema,
   parseContract,
+  PitchTranscriptDtoSchema,
   PlaybackAuthorizationDtoSchema,
   PROBLEM_CONTENT_TYPE,
   SetPitchPlaybackPolicyRequestSchema,
@@ -416,6 +419,78 @@ function registerPitchRoutes(
           expiresAt: grant.authorization.expiresAt,
         }),
       );
+    },
+  );
+
+  /**
+   * The pitch's transcript (R18), under exactly the playback rule. A pitch
+   * that is READY but has no transcript yet gets one step of sync started
+   * in the background -- after the answer, never holding the request -- so
+   * pitches that were READY before transcripts existed catch up when first
+   * watched. The answer is always what is stored now.
+   */
+  const transcriptOf = async (request: FastifyRequest) => {
+    const view = await service.getPitchTranscript({
+      actor: getActorContext(request),
+      companyId: companyIdParam(request),
+      mediaAssetId: mediaAssetIdParam(request),
+    });
+    if (view.status !== "AVAILABLE") {
+      void service
+        .syncPitchTranscript({
+          tenantId: view.tenantId,
+          mediaAssetId: view.mediaAssetId,
+        })
+        .catch((error: unknown) => {
+          request.log.warn(
+            { err: error, mediaAssetId: view.mediaAssetId },
+            "pitch transcript sync did not complete",
+          );
+        });
+    }
+    return view;
+  };
+
+  app.get(
+    `${pitch}/:mediaAssetId${MEDIA_TRANSCRIPT_SUFFIX}`,
+    { onRequest: withContext },
+    async (request, reply) => {
+      const view = await transcriptOf(request);
+      return reply.header("Cache-Control", "private, no-store").send(
+        PitchTranscriptDtoSchema.parse({
+          mediaAssetId: view.mediaAssetId,
+          status: view.status,
+          language: view.status === "AVAILABLE" ? view.language : null,
+          source: view.status === "AVAILABLE" ? "PROVIDER_GENERATED" : null,
+          cues: view.status === "AVAILABLE" ? view.cues : [],
+        }),
+      );
+    },
+  );
+
+  // The same transcript as WebVTT for the player's <track>. Not available
+  // yet is a 404: a track with no captions is simply absent.
+  app.get(
+    `${pitch}/:mediaAssetId${MEDIA_CAPTIONS_VTT_SUFFIX}`,
+    { onRequest: withContext },
+    async (request, reply) => {
+      const view = await transcriptOf(request);
+      if (view.status !== "AVAILABLE") {
+        return reply
+          .status(404)
+          .header("Cache-Control", "private, no-store")
+          .type(PROBLEM_CONTENT_TYPE)
+          .send(
+            createProblemDetails({
+              code: "RESOURCE_NOT_FOUND",
+              requestId: request.id,
+            }),
+          );
+      }
+      return reply
+        .header("Cache-Control", "private, no-store")
+        .type("text/vtt; charset=utf-8")
+        .send(view.vtt);
     },
   );
 }

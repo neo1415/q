@@ -245,7 +245,23 @@ export function PitchPlayer({
           data-playing={playing ? "true" : "false"}
           onPlay={() => setPlaying(true)}
           onPause={() => setPlaying(false)}
-        />
+        >
+          {/*
+            Captions (R18), same-origin because a <track> cannot carry the
+            API's bearer token: the route attaches it server-side, and the
+            API decides under the playback rule. Only once a source is
+            attached, so a cold card fetches nothing.
+          */}
+          {pitch.captionState === "AVAILABLE" && playbackUrl !== null ? (
+            <track
+              kind="captions"
+              srcLang="en"
+              label="English (generated)"
+              src={`/api/pitch-captions/${company.companyId}/${pitch.mediaAssetId}`}
+              default
+            />
+          ) : null}
+        </video>
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
@@ -285,7 +301,7 @@ export function PitchPlayer({
 
         {pitch.captionState === "AVAILABLE" ? (
           <span className="cq-caption text-(--cq-text-tertiary)">
-            Captions available
+            Captions on (generated)
           </span>
         ) : null}
       </div>

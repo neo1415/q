@@ -277,6 +277,57 @@ describe("the player element", () => {
     expect(videoIn(container).poster).toBe("https://cdn.test/sample.jpg");
   });
 
+  it("carries a same-origin captions track once a source is attached (R18)", async () => {
+    const authorize = vi.fn(() => Promise.resolve(authorization()));
+    const target = company(1);
+    const { container } = render(
+      <PitchPlayer
+        company={target}
+        policy="ACTIVE"
+        authorize={authorize}
+        reducedMotion={false}
+      />,
+    );
+    await waitFor(() =>
+      expect(container.querySelector("track")).not.toBeNull(),
+    );
+    const track = container.querySelector("track");
+    expect(track?.getAttribute("kind")).toBe("captions");
+    expect(track?.getAttribute("src")).toBe(
+      `/api/pitch-captions/${target.companyId}/${target.pitch?.mediaAssetId ?? ""}`,
+    );
+  });
+
+  it("has no captions track for a cold card, or when captions are not available", () => {
+    const authorize = vi.fn(() => Promise.resolve(authorization()));
+    const cold = render(
+      <PitchPlayer
+        company={company(1)}
+        policy="NONE"
+        authorize={authorize}
+        reducedMotion={false}
+      />,
+    );
+    expect(cold.container.querySelector("track")).toBeNull();
+    cold.unmount();
+    const base = company(2);
+    const noCaptions = render(
+      <PitchPlayer
+        company={{
+          ...base,
+          pitch:
+            base.pitch === null
+              ? null
+              : { ...base.pitch, captionState: "PENDING" },
+        }}
+        policy="ACTIVE"
+        authorize={authorize}
+        reducedMotion={false}
+      />,
+    );
+    expect(noCaptions.container.querySelector("track")).toBeNull();
+  });
+
   it("attaches no source and requests nothing for a cold card", () => {
     const authorize = vi.fn(() => Promise.resolve(authorization()));
     const { container } = render(

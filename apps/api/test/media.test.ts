@@ -854,3 +854,121 @@ describe("DELETE /v1/companies/:companyId/pitch/:mediaAssetId", () => {
     await app.close();
   });
 });
+
+describe("GET /v1/companies/:companyId/pitch/:mediaAssetId/{transcript,captions.vtt} (R18)", () => {
+  const transcriptUrl = `/v1/companies/${COMPANY}/pitch/${ASSET_ID}`;
+  const VTT = "WEBVTT\n\n00:00:01.000 --> 00:00:03.000\nWe help clinics\n";
+  const available = {
+    status: "AVAILABLE" as const,
+    mediaAssetId: ASSET_ID,
+    tenantId: TENANT,
+    language: "en",
+    cues: [{ startMs: 1000, endMs: 3000, text: "We help clinics" }],
+    vtt: VTT,
+  };
+
+  function transcriptService(
+    view: unknown,
+    syncs: unknown[] = [],
+  ): MediaService {
+    return fakeService({
+      getPitchTranscript: (query: unknown) => {
+        syncs.push({ read: query });
+        return view instanceof Error
+          ? Promise.reject(view)
+          : Promise.resolve(view as never);
+      },
+      syncPitchTranscript: (input: unknown) => {
+        syncs.push({ sync: input });
+        return Promise.resolve("PENDING");
+      },
+    }).service;
+  }
+
+  it("returns the timed cues as the server-resolved actor, labelled generated", async () => {
+    const calls: unknown[] = [];
+    const app = buildApp({
+      principal: PRINCIPAL,
+      context: CONTEXT,
+      service: transcriptService(available, calls),
+    });
+    const response = await app.inject({
+      method: "GET",
+      url: `${transcriptUrl}/transcript`,
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({
+      mediaAssetId: ASSET_ID,
+      status: "AVAILABLE",
+      language: "en",
+      source: "PROVIDER_GENERATED",
+      cues: available.cues,
+    });
+    expect(calls).toEqual([
+      { read: { actor: CONTEXT, companyId: COMPANY, mediaAssetId: ASSET_ID } },
+    ]);
+    await app.close();
+  });
+
+  it("serves the same transcript as WebVTT for the player's <track>", async () => {
+    const app = buildApp({
+      principal: PRINCIPAL,
+      context: CONTEXT,
+      service: transcriptService(available),
+    });
+    const response = await app.inject({
+      method: "GET",
+      url: `${transcriptUrl}/captions.vtt`,
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.headers["content-type"]).toContain("text/vtt");
+    expect(response.body).toBe(VTT);
+    await app.close();
+  });
+
+  it("says NONE with no cues, starts a sync in the background, and 404s the track", async () => {
+    const calls: unknown[] = [];
+    const none = { status: "NONE", mediaAssetId: ASSET_ID, tenantId: TENANT };
+    const app = buildApp({
+      principal: PRINCIPAL,
+      context: CONTEXT,
+      service: transcriptService(none, calls),
+    });
+    const json = await app.inject({
+      method: "GET",
+      url: `${transcriptUrl}/transcript`,
+    });
+    expect(json.statusCode).toBe(200);
+    expect(json.json()).toMatchObject({
+      status: "NONE",
+      cues: [],
+      language: null,
+    });
+    const track = await app.inject({
+      method: "GET",
+      url: `${transcriptUrl}/captions.vtt`,
+    });
+    expect(track.statusCode).toBe(404);
+    expect(calls).toContainEqual({
+      sync: { tenantId: TENANT, mediaAssetId: ASSET_ID },
+    });
+    await app.close();
+  });
+
+  it("is the same 404 for a pitch the caller may not play", async () => {
+    const app = buildApp({
+      principal: PRINCIPAL,
+      context: CONTEXT,
+      service: transcriptService(new MediaAssetNotFoundError()),
+    });
+    for (const suffix of ["transcript", "captions.vtt"]) {
+      const response = await app.inject({
+        method: "GET",
+        url: `${transcriptUrl}/${suffix}`,
+      });
+      expect(response.statusCode, suffix).toBe(404);
+      expect(response.body).not.toContain("We help clinics");
+    }
+    await app.close();
+  });
+});
