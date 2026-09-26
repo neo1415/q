@@ -4,7 +4,7 @@ Persistent instructions for Claude Code in this repository. Read fully before th
 
 ## Budget — Not a Blank Cheque (founder rule, applies to every session and every agent)
 
-**Claude credits.** The cloud budget is **$250 total and must last 4–5 days**: pace at **≤ $50/day**. Speed still matters, so spend where it moves the product, never on waste.
+**Claude credits.** The cloud budget is **$250 total**; that total is the only hard ceiling. **Deadline: the whole product done, polished and deployed, with seeded videos, by Monday 2026-09-28 morning.** The founder is unavailable on Sunday. **Never stop or pause work because of a daily figure.** Pacing exists to remove waste, not to idle. Spend where it moves the product toward the Monday definition of done in `docs/handoff/cloud-cost-playbook.md` section 0.
 
 - **Read `docs/handoff/cloud-cost-playbook.md` before spawning any agent.** It is the verified cost model and the settings to use.
 - Keep the prompt cache warm. Cloud env vars are `CLAUDE_CODE_PROMPT_CACHE_TTL=1h` and `CLAUDE_CODE_SUBAGENT_PROMPT_CACHE_TTL=1h`, because builds idle workers past the 5-minute default. Never switch model, enable fast mode, or change MCP/plugins mid-session.
@@ -15,7 +15,7 @@ Persistent instructions for Claude Code in this repository. Read fully before th
   - The lead runs `/compact` after each merge-and-deploy cycle.
   - One packet per worker. Resume a worker for the same packet; never duplicate one.
 - The cloud VM has 4 vCPU and 16 GB: at most 2 workers building, testing or running a browser at once, and eslint always alone. Commit and push after every meaningful step (idle VMs are reclaimed).
-- Run `/usage` morning, midday and evening, and log it in `docs/handoff/research/ledger.md`. Over pace means fewer workers first.
+- Run `/usage` morning, midday and evening, and log it in `docs/handoff/research/ledger.md`. If the total trends toward $250 before Monday's must-haves are done, cut waste and lower-priority items first; never stop the must-haves.
 - Workers run Opus 5.5 at medium effort, with tight prompts naming the exact files and requirement ids, and reports of 60 lines or fewer. Targeted tests only; full gates just before merging to the deploy branch. No sleep-polling.
 
 **The founder's API credits are off-limits.** OpenAI (a $5 top-up), Gemini, ElevenLabs, Deepgram, Cloudflare Stream, Bright Data and any other provider are paid by the founder.

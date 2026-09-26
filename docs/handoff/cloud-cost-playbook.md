@@ -1,13 +1,35 @@
 ---
-title: Cloud cost playbook ($250 over 4-5 days)
+title: Cloud cost playbook ($250 total, deadline Monday 2026-09-28)
 project: capital-q
 date: 2026-09-26
 tags: [budget, cloud, claude-code, cost]
 ---
 
-# Cloud cost playbook: $250 over 4–5 days
+# Cloud cost playbook: $250 total, deadline Monday morning
 
-**Rule:** the founder funds this personally. Budget pace is **≤ $50/day**. Speed still matters, so spend where it moves the product.
+**Rule:** the founder funds this personally. The **only hard ceiling is $250 total**. There is **no daily cap**: never stop, pause or slow the must-haves because of a daily figure. The deadline is fixed: **done, polished and deployed by Monday 2026-09-28 morning**, and the founder is unavailable all of Sunday. So work runs continuously and decides without waiting for answers. Everything below is about getting maximum product per dollar, not about spending less for its own sake.
+
+## 0. Monday definition of done (priority order: finish higher items first)
+
+Status labels matter: say NOT STARTED / PARTLY BUILT / DONE-NOT-DEPLOYED / LIVE.
+
+1. **Voice speaks smoothly** (R22): no stutter, answers aloud every time.
+2. **Q can do anything the app can** (R20 capability registry): profile edits, the Q Card, navigation, documents, all by voice and text. **Q knows the screen** (R21).
+3. **Minimal Home Q page and product UI** (R23, R24):
+   - collapsed side bars;
+   - Q presence visible without scrolling;
+   - Board opens only on its icon or when a file is made, and files open in a big modal;
+   - no evidence or truth-label clutter in chats;
+   - theme dropdown icon; voice options behind an icon; mute and end inside the input; scope chip moved out of the input.
+4. **Seeded world** (R29, R19): about 12 fictional companies with stories, decks AND narrated deck videos published as pitches; about 8 investors. Discover shows them full height, centred, with icon actions.
+5. **Profile shows everything from onboarding** (R25); **Settings page** (R28); **Relationships page** (R27).
+6. **Q Card and public /@handle page redesign** (R26); founder Pitch & media page (VID).
+7. **Journey audit fixes** (R30) for founder and investor, end to end on the deployed site.
+8. Then, in order: BIZ-009 investor research-first onboarding, BIZ-005 brand kit, BIZ-006 /ops console, UX-01 instant shell.
+
+Out of scope unless the founder provides accounts: BIZ-007 Gmail, BIZ-008 meetings. Dropped: nearby-video speaker filtering.
+
+If the $250 total starts running short, drop from the bottom of this list, never the top. Deploy each item as it lands, so Monday shows the best achievable product even if something at the bottom is unfinished.
 
 Every number and setting below was checked on 2026-09-26 against the official docs (links in the last section). The founder's provider API credits (OpenAI, Gemini, ElevenLabs, Deepgram, Cloudflare Stream, Bright Data) are covered separately in CLAUDE.md: tests never touch them.
 
@@ -119,7 +141,7 @@ Every token in context is re-paid on every tool call.
   - The `Prompt cache (main)` line shows the hit rate and names the likely cause of the last miss.
   - On a plan with usage credits, the usage-credits row shows the month's spend against the limit. Hard cap: the founder can set a monthly spend limit at claude.ai → Settings → Usage.
 - Log each check in `docs/handoff/research/ledger.md`: `YYYY-MM-DD HH:MM spend ~$X (day total ~$Y), cache hit Z%, workers N`.
-- **Over pace** (more than $50 by end of day, or more than $25 by midday): drop to 2 workers, then 1. Stop browser-evidence runs except for final gates. Tell the founder in one line.
+- **Trending over** (spend on course to exceed $250 before the section 0 must-haves are done): first remove waste (cache misses, oversized contexts, duplicate runs, needless browser evidence), then drop items from the bottom of section 0. Keep workers on the top items running. Note it in the ledger for the founder.
 
 ## Sources (fetched 2026-09-26)
 
