@@ -14,17 +14,14 @@ import {
 import type { OnboardingStepManifest } from "@capital-q/onboarding";
 import { type ModelGateway } from "@capital-q/model-gateway";
 import {
-  ConversationTurnReadingSchema,
   type ConversationTurnReading,
   type SpeechDelivery,
   type InterviewConductorResult,
   type InterviewOpenStep,
   type QualitativeMeaning,
-  type ReadingConfidence,
   type TurnTrace,
   type InterviewDestination,
 } from "@capital-q/q-core";
-import { SPOKEN_QUESTIONS, stepNoun } from "./step-copy.js";
 /**
  * Q conducting the interview (CQ-Q-VOICE-001 rework).
  *
@@ -312,106 +309,6 @@ export function signupContextFromToken(accessToken: string): {
   }
 }
 
-/**
- * Steps whose values are always read back before they are recorded (A §13).
- *
- * Figures: an amount heard wrong is the costliest mistake a voice can make,
- * so a stated figure is read back. Only a figure, though — the key pattern
- * matched "revenue" and so held I4.revenue_state, a choice between "pre-
- * revenue is fine" and "revenue required", for a yes it did not need; the
- * person said yes, the model restated rather than decided, and Q asked the
- * same question three times (acceptance walkthrough, 2026-09-24). Hard
- * exclusions are held whatever their shape: they remove companies outright.
- */
-const MATERIAL_FIGURE_PATTERN =
-  /target_amount|cheque|revenue|mrr|arr|customers|valuation|round_size/i;
-const MATERIAL_ANY_PATTERN = /hard_exclusions|sector_exclusions/i;
-const MAX_RECENT_TURNS = 12;
-const RECENT_TURN_MAX_CHARS = 600;
-/**
- * All the recent turns together (CQ-QX-005). Twelve turns of six hundred
- * characters is 7,200 characters — near two thousand tokens on top of a
- * v8 prompt that is already most of a small model's request limit. The
- * conversation core now carries what the transcript used to be read
- * for (the open question, the resume target, what is on screen), so the
- * newest turns are kept whole and older ones are dropped once this is
- * spent, rather than the request being refused outright.
- */
-const RECENT_TURNS_TOTAL_CHARS = 2_400;
-
-/**
- * Questions whose own prompt is written in the platform's vocabulary
- * rather than the person's (Workstream A).
- *
- * "Which mandate are we defining?" is a perfectly good label on a screen
- * where the drafts are listed beside it, and it is nonsense said aloud
- * to somebody who came to describe how they invest — they have never
- * heard the word used that way and there is nothing on screen to explain
- * it. Keyed by step key, so this is a presentation override for named
- * steps and not an attempt to rewrite copy by matching words in it.
- *
- * It is a fallback: the mandate step is normally resolved by the
- * platform without ever being asked (see `resolveSingleReference`), and
- * this is what Q says in the rarer case where there is a genuine choice.
- */
-const PLAIN_QUESTIONS: Readonly<Record<string, string>> = {
-  "I1.mandate_context":
-    "Are we setting up your main investment strategy, or a different one?",
-};
-
-/** The step as a noun, from the platform's own copy (step-copy.ts). */
-function noun(step: OnboardingStepManifest): string {
-  return stepNoun(step.stepKey, step.configuration.prompt);
-}
-
-function askAgain(
-  step: OnboardingStepManifest,
-  input: {
-    readonly signup?: { readonly organisationName: string | null } | undefined;
-  },
-): string {
-  const registered = input.signup?.organisationName ?? null;
-  if (
-    registered !== null &&
-    /\.(organisation_name|company_name)$/.test(step.stepKey)
-  ) {
-    return `Are we setting things up as ${registered}, or do you go by another name?`;
-  }
-  return questionFor(step);
-}
-
-function questionFor(step: OnboardingStepManifest): string {
-  const c = step.configuration;
-  /**
-   * Always a whole question (ACC round 3 #3, #4). A step whose prompt is a
-   * form label ("Typical cheque") is asked in the platform's own words
-   * (step-copy.ts); one whose prompt is already a question is asked as
-   * written. Never "Website?" or "typical cheque? Just the number…".
-   */
-  const spoken =
-    SPOKEN_QUESTIONS[step.stepKey] ??
-    (/\?\s*$/.test(c.prompt) ? c.prompt.trim() : `What's your ${noun(step)}?`);
-  const stem = spoken.replace(/[.?!]+$/, "");
-  switch (c.stepType) {
-    case "single_select":
-    case "multi_select": {
-      const labels = optionsOf(step)
-        .map((o) => o.label)
-        .slice(0, 7);
-      return `${stem}: ${labels.join(", ")}?`;
-    }
-    case "range":
-      return `${spoken} Just the number is fine.`;
-    case "short_text":
-    case "long_text":
-    case "voice_text":
-    case "document_upload":
-    case "confirmation":
-    case "reference_select":
-      return spoken;
-  }
-}
-
 export function definitionFor(journey: "founder" | "investor") {
   return journey === "founder" ? FOUNDER_DEFINITION_V2 : INVESTOR_DEFINITION_V1;
 }
@@ -644,15 +541,6 @@ function asList(raw: string | readonly string[] | boolean): readonly string[] {
   if (typeof raw === "string") return [raw];
   if (typeof raw === "boolean") return [];
   return raw;
-}
-
-function isChoiceStep(step: OnboardingStepManifest): boolean {
-  const type = step.configuration.stepType;
-  return (
-    type === "single_select" ||
-    type === "multi_select" ||
-    type === "reference_select"
-  );
 }
 
 const NUMBER_WORDS: Readonly<Record<string, number>> = {
@@ -909,33 +797,6 @@ export function toResponseValue(
 }
 
 /**
- * What "no restriction" means for one step (Workstream A).
- *
- * The model reads that somebody placed no restriction on something —
- * "everywhere on the planet", "it can be anyone", "we don't mind". What
- * that IS depends entirely on the step, and the step is the platform's
- * to read, not the model's:
- *
- * - A multi-select whose options are the whole range of an answer
- *   (lead, co-invest, follow) records no preference as all of them.
- *   "It can be anyone" is a real, recordable answer there.
- * - A single-select whose vocabulary already contains a no-preference
- *   code records that code. `any` is a canonical option key in the
- *   Investor constraint registry, not a word matched in prose.
- * - A taxonomy step records no restriction as no entries: the journey
- *   itself says "leave empty for anywhere". There is no node for
- *   everywhere, so a list is the wrong shape and SET_ASIDE is the
- *   journey's own way of saying it.
- *
- * Anything else — a required free-text answer, a number — genuinely
- * cannot represent it, and the honest outcome is to ask.
- */
-type UnrestrictedOutcome =
-  | { readonly kind: "VALUE"; readonly value: OnboardingResponseValue }
-  | { readonly kind: "SET_ASIDE" }
-  | { readonly kind: "CANNOT" };
-
-/**
  * The journeys' exclusion lists, each paired with its sibling (G, the
  * acceptance directive of 2026-09-24).
  *
@@ -964,19 +825,3 @@ export const EXCLUSION_SIBLINGS: ReadonlyMap<string, ExclusionSibling> =
           : [],
       ),
   );
-
-/**
- * A cheque figure that contradicts one already on the record
- * (Workstream A).
- *
- * "Maximum cheque is one hundred" against a minimum of fifty thousand is
- * not a maximum, it is a scale that was never said. The model is asked
- * to mark that as SCALE_UNCLEAR, and usually does; this is the
- * deterministic half, because a guessed magnitude is one of the few
- * mistakes here that silently changes who an investor is shown.
- *
- * The domain invariant is the check — minimum ≤ typical ≤ maximum —
- * rather than any threshold anybody invented. It never guesses the
- * intended value; it only says the pair cannot both be right.
- */
-const CHEQUE_ORDER = ["cheque_min", "cheque_typical", "cheque_max"] as const;
