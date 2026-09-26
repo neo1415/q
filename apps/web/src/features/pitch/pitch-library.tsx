@@ -44,6 +44,11 @@ export type PitchLibraryProps = {
   readonly refreshKey: number;
   /** Told when a withdrawal here changed which pitch is current. */
   readonly onCurrentChanged: () => void;
+  /**
+   * Told when a version's preview opens or closes, so the page keeps one
+   * active player (doc 20): the current pitch's preview above holds.
+   */
+  readonly onPreviewChange?: ((open: boolean) => void) | undefined;
 };
 
 /** Posters are minted grants: ask for the few a founder is likely to look at. */
@@ -70,6 +75,7 @@ export function PitchLibrary({
   company,
   refreshKey,
   onCurrentChanged,
+  onPreviewChange,
 }: PitchLibraryProps) {
   const [rows, setRows] = useState<readonly PitchVersionRow[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -79,6 +85,9 @@ export function PitchLibrary({
   const [working, setWorking] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [reload, setReload] = useState(0);
+  useEffect(() => {
+    onPreviewChange?.(previewing !== null);
+  }, [previewing, onPreviewChange]);
   const reducedMotion = useSyncExternalStore(
     subscribeReducedMotion,
     prefersReducedMotion,
