@@ -15,17 +15,18 @@ Status labels matter: say NOT STARTED / PARTLY BUILT / DONE-NOT-DEPLOYED / LIVE.
 
 1. **Voice speaks smoothly** (R22): no stutter, answers aloud every time.
 2. **Q can do anything the app can** (R20 capability registry): profile edits, the Q Card, navigation, documents, all by voice and text. **Q knows the screen** (R21).
-3. **Minimal Home Q page and product UI** (R23, R24):
+3. **Investor research-first onboarding** (BIZ-009, R13): Q first researches the investor from public sources (website, declared links; Companies House/SEC only if the founder supplies the key/contact), pre-builds the profile and mandate as recommendations with provenance, the investor confirms, and onboarding finishes much faster. Founder presence research already exists: align with it.
+4. **Minimal Home Q page and product UI** (R23, R24):
    - collapsed side bars;
    - Q presence visible without scrolling;
    - Board opens only on its icon or when a file is made, and files open in a big modal;
    - no evidence or truth-label clutter in chats;
    - theme dropdown icon; voice options behind an icon; mute and end inside the input; scope chip moved out of the input.
-4. **Seeded world** (R29, R19): about 12 fictional companies with stories, decks AND narrated deck videos published as pitches; about 8 investors. Discover shows them full height, centred, with icon actions.
-5. **Profile shows everything from onboarding** (R25); **Settings page** (R28); **Relationships page** (R27).
-6. **Q Card and public /@handle page redesign** (R26); founder Pitch & media page (VID).
-7. **Journey audit fixes** (R30) for founder and investor, end to end on the deployed site.
-8. Then, in order: BIZ-009 investor research-first onboarding, BIZ-005 brand kit, BIZ-006 /ops console, UX-01 instant shell.
+5. **Seeded world** (R29, R19): about 12 fictional companies with stories, decks AND narrated deck videos published as pitches; about 8 investors. Discover shows them full height, centred, with icon actions.
+6. **Profile shows everything from onboarding** (R25); **Settings page** (R28); **Relationships page** (R27).
+7. **Q Card and public /@handle page redesign** (R26); founder Pitch & media page (VID).
+8. **Journey audit fixes** (R30) for founder and investor, end to end on the deployed site.
+9. Then, in order: BIZ-005 brand kit, BIZ-006 /ops console, UX-01 instant shell.
 
 Out of scope unless the founder provides accounts: BIZ-007 Gmail, BIZ-008 meetings. Dropped: nearby-video speaker filtering.
 
