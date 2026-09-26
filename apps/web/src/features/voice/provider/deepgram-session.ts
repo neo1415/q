@@ -1,6 +1,6 @@
 "use client";
 
-import { AgentMicrophone, AgentPlayer, AgentSession } from "@deepgram/agents";
+import { AgentMicrophone } from "@deepgram/agents";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type {
@@ -10,6 +10,8 @@ import type {
   VoiceState,
   VoiceTranscriptLine,
 } from "../session";
+import { AgentSocket } from "./agent-socket";
+import { PcmPlayer } from "./pcm-player";
 
 /**
  * The Deepgram Voice Agent as the browser's transport (CQ-Q-VOICE-001
@@ -17,6 +19,13 @@ import type {
  * every "think" the agent makes goes back to the Q API's own endpoint, so
  * what the person hears is Q. This adapter owns the microphone, the
  * speaker and the socket, and nothing else: no words are decided here.
+ *
+ * The microphone is the SDK's; the socket (`AgentSocket`) and the speaker
+ * (`PcmPlayer`) are ours, because the SDK's pair is what made Q stutter
+ * (R22): its socket delivered each 20 ms frame through a serial Blob
+ * read that fell seconds behind on a busy page, and its player started
+ * each frame on arrival with nothing held back, so every late frame was a
+ * gap in the voice.
  */
 
 const PLAIN_ERRORS = {
@@ -83,7 +92,12 @@ const REPAIR_POLL_MS = 100;
 /** A repair not decided by then is dropped; the person can say "go on". */
 const REPAIR_GIVE_UP_MS = 20_000;
 const CONTINUE_SIGNAL = "[continue]";
-/** Audio in flight when the agent stopped arrives within this. */
+/**
+ * Audio in flight when the agent stopped arrives within this. True only
+ * because frames are read straight off the socket: behind the SDK's Blob
+ * hop they reached this code seconds late, after the window had closed,
+ * and the answer the person talked over played on.
+ */
 const STALE_AUDIO_MS = 700;
 
 /** The person's words without the cue, or "" when the line was only the cue. */
@@ -118,9 +132,9 @@ let counter = 0;
 const newId = () => `dg-${String(Date.now())}-${String((counter += 1))}`;
 
 type Live = {
-  readonly session: AgentSession;
+  readonly session: AgentSocket;
   readonly microphone: AgentMicrophone;
-  readonly player: AgentPlayer;
+  readonly player: PcmPlayer;
 };
 
 export function useDeepgramVoiceSession(
@@ -241,15 +255,13 @@ export function useDeepgramVoiceSession(
       discardUntilRef.current = 0;
 
       const token = credential.token;
-      const session = new AgentSession({
-        auth: { tokenFactory: () => Promise.resolve(token) },
+      const session = new AgentSocket({
+        token,
         agent: settings.agent,
-        audio: {
-          input: { encoding: "linear16", sampleRate: INPUT_SAMPLE_RATE },
-          output: { encoding: "linear16", sampleRate: OUTPUT_SAMPLE_RATE },
-        },
+        input: { encoding: "linear16", sampleRate: INPUT_SAMPLE_RATE },
+        output: { encoding: "linear16", sampleRate: OUTPUT_SAMPLE_RATE },
       });
-      const player = new AgentPlayer({ sampleRate: OUTPUT_SAMPLE_RATE });
+      const player = new PcmPlayer({ sampleRate: OUTPUT_SAMPLE_RATE });
       /**
        * Where the audio stops, if it stops.
        *
@@ -474,6 +486,12 @@ export function useDeepgramVoiceSession(
         player.queue(chunk);
       });
       session.on("agent-audio-done", () => {
+        // Nothing more is coming for this reply: play what is held now
+        // rather than waiting out the jitter buffer.
+        player.flush();
+        // How the speaker kept up, for the console only (as the heartbeat):
+        // a gap here is a break in Q's voice the person heard.
+        console.info("[voice] playback", player.stats);
         const remaining = Math.max(0, player.getRemainingPlaybackTime());
         window.setTimeout(
           () => {

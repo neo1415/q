@@ -13,7 +13,7 @@ import {
  * Barge-in and one utterance per turn, in the browser (acceptance J and
  * the voice half of B, 2026-09-24).
  *
- * The Deepgram SDK is replaced by a scripted double: the test plays the
+ * The agent socket and the speaker are replaced by scripted doubles: the test plays the
  * provider's events in the order the agent sends them and reads what the
  * adapter did with the speaker and the socket. What is proven:
  *
@@ -103,6 +103,12 @@ class FakePlayer {
   getRemainingPlaybackTime() {
     return this.remaining;
   }
+  flush() {
+    return undefined;
+  }
+  get stats() {
+    return { underruns: 0, gapMs: 0, blocks: 0, frames: 0, prebufferMs: 0 };
+  }
   getOutputVolume() {
     return 0;
   }
@@ -115,9 +121,13 @@ class FakePlayer {
 }
 
 vi.mock("@deepgram/agents", () => ({
-  AgentSession: FakeSession,
   AgentMicrophone: FakeMicrophone,
-  AgentPlayer: FakePlayer,
+}));
+vi.mock("../src/features/voice/provider/agent-socket", () => ({
+  AgentSocket: FakeSession,
+}));
+vi.mock("../src/features/voice/provider/pcm-player", () => ({
+  PcmPlayer: FakePlayer,
 }));
 
 const { useDeepgramVoiceSession } =
