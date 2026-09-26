@@ -1,13 +1,11 @@
 "use client";
 
-import {
-  useCallback,
-  useEffect,
-  useState,
-  useSyncExternalStore,
-} from "react";
+import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 
-import type { CompanyDto, PlaybackAuthorizationDto } from "@capital-q/contracts";
+import type {
+  CompanyDto,
+  PlaybackAuthorizationDto,
+} from "@capital-q/contracts";
 import { Button } from "@capital-q/ui/button";
 import { Check, ICON_SIZE, Play, X } from "@capital-q/ui/icons";
 import { InlineNotice, Skeleton } from "@capital-q/ui/states";
@@ -56,7 +54,10 @@ type Posters = Readonly<Record<string, string | null>>;
 const REDUCED_MOTION_QUERY = "(prefers-reduced-motion: reduce)";
 
 function subscribeReducedMotion(onChange: () => void): () => void {
-  if (typeof window === "undefined" || !("matchMedia" in window)) {
+  if (
+    typeof window === "undefined" ||
+    typeof window.matchMedia !== "function"
+  ) {
     return () => {};
   }
   const media = window.matchMedia(REDUCED_MOTION_QUERY);

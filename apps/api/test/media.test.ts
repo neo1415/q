@@ -235,7 +235,11 @@ describe("POST /v1/companies/:companyId/pitch", () => {
     const { service, calls } = fakeService({
       createCompanyPitch: (command) => {
         calls["create"]?.push(command);
-        return Promise.resolve({ asset: ASSET, replaced: null, replayed: true });
+        return Promise.resolve({
+          asset: ASSET,
+          replaced: null,
+          replayed: true,
+        });
       },
     });
     const app = buildApp({ principal: PRINCIPAL, context: CONTEXT, service });
