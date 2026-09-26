@@ -87,10 +87,13 @@ import {
   createDefaultDisclosureResolvers,
   createDisclosureAccessService,
   createDisclosureResourceResolverRegistry,
+  createPermissionsService,
   createPostgresDisclosurePolicyRepository,
   createRelationshipPartyResolver,
+  createVisibilityCentre,
   systemDisclosureClock,
 } from "@capital-q/permissions";
+import { PERMISSIONS_EVENTS } from "@capital-q/permissions/events";
 import {
   createPostgresQActionRepositories,
   createQActionNarrator,
@@ -160,6 +163,11 @@ import {
   createRelationshipActionBoard,
   createRelationshipIntelligencePort,
 } from "./composition/relationship-intelligence.js";
+import {
+  createRevokeShareAction,
+  createShareRaiseAction,
+  createVisibilityActionBoard,
+} from "./composition/visibility-actions.js";
 import { createInvestorFeedPort } from "./composition/investor-feed.js";
 import {
   createDiscoveryService,
@@ -654,6 +662,41 @@ const relationshipBoard = createRelationshipActionBoard({ logger });
 // A profile change the person asked Q for waits here for approval (BIZ-002).
 const profileChangeBoard = createProfileChangeBoard({ logger });
 
+// Who can see what (CQ-BIZ-003): the permissions context's visibility
+// centre, composed as the application API composes it -- the same
+// disclosure resolvers, the policy manager for shares and revokes, and the
+// company's relationships from InterestService's company-side list.
+const permissionsService = createPermissionsService({
+  sql: database.sql,
+  transactions: database.transactions,
+  authorization,
+  outbox: createOutboxWriter({
+    registry: createEventRegistry(PERMISSIONS_EVENTS),
+  }),
+  audit: createPostgresMaterialActionAuditWriter(),
+  resolvers: disclosureResolvers,
+  relationshipParties,
+});
+const visibilityCentre = createVisibilityCentre({
+  access: permissionsService.access,
+  inspect: permissionsService.inspectResourceDisclosure,
+  policies: permissionsService.policies,
+  authorization,
+  companies,
+  capital,
+  relationshipParties,
+  relationshipsOf: async (actor, companyId) =>
+    (
+      await interestService.listRelationshipsForCompany({ actor, companyId })
+    ).map((listing) => ({
+      relationshipId: listing.relationship.id,
+      investorOrganisationId: listing.relationship.investorOrganisationId,
+      name: listing.counterpartName,
+    })),
+});
+// Shares and revokes Q prepares wait here for the Approval Engine.
+const visibilityBoard = createVisibilityActionBoard({ logger });
+
 // The Tool Registry (CQ-Q-007): four SAFE_READ tools over the same public
 // query ports and the same two authorities the firewall uses, plus the two
 // bounded public-web research tools when a research provider is composed.
@@ -702,6 +745,10 @@ const qTools = createQTools({
     }),
     // BIZ-002: every profile field the page edits, Q can prepare.
     profileChanges: profileChangeBoard,
+    visibility: {
+      state: (actor, companyId) => visibilityCentre.state({ actor, companyId }),
+      prepareForApproval: visibilityBoard.prepareForApproval,
+    },
   },
   logger,
 });
@@ -769,6 +816,17 @@ const qActionRegistry = createQActionRegistry([
   createExpressInterestAction({ interests: interestService, logger }),
   // The company's answer: the inbox's own command, approved (CQ-NET-011).
   createRespondToInterestAction({ interests: interestService, logger }),
+  // Sharing the raise with an investor, and revoking it (CQ-BIZ-003).
+  createShareRaiseAction({
+    visibility: visibilityCentre,
+    authorization,
+    logger,
+  }),
+  createRevokeShareAction({
+    visibility: visibilityCentre,
+    authorization,
+    logger,
+  }),
   // What Q shows about the person: their own record, their own approval.
   createPersonProfileUpdateAction({ people, logger }),
   // The investor organisation's declared profile (BIZ-002).
@@ -799,6 +857,7 @@ const qActionPort = createQActionPort({
   proposer: chainProposers(
     relationshipBoard.proposer,
     profileChangeBoard.proposer,
+    visibilityBoard.proposer,
     profileBoard,
   ),
   // What Q says about an action is read from the records the engine
