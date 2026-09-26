@@ -21,12 +21,7 @@ import type {
  */
 
 export type PitchVersionPhase =
-  | "WAITING"
-  | "UPLOADING"
-  | "PROCESSING"
-  | "READY"
-  | "FAILED"
-  | "WITHDRAWN";
+  "WAITING" | "UPLOADING" | "PROCESSING" | "READY" | "FAILED" | "WITHDRAWN";
 
 export type PitchVersionRow = {
   readonly pitch: MediaAssetDto;

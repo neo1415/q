@@ -67,10 +67,7 @@ export function DesktopSidebar({
                 href={FOUNDER_MEDIA_NAVIGATION.href}
                 label={FOUNDER_MEDIA_NAVIGATION.label}
                 Icon={FOUNDER_MEDIA_NAVIGATION.icon}
-                active={isActiveRoute(
-                  pathname,
-                  FOUNDER_MEDIA_NAVIGATION.href,
-                )}
+                active={isActiveRoute(pathname, FOUNDER_MEDIA_NAVIGATION.href)}
               />
             </li>
           ) : null}
