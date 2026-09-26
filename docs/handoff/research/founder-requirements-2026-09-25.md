@@ -33,3 +33,30 @@ R17. Deploy now-ish so the founder can test; keep deploying as things land.
 - C9 Email replies: Gmail users.watch + Pub/Sub, Google app in Testing mode for demo (≤100 test users); CASA needed before real users.
 - C11 Card name: "Q Card".
 Plan: business-research.md P0 packets BIZ-001..012.
+
+## Added 2026-09-26
+R18. Discover must feel fully TikTok-like and smooth (preloading), with Q "watching with us": ask about the video at any moment; Q knows which pitch and the timestamp, answers from the transcript (and later visuals). Packet: pitch transcripts via Cloudflare Stream captions (also closes captions gap) + Q tool reading what's said around a timestamp; UXB passes pitch id + playback position to Ask Q.
+R19. AI-generated pitch videos from decks — founder chose "narrated deck video": deck slides + Q-written script + ElevenLabs narration → MP4 → published as pitch; labelled "AI-narrated" to investors; founder voice cloning only with explicit consent. Near-free.
+- 2026-09-26 decision: "ignore speech from a nearby video" (speaker filtering) is DROPPED. Do not build.
+
+## Added 2026-09-26 (evening, founder live review) — all important
+R20. CAPABILITY REGISTRY ("ledger of tools"). One code-built registry of every action the app can do (navigation to every screen, profile edits, visibility, handles/Q Card, documents PDF/PPTX, media, search/research APIs, relationships/interests, design/creation), each with its typed tool, authorize step and approval class. Q consults it on every turn (typed or voice) instantly, picks the tool and calls it straight away. Goal: Q can do anything the app can. Live bug: "edit my profile" by telling Q still does not work; "make a Q card" produced a brief.
+R21. Q sees the screen: Q always knows what the person is looking at (route, the entities on screen, selection, open document/pitch + position) so it can answer and navigate. Implement as structured app-state context sent with each turn (not pixel screenshots), through the Context Firewall.
+R22. Voice streaming is broken: speech stutters "like a game at 2 fps", words barely come out. P0, fix ASAP (gapless audio scheduling / buffering / chunk sizes / sentence streaming).
+R23. Minimalism and abstraction, very high bar. No evidence/fact/gap blocks, truth labels or "self-reported" chips dumped into chats or pages. Answer first; sources and evidence available on demand (tap "Sources"), never by default. Investors want things done immediately. Review every surface for verbosity. (Progressive disclosure keeps the evidence invariants intact: record ADR.)
+R24. Home Q page layout:
+  - Default on Q page: ALL side bars collapsed; maximum space for the Q presence, which must be visible without scrolling (currently you must scroll up to see Q).
+  - Right side bar (Board): collapsible, closed by default; opens when its icon is clicked or when a file (PDF/PPTX/etc.) is generated; closable again. Opening a file shows a big closable modal viewer.
+  - Left side bar collapsible. Remove the separate chat icon from the left bar: the Conversations control (chat list + New chat) is the right pattern and stays.
+  - Theme: a single icon that opens a small dropdown (light/dark/system).
+  - Q motion setting: move to profile for now; build a proper Settings page.
+  - Voice gender (male/female) buttons: remove from the page; a small icon opening those options.
+  - Scope/context chip ("Investor private · Zino Aviation") out of the input field: move to the side bar or top/bottom.
+  - Mute and End controls live inside the typing field.
+R25. Profile page is sparse: everything answered in onboarding must appear in the profile (mandate, sectors, stages, geographies, cheque sizes, thesis, etc. for investors; full company data for founders), editable, minimal presentation.
+R26. Q Card redesign: beautiful, professional card; the public scanned page (/@handle) redesigned with real UX thought (not basic).
+R27. Relationships get their own page (top-level navigation).
+R28. Settings page (theme, Q motion, voice, notifications, connected accounts later).
+R29. Seeded content: fictional founders/companies with full stories, decks AND videos (narrated deck videos, R19), and investors. Discover videos full screen height, centre aligned, action buttons as icons (not big text boxes).
+R30. Audit the whole user flow and journey (founder and investor), then fix.
+R31. Cloud readiness: be ready to move to Claude cloud at the founder's say-so. Hand over EVERYTHING (not summaries): state, branches, queue, requirements, decisions, memory, sources, rules. Install graphify there if possible. Cloud lead runs multiple agents like here, every agent on Opus 5.5 at medium effort, each told which sources/files to read. It works unsupervised: builds, tests, deploys, and the founder returns to a far-along product.
