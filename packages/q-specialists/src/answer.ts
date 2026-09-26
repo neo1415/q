@@ -116,6 +116,16 @@ export type SpecialistQAnswerDependencies = {
    */
   readonly visibility?: QVisibilityNotebook | undefined;
   /**
+   * The actions (not reads) this run offers the answer's model, name and
+   * what each does, so the turn reader never files a document for a
+   * request one of them performs. Absent: none are known.
+   */
+  readonly offeredActions?:
+    | ((
+        request: QAnswerRequest,
+      ) => Promise<readonly { readonly name: string; readonly does: string }[]>)
+    | undefined;
+  /**
    * The person's own investment mandate, read under this run's plan (the
    * firewall binds it only to the investor's own organisation). NOT_AN_
    * INVESTOR: the person has no investor organisation in this run. Absent:
@@ -810,9 +820,16 @@ export function createSpecialistQAnswer(
      * path already waited on it, so only the conversational path pays
      * the one classification it was already making.
      */
+    // The other actions this run can take, from what is offered: the
+    // reader must know them, or "make a Q card" reads as a document.
+    const actions =
+      dependencies.offeredActions === undefined
+        ? []
+        : await dependencies.offeredActions(request).catch(() => []);
     const readTurn = () =>
       turns.read({
         utterance: latest.content,
+        actions,
         recentTurns: history
           .filter((m) => m.id !== latest.id)
           .slice(-6)

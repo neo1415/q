@@ -31,7 +31,7 @@ export const TURN_READER_V6: PromptDefinition<
 > = {
   ...TURN_READER_V5,
   version: 6,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   changeDescription:
     "Founder live: a request to be taken somewhere with the destination left to Q is NAVIGATE, and Q chooses the most useful screen from the conversation.",
   effectiveFrom: "2026-09-26",
