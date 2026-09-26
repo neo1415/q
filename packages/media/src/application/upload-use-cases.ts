@@ -650,10 +650,16 @@ export type PlaybackGrant = {
  * rule. Every refusal on the viewer path is "not found": a pitch that
  * exists but is private must look exactly like one that does not exist.
  */
-export function createAuthorisePlayback(
+/**
+ * The one rule for "may this actor play this pitch" (CQ-MEDIA-011, R18):
+ * the owner, or a viewer the feed would show it to. Playback tokens and
+ * the pitch's transcript are both decided here, so a transcript can never
+ * be read by anyone who could not watch the video.
+ */
+export function createResolvePlayableAsset(
   dependencies: MediaServiceDependencies,
 ) {
-  const { repositories, videoProvider, viewers } = dependencies;
+  const { repositories, viewers } = dependencies;
 
   const asOwner = async (
     query: AuthorisePlaybackQuery,
@@ -720,8 +726,17 @@ export function createAuthorisePlayback(
     return asset;
   };
 
+  return async (query: AuthorisePlaybackQuery): Promise<MediaAsset> =>
+    (await asOwner(query)) ?? (await asViewer(query));
+}
+
+export function createAuthorisePlayback(
+  dependencies: MediaServiceDependencies,
+) {
+  const { videoProvider } = dependencies;
+  const playable = createResolvePlayableAsset(dependencies);
   return async (query: AuthorisePlaybackQuery): Promise<PlaybackGrant> => {
-    const asset = (await asOwner(query)) ?? (await asViewer(query));
+    const asset = await playable(query);
     if (asset.providerAssetId === null) {
       // READY without bytes cannot happen through this code; if a row says
       // so, it is not something to play.

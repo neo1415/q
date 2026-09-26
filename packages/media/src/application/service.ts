@@ -22,6 +22,11 @@ import {
   createSetPitchPlaybackPolicy,
 } from "./publish-use-cases.js";
 import {
+  createGetPitchTranscript,
+  createGetPitchTranscriptByPitch,
+  createSyncPitchTranscript,
+} from "./transcript-use-cases.js";
+import {
   createAuthorisePlayback,
   createCancelUpload,
   createCreateUploadSession,
@@ -54,6 +59,16 @@ export type MediaService = {
   readonly cancelUpload: ReturnType<typeof createCancelUpload>;
   readonly syncMediaAsset: ReturnType<typeof createSyncMediaAsset>;
   readonly authorisePlayback: ReturnType<typeof createAuthorisePlayback>;
+  /**
+   * The pitch's transcript (R18), read under exactly the playback rule;
+   * by company and pitch for the player, by pitch alone for Q.
+   */
+  readonly getPitchTranscript: ReturnType<typeof createGetPitchTranscript>;
+  readonly getPitchTranscriptByPitch: ReturnType<
+    typeof createGetPitchTranscriptByPitch
+  >;
+  /** Trusted: advance one pitch's transcript a step. Never a browser route. */
+  readonly syncPitchTranscript: ReturnType<typeof createSyncPitchTranscript>;
   /**
    * A verified provider report, applied under the platform's authority
    * (CQ-MEDIA-012). Reached only by a webhook route that has checked the
@@ -125,6 +140,9 @@ export function createMediaService(options: MediaServiceOptions): MediaService {
     cancelUpload: createCancelUpload(dependencies),
     syncMediaAsset: createSyncMediaAsset(dependencies),
     authorisePlayback: createAuthorisePlayback(dependencies),
+    getPitchTranscript: createGetPitchTranscript(dependencies),
+    getPitchTranscriptByPitch: createGetPitchTranscriptByPitch(dependencies),
+    syncPitchTranscript: createSyncPitchTranscript(dependencies),
     applyProviderStatusReport: createApplyProviderStatusReport(dependencies),
     setPitchPlaybackPolicy: createSetPitchPlaybackPolicy(dependencies),
     applyAutomatedModeration: createApplyAutomatedModeration(dependencies),

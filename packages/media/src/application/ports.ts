@@ -177,8 +177,48 @@ export type DiscoverablePitchQueryPort = {
   ) => Promise<ReadonlyMap<string, DiscoverablePitch>>;
 };
 
+/** A pitch's stored transcript (R18): one per asset and language, written once. */
+export type StoredPitchTranscript = {
+  readonly mediaAssetId: MediaAssetId;
+  readonly language: string;
+  readonly source: "PROVIDER_GENERATED";
+  readonly cues: readonly {
+    readonly startMs: number;
+    readonly endMs: number;
+    readonly text: string;
+  }[];
+  readonly vtt: string;
+  readonly createdAt: string;
+};
+
+export type PitchTranscriptRepository = {
+  readonly find: (
+    executor: DatabaseExecutor,
+    tenantId: TenantId,
+    mediaAssetId: MediaAssetId,
+  ) => Promise<StoredPitchTranscript | null>;
+  /** Idempotent on (asset, language): a second write keeps the first. */
+  readonly insert: (
+    tx: TransactionContext,
+    input: Omit<StoredPitchTranscript, "createdAt"> & {
+      readonly tenantId: TenantId;
+    },
+  ) => Promise<void>;
+  /**
+   * Which company owns an asset, in whichever tenant holds it: a lookup
+   * only, so a transcript asked for by pitch id can then be authorised by
+   * the playback rule for that company. Knowing an id grants nothing.
+   */
+  readonly findOwnerCompany: (
+    executor: DatabaseExecutor,
+    mediaAssetId: MediaAssetId,
+  ) => Promise<string | null>;
+};
+
 export type MediaRepositories = {
   readonly mediaAssets: MediaAssetRepository;
+  /** R18. Absent: no transcript is ever stored or read (unknown, not empty). */
+  readonly pitchTranscripts?: PitchTranscriptRepository | undefined;
 };
 
 /**

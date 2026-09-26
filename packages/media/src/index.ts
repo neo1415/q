@@ -70,7 +70,9 @@ export type {
   DiscoverablePitchQueryPort,
   MediaAssetRepository,
   MediaRepositories,
+  PitchTranscriptRepository,
   PitchViewerAccessPort,
+  StoredPitchTranscript,
 } from "./application/ports.js";
 export {
   AUTOMATED_MODERATION_RULE_V1,
@@ -102,6 +104,20 @@ export {
   type ProviderStatusDependencies,
   type ProviderStatusReportOutcome,
 } from "./application/provider-status-use-cases.js";
+export {
+  createGetPitchTranscript,
+  createGetPitchTranscriptByPitch,
+  createSyncPitchTranscript,
+  PITCH_TRANSCRIPT_LANGUAGE,
+  type PitchTranscriptView,
+  type SyncPitchTranscriptOutcome,
+} from "./application/transcript-use-cases.js";
+export {
+  cuesAround,
+  parseWebVtt,
+  WEB_VTT_MAX_CUES,
+  type TimedCue,
+} from "./domain/web-vtt.js";
 export {
   type AuthorisePlaybackQuery,
   type CancelUploadCommand,
@@ -141,6 +157,7 @@ export {
   createPostgresDiscoverablePitchQueryPort,
   createPostgresMediaAssetRepository,
   createPostgresMediaRepositories,
+  createPostgresPitchTranscriptRepository,
 } from "./infrastructure/postgres-media-repository.js";
 export {
   CLOUDFLARE_STREAM_PROVIDER_ID,
