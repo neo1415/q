@@ -150,3 +150,9 @@ export {
   type ArtifactPreparationOutcome,
   type ArtifactPreparation,
 } from "./company/prepare-artifact.js";
+export { createToolOwnMandatePort } from "./own-mandate-port.js";
+export {
+  composeOwnMandateDocument,
+  OWN_MANDATE_ARTIFACT_TYPE,
+  type OwnMandateDocument,
+} from "./own-mandate-document.js";

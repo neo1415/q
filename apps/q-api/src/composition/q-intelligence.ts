@@ -41,6 +41,7 @@ import {
   createRetrievalEvidencePort,
   createSpecialistQAnswer,
   createToolCanonicalPort,
+  createToolOwnMandatePort,
   type ArtifactPreparation,
   type QVisibilityNotebook,
 } from "@capital-q/q-specialists";
@@ -291,6 +292,9 @@ export function composeQIntelligence(
     ...(dependencies.visibility === undefined
       ? {}
       : { visibility: dependencies.visibility }),
+    // Their own mandate, for a mandate document (gap 3): read through the
+    // same tool, under the run's plan.
+    ownMandate: createToolOwnMandatePort(tools, logger),
     ...(logger === undefined ? {} : { logger }),
     // Every turn is read before it is answered (CQ-QX-005): research and
     // failure notices are decided by the conversation core, not by a word
