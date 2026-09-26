@@ -203,10 +203,14 @@ describe("a voice-delivered answer with a document", () => {
 
     act(() => completeVoiceTurn(turn(1)));
 
-    await waitFor(() =>
-      expect(
-        screen.getByText("Zino Aviation: investment mandate"),
-      ).toBeTruthy(),
+    // The first read (the voice line naming the conversation) has no
+    // answer yet; the re-read after the turn does.
+    await waitFor(
+      () =>
+        expect(
+          screen.getByText("Zino Aviation: investment mandate"),
+        ).toBeTruthy(),
+      { timeout: 8000 },
     );
     expect(screen.getByText("Investment mandate")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Open" })).toBeTruthy();
