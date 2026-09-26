@@ -22,6 +22,7 @@ export const config = {
     "/verification/:path*",
     "/profile/:path*",
     "/onboarding/:path*",
+    "/relationships/:path*",
     "/auth/:path*",
   ],
 };
