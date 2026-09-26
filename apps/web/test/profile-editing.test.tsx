@@ -238,6 +238,10 @@ describe("editing a profile field", () => {
     const input = within(row("websiteUrl")).getByRole("textbox", {
       name: "Website",
     });
+    // Not type="url": the browser's own check would refuse a bare domain
+    // before the page could read it (found in the browser, BIZ-002).
+    expect(input.getAttribute("type")).toBe("text");
+    expect(input.getAttribute("inputmode")).toBe("url");
     fireEvent.change(input, { target: { value: "kivu-freight.example" } });
     fireEvent.submit(input.closest("form") as HTMLFormElement);
     // A website without a scheme is read as https, as Q's write path reads it.
@@ -376,6 +380,12 @@ describe("what Q found", () => {
       <ProfileFindings subjectLabel="me" state={{ status: "UNAVAILABLE" }} />,
     );
     expect(screen.getByText(/Couldn't be read just now/)).toBeTruthy();
+    // While streaming: said as a read in progress, never as "nothing".
+    rerender(
+      <ProfileFindings subjectLabel="me" state={{ status: "LOADING" }} />,
+    );
+    expect(screen.getByText(/Reading what Q found/)).toBeTruthy();
+    expect(screen.queryByText(/Nothing found yet/)).toBeNull();
   });
 });
 
