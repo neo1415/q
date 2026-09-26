@@ -33,6 +33,7 @@ import {
   createPostgresCompanyPitchQueryPort,
   createPostgresDiscoverablePitchQueryPort,
   MediaAssetNotFoundError,
+  MediaIdempotencyConflictError,
   MediaOwnerNotFoundError,
   MediaReplacementConflictError,
   MediaRuleError,
@@ -250,10 +251,14 @@ describe("@capital-q/media against local PostgreSQL", () => {
     expect(completed).toBe(true);
   }
 
-  const outboxTypes = async (tx: TransactionContext) => {
-    const rows = await tx.sql<
-      { event_type: string }[]
-    >`select event_type from events.outbox where event_type like 'media.%' order by id`;
+  // Scoped to this world's tenants: the local database is shared, and media
+  // events other work committed there are not this test's to count.
+  const outboxTypes = async (world: World) => {
+    const rows = await world.tx.sql<{ event_type: string }[]>`
+      select event_type from events.outbox
+       where event_type like 'media.%'
+         and tenant_id in (${world.tenantA}, ${world.tenantB})
+       order by id`;
     return rows.map((row) => row.event_type);
   };
 
@@ -280,7 +285,7 @@ describe("@capital-q/media against local PostgreSQL", () => {
       expect(asset.ownerId).toBe(world.companyA);
       expect(replaced).toBeNull();
 
-      expect(await outboxTypes(world.tx)).toEqual(["media.asset.created"]);
+      expect(await outboxTypes(world)).toEqual(["media.asset.created"]);
     });
   });
 
@@ -334,10 +339,68 @@ describe("@capital-q/media against local PostgreSQL", () => {
         companyId: world.companyA,
       });
       expect(current?.id).toBe(second.asset.id);
-      expect(await outboxTypes(world.tx)).toEqual([
+      expect(await outboxTypes(world)).toEqual([
         "media.asset.created",
         "media.asset.replaced",
       ]);
+    });
+  });
+
+  it("answers a retried replacement with the same asset and refuses a reused key (VID)", async () => {
+    await withWorld(async (world) => {
+      const first = await world.service.createCompanyPitch({
+        actor: world.adminA,
+        companyId: world.companyA,
+        input: {},
+        idempotencyKey: `vid-create-${randomUUID()}`,
+        correlationId: CORRELATION(),
+      });
+      const key = `vid-replace-${randomUUID()}`;
+      const replace = () =>
+        world.service.createCompanyPitch({
+          actor: world.adminA,
+          companyId: world.companyA,
+          input: { replacesMediaAssetId: first.asset.id },
+          idempotencyKey: key,
+          correlationId: CORRELATION(),
+        });
+      const second = await replace();
+      const retried = await replace();
+      expect(second.replayed).toBe(false);
+      expect(retried.replayed).toBe(true);
+      expect(retried.asset.id).toBe(second.asset.id);
+      expect(retried.replaced?.id).toBe(first.asset.id);
+      expect(await outboxTypes(world)).toEqual([
+        "media.asset.created",
+        "media.asset.replaced",
+      ]);
+
+      // The same key for a different request is refused, not replayed.
+      await expect(
+        world.service.createCompanyPitch({
+          actor: world.adminA,
+          companyId: world.companyA,
+          input: {},
+          idempotencyKey: key,
+          correlationId: CORRELATION(),
+        }),
+      ).rejects.toBeInstanceOf(MediaIdempotencyConflictError);
+
+      // Another tenant's administrator cannot reach it with the same key.
+      await expect(
+        world.service.createCompanyPitch({
+          actor: world.adminB,
+          companyId: world.companyA,
+          input: { replacesMediaAssetId: first.asset.id },
+          idempotencyKey: key,
+          correlationId: CORRELATION(),
+        }),
+      ).rejects.toBeInstanceOf(MediaOwnerNotFoundError);
+
+      const rows = await world.tx.sql`
+        select count(*)::int as n from media.pitch_requests
+         where media_asset_id in (${first.asset.id}, ${second.asset.id})`;
+      expect(rows[0]?.["n"]).toBe(2);
     });
   });
 
@@ -452,7 +515,7 @@ describe("@capital-q/media against local PostgreSQL", () => {
         companyId: world.companyA,
       });
       expect(history).toHaveLength(1);
-      expect(await outboxTypes(world.tx)).toEqual([
+      expect(await outboxTypes(world)).toEqual([
         "media.asset.created",
         "media.asset.deleted",
       ]);
