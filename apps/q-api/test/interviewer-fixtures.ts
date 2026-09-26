@@ -10,7 +10,7 @@ import { OnboardingSuggestionIdSchema } from "@capital-q/onboarding";
 import type {
   InterviewGateway,
   InterviewTurnInput,
-} from "../src/voice/interviewer.js";
+} from "../src/voice/interview-steps.js";
 import type { RecommendationStore } from "../src/voice/onboarding-port.js";
 
 /**
