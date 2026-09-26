@@ -6,10 +6,17 @@ Persistent instructions for Claude Code in this repository. Read fully before th
 
 **Claude credits.** The cloud budget is **$250 total and must last 4–5 days**: pace at **≤ $50/day**. Speed still matters, so spend where it moves the product, never on waste.
 
-- Check spend at least twice a day and log it in `docs/handoff/research/ledger.md`. When ahead of pace, cut concurrent workers (default 3, max 4) before anything else.
-- Navigate with graphify first (`graphify query`, `explain`, `path`), then read only the file ranges you need. Never read the transcripts in `docs/handoff/transcripts/` end to end: grep them.
-- Workers: Opus 5.5, medium effort, with tight prompts naming the exact files and requirement ids. Resume a stalled agent instead of re-spawning it. No duplicate agents on the same topic.
-- Run targeted tests. Full gates only before merging to the deploy branch. No sleep-polling loops; use background notification. Don't rebuild packages nobody needs.
+- **Read `docs/handoff/cloud-cost-playbook.md` before spawning any agent.** It is the verified cost model and the settings to use.
+- Keep the prompt cache warm. Cloud env vars are `CLAUDE_CODE_PROMPT_CACHE_TTL=1h` and `CLAUDE_CODE_SUBAGENT_PROMPT_CACHE_TTL=1h`, because builds idle workers past the 5-minute default. Never switch model, enable fast mode, or change MCP/plugins mid-session.
+- Keep context small: every token is re-paid on each tool call.
+  - Tail or grep every build, test and log output.
+  - Navigate with graphify before opening files, and read only the ranges you need.
+  - Grep `docs/handoff/transcripts/`, never read it whole.
+  - The lead runs `/compact` after each merge-and-deploy cycle.
+  - One packet per worker. Resume a worker for the same packet; never duplicate one.
+- The cloud VM has 4 vCPU and 16 GB: at most 2 workers building, testing or running a browser at once, and eslint always alone. Commit and push after every meaningful step (idle VMs are reclaimed).
+- Run `/usage` morning, midday and evening, and log it in `docs/handoff/research/ledger.md`. Over pace means fewer workers first.
+- Workers run Opus 5.5 at medium effort, with tight prompts naming the exact files and requirement ids, and reports of 60 lines or fewer. Targeted tests only; full gates just before merging to the deploy branch. No sleep-polling.
 
 **The founder's API credits are off-limits.** OpenAI (a $5 top-up), Gemini, ElevenLabs, Deepgram, Cloudflare Stream, Bright Data and any other provider are paid by the founder.
 
