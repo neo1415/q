@@ -171,10 +171,16 @@ This is playbook section 0, in the same order, with the state at handoff. Finish
 6. **Profile shows everything from onboarding (R25); Settings page (R28); Relationships page (R27).** R25: every onboarding answer (investor mandate, sectors, stages, geographies, cheque sizes, thesis; founder company data) on the profile, editable, minimal; BIZ-002's editable profile is LIVE and is the base. **R25 PARTLY BUILT, R28 NOT STARTED, R27 NOT STARTED** (relationship screens exist but not as a top-level page).
 7. **Q Card and public `/@handle` page redesign (R26); founder Pitch & media page (VID).** BIZ-004 handles, Q Card, `/@handle`, QR, vCard are LIVE; the redesign is **NOT STARTED**. VID (`vid/founder-media`, 7 commits: every pitch version with status, poster, captions, signed preview, withdraw; idempotent create/replace; one active player) is **PARTLY BUILT**, near done; review, merge and it becomes DONE-NOT-DEPLOYED, then LIVE on push.
 8. **Journey audit fixes (R30)** for founder and investor, end to end on the deployed site. **NOT STARTED.**
-9. **Then, in order:**
-   - BIZ-005 / R7 brand kit (versioned brand kits, extraction from website and deck as recommendations, confirm UI, `BRAND` deck theme with a contrast guard). **NOT STARTED.**
-   - BIZ-006 / R12 `/ops` operator console (`platform_operator` principal with step-up, verification queue, company acceptance). **NOT STARTED.**
-   - UX-01 instant shell. Needs a static-shell security ADR first (what may render before auth). **NOT STARTED.**
+9. **Whole-product audit and enrichment (founder, 2026-09-27)**, run once items 1-8 are in, and again before Monday:
+   - **Spec audit:** re-read the PADL, the Product Specification, the Final System Review and the MVP/V1 definition (docs/product-sources, docs/architecture/10). List every promised MVP capability and mark it LIVE / PARTLY / MISSING on the deployed site. Build the missing ones that fit.
+   - **Connectivity audit:** every screen is reachable from navigation and from Q; no button, link or empty state is a dead end; every app action works by UI, typed Q and voice (R20 registry test); founder and investor journeys work end to end.
+   - **UI completeness:** every page is fully designed in light and dark at desktop and phone width, with no placeholder or unstyled screens. Use the project UI/UX skills in .claude/skills (frontend-design, emil-design-eng, accessibility, web-quality-audit, core-web-vitals).
+   - **Enrichment research:** study how top products in adjacent spaces handle the same journeys (investor deal flow, founder fundraising, AI assistants). Adopt the improvements that fit the locked specs; conflicts get an ADR proposal, never a silent redesign.
+10. **Then, in order:**
+
+- BIZ-005 / R7 brand kit (versioned brand kits, extraction from website and deck as recommendations, confirm UI, `BRAND` deck theme with a contrast guard). **NOT STARTED.**
+- BIZ-006 / R12 `/ops` operator console (`platform_operator` principal with step-up, verification queue, company acceptance). **NOT STARTED.**
+- UX-01 instant shell. Needs a static-shell security ADR first (what may render before auth). **NOT STARTED.**
 
 **Out of scope unless the founder provides accounts:** BIZ-007 Gmail and BIZ-008 meetings/reminders (R9, R11). See `setup-email-and-meetings.md`. **NOT STARTED.**
 **Dropped (do not build):** filtering out speech from a nearby video (speaker filtering), founder decision 2026-09-26.

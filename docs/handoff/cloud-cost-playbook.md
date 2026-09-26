@@ -26,7 +26,12 @@ Status labels matter: say NOT STARTED / PARTLY BUILT / DONE-NOT-DEPLOYED / LIVE.
 6. **Profile shows everything from onboarding** (R25); **Settings page** (R28); **Relationships page** (R27).
 7. **Q Card and public /@handle page redesign** (R26); founder Pitch & media page (VID).
 8. **Journey audit fixes** (R30) for founder and investor, end to end on the deployed site.
-9. Then, in order: BIZ-005 brand kit, BIZ-006 /ops console, UX-01 instant shell.
+9. **Whole-product audit and enrichment (founder, 2026-09-27)**, run once items 1-8 are in, and again before Monday:
+   - **Spec audit:** re-read the PADL, the Product Specification, the Final System Review and the MVP/V1 definition (docs/product-sources, docs/architecture/10). List every promised MVP capability and mark it LIVE / PARTLY / MISSING on the deployed site. Build the missing ones that fit.
+   - **Connectivity audit:** every screen is reachable from navigation and from Q; no button, link or empty state is a dead end; every app action works by UI, typed Q and voice (R20 registry test); founder and investor journeys work end to end.
+   - **UI completeness:** every page is fully designed in light and dark at desktop and phone width, with no placeholder or unstyled screens. Use the project UI/UX skills in .claude/skills (frontend-design, emil-design-eng, accessibility, web-quality-audit, core-web-vitals).
+   - **Enrichment research:** study how top products in adjacent spaces handle the same journeys (investor deal flow, founder fundraising, AI assistants). Adopt the improvements that fit the locked specs; conflicts get an ADR proposal, never a silent redesign.
+10. Then, in order: BIZ-005 brand kit, BIZ-006 /ops console, UX-01 instant shell.
 
 Out of scope unless the founder provides accounts: BIZ-007 Gmail, BIZ-008 meetings. Dropped: nearby-video speaker filtering.
 
