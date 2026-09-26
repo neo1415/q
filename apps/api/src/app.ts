@@ -59,6 +59,10 @@ import {
 } from "./http/investors.js";
 import { registerMeRoute, type MeRouteDependencies } from "./http/me.js";
 import {
+  registerQCardRoutes,
+  type QCardRoutesDependencies,
+} from "./http/q-cards.js";
+import {
   registerOnboardingRoutes,
   type OnboardingRoutesDependencies,
 } from "./http/onboarding.js";
@@ -140,6 +144,9 @@ export type ApiModules = {
     VerificationRoutesDependencies["verification"] | undefined;
   /** CQ-BIZ-003: the visibility control centre. */
   readonly visibility?: VisibilityRoutesDependencies["visibility"] | undefined;
+  /** BIZ-004: handles and the Q Card. Absent: no card or /@handle route. */
+  readonly publicIdentity?:
+    QCardRoutesDependencies["publicIdentity"] | undefined;
 };
 
 /**
@@ -282,6 +289,17 @@ export function createApp(
   // holding a link is the whole audience.
   if (modules.gateqApply !== undefined) {
     registerGateQApplyRoutes(app, modules.gateqApply);
+  }
+
+  // Handles and the Q Card (BIZ-004): the owner's card routes and the two
+  // anonymous reads behind /@handle and the QR redirect.
+  if (modules.publicIdentity !== undefined) {
+    registerQCardRoutes(app, {
+      authenticator: security.authenticator,
+      resolver: security.resolver,
+      identities: security.identities,
+      publicIdentity: modules.publicIdentity,
+    });
   }
 
   if (modules.capital !== undefined) {

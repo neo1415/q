@@ -52,5 +52,11 @@ export {
   type PublicIdentityServiceDependencies,
 } from "./application/service.js";
 export { createPostgresPublicIdentityRepository } from "./infrastructure/postgres-repository.js";
+export {
+  createSubjectDirectory,
+  type CompanyProfileRead,
+  type InvestorProfileRead,
+  type SubjectDirectoryPorts,
+} from "./infrastructure/subject-directory.js";
 
 export const PACKAGE_NAME = "@capital-q/public-identity" as const;

@@ -49,6 +49,7 @@ import {
   createInvestorService,
   createPostgresInvestorMandateQueryPort,
   createPostgresInvestorOrganisationQueryPort,
+  createPostgresInvestorProfileQueryPort,
 } from "@capital-q/investors";
 import {
   createInterestService,
@@ -109,7 +110,16 @@ import {
   createIntakeBoundPolicyPort,
   createIntakeTaxonomyPort,
 } from "./gateq/intake-ports.js";
-import { createAuthorizationService } from "@capital-q/security";
+import {
+  createAuthorizationService,
+  OrganisationIdSchema,
+  TenantIdSchema,
+} from "@capital-q/security";
+import {
+  createPostgresPublicIdentityRepository,
+  createPublicIdentityService,
+  createSubjectDirectory,
+} from "@capital-q/public-identity";
 import {
   createCompanyVerificationService,
   createVerificationClaimsReadinessPort,
@@ -775,6 +785,44 @@ const visibility = createVisibilityCentre({
       }),
     ),
 });
+// Handles and the Q Card (BIZ-004). The public-identity context holds no
+// profile data: a card's facts are read through each owning context's
+// permission-neutral port and projected through the card's allowlist.
+const companyFacts = createPostgresCompanyQueryPort({ sql: database.sql });
+const investorFacts = createPostgresInvestorProfileQueryPort({
+  sql: database.sql,
+});
+const cardVerification = createVerificationClaimsReadinessPort({
+  sql: database.sql,
+});
+const publicIdentity = createPublicIdentityService({
+  sql: database.sql,
+  transactions: database.transactions,
+  authorization,
+  audit,
+  repository: createPostgresPublicIdentityRepository(),
+  subjects: createSubjectDirectory({
+    findCompany: async (companyId) => {
+      const id = CompanyIdSchema.safeParse(companyId);
+      return id.success
+        ? companyFacts.findCanonicalCompanyProfile(id.data)
+        : null;
+    },
+    findInvestor: (investorOrganisationId) =>
+      investorFacts.findCanonicalInvestorProfile(investorOrganisationId),
+    companyVerification: async (subject) => {
+      const standings = await cardVerification.currentStandings({
+        tenantId: TenantIdSchema.parse(subject.tenantId),
+        organisationId: OrganisationIdSchema.parse(subject.organisationId),
+        companyId: CompanyIdSchema.parse(subject.companyId),
+      });
+      return {
+        organisation: standings.organisationIdentity === "VERIFIED",
+        founderIdentity: standings.founderIdentity === "VERIFIED",
+      };
+    },
+  }),
+});
 
 const { app, logger } = createApp(config, security, {
   organisations,
@@ -805,6 +853,7 @@ const { app, logger } = createApp(config, security, {
   media,
   verification,
   visibility,
+  publicIdentity,
 });
 
 app.addHook("onClose", async () => {

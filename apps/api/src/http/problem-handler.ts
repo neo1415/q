@@ -46,6 +46,13 @@ import {
 } from "@capital-q/permissions";
 import type { Logger } from "@capital-q/observability";
 import {
+  HandleUnavailableError,
+  QCardFieldNotAllowedError,
+  QCardNotFoundError,
+  QCardSubjectNotFoundError,
+  QCardVersionConflictError,
+} from "@capital-q/public-identity";
+import {
   OrganisationCreationConflictError,
   OrganisationNotFoundError,
   OrganisationVersionConflictError,
@@ -318,7 +325,10 @@ function toProblem(
     error instanceof InterestNotFoundError ||
     // A share that is not on this company's own objects (CQ-BIZ-003).
     error instanceof DisclosurePolicyNotFoundError ||
-    error instanceof DisclosureResourceNotFoundError
+    error instanceof DisclosureResourceNotFoundError ||
+    // Absent, another tenant's and another organisation's (BIZ-004).
+    error instanceof QCardSubjectNotFoundError ||
+    error instanceof QCardNotFoundError
   ) {
     return createProblemDetails({ code: "RESOURCE_NOT_FOUND", requestId });
   }
@@ -338,6 +348,27 @@ function toProblem(
 
   // An answer is never overwritten; saying so is safe to the one party
   // allowed to answer.
+  // Handles and the Q Card (BIZ-004). A refused handle says why in words a
+  // person can act on; held and retired handles read the same as taken.
+  if (error instanceof HandleUnavailableError) {
+    return createProblemDetails({
+      code:
+        error.reason === "SHAPE" ? "VALIDATION_FAILED" : "RESOURCE_CONFLICT",
+      requestId,
+      detail: error.message,
+    });
+  }
+  if (error instanceof QCardFieldNotAllowedError) {
+    return createProblemDetails({
+      code: "VALIDATION_FAILED",
+      requestId,
+      detail: error.message,
+    });
+  }
+  if (error instanceof QCardVersionConflictError) {
+    return createProblemDetails({ code: "VERSION_CONFLICT", requestId });
+  }
+
   if (error instanceof InterestAlreadyAnsweredError) {
     return createProblemDetails({
       code: "RESOURCE_CONFLICT",

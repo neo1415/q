@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  createSubjectDirectory,
   DEFAULT_FIELD_SCOPES,
   fitFieldScopes,
   holdUntil,
@@ -144,5 +145,45 @@ describe("the card projection", () => {
     expect(readStoredScopes("COMPANY", "garbage")).toEqual({
       canonicalName: "public_external",
     });
+  });
+});
+
+describe("the subject directory", () => {
+  it("copies only card fields from the canonical read, so nothing else can be projected", async () => {
+    // What a canonical row also holds, which the directory must drop.
+    const canonical = {
+      tenantId: "t",
+      organisationId: "o",
+      canonicalName: "Kivu Freight",
+      shortDescription: "Freight.",
+      currentStageCode: "seed",
+      headquartersCity: null,
+      headquartersCountry: "KE",
+      websiteUrl: null,
+      foundedDate: null,
+      primaryDescription: "ORGANISATION-PRIVATE-DO-NOT-COPY",
+    };
+    const directory = createSubjectDirectory({
+      findCompany: () => Promise.resolve(canonical),
+      findInvestor: () => Promise.resolve(null),
+      companyVerification: () =>
+        Promise.reject(new Error("verification unavailable")),
+    });
+    const facts = await directory.find({
+      subjectType: "COMPANY",
+      subjectId: "00000000-0000-4000-8000-000000000001",
+    });
+    expect(JSON.stringify(facts)).not.toContain("DO-NOT-COPY");
+    // Verification that cannot be read is not verified.
+    expect(facts?.verified).toEqual({
+      organisation: false,
+      founderIdentity: false,
+    });
+    expect(
+      await directory.find({
+        subjectType: "INVESTOR_ORGANISATION",
+        subjectId: "00000000-0000-4000-8000-000000000002",
+      }),
+    ).toBeNull();
   });
 });

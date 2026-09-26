@@ -89,8 +89,11 @@ export {
 export {
   createPostgresInvestorCreationRequestStore,
   createPostgresInvestorOrganisationQueryPort,
+  createPostgresInvestorProfileQueryPort,
   createPostgresInvestorOrganisationRepository,
   createPostgresInvestorRepresentativeRepository,
+  type InvestorProfileFacts,
+  type InvestorProfileQueryPort,
 } from "./infrastructure/postgres-repositories.js";
 
 // Declared mandate (CQ-INV-002).
