@@ -22,6 +22,7 @@
     "db:push": "node scripts/db-push.mjs",
     "dev:bootstrap": "node scripts/dev-bootstrap.mjs",
     "dev:marketplace-ready": "node scripts/dev-marketplace-ready.mjs",
+    "seed:fictional": "node scripts/seed-fictional-world.mjs",
     "build": "turbo run build",
     "deploy:build:api": "turbo run build --filter=@capital-q/api...",
     "deploy:build:q-api": "turbo run build --filter=@capital-q/q-api...",
