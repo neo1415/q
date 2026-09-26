@@ -6,6 +6,7 @@ import {
   QLocaleSchema,
   QRequestContextSchema,
 } from "./context.js";
+import { UuidSchema } from "../common/ids.js";
 import { QConversationIdSchema, QRunIdSchema } from "./ids.js";
 import { QSubjectRefsSchema } from "./subject.js";
 import { QContractVersionSchema } from "./version.js";
@@ -25,6 +26,19 @@ export const QUserMessageInputSchema = z
   .strict();
 
 export type QUserMessageInput = z.infer<typeof QUserMessageInputSchema>;
+
+/**
+ * What the person is watching as they ask (R18): a pitch and the playback
+ * position. Input, never authority -- the Q runtime re-authorises the
+ * pitch for the asker with the playback rule before anything is read.
+ */
+export const QWatchingSchema = z
+  .object({
+    pitchId: UuidSchema,
+    atSeconds: z.number().int().min(0).max(86_400),
+  })
+  .strict();
+export type QWatching = z.infer<typeof QWatchingSchema>;
 
 /**
  * PUBLIC. The body a client sends to start a Q run (doc 22 §67).
@@ -52,6 +66,8 @@ export const CreateQRunRequestSchema = z
     modality: QClientModalitySchema,
     locale: QLocaleSchema.optional(),
     conversationId: QConversationIdSchema.optional(),
+    /** R18: asked while watching a pitch. */
+    watching: QWatchingSchema.optional(),
   })
   .strict();
 
