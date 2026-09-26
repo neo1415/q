@@ -147,6 +147,33 @@ export type VisibilityIntelligencePort = {
 };
 
 /**
+ * What is said in a pitch around a moment (R18), read through the media
+ * context under exactly the pitch playback rule. Null or a throw: the
+ * person may not play this pitch, and there is nothing to read.
+ */
+export type PitchMomentPort = {
+  readonly momentAround: (
+    actor: ActorContext,
+    query: {
+      readonly pitchId: string;
+      readonly atMs: number;
+      readonly windowMs: number;
+    },
+  ) => Promise<
+    | {
+        readonly status: "AVAILABLE";
+        readonly cues: readonly {
+          readonly startMs: number;
+          readonly endMs: number;
+          readonly text: string;
+        }[];
+      }
+    | { readonly status: "PENDING" | "NONE" }
+    | null
+  >;
+};
+
+/**
  * Everything the Safe Read tools may reach: the owning contexts' public
  * query ports and the two deterministic authorities. No executor, no
  * connection, no credential — a tool cannot compose a statement, only
@@ -189,6 +216,8 @@ export type QToolPorts = {
   readonly relationships?: RelationshipIntelligencePort | undefined;
   /** Profile changes for approval (BIZ-002); absent means the tool does not exist. */
   readonly profileChanges?: ProfileChangePort | undefined;
+  /** A pitch's transcript around a moment (R18); absent means no pitch tool. */
+  readonly pitchMoments?: PitchMomentPort | undefined;
   /** Who can see what (CQ-BIZ-003); absent means no visibility tool exists. */
   readonly visibility?: VisibilityIntelligencePort | undefined;
   /** Handle claims for approval (BIZ-004); absent means the tool does not exist. */

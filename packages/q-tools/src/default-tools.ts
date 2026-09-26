@@ -17,6 +17,7 @@ import { createRecommendationExplanationTool } from "./tools/recommendation-expl
 import { createProposeHandleClaimTool } from "./tools/handle-claim.js";
 import { createProposeProfileChangeTool } from "./tools/profile-change.js";
 import { createRelationshipTools } from "./tools/relationships.js";
+import { createGetPitchMomentTool } from "./tools/pitch-moment.js";
 import { createVisibilityTools } from "./tools/visibility.js";
 import { createSearchCompaniesTool } from "./tools/search-companies.js";
 
@@ -59,6 +60,10 @@ export function createDefaultQTools(
     ...(ports.profileChanges === undefined
       ? []
       : [createProposeProfileChangeTool(ports, ports.profileChanges)]),
+    // R18: what is said in the pitch being watched, around a moment.
+    ...(ports.pitchMoments === undefined
+      ? []
+      : [createGetPitchMomentTool(ports.pitchMoments)]),
     // CQ-BIZ-003: who can see what, and sharing, prepared for approval.
     ...(ports.visibility === undefined
       ? []

@@ -55,6 +55,7 @@ export type {
   HandleClaimPort,
   ProfileChangePort,
   QToolPorts,
+  PitchMomentPort,
   RelationshipIntelligencePort,
   VisibilityIntelligencePort,
 } from "./ports.js";
@@ -87,6 +88,13 @@ export {
   ProposalOutputSchema,
   type GetRelationshipOutput,
 } from "./tools/relationships.js";
+export {
+  GET_PITCH_MOMENT,
+  GetPitchMomentInputSchema,
+  GetPitchMomentOutputSchema,
+  viewedPitchIn,
+  type GetPitchMomentOutput,
+} from "./tools/pitch-moment.js";
 export {
   GET_DISCLOSURE_STATE,
   GetDisclosureStateOutputSchema,

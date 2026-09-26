@@ -6,6 +6,7 @@ import { MarketplaceVisibilitySchema } from "../http/companies.js";
 import { MessageSensitivitySchema } from "../messaging/sensitivity.js";
 import { QCapabilitySchema } from "./capability.js";
 import { QRunIdSchema } from "./ids.js";
+import { QViewingMomentSchema } from "./request.js";
 import { QSubjectRefSchema, QSubjectRefsSchema } from "./subject.js";
 
 /**
@@ -301,6 +302,13 @@ export const PermittedContextPlanSchema = z
       })
       .strict(),
     subjects: QSubjectRefsSchema,
+    /**
+     * R18: the pitch moment the person was viewing, present only when the
+     * Q API authorised it for them (the pitch playback rule plus the
+     * company's visibility) and the firewall bound the company. What makes
+     * get_pitch_moment eligible; absent otherwise.
+     */
+    viewing: QViewingMomentSchema.optional(),
     scopes: z.array(QAuthorisedKnowledgeScopeSchema).max(Q_PLAN_SCOPES_MAX),
     denied: z.array(QDeniedScopeSchema).max(Q_PLAN_DENIED_MAX),
     /** The strongest sensitivity of any permitted scope: what derived output inherits. */
