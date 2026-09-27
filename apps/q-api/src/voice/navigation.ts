@@ -172,30 +172,9 @@ export function recoverySettled(line: object): void {
   recoveries.delete(line);
 }
 
-/** Lines that rotate, so the same filler is never said twice running. */
+/** Lines that rotate, so the same line is never said twice running. */
 function rotate(lines: readonly string[], turn: number): string {
   return lines[turn % lines.length] ?? lines.join(" ");
-}
-
-export const FILLERS_THINKING = [
-  "Let me check that.",
-  "One second.",
-  "Give me a moment on that.",
-  "Let me look.",
-  "Hold on, checking.",
-];
-export const FILLERS_RESEARCH = [
-  "Let me look at public sources.",
-  "Checking the public web on that.",
-  "Give me a moment to look that up.",
-];
-let fillerTurn = 0;
-
-/** A short line for the wait, different each time. */
-export function fillerLine(kind: "THINKING" | "RESEARCH"): string {
-  const lines = kind === "THINKING" ? FILLERS_THINKING : FILLERS_RESEARCH;
-  fillerTurn += 1;
-  return rotate(lines, fillerTurn);
 }
 
 const RESUME_ACKS = [

@@ -1,4 +1,3 @@
-import { FILLERS_RESEARCH } from "../src/voice/navigation.js";
 import { describe, expect, it, vi } from "vitest";
 
 import type {
@@ -966,7 +965,7 @@ describe("a spoken question for Q", () => {
     expect(speaker.spoken.join(" ")).not.toMatch(/picking up|where I stopped/i);
   });
 
-  it("says it is looking at public sources when the run reaches that stage, once (D §56)", async () => {
+  it("says nothing about searching public sources: only the answer is heard (R38)", async () => {
     const runtime = fakeRuntime();
     const handle = createVoiceTurnHandler({
       qRuntime: runtime.service,
@@ -997,14 +996,7 @@ describe("a spoken question for Q", () => {
       new AbortController().signal,
       speaker,
     );
-    expect(speaker.spoken).toHaveLength(1);
-    const said = speaker.spoken[0] ?? "";
-    expect(
-      FILLERS_RESEARCH.some((line) =>
-        said.startsWith(`${line} Paystack raised a Series A in 2018.`),
-      ),
-      said,
-    ).toBe(true);
+    expect(speaker.spoken).toEqual(["Paystack raised a Series A in 2018."]);
   });
 
   it("never narrates progress once the answer has been said (directive I)", async () => {

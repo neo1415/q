@@ -41,7 +41,6 @@ import type { PresenceFound } from "./presence-trigger.js";
 import {
   declines,
   endsUnfinished,
-  fillerLine,
   followOfAnswer,
   spokenVisibility,
   type SpokenVisibility,
@@ -67,7 +66,6 @@ import type { PresenceTrigger } from "./presence-trigger.js";
 import type { PronunciationTeacher } from "./pronunciation.js";
 import type { DecisionReader, DecisionReading } from "./decision.js";
 import type { VoiceTurnBoard } from "./turn-board.js";
-import { createProgressNarrator } from "./progress.js";
 import {
   anchorCues,
   type SpeechPerformanceBoard,
@@ -81,7 +79,6 @@ import {
   bySentence,
   sentences,
   speakable,
-  withFiller,
 } from "./speech.js";
 
 /**
@@ -675,14 +672,16 @@ export function createVoiceTurnHandler(
         : { kind: "INTERRUPTED", path: "MOVE" };
     }
     if (!item.done) {
-      if (!(await speakLine(speaker, "Still working on that.", signal))) {
-        held.set(binding, item);
-        return { kind: "INTERRUPTED", path: "Q" };
-      }
+      // Waited for in silence: a "still working" line is a filler, and no
+      // line reaches the voice unless it is part of an answer (R38).
       await Promise.race([
         item.settled,
         new Promise<void>((resolve) => setTimeout(resolve, RESUME_WAIT_MS)),
       ]);
+      if (signal.aborted) {
+        held.set(binding, item);
+        return { kind: "INTERRUPTED", path: "Q" };
+      }
     }
     const unsaid = notYetSaid(binding, unsaidPartOf(item));
     const text =
@@ -905,20 +904,9 @@ export function createVoiceTurnHandler(
     let runFailed = false;
     lastRunFailed.set(binding, false);
     let streamedDeltas = false;
-    /**
-     * The answer has been handed to the speaker, streamed or whole. Progress
-     * is about work still being done for the answer, so once the answer is
-     * out no stage is narrated over it (directive I: "I'm comparing the
-     * opportunities now" was said after an answer had been read out whole).
-     */
+    /** The answer has been handed to the speaker, streamed or whole. */
     let answerGiven = false;
     let spokenCharacters = 0;
-    // A look-up is gathered whole and offered only if it found something,
-    // so it is never narrated beyond the research line.
-    const progress = createProgressNarrator({
-      startedAt: Date.now(),
-      ...(options.lookup === true ? { maxLines: 0 } : {}),
-    });
     let proposedSummary: string | null = null;
     const record = await qStream.authorize(actor, runId, correlationId);
     async function* answer(): AsyncGenerator<string> {
@@ -1024,22 +1012,13 @@ export function createVoiceTurnHandler(
             terminal = true;
             recoverySettled(binding);
             return;
-          case "q.stage.changed": {
-            // Research is announced at once: it takes seconds, and the
-            // answer will come from somewhere other than their records
-            // (D §56). Any other stage is spoken only once the run has
-            // shown itself to be an investigation, in a line or two from
-            // the closed stage vocabulary, never over an answer already
-            // under way (CQ-VOICE-010).
-            const line = progress.lineFor(event.data.stage, {
-              answered: streamedDeltas || answerGiven,
-              researchLine: () => fillerLine("RESEARCH"),
-            });
-            if (line !== null) {
-              yield `${line} `;
-            }
+          case "q.stage.changed":
+            // Stages are shown, never spoken. A spoken progress line
+            // ("Checking the public web on that.", "One second.") is a
+            // filler, and nothing reaches the voice unless it is part of
+            // the answer (R38: search is quiet; founder live test
+            // 2026-09-27, failure 10).
             break;
-          }
           case "q.run.started":
           case "q.finding.available":
             break;
@@ -1081,16 +1060,10 @@ export function createVoiceTurnHandler(
         }
       } else {
         await speaker.speak(
-          withFiller(
-            tap(bySentence(answer(), signal), (part) => {
-              spokenSoFar += `${part} `;
-              rememberSpoken(binding, part);
-            }),
-            {
-              filler: fillerLine("THINKING"),
-              signal,
-            },
-          ),
+          tap(bySentence(answer(), signal), (part) => {
+            spokenSoFar += `${part} `;
+            rememberSpoken(binding, part);
+          }),
         );
       }
     } finally {

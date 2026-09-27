@@ -5,7 +5,6 @@ import { createLogger } from "@capital-q/observability";
 
 import type { VoiceSessionBinding } from "../src/voice/bindings.js";
 import type { VoiceSpeaker } from "../src/voice/provider.js";
-import { createProgressNarrator } from "../src/voice/progress.js";
 import {
   createVoiceTurnTimings,
   routeShape,
@@ -239,67 +238,5 @@ describe("route shapes in the timing line", () => {
       ),
     ).toBe("/v1/onboarding/sessions/:id/responses");
     expect(routeShape("/v1/things/123456/x")).toBe("/v1/things/:id/x");
-  });
-});
-
-describe("progress while a long answer is worked out", () => {
-  const research = () => "Checking the public web on that.";
-
-  it("says nothing for a quick answer", () => {
-    let now = 0;
-    const narrator = createProgressNarrator({ startedAt: 0, now: () => now });
-    now = 800;
-    expect(
-      narrator.lineFor("REVIEWING_COMPANY", {
-        answered: false,
-        researchLine: research,
-      }),
-    ).toBeNull();
-  });
-
-  it("names what it is doing once the run has shown itself to be long, a line or two at most", () => {
-    let now = 0;
-    const narrator = createProgressNarrator({ startedAt: 0, now: () => now });
-    now = 2_000;
-    const say = (stage: Parameters<typeof narrator.lineFor>[0]) =>
-      narrator.lineFor(stage, { answered: false, researchLine: research });
-    expect(say("REVIEWING_COMPANY")).toBe(
-      "I'm going through the company's record.",
-    );
-    expect(say("REVIEWING_COMPANY")).toBeNull();
-    expect(say("CHECKING_EVIDENCE")).toBe(
-      "I'm checking what the evidence actually supports.",
-    );
-    expect(say("PREPARING_ANALYSIS")).toBeNull();
-  });
-
-  it("announces a move to public sources at once, and never once the answer has begun", () => {
-    const narrator = createProgressNarrator({ startedAt: 0, now: () => 10 });
-    expect(
-      narrator.lineFor("SEARCHING_PUBLIC_SOURCES", {
-        answered: false,
-        researchLine: research,
-      }),
-    ).toBe(research());
-    const later = createProgressNarrator({ startedAt: 0, now: () => 5_000 });
-    expect(
-      later.lineFor("PREPARING_ANALYSIS", {
-        answered: true,
-        researchLine: research,
-      }),
-    ).toBeNull();
-  });
-
-  it("never narrates stages that are not work: waiting and understanding", () => {
-    const narrator = createProgressNarrator({ startedAt: 0, now: () => 5_000 });
-    for (const stage of [
-      "UNDERSTANDING_REQUEST",
-      "WAITING_FOR_REPLY",
-      "WAITING_FOR_APPROVAL",
-    ] as const) {
-      expect(
-        narrator.lineFor(stage, { answered: false, researchLine: research }),
-      ).toBeNull();
-    }
   });
 });

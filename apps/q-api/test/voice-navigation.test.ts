@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  fillerLine,
   followOfAnswer,
   isNonLexical,
   recoveryLine,
@@ -83,16 +82,12 @@ describe("voice lines, read deterministically", () => {
     expect(isNonLexical("hmm, tell me more about the fund")).toBe(false);
   });
 
-  it("never says the same apology or the same filler twice in a row", () => {
+  it("never says the same apology twice in a row", () => {
     const apologies = new Set(
       Array.from({ length: 4 }, () => recoveryLine("EVIDENCE_UNAVAILABLE")),
     );
     expect(apologies.size).toBeGreaterThan(1);
     expect(recoveryLine("SOMETHING_ELSE")).toMatch(/ask me again/i);
-    const fillers = new Set(
-      Array.from({ length: 5 }, () => fillerLine("THINKING")),
-    );
-    expect(fillers.size).toBeGreaterThan(2);
     expect(resumeAcknowledgement()).not.toBe(resumeAcknowledgement());
   });
 
