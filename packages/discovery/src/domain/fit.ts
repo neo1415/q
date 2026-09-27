@@ -159,12 +159,12 @@ export function declaredProfileFit(investor: {
 
   if (investor.deploymentState === "ACTIVELY_INVESTING") {
     score += SIGNAL_WEIGHT.declaredActivelyDeploying;
-    reasons.push({ kind: "DECLARED_DEPLOYING", detail: "actively investing" });
+    reasons.push({ kind: "DECLARED_DEPLOYING", detail: "Actively investing" });
   } else if (investor.deploymentState === "SELECTIVE") {
     score += SIGNAL_WEIGHT.declaredSelectivelyDeploying;
     reasons.push({
       kind: "DECLARED_DEPLOYING",
-      detail: "investing selectively",
+      detail: "Investing selectively",
     });
   }
 
@@ -177,7 +177,7 @@ export function declaredProfileFit(investor: {
     score += SIGNAL_WEIGHT.profileComplete;
     reasons.push({
       kind: "PROFILE_COMPLETE",
-      detail: "profile, website and location shared",
+      detail: "Profile, website and location shared",
     });
   }
 

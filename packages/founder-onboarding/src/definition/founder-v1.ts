@@ -257,6 +257,19 @@ export const INSTRUMENT_CODES: Readonly<Record<string, string | null>> = {
   unsure: null,
 };
 
+/**
+ * An instrument as a reader says it, from either spelling it is stored in:
+ * the option key ("priced") or the canonical code an objective holds
+ * ("priced_equity"). Undefined for a code the definition does not know.
+ */
+export function instrumentLabel(code: string): string | undefined {
+  const key =
+    Object.entries(INSTRUMENT_CODES).find(
+      ([, canonical]) => canonical === code,
+    )?.[0] ?? code;
+  return INSTRUMENT_OPTIONS.find((option) => option.optionKey === key)?.label;
+}
+
 export const TIMEFRAME_OPTIONS: Option[] = [
   { optionKey: "under_3", label: "Within 3 months" },
   { optionKey: "3_6", label: "3–6 months" },

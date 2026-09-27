@@ -12,6 +12,7 @@ import {
   FounderRaiseContextSchema,
   FounderReviewContextSchema,
   FounderSnapshotContextSchema,
+  instrumentLabel,
   RAISING_ACTIVE_OPTIONS,
   type FounderSnapshotContext,
 } from "@capital-q/founder-onboarding/definition";
@@ -964,9 +965,8 @@ function snapshotSections(snapshot: FounderSnapshotContext): SnapshotSection[] {
                 raise.instrumentCode === null
                   ? undefined
                   : `Instrument: ${
-                      optionsOf(S.instrument).find(
-                        (option) => option.value === raise.instrumentCode,
-                      )?.label ?? raise.instrumentCode
+                      instrumentLabel(raise.instrumentCode) ??
+                      raise.instrumentCode.replace(/_/g, " ")
                     }`,
               ),
               ...item("use", raise.useOfFundsSummary ?? undefined),

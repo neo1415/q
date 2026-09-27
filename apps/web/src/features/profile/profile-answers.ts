@@ -4,7 +4,7 @@ import type {
 } from "@capital-q/contracts";
 import {
   FOUNDER_STEPS,
-  INSTRUMENT_OPTIONS,
+  instrumentLabel,
   STAGE_OPTIONS,
 } from "@capital-q/founder-onboarding";
 import { INVESTOR_STEPS } from "@capital-q/investor-onboarding";
@@ -252,9 +252,6 @@ export function answerGroups(
 const STAGE_LABELS: ReadonlyMap<string, string> = new Map(
   STAGE_OPTIONS.map((option) => [option.optionKey, option.label]),
 );
-const INSTRUMENT_LABELS: ReadonlyMap<string, string> = new Map(
-  INSTRUMENT_OPTIONS.map((option) => [option.optionKey, option.label]),
-);
 
 /**
  * The raise as the canonical capital objective states it. Once an
@@ -278,7 +275,11 @@ export function raiseFromObjective(
       {
         stepKey: F.instrument,
         title: "Instrument",
-        value: code(INSTRUMENT_LABELS, objective.instrumentCode),
+        value:
+          objective.instrumentCode === null
+            ? null
+            : (instrumentLabel(objective.instrumentCode) ??
+              objective.instrumentCode.replace(/_/g, " ")),
       },
       {
         stepKey: "objective.stage",

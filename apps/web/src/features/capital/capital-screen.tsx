@@ -6,10 +6,7 @@ import {
   getCurrentCapitalObjective,
 } from "@capital-q/api-client";
 import type { CapitalObjectiveDto } from "@capital-q/contracts";
-import {
-  INSTRUMENT_OPTIONS,
-  STAGE_OPTIONS,
-} from "@capital-q/founder-onboarding";
+import { instrumentLabel, STAGE_OPTIONS } from "@capital-q/founder-onboarding";
 import { Badge } from "@capital-q/ui/badge";
 import { buttonClassName } from "@capital-q/ui/button";
 import { formatAmountForDisplay } from "@capital-q/ui/money-input";
@@ -34,9 +31,11 @@ import { RelationshipList } from "@/features/relationships/relationship-list";
 const STAGE_LABELS: ReadonlyMap<string, string> = new Map(
   STAGE_OPTIONS.map((option) => [option.optionKey, option.label]),
 );
-const INSTRUMENT_LABELS: ReadonlyMap<string, string> = new Map(
-  INSTRUMENT_OPTIONS.map((option) => [option.optionKey, option.label]),
-);
+// The objective stores canonical codes ("priced_equity"); the shared
+// label reads either spelling.
+const INSTRUMENT_LABELS = {
+  get: (code: string) => instrumentLabel(code),
+};
 
 const STATUS_LABELS: Readonly<Record<CapitalObjectiveDto["status"], string>> = {
   ACTIVE: "Active",
@@ -46,7 +45,10 @@ const STATUS_LABELS: Readonly<Record<CapitalObjectiveDto["status"], string>> = {
   REPLACED: "Replaced",
 };
 
-function label(map: ReadonlyMap<string, string>, code: string | null) {
+function label(
+  map: { readonly get: (code: string) => string | undefined },
+  code: string | null,
+) {
   return code === null ? null : (map.get(code) ?? code.replace(/_/g, " "));
 }
 

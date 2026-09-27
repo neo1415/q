@@ -51,7 +51,7 @@ const REASON_LABELS: Readonly<Record<DiscoveryReasonDto["kind"], string>> = {
   GEOGRAPHY_MATCH: "Where",
   BUSINESS_MODEL_MATCH: "Model",
   CUSTOMER_TYPE_MATCH: "Customers",
-  DECLARED_DEPLOYING: "Deploying",
+  DECLARED_DEPLOYING: "Status",
   PROFILE_COMPLETE: "Profile",
 };
 

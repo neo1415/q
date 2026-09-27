@@ -13,7 +13,7 @@ import type {
   VisibilityAudience,
   VisibilityStateDto,
 } from "@capital-q/contracts";
-import { INSTRUMENT_OPTIONS } from "@capital-q/founder-onboarding";
+import { instrumentLabel } from "@capital-q/founder-onboarding";
 import { Button } from "@capital-q/ui/button";
 import { ContextIndicator } from "@capital-q/ui/context-indicator";
 import { formatAmountForDisplay } from "@capital-q/ui/money-input";
@@ -66,9 +66,11 @@ const AUDIENCES: readonly {
   },
 ];
 
-const INSTRUMENT_LABELS: ReadonlyMap<string, string> = new Map(
-  INSTRUMENT_OPTIONS.map((option) => [option.optionKey, option.label]),
-);
+// The objective stores canonical codes ("priced_equity"); the shared
+// label reads either spelling.
+const INSTRUMENT_LABELS = {
+  get: (code: string) => instrumentLabel(code),
+};
 
 const OBJECT_WORDS: Readonly<
   Record<
