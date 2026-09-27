@@ -154,6 +154,9 @@ import { withRelationshipProjection } from "./network/relationship-projection-ha
 import { createOutboxPublisherRunner } from "./outbox-runner.js";
 import { createParserSandbox } from "./parser/sandbox.js";
 import { composeWorkerPresence } from "./presence/composition.js";
+import { runGmailReplyPoller } from "./integrations/gmail-poller.js";
+import { loadGoogleWorkspaceConfig } from "@capital-q/config/google-workspace";
+import { composeGoogleIntegrations } from "@capital-q/integrations";
 import { createPresenceResearchDispatch } from "./presence/dispatch.js";
 import { createPostgresBuildPrincipalResolver } from "./recommendations/build-principal.js";
 import { createRecommendationRefreshHandler } from "./recommendations/refresh-handler.js";
@@ -789,6 +792,25 @@ if (documents === undefined) {
   );
 }
 
+// Gmail reply tracking (BIZ-007): the 5-minute history poll per connected
+// mailbox, beside the push endpoint on the API. Absent configuration, the
+// integration is unavailable and the poller does not start.
+const googleWorkspace = loadGoogleWorkspaceConfig(process.env);
+const gmailIntegrations = composeGoogleIntegrations({
+  sql: database.sql,
+  transactions: database.transactions,
+  oauth: googleWorkspace.oauth,
+  tokenEncryptionKey: googleWorkspace.tokenEncryptionKey,
+  pushTopic: googleWorkspace.push?.topic,
+  logger,
+});
+if (!gmailIntegrations.available) {
+  logger.info(
+    { missing: googleWorkspace.missing },
+    "gmail reply poller disabled: Google workspace not configured",
+  );
+}
+
 const shutdownController = new AbortController();
 
 function shutdown(signal: NodeJS.Signals): void {
@@ -810,6 +832,15 @@ await Promise.all([
   ...(documents === undefined
     ? []
     : [documents.run(shutdownController.signal)]),
+  ...(gmailIntegrations.available
+    ? [
+        runGmailReplyPoller({
+          integrations: gmailIntegrations,
+          signal: shutdownController.signal,
+          logger,
+        }),
+      ]
+    : []),
   ...(syntheticAutoVerifySweep === undefined
     ? []
     : [
