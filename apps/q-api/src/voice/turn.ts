@@ -80,6 +80,7 @@ import {
   sentences,
   speakable,
 } from "./speech.js";
+import { utteranceRefOf } from "./utterance.js";
 
 /**
  * One spoken turn (CQ-Q-VOICE-001 C §35-§40).
@@ -330,8 +331,16 @@ type LiveRun = {
   readonly runId: QRunRecord["id"];
   readonly correlationId: CorrelationId;
   readonly stop: AbortController;
+  /** The spoken utterance the run answers (`utterance.ts`), if any. */
+  readonly utterance?: string | undefined;
 };
 const liveRuns = new WeakMap<VoiceSessionBinding, LiveRun>();
+/**
+ * The utterance the turn in hand is about, until the one run that answers
+ * the person's words takes it. A look-up Q starts on its own is not the
+ * person's utterance and never takes it.
+ */
+const utteranceInHand = new WeakMap<VoiceSessionBinding, string>();
 /** Runs already being cancelled, so a run is cancelled once. */
 const stopping = new WeakSet<LiveRun>();
 
@@ -837,6 +846,9 @@ export function createVoiceTurnHandler(
     const { actor, thread } = binding;
     const correlationId = correlation();
     const subjects: readonly QSubjectRef[] | undefined = thread.subjects;
+    const utterance =
+      options.lookup === true ? undefined : utteranceInHand.get(binding);
+    if (utterance !== undefined) utteranceInHand.delete(binding);
     const result = await qRuntime.createRun({
       actor,
       input: {
@@ -853,6 +865,9 @@ export function createVoiceTurnHandler(
       },
       idempotencyKey: randomUUID(),
       correlationId,
+      // The stored turn names its utterance, so a later form of it
+      // supersedes this one when the conversation is read.
+      ...(utterance === undefined ? {} : { utteranceRef: utterance }),
     });
     const runId = result.run.id;
     thread.conversationId = result.run.conversationId ?? undefined;
@@ -879,6 +894,7 @@ export function createVoiceTurnHandler(
       runId,
       correlationId,
       stop: new AbortController(),
+      utterance,
     };
     supersede(binding, live);
     liveRuns.set(binding, live);
@@ -913,7 +929,9 @@ export function createVoiceTurnHandler(
       for await (const item of qStream.open({
         run: record,
         afterSequence: 0,
-        signal,
+        // A run superseded while it streams (the person carried on with
+        // the same utterance) says nothing more.
+        signal: AbortSignal.any([signal, live.stop.signal]),
       })) {
         if (item.kind === "end") {
           return;
@@ -1671,10 +1689,21 @@ export function createVoiceTurnHandler(
       return { kind: "NOTHING" };
     }
     rememberTranscript(binding, transcript);
+    const utterance = utteranceRefOf(binding.voiceSessionId, transcript);
+    if (utterance === undefined) utteranceInHand.delete(binding);
+    else utteranceInHand.set(binding, utterance);
+    /**
+     * The same utterance, grown: the run on its earlier form answers a
+     * fragment the person went on to extend, and Q never answers that. It
+     * is cancelled whatever the new words are, by identity (`utterance.ts`).
+     */
+    const extending =
+      utterance !== undefined && liveRuns.get(binding)?.utterance === utterance;
     // Anything but "carry on" makes the run this line was waiting on
     // obsolete, whether it was cut off mid-answer or never heard at all.
     const resuming =
-      isNonLexical(text) || (held.has(binding) && isContinueCue(text));
+      !extending &&
+      (isNonLexical(text) || (held.has(binding) && isContinueCue(text)));
     if (!resuming) supersede(binding);
     /**
      * An utterance the recogniser left open is not yet a turn.

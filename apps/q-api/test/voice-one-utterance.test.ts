@@ -27,6 +27,7 @@ import {
   latestUtterance,
   type VoiceTurnHandler,
 } from "../src/voice/turn.js";
+import { utteranceRefOf } from "../src/voice/utterance.js";
 
 /**
  * One utterance, one turn, one answer (acceptance B, voice half, and J).
@@ -131,7 +132,11 @@ const event = (
  */
 function world() {
   let next = 0;
-  const created: { runId: string; text: string }[] = [];
+  const created: {
+    runId: string;
+    text: string;
+    utteranceRef: string | undefined;
+  }[] = [];
   const cancelled: string[] = [];
   const started: { runId: string; signal: AbortSignal | undefined }[] = [];
   // Two gates per run: its first sentence, and the rest of it.
@@ -173,10 +178,17 @@ function world() {
     }),
   });
   const runtime = {
-    createRun: (command: { input: { message: { text: string } } }) => {
+    createRun: (command: {
+      input: { message: { text: string } };
+      utteranceRef?: string;
+    }) => {
       next += 1;
       const runId = `f0000000-0000-4000-8000-0000000001${String(next).padStart(2, "0")}`;
-      created.push({ runId, text: command.input.message.text });
+      created.push({
+        runId,
+        text: command.input.message.text,
+        utteranceRef: command.utteranceRef,
+      });
       gate(runId);
       return Promise.resolve({
         run: {
@@ -583,5 +595,141 @@ describe("the think route", () => {
     expect(stale.body).not.toContain("Only this.");
     expect(newer.body).toContain("Only this.");
     await server.close();
+  });
+});
+
+describe("one utterance by identity, not by words (live test 2026-09-27, failure 9)", () => {
+  const SESSION = "f0000000-0000-4000-8000-000000000001";
+  const before = [
+    { role: "user" as const, content: "Find me founders." },
+    { role: "agent" as const, content: "None are discoverable yet." },
+  ];
+
+  it("names an utterance by its place in the conversation", () => {
+    const fragment = utteranceRefOf(SESSION, [
+      ...before,
+      { role: "user", content: "Okay." },
+    ]);
+    // Grown and re-heard: none of the first report survives word for
+    // word, and it is the same utterance.
+    const grown = utteranceRefOf(SESSION, [
+      ...before,
+      { role: "user", content: "Ok, that that makes sense." },
+    ]);
+    expect(fragment).toBeDefined();
+    expect(grown).toBe(fragment);
+    // The same words after Q has replied are a new utterance.
+    const again = utteranceRefOf(SESSION, [
+      ...before,
+      { role: "user", content: "Okay." },
+      { role: "agent", content: "Shall we look wider?" },
+      { role: "user", content: "Okay." },
+    ]);
+    expect(again).not.toBe(fragment);
+    // Only the person's words make an utterance; Q's own line does not.
+    expect(utteranceRefOf(SESSION, before)).toBeUndefined();
+    // The stored reference's shape (q-runtime UTTERANCE_REF_PATTERN).
+    expect(fragment).toMatch(/^[A-Za-z0-9._:-]{1,255}$/);
+  });
+
+  it("cancels a run on a fragment the person went on to extend, even one it would otherwise resume", async () => {
+    const q = world();
+    const handle = createVoiceTurnHandler({
+      qRuntime: q.runtime,
+      qStream: q.stream,
+      orchestration: { orchestrator: q.orchestrator, autostart: true },
+      logger,
+    });
+    const bound = binding();
+    const speaker = fakeSpeaker();
+    // "Okay." ends a turn at a pause; Q starts answering it.
+    const first = new AbortController();
+    const pending = handle(
+      bound,
+      [...before, { role: "user", content: "Okay." }],
+      first.signal,
+      speaker,
+    );
+    await tick();
+    const fragmentRun = q.created[0];
+    if (fragmentRun === undefined) throw new Error("no run");
+    q.releaseFirst(fragmentRun.runId);
+    await tick();
+    // The person carries on: the provider drops the request and brings
+    // the utterance grown, with nothing from Q in between. Its words
+    // alone ("Okay. Yeah.") read like a go-ahead to finish the paused
+    // answer; its identity says it is the same utterance, still talking.
+    first.abort();
+    await pending;
+    const next = handle(
+      bound,
+      [...before, { role: "user", content: "Okay. Yeah." }],
+      new AbortController().signal,
+      speaker,
+    );
+    await tick();
+    expect(q.cancelled).toContain(fragmentRun.runId);
+    expect(
+      q.started.find((s) => s.runId === fragmentRun.runId)?.signal?.aborted,
+    ).toBe(true);
+    const grownRun = q.created[1];
+    if (grownRun === undefined) throw new Error("no run for the utterance");
+    expect(grownRun.text).toBe("Okay. Yeah.");
+    // Both runs name the one utterance, so the stored conversation reads
+    // as one turn (q-runtime withoutSupersededUtterances).
+    expect(grownRun.utteranceRef).toBeDefined();
+    expect(grownRun.utteranceRef).toBe(fragmentRun.utteranceRef);
+    q.release(grownRun.runId);
+    await next;
+    expect(q.answered()).toEqual([grownRun.runId]);
+    expect(speaker.spoken.at(-1)).toContain(
+      `Answer for ${grownRun.runId.slice(-3)}.`,
+    );
+    expect(speaker.spoken.join(" ")).not.toMatch(/as I was saying/i);
+  });
+
+  it("stops speaking a run the moment it is superseded, mid-answer", async () => {
+    const q = world();
+    const handle = createVoiceTurnHandler({
+      qRuntime: q.runtime,
+      qStream: q.stream,
+      orchestration: { orchestrator: q.orchestrator, autostart: true },
+      logger,
+    });
+    const bound = binding();
+    const speaker = fakeSpeaker();
+    const first = handle(
+      bound,
+      [...before, { role: "user", content: "Okay." }],
+      new AbortController().signal,
+      speaker,
+    );
+    await tick();
+    const fragmentRun = q.created[0];
+    if (fragmentRun === undefined) throw new Error("no run");
+    q.releaseFirst(fragmentRun.runId);
+    await tick();
+    // The grown utterance arrives while the fragment's answer is still
+    // streaming on a request the provider has not dropped.
+    const next = handle(
+      bound,
+      [...before, { role: "user", content: "Okay. That makes sense." }],
+      new AbortController().signal,
+      speaker,
+    );
+    await tick();
+    q.finish(fragmentRun.runId);
+    await first;
+    const grownRun = q.created[1];
+    if (grownRun === undefined) throw new Error("no run for the utterance");
+    q.release(grownRun.runId);
+    await next;
+    expect(q.cancelled).toContain(fragmentRun.runId);
+    // Nothing of the fragment's answer after its first sentence was said.
+    expect(speaker.spoken).toEqual([
+      `Answer for ${fragmentRun.runId.slice(-3)}.`,
+      `Answer for ${grownRun.runId.slice(-3)}. Second sentence.`,
+    ]);
+    expect(q.answered()).toEqual([grownRun.runId]);
   });
 });
