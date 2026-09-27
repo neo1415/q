@@ -99,8 +99,15 @@ describe("chat.message.send", () => {
       code: "BLOCKED",
     });
     expect(
-      await action.executor.execute(approved("q_action:r:blocked") as never, context),
-    ).toMatchObject({ outcome: "FAILED", failureCode: "BLOCKED", retryable: false });
+      await action.executor.execute(
+        approved("q_action:r:blocked") as never,
+        context,
+      ),
+    ).toMatchObject({
+      outcome: "FAILED",
+      failureCode: "BLOCKED",
+      retryable: false,
+    });
     expect(store.rows).toHaveLength(0);
   });
 

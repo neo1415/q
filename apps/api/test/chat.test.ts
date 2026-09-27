@@ -258,8 +258,12 @@ describe("/v1/relationships/:relationshipId/messages", () => {
       headers: key === undefined ? {} : { "idempotency-key": key },
     });
     expect((await app.inject(post("block"))).statusCode).toBe(422);
-    expect((await app.inject(post("block", "block-key-0001"))).statusCode).toBe(204);
-    expect((await app.inject(post("block", "block-key-0001"))).statusCode).toBe(204);
+    expect((await app.inject(post("block", "block-key-0001"))).statusCode).toBe(
+      204,
+    );
+    expect((await app.inject(post("block", "block-key-0001"))).statusCode).toBe(
+      204,
+    );
     expect(safetyStore.blockRows).toHaveLength(1);
 
     const refused = await app.inject(
@@ -278,7 +282,9 @@ describe("/v1/relationships/:relationshipId/messages", () => {
       blockedByYourSide: true,
     });
 
-    expect((await app.inject(post("unblock", "unblock-key-0001"))).statusCode).toBe(204);
+    expect(
+      (await app.inject(post("unblock", "unblock-key-0001"))).statusCode,
+    ).toBe(204);
     expect(
       (await app.inject(send({ kind: "TEXT", body: "back" }, "chat-key-0021")))
         .statusCode,
@@ -323,13 +329,22 @@ describe("/v1/relationships/:relationshipId/messages", () => {
       payload: payload as Record<string, unknown>,
       headers: key === undefined ? {} : { "idempotency-key": key },
     });
-    expect((await app.inject(report({ reasonCode: "SPAM" }))).statusCode).toBe(422);
+    expect((await app.inject(report({ reasonCode: "SPAM" }))).statusCode).toBe(
+      422,
+    );
     expect(
-      (await app.inject(report({ reasonCode: "SPAM", note: "x".repeat(501) }, "report-key-0001")))
-        .statusCode,
+      (
+        await app.inject(
+          report(
+            { reasonCode: "SPAM", note: "x".repeat(501) },
+            "report-key-0001",
+          ),
+        )
+      ).statusCode,
     ).toBe(422);
     expect(
-      (await app.inject(report({ reasonCode: "NOPE" }, "report-key-0002"))).statusCode,
+      (await app.inject(report({ reasonCode: "NOPE" }, "report-key-0002")))
+        .statusCode,
     ).toBe(422);
     const first = await app.inject(
       report({ reasonCode: "SPAM", note: "Keeps pitching" }, "report-key-0003"),

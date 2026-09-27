@@ -201,7 +201,10 @@ describe("chat proposals", () => {
 
   it("does not prepare a message while messaging is blocked, and reads as not open", async () => {
     const { executor, prepared } = world({ blocked: true });
-    const context = contextFor(actorB, relationshipPlan(base(actorB), RELATIONSHIP));
+    const context = contextFor(
+      actorB,
+      relationshipPlan(base(actorB), RELATIONSHIP),
+    );
     const outcome = await executor.execute(
       {
         callId: "c6",

@@ -241,14 +241,19 @@ export async function reportChatAction(
   const relationshipId = Id.parse(rawRelationshipId);
   const report = ReportInput.parse(rawReport);
   const key = Key.parse(rawKey);
-  const note = report.note === undefined || report.note.length === 0 ? undefined : report.note;
+  const note =
+    report.note === undefined || report.note.length === 0
+      ? undefined
+      : report.note;
   return run(async (session) => {
     await reportChat(
       session,
       relationshipId,
       {
         reasonCode: report.reasonCode,
-        ...(report.messageId === undefined ? {} : { messageId: report.messageId }),
+        ...(report.messageId === undefined
+          ? {}
+          : { messageId: report.messageId }),
         ...(note === undefined ? {} : { note }),
       },
       `web:report:${key}`,

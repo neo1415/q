@@ -164,9 +164,9 @@ describe("chat block", () => {
     ).toEqual({ lifted: true });
     const sent = await chat.send(say(INVESTOR, "Hi again", "key-00000002"));
     expect(sent.message.body).toBe("Hi again");
-    expect((await chat.thread({ actor: INVESTOR, relationshipId: REL })).status).toBe(
-      "OPEN",
-    );
+    expect(
+      (await chat.thread({ actor: INVESTOR, relationshipId: REL })).status,
+    ).toBe("OPEN");
     expect(audits.map((a) => a.actionType)).toEqual([
       "chat.blocked",
       "chat.unblocked",
@@ -176,9 +176,21 @@ describe("chat block", () => {
   it("refuses a non-party, an unknown relationship and a non-person alike", async () => {
     const { safety, audits } = world();
     for (const call of [
-      safety.block({ actor: STRANGER, relationshipId: REL, idempotencyKey: "block-0001" }),
-      safety.block({ actor: FOUNDER, relationshipId: OTHER_REL, idempotencyKey: "block-0002" }),
-      safety.block({ actor: FOUNDER, relationshipId: "not-a-uuid", idempotencyKey: "block-0003" }),
+      safety.block({
+        actor: STRANGER,
+        relationshipId: REL,
+        idempotencyKey: "block-0001",
+      }),
+      safety.block({
+        actor: FOUNDER,
+        relationshipId: OTHER_REL,
+        idempotencyKey: "block-0002",
+      }),
+      safety.block({
+        actor: FOUNDER,
+        relationshipId: "not-a-uuid",
+        idempotencyKey: "block-0003",
+      }),
       safety.block({
         actor: actor(FOUNDER.userId, COMPANY_ORG, "Q"),
         relationshipId: REL,

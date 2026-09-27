@@ -194,9 +194,9 @@ describe("@capital-q/communication chat safety against PostgreSQL", () => {
       },
     ]);
 
-    await expect(chat.send(say(investor, "Still there?"))).rejects.toBeInstanceOf(
-      ChatBlockedError,
-    );
+    await expect(
+      chat.send(say(investor, "Still there?")),
+    ).rejects.toBeInstanceOf(ChatBlockedError);
     await expect(chat.send(say(founder, "One more"))).rejects.toBeInstanceOf(
       ChatBlockedError,
     );
@@ -212,13 +212,22 @@ describe("@capital-q/communication chat safety against PostgreSQL", () => {
 
     // The blocked side cannot lift it; the blocking side can, once.
     expect(
-      await safety.unblock({ actor: investor, relationshipId: ids.relationship }),
+      await safety.unblock({
+        actor: investor,
+        relationshipId: ids.relationship,
+      }),
     ).toEqual({ lifted: false });
     expect(
-      await safety.unblock({ actor: founder, relationshipId: ids.relationship }),
+      await safety.unblock({
+        actor: founder,
+        relationshipId: ids.relationship,
+      }),
     ).toEqual({ lifted: true });
     expect(
-      await safety.unblock({ actor: founder, relationshipId: ids.relationship }),
+      await safety.unblock({
+        actor: founder,
+        relationshipId: ids.relationship,
+      }),
     ).toEqual({ lifted: false });
     const back = await chat.send(say(investor, "Back again"));
     expect(back.message.body).toBe("Back again");
@@ -256,7 +265,11 @@ describe("@capital-q/communication chat safety against PostgreSQL", () => {
     >`select reporter_organisation_id, status, note from communication.reports
        where id = ${first.reportId}`;
     expect(stored).toEqual([
-      { reporter_organisation_id: ids.orgCo, status: "OPEN", note: "Asked for a fee" },
+      {
+        reporter_organisation_id: ids.orgCo,
+        status: "OPEN",
+        note: "Asked for a fee",
+      },
     ]);
 
     await expect(

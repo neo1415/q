@@ -57,7 +57,11 @@ export function ChatSafetyMenu({
   return (
     <MenuRoot>
       <MenuTrigger>
-        <Button variant="quiet" className="min-h-11 min-w-11" aria-label="Chat options">
+        <Button
+          variant="quiet"
+          className="min-h-11 min-w-11"
+          aria-label="Chat options"
+        >
           <MoreHorizontal size={ICON_SIZE.regular} aria-hidden="true" />
         </Button>
       </MenuTrigger>
@@ -132,14 +136,22 @@ export function ChatSafetyDialogs({
   const open = dialog !== null;
 
   return (
-    <DialogRoot open={open} onOpenChange={(next) => (next ? undefined : close())}>
+    <DialogRoot
+      open={open}
+      onOpenChange={(next) => (next ? undefined : close())}
+    >
       {dialog?.kind === "BLOCK" ? (
         <DialogContent
           title="Block messages?"
           description={`Neither of you can send messages until you unblock. Messages so far stay. ${counterpart} isn't told who blocked.`}
           actions={
             <>
-              <Button variant="secondary" className="min-h-11" onClick={close} disabled={busy}>
+              <Button
+                variant="secondary"
+                className="min-h-11"
+                onClick={close}
+                disabled={busy}
+              >
                 Cancel
               </Button>
               <Button
@@ -166,7 +178,12 @@ export function ChatSafetyDialogs({
           description={`You and ${counterpart} can send messages again.`}
           actions={
             <>
-              <Button variant="secondary" className="min-h-11" onClick={close} disabled={busy}>
+              <Button
+                variant="secondary"
+                className="min-h-11"
+                onClick={close}
+                disabled={busy}
+              >
                 Cancel
               </Button>
               <Button
@@ -189,11 +206,20 @@ export function ChatSafetyDialogs({
         </DialogContent>
       ) : dialog?.kind === "REPORT" ? (
         <DialogContent
-          title={dialog.messageId === null ? "Report conversation?" : "Report message?"}
+          title={
+            dialog.messageId === null
+              ? "Report conversation?"
+              : "Report message?"
+          }
           description={`Capital Q reviews every report. ${counterpart} isn't told who reported. Reporting doesn't block messages.`}
           actions={
             <>
-              <Button variant="secondary" className="min-h-11" onClick={close} disabled={busy}>
+              <Button
+                variant="secondary"
+                className="min-h-11"
+                onClick={close}
+                disabled={busy}
+              >
                 Cancel
               </Button>
               <Button
@@ -246,7 +272,10 @@ export function ChatSafetyDialogs({
               </label>
             ))}
           </fieldset>
-          <label htmlFor={noteId} className="cq-body-sm mt-3 block text-(--cq-text-secondary)">
+          <label
+            htmlFor={noteId}
+            className="cq-body-sm mt-3 block text-(--cq-text-secondary)"
+          >
             Add detail (optional)
           </label>
           <textarea

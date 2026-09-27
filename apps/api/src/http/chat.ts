@@ -22,10 +22,7 @@ import {
   SendChatMessageRequestSchema,
   SendChatMessageResultDtoSchema,
 } from "@capital-q/contracts";
-import type {
-  ChatSafetyService,
-  ChatService,
-} from "@capital-q/communication";
+import type { ChatSafetyService, ChatService } from "@capital-q/communication";
 
 import {
   getActorContext,
@@ -206,7 +203,10 @@ export function registerChatRoutes(
     async (request, reply) => {
       // Lifting is naturally idempotent; the key is still required so a
       // client treats it like every other consequential POST.
-      idempotencyKeyOf(request, "An Idempotency-Key header is required to unblock.");
+      idempotencyKeyOf(
+        request,
+        "An Idempotency-Key header is required to unblock.",
+      );
       await safety.unblock({
         actor: getActorContext(request),
         relationshipId: param(request, "relationshipId"),

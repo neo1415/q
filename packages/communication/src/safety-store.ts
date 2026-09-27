@@ -26,7 +26,11 @@ export type ChatSafetyStore = {
     readonly idempotencyKey: string;
     readonly audit: ChatSafetyAuditHook;
   }) => Promise<
-    | { readonly outcome: "BLOCKED"; readonly blockId: string; readonly deduplicated: boolean }
+    | {
+        readonly outcome: "BLOCKED";
+        readonly blockId: string;
+        readonly deduplicated: boolean;
+      }
     /** The key was used by this person for another relationship. */
     | { readonly outcome: "KEY_CONFLICT" }
   >;
@@ -48,7 +52,11 @@ export type ChatSafetyStore = {
     readonly idempotencyKey: string;
     readonly audit: ChatSafetyAuditHook;
   }) => Promise<
-    | { readonly outcome: "REPORTED"; readonly reportId: string; readonly deduplicated: boolean }
+    | {
+        readonly outcome: "REPORTED";
+        readonly reportId: string;
+        readonly deduplicated: boolean;
+      }
     | { readonly outcome: "KEY_CONFLICT" }
     | { readonly outcome: "UNKNOWN_REASON" }
     | { readonly outcome: "MESSAGE_NOT_FOUND" }

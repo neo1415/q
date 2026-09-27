@@ -250,7 +250,11 @@ describe("RelationshipChat", () => {
       <RelationshipChat
         relationshipId={REL}
         counterpart="Apex"
-        initial={{ ...thread("OPEN"), status: "BLOCKED", blockedByYourSide: true }}
+        initial={{
+          ...thread("OPEN"),
+          status: "BLOCKED",
+          blockedByYourSide: true,
+        }}
       />,
     );
     expect(screen.getByText(/You blocked messages/)).toBeTruthy();
@@ -268,7 +272,9 @@ describe("RelationshipChat", () => {
     fireEvent.click(
       screen.getByRole("button", { name: "Report message from Ada" }),
     );
-    const sendReport = await screen.findByRole("button", { name: "Send report" });
+    const sendReport = await screen.findByRole("button", {
+      name: "Send report",
+    });
     // No reason chosen yet: nothing can be sent.
     expect((sendReport as HTMLButtonElement).disabled).toBe(true);
     fireEvent.click(screen.getByLabelText("Scam or fraud"));

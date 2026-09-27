@@ -37,7 +37,11 @@ async function partiesOf(
   if (row === undefined) return null;
   return side === "COMPANY"
     ? { tenantId: row.tenant_id, own: row.company_org, other: row.investor_org }
-    : { tenantId: row.tenant_id, own: row.investor_org, other: row.company_org };
+    : {
+        tenantId: row.tenant_id,
+        own: row.investor_org,
+        other: row.company_org,
+      };
 }
 
 export function createPostgresChatSafetyStore(options: {
@@ -52,7 +56,11 @@ export function createPostgresChatSafetyStore(options: {
        where blocker_user_id = ${userId} and idempotency_key = ${key}`;
     return rows[0] ?? null;
   };
-  const activeBlock = async (db: Sql, relationshipId: string, side: ChatSide) => {
+  const activeBlock = async (
+    db: Sql,
+    relationshipId: string,
+    side: ChatSide,
+  ) => {
     const rows = await db<{ id: string }[]>`
       select id from communication.blocks
        where relationship_id = ${relationshipId} and blocker_side = ${side}
@@ -77,19 +85,36 @@ export function createPostgresChatSafetyStore(options: {
 
   const block: ChatSafetyStore["block"] = (input) =>
     transactions.run(async (tx) => {
-      const byKey = await blockByKey(tx.sql, input.userId, input.idempotencyKey);
+      const byKey = await blockByKey(
+        tx.sql,
+        input.userId,
+        input.idempotencyKey,
+      );
       if (byKey !== null) {
         return byKey.relationship_id === input.relationshipId
-          ? { outcome: "BLOCKED" as const, blockId: byKey.id, deduplicated: true }
+          ? {
+              outcome: "BLOCKED" as const,
+              blockId: byKey.id,
+              deduplicated: true,
+            }
           : { outcome: "KEY_CONFLICT" as const };
       }
       // Already blocked by this side (another member pressed Block first).
-      const active = await activeBlock(tx.sql, input.relationshipId, input.side);
+      const active = await activeBlock(
+        tx.sql,
+        input.relationshipId,
+        input.side,
+      );
       if (active !== null) {
-        return { outcome: "BLOCKED" as const, blockId: active, deduplicated: true };
+        return {
+          outcome: "BLOCKED" as const,
+          blockId: active,
+          deduplicated: true,
+        };
       }
       const parties = await partiesOf(tx.sql, input.relationshipId, input.side);
-      if (parties === null) throw new Error("relationship vanished while blocking");
+      if (parties === null)
+        throw new Error("relationship vanished while blocking");
       const inserted = await tx.sql<{ id: string }[]>`
         insert into communication.blocks
           (tenant_id, relationship_id, blocker_organisation_id, blocker_user_id,
@@ -105,7 +130,11 @@ export function createPostgresChatSafetyStore(options: {
 
   const report: ChatSafetyStore["report"] = (input) =>
     transactions.run(async (tx) => {
-      const byKey = await reportByKey(tx.sql, input.userId, input.idempotencyKey);
+      const byKey = await reportByKey(
+        tx.sql,
+        input.userId,
+        input.idempotencyKey,
+      );
       if (byKey !== null) {
         const same =
           byKey.relationship_id === input.relationshipId &&
@@ -113,7 +142,11 @@ export function createPostgresChatSafetyStore(options: {
           byKey.reason_code === input.reasonCode &&
           byKey.note === input.note;
         return same
-          ? { outcome: "REPORTED" as const, reportId: byKey.id, deduplicated: true }
+          ? {
+              outcome: "REPORTED" as const,
+              reportId: byKey.id,
+              deduplicated: true,
+            }
           : { outcome: "KEY_CONFLICT" as const };
       }
       const reasons = await tx.sql<{ code: string }[]>`
@@ -129,10 +162,12 @@ export function createPostgresChatSafetyStore(options: {
              and c.relationship_id = ${input.relationshipId}
              and m.revises_message_id is null
              and m.sender_side <> ${input.side}`;
-        if (messages.length === 0) return { outcome: "MESSAGE_NOT_FOUND" as const };
+        if (messages.length === 0)
+          return { outcome: "MESSAGE_NOT_FOUND" as const };
       }
       const parties = await partiesOf(tx.sql, input.relationshipId, input.side);
-      if (parties === null) throw new Error("relationship vanished while reporting");
+      if (parties === null)
+        throw new Error("relationship vanished while reporting");
       const inserted = await tx.sql<{ id: string }[]>`
         insert into communication.reports
           (tenant_id, relationship_id, message_id, reporter_organisation_id,
@@ -144,7 +179,11 @@ export function createPostgresChatSafetyStore(options: {
       const id = inserted[0]?.id;
       if (id === undefined) throw new Error("report insert returned nothing");
       await input.audit(tx, id);
-      return { outcome: "REPORTED" as const, reportId: id, deduplicated: false };
+      return {
+        outcome: "REPORTED" as const,
+        reportId: id,
+        deduplicated: false,
+      };
     });
 
   return {
@@ -154,11 +193,26 @@ export function createPostgresChatSafetyStore(options: {
       } catch (error) {
         // A concurrent Block (same key, or same side) won the race.
         if (isUniqueViolation(error)) {
-          const byKey = await blockByKey(sql, input.userId, input.idempotencyKey);
-          if (byKey !== null && byKey.relationship_id === input.relationshipId) {
-            return { outcome: "BLOCKED", blockId: byKey.id, deduplicated: true };
+          const byKey = await blockByKey(
+            sql,
+            input.userId,
+            input.idempotencyKey,
+          );
+          if (
+            byKey !== null &&
+            byKey.relationship_id === input.relationshipId
+          ) {
+            return {
+              outcome: "BLOCKED",
+              blockId: byKey.id,
+              deduplicated: true,
+            };
           }
-          const active = await activeBlock(sql, input.relationshipId, input.side);
+          const active = await activeBlock(
+            sql,
+            input.relationshipId,
+            input.side,
+          );
           if (active !== null) {
             return { outcome: "BLOCKED", blockId: active, deduplicated: true };
           }
@@ -187,7 +241,11 @@ export function createPostgresChatSafetyStore(options: {
         return await report(input);
       } catch (error) {
         if (isUniqueViolation(error)) {
-          const byKey = await reportByKey(sql, input.userId, input.idempotencyKey);
+          const byKey = await reportByKey(
+            sql,
+            input.userId,
+            input.idempotencyKey,
+          );
           if (byKey !== null) {
             return byKey.relationship_id === input.relationshipId &&
               byKey.message_id === input.messageId &&

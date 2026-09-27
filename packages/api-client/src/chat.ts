@@ -140,9 +140,13 @@ export function blockChat(
   relationshipId: string,
   idempotencyKey: string,
 ): Promise<void> {
-  return noContent(session, pathFor(RELATIONSHIP_CHAT_BLOCK_PATH, relationshipId), {
-    headers: { [IDEMPOTENCY_KEY_HEADER]: idempotencyKey },
-  });
+  return noContent(
+    session,
+    pathFor(RELATIONSHIP_CHAT_BLOCK_PATH, relationshipId),
+    {
+      headers: { [IDEMPOTENCY_KEY_HEADER]: idempotencyKey },
+    },
+  );
 }
 
 /** `204`: the caller's side lifts its block, if it holds one. */

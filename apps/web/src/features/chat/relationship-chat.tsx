@@ -512,14 +512,19 @@ export function RelationshipChat({
                     Unsend
                   </Button>
                 ) : null}
-                {!message.mine && !message.unsent && message.side !== ownSide ? (
+                {!message.mine &&
+                !message.unsent &&
+                message.side !== ownSide ? (
                   <Button
                     variant="quiet"
                     size="compact"
                     className="min-h-11"
                     aria-label={`Report message from ${message.senderName}`}
                     onClick={() =>
-                      setSafety({ kind: "REPORT", messageId: message.messageId })
+                      setSafety({
+                        kind: "REPORT",
+                        messageId: message.messageId,
+                      })
                     }
                   >
                     Report

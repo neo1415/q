@@ -17,20 +17,28 @@ import { createChatSafetyAudit } from "../src/chat-safety-audit.js";
 /** Block, unblock and report are audited as material actions (AUDIT). */
 describe("chat safety audit", () => {
   it("records a valid material action, in the caller's transaction, without words", async () => {
-    const recorded: { tx: TransactionContext; input: MaterialActionAuditInput }[] = [];
+    const recorded: {
+      tx: TransactionContext;
+      input: MaterialActionAuditInput;
+    }[] = [];
     const tx = { sql: undefined as never } satisfies TransactionContext;
     const audit = createChatSafetyAudit({
       record: (t, input) => {
-        recorded.push({ tx: t, input: MaterialActionAuditInputSchema.parse(input) });
-        return Promise.resolve(input.auditEventId);
+        const parsed = MaterialActionAuditInputSchema.parse(input);
+        recorded.push({ tx: t, input: parsed });
+        return Promise.resolve(parsed.auditEventId);
       },
     });
     await audit(tx, {
       actor: {
         userId: UserIdSchema.parse("b0000000-0000-4000-8000-000000000001"),
         tenantId: TenantIdSchema.parse("c0000000-0000-4000-8000-000000000001"),
-        organisationId: OrganisationIdSchema.parse("d0000000-0000-4000-8000-000000000001"),
-        membershipId: MembershipIdSchema.parse("e0000000-0000-4000-8000-000000000001"),
+        organisationId: OrganisationIdSchema.parse(
+          "d0000000-0000-4000-8000-000000000001",
+        ),
+        membershipId: MembershipIdSchema.parse(
+          "e0000000-0000-4000-8000-000000000001",
+        ),
         actorType: "HUMAN",
       },
       actionType: "chat.reported",

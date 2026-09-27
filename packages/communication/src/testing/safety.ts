@@ -59,7 +59,10 @@ export function createInMemoryChatSafetyStore(
       relationshipId,
       new Set(
         blockRows
-          .filter((row) => row.relationshipId === relationshipId && row.liftedBy === null)
+          .filter(
+            (row) =>
+              row.relationshipId === relationshipId && row.liftedBy === null,
+          )
           .map((row) => row.side),
       ),
     );
@@ -71,7 +74,8 @@ export function createInMemoryChatSafetyStore(
     audited,
     block: async (input) => {
       const byKey = blockRows.find(
-        (row) => row.userId === input.userId && row.key === input.idempotencyKey,
+        (row) =>
+          row.userId === input.userId && row.key === input.idempotencyKey,
       );
       if (byKey !== undefined) {
         return byKey.relationshipId === input.relationshipId
@@ -117,7 +121,8 @@ export function createInMemoryChatSafetyStore(
     },
     report: async (input) => {
       const byKey = reports.find(
-        (row) => row.userId === input.userId && row.key === input.idempotencyKey,
+        (row) =>
+          row.userId === input.userId && row.key === input.idempotencyKey,
       );
       if (byKey !== undefined) {
         return byKey.relationshipId === input.relationshipId &&
