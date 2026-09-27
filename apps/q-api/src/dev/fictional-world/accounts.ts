@@ -233,6 +233,25 @@ async function driveJourney(
   return view;
 }
 
+/**
+ * The early-stage traction answer, derived from the company's own story
+ * (R30 #10) rather than defaulted to "nothing measurable": a company whose
+ * story names customers or revenue has active users; one that names pilots
+ * has pilots. Only a company whose story states neither answers "none".
+ * The definition's early-stage options have no "revenue" choice; "users"
+ * is the one its own facts support.
+ */
+export function tractionSignalOf(
+  company: FictionalCompany,
+): NonNullable<FictionalCompany["signal"]> {
+  if (company.signal !== undefined) return company.signal;
+  if (company.pilots !== undefined) return "pilots";
+  if (company.customers !== undefined || company.revenueStatus !== undefined) {
+    return "users";
+  }
+  return "none";
+}
+
 function founderAnswers(
   company: FictionalCompany,
   taxonomy: Taxonomy,
@@ -275,7 +294,7 @@ function founderAnswers(
       case "F4.functions":
         return multi(company.team.functions);
       case "F5.signal":
-        return select(company.signal ?? "none");
+        return select(tractionSignalOf(company));
       case "F5.pilots":
         return company.pilots === undefined ? "skip" : range(company.pilots);
       case "F5.revenue_status":

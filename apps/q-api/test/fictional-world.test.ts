@@ -2,7 +2,10 @@ import { describe, expect, it } from "vitest";
 
 import { composePitchDeck } from "@capital-q/q-specialists";
 
-import { storyText } from "../src/dev/fictional-world/accounts.js";
+import {
+  storyText,
+  tractionSignalOf,
+} from "../src/dev/fictional-world/accounts.js";
 import { FICTIONAL_COMPANIES } from "../src/dev/fictional-world/companies.js";
 import {
   FICTIONAL_INTERESTS,
@@ -131,6 +134,20 @@ describe("fictional world content", () => {
     for (const interest of FICTIONAL_INTERESTS) {
       expect(companies.has(interest.companyKey)).toBe(true);
       expect(investors.has(interest.investorKey)).toBe(true);
+    }
+  });
+});
+
+describe("the seeded traction answer (R30 #10)", () => {
+  it("never says 'nothing measurable' for a company whose story has customers or pilots", () => {
+    for (const company of FICTIONAL_COMPANIES) {
+      const hasTraction =
+        company.customers !== undefined ||
+        company.revenueStatus !== undefined ||
+        company.pilots !== undefined;
+      if (hasTraction) {
+        expect(tractionSignalOf(company), company.key).not.toBe("none");
+      }
     }
   });
 });
