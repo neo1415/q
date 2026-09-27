@@ -40,6 +40,7 @@ import {
   createVerificationClaimsReadinessPort,
   VERIFICATION_EVENTS,
   type CompanyVerificationService,
+  type SyntheticDemoAttestation,
 } from "../src/index.js";
 
 /**
@@ -74,7 +75,7 @@ type World = {
   readonly service: CompanyVerificationService;
   readonly decide: ReturnType<typeof createSyntheticVerificationDecider>;
   readonly decider: (
-    attestation: typeof PROOF | null,
+    attestation: SyntheticDemoAttestation | null,
     environment: string,
   ) => ReturnType<typeof createSyntheticVerificationDecider>;
   readonly readiness: ReturnType<typeof createVerificationClaimsReadinessPort>;
@@ -205,7 +206,7 @@ describe("@capital-q/verification against local PostgreSQL", () => {
         const outbox = createOutboxWriter({ registry });
         const audit = createPostgresMaterialActionAuditWriter();
         const decider = (
-          attestation: typeof PROOF | null,
+          attestation: SyntheticDemoAttestation | null,
           environment: string,
         ) =>
           createSyntheticVerificationDecider({
