@@ -2,6 +2,9 @@ import type { FastifyInstance, FastifyRequest } from "fastify";
 import {
   ApproveQApprovalRequestSchema,
   CorrelationIdSchema,
+  EmailDraftDtoSchema,
+  Q_APPROVAL_EMAIL_DRAFT_SUFFIX,
+  ReviseEmailDraftRequestSchema,
   parseContract,
   Q_APPROVAL_APPROVE_SUFFIX,
   Q_APPROVAL_REJECT_SUFFIX,
@@ -18,9 +21,16 @@ import {
   createCorrelationId,
   withObservabilityContext,
 } from "@capital-q/observability";
-import type { QActionService } from "@capital-q/q-actions";
+import {
+  QApprovalNotFoundError,
+  type QActionService,
+} from "@capital-q/q-actions";
 import type { QOrchestrator } from "@capital-q/q-runtime";
 
+import {
+  EMAIL_SEND,
+  EmailSendPayloadSchema,
+} from "../composition/email-action.js";
 import {
   getActorContext,
   requireActorContextHook,
@@ -159,6 +169,61 @@ export function registerQApprovalRoutes(
         approvalId: approvalIdParam(request),
         correlationId: correlation(),
         reason: input.reason,
+      });
+      return reply
+        .header("Cache-Control", "no-store")
+        .send(QApprovalViewSchema.parse(result.view));
+    },
+  );
+
+  // The email draft behind an `email.send` approval (BIZ-007): read by its
+  // approver, and edited by them. An edit is a revision: the old approval
+  // is void and a new one is requested for exactly the new words; the
+  // recipient and the relationship cannot change here.
+  const emailDraft = async (request: FastifyRequest) => {
+    const read = await service.readProposal({
+      actor: getActorContext(request),
+      approvalId: approvalIdParam(request),
+      correlationId: correlation(),
+    });
+    const payload = EmailSendPayloadSchema.safeParse(read.payload);
+    if (read.actionType !== EMAIL_SEND || !payload.success) {
+      throw new QApprovalNotFoundError();
+    }
+    return { view: read.view, payload: payload.data };
+  };
+
+  app.get(
+    `${approvalPath}${Q_APPROVAL_EMAIL_DRAFT_SUFFIX}`,
+    { onRequest: withContext },
+    async (request, reply) => {
+      const { view, payload } = await emailDraft(request);
+      return reply
+        .header("Cache-Control", "no-store")
+        .send(
+          EmailDraftDtoSchema.parse({
+            approvalId: view.approvalId,
+            ...payload,
+          }),
+        );
+    },
+  );
+
+  app.post(
+    `${approvalPath}${Q_APPROVAL_EMAIL_DRAFT_SUFFIX}`,
+    { onRequest: withContext },
+    async (request, reply) => {
+      const input = parseContract(
+        ReviseEmailDraftRequestSchema,
+        request.body ?? {},
+        "The edited email is not valid.",
+      );
+      const { payload } = await emailDraft(request);
+      const result = await service.revise({
+        actor: getActorContext(request),
+        approvalId: approvalIdParam(request),
+        correlationId: correlation(),
+        payload: { ...payload, subject: input.subject, body: input.body },
       });
       return reply
         .header("Cache-Control", "no-store")

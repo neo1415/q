@@ -135,9 +135,7 @@ export type IntegrationsStore = {
    * means a row already existed (a retry or a duplicate): its status says
    * what happened before.
    */
-  readonly claimOutbound: (
-    input: NewOutboundEmail,
-  ) => Promise<{
+  readonly claimOutbound: (input: NewOutboundEmail) => Promise<{
     readonly record: EmailMessageRecord;
     readonly created: boolean;
   }>;

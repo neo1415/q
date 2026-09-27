@@ -260,6 +260,17 @@ import {
   withLearning,
 } from "./composition/memory-learner.js";
 import { ownRecordTerms } from "./voice/vocabulary.js";
+import { loadGoogleWorkspaceConfig } from "@capital-q/config/google-workspace";
+import {
+  composeGoogleIntegrations,
+  createPostgresCounterpartDirectory,
+} from "@capital-q/integrations";
+import {
+  createEmailActionBoard,
+  createEmailIntelligencePort,
+  createEmailSendAction,
+  createRelationshipCounterparts,
+} from "./composition/email-action.js";
 
 // Q configuration is loaded from its own schema, separate from the application
 // API even where the current fields coincide.
@@ -786,6 +797,39 @@ const interestService = createInterestService({
 const relationshipBoard = createRelationshipActionBoard({ logger });
 // A profile change the person asked Q for waits here for approval (BIZ-002).
 const profileChangeBoard = createProfileChangeBoard({ logger });
+// Email on a relationship (BIZ-007): the person's own connected Gmail,
+// through the integrations context. The approved `email.send` executes
+// here, so q-api carries the same Google variables as api and workers.
+const googleWorkspace = loadGoogleWorkspaceConfig(process.env);
+const integrations = composeGoogleIntegrations({
+  sql: database.sql,
+  transactions: database.transactions,
+  oauth: googleWorkspace.oauth,
+  tokenEncryptionKey: googleWorkspace.tokenEncryptionKey,
+  pushTopic: googleWorkspace.push?.topic,
+  logger,
+});
+const emailBoard = createEmailActionBoard();
+const emailInvestorNames = createPostgresInvestorProfileQueryPort({
+  sql: database.sql,
+});
+const relationshipCounterparts = createRelationshipCounterparts({
+  interests: interestService,
+  directory: createPostgresCounterpartDirectory({ sql: database.sql }),
+  nameOf: async (kind, id) => {
+    if (kind === "INVESTOR_ORGANISATION") {
+      return (
+        (await emailInvestorNames.findCanonicalInvestorProfile(id))
+          ?.displayName ?? null
+      );
+    }
+    const companyId = CompanyIdSchema.safeParse(id);
+    return companyId.success
+      ? ((await companies.findCanonicalCompanyProfile(companyId.data))
+          ?.canonicalName ?? null)
+      : null;
+  },
+});
 // Handles and the Q Card (BIZ-004), composed as the application API
 // composes them: the same service, the same allowlisted subject facts.
 const cardVerification = createVerificationClaimsReadinessPort({
@@ -922,6 +966,12 @@ const qTools = createQTools({
           : { status: view.status };
       },
     },
+    // BIZ-007: "email the founder", drafted for approval.
+    email: createEmailIntelligencePort({
+      counterparts: relationshipCounterparts,
+      integrations,
+      board: emailBoard,
+    }),
     // BIZ-002: every profile field the page edits, Q can prepare.
     profileChanges: profileChangeBoard,
     visibility: {
@@ -1053,6 +1103,12 @@ const qActionRegistry = createQActionRegistry([
     authorization,
     logger,
   }),
+  // An email on a relationship, from the approver's own Gmail (BIZ-007).
+  createEmailSendAction({
+    integrations,
+    counterparts: relationshipCounterparts,
+    logger,
+  }),
 ]);
 // Every composed action has a capability entry (R20): the list the
 // completeness test reads is the list composed here.
@@ -1077,6 +1133,7 @@ const qActionPort = createQActionPort({
   // profile change; one proposal per run either way.
   proposer: chainProposers(
     relationshipBoard.proposer,
+    emailBoard.proposer,
     profileChangeBoard.proposer,
     visibilityBoard.proposer,
     handleClaimBoard.proposer,

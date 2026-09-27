@@ -86,6 +86,9 @@ importers:
       '@capital-q/gateq-intake':
         specifier: workspace:*
         version: link:../../packages/gateq-intake
+      '@capital-q/integrations':
+        specifier: workspace:*
+        version: link:../../packages/integrations
       '@capital-q/investor-onboarding':
         specifier: workspace:*
         version: link:../../packages/investor-onboarding
@@ -171,6 +174,9 @@ importers:
       '@capital-q/founder-onboarding':
         specifier: workspace:*
         version: link:../../packages/founder-onboarding
+      '@capital-q/integrations':
+        specifier: workspace:*
+        version: link:../../packages/integrations
       '@capital-q/investor-onboarding':
         specifier: workspace:*
         version: link:../../packages/investor-onboarding
@@ -389,6 +395,9 @@ importers:
       '@capital-q/founder-onboarding':
         specifier: workspace:*
         version: link:../../packages/founder-onboarding
+      '@capital-q/integrations':
+        specifier: workspace:*
+        version: link:../../packages/integrations
       '@capital-q/investor-onboarding':
         specifier: workspace:*
         version: link:../../packages/investor-onboarding

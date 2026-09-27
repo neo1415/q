@@ -89,3 +89,4 @@ export {
   createPostgresCounterpartDirectory,
   createPostgresIntegrationsStore,
 } from "./postgres.js";
+export { composeGoogleIntegrations } from "./compose.js";
