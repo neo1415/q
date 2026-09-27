@@ -55,6 +55,7 @@ function port(recorded: string[]): OnboardingToolPort {
             options: [{ key: "angel", label: "Angel investor" }],
           },
         ],
+        checks: [],
       }),
     recommend: () => Promise.resolve([]),
     accept: () => Promise.resolve([]),

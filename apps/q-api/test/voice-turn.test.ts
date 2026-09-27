@@ -681,6 +681,7 @@ describe("a spoken question for Q", () => {
           });
           return Promise.resolve(outcomeOf("Seed it is. Where are you based?"));
         },
+        researchEnded: () => undefined,
       },
       logger,
     });
@@ -746,6 +747,7 @@ describe("a spoken question for Q", () => {
           timeline.push("turn ends");
           return outcomeOf("Seed it is. Where are you based?");
         },
+        researchEnded: () => undefined,
       },
       logger,
     });

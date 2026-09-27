@@ -102,7 +102,7 @@ function harness(
       calls.plans.push(request);
       return Promise.resolve(
         options.firewall === "DENIED"
-          ? { outcome: "DENIED", reason: "NOT_AVAILABLE", denied: [] }
+          ? { outcome: "DENIED", reason: "NO_AUTHORISED_CONTEXT", denied: [] }
           : {
               outcome: "AUTHORISED",
               plan: {

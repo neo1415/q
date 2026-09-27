@@ -174,7 +174,11 @@ describe("the prospects fallback (gap 1)", () => {
             kind,
             question:
               kind === "QUESTION_TO_Q"
-                ? { kind: "ADVICE", text: "Who would likely invest in us?" }
+                ? {
+                    kind: "ADVICE",
+                    text: "Who would likely invest in us?",
+                    about: [],
+                  }
                 : null,
           }),
           available,
@@ -196,7 +200,13 @@ describe("the prospects fallback (gap 1)", () => {
       });
     }
     const result = directive(
-      read({ question: { kind: "ADVICE", text: "Who would invest in us?" } }),
+      read({
+        question: {
+          kind: "ADVICE",
+          text: "Who would invest in us?",
+          about: [],
+        },
+      }),
       true,
       state,
     );

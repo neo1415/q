@@ -156,8 +156,8 @@ describe("disclosure.raise.share", () => {
       (
         await harness().share.authorize(SHARE, {
           ...FOUNDER,
-          actorType: "Q_AGENT",
-        } as ActorContext)
+          actorType: "Q",
+        })
       ).outcome,
     ).toBe("DENY");
   });

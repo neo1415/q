@@ -1563,8 +1563,6 @@ describe("@capital-q/permissions against local PostgreSQL", () => {
       relationshipParties: createRelationshipPartyResolver({
         companies,
         investors,
-        mandates: createPostgresInvestorMandateQueryPort({ sql }),
-        capital,
         relationships: world.network.query,
       }),
       // The company side's own list, as the Network context gives it: only

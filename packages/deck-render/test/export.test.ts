@@ -278,7 +278,14 @@ describe("BIZ-001 · a brief is a document you can download", () => {
       )
       .map((descriptor) => descriptor.get(PDFName.of("FontFile2")))
       .filter((ref) => ref !== undefined)
-      .map((ref) => pdf.context.lookup(ref, PDFRawStream))
+      .map((ref) => {
+        // pdf-lib's typed lookup overloads omit PDFRawStream; check it here.
+        const stream = pdf.context.lookup(ref);
+        if (!(stream instanceof PDFRawStream)) {
+          throw new Error("FontFile2 is not a raw stream");
+        }
+        return stream;
+      })
       .map((stream) => decodePDFRawStream(stream).decode().byteLength);
     const bundled = await Promise.all(
       ["NotoSans-Regular.ttf", "NotoSans-Bold.ttf"].map(
