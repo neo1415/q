@@ -136,13 +136,16 @@ function exactlyOne(input: {
   readonly investorOrganisationId?: string | undefined;
 }): boolean {
   return (
-    [input.relationshipId, input.companyId, input.investorOrganisationId].filter(
-      (id) => id !== undefined,
-    ).length === 1
+    [
+      input.relationshipId,
+      input.companyId,
+      input.investorOrganisationId,
+    ].filter((id) => id !== undefined).length === 1
   );
 }
 const ONE_REF = {
-  message: "name exactly one of relationshipId, companyId or investorOrganisationId",
+  message:
+    "name exactly one of relationshipId, companyId or investorOrganisationId",
 };
 
 /**
@@ -178,7 +181,9 @@ async function resolveRelationship(
   if (input.investorOrganisationId !== undefined) {
     const id = input.investorOrganisationId;
     if (!admitted(plan, { kind: "INVESTOR_ORGANISATION", id })) return null;
-    return (await relationships.withInvestor(actor, id))?.relationshipId ?? null;
+    return (
+      (await relationships.withInvestor(actor, id))?.relationshipId ?? null
+    );
   }
   return null;
 }
@@ -299,7 +304,12 @@ export type ProposeChatMessageInput = z.infer<
 export const ProposeReminderInputSchema = z
   .object({
     ...RelationshipRef,
-    title: z.string().trim().min(1).max(200).describe("What to be reminded of."),
+    title: z
+      .string()
+      .trim()
+      .min(1)
+      .max(200)
+      .describe("What to be reminded of."),
     remindAt: UtcTimestampSchema.describe("When, as an ISO 8601 UTC time."),
     note: z.string().trim().max(1000).optional(),
   })
@@ -329,7 +339,8 @@ type ProposalGrant = {
 };
 
 function proposalTool<
-  I extends ProposeChatMessageInput | ProposeReminderInput | ProposeMeetingInput,
+  I extends
+    ProposeChatMessageInput | ProposeReminderInput | ProposeMeetingInput,
 >(
   chat: ChatIntelligencePort,
   relationships: RelationshipIntelligencePort,

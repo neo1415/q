@@ -43,7 +43,9 @@ import type { ActorContext } from "@capital-q/security";
  * nothing because it drafted the words.
  */
 
-export const CHAT_MESSAGE_SEND = QActionTypeSchema.parse(CHAT_MESSAGE_SEND_NAME);
+export const CHAT_MESSAGE_SEND = QActionTypeSchema.parse(
+  CHAT_MESSAGE_SEND_NAME,
+);
 export const REMINDER_CREATE = QActionTypeSchema.parse(REMINDER_CREATE_NAME);
 export const MEETING_PROPOSE = QActionTypeSchema.parse(MEETING_PROPOSE_NAME);
 
@@ -57,7 +59,9 @@ export const ChatMessageSendPayloadSchema = z
     documentId: UuidSchema.optional(),
   })
   .strict();
-export type ChatMessageSendPayload = z.infer<typeof ChatMessageSendPayloadSchema>;
+export type ChatMessageSendPayload = z.infer<
+  typeof ChatMessageSendPayloadSchema
+>;
 
 export const ReminderCreatePayloadSchema = z
   .object({
@@ -108,7 +112,10 @@ export function createChatMessageSendAction(dependencies: {
   readonly logger?: Logger | undefined;
 }): AnyQActionDefinition {
   const { chat, logger } = dependencies;
-  return defineQAction<ChatMessageSendPayload, z.infer<typeof MessageResultSchema>>({
+  return defineQAction<
+    ChatMessageSendPayload,
+    z.infer<typeof MessageResultSchema>
+  >({
     actionType: CHAT_MESSAGE_SEND,
     version: 1,
     riskClass: "CONFIRM_REQUIRED",
@@ -163,10 +170,18 @@ export function createChatMessageSendAction(dependencies: {
           };
         } catch (error) {
           if (error instanceof ChatNotFoundError) {
-            return { outcome: "FAILED", failureCode: "NOT_A_PARTY", retryable: false };
+            return {
+              outcome: "FAILED",
+              failureCode: "NOT_A_PARTY",
+              retryable: false,
+            };
           }
           if (error instanceof ChatNotConnectedError) {
-            return { outcome: "FAILED", failureCode: "NOT_CONNECTED", retryable: false };
+            return {
+              outcome: "FAILED",
+              failureCode: "NOT_CONNECTED",
+              retryable: false,
+            };
           }
           if (error instanceof ChatAttachmentUnavailableError) {
             return {
@@ -181,7 +196,11 @@ export function createChatMessageSendAction(dependencies: {
             { actionId: action.actionId, attempt: context.attempt },
             "approved chat message failed",
           );
-          return { outcome: "FAILED", failureCode: "SEND_FAILED", retryable: true };
+          return {
+            outcome: "FAILED",
+            failureCode: "SEND_FAILED",
+            retryable: true,
+          };
         }
       },
     },
@@ -292,7 +311,12 @@ export function createChatActionBoard(
   const now = options.now ?? (() => Date.now());
   const prepared = new Map<
     string,
-    { tenantId: string; actorUserId: string; proposal: ChatProposal; at: number }
+    {
+      tenantId: string;
+      actorUserId: string;
+      proposal: ChatProposal;
+      at: number;
+    }
   >();
   return {
     prepareForApproval: (entry) => {

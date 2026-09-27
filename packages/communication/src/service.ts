@@ -204,9 +204,9 @@ export function createChatService(dependencies: ChatServiceDependencies) {
 
     let attachment: ChatAttachmentSnapshot | null = null;
     if (request.kind !== "TEXT") {
-      const document = await documents(actor, request.documentId).catch(
-        () => ({ outcome: "NOT_FOUND" as const }),
-      );
+      const document = await documents(actor, request.documentId).catch(() => ({
+        outcome: "NOT_FOUND" as const,
+      }));
       if (document.outcome !== "READY") {
         throw new ChatAttachmentUnavailableError(document.outcome);
       }
@@ -218,10 +218,10 @@ export function createChatService(dependencies: ChatServiceDependencies) {
       senderUserId: actor.userId,
       senderSide: party.side,
       kind: request.kind,
-      body:
-        request.kind === "VOICE_NOTE" ? null : (request.body ?? null),
+      body: request.kind === "VOICE_NOTE" ? null : (request.body ?? null),
       attachment,
-      voiceDurationMs: request.kind === "VOICE_NOTE" ? request.durationMs : null,
+      voiceDurationMs:
+        request.kind === "VOICE_NOTE" ? request.durationMs : null,
       revisesMessageId: null,
       qActionId: input.qActionId ?? null,
       idempotencyKey: input.idempotencyKey,
@@ -327,7 +327,10 @@ export function createChatService(dependencies: ChatServiceDependencies) {
       if (conversation === null || !UUID.test(input.messageId)) {
         throw new ChatNotFoundError();
       }
-      const original = await store.findMessage(conversation.id, input.messageId);
+      const original = await store.findMessage(
+        conversation.id,
+        input.messageId,
+      );
       // Only your own original; the other side's is not found to you.
       if (
         original === null ||

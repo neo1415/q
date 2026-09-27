@@ -136,9 +136,13 @@ export function registerChatRoutes(
     },
   );
 
-  app.get(CHAT_UNREAD_PATH, { onRequest: withContext }, async (request, reply) => {
-    const unread = await chat.unread(getActorContext(request));
-    void reply.header("Cache-Control", "no-store");
-    return ChatUnreadDtoSchema.parse(unread);
-  });
+  app.get(
+    CHAT_UNREAD_PATH,
+    { onRequest: withContext },
+    async (request, reply) => {
+      const unread = await chat.unread(getActorContext(request));
+      void reply.header("Cache-Control", "no-store");
+      return ChatUnreadDtoSchema.parse(unread);
+    },
+  );
 }

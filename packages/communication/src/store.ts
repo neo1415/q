@@ -8,11 +8,7 @@
 
 export type ChatSide = "COMPANY" | "INVESTOR";
 export type ChatRowKind =
-  | "TEXT"
-  | "ATTACHMENT"
-  | "VOICE_NOTE"
-  | "EDIT"
-  | "TOMBSTONE";
+  "TEXT" | "ATTACHMENT" | "VOICE_NOTE" | "EDIT" | "TOMBSTONE";
 
 export type ChatAttachmentSnapshot = {
   readonly documentId: string;
@@ -65,9 +61,10 @@ export type ChatStore = {
    * for an original -- `message_sent` on the relationship. A repeat of the
    * sender's idempotency key returns the stored row, `deduplicated`.
    */
-  readonly append: (
-    input: AppendChatMessageInput,
-  ) => Promise<{ readonly row: ChatMessageRow; readonly deduplicated: boolean }>;
+  readonly append: (input: AppendChatMessageInput) => Promise<{
+    readonly row: ChatMessageRow;
+    readonly deduplicated: boolean;
+  }>;
   readonly findMessage: (
     conversationId: string,
     messageId: string,

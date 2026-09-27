@@ -40,7 +40,9 @@ export type OwnDocumentLookup = (
 } | null>;
 
 /** Only a document that has cleared the malware gate may be shared. */
-export function createChatDocuments(lookup: OwnDocumentLookup): ChatDocumentPort {
+export function createChatDocuments(
+  lookup: OwnDocumentLookup,
+): ChatDocumentPort {
   return async (actor, documentId) => {
     const document = await lookup(actor, documentId).catch(() => null);
     if (document === null) return { outcome: "NOT_FOUND" };

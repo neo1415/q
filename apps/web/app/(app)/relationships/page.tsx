@@ -1,10 +1,12 @@
 import type { Metadata } from "next";
 
+import { getChatUnread } from "@capital-q/api-client";
+
 import {
   PageContainer,
   PageHeader,
 } from "@/components/app-shell/page-container";
-import { resolveOwnContext } from "@/features/q/context";
+import { apiSession, resolveOwnContext } from "@/features/q/context";
 import { ownRelationships } from "@/features/relationships/relationship-data";
 import { RelationshipsIndex } from "@/features/relationships/relationships-index";
 
@@ -21,7 +23,10 @@ export const dynamic = "force-dynamic";
  */
 export default async function RelationshipsPage() {
   const context = await resolveOwnContext();
-  const items = await ownRelationships(context);
+  const [items, unread] = await Promise.all([
+    ownRelationships(context),
+    unreadByRelationship(),
+  ]);
   const side =
     context.kind === "FOUNDER"
       ? "COMPANY"
@@ -41,7 +46,19 @@ export default async function RelationshipsPage() {
               : undefined
         }
       />
-      <RelationshipsIndex side={side} items={items} />
+      <RelationshipsIndex side={side} items={items} unread={unread} />
     </PageContainer>
   );
+}
+
+/** R34: unread chat per relationship; an unreadable count is simply none. */
+async function unreadByRelationship(): Promise<ReadonlyMap<string, number>> {
+  const session = await apiSession();
+  if (session === null) return new Map();
+  try {
+    const { items } = await getChatUnread(session);
+    return new Map(items.map((item) => [item.relationshipId, item.unread]));
+  } catch {
+    return new Map();
+  }
 }

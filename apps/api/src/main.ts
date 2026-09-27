@@ -856,9 +856,10 @@ const chat = composeChat({
   ownDocument: async (actor, documentId) => {
     const parsed = DocumentIdSchema.safeParse(documentId);
     if (!parsed.success) return null;
-    const { document, currentVersion } = await evidence.getDocumentWithVersion(
-      { actor, documentId: parsed.data },
-    );
+    const { document, currentVersion } = await evidence.getDocumentWithVersion({
+      actor,
+      documentId: parsed.data,
+    });
     return currentVersion === null
       ? null
       : {

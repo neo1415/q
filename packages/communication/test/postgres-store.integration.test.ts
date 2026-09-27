@@ -68,7 +68,8 @@ describe("@capital-q/communication against PostgreSQL", () => {
         await sql`insert into auth.users (id, email) values (${authId}, ${`${authId.slice(0, 8)}@chat.example.invalid`})`;
         const [profile] = await sql<{ id: string }[]>`
           select id from identity.user_profiles where auth_user_id = ${authId}`;
-        if (profile === undefined) throw new Error("profile trigger did not run");
+        if (profile === undefined)
+          throw new Error("profile trigger did not run");
         await sql`update identity.user_profiles set display_name = ${type === "company" ? "Ada" : "Ben"} where id = ${profile.id}`;
         await sql`insert into identity.organisation_memberships (tenant_id, organisation_id, user_id, membership_status)
           values (${tenant}, ${org}, ${profile.id}, 'active')`;
@@ -92,7 +93,10 @@ describe("@capital-q/communication against PostgreSQL", () => {
     founder = actor(users[0] ?? "", ids.tenantCo, ids.orgCo);
     investor = actor(users[1] ?? "", ids.tenantInv, ids.orgInv);
     service = createChatService({
-      store: createPostgresChatStore({ sql: db.sql, transactions: db.transactions }),
+      store: createPostgresChatStore({
+        sql: db.sql,
+        transactions: db.transactions,
+      }),
       parties: (a, relationshipId) =>
         Promise.resolve(
           relationshipId !== ids.relationship
@@ -113,35 +117,89 @@ describe("@capital-q/communication against PostgreSQL", () => {
   });
 
   it("sends, dedupes, records activity, folds an unsend and counts unread", async () => {
-    const first = await service.send({ actor: founder, relationshipId: ids.relationship, request: { kind: "TEXT", body: "Hello Ben" }, idempotencyKey: "it-key-0001" });
-    const again = await service.send({ actor: founder, relationshipId: ids.relationship, request: { kind: "TEXT", body: "Hello Ben" }, idempotencyKey: "it-key-0001" });
+    const first = await service.send({
+      actor: founder,
+      relationshipId: ids.relationship,
+      request: { kind: "TEXT", body: "Hello Ben" },
+      idempotencyKey: "it-key-0001",
+    });
+    const again = await service.send({
+      actor: founder,
+      relationshipId: ids.relationship,
+      request: { kind: "TEXT", body: "Hello Ben" },
+      idempotencyKey: "it-key-0001",
+    });
     expect(again.deduplicated).toBe(true);
     expect(again.message.messageId).toBe(first.message.messageId);
     expect(first.message.senderName).toBe("Ada");
 
-    const second = await service.send({ actor: founder, relationshipId: ids.relationship, request: { kind: "TEXT", body: "Deck attached soon" }, idempotencyKey: "it-key-0002" });
-    const events = await db.sql<{ event_type: string; visibility_scope: string; payload: unknown }[]>`
+    const second = await service.send({
+      actor: founder,
+      relationshipId: ids.relationship,
+      request: { kind: "TEXT", body: "Deck attached soon" },
+      idempotencyKey: "it-key-0002",
+    });
+    const events = await db.sql<
+      { event_type: string; visibility_scope: string; payload: unknown }[]
+    >`
       select event_type, visibility_scope, payload from network.relationship_events
        where relationship_id = ${ids.relationship} order by sequence`;
-    expect(events.map((e) => e.event_type)).toEqual(["message_sent", "message_sent"]);
+    expect(events.map((e) => e.event_type)).toEqual([
+      "message_sent",
+      "message_sent",
+    ]);
     expect(events[0]?.visibility_scope).toBe("relationship_shared");
     expect(JSON.stringify(events)).not.toContain("Hello Ben");
 
-    expect((await service.unread(investor)).items).toEqual([{ relationshipId: ids.relationship, unread: 2 }]);
-    const view = await service.thread({ actor: investor, relationshipId: ids.relationship });
-    expect(view.messages.map((m) => m.body)).toEqual(["Hello Ben", "Deck attached soon"]);
+    expect((await service.unread(investor)).items).toEqual([
+      { relationshipId: ids.relationship, unread: 2 },
+    ]);
+    const view = await service.thread({
+      actor: investor,
+      relationshipId: ids.relationship,
+    });
+    expect(view.messages.map((m) => m.body)).toEqual([
+      "Hello Ben",
+      "Deck attached soon",
+    ]);
     const cursor = view.cursor ?? "";
 
-    await service.markRead({ actor: investor, relationshipId: ids.relationship, lastReadMessageId: second.message.messageId });
-    await service.markRead({ actor: investor, relationshipId: ids.relationship, lastReadMessageId: first.message.messageId });
+    await service.markRead({
+      actor: investor,
+      relationshipId: ids.relationship,
+      lastReadMessageId: second.message.messageId,
+    });
+    await service.markRead({
+      actor: investor,
+      relationshipId: ids.relationship,
+      lastReadMessageId: first.message.messageId,
+    });
     expect((await service.unread(investor)).items).toEqual([]);
-    const founderView = await service.thread({ actor: founder, relationshipId: ids.relationship });
-    expect(founderView.counterpartLastReadMessageId).toBe(second.message.messageId);
+    const founderView = await service.thread({
+      actor: founder,
+      relationshipId: ids.relationship,
+    });
+    expect(founderView.counterpartLastReadMessageId).toBe(
+      second.message.messageId,
+    );
 
-    await service.unsend({ actor: founder, relationshipId: ids.relationship, messageId: first.message.messageId, idempotencyKey: "it-key-0003" });
-    const changes = await service.thread({ actor: investor, relationshipId: ids.relationship, after: cursor });
+    await service.unsend({
+      actor: founder,
+      relationshipId: ids.relationship,
+      messageId: first.message.messageId,
+      idempotencyKey: "it-key-0003",
+    });
+    const changes = await service.thread({
+      actor: investor,
+      relationshipId: ids.relationship,
+      after: cursor,
+    });
     expect(changes.messages).toHaveLength(1);
-    expect(changes.messages[0]).toMatchObject({ messageId: first.message.messageId, unsent: true, body: null });
+    expect(changes.messages[0]).toMatchObject({
+      messageId: first.message.messageId,
+      unsent: true,
+      body: null,
+    });
 
     await expect(
       db.sql`update communication.messages set body = 'x' where id = ${second.message.messageId}`,

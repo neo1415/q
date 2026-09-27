@@ -218,3 +218,10 @@ export {
   reviseEmailDraft,
   startGoogleConnect,
 } from "./integrations.js";
+export {
+  getChatThread,
+  getChatUnread,
+  markChatRead,
+  sendChatMessage,
+  unsendChatMessage,
+} from "./chat.js";

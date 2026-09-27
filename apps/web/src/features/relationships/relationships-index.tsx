@@ -15,9 +15,12 @@ import { RelationshipList } from "./relationship-list";
 export function RelationshipsIndex({
   side,
   items,
+  unread,
 }: {
   readonly side: "INVESTOR" | "COMPANY" | "NONE";
   readonly items: readonly RelationshipSummaryDto[] | undefined;
+  /** R34: unread chat messages per relationship id. */
+  readonly unread?: ReadonlyMap<string, number> | undefined;
 }) {
   if (side === "NONE") {
     return (
@@ -53,7 +56,7 @@ export function RelationshipsIndex({
       />
     );
   }
-  return <RelationshipList items={items} emptySentence="" />;
+  return <RelationshipList items={items} emptySentence="" unread={unread} />;
 }
 
 function Empty({

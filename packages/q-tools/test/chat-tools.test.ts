@@ -96,19 +96,31 @@ describe("list_messages", () => {
   it("reads the invoker's own bound thread", async () => {
     const { executor } = world();
     const outcome = await executor.execute(
-      { callId: "c1", name: "list_messages", arguments: { relationshipId: RELATIONSHIP } },
+      {
+        callId: "c1",
+        name: "list_messages",
+        arguments: { relationshipId: RELATIONSHIP },
+      },
       contextFor(actorB, relationshipPlan(base(actorB), RELATIONSHIP)),
     );
     expect(outcome.result).toMatchObject({
       ok: true,
-      data: { open: true, counterpartName: "Apex", messages: [{ text: "Deck attached" }] },
+      data: {
+        open: true,
+        counterpartName: "Apex",
+        messages: [{ text: "Deck attached" }],
+      },
     });
   });
 
   it("never reads a thread the firewall did not bind for this run", async () => {
     const { executor, reads } = world();
     const outcome = await executor.execute(
-      { callId: "c2", name: "list_messages", arguments: { relationshipId: OTHER } },
+      {
+        callId: "c2",
+        name: "list_messages",
+        arguments: { relationshipId: OTHER },
+      },
       contextFor(actorB, relationshipPlan(base(actorB), RELATIONSHIP)),
     );
     expect(outcome.status).toBe("DENIED");
@@ -118,7 +130,11 @@ describe("list_messages", () => {
   it("gives a non-party nothing, even with the thread bound", async () => {
     const { executor } = world();
     const outcome = await executor.execute(
-      { callId: "c3", name: "list_messages", arguments: { relationshipId: RELATIONSHIP } },
+      {
+        callId: "c3",
+        name: "list_messages",
+        arguments: { relationshipId: RELATIONSHIP },
+      },
       contextFor(actorA, relationshipPlan(base(actorA), RELATIONSHIP)),
     );
     expect(outcome.status).toBe("DENIED");
@@ -133,15 +149,25 @@ describe("chat proposals", () => {
       {
         callId: "c4",
         name: "propose_chat_message",
-        arguments: { relationshipId: RELATIONSHIP, body: "Thanks Ada, reading it now." },
+        arguments: {
+          relationshipId: RELATIONSHIP,
+          body: "Thanks Ada, reading it now.",
+        },
       },
       contextFor(actorB, relationshipPlan(base(actorB), RELATIONSHIP)),
     );
-    expect(outcome.result).toMatchObject({ ok: true, data: { status: "PREPARED" } });
+    expect(outcome.result).toMatchObject({
+      ok: true,
+      data: { status: "PREPARED" },
+    });
     expect(prepared).toEqual([
       {
         actionType: "chat.message.send",
-        payload: { relationshipId: RELATIONSHIP, counterpartName: "Apex", body: "Thanks Ada, reading it now." },
+        payload: {
+          relationshipId: RELATIONSHIP,
+          counterpartName: "Apex",
+          body: "Thanks Ada, reading it now.",
+        },
       },
     ]);
   });
@@ -156,13 +182,19 @@ describe("chat proposals", () => {
       },
       contextFor(actorB, relationshipPlan(base(actorB), RELATIONSHIP)),
     );
-    expect(outcome.result).toMatchObject({ ok: true, data: { status: "NOT_CONNECTED" } });
+    expect(outcome.result).toMatchObject({
+      ok: true,
+      data: { status: "NOT_CONNECTED" },
+    });
     expect(prepared).toEqual([]);
   });
 
   it("prepares a meeting and a reminder as proposals", async () => {
     const { executor, prepared } = world();
-    const context = contextFor(actorB, relationshipPlan(base(actorB), RELATIONSHIP));
+    const context = contextFor(
+      actorB,
+      relationshipPlan(base(actorB), RELATIONSHIP),
+    );
     await executor.execute(
       {
         callId: "c6",
@@ -180,13 +212,16 @@ describe("chat proposals", () => {
       {
         callId: "c7",
         name: "propose_reminder",
-        arguments: { relationshipId: RELATIONSHIP, title: "Follow up with Apex", remindAt: "2026-10-03T09:00:00.000Z" },
+        arguments: {
+          relationshipId: RELATIONSHIP,
+          title: "Follow up with Apex",
+          remindAt: "2026-10-03T09:00:00.000Z",
+        },
       },
       context,
     );
-    expect(prepared.map((p) => (p as { actionType: string }).actionType)).toEqual([
-      "meeting.propose",
-      "reminder.create",
-    ]);
+    expect(
+      prepared.map((p) => (p as { actionType: string }).actionType),
+    ).toEqual(["meeting.propose", "reminder.create"]);
   });
 });

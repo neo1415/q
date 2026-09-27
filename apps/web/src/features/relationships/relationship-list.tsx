@@ -22,9 +22,12 @@ import {
 export function RelationshipList({
   items,
   emptySentence,
+  unread,
 }: {
   readonly items: readonly RelationshipSummaryDto[];
   readonly emptySentence: string;
+  /** R34: unread chat messages per relationship id. */
+  readonly unread?: ReadonlyMap<string, number> | undefined;
 }) {
   if (items.length === 0) {
     return (
@@ -46,14 +49,23 @@ export function RelationshipList({
           key={item.relationshipId}
           data-relationship-id={item.relationshipId}
         >
-          <RelationshipRow item={item} />
+          <RelationshipRow
+            item={item}
+            unread={unread?.get(item.relationshipId) ?? 0}
+          />
         </li>
       ))}
     </ul>
   );
 }
 
-function RelationshipRow({ item }: { readonly item: RelationshipSummaryDto }) {
+function RelationshipRow({
+  item,
+  unread,
+}: {
+  readonly item: RelationshipSummaryDto;
+  readonly unread: number;
+}) {
   return (
     <Link
       href={relationshipHref(item)}
@@ -74,6 +86,17 @@ function RelationshipRow({ item }: { readonly item: RelationshipSummaryDto }) {
           {nextStepSentence(item.nextStep, item.counterpart.name)}
         </span>
       </span>
+      {unread > 0 ? (
+        // Said in words, not by colour alone.
+        <span
+          className="cq-caption cq-numeric shrink-0 rounded-full bg-(--cq-accent-soft) px-2 py-0.5 text-(--cq-text-primary)"
+          data-unread={unread}
+        >
+          {unread === 1
+            ? "1 new message"
+            : `${unread > 99 ? "99+" : unread} new messages`}
+        </span>
+      ) : null}
       <ChevronRight
         size={ICON_SIZE.compact}
         aria-hidden="true"

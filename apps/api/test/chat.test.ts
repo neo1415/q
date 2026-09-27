@@ -85,52 +85,99 @@ const send = (body: unknown, key?: string) => ({
 describe("/v1/relationships/:relationshipId/messages", () => {
   it("sends once per key and lists the thread", async () => {
     const { app, store } = build();
-    const first = await app.inject(send({ kind: "TEXT", body: "Hello" }, "chat-key-0001"));
+    const first = await app.inject(
+      send({ kind: "TEXT", body: "Hello" }, "chat-key-0001"),
+    );
     expect(first.statusCode).toBe(201);
-    const again = await app.inject(send({ kind: "TEXT", body: "Hello" }, "chat-key-0001"));
+    const again = await app.inject(
+      send({ kind: "TEXT", body: "Hello" }, "chat-key-0001"),
+    );
     expect(again.statusCode).toBe(200);
     expect(again.json<{ deduplicated: boolean }>().deduplicated).toBe(true);
     expect(store.rows).toHaveLength(1);
 
-    const listed = await app.inject({ method: "GET", url: `/v1/relationships/${REL}/messages` });
+    const listed = await app.inject({
+      method: "GET",
+      url: `/v1/relationships/${REL}/messages`,
+    });
     expect(listed.statusCode).toBe(200);
     expect(listed.headers["cache-control"]).toBe("no-store");
-    const thread = listed.json<{ status: string; messages: { body: string; mine: boolean }[] }>();
+    const thread = listed.json<{
+      status: string;
+      messages: { body: string; mine: boolean }[];
+    }>();
     expect(thread.status).toBe("OPEN");
-    expect(thread.messages).toEqual([expect.objectContaining({ body: "Hello", mine: true })]);
+    expect(thread.messages).toEqual([
+      expect.objectContaining({ body: "Hello", mine: true }),
+    ]);
   });
 
   it("requires an Idempotency-Key and a valid body before writing", async () => {
     const { app, store } = build();
-    expect((await app.inject(send({ kind: "TEXT", body: "x" }))).statusCode).toBe(422);
-    expect((await app.inject(send({ kind: "TEXT", body: "" }, "chat-key-0002"))).statusCode).toBe(422);
-    expect((await app.inject(send({ kind: "TEXT", body: "x", tenantId: "t" }, "chat-key-0003"))).statusCode).toBe(422);
+    expect(
+      (await app.inject(send({ kind: "TEXT", body: "x" }))).statusCode,
+    ).toBe(422);
+    expect(
+      (await app.inject(send({ kind: "TEXT", body: "" }, "chat-key-0002")))
+        .statusCode,
+    ).toBe(422);
+    expect(
+      (
+        await app.inject(
+          send({ kind: "TEXT", body: "x", tenantId: "t" }, "chat-key-0003"),
+        )
+      ).statusCode,
+    ).toBe(422);
     expect(store.rows).toHaveLength(0);
   });
 
   it("answers a non-party exactly as a missing thread", async () => {
     const { app } = build({ org: "d0000000-0000-4000-8000-000000000009" });
-    const theirs = await app.inject({ method: "GET", url: `/v1/relationships/${REL}/messages` });
-    const missing = await app.inject({ method: "GET", url: `/v1/relationships/${OTHER}/messages` });
+    const theirs = await app.inject({
+      method: "GET",
+      url: `/v1/relationships/${REL}/messages`,
+    });
+    const missing = await app.inject({
+      method: "GET",
+      url: `/v1/relationships/${OTHER}/messages`,
+    });
     expect(theirs.statusCode).toBe(404);
     expect(missing.statusCode).toBe(404);
-    expect(theirs.json<{ code: string }>().code).toBe(missing.json<{ code: string }>().code);
-    expect((await app.inject(send({ kind: "TEXT", body: "hi" }, "chat-key-0004"))).statusCode).toBe(404);
+    expect(theirs.json<{ code: string }>().code).toBe(
+      missing.json<{ code: string }>().code,
+    );
+    expect(
+      (await app.inject(send({ kind: "TEXT", body: "hi" }, "chat-key-0004")))
+        .statusCode,
+    ).toBe(404);
   });
 
   it("refuses a send before the relationship is connected", async () => {
     const { app } = build({ connected: false });
-    const refused = await app.inject(send({ kind: "TEXT", body: "early" }, "chat-key-0005"));
+    const refused = await app.inject(
+      send({ kind: "TEXT", body: "early" }, "chat-key-0005"),
+    );
     expect(refused.statusCode).toBe(409);
   });
 
   it("marks read, unsends and reports unread", async () => {
     const { app } = build();
-    const sent = await app.inject(send({ kind: "TEXT", body: "gone soon" }, "chat-key-0006"));
-    const id = sent.json<{ message: { messageId: string } }>().message.messageId;
-    const read = await app.inject({ method: "POST", url: `/v1/relationships/${REL}/messages/read`, payload: { lastReadMessageId: id } });
+    const sent = await app.inject(
+      send({ kind: "TEXT", body: "gone soon" }, "chat-key-0006"),
+    );
+    const id = sent.json<{ message: { messageId: string } }>().message
+      .messageId;
+    const read = await app.inject({
+      method: "POST",
+      url: `/v1/relationships/${REL}/messages/read`,
+      payload: { lastReadMessageId: id },
+    });
     expect(read.statusCode).toBe(204);
-    const unsent = await app.inject({ method: "POST", url: `/v1/relationships/${REL}/messages/${id}/unsend`, headers: { "idempotency-key": "chat-key-0007" } });
+    const unsent = await app.inject({
+      method: "POST",
+      url: `/v1/relationships/${REL}/messages/${id}/unsend`,
+      headers: { "idempotency-key": "chat-key-0007" },
+    });
     expect(unsent.statusCode).toBe(204);
     const unread = await app.inject({ method: "GET", url: "/v1/chat/unread" });
     expect(unread.json()).toEqual({ items: [] });

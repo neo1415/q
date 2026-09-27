@@ -1,0 +1,168 @@
+"use server";
+
+import { randomUUID } from "node:crypto";
+
+import { z } from "zod";
+
+import {
+  ApiProblemError,
+  getChatThread,
+  listDocuments,
+  markChatRead,
+  sendChatMessage,
+  unsendChatMessage,
+  type ApiSession,
+} from "@capital-q/api-client";
+import {
+  ChatMessageBodySchema,
+  type ChatMessageDto,
+  type ChatThreadDto,
+} from "@capital-q/contracts";
+
+import { apiSession } from "@/features/q/context";
+
+/**
+ * Relationship chat, server side (R34). Server actions so the session token
+ * never reaches the browser. The relationship id is input here, as it is
+ * to the API: the API decides whether this person is a party. Every send
+ * carries a fresh idempotency key made once per press, by the browser, so
+ * a retry of the same press cannot post twice.
+ */
+
+export type ChatActionResult<T> =
+  | { readonly ok: true; readonly value: T }
+  | {
+      readonly ok: false;
+      readonly kind: "NOT_READY" | "CLOSED" | "REJECTED" | "NETWORK";
+      readonly message: string;
+    };
+
+const Id = z.string().uuid();
+const Key = z
+  .string()
+  .min(8)
+  .max(200)
+  .regex(/^[A-Za-z0-9:_-]+$/);
+
+async function run<T>(
+  work: (session: ApiSession) => Promise<T>,
+): Promise<ChatActionResult<T>> {
+  const session = await apiSession();
+  if (session === null) {
+    return {
+      ok: false,
+      kind: "REJECTED",
+      message: "Please sign in again to continue.",
+    };
+  }
+  try {
+    return { ok: true, value: await work(session) };
+  } catch (error: unknown) {
+    if (error instanceof ApiProblemError && error.status < 500) {
+      const detail = error.problem?.detail;
+      return {
+        ok: false,
+        kind:
+          error.status === 409
+            ? "CLOSED"
+            : error.status === 422 && detail?.includes("being checked") === true
+              ? "NOT_READY"
+              : "REJECTED",
+        message:
+          error.status === 404
+            ? "This conversation isn't available."
+            : (detail ?? "That didn't send. Please try again."),
+      };
+    }
+    return {
+      ok: false,
+      kind: "NETWORK",
+      message:
+        "We couldn't reach Capital Q. Check your connection and try again.",
+    };
+  }
+}
+
+export async function chatThreadAction(
+  rawRelationshipId: string,
+  rawAfter?: string | null,
+): Promise<ChatActionResult<ChatThreadDto>> {
+  const relationshipId = Id.parse(rawRelationshipId);
+  const after =
+    rawAfter === null || rawAfter === undefined
+      ? undefined
+      : Id.parse(rawAfter);
+  return run((session) => getChatThread(session, relationshipId, after));
+}
+
+const SendInput = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("TEXT"), body: ChatMessageBodySchema }),
+  z.object({
+    kind: z.literal("ATTACHMENT"),
+    documentId: Id,
+    body: ChatMessageBodySchema.optional(),
+  }),
+]);
+
+export async function sendChatMessageAction(
+  rawRelationshipId: string,
+  rawMessage: unknown,
+  rawKey: string,
+): Promise<ChatActionResult<ChatMessageDto>> {
+  const relationshipId = Id.parse(rawRelationshipId);
+  const message = SendInput.parse(rawMessage);
+  const key = Key.parse(rawKey);
+  return run(
+    async (session) =>
+      (await sendChatMessage(session, relationshipId, message, `web:${key}`))
+        .message,
+  );
+}
+
+export async function markChatReadAction(
+  rawRelationshipId: string,
+  rawMessageId: string,
+): Promise<ChatActionResult<null>> {
+  const relationshipId = Id.parse(rawRelationshipId);
+  const messageId = Id.parse(rawMessageId);
+  return run(async (session) => {
+    await markChatRead(session, relationshipId, messageId);
+    return null;
+  });
+}
+
+export async function unsendChatMessageAction(
+  rawRelationshipId: string,
+  rawMessageId: string,
+): Promise<ChatActionResult<null>> {
+  const relationshipId = Id.parse(rawRelationshipId);
+  const messageId = Id.parse(rawMessageId);
+  return run(async (session) => {
+    await unsendChatMessage(
+      session,
+      relationshipId,
+      messageId,
+      `web:unsend:${randomUUID()}`,
+    );
+    return null;
+  });
+}
+
+/** The person's own organisation's documents, to share one. */
+export async function shareableDocumentsAction(): Promise<
+  ChatActionResult<
+    readonly {
+      readonly id: string;
+      readonly name: string;
+      readonly ready: boolean;
+    }[]
+  >
+> {
+  return run(async (session) =>
+    (await listDocuments(session)).documents.slice(0, 50).map((document) => ({
+      id: document.id,
+      name: document.currentVersion?.originalFilename ?? document.title,
+      ready: document.currentVersion?.malwareScanStatus === "CLEAN",
+    })),
+  );
+}

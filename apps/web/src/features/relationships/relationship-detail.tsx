@@ -13,6 +13,7 @@ import {
 
 import { AskQAboutRelationship } from "./relationship-actions";
 import { RelationshipMail } from "@/features/integrations/relationship-mail";
+import { RelationshipChatSection } from "@/features/chat/relationship-chat-section";
 
 import { RelationshipTimeline } from "./relationship-timeline";
 import {
@@ -31,8 +32,8 @@ import {
  * what can be done about it (the same server-confirmed controls used
  * everywhere else, and Ask Q; absent when there is nothing to do), and
  * what happened (a dated timeline with who can see each entry). No
- * celebration, no score, no badge; nothing here is a messaging surface
- * (CQ-COMM-001).
+ * celebration, no score, no badge. The chat (R34) sits below, on the
+ * same canonical relationship; it opens once both sides are connected.
  */
 export function RelationshipDetail({
   side,
@@ -112,6 +113,13 @@ export function RelationshipDetail({
               counterpart={counterpart}
             />
           </PageSection>
+        )}
+
+        {relationship === null ? null : (
+          <RelationshipChatSection
+            relationshipId={relationship.relationshipId}
+            counterpart={counterpart}
+          />
         )}
 
         {relationship === null ? null : (

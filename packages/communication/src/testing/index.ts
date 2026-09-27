@@ -117,7 +117,8 @@ export function createInMemoryChatStore(
     findMessage: (conversationId, messageId) =>
       Promise.resolve(
         rows.find(
-          (row) => row.id === messageId && row.conversationId === conversationId,
+          (row) =>
+            row.id === messageId && row.conversationId === conversationId,
         ) ?? null,
       ),
     listRecent: (conversationId, limit) => {
@@ -125,9 +126,7 @@ export function createInMemoryChatStore(
         .filter((row) => row.revisesMessageId === null)
         .slice(-limit)
         .map((row) => row.id);
-      return Promise.resolve(
-        withRevisions(conversationId, new Set(originals)),
-      );
+      return Promise.resolve(withRevisions(conversationId, new Set(originals)));
     },
     listChangedAfter: (conversationId, afterMessageId, limit) => {
       const from = indexOf(afterMessageId);

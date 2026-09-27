@@ -33,7 +33,10 @@ import {
   type IntegrationRoutesDependencies,
 } from "./http/integrations.js";
 import { registerMediaWebhookRoutes } from "./http/media-webhooks.js";
-import { registerChatRoutes, type ChatRoutesDependencies } from "./http/chat.js";
+import {
+  registerChatRoutes,
+  type ChatRoutesDependencies,
+} from "./http/chat.js";
 import {
   registerNetworkInterestRoutes,
   type NetworkInterestRoutesDependencies,
