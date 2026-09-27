@@ -23,6 +23,7 @@ export const config = {
     "/profile/:path*",
     "/onboarding/:path*",
     "/relationships/:path*",
+    "/settings/:path*",
     "/auth/:path*",
   ],
 };

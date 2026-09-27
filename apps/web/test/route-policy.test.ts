@@ -65,6 +65,8 @@ describe("classifyRoute", () => {
     "/capital",
     "/capital/objectives/1",
     "/profile",
+    "/settings",
+    "/relationships",
     "/onboarding/founder",
     "/onboarding/investor",
     "/auth/update-password",

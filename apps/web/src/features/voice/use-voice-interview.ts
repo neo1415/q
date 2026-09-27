@@ -10,6 +10,7 @@ import type {
 } from "@capital-q/contracts";
 
 import { readVoiceTurnAction, startVoiceSessionAction } from "./actions";
+import { storeVoicePreference, useVoicePreference } from "./voice-preference";
 import { useVoiceSession } from "./use-voice-session";
 import type {
   VoiceSessionClient,
@@ -120,7 +121,11 @@ export function useVoiceInterview(
   events: VoiceSessionEvents = {},
 ): VoiceInterview {
   const [active, setActive] = useState(false);
-  const [voice, setVoice] = useState<QVoiceChoice>("FEMALE");
+  // The remembered choice (R28), unless this session has settled on
+  // another: the server's answer, or a switch made mid-conversation.
+  const preferred = useVoicePreference();
+  const [settled, setVoice] = useState<QVoiceChoice | null>(null);
+  const voice = settled ?? preferred;
   const [notice, setNotice] = useState<string | null>(null);
   const [turn, setTurn] = useState<QVoiceTurnState | null>(null);
   const [voiceSessionId, setVoiceSessionId] = useState<string | null>(null);
@@ -248,6 +253,9 @@ export function useVoiceInterview(
   const end = useCallback(async () => {
     setActive(false);
     setVoiceSessionId(null);
+    // Back to the remembered choice, so a change made in Settings while
+    // the line was closed is the voice of the next session.
+    setVoice(null);
     setTurn(null);
     lastStart.current = null;
     reconnectAttempts.current = 0;
@@ -299,6 +307,7 @@ export function useVoiceInterview(
       if (next === voice) {
         return;
       }
+      storeVoicePreference(next);
       setVoice(next);
       const last = lastStart.current;
       if (!active || last === null) {
