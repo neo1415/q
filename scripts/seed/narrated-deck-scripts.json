@@ -4,173 +4,509 @@
     {
       "key": "ledgerfold",
       "segments": [
-        { "slide": 1, "text": "This is Ledgerfold, a fictional demo company, summarised by Q from its own deck." },
-        { "slide": 2, "text": "Ledgerfold lends working capital to Lagos market traders, underwritten from the bookkeeping app they use every day." },
-        { "slide": 3, "text": "The app is free. After ninety days of records it offers fourteen to sixty day loans, repaid from daily sales through agency-banking partners." },
-        { "slide": 4, "text": "The founders size the market at around three million traders in Lagos State." },
-        { "slide": 5, "text": "Revenue is interest and a flat facility fee on each loan." },
-        { "slide": 6, "text": "They report sixty-four hundred traders keeping books in the app, and twenty-one hundred and fifty who have borrowed." },
-        { "slide": 7, "text": "The loan book is reported to have grown from one hundred and fifty thousand dollars in September 2025 to four hundred and ten thousand in March 2026." },
-        { "slide": 8, "text": "Monthly revenue is about thirty-eight thousand dollars, with thirty-day portfolio at risk of three point eight percent." },
-        { "slide": 9, "text": "The CEO ran SME lending operations for five years; the CTO built payments back-ends." },
-        { "slide": 10, "text": "Next: a debt partner for on-lending, a risk team, and the Onitsha and Aba markets." },
-        { "slide": 11, "text": "Ledgerfold is raising two and a half million dollars in a priced seed. These figures are the company's own claims." }
+        {
+          "slide": 1,
+          "text": "This is Ledgerfold, a fictional demo company, summarised by Q from its own deck."
+        },
+        {
+          "slide": 2,
+          "text": "Ledgerfold lends working capital to Lagos market traders, underwritten from the bookkeeping app they use every day."
+        },
+        {
+          "slide": 3,
+          "text": "The app is free. After ninety days of records it offers fourteen to sixty day loans, repaid from daily sales through agency-banking partners."
+        },
+        {
+          "slide": 4,
+          "text": "The founders size the market at around three million traders in Lagos State."
+        },
+        {
+          "slide": 5,
+          "text": "Revenue is interest and a flat facility fee on each loan."
+        },
+        {
+          "slide": 6,
+          "text": "They report sixty-four hundred traders keeping books in the app, and twenty-one hundred and fifty who have borrowed."
+        },
+        {
+          "slide": 7,
+          "text": "The loan book is reported to have grown from one hundred and fifty thousand dollars in September 2025 to four hundred and ten thousand in March 2026."
+        },
+        {
+          "slide": 8,
+          "text": "Monthly revenue is about thirty-eight thousand dollars, with thirty-day portfolio at risk of three point eight percent."
+        },
+        {
+          "slide": 9,
+          "text": "The CEO ran SME lending operations for five years; the CTO built payments back-ends."
+        },
+        {
+          "slide": 10,
+          "text": "Next: a debt partner for on-lending, a risk team, and the Onitsha and Aba markets."
+        },
+        {
+          "slide": 11,
+          "text": "Ledgerfold is raising two and a half million dollars in a priced seed. These figures are the company's own claims."
+        }
       ]
     },
     {
       "key": "tarmacly",
       "segments": [
-        { "slide": 1, "text": "This is Tarmacly, a fictional demo company, summarised by Q from its own deck." },
-        { "slide": 2, "text": "Tarmacly is a middle-mile freight marketplace on the Kano, Lagos and Port Harcourt corridors." },
-        { "slide": 3, "text": "Shippers post loads. Tarmacly matches vetted trucks, prices and tracks the trip, and confirms delivery. Carriers are paid within forty-eight hours through a partner bank." },
-        { "slide": 4, "text": "The company describes Nigerian road freight as a twenty billion dollar a year market, mostly still booked by phone." },
-        { "slide": 5, "text": "It earns a take rate of around nine percent per trip, plus a financing margin on early carrier payment." },
-        { "slide": 6, "text": "It reports one hundred and eighty shippers under contract and twenty-three hundred onboarded trucks." },
-        { "slide": 7, "text": "Completed trips are reported rising from eight hundred and twenty in September 2025 to fourteen hundred and fifty in March 2026." },
-        { "slide": 8, "text": "Three founders cover fleet operations, FMCG distribution and engineering, with sixty-four staff in three cities." },
-        { "slide": 9, "text": "Next: the Abuja to Onitsha corridor and route-level pricing." },
-        { "slide": 10, "text": "Tarmacly is raising an eight million dollar Series A. These figures are the company's own claims." }
+        {
+          "slide": 1,
+          "text": "This is Tarmacly, a fictional demo company, summarised by Q from its own deck."
+        },
+        {
+          "slide": 2,
+          "text": "Tarmacly is a middle-mile freight marketplace on the Kano, Lagos and Port Harcourt corridors."
+        },
+        {
+          "slide": 3,
+          "text": "Shippers post loads. Tarmacly matches vetted trucks, prices and tracks the trip, and confirms delivery. Carriers are paid within forty-eight hours through a partner bank."
+        },
+        {
+          "slide": 4,
+          "text": "The company describes Nigerian road freight as a twenty billion dollar a year market, mostly still booked by phone."
+        },
+        {
+          "slide": 5,
+          "text": "It earns a take rate of around nine percent per trip, plus a financing margin on early carrier payment."
+        },
+        {
+          "slide": 6,
+          "text": "It reports one hundred and eighty shippers under contract and twenty-three hundred onboarded trucks."
+        },
+        {
+          "slide": 7,
+          "text": "Completed trips are reported rising from eight hundred and twenty in September 2025 to fourteen hundred and fifty in March 2026."
+        },
+        {
+          "slide": 8,
+          "text": "Three founders cover fleet operations, FMCG distribution and engineering, with sixty-four staff in three cities."
+        },
+        {
+          "slide": 9,
+          "text": "Next: the Abuja to Onitsha corridor and route-level pricing."
+        },
+        {
+          "slide": 10,
+          "text": "Tarmacly is raising an eight million dollar Series A. These figures are the company's own claims."
+        }
       ]
     },
     {
       "key": "yamfield-agro",
       "segments": [
-        { "slide": 1, "text": "This is Yamfield Agro, a fictional demo company, summarised by Q from its own deck." },
-        { "slide": 2, "text": "Yamfield puts solar cold rooms at rural Benue markets, and buys stored produce at a floor price." },
-        { "slide": 3, "text": "Farmers rent container cold rooms per crate per day, and pay by mobile money." },
-        { "slide": 4, "text": "The problem it names: farmers lose thirty to forty percent of their tomatoes after harvest, for lack of nearby cold storage." },
-        { "slide": 5, "text": "Revenue comes from storage fees per crate, plus a trading margin on produce bought at the floor price." },
-        { "slide": 6, "text": "Two pilot cold rooms have run since August 2025, and three hundred and ten farmers have stored produce. It is early, and unit economics per site are not yet proven." },
-        { "slide": 7, "text": "The CEO ran post-harvest loss programmes for four years. The engineering co-founder is part-time." },
-        { "slide": 8, "text": "The plan is eight more cold rooms in Benue, then Nasarawa, once each site's economics are proven." },
-        { "slide": 9, "text": "Yamfield is raising four hundred thousand dollars on a SAFE to build eight cold rooms. These figures are the company's own claims." }
+        {
+          "slide": 1,
+          "text": "This is Yamfield Agro, a fictional demo company, summarised by Q from its own deck."
+        },
+        {
+          "slide": 2,
+          "text": "Yamfield puts solar cold rooms at rural Benue markets, and buys stored produce at a floor price."
+        },
+        {
+          "slide": 3,
+          "text": "Farmers rent container cold rooms per crate per day, and pay by mobile money."
+        },
+        {
+          "slide": 4,
+          "text": "The problem it names: farmers lose thirty to forty percent of their tomatoes after harvest, for lack of nearby cold storage."
+        },
+        {
+          "slide": 5,
+          "text": "Revenue comes from storage fees per crate, plus a trading margin on produce bought at the floor price."
+        },
+        {
+          "slide": 6,
+          "text": "Two pilot cold rooms have run since August 2025, and three hundred and ten farmers have stored produce. It is early, and unit economics per site are not yet proven."
+        },
+        {
+          "slide": 7,
+          "text": "The CEO ran post-harvest loss programmes for four years. The engineering co-founder is part-time."
+        },
+        {
+          "slide": 8,
+          "text": "The plan is eight more cold rooms in Benue, then Nasarawa, once each site's economics are proven."
+        },
+        {
+          "slide": 9,
+          "text": "Yamfield is raising four hundred thousand dollars on a SAFE to build eight cold rooms. These figures are the company's own claims."
+        }
       ]
     },
     {
       "key": "clinicrest",
       "segments": [
-        { "slide": 1, "text": "This is Clinicrest, a fictional demo company, summarised by Q from its own deck." },
-        { "slide": 2, "text": "Clinicrest keeps primary clinics stocked with genuine essential medicines, delivered next day." },
-        { "slide": 3, "text": "A tablet inventory app forecasts each clinic's needs, and is tied to a licensed warehouse in Ibadan." },
-        { "slide": 4, "text": "The company counts around thirty thousand private medicine outlets in south-west Nigeria." },
-        { "slide": 5, "text": "It earns a distribution margin on medicines, plus a monthly software subscription per clinic." },
-        { "slide": 6, "text": "It reports two hundred and twelve paying clinic and pharmacy accounts in February 2026." },
-        { "slide": 7, "text": "Monthly revenue was about ninety-five thousand dollars that month." },
-        { "slide": 8, "text": "A physician CEO and a pharmaceutical-distribution COO lead the team, with two licensed pharmacists on staff." },
-        { "slide": 9, "text": "Next: depots in Abeokuta and Osogbo, and credit terms for clinics." },
-        { "slide": 10, "text": "Clinicrest is raising one point eight million dollars in a priced seed. These figures are the company's own claims." }
+        {
+          "slide": 1,
+          "text": "This is Clinicrest, a fictional demo company, summarised by Q from its own deck."
+        },
+        {
+          "slide": 2,
+          "text": "Clinicrest keeps primary clinics stocked with genuine essential medicines, delivered next day."
+        },
+        {
+          "slide": 3,
+          "text": "A tablet inventory app forecasts each clinic's needs, and is tied to a licensed warehouse in Ibadan."
+        },
+        {
+          "slide": 4,
+          "text": "The company counts around thirty thousand private medicine outlets in south-west Nigeria."
+        },
+        {
+          "slide": 5,
+          "text": "It earns a distribution margin on medicines, plus a monthly software subscription per clinic."
+        },
+        {
+          "slide": 6,
+          "text": "It reports two hundred and twelve paying clinic and pharmacy accounts in February 2026."
+        },
+        {
+          "slide": 7,
+          "text": "Monthly revenue was about ninety-five thousand dollars that month."
+        },
+        {
+          "slide": 8,
+          "text": "A physician CEO and a pharmaceutical-distribution COO lead the team, with two licensed pharmacists on staff."
+        },
+        {
+          "slide": 9,
+          "text": "Next: depots in Abeokuta and Osogbo, and credit terms for clinics."
+        },
+        {
+          "slide": 10,
+          "text": "Clinicrest is raising one point eight million dollars in a priced seed. These figures are the company's own claims."
+        }
       ]
     },
     {
       "key": "marketlight-grids",
       "segments": [
-        { "slide": 1, "text": "This is Marketlight Grids, a fictional demo company, summarised by Q from its own deck." },
-        { "slide": 2, "text": "Marketlight replaces diesel generators in Nigerian markets with solar mini-grids." },
-        { "slide": 3, "text": "Every shop gets a prepaid smart meter, topped up by mobile money, on solar and battery mini-grids." },
-        { "slide": 4, "text": "The company says traders pay roughly three times grid prices for generator power." },
-        { "slide": 5, "text": "It charges per kilowatt-hour under fifteen-year concessions with market associations, and owns the assets." },
-        { "slide": 6, "text": "Live mini-grids are reported growing from six in March 2024 to fourteen in March 2026." },
-        { "slide": 7, "text": "Annualised revenue is about one point nine million dollars, with a collection rate of ninety-six percent." },
-        { "slide": 8, "text": "An engineer CEO from rural electrification and a project-finance CFO lead fifty-eight staff." },
-        { "slide": 9, "text": "The plan is thirty more mini-grids across the North Central zone, financed with equity and project debt." },
-        { "slide": 10, "text": "Marketlight is raising twelve million dollars in equity, alongside a separate debt facility. These figures are the company's own claims." }
+        {
+          "slide": 1,
+          "text": "This is Marketlight Grids, a fictional demo company, summarised by Q from its own deck."
+        },
+        {
+          "slide": 2,
+          "text": "Marketlight replaces diesel generators in Nigerian markets with solar mini-grids."
+        },
+        {
+          "slide": 3,
+          "text": "Every shop gets a prepaid smart meter, topped up by mobile money, on solar and battery mini-grids."
+        },
+        {
+          "slide": 4,
+          "text": "The company says traders pay roughly three times grid prices for generator power."
+        },
+        {
+          "slide": 5,
+          "text": "It charges per kilowatt-hour under fifteen-year concessions with market associations, and owns the assets."
+        },
+        {
+          "slide": 6,
+          "text": "Live mini-grids are reported growing from six in March 2024 to fourteen in March 2026."
+        },
+        {
+          "slide": 7,
+          "text": "Annualised revenue is about one point nine million dollars, with a collection rate of ninety-six percent."
+        },
+        {
+          "slide": 8,
+          "text": "An engineer CEO from rural electrification and a project-finance CFO lead fifty-eight staff."
+        },
+        {
+          "slide": 9,
+          "text": "The plan is thirty more mini-grids across the North Central zone, financed with equity and project debt."
+        },
+        {
+          "slide": 10,
+          "text": "Marketlight is raising twelve million dollars in equity, alongside a separate debt facility. These figures are the company's own claims."
+        }
       ]
     },
     {
       "key": "tallyloom",
       "segments": [
-        { "slide": 1, "text": "This is Tallyloom, a fictional demo company, summarised by Q from its own deck." },
-        { "slide": 2, "text": "Tallyloom runs payroll and statutory compliance for mid-sized employers in Nigeria and Ghana." },
-        { "slide": 3, "text": "It computes and files PAYE, pension and NHF, pays staff through bank integrations, and keeps an inspection-ready audit trail." },
-        { "slide": 4, "text": "The company counts around sixty thousand formal employers with twenty to a thousand staff across the two countries." },
-        { "slide": 5, "text": "Pricing is per employee per month, with HR modules as an upsell." },
-        { "slide": 6, "text": "It reports twelve hundred and fifty employers paying for one hundred and eighty-six thousand seats, and net revenue retention of one hundred and eighteen percent." },
-        { "slide": 7, "text": "Annual recurring revenue is reported at two point one million dollars in 2023, rising to six point four million in December 2025." },
-        { "slide": 8, "text": "A second-time founder CEO with nine years in payroll outsourcing leads one hundred and forty staff in Lagos and Accra." },
-        { "slide": 9, "text": "Next: Kenya, embedded salary advances with a bank partner, and enterprise sales." },
-        { "slide": 10, "text": "Tallyloom is raising a twenty-two million dollar Series B. These figures are the company's own claims." }
+        {
+          "slide": 1,
+          "text": "This is Tallyloom, a fictional demo company, summarised by Q from its own deck."
+        },
+        {
+          "slide": 2,
+          "text": "Tallyloom runs payroll and statutory compliance for mid-sized employers in Nigeria and Ghana."
+        },
+        {
+          "slide": 3,
+          "text": "It computes and files PAYE, pension and NHF, pays staff through bank integrations, and keeps an inspection-ready audit trail."
+        },
+        {
+          "slide": 4,
+          "text": "The company counts around sixty thousand formal employers with twenty to a thousand staff across the two countries."
+        },
+        {
+          "slide": 5,
+          "text": "Pricing is per employee per month, with HR modules as an upsell."
+        },
+        {
+          "slide": 6,
+          "text": "It reports twelve hundred and fifty employers paying for one hundred and eighty-six thousand seats, and net revenue retention of one hundred and eighteen percent."
+        },
+        {
+          "slide": 7,
+          "text": "Annual recurring revenue is reported at two point one million dollars in 2023, rising to six point four million in December 2025."
+        },
+        {
+          "slide": 8,
+          "text": "A second-time founder CEO with nine years in payroll outsourcing leads one hundred and forty staff in Lagos and Accra."
+        },
+        {
+          "slide": 9,
+          "text": "Next: Kenya, embedded salary advances with a bank partner, and enterprise sales."
+        },
+        {
+          "slide": 10,
+          "text": "Tallyloom is raising a twenty-two million dollar Series B. These figures are the company's own claims."
+        }
       ]
     },
     {
       "key": "ajopot",
       "segments": [
-        { "slide": 1, "text": "This is Ajopot, a fictional demo company, summarised by Q from its own deck." },
-        { "slide": 2, "text": "Ajopot digitises ajo, the rotating savings circle, with members' funds held at a licensed partner bank." },
-        { "slide": 3, "text": "Each circle has a fixed payout order and auto-debited contributions, and every member carries a reliability score." },
-        { "slide": 4, "text": "Today it charges a one percent fee on each payout. Small loans against circle history come next." },
-        { "slide": 5, "text": "It reports fifty-two thousand registered users in thirty-nine hundred circles." },
-        { "slide": 6, "text": "Monthly active users are reported rising from forty-two hundred in September 2025 to eighteen thousand seven hundred in March 2026." },
-        { "slide": 7, "text": "A product-growth CEO from a driver-wallet app and an engineering CTO lead fourteen staff." },
-        { "slide": 8, "text": "Next: Abuja and Port Harcourt, and small loans against circle history." },
-        { "slide": 9, "text": "Ajopot is raising one point two billion naira on a SAFE for growth and lending. These figures are the company's own claims." }
+        {
+          "slide": 1,
+          "text": "This is Ajopot, a fictional demo company, summarised by Q from its own deck."
+        },
+        {
+          "slide": 2,
+          "text": "Ajopot digitises ajo, the rotating savings circle, with members' funds held at a licensed partner bank."
+        },
+        {
+          "slide": 3,
+          "text": "Each circle has a fixed payout order and auto-debited contributions, and every member carries a reliability score."
+        },
+        {
+          "slide": 4,
+          "text": "Today it charges a one percent fee on each payout. Small loans against circle history come next."
+        },
+        {
+          "slide": 5,
+          "text": "It reports fifty-two thousand registered users in thirty-nine hundred circles."
+        },
+        {
+          "slide": 6,
+          "text": "Monthly active users are reported rising from forty-two hundred in September 2025 to eighteen thousand seven hundred in March 2026."
+        },
+        {
+          "slide": 7,
+          "text": "A product-growth CEO from a driver-wallet app and an engineering CTO lead fourteen staff."
+        },
+        {
+          "slide": 8,
+          "text": "Next: Abuja and Port Harcourt, and small loans against circle history."
+        },
+        {
+          "slide": 9,
+          "text": "Ajopot is raising one point two billion naira on a SAFE for growth and lending. These figures are the company's own claims."
+        }
       ]
     },
     {
       "key": "maji-loop",
       "segments": [
-        { "slide": 1, "text": "This is Maji Loop, a fictional demo company, summarised by Q from its own deck." },
-        { "slide": 2, "text": "Maji Loop sells clean water by the litre from solar-pumped, metered kiosks in Nairobi." },
-        { "slide": 3, "text": "Each kiosk combines solar pumping, filtration and a smart dispenser. Residents pay by M-Pesa or with a tag." },
-        { "slide": 4, "text": "The company notes that more than two million people live in Nairobi's informal settlements." },
-        { "slide": 5, "text": "It sells per litre, sharing revenue with the utility under a service contract." },
-        { "slide": 6, "text": "Live kiosks are reported growing from thirty-eight in 2023 to ninety-six in 2025." },
-        { "slide": 7, "text": "A water-engineer CEO from a county utility and an embedded-hardware CTO lead twenty-two staff." },
-        { "slide": 8, "text": "The plan is one hundred and fifty more kiosks in Nairobi and Mombasa." },
-        { "slide": 9, "text": "Maji Loop is raising one and a half million dollars in a priced seed to build them. These figures are the company's own claims." }
+        {
+          "slide": 1,
+          "text": "This is Maji Loop, a fictional demo company, summarised by Q from its own deck."
+        },
+        {
+          "slide": 2,
+          "text": "Maji Loop sells clean water by the litre from solar-pumped, metered kiosks in Nairobi."
+        },
+        {
+          "slide": 3,
+          "text": "Each kiosk combines solar pumping, filtration and a smart dispenser. Residents pay by M-Pesa or with a tag."
+        },
+        {
+          "slide": 4,
+          "text": "The company notes that more than two million people live in Nairobi's informal settlements."
+        },
+        {
+          "slide": 5,
+          "text": "It sells per litre, sharing revenue with the utility under a service contract."
+        },
+        {
+          "slide": 6,
+          "text": "Live kiosks are reported growing from thirty-eight in 2023 to ninety-six in 2025."
+        },
+        {
+          "slide": 7,
+          "text": "A water-engineer CEO from a county utility and an embedded-hardware CTO lead twenty-two staff."
+        },
+        {
+          "slide": 8,
+          "text": "The plan is one hundred and fifty more kiosks in Nairobi and Mombasa."
+        },
+        {
+          "slide": 9,
+          "text": "Maji Loop is raising one and a half million dollars in a priced seed to build them. These figures are the company's own claims."
+        }
       ]
     },
     {
       "key": "nsuo-labs",
       "segments": [
-        { "slide": 1, "text": "This is Nsuo Labs, a fictional demo company, summarised by Q from its own deck." },
-        { "slide": 2, "text": "Nsuo Labs makes ice with solar power at Ghana's landing beaches, and rents insulated crates to fish traders, to cut spoilage between the canoe and the market." },
-        { "slide": 3, "text": "A beach-side solar ice plant supplies crates, rented per day through trader groups." },
-        { "slide": 4, "text": "It reports one hundred and forty regular trader customers at its pilot site in Tema." },
-        { "slide": 5, "text": "Traders there report spoilage falling from about twenty-five percent of the catch to under ten. That is the traders' own account, from a single site." },
-        { "slide": 6, "text": "The founder is a refrigeration engineer with four staff. A co-founder hire is planned, so the team is not yet complete." },
-        { "slide": 7, "text": "Next: five more beach sites along the Greater Accra and Central coasts." },
-        { "slide": 8, "text": "Nsuo Labs is raising six hundred thousand dollars on a SAFE, for five sites and a co-founder. These figures are the company's own claims." }
+        {
+          "slide": 1,
+          "text": "This is Nsuo Labs, a fictional demo company, summarised by Q from its own deck."
+        },
+        {
+          "slide": 2,
+          "text": "Nsuo Labs makes ice with solar power at Ghana's landing beaches, and rents insulated crates to fish traders, to cut spoilage between the canoe and the market."
+        },
+        {
+          "slide": 3,
+          "text": "A beach-side solar ice plant supplies crates, rented per day through trader groups."
+        },
+        {
+          "slide": 4,
+          "text": "It reports one hundred and forty regular trader customers at its pilot site in Tema."
+        },
+        {
+          "slide": 5,
+          "text": "Traders there report spoilage falling from about twenty-five percent of the catch to under ten. That is the traders' own account, from a single site."
+        },
+        {
+          "slide": 6,
+          "text": "The founder is a refrigeration engineer with four staff. A co-founder hire is planned, so the team is not yet complete."
+        },
+        {
+          "slide": 7,
+          "text": "Next: five more beach sites along the Greater Accra and Central coasts."
+        },
+        {
+          "slide": 8,
+          "text": "Nsuo Labs is raising six hundred thousand dollars on a SAFE, for five sites and a co-founder. These figures are the company's own claims."
+        }
       ]
     },
     {
       "key": "brightkloof-energy",
       "segments": [
-        { "slide": 1, "text": "This is Brightkloof Energy, a fictional demo company, summarised by Q from its own deck." },
-        { "slide": 2, "text": "Brightkloof puts solar and batteries on South African SME rooftops for a fixed monthly fee, with no upfront cost, designed around load-shedding." },
-        { "slide": 3, "text": "Design, installation, monitoring and maintenance are included for ten years." },
-        { "slide": 4, "text": "The company says several hundred thousand SMEs have rooftops suitable for solar." },
-        { "slide": 5, "text": "It sells ten-year subscriptions, later sold into securitised pools to recycle capital." },
-        { "slide": 6, "text": "It reports twenty-nine hundred SME sites and thirty-eight megawatts peak installed." },
-        { "slide": 7, "text": "Contracted annual recurring revenue is reported at ninety-six million rand in FY2023, rising to two hundred and fourteen million in FY2025." },
-        { "slide": 8, "text": "A former energy banker CEO and an electrical-engineering CTO lead two hundred and ten staff, with in-house crews." },
-        { "slide": 9, "text": "Next: KwaZulu-Natal and the Western Cape, and securitising mature contracts." },
-        { "slide": 10, "text": "Brightkloof is raising two hundred and eighty million rand in Series B equity. These figures are the company's own claims." }
+        {
+          "slide": 1,
+          "text": "This is Brightkloof Energy, a fictional demo company, summarised by Q from its own deck."
+        },
+        {
+          "slide": 2,
+          "text": "Brightkloof puts solar and batteries on South African SME rooftops for a fixed monthly fee, with no upfront cost, designed around load-shedding."
+        },
+        {
+          "slide": 3,
+          "text": "Design, installation, monitoring and maintenance are included for ten years."
+        },
+        {
+          "slide": 4,
+          "text": "The company says several hundred thousand SMEs have rooftops suitable for solar."
+        },
+        {
+          "slide": 5,
+          "text": "It sells ten-year subscriptions, later sold into securitised pools to recycle capital."
+        },
+        {
+          "slide": 6,
+          "text": "It reports twenty-nine hundred SME sites and thirty-eight megawatts peak installed."
+        },
+        {
+          "slide": 7,
+          "text": "Contracted annual recurring revenue is reported at ninety-six million rand in FY2023, rising to two hundred and fourteen million in FY2025."
+        },
+        {
+          "slide": 8,
+          "text": "A former energy banker CEO and an electrical-engineering CTO lead two hundred and ten staff, with in-house crews."
+        },
+        {
+          "slide": 9,
+          "text": "Next: KwaZulu-Natal and the Western Cape, and securitising mature contracts."
+        },
+        {
+          "slide": 10,
+          "text": "Brightkloof is raising two hundred and eighty million rand in Series B equity. These figures are the company's own claims."
+        }
       ]
     },
     {
       "key": "souqsheet",
       "segments": [
-        { "slide": 1, "text": "This is Souqsheet, a fictional demo company, summarised by Q from its own deck." },
-        { "slide": 2, "text": "Souqsheet gives Cairo's neighbourhood kiosks one app to order from every distributor, track stock and get supplier credit." },
-        { "slide": 3, "text": "It runs on Android: ordering across distributors, simple stock tracking, and seven-day supplier credit through a partner bank." },
-        { "slide": 4, "text": "Revenue is distributor subscription fees, plus a margin on supplier credit." },
-        { "slide": 5, "text": "It reports ninety-eight hundred kiosks ordering every month across Greater Cairo and Alexandria." },
-        { "slide": 6, "text": "Gross order value is reported rising from one point six million dollars a month in February 2024 to four point two million in February 2026." },
-        { "slide": 7, "text": "An FMCG trade-marketing CEO and an engineering CTO lead seventy-five staff." },
-        { "slide": 8, "text": "Next: Upper Egypt, and scaling supplier credit." },
-        { "slide": 9, "text": "Souqsheet is raising a six million dollar Series A. These figures are the company's own claims." }
+        {
+          "slide": 1,
+          "text": "This is Souqsheet, a fictional demo company, summarised by Q from its own deck."
+        },
+        {
+          "slide": 2,
+          "text": "Souqsheet gives Cairo's neighbourhood kiosks one app to order from every distributor, track stock and get supplier credit."
+        },
+        {
+          "slide": 3,
+          "text": "It runs on Android: ordering across distributors, simple stock tracking, and seven-day supplier credit through a partner bank."
+        },
+        {
+          "slide": 4,
+          "text": "Revenue is distributor subscription fees, plus a margin on supplier credit."
+        },
+        {
+          "slide": 5,
+          "text": "It reports ninety-eight hundred kiosks ordering every month across Greater Cairo and Alexandria."
+        },
+        {
+          "slide": 6,
+          "text": "Gross order value is reported rising from one point six million dollars a month in February 2024 to four point two million in February 2026."
+        },
+        {
+          "slide": 7,
+          "text": "An FMCG trade-marketing CEO and an engineering CTO lead seventy-five staff."
+        },
+        {
+          "slide": 8,
+          "text": "Next: Upper Egypt, and scaling supplier credit."
+        },
+        {
+          "slide": 9,
+          "text": "Souqsheet is raising a six million dollar Series A. These figures are the company's own claims."
+        }
       ]
     },
     {
       "key": "kazikit",
       "segments": [
-        { "slide": 1, "text": "This is Kazikit, a fictional demo company, summarised by Q from its own deck." },
-        { "slide": 2, "text": "Kazikit helps Kenya's informal building contractors, the fundis, quote, cost and get paid from a basic Android phone." },
-        { "slide": 3, "text": "Contractors build quotes with local material prices, track spend on each job, and send M-Pesa payment requests." },
-        { "slide": 4, "text": "There is no revenue yet. A paid tier is planned from mid-2026, with a materials marketplace alongside hardware stores." },
-        { "slide": 5, "text": "It reports nineteen hundred contractors signed up since September 2025, and about six hundred using it weekly." },
-        { "slide": 6, "text": "A software-engineer CTO and a CEO who ran a hardware chain's credit desk lead the company." },
-        { "slide": 7, "text": "Kazikit is raising three hundred and fifty thousand dollars on a SAFE, for the paid tier and the marketplace. These figures are the company's own claims." }
+        {
+          "slide": 1,
+          "text": "This is Kazikit, a fictional demo company, summarised by Q from its own deck."
+        },
+        {
+          "slide": 2,
+          "text": "Kazikit helps Kenya's informal building contractors, the fundis, quote, cost and get paid from a basic Android phone."
+        },
+        {
+          "slide": 3,
+          "text": "Contractors build quotes with local material prices, track spend on each job, and send M-Pesa payment requests."
+        },
+        {
+          "slide": 4,
+          "text": "There is no revenue yet. A paid tier is planned from mid-2026, with a materials marketplace alongside hardware stores."
+        },
+        {
+          "slide": 5,
+          "text": "It reports nineteen hundred contractors signed up since September 2025, and about six hundred using it weekly."
+        },
+        {
+          "slide": 6,
+          "text": "A software-engineer CTO and a CEO who ran a hardware chain's credit desk lead the company."
+        },
+        {
+          "slide": 7,
+          "text": "Kazikit is raising three hundred and fifty thousand dollars on a SAFE, for the paid tier and the marketplace. These figures are the company's own claims."
+        }
       ]
     }
   ]
