@@ -47,6 +47,7 @@ function card(
     name: "Kivu Freight",
     fields: [...fields],
     verified: [],
+    demoAttested: [],
     audience,
     indexable: false,
   };
@@ -156,6 +157,27 @@ describe("who this is, in one screen", () => {
         { key: "headquartersCountry", value: "KE", scope: "public_external" },
       ]),
     ).toBe("Kenya");
+  });
+});
+
+describe("what Capital Q vouches for", () => {
+  it("says a synthetic-demo attestation is one, never 'verified by Capital Q'", () => {
+    render(
+      <PublicCardView
+        card={{
+          ...card("PUBLIC", []),
+          verified: ["ORGANISATION_VERIFIED", "FOUNDER_IDENTITY_VERIFIED"],
+          demoAttested: ["ORGANISATION_VERIFIED"],
+        }}
+      />,
+    );
+    expect(screen.queryByText("Organisation verified by Capital Q")).toBeNull();
+    expect(
+      screen.getByText(/Organisation: synthetic demo attestation/),
+    ).toBeTruthy();
+    expect(
+      screen.getByText("Founder identity verified by Capital Q"),
+    ).toBeTruthy();
   });
 });
 

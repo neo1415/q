@@ -77,7 +77,9 @@ export {
   createPostgresVerificationClaimRepository,
 } from "./infrastructure/postgres-verification-repository.js";
 export {
+  createPublicVerificationReader,
   createVerificationClaimsReadinessPort,
+  type PublicClaimStanding,
   VERIFICATION_CLAIMS_SOURCE,
 } from "./infrastructure/readiness-port.js";
 export {

@@ -24,6 +24,13 @@ export type SubjectFacts = {
   readonly verified: {
     readonly organisation: boolean;
     readonly founderIdentity: boolean;
+    /** Which of the above rest on the synthetic-demo attestation. */
+    readonly demoAttested?:
+      | {
+          readonly organisation: boolean;
+          readonly founderIdentity: boolean;
+        }
+      | undefined;
   };
 };
 

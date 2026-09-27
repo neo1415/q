@@ -414,6 +414,16 @@ export function createPublicIdentityService(
             ? (["FOUNDER_IDENTITY_VERIFIED"] as const)
             : []),
         ],
+        demoAttested: [
+          ...(facts.verified.organisation &&
+          facts.verified.demoAttested?.organisation === true
+            ? (["ORGANISATION_VERIFIED"] as const)
+            : []),
+          ...(facts.verified.founderIdentity &&
+          facts.verified.demoAttested?.founderIdentity === true
+            ? (["FOUNDER_IDENTITY_VERIFIED"] as const)
+            : []),
+        ],
         audience,
         indexable: card.indexable,
       };

@@ -155,6 +155,12 @@ export const PublicCardDtoSchema = z
     /** Only fields the audience may see; public first, then network. */
     fields: z.array(PublicCardFieldSchema).max(12),
     verified: z.array(z.enum(PUBLIC_VERIFICATION_LABELS)).max(2),
+    /**
+     * The subset of `verified` that rests on the synthetic-demo attestation
+     * (demo data on a demo deployment, not a real-world check). A surface
+     * must never present these as Capital Q's verification.
+     */
+    demoAttested: z.array(z.enum(PUBLIC_VERIFICATION_LABELS)).max(2),
     /** Who this projection was built for. */
     audience: z.enum(["PUBLIC", "PARTICIPANT"]),
     indexable: z.boolean(),

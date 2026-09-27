@@ -34,6 +34,19 @@ const VERIFIED_WORDS: Readonly<Record<string, string>> = {
   FOUNDER_IDENTITY_VERIFIED: "Founder identity verified by Capital Q",
 };
 
+/**
+ * The same claims when they rest on the synthetic-demo attestation: said as
+ * what they are, the way the owner's own view says it, never as Capital
+ * Q's verification. This page is public_external; honesty cannot depend on
+ * who is looking.
+ */
+const DEMO_WORDS: Readonly<Record<string, string>> = {
+  ORGANISATION_VERIFIED:
+    "Organisation: synthetic demo attestation (demo data, not a real-world check)",
+  FOUNDER_IDENTITY_VERIFIED:
+    "Founder identity: synthetic demo attestation (demo data, not a real-world check)",
+};
+
 /** The facts list leaves out what the hero and actions already say. */
 const SHOWN_ELSEWHERE: ReadonlySet<string> = new Set([
   // The descriptor line.
@@ -58,7 +71,12 @@ export function PublicCardView({ card }: { readonly card: PublicCardDto }) {
   const kind = card.subjectType === "COMPANY" ? "Company" : "Investor";
   const website = fields.find((field) => field.key === "websiteUrl");
   const facts = fields.filter((field) => !SHOWN_ELSEWHERE.has(field.key));
-  const verified = card.verified.map((label) => VERIFIED_WORDS[label] ?? label);
+  const demo = new Set<string>(card.demoAttested);
+  const verified = card.verified.map((label) =>
+    demo.has(label)
+      ? { label, text: DEMO_WORDS[label] ?? label, demo: true }
+      : { label, text: VERIFIED_WORDS[label] ?? label, demo: false },
+  );
   const signIn = `/auth/sign-in?next=${encodeURIComponent(`/@${card.handle}`)}`;
 
   return (
@@ -88,18 +106,21 @@ export function PublicCardView({ card }: { readonly card: PublicCardDto }) {
         )}
         {verified.length === 0 ? null : (
           <ul className="flex flex-col gap-1.5 pt-1">
-            {verified.map((label) => (
+            {verified.map(({ label, text, demo: isDemo }) => (
               <li
                 key={label}
-                className="cq-body-sm flex items-center gap-2 text-(--cq-text-primary)"
+                className={`cq-body-sm flex items-center gap-2 ${isDemo ? "text-(--cq-text-secondary)" : "text-(--cq-text-primary)"}`}
+                data-demo-attestation={isDemo ? "" : undefined}
               >
-                <Check
-                  aria-hidden="true"
-                  size={16}
-                  strokeWidth={ICON_STROKE}
-                  className="shrink-0 text-(--cq-positive)"
-                />
-                {label}
+                {isDemo ? null : (
+                  <Check
+                    aria-hidden="true"
+                    size={16}
+                    strokeWidth={ICON_STROKE}
+                    className="shrink-0 text-(--cq-positive)"
+                  />
+                )}
+                {text}
               </li>
             ))}
           </ul>

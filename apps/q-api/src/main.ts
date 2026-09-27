@@ -280,6 +280,7 @@ import {
 } from "@capital-q/public-identity";
 import {
   createCompanyVerificationService,
+  createPublicVerificationReader,
   createVerificationClaimsReadinessPort,
   VERIFICATION_EVENTS,
 } from "@capital-q/verification";
@@ -895,7 +896,7 @@ const chat = composeChat({
 });
 // Handles and the Q Card (BIZ-004), composed as the application API
 // composes them: the same service, the same allowlisted subject facts.
-const cardVerification = createVerificationClaimsReadinessPort({
+const cardVerification = createPublicVerificationReader({
   sql: database.sql,
 });
 const cardInvestorFacts = createPostgresInvestorProfileQueryPort({
@@ -909,14 +910,17 @@ const cardSubjects = createSubjectDirectory({
   findInvestor: (investorOrganisationId) =>
     cardInvestorFacts.findCanonicalInvestorProfile(investorOrganisationId),
   companyVerification: async (subject) => {
-    const standings = await cardVerification.currentStandings({
+    const standings = await cardVerification.companyStandings({
       tenantId: TenantIdSchema.parse(subject.tenantId),
       organisationId: OrganisationIdSchema.parse(subject.organisationId),
-      companyId: CompanyIdSchema.parse(subject.companyId),
     });
     return {
-      organisation: standings.organisationIdentity === "VERIFIED",
-      founderIdentity: standings.founderIdentity === "VERIFIED",
+      organisation: standings.organisation.verified,
+      founderIdentity: standings.founderIdentity.verified,
+      demoAttested: {
+        organisation: standings.organisation.syntheticDemo,
+        founderIdentity: standings.founderIdentity.syntheticDemo,
+      },
     };
   },
 });
@@ -1184,7 +1188,7 @@ const companyService = createCompanyService({
   audit: createPostgresMaterialActionAuditWriter(),
   // R33: readiness (read and reassessed by Q) reads Capital Q's own
   // verification claims, as in the application API.
-  verification: cardVerification,
+  verification: createVerificationClaimsReadinessPort({ sql: database.sql }),
 });
 // A requested profile change travels from the answer seam to the proposer
 // on this board (ADR 0011); the Approval Engine does everything after.

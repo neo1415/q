@@ -132,6 +132,7 @@ import {
 } from "@capital-q/public-identity";
 import {
   createCompanyVerificationService,
+  createPublicVerificationReader,
   createVerificationClaimsReadinessPort,
 } from "@capital-q/verification";
 import {
@@ -806,7 +807,7 @@ const companyFacts = createPostgresCompanyQueryPort({ sql: database.sql });
 const investorFacts = createPostgresInvestorProfileQueryPort({
   sql: database.sql,
 });
-const cardVerification = createVerificationClaimsReadinessPort({
+const cardVerification = createPublicVerificationReader({
   sql: database.sql,
 });
 const publicIdentity = createPublicIdentityService({
@@ -825,14 +826,17 @@ const publicIdentity = createPublicIdentityService({
     findInvestor: (investorOrganisationId) =>
       investorFacts.findCanonicalInvestorProfile(investorOrganisationId),
     companyVerification: async (subject) => {
-      const standings = await cardVerification.currentStandings({
+      const standings = await cardVerification.companyStandings({
         tenantId: TenantIdSchema.parse(subject.tenantId),
         organisationId: OrganisationIdSchema.parse(subject.organisationId),
-        companyId: CompanyIdSchema.parse(subject.companyId),
       });
       return {
-        organisation: standings.organisationIdentity === "VERIFIED",
-        founderIdentity: standings.founderIdentity === "VERIFIED",
+        organisation: standings.organisation.verified,
+        founderIdentity: standings.founderIdentity.verified,
+        demoAttested: {
+          organisation: standings.organisation.syntheticDemo,
+          founderIdentity: standings.founderIdentity.syntheticDemo,
+        },
       };
     },
   }),

@@ -85,6 +85,7 @@ function service(overrides: Partial<PublicIdentityService> = {}) {
         name: "Kivu Freight",
         fields: [],
         verified: [],
+        demoAttested: [],
         audience,
         indexable: false,
       });

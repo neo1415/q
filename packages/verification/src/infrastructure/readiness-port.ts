@@ -73,3 +73,64 @@ export function createVerificationClaimsReadinessPort(options: {
     },
   };
 }
+
+/** One of Capital Q's claims as a public surface may state it. */
+export type PublicClaimStanding = {
+  readonly verified: boolean;
+  /**
+   * True when the standing rests on the synthetic-demo attestation: demo
+   * data on a demo deployment, never a real-world check. Every surface
+   * that says "verified" must say this too (the owner's view does, through
+   * `describeStanding`).
+   */
+  readonly syntheticDemo: boolean;
+};
+
+/**
+ * The standings a public surface (the Q Card) may state, with how each was
+ * decided, so a synthetic attestation can never read as Capital Q's check.
+ */
+export function createPublicVerificationReader(options: {
+  readonly sql: DatabaseExecutor;
+  readonly repository?: VerificationClaimRepository | undefined;
+  readonly clock?: (() => Date) | undefined;
+}): {
+  readonly companyStandings: (subject: {
+    readonly tenantId: string;
+    readonly organisationId: string;
+  }) => Promise<{
+    readonly organisation: PublicClaimStanding;
+    readonly founderIdentity: PublicClaimStanding;
+  }>;
+} {
+  const repository =
+    options.repository ?? createPostgresVerificationClaimRepository();
+  const clock = options.clock ?? (() => new Date());
+  const standing = (
+    claim: ReturnType<typeof founderIdentityOf>,
+    now: Date,
+  ): PublicClaimStanding => {
+    const verified = standingOf(claim, now) === "VERIFIED";
+    return {
+      verified,
+      syntheticDemo: verified && claim?.method === "SYNTHETIC_DEMO_ATTESTATION",
+    };
+  };
+  return {
+    companyStandings: async (subject) => {
+      const now = clock();
+      const claims = await repository.currentForOrganisation(
+        options.sql,
+        subject.tenantId,
+        subject.organisationId,
+      );
+      return {
+        organisation: standing(
+          organisationIdentityOf(claims, subject.organisationId),
+          now,
+        ),
+        founderIdentity: standing(founderIdentityOf(claims, null, now), now),
+      };
+    },
+  };
+}
