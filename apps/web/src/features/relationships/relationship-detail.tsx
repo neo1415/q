@@ -14,6 +14,7 @@ import {
 import { AskQAboutRelationship } from "./relationship-actions";
 import { RelationshipMail } from "@/features/integrations/relationship-mail";
 import { RelationshipChatSection } from "@/features/chat/relationship-chat-section";
+import { RelationshipSchedule } from "@/features/schedule/relationship-schedule";
 
 import { RelationshipTimeline } from "./relationship-timeline";
 import {
@@ -119,6 +120,14 @@ export function RelationshipDetail({
           <RelationshipChatSection
             relationshipId={relationship.relationshipId}
             counterpart={counterpart}
+          />
+        )}
+
+        {relationship === null ? null : (
+          <RelationshipSchedule
+            relationshipId={relationship.relationshipId}
+            counterpart={counterpart}
+            connected={relationship.state === "CONNECTED"}
           />
         )}
 

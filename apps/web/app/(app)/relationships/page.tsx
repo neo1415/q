@@ -9,6 +9,7 @@ import {
 import { apiSession, resolveOwnContext } from "@/features/q/context";
 import { ownRelationships } from "@/features/relationships/relationship-data";
 import { RelationshipsIndex } from "@/features/relationships/relationships-index";
+import { NoticesPanel } from "@/features/schedule/notices-panel";
 
 export const metadata: Metadata = { title: "Relationships" };
 
@@ -46,6 +47,8 @@ export default async function RelationshipsPage() {
               : undefined
         }
       />
+      {/* BIZ-008: due reminders and notices, before the list. */}
+      <NoticesPanel />
       <RelationshipsIndex side={side} items={items} unread={unread} />
     </PageContainer>
   );
