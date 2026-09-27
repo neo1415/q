@@ -57,7 +57,7 @@ const PRESENCE_BUDGET = {
 } as const;
 
 function correlation(): CorrelationId {
-  return CorrelationIdSchema.parse(randomUUID());
+  return CorrelationIdSchema.parse(`cor_${randomUUID()}`);
 }
 
 /**
