@@ -94,7 +94,11 @@ export {
   withoutContradictedGaps,
   type AnalystResultLike,
 } from "./result-blocks.js";
-export { createQTurnReader, type QTurnReader } from "./turn-reader.js";
+export {
+  createQTurnReader,
+  type QTurnReader,
+  type QTurnReading,
+} from "./turn-reader.js";
 export {
   APPROVE_PENDING_TOOL,
   approvalStatusLine,

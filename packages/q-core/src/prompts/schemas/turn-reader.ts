@@ -313,3 +313,26 @@ export const TurnReaderV8ResultSchema = TurnReaderResultSchema.extend({
   tool: TurnToolV8Schema.nullable().default(null),
 }).strict();
 export type TurnReaderV8Result = z.infer<typeof TurnReaderV8ResultSchema>;
+
+/**
+ * v9 (founder live 2026-09-27, failure 7): v8 plus several documents in
+ * one message. "A PDF of my mandate AND a PPTX deck for my company" held
+ * one tool, so one document was made (or a question asked) and the other
+ * dropped. `tool` stays the first document; `moreDocuments` holds each
+ * other one asked for in the same message, in the order asked. Only
+ * PREPARE_DOCUMENT may appear there: one message moves at most one screen.
+ */
+export const TURN_READER_V9_SCHEMA_VERSION = 9;
+export const TURN_READER_MORE_DOCUMENTS_MAX = 3;
+
+export const TurnReaderV9ResultSchema = TurnReaderV8ResultSchema.extend({
+  moreDocuments: z
+    .array(
+      TurnToolV8Schema.refine((tool) => tool.kind === "PREPARE_DOCUMENT", {
+        message: "only documents may be asked for together",
+      }),
+    )
+    .max(TURN_READER_MORE_DOCUMENTS_MAX)
+    .default([]),
+}).strict();
+export type TurnReaderV9Result = z.infer<typeof TurnReaderV9ResultSchema>;

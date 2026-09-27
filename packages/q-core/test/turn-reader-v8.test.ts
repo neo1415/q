@@ -20,14 +20,16 @@ const base = {
 } as const;
 
 describe("TURN_READER v8", () => {
-  it("is the active turn reader and states the unknown-screen rule once", () => {
+  it("states the unknown-screen rule once, and v9 (now active) keeps it", () => {
     const registry = createDefaultPromptRegistry();
-    expect(registry.getActive("TURN_READER").definition.version).toBe(8);
-    const template = TURN_READER_V8.template;
-    expect(template.split("unknownScreen is set").length - 1).toBe(1);
-    expect(template).toContain(
-      "Never choose a destination for a screen that does not exist.",
-    );
+    const active = registry.getActive("TURN_READER").definition;
+    expect(active.version).toBe(9);
+    for (const template of [TURN_READER_V8.template, active.template]) {
+      expect(template.split("unknownScreen is set").length - 1).toBe(1);
+      expect(template).toContain(
+        "Never choose a destination for a screen that does not exist.",
+      );
+    }
   });
 
   it("NAVIGATE carries a destination or an unknown screen, never both, never neither", () => {

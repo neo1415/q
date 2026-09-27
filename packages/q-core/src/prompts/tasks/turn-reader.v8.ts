@@ -32,7 +32,7 @@ export const TURN_READER_V8: PromptDefinition<
 > = {
   ...TURN_READER_V7,
   version: 8,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   changeDescription:
     "Founder live test 2026-09-27 #5: a named screen Capital Q does not have is NAVIGATE with destination null and unknownScreen (named, nearest); never a silent move to another screen.",
   effectiveFrom: "2026-09-27",
