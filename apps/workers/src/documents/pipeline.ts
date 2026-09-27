@@ -182,7 +182,7 @@ export function createDocumentProcessingPipeline(
       status: "FAILED" | "BLOCKED",
       errorCode: string,
       textExtractionStatus: "FAILED" | "UNSUPPORTED",
-      malwareScanStatus?: "BLOCKED" | "ERROR",
+      malwareScanStatus?: "BLOCKED" | "ERROR" | "CLEAN",
     ): Promise<void> => {
       await evidence.advanceVersionProcessingState({
         tenantId,
@@ -268,6 +268,20 @@ export function createDocumentProcessingPipeline(
     if (decision.kind === "RETRY") {
       observe(decision.errorCode, startedAt);
       return { kind: "RETRY", errorCode: decision.errorCode };
+    }
+
+    // A voice note (R34) has no text for the extractor: it is stored and
+    // scanned, never parsed. A real scanner's clean verdict is still the
+    // version's truth; without one it stays unscanned.
+    if (version.mimeType.startsWith("audio/")) {
+      await fail(
+        "FAILED",
+        "NOT_A_TEXT_DOCUMENT",
+        "UNSUPPORTED",
+        decision.scanned ? "CLEAN" : undefined,
+      );
+      observe("AUDIO_STORED", startedAt);
+      return { kind: "DONE" };
     }
 
     // --- Isolated extraction ----------------------------------------------

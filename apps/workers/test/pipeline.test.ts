@@ -364,6 +364,59 @@ describe("document processing pipeline", () => {
     expect(completion?.input).toMatchObject({ scannedClean: false });
   });
 
+  it("stores and scans a voice note without parsing it, recording a clean verdict (R34)", async () => {
+    const version = makeVersion({ mimeType: "audio/webm" });
+    const evidence = createFakeEvidence({
+      version,
+      pipelineVersion: PIPELINE_VERSION,
+    });
+    const storage = storageStub(version.sizeBytes);
+    let parsed = false;
+    const { handle } = build({
+      evidence: evidence.service,
+      storage: storage.provider,
+      sandbox: {
+        run: () => {
+          parsed = true;
+          return Promise.resolve(successfulParse);
+        },
+      },
+    });
+
+    await handle(jobMessage({ documentVersionId: version.id }));
+
+    expect(parsed).toBe(false);
+    const advance = evidence.calls.findLast(
+      (call) => call.name === "advanceVersionProcessingState",
+    );
+    expect(advance?.input).toMatchObject({
+      malwareScanStatus: "CLEAN",
+      textExtractionStatus: "UNSUPPORTED",
+    });
+  });
+
+  it("never claims CLEAN for an unscanned voice note", async () => {
+    const version = makeVersion({ mimeType: "audio/mp4" });
+    const evidence = createFakeEvidence({
+      version,
+      pipelineVersion: PIPELINE_VERSION,
+    });
+    const storage = storageStub(version.sizeBytes);
+    const { handle } = build({
+      evidence: evidence.service,
+      storage: storage.provider,
+      scanner: scannerStub("UNAVAILABLE"),
+      malwarePolicy: "ALLOW_UNSCANNED",
+    });
+
+    await handle(jobMessage({ documentVersionId: version.id }));
+
+    const advance = evidence.calls.findLast(
+      (call) => call.name === "advanceVersionProcessingState",
+    );
+    expect(advance?.input).not.toHaveProperty("malwareScanStatus");
+  });
+
   it("retries when the scanner itself fails", async () => {
     const version = makeVersion();
     const evidence = createFakeEvidence({

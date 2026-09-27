@@ -136,6 +136,52 @@ describe("content detection", () => {
   });
 });
 
+describe("voice notes (R34)", () => {
+  const webm = new Uint8Array([
+    0x1a, 0x45, 0xdf, 0xa3, 0x9f, 0x42, 0x86, 0x81, 0x01, 0x42, 0xf7, 0x81,
+  ]);
+  const m4a = new Uint8Array([
+    0, 0, 0, 0x20, 0x66, 0x74, 0x79, 0x70, 0x4d, 0x34, 0x41, 0x20, 0, 0, 0, 0,
+  ]);
+
+  it("recognises the two audio containers browsers record into", async () => {
+    await expectKind(webm, "webm_audio");
+    await expectKind(m4a, "mp4_audio");
+  });
+
+  it("admits audio only when name, declared type and bytes agree", () => {
+    expect(
+      checkClaimedType({
+        filename: "voice-note.webm",
+        declaredMimeType: "audio/webm",
+        detected: "webm_audio",
+      }),
+    ).toMatchObject({ ok: true });
+    expect(
+      checkClaimedType({
+        filename: "voice-note.m4a",
+        declaredMimeType: "audio/mp4",
+        detected: "mp4_audio",
+      }),
+    ).toMatchObject({ ok: true });
+    // Audio bytes wearing a document's name, and a document wearing audio's.
+    expect(
+      checkClaimedType({
+        filename: "deck.pdf",
+        declaredMimeType: PDF,
+        detected: "webm_audio",
+      }),
+    ).toMatchObject({ ok: false });
+    expect(
+      checkClaimedType({
+        filename: "voice-note.webm",
+        declaredMimeType: "audio/webm",
+        detected: "pdf",
+      }),
+    ).toMatchObject({ ok: false });
+  });
+});
+
 describe("claimed type agreement", () => {
   it("accepts a file whose extension, declared type and content all agree", () => {
     expect(

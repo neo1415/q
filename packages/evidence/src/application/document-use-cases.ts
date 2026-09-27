@@ -82,6 +82,9 @@ export const DOCUMENT_MIME_ALLOWLIST = [
   "text/plain",
   "image/png",
   "image/jpeg",
+  // R34 voice notes (stored and scanned, never parsed).
+  "audio/webm",
+  "audio/mp4",
 ] as const;
 
 /** Upper bound on a registered version; the platform storage limit is 50 MiB. */
