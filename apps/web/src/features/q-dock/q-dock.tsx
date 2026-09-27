@@ -176,10 +176,16 @@ export function QDock() {
   // Where the investor feed is on screen the dock merges into its action
   // rail (spec §6.2): hidden in CSS while `[data-feed-immersive]` exists.
   const visible = session !== null && !onQPage && !hidden;
+  // The dock's element exists only once Q's presence has arrived (see the
+  // early return below). Placement keys on that, not on `visible` alone: a
+  // session that arrives before its presence would otherwise run the
+  // placement while there is no element, and never again, leaving the dock
+  // at the layer's origin (the top-left corner).
+  const rendered = visible && presence !== undefined;
 
   // Re-place on anything that moves the chrome or a registered control.
   useEffect(() => {
-    if (!visible) return;
+    if (!rendered) return;
     let frame = 0;
     const bump = () => {
       if (frame !== 0) return;
@@ -201,12 +207,12 @@ export function QDock() {
       unsubscribe();
       observer.disconnect();
     };
-  }, [visible]);
+  }, [rendered]);
 
   const still = motion !== "full";
   useLayoutEffect(() => {
     const box = boxRef.current;
-    if (!visible || box === null || dragging.current) return;
+    if (!rendered || box === null || dragging.current) return;
     const size = { width: box.offsetWidth, height: box.offsetHeight };
     const viewport = measureViewport(dockClass);
     const shown = placementAvoiding(
@@ -231,6 +237,14 @@ export function QDock() {
       // its values (first paint, a cold load) a set alone would not reach
       // the DOM, and the dock would show at the corner of the screen.
       box.style.transform = `translateX(${String(target.x)}px) translateY(${String(target.y)}px)`;
+      // And said again once Motion's features have mounted: its element
+      // renders from the values it last heard, and a set to the value a
+      // motion value already holds is silent, so without this the first
+      // render after the features load writes the stale origin back.
+      if (draggable) {
+        x.dirty();
+        y.dirty();
+      }
       placed.current = true;
       box.setAttribute("data-placed", "");
       return;
@@ -246,7 +260,18 @@ export function QDock() {
     return () => {
       for (const move of moves) move.stop();
     };
-  }, [visible, chosen, layoutTick, dockClass, still, compact, stashed, x, y]);
+  }, [
+    rendered,
+    draggable,
+    chosen,
+    layoutTick,
+    dockClass,
+    still,
+    compact,
+    stashed,
+    x,
+    y,
+  ]);
 
   const release = useCallback(
     (velocity: { readonly x: number; readonly y: number }) => {
