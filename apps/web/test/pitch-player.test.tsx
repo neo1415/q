@@ -754,3 +754,50 @@ describe("R36 · one active player across a page", () => {
     }
   });
 });
+
+describe("a pitch this browser cannot play (R30 #22, #23)", () => {
+  it("says so when the element or the stream engine gives up, instead of a still poster", async () => {
+    const authorize = vi.fn(() => Promise.resolve(authorization()));
+    const { container } = render(
+      <PitchPlayer
+        company={company(1)}
+        policy="ACTIVE"
+        authorize={authorize}
+        reducedMotion={false}
+        attachSource={() => () => undefined}
+      />,
+    );
+    await waitFor(() => expect(videoIn(container).poster).not.toBe(""));
+    act(() => {
+      videoIn(container).dispatchEvent(new Event("cq-playback-failed"));
+    });
+    expect(screen.getByRole("status").textContent).toContain(
+      "can't play in this browser",
+    );
+  });
+
+  it("offers sound only on the card on screen, so there is one Unmute", async () => {
+    const authorize = vi.fn(() => Promise.resolve(authorization()));
+    render(
+      <>
+        <PitchPlayer
+          company={company(1)}
+          policy="ACTIVE"
+          variant="stage"
+          authorize={authorize}
+          reducedMotion={false}
+        />
+        <PitchPlayer
+          company={company(2)}
+          policy="STARTUP_BUFFER"
+          variant="stage"
+          authorize={authorize}
+          reducedMotion={false}
+        />
+      </>,
+    );
+    await waitFor(() =>
+      expect(screen.getAllByRole("button", { name: "Unmute" })).toHaveLength(1),
+    );
+  });
+});

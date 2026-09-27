@@ -160,6 +160,16 @@ export type PlaybackSource = (
  * The returned function detaches — stopping any in-flight fetch the engine
  * started, which is doc 20 §236's preload abort.
  */
+/** Dispatched on the element by a source strategy that failed for good. */
+export const PLAYBACK_FAILED_EVENT = "cq-playback-failed";
+
+/**
+ * How long an attached, playing-intended pitch may show no frame before the
+ * player says it cannot play here: a browser that cannot decode the stream
+ * (no H.264) sits at readyState 0 without ever raising an error.
+ */
+export const FIRST_FRAME_TIMEOUT_MS = 8_000;
+
 export type AttachSource = (video: HTMLVideoElement, url: string) => () => void;
 
 /**

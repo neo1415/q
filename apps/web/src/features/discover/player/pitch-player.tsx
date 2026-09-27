@@ -21,6 +21,8 @@ import {
 import type { FeedPreloadPolicy } from "../feed/feed-state";
 import {
   attachNativeSource,
+  FIRST_FRAME_TIMEOUT_MS,
+  PLAYBACK_FAILED_EVENT,
   type AttachSource,
   type PlaybackSource,
 } from "./pitch-playback";
@@ -130,6 +132,9 @@ export function requestedPolicy(
   return "POSTER";
 }
 
+const CANNOT_PLAY =
+  "This pitch can't play in this browser. Try another browser or device; the rest of the company's profile is here.";
+
 export function PitchPlayer({
   company,
   policy,
@@ -172,6 +177,44 @@ export function PitchPlayer({
     if (video === null || playbackUrl === null) return;
     return attachSource(video, playbackUrl);
   }, [attachSource, playbackUrl]);
+
+  // A source that cannot play here says so, rather than leaving a poster
+  // that never moves: an error on the element, a fatal error from the
+  // stream engine, or no first frame within a bounded time of being asked
+  // to play (a browser without H.264 raises nothing at all).
+  const [unplayable, setUnplayable] = useState<string | null>(null);
+  useEffect(() => {
+    const video = videoRef.current;
+    if (video === null || playbackUrl === null) return;
+    let timer: number | undefined;
+    const give = () => setUnplayable(playbackUrl);
+    const stopWaiting = () => {
+      if (timer !== undefined) window.clearTimeout(timer);
+      timer = undefined;
+    };
+    const startWaiting = () => {
+      stopWaiting();
+      if (video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) return;
+      timer = window.setTimeout(() => {
+        if (video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) give();
+      }, FIRST_FRAME_TIMEOUT_MS);
+    };
+    video.addEventListener("error", give);
+    video.addEventListener(PLAYBACK_FAILED_EVENT, give);
+    video.addEventListener("play", startWaiting);
+    video.addEventListener("loadeddata", stopWaiting);
+    video.addEventListener("pause", stopWaiting);
+    return () => {
+      stopWaiting();
+      video.removeEventListener("error", give);
+      video.removeEventListener(PLAYBACK_FAILED_EVENT, give);
+      video.removeEventListener("play", startWaiting);
+      video.removeEventListener("loadeddata", stopWaiting);
+      video.removeEventListener("pause", stopWaiting);
+    };
+  }, [playbackUrl]);
+  // Only for the source that failed: a new authorization is a new chance.
+  const cannotPlay = unplayable !== null && unplayable === playbackUrl;
 
   // Autoplay only where the controller said ACTIVE and motion is allowed.
   // A rejected play() promise is normal -- browsers refuse autoplay under
@@ -273,9 +316,9 @@ export function PitchPlayer({
           onPlay={onPlay}
           onPause={() => setPlaying(false)}
         />
-        {intent.attach || failed ? (
+        {intent.attach || failed || cannotPlay ? (
           <div className="cq-feed-player-controls">
-            {intent.requiresExplicitPlay && !playing ? (
+            {intent.requiresExplicitPlay && !playing && !cannotPlay ? (
               <button
                 type="button"
                 className="cq-stage-control"
@@ -287,7 +330,9 @@ export function PitchPlayer({
                 Play
               </button>
             ) : null}
-            {intent.attach ? (
+            {/* Sound belongs to the card on screen only: a preloaded card
+                offering its own Unmute read as "Unmute Unmute". */}
+            {intent.attach && policy === "ACTIVE" && !cannotPlay ? (
               <button
                 type="button"
                 className="cq-stage-control"
@@ -300,6 +345,13 @@ export function PitchPlayer({
             {failed ? (
               <span className="cq-caption text-(--cq-text-secondary)">
                 This pitch couldn&apos;t load right now. Try again in a moment.
+              </span>
+            ) : cannotPlay ? (
+              <span
+                className="cq-caption text-(--cq-text-secondary)"
+                role="status"
+              >
+                {CANNOT_PLAY}
               </span>
             ) : null}
           </div>
@@ -368,7 +420,7 @@ export function PitchPlayer({
           works. Hidden from assistive technology because the labelled
           button below is the one it should find, once.
         */}
-        {explicitPlay && !playing && !failed ? (
+        {explicitPlay && !playing && !failed && !cannotPlay ? (
           <button
             type="button"
             tabIndex={-1}
@@ -392,7 +444,12 @@ export function PitchPlayer({
           with a word on it, not an icon overlay, so it is reachable by
           keyboard and announced by a screen reader.
         */}
-        {explicitPlay && !playing ? (
+        {cannotPlay ? (
+          <p className="cq-caption text-(--cq-text-secondary)" role="status">
+            {CANNOT_PLAY}
+          </p>
+        ) : null}
+        {explicitPlay && !playing && !cannotPlay ? (
           <Button
             variant="secondary"
             onClick={startPlaying}

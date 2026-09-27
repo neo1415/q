@@ -1,4 +1,4 @@
-import type { AttachSource } from "./pitch-playback";
+import { PLAYBACK_FAILED_EVENT, type AttachSource } from "./pitch-playback";
 
 /**
  * Getting an HLS manifest onto a `<video>` (CQ-WEB-021 decision, approved).
@@ -65,6 +65,13 @@ export const attachHlsOrNativeSource: AttachSource = (video, url) => {
         // controller's, so the engine is told to keep a short buffer
         // rather than race ahead filling one.
         maxBufferLength: 10,
+      });
+      // A fatal engine error (a codec this browser cannot decode, a
+      // manifest that will not load) never reaches the element on its own:
+      // it is said on the element, so the player can show its fallback
+      // instead of a poster that never moves.
+      engine.on(Hls.Events.ERROR, (_event, data) => {
+        if (data.fatal) video.dispatchEvent(new Event(PLAYBACK_FAILED_EVENT));
       });
       engine.loadSource(url);
       engine.attachMedia(video);
