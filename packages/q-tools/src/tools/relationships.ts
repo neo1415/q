@@ -80,7 +80,7 @@ const SCOPES = [
  * as a subject but not bound: the firewall refused it, so do we. Anything
  * else only under the actor-wide network scope.
  */
-function admitted(
+export function admitted(
   plan: PermittedContextPlan,
   target:
     | { readonly kind: "COMPANY"; readonly id: string }

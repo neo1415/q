@@ -62,6 +62,7 @@ export type {
   QToolPorts,
   PitchMomentPort,
   RelationshipIntelligencePort,
+  EmailIntelligencePort,
   VisibilityIntelligencePort,
 } from "./ports.js";
 export {
@@ -122,6 +123,14 @@ export {
   ProposalOutputSchema,
   type GetRelationshipOutput,
 } from "./tools/relationships.js";
+export {
+  createProposeEmailTool,
+  PROPOSE_EMAIL,
+  ProposeEmailInputSchema,
+  ProposeEmailOutputSchema,
+  type ProposeEmailInput,
+  type ProposeEmailOutput,
+} from "./tools/email.js";
 export {
   GET_PITCH_MOMENT,
   GetPitchMomentInputSchema,

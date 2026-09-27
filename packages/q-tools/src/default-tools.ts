@@ -17,6 +17,7 @@ import { createRecommendationExplanationTool } from "./tools/recommendation-expl
 import { createProposeHandleClaimTool } from "./tools/handle-claim.js";
 import { createApprovePendingProposalTool } from "./tools/pending-proposal.js";
 import { createProposeProfileChangeTool } from "./tools/profile-change.js";
+import { createProposeEmailTool } from "./tools/email.js";
 import { createRelationshipTools } from "./tools/relationships.js";
 import { createGetPitchMomentTool } from "./tools/pitch-moment.js";
 import { createVisibilityTools } from "./tools/visibility.js";
@@ -59,6 +60,10 @@ export function createDefaultQTools(
     ...(ports.relationships === undefined
       ? []
       : createRelationshipTools(ports, ports.relationships)),
+    // BIZ-007: "email the founder", drafted for the person's approval.
+    ...(ports.email === undefined
+      ? []
+      : [createProposeEmailTool(ports.email, ports.relationships)]),
     // BIZ-002: every profile field the page edits, Q can prepare.
     ...(ports.profileChanges === undefined
       ? []

@@ -286,6 +286,12 @@ export const Q_CAPABILITIES: readonly QCapability[] = Object.freeze([
     },
   ),
   tool(
+    "propose_email",
+    "RELATIONSHIP",
+    "Drafts an email to the other side of a relationship (a company's founders or an investor's people), sent from their own connected Gmail when they approve; they can edit it first.",
+    { approval: "PREPARE_APPROVE", executes: ["email.send"] },
+  ),
+  tool(
     "get_relationship",
     "RELATIONSHIP",
     "Reads where they stand with a company or investor.",

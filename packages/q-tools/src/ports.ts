@@ -125,6 +125,46 @@ export type RelationshipIntelligencePort = {
 };
 
 /**
+ * Email on a relationship (BIZ-007): the person's own connected mailbox and
+ * the people on the other side of ONE relationship they are a party to.
+ * The proposal tool writes one thing: a note to this run's Approval Engine
+ * proposer. The send runs only as the approved `email.send`, from the
+ * approver's mailbox, to exactly the approved recipient.
+ */
+export type EmailIntelligencePort = {
+  /** Null when the actor is not a party to the relationship (or it does not exist). */
+  readonly counterpart: (
+    actor: ActorContext,
+    relationshipId: string,
+  ) => Promise<{
+    readonly kind: "COMPANY" | "INVESTOR_ORGANISATION";
+    readonly id: string;
+    readonly name: string;
+    readonly contacts: readonly {
+      readonly name: string;
+      readonly email: string;
+    }[];
+  } | null>;
+  /** The actor's own connected mailbox, or null. */
+  readonly mailbox: (
+    actor: ActorContext,
+  ) => Promise<{ readonly email: string } | null>;
+  readonly prepareForApproval: (entry: {
+    readonly runId: string;
+    readonly tenantId: string;
+    readonly actorUserId: string;
+    readonly payload: {
+      readonly relationshipId: string;
+      readonly to: string;
+      readonly toName: string;
+      readonly counterpartName: string;
+      readonly subject: string;
+      readonly body: string;
+    };
+  }) => "PREPARED" | "ONE_PER_TURN";
+};
+
+/**
  * Who can see what of the person's own company (CQ-BIZ-003), through the
  * permissions context's visibility centre -- the same answers as the
  * visibility page. The two proposal tools write one thing: a note to this
@@ -214,6 +254,8 @@ export type QToolPorts = {
   readonly profiles?: PublicProfileLookupProvider | undefined;
   /** Relationships (CQ-Q-030); absent means no relationship tool exists. */
   readonly relationships?: RelationshipIntelligencePort | undefined;
+  /** Email on a relationship (BIZ-007); absent means the email tool does not exist. */
+  readonly email?: EmailIntelligencePort | undefined;
   /** Profile changes for approval (BIZ-002); absent means the tool does not exist. */
   readonly profileChanges?: ProfileChangePort | undefined;
   /** A pitch's transcript around a moment (R18); absent means no pitch tool. */

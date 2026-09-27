@@ -240,7 +240,16 @@ export function createIntegrationsService(
     }
     let recorded = 0;
     for (const providerMessageId of added.messageIds) {
-      const meta = await g.email.readMetadata(access, providerMessageId);
+      let meta: Awaited<ReturnType<EmailProvider["readMetadata"]>>;
+      try {
+        meta = await g.email.readMetadata(access, providerMessageId);
+      } catch (error: unknown) {
+        // Deleted between the history and the read: nothing to match.
+        if (error instanceof GoogleProviderError && error.status === 404) {
+          continue;
+        }
+        throw error;
+      }
       const from = addressOf(meta.from);
       // Our own sends and drafts are not replies.
       if (
