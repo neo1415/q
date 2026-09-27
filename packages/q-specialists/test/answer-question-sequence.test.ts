@@ -73,13 +73,13 @@ function request(): QAnswerRequest {
 type Reading = Awaited<ReturnType<QTurnReader["read"]>>;
 
 const base = {
-  confidence: "HIGH",
-  transcript: "CLEAR",
+  confidence: "HIGH" as const,
+  transcript: "CLEAR" as const,
   question: null,
   aboutNamedOther: false,
   tool: null,
   moreDocuments: [],
-} as const;
+};
 
 const START = (count: number): Reading => ({
   ...base,
