@@ -176,6 +176,8 @@ export async function HomeScreen({
   let welcome: ReactNode = undefined;
   let welcomeLine: string | undefined = undefined;
   let welcomeLead: string | undefined = undefined;
+  // Whether the page already has its one visible h1 (the welcomes do).
+  let headed = false;
   let briefing: Promise<Briefing | null> | undefined = undefined;
   if (conversationId === null) {
     if (arrival === "RETURNING") {
@@ -209,9 +211,11 @@ export async function HomeScreen({
       );
       welcomeLine = greeting.spoken;
       welcomeLead = greeting.headline;
+      headed = true;
     } else if (arrival === "FIRST_TIME" && qConnected) {
       const name = firstName((await accountDetails()).displayName);
       welcome = <FirstRunWelcome name={name} />;
+      headed = true;
       welcomeLine = `${name === null ? "Hi, I'm Q." : `Hi ${name}, I'm Q.`} ${FIRST_RUN_QUESTION}`;
     } else {
       welcome = (
@@ -237,6 +241,8 @@ export async function HomeScreen({
         background tab until it was removed.
       */}
       <section aria-label="Ask Q" className="flex flex-col" data-q-surface>
+        {/* A conversation view still has a page heading (R30 #34). */}
+        {headed ? null : <h1 className="sr-only">Q</h1>}
         <QConversationPanel
           connected={qConnected}
           context={surfaceContext(context)}

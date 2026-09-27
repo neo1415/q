@@ -120,9 +120,13 @@ export function FounderOnboardingScreen({
   if (session.status === "complete" || session.step === undefined) {
     return (
       <div className="mx-auto flex min-h-dvh w-full max-w-(--cq-layout-narrow) flex-col justify-center gap-6 px-4 py-10">
+        <h1 className="sr-only">Founder setup</h1>
+        {/* Whether investors see the company is the visibility setting's
+            to say; this screen does not know it, so it does not claim it
+            (R30 #19). */}
         <EmptyState
           title="Founder setup is complete."
-          description="Your company profile is in place. Tell Q what to change, in your own words, and approve it; investors don't see any of it until you choose to become discoverable."
+          description="Your company profile is in place. Tell Q what to change, in your own words, and approve it. What investors can see follows your visibility settings."
           action={
             <div className="flex flex-wrap gap-2">
               <Link href="/home" className={buttonClassName("primary")}>
