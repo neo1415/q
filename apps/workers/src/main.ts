@@ -155,8 +155,15 @@ import { createOutboxPublisherRunner } from "./outbox-runner.js";
 import { createParserSandbox } from "./parser/sandbox.js";
 import { composeWorkerPresence } from "./presence/composition.js";
 import { runGmailReplyPoller } from "./integrations/gmail-poller.js";
+import { runScheduleTicker } from "./integrations/schedule-ticker.js";
 import { loadGoogleWorkspaceConfig } from "@capital-q/config/google-workspace";
-import { composeGoogleIntegrations } from "@capital-q/integrations";
+import { composeSchedule } from "@capital-q/communication";
+import { loadAppEmailConfig } from "@capital-q/config/app-email";
+import {
+  composeGoogleIntegrations,
+  createSmtpAppEmailSender,
+  unavailableAppEmailSender,
+} from "@capital-q/integrations";
 import { createPresenceResearchDispatch } from "./presence/dispatch.js";
 import { createPostgresBuildPrincipalResolver } from "./recommendations/build-principal.js";
 import { createRecommendationRefreshHandler } from "./recommendations/refresh-handler.js";
@@ -819,6 +826,29 @@ if (!gmailIntegrations.available) {
   );
 }
 
+// Reminders and prep briefs (BIZ-008): in-app always; email over the
+// SMTP relay in the setup contract when SMTP_* are set.
+const appEmail = loadAppEmailConfig(process.env);
+if (appEmail.smtp === undefined) {
+  logger.info(
+    { missing: appEmail.missing },
+    "reminder email disabled: SMTP not configured (in-app delivery continues)",
+  );
+}
+const schedule = composeSchedule({
+  sql: database.sql,
+  transactions: database.transactions,
+  // The worker acts for nobody: it only delivers and briefs from rows a
+  // person's authorised request created. No party check can pass here.
+  interests: { relationshipById: () => Promise.resolve(null) },
+  calendars: (userId) => gmailIntegrations.calendarOf(userId),
+  email:
+    appEmail.smtp === undefined
+      ? unavailableAppEmailSender
+      : createSmtpAppEmailSender(appEmail.smtp),
+  logger,
+});
+
 const shutdownController = new AbortController();
 
 function shutdown(signal: NodeJS.Signals): void {
@@ -849,6 +879,11 @@ await Promise.all([
         }),
       ]
     : []),
+  runScheduleTicker({
+    schedule,
+    signal: shutdownController.signal,
+    logger,
+  }),
   ...(syntheticAutoVerifySweep === undefined
     ? []
     : [

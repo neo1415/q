@@ -380,6 +380,9 @@ importers:
       '@capital-q/capital':
         specifier: workspace:*
         version: link:../../packages/capital
+      '@capital-q/communication':
+        specifier: workspace:*
+        version: link:../../packages/communication
       '@capital-q/companies':
         specifier: workspace:*
         version: link:../../packages/companies
