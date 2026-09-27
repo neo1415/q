@@ -96,6 +96,10 @@ const ACTIONS = [
     name: "propose_handle_claim",
     does: "Proposes a Capital Q handle and shareable Q card (with its QR code) for the person's own company or investor organisation, for their approval.",
   },
+  {
+    name: "propose_profile_change",
+    does: "Changes their own profile — their name and headline, their company's profile, or their investor organisation's profile — shown to them exactly and applied only when they approve.",
+  },
 ];
 
 const ACTION_REQUESTS = [
@@ -103,7 +107,12 @@ const ACTION_REQUESTS = [
   "set up our public card",
   "claim @kivu for us",
   "I want a shareable card with a QR",
+  "edit my profile",
+  "change my headline to fintech founder in Lagos",
+  "our website is zino.aero now, put that on the company page",
+  "can you fix my company description, it's out of date",
 ];
+const SCREEN_REQUESTS = ["take me to my profile", "open my profile page"];
 const DOCUMENT_REQUESTS = [
   "write a brief on Zino Aviation",
   "make me a pitch deck for my company",
@@ -146,6 +155,20 @@ describe.skipIf(!LIVE || GEMINI === undefined)(
           const r = await read(utterance);
           if (r === null || r.tool?.kind === "PREPARE_DOCUMENT") {
             misses.push(`action read as a document: "${utterance}"`);
+          }
+        }
+        for (const utterance of ACTION_REQUESTS) {
+          const r = await read(utterance);
+          if (r?.tool?.kind === "NAVIGATE") {
+            misses.push(`action read as navigation: "${utterance}"`);
+          }
+        }
+        for (const utterance of SCREEN_REQUESTS) {
+          const r = await read(utterance);
+          if (r?.tool?.kind !== "NAVIGATE") {
+            misses.push(
+              `screen request not read as navigation: "${utterance}"`,
+            );
           }
         }
         for (const utterance of DOCUMENT_REQUESTS) {

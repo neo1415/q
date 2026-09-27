@@ -110,6 +110,35 @@ describe("the capability note says what the run can do, and nothing else", () =>
     }
   });
 
+  it("a tool that prepares a change is named as one, never as a read (R20)", () => {
+    const note = capabilityNote(
+      FULL,
+      [
+        {
+          name: "search_companies",
+          description: "Finds companies.",
+          classification: "READ_ONLY",
+        },
+        {
+          name: "propose_profile_change",
+          description: "Prepares a change to the person's own profile. More.",
+          classification: "SIDE_EFFECT",
+        },
+      ],
+      [],
+    ).content;
+    const readLine =
+      note.split("\n").find((line) => line.startsWith("- Read")) ?? "";
+    const changeLine =
+      note
+        .split("\n")
+        .find((line) => line.startsWith("- Prepare these changes")) ?? "";
+    expect(readLine).toContain("search_companies");
+    expect(readLine).not.toContain("propose_profile_change");
+    expect(changeLine).toContain("propose_profile_change");
+    expect(changeLine).toContain("for their approval");
+  });
+
   it("says a document it made is the card above, downloadable only when ready", () => {
     for (const status of ["READY", "PREPARING", "FAILED"]) {
       const note = capabilityNote(

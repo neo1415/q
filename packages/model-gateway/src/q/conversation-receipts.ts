@@ -133,20 +133,35 @@ export function capabilityNote(
   offeredTools: readonly {
     readonly name: string;
     readonly description: string;
+    /** READ_ONLY reads; anything else prepares a change for approval. */
+    readonly classification?: string | undefined;
   }[],
   receipts: readonly QReceipt[],
 ): ModelMessage {
   const lines: string[] = [
     "WHAT YOU CAN DO IN THIS CONVERSATION (Capital Q, authoritative; you can do nothing else):",
   ];
-  if (offeredTools.length > 0) {
+  const named = (tools: typeof offeredTools): string =>
+    tools
+      .map(
+        (tool) =>
+          `${tool.name} (${tool.description.split(/(?<=\.)\s/)[0]?.slice(0, 140) ?? ""})`,
+      )
+      .join("; ");
+  // A change-preparing tool listed as a read told the model it could only
+  // read, and "edit my profile" was declined (R20).
+  const reads = offeredTools.filter(
+    (tool) => (tool.classification ?? "READ_ONLY") === "READ_ONLY",
+  );
+  const changes = offeredTools.filter(
+    (tool) => (tool.classification ?? "READ_ONLY") !== "READ_ONLY",
+  );
+  if (reads.length > 0) {
+    lines.push(`- Read and look things up with these tools: ${named(reads)}.`);
+  }
+  if (changes.length > 0) {
     lines.push(
-      `- Read and look things up with these tools: ${offeredTools
-        .map(
-          (tool) =>
-            `${tool.name} (${tool.description.split(/(?<=\.)\s/)[0]?.slice(0, 140) ?? ""})`,
-        )
-        .join("; ")}.`,
+      `- Prepare these changes when they ask, for their approval (nothing changes until they approve; say it is ready for approval, never done): ${named(changes)}.`,
     );
   }
   if (manifest !== undefined && manifest.navigate.length > 0) {

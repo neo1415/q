@@ -15,6 +15,8 @@ import { TURN_READER_V6 } from "./turn-reader.v6.js";
  * document was prepared before the model that holds the real action was
  * asked. The run's own actions now arrive as trusted input, built by code
  * from what is offered, and a request for one of them is never a document.
+ * The same rule keeps "edit my profile" from being read as NAVIGATE PROFILE
+ * (v6's "their own profile or details" took it to the screen; R20).
  * Concepts only.
  */
 const UNTRUSTED_ANCHOR =
@@ -23,7 +25,7 @@ const UNTRUSTED_ANCHOR =
 const ACTIONS_SECTION = `OTHER ACTIONS CAPITAL Q TAKES IN THIS CONVERSATION (trusted; built from what this run can do)
 {{actions}}
 
-When what they ask for is one of these actions — whatever the verb, including making, creating or setting something up — the kind is TOOL_REQUEST and tool is null: Capital Q takes that action itself. PREPARE_DOCUMENT is only for the document types it names, never for something one of these actions does.
+When what they ask for is one of these actions — whatever the verb, including making, creating, changing, editing, updating or setting something up — the kind is TOOL_REQUEST and tool is null: Capital Q takes that action itself. NAVIGATE is only being taken to a screen: asking Capital Q to change something that a screen shows, their own profile included, is one of these actions when one of them does it, not NAVIGATE. PREPARE_DOCUMENT is only for the document types it names, never for something one of these actions does.
 
 `;
 
@@ -39,7 +41,7 @@ export const TURN_READER_V7: PromptDefinition<
   version: 7,
   status: "ACTIVE",
   changeDescription:
-    "Founder live: the run's own actions (from what is offered) arrive as trusted input; a request for one of them is TOOL_REQUEST with tool null, never PREPARE_DOCUMENT.",
+    "Founder live: the run's own actions (from what is offered) arrive as trusted input; a request for one of them is TOOL_REQUEST with tool null, never PREPARE_DOCUMENT, and a request to change what a screen shows is never NAVIGATE.",
   effectiveFrom: "2026-09-26",
   variables: {
     schema: TurnReaderV7VariablesSchema,

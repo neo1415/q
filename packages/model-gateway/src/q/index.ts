@@ -1608,6 +1608,7 @@ export function createModelGatewayQAnswer(
         offered.map((tool) => ({
           name: tool.definition.name,
           description: tool.definition.description,
+          classification: tool.classification,
         })),
         receipts,
       );

@@ -1,5 +1,4 @@
 import {
-  Q_NAVIGATE_DESTINATIONS,
   type QNavigateDestination,
   type QResponseMessage,
   type QResultBlock,
@@ -19,7 +18,11 @@ import {
   type FailureOperation,
   type TurnToolV5,
 } from "@capital-q/q-core";
-import type { GetInvestorMandateOutput } from "@capital-q/q-tools";
+import {
+  eligibleCapabilities,
+  type GetInvestorMandateOutput,
+  type QCapability,
+} from "@capital-q/q-tools";
 import { ownInvestorOrganisationIn } from "@capital-q/model-gateway/q";
 
 import {
@@ -116,15 +119,14 @@ export type SpecialistQAnswerDependencies = {
    */
   readonly visibility?: QVisibilityNotebook | undefined;
   /**
-   * The actions (not reads) this run offers the answer's model, name and
-   * what each does, so the turn reader never files a document for a
-   * request one of them performs. Absent: none are known.
+   * The provider names of the tools the Tool Registry offers this run's
+   * answer model. With what is composed here they decide which entries of
+   * the capability registry (R20) the run has: the turn reader is told the
+   * actions, so it never files a request one of them performs as a
+   * document, and the answer's model is told all of them. Absent: none.
    */
-  readonly offeredActions?:
-    | ((
-        request: QAnswerRequest,
-      ) => Promise<readonly { readonly name: string; readonly does: string }[]>)
-    | undefined;
+  readonly offeredTools?:
+    ((request: QAnswerRequest) => Promise<readonly string[]>) | undefined;
   /**
    * The person's own investment mandate, read under this run's plan (the
    * firewall binds it only to the investor's own organisation). NOT_AN_
@@ -763,26 +765,40 @@ export function createSpecialistQAnswer(
    * here and what the plan holds (CQ-QX-008). Built by code, so Q can
    * neither deny a capability it has nor claim one it has not.
    */
-  const capabilitiesFor = (request: QAnswerRequest): QCapabilityManifest => {
-    const company = request.subjects.some(
-      (subject) => subject.kind === "COMPANY",
+  const capabilitiesOf = async (
+    request: QAnswerRequest,
+  ): Promise<readonly QCapability[]> => {
+    const offeredTools =
+      dependencies.offeredTools === undefined
+        ? []
+        : await dependencies.offeredTools(request).catch(() => []);
+    return eligibleCapabilities({
+      surface: "HOME_Q",
+      offeredTools: new Set(offeredTools),
+      company: request.subjects.some((subject) => subject.kind === "COMPANY"),
+      ownInvestorOrganisation: ownInvestorOrganisationIn(request.plan) !== null,
+      artifacts: artifacts !== undefined,
+      ownMandate: dependencies.ownMandate !== undefined,
+      visibility: dependencies.visibility !== undefined,
+    });
+  };
+  /** The manifest the answer's note renders, from the registry's hands. */
+  const manifestOf = (
+    capabilities: readonly QCapability[],
+  ): QCapabilityManifest => {
+    const hands = capabilities.flatMap((capability) =>
+      capability.performedBy.kind === "HAND"
+        ? [capability.performedBy.hand]
+        : [],
     );
     return {
-      navigate: Q_NAVIGATE_DESTINATIONS.filter(
-        (destination) => destination !== "COMPANY_VISIBILITY" || company,
+      navigate: hands.flatMap((hand) =>
+        hand.kind === "NAVIGATE" ? [hand.destination] : [],
       ),
-      documents:
-        artifacts === undefined
-          ? []
-          : [
-              "PITCH_DECK",
-              "INVESTMENT_BRIEF",
-              ...(dependencies.ownMandate !== undefined &&
-              ownInvestorOrganisationIn(request.plan) !== null
-                ? ["OWN_MANDATE"]
-                : []),
-            ],
-      visibilityChange: dependencies.visibility !== undefined && company,
+      documents: hands.flatMap((hand) =>
+        hand.kind === "PREPARE_DOCUMENT" ? [hand.documentType] : [],
+      ),
+      visibilityChange: hands.some((hand) => hand.kind === "SET_VISIBILITY"),
     };
   };
 
@@ -820,12 +836,16 @@ export function createSpecialistQAnswer(
      * path already waited on it, so only the conversational path pays
      * the one classification it was already making.
      */
-    // The other actions this run can take, from what is offered: the
-    // reader must know them, or "make a Q card" reads as a document.
-    const actions =
-      dependencies.offeredActions === undefined
-        ? []
-        : await dependencies.offeredActions(request).catch(() => []);
+    // What this run can do, from the capability registry (R20), once per
+    // turn and cached by composition. The reader is told the actions the
+    // answer's model takes, or "make a Q card" reads as a document.
+    const capabilities = await capabilitiesOf(request);
+    const actions = capabilities.flatMap((capability) =>
+      capability.performedBy.kind === "TOOL" &&
+      capability.approval === "PREPARE_APPROVE"
+        ? [{ name: capability.performedBy.providerName, does: capability.does }]
+        : [],
+    );
     const readTurn = () =>
       turns.read({
         utterance: latest.content,
@@ -930,7 +950,7 @@ export function createSpecialistQAnswer(
     const outcome = await answerOnce({
       ...request,
       research,
-      capabilities: capabilitiesFor(request),
+      capabilities: manifestOf(capabilities),
       ...(turnUnread ? { turnUnread: true } : {}),
     });
     if (outcome.kind === "FAILED") {

@@ -233,6 +233,7 @@ import { createInvestorProfileUpdateAction } from "./composition/investor-profil
 import { createProfileChangeBoard } from "./composition/profile-change-board.js";
 import { createProfileFindingsReader } from "./composition/profile-findings.js";
 import { createHandleClaimAction } from "./composition/handle-claim-action.js";
+import { assertComposedActionTypes } from "./composition/q-action-types.js";
 import { createHandleClaimBoard } from "./composition/handle-claim-board.js";
 import {
   createPostgresPublicIdentityRepository,
@@ -1008,6 +1009,9 @@ const qActionRegistry = createQActionRegistry([
     logger,
   }),
 ]);
+// Every composed action has a capability entry (R20): the list the
+// completeness test reads is the list composed here.
+assertComposedActionTypes(qActionRegistry);
 const qActions = createQActionService({
   sql: database.sql,
   transactions: database.transactions,

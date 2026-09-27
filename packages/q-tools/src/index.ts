@@ -248,3 +248,17 @@ export {
   type NotePreferenceOutput,
   type PreferenceNotePort,
 } from "./tools/note-preference.js";
+
+export {
+  eligibleCapabilities,
+  HOME_Q_CAPABILITY_GROUPS,
+  Q_CAPABILITIES,
+  Q_CAPABILITY_EXCLUSIONS,
+  Q_CAPABILITY_GROUPS,
+  type QCapability,
+  type QCapabilityApproval,
+  type QCapabilityGroup,
+  type QCapabilityHand,
+  type QCapabilityRunFacts,
+  type QCapabilitySurface,
+} from "./capabilities.js";

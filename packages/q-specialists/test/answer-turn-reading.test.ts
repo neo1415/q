@@ -7,6 +7,7 @@ import {
   Q_CONTEXT_FIREWALL_POLICY_VERSION,
 } from "@capital-q/contracts";
 import type { QTurnReader } from "@capital-q/model-gateway/q";
+import { Q_CAPABILITIES } from "@capital-q/q-tools";
 import type { TurnReaderV3Result as TurnReaderResult } from "@capital-q/q-core";
 import type {
   QAnswerOutcome,
@@ -78,7 +79,7 @@ function seam(options: {
   readonly visibility?: {
     noteVisibility: (entry: Record<string, unknown>) => void;
   };
-  readonly actions?: readonly { name: string; does: string }[];
+  readonly offeredTools?: readonly string[];
 }) {
   const message: QConversationMessage = {
     id: randomUUID() as QConversationMessage["id"],
@@ -166,9 +167,9 @@ function seam(options: {
     sql: {} as never,
     transactions: { run: (work) => work({} as never) },
     turns,
-    ...(options.actions === undefined
+    ...(options.offeredTools === undefined
       ? {}
-      : { offeredActions: () => Promise.resolve(options.actions ?? []) }),
+      : { offeredTools: () => Promise.resolve(options.offeredTools ?? []) }),
   });
   return {
     answer,
@@ -527,29 +528,60 @@ describe("the answer is told what this run can do (CQ-QX-008)", () => {
 });
 
 describe("an action the run offers is never filed as a document (BIZ-004 founder live)", () => {
-  const HANDLE = {
-    name: "propose_handle_claim",
-    does: "Proposes a Capital Q handle and Q card for their own organisation.",
+  const actionOf = (providerName: string) => {
+    const entry = Q_CAPABILITIES.find(
+      (capability) =>
+        capability.performedBy.kind === "TOOL" &&
+        capability.performedBy.providerName === providerName,
+    );
+    return { name: providerName, does: entry?.does };
   };
+  const ACTION_READING = {
+    kind: "TOOL_REQUEST",
+    confidence: "HIGH",
+    transcript: "CLEAR",
+    question: null,
+    aboutNamedOther: false,
+    tool: null,
+  } as const;
 
   it("hands the offered actions to the reader, and an action request goes to the model that holds it", async () => {
     const run = seam({
       said: "Make a Q card for Zino Aviation with the handle zino-aviation",
-      reading: {
-        kind: "TOOL_REQUEST",
-        confidence: "HIGH",
-        transcript: "CLEAR",
-        question: null,
-        aboutNamedOther: false,
-        tool: null,
-      },
+      reading: ACTION_READING,
       outcomes: [],
-      actions: [HANDLE],
+      offeredTools: ["propose_handle_claim", "get_company"],
     });
     await run.answer.answer(request());
-    expect(run.heardActions).toEqual([[HANDLE]]);
+    // From the capability registry: the action, never the read.
+    expect(run.heardActions).toEqual([[actionOf("propose_handle_claim")]]);
     // No document was prepared here; the answer's model took the turn.
     expect(run.delegated()).toBe(1);
     expect(run.stored).toHaveLength(0);
+  });
+
+  it("a profile edit is an action the reader knows, and the model that holds it takes the turn (R20)", async () => {
+    const run = seam({
+      said: "change my headline to fintech founder in Lagos",
+      reading: ACTION_READING,
+      outcomes: [],
+      offeredTools: ["propose_profile_change", "search_companies"],
+    });
+    await run.answer.answer(request());
+    expect(run.heardActions).toEqual([[actionOf("propose_profile_change")]]);
+    expect(run.delegated()).toBe(1);
+    // Not taken to the profile screen: no navigation message was stored.
+    expect(run.stored).toHaveLength(0);
+  });
+
+  it("a tool the run does not offer is not an action it has", async () => {
+    const run = seam({
+      said: "claim @kivu for us",
+      reading: ACTION_READING,
+      outcomes: [],
+      offeredTools: ["get_company"],
+    });
+    await run.answer.answer(request());
+    expect(run.heardActions).toEqual([[]]);
   });
 });

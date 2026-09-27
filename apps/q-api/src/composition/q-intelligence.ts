@@ -301,9 +301,10 @@ export function composeQIntelligence(
     // Their own mandate, for a mandate document (gap 3): read through the
     // same tool, under the run's plan.
     ownMandate: createToolOwnMandatePort(tools, logger),
-    // The actions the answer's model is offered for this run (not reads),
-    // so the turn reader knows them (BIZ-004 founder live).
-    offeredActions: async (request) =>
+    // The tools the answer's model is offered for this run: with what is
+    // composed they pick the run's entries of the capability registry
+    // (R20), which the turn reader and the answer's note are given.
+    offeredTools: async (request) =>
       (
         await tools.offer({
           actor: request.actor,
@@ -312,12 +313,7 @@ export function composeQIntelligence(
           capability: request.capability,
           plan: request.plan,
         })
-      )
-        .filter((tool) => tool.classification !== "READ_ONLY")
-        .map((tool) => ({
-          name: tool.definition.name,
-          does: tool.definition.description.slice(0, 240),
-        })),
+      ).map((tool) => tool.definition.name),
     ...(logger === undefined ? {} : { logger }),
     // Every turn is read before it is answered (CQ-QX-005): research and
     // failure notices are decided by the conversation core, not by a word

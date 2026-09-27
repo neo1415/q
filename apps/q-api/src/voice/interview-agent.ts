@@ -46,6 +46,8 @@ import {
   createOnboardingTools,
   createQToolExecutor,
   createQToolRegistry,
+  HOME_Q_CAPABILITY_GROUPS,
+  type QCapabilityGroup,
 } from "@capital-q/q-tools";
 import type { ActorContext } from "@capital-q/security";
 
@@ -261,6 +263,29 @@ export type InterviewAgent = {
 };
 
 /**
+ * What Q does on Home that the loop does not, in a person's terms, from
+ * the capability registry (R20). Groups with nothing to ask for (screens,
+ * records, the loop itself) are left out.
+ */
+const ELSEWHERE_WORDS: Readonly<Partial<Record<QCapabilityGroup, string>>> = {
+  PROFILE: "change their profile",
+  HANDLE: "make their Q Card",
+  DOCUMENT: "prepare documents such as a pitch deck or a brief, with a PDF",
+  VISIBILITY: "change who can see their company",
+  RELATIONSHIP: "express or answer interest",
+  RESEARCH: "research public sources",
+};
+
+export const ELSEWHERE_NOTE = `Outside onboarding, Q on their Home page can also ${HOME_Q_CAPABILITY_GROUPS.flatMap(
+  (group) => {
+    const words = ELSEWHERE_WORDS[group];
+    return words === undefined ? [] : [words];
+  },
+).join(
+  "; ",
+)}. If they ask for one of these now, say Q will do it on Home once they finish or pause here; never say it is done, and never say Capital Q cannot do it.`;
+
+/**
  * The trusted notes on what else a turn asks, from the independent
  * reading and the research ledger. Code composes the facts; the loop says
  * them in its own words.
@@ -304,7 +329,9 @@ export function turnNotesFor(input: {
       `They corrected how to say "${input.pronounce.term.slice(0, 80)}": say it as "${input.pronounce.sayAs.slice(0, 120)}" from now on, and acknowledge it in a few words.`,
     );
   }
-  return notes.length === 0 ? "none" : notes.join("\n");
+  // Every turn: the registry's view of what Q does beyond this loop.
+  notes.push(ELSEWHERE_NOTE);
+  return notes.join("\n").slice(0, 1_500);
 }
 
 export function createInterviewAgent(

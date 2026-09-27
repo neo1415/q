@@ -70,6 +70,7 @@ describe("the turn reader knows the run's own actions", () => {
     expect(prompt).toContain("OTHER ACTIONS CAPITAL Q TAKES");
     expect(prompt).toContain("propose_handle_claim");
     expect(prompt).toContain("never for something one of these actions does");
+    expect(prompt).toContain("their own profile included");
     // A request for an action comes back as TOOL_REQUEST with no tool of the
     // reader's own: the answer's model, which holds the action, takes it.
     expect(read?.kind).toBe("TOOL_REQUEST");
