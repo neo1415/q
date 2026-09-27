@@ -3,12 +3,13 @@
 import { AgentMicrophone } from "@deepgram/agents";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import type {
-  VoiceSessionClient,
-  VoiceSessionEvents,
-  VoiceSessionStart,
-  VoiceState,
-  VoiceTranscriptLine,
+import {
+  transcriptLineFor,
+  type VoiceSessionClient,
+  type VoiceSessionEvents,
+  type VoiceSessionStart,
+  type VoiceState,
+  type VoiceTranscriptLine,
 } from "../session";
 import { AgentSocket } from "./agent-socket";
 import { PcmPlayer } from "./pcm-player";
@@ -105,29 +106,6 @@ function withoutCue(text: string): string {
   return text.split(CONTINUE_SIGNAL).join(" ").replace(/\s+/g, " ").trim();
 }
 
-const comparable = (text: string) =>
-  text
-    .toLowerCase()
-    .replace(/[^\p{L}\p{N}\s]/gu, "")
-    .replace(/\s+/g, " ")
-    .trim();
-
-/**
- * Whether `next` is the provider reporting the same utterance again, grown
- * or with its last words re-heard. The provider folds the person's
- * consecutive messages into one, so a line that begins with most of the
- * previous one is that line, not a second thing they said.
- */
-function sameUtterance(previous: string, next: string): boolean {
-  const a = comparable(previous);
-  const b = comparable(next);
-  if (a.length === 0) return false;
-  if (b.startsWith(a)) return true;
-  let shared = 0;
-  while (shared < a.length && a[shared] === b[shared]) shared += 1;
-  return shared >= 24 && shared >= a.length * 0.8;
-}
-
 let counter = 0;
 const newId = () => `dg-${String(Date.now())}-${String((counter += 1))}`;
 
@@ -213,22 +191,10 @@ export function useDeepgramVoiceSession(
     const trimmed = text.trim();
     if (trimmed.length === 0) return;
     const previous = lastLineRef.current;
-    // One utterance, one line: the same utterance reported again replaces
-    // the line it grew from, under the same id, so every consumer that
-    // keys lines by id shows it once.
-    const replacing =
-      role === "user" &&
-      previous?.role === "user" &&
-      sameUtterance(previous.text, trimmed)
-        ? previous
-        : null;
-    const line: VoiceTranscriptLine = {
-      id: replacing?.id ?? newId(),
-      role,
-      text: trimmed,
-      partial: false,
-      at: Date.now(),
-    };
+    // Same id as the line shown last when it is the same utterance or the
+    // same reply, so every consumer that keys lines by id shows it once.
+    const line = transcriptLineFor(previous, role, trimmed, newId, Date.now());
+    const replacing = line.id === previous?.id ? previous : null;
     lastLineRef.current = line;
     setTranscript((current) =>
       replacing === null

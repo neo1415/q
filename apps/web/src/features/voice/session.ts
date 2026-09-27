@@ -58,6 +58,40 @@ export function upsertLine<T extends { readonly id: string }>(
     : [...lines, line];
 }
 
+/**
+ * The line a new report from the provider becomes, given the line shown
+ * last (founder live test 2026-09-27, failure 9).
+ *
+ * Identity is the conversation's own structure, never the words:
+ *
+ * - One utterance, one line. The person's words reported again before Q
+ *   has said anything since are the same utterance: the provider folds a
+ *   person's consecutive messages into one and answers only that, so the
+ *   newer report replaces the line under the id it already has ("Okay."
+ *   then "Okay. That makes sense." is one line, never two).
+ * - One reply, one line. Q's sentences are spoken as they are written and
+ *   reported one by one; each adds to the reply's line until the person
+ *   speaks, rather than becoming a line of its own.
+ */
+export function transcriptLineFor(
+  previous: VoiceTranscriptLine | null,
+  role: VoiceTranscriptLine["role"],
+  text: string,
+  fresh: () => string,
+  at: number,
+): VoiceTranscriptLine {
+  if (previous?.role !== role) {
+    return { id: fresh(), role, text, partial: false, at };
+  }
+  return {
+    id: previous.id,
+    role,
+    text: role === "user" ? text : `${previous.text} ${text}`,
+    partial: false,
+    at,
+  };
+}
+
 export type VoiceSessionEvents = {
   /**
    * A completed transcript line from either side. A line whose id was

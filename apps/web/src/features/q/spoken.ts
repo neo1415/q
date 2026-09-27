@@ -25,15 +25,49 @@ function asWords(text: string): string {
     .trim();
 }
 
+/** A stored turn, as much of it as the comparison needs. */
+export type StoredTurnText = {
+  readonly kind: "PERSON" | "Q";
+  readonly text: string;
+};
+
+/**
+ * The spoken lines not yet in the stored thread.
+ *
+ * A person's line is stored once the same words are. Q's spoken reply is
+ * one line for the whole reply (`transcriptLineFor`), but what was spoken
+ * is not the stored text word for word: the voice drops what cannot be
+ * said and stops at a listener's limit. So a reply is placed by the
+ * conversation's structure instead: it answers the person's line before
+ * it, and once that line is stored with a Q turn after it, the stored
+ * reply is the one shown.
+ */
 export function spokenNotYetStored(
   spoken: readonly SpokenLine[],
-  storedTexts: readonly string[],
+  storedTurns: readonly StoredTurnText[],
 ): readonly SpokenLine[] {
-  const stored = new Set(storedTexts.map(asWords));
+  const stored = new Set(storedTurns.map((turn) => asWords(turn.text)));
+  /** Person turns, by words, that already have a stored reply after them. */
+  const answered = new Set<string>();
+  storedTurns.forEach((turn, index) => {
+    if (turn.kind === "PERSON" && storedTurns[index + 1]?.kind === "Q") {
+      answered.add(asWords(turn.text));
+    }
+  });
   const seen = new Set<string>();
+  let before: SpokenLine | undefined;
   return spoken.filter((line) => {
+    const asked = before;
+    before = line;
     const words = asWords(line.text);
     if (words.length === 0 || stored.has(words)) {
+      return false;
+    }
+    if (
+      line.role === "q" &&
+      asked?.role === "user" &&
+      answered.has(asWords(asked.text))
+    ) {
       return false;
     }
     // The same words twice from the transcript itself is one line.

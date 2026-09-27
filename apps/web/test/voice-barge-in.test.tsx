@@ -361,6 +361,84 @@ describe("one utterance, one line", () => {
   });
 });
 
+describe("one utterance one row, one reply one row (live test 2026-09-27, failure 9)", () => {
+  it("merges an end-of-turn fragment into the utterance it grew into, by position not by words", async () => {
+    const { hook, session, onLine } = await started();
+    act(() => {
+      session.emit("conversation-text", {
+        role: "assistant",
+        content: "There are no discoverable founders yet.",
+      });
+      session.emit("conversation-text", { role: "user", content: "Okay." });
+      // Re-heard differently: nothing of the first report survives word
+      // for word, and it is still the same utterance, because Q has said
+      // nothing since.
+      session.emit("conversation-text", {
+        role: "user",
+        content: "Ok, that that makes sense.",
+      });
+    });
+    const users = hook.result.current.transcript.filter(
+      (line) => line.role === "user",
+    );
+    expect(users.map((line) => line.text)).toEqual([
+      "Ok, that that makes sense.",
+    ]);
+    const sent = onLine.mock.calls
+      .map(([line]) => line as VoiceTranscriptLine)
+      .filter((line) => line.role === "user");
+    expect(new Set(sent.map((line) => line.id)).size).toBe(1);
+  });
+
+  it("shows Q's reply, spoken sentence by sentence, as one row", async () => {
+    const { hook, session, onLine } = await started();
+    const sentences = [
+      "Which company should the deck be about?",
+      "You're right.",
+      "The deck should be about Zino Aviation, your company.",
+    ];
+    act(() => {
+      session.emit("conversation-text", {
+        role: "user",
+        content: "Make me a pitch deck.",
+      });
+      for (const content of sentences) {
+        session.emit("conversation-text", { role: "assistant", content });
+      }
+    });
+    const replies = hook.result.current.transcript.filter(
+      (line) => line.role === "q",
+    );
+    expect(replies.map((line) => line.text)).toEqual([sentences.join(" ")]);
+    // Every consumer gets the growing reply under one id, and a store that
+    // upserts by id ends with one row.
+    let shown: readonly VoiceTranscriptLine[] = [];
+    for (const [line] of onLine.mock.calls) {
+      shown = upsertLine(shown, line as VoiceTranscriptLine);
+    }
+    expect(shown.map((line) => [line.role, line.text])).toEqual([
+      ["user", "Make me a pitch deck."],
+      ["q", sentences.join(" ")],
+    ]);
+    // The person speaking starts the next exchange: a new row each side.
+    act(() => {
+      session.emit("conversation-text", { role: "user", content: "Why?" });
+      session.emit("conversation-text", {
+        role: "assistant",
+        content: "Because it is yours.",
+      });
+    });
+    expect(
+      hook.result.current.transcript.map((line) => [line.role, line.text]),
+    ).toEqual([
+      ["user", "Make me a pitch deck."],
+      ["q", sentences.join(" ")],
+      ["user", "Why?"],
+      ["q", "Because it is yours."],
+    ]);
+  });
+});
+
 describe("no silent dead starts", () => {
   const GREETED = {
     ...CREDENTIAL,

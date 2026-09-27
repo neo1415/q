@@ -4,12 +4,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { Conversation, type VoiceConversation } from "@elevenlabs/react";
 
-import type {
-  VoiceSessionClient,
-  VoiceSessionEvents,
-  VoiceSessionStart,
-  VoiceState,
-  VoiceTranscriptLine,
+import {
+  transcriptLineFor,
+  type VoiceSessionClient,
+  type VoiceSessionEvents,
+  type VoiceSessionStart,
+  type VoiceState,
+  type VoiceTranscriptLine,
 } from "../session";
 
 /**
@@ -66,6 +67,8 @@ export function useElevenLabsVoiceSession(
     eventsRef.current = events;
   }, [events]);
   const conversationRef = useRef<VoiceConversation | null>(null);
+  /** The last line shown: the same utterance or reply continues it. */
+  const lastLineRef = useRef<VoiceTranscriptLine | null>(null);
 
   // Whatever is open when the interview unmounts is closed with it.
   useEffect(
@@ -82,20 +85,21 @@ export function useElevenLabsVoiceSession(
     if (trimmed.length === 0) {
       return;
     }
-    const line: VoiceTranscriptLine = {
-      id: newId(),
-      role,
-      text: trimmed,
-      partial: false,
-      at: Date.now(),
-    };
-    setTranscript((current) => [...current, line]);
+    const previous = lastLineRef.current;
+    const line = transcriptLineFor(previous, role, trimmed, newId, Date.now());
+    lastLineRef.current = line;
+    setTranscript((current) =>
+      line.id === previous?.id
+        ? current.map((item) => (item.id === line.id ? line : item))
+        : [...current, line],
+    );
     eventsRef.current.onLine?.(line);
   }, []);
 
   const start = useCallback(
     async ({ credential, firstMessage }: VoiceSessionStart) => {
       setTranscript([]);
+      lastLineRef.current = null;
       setState("CONNECTING");
       try {
         await navigator.mediaDevices.getUserMedia({ audio: true });

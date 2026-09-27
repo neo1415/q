@@ -378,7 +378,7 @@ export function QSessionProvider({
 
   const spokenOnly = spokenNotYetStored(
     spoken,
-    turns.map((turn) => turn.text),
+    turns.map((turn) => ({ kind: turn.kind, text: turn.text })),
   );
 
   const state = apertureStateFor({
