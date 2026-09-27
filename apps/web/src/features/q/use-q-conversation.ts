@@ -83,7 +83,7 @@ export type QConversation = {
   readonly state: QStreamState;
   readonly pending: readonly PendingTurn[];
   readonly transport: QStreamTransportStatus | null;
-  /** True from submit until the run's stream ends. */
+  /** True from submit until the run's stream ends, except while the run waits on the person's approval. */
   readonly working: boolean;
   /** True while the conversation named by the caller is being read back. */
   readonly loading: boolean;
@@ -364,13 +364,17 @@ export function useQConversation(
     [follow, runState.messages],
   );
 
+  const awaitingPerson = runState.approval !== null;
   const ask = useCallback(
     async (
       question: string,
       extras?: { readonly viewing?: QViewingMoment | undefined },
     ) => {
       const text = question.trim();
-      if (text.length === 0 || submitting || streaming) {
+      // A run paused on an approval is waiting for the person, not busy:
+      // what they type is its next turn ("go ahead" approves through the
+      // run, the same as the card's button).
+      if (text.length === 0 || submitting || (streaming && !awaitingPerson)) {
         return;
       }
       setNotice(null);
@@ -453,6 +457,7 @@ export function useQConversation(
       options.relationshipId,
       streaming,
       submitting,
+      awaitingPerson,
     ],
   );
 
@@ -579,7 +584,9 @@ export function useQConversation(
     transport,
     // A run is "working" from the moment it is asked for until its stream
     // ends. Never inferred from elapsed time or the absence of text.
-    working: submitting || streaming,
+    // A run paused on the person's approval is not working: the composer
+    // stays open for "go ahead", and nothing says "Q is working".
+    working: submitting || (streaming && !awaitingPerson),
     loading,
     notice,
     runId,

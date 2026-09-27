@@ -536,7 +536,10 @@ export function QConversationPanel({
     ? client.muted
       ? "Muted"
       : (presence.label ?? "Listening")
-    : (presence.label ?? (connected ? "Ready when you are" : "Q"));
+    : // An invitation before the first question; once Q has answered it
+      // would read as stale, so the idle label is just Q's name.
+      (presence.label ??
+      (connected && lines.length === 0 ? "Ready when you are" : "Q"));
 
   const [historyOpen, setHistoryOpen] = useState(false);
   const download =
