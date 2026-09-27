@@ -356,9 +356,85 @@ describe("a card", () => {
       />,
     );
 
+    // The name opens the company, as in any feed.
     expect(
-      screen.getByRole("link", { name: "Open company" }).getAttribute("href"),
+      screen
+        .getByRole("link", { name: company(1).canonicalName })
+        .getAttribute("href"),
     ).toBe(`/company/${companyId(1)}`);
+  });
+});
+
+describe("the phone overlay and rail (founder directive, 2026-09-27)", () => {
+  function renderCard() {
+    return render(
+      <FeedCard
+        company={company(1)}
+        policy="ACTIVE"
+        reducedMotion={false}
+        saved={false}
+        deciding={false}
+        onSave={() => undefined}
+        onPass={() => undefined}
+        onAskQ={() => undefined}
+      />,
+    );
+  }
+
+  it("carries Save, Pass, Interest, Ask Q and Share, with no counts", () => {
+    renderCard();
+    const rail = screen.getByRole("group", { name: "Decide" });
+    const labels = [...rail.querySelectorAll("button")].map((button) =>
+      button.textContent?.trim(),
+    );
+    expect(labels).toEqual(["Save", "Pass", "Interest", "Ask Q", "Share"]);
+    // Nothing in the rail is a number: no vanity counts.
+    expect(rail.textContent).not.toMatch(/\d/);
+  });
+
+  it("keeps details one tap away, and says whether they are open", () => {
+    renderCard();
+    const toggle = screen.getByRole("button", {
+      name: "More about this company",
+    });
+    expect(toggle.getAttribute("aria-expanded")).toBe("false");
+    fireEvent.click(toggle);
+    expect(
+      screen
+        .getByRole("button", { name: "Less" })
+        .getAttribute("aria-expanded"),
+    ).toBe("true");
+  });
+
+  it("opens Express Interest at its confirmation step and sends nothing yet", () => {
+    renderCard();
+    fireEvent.click(screen.getByRole("button", { name: "Interest" }));
+    expect(
+      screen.getByRole("group", {
+        name: `Express interest in ${company(1).canonicalName}`,
+      }),
+    ).toBeTruthy();
+    expect(expressInterestAction).not.toHaveBeenCalled();
+  });
+
+  it("shares the company's address, never a media URL, and falls back to copying", async () => {
+    const writeText = vi.fn<(text: string) => Promise<void>>(() =>
+      Promise.resolve(),
+    );
+    Object.defineProperty(navigator, "clipboard", {
+      value: { writeText },
+      configurable: true,
+    });
+    renderCard();
+    fireEvent.click(screen.getByRole("button", { name: "Share" }));
+    await waitFor(() => {
+      expect(writeText).toHaveBeenCalledWith(
+        `${window.location.origin}/company/${companyId(1)}`,
+      );
+    });
+    expect(
+      await screen.findByRole("button", { name: "Link copied" }),
+    ).toBeTruthy();
   });
 });
 

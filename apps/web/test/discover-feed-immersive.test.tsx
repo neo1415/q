@@ -547,3 +547,50 @@ describe("the first cards' grants from the server", () => {
     expect(loadSlatePageAction).not.toHaveBeenCalled();
   });
 });
+
+describe("tap to pause (founder directive, 2026-09-27)", () => {
+  function activeVideo(container: HTMLElement): HTMLVideoElement {
+    const video = container.querySelector<HTMLVideoElement>(
+      "[data-slot-active] video",
+    );
+    if (video === null) throw new Error("no active video");
+    return video;
+  }
+
+  it("pauses the pitch in view on a tap, and a second tap plays it again", async () => {
+    const { container } = await renderFeed();
+    const video = activeVideo(container);
+    Object.defineProperty(video, "paused", {
+      configurable: true,
+      get: () => false,
+    });
+    pause.mockClear();
+    fireEvent.click(video);
+    expect(pause).toHaveBeenCalled();
+    expect(container.querySelector("[data-feed-paused]")).not.toBeNull();
+
+    Object.defineProperty(video, "paused", {
+      configurable: true,
+      get: () => true,
+    });
+    play.mockClear();
+    fireEvent.click(video);
+    expect(play).toHaveBeenCalled();
+    expect(container.querySelector("[data-feed-paused]")).toBeNull();
+  });
+
+  it("leaves taps on the rail and the overlay to their own controls", async () => {
+    const { container } = await renderFeed();
+    const video = activeVideo(container);
+    Object.defineProperty(video, "paused", {
+      configurable: true,
+      get: () => false,
+    });
+    pause.mockClear();
+    fireEvent.click(screen.getByRole("button", { name: "Share" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "More about this company" }),
+    );
+    expect(pause).not.toHaveBeenCalled();
+  });
+});

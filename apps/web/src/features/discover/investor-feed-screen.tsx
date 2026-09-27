@@ -22,6 +22,7 @@ import {
   ChevronUp,
   ICON_SIZE,
   ICON_STROKE,
+  Play,
 } from "@capital-q/ui/icons";
 import { EmptyState } from "@capital-q/ui/states";
 
@@ -124,7 +125,10 @@ function FeedMedia({
   onMutedChange,
   initialAuthorization,
   mediaRef,
+  paused,
 }: {
+  /** The person paused the card in view with a tap. */
+  readonly paused: boolean;
   readonly initialAuthorization: PlaybackAuthorizationDto | null;
   readonly items: readonly DiscoveredCompanyDto[];
   readonly index: number;
@@ -198,6 +202,17 @@ function FeedMedia({
           )}
         </div>
       ))}
+      {paused ? (
+        // Where the tap was answered. The tap region itself is the control,
+        // so this is a picture of the state, not a second button.
+        <span
+          aria-hidden="true"
+          data-feed-paused
+          className="pointer-events-none absolute top-1/2 left-1/2 flex size-16 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-(--cq-stage-surface) text-(--cq-stage-text)"
+        >
+          <Play size={28} strokeWidth={ICON_STROKE} />
+        </span>
+      ) : null}
       {warm.map((item) => (
         <PosterWarmer
           key={item.companyId}
@@ -366,7 +381,14 @@ export function InvestorFeedScreen({
     () => false,
   );
   const qSpeaking = session?.voice.client.state === "Q_SPEAKING";
-  const hold = settledAt !== index || tabHidden;
+  /*
+   * Tap to pause (founder directive, 2026-09-27). A pause the person asked
+   * for belongs to the card they asked on: moving to another card starts
+   * that one normally, and coming back does not resume this one by itself.
+   */
+  const [pausedAt, setPausedAt] = useState<number | null>(null);
+  const tapPaused = pausedAt === index;
+  const hold = settledAt !== index || tabHidden || tapPaused;
   const effectiveMuted = muted || qOpen || qSpeaking;
 
   /** Space plays or pauses the pitch in view; the element is the truth. */
@@ -378,6 +400,37 @@ export function InvestorFeedScreen({
     if (video.paused) void video.play().catch(() => undefined);
     else video.pause();
   }, []);
+
+  /**
+   * A tap on the pitch itself -- not on the overlay, the rail or a
+   * control -- pauses or resumes it. Under reduced motion nothing plays by
+   * itself, so the tap is also the explicit Play.
+   */
+  const onStageClick = useCallback(
+    (event: React.MouseEvent<HTMLDivElement>) => {
+      const target = event.target;
+      if (
+        !(target instanceof Element) ||
+        target.closest(
+          "button, a, input, textarea, select, [role='button'], .cq-feed-overlay, .cq-feed-nav, .cq-feed-player-controls",
+        ) !== null
+      ) {
+        return;
+      }
+      const video = stageRef.current?.querySelector<HTMLVideoElement>(
+        "[data-slot-active] video",
+      );
+      if (video === null || video === undefined) return;
+      if (video.paused) {
+        setPausedAt(null);
+        void video.play().catch(() => undefined);
+      } else {
+        video.pause();
+        setPausedAt(index);
+      }
+    },
+    [index],
+  );
 
   // Wheel and trackpad: one item per gesture (spec §9.3).
   const wheel = useRef({ sum: 0, last: -Infinity, lockedUntil: 0 });
@@ -683,6 +736,7 @@ export function InvestorFeedScreen({
         onTouchCancel={onTouchCancel}
         onKeyDown={onKeyDown}
         onWheel={onWheel}
+        onClick={onStageClick}
         // Programmatically focusable, not a tab stop: the controls inside
         // are the tab stops, and the region only needs focus so its keys
         // work from the moment the feed appears.
@@ -703,7 +757,12 @@ export function InvestorFeedScreen({
           onMutedChange={setMuted}
           initialAuthorization={initialAuthorization}
           mediaRef={mediaRef}
+          paused={tapPaused}
         />
+
+        <span className="sr-only" role="status">
+          {tapPaused ? "Paused" : ""}
+        </span>
 
         <div className="cq-feed-overlay">
           <Notes notes={notes} />

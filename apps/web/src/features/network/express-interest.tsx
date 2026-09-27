@@ -56,6 +56,7 @@ export function ExpressInterest({
   initialInterest = null,
   express = expressInterestAction,
   onConfirmed,
+  startConfirming = false,
 }: {
   readonly companyId: string;
   readonly companyName: string;
@@ -65,10 +66,15 @@ export function ExpressInterest({
   readonly express?: ExpressInterestPort;
   /** Called once the server has confirmed the interest (CQ-WEB-030). */
   readonly onConfirmed?: (() => void) | undefined;
+  /**
+   * Open at the confirmation step: the feed's rail asked for it. The
+   * server still confirms nothing until the person confirms here.
+   */
+  readonly startConfirming?: boolean | undefined;
 }) {
   const [phase, setPhase] = useState<Phase>(
     initialInterest === null
-      ? { kind: "IDLE" }
+      ? { kind: startConfirming ? "CONFIRMING" : "IDLE" }
       : { kind: "SENT", interest: initialInterest, alreadySent: true },
   );
   // One key per intended expression, reused across retries of it.
