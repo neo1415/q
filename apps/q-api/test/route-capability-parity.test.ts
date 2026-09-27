@@ -266,6 +266,14 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
     "tool.get_onboarding_state",
   ),
   "api/http/onboarding.ts GET byId": cap("tool.get_onboarding_state"),
+  // Setup reminders (founder directive 2026-09-27): Home's card claims
+  // today's reminder; "Later" / "stop" are Q's own tool too.
+  "api/http/onboarding.ts POST `${nudgePath}${ONBOARDING_NUDGE_BRIEFING_SEGMENT}`":
+    exempt(
+      "Home's briefing reads today's setup reminder for its card; Q is told of the same reminder in its own answer",
+    ),
+  "api/http/onboarding.ts POST `${nudgePath}${ONBOARDING_NUDGE_CHOICE_SEGMENT}`":
+    cap("tool.set_onboarding_reminders"),
   "api/http/onboarding.ts POST `${byId}${ONBOARDING_RESPONSES_SEGMENT}`": cap(
     "tool.record_answers",
   ),

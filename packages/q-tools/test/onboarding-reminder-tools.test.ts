@@ -102,7 +102,7 @@ describe("setup reminder tools", () => {
         call("continue_onboarding", {}),
         contextFor(actorA, ownPlan()),
       );
-      expect(outcome.result.ok).toBe(true);
+      if (!outcome.result.ok) throw new Error("expected the tool to succeed");
       expect(
         QClientActionToolResultSchema.parse(outcome.result.data).clientAction,
       ).toEqual({ kind: "OPEN_SETUP", journey });

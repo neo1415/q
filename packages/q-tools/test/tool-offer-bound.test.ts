@@ -48,6 +48,9 @@ const CORE = [
   "approve_pending_proposal",
   "decline_pending_proposal",
   "list_pending_approvals",
+  // Setup reminders: "stop reminding me" must work whenever Q has said it.
+  "set_onboarding_reminders",
+  "continue_onboarding",
 ];
 
 const registry = createQToolRegistry(createDefaultQTools(EVERY_PORT));
