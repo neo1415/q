@@ -64,6 +64,7 @@ function service(
     propose,
     executeApproved:
       executeApproved ?? (() => Promise.resolve({ kind: "EXECUTED" })),
+    currentRevision: (_tenantId, _runId, actionId) => Promise.resolve(actionId),
   } as unknown as QActionService;
 }
 

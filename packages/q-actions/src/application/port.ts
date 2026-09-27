@@ -119,7 +119,22 @@ export function createQActionPort(options: {
         throw error;
       }
     },
-    executeApproved: async (context) => {
+    executeApproved: async (requested) => {
+      // The run resumes with the action it first prepared; if the person
+      // edited it since, the approval they gave is for the revision, and
+      // the gate verifies that revision's own approval and hash.
+      const actionId = await options.service.currentRevision(
+        requested.tenantId,
+        requested.runId,
+        requested.actionId,
+      );
+      const context =
+        actionId === requested.actionId
+          ? requested
+          : {
+              ...requested,
+              actionId,
+            };
       const outcome = await options.service.executeApproved(context);
       // "Done" only after the gate persisted what the executor reported.
       await narrator.settled(context, outcome);

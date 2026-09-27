@@ -123,6 +123,13 @@ export type QActionDefinition<P, R> = {
   ) => Promise<QActionAuthorization>;
   readonly executor: QActionExecutor<P, R>;
   /**
+   * Whether `next` may replace `previous` as the person's own edit of a
+   * pending proposal (BIZ-007: the words of an email, never its recipient).
+   * Absent: the action cannot be revised in place. A revision is proposed,
+   * authorised and bound afresh; the old approval is void.
+   */
+  readonly revisable?: ((previous: P, next: P) => boolean) | undefined;
+  /**
    * What Q tells the person once the gate has persisted EXECUTED, from the
    * approved payload and the executor's validated result — never from a
    * model. Absent: the approval summary, prefixed "Done".

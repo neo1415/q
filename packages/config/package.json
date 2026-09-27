@@ -29,6 +29,10 @@
       "types": "./dist/database.d.ts",
       "default": "./dist/database.js"
     },
+    "./google-workspace": {
+      "types": "./dist/google-workspace.d.ts",
+      "default": "./dist/google-workspace.js"
+    },
     "./speech-providers": {
       "types": "./dist/speech-providers.d.ts",
       "default": "./dist/speech-providers.js"

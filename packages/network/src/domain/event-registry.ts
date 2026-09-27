@@ -142,6 +142,38 @@ export const InterestDeclinedRelationshipEvent = defineRelationshipEvent({
     "The company has not taken the investor organisation's interest forward. No reason is recorded.",
 });
 
+/**
+ * Mail on the relationship (BIZ-007). A person's approved email to the
+ * counterpart went out from their own connected mailbox, and a reply to it
+ * arrived. Both are activity, not state: the projector does not move on
+ * them. The payload names the integrations mail record and nothing else --
+ * never a subject, a body or an address.
+ */
+export const EmailActivityPayloadSchema = z
+  .object({
+    emailMessageId: UuidSchema,
+  })
+  .strict();
+export type EmailActivityPayload = z.infer<typeof EmailActivityPayloadSchema>;
+
+export const RELATIONSHIP_EVENT_OUTREACH_SENT = "outreach_sent" as const;
+export const OutreachSentRelationshipEvent = defineRelationshipEvent({
+  type: RELATIONSHIP_EVENT_OUTREACH_SENT,
+  payloadSchema: EmailActivityPayloadSchema,
+  allowedVisibilityScopes: ["relationship_shared"],
+  description:
+    "A person on one side emailed the other side from their connected mailbox, after approving the exact message.",
+});
+
+export const RELATIONSHIP_EVENT_REPLY_RECEIVED = "reply_received" as const;
+export const ReplyReceivedRelationshipEvent = defineRelationshipEvent({
+  type: RELATIONSHIP_EVENT_REPLY_RECEIVED,
+  payloadSchema: EmailActivityPayloadSchema,
+  allowedVisibilityScopes: ["relationship_shared"],
+  description:
+    "The other side replied to an email sent on this relationship. Matched by the thread of the message Capital Q sent.",
+});
+
 export type RelationshipEventRegistry = {
   readonly get: (eventType: string) => RelationshipEventDefinition | undefined;
   readonly types: () => readonly string[];
@@ -215,4 +247,6 @@ export const RELATIONSHIP_EVENT_DEFINITIONS: readonly RelationshipEventDefinitio
     InterestExpressedRelationshipEvent,
     ConnectionAcceptedRelationshipEvent,
     InterestDeclinedRelationshipEvent,
+    OutreachSentRelationshipEvent,
+    ReplyReceivedRelationshipEvent,
   ];

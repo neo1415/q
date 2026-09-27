@@ -8,6 +8,8 @@ import {
   RELATIONSHIP_EVENT_DISCOVERED,
   RELATIONSHIP_EVENT_INTEREST_DECLINED,
   RELATIONSHIP_EVENT_INTEREST_EXPRESSED,
+  RELATIONSHIP_EVENT_OUTREACH_SENT,
+  RELATIONSHIP_EVENT_REPLY_RECEIVED,
 } from "./event-registry.js";
 
 /**
@@ -77,6 +79,12 @@ const KNOWN_TYPES: ReadonlySet<string> = new Set([
   RELATIONSHIP_EVENT_INTEREST_DECLINED,
 ]);
 
+/** Registered activity that never moves state and is not an anomaly. */
+const ACTIVITY_TYPES: ReadonlySet<string> = new Set([
+  RELATIONSHIP_EVENT_OUTREACH_SENT,
+  RELATIONSHIP_EVENT_REPLY_RECEIVED,
+]);
+
 export type RelationshipProjection = {
   readonly version: typeof RELATIONSHIP_PROJECTOR_VERSION;
   readonly state: RelationshipStateV1;
@@ -131,6 +139,8 @@ export function projectRelationshipState(
     throughSequence = Math.max(throughSequence, event.sequence);
     stateSince ??= event.occurredAt;
 
+    // Mail on the relationship (BIZ-007) is activity, never a state move.
+    if (ACTIVITY_TYPES.has(event.eventType)) continue;
     if (!KNOWN_TYPES.has(event.eventType)) {
       unrecognised += 1;
       continue;

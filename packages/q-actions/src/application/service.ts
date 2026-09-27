@@ -11,6 +11,7 @@ import {
   type SecurityEventWriter,
 } from "@capital-q/audit";
 import {
+  canonicalJsonStringify,
   Q_CONTRACT_VERSION,
   QActionProposalIdSchema,
   QApprovalIdSchema,
@@ -151,6 +152,31 @@ export type DecideQApprovalCommand = {
   readonly reason?: string | undefined;
 };
 
+/**
+ * An edit of a pending proposal by the person it waits on (BIZ-007). The
+ * new payload is validated, authorised and bound afresh; the old approval
+ * is REVOKED and its action WITHDRAWN in the same transaction, so an
+ * approval of the old words can never send the new ones, or vice versa.
+ */
+export type ReviseQApprovalCommand = {
+  readonly actor: ActorContext;
+  readonly approvalId: QApprovalId;
+  readonly correlationId: CorrelationId;
+  /** Untrusted: validated by the definition's schema and its `revisable` rule. */
+  readonly payload: unknown;
+};
+
+export type ReviseQApprovalResult = ProposeQActionResult & {
+  readonly view: QApprovalView;
+};
+
+/** A pending or decided proposal as its approver may read it, payload included. */
+export type QApprovalProposalRead = {
+  readonly view: QApprovalView;
+  readonly actionType: QActionRecord["actionType"];
+  readonly payload: QActionRecord["payload"];
+};
+
 export type DecideQApprovalResult = {
   readonly view: QApprovalView;
   /** False when the same person had already made this exact decision (a retried request). */
@@ -179,6 +205,23 @@ export type QActionService = {
   readonly reject: (
     command: DecideQApprovalCommand,
   ) => Promise<DecideQApprovalResult>;
+  /** Replace a pending proposal's payload; voids the old approval (BIZ-007). */
+  readonly revise: (
+    command: ReviseQApprovalCommand,
+  ) => Promise<ReviseQApprovalResult>;
+  /** The proposal behind an approval, for its approver only. */
+  readonly readProposal: (
+    query: QApprovalQuery,
+  ) => Promise<QApprovalProposalRead>;
+  /**
+   * The current revision of an action on its run: the action itself, or
+   * the newest same-type proposal that replaced it by `revise`.
+   */
+  readonly currentRevision: (
+    tenantId: ActorContext["tenantId"],
+    runId: QRunId,
+    actionId: QActionProposalId,
+  ) => Promise<QActionProposalId>;
   /** The idempotent execution gate (CQ-Q-008 §52, §110). */
   readonly executeApproved: (
     context: QActionExecuteContext,
@@ -631,6 +674,188 @@ export function createQActionService(
     }
   }
 
+  /**
+   * Persist one proposal and its approval request inside the caller's
+   * transaction: the exact payload and its binding hash, the run's events,
+   * audit and the outbox. A first proposal moves the run to
+   * AWAITING_APPROVAL; a revision (the run already waits) only records the
+   * new proposal it now waits on.
+   */
+  async function recordProposal(
+    tx: TransactionContext,
+    input: {
+      readonly run: QRunRecord;
+      readonly actor: ActorContext;
+      readonly definition: AnyQActionDefinition;
+      readonly payload: { readonly data: unknown };
+      readonly targets: readonly QSubjectRef[];
+      readonly described: {
+        readonly summary: string;
+        readonly preview?: string | undefined;
+      };
+      readonly actionId: QActionProposalId;
+      readonly approvalId: QApprovalId;
+      readonly now: Date;
+      readonly expiresAt: UtcTimestamp;
+      readonly correlationId: CorrelationId;
+      readonly revisedFrom?: QActionProposalId | undefined;
+    },
+  ): Promise<ProposeQActionResult> {
+    const {
+      run,
+      actor,
+      definition,
+      payload,
+      targets,
+      described,
+      actionId,
+      approvalId,
+      now,
+      expiresAt,
+      correlationId,
+      revisedFrom,
+    } = input;
+    const payloadRecord = payload.data as Record<string, unknown>;
+    const envelope = bindingEnvelope({
+      bindingVersion: 1,
+      tenantId: actor.tenantId,
+      organisationId: actor.organisationId ?? null,
+      runId: run.id,
+      actionId,
+      actionType: definition.actionType,
+      actionVersion: definition.version,
+      actionClass: definition.riskClass,
+      targets: [...targets],
+      payload: payloadRecord,
+    });
+    const payloadHash = hashBindingEnvelope(envelope);
+    const inserted = await repositories.actions.insert(tx, {
+      id: actionId,
+      tenantId: actor.tenantId,
+      runId: run.id,
+      organisationId: actor.organisationId ?? null,
+      proposedByUserId: actor.userId,
+      actionType: definition.actionType,
+      actionVersion: definition.version,
+      riskClass: definition.riskClass,
+      targets,
+      payload: payloadRecord,
+      payloadHash,
+      summary: described.summary,
+      preview: described.preview ?? null,
+      idempotencyKey: idempotencyKeyFor(run.id, actionId),
+    });
+    assertActionTransition(inserted.status, "AWAITING_APPROVAL");
+    const action = await repositories.actions.transition(tx, {
+      tenantId: actor.tenantId,
+      actionId,
+      expectedVersion: inserted.version,
+      status: "AWAITING_APPROVAL",
+    });
+    if (action === null) {
+      throw new QActionVersionConflictError();
+    }
+    const approval = await repositories.approvals.insert(tx, {
+      id: approvalId,
+      tenantId: actor.tenantId,
+      actionId,
+      requestedFromUserId: actor.userId,
+      requestedAt: iso(now),
+      expiresAt,
+    });
+
+    const proposalEvents: readonly Parameters<typeof appendRunEvent>[3][] = [
+      {
+        type: "q.action.proposed",
+        data: {
+          proposal: {
+            contractVersion: Q_CONTRACT_VERSION,
+            proposalId: actionId,
+            runId: run.id,
+            actionType: definition.actionType,
+            actionClass: definition.riskClass,
+            targets: [...targets],
+            summary: described.summary,
+            ...(described.preview === undefined
+              ? {}
+              : { preview: described.preview }),
+            approval: {
+              required: true,
+              approval: { approvalId, status: "PENDING" },
+            },
+            status: "PROPOSED",
+            createdAt: action.createdAt,
+            expiresAt,
+          },
+        },
+      },
+      {
+        type: "q.approval.required",
+        data: { proposalId: actionId, approvalId, expiresAt },
+      },
+    ];
+    if (run.status === "AWAITING_APPROVAL") {
+      // A revision: the run already waits on this person; only the
+      // proposal it waits on changes.
+      for (const event of proposalEvents) {
+        await appendRunEvent(runtime, tx, run, event);
+      }
+    } else {
+      await moveRun(tx, run, "AWAITING_APPROVAL", {
+        stage: "WAITING_FOR_APPROVAL",
+        events: proposalEvents,
+      });
+    }
+
+    await audit.record(tx, {
+      auditEventId: createAuditEventId(),
+      tenantId: actor.tenantId,
+      actorType: "Q",
+      actorId: run.id,
+      authorityUserId: actor.userId,
+      organisationId: actor.organisationId,
+      actionType: AUDIT.proposed,
+      resourceType: RESOURCE_Q_ACTION,
+      resourceId: actionId,
+      occurredAt: iso(now),
+      outcome: "SUCCEEDED",
+      metadata: auditMetadata(action, {
+        approvalId,
+        expiresAt,
+        revisedFrom: revisedFrom ?? null,
+      }),
+      correlationId,
+    });
+    if (dependencies.outbox !== undefined) {
+      await dependencies.outbox.enqueue(
+        tx,
+        qActionEvent(
+          QActionPreparedEvent,
+          eventContext(action, { type: "Q", id: run.id }, correlationId),
+          eventData(action, approvalId),
+        ),
+      );
+    }
+    metrics.proposals.add(1, { action_type: definition.actionType });
+    metrics.approvalsRequested.add(1, {
+      action_type: definition.actionType,
+    });
+    logger?.info(
+      {
+        qRunId: run.id,
+        actionId,
+        approvalId,
+        actionType: definition.actionType,
+        actionVersion: definition.version,
+        riskClass: definition.riskClass,
+        expiresAt,
+        correlationId,
+      },
+      "q action proposed; approval requested",
+    );
+    return { action, approval };
+  }
+
   const propose: QActionService["propose"] = async (command) => {
     const { actor, correlationId } = command;
     const definition = registry.get(command.actionType);
@@ -698,136 +923,19 @@ export function createQActionService(
             if (!canTransition(run.status, "AWAITING_APPROVAL")) {
               throw new QActionVersionConflictError();
             }
-            const payloadRecord = payload.data as Record<string, unknown>;
-            const envelope = bindingEnvelope({
-              bindingVersion: 1,
-              tenantId: actor.tenantId,
-              organisationId: actor.organisationId ?? null,
-              runId: run.id,
-              actionId,
-              actionType: definition.actionType,
-              actionVersion: definition.version,
-              actionClass: definition.riskClass,
-              targets: [...targets],
-              payload: payloadRecord,
-            });
-            const payloadHash = hashBindingEnvelope(envelope);
-            const inserted = await repositories.actions.insert(tx, {
-              id: actionId,
-              tenantId: actor.tenantId,
-              runId: run.id,
-              organisationId: actor.organisationId ?? null,
-              proposedByUserId: actor.userId,
-              actionType: definition.actionType,
-              actionVersion: definition.version,
-              riskClass: definition.riskClass,
+            return recordProposal(tx, {
+              run,
+              actor,
+              definition,
+              payload,
               targets,
-              payload: payloadRecord,
-              payloadHash,
-              summary: described.summary,
-              preview: described.preview ?? null,
-              idempotencyKey: idempotencyKeyFor(run.id, actionId),
-            });
-            assertActionTransition(inserted.status, "AWAITING_APPROVAL");
-            const action = await repositories.actions.transition(tx, {
-              tenantId: actor.tenantId,
+              described,
               actionId,
-              expectedVersion: inserted.version,
-              status: "AWAITING_APPROVAL",
-            });
-            if (action === null) {
-              throw new QActionVersionConflictError();
-            }
-            const approval = await repositories.approvals.insert(tx, {
-              id: approvalId,
-              tenantId: actor.tenantId,
-              actionId,
-              requestedFromUserId: actor.userId,
-              requestedAt: iso(now),
+              approvalId,
+              now,
               expiresAt,
-            });
-
-            await moveRun(tx, run, "AWAITING_APPROVAL", {
-              stage: "WAITING_FOR_APPROVAL",
-              events: [
-                {
-                  type: "q.action.proposed",
-                  data: {
-                    proposal: {
-                      contractVersion: Q_CONTRACT_VERSION,
-                      proposalId: actionId,
-                      runId: run.id,
-                      actionType: definition.actionType,
-                      actionClass: definition.riskClass,
-                      targets: [...targets],
-                      summary: described.summary,
-                      ...(described.preview === undefined
-                        ? {}
-                        : { preview: described.preview }),
-                      approval: {
-                        required: true,
-                        approval: { approvalId, status: "PENDING" },
-                      },
-                      status: "PROPOSED",
-                      createdAt: action.createdAt,
-                      expiresAt,
-                    },
-                  },
-                },
-                {
-                  type: "q.approval.required",
-                  data: { proposalId: actionId, approvalId, expiresAt },
-                },
-              ],
-            });
-
-            await audit.record(tx, {
-              auditEventId: createAuditEventId(),
-              tenantId: actor.tenantId,
-              actorType: "Q",
-              actorId: run.id,
-              authorityUserId: actor.userId,
-              organisationId: actor.organisationId,
-              actionType: AUDIT.proposed,
-              resourceType: RESOURCE_Q_ACTION,
-              resourceId: actionId,
-              occurredAt: iso(now),
-              outcome: "SUCCEEDED",
-              metadata: auditMetadata(action, { approvalId, expiresAt }),
               correlationId,
             });
-            if (dependencies.outbox !== undefined) {
-              await dependencies.outbox.enqueue(
-                tx,
-                qActionEvent(
-                  QActionPreparedEvent,
-                  eventContext(
-                    action,
-                    { type: "Q", id: run.id },
-                    correlationId,
-                  ),
-                  eventData(action, approvalId),
-                ),
-              );
-            }
-            metrics.proposals.add(1, { action_type: definition.actionType });
-            metrics.approvalsRequested.add(1, {
-              action_type: definition.actionType,
-            });
-            logger?.info(
-              {
-                qRunId: run.id,
-                actionId,
-                approvalId,
-                actionType: definition.actionType,
-                actionVersion: definition.version,
-                riskClass: definition.riskClass,
-                expiresAt,
-                correlationId,
-              },
-              "q action proposed; approval requested",
-            );
-            return { action, approval };
           });
         } finally {
           span.end();
@@ -1608,8 +1716,145 @@ export function createQActionService(
     );
   };
 
+  const revise: QActionService["revise"] = async (command) => {
+    const { actor, correlationId } = command;
+    return transactions.run(async (tx) => {
+      const { approval, action } = await loadForActor(
+        tx.sql,
+        actor,
+        command.approvalId,
+        correlationId,
+        tx,
+      );
+      const now = clock.now();
+      if (
+        approval.status !== "PENDING" ||
+        !approvalIsOpen(approval, now) ||
+        action.status !== "AWAITING_APPROVAL"
+      ) {
+        throw new QApprovalAlreadyDecidedError(
+          projectedApprovalStatus(approval, now),
+        );
+      }
+      const definition = registry.get(action.actionType);
+      if (
+        definition?.revisable === undefined ||
+        definition.version !== action.actionVersion
+      ) {
+        throw new QActionUnavailableError();
+      }
+      const previous = definition.payload.safeParse(action.payload);
+      const next = definition.payload.safeParse(command.payload);
+      if (
+        !previous.success ||
+        !next.success ||
+        !definition.revisable(previous.data, next.data)
+      ) {
+        throw new QActionNotPermittedError();
+      }
+      // Same consequence, other words: another target is another action.
+      const targets: readonly QSubjectRef[] = definition.targets(next.data);
+      if (
+        canonicalJsonStringify([...targets]) !==
+        canonicalJsonStringify([...action.targets])
+      ) {
+        throw new QActionNotPermittedError();
+      }
+      const authorized = await definition.authorize(next.data, actor);
+      if (authorized.outcome !== "ALLOW") {
+        throw new QActionNotPermittedError();
+      }
+      const run = await runtime.runs.lockForActor(
+        tx,
+        actor.tenantId,
+        actor.userId,
+        action.runId,
+      );
+      if (run?.status !== "AWAITING_APPROVAL") {
+        throw new QActionVersionConflictError();
+      }
+      assertApprovalTransition(approval.status, "REVOKED");
+      const revoked = await repositories.approvals.decide(tx, {
+        tenantId: approval.tenantId,
+        approvalId: approval.id,
+        expectedVersion: approval.version,
+        status: "REVOKED",
+        revokedAt: iso(now),
+        revokedByUserId: actor.userId,
+      });
+      assertActionTransition(action.status, "WITHDRAWN");
+      const withdrawn =
+        revoked === null
+          ? null
+          : await repositories.actions.transition(tx, {
+              tenantId: action.tenantId,
+              actionId: action.id,
+              expectedVersion: action.version,
+              status: "WITHDRAWN",
+            });
+      if (withdrawn === null) {
+        throw new QActionVersionConflictError();
+      }
+      const result = await recordProposal(tx, {
+        run,
+        actor,
+        definition,
+        payload: next,
+        targets,
+        described: definition.describe(next.data, targets),
+        actionId: QActionProposalIdSchema.parse(randomUUID()),
+        approvalId: QApprovalIdSchema.parse(randomUUID()),
+        now,
+        expiresAt: iso(new Date(now.getTime() + policy.approvalTtlMs)),
+        correlationId,
+        revisedFrom: action.id,
+      });
+      return {
+        ...result,
+        view: toApprovalView(result.approval, result.action, now),
+      };
+    });
+  };
+
+  const readProposal: QActionService["readProposal"] = async (query) => {
+    const { approval, action } = await loadForActor(
+      sql,
+      query.actor,
+      query.approvalId,
+      query.correlationId,
+      null,
+    );
+    return {
+      view: toApprovalView(approval, action, clock.now()),
+      actionType: action.actionType,
+      payload: action.payload,
+    };
+  };
+
+  const currentRevision: QActionService["currentRevision"] = async (
+    tenantId,
+    runId,
+    actionId,
+  ) => {
+    const onRun = await repositories.actions.listForRun(sql, tenantId, runId);
+    const asked = onRun.find((candidate) => candidate.id === actionId);
+    if (asked?.status !== "WITHDRAWN") return actionId;
+    // Newest first: the live revision is the newest same-type proposal
+    // that has not itself been withdrawn.
+    const live = onRun.find(
+      (candidate) =>
+        candidate.actionType === asked.actionType &&
+        candidate.status !== "WITHDRAWN" &&
+        candidate.createdAt >= asked.createdAt,
+    );
+    return live?.id ?? actionId;
+  };
+
   return {
     propose,
+    revise,
+    readProposal,
+    currentRevision,
     getApproval,
     listPendingApprovals,
     approve: (command) => decide(command, "APPROVED"),

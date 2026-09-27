@@ -97,7 +97,10 @@ export {
   type ProposeQActionResult,
   type QActionService,
   type QActionServiceDependencies,
+  type QApprovalProposalRead,
   type QApprovalQuery,
+  type ReviseQApprovalCommand,
+  type ReviseQApprovalResult,
 } from "./application/service.js";
 export {
   createQActionPort,
