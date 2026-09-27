@@ -199,3 +199,92 @@ describe("relationship actions reach the person only as an approval", () => {
     expect(h.laterAsked()).toBe(1);
   });
 });
+
+describe("R35: the person's own relationships, for Q", () => {
+  const REL = "e0000000-0000-4000-8000-000000000035";
+  const INVESTOR_ORG = "e1000000-0000-4000-8000-000000000035";
+  const listing = (counterpartName: string) =>
+    ({
+      relationship: {
+        id: REL,
+        companyId: COMPANY,
+        investorOrganisationId: INVESTOR_ORG,
+      },
+      projection: {
+        state: "CONNECTED",
+        stateSince: "2026-09-14T00:00:00.000Z",
+        milestones: [
+          { state: "INTEREST_EXPRESSED", at: "2026-09-12T00:00:00.000Z" },
+          { state: "CONNECTED", at: "2026-09-14T00:00:00.000Z" },
+        ],
+        version: 1,
+      },
+      nextStep: "SCHEDULE_MEETING",
+      counterpartName,
+    }) as never;
+
+  it("an investor's member gets their organisation's list, as the investor side, with dated milestones", async () => {
+    const asked: string[] = [];
+    const interests = {
+      listRelationshipsForInvestor: ({ actor }: { actor: ActorContext }) => {
+        asked.push(`investor:${actor.organisationId ?? ""}`);
+        return Promise.resolve([listing("Kestrel Bio")]);
+      },
+      listRelationshipsForCompany: () => {
+        asked.push("company");
+        return Promise.resolve([]);
+      },
+    } as Partial<InterestService> as InterestService;
+    const port = createRelationshipIntelligencePort({
+      interests,
+      board: createRelationshipActionBoard(),
+      ownCompany: () => Promise.resolve(COMPANY),
+    });
+    const own = await port.ownRelationships?.(INVESTOR);
+    expect(asked).toEqual([`investor:${ORG}`]);
+    expect(own).toEqual({
+      side: "INVESTOR",
+      items: [
+        {
+          relationshipId: REL,
+          counterpart: { kind: "COMPANY", id: COMPANY, name: "Kestrel Bio" },
+          state: "CONNECTED",
+          stateSince: "2026-09-14T00:00:00.000Z",
+          nextStep: "SCHEDULE_MEETING",
+          milestones: [
+            { state: "INTEREST_EXPRESSED", at: "2026-09-12T00:00:00.000Z" },
+            { state: "CONNECTED", at: "2026-09-14T00:00:00.000Z" },
+          ],
+        },
+      ],
+    });
+  });
+
+  it("a founder (not an investor) gets their own company's list; nobody on either side gets null", async () => {
+    const { InterestNotPermittedError } = await import("@capital-q/network");
+    const interests = {
+      listRelationshipsForInvestor: () =>
+        Promise.reject(new InterestNotPermittedError()),
+      listRelationshipsForCompany: ({ companyId }: { companyId: string }) =>
+        Promise.resolve(companyId === COMPANY ? [listing("Ivy Capital")] : []),
+    } as Partial<InterestService> as InterestService;
+    const founder = createRelationshipIntelligencePort({
+      interests,
+      board: createRelationshipActionBoard(),
+      ownCompany: () => Promise.resolve(COMPANY),
+    });
+    const own = await founder.ownRelationships?.(INVESTOR);
+    expect(own?.side).toBe("COMPANY");
+    expect(own?.items[0]?.counterpart).toEqual({
+      kind: "INVESTOR_ORGANISATION",
+      id: INVESTOR_ORG,
+      name: "Ivy Capital",
+    });
+    const nobody = createRelationshipIntelligencePort({
+      interests,
+      board: createRelationshipActionBoard(),
+      ownCompany: () => Promise.resolve(null),
+    });
+    expect(await nobody.ownRelationships?.(INVESTOR)).toBeNull();
+  });
+});

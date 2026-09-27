@@ -24,6 +24,7 @@ import { COMPANY_A, actorA, contextFor, planFor } from "./support.js";
 const STUB: unknown = {};
 const GIVEN: Readonly<Record<string, unknown>> = {
   clientActions: true,
+  relationships: { ownRelationships: STUB },
   pendingProposals: {
     inConversation: STUB,
     approve: STUB,
@@ -51,6 +52,8 @@ const CORE = [
   // Setup reminders: "stop reminding me" must work whenever Q has said it.
   "set_onboarding_reminders",
   "continue_onboarding",
+  // R35: their own interests and relationships, whatever the turn is about.
+  "list_my_relationships",
 ];
 
 const registry = createQToolRegistry(createDefaultQTools(EVERY_PORT));

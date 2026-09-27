@@ -1039,6 +1039,7 @@ const qTools = createQTools({
     relationships: createRelationshipIntelligencePort({
       interests: interestService,
       board: relationshipBoard,
+      ownCompany: runtimeDependencies.ownCompany,
     }),
     // R18: what is said in the pitch around a moment, under the playback rule.
     pitchMoments: {

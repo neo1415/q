@@ -11,6 +11,7 @@ import type {
 import type {
   IncomingInterestDto,
   RelationshipStatusDto,
+  RelationshipSummaryDto,
   VisibilityStateDto,
 } from "@capital-q/contracts";
 import type { DisclosureAccessService } from "@capital-q/permissions";
@@ -64,6 +65,19 @@ export type InvestorFeedPort = {
   ) => Promise<readonly InvestorFeedDecision[]>;
 };
 
+/** One of the actor's own relationships, as their side sees it (R35). */
+export type OwnRelationship = RelationshipSummaryDto & {
+  readonly milestones: readonly {
+    readonly state: RelationshipSummaryDto["state"];
+    readonly at: string;
+  }[];
+};
+
+export type OwnRelationships = {
+  readonly side: "INVESTOR" | "COMPANY";
+  readonly items: readonly OwnRelationship[];
+};
+
 /**
  * The Network context's relationship capabilities, for Q (CQ-Q-030).
  *
@@ -102,6 +116,16 @@ export type RelationshipIntelligencePort = {
       | { readonly kind: "INVESTOR_ORGANISATION"; readonly id: string };
     readonly status: RelationshipStatusDto | null;
   } | null>;
+  /**
+   * R35: every relationship of the actor's own side -- interest they
+   * expressed, interest addressed to them, connections and declines -- as
+   * their relationships screen lists them, each folded for their side with
+   * its dated milestones. The side is resolved by the Network context from
+   * the actor's membership, never from input. Null: the actor is neither an
+   * investor organisation's member nor a company's. Absent: not composed.
+   */
+  readonly ownRelationships?:
+    ((actor: ActorContext) => Promise<OwnRelationships | null>) | undefined;
   /** Interest addressed to the actor's own company, with its answers. */
   readonly incomingInterest: (
     actor: ActorContext,

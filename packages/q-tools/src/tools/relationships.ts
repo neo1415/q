@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import {
+  Q_TASK_CLASSES,
   RelationshipStateV1Schema,
   RELATIONSHIP_NEXT_STEPS,
   UtcTimestampSchema,
@@ -11,7 +12,7 @@ import {
 } from "@capital-q/contracts";
 import { CompanyIdSchema } from "@capital-q/companies";
 import { InvestorOrganisationIdSchema } from "@capital-q/investors";
-import { capability } from "@capital-q/security";
+import { capability, type ActorContext } from "@capital-q/security";
 
 import {
   allow,
@@ -20,7 +21,12 @@ import {
   type AnyQToolDefinition,
 } from "../definition.js";
 import { actorWideScope, boundScopeFor } from "../plan.js";
-import type { QToolPorts, RelationshipIntelligencePort } from "../ports.js";
+import type {
+  InvestorFeedPort,
+  OwnRelationships,
+  QToolPorts,
+  RelationshipIntelligencePort,
+} from "../ports.js";
 
 /**
  * Relationship intelligence (CQ-Q-030; doc 25 §122: "what happened with
@@ -57,6 +63,7 @@ export const PROPOSE_EXPRESS_INTEREST =
   "relationship.interest.express.propose" as const;
 export const PROPOSE_INTEREST_ANSWER =
   "relationship.interest.answer.propose" as const;
+export const LIST_MY_RELATIONSHIPS = "relationship.own.list" as const;
 
 const PURPOSES: readonly QTaskClass[] = [
   "OWN_COMPANY_QUESTION",
@@ -605,6 +612,162 @@ function createProposeInterestAnswerTool(
   });
 }
 
+// ---------------------------------------------------------------------------
+// list_my_relationships (R35)
+// ---------------------------------------------------------------------------
+
+/**
+ * The person's own relationships, and for an investor their own Saves and
+ * Passes: records of their OWN organisation, so always theirs to know,
+ * whatever the turn is about ("have I expressed interest in anyone?",
+ * "compare the companies I'm interested in"). Nothing here takes a
+ * counterparty from input: the Network context resolves the actor's side
+ * from their membership and folds each relationship over the history that
+ * side may see, and the feed's decision read re-checks each saved or
+ * passed company is still visible to them. Another organisation's
+ * interests cannot be asked for, because there is no parameter to ask.
+ */
+
+const MY_RELATIONSHIPS_MAX = 100;
+const MY_DECISIONS_MAX = 50;
+
+export const ListMyRelationshipsInputSchema = z.object({}).strict();
+export type ListMyRelationshipsInput = z.infer<
+  typeof ListMyRelationshipsInputSchema
+>;
+
+const CompanyDecisionSchema = z
+  .object({
+    companyId: UuidSchema,
+    name: z.string().max(200),
+    stageCode: z.string().max(64).nullable(),
+  })
+  .strict();
+
+export const ListMyRelationshipsOutputSchema = z
+  .object({
+    /** NONE: the person is on neither side of any relationship. */
+    yourSide: z.enum(["INVESTOR", "COMPANY", "NONE"]),
+    relationships: z
+      .array(
+        z
+          .object({
+            relationshipId: UuidSchema,
+            counterpart: z
+              .object({
+                kind: z.enum(["COMPANY", "INVESTOR_ORGANISATION"]),
+                id: UuidSchema,
+                name: z.string().max(200),
+              })
+              .strict(),
+            state: RelationshipStateV1Schema,
+            stateSince: UtcTimestampSchema,
+            milestones: z.array(MilestoneSchema).max(64),
+            nextStep: z.enum(RELATIONSHIP_NEXT_STEPS),
+          })
+          .strict(),
+      )
+      .max(MY_RELATIONSHIPS_MAX),
+    /** Investor only: companies they saved in Discover (not interest). */
+    saved: z.array(CompanyDecisionSchema).max(MY_DECISIONS_MAX),
+    /** Investor only: companies they passed on in Discover. */
+    passed: z.array(CompanyDecisionSchema).max(MY_DECISIONS_MAX),
+    truthClass: z.literal("VERIFIED"),
+    source: z.literal("Capital Q relationship history"),
+  })
+  .strict();
+export type ListMyRelationshipsOutput = z.infer<
+  typeof ListMyRelationshipsOutputSchema
+>;
+
+function createListMyRelationshipsTool(
+  own: (actor: ActorContext) => Promise<OwnRelationships | null>,
+  feed: InvestorFeedPort | undefined,
+): AnyQToolDefinition {
+  return defineQTool<ListMyRelationshipsInput, ListMyRelationshipsOutput, null>(
+    {
+      id: LIST_MY_RELATIONSHIPS,
+      version: 1,
+      status: "ACTIVE",
+      // Always on: their own relationships are theirs to ask about in any
+      // turn, and a question about "the ones I'm interested in" names no
+      // company for the purpose to narrow by.
+      core: true,
+      providerName: "list_my_relationships",
+      description:
+        "Lists the person's own relationships on Capital Q, with each counterparty's name and id: for an investor, every company they expressed interest in and whether it is still awaiting an answer (INTEREST_EXPRESSED), accepted (CONNECTED) or declined, plus the companies they saved or passed on in Discover; for a founder, every investor that expressed interest in their company and where each stands. Each has its state, since when, dated milestones and their next step. Call it whenever they ask about their interests, connections, pipeline, saved companies or 'the companies I'm interested in' -- never ask them for names these records already hold. Saving or passing is not interest.",
+      classification: "READ_ONLY",
+      riskClass: "SAFE_READ",
+      requiredCapabilities: [],
+      supportedPurposes: [...Q_TASK_CLASSES],
+      requiredScopeKinds: ["OWN_Q_CONVERSATION"],
+      approval: "NONE",
+      idempotency: "SAFE_TO_REPEAT",
+      owner: "q-tools",
+      visibleStage: "REVIEWING_RELATIONSHIP",
+      input: ListMyRelationshipsInputSchema,
+      output: ListMyRelationshipsOutputSchema,
+      authorize: (_input, { actor, plan }) => {
+        // Their own conversation, as themselves: the scope the firewall
+        // binds to this person only.
+        const scope = actorWideScope(plan, "OWN_Q_CONVERSATION");
+        return Promise.resolve(
+          actor.actorType === "HUMAN" &&
+            scope !== undefined &&
+            scope.filter.userId === actor.userId
+            ? allow<null>("CONFIDENTIAL", null)
+            : deny<null>("NOT_AVAILABLE"),
+        );
+      },
+      execute: async (_input, context) => {
+        const mine = await own(context.actor).catch(() => null);
+        const side = mine?.side ?? "NONE";
+        const decisions =
+          side === "COMPANY" || feed === undefined
+            ? []
+            : await feed
+                .decisions(context.actor, MY_DECISIONS_MAX * 2)
+                .catch(() => []);
+        const pick = (decision: "SAVED" | "PASSED") =>
+          decisions
+            .filter((entry) => entry.decision === decision)
+            .slice(0, MY_DECISIONS_MAX)
+            .map((entry) => ({
+              companyId: entry.companyId,
+              name: entry.name.slice(0, 200),
+              stageCode: entry.stageCode,
+            }));
+        const saved = pick("SAVED");
+        const passed = pick("PASSED");
+        return {
+          yourSide: side === "NONE" && decisions.length > 0 ? "INVESTOR" : side,
+          relationships: (mine?.items ?? [])
+            .slice(0, MY_RELATIONSHIPS_MAX)
+            .map((item) => ({
+              relationshipId: item.relationshipId,
+              counterpart: {
+                kind: item.counterpart.kind,
+                id: item.counterpart.id,
+                name: item.counterpart.name.slice(0, 200),
+              },
+              state: item.state,
+              stateSince: item.stateSince,
+              milestones: item.milestones.slice(0, 64).map((m) => ({
+                state: m.state,
+                at: UtcTimestampSchema.parse(m.at),
+              })),
+              nextStep: item.nextStep,
+            })),
+          saved,
+          passed,
+          truthClass: "VERIFIED",
+          source: "Capital Q relationship history",
+        };
+      },
+    },
+  );
+}
+
 export function createRelationshipTools(
   ports: QToolPorts,
   relationships: RelationshipIntelligencePort,
@@ -614,5 +777,13 @@ export function createRelationshipTools(
     createListIncomingInterestTool(relationships),
     createProposeExpressInterestTool(ports, relationships),
     createProposeInterestAnswerTool(relationships),
+    ...(relationships.ownRelationships === undefined
+      ? []
+      : [
+          createListMyRelationshipsTool(
+            relationships.ownRelationships,
+            ports.investorFeed,
+          ),
+        ]),
   ];
 }

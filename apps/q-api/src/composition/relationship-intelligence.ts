@@ -1,7 +1,10 @@
 import {
+  InterestNotPermittedError,
   toIncomingInterestDto,
   toRelationshipStatusDto,
+  toRelationshipSummaryDto,
   type InterestService,
+  type RelationshipListing,
 } from "@capital-q/network";
 import type { Logger } from "@capital-q/observability";
 import type {
@@ -9,7 +12,11 @@ import type {
   QActionProposer,
   QActionRefusal,
 } from "@capital-q/q-actions";
-import type { RelationshipIntelligencePort } from "@capital-q/q-tools";
+import type {
+  OwnRelationship,
+  RelationshipIntelligencePort,
+} from "@capital-q/q-tools";
+import type { ActorContext } from "@capital-q/security";
 
 import {
   ExpressInterestPayloadSchema,
@@ -135,12 +142,56 @@ export function chainProposers(
   };
 }
 
+function ownRow(
+  listing: RelationshipListing,
+  side: "INVESTOR" | "COMPANY",
+): OwnRelationship {
+  return {
+    ...toRelationshipSummaryDto(listing, side),
+    milestones: toRelationshipStatusDto(listing).milestones,
+  };
+}
+
 export function createRelationshipIntelligencePort(dependencies: {
   readonly interests: InterestService;
   readonly board: RelationshipActionBoard;
+  /**
+   * The actor's own company, resolved from their membership on the server
+   * (CQ-QX-008); absent, a founder's own relationships are not listed.
+   */
+  readonly ownCompany?:
+    ((actor: ActorContext) => Promise<string | null>) | undefined;
 }): RelationshipIntelligencePort {
-  const { interests, board } = dependencies;
+  const { interests, board, ownCompany } = dependencies;
   return {
+    /**
+     * R35: the same lists the relationships screen reads. An investor's
+     * member first (the Network context resolves the organisation from the
+     * membership and refuses anyone else); otherwise the member's own
+     * company. Anything else -- no side at all -- is null.
+     */
+    ownRelationships: async (actor) => {
+      try {
+        const items = await interests.listRelationshipsForInvestor({ actor });
+        return {
+          side: "INVESTOR",
+          items: items.map((item) => ownRow(item, "INVESTOR")),
+        };
+      } catch (error) {
+        if (!(error instanceof InterestNotPermittedError)) throw error;
+      }
+      const companyId =
+        ownCompany === undefined ? null : await ownCompany(actor);
+      if (companyId === null) return null;
+      const items = await interests.listRelationshipsForCompany({
+        actor,
+        companyId,
+      });
+      return {
+        side: "COMPANY",
+        items: items.map((item) => ownRow(item, "COMPANY")),
+      };
+    },
     withCompany: async (actor, companyId) => {
       const status = await interests.relationshipForInvestor({
         actor,

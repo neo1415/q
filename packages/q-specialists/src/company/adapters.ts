@@ -138,6 +138,7 @@ export function createToolCanonicalPort(
         );
         if (outcome.result.ok) {
           const payload = outcome.result.data as {
+            availability?: "CURRENT" | "NONE" | "NOT_SHARED_WITH_YOU";
             objective: {
               objectiveType: string;
               status: string;
@@ -150,6 +151,19 @@ export function createToolCanonicalPort(
           // Null means the company has no current objective. Unknown stays
           // unknown: nothing here turns an absent objective into "not
           // raising", which would be an assertion nobody made.
+          if (payload.availability === "NOT_SHARED_WITH_YOU") {
+            // Private (or absent) to this person: said as such, so the
+            // answer is "not shared with you", never "unknown" and never
+            // a guess (R35).
+            facts.push({
+              scope: "CAPITAL_OBJECTIVE",
+              statement:
+                "The company has not shared its raise (amount, instrument or terms) with you on Capital Q.",
+              truthClass: "VERIFIED",
+              evidenceStatus: "PLATFORM_VERIFIED",
+              source: "Capital Q disclosure settings",
+            });
+          }
           if (payload.objective !== null) {
             const objective = payload.objective;
             const amount =

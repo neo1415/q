@@ -133,7 +133,9 @@ describe("tool registry", () => {
           { kind: "NETWORK_VISIBLE_DATA", sensitivity: "NETWORK_VISIBLE" },
         ]),
       ),
-    ).toEqual(["get_capital_objective", "get_company", "search_companies"]);
+      // Ranked by specificity (R33): the capital tool serves more purposes
+      // since R35, so it follows the narrower ones.
+    ).toEqual(["get_company", "search_companies", "get_capital_objective"]);
     // No capital scope: no capital tool. No network scope: no search.
     expect(
       names(
