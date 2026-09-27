@@ -83,7 +83,8 @@ function build(
       createdAt: "2026-09-16T10:00:00.000Z",
     } as unknown as QConversationMessage,
   ];
-  const stored: { id?: string } = {};
+  const stored: { id?: string; inserts: { role: string; content: string }[] } =
+    { inserts: [] };
   const published: { messageId: string; text: string }[] = [];
 
   const alpha = createFakeModelProvider({
@@ -115,8 +116,9 @@ function build(
       listForRun: () => Promise.resolve([...messages]),
       insert: (
         _tx: unknown,
-        input: { id?: string | undefined; content: string },
+        input: { id?: string | undefined; role: string; content: string },
       ) => {
+        stored.inserts.push({ role: input.role, content: input.content });
         if (input.id !== undefined) {
           stored.id = input.id;
         }
@@ -239,6 +241,24 @@ describe("an answer that arrives as it is written", () => {
     for (const delta of published) {
       expect(delta.messageId).toBe(outcome.messageId);
     }
+  });
+
+  it("stores one Q message per reply, however many sentences were streamed (live test 2026-09-27, failure 9)", async () => {
+    const { seam, request, published, stored } = build(
+      "Which company should the deck be about? You're right. The deck should be about Zino Aviation, your company.",
+    );
+    const outcome = await seam.answer(request);
+    expect(outcome.kind).toBe("ANSWERED");
+    // Streamed sentence by sentence, for the voice...
+    expect(published.length).toBeGreaterThan(1);
+    // ...and persisted once, whole: a reopened conversation shows one row.
+    expect(stored.inserts).toEqual([
+      {
+        role: "Q",
+        content:
+          "Which company should the deck be about? You're right. The deck should be about Zino Aviation, your company.",
+      },
+    ]);
   });
 
   it("keeps an answer that was heard when the object around it is refused", async () => {
