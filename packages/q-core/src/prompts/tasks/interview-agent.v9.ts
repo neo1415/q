@@ -42,7 +42,7 @@ export const INTERVIEW_AGENT_V9: PromptDefinition<
     untrusted: [...INTERVIEW_AGENT_V5_UNTRUSTED],
   },
   version: 9,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   changeDescription:
     "P0-1: trusted notes on what else the turn asks — a pause, a look-up that runs after the reply, look-ups unavailable, a corrected pronunciation — read independently from the person's latest words; the legacy conductor that read them is retired.",
   effectiveFrom: "2026-09-26",

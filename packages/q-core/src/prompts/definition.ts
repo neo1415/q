@@ -45,6 +45,8 @@ export const PROMPT_IDS = [
   "INTERVIEW_AGENT",
   /** Which onboarding choices the person just handed to Q. */
   "DELEGATION_READER",
+  /** BIZ-009: an investor's own public pages, read into their mandate's shape. */
+  "INVESTOR_RESEARCH_READER",
 ] as const;
 export type PromptId = (typeof PROMPT_IDS)[number];
 
@@ -66,6 +68,7 @@ export const PROMPT_SLUGS: Readonly<Record<PromptId, string>> = {
   TURN_READER: "turn-reader",
   INTERVIEW_AGENT: "interview-agent",
   DELEGATION_READER: "delegation-reader",
+  INVESTOR_RESEARCH_READER: "investor-research-reader",
 };
 
 export type PromptKind = "CHARTER" | "TASK";
