@@ -605,6 +605,7 @@ describe("founder live 2026-09-27 · own company binds; misheard names resolve; 
     return {
       kind: "PREPARE_DOCUMENT" as const,
       destination: null,
+      unknownScreen: null,
       visibility: null,
       documentType: "PITCH_DECK" as const,
       subjectName,
