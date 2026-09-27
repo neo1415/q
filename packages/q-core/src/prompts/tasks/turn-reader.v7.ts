@@ -39,7 +39,7 @@ export const TURN_READER_V7: PromptDefinition<
 > = {
   ...TURN_READER_V6,
   version: 7,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   changeDescription:
     "Founder live: the run's own actions (from what is offered) arrive as trusted input; a request for one of them is TOOL_REQUEST with tool null, never PREPARE_DOCUMENT, and a request to change what a screen shows is never NAVIGATE.",
   effectiveFrom: "2026-09-26",

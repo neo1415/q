@@ -8,7 +8,7 @@ import {
 } from "@capital-q/contracts";
 import type { QTurnReader } from "@capital-q/model-gateway/q";
 import { Q_CAPABILITIES } from "@capital-q/q-tools";
-import type { TurnReaderV3Result as TurnReaderResult } from "@capital-q/q-core";
+import type { TurnReaderV8Result as TurnReaderResult } from "@capital-q/q-core";
 import type {
   QAnswerOutcome,
   QAnswerRequest,
@@ -18,7 +18,7 @@ import type {
 } from "@capital-q/q-runtime";
 import { ActorContextSchema } from "@capital-q/security";
 
-import { createSpecialistQAnswer } from "../src/answer.js";
+import { createSpecialistQAnswer, unknownScreenLine } from "../src/answer.js";
 
 /**
  * Every general turn to Q is read before it is answered (CQ-QX-005):
@@ -189,8 +189,12 @@ const COMPANY = "c0c0c0c0-c0c0-4c0c-8c0c-c0c0c0c0c0c0";
 function toolReading(
   tool: Omit<
     NonNullable<TurnReaderResult["tool"]>,
-    "documentType" | "subjectName"
-  >,
+    "documentType" | "subjectName" | "unknownScreen"
+  > & {
+    readonly unknownScreen?: NonNullable<
+      TurnReaderResult["tool"]
+    >["unknownScreen"];
+  },
   confidence: TurnReaderResult["confidence"] = "HIGH",
 ): TurnReaderResult {
   return {
@@ -200,7 +204,12 @@ function toolReading(
     question: null,
     aboutNamedOther: false,
     // v3's document parameters belong to PREPARE_DOCUMENT only.
-    tool: { ...tool, documentType: null, subjectName: null },
+    tool: {
+      unknownScreen: null,
+      ...tool,
+      documentType: null,
+      subjectName: null,
+    },
   };
 }
 
@@ -229,6 +238,39 @@ describe("a request for one of Q's own hands (CQ-QACT-001)", () => {
     expect(run.events.map((event) => event.type)).toEqual([
       "q.message.completed",
     ]);
+  });
+
+  it("a screen Capital Q does not have is said not to exist and the nearest offered; nobody is moved (live test 2026-09-27 #5)", async () => {
+    const run = seam({
+      said: "take me to the queue page",
+      reading: toolReading({
+        kind: "NAVIGATE",
+        destination: null,
+        unknownScreen: { named: "queue", nearest: "DISCOVER" },
+        visibility: null,
+      }),
+      outcomes: [],
+    });
+    const outcome = await run.answer.answer(request());
+    expect(outcome.kind).toBe("ANSWERED");
+    expect(run.delegated()).toBe(0);
+    expect(run.stored).toHaveLength(1);
+    expect(run.stored[0]?.content).toBe(
+      'Capital Q doesn\'t have a "queue" page. The nearest is Discover. Shall I take you there?',
+    );
+    // No UI_INTENT: nothing moves the person, least of all Home.
+    expect(run.stored[0]?.blocks ?? []).toEqual([]);
+  });
+
+  it("offers only a screen this run can open; otherwise names the ones it can", () => {
+    expect(
+      unknownScreenLine("settings <b>", "COMPANY_VISIBILITY", [
+        "HOME",
+        "DISCOVER",
+      ]),
+    ).toBe(
+      'Capital Q doesn\'t have a "settings b" page. I can take you to Home, Discover.',
+    );
   });
 
   it("never navigates on a guess, and never to a surface the run has no subject for", async () => {

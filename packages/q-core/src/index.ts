@@ -154,6 +154,7 @@ export { TURN_READER_V4 } from "./prompts/tasks/turn-reader.v4.js";
 export { TURN_READER_V5 } from "./prompts/tasks/turn-reader.v5.js";
 export { TURN_READER_V6 } from "./prompts/tasks/turn-reader.v6.js";
 export { TURN_READER_V7 } from "./prompts/tasks/turn-reader.v7.js";
+export { TURN_READER_V8 } from "./prompts/tasks/turn-reader.v8.js";
 export {
   TURN_READER_SCHEMA_NAME,
   TURN_READER_SCHEMA_VERSION,
@@ -169,6 +170,13 @@ export {
   TurnReaderV5ResultSchema,
   TurnReaderV7VariablesSchema,
   type TurnReaderV7Variables,
+  TURN_READER_V8_SCHEMA_VERSION,
+  TurnReaderV8ResultSchema,
+  TurnToolV8Schema,
+  TurnUnknownScreenSchema,
+  type TurnReaderV8Result,
+  type TurnToolV8,
+  type TurnUnknownScreen,
   TurnToolV5Schema,
   type TurnReaderV5Result,
   type TurnToolV5,

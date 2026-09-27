@@ -1,4 +1,5 @@
 import {
+  Q_CLIENT_ACTION_TOOLS,
   type QNavigateDestination,
   type QResponseMessage,
   type QResultBlock,
@@ -16,7 +17,7 @@ import {
   withoutRecommendationClaims,
   type ConversationState,
   type FailureOperation,
-  type TurnToolV5,
+  type TurnToolV8,
 } from "@capital-q/q-core";
 import {
   eligibleCapabilities,
@@ -164,6 +165,45 @@ const DESTINATION_LINES: Readonly<Record<QNavigateDestination, string>> = {
   DISCOVER: "Taking you to Discover.",
   COMPANY_VISIBILITY: "Opening your visibility settings.",
 };
+
+/** A real screen, as offered back to someone who named one that isn't. */
+const DESTINATION_NAMES: Readonly<Record<QNavigateDestination, string>> = {
+  HOME: "Home",
+  PROFILE: "your profile",
+  CAPITAL: "Capital",
+  DISCOVER: "Discover",
+  COMPANY_VISIBILITY: "your visibility settings",
+};
+
+/**
+ * A screen Capital Q does not have (founder live test 2026-09-27 #5): said
+ * plainly, and the nearest real one offered, never a silent move. The
+ * nearest comes from the reading but is offered only if this run can open
+ * it; otherwise the screens it can open are named. `named` is the person's
+ * own words echoed back, bounded to plain text.
+ */
+export function unknownScreenLine(
+  named: string,
+  nearest: QNavigateDestination,
+  navigable: readonly QNavigateDestination[],
+): string {
+  const plain = named
+    .replace(/[^\p{L}\p{N}\s'-]/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 60);
+  const opening =
+    plain.length === 0
+      ? "Capital Q doesn't have that page."
+      : `Capital Q doesn't have a "${plain}" page.`;
+  if (navigable.includes(nearest)) {
+    return `${opening} The nearest is ${DESTINATION_NAMES[nearest]}. Shall I take you there?`;
+  }
+  if (navigable.length === 0) return opening;
+  return `${opening} I can take you to ${navigable
+    .map((destination) => DESTINATION_NAMES[destination])
+    .join(", ")}.`;
+}
 
 /**
  * What changing visibility means, said before the proposal (which Q only
@@ -655,8 +695,10 @@ export function createSpecialistQAnswer(
   async function actOnTool(
     request: QAnswerRequest,
     conversationId: QConversationMessage["conversationId"],
-    tool: TurnToolV5,
+    tool: TurnToolV8,
     history: readonly QConversationMessage[],
+    /** The screens this run can open, from the capability registry. */
+    navigable: readonly QNavigateDestination[],
   ): Promise<QAnswerOutcome | null> {
     const company = request.subjects.find(
       (subject) => subject.kind === "COMPANY",
@@ -703,6 +745,21 @@ export function createSpecialistQAnswer(
         );
       }
       return recordAnswer(request, conversationId, done.content, done.blocks);
+    }
+    if (tool.kind === "NAVIGATE" && tool.unknownScreen !== null) {
+      logger?.info(
+        { qRunId: request.runId, nearest: tool.unknownScreen.nearest },
+        "q was asked for a screen Capital Q does not have",
+      );
+      return recordAnswer(
+        request,
+        conversationId,
+        unknownScreenLine(
+          tool.unknownScreen.named,
+          tool.unknownScreen.nearest,
+          navigable,
+        ),
+      );
     }
     if (tool.kind === "NAVIGATE" && tool.destination !== null) {
       const destination = tool.destination;
@@ -842,7 +899,12 @@ export function createSpecialistQAnswer(
     const capabilities = await capabilitiesOf(request);
     const actions = capabilities.flatMap((capability) =>
       capability.performedBy.kind === "TOOL" &&
-      capability.approval === "PREPARE_APPROVE"
+      (capability.approval === "PREPARE_APPROVE" ||
+        // R20/R33: the app's own actions in their browser are actions
+        // too: "reload the page" is not a screen to navigate to.
+        (Q_CLIENT_ACTION_TOOLS as readonly string[]).includes(
+          capability.performedBy.providerName,
+        ))
         ? [{ name: capability.performedBy.providerName, does: capability.does }]
         : [],
     );
@@ -938,7 +1000,13 @@ export function createSpecialistQAnswer(
         ? read.tool
         : null;
     if (tool !== null) {
-      const acted = await actOnTool(request, conversationId, tool, history);
+      const acted = await actOnTool(
+        request,
+        conversationId,
+        tool,
+        history,
+        manifestOf(capabilities).navigate,
+      );
       if (acted !== null) {
         remember(
           conversationId,

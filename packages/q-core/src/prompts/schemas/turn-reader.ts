@@ -248,3 +248,68 @@ export const TurnReaderV7VariablesSchema = TurnReaderVariablesSchema.extend({
     .default([]),
 }).strict();
 export type TurnReaderV7Variables = z.infer<typeof TurnReaderV7VariablesSchema>;
+
+/**
+ * v8 (founder live test 2026-09-27 #5): a screen Capital Q does not have.
+ * "Take me to the queue page" was read as NAVIGATE HOME (v6: "choose the
+ * most useful") and the person was moved Home without a word. Now a named
+ * screen that is not a destination is NAVIGATE with destination null and
+ * `unknownScreen`: what they called it, and the nearest real destination.
+ * Code then says it doesn't exist and offers the nearest; nobody is moved.
+ */
+export const TurnUnknownScreenSchema = z
+  .object({
+    /** The screen as they named it. UNTRUSTED words: shown bounded, never acted on. */
+    named: z.string().trim().min(1).max(60),
+    /** The nearest of the real destinations, which Q offers. */
+    nearest: QNavigateDestinationSchema,
+  })
+  .strict();
+export type TurnUnknownScreen = z.infer<typeof TurnUnknownScreenSchema>;
+
+export const TurnToolV8Schema = z
+  .object({
+    kind: z.enum(TURN_TOOL_V3_KINDS),
+    destination: QNavigateDestinationSchema.nullable().default(null),
+    unknownScreen: TurnUnknownScreenSchema.nullable().default(null),
+    visibility: z.enum(TURN_TOOL_VISIBILITIES).nullable().default(null),
+    documentType: z.enum(TURN_DOCUMENT_TYPES_V5).nullable().default(null),
+    /** The company as the person named it; null when it is plainly their own, and for OWN_MANDATE. */
+    subjectName: z.string().trim().min(1).max(120).nullable().default(null),
+  })
+  .strict()
+  .refine(
+    (tool) => {
+      switch (tool.kind) {
+        case "NAVIGATE":
+          return (
+            (tool.destination === null) !== (tool.unknownScreen === null) &&
+            tool.visibility === null &&
+            tool.documentType === null
+          );
+        case "SET_VISIBILITY":
+          return (
+            tool.visibility !== null &&
+            tool.destination === null &&
+            tool.unknownScreen === null &&
+            tool.documentType === null
+          );
+        case "PREPARE_DOCUMENT":
+          return (
+            tool.documentType !== null &&
+            tool.destination === null &&
+            tool.unknownScreen === null &&
+            tool.visibility === null
+          );
+      }
+    },
+    { message: "a tool carries exactly its own parameters" },
+  );
+export type TurnToolV8 = z.infer<typeof TurnToolV8Schema>;
+
+export const TURN_READER_V8_SCHEMA_VERSION = 8;
+
+export const TurnReaderV8ResultSchema = TurnReaderResultSchema.extend({
+  tool: TurnToolV8Schema.nullable().default(null),
+}).strict();
+export type TurnReaderV8Result = z.infer<typeof TurnReaderV8ResultSchema>;
