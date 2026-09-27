@@ -699,6 +699,7 @@ export {
   DiscoveryCompanySlateDtoSchema,
   DiscoveryInvestorSlateDtoSchema,
   DiscoveryNoteDtoSchema,
+  MandateRuleCodeDtoSchema,
   DiscoveryReasonDtoSchema,
   ExplanationFactorDtoSchema,
   RecommendationExplanationDtoSchema,

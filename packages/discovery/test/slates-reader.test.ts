@@ -18,6 +18,7 @@ import {
 import type {
   CompanyCard,
   CompanyCardPort,
+  DiscoverablePoolPort,
   SlateKey,
 } from "../src/slates/ports.js";
 import {
@@ -66,7 +67,7 @@ const KEY: SlateKey = {
 };
 
 const VERSIONS = {
-  eligibilityPolicyVersion: "eligibility.v2" as const,
+  eligibilityPolicyVersion: "eligibility.v3" as const,
   structuredGeneratorVersion: "structured-mandate.v4" as const,
   semanticGeneratorVersion: "semantic-mandate.v1" as const,
   featureSchemaVersion: FEATURE_SCHEMA_VERSION,
@@ -134,7 +135,7 @@ const eligible = (
   companyId: string,
   decision: EligibilityResult["decision"],
 ): EligibilityResult => ({
-  eligibilityPolicyVersion: "eligibility.v2",
+  eligibilityPolicyVersion: "eligibility.v3",
   mode: "INVESTOR_DISCOVER",
   companyId,
   investorOrganisationId: INVESTOR,
@@ -153,6 +154,34 @@ const eligible = (
   evaluatedAt: NOW.toISOString(),
 });
 
+/** The same result with the stage exclusion FAILing or unanswerable. */
+function withStage(
+  r: EligibilityResult,
+  outcome: "FAIL" | "UNKNOWN",
+): EligibilityResult {
+  return {
+    ...r,
+    decision: outcome === "FAIL" ? "INELIGIBLE" : "ELIGIBLE",
+    reasonCodes: [
+      outcome === "FAIL"
+        ? "STAGE_OUTSIDE_HARD_MANDATE"
+        : "COMPANY_STAGE_UNKNOWN",
+    ],
+    criteria: r.criteria.map((c) =>
+      c.criterion === "HARD_EXCLUSION_STAGE"
+        ? {
+            ...c,
+            outcome,
+            reasonCode:
+              outcome === "FAIL"
+                ? "STAGE_OUTSIDE_HARD_MANDATE"
+                : "COMPANY_STAGE_UNKNOWN",
+          }
+        : c,
+    ),
+  };
+}
+
 function harness(
   options: {
     readonly ineligible?: readonly string[];
@@ -164,6 +193,18 @@ function harness(
     readonly passed?: readonly string[];
     /** A proven reason to offer one of them again; nothing produces one in V1. */
     readonly reintroduce?: Readonly<Record<string, string>>;
+    /** What is discoverable at all (ADR 0019); nothing by default. */
+    readonly pool?: {
+      readonly discoverable: number;
+      readonly latestChangeAt?: string | null;
+      readonly sample?: readonly string[];
+    };
+    /** Companies a declared stage exclusion removes (a positive match). */
+    readonly stageExcluded?: readonly string[];
+    /** Companies whose stage is unknown under a declared stage exclusion. */
+    readonly stageUnknown?: readonly string[];
+    /** The mandate declares an exclusion V1 cannot evaluate (red_flag). */
+    readonly redFlag?: boolean;
   } = {},
 ) {
   const store = memorySlates();
@@ -180,16 +221,22 @@ function harness(
           mode: "INVESTOR_DISCOVER",
           mandateId: MANDATE,
           taxonomyVersion: null,
-          eligibilityPolicyVersion: "eligibility.v2",
+          eligibilityPolicyVersion: "eligibility.v3",
         },
-        results: query.companyIds.map((companyId) =>
-          eligible(
+        results: query.companyIds.map((companyId) => {
+          if ((options.stageExcluded ?? []).includes(companyId)) {
+            return withStage(eligible(companyId, "ELIGIBLE"), "FAIL");
+          }
+          if ((options.stageUnknown ?? []).includes(companyId)) {
+            return withStage(eligible(companyId, "ELIGIBLE"), "UNKNOWN");
+          }
+          return eligible(
             companyId,
             (options.ineligible ?? []).includes(companyId)
               ? "INELIGIBLE"
               : "ELIGIBLE",
-          ),
-        ),
+          );
+        }),
       });
     },
   };
@@ -258,11 +305,34 @@ function harness(
                   investorOrganisationId: INVESTOR,
                   version: 1,
                   status: "ACTIVE",
-                  constraints: [],
+                  constraints:
+                    options.redFlag === true
+                      ? [
+                          {
+                            dimension: "red_flag",
+                            operator: "IN",
+                            value: { kind: "codes", values: ["litigation"] },
+                            importance: "HARD_EXCLUSION",
+                            isHardExclusion: true,
+                            automatedUse: "ELIGIBLE",
+                          },
+                        ]
+                      : [],
                   taxonomyPreferences: [],
                 },
               },
         ),
+    },
+  };
+  const poolAsked: string[] = [];
+  const pool: DiscoverablePoolPort = {
+    summary: (input) => {
+      poolAsked.push(input.excludeOrganisationId);
+      return Promise.resolve({
+        discoverable: options.pool?.discoverable ?? 0,
+        latestChangeAt: options.pool?.latestChangeAt ?? null,
+        sampleCompanyIds: options.pool?.sample ?? [],
+      });
     },
   };
   // The real rule over a fake store of interaction state, so what the
@@ -307,6 +377,7 @@ function harness(
     suppression,
     slates: store.repo,
     cards,
+    pool,
     requester: options.requester === false ? undefined : requester,
     clock: () => now,
   });
@@ -316,6 +387,7 @@ function harness(
     evaluated,
     suppressionAsked,
     requested,
+    poolAsked,
     setNow: (next: Date) => {
       now = next;
     },
@@ -338,6 +410,7 @@ describe("slate reader (CQ-REC-006)", () => {
       currentStageCode: "seed",
       shortDescription: "REC006-free description",
       reasonCodes: ["STAGE_ALIGNED"],
+      unverifiedExclusions: [],
     });
     expect(first.notes).toEqual([]);
     expect(first.nextCursor).not.toBeNull();
@@ -490,6 +563,9 @@ describe("slate reader (CQ-REC-006)", () => {
       items: [],
       notes: ["RECOMMENDATIONS_REFRESHING"],
       nextCursor: null,
+      unverifiableExclusions: [],
+      excludingRules: [],
+      discoverableCount: null,
     });
     expect(h.requested).toHaveLength(1);
     expect(h.requested[0]).toMatchObject({
@@ -519,7 +595,10 @@ describe("slate reader (CQ-REC-006)", () => {
     expect(page.slateId).toBe(empty.id);
     expect(page.items).toEqual([]);
     expect(page.notes).toEqual(["NO_DISCOVERABLE_COUNTERPARTS"]);
+    expect(page.discoverableCount).toBe(0);
     expect(h.evaluated).toEqual([]);
+    // The investor's own organisation is never counted as a counterpart.
+    expect(h.poolAsked).toEqual([INVESTOR]);
 
     const noMandate = harness({ mandate: "NONE" });
     expect((await noMandate.reader.pageCompanies({ actor })).notes).toEqual([
@@ -643,5 +722,94 @@ describe("a company this organisation passed on", () => {
     await publish(h.store, KEY, 5);
     await h.reader.pageCompanies({ actor, limit: 2 });
     expect(h.suppressionAsked).toEqual([[id(1), id(2)]]);
+  });
+});
+
+/**
+ * Truthful empty states and unknown-never-excludes at read time (ADR 0019).
+ * The live defect: twelve discoverable companies, an empty slate, and the
+ * page said nobody had made themselves discoverable.
+ */
+describe("why a slate is empty, and what could not be checked", () => {
+  const twelve = Array.from({ length: 12 }, (_, i) => id(100 + i));
+
+  it("discoverable companies all removed by a declared rule: NONE_PASS_HARD_RULES, the rule named, never 'nobody is discoverable'", async () => {
+    const h = harness({
+      pool: { discoverable: 12, latestChangeAt: null, sample: twelve },
+      stageExcluded: twelve,
+    });
+    await publish(h.store, KEY, 0);
+    const page = await h.reader.pageCompanies({ actor });
+    expect(page.notes).toEqual(["NONE_PASS_HARD_RULES"]);
+    expect(page.excludingRules).toEqual(["stage"]);
+    expect(page.discoverableCount).toBe(12);
+    expect(h.evaluated).toEqual([twelve]);
+    expect(h.requested).toEqual([]);
+  });
+
+  it("discoverable companies that pass the rules but matched nothing: NONE_MATCH_MANDATE", async () => {
+    const h = harness({
+      pool: { discoverable: 12, latestChangeAt: null, sample: twelve },
+    });
+    await publish(h.store, KEY, 0);
+    const page = await h.reader.pageCompanies({ actor });
+    expect(page.notes).toEqual(["NONE_MATCH_MANDATE"]);
+    expect(page.excludingRules).toEqual([]);
+  });
+
+  it("an empty slate older than the newest discoverable-company change is rebuilt on read, and says so", async () => {
+    const h = harness({
+      pool: {
+        discoverable: 12,
+        // The slate was generated at 09:00; a company became discoverable at 11:00.
+        latestChangeAt: "2026-09-19T11:00:00.000Z",
+        sample: twelve,
+      },
+    });
+    await publish(h.store, KEY, 0);
+    const page = await h.reader.pageCompanies({ actor });
+    expect(page.notes).toEqual(["RECOMMENDATIONS_REFRESHING"]);
+    expect(h.requested).toEqual([
+      expect.objectContaining({ ...KEY, priority: "HIGH" }),
+    ]);
+    // Not re-evaluated: the rebuild answers the question.
+    expect(h.evaluated).toEqual([]);
+  });
+
+  it("an empty slate newer than every change is believed", async () => {
+    const h = harness({
+      pool: {
+        discoverable: 3,
+        latestChangeAt: "2026-09-19T08:00:00.000Z",
+        sample: twelve.slice(0, 3),
+      },
+    });
+    await publish(h.store, KEY, 0);
+    const page = await h.reader.pageCompanies({ actor });
+    expect(page.notes).toEqual(["NONE_MATCH_MANDATE"]);
+    expect(h.requested).toEqual([]);
+  });
+
+  it("a card whose stage is unknown under a stage exclusion is shown with the rule marked unverified", async () => {
+    const h = harness({ stageUnknown: [id(2)] });
+    await publish(h.store, KEY, 3);
+    const page = await h.reader.pageCompanies({ actor });
+    expect(page.items.map((i) => i.companyId)).toEqual([id(1), id(2), id(3)]);
+    expect(page.items.map((i) => i.unverifiedExclusions)).toEqual([
+      [],
+      ["stage"],
+      [],
+    ]);
+  });
+
+  it("an exclusion V1 cannot evaluate is reported once per page, never per card, and withholds nothing", async () => {
+    const h = harness({ redFlag: true });
+    await publish(h.store, KEY, 2);
+    const page = await h.reader.pageCompanies({ actor });
+    expect(page.items).toHaveLength(2);
+    expect(page.unverifiableExclusions).toEqual(["red_flag"]);
+    expect(page.items.every((i) => i.unverifiedExclusions.length === 0)).toBe(
+      true,
+    );
   });
 });

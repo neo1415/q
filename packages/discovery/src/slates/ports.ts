@@ -112,6 +112,29 @@ export type SlateRepository = {
 };
 
 /** A company's declared card: the network projection's fields, no more. */
+/**
+ * What is discoverable at all, independent of any mandate (doc 19 §13):
+ * active, marketplace-ready, network-classified companies. Counts, a
+ * watermark and a bounded id sample only; never a name. It lets the reader
+ * tell "nobody is discoverable" from "nobody passes your rules", and notice
+ * that an empty slate predates a company becoming discoverable.
+ */
+export type DiscoverablePoolSummary = {
+  readonly discoverable: number;
+  /** The newest change among discoverable companies; null when there are none. */
+  readonly latestChangeAt: string | null;
+  /** Up to the requested number of discoverable company ids, in id order. */
+  readonly sampleCompanyIds: readonly string[];
+};
+
+export type DiscoverablePoolPort = {
+  readonly summary: (input: {
+    /** The investor's own organisation, whose companies are never counterparts. */
+    readonly excludeOrganisationId: string;
+    readonly sample: number;
+  }) => Promise<DiscoverablePoolSummary>;
+};
+
 export type CompanyCard = {
   readonly companyId: string;
   readonly canonicalName: string;

@@ -13,7 +13,10 @@ import {
 import { STRUCTURED_GENERATOR_VERSION } from "../src/candidates/contracts.js";
 import { ELIGIBILITY_POLICY_VERSION } from "../src/eligibility/contracts.js";
 import { FEATURE_SCHEMA_VERSION } from "../src/features/contracts.js";
-import { createPostgresCompanyCardPort } from "../src/infrastructure/postgres-discovery-repository.js";
+import {
+  createPostgresCompanyCardPort,
+  createPostgresDiscoverablePoolPort,
+} from "../src/infrastructure/postgres-discovery-repository.js";
 import { createPostgresInteractionRepository } from "../src/infrastructure/postgres-interaction-repository.js";
 import {
   createPostgresRefreshRequestStore,
@@ -795,6 +798,7 @@ describe("@capital-q/discovery slate reader over the live local pipeline", () =>
       suppression: w.pipeline.suppression,
       slates: w.pipeline.slates,
       cards: createPostgresCompanyCardPort({ sql: w.tx.sql }),
+      pool: createPostgresDiscoverablePoolPort({ sql: w.tx.sql }),
       clock: () => new Date("2026-09-18T12:00:00.000Z"),
     });
 

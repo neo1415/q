@@ -41,7 +41,7 @@ import {
   type SlateBuilderDependencies,
 } from "../src/slates/builder.js";
 import { SLATE_POLICY_V1 } from "../src/slates/contracts.js";
-import type { SlateKey } from "../src/slates/ports.js";
+import type { DiscoverablePoolPort, SlateKey } from "../src/slates/ports.js";
 import { memorySlates } from "./support/memory-slates.js";
 
 /**
@@ -71,7 +71,7 @@ const actor: ActorContext = ActorContextSchema.parse({
 });
 
 const eligible = (companyId: string): EligibilityResult => ({
-  eligibilityPolicyVersion: "eligibility.v2",
+  eligibilityPolicyVersion: "eligibility.v3",
   mode: "INVESTOR_DISCOVER",
   companyId,
   investorOrganisationId: INVESTOR,
@@ -125,14 +125,14 @@ function pool(
     poolVersion: "hybrid-candidate-pool.v1",
     structuredGeneratorVersion: "structured-mandate.v4",
     semanticGeneratorVersion: "semantic-mandate.v1",
-    eligibilityPolicyVersion: "eligibility.v2",
+    eligibilityPolicyVersion: "eligibility.v3",
     context: {
       tenantId: TENANT,
       investorOrganisationId: INVESTOR,
       mode: "INVESTOR_DISCOVER",
       mandateId: MANDATE,
       taxonomyVersion: { industry: 2 },
-      eligibilityPolicyVersion: "eligibility.v2",
+      eligibilityPolicyVersion: "eligibility.v3",
     },
     semanticUnavailable:
       unavailable === undefined
@@ -316,6 +316,7 @@ type Scenario = {
   readonly failPublish?: boolean;
   readonly now?: () => Date;
   readonly rerank?: RerankService;
+  readonly discoverable?: DiscoverablePoolPort;
 };
 
 /**
@@ -355,12 +356,59 @@ function scenario(s: Scenario = {}) {
     snapshots: s.snapshots ?? refsFor(ranked),
     slates: store.repo,
     transactions,
+    pool: s.discoverable,
     clock: s.now ?? (() => new Date("2026-09-19T10:00:00.000Z")),
   });
   return { builder, store };
 }
 
 const query = { actor, mode: "INVESTOR_DISCOVER" as const };
+
+describe("an empty slate that predates a discoverable-company change (ADR 0019)", () => {
+  const watermark = (at: string | null): DiscoverablePoolPort => ({
+    summary: () =>
+      Promise.resolve({
+        discoverable: 1,
+        latestChangeAt: at,
+        sampleCompanyIds: [],
+      }),
+  });
+
+  it("is republished even though its fingerprint is unchanged, so the reader stops asking", async () => {
+    let now = new Date("2026-09-19T10:00:00.000Z");
+    let latest: string | null = null;
+    const { builder, store } = scenario({
+      pool: pool([]),
+      ranked: [],
+      now: () => now,
+      discoverable: {
+        summary: (input) => watermark(latest).summary(input),
+      },
+    });
+    const first = await builder.build(query);
+    expect(first.kind).toBe("PUBLISHED");
+    // Nothing changed: the empty slate is still the answer.
+    now = new Date("2026-09-19T10:05:00.000Z");
+    expect((await builder.build(query)).kind).toBe("UNCHANGED");
+    // A company became discoverable after the slate was generated.
+    latest = "2026-09-19T10:03:00.000Z";
+    now = new Date("2026-09-19T10:06:00.000Z");
+    const rebuilt = await builder.build(query);
+    expect(rebuilt.kind).toBe("PUBLISHED");
+    expect(store.rows.size).toBe(2);
+    // And once, not forever: the new slate is newer than the change.
+    now = new Date("2026-09-19T10:07:00.000Z");
+    expect((await builder.build(query)).kind).toBe("UNCHANGED");
+  });
+
+  it("a non-empty slate is never republished for it: its fingerprint decides", async () => {
+    const { builder } = scenario({
+      discoverable: watermark("2099-01-01T00:00:00.000Z"),
+    });
+    expect((await builder.build(query)).kind).toBe("PUBLISHED");
+    expect((await builder.build(query)).kind).toBe("UNCHANGED");
+  });
+});
 
 describe("slate builder (CQ-REC-006)", () => {
   it("publishes the pipeline's order verbatim: rank, score, reason codes and the exact stored snapshot", async () => {
@@ -571,7 +619,7 @@ describe("slate builder (CQ-REC-006)", () => {
       mode: "INVESTOR_DISCOVER",
       mandateVersion: 1,
       versions: {
-        eligibilityPolicyVersion: "eligibility.v2",
+        eligibilityPolicyVersion: "eligibility.v3",
         structuredGeneratorVersion: "structured-mandate.v4",
         semanticGeneratorVersion: "semantic-mandate.v1",
         featureSchemaVersion: FEATURE_SCHEMA_VERSION,
@@ -605,7 +653,7 @@ describe("slate builder (CQ-REC-006)", () => {
       mode: "INVESTOR_DISCOVER",
     };
     const versions = {
-      eligibilityPolicyVersion: "eligibility.v2" as const,
+      eligibilityPolicyVersion: "eligibility.v3" as const,
       structuredGeneratorVersion: "structured-mandate.v4" as const,
       semanticGeneratorVersion: "semantic-mandate.v1" as const,
       featureSchemaVersion: FEATURE_SCHEMA_VERSION,

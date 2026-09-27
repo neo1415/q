@@ -122,8 +122,13 @@ export {
 export {
   DECLARED_TAXONOMY_SOURCES,
   DISCOVERABLE_VISIBILITIES,
+  declaredHardExclusions,
   evaluateHardEligibility,
+  excludingRules,
+  HARD_EXCLUSION_CRITERIA,
   RELATIONSHIP_STATES_CLOSED_TO_DISCOVERY,
+  unverifiableHardExclusions,
+  unverifiedExclusions,
   type EligibilityEvaluationInput,
 } from "./eligibility/policy.js";
 export type {
@@ -481,6 +486,8 @@ export {
   type PublishInput,
   type CompanyCard,
   type CompanyCardPort,
+  type DiscoverablePoolPort,
+  type DiscoverablePoolSummary,
   type RefreshRequest,
   type RefreshRequestStore,
   type SlateKey,
@@ -570,7 +577,10 @@ export {
   type SlateReadServiceDependencies,
 } from "./slates/reader.js";
 export { createPostgresRefreshQueue } from "./infrastructure/postgres-refresh-queue.js";
-export { createPostgresCompanyCardPort } from "./infrastructure/postgres-discovery-repository.js";
+export {
+  createPostgresCompanyCardPort,
+  createPostgresDiscoverablePoolPort,
+} from "./infrastructure/postgres-discovery-repository.js";
 
 export {
   RECOMMENDATION_REFRESH_DEAD_LETTER_QUEUE,

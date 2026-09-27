@@ -2,6 +2,15 @@ import { ContractValidationError } from "@capital-q/contracts";
 import { getMeter, type Logger } from "@capital-q/observability";
 import type { ActorContext } from "@capital-q/security";
 
+import {
+  ELIGIBILITY_BATCH_MAX,
+  ELIGIBILITY_POLICY_VERSION,
+} from "../eligibility/contracts.js";
+import {
+  excludingRules,
+  unverifiableHardExclusions,
+  unverifiedExclusions,
+} from "../eligibility/policy.js";
 import type { EligibilityPorts } from "../eligibility/ports.js";
 import type { EligibilityService } from "../eligibility/service.js";
 import { RANKING_CONFIG_CURRENT } from "../ranking/config.js";
@@ -17,6 +26,7 @@ import {
 import type {
   CompanyCard,
   CompanyCardPort,
+  DiscoverablePoolPort,
   SlateKey,
   SlateRepository,
 } from "./ports.js";
@@ -59,7 +69,12 @@ export const PUBLIC_REASON_CODES: readonly string[] = [
 
 export const SLATE_PAGE_NOTES = [
   "NO_ACTIVE_MANDATE",
+  /** Nothing is discoverable to this investor at all. */
   "NO_DISCOVERABLE_COUNTERPARTS",
+  /** Companies are discoverable, and every one is removed by a declared hard rule (`excludingRules`). */
+  "NONE_PASS_HARD_RULES",
+  /** Companies are discoverable and pass the hard rules, but none matched what the mandate asks for. */
+  "NONE_MATCH_MANDATE",
   /** No servable slate yet; a rebuild has been requested. */
   "RECOMMENDATIONS_REFRESHING",
   /** The cursor's slate is no longer servable; this page starts the current one. */
@@ -69,6 +84,12 @@ export type SlatePageNote = (typeof SLATE_PAGE_NOTES)[number];
 
 export type SlatePageItem = CompanyCard & {
   readonly reasonCodes: readonly string[];
+  /**
+   * Declared exclusions this company's own facts could not answer (ADR
+   * 0019), as rule codes (`stage`, `geography.country`, `taxonomy`). The
+   * company is shown; the investor is told the rule was not checked.
+   */
+  readonly unverifiedExclusions: readonly string[];
 };
 
 export type SlatePage = {
@@ -78,6 +99,16 @@ export type SlatePage = {
   readonly items: readonly SlatePageItem[];
   readonly notes: readonly SlatePageNote[];
   readonly nextCursor: string | null;
+  /**
+   * Declared hard exclusions V1 cannot evaluate for any company (e.g.
+   * `red_flag`), said once per page rather than on every card. They
+   * withhold nothing (ADR 0019).
+   */
+  readonly unverifiableExclusions: readonly string[];
+  /** With NONE_PASS_HARD_RULES: the declared rules that removed every company. */
+  readonly excludingRules: readonly string[];
+  /** How many companies are discoverable to this investor; null when not counted. */
+  readonly discoverableCount: number | null;
 };
 
 export type PageCompaniesQuery = {
@@ -110,6 +141,12 @@ export type SlateReadServiceDependencies = {
   readonly suppression: ProactiveSuppressionPort;
   readonly slates: SlateRepository;
   readonly cards: CompanyCardPort;
+  /**
+   * Required: without it an empty slate cannot say *why* it is empty, and
+   * "nobody is discoverable" was shown to an investor whose rules had
+   * removed twelve discoverable companies.
+   */
+  readonly pool: DiscoverablePoolPort;
   /** When present, a missing or expired slate asks for a rebuild. */
   readonly requester?: RefreshRequester | undefined;
   readonly policy?: SlatePolicy | undefined;
@@ -130,8 +167,16 @@ function servable(slate: RecommendationSlate, now: Date): boolean {
 export function createSlateReadService(
   dependencies: SlateReadServiceDependencies,
 ): SlateReadService {
-  const { ports, eligibility, suppression, slates, cards, requester, logger } =
-    dependencies;
+  const {
+    ports,
+    eligibility,
+    suppression,
+    slates,
+    cards,
+    pool,
+    requester,
+    logger,
+  } = dependencies;
   const policy = dependencies.policy ?? SLATE_POLICY_V1;
   const clock = dependencies.clock ?? (() => new Date());
   const meter = getMeter("@capital-q/discovery");
@@ -144,13 +189,84 @@ export function createSlateReadService(
   const empty = (
     notes: readonly SlatePageNote[],
     slateId: string | null = null,
+    extra: Partial<
+      Pick<
+        SlatePage,
+        "unverifiableExclusions" | "excludingRules" | "discoverableCount"
+      >
+    > = {},
   ): SlatePage => ({
     slateId,
     rankingVersion: RANKING_CONFIG_CURRENT.version,
     items: [],
     notes,
     nextCursor: null,
+    unverifiableExclusions: extra.unverifiableExclusions ?? [],
+    excludingRules: extra.excludingRules ?? [],
+    discoverableCount: extra.discoverableCount ?? null,
   });
+
+  /**
+   * Why a first page is empty, truthfully (ADR 0019). In order: nothing is
+   * discoverable; the slate predates a change in what is discoverable (or
+   * the policy that built it), so it is rebuilt rather than believed; every
+   * discoverable company is removed by a declared hard rule, named; or they
+   * pass the rules and none matched the mandate. Never the wrong one.
+   */
+  const classifyEmpty = async (input: {
+    readonly key: SlateKey;
+    readonly investorOrganisationId: string;
+    readonly actor: ActorContext;
+    readonly slate: RecommendationSlate;
+    readonly outdatedPolicy: boolean;
+    readonly notes: readonly SlatePageNote[];
+  }): Promise<
+    Pick<SlatePage, "notes" | "excludingRules" | "discoverableCount">
+  > => {
+    const summary = await pool.summary({
+      excludeOrganisationId: input.investorOrganisationId,
+      sample: ELIGIBILITY_BATCH_MAX,
+    });
+    const say = (
+      note: SlatePageNote,
+      rules: readonly string[] = [],
+    ): Pick<SlatePage, "notes" | "excludingRules" | "discoverableCount"> => ({
+      notes: [...input.notes, note],
+      excludingRules: rules,
+      discoverableCount: summary.discoverable,
+    });
+    if (summary.discoverable === 0) return say("NO_DISCOVERABLE_COUNTERPARTS");
+
+    const stale =
+      input.outdatedPolicy ||
+      (summary.latestChangeAt !== null &&
+        Date.parse(summary.latestChangeAt) >
+          Date.parse(input.slate.generatedAt));
+    if (stale && requester !== undefined) {
+      await requester.request({
+        ...input.key,
+        reason: "SLATE_EXPIRED",
+        priority: "HIGH",
+      });
+      return say("RECOMMENDATIONS_REFRESHING");
+    }
+
+    const evaluation = await eligibility.evaluate({
+      actor: input.actor,
+      mode: MODE,
+      mandateId: input.key.mandateId,
+      companyIds: summary.sampleCompanyIds,
+    });
+    if (evaluation.results.some((r) => r.decision === "ELIGIBLE")) {
+      return say("NONE_MATCH_MANDATE");
+    }
+    const rules = [
+      ...new Set(evaluation.results.flatMap((r) => excludingRules(r))),
+    ].sort();
+    return rules.length > 0
+      ? say("NONE_PASS_HARD_RULES", rules)
+      : say("NO_DISCOVERABLE_COUNTERPARTS");
+  };
 
   return {
     pageCompanies: async (query) => {
@@ -202,6 +318,7 @@ export function createSlateReadService(
         mode: MODE,
       };
 
+      const unverifiable = unverifiableHardExclusions(lookup.mandate);
       const notes: SlatePageNote[] = [];
       let slate: RecommendationSlate | null = null;
       let afterRank = 0;
@@ -239,8 +356,23 @@ export function createSlateReadService(
             });
           }
           metrics.pages.add(1, { outcome: "REFRESHING" });
-          return empty([...notes, "RECOMMENDATIONS_REFRESHING"]);
+          return empty([...notes, "RECOMMENDATIONS_REFRESHING"], null, {
+            unverifiableExclusions: unverifiable,
+          });
         }
+      }
+      // A slate computed under a superseded eligibility policy is an
+      // ordering nobody would compute again: ask for a rebuild. Its items
+      // are still re-checked below under the current policy, so a
+      // non-empty one keeps serving meanwhile.
+      const outdatedPolicy =
+        slate.eligibilityPolicyVersion !== ELIGIBILITY_POLICY_VERSION;
+      if (outdatedPolicy && afterRank === 0 && requester !== undefined) {
+        await requester.request({
+          ...key,
+          reason: "SLATE_EXPIRED",
+          priority: "HIGH",
+        });
       }
 
       // One more than the page so the continuation is known without a count.
@@ -258,17 +390,26 @@ export function createSlateReadService(
 
       if (pageItems.length === 0) {
         metrics.pages.add(1, { outcome: "EMPTY" });
-        return {
+        const base = {
           slateId: slate.id,
           rankingVersion: slate.rankingConfigVersion,
           items: [],
-          notes: [
-            ...notes,
-            ...(afterRank === 0
-              ? (["NO_DISCOVERABLE_COUNTERPARTS"] as const)
-              : []),
-          ],
           nextCursor,
+          unverifiableExclusions: unverifiable,
+          excludingRules: [],
+          discoverableCount: null,
+        };
+        if (afterRank > 0) return { ...base, notes };
+        return {
+          ...base,
+          ...(await classifyEmpty({
+            key,
+            investorOrganisationId: subject.investorOrganisationId,
+            actor: query.actor,
+            slate,
+            outdatedPolicy,
+            notes,
+          })),
         };
       }
 
@@ -291,6 +432,9 @@ export function createSlateReadService(
           companyIds,
         }),
       ]);
+      const resultById = new Map(
+        evaluation.results.map((r) => [r.companyId, r] as const),
+      );
       const eligibleIds = new Set(
         evaluation.results
           .filter((r) => r.decision === "ELIGIBLE")
@@ -309,11 +453,14 @@ export function createSlateReadService(
         const card = cardById.get(item.companyId);
         // A company without a declared card is withheld, not invented.
         if (card === undefined) continue;
+        const result = resultById.get(item.companyId);
         items.push({
           ...card,
           reasonCodes: item.reasonCodes.filter((code) =>
             PUBLIC_REASON_CODES.includes(code),
           ),
+          unverifiedExclusions:
+            result === undefined ? [] : unverifiedExclusions(result),
         });
       }
 
@@ -339,6 +486,9 @@ export function createSlateReadService(
         items,
         notes,
         nextCursor,
+        unverifiableExclusions: unverifiable,
+        excludingRules: [],
+        discoverableCount: null,
       };
     },
   };

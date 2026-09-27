@@ -101,10 +101,14 @@ const PAGE: SlatePage = {
       currentStageCode: "seed",
       shortDescription: "Logistics workflow SaaS.",
       reasonCodes: ["STAGE_ALIGNED", "TAXONOMY_EXACT"],
+      unverifiedExclusions: ["stage"],
     },
   ],
   notes: [],
   nextCursor: "eyJ2IjoxfQ",
+  unverifiableExclusions: ["red_flag"],
+  excludingRules: [],
+  discoverableCount: null,
 };
 
 describe("GET /v1/discovery/companies (persisted slates)", () => {
@@ -130,11 +134,15 @@ describe("GET /v1/discovery/companies (persisted slates)", () => {
           shortDescription: "Logistics workflow SaaS.",
           reasons: [],
           reasonCodes: ["STAGE_ALIGNED", "TAXONOMY_EXACT"],
+          unverifiedExclusions: ["stage"],
           pitch: null,
         },
       ],
       notes: [],
       nextCursor: "eyJ2IjoxfQ",
+      unverifiableExclusions: ["red_flag"],
+      excludingRules: [],
+      discoverableCount: null,
     });
     await app.close();
   });
@@ -148,6 +156,9 @@ describe("GET /v1/discovery/companies (persisted slates)", () => {
         items: [],
         notes: ["RECOMMENDATIONS_REFRESHING"],
         nextCursor: null,
+        unverifiableExclusions: [],
+        excludingRules: [],
+        discoverableCount: null,
       },
     });
     const response = await app.inject({
@@ -219,6 +230,7 @@ describe("GET /v1/discovery/companies — the feed item's pitch", () => {
         currentStageCode: null,
         shortDescription: null,
         reasonCodes: [],
+        unverifiedExclusions: [],
       },
     ],
   };

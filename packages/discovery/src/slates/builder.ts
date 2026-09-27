@@ -27,6 +27,7 @@ import {
 } from "./contracts.js";
 import {
   SlateBuildInProgressError,
+  type DiscoverablePoolPort,
   type SlateKey,
   type SlateRepository,
 } from "./ports.js";
@@ -109,6 +110,13 @@ export type SlateBuilderDependencies = {
   readonly snapshots: FeatureSnapshotStore;
   readonly slates: SlateRepository;
   readonly transactions: TransactionManager;
+  /**
+   * When present, an empty CURRENT slate generated before the newest change
+   * in what is discoverable is republished even when its fingerprint is
+   * unchanged, so the reader's "is this empty slate stale?" question
+   * (ADR 0019) is answered once rather than on every read.
+   */
+  readonly pool?: DiscoverablePoolPort | undefined;
   readonly policy?: SlatePolicy | undefined;
   readonly clock?: (() => Date) | undefined;
   readonly logger?: Logger | undefined;
@@ -193,6 +201,7 @@ export function createSlateBuilder(
     snapshots,
     slates,
     transactions,
+    pool: discoverablePool,
     logger,
   } = dependencies;
   const policy = dependencies.policy ?? SLATE_POLICY_V1;
@@ -367,8 +376,23 @@ export function createSlateBuilder(
 
         const now = generatedAt;
         const current = await slates.findCurrent(key);
+        const staleEmpty =
+          current !== null &&
+          current.itemCount === 0 &&
+          discoverablePool !== undefined &&
+          (await discoverablePool
+            .summary({
+              excludeOrganisationId: key.investorOrganisationId,
+              sample: 0,
+            })
+            .then(
+              (s) =>
+                s.latestChangeAt !== null &&
+                Date.parse(s.latestChangeAt) > Date.parse(current.generatedAt),
+            ));
         if (
           current !== null &&
+          !staleEmpty &&
           current.generationFingerprint === fingerprint &&
           current.expiresAt !== null &&
           Date.parse(current.expiresAt) > now.getTime()

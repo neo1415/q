@@ -71,7 +71,10 @@ import { createDomainCandidatePorts } from "./domain-port-candidate-sources.js";
 import { createDomainEligibilityPorts } from "./domain-port-eligibility-sources.js";
 import { createDomainFeaturePorts } from "./domain-port-feature-sources.js";
 import { createDomainSemanticPorts } from "./domain-port-semantic-sources.js";
-import { createPostgresCompanyCardPort } from "./postgres-discovery-repository.js";
+import {
+  createPostgresCompanyCardPort,
+  createPostgresDiscoverablePoolPort,
+} from "./postgres-discovery-repository.js";
 import { createInteractionRerankSignals } from "./interaction-rerank-signals.js";
 import { createPostgresFeatureSnapshotStore } from "./postgres-feature-snapshot-store.js";
 import { createPostgresInteractionRepository } from "./postgres-interaction-repository.js";
@@ -233,6 +236,7 @@ export function createSlateReadPipeline(
     suppression,
     slates,
     cards: createPostgresCompanyCardPort({ sql }),
+    pool: createPostgresDiscoverablePoolPort({ sql }),
     requester,
     policy,
     clock,
@@ -332,6 +336,7 @@ export function createRecommendationPipeline(
   const suppression = createProactiveSuppression({ signals });
   const builder = createSlateBuilder({
     ports: eligibilityPorts,
+    pool: createPostgresDiscoverablePoolPort({ sql }),
     hybrid,
     ranking,
     rerank,

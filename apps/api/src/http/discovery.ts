@@ -109,6 +109,7 @@ export function registerDiscoveryRoutes(
             shortDescription: item.shortDescription,
             reasons: [],
             reasonCodes: item.reasonCodes,
+            unverifiedExclusions: item.unverifiedExclusions,
             pitch:
               pitch === undefined
                 ? null
@@ -122,6 +123,9 @@ export function registerDiscoveryRoutes(
         }),
         notes: served.notes,
         nextCursor: served.nextCursor,
+        unverifiableExclusions: served.unverifiableExclusions,
+        excludingRules: served.excludingRules,
+        discoverableCount: served.discoverableCount,
       });
     },
   );

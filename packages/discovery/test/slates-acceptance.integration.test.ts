@@ -9,7 +9,10 @@ import {
   type RequestDatabase,
 } from "@capital-q/database";
 
-import { createPostgresCompanyCardPort } from "../src/infrastructure/postgres-discovery-repository.js";
+import {
+  createPostgresCompanyCardPort,
+  createPostgresDiscoverablePoolPort,
+} from "../src/infrastructure/postgres-discovery-repository.js";
 import { createPostgresRefreshQueue } from "../src/infrastructure/postgres-refresh-queue.js";
 import {
   RECOMMENDATION_REFRESH_QUEUE,
@@ -164,6 +167,7 @@ describe("CQ-REC-006 live acceptance (local stack)", () => {
         suppression: w.pipeline.suppression,
         slates: w.pipeline.slates,
         cards: createPostgresCompanyCardPort({ sql }),
+        pool: createPostgresDiscoverablePoolPort({ sql }),
         requester,
         clock: () => new Date("2026-09-18T12:00:00.000Z"),
       });

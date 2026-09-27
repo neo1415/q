@@ -1,8 +1,13 @@
 import { z } from "zod";
 
+import { MARKETPLACE_READINESS_MARKETPLACE_READY } from "@capital-q/contracts";
 import type { DatabaseExecutor } from "@capital-q/database";
 
-import type { CompanyCard, CompanyCardPort } from "../slates/ports.js";
+import type {
+  CompanyCard,
+  CompanyCardPort,
+  DiscoverablePoolPort,
+} from "../slates/ports.js";
 import type {
   CandidateCompany,
   CandidateInvestor,
@@ -300,6 +305,54 @@ export function createPostgresCompanyCardPort(options: {
         });
       }
       return out;
+    },
+  };
+}
+
+const PoolRow = z.object({
+  discoverable: z.coerce.number().int().min(0),
+  latest_change_at: z.union([z.date(), z.string()]).nullable(),
+  sample: z.array(z.string().uuid()).nullable(),
+});
+
+/**
+ * The discoverable pool as the reader needs it (ADR 0019): one statement,
+ * counts and ids only. The same predicate discoverability uses everywhere
+ * — active, network classification, marketplace-ready — and never the
+ * acting investor's own organisation.
+ */
+export function createPostgresDiscoverablePoolPort(options: {
+  readonly sql: DatabaseExecutor;
+}): DiscoverablePoolPort {
+  const { sql } = options;
+  return {
+    summary: async ({ excludeOrganisationId, sample }) => {
+      const rows = await sql`
+        with pool as (
+          select c.id, c.updated_at
+            from core.companies c
+           where c.company_status = 'active'
+             and c.marketplace_visibility = any(${[...DISCOVERABLE]}::text[])
+             and c.marketplace_readiness_state = ${MARKETPLACE_READINESS_MARKETPLACE_READY}
+             and c.organisation_id <> ${excludeOrganisationId}::uuid
+        )
+        select (select count(*) from pool) as discoverable,
+               (select max(updated_at) from pool) as latest_change_at,
+               (select array_agg(id order by id)
+                  from (select id from pool order by id limit ${sample}) s) as sample`;
+      const row = PoolRow.parse(rows[0]);
+      const latest = row.latest_change_at;
+      return {
+        discoverable: row.discoverable,
+        latestChangeAt:
+          latest === null
+            ? null
+            : (latest instanceof Date
+                ? latest
+                : new Date(latest)
+              ).toISOString(),
+        sampleCompanyIds: row.sample ?? [],
+      };
     },
   };
 }

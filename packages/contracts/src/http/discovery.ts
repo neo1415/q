@@ -41,8 +41,26 @@ export const DiscoveryNoteDtoSchema = z.enum([
   "RECOMMENDATIONS_REFRESHING",
   /** The cursor's slate is no longer servable; this page starts the current one. */
   "SLATE_RESTARTED",
+  /**
+   * Companies are discoverable and a declared hard rule removed every one
+   * (ADR 0019); `excludingRules` names the rules. Never shown as "nobody
+   * is discoverable".
+   */
+  "NONE_PASS_HARD_RULES",
+  /** Companies are discoverable and pass the hard rules; none matched the mandate. */
+  "NONE_MATCH_MANDATE",
 ]);
 export type DiscoveryNoteDto = z.infer<typeof DiscoveryNoteDtoSchema>;
+
+/**
+ * A declared mandate rule, by dimension (`stage`, `geography.country`,
+ * `taxonomy`, `red_flag`, …). The investor's own rule, never a value from
+ * it and never anything about the company.
+ */
+export const MandateRuleCodeDtoSchema = z
+  .string()
+  .regex(/^[a-z][a-z0-9_.]*$/)
+  .max(64);
 
 export const DiscoveredCompanyDtoSchema = z
   .object({
@@ -67,6 +85,13 @@ export const DiscoveredCompanyDtoSchema = z
      * existed still parse.
      */
     pitch: PitchSummaryDtoSchema.nullable().default(null),
+    /**
+     * Declared hard exclusions this company's own facts could not answer
+     * (its stage, country or sector is not stated). Unknown never excludes
+     * (ADR 0019): the company is shown and the investor is told. Optional
+     * so a page from an API that predates it still parses; absent is none.
+     */
+    unverifiedExclusions: z.array(MandateRuleCodeDtoSchema).max(8).optional(),
   })
   .strict();
 export type DiscoveredCompanyDto = z.infer<typeof DiscoveredCompanyDtoSchema>;
@@ -94,6 +119,18 @@ export const DiscoveryCompanySlateDtoSchema = z
     items: z.array(DiscoveredCompanyDtoSchema),
     notes: z.array(DiscoveryNoteDtoSchema).max(4),
     nextCursor: z.string().max(200).nullable(),
+    /**
+     * Declared hard exclusions V1 cannot evaluate for any company, said
+     * once per page. They withhold nothing (ADR 0019).
+     */
+    unverifiableExclusions: z
+      .array(MandateRuleCodeDtoSchema)
+      .max(16)
+      .optional(),
+    /** With NONE_PASS_HARD_RULES: the declared rules that removed every company. */
+    excludingRules: z.array(MandateRuleCodeDtoSchema).max(16).optional(),
+    /** How many companies are discoverable to this investor, when an empty page counted them. */
+    discoverableCount: z.number().int().min(0).nullable().optional(),
   })
   .strict();
 export type DiscoveryCompanySlateDto = z.infer<
