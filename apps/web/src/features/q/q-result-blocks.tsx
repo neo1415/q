@@ -11,7 +11,7 @@ import { buttonClassName } from "@capital-q/ui/button";
 
 import { destinationPath } from "../voice/destinations";
 import { ArtifactCard } from "./artifact-card";
-import { recordPagePath } from "./client-actions";
+import { recordPagePath, setupPath } from "./client-actions";
 import type { QTurnObjectBlock } from "./conversation";
 
 /**
@@ -60,6 +60,7 @@ const INTENT_ROUTES: Readonly<
       | "SET_VOICE"
       | "SIGN_OUT"
       | "OPEN_RECORD_PAGE"
+      | "OPEN_SETUP"
     >,
     string | null
   >
@@ -89,6 +90,9 @@ function intentHref(intent: QUiIntent): string | null {
   }
   if (intent.kind === "OPEN_RECORD_PAGE") {
     return recordPagePath(intent.page, intent.id);
+  }
+  if (intent.kind === "OPEN_SETUP") {
+    return setupPath(intent.journey);
   }
   const route = INTENT_ROUTES[intent.kind];
   if (route === null) {
@@ -140,6 +144,10 @@ function intentLabel(intent: QUiIntent): string {
       return intent.page === "COMPANY"
         ? "Open the company"
         : "Open the relationship";
+    case "OPEN_SETUP":
+      return intent.journey === "investor"
+        ? "Continue your mandate"
+        : "Continue setup";
   }
 }
 

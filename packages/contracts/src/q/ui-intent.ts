@@ -32,6 +32,7 @@ export const Q_UI_INTENT_KINDS = [
   "SET_VOICE",
   "SIGN_OUT",
   "OPEN_RECORD_PAGE",
+  "OPEN_SETUP",
 ] as const;
 
 export type QUiIntentKind = (typeof Q_UI_INTENT_KINDS)[number];
@@ -227,6 +228,18 @@ export const QOpenRecordPageIntentSchema = z
   })
   .strict();
 
+/**
+ * Setup reminders (founder directive 2026-09-27): take the person back to
+ * their own unfinished setup. The journey comes from their own record on
+ * the server, never from a model; the browser maps it to its fixed route.
+ */
+export const QOpenSetupIntentSchema = z
+  .object({
+    kind: z.literal("OPEN_SETUP"),
+    journey: z.enum(["founder", "investor"]),
+  })
+  .strict();
+
 export const QClientActionIntentSchema = z.discriminatedUnion("kind", [
   QOpenRecordPageIntentSchema,
   QSetThemeIntentSchema,
@@ -235,6 +248,7 @@ export const QClientActionIntentSchema = z.discriminatedUnion("kind", [
   QSetQMotionIntentSchema,
   QSetVoiceIntentSchema,
   QSignOutIntentSchema,
+  QOpenSetupIntentSchema,
 ]);
 export type QClientActionIntent = z.infer<typeof QClientActionIntentSchema>;
 
@@ -250,6 +264,7 @@ export const Q_CLIENT_ACTION_TOOLS = [
   "set_voice",
   "sign_out",
   "open_page",
+  "continue_onboarding",
 ] as const;
 
 /**
@@ -264,6 +279,7 @@ export const Q_INSTANT_ACTION_TOOLS = [
   "pass_company",
   "decline_pending_proposal",
   "reassess_marketplace_readiness",
+  "set_onboarding_reminders",
 ] as const;
 
 /**
@@ -294,6 +310,7 @@ export const QUiIntentSchema = z.discriminatedUnion("kind", [
   QSetVoiceIntentSchema,
   QSignOutIntentSchema,
   QOpenRecordPageIntentSchema,
+  QOpenSetupIntentSchema,
 ]);
 
 export type QUiIntent = z.infer<typeof QUiIntentSchema>;

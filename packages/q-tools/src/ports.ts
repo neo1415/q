@@ -21,6 +21,7 @@ import type {
 import type { ActorContext, AuthorizationService } from "@capital-q/security";
 
 import type { ChatIntelligencePort } from "./tools/chat.js";
+import type { OnboardingRemindersPort } from "./tools/onboarding-reminders.js";
 
 /** One company as the investor's feed shows it. */
 export type InvestorFeedCompany = {
@@ -295,6 +296,11 @@ export type QToolPorts = {
   readonly evidenceDocuments?: EvidenceDocumentsPort | undefined;
   /** R33 / BIZ-007: a relationship's email thread. */
   readonly relationshipMail?: RelationshipMailPort | undefined;
+  /**
+   * Setup reminders (founder directive 2026-09-27): "remind me later",
+   * "stop reminding me", "let's finish my setup". Absent: neither tool exists.
+   */
+  readonly onboardingReminders?: OnboardingRemindersPort | undefined;
 };
 
 /**

@@ -347,6 +347,7 @@ export {
   Q_RECORD_PAGES,
   QRecordPageSchema,
   QOpenRecordPageIntentSchema,
+  QOpenSetupIntentSchema,
   type QRecordPage,
   type QMotionChoice,
   QClientActionIntentSchema,

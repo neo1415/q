@@ -29,6 +29,13 @@ export type ClientActionEffects = {
   readonly goTo: (path: string) => void;
 };
 
+/** Their own unfinished setup, from the fixed route map. */
+export function setupPath(journey: "founder" | "investor"): string {
+  return journey === "investor"
+    ? "/onboarding/investor?from=home"
+    : "/onboarding/founder?from=home";
+}
+
 /** R33: a record's own page, from its kind and a validated id only. */
 export function recordPagePath(
   page: "COMPANY" | "RELATIONSHIP_COMPANY" | "RELATIONSHIP_INVESTOR",
@@ -104,6 +111,9 @@ export function performClientAction(
       return true;
     case "OPEN_RECORD_PAGE":
       effects.goTo(recordPagePath(action.page, action.id));
+      return true;
+    case "OPEN_SETUP":
+      effects.goTo(setupPath(action.journey));
       return true;
   }
 }

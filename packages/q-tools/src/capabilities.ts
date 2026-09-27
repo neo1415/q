@@ -597,6 +597,19 @@ export const Q_CAPABILITIES: readonly QCapability[] = Object.freeze([
     "RESEARCH",
     "Looks up a public professional profile.",
   ),
+  // Setup reminders (founder directive 2026-09-27), text and voice alike.
+  tool(
+    "set_onboarding_reminders",
+    "ONBOARDING",
+    "Puts off, or stops, the reminders to finish their setup, when they say remind me later or stop reminding me.",
+    { acts: true },
+  ),
+  tool(
+    "continue_onboarding",
+    "ONBOARDING",
+    "Takes them back to their own unfinished setup, where they left off.",
+    { acts: true },
+  ),
   // The onboarding loop's own hands: reversible writes to the person's own
   // onboarding under scoped delegation (ADR 0016), not Approval Engine work.
   tool("get_onboarding_state", "ONBOARDING", "Reads their onboarding.", {

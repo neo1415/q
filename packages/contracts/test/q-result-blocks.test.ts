@@ -203,6 +203,7 @@ describe("QUiIntent", () => {
     SET_VOICE: { kind: "SET_VOICE", voice: "FEMALE" },
     SIGN_OUT: { kind: "SIGN_OUT" },
     OPEN_RECORD_PAGE: { kind: "OPEN_RECORD_PAGE", page: "COMPANY", id: UUID },
+    OPEN_SETUP: { kind: "OPEN_SETUP", journey: "investor" },
   };
 
   it("parses every supported intent", () => {

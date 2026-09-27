@@ -95,6 +95,17 @@ export {
   siteHost,
 } from "./tools/client-actions.js";
 export {
+  CONTINUE_ONBOARDING,
+  ContinueOnboardingInputSchema,
+  createContinueOnboardingTool,
+  createOnboardingReminderTools,
+  createSetOnboardingRemindersTool,
+  SET_ONBOARDING_REMINDERS,
+  SetOnboardingRemindersInputSchema,
+  SetOnboardingRemindersOutputSchema,
+  type OnboardingRemindersPort,
+} from "./tools/onboarding-reminders.js";
+export {
   createGetQCardTool,
   GET_Q_CARD,
   GetQCardInputSchema,

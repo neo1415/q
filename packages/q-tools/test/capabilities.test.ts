@@ -55,6 +55,7 @@ const EVERY_PORT: QToolPorts = {
   ownRecords: STUB,
   evidenceDocuments: STUB,
   relationshipMail: STUB,
+  onboardingReminders: STUB,
 };
 
 const EVERY_TOOL = [

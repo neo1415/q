@@ -74,6 +74,9 @@ describe("performing a client action", () => {
         port,
       ),
     ).toBe(true);
+    expect(
+      performClientAction({ kind: "OPEN_SETUP", journey: "investor" }, port),
+    ).toBe(true);
     expect(done).toEqual([
       "theme:dark",
       "reload",
@@ -82,6 +85,7 @@ describe("performing a client action", () => {
       "voice:MALE",
       "sign-out",
       "go:/relationships/investor/c0000000-0000-4000-8000-000000000001",
+      "go:/onboarding/investor?from=home",
     ]);
   });
 
@@ -101,6 +105,7 @@ describe("performing a client action", () => {
         id: "c0000000-0000-4000-8000-000000000001",
       },
       { kind: "RUN_SCRIPT", code: "x" },
+      { kind: "OPEN_SETUP", journey: "../admin" },
       null,
     ]) {
       expect(performClientAction(raw, port), JSON.stringify(raw)).toBe(false);

@@ -30,6 +30,10 @@ import { createGetPitchMomentTool } from "./tools/pitch-moment.js";
 import { createVisibilityTools } from "./tools/visibility.js";
 import { createSearchCompaniesTool } from "./tools/search-companies.js";
 import { createClientActionTools } from "./tools/client-actions.js";
+import {
+  createOnboardingReminderTools,
+  createSetOnboardingRemindersTool,
+} from "./tools/onboarding-reminders.js";
 import { createGetQCardTool } from "./tools/q-card.js";
 
 /**
@@ -112,6 +116,13 @@ export function createDefaultQTools(
     // R20/R33: the app's own actions in their browser (theme, reload,
     // their own website), where a screen reads the answer.
     ...(ports.clientActions === true ? createClientActionTools(ports) : []),
+    // Setup reminders: later / stop, and back to their own setup. The
+    // continue tool is a client action, so it needs a screen too.
+    ...(ports.onboardingReminders === undefined
+      ? []
+      : ports.clientActions === true
+        ? createOnboardingReminderTools(ports.onboardingReminders)
+        : [createSetOnboardingRemindersTool(ports.onboardingReminders)]),
     // R33: their approvals inbox, their documents, Save / Unsave / Pass.
     ...createOwnWorkTools(ports),
     // R33: the record forms as Prepare → Approve, and their own records.
