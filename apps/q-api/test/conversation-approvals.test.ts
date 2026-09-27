@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 
 import { describe, expect, it } from "vitest";
 
-import type { QApprovalView } from "@capital-q/contracts";
+import { QApprovalViewSchema, type QApprovalView } from "@capital-q/contracts";
 import {
   QActionPayloadMismatchError,
   QApprovalNotPermittedError,
@@ -52,8 +52,8 @@ type Row = {
 };
 
 function viewOf(row: Row): QApprovalView {
-  return {
-    contractVersion: "1.0",
+  return QApprovalViewSchema.parse({
+    contractVersion: 1,
     approvalId: row.approvalId,
     runId: RUN_EARLIER,
     status: row.approval,
@@ -69,7 +69,7 @@ function viewOf(row: Row): QApprovalView {
       targets: [{ kind: "COMPANY", companyId: randomUUID() }],
       summary: row.summary,
     },
-  } as QApprovalView;
+  });
 }
 
 function harness(rows: Row[]) {
