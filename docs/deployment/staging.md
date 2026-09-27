@@ -138,9 +138,10 @@ application change was needed for the platform's port.
   **throws at startup** otherwise. Staging is `staging` against hosted
   Supabase, so setting this both crashes the service and asserts something
   false. Staging Q traffic runs under its ordinary confidentiality ceiling.
-- **`Q_EMBEDDING_BASE_URL`.** Left at its loopback default. No embedding
-  runtime is deployed, so semantic retrieval degrades to lexical, which is the
-  designed behaviour. Pointing it at a public host is rejected by
+- **`Q_EMBEDDING_BASE_URL`.** Left unset. Outside `local` there is no
+  loopback default: startup logs it as missing and no request is made. No
+  embedding runtime is deployed, so semantic retrieval degrades to lexical,
+  which is the designed behaviour. Pointing it at a public host is rejected by
   `isPrivateEmbeddingHost` on purpose: that runtime holds confidential
   document text.
 

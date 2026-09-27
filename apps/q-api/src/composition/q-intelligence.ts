@@ -165,8 +165,11 @@ export type QIntelligenceComposition = {
  * service already reports — not a reason to withhold the port, and not a
  * reason to start without one.
  */
-export function createProductionEmbeddingService(): EmbeddingService {
+export function createProductionEmbeddingService(options?: {
+  readonly onMissing?: (missing: readonly string[]) => void;
+}): EmbeddingService {
   const config = loadEmbeddingConfig();
+  if (config.missing.length > 0) options?.onMissing?.(config.missing);
   return createEmbeddingService({
     provider: createLocalTeiEmbeddingProvider({
       baseUrl: config.baseUrl,

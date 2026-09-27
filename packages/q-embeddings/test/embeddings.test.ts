@@ -664,3 +664,17 @@ describe("similarity", () => {
     expect(() => cosineSimilarity([1, 0], [1, 0, 0])).toThrow(TypeError);
   });
 });
+
+describe("an unconfigured runtime (no Q_EMBEDDING_BASE_URL outside local)", () => {
+  it("is UNAVAILABLE on every call without making a request, and says so in health", async () => {
+    const { provider, requests } = teiProvider([], { baseUrl: undefined });
+    await expect(
+      provider.embedQuery({ query: "runway", task: "EVIDENCE_RETRIEVAL" }),
+    ).rejects.toMatchObject({ failureClass: "UNAVAILABLE" });
+    const health = await provider.health();
+    expect(health.state).toBe("UNAVAILABLE");
+    expect(health.detail).toBe("the embedding runtime is not configured");
+    expect(health.endpoint).toBeNull();
+    expect(requests).toHaveLength(0);
+  });
+});

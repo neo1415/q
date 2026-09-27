@@ -219,12 +219,12 @@ optional acceleration, not an architectural requirement.
 
 All non-secret. There is no embedding credential of any kind.
 
-| Variable                      | Default                 | Meaning                                                        |
-| ----------------------------- | ----------------------- | -------------------------------------------------------------- |
-| `Q_EMBEDDING_PROVIDER`        | `local-tei`             | Which adapter to compose                                       |
-| `Q_EMBEDDING_BASE_URL`        | `http://127.0.0.1:8080` | Where the private runtime listens; must be loopback or private |
-| `Q_EMBEDDING_TIMEOUT_MS`      | `60000`                 | One request's ceiling                                          |
-| `Q_EMBEDDING_MAX_BATCH_ITEMS` | `16`                    | Items per request                                              |
+| Variable                      | Default                              | Meaning                                                                                                                    |
+| ----------------------------- | ------------------------------------ | -------------------------------------------------------------------------------------------------------------------------- |
+| `Q_EMBEDDING_PROVIDER`        | `local-tei`                          | Which adapter to compose                                                                                                   |
+| `Q_EMBEDDING_BASE_URL`        | `http://127.0.0.1:8080` (local only) | Where the private runtime listens; must be loopback or private. Unset outside local: reported missing, runtime unavailable |
+| `Q_EMBEDDING_TIMEOUT_MS`      | `60000`                              | One request's ceiling                                                                                                      |
+| `Q_EMBEDDING_MAX_BATCH_ITEMS` | `16`                                 | Items per request                                                                                                          |
 
 ## Degraded behaviour
 

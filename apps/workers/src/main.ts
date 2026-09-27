@@ -517,6 +517,14 @@ const disclosure = createDisclosureAccessService({
   clock: systemDisclosureClock,
 });
 const embeddingConfig = loadEmbeddingConfig();
+if (embeddingConfig.missing.length > 0) {
+  // Named at startup rather than discovered per request: outside local the
+  // runtime has no default address, so semantic candidates stay off.
+  logger.warn(
+    { missing: embeddingConfig.missing },
+    "embedding runtime not configured: semantic retrieval disabled",
+  );
+}
 const recommendations = createRecommendationPipeline({
   sql: database.sql,
   transactions: database.transactions,

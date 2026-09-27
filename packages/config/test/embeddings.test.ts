@@ -109,3 +109,31 @@ describe("embedding configuration", () => {
     ).toThrow(ConfigurationError);
   });
 });
+
+describe("no loopback default outside local", () => {
+  for (const env of ["preview", "staging", "production"] as const) {
+    it(`${env}: an unset runtime URL is named in missing and nothing is guessed`, () => {
+      const config = parseEmbeddingConfig({
+        NODE_ENV: "production",
+        CAPITAL_Q_ENV: env,
+      });
+      expect(config.baseUrl).toBeUndefined();
+      expect(config.missing).toEqual(["Q_EMBEDDING_BASE_URL"]);
+      expect(JSON.stringify(config)).not.toMatch(/127\.0\.0\.1|localhost/);
+    });
+  }
+
+  it("a configured private runtime is used as given, with nothing missing", () => {
+    const config = parseEmbeddingConfig({
+      NODE_ENV: "production",
+      CAPITAL_Q_ENV: "production",
+      Q_EMBEDDING_BASE_URL: "http://embeddings.railway.internal:8080",
+    });
+    expect(config.baseUrl).toBe("http://embeddings.railway.internal:8080");
+    expect(config.missing).toEqual([]);
+  });
+
+  it("local keeps the laptop default", () => {
+    expect(parseEmbeddingConfig(base).missing).toEqual([]);
+  });
+});

@@ -1203,7 +1203,14 @@ const qActionPort = createQActionPort({
 // a private network. It is composed unconditionally: when it cannot be
 // reached, retrieval runs lexically and says so in its own diagnostics,
 // which is an honest degradation rather than a silent one.
-const embeddings = createProductionEmbeddingService();
+const embeddings = createProductionEmbeddingService({
+  onMissing: (missing) => {
+    logger.warn(
+      { missing },
+      "embedding runtime not configured: semantic retrieval disabled",
+    );
+  },
+});
 // One embedding before anyone asks for one. The runtime loads its model
 // on first use, and that cost landed on the first person to speak after a
 // start: a retrieval that should take under a second took twelve. Best
