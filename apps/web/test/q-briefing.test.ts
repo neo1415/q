@@ -91,6 +91,7 @@ function reads(overrides: Partial<BriefingReads> = {}) {
         nextCursor: null,
       }),
     ),
+    setupNudge: track("setupNudge", () => Promise.resolve({ nudge: null })),
     ...overrides,
   };
   return { reads: all, calls };
@@ -264,7 +265,12 @@ describe("readBriefingFacts (authorised reads only)", () => {
     );
     // (The inbox read is the override above, which is not tracked.)
     expect(new Set(calls)).toEqual(
-      new Set(["pendingApprovals", "companyRelationships", "readiness"]),
+      new Set([
+        "pendingApprovals",
+        "companyRelationships",
+        "readiness",
+        "setupNudge",
+      ]),
     );
     expect(calls).not.toContain("investorRelationships");
     expect(calls).not.toContain("companySlate");

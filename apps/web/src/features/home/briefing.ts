@@ -53,6 +53,19 @@ export type PitchFact = {
   readonly name: string;
 };
 
+/**
+ * Their setup, part-way (founder directive 2026-09-27): given only on the
+ * days the server's reminder policy says so, never composed from a guess.
+ */
+export type SetupNudgeFact = {
+  readonly journeyType: "founder" | "investor";
+  readonly doneCount: number;
+  readonly requiredCount: number;
+  readonly minutesLeft: number;
+  /** The day it was given for; one card per day, recognisably. */
+  readonly day: string;
+};
+
 export type FounderBriefingFacts = {
   readonly role: "FOUNDER";
   /** Changes since this instant are news. */
@@ -61,6 +74,7 @@ export type FounderBriefingFacts = {
   readonly relationships?: readonly RelationshipFact[] | undefined;
   readonly interest?: readonly InterestFact[] | undefined;
   readonly readinessGaps?: readonly ReadinessGapFact[] | undefined;
+  readonly setupNudge?: SetupNudgeFact | undefined;
 };
 
 export type InvestorBriefingFacts = {
@@ -72,6 +86,7 @@ export type InvestorBriefingFacts = {
   readonly pitches?: readonly PitchFact[] | undefined;
   /** What the slate says about their mandate, when it says anything. */
   readonly mandate?: "ACTIVE" | "NOT_ACTIVE" | "NO_PREFERENCES" | undefined;
+  readonly setupNudge?: SetupNudgeFact | undefined;
 };
 
 export type BriefingFacts = FounderBriefingFacts | InvestorBriefingFacts;
@@ -82,6 +97,11 @@ export type BriefingItem = {
   readonly title: string;
   readonly description: string;
   readonly href: string;
+  /**
+   * The setup reminder's card also offers "Later", which puts reminders
+   * off for a few days (the server's policy says how many).
+   */
+  readonly later?: true | undefined;
 };
 
 export type Briefing = {
@@ -257,6 +277,32 @@ function mandateItems(facts: InvestorBriefingFacts): BriefingItem[] {
 }
 
 /**
+ * One quiet card: how far along, how long the rest takes, and the way back
+ * in. Never a list of what is missing, never urgent words.
+ */
+export function setupNudgeItems(
+  nudge: SetupNudgeFact | undefined,
+): BriefingItem[] {
+  if (nudge === undefined || nudge.doneCount >= nudge.requiredCount) return [];
+  const minutes =
+    nudge.minutesLeft === 1
+      ? "about a minute left"
+      : `about ${String(nudge.minutesLeft)} minutes left`;
+  return [
+    {
+      id: `setup-nudge:${nudge.day}`,
+      title: `Setup: ${String(nudge.doneCount)} of ${String(nudge.requiredCount)} done — ${minutes}`,
+      description:
+        nudge.journeyType === "investor"
+          ? "Finish your mandate when you're ready; your feed sharpens with it."
+          : "Finish your company setup when you're ready; Q picks up where you left off.",
+      href: `/onboarding/${nudge.journeyType}?from=home`,
+      later: true,
+    },
+  ];
+}
+
+/**
  * The briefing, or null when there is nothing to say. What needs them
  * comes first, then what changed, then what is worth a look.
  */
@@ -267,10 +313,17 @@ export function composeBriefing(facts: BriefingFacts): Briefing | null {
   if (facts.role === "FOUNDER") {
     needs.push(...interestItems(facts.interest));
     changed.push(...relationshipItems(facts));
-    worth.push(...readinessItems(facts.readinessGaps));
+    worth.push(
+      ...setupNudgeItems(facts.setupNudge),
+      ...readinessItems(facts.readinessGaps),
+    );
   } else {
     changed.push(...relationshipItems(facts));
-    worth.push(...pitchItems(facts), ...mandateItems(facts));
+    worth.push(
+      ...setupNudgeItems(facts.setupNudge),
+      ...pitchItems(facts),
+      ...mandateItems(facts),
+    );
   }
   const items = [...needs, ...changed, ...worth].slice(0, MAX_BRIEFING_ITEMS);
   if (items.length === 0) return null;

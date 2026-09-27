@@ -1,6 +1,7 @@
 import "server-only";
 
 import {
+  claimBriefingOnboardingNudge,
   discoverCompanies,
   getMarketplaceReadiness,
   listCompanyRelationships,
@@ -12,6 +13,7 @@ import type {
   DiscoveryCompanySlateDto,
   IncomingInterestListDto,
   MarketplaceReadinessAssessment,
+  OnboardingBriefingNudgeResponse,
   QPendingApprovalList,
   RelationshipListDto,
 } from "@capital-q/contracts";
@@ -27,6 +29,7 @@ import {
   type BriefingFacts,
   type ReadinessGapFact,
   type RelationshipFact,
+  type SetupNudgeFact,
 } from "./briefing";
 
 /**
@@ -58,6 +61,8 @@ export type BriefingReads = {
     companyId: string,
   ) => Promise<MarketplaceReadinessAssessment>;
   readonly companySlate: () => Promise<DiscoveryCompanySlateDto>;
+  /** Today's setup reminder, if the server's policy gives one. */
+  readonly setupNudge: () => Promise<OnboardingBriefingNudgeResponse>;
 };
 
 /** Past this, a read is treated as unanswered rather than waited for. */
@@ -89,6 +94,21 @@ function approvalFacts(
     summary: item.summary,
     conversationId: item.conversationId,
   }));
+}
+
+function setupNudgeFact(
+  response: OnboardingBriefingNudgeResponse | undefined,
+): SetupNudgeFact | undefined {
+  const nudge = response?.nudge ?? null;
+  return nudge === null
+    ? undefined
+    : {
+        journeyType: nudge.journeyType,
+        doneCount: nudge.doneCount,
+        requiredCount: nudge.requiredCount,
+        minutesLeft: nudge.minutesLeft,
+        day: nudge.day,
+      };
 }
 
 function relationshipFacts(
@@ -143,14 +163,14 @@ export async function readBriefingFacts(
   switch (context.kind) {
     case "FOUNDER": {
       const { companyId } = context;
-      const [approvals, relationships, interest, readiness] = await Promise.all(
-        [
+      const [approvals, relationships, interest, readiness, nudge] =
+        await Promise.all([
           within(reads.pendingApprovals),
           within(() => reads.companyRelationships(companyId)),
           within(() => reads.incomingInterest(companyId)),
           within(() => reads.readiness(companyId)),
-        ],
-      );
+          within(reads.setupNudge),
+        ]);
       return {
         role: "FOUNDER",
         since,
@@ -163,13 +183,15 @@ export async function readBriefingFacts(
             investorName: item.investorName,
           })),
         readinessGaps: readinessGaps(readiness, companyId),
+        setupNudge: setupNudgeFact(nudge),
       };
     }
     case "INVESTOR": {
-      const [approvals, relationships, slate] = await Promise.all([
+      const [approvals, relationships, slate, nudge] = await Promise.all([
         within(reads.pendingApprovals),
         within(reads.investorRelationships),
         within(reads.companySlate),
+        within(reads.setupNudge),
       ]);
       return {
         role: "INVESTOR",
@@ -190,6 +212,7 @@ export async function readBriefingFacts(
               : slate.notes.includes("MANDATE_HAS_NO_PREFERENCES")
                 ? "NO_PREFERENCES"
                 : "ACTIVE",
+        setupNudge: setupNudgeFact(nudge),
       };
     }
     case "NONE":
@@ -227,6 +250,7 @@ export async function resolveBriefing(
           listIncomingInterest(session, companyId),
         readiness: (companyId) => getMarketplaceReadiness(session, companyId),
         companySlate: () => discoverCompanies(session, { limit: SLATE_LOOK }),
+        setupNudge: () => claimBriefingOnboardingNudge(session),
       },
       new Date(),
     );
