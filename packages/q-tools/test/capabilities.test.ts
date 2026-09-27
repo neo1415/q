@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { Q_NAVIGATE_DESTINATIONS } from "@capital-q/contracts";
+import {
+  Q_CLIENT_ACTION_TOOLS,
+  Q_NAVIGATE_DESTINATIONS,
+} from "@capital-q/contracts";
 
 import {
   createDefaultQTools,
@@ -40,6 +43,8 @@ const EVERY_PORT: QToolPorts = {
   visibility: STUB,
   handleClaims: STUB,
   pendingProposals: STUB,
+  qCards: STUB,
+  clientActions: true,
 };
 
 const EVERY_TOOL = [
@@ -85,9 +90,13 @@ describe("the capability registry is complete", () => {
         expect(capability.approval, providerName).toBe("INSTANT");
         continue;
       }
-      if (providerName === "approve_pending_proposal") {
+      if (
+        providerName === "approve_pending_proposal" ||
+        (Q_CLIENT_ACTION_TOOLS as readonly string[]).includes(providerName)
+      ) {
         // The person's own decision on a change another capability
-        // prepared: it proposes nothing, so it has no action of its own.
+        // prepared, or the app's own action in their browser, reversible
+        // there: done at once, never an Approval Engine action of its own.
         expect(capability.approval, providerName).toBe("INSTANT");
         expect(capability.executes, providerName).toEqual([]);
         continue;
@@ -98,6 +107,17 @@ describe("the capability registry is complete", () => {
       expect(capability.executes.length > 0, providerName).toBe(
         capability.approval === "PREPARE_APPROVE",
       );
+    }
+  });
+
+  it("the client actions and the Q Card read are registered tools (live test 2026-09-27 #4)", () => {
+    const listed = new Set(toolEntries.map((entry) => entry.providerName));
+    for (const name of [...Q_CLIENT_ACTION_TOOLS, "get_q_card"]) {
+      expect(listed.has(name), name).toBe(true);
+      expect(
+        EVERY_TOOL.some((tool) => tool.providerName === name),
+        name,
+      ).toBe(true);
     }
   });
 

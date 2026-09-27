@@ -227,6 +227,14 @@ export type QToolPorts = {
    * approve tool does not exist and approval stays on the card.
    */
   readonly pendingProposals?: PendingProposalPort | undefined;
+  /** "Is my card saved?": the Q Card screen's own read. */
+  readonly qCards?: QCardReadPort | undefined;
+  /**
+   * R20/R33: the answer's screen performs client actions (theme, reload,
+   * their own website). True where a person's screen reads the answer;
+   * absent, the client-action tools do not exist.
+   */
+  readonly clientActions?: boolean | undefined;
 };
 
 /**
@@ -288,6 +296,23 @@ export type PendingProposalPort = {
     context: PendingProposalContext,
     proposalId: string,
   ) => Promise<{ readonly status: ProposalPlainStatus | "CHANGED" }>;
+
+/**
+ * The person's own Q Card, read as the Q Card screen reads it (the public
+ * identity service authorises card.view again). Null: none made yet.
+ */
+export type QCardReadPort = {
+  readonly getCard: (
+    actor: ActorContext,
+    subject: {
+      readonly subjectType: "COMPANY" | "INVESTOR_ORGANISATION";
+      readonly subjectId: string;
+    },
+  ) => Promise<{
+    readonly handle: string | null;
+    readonly indexable: boolean;
+    readonly updatedAt: string;
+  } | null>;
 };
 
 /**

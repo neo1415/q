@@ -40,6 +40,7 @@ export const Q_CAPABILITY_GROUPS = [
   "RELATIONSHIP",
   "RECORDS",
   "ONBOARDING",
+  "SETTINGS",
 ] as const;
 export type QCapabilityGroup = (typeof Q_CAPABILITY_GROUPS)[number];
 
@@ -229,6 +230,23 @@ export const Q_CAPABILITIES: readonly QCapability[] = Object.freeze([
     "approve_pending_proposal",
     "RECORDS",
     "Approves, when they say so, the one change Q prepared in this conversation that is waiting for their decision, exactly as the Approve button on its card does.",
+  ),
+  tool(
+    "get_q_card",
+    "HANDLE",
+    "Reads their own Q Card: whether it is made and saved, its handle, and whether it is findable.",
+  ),
+  // R20/R33: the app's own actions in their browser, done at once.
+  tool(
+    "set_theme",
+    "SETTINGS",
+    "Switches the app's appearance to light, dark or system.",
+  ),
+  tool("reload_page", "NAVIGATION", "Reloads the page they are on."),
+  tool(
+    "open_website",
+    "NAVIGATION",
+    "Opens their own website (from their own record, or as they gave it) in a new tab.",
   ),
   tool(
     "propose_share_raise",

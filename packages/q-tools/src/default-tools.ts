@@ -21,6 +21,8 @@ import { createRelationshipTools } from "./tools/relationships.js";
 import { createGetPitchMomentTool } from "./tools/pitch-moment.js";
 import { createVisibilityTools } from "./tools/visibility.js";
 import { createSearchCompaniesTool } from "./tools/search-companies.js";
+import { createClientActionTools } from "./tools/client-actions.js";
+import { createGetQCardTool } from "./tools/q-card.js";
 
 /**
  * The catalogue: four SAFE_READ tools over public query ports, plus the two
@@ -78,6 +80,13 @@ export function createDefaultQTools(
     ...(ports.pendingProposals === undefined
       ? []
       : [createApprovePendingProposalTool(ports.pendingProposals)]),
+    // Founder live test 2026-09-27 #4: "is my card saved?".
+    ...(ports.qCards === undefined
+      ? []
+      : [createGetQCardTool(ports, ports.qCards)]),
+    // R20/R33: the app's own actions in their browser (theme, reload,
+    // their own website), where a screen reads the answer.
+    ...(ports.clientActions === true ? createClientActionTools(ports) : []),
   ];
 }
 

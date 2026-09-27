@@ -56,6 +56,7 @@ export type {
   HandleClaimPort,
   PendingProposalContext,
   PendingProposalPort,
+  QCardReadPort,
   ProfileChangePort,
   ProposalPlainStatus,
   QToolPorts,
@@ -63,6 +64,25 @@ export type {
   RelationshipIntelligencePort,
   VisibilityIntelligencePort,
 } from "./ports.js";
+export {
+  createClientActionTools,
+  createOpenWebsiteTool,
+  createReloadPageTool,
+  createSetThemeTool,
+  OPEN_WEBSITE,
+  OpenWebsiteInputSchema,
+  RELOAD_PAGE,
+  SET_THEME,
+  SetThemeInputSchema,
+  siteHost,
+} from "./tools/client-actions.js";
+export {
+  createGetQCardTool,
+  GET_Q_CARD,
+  GetQCardInputSchema,
+  GetQCardOutputSchema,
+  type GetQCardOutput,
+} from "./tools/q-card.js";
 export {
   createProposeHandleClaimTool,
   PROPOSE_HANDLE_CLAIM,
