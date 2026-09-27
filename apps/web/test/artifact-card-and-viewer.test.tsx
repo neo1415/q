@@ -508,8 +508,8 @@ describe("BIZ-001 · downloading from the card", () => {
     // click, observed rather than performed.
     const createObjectURL = vi.fn(() => "blob:q-artifact");
     const original = {
-      create: URL.createObjectURL,
-      revoke: URL.revokeObjectURL,
+      create: Object.getOwnPropertyDescriptor(URL, "createObjectURL"),
+      revoke: Object.getOwnPropertyDescriptor(URL, "revokeObjectURL"),
     };
     URL.createObjectURL = createObjectURL;
     URL.revokeObjectURL = vi.fn();
@@ -546,8 +546,16 @@ describe("BIZ-001 · downloading from the card", () => {
     expect(createObjectURL).toHaveBeenCalledTimes(1);
     expect(screen.queryByText("That file didn't download")).toBeNull();
     click.mockRestore();
-    URL.createObjectURL = original.create;
-    URL.revokeObjectURL = original.revoke;
+    for (const [name, descriptor] of [
+      ["createObjectURL", original.create],
+      ["revokeObjectURL", original.revoke],
+    ] as const) {
+      if (descriptor === undefined) {
+        Reflect.deleteProperty(URL, name);
+      } else {
+        Object.defineProperty(URL, name, descriptor);
+      }
+    }
   });
 
   it("says the route's sentence beside the button when the file cannot be made, and stays put", async () => {
