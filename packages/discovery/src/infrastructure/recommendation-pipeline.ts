@@ -75,9 +75,11 @@ import {
   createPostgresCompanyCardPort,
   createPostgresDiscoverablePoolPort,
 } from "./postgres-discovery-repository.js";
+import type { DiscoverFilterFactsPort } from "../slates/filters.js";
 import { createInteractionRerankSignals } from "./interaction-rerank-signals.js";
 import { createPostgresFeatureSnapshotStore } from "./postgres-feature-snapshot-store.js";
 import { createPostgresInteractionRepository } from "./postgres-interaction-repository.js";
+import { createPostgresCompanySectorsPort } from "./postgres-filter-facts.js";
 import { createPostgresSemanticRepresentationStore } from "./postgres-semantic-store.js";
 import {
   createPostgresRefreshRequestStore,
@@ -180,6 +182,12 @@ export type SlateReadPipelineDependencies = {
   readonly disclosure: DisclosureAccessService;
   /** When present, a page with no servable slate asks the queue for a rebuild. */
   readonly queue?: RefreshQueue | undefined;
+  /**
+   * Discover filter facts other contexts own (a raise shared with the
+   * reader, verification, a pitch), composed by the app. Sectors are read
+   * here, from declared taxonomy assignments.
+   */
+  readonly filterFacts?: Omit<DiscoverFilterFactsPort, "sectors"> | undefined;
   readonly policy?: SlatePolicy | undefined;
   readonly clock?: (() => Date) | undefined;
   readonly logger?: Logger | undefined;
@@ -237,6 +245,10 @@ export function createSlateReadPipeline(
     slates,
     cards: createPostgresCompanyCardPort({ sql }),
     pool: createPostgresDiscoverablePoolPort({ sql }),
+    filterFacts: {
+      ...dependencies.filterFacts,
+      ...createPostgresCompanySectorsPort({ sql }),
+    },
     requester,
     policy,
     clock,

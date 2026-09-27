@@ -252,6 +252,14 @@ export const SlateCursorSchema = z
     slateId: SlateIdSchema,
     /** The last rank already served; the next page starts after it. */
     afterRank: z.number().int().min(0),
+    /**
+     * The Discover filters' fingerprint the page was read under; absent
+     * for an unfiltered scroll. A request with other filters starts again.
+     */
+    f: z
+      .string()
+      .regex(/^[0-9a-f]{16}$/)
+      .optional(),
   })
   .strict();
 export type SlateCursor = z.infer<typeof SlateCursorSchema>;

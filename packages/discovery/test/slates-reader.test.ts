@@ -30,6 +30,7 @@ import type {
   RefreshRequester,
   RequestRefreshInput,
 } from "../src/slates/refresh.js";
+import { compareAmounts } from "../src/slates/filters.js";
 import { memorySlates } from "./support/memory-slates.js";
 
 /**
@@ -205,6 +206,18 @@ function harness(
     readonly stageUnknown?: readonly string[];
     /** The mandate declares an exclusion V1 cannot evaluate (red_flag). */
     readonly redFlag?: boolean;
+    /** Per-company declared card facts; NG / seed otherwise. */
+    readonly cardFacts?: Readonly<
+      Record<
+        string,
+        {
+          readonly country?: string | null;
+          readonly stage?: string | null;
+        }
+      >
+    >;
+    /** Discover filter facts (ux/discover-filters). */
+    readonly filterFacts?: SlateReadServiceDependencies["filterFacts"];
   } = {},
 ) {
   const store = memorySlates();
@@ -254,8 +267,14 @@ function harness(
                 companyId,
                 canonicalName: `Company ${companyId.slice(-2)}`,
                 websiteUrl: null,
-                headquartersCountry: "NG",
-                currentStageCode: "seed",
+                headquartersCountry:
+                  options.cardFacts?.[companyId]?.country === undefined
+                    ? "NG"
+                    : options.cardFacts[companyId].country,
+                currentStageCode:
+                  options.cardFacts?.[companyId]?.stage === undefined
+                    ? "seed"
+                    : options.cardFacts[companyId].stage,
                 shortDescription: `${MARKER.slice(0, 6)}-free description`,
               },
             ]),
@@ -379,6 +398,7 @@ function harness(
     cards,
     pool,
     requester: options.requester === false ? undefined : requester,
+    filterFacts: options.filterFacts,
     clock: () => now,
   });
   return {
@@ -811,5 +831,211 @@ describe("why a slate is empty, and what could not be checked", () => {
     expect(page.items.every((i) => i.unverifiedExclusions.length === 0)).toBe(
       true,
     );
+  });
+});
+
+describe("Discover filters narrow the served slate (ux/discover-filters)", () => {
+  const FINTECH = "eacf7107-9af3-5b76-91a2-3c169e396347";
+  const HEALTH = "7c953fc5-a6bc-5014-afef-068150e5209a";
+  const none = {
+    sectorNodeIds: [],
+    stageCodes: [],
+    countryCodes: [],
+    raise: null,
+    raiseDisclosedOnly: false,
+    verifiedOnly: false,
+    hasPitch: false,
+  };
+
+  it("keeps slate order, drops non-matches, and keeps unknown countries marked", async () => {
+    const h = harness({
+      cardFacts: {
+        [id(2)]: { country: "KE" },
+        [id(3)]: { country: null },
+        [id(5)]: { country: "KE" },
+      },
+    });
+    await publish(h.store, KEY, 6);
+    const page = await h.reader.pageCompanies({
+      actor,
+      limit: 10,
+      filters: { ...none, countryCodes: ["NG"] },
+    });
+    expect(page.items.map((i) => i.companyId)).toEqual([
+      id(1),
+      id(3),
+      id(4),
+      id(6),
+    ]);
+    expect(
+      page.items.find((i) => i.companyId === id(3))?.filterUnknown,
+    ).toEqual(["country"]);
+    expect(page.items[0]?.filterUnknown).toEqual([]);
+    expect(page.nextCursor).toBeNull();
+  });
+
+  it("an undisclosed raise stays under 'Raise not shared' unless disclosed-only is asked", async () => {
+    const raises = new Map([
+      [id(1), { amount: "500000", currency: "USD" }],
+      [id(2), { amount: "5000000", currency: "USD" }],
+      [id(3), { amount: "500000", currency: "NGN" }],
+    ]);
+    const asked: string[][] = [];
+    const h = harness({
+      filterFacts: {
+        disclosedRaises: ({ companyIds }) => {
+          asked.push([...companyIds]);
+          return Promise.resolve(
+            new Map([...raises].filter(([c]) => companyIds.includes(c))),
+          );
+        },
+      },
+    });
+    await publish(h.store, KEY, 4);
+    const range = { min: "100000", max: "1000000", currency: "USD" };
+    const open = await h.reader.pageCompanies({
+      actor,
+      limit: 10,
+      filters: { ...none, raise: range },
+    });
+    expect(open.items.map((i) => [i.companyId, i.filterUnknown])).toEqual([
+      [id(1), []],
+      [id(3), ["raise"]],
+      [id(4), ["raise"]],
+    ]);
+    const disclosed = await h.reader.pageCompanies({
+      actor,
+      limit: 10,
+      filters: { ...none, raise: range, raiseDisclosedOnly: true },
+    });
+    expect(disclosed.items.map((i) => i.companyId)).toEqual([id(1)]);
+    // The raise is asked only for companies the guards already allowed.
+    expect(asked.every((ids) => ids.length <= 4)).toBe(true);
+  });
+
+  it("sector, verified and pitch filters need the positive fact; a missing sector is unknown", async () => {
+    const h = harness({
+      filterFacts: {
+        sectors: (ids) =>
+          Promise.resolve(
+            new Map<string, readonly string[]>(
+              ids.flatMap((c): [string, readonly string[]][] =>
+                c === id(1)
+                  ? [[c, [FINTECH]]]
+                  : c === id(2)
+                    ? [[c, [HEALTH]]]
+                    : c === id(3)
+                      ? [[c, [FINTECH]]]
+                      : [],
+              ),
+            ),
+          ),
+        verified: () => Promise.resolve(new Set([id(1), id(4)])),
+        withPitch: () => Promise.resolve(new Set([id(1), id(3), id(4)])),
+      },
+    });
+    await publish(h.store, KEY, 4);
+    const sector = await h.reader.pageCompanies({
+      actor,
+      filters: { ...none, sectorNodeIds: [FINTECH] },
+    });
+    expect(sector.items.map((i) => [i.companyId, i.filterUnknown])).toEqual([
+      [id(1), []],
+      [id(3), []],
+      [id(4), ["sector"]],
+    ]);
+    const strict = await h.reader.pageCompanies({
+      actor,
+      filters: { ...none, verifiedOnly: true, hasPitch: true },
+    });
+    expect(strict.items.map((i) => i.companyId)).toEqual([id(1), id(4)]);
+  });
+
+  it("the cursor carries the filters: pages stay consistent, and a filter change restarts from the first page", async () => {
+    const h = harness({
+      cardFacts: Object.fromEntries(
+        Array.from({ length: 9 }, (_, n) => [
+          id(n + 1),
+          { country: n % 2 === 0 ? "NG" : "KE" },
+        ]),
+      ),
+    });
+    const slate = await publish(h.store, KEY, 9);
+    const filters = { ...none, countryCodes: ["NG"] };
+    const first = await h.reader.pageCompanies({ actor, limit: 2, filters });
+    expect(first.items.map((i) => i.companyId)).toEqual([id(1), id(3)]);
+    const cursor = decodeSlateCursor(first.nextCursor ?? "");
+    expect(cursor.slateId).toBe(slate.id);
+    expect(cursor.afterRank).toBe(3);
+    expect(cursor.f).toMatch(/^[0-9a-f]{16}$/);
+
+    const seen = [...first.items.map((i) => i.companyId)];
+    let next = first.nextCursor;
+    while (next !== null) {
+      const page = await h.reader.pageCompanies({
+        actor,
+        limit: 2,
+        filters,
+        cursor: next,
+      });
+      expect(page.notes).toEqual([]);
+      seen.push(...page.items.map((i) => i.companyId));
+      next = page.nextCursor;
+    }
+    expect(seen).toEqual([id(1), id(3), id(5), id(7), id(9)]);
+
+    // Same cursor, other filters: starts again, and says so.
+    const changed = await h.reader.pageCompanies({
+      actor,
+      limit: 2,
+      filters: { ...none, countryCodes: ["KE"] },
+      cursor: first.nextCursor,
+    });
+    expect(changed.notes).toEqual(["SLATE_RESTARTED"]);
+    expect(changed.items.map((i) => i.companyId)).toEqual([id(2), id(4)]);
+    // A filtered cursor used without filters restarts too.
+    const cleared = await h.reader.pageCompanies({
+      actor,
+      limit: 2,
+      cursor: first.nextCursor,
+    });
+    expect(cleared.notes).toEqual(["SLATE_RESTARTED"]);
+    expect(cleared.items.map((i) => i.companyId)).toEqual([id(1), id(2)]);
+  });
+
+  it("filters never show what the guards withheld, and say when nothing matches", async () => {
+    const h = harness({ ineligible: [id(1)], passed: [id(2)] });
+    await publish(h.store, KEY, 3);
+    const page = await h.reader.pageCompanies({
+      actor,
+      filters: { ...none, countryCodes: ["NG"] },
+    });
+    expect(page.items.map((i) => i.companyId)).toEqual([id(3)]);
+    const empty = await h.reader.pageCompanies({
+      actor,
+      filters: { ...none, countryCodes: ["GB"] },
+    });
+    expect(empty.items).toEqual([]);
+    expect(empty.notes).toEqual(["NONE_MATCH_FILTERS"]);
+    expect(empty.nextCursor).toBeNull();
+  });
+
+  it("without filters the page is exactly as before (no fingerprint, no filterUnknown)", async () => {
+    const h = harness();
+    await publish(h.store, KEY, 3);
+    const page = await h.reader.pageCompanies({
+      actor,
+      limit: 2,
+      filters: none,
+    });
+    expect(page.items[0]).not.toHaveProperty("filterUnknown");
+    expect(decodeSlateCursor(page.nextCursor ?? "")).not.toHaveProperty("f");
+  });
+
+  it("compares raise amounts exactly, never as floats", () => {
+    expect(compareAmounts("1000000", "999999.99")).toBe(1);
+    expect(compareAmounts("0500", "500.00")).toBe(0);
+    expect(compareAmounts("0.1", "0.10")).toBe(0);
+    expect(compareAmounts("12.5", "12.50001")).toBe(-1);
   });
 });

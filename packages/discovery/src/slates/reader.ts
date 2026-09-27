@@ -1,4 +1,8 @@
-import { ContractValidationError } from "@capital-q/contracts";
+import {
+  ContractValidationError,
+  type DiscoverFilterDimension,
+  type DiscoverFilters,
+} from "@capital-q/contracts";
 import { getMeter, type Logger } from "@capital-q/observability";
 import type { ActorContext } from "@capital-q/security";
 
@@ -30,6 +34,13 @@ import type {
   SlateKey,
   SlateRepository,
 } from "./ports.js";
+import {
+  activeFilters,
+  discoverFiltersFingerprint,
+  evaluateDiscoverFilters,
+  raiseFilterActive,
+  type DiscoverFilterFactsPort,
+} from "./filters.js";
 import type { RefreshRequester } from "./refresh.js";
 
 /**
@@ -79,6 +90,8 @@ export const SLATE_PAGE_NOTES = [
   "RECOMMENDATIONS_REFRESHING",
   /** The cursor's slate is no longer servable; this page starts the current one. */
   "SLATE_RESTARTED",
+  /** The reader's Discover filters left nothing in the slate. */
+  "NONE_MATCH_FILTERS",
 ] as const;
 export type SlatePageNote = (typeof SLATE_PAGE_NOTES)[number];
 
@@ -90,6 +103,11 @@ export type SlatePageItem = CompanyCard & {
    * company is shown; the investor is told the rule was not checked.
    */
   readonly unverifiedExclusions: readonly string[];
+  /**
+   * Filters the reader applied that this company's facts could not answer
+   * (kept, never silently excluded). Absent when no filter was applied.
+   */
+  readonly filterUnknown?: readonly DiscoverFilterDimension[] | undefined;
 };
 
 export type SlatePage = {
@@ -116,6 +134,12 @@ export type PageCompaniesQuery = {
   readonly mandateId?: string | null | undefined;
   readonly limit?: number | undefined;
   readonly cursor?: string | null | undefined;
+  /**
+   * The reader's Discover filters: they narrow this page at read time and
+   * never re-rank. The cursor carries their fingerprint; a request whose
+   * filters differ from its cursor's starts from the first page.
+   */
+  readonly filters?: DiscoverFilters | null | undefined;
 };
 
 export type SlateReadService = {
@@ -147,6 +171,12 @@ export type SlateReadServiceDependencies = {
    * removed twelve discoverable companies.
    */
   readonly pool: DiscoverablePoolPort;
+  /**
+   * The facts Discover filters need beyond the declared card (sector,
+   * a raise shared with this reader, verification, a pitch). Absent, a
+   * filter on them treats the fact as unknown.
+   */
+  readonly filterFacts?: DiscoverFilterFactsPort | undefined;
   /** When present, a missing or expired slate asks for a rebuild. */
   readonly requester?: RefreshRequester | undefined;
   readonly policy?: SlatePolicy | undefined;
@@ -177,6 +207,7 @@ export function createSlateReadService(
     requester,
     logger,
   } = dependencies;
+  const filterFacts = dependencies.filterFacts ?? {};
   const policy = dependencies.policy ?? SLATE_POLICY_V1;
   const clock = dependencies.clock ?? (() => new Date());
   const meter = getMeter("@capital-q/discovery");
@@ -268,6 +299,240 @@ export function createSlateReadService(
       : say("NO_DISCOVERABLE_COUNTERPARTS");
   };
 
+  /**
+   * The read-time guards for a run of slate items, in rank order: REC-001
+   * for this actor, what this organisation has passed on, and a declared
+   * card. Withheld companies leave a gap, never a substitute.
+   */
+  const guard = async (input: {
+    readonly actor: ActorContext;
+    readonly key: SlateKey;
+    readonly mandateVersion: number;
+    readonly items: readonly RecommendationItem[];
+  }): Promise<{
+    readonly items: readonly (SlatePageItem & { readonly rank: number })[];
+    readonly suppressed: number;
+  }> => {
+    const companyIds = input.items.map((i) => i.companyId);
+    const [evaluation, suppressedIds] = await Promise.all([
+      eligibility.evaluate({
+        actor: input.actor,
+        mode: MODE,
+        mandateId: input.key.mandateId,
+        companyIds,
+      }),
+      suppression.suppressedCompanyIds({
+        tenantId: input.key.tenantId,
+        investorOrganisationId: input.key.investorOrganisationId,
+        mandateId: input.key.mandateId,
+        mandateVersion: input.mandateVersion,
+        companyIds,
+      }),
+    ]);
+    const resultById = new Map(
+      evaluation.results.map((r) => [r.companyId, r] as const),
+    );
+    const eligibleIds = new Set(
+      evaluation.results
+        .filter((r) => r.decision === "ELIGIBLE")
+        .map((r) => r.companyId),
+    );
+    // A passed company stays in the slate, so the ordering remains
+    // reproducible and the history remains auditable; it simply is not
+    // offered again. The tail of a slate is still reachable, which is
+    // why demotion alone was not suppression (REC-009R).
+    const shown = input.items.filter(
+      (i) => eligibleIds.has(i.companyId) && !suppressedIds.has(i.companyId),
+    );
+    const cardById = await cards.cardsByIds(shown.map((i) => i.companyId));
+    const items: (SlatePageItem & { readonly rank: number })[] = [];
+    for (const item of shown) {
+      const card = cardById.get(item.companyId);
+      // A company without a declared card is withheld, not invented.
+      if (card === undefined) continue;
+      const result = resultById.get(item.companyId);
+      items.push({
+        ...card,
+        rank: item.rank,
+        reasonCodes: item.reasonCodes.filter((code) =>
+          PUBLIC_REASON_CODES.includes(code),
+        ),
+        unverifiedExclusions:
+          result === undefined ? [] : unverifiedExclusions(result),
+      });
+    }
+    return { items, suppressed: suppressedIds.size };
+  };
+
+  /** The filters' verdict on guarded items, in rank order; ranks unchanged. */
+  const applyFilters = async (input: {
+    readonly actor: ActorContext;
+    readonly filters: DiscoverFilters;
+    readonly items: readonly (SlatePageItem & { readonly rank: number })[];
+  }): Promise<ReadonlyMap<string, SlatePageItem>> => {
+    const { filters, actor } = input;
+    const ids = input.items.map((i) => i.companyId);
+    const out = new Map<string, SlatePageItem>();
+    if (ids.length === 0) return out;
+    const none = <T>(): Promise<T | null> => Promise.resolve(null);
+    const [sectors, raises, verified, pitched] = await Promise.all([
+      filters.sectorNodeIds.length > 0 && filterFacts.sectors !== undefined
+        ? filterFacts.sectors(ids)
+        : none<ReadonlyMap<string, readonly string[]>>(),
+      raiseFilterActive(filters) && filterFacts.disclosedRaises !== undefined
+        ? filterFacts.disclosedRaises({ actor, companyIds: ids })
+        : none<ReadonlyMap<string, { amount: string; currency: string }>>(),
+      filters.verifiedOnly && filterFacts.verified !== undefined
+        ? filterFacts.verified(ids)
+        : none<ReadonlySet<string>>(),
+      filters.hasPitch && filterFacts.withPitch !== undefined
+        ? filterFacts.withPitch(ids)
+        : none<ReadonlySet<string>>(),
+    ]);
+    for (const { rank: _rank, ...item } of input.items) {
+      const verdict = evaluateDiscoverFilters(filters, {
+        stageCode: item.currentStageCode,
+        country: item.headquartersCountry,
+        sectorNodeIds:
+          sectors === null ? null : (sectors.get(item.companyId) ?? []),
+        raise: raises?.get(item.companyId) ?? null,
+        verified: verified?.has(item.companyId) ?? false,
+        hasPitch: pitched?.has(item.companyId) ?? false,
+      });
+      if (verdict.pass) {
+        out.set(item.companyId, { ...item, filterUnknown: verdict.unknown });
+      }
+    }
+    return out;
+  };
+
+  /**
+   * A filtered page: scan the slate forward from the cursor in rank order,
+   * guard each run of items exactly as an unfiltered page does, keep what
+   * the filters pass, and stop at a full page or the slate's end. The scan
+   * is bounded by the candidate budget a slate is built from, so one
+   * request reads at most one slate's worth of items. The continuation is
+   * the last rank considered, with the filters' fingerprint, so the next
+   * page resumes the same scan under the same filters.
+   */
+  const pageFiltered = async (input: {
+    readonly actor: ActorContext;
+    readonly key: SlateKey;
+    readonly mandateVersion: number;
+    readonly slate: RecommendationSlate;
+    readonly afterRank: number;
+    readonly limit: number;
+    readonly filters: DiscoverFilters;
+    readonly fingerprint: string;
+    readonly notes: readonly SlatePageNote[];
+    readonly unverifiable: readonly string[];
+    readonly outdatedPolicy: boolean;
+    readonly investorOrganisationId: string;
+  }): Promise<SlatePage> => {
+    const { slate, limit } = input;
+    const batchSize = Math.min(
+      policy.candidatePoolMax,
+      ELIGIBILITY_BATCH_MAX,
+      Math.max(limit * 3, 30),
+    );
+    const items: SlatePageItem[] = [];
+    let after = input.afterRank;
+    let lastConsidered = input.afterRank;
+    let scanned = 0;
+    let exhausted = false;
+    let more = false;
+    while (items.length < limit && scanned < policy.candidatePoolMax) {
+      const batch = await slates.pageItems({
+        slateId: slate.id,
+        afterRank: after,
+        limit: Math.min(batchSize, policy.candidatePoolMax - scanned),
+      });
+      if (batch.length === 0) {
+        exhausted = true;
+        break;
+      }
+      scanned += batch.length;
+      const guarded = await guard({
+        actor: input.actor,
+        key: input.key,
+        mandateVersion: input.mandateVersion,
+        items: batch,
+      });
+      const passed = await applyFilters({
+        actor: input.actor,
+        filters: input.filters,
+        items: guarded.items,
+      });
+      for (const item of batch) {
+        if (items.length === limit) {
+          more = true;
+          break;
+        }
+        lastConsidered = item.rank;
+        const kept = passed.get(item.companyId);
+        if (kept !== undefined) items.push(kept);
+      }
+      if (more) break;
+      const last = batch[batch.length - 1];
+      if (last !== undefined) after = last.rank;
+      if (batch.length < batchSize) {
+        exhausted = true;
+        break;
+      }
+    }
+    const nextCursor =
+      more || !exhausted
+        ? encodeSlateCursor({
+            v: 1,
+            slateId: slate.id,
+            afterRank: lastConsidered,
+            f: input.fingerprint,
+          })
+        : null;
+
+    metrics.pages.add(1, { outcome: items.length > 0 ? "SERVED" : "EMPTY" });
+    metrics.served.record(items.length);
+    logger?.debug(
+      {
+        slateId: slate.id,
+        afterRank: input.afterRank,
+        scanned,
+        served: items.length,
+        filtered: true,
+        restarted: input.notes.includes("SLATE_RESTARTED"),
+      },
+      "recommendation slate page served (filtered)",
+    );
+    const base = {
+      slateId: slate.id,
+      rankingVersion: slate.rankingConfigVersion,
+      items,
+      nextCursor,
+      unverifiableExclusions: input.unverifiable,
+      excludingRules: [],
+      discoverableCount: null,
+    };
+    if (items.length > 0 || input.afterRank > 0 || nextCursor !== null) {
+      return { ...base, notes: input.notes };
+    }
+    // An empty first page. When the slate itself is empty, the filters are
+    // not the reason: say what is, as an unfiltered page would.
+    if (scanned === 0) {
+      return {
+        ...base,
+        ...(await classifyEmpty({
+          key: input.key,
+          investorOrganisationId: input.investorOrganisationId,
+          actor: input.actor,
+          slate,
+          outdatedPolicy: input.outdatedPolicy,
+          notes: input.notes,
+        })),
+      };
+    }
+    return { ...base, notes: [...input.notes, "NONE_MATCH_FILTERS"] };
+  };
+
   return {
     pageCompanies: async (query) => {
       const now = clock();
@@ -319,6 +584,9 @@ export function createSlateReadService(
       };
 
       const unverifiable = unverifiableHardExclusions(lookup.mandate);
+      const filters = activeFilters(query.filters);
+      const fingerprint =
+        filters === null ? undefined : discoverFiltersFingerprint(filters);
       const notes: SlatePageNote[] = [];
       let slate: RecommendationSlate | null = null;
       let afterRank = 0;
@@ -334,7 +602,11 @@ export function createSlateReadService(
         ) {
           throw new SlateCursorRejectedError();
         }
-        if (servable(named, now)) {
+        if (cursor.f !== fingerprint) {
+          // Other filters than the scroll was read under: pages would not
+          // be consistent, so this one starts from the first page.
+          notes.push("SLATE_RESTARTED");
+        } else if (servable(named, now)) {
           slate = named;
           afterRank = cursor.afterRank;
         } else {
@@ -372,6 +644,23 @@ export function createSlateReadService(
           ...key,
           reason: "SLATE_EXPIRED",
           priority: "HIGH",
+        });
+      }
+
+      if (filters !== null && fingerprint !== undefined) {
+        return pageFiltered({
+          actor: query.actor,
+          key,
+          mandateVersion: lookup.mandate.version,
+          slate,
+          afterRank,
+          limit,
+          filters,
+          fingerprint,
+          notes,
+          unverifiable,
+          outdatedPolicy,
+          investorOrganisationId: subject.investorOrganisationId,
         });
       }
 
@@ -416,53 +705,16 @@ export function createSlateReadService(
       // The read-time guards: REC-001 for this actor, and what this
       // organisation has passed on, both now and both in one batch.
       // Withheld companies leave a shorter page, never a substitute.
-      const companyIds = pageItems.map((i) => i.companyId);
-      const [evaluation, suppressedIds] = await Promise.all([
-        eligibility.evaluate({
-          actor: query.actor,
-          mode: MODE,
-          mandateId: key.mandateId,
-          companyIds,
-        }),
-        suppression.suppressedCompanyIds({
-          tenantId: key.tenantId,
-          investorOrganisationId: key.investorOrganisationId,
-          mandateId: key.mandateId,
-          mandateVersion: lookup.mandate.version,
-          companyIds,
-        }),
-      ]);
-      const resultById = new Map(
-        evaluation.results.map((r) => [r.companyId, r] as const),
+      const guarded = await guard({
+        actor: query.actor,
+        key,
+        mandateVersion: lookup.mandate.version,
+        items: pageItems,
+      });
+      const items: SlatePageItem[] = guarded.items.map(
+        ({ rank: _rank, ...item }) => item,
       );
-      const eligibleIds = new Set(
-        evaluation.results
-          .filter((r) => r.decision === "ELIGIBLE")
-          .map((r) => r.companyId),
-      );
-      // A passed company stays in the slate, so the ordering remains
-      // reproducible and the history remains auditable; it simply is not
-      // offered again. The tail of a slate is still reachable, which is
-      // why demotion alone was not suppression (REC-009R).
-      const shown = pageItems.filter(
-        (i) => eligibleIds.has(i.companyId) && !suppressedIds.has(i.companyId),
-      );
-      const cardById = await cards.cardsByIds(shown.map((i) => i.companyId));
-      const items: SlatePageItem[] = [];
-      for (const item of shown) {
-        const card = cardById.get(item.companyId);
-        // A company without a declared card is withheld, not invented.
-        if (card === undefined) continue;
-        const result = resultById.get(item.companyId);
-        items.push({
-          ...card,
-          reasonCodes: item.reasonCodes.filter((code) =>
-            PUBLIC_REASON_CODES.includes(code),
-          ),
-          unverifiedExclusions:
-            result === undefined ? [] : unverifiedExclusions(result),
-        });
-      }
+      const suppressedCount = guarded.suppressed;
 
       metrics.pages.add(1, { outcome: "SERVED" });
       metrics.served.record(items.length);
@@ -475,7 +727,7 @@ export function createSlateReadService(
           fetched: pageItems.length,
           served: items.length,
           withheld: pageItems.length - items.length,
-          suppressed: suppressedIds.size,
+          suppressed: suppressedCount,
           restarted: notes.includes("SLATE_RESTARTED"),
         },
         "recommendation slate page served",

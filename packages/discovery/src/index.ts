@@ -576,6 +576,15 @@ export {
   type SlateReadService,
   type SlateReadServiceDependencies,
 } from "./slates/reader.js";
+export {
+  compareAmounts,
+  discoverFiltersFingerprint,
+  evaluateDiscoverFilters,
+  type CompanyFilterFacts,
+  type DiscoverFilterFactsPort,
+  type FilterMoney,
+  type FilterVerdict,
+} from "./slates/filters.js";
 export { createPostgresRefreshQueue } from "./infrastructure/postgres-refresh-queue.js";
 export {
   createPostgresCompanyCardPort,
