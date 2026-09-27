@@ -129,6 +129,9 @@ describe("relationship event registry", () => {
       "outreach_sent",
       "reply_received",
       "message_sent",
+      "meeting_scheduled",
+      "meeting_rescheduled",
+      "meeting_cancelled",
     ]);
     expect(DiscoveredRelationshipEvent.allowedVisibilityScopes).not.toContain(
       "relationship_shared",

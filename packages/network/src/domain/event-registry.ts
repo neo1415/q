@@ -195,6 +195,49 @@ export const MessageSentRelationshipEvent = defineRelationshipEvent({
     "A person on one side sent a message on the relationship's chat thread.",
 });
 
+/**
+ * A call on the relationship (BIZ-008). The organiser approved the exact
+ * invite; the event names the communication meeting and nothing else --
+ * never its purpose, times or attendees. Activity only: a meeting is not
+ * interest, a match or an outcome.
+ */
+export const MeetingActivityPayloadSchema = z
+  .object({
+    meetingId: UuidSchema,
+  })
+  .strict();
+export type MeetingActivityPayload = z.infer<
+  typeof MeetingActivityPayloadSchema
+>;
+
+export const RELATIONSHIP_EVENT_MEETING_SCHEDULED =
+  "meeting_scheduled" as const;
+export const MeetingScheduledRelationshipEvent = defineRelationshipEvent({
+  type: RELATIONSHIP_EVENT_MEETING_SCHEDULED,
+  payloadSchema: MeetingActivityPayloadSchema,
+  allowedVisibilityScopes: ["relationship_shared"],
+  description:
+    "A person on one side invited the other side to a call, after approving the exact invite.",
+});
+
+export const RELATIONSHIP_EVENT_MEETING_RESCHEDULED =
+  "meeting_rescheduled" as const;
+export const MeetingRescheduledRelationshipEvent = defineRelationshipEvent({
+  type: RELATIONSHIP_EVENT_MEETING_RESCHEDULED,
+  payloadSchema: MeetingActivityPayloadSchema,
+  allowedVisibilityScopes: ["relationship_shared"],
+  description: "The organiser moved a call to a new time, after approving it.",
+});
+
+export const RELATIONSHIP_EVENT_MEETING_CANCELLED =
+  "meeting_cancelled" as const;
+export const MeetingCancelledRelationshipEvent = defineRelationshipEvent({
+  type: RELATIONSHIP_EVENT_MEETING_CANCELLED,
+  payloadSchema: MeetingActivityPayloadSchema,
+  allowedVisibilityScopes: ["relationship_shared"],
+  description: "The organiser cancelled a call, after approving it.",
+});
+
 export type RelationshipEventRegistry = {
   readonly get: (eventType: string) => RelationshipEventDefinition | undefined;
   readonly types: () => readonly string[];
@@ -271,4 +314,7 @@ export const RELATIONSHIP_EVENT_DEFINITIONS: readonly RelationshipEventDefinitio
     OutreachSentRelationshipEvent,
     ReplyReceivedRelationshipEvent,
     MessageSentRelationshipEvent,
+    MeetingScheduledRelationshipEvent,
+    MeetingRescheduledRelationshipEvent,
+    MeetingCancelledRelationshipEvent,
   ];
