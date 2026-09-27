@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { UtcTimestampSchema } from "@capital-q/contracts";
+import { AuditEventIdSchema } from "@capital-q/audit";
 import {
   createSyntheticVerificationDecider,
   type SyntheticPrincipalPort,
@@ -141,7 +142,7 @@ function world(founder: string) {
       audit: {
         record: (_tx, input) => {
           audits.push(input);
-          return Promise.resolve(input.auditEventId);
+          return Promise.resolve(AuditEventIdSchema.parse(input.auditEventId));
         },
       },
       attestation,
