@@ -25,6 +25,10 @@ export const metadata: Metadata = {
     apple: "/icons/apple-touch-icon.png",
   },
   formatDetection: { telephone: false },
+  // Next renders the standard `mobile-web-app-capable`; older iOS versions
+  // read only Apple's prefixed name for standalone launch from the Home
+  // Screen, so both are declared.
+  other: { "apple-mobile-web-app-capable": "yes" },
 };
 
 export const viewport: Viewport = {

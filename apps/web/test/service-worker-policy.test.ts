@@ -168,7 +168,166 @@ describe("service worker cache policy", () => {
     // allow-list check gates the handler.
     expect(worker.source).toMatch(/response\.ok && response\.type === "basic"/);
     expect(worker.source).toMatch(
-      /if \(!isCacheable\(event\.request, self\.location\.origin\)\) \{\s*return;/,
+      /if \(!isCacheable\(request, origin\)\) \{\s*return;/,
     );
+  });
+});
+
+/**
+ * The handlers themselves, run against fake Cache Storage and network, so
+ * "never stored" is observed rather than inferred from the source.
+ */
+describe("service worker handlers", () => {
+  type Handler = (event: unknown) => void;
+  type FakeRequest = {
+    url: string;
+    method: string;
+    mode?: string;
+    destination?: string;
+    headers?: { has: (name: string) => boolean };
+  };
+
+  function harness(network: (request: FakeRequest) => Promise<unknown>) {
+    const source = readFileSync(
+      fileURLToPath(new URL("../public/sw.js", import.meta.url)),
+      "utf8",
+    );
+    const handlers = new Map<string, Handler>();
+    const stored: string[] = [];
+    const offline = { offline: true };
+    const cache = {
+      match: (request: FakeRequest | string) =>
+        Promise.resolve(
+          (typeof request === "string" ? request : request.url).endsWith(
+            "/offline.html",
+          )
+            ? offline
+            : undefined,
+        ),
+      put: (request: FakeRequest) => {
+        stored.push(request.url);
+        return Promise.resolve();
+      },
+      add: (request: FakeRequest) => {
+        stored.push(request.url);
+        return Promise.resolve();
+      },
+    };
+    const caches = {
+      open: () => Promise.resolve(cache),
+      match: cache.match,
+      keys: () => Promise.resolve([]),
+      delete: () => Promise.resolve(true),
+    };
+    const self = {
+      __cq: undefined as unknown,
+      location: { origin: ORIGIN },
+      addEventListener: (type: string, handler: Handler) => {
+        handlers.set(type, handler);
+      },
+      skipWaiting: () => Promise.resolve(),
+      clients: { claim: () => Promise.resolve() },
+    };
+    class FakeRequestCtor {
+      readonly url: string;
+      constructor(url: string) {
+        this.url = new URL(url, ORIGIN).toString();
+      }
+    }
+    runInNewContext(source, {
+      self,
+      URL,
+      caches,
+      fetch: network,
+      Request: FakeRequestCtor,
+      Response: { error: () => ({ error: true }) },
+    });
+    async function dispatch(request: FakeRequest): Promise<unknown> {
+      const answered: { response: Promise<unknown> | null } = {
+        response: null,
+      };
+      handlers.get("fetch")?.({
+        request,
+        respondWith: (response: Promise<unknown>) => {
+          answered.response = response;
+        },
+      });
+      return answered.response === null
+        ? "NOT_INTERCEPTED"
+        : await answered.response;
+    }
+    async function install(): Promise<void> {
+      let pending: Promise<unknown> = Promise.resolve();
+      handlers.get("install")?.({
+        waitUntil: (promise: Promise<unknown>) => {
+          pending = promise;
+        },
+      });
+      await pending;
+    }
+    return { dispatch, install, stored, offline };
+  }
+
+  const ok = { ok: true, type: "basic", clone: () => ok };
+
+  it("precaches the offline page, and only the offline page, on install", async () => {
+    const worker = harness(() => Promise.resolve(ok));
+    await worker.install();
+    expect(worker.stored).toEqual([`${ORIGIN}/offline.html`]);
+  });
+
+  it("answers a failed navigation with the offline page and stores nothing", async () => {
+    const worker = harness(() => Promise.reject(new TypeError("offline")));
+    const response = await worker.dispatch({
+      ...get("/discover"),
+      mode: "navigate",
+    });
+    expect(response).toBe(worker.offline);
+    expect(worker.stored).toEqual([]);
+  });
+
+  it("passes a working navigation through without storing it", async () => {
+    const page = { ok: true, type: "basic", clone: () => page };
+    const worker = harness(() => Promise.resolve(page));
+    expect(await worker.dispatch({ ...get("/home"), mode: "navigate" })).toBe(
+      page,
+    );
+    expect(worker.stored).toEqual([]);
+  });
+
+  it.each(["/auth/callback?code=abc", "/api/q-stream/v1", "/v1/me"])(
+    "does not touch the navigation %s at all",
+    async (path) => {
+      const worker = harness(() => Promise.resolve(ok));
+      expect(await worker.dispatch({ ...get(path), mode: "navigate" })).toBe(
+        "NOT_INTERCEPTED",
+      );
+    },
+  );
+
+  it.each([
+    { ...get("/v1/companies/1/pitch/2/playback") },
+    { ...get("/api/pitch-captions/abc") },
+    { ...get("/_next/static/media/pitch.mp4") },
+    { ...get("/icons/pitch.m3u8") },
+    { ...get("/_next/static/chunk.js"), destination: "video" },
+    {
+      ...get("/_next/static/chunk.js"),
+      headers: { has: (name: string) => name === "range" },
+    },
+    get("/video/abc/manifest/video.m3u8?token=signed", "https://cdn.test"),
+  ])(
+    "never stores API, media, ranged or signed requests: %o",
+    async (request) => {
+      const worker = harness(() => Promise.resolve(ok));
+      expect(await worker.dispatch(request)).toBe("NOT_INTERCEPTED");
+      expect(worker.stored).toEqual([]);
+    },
+  );
+
+  it("stores a hashed build asset once fetched", async () => {
+    const worker = harness(() => Promise.resolve(ok));
+    await worker.dispatch(get("/_next/static/chunks/app-abc.js"));
+    expect(worker.stored).toEqual([`${ORIGIN}/_next/static/chunks/app-abc.js`]);
   });
 });

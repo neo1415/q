@@ -6,6 +6,7 @@ import { requireSessionUser } from "@/auth/session";
 import { AppShell, type ShellContext } from "@/components/app-shell/app-shell";
 import { resolveOwnContext } from "@/features/q/context";
 import type { QSubject } from "@/features/q/q-subject";
+import { InstallPrompt } from "@/pwa/install-prompt";
 
 // Session-bound HTML is rendered per request and never prerendered or
 // shared-cached (doc 15 s9.4).
@@ -55,6 +56,7 @@ export default async function ApplicationLayout({
   return (
     <AppShell context={shell} subject={subject} qConnected={qConnected}>
       {children}
+      <InstallPrompt />
     </AppShell>
   );
 }

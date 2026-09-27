@@ -12,6 +12,7 @@ const ALLOWED = [
   /\/fonts\//,
   /\/manifest\.webmanifest$/,
   /\/icon\.svg$/,
+  /\/offline\.html$/,
 ];
 
 test.describe("progressive web application", () => {
@@ -28,10 +29,15 @@ test.describe("progressive web application", () => {
       icons: { src: string; sizes: string; type: string; purpose?: string }[];
       theme_color: string;
       background_color: string;
+      shortcuts: { name: string; url: string }[];
     };
     expect(manifest.name).toBe("Capital Q");
     expect(manifest.short_name).toBe("Capital Q");
-    expect(manifest.start_url).toBe("/home");
+    expect(manifest.start_url).toBe("/discover");
+    expect(manifest.shortcuts.map((shortcut) => shortcut.url)).toEqual([
+      "/discover",
+      "/home",
+    ]);
     expect(manifest.display).toBe("standalone");
     expect(manifest.icons.some((icon) => icon.sizes === "192x192")).toBe(true);
     expect(manifest.icons.some((icon) => icon.sizes === "512x512")).toBe(true);
@@ -92,7 +98,8 @@ test.describe("progressive web application", () => {
       }
       return { keys, urls };
     });
-    expect(cached.keys).toEqual(["cq-shell-v2"]);
+    expect(cached.keys).toEqual(["cq-shell-v3"]);
+    expect(cached.urls).toContain("/offline.html");
     for (const url of cached.urls) {
       expect(
         ALLOWED.some((pattern) => pattern.test(url)),
@@ -118,5 +125,39 @@ test.describe("progressive web application", () => {
     await expect(
       page.getByRole("status").filter({ hasText: "Back online" }),
     ).toBeVisible();
+  });
+
+  test("answers a navigation made offline with the offline page", async ({
+    page,
+    context,
+  }) => {
+    await page.goto("/home");
+    await page.evaluate(() => navigator.serviceWorker.ready);
+    await context.setOffline(true);
+    await page.goto("/capital").catch(() => undefined);
+    await expect(
+      page.getByRole("heading", { name: "You're offline." }),
+    ).toBeVisible();
+    await context.setOffline(false);
+  });
+
+  test("declares the iOS home-screen metadata and covers the notch", async ({
+    page,
+  }) => {
+    await page.goto("/auth/sign-in");
+    await expect(
+      page.locator('meta[name="mobile-web-app-capable"]'),
+    ).toHaveAttribute("content", "yes");
+    await expect(
+      page.locator('meta[name="apple-mobile-web-app-capable"]'),
+    ).toHaveAttribute("content", "yes");
+    await expect(
+      page.locator('meta[name="apple-mobile-web-app-status-bar-style"]'),
+    ).toHaveCount(1);
+    await expect(page.locator('link[rel="apple-touch-icon"]')).toHaveCount(1);
+    await expect(page.locator('meta[name="viewport"]')).toHaveAttribute(
+      "content",
+      /viewport-fit=cover/,
+    );
   });
 });
