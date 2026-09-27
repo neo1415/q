@@ -93,7 +93,7 @@ export type OnboardingRoutesDependencies = OnboardingActorDependencies & {
   readonly qInterview: QInterviewClient | undefined;
   /** Setup reminders (founder directive 2026-09-27). Absent: none are given. */
   readonly nudges?:
-    Pick<OnboardingNudges, "claimBriefing" | "choose"> | undefined;
+    Pick<OnboardingNudges, "peek" | "claimBriefing" | "choose"> | undefined;
 };
 
 function correlation(): CorrelationId {
