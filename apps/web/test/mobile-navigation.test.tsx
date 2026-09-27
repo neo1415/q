@@ -13,15 +13,16 @@ vi.mock("next/navigation", () => ({
 }));
 
 describe("MobileNavigation", () => {
-  it("is the Primary landmark with exactly four labelled tabs", () => {
+  it("is the Primary landmark with exactly five labelled tabs", () => {
     render(<MobileNavigation />);
     const nav = screen.getByRole("navigation", { name: "Primary" });
     const links = nav.querySelectorAll("a");
-    expect(links).toHaveLength(4);
+    expect(links).toHaveLength(5);
     expect([...links].map((link) => link.textContent)).toEqual([
       "Q",
       "Discover",
       "Capital",
+      "Relationships",
       "Profile",
     ]);
   });
@@ -33,7 +34,7 @@ describe("MobileNavigation", () => {
         .getByRole("link", { name: "Discover" })
         .getAttribute("aria-current"),
     ).toBe("page");
-    for (const name of ["Q", "Capital", "Profile"]) {
+    for (const name of ["Q", "Capital", "Relationships", "Profile"]) {
       expect(
         screen.getByRole("link", { name }).hasAttribute("aria-current"),
       ).toBe(false);
@@ -47,6 +48,7 @@ describe("MobileNavigation", () => {
       "/home",
       "/discover",
       "/capital",
+      "/relationships",
       "/profile",
     ]);
   });

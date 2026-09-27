@@ -11,8 +11,9 @@ import { useHomeHref } from "@/features/q/active-conversation";
 import { isActiveRoute, MOBILE_NAVIGATION } from "./navigation";
 
 /**
- * Canonical mobile navigation: four fixed tabs, each a 44 px+ target with a
- * visible icon and label. The active tab is marked by aria-current, weight
+ * Canonical mobile navigation: five fixed tabs, each a 44 px+ target with a
+ * visible icon and label. Labels are set a step smaller and tighter than
+ * caption so "Relationships" fits a 360 px phone without truncating. The active tab is marked by aria-current, weight
  * and an indicator bar as well as colour.
  */
 export function MobileNavigation() {
@@ -22,7 +23,7 @@ export function MobileNavigation() {
 
   return (
     <nav aria-label="Primary" className="cq-bottom-nav">
-      <ul className="grid h-full grid-cols-4">
+      <ul className="grid h-full grid-cols-5">
         {MOBILE_NAVIGATION.map((item) => {
           const active = isActiveRoute(pathname, item.href);
           const Icon = item.icon;
@@ -33,7 +34,7 @@ export function MobileNavigation() {
                 aria-current={active ? "page" : undefined}
                 data-active={active ? "" : undefined}
                 className={cx(
-                  "relative flex h-full min-h-11 flex-col items-center justify-center gap-1 px-1 cq-caption transition-colors duration-(--cq-motion-fast)",
+                  "relative flex h-full min-h-11 flex-col items-center justify-center gap-1 px-0.5 text-[11px] leading-tight tracking-tight transition-colors duration-(--cq-motion-fast)",
                   active
                     ? "font-semibold text-(--cq-accent)"
                     : "font-medium text-(--cq-text-secondary)",
@@ -42,7 +43,7 @@ export function MobileNavigation() {
                 {active ? (
                   <span
                     aria-hidden="true"
-                    className="absolute inset-x-5 top-0 h-0.5 rounded-b-full bg-(--cq-accent)"
+                    className="absolute inset-x-4 top-0 h-0.5 rounded-b-full bg-(--cq-accent)"
                   />
                 ) : null}
                 <Icon

@@ -257,6 +257,42 @@ test.describe("investor onboarding (desktop, real API)", () => {
     await expect(page).toHaveURL(/\/discover$/);
     await page.goto("/onboarding/investor");
     await expect(page.getByText("Investor setup is complete.")).toBeVisible();
+
+    // R25: the profile shows the whole mandate as answered, each group
+    // with its edit path; an unanswered step reads "Not added", never 0.
+    await page.goto("/profile");
+    const role = page.getByRole("region", { name: "Your role" });
+    await expect(role).toContainText("Partner");
+    const cheque = page.getByRole("region", { name: "Cheque size" });
+    await expect(cheque).toContainText("USD 250,000");
+    await expect(cheque).toContainText("USD 1,500,000");
+    await expect(cheque).toContainText("USD 3,000,000");
+    await expect(
+      cheque.getByRole("link", { name: "Edit cheque size" }),
+    ).toHaveAttribute("href", "/onboarding/investor?review=1");
+    await expect(page.getByRole("region", { name: "Stages" })).toContainText(
+      "Series A",
+    );
+    await expect(
+      page.getByRole("region", { name: "Exclusions" }),
+    ).toContainText("Gambling");
+    await expect(page.getByRole("region", { name: "Thesis" })).toContainText(
+      "Founders who have sold into banks before.",
+    );
+    await expect(page.getByText("How this is known")).toBeVisible();
+
+    // R27: Relationships is top-level; with none yet it points to Discover.
+    await page
+      .getByRole("complementary")
+      .getByRole("link", { name: "Relationships" })
+      .click();
+    await expect(page).toHaveURL(/\/relationships$/);
+    await expect(
+      page.getByRole("heading", { name: "Relationships", level: 1 }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("link", { name: "Open Discover" }),
+    ).toBeVisible();
   });
 
   test("Back preserves answers and a stale tab is told the session moved on", async ({

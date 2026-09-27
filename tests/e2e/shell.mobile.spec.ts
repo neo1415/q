@@ -26,7 +26,7 @@ test.describe("mobile application shell", () => {
 
     const nav = page.getByRole("navigation", { name: "Primary" });
     await expect(nav).toBeVisible();
-    await expect(nav.getByRole("link")).toHaveCount(4);
+    await expect(nav.getByRole("link")).toHaveCount(5);
     await expect(nav.getByRole("link", { name: "Q" })).toHaveAttribute(
       "aria-current",
       "page",
@@ -68,7 +68,13 @@ test.describe("mobile application shell", () => {
     );
 
     // Every tab is a comfortable touch target.
-    for (const name of ["Q", "Discover", "Capital", "Profile"]) {
+    for (const name of [
+      "Q",
+      "Discover",
+      "Capital",
+      "Relationships",
+      "Profile",
+    ]) {
       const box = await nav.getByRole("link", { name }).boundingBox();
       expect(box?.height ?? 0).toBeGreaterThanOrEqual(44);
       expect(box?.width ?? 0).toBeGreaterThanOrEqual(44);

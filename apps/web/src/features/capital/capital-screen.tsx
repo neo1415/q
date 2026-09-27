@@ -4,13 +4,8 @@ import type { ReactNode } from "react";
 import {
   ApiProblemError,
   getCurrentCapitalObjective,
-  listCompanyRelationships,
-  listInvestorRelationships,
 } from "@capital-q/api-client";
-import type {
-  CapitalObjectiveDto,
-  RelationshipSummaryDto,
-} from "@capital-q/contracts";
+import type { CapitalObjectiveDto } from "@capital-q/contracts";
 import {
   INSTRUMENT_OPTIONS,
   STAGE_OPTIONS,
@@ -21,6 +16,7 @@ import { formatAmountForDisplay } from "@capital-q/ui/money-input";
 
 import { PageSection } from "@/components/app-shell/page-container";
 import { apiSession, resolveOwnContext } from "@/features/q/context";
+import { ownRelationships } from "@/features/relationships/relationship-data";
 import { RelationshipList } from "@/features/relationships/relationship-list";
 
 /**
@@ -82,27 +78,6 @@ async function currentObjective(
     if (error instanceof ApiProblemError && error.status === 404) {
       return null;
     }
-    return undefined;
-  }
-}
-
-/**
- * The side's relationships, or undefined when they couldn't be read. A
- * person with neither a company nor an organisation has none.
- */
-async function ownRelationships(
-  context: Awaited<ReturnType<typeof resolveOwnContext>>,
-): Promise<readonly RelationshipSummaryDto[] | undefined> {
-  if (context.kind !== "FOUNDER" && context.kind !== "INVESTOR") return [];
-  const session = await apiSession();
-  if (session === null) return undefined;
-  try {
-    const list =
-      context.kind === "FOUNDER"
-        ? await listCompanyRelationships(session, context.companyId)
-        : await listInvestorRelationships(session);
-    return list.items;
-  } catch {
     return undefined;
   }
 }

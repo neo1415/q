@@ -10,7 +10,7 @@ test.describe("desktop application shell", () => {
     const sidebar = page.getByRole("complementary");
     await expect(sidebar).toBeVisible();
     const nav = sidebar.getByRole("navigation", { name: "Primary" });
-    await expect(nav.getByRole("link")).toHaveCount(3);
+    await expect(nav.getByRole("link")).toHaveCount(4);
     // The Q page's entry is labelled "Q" (ADR 0017; route still /home).
     await expect(nav.getByRole("link", { name: "Q" })).toHaveAttribute(
       "aria-current",
@@ -44,6 +44,13 @@ test.describe("desktop application shell", () => {
     await nav.getByRole("link", { name: "Capital" }).click();
     await expect(
       page.getByRole("heading", { name: "Capital", level: 1 }),
+    ).toBeVisible();
+
+    // Relationships is top-level (R27).
+    await nav.getByRole("link", { name: "Relationships" }).click();
+    await expect(page).toHaveURL(/\/relationships$/);
+    await expect(
+      page.getByRole("heading", { name: "Relationships", level: 1 }),
     ).toBeVisible();
 
     await sidebar.getByRole("link", { name: "Profile" }).click();
