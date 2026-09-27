@@ -6,6 +6,7 @@ import {
   useState,
   type FormEvent,
   type KeyboardEvent,
+  type ReactNode,
 } from "react";
 
 import { IconButton } from "../components/button.js";
@@ -64,6 +65,16 @@ export type QComposerProps = {
    * ever a draft: nothing is sent until they send it.
    */
   readonly initialValue?: string | undefined;
+  /**
+   * False where the surface already shows the scope elsewhere (the Q
+   * page's top line): the field carries the words, not a chip.
+   */
+  readonly showContext?: boolean | undefined;
+  /**
+   * Controls that belong to the field while something is live (Mute and
+   * End during a voice session), set at its leading edge.
+   */
+  readonly actions?: ReactNode | undefined;
 };
 
 export function QComposer({
@@ -82,6 +93,8 @@ export function QComposer({
   attachments = [],
   attachAccept,
   initialValue = "",
+  showContext = true,
+  actions,
 }: QComposerProps) {
   const generatedId = useId();
   const inputId = id ?? `q-composer-${generatedId}`;
@@ -178,7 +191,12 @@ export function QComposer({
         </div>
       </div>
       <div className="flex items-center justify-between gap-3">
-        <ContextIndicator scope={contextScope} detail={contextDetail} />
+        <div className="flex min-w-0 items-center gap-1">
+          {showContext ? (
+            <ContextIndicator scope={contextScope} detail={contextDetail} />
+          ) : null}
+          {actions}
+        </div>
         <div className="flex items-center gap-1">
           {onAttach !== undefined ? (
             <>

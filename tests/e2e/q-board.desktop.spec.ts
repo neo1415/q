@@ -13,6 +13,11 @@ test("an answer lands on the Board as an object, and the transcript is complete"
   test.setTimeout(180_000);
   await page.goto("/home");
   const board = page.locator("[data-q-board]");
+  // Closed by default (R24); its icon opens it.
+  await expect(board).toHaveCount(0);
+  const toggle = page.getByRole("button", { name: "Board" });
+  await expect(toggle).toHaveAttribute("aria-expanded", "false");
+  await toggle.click();
   await expect(board).toBeVisible();
   await expect(page.locator("[data-q-now]")).toBeVisible();
 
@@ -35,6 +40,7 @@ test("an answer lands on the Board as an object, and the transcript is complete"
   await note.getByRole("button", { name: "Pin" }).click();
   await expect(note.getByRole("button", { name: "Unpin" })).toBeVisible();
   await page.reload();
+  await page.getByRole("button", { name: "Board" }).click();
   await expect(
     page
       .locator('[data-q-board-object="NOTE"]')

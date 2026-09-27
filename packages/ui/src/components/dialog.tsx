@@ -81,6 +81,36 @@ export function DialogContent({
   );
 }
 
+/**
+ * A large reading modal (a document, a deck): nearly the whole viewport,
+ * the content supplying its own heading and close control. The title is
+ * still given to assistive technology. Escape and the backdrop close it.
+ */
+export function DialogViewerContent({
+  title,
+  children,
+  className,
+}: {
+  readonly title: string;
+  readonly children: ReactNode;
+  readonly className?: string | undefined;
+}) {
+  return (
+    <BaseDialog.Portal>
+      <BaseDialog.Backdrop className="fixed inset-0 z-(--cq-z-modal) bg-(--cq-overlay) transition-opacity duration-(--cq-motion-base) data-[ending-style]:opacity-0 data-[starting-style]:opacity-0" />
+      <BaseDialog.Popup
+        className={cx(
+          "fixed top-1/2 left-1/2 z-(--cq-z-modal) flex h-[calc(100dvh-32px)] w-[calc(100vw-32px)] max-w-5xl -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-xl bg-(--cq-surface-raised) shadow-(--cq-shadow-overlay) outline-none transition-[opacity,transform] duration-(--cq-motion-base) data-[ending-style]:scale-[0.98] data-[ending-style]:opacity-0 data-[starting-style]:scale-[0.98] data-[starting-style]:opacity-0 sm:h-[calc(100dvh-64px)]",
+          className,
+        )}
+      >
+        <BaseDialog.Title className="sr-only">{title}</BaseDialog.Title>
+        {children}
+      </BaseDialog.Popup>
+    </BaseDialog.Portal>
+  );
+}
+
 export function DialogClose({ children }: { readonly children: ReactElement }) {
   return <BaseDialog.Close render={children} />;
 }

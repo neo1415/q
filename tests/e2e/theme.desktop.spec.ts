@@ -161,15 +161,23 @@ test.describe("theme switch, signed out", () => {
 });
 
 test.describe("theme switch, signed in", () => {
-  test("is in the sidebar footer without opening anything", async ({
+  test("is one icon in the sidebar footer, opening Light, Dark and System (R24)", async ({
     page,
   }) => {
     await page.goto("/profile");
     const sidebar = page.getByRole("complementary");
-    const theme = sidebar.getByRole("group", { name: "Theme" });
-    await expect(theme).toBeVisible();
-    const box = await theme.getByRole("button", { name: "Dark" }).boundingBox();
-    expect(box?.width ?? 0).toBeGreaterThanOrEqual(40);
-    expect(box?.height ?? 0).toBeGreaterThanOrEqual(40);
+    const trigger = sidebar.getByRole("button", { name: /^Theme: / });
+    await expect(trigger).toBeVisible();
+    const box = await trigger.boundingBox();
+    expect(box?.width ?? 0).toBeGreaterThanOrEqual(44);
+    expect(box?.height ?? 0).toBeGreaterThanOrEqual(44);
+    await trigger.click();
+    const menu = page.getByRole("menu");
+    for (const name of ["Light", "Dark", "System"]) {
+      await expect(menu.getByRole("menuitemradio", { name })).toBeVisible();
+    }
+    await menu.getByRole("menuitemradio", { name: "Dark" }).click();
+    await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+    await expect(trigger).toHaveAccessibleName("Theme: Dark");
   });
 });

@@ -11,7 +11,7 @@ import {
 } from "react";
 
 import { describeQStreamTransport } from "@capital-q/api-client";
-import { Q_SPEECH_MAX_CHARS, type QVoiceChoice } from "@capital-q/contracts";
+import { Q_SPEECH_MAX_CHARS } from "@capital-q/contracts";
 import { cx } from "@capital-q/ui";
 import { Button } from "@capital-q/ui/button";
 import {
@@ -24,7 +24,10 @@ import {
   Mic,
   MicOff,
   Square,
+  X,
 } from "@capital-q/ui/icons";
+import { ContextIndicator } from "@capital-q/ui/context-indicator";
+import { DialogRoot, DialogViewerContent } from "@capital-q/ui/dialog";
 import { QComposer } from "@capital-q/ui/q-composer";
 import { SheetContent, SheetRoot } from "@capital-q/ui/sheet";
 import type { ContextScope } from "@capital-q/ui/tokens";
@@ -37,7 +40,9 @@ import {
 } from "../onboarding-kit/material-actions";
 import { QAperture, QLumen } from "../q-aperture";
 import { useQSpeech } from "../voice/use-q-speech";
+import { VoiceMenu } from "../voice/voice-menu";
 import { ArtifactViewer } from "./artifact-viewer";
+import { useBoardAutoOpen } from "./board-open";
 import {
   failureMessage,
   recoveryHint,
@@ -63,7 +68,7 @@ import type { SpokenLine } from "./spoken";
  * Finished turns become a faded history above, never a chat log of
  * bubbles. Answers are spoken; their text is a short caption, and the
  * structure behind an answer (findings, what is still open, what Q needs
- * to know, the sources) sits behind one "Evidence" disclosure.
+ * to know, the sources) sits behind one "Sources" disclosure (R23).
  *
  * Typing is a secondary control on the same stage: while the line is open
  * typed words go down it and are answered aloud; without it they are a
@@ -106,11 +111,6 @@ const COMPOSER_ID = "home-q";
 const ENDED_KEY = "cq.q.voice-ended";
 /** A caption is short: more than this is behind "Read all". */
 const CAPTION_CHARS = 220;
-
-const VOICE_LABELS: Readonly<Record<QVoiceChoice, string>> = {
-  FEMALE: "Female",
-  MALE: "Male",
-};
 
 /** The conversation as plain text, for saving. */
 function transcriptText(
@@ -452,13 +452,28 @@ export function QConversationPanel({
   // The newest words are where the eye is: the stage keeps its end in view.
   const bodyRef = useRef<HTMLDivElement>(null);
   const newest = `${String(lines.length)}:${live?.text ?? ""}:${currentQ?.text.length ?? 0}`;
+  const conversing = lines.length > 0 || liveIsPerson;
   useEffect(() => {
     const body = bodyRef.current;
-    if (body !== null) body.scrollTop = body.scrollHeight;
-  }, [newest]);
+    if (body === null) return;
+    // Before anything is said the top of the stage -- Q -- is what must be
+    // in view (R24); the welcome beneath it can scroll. Once there is a
+    // conversation, its newest words are where the eye is.
+    body.scrollTop = conversing ? body.scrollHeight : 0;
+  }, [newest, conversing]);
   const wide = useWide();
   const [view, setView] = useState<"stage" | "transcript">("stage");
+  // The Board is closed until its icon is pressed or Q makes a file (R24).
   const [boardOpen, setBoardOpen] = useState(false);
+  const boardDocked = wide && boardOpen;
+  useBoardAutoOpen({
+    turns,
+    loading: q.loading,
+    conversationId: q.conversationId,
+    onFresh: () => {
+      setBoardOpen(true);
+    },
+  });
 
   const stage = workingLabel(q.state);
   const showWelcome = welcome !== undefined && lines.length === 0 && !q.loading;
@@ -527,10 +542,7 @@ export function QConversationPanel({
       >
         <section
           aria-label="Q"
-          className={cx(
-            "flex min-h-0 min-w-0 flex-1 flex-col",
-            openArtifact === null ? "" : "hidden lg:flex",
-          )}
+          className="flex min-h-0 min-w-0 flex-1 flex-col"
           data-q-workspace
           data-q-stage={voice.active ? "voice" : "ready"}
           data-q-turns={String(turns.length)}
@@ -544,9 +556,11 @@ export function QConversationPanel({
 
           {/* The top line: history and the saved transcript, quiet. */}
           <div className="flex flex-none items-center justify-between gap-3 px-5 pt-4 sm:px-8">
-            <span className="cq-label text-(--cq-text-secondary)">
-              {context.label ?? "Q"}
-            </span>
+            {/* The scope, out of the input (R24). A phone's top bar already
+                carries it, so here it is the desktop's. */}
+            <div className="min-w-0 max-lg:invisible" data-q-scope>
+              <ContextIndicator scope={context.scope} detail={context.label} />
+            </div>
             <div className="flex items-center gap-1">
               <button
                 type="button"
@@ -570,21 +584,26 @@ export function QConversationPanel({
                 />
                 <span className="max-sm:sr-only">Transcript</span>
               </button>
-              {wide ? null : (
-                <button
-                  type="button"
-                  className="cq-stage-quiet"
-                  onClick={() => setBoardOpen(true)}
-                  data-q-control="board"
-                >
-                  <PanelRight
-                    aria-hidden="true"
-                    size={ICON_SIZE.compact}
-                    strokeWidth={ICON_STROKE}
-                  />
-                  <span className="max-sm:sr-only">Board</span>
-                </button>
-              )}
+              <VoiceMenu
+                voice={voice.voice}
+                onChoose={(choice) => void voice.chooseVoice(choice)}
+              />
+              <button
+                type="button"
+                className={
+                  boardOpen ? "cq-stage-quiet is-active" : "cq-stage-quiet"
+                }
+                aria-expanded={boardOpen}
+                onClick={() => setBoardOpen((current) => !current)}
+                data-q-control="board"
+              >
+                <PanelRight
+                  aria-hidden="true"
+                  size={ICON_SIZE.compact}
+                  strokeWidth={ICON_STROKE}
+                />
+                <span className="max-sm:sr-only">Board</span>
+              </button>
               <button
                 type="button"
                 className="cq-stage-quiet"
@@ -753,7 +772,7 @@ export function QConversationPanel({
 
                 {currentTurn !== undefined && currentParts !== null ? (
                   <div className="flex w-full flex-col items-center gap-3">
-                    {!wide && currentParts.visible.length > 0 ? (
+                    {!boardDocked && currentParts.visible.length > 0 ? (
                       <div className="w-full max-w-(--cq-layout-narrow)">
                         <QResultBlocks
                           blocks={currentParts.visible}
@@ -823,9 +842,9 @@ export function QConversationPanel({
                   </p>
                 ) : null}
 
-                {wide ? null : (
+                {boardDocked ? null : (
                   <div className="w-full max-w-(--cq-layout-narrow)">
-                    <QNow session={session} onAct={sayOrAsk} />
+                    <QNow session={session} onAct={sayOrAsk} quietWhenIdle />
                   </div>
                 )}
 
@@ -879,60 +898,8 @@ export function QConversationPanel({
             className="flex flex-none flex-col items-center gap-3 border-t border-(--cq-border-subtle) px-5 pt-4 pb-5 sm:px-8"
             data-q-voice-stage-controls
           >
-            <div className="flex flex-wrap items-center justify-center gap-2">
-              {voice.active ? (
-                <>
-                  <button
-                    type="button"
-                    className={
-                      client.muted
-                        ? "cq-stage-control is-active"
-                        : "cq-stage-control"
-                    }
-                    aria-pressed={client.muted}
-                    disabled={!client.connected}
-                    onClick={() => client.setMuted(!client.muted)}
-                    data-q-control="mute"
-                  >
-                    {client.muted ? (
-                      <MicOff size={ICON_SIZE.compact} aria-hidden="true" />
-                    ) : (
-                      <Mic size={ICON_SIZE.compact} aria-hidden="true" />
-                    )}
-                    {client.muted ? "Unmute" : "Mute"}
-                  </button>
-                  <button
-                    type="button"
-                    className="cq-stage-primary inline-flex items-center gap-2"
-                    onClick={end}
-                    data-q-control="end"
-                  >
-                    <Square size={ICON_SIZE.compact} aria-hidden="true" />
-                    End
-                  </button>
-                  <div
-                    className="flex items-center gap-1"
-                    role="group"
-                    aria-label="Q's voice"
-                  >
-                    {(["FEMALE", "MALE"] as const).map((choice) => (
-                      <button
-                        key={choice}
-                        type="button"
-                        className={
-                          choice === voice.voice
-                            ? "cq-stage-control is-active"
-                            : "cq-stage-control"
-                        }
-                        aria-pressed={choice === voice.voice}
-                        onClick={() => void voice.chooseVoice(choice)}
-                      >
-                        {VOICE_LABELS[choice]}
-                      </button>
-                    ))}
-                  </div>
-                </>
-              ) : (
+            <div className="flex flex-wrap items-center justify-center gap-2 empty:hidden">
+              {voice.active ? null : (
                 <button
                   type="button"
                   className="cq-q-talk"
@@ -963,9 +930,56 @@ export function QConversationPanel({
             <div className="w-full max-w-2xl">
               <QComposer
                 id={COMPOSER_ID}
-                contextScope={context.scope}
-                contextDetail={context.label}
+                showContext={false}
                 disabled={q.working && !voice.active}
+                {...(voice.active
+                  ? {
+                      actions: (
+                        <div
+                          className="flex items-center gap-1"
+                          data-q-voice-controls
+                        >
+                          <button
+                            type="button"
+                            className={
+                              client.muted
+                                ? "cq-q-field-control is-active"
+                                : "cq-q-field-control"
+                            }
+                            aria-pressed={client.muted}
+                            disabled={!client.connected}
+                            onClick={() => client.setMuted(!client.muted)}
+                            data-q-control="mute"
+                          >
+                            {client.muted ? (
+                              <MicOff
+                                size={ICON_SIZE.compact}
+                                aria-hidden="true"
+                              />
+                            ) : (
+                              <Mic
+                                size={ICON_SIZE.compact}
+                                aria-hidden="true"
+                              />
+                            )}
+                            {client.muted ? "Unmute" : "Mute"}
+                          </button>
+                          <button
+                            type="button"
+                            className="cq-q-field-control is-end"
+                            onClick={end}
+                            data-q-control="end"
+                          >
+                            <Square
+                              size={ICON_SIZE.compact}
+                              aria-hidden="true"
+                            />
+                            End
+                          </button>
+                        </div>
+                      ),
+                    }
+                  : {})}
                 placeholder={
                   voice.active
                     ? "Type instead — Q hears this too"
@@ -990,19 +1004,36 @@ export function QConversationPanel({
         </section>
 
         {wide ? (
-          <aside
-            aria-label="Now and Board"
-            className="cq-q-aside flex w-[400px] flex-none flex-col gap-6 overflow-y-auto border-l border-(--cq-border-subtle) px-5 py-5"
-            data-q-aside
-          >
-            <QNow session={session} onAct={sayOrAsk} />
-            <QBoard
-              conversationId={q.conversationId}
-              turns={turns}
-              onAsk={sayOrAsk}
-              onOpenArtifact={showArtifact}
-            />
-          </aside>
+          boardOpen ? (
+            <aside
+              aria-label="Now and Board"
+              className="cq-q-aside flex w-[400px] flex-none flex-col gap-6 overflow-y-auto border-l border-(--cq-border-subtle) px-5 py-5"
+              data-q-aside
+            >
+              <div className="-mt-2 -mr-2 flex justify-end">
+                <button
+                  type="button"
+                  className="cq-stage-quiet"
+                  aria-label="Close the Board"
+                  onClick={() => setBoardOpen(false)}
+                  data-q-control="board-close"
+                >
+                  <X
+                    aria-hidden="true"
+                    size={ICON_SIZE.compact}
+                    strokeWidth={ICON_STROKE}
+                  />
+                </button>
+              </div>
+              <QNow session={session} onAct={sayOrAsk} />
+              <QBoard
+                conversationId={q.conversationId}
+                turns={turns}
+                onAsk={sayOrAsk}
+                onOpenArtifact={showArtifact}
+              />
+            </aside>
+          ) : null
         ) : (
           <SheetRoot open={boardOpen} onOpenChange={setBoardOpen}>
             {boardOpen ? (
@@ -1024,25 +1055,32 @@ export function QConversationPanel({
           </SheetRoot>
         )}
 
-        {openArtifact === null ? null : (
-          <div className="flex min-w-0 flex-1 flex-col p-4 lg:sticky lg:top-0 lg:max-h-dvh">
-            <ArtifactViewer
-              artifactId={openArtifact}
-              onClose={closeArtifact}
-              revision={
-                turns.findLast(
-                  (turn) =>
-                    turn.kind === "Q" &&
-                    turn.blocks.some(
-                      (block) =>
-                        block.kind === "ARTIFACT_REFERENCE" &&
-                        block.artifactId === openArtifact,
-                    ),
-                )?.id
-              }
-            />
-          </div>
-        )}
+        <DialogRoot
+          open={openArtifact !== null}
+          onOpenChange={(open) => {
+            if (!open) closeArtifact();
+          }}
+        >
+          {openArtifact === null ? null : (
+            <DialogViewerContent title="Document">
+              <ArtifactViewer
+                artifactId={openArtifact}
+                onClose={closeArtifact}
+                revision={
+                  turns.findLast(
+                    (turn) =>
+                      turn.kind === "Q" &&
+                      turn.blocks.some(
+                        (block) =>
+                          block.kind === "ARTIFACT_REFERENCE" &&
+                          block.artifactId === openArtifact,
+                      ),
+                  )?.id
+                }
+              />
+            </DialogViewerContent>
+          )}
+        </DialogRoot>
       </div>
     </QSurfaceToolsContext.Provider>
   );

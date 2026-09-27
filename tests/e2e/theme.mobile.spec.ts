@@ -1,23 +1,27 @@
 import { expect, test } from "@playwright/test";
 
 /**
- * On a phone the theme is the first row of the header's account menu
- * (ADR 0017 F4), with thumb-sized segments.
+ * On a phone the theme is one icon in the header (R24; ADR 0017 F4): a
+ * thumb-sized target opening Light, Dark and System.
  */
-test("the account menu opens on the theme", async ({ page }) => {
+test("the header's theme icon opens the three choices", async ({ page }) => {
   await page.goto("/profile");
-  await page
+  const trigger = page
     .getByRole("banner")
-    .getByRole("button", { name: "Account and appearance" })
-    .click();
-  const menu = page.getByRole("dialog");
-  const theme = menu.getByRole("group", { name: "Theme" });
-  await expect(theme).toBeVisible();
-  const box = await theme.getByRole("button", { name: "Dark" }).boundingBox();
+    .getByRole("button", { name: /^Theme: / });
+  const box = await trigger.boundingBox();
   expect(box?.width ?? 0).toBeGreaterThanOrEqual(44);
   expect(box?.height ?? 0).toBeGreaterThanOrEqual(44);
-
-  await theme.getByRole("button", { name: "Dark" }).click();
+  await trigger.click();
+  const menu = page.getByRole("menu");
+  await menu.getByRole("menuitemradio", { name: "Dark" }).click();
   await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
-  await expect(menu.getByRole("link", { name: "Profile" })).toBeVisible();
+
+  await page
+    .getByRole("banner")
+    .getByRole("button", { name: "Account" })
+    .click();
+  await expect(
+    page.getByRole("dialog").getByRole("link", { name: "Profile" }),
+  ).toBeVisible();
 });

@@ -72,6 +72,59 @@ export function MenuItem({
   );
 }
 
+/**
+ * A one-of-several choice inside a menu (the theme, for instance): radio
+ * semantics, so assistive technology hears which option is current, and
+ * a check mark beside it, so the choice never rests on colour alone.
+ */
+export function MenuRadioGroup({
+  value,
+  onValueChange,
+  children,
+  label,
+}: {
+  readonly value: string;
+  readonly onValueChange: (value: string) => void;
+  readonly children: ReactNode;
+  readonly label?: string | undefined;
+}) {
+  return (
+    <BaseMenu.RadioGroup
+      value={value}
+      onValueChange={(next: unknown) => {
+        if (typeof next === "string") onValueChange(next);
+      }}
+      aria-label={label}
+    >
+      {children}
+    </BaseMenu.RadioGroup>
+  );
+}
+
+export function MenuRadioItem({
+  value,
+  children,
+  indicator,
+}: {
+  readonly value: string;
+  readonly children: ReactNode;
+  /** The mark shown beside the current option. */
+  readonly indicator: ReactNode;
+}) {
+  return (
+    <BaseMenu.RadioItem
+      value={value}
+      closeOnClick
+      className="flex min-h-11 cursor-default select-none items-center gap-2 rounded-sm px-2.5 cq-body-sm text-(--cq-text-primary) outline-none data-[highlighted]:bg-(--cq-surface-subtle)"
+    >
+      {children}
+      <BaseMenu.RadioItemIndicator className="ml-auto inline-flex text-(--cq-text-primary)">
+        {indicator}
+      </BaseMenu.RadioItemIndicator>
+    </BaseMenu.RadioItem>
+  );
+}
+
 export function MenuSeparator() {
   return <BaseMenu.Separator className="my-1 h-px bg-(--cq-border-subtle)" />;
 }
