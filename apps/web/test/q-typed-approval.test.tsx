@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { act, render, screen, waitFor } from "@testing-library/react";
+import { useEffect } from "react";
 import { describe, expect, it, vi } from "vitest";
 
 import { QStreamEventSchema, type QStreamEvent } from "@capital-q/contracts";
@@ -66,11 +67,15 @@ function event(type: QStreamEvent["type"], data: Record<string, unknown>) {
   });
 }
 
-let ask: ((text: string) => Promise<void>) | null = null;
+const handle: { ask: ((text: string) => Promise<void>) | null } = {
+  ask: null,
+};
 
 function Home() {
   const q = useQConversation({ conversationId: null });
-  ask = q.ask;
+  useEffect(() => {
+    handle.ask = q.ask;
+  }, [q.ask]);
   return <p data-testid="working">{String(q.working)}</p>;
 }
 
@@ -78,7 +83,7 @@ describe("typed approval while a change waits", () => {
   it("is not 'working' while waiting, and a typed reply continues the run", async () => {
     render(<Home />);
     await act(async () => {
-      await ask?.("Change my headline to: Credit for Lagos traders");
+      await handle.ask?.("Change my headline to: Credit for Lagos traders");
     });
     await waitFor(() => {
       expect(emit).not.toBeNull();
@@ -104,7 +109,7 @@ describe("typed approval while a change waits", () => {
 
     continueQRunAction.mockResolvedValue({ ok: true, value: null });
     await act(async () => {
-      await ask?.("go ahead");
+      await handle.ask?.("go ahead");
     });
     expect(continueQRunAction).toHaveBeenCalledWith(RUN, "go ahead");
   });
