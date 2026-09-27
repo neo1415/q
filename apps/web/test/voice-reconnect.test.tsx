@@ -21,6 +21,7 @@ vi.mock("../src/features/voice/actions", () => ({
     startVoiceSessionAction(...args) as unknown,
   readVoiceTurnAction: () =>
     Promise.resolve({ ok: false, gone: false, message: "" }),
+  sendVoiceScreenAction: () => Promise.resolve({ ok: true }),
 }));
 
 // The transport stands in for a provider that fails as soon as it starts:
