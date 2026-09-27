@@ -126,9 +126,14 @@ describe("editing a profile field", () => {
       within(row("headline")).getByRole("button", { name: "Add headline" }),
     ).toBeTruthy();
     expect(within(row("displayName")).getByText("Ada")).toBeTruthy();
-    expect(within(row("displayName")).getByText(DECLARED)).toBeTruthy();
-    // No provenance claimed for a value that does not exist.
-    expect(within(row("headline")).queryByText(DECLARED)).toBeNull();
+    // The value stands alone (R23); its provenance is said once, one tap
+    // away under "Sources", not beneath every value (ADR 0018).
+    expect(within(row("displayName")).queryByText(DECLARED)).toBeNull();
+    const sources = screen.getByText("Sources").closest("details");
+    expect(sources?.open).toBe(false);
+    expect(
+      within(sources as HTMLElement).getByText(new RegExp(DECLARED)),
+    ).toBeTruthy();
   });
 
   it("saves with the keyboard alone, sending the page's version, and shows the value only once the server confirms it", async () => {

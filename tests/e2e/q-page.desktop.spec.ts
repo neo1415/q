@@ -59,7 +59,7 @@ test("keeps an answer's evidence behind one closed disclosure", async ({
   page,
 }) => {
   await page.goto("/home");
-  // Evidence, where an answer has any, starts closed.
+  // Sources, where an answer has any, start closed (R23; ADR 0018).
   for (const details of await page.locator("[data-q-evidence]").all()) {
     expect(await details.getAttribute("open")).toBeNull();
   }

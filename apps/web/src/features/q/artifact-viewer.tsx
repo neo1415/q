@@ -6,6 +6,8 @@ import type { QArtifactDetail } from "@capital-q/contracts";
 import { buttonClassName } from "@capital-q/ui/button";
 import { InlineNotice } from "@capital-q/ui/states";
 
+import { SourcesDisclosure } from "@/components/sources-disclosure";
+
 import { artifactTypeLabel } from "./artifact-type";
 import { readQArtifactAction, readQArtifactVersionAction } from "./actions";
 import { ArtifactDownloads, artifactFileUrl } from "./artifact-download";
@@ -320,11 +322,6 @@ export function ArtifactViewer({
 
       {current === undefined ? null : (
         <article className="flex flex-col gap-5" data-q-artifact-body>
-          {isDeck && current.content.sections.length > 0 ? (
-            <h3 className="cq-label text-(--cq-text-tertiary)">
-              What each slide rests on
-            </h3>
-          ) : null}
           {current.content.sections.map((section) => (
             <section key={section.heading} className="flex flex-col gap-2">
               <h3 className="cq-title-sm text-(--cq-text-primary)">
@@ -334,27 +331,30 @@ export function ArtifactViewer({
                 {section.body}
               </p>
               {section.findings.length === 0 ? null : (
-                <dl className="flex flex-col gap-1 border-l-2 border-(--cq-border-subtle) pl-3">
-                  {section.findings.map((finding) => (
-                    <div key={finding.findingId} className="flex flex-col">
-                      <dd className="cq-body-sm text-(--cq-text-secondary)">
-                        {finding.statement}
-                      </dd>
-                      {/*
+                <SourcesDisclosure count={section.findings.length}>
+                  <dl className="flex flex-col gap-1 border-l-2 border-(--cq-border-subtle) pl-3">
+                    {section.findings.map((finding) => (
+                      <div key={finding.findingId} className="flex flex-col">
+                        <dd className="cq-body-sm text-(--cq-text-secondary)">
+                          {finding.statement}
+                        </dd>
+                        {/*
                         Truth class and evidence status, kept apart and
-                        kept visible: a reader deciding whether to send
-                        this needs to know which sentences are somebody's
-                        claim and which the record actually supports.
+                        one tap away (ADR 0018): a reader deciding whether
+                        to send this can still see which sentences are
+                        somebody's claim and which the record supports.
                       */}
-                      <dd className="cq-caption text-(--cq-text-tertiary)">
-                        {finding.truthClass.toLowerCase().replace(/_/g, " ")} ·{" "}
-                        {finding.evidenceStatus
-                          .toLowerCase()
-                          .replace(/_/g, " ")}
-                      </dd>
-                    </div>
-                  ))}
-                </dl>
+                        <dd className="cq-caption text-(--cq-text-tertiary)">
+                          {finding.truthClass.toLowerCase().replace(/_/g, " ")}{" "}
+                          ·{" "}
+                          {finding.evidenceStatus
+                            .toLowerCase()
+                            .replace(/_/g, " ")}
+                        </dd>
+                      </div>
+                    ))}
+                  </dl>
+                </SourcesDisclosure>
               )}
             </section>
           ))}

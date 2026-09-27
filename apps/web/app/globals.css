@@ -440,6 +440,32 @@
     border-top: 1px solid var(--cq-border-subtle);
     padding-top: 8px;
   }
+  /* "Sources": provenance one tap away (R23; ADR 0018). */
+  .cq-sources-summary {
+    display: inline-flex;
+    min-height: 44px;
+    align-items: center;
+    gap: 4px;
+    cursor: pointer;
+    font-size: 13px;
+    color: var(--cq-text-secondary);
+    list-style: none;
+  }
+  .cq-sources-summary::-webkit-details-marker {
+    display: none;
+  }
+  .cq-sources-summary::before {
+    content: "B8";
+    font-size: 11px;
+    transition: transform var(--cq-motion-fast) var(--cq-ease);
+  }
+  .cq-sources[open] > .cq-sources-summary::before {
+    transform: rotate(90deg);
+  }
+  .cq-sources-summary:hover {
+    color: var(--cq-text-primary);
+  }
+
   .cq-q-evidence-summary {
     display: inline-flex;
     min-height: 44px;
