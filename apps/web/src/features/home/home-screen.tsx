@@ -21,6 +21,8 @@ import {
   firstName,
   returningGreeting,
 } from "./returning";
+import type { Briefing } from "./briefing";
+import { resolveBriefing } from "./briefing-facts";
 import { resolveReturningFacts } from "./returning-facts";
 import { ReturningWelcome } from "./returning-welcome";
 
@@ -171,8 +173,13 @@ export async function HomeScreen({
   */
   let welcome: ReactNode = undefined;
   let welcomeLine: string | undefined = undefined;
+  let welcomeLead: string | undefined = undefined;
+  let briefing: Promise<Briefing | null> | undefined = undefined;
   if (conversationId === null) {
     if (arrival === "RETURNING") {
+      // Q's briefing (R35) starts now and is not awaited: the page and Q
+      // render first, and the briefing streams in when its reads answer.
+      briefing = context.kind === "NONE" ? undefined : resolveBriefing(context);
       const facts = await resolveReturningFacts(context, unfinished);
       const greeting = returningGreeting(facts);
       welcome = (
@@ -180,9 +187,11 @@ export async function HomeScreen({
           greeting={greeting}
           cards={chooseReturningCards(facts)}
           subject={askSubject(context)}
+          briefing={briefing}
         />
       );
       welcomeLine = greeting.spoken;
+      welcomeLead = greeting.headline;
     } else if (arrival === "FIRST_TIME" && qConnected) {
       const name = firstName((await accountDetails()).displayName);
       welcome = <FirstRunWelcome name={name} />;
@@ -217,6 +226,8 @@ export async function HomeScreen({
           conversationId={conversationId}
           welcome={welcome}
           welcomeLine={welcomeLine}
+          welcomeLead={welcomeLead}
+          briefing={briefing}
         />
       </section>
     </div>

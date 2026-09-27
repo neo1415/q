@@ -9,6 +9,8 @@ import { ChevronRight, ICON_SIZE, ICON_STROKE } from "@capital-q/ui/icons";
 import { askQAction, type QSubjectInput } from "@/features/q/actions";
 import { useQSurfaceTools } from "@/features/q/q-surface-tools";
 
+import type { Briefing } from "./briefing";
+import { QBriefing } from "./q-briefing";
 import type { ReturningCard, ReturningGreeting } from "./returning";
 
 /**
@@ -59,11 +61,14 @@ export function ReturningWelcome({
   greeting,
   cards,
   subject,
+  briefing,
 }: {
   readonly greeting: ReturningGreeting;
   readonly cards: readonly ReturningCard[];
   /** The person's own company or organisation, resolved on the server. */
   readonly subject: QSubjectInput | undefined;
+  /** Q's briefing (R35), streamed from the server after the page. */
+  readonly briefing?: Promise<Briefing | null> | undefined;
 }) {
   const router = useRouter();
   const tools = useQSurfaceTools();
@@ -129,6 +134,8 @@ export function ReturningWelcome({
           </blockquote>
         </figure>
       )}
+
+      {briefing === undefined ? null : <QBriefing briefing={briefing} />}
 
       {cards.length > 0 ? (
         <ul

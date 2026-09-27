@@ -33,6 +33,8 @@ import { SheetContent, SheetRoot } from "@capital-q/ui/sheet";
 import type { ContextScope } from "@capital-q/ui/tokens";
 
 import { ViewTransition } from "@/components/view-transition";
+import type { Briefing } from "@/features/home/briefing";
+import { decideBriefing } from "@/features/home/briefing-gate";
 
 import {
   materialUploadCompleteAction,
@@ -105,7 +107,43 @@ export type QConversationPanelProps = {
   readonly welcome?: ReactNode | undefined;
   /** The welcome as Q says it: the line Q opens with. */
   readonly welcomeLine?: string | undefined;
+  /**
+   * The greeting at the head of `welcomeLine` ("Welcome back, Ada."):
+   * Q's briefing, when there is one, is said right after it (R35).
+   */
+  readonly welcomeLead?: string | undefined;
+  /** Q's briefing (R35), streamed from the server; said only with voice on. */
+  readonly briefing?: Promise<Briefing | null> | undefined;
 };
+
+/** How long voice waits for a briefing still on its way before greeting. */
+const BRIEFING_WAIT_MS = 1_500;
+
+/**
+ * The welcome as spoken, with the briefing said after the greeting when
+ * this page gives one: "Welcome back, Ada. One thing needs you. …
+ * Where would you like to start?" Plain and brief; no briefing, no change.
+ */
+async function spokenWelcome(
+  welcomeLine: string,
+  welcomeLead: string | undefined,
+  briefing: Promise<Briefing | null> | undefined,
+): Promise<string> {
+  if (briefing === undefined) return welcomeLine;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const late = new Promise<null>((resolve) => {
+    timer = setTimeout(() => resolve(null), BRIEFING_WAIT_MS);
+  });
+  const given = decideBriefing(
+    await Promise.race([briefing.catch(() => null), late]),
+  );
+  clearTimeout(timer);
+  if (given === null) return welcomeLine;
+  if (welcomeLead !== undefined && welcomeLine.startsWith(welcomeLead)) {
+    return `${welcomeLead} ${given.spoken}${welcomeLine.slice(welcomeLead.length)}`;
+  }
+  return `${welcomeLine} ${given.spoken}`;
+}
 
 const COMPOSER_ID = "home-q";
 const ENDED_KEY = "cq.q.voice-ended";
@@ -243,6 +281,8 @@ export function QConversationPanel({
   conversationId: openConversationId = null,
   welcome,
   welcomeLine,
+  welcomeLead,
+  briefing,
 }: QConversationPanelProps) {
   const session = useQSession();
   const { q, turns, voice, spoken, spokenOnly, presence } = session;
@@ -314,10 +354,17 @@ export function QConversationPanel({
     // before it: one greeting, not the page's and then the call's.
     const greeting =
       welcomeLine !== undefined && turns.length === 0 && spoken.length === 0
-        ? welcomeLine
+        ? await spokenWelcome(welcomeLine, welcomeLead, briefing)
         : undefined;
     await sessionTalk(greeting === undefined ? undefined : { greeting });
-  }, [sessionTalk, welcomeLine, turns.length, spoken.length]);
+  }, [
+    sessionTalk,
+    welcomeLine,
+    welcomeLead,
+    briefing,
+    turns.length,
+    spoken.length,
+  ]);
 
   const endVoice = voice.end;
   const end = useCallback(() => {
