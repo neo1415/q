@@ -441,6 +441,11 @@ const PAGE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "/profile": cap("navigate.PROFILE"),
   "/capital": cap("navigate.CAPITAL"),
   "/discover": cap("navigate.DISCOVER"),
+  // R30 #7 added the page; a Q destination for it (contracts, voice, the
+  // capability registry) is a follow-up the lead owns, flagged in the report.
+  "/discover/saved": exempt(
+    "the Saved list, reached from Discover and Capital; Q navigation to it is pending",
+  ),
   "/company/visibility": cap("navigate.COMPANY_VISIBILITY"),
   "/company/interest": cap("navigate.COMPANY_INTEREST"),
   "/relationships": cap("navigate.RELATIONSHIPS"),
