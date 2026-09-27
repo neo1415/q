@@ -84,7 +84,9 @@ select throws_ok(
   '23514', null, 'a meeting reminder names its meeting');
 
 -- Privileged server role -----------------------------------------------------------
-select is((select count(*)::int from communication.reminders), 3, 'the server role reads every reminder');
+select is((select count(*)::int from communication.reminders
+            where owner_user_id in (pg_temp.rls_id('user_a'), pg_temp.rls_id('user_b'), pg_temp.rls_id('user_r'))),
+          3, 'the server role reads every reminder');
 
 -- Positive: A (invited) --------------------------------------------------------------
 select pg_temp.act_as_user_a();
