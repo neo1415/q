@@ -7,6 +7,12 @@ import { apiSession } from "@/features/q/context";
 
 import { RelationshipScheduleControls } from "./relationship-schedule-controls";
 
+/** Calls that ended over an hour ago are history, not something to act on. */
+function notPast(meetings: readonly MeetingDto[]): readonly MeetingDto[] {
+  const cutoff = Date.now() - 3_600_000;
+  return meetings.filter((meeting) => Date.parse(meeting.endsAt) > cutoff);
+}
+
 /**
  * Calls and reminders on a relationship page (BIZ-008; R11, R33: every
  * capability Q has also has its screen). Read on the server as the person;
@@ -31,7 +37,7 @@ export async function RelationshipSchedule({
       listRelationshipMeetings(session, relationshipId),
       listReminders(session),
     ]);
-    meetings = meetingList.items;
+    meetings = notPast(meetingList.items);
     reminders = reminderList.items.filter(
       (reminder) =>
         reminder.relationshipId === relationshipId &&

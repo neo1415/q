@@ -117,8 +117,20 @@ function toReminder(row: ReminderRow): ReminderRecord {
   };
 }
 
-const REMINDER_COLUMNS = `id, tenant_id, owner_user_id, relationship_id, meeting_id, title, note,
-  due_at, channel, status, source, email_sent_at`;
+const REMINDER_COLUMNS = [
+  "id",
+  "tenant_id",
+  "owner_user_id",
+  "relationship_id",
+  "meeting_id",
+  "title",
+  "note",
+  "due_at",
+  "channel",
+  "status",
+  "source",
+  "email_sent_at",
+] as const;
 
 export function createPostgresScheduleStore(options: {
   readonly sql: DatabaseExecutor;
@@ -275,11 +287,11 @@ export function createPostgresScheduleStore(options: {
                 ${input.note}, ${input.dueAt}, ${input.channel}, 'PERSON', ${input.qActionId},
                 ${input.idempotencyKey})
         on conflict do nothing
-        returning ${sql.unsafe(REMINDER_COLUMNS)}`;
+        returning ${sql(REMINDER_COLUMNS)}`;
       const row = inserted[0];
       if (row !== undefined) return { record: toReminder(row), created: true };
       const existing = await sql<ReminderRow[]>`
-        select ${sql.unsafe(REMINDER_COLUMNS)} from communication.reminders
+        select ${sql(REMINDER_COLUMNS)} from communication.reminders
          where (owner_user_id = ${input.ownerUserId} and idempotency_key = ${input.idempotencyKey})
             or (${input.qActionId}::uuid is not null and q_action_id = ${input.qActionId}::uuid)
          limit 1`;
@@ -309,7 +321,7 @@ export function createPostgresScheduleStore(options: {
     listReminders: async (ownerUserId, limit) =>
       (
         await sql<ReminderRow[]>`
-          select ${sql.unsafe(REMINDER_COLUMNS)} from communication.reminders
+          select ${sql(REMINDER_COLUMNS)} from communication.reminders
            where owner_user_id = ${ownerUserId} and status in ('PENDING', 'DELIVERED')
            order by due_at asc limit ${limit}`
       ).map(toReminder),
@@ -326,7 +338,7 @@ export function createPostgresScheduleStore(options: {
     dueReminders: async (now, limit) =>
       (
         await sql<ReminderRow[]>`
-          select ${sql.unsafe(REMINDER_COLUMNS)} from communication.reminders
+          select ${sql(REMINDER_COLUMNS)} from communication.reminders
            where (status = 'PENDING' and due_at <= ${now})
               or (status = 'DELIVERED' and channel = 'EMAIL' and email_sent_at is null
                   and due_at > ${now}::timestamptz - interval '1 hour')

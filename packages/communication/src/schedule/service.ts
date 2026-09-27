@@ -94,8 +94,14 @@ export type ScheduleServiceDependencies = {
   readonly email: AppEmailPort;
   readonly logger?:
     | {
-        readonly info: (fields: object, message: string) => void;
-        readonly warn: (fields: object, message: string) => void;
+        readonly info: (
+          fields: Readonly<Record<string, unknown>>,
+          message: string,
+        ) => void;
+        readonly warn: (
+          fields: Readonly<Record<string, unknown>>,
+          message: string,
+        ) => void;
       }
     | undefined;
   readonly now?: (() => Date) | undefined;
@@ -354,10 +360,7 @@ export function createScheduleService(
     };
   }
 
-  async function viewFor(
-    record: MeetingRecord,
-    viewerUserId: string,
-  ): Promise<MeetingView> {
+  function viewFor(record: MeetingRecord, viewerUserId: string): MeetingView {
     const brief =
       record.organiserUserId === viewerUserId && record.prepBriefAt !== null;
     return view(record, viewerUserId, brief);
@@ -523,7 +526,7 @@ export function createScheduleService(
       if (record.status === "SCHEDULED" || record.status === "CANCELLED") {
         return {
           outcome: "OK",
-          meeting: await viewFor(record, actor.userId),
+          meeting: viewFor(record, actor.userId),
           alreadyScheduled: true,
         };
       }
@@ -594,7 +597,7 @@ export function createScheduleService(
       const fresh = (await store.findMeeting(record.id)) ?? record;
       return {
         outcome: "OK",
-        meeting: await viewFor(fresh, actor.userId),
+        meeting: viewFor(fresh, actor.userId),
         alreadyScheduled: !claim.created,
       };
     },
@@ -619,7 +622,7 @@ export function createScheduleService(
       ) {
         return {
           outcome: "OK",
-          meeting: await viewFor(record, input.actor.userId),
+          meeting: viewFor(record, input.actor.userId),
           alreadyDone: true,
         };
       }
@@ -668,7 +671,7 @@ export function createScheduleService(
       const fresh = (await store.findMeeting(record.id)) ?? record;
       return {
         outcome: "OK",
-        meeting: await viewFor(fresh, input.actor.userId),
+        meeting: viewFor(fresh, input.actor.userId),
         alreadyDone: false,
       };
     },
@@ -729,12 +732,12 @@ export function createScheduleService(
         relationshipId,
         50,
       );
-      return Promise.all(
+      return (
         records
           // A party sees the calls they are in; the organiser's colleagues
           // who were not invited see nothing of the link (view() hides it).
           .filter((record) => record.status !== "FAILED")
-          .map((record) => viewFor(record, actor.userId)),
+          .map((record) => viewFor(record, actor.userId))
       );
     },
 
@@ -745,11 +748,9 @@ export function createScheduleService(
         new Date(now().getTime() - 3_600_000),
         20,
       );
-      return Promise.all(
-        records
-          .filter((record) => record.status === "SCHEDULED")
-          .map((record) => viewFor(record, actor.userId)),
-      );
+      return records
+        .filter((record) => record.status === "SCHEDULED")
+        .map((record) => viewFor(record, actor.userId));
     },
 
     brief: async (actor, meetingId) => {

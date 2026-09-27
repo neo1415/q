@@ -202,13 +202,13 @@ export function createGoogleCalendarProvider(
         `${CALENDAR_API}/calendars/primary/events?conferenceDataVersion=1&sendUpdates=all`,
         { method: "POST", headers: headers(access, true), body },
       );
+      // 409: the id already exists (a previous attempt created it); the
+      // link is read back below.
       let created: z.infer<typeof EventSchema> | null = null;
-      if (response.status === 409) {
-        // The id already exists: a previous attempt created it. Read it.
-        created = null;
-      } else if (response.status < 200 || response.status > 299) {
-        throw errorForStatus(response.status);
-      } else {
+      if (response.status !== 409) {
+        if (response.status < 200 || response.status > 299) {
+          throw errorForStatus(response.status);
+        }
         const parsed = EventSchema.safeParse(await readJson(response));
         if (!parsed.success) {
           throw new GoogleProviderError("MALFORMED_RESPONSE", response.status);

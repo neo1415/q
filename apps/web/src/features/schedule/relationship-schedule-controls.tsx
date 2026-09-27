@@ -75,11 +75,7 @@ export function RelationshipScheduleControls({
   const [message, setMessage] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
-  const upcoming = meetings.filter(
-    (meeting) =>
-      meeting.status === "SCHEDULED" &&
-      Date.parse(meeting.endsAt) > Date.now() - 3_600_000,
-  );
+  const upcoming = meetings.filter((meeting) => meeting.status === "SCHEDULED");
 
   const findTimes = () =>
     startTransition(async () => {
