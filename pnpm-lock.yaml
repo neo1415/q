@@ -912,6 +912,9 @@ importers:
         specifier: 4.5.4
         version: 4.5.4
     devDependencies:
+      '@capital-q/config':
+        specifier: workspace:*
+        version: link:../config
       '@types/node':
         specifier: ^24.13.3
         version: 24.13.3

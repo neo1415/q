@@ -24,7 +24,11 @@ import {
  * failures, and ticking again over the same mailbox records a reply once.
  */
 
-const logger = { info: () => undefined, warn: () => undefined };
+const logger = {
+  info: () => undefined,
+  warn: () => undefined,
+  error: () => undefined,
+};
 
 describe("gmail reply poller", () => {
   it("polls every five minutes and survives a failed tick", async () => {

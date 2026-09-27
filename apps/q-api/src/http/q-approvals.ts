@@ -198,14 +198,12 @@ export function registerQApprovalRoutes(
     { onRequest: withContext },
     async (request, reply) => {
       const { view, payload } = await emailDraft(request);
-      return reply
-        .header("Cache-Control", "no-store")
-        .send(
-          EmailDraftDtoSchema.parse({
-            approvalId: view.approvalId,
-            ...payload,
-          }),
-        );
+      return reply.header("Cache-Control", "no-store").send(
+        EmailDraftDtoSchema.parse({
+          approvalId: view.approvalId,
+          ...payload,
+        }),
+      );
     },
   );
 

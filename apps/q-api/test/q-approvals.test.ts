@@ -112,6 +112,9 @@ function fakeEngine(overrides: Partial<QActionService> = {}) {
   const calls: Calls = { getApproval: [], approve: [], reject: [], resume: [] };
   const service: QActionService = {
     propose: () => Promise.reject(new Error("not used")),
+    revise: () => Promise.reject(new Error("not used")),
+    readProposal: () => Promise.reject(new Error("not used")),
+    currentRevision: (_tenantId, _runId, actionId) => Promise.resolve(actionId),
     getApproval: (query) => {
       calls.getApproval.push(query);
       return Promise.resolve(VIEW);

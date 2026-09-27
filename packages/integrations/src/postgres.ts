@@ -96,11 +96,38 @@ function toEmail(row: EmailRow): EmailMessageRecord {
   };
 }
 
-const ACCOUNT_COLUMNS = `id, tenant_id, user_id, google_subject, email, scopes, status,
-  refresh_token_ciphertext, history_id, watch_expires_at, last_synced_at, connected_at`;
-const EMAIL_COLUMNS = `id, tenant_id, google_account_id, relationship_id, direction, status,
-  q_action_id, idempotency_key, rfc822_message_id, provider_message_id, provider_thread_id,
-  reply_to_email_id, from_address, to_address, subject, occurred_at`;
+const ACCOUNT_COLUMNS = [
+  "id",
+  "tenant_id",
+  "user_id",
+  "google_subject",
+  "email",
+  "scopes",
+  "status",
+  "refresh_token_ciphertext",
+  "history_id",
+  "watch_expires_at",
+  "last_synced_at",
+  "connected_at",
+] as const;
+const EMAIL_COLUMNS = [
+  "id",
+  "tenant_id",
+  "google_account_id",
+  "relationship_id",
+  "direction",
+  "status",
+  "q_action_id",
+  "idempotency_key",
+  "rfc822_message_id",
+  "provider_message_id",
+  "provider_thread_id",
+  "reply_to_email_id",
+  "from_address",
+  "to_address",
+  "subject",
+  "occurred_at",
+] as const;
 
 export function createPostgresIntegrationsStore(options: {
   readonly sql: DatabaseExecutor;
@@ -154,7 +181,7 @@ export function createPostgresIntegrationsStore(options: {
           values (${input.tenantId}, ${input.userId}, ${input.googleSubject}, ${input.email},
                   ${[...input.scopes]}, ${Buffer.from(input.refreshTokenCiphertext)},
                   ${input.keyVersion}, ${input.historyId})
-          returning ${tx.sql.unsafe(ACCOUNT_COLUMNS)}`;
+          returning ${tx.sql([...ACCOUNT_COLUMNS])}`;
         const row = rows[0];
         if (row === undefined)
           throw new Error("google account insert returned nothing");
@@ -162,25 +189,25 @@ export function createPostgresIntegrationsStore(options: {
       }),
     findConnectedByUser: async (userId) =>
       accounts(
-        await sql<AccountRow[]>`select ${sql.unsafe(ACCOUNT_COLUMNS)}
+        await sql<AccountRow[]>`select ${sql([...ACCOUNT_COLUMNS])}
           from integrations.google_accounts
           where user_id = ${userId} and status = 'CONNECTED' limit 1`,
       )[0] ?? null,
     findConnectedById: async (accountId) =>
       accounts(
-        await sql<AccountRow[]>`select ${sql.unsafe(ACCOUNT_COLUMNS)}
+        await sql<AccountRow[]>`select ${sql([...ACCOUNT_COLUMNS])}
           from integrations.google_accounts
           where id = ${accountId} and status = 'CONNECTED' limit 1`,
       )[0] ?? null,
     findConnectedByEmail: async (email) =>
       accounts(
-        await sql<AccountRow[]>`select ${sql.unsafe(ACCOUNT_COLUMNS)}
+        await sql<AccountRow[]>`select ${sql([...ACCOUNT_COLUMNS])}
           from integrations.google_accounts
           where lower(email) = ${email.toLowerCase()} and status = 'CONNECTED' limit 10`,
       ),
     listConnected: async (limit) =>
       accounts(
-        await sql<AccountRow[]>`select ${sql.unsafe(ACCOUNT_COLUMNS)}
+        await sql<AccountRow[]>`select ${sql([...ACCOUNT_COLUMNS])}
           from integrations.google_accounts
           where status = 'CONNECTED'
           order by last_synced_at asc nulls first
@@ -209,11 +236,11 @@ export function createPostgresIntegrationsStore(options: {
                 'SENDING', ${input.qActionId}, ${input.idempotencyKey}, ${input.rfc822MessageId},
                 ${input.fromAddress}, ${input.toAddress}, ${input.subject}, ${input.bodyText})
         on conflict do nothing
-        returning ${sql.unsafe(EMAIL_COLUMNS)}`;
+        returning ${sql([...EMAIL_COLUMNS])}`;
       if (inserted[0] !== undefined) {
         return { record: toEmail(inserted[0]), created: true };
       }
-      const existing = await sql<EmailRow[]>`select ${sql.unsafe(EMAIL_COLUMNS)}
+      const existing = await sql<EmailRow[]>`select ${sql([...EMAIL_COLUMNS])}
           from integrations.email_messages
          where idempotency_key = ${input.idempotencyKey} or q_action_id = ${input.qActionId}
          limit 1`;
@@ -238,7 +265,7 @@ export function createPostgresIntegrationsStore(options: {
         where id = ${emailId} and status = 'SENDING'`;
     },
     findOutboundForReply: async (googleAccountId, match) => {
-      const rows = await sql<EmailRow[]>`select ${sql.unsafe(EMAIL_COLUMNS)}
+      const rows = await sql<EmailRow[]>`select ${sql([...EMAIL_COLUMNS])}
           from integrations.email_messages
          where google_account_id = ${googleAccountId}
            and direction = 'OUTBOUND' and status = 'SENT'
@@ -260,12 +287,12 @@ export function createPostgresIntegrationsStore(options: {
                 ${input.providerThreadId}, ${input.replyToEmailId}, ${input.fromAddress},
                 ${input.toAddress}, ${input.subject}, ${input.occurredAt})
         on conflict do nothing
-        returning ${tx.sql.unsafe(EMAIL_COLUMNS)}`;
+        returning ${tx.sql([...EMAIL_COLUMNS])}`;
       return rows[0] === undefined ? null : toEmail(rows[0]);
     },
     listForRelationship: async (googleAccountId, relationshipId) =>
       (
-        await sql<EmailRow[]>`select ${sql.unsafe(EMAIL_COLUMNS)}
+        await sql<EmailRow[]>`select ${sql([...EMAIL_COLUMNS])}
           from integrations.email_messages
          where google_account_id = ${googleAccountId}
            and relationship_id = ${relationshipId}

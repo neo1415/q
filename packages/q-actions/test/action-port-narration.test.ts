@@ -56,6 +56,12 @@ function recordingNarrator() {
   return { said, narrator };
 }
 
+const currentRevision: QActionService["currentRevision"] = (
+  _tenantId,
+  _runId,
+  actionId,
+) => Promise.resolve(actionId);
+
 function service(
   propose: QActionService["propose"],
   executeApproved?: QActionService["executeApproved"],
@@ -64,7 +70,7 @@ function service(
     propose,
     executeApproved:
       executeApproved ?? (() => Promise.resolve({ kind: "EXECUTED" })),
-    currentRevision: (_tenantId, _runId, actionId) => Promise.resolve(actionId),
+    currentRevision,
   } as unknown as QActionService;
 }
 
