@@ -588,9 +588,34 @@ describe("tap to pause (founder directive, 2026-09-27)", () => {
     });
     pause.mockClear();
     fireEvent.click(screen.getByRole("button", { name: "Share" }));
-    fireEvent.click(
-      screen.getByRole("button", { name: "More about this company" }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: "More" }));
     expect(pause).not.toHaveBeenCalled();
+  });
+});
+
+describe("the details sheet over the feed", () => {
+  it("keeps its keys, taps and swipes out of the feed", async () => {
+    const { container } = await renderFeed();
+    const video = container.querySelector<HTMLVideoElement>(
+      "[data-slot-active] video",
+    );
+    if (video === null) throw new Error("no active video");
+    Object.defineProperty(video, "paused", {
+      configurable: true,
+      get: () => false,
+    });
+    fireEvent.click(screen.getByRole("button", { name: "More" }));
+    const dialog = await screen.findByRole("dialog");
+    pause.mockClear();
+
+    fireEvent.keyDown(dialog, { key: "ArrowDown" });
+    fireEvent.click(dialog);
+    const details = dialog.querySelector("[data-feed-details]");
+    if (details === null) throw new Error("no details");
+    fireEvent.touchStart(details, { touches: [{ clientY: 400 }] });
+    fireEvent.touchEnd(details, { changedTouches: [{ clientY: 100 }] });
+
+    expect(pause).not.toHaveBeenCalled();
+    expect(screen.getByRole("heading", { name: "Company 1" })).toBeTruthy();
   });
 });

@@ -411,6 +411,9 @@ export function InvestorFeedScreen({
       const target = event.target;
       if (
         !(target instanceof Element) ||
+        // The details sheet is portalled: its clicks, backdrop included,
+        // reach this handler through React but are not on the pitch.
+        !event.currentTarget.contains(target) ||
         target.closest(
           "button, a, input, textarea, select, [role='button'], .cq-feed-overlay, .cq-feed-nav, .cq-feed-player-controls",
         ) !== null
@@ -474,6 +477,10 @@ export function InvestorFeedScreen({
   const onKeyDown = useCallback(
     (event: React.KeyboardEvent<HTMLDivElement>) => {
       const target = event.target;
+      // Keys in the portalled details sheet are the sheet's.
+      if (target instanceof Node && !event.currentTarget.contains(target)) {
+        return;
+      }
       // Never steal a keystroke from something being typed into.
       if (
         target instanceof HTMLElement &&
@@ -534,6 +541,14 @@ export function InvestorFeedScreen({
 
   const { canAdvance, canRetreat } = feed;
   const onTouchStart = useCallback((event: React.TouchEvent) => {
+    // A touch in a portalled sheet (its backdrop) is not a feed gesture.
+    if (
+      event.target instanceof Node &&
+      !event.currentTarget.contains(event.target)
+    ) {
+      drag.current = null;
+      return;
+    }
     const y = event.touches[0]?.clientY;
     drag.current = y === undefined ? null : { startY: y, dy: 0 };
   }, []);
@@ -764,9 +779,15 @@ export function InvestorFeedScreen({
           {tapPaused ? "Paused" : ""}
         </span>
 
-        <div className="cq-feed-overlay">
-          <Notes notes={notes} />
-          {unverifiableLine}
+        {/*
+          The scrim is always there on a phone (founder feedback,
+          2026-09-27): stage canvas, solid at the bottom and at least 92%
+          under every line of text, fading out only in the overlay's top
+          padding, so the words keep ≥4.5:1 whatever frame is behind them.
+          The stage is dark in both themes (ADR 0017), so the scrim is too.
+          On a desktop the panel sits beside the pitch, on the canvas.
+        */}
+        <div className="cq-feed-overlay bg-[linear-gradient(to_top,var(--cq-stage-canvas)_0%,color-mix(in_oklch,var(--cq-stage-canvas)_92%,transparent)_calc(100%-48px),transparent_100%)] lg:bg-none">
           <FeedCard
             key={card.companyId}
             company={card}
@@ -790,6 +811,14 @@ export function InvestorFeedScreen({
               next();
             }}
             onAskQ={() => setOpen(true)}
+            feedNotes={
+              notes.length === 0 && unverifiableLine === null ? null : (
+                <div className="flex flex-col gap-1">
+                  <Notes notes={notes} />
+                  {unverifiableLine}
+                </div>
+              )
+            }
           />
         </div>
 

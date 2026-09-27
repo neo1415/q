@@ -1,20 +1,18 @@
 "use client";
 
 import Link from "next/link";
-import { useId, useRef, useState, type ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
 
 import type {
   DiscoveredCompanyDto,
   DiscoveryReasonDto,
 } from "@capital-q/contracts";
-import { cx } from "@capital-q/ui";
 import { Button } from "@capital-q/ui/button";
+import { SheetContent, SheetRoot } from "@capital-q/ui/sheet";
 import {
   ArrowDown,
   Bookmark,
   BookmarkCheck,
-  Building2,
-  ChevronDown,
   ChevronUp,
   Globe,
   Handshake,
@@ -33,6 +31,9 @@ import { ruleList } from "./mandate-rules";
 import { shareCompany, type ShareOutcome } from "./share-company";
 import { attachHlsOrNativeSource } from "./player/hls-source";
 import { PitchPlayer } from "./player/pitch-player";
+
+/** A swipe down this far on the details sheet closes it. */
+const SHEET_DISMISS_PX = 64;
 
 /**
  * One company in the feed (CQ-WEB-022; doc 17 §66-§68, doc 19 §44-§45).
@@ -152,6 +153,7 @@ export function FeedCard({
   onAskQ,
   showMedia = true,
   askQMark,
+  feedNotes = null,
 }: {
   readonly company: DiscoveredCompanyDto;
   readonly policy: FeedPreloadPolicy;
@@ -169,19 +171,26 @@ export function FeedCard({
   readonly showMedia?: boolean | undefined;
   /** Q's aperture in the Ask Q control: the dock merged into the rail. */
   readonly askQMark?: ReactNode;
+  /** The feed's own notes, said in the details rather than over the pitch. */
+  readonly feedNotes?: ReactNode;
 }) {
+  // Stage first, then where: "Seed · Nigeria".
   const place = [
-    countryLabel(company.headquartersCountry),
     stageLabel(company.currentStageCode),
+    countryLabel(company.headquartersCountry),
   ]
     .filter((part): part is string => part !== null)
     .join(" · ");
   const decisions = useRef<HTMLDivElement>(null);
   useDockAvoid(decisions);
   const unverified = company.unverifiedExclusions ?? [];
-  const detailsId = useId();
+  const sheetDrag = useRef<number | null>(null);
   const [expanded, setExpanded] = useState(false);
   const [confirming, setConfirming] = useState(false);
+  const openDetails = (confirm: boolean) => {
+    setConfirming(confirm);
+    setExpanded(true);
+  };
   const [shared, setShared] = useState<ShareOutcome | null>(null);
 
   return (
@@ -207,119 +216,158 @@ export function FeedCard({
         />
       )}
 
-      <div className="cq-feed-info flex flex-col gap-3">
-        <div className="flex items-center gap-2">
-          <Building2 size={ICON_SIZE.regular} aria-hidden="true" />
-          <h2 className="cq-title-sm text-(--cq-text-primary)">
-            {/* The name opens the company, as it does in any feed. */}
-            <Link
-              href={`/company/${company.companyId}`}
-              className="underline-offset-4 hover:underline"
-              data-feed-company-link
-            >
-              {company.canonicalName}
-            </Link>
-          </h2>
-        </div>
-
-        {place === "" ? null : (
-          <p className="cq-caption text-(--cq-text-tertiary)">{place}</p>
-        )}
-
-        {company.pitch === null ? (
-          <p className="cq-caption text-(--cq-text-tertiary)">
-            No pitch video yet. This is what {company.canonicalName} has
-            declared.
-          </p>
-        ) : null}
+      {/*
+        The summary over the pitch (founder feedback, 2026-09-27): the name,
+        one short line and stage · place. Everything else is behind More,
+        in a sheet with its own solid surface -- never bare text over video.
+      */}
+      <div className="cq-feed-info flex flex-col gap-1.5" data-feed-summary>
+        <h2 className="cq-title-sm text-(--cq-text-primary)">
+          {/* The name opens the company, as it does in any feed. */}
+          <Link
+            href={`/company/${company.companyId}`}
+            className="underline-offset-4 hover:underline"
+            data-feed-company-link
+          >
+            {company.canonicalName}
+          </Link>
+        </h2>
 
         {company.shortDescription === null ? null : (
           <p
-            className={cx(
-              "cq-body max-w-(--cq-layout-narrow) text-(--cq-text-secondary)",
-              expanded && "line-clamp-none",
-            )}
+            className="cq-body-sm line-clamp-2 max-w-(--cq-layout-narrow) text-(--cq-text-primary)"
+            data-feed-one-liner
           >
             {company.shortDescription}
           </p>
         )}
 
-        {/*
-          On a phone the overlay stays short so the pitch is the screen;
-          the reasons, the website and Express Interest are one tap away.
-          A desktop panel has the room and always shows them.
-        */}
+        {place === "" ? null : (
+          <p className="cq-caption text-(--cq-text-secondary)">{place}</p>
+        )}
+
         <button
           type="button"
-          className="cq-caption inline-flex min-h-11 items-center gap-1 self-start text-(--cq-text-secondary) lg:hidden"
+          className="cq-caption inline-flex min-h-11 items-center gap-1 self-start font-medium text-(--cq-text-primary)"
+          aria-haspopup="dialog"
           aria-expanded={expanded}
-          aria-controls={detailsId}
-          onClick={() => setExpanded((open) => !open)}
+          onClick={() => openDetails(false)}
           data-feed-details-toggle
         >
-          {expanded ? "Less" : "More about this company"}
-          {expanded ? (
-            <ChevronDown aria-hidden="true" size={ICON_SIZE.compact} />
-          ) : (
-            <ChevronUp aria-hidden="true" size={ICON_SIZE.compact} />
-          )}
+          More
+          <ChevronUp aria-hidden="true" size={ICON_SIZE.compact} />
         </button>
-
-        <div
-          id={detailsId}
-          className={cx(
-            "flex-col gap-3 lg:flex",
-            expanded
-              ? "flex max-h-[45dvh] overflow-y-auto lg:max-h-none lg:overflow-visible"
-              : "hidden",
-          )}
-          data-feed-details
-        >
-          <Reasons
-            reasons={
-              company.reasons.length > 0
-                ? company.reasons
-                : slateReasons(company)
-            }
-          />
-
-          {/*
-            Unknown never excludes (ADR 0020): a hard rule this company's own
-            facts could not answer is said, quietly, rather than applied.
-          */}
-          {unverified.length === 0 ? null : (
-            <p className="cq-caption text-(--cq-text-tertiary)">
-              Your {ruleList(unverified)} exclusion
-              {unverified.length === 1 ? " wasn't" : "s weren't"} checked: this
-              company hasn&apos;t stated it yet.
-            </p>
-          )}
-
-          {company.websiteUrl === null ? null : (
-            <p className="flex items-center gap-1.5">
-              <Globe size={ICON_SIZE.compact} aria-hidden="true" />
-              <span className="cq-caption break-all text-(--cq-text-tertiary)">
-                {company.websiteUrl}
-              </span>
-            </p>
-          )}
-
-          {/*
-            Apart from Save and Pass on purpose: those are optimistic and
-            this is server-confirmed (CQ-NET-010), and Interest ≠ Save. The
-            rail's Interest only opens this at its confirmation step.
-          */}
-          <div className="cq-feed-interest">
-            <ExpressInterest
-              key={confirming ? "confirming" : "idle"}
-              companyId={company.companyId}
-              companyName={company.canonicalName}
-              surface="RECOMMENDATION_FEED"
-              startConfirming={confirming}
-            />
-          </div>
-        </div>
       </div>
+
+      <SheetRoot
+        open={expanded}
+        onOpenChange={(open) => {
+          setExpanded(open);
+          if (!open) setConfirming(false);
+        }}
+      >
+        <SheetContent title={company.canonicalName} side="side">
+          {/*
+            In a portal, but still inside the feed in React's tree: its
+            gestures and keys stop here so a scroll in the sheet never
+            moves the feed, and a swipe down on it closes it.
+          */}
+          <div
+            className="flex flex-col gap-5"
+            data-feed-details
+            onTouchStart={(event) => {
+              event.stopPropagation();
+              sheetDrag.current = event.touches[0]?.clientY ?? null;
+            }}
+            onTouchMove={(event) => event.stopPropagation()}
+            onTouchEnd={(event) => {
+              event.stopPropagation();
+              const start = sheetDrag.current;
+              sheetDrag.current = null;
+              const end = event.changedTouches[0]?.clientY;
+              const scroller = event.currentTarget.parentElement;
+              if (
+                start !== null &&
+                end !== undefined &&
+                end - start > SHEET_DISMISS_PX &&
+                (scroller === null || scroller.scrollTop <= 0)
+              ) {
+                setExpanded(false);
+              }
+            }}
+            onKeyDown={(event) => event.stopPropagation()}
+            onWheel={(event) => event.stopPropagation()}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex flex-col gap-2">
+              {place === "" ? null : (
+                <p className="cq-caption text-(--cq-text-secondary)">{place}</p>
+              )}
+              {company.shortDescription === null ? null : (
+                <p className="cq-body text-(--cq-text-primary)">
+                  {company.shortDescription}
+                </p>
+              )}
+              {company.pitch === null ? (
+                <p className="cq-caption text-(--cq-text-secondary)">
+                  No pitch video yet.
+                </p>
+              ) : null}
+            </div>
+
+            <section className="flex flex-col gap-2" aria-label="Why it's here">
+              <h3 className="cq-label text-(--cq-text-secondary)">
+                Why it&apos;s here
+              </h3>
+              <Reasons
+                reasons={
+                  company.reasons.length > 0
+                    ? company.reasons
+                    : slateReasons(company)
+                }
+              />
+              {/*
+                Unknown never excludes (ADR 0020): a hard rule this
+                company's own facts could not answer is said, quietly,
+                rather than applied.
+              */}
+              {unverified.length === 0 ? null : (
+                <p className="cq-caption text-(--cq-text-secondary)">
+                  Your {ruleList(unverified)} exclusion
+                  {unverified.length === 1 ? " wasn't" : "s weren't"} checked:
+                  this company hasn&apos;t stated it yet.
+                </p>
+              )}
+            </section>
+
+            {company.websiteUrl === null ? null : (
+              <p className="flex items-center gap-1.5">
+                <Globe size={ICON_SIZE.compact} aria-hidden="true" />
+                <span className="cq-caption break-all text-(--cq-text-secondary)">
+                  {company.websiteUrl}
+                </span>
+              </p>
+            )}
+
+            {feedNotes}
+
+            {/*
+              Apart from Save and Pass on purpose: those are optimistic and
+              this is server-confirmed (CQ-NET-010), and Interest ≠ Save.
+              The rail's Interest opens it at its confirmation step.
+            */}
+            <div className="cq-feed-interest">
+              <ExpressInterest
+                key={confirming ? "confirming" : "idle"}
+                companyId={company.companyId}
+                companyName={company.canonicalName}
+                surface="RECOMMENDATION_FEED"
+                startConfirming={confirming}
+              />
+            </div>
+          </div>
+        </SheetContent>
+      </SheetRoot>
 
       {/*
         The action rail (spec §9.1; ADR 0017 C4; founder directive
@@ -373,12 +421,9 @@ export function FeedCard({
         </Button>
         <Button
           variant="quiet"
-          onClick={() => {
-            setExpanded(true);
-            setConfirming(true);
-          }}
-          className="cq-feed-rail-button lg:hidden"
-          aria-controls={detailsId}
+          onClick={() => openDetails(true)}
+          className="cq-feed-rail-button"
+          aria-haspopup="dialog"
           data-feed-interest
         >
           <Handshake

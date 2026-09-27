@@ -191,6 +191,11 @@ async function renderFeed() {
   return view;
 }
 
+/** Reasons, the website and Express Interest live in the details sheet. */
+function openDetails() {
+  fireEvent.click(screen.getByRole("button", { name: "More" }));
+}
+
 /** The feed owns its keys; they are not dispatched at the window. */
 function feedRegion(): HTMLElement {
   return screen.getByRole("group", { name: "Companies to review" });
@@ -210,9 +215,12 @@ describe("a card", () => {
         onAskQ={() => undefined}
       />,
     );
+    openDetails();
 
     expect(screen.getByRole("heading", { name: "Company 1" })).toBeTruthy();
-    expect(screen.getByText("What company 1 does.")).toBeTruthy();
+    expect(screen.getAllByText("What company 1 does.").length).toBeGreaterThan(
+      0,
+    );
     expect(screen.getByText("Seed, as you declared")).toBeTruthy();
 
     // No percentage, no "match", no score, anywhere in the rendered card.
@@ -241,9 +249,10 @@ describe("a card", () => {
         onAskQ={() => undefined}
       />,
     );
+    openDetails();
 
     expect(screen.getByText("Pre-seed, in your range")).toBeTruthy();
-    expect(screen.getByText("Nigeria · Pre-seed")).toBeTruthy();
+    expect(screen.getAllByText("Pre-seed · Nigeria").length).toBeGreaterThan(0);
     const text = container.textContent ?? "";
     expect(text).not.toMatch(/nothing declared in common/);
     // Missingness and mismatch are never shown as a reason.
@@ -263,6 +272,7 @@ describe("a card", () => {
         onAskQ={() => undefined}
       />,
     );
+    openDetails();
     const note = screen.getByText(/stage exclusion\s+wasn't\s+checked/i);
     expect(note.className).toContain("cq-caption");
     expect(screen.getByRole("heading", { name: "Company 1" })).toBeTruthy();
@@ -297,6 +307,7 @@ describe("a card", () => {
         onAskQ={() => undefined}
       />,
     );
+    openDetails();
 
     expect(screen.getByText(/No pitch video yet/i)).toBeTruthy();
     expect(container.querySelector("video")).toBeNull();
@@ -392,18 +403,48 @@ describe("the phone overlay and rail (founder directive, 2026-09-27)", () => {
     expect(rail.textContent).not.toMatch(/\d/);
   });
 
-  it("keeps details one tap away, and says whether they are open", () => {
-    renderCard();
-    const toggle = screen.getByRole("button", {
-      name: "More about this company",
-    });
-    expect(toggle.getAttribute("aria-expanded")).toBe("false");
-    fireEvent.click(toggle);
+  it("keeps the summary short: name, one line, stage · place", () => {
+    const { container } = renderCard();
+    const summary = container.querySelector("[data-feed-summary]");
+    expect(summary?.querySelector("h2")?.textContent).toBe(
+      company(1).canonicalName,
+    );
     expect(
-      screen
-        .getByRole("button", { name: "Less" })
-        .getAttribute("aria-expanded"),
-    ).toBe("true");
+      summary?.querySelector("[data-feed-one-liner]")?.className,
+    ).toContain("line-clamp-2");
+    // Reasons and the website are not over the pitch.
+    expect(summary?.querySelector("dl")).toBeNull();
+    expect(document.querySelector("[data-feed-details]")).toBeNull();
+  });
+
+  it("opens details in a closable dialog, not as bare text over the video", async () => {
+    renderCard();
+    const more = screen.getByRole("button", { name: "More" });
+    expect(more.getAttribute("aria-expanded")).toBe("false");
+    fireEvent.click(more);
+    const dialog = await screen.findByRole("dialog", {
+      name: company(1).canonicalName,
+    });
+    expect(dialog.querySelector("[data-feed-details]")).not.toBeNull();
+    expect(more.getAttribute("aria-expanded")).toBe("true");
+
+    fireEvent.keyDown(dialog, { key: "Escape" });
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog")).toBeNull();
+    });
+  });
+
+  it("closes the details on a swipe down", async () => {
+    renderCard();
+    fireEvent.click(screen.getByRole("button", { name: "More" }));
+    await screen.findByRole("dialog");
+    const details = document.querySelector("[data-feed-details]");
+    if (details === null) throw new Error("no details");
+    fireEvent.touchStart(details, { touches: [{ clientY: 100 }] });
+    fireEvent.touchEnd(details, { changedTouches: [{ clientY: 220 }] });
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog")).toBeNull();
+    });
   });
 
   it("opens Express Interest at its confirmation step and sends nothing yet", () => {
@@ -595,6 +636,7 @@ describe("Express Interest (CQ-NET-010)", () => {
   }
 
   async function confirmInterest() {
+    openDetails();
     fireEvent.click(screen.getByRole("button", { name: "Express interest" }));
     // Doc 17 §70: the consequence is stated before it happens.
     expect(
