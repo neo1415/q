@@ -3,7 +3,6 @@ import { z } from "zod";
 import {
   ChatMessageBodySchema,
   QActionTypeSchema,
-  UtcTimestampSchema,
   UuidSchema,
   type QSubjectRef,
 } from "@capital-q/contracts";
@@ -21,12 +20,21 @@ import {
 } from "@capital-q/q-actions";
 import {
   CHAT_MESSAGE_SEND as CHAT_MESSAGE_SEND_NAME,
-  MEETING_PROPOSE as MEETING_PROPOSE_NAME,
+  MEETING_CANCEL as MEETING_CANCEL_NAME,
+  MEETING_RESCHEDULE as MEETING_RESCHEDULE_NAME,
+  MEETING_SCHEDULE as MEETING_SCHEDULE_NAME,
   REMINDER_CREATE as REMINDER_CREATE_NAME,
   type ChatIntelligencePort,
   type ChatProposal,
 } from "@capital-q/q-tools";
 import type { ActorContext } from "@capital-q/security";
+
+import {
+  MeetingCancelPayloadSchema,
+  MeetingReschedulePayloadSchema,
+  MeetingSchedulePayloadSchema,
+  ReminderCreatePayloadSchema,
+} from "./schedule-actions.js";
 
 /**
  * Relationship chat actions (R34; ADR 0019), all Prepare → Approve.
@@ -34,8 +42,9 @@ import type { ActorContext } from "@capital-q/security";
  *   chat.message.send  a message (optionally sharing one of the approver's
  *                      own scanned documents) posted as the approver, once
  *                      per execution identity
- *   reminder.create    prepared and approved now; execution needs Calendar
- *   meeting.propose    (BIZ-008) and answers NOT_CONFIGURED until then
+ *
+ * Reminders and meetings (BIZ-008) live in ./schedule-actions.ts; they
+ * share this run board.
  *
  * `authorize` runs at proposal, at approval and before execution: the
  * approver must be a person and still a party to the relationship (and,
@@ -46,8 +55,6 @@ import type { ActorContext } from "@capital-q/security";
 export const CHAT_MESSAGE_SEND = QActionTypeSchema.parse(
   CHAT_MESSAGE_SEND_NAME,
 );
-export const REMINDER_CREATE = QActionTypeSchema.parse(REMINDER_CREATE_NAME);
-export const MEETING_PROPOSE = QActionTypeSchema.parse(MEETING_PROPOSE_NAME);
 
 const CounterpartNameSchema = z.string().trim().min(1).max(200);
 
@@ -63,32 +70,9 @@ export type ChatMessageSendPayload = z.infer<
   typeof ChatMessageSendPayloadSchema
 >;
 
-export const ReminderCreatePayloadSchema = z
-  .object({
-    relationshipId: UuidSchema,
-    counterpartName: CounterpartNameSchema,
-    title: z.string().trim().min(1).max(200),
-    remindAt: UtcTimestampSchema,
-    note: z.string().trim().max(1000).optional(),
-  })
-  .strict();
-export type ReminderCreatePayload = z.infer<typeof ReminderCreatePayloadSchema>;
-
-export const MeetingProposePayloadSchema = z
-  .object({
-    relationshipId: UuidSchema,
-    counterpartName: CounterpartNameSchema,
-    purpose: z.string().trim().min(1).max(500),
-    proposedStarts: z.array(UtcTimestampSchema).min(1).max(3),
-    durationMinutes: z.number().int().min(15).max(180),
-  })
-  .strict();
-export type MeetingProposePayload = z.infer<typeof MeetingProposePayloadSchema>;
-
 const MessageResultSchema = z
   .object({ messageId: UuidSchema, alreadySent: z.boolean() })
   .strict();
-const NothingSchema = z.object({}).strict();
 
 type Party = { readonly connected: boolean } | null;
 
@@ -103,9 +87,6 @@ async function partyOf(
     .then((read) => ({ connected: read.connected }))
     .catch(() => null);
 }
-
-const when = (iso: string) =>
-  new Date(iso).toUTCString().replace(":00 GMT", " UTC");
 
 export function createChatMessageSendAction(dependencies: {
   readonly chat: ChatService;
@@ -207,97 +188,19 @@ export function createChatMessageSendAction(dependencies: {
   });
 }
 
-/** Approved now; executed once Calendar (BIZ-008) is composed. */
-function notConfiguredAction<P extends { readonly relationshipId: string }>(
-  chat: ChatService,
-  spec: {
-    readonly actionType: typeof REMINDER_CREATE;
-    readonly payload: z.ZodType<P>;
-    readonly description: string;
-    readonly requiresConnection: boolean;
-    readonly describe: (payload: P) => { summary: string; preview: string };
-  },
-): AnyQActionDefinition {
-  return defineQAction<P, Record<string, never>>({
-    actionType: spec.actionType,
-    version: 1,
-    riskClass: "CONFIRM_REQUIRED",
-    owner: "q-api",
-    description: spec.description,
-    payload: spec.payload,
-    result: NothingSchema,
-    targets: (payload): readonly QSubjectRef[] => [
-      { kind: "RELATIONSHIP", relationshipId: payload.relationshipId },
-    ],
-    describe: spec.describe,
-    confirm: () => "Done.",
-    authorize: async (payload, actor) => {
-      const party = await partyOf(chat, actor, payload.relationshipId);
-      if (party === null) return { outcome: "DENY", code: "NOT_A_PARTY" };
-      if (spec.requiresConnection && !party.connected) {
-        return { outcome: "DENY", code: "NOT_CONNECTED" };
-      }
-      return { outcome: "ALLOW" };
-    },
-    executor: {
-      // Plug-and-play: BIZ-008 replaces this executor with the Calendar
-      // one. Until then the approved proposal says plainly it did not run.
-      execute: () =>
-        Promise.resolve({
-          outcome: "FAILED",
-          failureCode: "NOT_CONFIGURED",
-          retryable: false,
-        }),
-    },
-  });
-}
-
-export function createReminderCreateAction(dependencies: {
-  readonly chat: ChatService;
-}): AnyQActionDefinition {
-  return notConfiguredAction(dependencies.chat, {
-    actionType: REMINDER_CREATE,
-    payload: ReminderCreatePayloadSchema,
-    description:
-      "Creates a reminder about one relationship on the approver's calendar (needs Calendar; until it is connected the action reports NOT_CONFIGURED).",
-    requiresConnection: false,
-    describe: (payload) => ({
-      summary: `Reminder: ${payload.title}`,
-      preview: `${payload.title}\n${when(payload.remindAt)}${payload.note === undefined ? "" : `\n\n${payload.note}`}`,
-    }),
-  });
-}
-
-export function createMeetingProposeAction(dependencies: {
-  readonly chat: ChatService;
-}): AnyQActionDefinition {
-  return notConfiguredAction(dependencies.chat, {
-    actionType: MEETING_PROPOSE,
-    payload: MeetingProposePayloadSchema,
-    description:
-      "Proposes a meeting with the other side of a connected relationship as a calendar invite with a Meet link (needs Calendar; until it is connected the action reports NOT_CONFIGURED).",
-    requiresConnection: true,
-    describe: (payload) => ({
-      summary: `Meeting with ${payload.counterpartName}`,
-      preview: `${payload.purpose}\n${payload.durationMinutes} minutes\n${payload.proposedStarts.map(when).join("\n")}`,
-    }),
-  });
-}
-
 const READING_TTL_MS = 10 * 60 * 1000;
-function schemaFor(
-  proposal: ChatProposal,
-):
-  | typeof ChatMessageSendPayloadSchema
-  | typeof ReminderCreatePayloadSchema
-  | typeof MeetingProposePayloadSchema {
+function schemaFor(proposal: ChatProposal): z.ZodType {
   switch (proposal.actionType) {
     case CHAT_MESSAGE_SEND_NAME:
       return ChatMessageSendPayloadSchema;
     case REMINDER_CREATE_NAME:
       return ReminderCreatePayloadSchema;
-    case MEETING_PROPOSE_NAME:
-      return MeetingProposePayloadSchema;
+    case MEETING_SCHEDULE_NAME:
+      return MeetingSchedulePayloadSchema;
+    case MEETING_RESCHEDULE_NAME:
+      return MeetingReschedulePayloadSchema;
+    case MEETING_CANCEL_NAME:
+      return MeetingCancelPayloadSchema;
   }
 }
 

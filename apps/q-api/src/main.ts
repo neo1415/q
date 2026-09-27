@@ -57,7 +57,7 @@ import {
   createOnboardingQRecommendations,
   createOwnOnboardingSummaryReader,
 } from "@capital-q/onboarding";
-import { composeChat } from "@capital-q/communication";
+import { composeChat, composeSchedule } from "@capital-q/communication";
 import {
   createPostgresDocumentQueryPort,
   DocumentIdSchema,
@@ -294,6 +294,7 @@ import { loadGoogleWorkspaceConfig } from "@capital-q/config/google-workspace";
 import {
   composeGoogleIntegrations,
   createPostgresCounterpartDirectory,
+  unavailableAppEmailSender,
 } from "@capital-q/integrations";
 import {
   createEmailActionBoard,
@@ -305,9 +306,14 @@ import {
   createChatActionBoard,
   createChatIntelligencePort,
   createChatMessageSendAction,
-  createMeetingProposeAction,
-  createReminderCreateAction,
 } from "./composition/chat-actions.js";
+import {
+  createMeetingCancelAction,
+  createMeetingRescheduleAction,
+  createMeetingScheduleAction,
+  createReminderCreateAction,
+  createScheduleIntelligencePort,
+} from "./composition/schedule-actions.js";
 
 // Q configuration is loaded from its own schema, separate from the application
 // API even where the current fields coincide.
@@ -894,6 +900,17 @@ const chat = composeChat({
   },
   newCorrelationId: createCorrelationId,
 });
+// Meetings and reminders (BIZ-008): the person's own Google Calendar
+// through the integrations context; approved actions execute here. App
+// email (reminders) is the workers' job, so q-api composes none.
+const schedule = composeSchedule({
+  sql: database.sql,
+  transactions: database.transactions,
+  interests: interestService,
+  calendars: (userId) => integrations.calendarOf(userId),
+  email: unavailableAppEmailSender,
+  logger,
+});
 // Handles and the Q Card (BIZ-004), composed as the application API
 // composes them: the same service, the same allowlisted subject facts.
 const cardVerification = createPublicVerificationReader({
@@ -1072,6 +1089,8 @@ const qTools = createQTools({
         (await relationshipCounterparts.of(actor, relationshipId))?.name ??
         null,
     }),
+    // BIZ-008: calls and reminders, prepared on the chat board.
+    schedule: createScheduleIntelligencePort(schedule),
     // BIZ-002: every profile field the page edits, Q can prepare.
     profileChanges: profileChangeBoard,
     visibility: {
@@ -1305,10 +1324,13 @@ const qActionRegistry = createQActionRegistry([
     counterparts: relationshipCounterparts,
     logger,
   }),
-  // R34: chat message, reminder and meeting from the relationship chat.
+  // R34: chat message from the relationship chat.
   createChatMessageSendAction({ chat, logger }),
-  createReminderCreateAction({ chat }),
-  createMeetingProposeAction({ chat }),
+  // BIZ-008: reminders and calls (Google Calendar + Meet).
+  createReminderCreateAction({ schedule }),
+  createMeetingScheduleAction({ schedule, logger }),
+  createMeetingRescheduleAction({ schedule }),
+  createMeetingCancelAction({ schedule }),
 ]);
 // Every composed action has a capability entry (R20): the list the
 // completeness test reads is the list composed here.

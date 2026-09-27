@@ -8,16 +8,13 @@ import {
   CHAT_MESSAGE_SEND,
   createChatActionBoard,
   createChatMessageSendAction,
-  createMeetingProposeAction,
-  createReminderCreateAction,
-  MEETING_PROPOSE,
   type ChatMessageSendPayload,
 } from "../src/composition/chat-actions.js";
 
 /**
  * R34 chat actions: a chat message posts once, as the approver, only for a
- * party on a connected relationship; reminders and meetings are approvable
- * proposals whose execution says NOT_CONFIGURED until Calendar exists.
+ * party on a connected relationship. Reminders and meetings (BIZ-008) are
+ * in schedule-actions.test.ts.
  */
 
 const RELATIONSHIP = "00000000-0000-4000-8000-0000000000c1";
@@ -131,55 +128,6 @@ describe("chat.message.send", () => {
       retryable: false,
     });
     expect(store.rows).toHaveLength(0);
-  });
-});
-
-describe("reminders and meetings before Calendar", () => {
-  it("are approvable proposals that report NOT_CONFIGURED when executed", async () => {
-    const { chat } = world();
-    const meeting = createMeetingProposeAction({ chat });
-    const reminder = createReminderCreateAction({ chat });
-    const meetingPayload = {
-      relationshipId: RELATIONSHIP,
-      counterpartName: "Apex",
-      purpose: "First call",
-      proposedStarts: ["2026-10-01T14:00:00.000Z"],
-      durationMinutes: 30,
-    };
-    expect(await meeting.authorize(meetingPayload, actor)).toEqual({
-      outcome: "ALLOW",
-    });
-    expect(await meeting.authorize(meetingPayload, stranger)).toMatchObject({
-      outcome: "DENY",
-    });
-    expect(
-      await meeting.executor.execute(
-        {
-          ...approved("q_action:m:a"),
-          actionType: MEETING_PROPOSE,
-          payload: meetingPayload,
-        } as never,
-        context as never,
-      ),
-    ).toEqual({
-      outcome: "FAILED",
-      failureCode: "NOT_CONFIGURED",
-      retryable: false,
-    });
-    expect(
-      meeting.describe(meetingPayload, meeting.targets(meetingPayload)).summary,
-    ).toBe("Meeting with Apex");
-    expect(
-      await reminder.authorize(
-        {
-          relationshipId: RELATIONSHIP,
-          counterpartName: "Apex",
-          title: "Follow up",
-          remindAt: "2026-10-03T09:00:00.000Z",
-        },
-        actor,
-      ),
-    ).toEqual({ outcome: "ALLOW" });
   });
 });
 

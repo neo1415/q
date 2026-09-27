@@ -3,11 +3,13 @@ import type { QActionRegistry } from "@capital-q/q-actions";
 import { COMPANY_PROFILE_UPDATE } from "./company-profile-action.js";
 import { COMPANY_VISIBILITY_SET } from "./company-visibility-action.js";
 import { EMAIL_SEND } from "./email-action.js";
+import { CHAT_MESSAGE_SEND } from "./chat-actions.js";
 import {
-  CHAT_MESSAGE_SEND,
-  MEETING_PROPOSE,
+  MEETING_CANCEL,
+  MEETING_RESCHEDULE,
+  MEETING_SCHEDULE,
   REMINDER_CREATE,
-} from "./chat-actions.js";
+} from "./schedule-actions.js";
 import { RELATIONSHIP_INTEREST_EXPRESS } from "./express-interest-action.js";
 import { HANDLE_CLAIM } from "./handle-claim-action.js";
 import { INVESTOR_PROFILE_UPDATE } from "./investor-profile-action.js";
@@ -36,10 +38,13 @@ export const Q_API_ACTION_TYPES: readonly string[] = Object.freeze([
   HANDLE_CLAIM,
   INVESTOR_PROFILE_UPDATE,
   EMAIL_SEND,
-  // R34: relationship chat (reminders and meetings await Calendar).
+  // R34: relationship chat.
   CHAT_MESSAGE_SEND,
+  // BIZ-008: reminders and meetings.
   REMINDER_CREATE,
-  MEETING_PROPOSE,
+  MEETING_SCHEDULE,
+  MEETING_RESCHEDULE,
+  MEETING_CANCEL,
   ...RECORD_CHANGE_ACTION_TYPES,
 ]);
 
