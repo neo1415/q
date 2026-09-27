@@ -10,8 +10,10 @@ import type { QVoiceDestination } from "./voice.js";
  * Q proposes navigation; the client decides whether and how to perform it,
  * under the same permission checks the person would face clicking the same
  * thing. Every intent is a closed shape with identifier or enum parameters
- * only. There is no OPEN_URL, no RUN_SCRIPT, no SET_HTML and no CALL_API,
- * and a string that looks like JavaScript inside a text field is text.
+ * only -- except OPEN_WEBSITE's validated http(s) URL, bounded below to the
+ * person's own declared site. There is no general OPEN_URL, no RUN_SCRIPT,
+ * no SET_HTML and no CALL_API, and a string that looks like JavaScript
+ * inside a text field is text.
  *
  * Intents refer to companies rather than to a generic subject because these
  * are the screens that exist. Investor and relationship surfaces gain their
@@ -23,6 +25,9 @@ export const Q_UI_INTENT_KINDS = [
   "FOCUS_SECTION",
   "SHOW_EVIDENCE",
   "NAVIGATE",
+  "SET_THEME",
+  "RELOAD_PAGE",
+  "OPEN_WEBSITE",
 ] as const;
 
 export type QUiIntentKind = (typeof Q_UI_INTENT_KINDS)[number];
@@ -107,12 +112,101 @@ export const QNavigateIntentSchema = z
   })
   .strict();
 
+/**
+ * Client actions (R20/R33, founder live test 2026-09-27 #4): things the
+ * app itself does in the person's browser, which Q now does when asked
+ * instead of saying it cannot. Each comes only from a typed tool whose
+ * authorize step allowed it for this run; the browser performs it through
+ * the same code its own controls use.
+ */
+export const Q_THEME_CHOICES = ["light", "dark", "system"] as const;
+export const QThemeChoiceSchema = z.enum(Q_THEME_CHOICES);
+export type QThemeChoice = z.infer<typeof QThemeChoiceSchema>;
+
+export const QSetThemeIntentSchema = z
+  .object({ kind: z.literal("SET_THEME"), theme: QThemeChoiceSchema })
+  .strict();
+
+export const QReloadPageIntentSchema = z
+  .object({ kind: z.literal("RELOAD_PAGE") })
+  .strict();
+
+export const Q_WEBSITE_URL_MAX_LENGTH = 2048;
+
+/**
+ * An http(s) URL, absolute, with no credentials in it. The one shape a
+ * website Q opens may take; anything else (javascript:, data:, a relative
+ * path, user:pass@host) fails here, on the server and again in the browser.
+ */
+export const QWebsiteUrlSchema = z
+  .string()
+  .trim()
+  .max(Q_WEBSITE_URL_MAX_LENGTH)
+  .refine((raw) => {
+    try {
+      const url = new URL(raw);
+      return (
+        (url.protocol === "https:" || url.protocol === "http:") &&
+        url.hostname.length > 0 &&
+        url.username === "" &&
+        url.password === ""
+      );
+    } catch {
+      return false;
+    }
+  }, "an absolute http(s) URL without credentials");
+
+/**
+ * Open a website in a new tab (opened with noopener and noreferrer).
+ * Deliberately not a general OPEN_URL: the tool that produces it allows
+ * only the person's own declared website (from their own company or
+ * investor record) or an address they gave in their own words this turn.
+ */
+export const QOpenWebsiteIntentSchema = z
+  .object({ kind: z.literal("OPEN_WEBSITE"), url: QWebsiteUrlSchema })
+  .strict();
+
+export const QClientActionIntentSchema = z.discriminatedUnion("kind", [
+  QSetThemeIntentSchema,
+  QReloadPageIntentSchema,
+  QOpenWebsiteIntentSchema,
+]);
+export type QClientActionIntent = z.infer<typeof QClientActionIntentSchema>;
+
+/**
+ * The model-facing names of the tools that produce a client action, so the
+ * answer can tell a model these happen at once (not "for approval").
+ */
+export const Q_CLIENT_ACTION_TOOLS = [
+  "set_theme",
+  "reload_page",
+  "open_website",
+] as const;
+
+/**
+ * What a client-action tool returns once its authorize step allowed it:
+ * the intent the answer carries to the screen, which the browser performs
+ * as the answer arrives.
+ */
+export const QClientActionToolResultSchema = z
+  .object({
+    status: z.literal("SCREEN_WILL_DO_IT"),
+    clientAction: QClientActionIntentSchema,
+  })
+  .strict();
+export type QClientActionToolResult = z.infer<
+  typeof QClientActionToolResultSchema
+>;
+
 export const QUiIntentSchema = z.discriminatedUnion("kind", [
   QOpenCompanyIntentSchema,
   QShowComparisonIntentSchema,
   QFocusSectionIntentSchema,
   QShowEvidenceIntentSchema,
   QNavigateIntentSchema,
+  QSetThemeIntentSchema,
+  QReloadPageIntentSchema,
+  QOpenWebsiteIntentSchema,
 ]);
 
 export type QUiIntent = z.infer<typeof QUiIntentSchema>;

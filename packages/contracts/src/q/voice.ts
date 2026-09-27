@@ -3,8 +3,9 @@ import { z } from "zod";
 import { UuidSchema } from "../common/ids.js";
 import { UtcTimestampSchema } from "../common/time.js";
 import { QConversationIdSchema } from "./ids.js";
-import { QViewingMomentSchema } from "./request.js";
+import { QScreenContextSchema, QViewingMomentSchema } from "./request.js";
 import { QSubjectRefsSchema } from "./subject.js";
+import { QClientActionIntentSchema } from "./ui-intent.js";
 
 /**
  * The realtime voice surface (CQ-Q-VOICE-001 C; doc 12 §7.2, §36).
@@ -38,6 +39,15 @@ export const Q_VOICE_TURN_PATH =
   "/v1/q/voice/sessions/:voiceSessionId/turn" as const;
 export const qVoiceTurnPath = (voiceSessionId: string) =>
   `/v1/q/voice/sessions/${encodeURIComponent(voiceSessionId)}/turn`;
+/**
+ * POST: the screen the person is on now, while the line is open (R21).
+ * The body is a QScreenContext; spoken turns carry it like typed ones.
+ * Owner only; a request, never authority (resolved per run or dropped).
+ */
+export const Q_VOICE_SCREEN_PATH =
+  "/v1/q/voice/sessions/:voiceSessionId/screen" as const;
+export const qVoiceScreenPath = (voiceSessionId: string) =>
+  `/v1/q/voice/sessions/${encodeURIComponent(voiceSessionId)}/screen`;
 
 export const Q_VOICE_CHOICES = ["FEMALE", "MALE"] as const;
 export type QVoiceChoice = (typeof Q_VOICE_CHOICES)[number];
@@ -118,6 +128,8 @@ export const CreateQVoiceSessionRequestSchema = z
      * with the playback rule, or dropped as if absent.
      */
     viewing: QViewingMomentSchema.optional(),
+    /** R21: the screen the line was opened on; later moves arrive by Q_VOICE_SCREEN_PATH. */
+    screen: QScreenContextSchema.optional(),
     /**
      * The interview the person is in, so spoken answers reach the same
      * onboarding session their typed answers do. Ownership is enforced by
@@ -262,6 +274,12 @@ export const QVoiceTurnStateSchema = z
       .strict()
       .nullable(),
     navigate: QVoiceDestinationSchema.nullable(),
+    /**
+     * R20/R33: something the app does in the browser that Q's answer
+     * carried (theme, reload, open their website); followed once, like
+     * `navigate`. Absent or null when none.
+     */
+    clientAction: QClientActionIntentSchema.nullable().optional(),
     /** FORM: the interview leaves the person with the form. CHAT: the voice ends and the typed thread stays. */
     handoff: z.enum(["FORM", "CHAT"]).nullable(),
     degraded: z.boolean(),

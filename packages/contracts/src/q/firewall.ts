@@ -6,7 +6,7 @@ import { MarketplaceVisibilitySchema } from "../http/companies.js";
 import { MessageSensitivitySchema } from "../messaging/sensitivity.js";
 import { QCapabilitySchema } from "./capability.js";
 import { QRunIdSchema } from "./ids.js";
-import { QViewingMomentSchema } from "./request.js";
+import { QScreenContextSchema, QViewingMomentSchema } from "./request.js";
 import { QSubjectRefSchema, QSubjectRefsSchema } from "./subject.js";
 
 /**
@@ -309,6 +309,14 @@ export const PermittedContextPlanSchema = z
      * get_pitch_moment eligible; absent otherwise.
      */
     viewing: QViewingMomentSchema.optional(),
+    /**
+     * R21: the screen the person asked from. The route always (it is their
+     * own screen, not data about anyone); each entity id only when the
+     * firewall bound that entity for this actor, dropped otherwise. What
+     * lets Q say "you're on your profile" truthfully. Absent when the
+     * client sent none.
+     */
+    screen: QScreenContextSchema.optional(),
     scopes: z.array(QAuthorisedKnowledgeScopeSchema).max(Q_PLAN_SCOPES_MAX),
     denied: z.array(QDeniedScopeSchema).max(Q_PLAN_DENIED_MAX),
     /** The strongest sensitivity of any permitted scope: what derived output inherits. */
