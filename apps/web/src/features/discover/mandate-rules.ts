@@ -1,5 +1,5 @@
 /**
- * Words for a declared mandate rule, by its dimension code (ADR 0019).
+ * Words for a declared mandate rule, by its dimension code (ADR 0020).
  * The code is the investor's own rule, never a value in it; a code this
  * table does not know is spelled out rather than hidden, because hiding a
  * rule that could not be checked is the defect this exists to prevent.

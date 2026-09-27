@@ -316,7 +316,7 @@ const PoolRow = z.object({
 });
 
 /**
- * The discoverable pool as the reader needs it (ADR 0019): one statement,
+ * The discoverable pool as the reader needs it (ADR 0020): one statement,
  * counts and ids only. The same predicate discoverability uses everywhere
  * — active, network classification, marketplace-ready — and never the
  * acting investor's own organisation.

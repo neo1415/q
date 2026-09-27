@@ -166,7 +166,7 @@ export type FeedState = {
   /** Server order, appended to and never re-ordered. */
   readonly items: readonly DiscoveredCompanyDto[];
   readonly notes: readonly DiscoveryNoteDto[];
-  /** Declared exclusions V1 cannot check for any company (ADR 0019); latest page wins. */
+  /** Declared exclusions V1 cannot check for any company (ADR 0020); latest page wins. */
   readonly unverifiableExclusions: readonly string[];
   /** With NONE_PASS_HARD_RULES: the rules that removed every discoverable company. */
   readonly excludingRules: readonly string[];

@@ -114,7 +114,7 @@ export type SlateBuilderDependencies = {
    * When present, an empty CURRENT slate generated before the newest change
    * in what is discoverable is republished even when its fingerprint is
    * unchanged, so the reader's "is this empty slate stale?" question
-   * (ADR 0019) is answered once rather than on every read.
+   * (ADR 0020) is answered once rather than on every read.
    */
   readonly pool?: DiscoverablePoolPort | undefined;
   readonly policy?: SlatePolicy | undefined;

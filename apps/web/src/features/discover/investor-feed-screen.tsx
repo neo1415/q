@@ -525,7 +525,7 @@ export function InvestorFeedScreen({
   const { unverifiableExclusions, excludingRules, discoverableCount } =
     feed.state;
   /*
-    Said once per feed, never per card (ADR 0019): a declared exclusion V1
+    Said once per feed, never per card (ADR 0020): a declared exclusion V1
     cannot evaluate for anybody withholds nobody, and the investor is told
     so rather than shown a feed that silently ignores the rule.
   */

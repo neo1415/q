@@ -343,7 +343,7 @@ describe("@capital-q/discovery hard eligibility against local PostgreSQL", () =>
     );
   });
 
-  it("eligibility.v2. a q_inferred classification on a hard-excluded node is not a FAIL; confirming it (user_selected) is", async () => {
+  it("eligibility.v2+. a q_inferred classification on a hard-excluded node is not a FAIL (v3: kept, rule reported unverified); confirming it (user_selected) is", async () => {
     await withWorld(
       async ({
         tx,
@@ -360,8 +360,15 @@ describe("@capital-q/discovery hard eligibility against local PostgreSQL", () =>
         values (${tenantC}, 'COMPANY', ${companyId}, ${node("business_model", "marketplace")}, 'q_inferred')`;
         const [inferred] = await evaluate([companyId]);
         expect(inferred?.eligibilityPolicyVersion).toBe("eligibility.v3");
-        expect(inferred?.decision).toBe("UNDETERMINED");
+        // v3 (ADR 0020): an exclusion the company's declared facts cannot
+        // answer never withholds; the criterion stays UNKNOWN and is reported.
+        expect(inferred?.decision).toBe("ELIGIBLE");
         expect(inferred?.reasonCodes).toEqual(["COMPANY_TAXONOMY_UNKNOWN"]);
+        expect(
+          inferred?.criteria.find(
+            (c) => c.criterion === "HARD_EXCLUSION_TAXONOMY",
+          )?.outcome,
+        ).toBe("UNKNOWN");
 
         // Confirmation supersedes the suggestion with a user_selected row,
         // as the Taxonomy context's own workflow does.
@@ -376,18 +383,22 @@ describe("@capital-q/discovery hard eligibility against local PostgreSQL", () =>
     );
   });
 
-  it("F/G. a HARD_EXCLUSION stage rule: mismatch is INELIGIBLE, unknown stage is UNDETERMINED", async () => {
+  it("F/G. a HARD_EXCLUSION stage rule: mismatch is INELIGIBLE, unknown stage stays ELIGIBLE with the rule reported (v3)", async () => {
     await withWorld(
       async ({ tx, evaluate, companyId, mandateId, investorActor }) => {
         await tx.sql`insert into core.investor_mandate_constraints (tenant_id, mandate_id, dimension, operator, value_jsonb, importance, is_hard_exclusion)
         values (${investorActor.tenantId}, ${mandateId}, 'stage', 'NOT_IN', ${tx.sql.json({ kind: "codes", values: ["series_a"] })}, 'HARD_EXCLUSION', true)`;
-        expect((await evaluate([companyId]))[0]?.reasonCodes).toEqual([
-          "STAGE_OUTSIDE_HARD_MANDATE",
-        ]);
+        const [mismatch] = await evaluate([companyId]);
+        expect(mismatch?.decision).toBe("INELIGIBLE");
+        expect(mismatch?.reasonCodes).toEqual(["STAGE_OUTSIDE_HARD_MANDATE"]);
         await tx.sql`update core.companies set current_stage_code = null where id = ${companyId}`;
         const [r] = await evaluate([companyId]);
-        expect(r?.decision).toBe("UNDETERMINED");
+        expect(r?.decision).toBe("ELIGIBLE");
         expect(r?.reasonCodes).toEqual(["COMPANY_STAGE_UNKNOWN"]);
+        expect(
+          r?.criteria.find((c) => c.criterion === "HARD_EXCLUSION_STAGE")
+            ?.outcome,
+        ).toBe("UNKNOWN");
       },
     );
   });

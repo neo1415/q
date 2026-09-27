@@ -515,7 +515,7 @@ describe("eligibility policy v1 — golden scenarios", () => {
     expect(answered.decision).toBe("ELIGIBLE");
   });
 
-  it("a hard exclusion on a dimension canonical state cannot answer → kept (ADR 0019), naming only the dimension", () => {
+  it("a hard exclusion on a dimension canonical state cannot answer → kept (ADR 0020), naming only the dimension", () => {
     const r = evaluateHardEligibility(
       input({
         mandate: mandate({
@@ -775,7 +775,7 @@ describe("eligibility policy v1 — golden scenarios", () => {
   });
 });
 
-describe("ADR 0019: a hard exclusion excludes only on positive evidence", () => {
+describe("ADR 0020: a hard exclusion excludes only on positive evidence", () => {
   const redFlag = constraint({
     dimension: "red_flag",
     value: { kind: "codes", values: ["litigation"] },

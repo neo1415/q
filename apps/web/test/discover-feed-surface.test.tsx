@@ -250,7 +250,7 @@ describe("a card", () => {
     expect(text).not.toMatch(/mismatch/i);
   });
 
-  it("says quietly which hard rule could not be checked for this company, and still shows it (ADR 0019)", () => {
+  it("says quietly which hard rule could not be checked for this company, and still shows it (ADR 0020)", () => {
     render(
       <FeedCard
         company={company(1, { unverifiedExclusions: ["stage"] })}
@@ -816,7 +816,7 @@ describe("degraded and empty states", () => {
     expect(screen.getByText(/Nothing to review yet/i)).toBeTruthy();
   });
 
-  it("names the hard rules when discoverable companies exist but every one is excluded, never 'nobody is discoverable' (ADR 0019)", async () => {
+  it("names the hard rules when discoverable companies exist but every one is excluded, never 'nobody is discoverable' (ADR 0020)", async () => {
     loadSlatePageAction.mockResolvedValue({
       ok: true,
       value: {

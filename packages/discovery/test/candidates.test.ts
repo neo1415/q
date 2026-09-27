@@ -728,7 +728,7 @@ describe("structured candidate service", () => {
     expect(ids(await generated(w))).toContain(companyId(1));
   });
 
-  it("I, J. hard-excluded and not-ready companies are found raw and removed by REC-001, never rankable; unclassified ones stay, the exclusion reported unverified (ADR 0019)", async () => {
+  it("I, J. hard-excluded and not-ready companies are found raw and removed by REC-001, never rankable; unclassified ones stay, the exclusion reported unverified (ADR 0020)", async () => {
     const r = await generated(withGamblingExclusion(world()));
     expect(r.diagnostics.rawHits).toBe(11);
     expect(ids(r)).not.toContain(companyId(6));
@@ -767,7 +767,7 @@ describe("structured candidate service", () => {
     expect(reasons(r, 11)).toEqual(["STAGE_OVERLAP"]);
   });
 
-  it("an exclusion V1 cannot evaluate (red_flag) keeps every candidate: unknown never excludes (ADR 0019)", async () => {
+  it("an exclusion V1 cannot evaluate (red_flag) keeps every candidate: unknown never excludes (ADR 0020)", async () => {
     const w = world();
     const active = w.mandates[0];
     if (active === undefined) throw new Error("fixture");

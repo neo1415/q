@@ -43,7 +43,7 @@ export const DiscoveryNoteDtoSchema = z.enum([
   "SLATE_RESTARTED",
   /**
    * Companies are discoverable and a declared hard rule removed every one
-   * (ADR 0019); `excludingRules` names the rules. Never shown as "nobody
+   * (ADR 0020); `excludingRules` names the rules. Never shown as "nobody
    * is discoverable".
    */
   "NONE_PASS_HARD_RULES",
@@ -88,7 +88,7 @@ export const DiscoveredCompanyDtoSchema = z
     /**
      * Declared hard exclusions this company's own facts could not answer
      * (its stage, country or sector is not stated). Unknown never excludes
-     * (ADR 0019): the company is shown and the investor is told. Optional
+     * (ADR 0020): the company is shown and the investor is told. Optional
      * so a page from an API that predates it still parses; absent is none.
      */
     unverifiedExclusions: z.array(MandateRuleCodeDtoSchema).max(8).optional(),
@@ -121,7 +121,7 @@ export const DiscoveryCompanySlateDtoSchema = z
     nextCursor: z.string().max(200).nullable(),
     /**
      * Declared hard exclusions V1 cannot evaluate for any company, said
-     * once per page. They withhold nothing (ADR 0019).
+     * once per page. They withhold nothing (ADR 0020).
      */
     unverifiableExclusions: z
       .array(MandateRuleCodeDtoSchema)

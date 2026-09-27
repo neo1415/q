@@ -33,7 +33,7 @@ import { z } from "zod";
  * answer a taxonomy hard exclusion. v1 let a Q inference or an extracted
  * suggestion on an excluded node make a company INELIGIBLE.
  *
- * v3 (ADR 0019): a declared hard exclusion excludes only on positive
+ * v3 (ADR 0020): a declared hard exclusion excludes only on positive
  * evidence that the company matches it. When the fact is missing, or V1
  * cannot evaluate the rule's dimension at all, the criterion stays UNKNOWN
  * and is reported, but it no longer makes the company UNDETERMINED: v2

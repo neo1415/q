@@ -193,7 +193,7 @@ function harness(
     readonly passed?: readonly string[];
     /** A proven reason to offer one of them again; nothing produces one in V1. */
     readonly reintroduce?: Readonly<Record<string, string>>;
-    /** What is discoverable at all (ADR 0019); nothing by default. */
+    /** What is discoverable at all (ADR 0020); nothing by default. */
     readonly pool?: {
       readonly discoverable: number;
       readonly latestChangeAt?: string | null;
@@ -726,7 +726,7 @@ describe("a company this organisation passed on", () => {
 });
 
 /**
- * Truthful empty states and unknown-never-excludes at read time (ADR 0019).
+ * Truthful empty states and unknown-never-excludes at read time (ADR 0020).
  * The live defect: twelve discoverable companies, an empty slate, and the
  * page said nobody had made themselves discoverable.
  */

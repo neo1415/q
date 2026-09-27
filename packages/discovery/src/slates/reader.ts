@@ -86,7 +86,7 @@ export type SlatePageItem = CompanyCard & {
   readonly reasonCodes: readonly string[];
   /**
    * Declared exclusions this company's own facts could not answer (ADR
-   * 0019), as rule codes (`stage`, `geography.country`, `taxonomy`). The
+   * 0020), as rule codes (`stage`, `geography.country`, `taxonomy`). The
    * company is shown; the investor is told the rule was not checked.
    */
   readonly unverifiedExclusions: readonly string[];
@@ -102,7 +102,7 @@ export type SlatePage = {
   /**
    * Declared hard exclusions V1 cannot evaluate for any company (e.g.
    * `red_flag`), said once per page rather than on every card. They
-   * withhold nothing (ADR 0019).
+   * withhold nothing (ADR 0020).
    */
   readonly unverifiableExclusions: readonly string[];
   /** With NONE_PASS_HARD_RULES: the declared rules that removed every company. */
@@ -207,7 +207,7 @@ export function createSlateReadService(
   });
 
   /**
-   * Why a first page is empty, truthfully (ADR 0019). In order: nothing is
+   * Why a first page is empty, truthfully (ADR 0020). In order: nothing is
    * discoverable; the slate predates a change in what is discoverable (or
    * the policy that built it), so it is rebuilt rather than believed; every
    * discoverable company is removed by a declared hard rule, named; or they

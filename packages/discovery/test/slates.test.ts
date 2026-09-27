@@ -364,7 +364,7 @@ function scenario(s: Scenario = {}) {
 
 const query = { actor, mode: "INVESTOR_DISCOVER" as const };
 
-describe("an empty slate that predates a discoverable-company change (ADR 0019)", () => {
+describe("an empty slate that predates a discoverable-company change (ADR 0020)", () => {
   const watermark = (at: string | null): DiscoverablePoolPort => ({
     summary: () =>
       Promise.resolve({

@@ -229,7 +229,7 @@ export function FeedCard({
         />
 
         {/*
-          Unknown never excludes (ADR 0019): a hard rule this company's own
+          Unknown never excludes (ADR 0020): a hard rule this company's own
           facts could not answer is said, quietly, rather than applied.
         */}
         {unverified.length === 0 ? null : (

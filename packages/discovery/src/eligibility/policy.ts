@@ -33,7 +33,7 @@ import type {
  * A FAIL stands even when something else is unknown: a closed company is
  * ineligible whether or not its stage is known. An UNKNOWN never becomes a
  * FAIL: missing data lowers certainty, it never means "poor company". And
- * since v3 (ADR 0019) an UNKNOWN hard *exclusion* never withholds either:
+ * since v3 (ADR 0020) an UNKNOWN hard *exclusion* never withholds either:
  * an exclusion removes a company only on positive evidence that it matches,
  * so a rule that could not be checked is reported, not silently applied.
  *
@@ -221,7 +221,7 @@ function taxonomyCriterion(
  * answers in V1 (red flags, business attributes, founder attributes,
  * declared sector codes, investment role). The rule is real and the fact is
  * missing, so the honest outcome is UNKNOWN — not a silent pass, not an
- * exclusion (ADR 0019), and never a fill-in from a document, a memory or a
+ * exclusion (ADR 0020), and never a fill-in from a document, a memory or a
  * model.
  */
 function otherHardCriterion(
@@ -260,7 +260,7 @@ function relationshipCriterion(
 
 /**
  * Declared hard exclusions. Their UNKNOWN means "could not be checked", and
- * an unchecked exclusion never withholds (ADR 0019): it is reported through
+ * an unchecked exclusion never withholds (ADR 0020): it is reported through
  * `unverifiedExclusions` instead.
  */
 export const HARD_EXCLUSION_CRITERIA: readonly EligibilityCriterion[] = [

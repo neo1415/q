@@ -456,7 +456,7 @@ describe("domain events reach the slate invalidation", () => {
 });
 
 /**
- * ADR 0019 (c): a company becoming discoverable reaches every CURRENT
+ * ADR 0020 (c): a company becoming discoverable reaches every CURRENT
  * slate. The event is the companies context's own, validated by the
  * production registry, handed to the real directive and the real
  * invalidation service; the fake stops at the slate store and the
