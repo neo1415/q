@@ -4,8 +4,10 @@ import type { FastifyInstance } from "fastify";
 import { parseApiConfig } from "@capital-q/config/api";
 import { DISCOVERY_COMPANIES_PATH } from "@capital-q/contracts";
 import {
+  InteractionStateSchema,
   SlateCursorRejectedError,
   type DiscoveryService,
+  type InteractionSignalService,
   type PageCompaniesQuery,
   type SlatePage,
   type SlateReadService,
@@ -61,6 +63,7 @@ function buildApp(options: {
   readonly principal: AuthenticatedPrincipal | null;
   readonly page: SlatePage | Error;
   readonly pitches?: DiscoverablePitchQueryPort | undefined;
+  readonly saved?: readonly string[] | Error | undefined;
 }): { readonly app: FastifyInstance; readonly queries: PageCompaniesQuery[] } {
   const queries: PageCompaniesQuery[] = [];
   const slates: SlateReadService = {
@@ -84,9 +87,51 @@ function buildApp(options: {
       discovery,
       slates,
       ...(options.pitches === undefined ? {} : { pitches: options.pitches }),
+      ...(options.saved === undefined
+        ? {}
+        : { interactions: fakeInteractions(options.saved) }),
     },
   });
   return { app, queries };
+}
+
+const STATE_BASE = {
+  saved: false,
+  savedAt: null,
+  passed: false,
+  passedAt: null,
+  lastPassReason: null,
+  impressionCount: 0,
+  lastImpressionAt: null,
+  lastInteractionAt: null,
+};
+
+function fakeInteractions(
+  saved: readonly string[] | Error,
+): InteractionSignalService {
+  const refuse = () => Promise.reject(new Error("not used here"));
+  return {
+    decide: refuse,
+    observe: refuse,
+    savedCompanyIds: () => Promise.resolve([]),
+    stateForCompanies: ({ companyIds }) =>
+      saved instanceof Error
+        ? Promise.reject(saved)
+        : Promise.resolve(
+            new Map(
+              companyIds
+                .filter((id) => saved.includes(id))
+                .map((id) => [
+                  id,
+                  InteractionStateSchema.parse({
+                    ...STATE_BASE,
+                    companyId: id,
+                    saved: true,
+                  }),
+                ]),
+            ),
+          ),
+  };
 }
 
 const PAGE: SlatePage = {
@@ -211,6 +256,40 @@ describe("GET /v1/discovery/companies (persisted slates)", () => {
 // call with exactly the page's company ids, the DTO's pitch shape and
 // nothing more, null for a company the port did not return, and no call at
 // all for an empty page.
+describe("GET /v1/discovery/companies — the viewer's saved state (R30 #7)", () => {
+  it("marks each item with the viewer's own saved state", async () => {
+    const { app } = buildApp({
+      principal: PRINCIPAL,
+      page: PAGE,
+      saved: [COMPANY],
+    });
+    const response = await app.inject({
+      method: "GET",
+      url: DISCOVERY_COMPANIES_PATH,
+    });
+    expect(response.statusCode).toBe(200);
+    const body = response.json<{ items: { viewerSaved?: boolean }[] }>();
+    expect(body.items[0]?.viewerSaved).toBe(true);
+    await app.close();
+  });
+
+  it("serves the page without the mark when the state cannot be read", async () => {
+    const { app } = buildApp({
+      principal: PRINCIPAL,
+      page: PAGE,
+      saved: new Error("down"),
+    });
+    const response = await app.inject({
+      method: "GET",
+      url: DISCOVERY_COMPANIES_PATH,
+    });
+    expect(response.statusCode).toBe(200);
+    const body = response.json<{ items: { viewerSaved?: boolean }[] }>();
+    expect(body.items[0]?.viewerSaved).toBeUndefined();
+    await app.close();
+  });
+});
+
 describe("GET /v1/discovery/companies — the feed item's pitch", () => {
   const OTHER = "44444444-0000-4000-8000-000000000002";
   const FOREIGN = "44444444-0000-4000-8000-000000000003";

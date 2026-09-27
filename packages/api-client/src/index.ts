@@ -179,6 +179,7 @@ export {
   discoverCompanies,
   discoverInvestors,
   getRecommendationExplanation,
+  listSavedCompanies,
   passCompany,
   saveCompany,
   unsaveCompany,

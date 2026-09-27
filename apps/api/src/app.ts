@@ -268,6 +268,7 @@ export function createApp(
       discovery: modules.discovery.discovery,
       slates: modules.discovery.slates,
       pitches: modules.discovery.pitches,
+      interactions: modules.discovery.interactions,
     });
     if (modules.discovery.interactions !== undefined) {
       registerRecommendationInteractionRoutes(app, {

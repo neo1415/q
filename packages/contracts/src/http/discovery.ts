@@ -92,6 +92,12 @@ export const DiscoveredCompanyDtoSchema = z
      * so a page from an API that predates it still parses; absent is none.
      */
     unverifiedExclusions: z.array(MandateRuleCodeDtoSchema).max(8).optional(),
+    /**
+     * Whether this viewer has saved the company (their own interaction
+     * state, never a ranking input). Absent when the state could not be
+     * read: the client then shows the card as not saved yet.
+     */
+    viewerSaved: z.boolean().optional(),
   })
   .strict();
 export type DiscoveredCompanyDto = z.infer<typeof DiscoveredCompanyDtoSchema>;

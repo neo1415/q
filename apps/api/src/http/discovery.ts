@@ -6,7 +6,11 @@ import {
   DiscoveryCompanySlateDtoSchema,
   DiscoveryInvestorSlateDtoSchema,
 } from "@capital-q/contracts";
-import type { DiscoveryService, SlateReadService } from "@capital-q/discovery";
+import type {
+  DiscoveryService,
+  InteractionSignalService,
+  SlateReadService,
+} from "@capital-q/discovery";
 import type {
   DiscoverablePitch,
   DiscoverablePitchQueryPort,
@@ -38,6 +42,13 @@ export type DiscoveryRoutesDependencies = ActorContextDependencies & {
    * — a feed without video is still a feed (doc 20 §137).
    */
   readonly pitches?: DiscoverablePitchQueryPort | undefined;
+  /**
+   * The viewer's own saved state for a page's companies (the interaction
+   * projection), so a save survives a reload. Absent, or failing, the
+   * page is served without it: a feed without saved marks is still a feed.
+   */
+  readonly interactions?:
+    Pick<InteractionSignalService, "stateForCompanies"> | undefined;
 };
 
 type PageQuery = {
@@ -94,6 +105,15 @@ export function registerDiscoveryRoutes(
           : await dependencies.pitches.findDiscoverablePitches(
               served.items.map((item) => item.companyId),
             );
+      const states =
+        dependencies.interactions === undefined || served.items.length === 0
+          ? null
+          : await dependencies.interactions
+              .stateForCompanies({
+                actor: getActorContext(request),
+                companyIds: served.items.map((item) => item.companyId),
+              })
+              .catch(() => null);
       void reply.header("Cache-Control", "no-store");
       return DiscoveryCompanySlateDtoSchema.parse({
         slateId: served.slateId,
@@ -110,6 +130,9 @@ export function registerDiscoveryRoutes(
             reasons: [],
             reasonCodes: item.reasonCodes,
             unverifiedExclusions: item.unverifiedExclusions,
+            ...(states === null
+              ? {}
+              : { viewerSaved: states.get(item.companyId)?.saved === true }),
             pitch:
               pitch === undefined
                 ? null

@@ -335,7 +335,7 @@ export function feedReducer(state: FeedState, action: FeedAction): FeedState {
       });
 
     case "DECISION_REQUESTED": {
-      const previous = state.decisions[action.companyId] ?? UNDECIDED;
+      const previous = decisionFor(state, action.companyId);
       return {
         ...state,
         decisions: {
@@ -385,7 +385,15 @@ export function activeCard(state: FeedState): DiscoveredCompanyDto | null {
 }
 
 export function decisionFor(state: FeedState, companyId: string): FeedDecision {
-  return state.decisions[companyId] ?? UNDECIDED;
+  const local = state.decisions[companyId];
+  if (local !== undefined) return local;
+  // What this person decided on an earlier visit, as the server recorded
+  // it on the slate item: a save survives a reload. Passed companies are
+  // not served again, so only the saved mark travels.
+  const served = state.items.find((item) => item.companyId === companyId);
+  return served?.viewerSaved === true
+    ? { saved: true, passed: false }
+    : UNDECIDED;
 }
 
 export function isDecisionPending(

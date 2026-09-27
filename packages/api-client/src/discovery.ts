@@ -5,10 +5,12 @@ import {
   DISCOVERY_COMPANY_UNSAVE_PATH,
   DISCOVERY_EXPLANATION_PATH,
   DISCOVERY_INVESTORS_PATH,
+  DISCOVERY_SAVED_PATH,
   DiscoveryCompanySlateDtoSchema,
   DiscoveryInvestorSlateDtoSchema,
   InteractionRecordedDtoSchema,
   RecommendationExplanationDtoSchema,
+  SavedCompaniesDtoSchema,
   type PassCompanyRequest,
   type SaveCompanyRequest,
 } from "@capital-q/contracts";
@@ -76,6 +78,15 @@ export function saveCompany(
     InteractionRecordedDtoSchema,
     { body },
   );
+}
+
+/**
+ * `GET /v1/discovery/saved` — the investor's Saved section: company ids
+ * only, newest first. Each is read back through the ordinary company path,
+ * which re-checks disclosure.
+ */
+export function listSavedCompanies(session: ApiSession) {
+  return call(session, "GET", DISCOVERY_SAVED_PATH, SavedCompaniesDtoSchema);
 }
 
 export function unsaveCompany(

@@ -115,12 +115,20 @@ export async function CapitalScreen() {
             }
             action={
               context.kind === "INVESTOR" ? (
-                <Link
-                  href="/onboarding/investor?review=1"
-                  className={buttonClassName("secondary")}
-                >
-                  Review my mandate
-                </Link>
+                <span className="flex flex-wrap gap-2">
+                  <Link
+                    href="/onboarding/investor?review=1"
+                    className={buttonClassName("secondary")}
+                  >
+                    Review my mandate
+                  </Link>
+                  <Link
+                    href="/discover/saved"
+                    className={buttonClassName("secondary")}
+                  >
+                    Saved companies
+                  </Link>
+                </span>
               ) : objective === null ? (
                 <Link href="/home#q" className={buttonClassName("secondary")}>
                   Tell Q your objective

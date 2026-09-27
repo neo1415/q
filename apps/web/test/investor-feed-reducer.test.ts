@@ -224,6 +224,37 @@ describe("the prefetch window", () => {
   });
 });
 
+describe("a save made on an earlier visit (R30 #7)", () => {
+  it("reads the server's saved mark until the person decides again", () => {
+    const page = slate([1, 2]);
+    const withSaved: DiscoveryCompanySlateDto = {
+      ...page,
+      items: page.items.map((item) =>
+        item.companyId === "c-1" ? { ...item, viewerSaved: true } : item,
+      ),
+    };
+    const state = run([
+      { type: "LOAD_STARTED" },
+      { type: "PAGE_LOADED", slate: withSaved },
+    ]);
+    expect(decisionFor(state, "c-1")).toEqual({ saved: true, passed: false });
+    expect(decisionFor(state, "c-2")).toEqual({ saved: false, passed: false });
+
+    const unsaved = feedReducer(state, {
+      type: "DECISION_REQUESTED",
+      companyId: "c-1",
+      intent: "UNSAVE",
+    });
+    expect(decisionFor(unsaved, "c-1").saved).toBe(false);
+    // A failed unsave puts back what the server had, not "undecided".
+    const failed = feedReducer(unsaved, {
+      type: "DECISION_FAILED",
+      companyId: "c-1",
+    });
+    expect(decisionFor(failed, "c-1").saved).toBe(true);
+  });
+});
+
 describe("optimistic save and pass", () => {
   it("shows a save immediately, before the server has answered", () => {
     const state = feedReducer(loaded([1, 2]), {
