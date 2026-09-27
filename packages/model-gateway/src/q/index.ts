@@ -82,6 +82,11 @@ import {
   type QOwnOnboardingPort,
 } from "./own-onboarding.js";
 import {
+  onboardingNudgeNote,
+  type QOnboardingNudge,
+  type QOnboardingNudgePort,
+} from "./onboarding-nudge.js";
+import {
   analystResultBlocks,
   askedSubjects,
   ownInvestorOrganisationIn,
@@ -133,6 +138,11 @@ export {
   withoutActionTalk,
   type ActionTalkStripResult,
 } from "./action-talk.js";
+export {
+  onboardingNudgeNote,
+  type QOnboardingNudge,
+  type QOnboardingNudgePort,
+} from "./onboarding-nudge.js";
 
 /**
  * The Q answer seam over the Prompt Registry, the Tool Registry and the
@@ -613,6 +623,12 @@ export function environmentNotesFor(
     readonly turnUnread?: boolean | undefined;
     /** A requested series of questions and this turn's step in it (R35). */
     readonly questionSequence?: QQuestionSequenceStep | undefined;
+    /**
+     * A setup reminder due in this conversation (founder directive
+     * 2026-09-27). Last, so it is the first thing the bound cuts: a turn
+     * whose notes are full simply carries no reminder.
+     */
+    readonly onboardingNudge?: QOnboardingNudge | undefined;
   } = {},
 ): string {
   const factsNote =
@@ -670,6 +686,9 @@ export function environmentNotesFor(
       ...(aboutACompany ? [PROFILE_UPDATE_NOTE] : []),
       DISPLAY_NAME_NOTE,
       "No scoring or ranking service is available; do not produce scores.",
+      ...(options.onboardingNudge === undefined
+        ? []
+        : [onboardingNudgeNote(options.onboardingNudge)]),
     ].join(" ");
   // The charter variable is bounded; the research guidance is the part that
   // yields first, in two steps, so a run with many subjects still renders.
@@ -812,6 +831,12 @@ export type ModelGatewayQAnswerDependencies = {
    * the actor-wide OWN_ONBOARDING scope. Absent: not read.
    */
   readonly ownOnboarding?: QOwnOnboardingPort | undefined;
+  /**
+   * Setup reminders (founder directive 2026-09-27): asked under the same
+   * OWN_ONBOARDING scope, only on a turn that is a natural pause. Absent:
+   * Q never mentions an unfinished setup of its own accord.
+   */
+  readonly onboardingNudge?: QOnboardingNudgePort | undefined;
   /**
    * Where the answer goes as it is written. Absent means it goes out only
    * when it is finished, which is what happened before and is still what
@@ -1316,6 +1341,35 @@ export function createModelGatewayQAnswer(
         }
         took("onboarding");
       }
+      /**
+       * A setup reminder (founder directive 2026-09-27), only at a natural
+       * pause: never while Q is putting a series of questions to them and
+       * never on a turn that could not be read. Due-ness is the policy's,
+       * under the same own-only scope; a failed read is simply no reminder.
+       */
+      let onboardingNudge: QOnboardingNudge | null = null;
+      if (
+        dependencies.onboardingNudge !== undefined &&
+        request.questionSequence === undefined &&
+        request.turnUnread !== true &&
+        plan.scopes.some(
+          (scope) =>
+            scope.kind === "OWN_ONBOARDING" && scope.subject === undefined,
+        )
+      ) {
+        try {
+          onboardingNudge = await dependencies.onboardingNudge.peek(
+            request.actor,
+            conversationId,
+          );
+        } catch (error: unknown) {
+          logger?.warn(
+            { err: error, qRunId: request.runId },
+            "the setup reminder was not read for this answer",
+          );
+        }
+        took("onboarding-nudge");
+      }
       const facts: readonly AuthorisedFact[] = [
         ...onboardingFacts,
         ...(ownProfile === null ? [] : [ownProfile]),
@@ -1344,29 +1398,36 @@ export function createModelGatewayQAnswer(
           "Nothing was established in advance for this request.",
         memory,
       };
+      const environmentNotes = environmentNotesFor(
+        facts,
+        offered,
+        request.subjects,
+        {
+          // Only when the firewall actually granted it. The plan has
+          // said so all along; nothing was reading it.
+          generalKnowledge: plan.scopes.some(
+            (scope) => scope.kind === "GENERAL_MODEL_KNOWLEDGE",
+          ),
+          ...(openDocumentTitle === undefined ? {} : { openDocumentTitle }),
+          ...(request.turnUnread === true ? { turnUnread: true } : {}),
+          ...(request.questionSequence === undefined
+            ? {}
+            : { questionSequence: request.questionSequence }),
+          ...(onboardingNudge === null ? {} : { onboardingNudge }),
+        },
+      );
       const rendered = renderPrompt<CompanyAnalystV4Variables>(registry, {
         task: "COMPANY_ANALYST",
         operatingMode: operatingModeForCapability(request.capability),
         communicationProfile: profile,
-        environmentNotes: environmentNotesFor(
-          facts,
-          offered,
-          request.subjects,
-          {
-            // Only when the firewall actually granted it. The plan has
-            // said so all along; nothing was reading it.
-            generalKnowledge: plan.scopes.some(
-              (scope) => scope.kind === "GENERAL_MODEL_KNOWLEDGE",
-            ),
-            ...(openDocumentTitle === undefined ? {} : { openDocumentTitle }),
-            ...(request.turnUnread === true ? { turnUnread: true } : {}),
-            ...(request.questionSequence === undefined
-              ? {}
-              : { questionSequence: request.questionSequence }),
-          },
-        ),
+        environmentNotes,
         variables,
       });
+      // Counted only when the note actually reached the model: the notes
+      // are bounded, and a reminder cut off was never offered.
+      const nudgeOffered =
+        onboardingNudge !== null &&
+        environmentNotes.includes(onboardingNudgeNote(onboardingNudge));
 
       const budget = budgetForTaskClass(taskClass);
       const base = {
@@ -2238,6 +2299,17 @@ I've updated **${revisedArtifact.title}** — that's version ${String(revisedArt
           },
           "q answer produced",
         );
+        if (nudgeOffered && dependencies.onboardingNudge !== undefined) {
+          // After the answer, never before: a failed answer offered nothing.
+          await dependencies.onboardingNudge
+            .markShown(request.actor, conversationId)
+            .catch((error: unknown) => {
+              logger?.warn(
+                { err: error, qRunId: request.runId },
+                "the setup reminder was not recorded as given",
+              );
+            });
+        }
         return {
           kind: "ANSWERED",
           messageId: message.id,
