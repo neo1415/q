@@ -979,3 +979,51 @@ export const AppendOnboardingInterviewTurnsResponseSchema = z
 export type AppendOnboardingInterviewTurnsResponse = z.infer<
   typeof AppendOnboardingInterviewTurnsResponseSchema
 >;
+
+/**
+ * Setup reminders (founder directive 2026-09-27). Whether one is due is
+ * decided on the server by the versioned policy in @capital-q/onboarding;
+ * these are the person's own reminders only, keyed by the authenticated
+ * principal, never by an id in the request.
+ */
+export const ONBOARDING_NUDGE_SEGMENT = "/nudge";
+export const ONBOARDING_NUDGE_BRIEFING_SEGMENT = "/briefing";
+export const ONBOARDING_NUDGE_CHOICE_SEGMENT = "/choice";
+
+export const OnboardingNudgeViewSchema = z
+  .object({
+    policyVersion: z.string().min(1).max(64),
+    journeyType: z.enum(["founder", "investor"]),
+    emphasis: z.enum(["STRONG", "LIGHT"]),
+    requiredCount: z.number().int().min(1),
+    doneCount: z.number().int().min(0),
+    minutesLeft: z.number().int().min(1),
+    remainingTopics: z.array(z.string().min(1).max(80)).max(4),
+    /** The UTC day it was given for, YYYY-MM-DD. */
+    day: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  })
+  .strict();
+export type OnboardingNudgeView = z.infer<typeof OnboardingNudgeViewSchema>;
+
+/** `POST /v1/onboarding/nudge/briefing` -- today's card for Home, if any. */
+export const OnboardingBriefingNudgeResponseSchema = z
+  .object({ nudge: OnboardingNudgeViewSchema.nullable() })
+  .strict();
+export type OnboardingBriefingNudgeResponse = z.infer<
+  typeof OnboardingBriefingNudgeResponseSchema
+>;
+
+/** `POST /v1/onboarding/nudge/choice` -- "remind me later" / "stop reminding me". */
+export const OnboardingNudgeChoiceSchema = z.enum(["LATER", "STOP"]);
+export type OnboardingNudgeChoiceValue = z.infer<
+  typeof OnboardingNudgeChoiceSchema
+>;
+export const OnboardingNudgeChoiceRequestSchema = z
+  .object({ choice: OnboardingNudgeChoiceSchema })
+  .strict();
+export type OnboardingNudgeChoiceRequest = z.infer<
+  typeof OnboardingNudgeChoiceRequestSchema
+>;
+export const OnboardingNudgeChoiceResponseSchema = z
+  .object({ recorded: OnboardingNudgeChoiceSchema })
+  .strict();

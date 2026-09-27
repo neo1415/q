@@ -137,6 +137,7 @@ import {
 import {
   createCompanyOnboardingSubjectResolver,
   createInvestorOrganisationOnboardingSubjectResolver,
+  createOnboardingNudges,
   createOnboardingService,
 } from "@capital-q/onboarding";
 import {
@@ -907,6 +908,9 @@ const { app, logger } = createApp(config, security, {
     candidates: taxonomy.classification.candidates,
   },
   onboarding: onboarding.runtime,
+  // Setup reminders over the person's own sessions (founder directive
+  // 2026-09-27): the versioned policy decides, the table remembers.
+  onboardingNudges: createOnboardingNudges({ sql: database.sql }),
   evidence,
   media,
   verification,

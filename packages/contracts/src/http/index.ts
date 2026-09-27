@@ -563,6 +563,18 @@ export {
   type ListOnboardingInterviewTurnsResponse,
   type AppendOnboardingInterviewTurnsRequest,
   type AppendOnboardingInterviewTurnsResponse,
+  ONBOARDING_NUDGE_SEGMENT,
+  ONBOARDING_NUDGE_BRIEFING_SEGMENT,
+  ONBOARDING_NUDGE_CHOICE_SEGMENT,
+  OnboardingNudgeViewSchema,
+  OnboardingBriefingNudgeResponseSchema,
+  OnboardingNudgeChoiceSchema,
+  OnboardingNudgeChoiceRequestSchema,
+  OnboardingNudgeChoiceResponseSchema,
+  type OnboardingNudgeView,
+  type OnboardingBriefingNudgeResponse,
+  type OnboardingNudgeChoiceValue,
+  type OnboardingNudgeChoiceRequest,
 } from "./onboarding.js";
 export {
   CompleteDocumentUploadSessionRequestSchema,

@@ -22,6 +22,12 @@ import {
   ONBOARDING_STEPS_SEGMENT,
   ONBOARDING_SUGGESTIONS_SEGMENT,
   OnboardingSessionViewSchema,
+  ONBOARDING_NUDGE_SEGMENT,
+  ONBOARDING_NUDGE_BRIEFING_SEGMENT,
+  ONBOARDING_NUDGE_CHOICE_SEGMENT,
+  OnboardingBriefingNudgeResponseSchema,
+  OnboardingNudgeChoiceResponseSchema,
+  type OnboardingNudgeChoiceValue,
   type AnswerOnboardingQuestionRequest,
   type CompleteOnboardingSessionRequest,
   type DismissOnboardingQuestionRequest,
@@ -262,5 +268,35 @@ export function appendOnboardingInterviewTurns(
     `${byId(sessionId)}${ONBOARDING_TURNS_SEGMENT}`,
     AppendOnboardingInterviewTurnsResponseSchema,
     { body: request },
+  );
+}
+
+const nudge = `${ONBOARDING_PATH}${ONBOARDING_NUDGE_SEGMENT}`;
+
+/**
+ * `POST /v1/onboarding/nudge/briefing` -- today's setup reminder for Home,
+ * if one is due (recorded as given) or was already given there today.
+ */
+export function claimBriefingOnboardingNudge(session: ApiSession) {
+  return call(
+    session,
+    "POST",
+    `${nudge}${ONBOARDING_NUDGE_BRIEFING_SEGMENT}`,
+    OnboardingBriefingNudgeResponseSchema,
+    { body: {} },
+  );
+}
+
+/** `POST /v1/onboarding/nudge/choice` -- "remind me later" / "stop reminding me". */
+export function chooseOnboardingNudge(
+  session: ApiSession,
+  choice: OnboardingNudgeChoiceValue,
+) {
+  return call(
+    session,
+    "POST",
+    `${nudge}${ONBOARDING_NUDGE_CHOICE_SEGMENT}`,
+    OnboardingNudgeChoiceResponseSchema,
+    { body: { choice } },
   );
 }

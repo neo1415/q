@@ -145,6 +145,7 @@ export type ApiModules = {
   readonly gateqApply?: GateQApplyRoutesDependencies | undefined;
   readonly taxonomy?: TaxonomyRoutesDependencies["taxonomy"] | undefined;
   readonly onboarding?: OnboardingRoutesDependencies["onboarding"] | undefined;
+  readonly onboardingNudges?: OnboardingRoutesDependencies["nudges"];
   readonly evidence?: DocumentRoutesDependencies["evidence"] | undefined;
   readonly media?: MediaRoutesDependencies["media"] | undefined;
   /** CQ-VERIFY-001: a founder asks and reads; nothing here decides. */
@@ -349,6 +350,7 @@ export function createApp(
       resolver: security.resolver,
       identities: security.identities,
       onboarding: modules.onboarding,
+      nudges: modules.onboardingNudges,
       // One Q (QX-004 core gate). The conversational turn belongs to the
       // interviewer in q-api; this service carries it there and adapts the
       // answer into the shape the onboarding screen already reads.

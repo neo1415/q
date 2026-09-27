@@ -97,6 +97,8 @@ export {
 export {
   answerOnboardingQuestion,
   appendOnboardingInterviewTurns,
+  chooseOnboardingNudge,
+  claimBriefingOnboardingNudge,
   listOnboardingInterviewTurns,
   sayToOnboarding,
   completeOnboardingSession,

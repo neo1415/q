@@ -38,6 +38,12 @@ import {
   WithdrawOnboardingResponseRequestSchema,
   StartOnboardingSessionRequestSchema,
   SubmitOnboardingResponseRequestSchema,
+  ONBOARDING_NUDGE_SEGMENT,
+  ONBOARDING_NUDGE_BRIEFING_SEGMENT,
+  ONBOARDING_NUDGE_CHOICE_SEGMENT,
+  OnboardingBriefingNudgeResponseSchema,
+  OnboardingNudgeChoiceRequestSchema,
+  OnboardingNudgeChoiceResponseSchema,
   type CorrelationId,
 } from "@capital-q/contracts";
 import {
@@ -47,6 +53,7 @@ import {
   OnboardingSessionVersionConflictError,
   OnboardingSuggestionIdSchema,
   type OnboardingInterviewQuestionId,
+  type OnboardingNudges,
   type OnboardingService,
   type OnboardingSessionId,
   type OnboardingSuggestionId,
@@ -84,6 +91,9 @@ export type OnboardingRoutesDependencies = OnboardingActorDependencies & {
    * interview is closed, not degraded.
    */
   readonly qInterview: QInterviewClient | undefined;
+  /** Setup reminders (founder directive 2026-09-27). Absent: none are given. */
+  readonly nudges?:
+    Pick<OnboardingNudges, "claimBriefing" | "choose"> | undefined;
 };
 
 function correlation(): CorrelationId {
@@ -496,4 +506,40 @@ export function registerOnboardingRoutes(
       return AppendOnboardingInterviewTurnsResponseSchema.parse(result);
     },
   );
+
+  // Setup reminders: the person's own, by the authenticated principal.
+  // Both are safe to repeat (a second claim the same day returns the same
+  // card; a second choice sets the same thing), so neither takes an
+  // Idempotency-Key.
+  const nudges = dependencies.nudges;
+  if (nudges !== undefined) {
+    const nudgePath = `${ONBOARDING_PATH}${ONBOARDING_NUDGE_SEGMENT}`;
+    app.post(
+      `${nudgePath}${ONBOARDING_NUDGE_BRIEFING_SEGMENT}`,
+      { onRequest: withActor },
+      async (request, reply) => {
+        const nudge = await nudges.claimBriefing(
+          getOnboardingActor(request).userId,
+        );
+        void reply.header("Cache-Control", "no-store");
+        return OnboardingBriefingNudgeResponseSchema.parse({ nudge });
+      },
+    );
+    app.post(
+      `${nudgePath}${ONBOARDING_NUDGE_CHOICE_SEGMENT}`,
+      { onRequest: withActor },
+      async (request, reply) => {
+        const input = parseContract(
+          OnboardingNudgeChoiceRequestSchema,
+          request.body,
+          "The reminder choice is not valid.",
+        );
+        await nudges.choose(getOnboardingActor(request).userId, input.choice);
+        void reply.header("Cache-Control", "no-store");
+        return OnboardingNudgeChoiceResponseSchema.parse({
+          recorded: input.choice,
+        });
+      },
+    );
+  }
 }
