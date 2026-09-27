@@ -5,7 +5,6 @@ import {
   CompanySearchCursorError,
 } from "@capital-q/companies";
 import { UuidSchema } from "@capital-q/contracts";
-import { actorPrincipal } from "@capital-q/permissions";
 
 import {
   allow,
@@ -16,6 +15,7 @@ import {
 } from "../definition.js";
 import { actorWideScope } from "../plan.js";
 import type { QToolPorts } from "../ports.js";
+import { networkVisibleCompanies } from "./network-companies.js";
 
 /**
  * SEARCH_COMPANIES — `company.search` v1 (doc 12 §28.1 `searchCompanies`;
@@ -134,13 +134,10 @@ export function createSearchCompaniesTool(
       );
     },
     execute: async (input, context) => {
-      let page;
+      let found: Awaited<ReturnType<typeof networkVisibleCompanies>>;
       try {
-        page = await ports.companies.searchCompanies({
-          viewer: {
-            tenantId: context.actor.tenantId,
-            organisationId: undefined,
-          },
+        // Classification chose the candidates; disclosure decides each one.
+        found = await networkVisibleCompanies(ports, context.actor, {
           text: input.query,
           stageCode: input.stageCode,
           headquartersCountry: input.headquartersCountry?.toUpperCase(),
@@ -155,35 +152,15 @@ export function createSearchCompaniesTool(
         }
         throw error;
       }
-      // Classification chose the candidates; disclosure decides each one.
-      const decisions =
-        page.items.length === 0
-          ? []
-          : await ports.disclosure.evaluateMany(
-              page.items.map((item) => ({
-                principal: actorPrincipal(context.actor),
-                resource: { type: "company" as const, id: item.id },
-                requestedAccess: "view" as const,
-              })),
-            );
-      const items = page.items.filter((_item, index) => {
-        const decision = decisions[index];
-        return (
-          decision !== undefined &&
-          decision.outcome === "ALLOW" &&
-          (decision.reasonCode === "NETWORK_VISIBLE" ||
-            decision.reasonCode === "PUBLIC_EXTERNAL")
-        );
-      });
       return {
-        items: items.map((item) => ({
+        items: found.items.map((item) => ({
           companyId: item.id,
           canonicalName: item.canonicalName,
           currentStageCode: item.currentStageCode,
           headquartersCountry: item.headquartersCountry,
           shortDescription: item.shortDescription,
         })),
-        nextCursor: page.nextCursor,
+        nextCursor: found.nextCursor,
         truthClass: "USER_CLAIM",
       };
     },
