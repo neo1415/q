@@ -1,0 +1,533 @@
+import { readdirSync, readFileSync, statSync } from "node:fs";
+import { dirname, join, relative } from "node:path";
+import { fileURLToPath } from "node:url";
+
+import { describe, expect, it } from "vitest";
+
+import { Q_CAPABILITIES } from "@capital-q/q-tools";
+
+/**
+ * R20/R33 parity: every HTTP route a person's action reaches, in the
+ * application API and the Q API, and every page of the web app, is either
+ * something Q can do (a capability id in the registry) or exempt with the
+ * reason it is not. A new route or page that is neither fails here, so a
+ * feature cannot ship that Q silently cannot do.
+ *
+ * Routes are read from the source (the `app.<method>(<path>` call sites),
+ * so this runs without composing either service. The key is
+ * `<app>/<file> <METHOD> <path expression>` exactly as written.
+ *
+ * Exemptions come in two kinds, both stated:
+ * - a plain reason: not a person's action (transport, webhook, public or
+ *   anonymous surface, reference data, the Q conversation itself);
+ * - `BACKLOG:` a person's action with no Q tool yet. Listed in
+ *   docs/handoff/research/q-capability-inventory-2026-09-27.md; each one
+ *   moves to a capability id when its tool lands.
+ */
+
+type Coverage = { readonly capability: string } | { readonly exempt: string };
+
+const cap = (capability: string): Coverage => ({ capability });
+const exempt = (reason: string): Coverage => ({ exempt: reason });
+const backlog = (what: string): Coverage => ({ exempt: `BACKLOG: ${what}` });
+
+const HEALTH = exempt("liveness/readiness probe; not a person's action");
+const ONBOARDING_SETUP = exempt(
+  "account and organisation setup happens once, inside onboarding (the ADR 0016 loop and its own tools)",
+);
+const REFERENCE = exempt(
+  "reference data the forms read (taxonomy); Q reads taxonomy through its own tools",
+);
+const Q_TRANSPORT = exempt(
+  "the Q conversation's own transport (runs, messages, events, voice): Q is the one using it",
+);
+const WEBHOOK = exempt(
+  "provider webhook or OAuth callback: called by Google/Cloudflare, never by a person",
+);
+const PUBLIC = exempt(
+  "public or anonymous surface (Q Card by handle/code, GateQ applicant): no signed-in Q session",
+);
+const PLAYER = exempt(
+  "the video player's own signed playback and captions: bytes go browser <-> CDN; Q reads transcripts with get_pitch_moment",
+);
+const DOWNLOAD = exempt(
+  "a document's render or file download (PDF/PPTX, slides, a version), linked from its card; Q lists documents (list_my_documents) and the card carries the downloads",
+);
+
+const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
+  // ---- apps/api ---------------------------------------------------------
+  'api/app.ts GET "/health/live"': HEALTH,
+  'api/app.ts GET "/health/ready"': HEALTH,
+
+  "api/http/capital-objectives.ts POST base": cap("offer.capital_raise_edit"),
+  "api/http/capital-objectives.ts GET base": cap("tool.get_capital_objective"),
+  "api/http/capital-objectives.ts GET `${base}${CAPITAL_OBJECTIVE_CURRENT_SEGMENT}`":
+    cap("tool.get_capital_objective"),
+  "api/http/capital-objectives.ts GET byId": cap("tool.get_capital_objective"),
+  "api/http/capital-objectives.ts PATCH byId": cap("offer.capital_raise_edit"),
+  "api/http/capital-objectives.ts POST `${byId}${CAPITAL_OBJECTIVE_CLOSE_SUFFIX}`":
+    cap("offer.capital_raise_edit"),
+  "api/http/capital-objectives.ts POST `${byId}${CAPITAL_OBJECTIVE_REPLACE_SUFFIX}`":
+    cap("offer.capital_raise_edit"),
+
+  "api/http/companies.ts POST COMPANIES_PATH": ONBOARDING_SETUP,
+  "api/http/companies.ts GET `${COMPANIES_PATH}/:companyId`":
+    cap("tool.get_company"),
+  "api/http/companies.ts PATCH `${COMPANIES_PATH}/:companyId`": cap(
+    "tool.propose_profile_change",
+  ),
+  "api/http/companies.ts POST `${COMPANIES_PATH}/:companyId${COMPANY_VISIBILITY_SEGMENT}`":
+    cap("hand.set_visibility"),
+  "api/http/companies.ts GET `${COMPANIES_PATH}/:companyId${COMPANY_MARKETPLACE_READINESS_SEGMENT}`":
+    backlog("read their company's marketplace readiness"),
+  "api/http/companies.ts POST `${COMPANIES_PATH}/:companyId${COMPANY_MARKETPLACE_READINESS_ASSESS_SEGMENT}`":
+    backlog("re-assess their company's marketplace readiness"),
+  "api/http/companies.ts GET `${COMPANIES_PATH}/:companyId${COMPANY_NETWORK_PREVIEW_SEGMENT}`":
+    backlog("preview how the network sees their company"),
+
+  "api/http/company-team.ts GET `${base}${COMPANY_TEAM_ME_SUFFIX}`": backlog(
+    "read their own team membership",
+  ),
+  "api/http/company-team.ts PUT `${base}${COMPANY_TEAM_ME_SUFFIX}`": backlog(
+    "set their own team membership (role/title)",
+  ),
+  "api/http/company-team.ts GET `${base}${COMPANY_FOUNDER_PROFILE_ME_SUFFIX}`":
+    backlog("read their founder profile"),
+  "api/http/company-team.ts PATCH `${base}${COMPANY_FOUNDER_PROFILE_ME_SUFFIX}`":
+    backlog(
+      "edit their founder profile (not yet a propose_profile_change field set)",
+    ),
+  "api/http/company-team.ts GET `${base}${COMPANY_TEAM_FACTS_SUFFIX}`": backlog(
+    "read their company's team facts",
+  ),
+  "api/http/company-team.ts PATCH `${base}${COMPANY_TEAM_FACTS_SUFFIX}`":
+    backlog("edit their company's team facts"),
+
+  "api/http/discovery.ts GET DISCOVERY_COMPANIES_PATH": cap(
+    "tool.discovery_slate",
+  ),
+  "api/http/discovery.ts GET DISCOVERY_INVESTORS_PATH": cap(
+    "tool.find_prospective_investors",
+  ),
+
+  "api/http/documents.ts POST DOCUMENT_UPLOAD_SESSIONS_PATH": cap(
+    "offer.document_upload",
+  ),
+  "api/http/documents.ts POST `${sessionById}/complete`": cap(
+    "offer.document_upload",
+  ),
+  "api/http/documents.ts POST `${sessionById}/cancel`": cap(
+    "offer.document_upload",
+  ),
+  "api/http/documents.ts GET sessionById": cap("offer.document_upload"),
+  "api/http/documents.ts GET DOCUMENTS_PATH": backlog(
+    "list the evidence documents they uploaded",
+  ),
+  "api/http/documents.ts GET `${DOCUMENTS_PATH}/:documentId`": backlog(
+    "read one evidence document they uploaded",
+  ),
+
+  "api/http/gateq-apply.ts POST GATEQ_APPLY_START_PATH": PUBLIC,
+  "api/http/gateq-apply.ts GET GATEQ_APPLY_SESSION_PATH": PUBLIC,
+  "api/http/gateq-apply.ts POST GATEQ_APPLY_TURN_PATH": PUBLIC,
+  "api/http/gateq-apply.ts POST GATEQ_APPLY_SUBMIT_PATH": PUBLIC,
+  ...Object.fromEntries(
+    [
+      "POST GATEQ_GATEWAYS_PATH",
+      "GET GATEQ_GATEWAYS_PATH",
+      "GET GATEQ_GATEWAY_PATH",
+      "GET GATEQ_GATEWAY_VERSIONS_PATH",
+      "POST GATEQ_GATEWAY_VERSIONS_PATH",
+      "PUT GATEQ_GATEWAY_VERSION_PATH",
+      "POST GATEQ_GATEWAY_PUBLISH_PATH",
+      "POST GATEQ_GATEWAY_QUALIFY_PATH",
+    ].map((route) => [
+      `api/http/gateq.ts ${route}`,
+      exempt(
+        "GateQ gateway administration has no screen in the web app yet (API only); R33 requires a page before a Q tool",
+      ),
+    ]),
+  ),
+  "api/http/gateq.ts GET GATEQ_PUBLIC_GATEWAY_PATH": PUBLIC,
+
+  "api/http/integrations.ts GET GOOGLE_INTEGRATION_PATH": cap(
+    "offer.gmail_connect",
+  ),
+  "api/http/integrations.ts POST GOOGLE_CONNECT_PATH": cap(
+    "offer.gmail_connect",
+  ),
+  "api/http/integrations.ts GET GOOGLE_OAUTH_CALLBACK_PATH": WEBHOOK,
+  "api/http/integrations.ts DELETE GOOGLE_INTEGRATION_PATH": cap(
+    "offer.gmail_connect",
+  ),
+  "api/http/integrations.ts GET GOOGLE_RELATIONSHIP_MAIL_PATH": backlog(
+    "read the email thread of a relationship",
+  ),
+  "api/http/integrations.ts POST GOOGLE_GMAIL_PUSH_PATH": WEBHOOK,
+
+  "api/http/investor-mandates.ts POST base": backlog(
+    "create a mandate outside onboarding",
+  ),
+  "api/http/investor-mandates.ts GET base": cap("tool.get_investor_mandate"),
+  "api/http/investor-mandates.ts GET byId": cap("tool.get_investor_mandate"),
+  "api/http/investor-mandates.ts PATCH byId": backlog(
+    "edit their mandate (a Prepare -> Approve action is needed)",
+  ),
+  "api/http/investor-mandates.ts POST `${byId}${suffix}`": backlog(
+    "activate / pause / archive their mandate",
+  ),
+
+  "api/http/investors.ts POST INVESTORS_PATH": ONBOARDING_SETUP,
+  "api/http/investors.ts GET INVESTORS_CURRENT_PATH": backlog(
+    "read their own investor organisation (the profile page's read)",
+  ),
+  "api/http/investors.ts GET byId": backlog(
+    "read an investor organisation's profile",
+  ),
+  "api/http/investors.ts PATCH byId": cap("tool.propose_profile_change"),
+  "api/http/investors.ts POST `${byId}${INVESTOR_VISIBILITY_SEGMENT}`": backlog(
+    "change who can see their investor organisation",
+  ),
+  "api/http/investors.ts GET `${byId}${INVESTOR_NETWORK_PREVIEW_SEGMENT}`":
+    backlog("preview how the network sees their investor organisation"),
+  "api/http/investors.ts GET `${byId}${INVESTOR_REPRESENTATIVE_ME_SUFFIX}`":
+    backlog("read their own representative record"),
+  "api/http/investors.ts PUT `${byId}${INVESTOR_REPRESENTATIVE_ME_SUFFIX}`":
+    backlog("set their own representative record (role/title)"),
+
+  "api/http/me.ts PATCH ME_PATH": cap("tool.propose_profile_change"),
+  "api/http/me.ts GET ME_PROFILE_PATH": exempt(
+    "the person's own profile is in every Q run's context already (CQ-QX-007)",
+  ),
+  "api/http/me.ts PATCH ME_PROFILE_PATH": cap("tool.propose_profile_change"),
+  "api/http/me.ts GET ME_PATH": exempt(
+    "the app shell's session read; Q already acts as the signed-in person",
+  ),
+
+  "api/http/media-webhooks.ts POST CLOUDFLARE_STREAM_WEBHOOK_PATH": WEBHOOK,
+  "api/http/media.ts POST pitch": cap("offer.pitch_video_upload"),
+  "api/http/media.ts GET pitch": cap("tool.get_pitch_moment"),
+  "api/http/media.ts GET `${COMPANIES_PATH}/:companyId/media`": cap(
+    "tool.get_pitch_moment",
+  ),
+  "api/http/media.ts DELETE `${pitch}/:mediaAssetId`": cap(
+    "offer.pitch_video_upload",
+  ),
+  "api/http/media.ts POST `${pitch}/:mediaAssetId${MEDIA_UPLOAD_SESSION_SUFFIX}`":
+    cap("offer.pitch_video_upload"),
+  "api/http/media.ts POST `${pitch}/:mediaAssetId${MEDIA_UPLOAD_CANCEL_SUFFIX}`":
+    cap("offer.pitch_video_upload"),
+  "api/http/media.ts POST `${pitch}/:mediaAssetId${MEDIA_SYNC_SUFFIX}`": PLAYER,
+  "api/http/media.ts POST `${pitch}/:mediaAssetId${MEDIA_PLAYBACK_POLICY_SUFFIX}`":
+    cap("offer.pitch_video_upload"),
+  "api/http/media.ts POST `${pitch}/:mediaAssetId${MEDIA_PLAYBACK_SUFFIX}`":
+    PLAYER,
+  "api/http/media.ts GET `${pitch}/:mediaAssetId${MEDIA_TRANSCRIPT_SUFFIX}`":
+    cap("tool.get_pitch_moment"),
+  "api/http/media.ts GET `${pitch}/:mediaAssetId${MEDIA_CAPTIONS_VTT_SUFFIX}`":
+    PLAYER,
+
+  "api/http/network-interests.ts POST NETWORK_COMPANY_EXPRESS_INTEREST_PATH":
+    cap("tool.propose_express_interest"),
+  "api/http/network-interests.ts GET NETWORK_COMPANY_INTEREST_PATH": cap(
+    "tool.get_relationship",
+  ),
+  "api/http/network-interests.ts GET NETWORK_COMPANY_RELATIONSHIP_PATH": cap(
+    "tool.get_relationship",
+  ),
+  "api/http/network-interests.ts GET NETWORK_INVESTOR_RELATIONSHIP_PATH": cap(
+    "tool.get_relationship",
+  ),
+  "api/http/network-interests.ts GET NETWORK_INVESTOR_RELATIONSHIPS_PATH": cap(
+    "navigate.RELATIONSHIPS",
+  ),
+  "api/http/network-interests.ts GET NETWORK_COMPANY_RELATIONSHIPS_PATH": cap(
+    "navigate.RELATIONSHIPS",
+  ),
+  "api/http/network-interests.ts GET NETWORK_COMPANY_INCOMING_INTEREST_PATH":
+    cap("tool.list_incoming_interest"),
+  "api/http/network-interests.ts POST path": cap(
+    "tool.propose_interest_answer",
+  ),
+
+  "api/http/onboarding.ts POST sessions": exempt(
+    "an onboarding session starts when the onboarding screen opens; the loop's tools act within it",
+  ),
+  "api/http/onboarding.ts GET `${sessions}${ONBOARDING_CURRENT_SEGMENT}`": cap(
+    "tool.get_onboarding_state",
+  ),
+  "api/http/onboarding.ts GET byId": cap("tool.get_onboarding_state"),
+  "api/http/onboarding.ts POST `${byId}${ONBOARDING_RESPONSES_SEGMENT}`": cap(
+    "tool.record_answers",
+  ),
+  "api/http/onboarding.ts POST `${byId}${ONBOARDING_STEPS_SEGMENT}/:stepKey${ONBOARDING_SKIP_SEGMENT}`":
+    cap("tool.set_aside"),
+  "api/http/onboarding.ts POST `${byId}${ONBOARDING_STEPS_SEGMENT}/:stepKey${ONBOARDING_WITHDRAW_SEGMENT}`":
+    cap("tool.correct_answer"),
+  "api/http/onboarding.ts POST `${byId}${ONBOARDING_BACK_SEGMENT}`": exempt(
+    "the form's Back button (screen position, not a change); in the Q loop the person just says what to revisit",
+  ),
+  "api/http/onboarding.ts POST `${byId}${ONBOARDING_COMPLETE_SEGMENT}`": cap(
+    "tool.confirm_and_finish",
+  ),
+  "api/http/onboarding.ts POST `${byId}${ONBOARDING_SUGGESTIONS_SEGMENT}/:suggestionId${ONBOARDING_RESOLVE_SEGMENT}`":
+    cap("tool.accept_recommendation"),
+  "api/http/onboarding.ts POST `${byId}${ONBOARDING_QUESTIONS_SEGMENT}/:questionId${ONBOARDING_ANSWER_SEGMENT}`":
+    cap("tool.record_answers"),
+  "api/http/onboarding.ts POST `${byId}${ONBOARDING_SAY_SEGMENT}`": Q_TRANSPORT,
+  "api/http/onboarding.ts POST `${byId}${ONBOARDING_QUESTIONS_SEGMENT}/:questionId${ONBOARDING_DISMISS_SEGMENT}`":
+    cap("tool.set_aside"),
+  "api/http/onboarding.ts GET `${byId}${ONBOARDING_TURNS_SEGMENT}`":
+    Q_TRANSPORT,
+  "api/http/onboarding.ts POST `${byId}${ONBOARDING_TURNS_SEGMENT}`":
+    Q_TRANSPORT,
+
+  "api/http/organisations.ts POST ORGANISATIONS_PATH": ONBOARDING_SETUP,
+  "api/http/organisations.ts GET ORGANISATIONS_PATH": ONBOARDING_SETUP,
+  "api/http/organisations.ts GET `${ORGANISATIONS_PATH}/:organisationId`":
+    ONBOARDING_SETUP,
+  "api/http/organisations.ts PATCH `${ORGANISATIONS_PATH}/:organisationId`":
+    ONBOARDING_SETUP,
+  "api/http/organisations.ts POST `${ORGANISATIONS_PATH}/:organisationId/activate`":
+    ONBOARDING_SETUP,
+
+  "api/http/q-cards.ts GET cardPath": cap("tool.get_q_card"),
+  "api/http/q-cards.ts PUT `${cardPath}${Q_CARD_HANDLE_SEGMENT}`": cap(
+    "tool.propose_handle_claim",
+  ),
+  "api/http/q-cards.ts PATCH cardPath": backlog(
+    "change their Q Card's details (findable by search engines, contact fields)",
+  ),
+  "api/http/q-cards.ts GET `${PUBLIC_HANDLES_PATH}/:handle`": PUBLIC,
+  "api/http/q-cards.ts GET `${PUBLIC_CARD_CODES_PATH}/:code`": PUBLIC,
+
+  "api/http/recommendation-interactions.ts POST DISCOVERY_INTERACTIONS_PATH":
+    exempt(
+      "observations the feed reports (impressions, watch milestones); never an action a person asks for",
+    ),
+  "api/http/recommendation-interactions.ts POST path": cap("tool.save_company"),
+  "api/http/recommendation-interactions.ts POST DISCOVERY_COMPANY_PASS_PATH":
+    cap("tool.pass_company"),
+  "api/http/recommendation-interactions.ts GET DISCOVERY_SAVED_PATH": cap(
+    "tool.discovery_slate",
+  ),
+
+  "api/http/taxonomy.ts POST `${TAXONOMY_PATH}${TAXONOMY_CANDIDATES_SEGMENT}`":
+    REFERENCE,
+  "api/http/taxonomy.ts GET vocabularies": REFERENCE,
+  "api/http/taxonomy.ts GET `${vocabularies}/:vocabularyCode${TAXONOMY_NODES_SEGMENT}`":
+    REFERENCE,
+  "api/http/taxonomy.ts GET `${TAXONOMY_PATH}${TAXONOMY_NODES_SEGMENT}/:nodeId`":
+    REFERENCE,
+
+  "api/http/verification.ts GET `${base}${COMPANY_VERIFICATION_SEGMENT}`":
+    backlog("read their company's verification status"),
+  "api/http/verification.ts POST `${base}${COMPANY_VERIFICATION_REQUESTS_SEGMENT}`":
+    cap("offer.verification_request"),
+
+  "api/http/visibility.ts GET COMPANY_VISIBILITY_STATE_PATH": cap(
+    "tool.get_disclosure_state",
+  ),
+  "api/http/visibility.ts GET COMPANY_AUDIENCE_PREVIEW_PATH": backlog(
+    "preview what one audience sees of their company",
+  ),
+  "api/http/visibility.ts POST COMPANY_SHARES_PATH": cap(
+    "tool.propose_share_raise",
+  ),
+  "api/http/visibility.ts POST COMPANY_SHARE_REVOKE_PATH": cap(
+    "tool.propose_revoke_share",
+  ),
+
+  // ---- apps/q-api -------------------------------------------------------
+  'q-api/app.ts GET "/health/live"': HEALTH,
+  'q-api/app.ts GET "/health/ready"': HEALTH,
+  "q-api/http/profile-findings.ts GET Q_PROFILE_FINDINGS_PATH": backlog(
+    "read what Q found about their profile (shown on the profile page)",
+  ),
+  "q-api/http/q-approvals.ts GET Q_APPROVALS_PATH": cap(
+    "tool.list_pending_approvals",
+  ),
+  "q-api/http/q-approvals.ts GET approvalPath": exempt(
+    "one approval's card read; Q reads the same status through its receipts and list_pending_approvals",
+  ),
+  "q-api/http/q-approvals.ts POST `${approvalPath}${Q_APPROVAL_APPROVE_SUFFIX}`":
+    cap("tool.approve_pending_proposal"),
+  "q-api/http/q-approvals.ts POST `${approvalPath}${Q_APPROVAL_REJECT_SUFFIX}`":
+    cap("tool.decline_pending_proposal"),
+  "q-api/http/q-approvals.ts GET `${approvalPath}${Q_APPROVAL_EMAIL_DRAFT_SUFFIX}`":
+    cap("tool.propose_email"),
+  "q-api/http/q-approvals.ts POST `${approvalPath}${Q_APPROVAL_EMAIL_DRAFT_SUFFIX}`":
+    exempt(
+      "the person's own edit of a draft's words on its card; asked to Q, Q prepares a new draft (propose_email) for its own approval",
+    ),
+  "q-api/http/q-artifacts.ts GET Q_ARTIFACTS_PATH": cap(
+    "tool.list_my_documents",
+  ),
+  "q-api/http/q-artifacts.ts GET artifactPath": cap("tool.list_my_documents"),
+  "q-api/http/q-artifacts.ts GET `${artifactPath}${Q_ARTIFACT_SLIDES_SUFFIX}`":
+    DOWNLOAD,
+  "q-api/http/q-artifacts.ts GET `${artifactPath}${Q_ARTIFACT_EXPORT_SUFFIX}/:format`":
+    DOWNLOAD,
+  "q-api/http/q-artifacts.ts GET `${artifactPath}${Q_ARTIFACT_VERSIONS_SUFFIX}/:version`":
+    DOWNLOAD,
+  "q-api/http/q-conversations.ts GET Q_CONVERSATIONS_PATH": Q_TRANSPORT,
+  "q-api/http/q-conversations.ts GET conversationPath": Q_TRANSPORT,
+  "q-api/http/q-conversations.ts POST `${conversationPath}${Q_CONVERSATION_ARCHIVE_SUFFIX}`":
+    exempt(
+      "a conversation is ended from the chats list; Q never ends or clears its own conversation (conversation receipts rule)",
+    ),
+  "q-api/http/q-events.ts GET eventsPath": Q_TRANSPORT,
+  "q-api/http/q-mcp.ts POST Q_MCP_PATH": exempt(
+    "the MCP connector surface: an external client calling Q's tools, not a person's action",
+  ),
+  "q-api/http/q-runs.ts POST Q_RUNS_PATH": Q_TRANSPORT,
+  "q-api/http/q-runs.ts GET runPath": Q_TRANSPORT,
+  "q-api/http/q-runs.ts POST `${runPath}${Q_RUN_MESSAGES_SUFFIX}`": Q_TRANSPORT,
+  "q-api/http/q-runs.ts POST `${runPath}${Q_RUN_CANCEL_SUFFIX}`": Q_TRANSPORT,
+  "q-api/http/recommendation-explanations.ts GET DISCOVERY_EXPLANATION_PATH":
+    cap("tool.recommendation_explanation"),
+  "q-api/voice/interview-route.ts POST dependencies.path": Q_TRANSPORT,
+  "q-api/voice/routes.ts GET Q_VOICE_TURN_PATH": Q_TRANSPORT,
+  "q-api/voice/routes.ts POST Q_VOICE_SCREEN_PATH": Q_TRANSPORT,
+  "q-api/voice/routes.ts POST Q_VOICE_SPEECH_PATH": Q_TRANSPORT,
+  "q-api/voice/routes.ts POST Q_VOICE_SPEAK_RELAY_PATH": Q_TRANSPORT,
+  "q-api/voice/routes.ts POST Q_VOICE_SESSIONS_PATH": Q_TRANSPORT,
+  "q-api/voice/think.ts POST dependencies.path": Q_TRANSPORT,
+  "q-api/voice/think.ts POST `${dependencies.path}/chat/completions`":
+    Q_TRANSPORT,
+};
+
+/** Every web page (app/**\/page.tsx), by route. */
+const PAGE_COVERAGE: Readonly<Record<string, Coverage>> = {
+  "/": exempt("the signed-out landing page"),
+  "/auth/check-email": exempt("signed-out authentication"),
+  "/auth/forgot-password": exempt("signed-out authentication"),
+  "/auth/sign-in": exempt("signed-out authentication"),
+  "/auth/sign-up": exempt("signed-out authentication"),
+  "/auth/update-password": exempt(
+    "password entry in the auth provider's own flow; a password never passes through Q",
+  ),
+  "/dev/q-presence": exempt("development-only page"),
+  "/dev/ui": exempt("development-only page"),
+  "/u/[handle]": PUBLIC,
+  "/onboarding/founder": exempt(
+    "the founder interview: Q's own onboarding loop (voice INTERVIEW_FOUNDER)",
+  ),
+  "/onboarding/investor": exempt(
+    "the investor interview: Q's own onboarding loop (voice INTERVIEW_INVESTOR)",
+  ),
+  "/welcome": exempt("the first-run welcome shown once after sign-up"),
+  "/home": cap("navigate.HOME"),
+  "/profile": cap("navigate.PROFILE"),
+  "/capital": cap("navigate.CAPITAL"),
+  "/discover": cap("navigate.DISCOVER"),
+  "/company/visibility": cap("navigate.COMPANY_VISIBILITY"),
+  "/company/interest": cap("navigate.COMPANY_INTEREST"),
+  "/relationships": cap("navigate.RELATIONSHIPS"),
+  "/settings": cap("navigate.SETTINGS"),
+  "/verification": cap("navigate.VERIFICATION"),
+  "/pitch": cap("navigate.PITCH"),
+  "/company/[companyId]": backlog(
+    "open one company's page by id (OPEN_COMPANY intent has no route map entry yet)",
+  ),
+  "/relationships/company/[companyId]": backlog(
+    "open one relationship with a company by id",
+  ),
+  "/relationships/investor/[investorOrganisationId]": backlog(
+    "open one relationship with an investor by id",
+  ),
+};
+
+const APPS = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
+
+function files(dir: string, suffix: string): string[] {
+  return readdirSync(dir).flatMap((name) => {
+    const path = join(dir, name);
+    if (statSync(path).isDirectory()) return files(path, suffix);
+    return name.endsWith(suffix) ? [path] : [];
+  });
+}
+
+const ROUTE_CALL =
+  /\b(?:app|server|instance|fastify|scope)\.(get|post|put|patch|delete)(?:<[^>]*>)?\(\s*([`'"][^`'"]+[`'"]|[A-Za-z_$][\w$.]*)/g;
+
+/** Every route call site in the two services' HTTP sources. */
+function routeKeys(): string[] {
+  const keys: string[] = [];
+  for (const [app, dirs] of [
+    ["api", ["src/app.ts", "src/http"]],
+    ["q-api", ["src/app.ts", "src/http", "src/voice"]],
+  ] as const) {
+    const root = join(APPS, app);
+    for (const dir of dirs) {
+      const path = join(root, dir);
+      const sources = dir.endsWith(".ts") ? [path] : files(path, ".ts");
+      for (const source of sources) {
+        const text = readFileSync(source, "utf8");
+        const file = relative(join(root, "src"), source).split("\\").join("/");
+        for (const match of text.matchAll(ROUTE_CALL)) {
+          const [, method, path] = match;
+          if (method === undefined || path === undefined) continue;
+          // `headers.get("content-type")` and the like are not routes.
+          if (/^["']/.test(path) && !path.slice(1).startsWith("/")) continue;
+          keys.push(`${app}/${file} ${method.toUpperCase()} ${path}`);
+        }
+      }
+    }
+  }
+  return keys;
+}
+
+function pageRoutes(): string[] {
+  const appDir = join(APPS, "web", "app");
+  return files(appDir, "page.tsx").map((page) => {
+    const route = relative(appDir, dirname(page))
+      .split("\\")
+      .join("/")
+      .split("/")
+      .filter((segment) => !/^\(.*\)$/.test(segment) && segment !== "")
+      .join("/");
+    return `/${route}`;
+  });
+}
+
+const CAPABILITY_IDS = new Set(Q_CAPABILITIES.map((c) => c.id));
+
+describe("every route and page is something Q can do, or exempt with a reason (R20/R33)", () => {
+  it("every API route call site is classified", () => {
+    const keys = routeKeys();
+    expect(keys.length).toBeGreaterThan(100);
+    expect(keys.filter((key) => ROUTE_COVERAGE[key] === undefined)).toEqual([]);
+  });
+
+  it("every classified route still exists", () => {
+    const keys = new Set(routeKeys());
+    expect(Object.keys(ROUTE_COVERAGE).filter((key) => !keys.has(key))).toEqual(
+      [],
+    );
+  });
+
+  it("every web page is classified, and every classified page exists", () => {
+    const pages = pageRoutes();
+    expect(pages.filter((page) => PAGE_COVERAGE[page] === undefined)).toEqual(
+      [],
+    );
+    const real = new Set(pages);
+    expect(
+      Object.keys(PAGE_COVERAGE).filter((page) => !real.has(page)),
+    ).toEqual([]);
+  });
+
+  it("every capability named is in the registry, and every exemption says why", () => {
+    for (const [key, coverage] of [
+      ...Object.entries(ROUTE_COVERAGE),
+      ...Object.entries(PAGE_COVERAGE),
+    ]) {
+      if ("capability" in coverage) {
+        expect(CAPABILITY_IDS.has(coverage.capability), key).toBe(true);
+      } else {
+        expect(coverage.exempt.length, key).toBeGreaterThan(20);
+      }
+    }
+  });
+});
