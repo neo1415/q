@@ -461,6 +461,31 @@ export const Q_CAPABILITIES: readonly QCapability[] = Object.freeze([
     "RELATIONSHIP",
     "Reads where they stand with a company or investor.",
   ),
+  // --- R34 relationship chat (CHAT worker block; keep together) ---------
+  tool(
+    "list_messages",
+    "RELATIONSHIP",
+    "Reads their chat with the other side of a relationship: the latest messages, who wrote them, and files shared by name.",
+  ),
+  tool(
+    "propose_chat_message",
+    "RELATIONSHIP",
+    "Drafts a chat message to the other side of a connected relationship, optionally sharing one of their own documents; it is posted as them when they approve.",
+    { approval: "PREPARE_APPROVE", executes: ["chat.message.send"] },
+  ),
+  tool(
+    "propose_reminder",
+    "RELATIONSHIP",
+    "Prepares a reminder about a relationship for them to approve; it becomes a calendar reminder once Calendar is connected.",
+    { approval: "PREPARE_APPROVE", executes: ["reminder.create"] },
+  ),
+  tool(
+    "propose_meeting",
+    "RELATIONSHIP",
+    "Prepares a meeting proposal (purpose, times, length) with the other side of a connected relationship for them to approve; it becomes a calendar invite with a Meet link once Calendar is connected.",
+    { approval: "PREPARE_APPROVE", executes: ["meeting.propose"] },
+  ),
+  // --- end R34 ------------------------------------------------------------
   tool(
     "list_incoming_interest",
     "RELATIONSHIP",

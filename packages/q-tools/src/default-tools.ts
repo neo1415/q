@@ -22,6 +22,7 @@ import {
 import { createOwnWorkTools } from "./tools/own-work.js";
 import { createProposeProfileChangeTool } from "./tools/profile-change.js";
 import { createProposeEmailTool } from "./tools/email.js";
+import { createChatTools } from "./tools/chat.js";
 import { createRelationshipTools } from "./tools/relationships.js";
 import { createGetPitchMomentTool } from "./tools/pitch-moment.js";
 import { createVisibilityTools } from "./tools/visibility.js";
@@ -68,6 +69,10 @@ export function createDefaultQTools(
     ...(ports.email === undefined
       ? []
       : [createProposeEmailTool(ports.email, ports.relationships)]),
+    // R34: the relationship chat, read and prepared for approval.
+    ...(ports.chat === undefined || ports.relationships === undefined
+      ? []
+      : createChatTools(ports.chat, ports.relationships)),
     // BIZ-002: every profile field the page edits, Q can prepare.
     ...(ports.profileChanges === undefined
       ? []

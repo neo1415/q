@@ -149,6 +149,31 @@ export {
   ProposalOutputSchema,
   type GetRelationshipOutput,
 } from "./tools/relationships.js";
+// R34: relationship chat tools.
+export {
+  CHAT_MESSAGE_SEND,
+  ChatProposalOutputSchema,
+  createChatTools,
+  LIST_MESSAGES,
+  ListMessagesInputSchema,
+  ListMessagesOutputSchema,
+  MEETING_PROPOSE,
+  PROPOSE_CHAT_MESSAGE,
+  PROPOSE_MEETING,
+  PROPOSE_REMINDER,
+  ProposeChatMessageInputSchema,
+  ProposeMeetingInputSchema,
+  ProposeReminderInputSchema,
+  REMINDER_CREATE,
+  type ChatIntelligencePort,
+  type ChatProposal,
+  type ChatProposalOutput,
+  type ListMessagesInput,
+  type ListMessagesOutput,
+  type ProposeChatMessageInput,
+  type ProposeMeetingInput,
+  type ProposeReminderInput,
+} from "./tools/chat.js";
 export {
   createProposeEmailTool,
   PROPOSE_EMAIL,
