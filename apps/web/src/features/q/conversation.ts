@@ -135,9 +135,8 @@ function objectBlocksOf(
       case "TEXT":
       case "EVIDENCE":
       case "FINDING":
-      // PUBLIC_SOURCE is carried as the turn's own public sources.
       case "UNCERTAINTY":
-      case "PUBLIC_SOURCE":
+      case "PUBLIC_SOURCE": // carried as the turn's own public sources
         return false;
     }
   });
