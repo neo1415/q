@@ -75,7 +75,7 @@ function translate(error: unknown): ProfileSaveResult {
       return {
         ok: false,
         reason: "DENIED",
-        message: "Please sign in again to continue.",
+        message: "Your session ended. Sign in again to continue.",
       };
     }
     if (error.status === 403) {
@@ -104,7 +104,7 @@ function translate(error: unknown): ProfileSaveResult {
   return {
     ok: false,
     reason: "UNAVAILABLE",
-    message: "Capital Q couldn't save that just now. Please try again.",
+    message: "Capital Q couldn't save that just now. Try again.",
   };
 }
 
@@ -117,7 +117,7 @@ const INVALID: ProfileSaveResult = {
 const SIGNED_OUT: ProfileSaveResult = {
   ok: false,
   reason: "DENIED",
-  message: "Please sign in again to continue.",
+  message: "Your session ended. Sign in again to continue.",
 };
 
 export async function savePersonFieldAction(

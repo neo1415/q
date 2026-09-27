@@ -180,7 +180,9 @@ export function useOnboardingJourney<
           setPhase("unavailable");
         } else {
           setErrorMessage(
-            error instanceof Error ? error.message : "Something went wrong.",
+            error instanceof Error
+              ? error.message
+              : "That didn't work. Try again in a moment.",
           );
           setPhase("error");
         }
@@ -226,7 +228,7 @@ export function useOnboardingJourney<
         const message =
           error instanceof Error
             ? error.message
-            : "Something went wrong. Please try again.";
+            : "That didn't work. Try again in a moment.";
         if (isSave) {
           setSave(conflict ? "idle" : "failed");
         }

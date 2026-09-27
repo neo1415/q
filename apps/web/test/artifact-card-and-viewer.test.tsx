@@ -219,9 +219,7 @@ describe("QX-003E · the card in an answer", () => {
     await userEvent.click(
       screen.getByRole("button", { name: "Ask Q to try again" }),
     );
-    expect(onAsk).toHaveBeenCalledWith(
-      "Please try preparing that document again.",
-    );
+    expect(onAsk).toHaveBeenCalledWith("Try preparing that document again.");
   });
 });
 
@@ -666,7 +664,7 @@ describe("BIZ-001 · downloading from the card", () => {
     );
     await waitFor(() => {
       expect(
-        screen.getByText("I lost the connection to Q. Please try again."),
+        screen.getByText("I lost the connection to Q. Try again."),
       ).toBeTruthy();
     });
   });

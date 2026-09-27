@@ -39,12 +39,12 @@ function plain(status: number, message: string): NextResponse {
 export async function POST(request: NextRequest): Promise<Response> {
   const { qApiBaseUrl } = loadWebServerConfig();
   if (qApiBaseUrl === undefined) {
-    return plain(503, "Q isn't connected on this build yet.");
+    return plain(503, "Q isn't available right now. Try again later.");
   }
 
   const accessToken = await getSessionAccessToken();
   if (accessToken === null) {
-    return plain(401, "Please sign in again to continue.");
+    return plain(401, "Your session ended. Sign in again to continue.");
   }
 
   // External data starts as unknown, including a body this application's
@@ -74,7 +74,7 @@ export async function POST(request: NextRequest): Promise<Response> {
 
   if (!upstream.ok) {
     if (upstream.status === 401 || upstream.status === 403) {
-      return plain(401, "Please sign in again to continue.");
+      return plain(401, "Your session ended. Sign in again to continue.");
     }
     if (upstream.status === 429) {
       return plain(429, "That is more speech than Q will read out just now.");

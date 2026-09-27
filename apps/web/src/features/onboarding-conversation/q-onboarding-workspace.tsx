@@ -1268,7 +1268,7 @@ export function QOnboardingWorkspace({
 
   if (view === undefined) {
     return (
-      <InlineNotice tone="info" title="Q can't lead this setup on this build.">
+      <InlineNotice tone="info" title="Q can't lead this setup right now.">
         Use the form instead; everything you enter is kept the same way.
       </InlineNotice>
     );

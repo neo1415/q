@@ -88,7 +88,7 @@ export function InvestorOnboardingScreen({
       <div className="mx-auto flex min-h-dvh w-full max-w-(--cq-layout-reading) flex-col gap-6 px-4 py-10">
         {state.phase === "error" ? (
           <InlineNotice tone="danger" title="Investor setup couldn't load.">
-            {state.errorMessage ?? "Please try again."}
+            {state.errorMessage ?? "Try again in a moment."}
           </InlineNotice>
         ) : (
           <div
@@ -264,7 +264,7 @@ export function InvestorOnboardingScreen({
               size="compact"
               onClick={() => void actions.retry()}
             >
-              Retry
+              Try again
             </Button>
           ) : undefined
         }

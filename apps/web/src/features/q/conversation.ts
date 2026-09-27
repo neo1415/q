@@ -342,7 +342,7 @@ export function failureMessage(
   const message = failure?.message;
   return message !== undefined && message.length > 0
     ? message
-    : "I couldn't answer that right now. Please try again.";
+    : "I couldn't answer that right now. Try again.";
 }
 
 /**

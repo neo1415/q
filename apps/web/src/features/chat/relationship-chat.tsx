@@ -237,7 +237,7 @@ export function RelationshipChat({
       body: file,
     });
     if (!put.ok) {
-      setNotice("That file didn't upload. Please try again.");
+      setNotice("That file didn't upload. Try again.");
       return null;
     }
     const done = await materialUploadCompleteAction(
@@ -259,7 +259,7 @@ export function RelationshipChat({
         await deliver({ kind: "VOICE_NOTE", documentId, durationMs });
       }
     } catch {
-      setNotice("That voice note didn't send. Please try again.");
+      setNotice("That voice note didn't send. Try again.");
     } finally {
       setBusy(false);
     }
@@ -298,7 +298,7 @@ export function RelationshipChat({
       });
       if (sent && caption.length > 0) setDraft("");
     } catch {
-      setNotice("That file didn't upload. Please try again.");
+      setNotice("That file didn't upload. Try again.");
     } finally {
       setBusy(false);
       if (fileInput.current !== null) fileInput.current.value = "";

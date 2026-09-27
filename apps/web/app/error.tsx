@@ -39,7 +39,7 @@ export default function PageError({
       description={
         stale
           ? "Reload to get the latest version. Nothing you saved is lost."
-          : "Something went wrong on our side. Nothing you saved is lost; try again in a moment."
+          : "Capital Q hit a problem loading this page. Nothing you saved is lost; try again in a moment."
       }
     >
       <Button

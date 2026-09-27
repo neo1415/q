@@ -34,7 +34,7 @@ const PLAIN_ERRORS = {
     "Q can't hear you: the microphone isn't available. Check the browser's permission and try again.",
   connection:
     "The voice connection dropped. You can keep typing, or try again.",
-  generic: "I lost the line there. Give me a second and I'll pick it back up.",
+  generic: "I lost the connection for a moment. Reconnecting.",
   speech:
     "I can't speak out loud right now, but I'm listening. My replies will show here, or you can type.",
 } as const;

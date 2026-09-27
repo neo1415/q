@@ -94,7 +94,7 @@ export default async function VerificationPage({
           description="Founders ask Capital Q to verify their identity and their organisation once their company is set up."
           action={
             <Link href="/home" className={buttonClassName("secondary")}>
-              Go home
+              Go to Home
             </Link>
           }
         />

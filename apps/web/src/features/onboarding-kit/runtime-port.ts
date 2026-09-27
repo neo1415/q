@@ -244,7 +244,7 @@ export function createRuntimeClient<
     if (!model.isSupportedVersion(view)) {
       throw new OnboardingClientError(
         "UNAVAILABLE",
-        "This version of Capital Q can't show your setup journey yet. Please refresh later.",
+        "This version of Capital Q can't show your setup journey yet. Reload the page later.",
       );
     }
     const group = model.currentGroup(view);
@@ -400,7 +400,7 @@ export function createRuntimeClient<
               if (resolve === undefined) {
                 throw new OnboardingClientError(
                   "UNAVAILABLE",
-                  "Capital Q can't record that decision on this build yet.",
+                  "Capital Q can't record that decision yet. Use the form for this step.",
                 );
               }
               const view = await session();
@@ -437,7 +437,7 @@ export function createRuntimeClient<
               if (answer === undefined) {
                 throw new OnboardingClientError(
                   "UNAVAILABLE",
-                  "Capital Q cannot record that answer on this build yet.",
+                  "Capital Q can't record that answer yet. Use the form for this step.",
                 );
               }
               const view = await session();
@@ -499,7 +499,7 @@ export function createRuntimeClient<
               if (say === undefined) {
                 throw new OnboardingClientError(
                   "UNAVAILABLE",
-                  "Capital Q cannot take that on this build yet.",
+                  "Capital Q can't take that yet. Use the form for this step.",
                 );
               }
               const view = await session();
@@ -529,7 +529,7 @@ export function createRuntimeClient<
               if (dismiss === undefined) {
                 throw new OnboardingClientError(
                   "UNAVAILABLE",
-                  "Capital Q cannot record that on this build yet.",
+                  "Capital Q can't record that yet. Use the form for this step.",
                 );
               }
               const view = await session();

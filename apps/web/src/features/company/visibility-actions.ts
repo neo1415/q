@@ -60,7 +60,10 @@ async function session(): Promise<ApiSession | null> {
 function translate(error: unknown): VisibilityActionResult<never> {
   if (error instanceof ApiProblemError) {
     if (error.status === 401) {
-      return { ok: false, message: "Please sign in again to continue." };
+      return {
+        ok: false,
+        message: "Your session ended. Sign in again to continue.",
+      };
     }
     if (error.status === 403) {
       return {
@@ -82,13 +85,15 @@ function translate(error: unknown): VisibilityActionResult<never> {
     if (error.status < 500) {
       return {
         ok: false,
-        message: error.problem?.detail ?? "That request couldn't be made.",
+        message:
+          error.problem?.detail ??
+          "That didn't go through. Reload and try again.",
       };
     }
   }
   return {
     ok: false,
-    message: "Capital Q couldn't complete that right now. Please try again.",
+    message: "Capital Q couldn't complete that right now. Try again.",
   };
 }
 
@@ -108,7 +113,10 @@ export async function loadVisibilityOverviewAction(
   }
   const current = await session();
   if (current === null) {
-    return { ok: false, message: "Please sign in again to continue." };
+    return {
+      ok: false,
+      message: "Your session ended. Sign in again to continue.",
+    };
   }
   try {
     const [company, preview, readiness] = await Promise.all([
@@ -133,11 +141,17 @@ export async function setCompanyVisibilityAction(
   const visibility = ChoiceInput.safeParse(rawVisibility);
   const expectedVersion = VersionInput.safeParse(rawExpectedVersion);
   if (!companyId.success || !visibility.success || !expectedVersion.success) {
-    return { ok: false, message: "That request couldn't be made." };
+    return {
+      ok: false,
+      message: "That didn't go through. Reload and try again.",
+    };
   }
   const current = await session();
   if (current === null) {
-    return { ok: false, message: "Please sign in again to continue." };
+    return {
+      ok: false,
+      message: "Your session ended. Sign in again to continue.",
+    };
   }
   try {
     const choice: CompanyVisibilityChoice = visibility.data;
@@ -165,7 +179,10 @@ export async function assessMarketplaceReadinessAction(
   }
   const current = await session();
   if (current === null) {
-    return { ok: false, message: "Please sign in again to continue." };
+    return {
+      ok: false,
+      message: "Your session ended. Sign in again to continue.",
+    };
   }
   try {
     return {
@@ -188,7 +205,10 @@ async function withSession<T>(
 ): Promise<VisibilityActionResult<T>> {
   const current = await session();
   if (current === null) {
-    return { ok: false, message: "Please sign in again to continue." };
+    return {
+      ok: false,
+      message: "Your session ended. Sign in again to continue.",
+    };
   }
   try {
     return { ok: true, value: await work(current) };
@@ -247,7 +267,10 @@ export async function shareRaiseAction(
   const relationshipId = UuidInput.safeParse(rawRelationshipId);
   const key = z.string().min(8).max(255).safeParse(rawIdempotencyKey);
   if (!companyId.success || !relationshipId.success || !key.success) {
-    return { ok: false, message: "That request couldn't be made." };
+    return {
+      ok: false,
+      message: "That didn't go through. Reload and try again.",
+    };
   }
   return withSession((current) =>
     shareWithRelationship(
@@ -267,7 +290,10 @@ export async function revokeShareAction(
   const companyId = CompanyIdInput.safeParse(rawCompanyId);
   const policyId = UuidInput.safeParse(rawPolicyId);
   if (!companyId.success || !policyId.success) {
-    return { ok: false, message: "That request couldn't be made." };
+    return {
+      ok: false,
+      message: "That didn't go through. Reload and try again.",
+    };
   }
   return withSession((current) =>
     revokeVisibilityShare(current, companyId.data, policyId.data),

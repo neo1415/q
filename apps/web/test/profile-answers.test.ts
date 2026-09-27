@@ -212,7 +212,7 @@ describe("answerGroups (founder)", () => {
     expect(raise.lines.map((l) => [l.title, l.value])).toEqual([
       ["Target", "EUR 2,000,000"],
       ["Instrument", null],
-      ["Round stage", "Seed"],
+      ["Stage", "Seed"],
       ["Use of funds", null],
     ]);
   });

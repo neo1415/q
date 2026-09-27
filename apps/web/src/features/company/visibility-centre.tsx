@@ -287,8 +287,8 @@ function WhoSeesWhat({
 
       {raise === undefined ? (
         <p className="cq-status-line">
-          No raise to share yet. Once you set a capital objective, you can share
-          it with an investor you have a relationship with.
+          No raise to share yet. Once you set your raise, you can share it with
+          an investor you have a relationship with.
         </p>
       ) : (
         <div className="flex max-w-(--cq-layout-reading) flex-col gap-3">

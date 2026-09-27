@@ -65,7 +65,7 @@ async function run<T>(
     return {
       ok: false,
       kind: "REJECTED",
-      message: "Please sign in again to continue.",
+      message: "Your session ended. Sign in again to continue.",
     };
   }
   const config = loadWebServerConfig();

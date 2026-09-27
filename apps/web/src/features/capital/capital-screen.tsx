@@ -102,10 +102,10 @@ export async function CapitalScreen() {
           <QuietEmpty
             sentence={
               objective === undefined
-                ? "Your objective couldn't be read just now."
+                ? "Your raise couldn't load. Try again in a moment."
                 : context.kind === "INVESTOR"
                   ? "Your mandate stands in for an objective on this side of the table. Review it whenever it changes."
-                  : "No capital objective yet. Tell Q what you're raising, and it becomes the objective everything here gathers around."
+                  : "No raise yet. Tell Q what you're raising and this page gathers around it."
             }
             action={
               context.kind === "INVESTOR" ? (
@@ -143,7 +143,7 @@ export async function CapitalScreen() {
         }
       >
         {relationships === undefined ? (
-          <QuietEmpty sentence="Your relationships couldn't be read just now." />
+          <QuietEmpty sentence="Your relationships couldn't load. Try again in a moment." />
         ) : (
           <RelationshipList
             items={relationships}

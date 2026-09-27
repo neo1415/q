@@ -47,8 +47,8 @@ export function HandoffStep({
             className="cq-body text-(--cq-text-primary)"
             data-handoff-recommendation
           >
-            Not available yet. When discovery is built, it will use this mandate
-            and explain every result. Nothing is being ranked for you right now.
+            Discover ranks companies against this mandate and explains every
+            result.
           </dd>
         </div>
         <div className="flex flex-col gap-1">
@@ -57,8 +57,8 @@ export function HandoffStep({
           </dt>
           <dd className="cq-body text-(--cq-text-primary)" data-handoff-inbound>
             {handoff?.inboundPreference === null || handoff === undefined
-              ? "Not set. Founders cannot reach you through Capital Q on this build."
-              : `Recorded as “${handoff.inboundPreference.label}”. Not enforced yet: founders cannot reach you through Capital Q on this build.`}
+              ? "Not set. Founders can't contact you directly yet."
+              : `Recorded as “${handoff.inboundPreference.label}”. It takes effect once founders can contact you directly.`}
           </dd>
         </div>
       </dl>

@@ -163,7 +163,7 @@ export class OnboardingClientError extends Error {
 
 /** The client composed when no backend is configured: honest, never a fixture. */
 export function createUnavailableClient<TView, TResponse>(
-  message = "Setup isn't available on this build yet.",
+  message = "Setup isn't available right now. Try again later.",
 ): OnboardingClient<TView, TResponse> {
   const unavailable = () =>
     Promise.reject(new OnboardingClientError("UNAVAILABLE", message));

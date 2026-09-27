@@ -126,7 +126,9 @@ export class AgentSocket {
       const timeout = setTimeout(() => {
         if (opened) return;
         this.drop(socket);
-        reject(new Error("The voice line did not open."));
+        reject(
+          new Error("The voice line didn't open. Try again, or keep typing."),
+        );
       }, OPEN_TIMEOUT_MS);
       socket.onopen = () => {
         opened = true;
@@ -143,7 +145,10 @@ export class AgentSocket {
       };
       socket.onclose = (event) => {
         clearTimeout(timeout);
-        if (!opened) reject(new Error("The voice line did not open."));
+        if (!opened)
+          reject(
+            new Error("The voice line didn't open. Try again, or keep typing."),
+          );
         if (this.socket !== socket) return;
         this.stop();
         this.socket = null;

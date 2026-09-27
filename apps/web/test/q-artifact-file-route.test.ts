@@ -112,7 +112,7 @@ describe("BIZ-001 · the artifact file route", () => {
     const response = await call("pdf");
     expect(response.status).toBe(502);
     const said = await message(response);
-    expect(said).toBe("I couldn't prepare that file. Please try again.");
+    expect(said).toBe("I couldn't prepare that file. Try again.");
     expect(said).not.toContain("fonts.ts");
   });
 

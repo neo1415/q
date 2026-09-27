@@ -793,7 +793,7 @@ export function PitchUpload({
         </p>
         <p className="mt-3">
           <Link href="/company/visibility" className={buttonClassName("quiet")}>
-            Visibility &amp; Discovery
+            Visibility and discovery
           </Link>
         </p>
       </PageSection>

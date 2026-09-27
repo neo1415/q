@@ -32,7 +32,10 @@ export async function authorisePlaybackAction(
   const company = CompanyIdInput.safeParse(companyId);
   const asset = MediaAssetIdInput.safeParse(mediaAssetId);
   if (!company.success || !asset.success) {
-    return { ok: false, message: "That pitch reference is not valid." };
+    return {
+      ok: false,
+      message: "That pitch can't be played. Reload and try again.",
+    };
   }
 
   const session = await apiSession();

@@ -87,7 +87,7 @@ async function refusalSentence(
   if (format === "slides") {
     return "That document has no slides.";
   }
-  return "I couldn't prepare that file. Please try again.";
+  return "I couldn't prepare that file. Try again.";
 }
 
 /** `?version=N`, bounded, or nothing. An artifact has few versions. */
@@ -110,7 +110,7 @@ export async function GET(
 ): Promise<NextResponse | Response> {
   const { qApiBaseUrl } = loadWebServerConfig();
   if (qApiBaseUrl === undefined) {
-    return plain(503, "Q isn't connected on this build yet.");
+    return plain(503, "Q isn't available right now. Try again later.");
   }
 
   const { artifactId, format } = await context.params;
@@ -120,7 +120,7 @@ export async function GET(
 
   const accessToken = await getSessionAccessToken();
   if (accessToken === null) {
-    return plain(401, "Please sign in again to continue.");
+    return plain(401, "Your session ended. Sign in again to continue.");
   }
 
   const version = versionOf(request);
@@ -137,14 +137,14 @@ export async function GET(
       signal: request.signal,
     });
   } catch {
-    return plain(502, "I lost the connection to Q. Please try again.");
+    return plain(502, "I lost the connection to Q. Try again.");
   }
 
   if (!upstream.ok || upstream.body === null) {
     // The upstream problem document describes the Q API to an operator,
     // not to this person. One plain sentence per class.
     if (upstream.status === 401 || upstream.status === 403) {
-      return plain(401, "Please sign in again to continue.");
+      return plain(401, "Your session ended. Sign in again to continue.");
     }
     if (upstream.status === 404) {
       return plain(404, "I couldn't find that document.");
@@ -152,7 +152,7 @@ export async function GET(
     if (upstream.status === 409) {
       return plain(409, await refusalSentence(upstream, format));
     }
-    return plain(502, "I couldn't prepare that file. Please try again.");
+    return plain(502, "I couldn't prepare that file. Try again.");
   }
 
   const disposition = upstream.headers.get("content-disposition");

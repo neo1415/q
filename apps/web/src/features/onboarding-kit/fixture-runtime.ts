@@ -605,7 +605,7 @@ export function createFixtureRuntime(
         persist({ ...state, failNextSave: false });
         throw new OnboardingClientError(
           "NETWORK",
-          "Couldn't reach Capital Q. Please try again.",
+          "Couldn't reach Capital Q. Try again.",
         );
       }
       const step = eligibleStep(stepKey);

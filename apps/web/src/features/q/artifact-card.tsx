@@ -40,7 +40,7 @@ export type ArtifactReference = Extract<
 
 export const EDIT_WITH_Q_PROMPT =
   "Edit this document with me — what would you change first?";
-export const RETRY_PROMPT = "Please try preparing that document again.";
+export const RETRY_PROMPT = "Try preparing that document again.";
 
 export function ArtifactCard({
   block,

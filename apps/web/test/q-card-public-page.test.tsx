@@ -173,7 +173,7 @@ describe("what Capital Q vouches for", () => {
     );
     expect(screen.queryByText("Organisation verified by Capital Q")).toBeNull();
     expect(
-      screen.getByText(/Organisation: synthetic demo attestation/),
+      screen.getByText(/Organisation: demo data only, not verified/),
     ).toBeTruthy();
     expect(
       screen.getByText("Founder identity verified by Capital Q"),

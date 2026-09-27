@@ -119,7 +119,7 @@ export function TaxonomyFocusStep({
           id={`${step.id}-search`}
           label={step.searchLabel}
           placeholder={step.searchPlaceholder}
-          description="Type a word or two; suggestions come from the canonical taxonomy. Add as many as apply."
+          description="Type a word or two and choose from the suggestions. Add as many as apply."
           value={query}
           disabled={busy}
           onChange={(event) => setQuery(event.target.value)}

@@ -158,8 +158,7 @@ const FAILURE_MESSAGE: Readonly<Record<PitchFailure, string>> = {
   TARGET_LOST:
     "This upload was started elsewhere and can't be resumed here. Cancel it, or choose the file again to replace this pitch.",
   CANCELLED: "Upload cancelled. Choose a file when you're ready.",
-  REQUEST_FAILED:
-    "Capital Q couldn't complete that right now. Please try again.",
+  REQUEST_FAILED: "Capital Q couldn't complete that right now. Try again.",
 };
 
 export function pitchFailureMessage(failure: PitchFailure): string {

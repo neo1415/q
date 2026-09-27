@@ -197,9 +197,7 @@ describe("C5R1-W02 · working states and failures are the server's words", () =>
 
   it("falls back to one plain sentence when nothing was received", () => {
     const fallback = failureMessage(null);
-    expect(fallback).toBe(
-      "I couldn't answer that right now. Please try again.",
-    );
+    expect(fallback).toBe("I couldn't answer that right now. Try again.");
     // Nothing technical reaches a person (§19).
     expect(fallback).not.toMatch(/\d{3}|http|sql|queue|provider|stack/i);
   });

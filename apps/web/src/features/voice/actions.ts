@@ -49,10 +49,10 @@ const failure = (message: string): VoiceActionResult<never> => ({
 function translate(error: unknown): VoiceActionResult<never> {
   if (error instanceof ApiProblemError) {
     if (error.status === 401 || error.status === 403) {
-      return failure("Please sign in again to continue.");
+      return failure("Your session ended. Sign in again to continue.");
     }
     if (error.status === 404) {
-      return failure("Voice isn't available on this build yet.");
+      return failure("Voice isn't available right now. You can keep typing.");
     }
     if (error.status === 429) {
       return failure(
@@ -60,11 +60,14 @@ function translate(error: unknown): VoiceActionResult<never> {
       );
     }
     if (error.status >= 500) {
-      return failure("I couldn't start voice right now. Please try again.");
+      return failure("I couldn't start voice right now. Try again.");
     }
-    return failure(error.problem?.detail ?? "I couldn't start voice.");
+    return failure(
+      error.problem?.detail ??
+        "I couldn't start voice. Try again, or keep typing.",
+    );
   }
-  return failure("I couldn't reach Q. Please try again.");
+  return failure("I couldn't reach Q. Try again.");
 }
 
 const InputSchema = CreateQVoiceSessionRequestSchema;
@@ -80,11 +83,11 @@ export async function startVoiceSessionAction(
   const input: CreateQVoiceSessionRequest = parsed.data;
   const { qApiBaseUrl } = loadWebServerConfig();
   if (qApiBaseUrl === undefined) {
-    return failure("Q isn't connected on this build yet.");
+    return failure("Q isn't available right now. Try again later.");
   }
   const accessToken = await getSessionAccessToken();
   if (accessToken === null) {
-    return failure("Please sign in again to continue.");
+    return failure("Your session ended. Sign in again to continue.");
   }
   try {
     const value = await createQVoiceSession(
@@ -103,15 +106,15 @@ export async function readVoiceTurnAction(
 ): Promise<VoiceActionResult<QVoiceTurnState>> {
   const parsed = UuidSchema.safeParse(rawVoiceSessionId);
   if (!parsed.success) {
-    return failure("That voice session isn't valid.");
+    return failure("That voice session ended. Start voice again.");
   }
   const accessToken = await getSessionAccessToken();
   if (accessToken === null) {
-    return failure("Please sign in again to continue.");
+    return failure("Your session ended. Sign in again to continue.");
   }
   const { qApiBaseUrl } = loadWebServerConfig();
   if (qApiBaseUrl === undefined) {
-    return failure("Q isn't connected on this build yet.");
+    return failure("Q isn't available right now. Try again later.");
   }
   try {
     const value = await getQVoiceTurnState(
@@ -127,8 +130,7 @@ export async function readVoiceTurnAction(
       return {
         ok: false,
         gone: true,
-        message:
-          "I lost the line there. Give me a second and I'll pick it back up.",
+        message: "I lost the connection for a moment. Reconnecting.",
       };
     }
     return translate(error);
@@ -147,15 +149,15 @@ export async function sendVoiceScreenAction(
   const id = UuidSchema.safeParse(rawVoiceSessionId);
   const screen = QVoiceScreenUpdateSchema.safeParse(rawScreen);
   if (!id.success || !screen.success) {
-    return failure("That screen isn't valid.");
+    return failure("That screen can't be shared with Q. Reload and try again.");
   }
   const accessToken = await getSessionAccessToken();
   if (accessToken === null) {
-    return failure("Please sign in again to continue.");
+    return failure("Your session ended. Sign in again to continue.");
   }
   const { qApiBaseUrl } = loadWebServerConfig();
   if (qApiBaseUrl === undefined) {
-    return failure("Q isn't connected on this build yet.");
+    return failure("Q isn't available right now. Try again later.");
   }
   try {
     await setQVoiceScreen(

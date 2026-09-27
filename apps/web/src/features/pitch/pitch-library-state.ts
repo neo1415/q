@@ -66,7 +66,7 @@ const PHASE_LABEL: Readonly<Record<PitchVersionPhase, string>> = {
   UPLOADING: "Uploading",
   PROCESSING: "Processing",
   READY: "Ready",
-  FAILED: "Failed",
+  FAILED: "Couldn't process",
   WITHDRAWN: "Withdrawn",
 };
 

@@ -228,7 +228,7 @@ describe("the profile panel", () => {
     renderPanel(null);
     fireEvent.click(screen.getByRole("button", { name: "Ask Q to make it" }));
     expect(askAbout).toHaveBeenCalledWith(
-      "Make a Q card for Kivu Freight with the handle ",
+      "Make a Q Card for Kivu Freight with the handle ",
     );
   });
 

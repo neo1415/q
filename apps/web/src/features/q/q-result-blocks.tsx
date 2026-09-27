@@ -154,7 +154,7 @@ function intentLabel(intent: QUiIntent): string {
 const DESTINATION_LABELS: Readonly<
   Record<Extract<QUiIntent, { kind: "NAVIGATE" }>["destination"], string>
 > = {
-  HOME: "Go home",
+  HOME: "Go to Home",
   PROFILE: "Open your profile",
   CAPITAL: "Open Capital",
   DISCOVER: "Open Discover",

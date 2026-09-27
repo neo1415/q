@@ -66,11 +66,17 @@ const failure = (
 async function apiSession(): Promise<ApiSession | ActionResult<never>> {
   const { apiBaseUrl } = loadWebServerConfig();
   if (apiBaseUrl === undefined) {
-    return failure("UNAVAILABLE", "Setup isn't available on this build yet.");
+    return failure(
+      "UNAVAILABLE",
+      "Setup isn't available right now. Try again later.",
+    );
   }
   const accessToken = await getSessionAccessToken();
   if (accessToken === null) {
-    return failure("UNAVAILABLE", "Please sign in again to continue.");
+    return failure(
+      "UNAVAILABLE",
+      "Your session ended. Sign in again to continue.",
+    );
   }
   return { baseUrl: apiBaseUrl, accessToken };
 }
@@ -92,17 +98,17 @@ function translate(error: unknown): ActionResult<never> {
       );
     }
     if (error.status === 401) {
-      return failure("UNAVAILABLE", "Please sign in again to continue.");
+      return failure(
+        "UNAVAILABLE",
+        "Your session ended. Sign in again to continue.",
+      );
     }
     if (error.status >= 500) {
-      return failure(
-        "NETWORK",
-        "Capital Q couldn't save that. Please try again.",
-      );
+      return failure("NETWORK", "Capital Q couldn't save that. Try again.");
     }
     return failure("REJECTED", detail);
   }
-  return failure("NETWORK", "Couldn't reach Capital Q. Please try again.");
+  return failure("NETWORK", "Couldn't reach Capital Q. Try again.");
 }
 
 async function run<T>(

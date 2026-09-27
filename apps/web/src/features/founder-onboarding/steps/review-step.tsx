@@ -49,7 +49,7 @@ export function ReviewStep({
       resolution,
     });
     if (!recorded) {
-      setProblem("Capital Q couldn't record that just now. Please try again.");
+      setProblem("Capital Q couldn't record that just now. Try again.");
     }
   }
 

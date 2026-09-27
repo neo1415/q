@@ -87,7 +87,7 @@ export function QCardPanel(props: QCardPanelProps) {
               type="button"
               className={buttonClassName("quiet", "regular", "-ml-4")}
               onClick={() =>
-                askAbout(`Make a Q card for ${props.name} with the handle `)
+                askAbout(`Make a Q Card for ${props.name} with the handle `)
               }
             >
               Ask Q to make it

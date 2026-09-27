@@ -60,7 +60,10 @@ export async function loadSlatePageAction(
 
   const parsed = cursor === null ? null : CursorInput.safeParse(cursor);
   if (parsed !== null && !parsed.success) {
-    return { ok: false, message: "That page reference is not valid." };
+    return {
+      ok: false,
+      message: "That page link isn't valid. Reload Discover and try again.",
+    };
   }
 
   try {
@@ -104,7 +107,10 @@ export async function recordDecisionAction(input: {
     !clientEventId.success ||
     (slateId !== null && !slateId.success)
   ) {
-    return { ok: false, message: "That request was not understood." };
+    return {
+      ok: false,
+      message: "That didn't go through. Reload and try again.",
+    };
   }
 
   const body = {

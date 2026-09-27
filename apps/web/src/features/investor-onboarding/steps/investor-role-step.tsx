@@ -89,7 +89,7 @@ export function InvestorRoleStep({
       <Input
         id="investor-title"
         label="Your role there"
-        description="Optional. A title is descriptive only; it grants no permissions."
+        description="Optional. Shown with your name; it changes nothing you can do."
         placeholder="Partner, Principal, Angel"
         autoComplete="organization-title"
         value={businessTitle}

@@ -317,7 +317,7 @@ export default async function ProfilePage() {
             field of the profile itself. */}
         <PageSection
           id="visibility"
-          title="Visibility & Discovery"
+          title="Visibility and discovery"
           description="Who can see your profile on the network, what they see, and the one switch that changes it."
         >
           <div>

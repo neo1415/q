@@ -211,7 +211,7 @@ export function useQConversation(
       .catch(() => {
         // A refusal on the stream is not a failed run — the run may still
         // be recorded and answered. Say so plainly; do not claim it failed.
-        setNotice("I lost the connection to Q. Please try again.");
+        setNotice("I lost the connection to Q. Try again.");
       })
       .finally(() => {
         if (abort.current === controller) {

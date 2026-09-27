@@ -156,7 +156,7 @@ export async function answerInterestAction(input: {
   if (!interestId.success || !decision.success || !key.success) {
     return {
       ok: false,
-      message: "That request was not understood.",
+      message: "That didn't go through. Reload and try again.",
       retryable: false,
     };
   }
@@ -193,7 +193,7 @@ export async function expressInterestAction(input: {
   if (!companyId.success || !surface.success || !key.success) {
     return {
       ok: false,
-      message: "That request was not understood.",
+      message: "That didn't go through. Reload and try again.",
       retryable: false,
     };
   }

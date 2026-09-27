@@ -45,7 +45,10 @@ async function session(): Promise<ApiSession | null> {
 function translate(error: unknown): InvestorVisibilityActionResult<never> {
   if (error instanceof ApiProblemError) {
     if (error.status === 401) {
-      return { ok: false, message: "Please sign in again to continue." };
+      return {
+        ok: false,
+        message: "Your session ended. Sign in again to continue.",
+      };
     }
     if (error.status === 403) {
       return {
@@ -67,13 +70,15 @@ function translate(error: unknown): InvestorVisibilityActionResult<never> {
     if (error.status < 500) {
       return {
         ok: false,
-        message: error.problem?.detail ?? "That request couldn't be made.",
+        message:
+          error.problem?.detail ??
+          "That didn't go through. Reload and try again.",
       };
     }
   }
   return {
     ok: false,
-    message: "Capital Q couldn't complete that right now. Please try again.",
+    message: "Capital Q couldn't complete that right now. Try again.",
   };
 }
 
@@ -93,7 +98,10 @@ export async function loadInvestorVisibilityAction(
   }
   const current = await session();
   if (current === null) {
-    return { ok: false, message: "Please sign in again to continue." };
+    return {
+      ok: false,
+      message: "Your session ended. Sign in again to continue.",
+    };
   }
   try {
     const [investor, preview] = await Promise.all([
@@ -121,11 +129,17 @@ export async function setInvestorVisibilityAction(
     !visibility.success ||
     !expectedVersion.success
   ) {
-    return { ok: false, message: "That request couldn't be made." };
+    return {
+      ok: false,
+      message: "That didn't go through. Reload and try again.",
+    };
   }
   const current = await session();
   if (current === null) {
-    return { ok: false, message: "Please sign in again to continue." };
+    return {
+      ok: false,
+      message: "Your session ended. Sign in again to continue.",
+    };
   }
   try {
     const choice: InvestorVisibilityChoice = visibility.data;

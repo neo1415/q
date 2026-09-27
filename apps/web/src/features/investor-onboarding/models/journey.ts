@@ -716,7 +716,7 @@ function buildStep(
       return {
         ...base(group, "attributes", state),
         prompt: "Business attributes",
-        help: "Each dimension is recorded separately; nothing is collapsed into one category.",
+        help: "Answer what matters to you. Each one is kept separately.",
         businessModelOptions:
           extras.nodeLists?.[BUSINESS_MODEL_VOCABULARIES[0]] ?? [],
         customerTypeOptions:

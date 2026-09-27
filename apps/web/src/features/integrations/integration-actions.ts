@@ -48,19 +48,22 @@ async function run<T>(
 ): Promise<IntegrationResult<T>> {
   const s = await session(which);
   if (s === null)
-    return { ok: false, message: "Please sign in again to continue." };
+    return {
+      ok: false,
+      message: "Your session ended. Sign in again to continue.",
+    };
   try {
     return { ok: true, value: await work(s) };
   } catch (error: unknown) {
     if (error instanceof ApiProblemError && error.status < 500) {
       return {
         ok: false,
-        message: error.problem?.detail ?? "That didn't work. Please try again.",
+        message: error.problem?.detail ?? "That didn't work. Try again.",
       };
     }
     return {
       ok: false,
-      message: "Gmail couldn't be reached. Please try again.",
+      message: "Gmail couldn't be reached. Try again.",
     };
   }
 }

@@ -962,9 +962,7 @@ export function QConversationPanel({
                     strokeWidth={2}
                     aria-hidden="true"
                   />
-                  {connected
-                    ? "Talk with Q"
-                    : "Q isn't connected on this build"}
+                  {connected ? "Talk with Q" : "Q isn't available right now"}
                 </button>
               )}
               {q.working ? (

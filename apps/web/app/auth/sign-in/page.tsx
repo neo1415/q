@@ -19,7 +19,7 @@ const NOTICES: Record<string, SignInNotice> = {
   // misconfigured, reaches a person as this one sentence.
   "google-failed": {
     tone: "warning",
-    message: "We couldn't sign you in with Google. Please try again.",
+    message: "We couldn't sign you in with Google. Try again.",
   },
 };
 

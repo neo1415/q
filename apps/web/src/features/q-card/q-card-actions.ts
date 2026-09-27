@@ -58,7 +58,10 @@ function translate(error: unknown): QCardActionResult {
       };
     }
     if (error.status === 401) {
-      return { ok: false, message: "Please sign in again to continue." };
+      return {
+        ok: false,
+        message: "Your session ended. Sign in again to continue.",
+      };
     }
     if (error.status === 404) {
       return { ok: false, message: "This profile isn't available to you." };
@@ -66,7 +69,7 @@ function translate(error: unknown): QCardActionResult {
   }
   return {
     ok: false,
-    message: "Capital Q couldn't save that just now. Please try again.",
+    message: "Capital Q couldn't save that just now. Try again.",
   };
 }
 
@@ -86,7 +89,10 @@ export async function claimHandleAction(
   }
   const current = await session();
   if (current === null) {
-    return { ok: false, message: "Please sign in again to continue." };
+    return {
+      ok: false,
+      message: "Your session ended. Sign in again to continue.",
+    };
   }
   try {
     return {
@@ -121,7 +127,10 @@ export async function updateQCardAction(
   }
   const current = await session();
   if (current === null) {
-    return { ok: false, message: "Please sign in again to continue." };
+    return {
+      ok: false,
+      message: "Your session ended. Sign in again to continue.",
+    };
   }
   try {
     return {

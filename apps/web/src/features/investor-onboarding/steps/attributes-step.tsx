@@ -142,7 +142,7 @@ export function AttributesStep({
         id="attributes-revenue"
         name="revenueState"
         legend="Revenue expectations"
-        description="Optional. Kept with your onboarding answers until revenue thresholds are supported as policy."
+        description="Optional. Kept on record; not yet used to filter companies."
         options={step.revenueOptions}
         value={revenueState}
         disabled={busy}

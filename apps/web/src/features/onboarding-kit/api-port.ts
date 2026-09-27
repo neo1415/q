@@ -42,7 +42,7 @@ async function through<T>(call: Promise<ActionResult<T>>): Promise<T> {
     // A failed server-action round trip (offline, deploy in progress).
     throw new OnboardingClientError(
       "NETWORK",
-      "Couldn't reach Capital Q. Please try again.",
+      "Couldn't reach Capital Q. Try again.",
     );
   }
   return unwrap(result);
@@ -101,7 +101,7 @@ export function createApiRuntimePort(input: {
         // rather than completed over nothing.
         return {
           ok: false,
-          message: "We couldn't upload that file. Please try again.",
+          message: "We couldn't upload that file. Try again.",
         };
       }
       const completed = await materialUploadCompleteAction(

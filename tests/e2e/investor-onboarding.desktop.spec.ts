@@ -238,7 +238,7 @@ test.describe("investor onboarding (desktop, real API)", () => {
       "Active",
     );
     await expect(page.locator("[data-handoff-recommendation]")).toContainText(
-      "Not available yet",
+      "Discover ranks companies against this mandate",
     );
     await expect(page.getByText(FORBIDDEN_COPY)).toHaveCount(0);
     await expect(page.getByText(/GateQ/)).toHaveCount(0);

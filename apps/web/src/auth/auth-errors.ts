@@ -13,7 +13,7 @@ import { isAuthApiError } from "@supabase/supabase-js";
 export const GENERIC_SIGN_IN_FAILURE = "Email or password wasn't recognised.";
 export const GENERIC_SIGN_UP_FAILURE =
   "We couldn't create an account with that email. If you already have one, sign in or reset your password.";
-export const GENERIC_FAILURE = "Something went wrong. Try again.";
+export const GENERIC_FAILURE = "That didn't work. Try again in a moment.";
 /**
  * Every way Google sign-in can fail, in one sentence (§11, §36).
  *
@@ -23,7 +23,7 @@ export const GENERIC_FAILURE = "Something went wrong. Try again.";
  * configuration to whoever asked. One sentence; the detail goes to the log.
  */
 export const GOOGLE_SIGN_IN_FAILURE =
-  "We couldn't sign you in with Google. Please try again.";
+  "We couldn't sign you in with Google. Try again.";
 export const RATE_LIMITED =
   "Too many attempts. Wait a few minutes and try again.";
 export const SAME_PASSWORD = "Choose a password you haven't used before.";

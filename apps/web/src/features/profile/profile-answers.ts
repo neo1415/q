@@ -297,7 +297,7 @@ export function raiseFromObjective(
       },
       {
         stepKey: "objective.stage",
-        title: "Round stage",
+        title: "Stage",
         value: code(STAGE_LABELS, objective.targetStage),
       },
       {

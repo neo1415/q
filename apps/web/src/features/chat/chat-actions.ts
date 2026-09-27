@@ -53,7 +53,7 @@ async function run<T>(
     return {
       ok: false,
       kind: "REJECTED",
-      message: "Please sign in again to continue.",
+      message: "Your session ended. Sign in again to continue.",
     };
   }
   try {
@@ -72,7 +72,7 @@ async function run<T>(
         message:
           error.status === 404
             ? "This conversation isn't available."
-            : (detail ?? "That didn't send. Please try again."),
+            : (detail ?? "That didn't send. Try again."),
       };
     }
     return {

@@ -88,7 +88,7 @@ async function failureMessage(response: Response): Promise<string> {
   } catch {
     // Not JSON: the status line is all there is.
   }
-  return "I couldn't prepare that file. Please try again.";
+  return "I couldn't prepare that file. Try again.";
 }
 
 /** Hand bytes to the browser's own download, under the server's file name. */
@@ -141,7 +141,7 @@ export function ArtifactDownloads({
       }
       saveFile(await response.blob(), fileNameFrom(response, format));
     } catch {
-      setFailure("I lost the connection to Q. Please try again.");
+      setFailure("I lost the connection to Q. Try again.");
     } finally {
       setBusy(null);
     }

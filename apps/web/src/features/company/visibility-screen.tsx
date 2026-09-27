@@ -143,7 +143,7 @@ export function VisibilityScreen({ companyId }: VisibilityScreenProps) {
       }
       setSaved(
         result.value.state === "marketplace_ready"
-          ? "Your company meets the marketplace requirements."
+          ? "Your company meets the requirements for investor recommendations."
           : "Readiness checked. What remains is listed below.",
       );
       await load();
@@ -260,13 +260,13 @@ export function VisibilityScreen({ companyId }: VisibilityScreenProps) {
           </h3>
           <p className="cq-body max-w-(--cq-layout-reading) text-(--cq-text-secondary)">
             {ready
-              ? "Your company meets the marketplace requirements and can be included in investor recommendations. Being visible and being recommended are separate: both are needed."
-              : "Not in investor recommendations yet. Being visible does not change that on its own; the marketplace requirements below decide it."}
+              ? "Your company meets the requirements and can be included in investor recommendations. Being visible and being recommended are separate: both are needed."
+              : "Not in investor recommendations yet. Being visible does not change that on its own; the requirements below decide it."}
           </p>
         </div>
         {readiness === null ? (
           <p className="cq-status-line">
-            Readiness couldn&apos;t be read just now.
+            Readiness couldn&apos;t load. Try again in a moment.
           </p>
         ) : (
           <ul

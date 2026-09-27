@@ -15,7 +15,7 @@ import {
 import { InvestorVisibilityScreen } from "@/features/investor/visibility-screen";
 import { resolveOwnContext } from "@/features/q/context";
 
-export const metadata: Metadata = { title: "Visibility & Discovery" };
+export const metadata: Metadata = { title: "Visibility and discovery" };
 
 export const dynamic = "force-dynamic";
 
@@ -32,7 +32,7 @@ export default async function VisibilityPage() {
   return (
     <PageContainer>
       <PageHeader
-        title="Visibility & Discovery"
+        title="Visibility and discovery"
         description={
           context.kind === "INVESTOR"
             ? "Who can see your investor profile, what they see, and whether founders can find you."

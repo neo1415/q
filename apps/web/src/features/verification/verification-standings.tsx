@@ -48,14 +48,17 @@ const NOTICE: Record<
     tone: "info",
     text: "Nothing new to ask for: every standing is already requested or verified.",
   },
-  "sign-in": { tone: "warning", text: "Please sign in again to continue." },
+  "sign-in": {
+    tone: "warning",
+    text: "Your session ended. Sign in again to continue.",
+  },
   "not-allowed": {
     tone: "warning",
     text: "Only someone who can edit this company can ask for its verification.",
   },
   unavailable: {
     tone: "warning",
-    text: "Capital Q couldn't complete that right now. Please try again.",
+    text: "Capital Q couldn't complete that right now. Try again.",
   },
 };
 
@@ -146,7 +149,7 @@ export function VerificationStandings({
             </Link>
           ) : null}
           <Link href="/company/visibility" className={buttonClassName("quiet")}>
-            Check marketplace readiness
+            Check readiness
           </Link>
         </div>
       </section>

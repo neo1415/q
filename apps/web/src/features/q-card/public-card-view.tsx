@@ -41,10 +41,8 @@ const VERIFIED_WORDS: Readonly<Record<string, string>> = {
  * who is looking.
  */
 const DEMO_WORDS: Readonly<Record<string, string>> = {
-  ORGANISATION_VERIFIED:
-    "Organisation: synthetic demo attestation (demo data, not a real-world check)",
-  FOUNDER_IDENTITY_VERIFIED:
-    "Founder identity: synthetic demo attestation (demo data, not a real-world check)",
+  ORGANISATION_VERIFIED: "Organisation: demo data only, not verified",
+  FOUNDER_IDENTITY_VERIFIED: "Founder identity: demo data only, not verified",
 };
 
 /** The facts list leaves out what the hero and actions already say. */

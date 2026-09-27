@@ -30,7 +30,7 @@ export function GmailConnection({
     outcome === "denied"
       ? "Gmail wasn't connected: mail access wasn't granted."
       : outcome === "failed"
-        ? "Gmail couldn't be connected. Please try again."
+        ? "Gmail couldn't be connected. Try again."
         : null,
   );
   const [pending, startTransition] = useTransition();
@@ -70,7 +70,7 @@ export function GmailConnection({
         <p className="cq-body-sm text-(--cq-text-tertiary)">Checking…</p>
       ) : connection.status === "UNAVAILABLE" ? (
         <p className="cq-body-sm text-(--cq-text-secondary)">
-          Gmail isn&apos;t available on this build yet.
+          Gmail isn&apos;t available yet.
         </p>
       ) : connection.status === "CONNECTED" ? (
         <div className="flex flex-wrap items-center gap-3">

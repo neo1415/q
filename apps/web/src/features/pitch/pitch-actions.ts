@@ -44,7 +44,7 @@ async function session(): Promise<ApiSession | null> {
   return { baseUrl: apiBaseUrl, accessToken };
 }
 
-const SIGN_IN = "Please sign in again to continue.";
+const SIGN_IN = "Your session ended. Sign in again to continue.";
 const NOT_HERE = "That company isn't available here.";
 
 /** The API's own reason, without the machine code in front of it. */
@@ -85,14 +85,16 @@ function translate(error: unknown): PitchActionResult<never> {
     if (status < 500) {
       return {
         ok: false,
-        message: error.problem?.detail ?? "That request couldn't be made.",
+        message:
+          error.problem?.detail ??
+          "That didn't go through. Reload and try again.",
         status,
       };
     }
   }
   return {
     ok: false,
-    message: "Capital Q couldn't complete that right now. Please try again.",
+    message: "Capital Q couldn't complete that right now. Try again.",
   };
 }
 
@@ -138,7 +140,10 @@ export async function createPitchAction(
     return { ok: false, message: NOT_HERE };
   }
   if (!key.success) {
-    return { ok: false, message: "That request couldn't be made." };
+    return {
+      ok: false,
+      message: "That didn't go through. Reload and try again.",
+    };
   }
   return run((transport) =>
     transport.create(companyId.data, replaces.data, key.data),
@@ -208,7 +213,10 @@ export async function createUploadSessionAction(
     !expectedVersion.success ||
     !resumable.success
   ) {
-    return { ok: false, message: "That request couldn't be made." };
+    return {
+      ok: false,
+      message: "That didn't go through. Reload and try again.",
+    };
   }
   return run((transport) =>
     transport.reserve(
@@ -273,7 +281,10 @@ export async function setPitchPlaybackPolicyAction(
     !playbackPolicy.success ||
     !expectedVersion.success
   ) {
-    return { ok: false, message: "That request couldn't be made." };
+    return {
+      ok: false,
+      message: "That didn't go through. Reload and try again.",
+    };
   }
   return run((transport) =>
     transport.setPlaybackPolicy(

@@ -50,7 +50,7 @@ export type QActionResult<T> =
   | { readonly ok: true; readonly value: T }
   | { readonly ok: false; readonly message: string };
 
-const UNAVAILABLE = "Q isn't connected on this build yet.";
+const UNAVAILABLE = "Q isn't available right now. Try again later.";
 
 const failure = (message: string): QActionResult<never> => ({
   ok: false,
@@ -67,7 +67,7 @@ async function qSession(): Promise<ApiSession | QActionResult<never>> {
   }
   const accessToken = await getSessionAccessToken();
   if (accessToken === null) {
-    return failure("Please sign in again to continue.");
+    return failure("Your session ended. Sign in again to continue.");
   }
   return { baseUrl: qApiBaseUrl, accessToken };
 }
@@ -88,19 +88,19 @@ function isSession(
 function translate(error: unknown): QActionResult<never> {
   if (error instanceof ApiProblemError) {
     if (error.status === 401 || error.status === 403) {
-      return failure("Please sign in again to continue.");
+      return failure("Your session ended. Sign in again to continue.");
     }
     if (error.status === 429) {
-      return failure(
-        "Q is handling a lot right now. Please try again in a moment.",
-      );
+      return failure("Q is handling a lot right now. Try again in a moment.");
     }
     if (error.status >= 500) {
-      return failure("I couldn't answer that right now. Please try again.");
+      return failure("I couldn't answer that right now. Try again.");
     }
-    return failure(error.problem?.detail ?? "I couldn't send that to Q.");
+    return failure(
+      error.problem?.detail ?? "I couldn't send that to Q. Try again.",
+    );
   }
-  return failure("I couldn't reach Q. Please try again.");
+  return failure("I couldn't reach Q. Try again.");
 }
 
 async function run<T>(
@@ -219,7 +219,7 @@ export async function askQAction(
 ): Promise<QActionResult<QStartedRun>> {
   const parsed = QuestionSchema.safeParse(rawQuestion);
   if (!parsed.success) {
-    return failure("Please write a question first.");
+    return failure("Write a question first.");
   }
   // A conversation id from the browser is a request to continue that
   // conversation, never proof of access to it: the Q API resolves ownership
@@ -326,7 +326,7 @@ export async function continueQRunAction(
   const runId = RunIdSchema.safeParse(rawRunId);
   const question = QuestionSchema.safeParse(rawQuestion);
   if (!runId.success || !question.success) {
-    return failure("Please write a question first.");
+    return failure("Write a question first.");
   }
   return run(async (session) => {
     await appendQRunMessage(
@@ -345,7 +345,7 @@ export async function cancelQRunAction(
 ): Promise<QActionResult<null>> {
   const runId = RunIdSchema.safeParse(rawRunId);
   if (!runId.success) {
-    return failure("I couldn't stop that.");
+    return failure("I couldn't stop that. Try again.");
   }
   return run(async (session) => {
     await cancelQRun(session, runId.data);
@@ -366,7 +366,7 @@ export async function approveQApprovalAction(
 ): Promise<QActionResult<null>> {
   const approvalId = ApprovalIdSchema.safeParse(rawApprovalId);
   if (!approvalId.success) {
-    return failure("I couldn't record that decision.");
+    return failure("I couldn't record that decision. Try again.");
   }
   return run(async (session) => {
     await approveQApproval(session, approvalId.data);
@@ -379,7 +379,7 @@ export async function rejectQApprovalAction(
 ): Promise<QActionResult<null>> {
   const approvalId = ApprovalIdSchema.safeParse(rawApprovalId);
   if (!approvalId.success) {
-    return failure("I couldn't record that decision.");
+    return failure("I couldn't record that decision. Try again.");
   }
   return run(async (session) => {
     await rejectQApproval(session, approvalId.data);
