@@ -31,6 +31,7 @@ import { useQSessionOptional } from "@/features/q/q-session";
 import { QPageSubject } from "@/features/q/q-subject";
 
 import { FeedCard } from "./feed-card";
+import { ruleList } from "./mandate-rules";
 import {
   actionFeedTransport,
   authorisePlaybackViaAction,
@@ -88,7 +89,17 @@ const NOTE_TEXT: Readonly<Record<DiscoveryNoteDto, string>> = {
     "Your recommendations are being prepared. Check back in a moment.",
   SLATE_RESTARTED:
     "Your recommendations were refreshed while you were browsing, so this starts again from the top.",
+  NONE_PASS_HARD_RULES:
+    "Companies are discoverable, but your hard rules exclude every one of them.",
+  NONE_MATCH_MANDATE:
+    "Companies are discoverable, but none matches your mandate yet.",
 };
+
+/** "12 companies are", "1 company is": the count is the market, not a score. */
+function discoverableCompanies(count: number | null): string {
+  if (count === null) return "Companies are";
+  return count === 1 ? "1 company is" : `${String(count)} companies are`;
+}
 
 /**
  * The media layer: at most three players, recycled (spec §9.5). The card
@@ -511,6 +522,22 @@ export function InvestorFeedScreen({
 
   const card = feed.card;
   const notes = feed.state.notes;
+  const { unverifiableExclusions, excludingRules, discoverableCount } =
+    feed.state;
+  /*
+    Said once per feed, never per card (ADR 0019): a declared exclusion V1
+    cannot evaluate for anybody withholds nobody, and the investor is told
+    so rather than shown a feed that silently ignores the rule.
+  */
+  const unverifiableLine =
+    unverifiableExclusions.length === 0 ? null : (
+      <p className="cq-status-line">
+        Your {ruleList(unverifiableExclusions)} exclusion
+        {unverifiableExclusions.length === 1 ? " can't" : "s can't"} be checked
+        automatically yet, so nobody is hidden because of{" "}
+        {unverifiableExclusions.length === 1 ? "it" : "them"}.
+      </p>
+    );
 
   if (feed.state.status === "LOADING_FIRST") {
     return <p className="cq-status-line">Loading your recommendations…</p>;
@@ -552,6 +579,66 @@ export function InvestorFeedScreen({
               </Button>
             </div>
           }
+        />
+      </div>
+    ) : notes.includes("NONE_PASS_HARD_RULES") ? (
+      /*
+        Companies exist and the investor's own hard rules removed them.
+        Saying "nobody is discoverable" here was the live defect: the way
+        forward is the rules, so they are named and one tap away.
+      */
+      <div className="flex flex-col gap-4">
+        {unverifiableLine}
+        <EmptyState
+          title={`${discoverableCompanies(discoverableCount)} discoverable. None passes your hard rules.`}
+          description={
+            excludingRules.length === 0
+              ? "Every discoverable company is excluded by a rule in your mandate."
+              : `Your ${ruleList(excludingRules)} exclusion${excludingRules.length === 1 ? "" : "s"} currently exclude${excludingRules.length === 1 ? "s" : ""} every one of them.`
+          }
+          action={
+            <div className="flex flex-wrap items-center gap-2">
+              <Link
+                href="/onboarding/investor?review=1"
+                className={buttonClassName("primary")}
+              >
+                Review my hard rules
+              </Link>
+              <Button variant="secondary" onClick={() => setOpen(true)}>
+                Ask Q
+              </Button>
+            </div>
+          }
+        />
+      </div>
+    ) : notes.includes("NONE_MATCH_MANDATE") ? (
+      <div className="flex flex-col gap-4">
+        {unverifiableLine}
+        <EmptyState
+          title={`${discoverableCompanies(discoverableCount)} discoverable. None matches your mandate yet.`}
+          description="They pass your hard rules, but none shares a stage, country or sector you named. Widening your mandate is what brings them in."
+          action={
+            <div className="flex flex-wrap items-center gap-2">
+              <Link
+                href="/onboarding/investor?review=1"
+                className={buttonClassName("secondary")}
+              >
+                Review my mandate
+              </Link>
+              <Button variant="secondary" onClick={() => setOpen(true)}>
+                Ask Q
+              </Button>
+            </div>
+          }
+        />
+      </div>
+    ) : notes.includes("RECOMMENDATIONS_REFRESHING") ? (
+      <div className="flex flex-col gap-4">
+        <Notes notes={notes} />
+        {unverifiableLine}
+        <EmptyState
+          title="Building your list."
+          description="Q is matching discoverable companies to your mandate. Check back in a moment."
         />
       </div>
     ) : (
@@ -620,6 +707,7 @@ export function InvestorFeedScreen({
 
         <div className="cq-feed-overlay">
           <Notes notes={notes} />
+          {unverifiableLine}
           <FeedCard
             key={card.companyId}
             company={card}

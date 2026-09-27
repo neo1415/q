@@ -250,6 +250,40 @@ describe("a card", () => {
     expect(text).not.toMatch(/mismatch/i);
   });
 
+  it("says quietly which hard rule could not be checked for this company, and still shows it (ADR 0019)", () => {
+    render(
+      <FeedCard
+        company={company(1, { unverifiedExclusions: ["stage"] })}
+        policy="ACTIVE"
+        reducedMotion={false}
+        saved={false}
+        deciding={false}
+        onSave={() => undefined}
+        onPass={() => undefined}
+        onAskQ={() => undefined}
+      />,
+    );
+    const note = screen.getByText(/stage exclusion\s+wasn't\s+checked/i);
+    expect(note.className).toContain("cq-caption");
+    expect(screen.getByRole("heading", { name: "Company 1" })).toBeTruthy();
+  });
+
+  it("says nothing about unchecked rules when every rule was checked", () => {
+    render(
+      <FeedCard
+        company={company(1)}
+        policy="ACTIVE"
+        reducedMotion={false}
+        saved={false}
+        deciding={false}
+        onSave={() => undefined}
+        onPass={() => undefined}
+        onAskQ={() => undefined}
+      />,
+    );
+    expect(screen.queryByText(/checked/i)).toBeNull();
+  });
+
   it("says plainly when there is no pitch, and shows no player", () => {
     const { container } = render(
       <FeedCard
@@ -780,6 +814,64 @@ describe("degraded and empty states", () => {
       await screen.findByText(/as founders choose to be found/i),
     ).toBeTruthy();
     expect(screen.getByText(/Nothing to review yet/i)).toBeTruthy();
+  });
+
+  it("names the hard rules when discoverable companies exist but every one is excluded, never 'nobody is discoverable' (ADR 0019)", async () => {
+    loadSlatePageAction.mockResolvedValue({
+      ok: true,
+      value: {
+        slateId: null,
+        rankingVersion: "declared.v1",
+        items: [],
+        notes: ["NONE_PASS_HARD_RULES"],
+        nextCursor: null,
+        unverifiableExclusions: ["red_flag"],
+        excludingRules: ["stage", "geography.country"],
+        discoverableCount: 12,
+      },
+    });
+
+    render(<InvestorFeedScreen />);
+
+    expect(
+      await screen.findByText(
+        /12 companies are discoverable\. None passes your hard rules/i,
+      ),
+    ).toBeTruthy();
+    expect(screen.getByText(/stage and country exclusions/i)).toBeTruthy();
+    expect(
+      screen
+        .getByRole("link", { name: /Review my hard rules/i })
+        .getAttribute("href"),
+    ).toBe("/onboarding/investor?review=1");
+    expect(
+      screen.getByText(/red-flag exclusion can't be checked/i),
+    ).toBeTruthy();
+    expect(screen.queryByText(/choose to be found/i)).toBeNull();
+    expect(screen.queryByText(/Nothing to review yet/i)).toBeNull();
+  });
+
+  it("tells companies-that-match-nothing apart from nobody discoverable", async () => {
+    loadSlatePageAction.mockResolvedValue({
+      ok: true,
+      value: {
+        slateId: null,
+        rankingVersion: "declared.v1",
+        items: [],
+        notes: ["NONE_MATCH_MANDATE"],
+        nextCursor: null,
+        discoverableCount: 1,
+      },
+    });
+
+    render(<InvestorFeedScreen />);
+
+    expect(
+      await screen.findByText(
+        /1 company is discoverable\. None matches your mandate yet/i,
+      ),
+    ).toBeTruthy();
+    expect(screen.queryByText(/choose to be found/i)).toBeNull();
   });
 
   it("says a mandate is missing without calling it an error", async () => {

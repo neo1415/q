@@ -166,6 +166,12 @@ export type FeedState = {
   /** Server order, appended to and never re-ordered. */
   readonly items: readonly DiscoveredCompanyDto[];
   readonly notes: readonly DiscoveryNoteDto[];
+  /** Declared exclusions V1 cannot check for any company (ADR 0019); latest page wins. */
+  readonly unverifiableExclusions: readonly string[];
+  /** With NONE_PASS_HARD_RULES: the rules that removed every discoverable company. */
+  readonly excludingRules: readonly string[];
+  /** How many companies are discoverable, when an empty page counted them. */
+  readonly discoverableCount: number | null;
   readonly nextCursor: string | null;
   readonly index: number;
   readonly decisions: Readonly<Record<string, FeedDecision>>;
@@ -184,6 +190,9 @@ export const INITIAL_FEED_STATE: FeedState = {
   rankingVersion: null,
   items: [],
   notes: [],
+  unverifiableExclusions: [],
+  excludingRules: [],
+  discoverableCount: null,
   nextCursor: null,
   index: 0,
   decisions: {},
@@ -287,6 +296,9 @@ export function feedReducer(state: FeedState, action: FeedAction): FeedState {
         rankingVersion: slate.rankingVersion,
         items,
         notes: restarted ? slate.notes : mergeNotes(state.notes, slate.notes),
+        unverifiableExclusions: slate.unverifiableExclusions ?? [],
+        excludingRules: slate.excludingRules ?? [],
+        discoverableCount: slate.discoverableCount ?? null,
         nextCursor: slate.nextCursor,
         index: restarted
           ? 0

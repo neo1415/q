@@ -47,6 +47,10 @@ const NOTE_TEXT: Readonly<Record<DiscoveryNoteDto, string>> = {
     "Your recommendations are being prepared. Check back in a moment.",
   SLATE_RESTARTED:
     "Your recommendations were refreshed while you were browsing, so this list starts again from the top.",
+  NONE_PASS_HARD_RULES:
+    "Companies are discoverable, but your hard rules exclude every one of them.",
+  NONE_MATCH_MANDATE:
+    "Companies are discoverable, but none matches your mandate yet.",
 };
 
 function Reasons({

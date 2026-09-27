@@ -24,6 +24,7 @@ import { useDockAvoid } from "../q-dock";
 
 import type { FeedPreloadPolicy } from "./feed/feed-state";
 import { actionPlaybackSource } from "./feed/action-feed-transport";
+import { ruleList } from "./mandate-rules";
 import { attachHlsOrNativeSource } from "./player/hls-source";
 import { PitchPlayer } from "./player/pitch-player";
 
@@ -171,6 +172,7 @@ export function FeedCard({
     .join(" · ");
   const decisions = useRef<HTMLDivElement>(null);
   useDockAvoid(decisions);
+  const unverified = company.unverifiedExclusions ?? [];
 
   return (
     <article
@@ -225,6 +227,18 @@ export function FeedCard({
             company.reasons.length > 0 ? company.reasons : slateReasons(company)
           }
         />
+
+        {/*
+          Unknown never excludes (ADR 0019): a hard rule this company's own
+          facts could not answer is said, quietly, rather than applied.
+        */}
+        {unverified.length === 0 ? null : (
+          <p className="cq-caption text-(--cq-text-tertiary)">
+            Your {ruleList(unverified)} exclusion
+            {unverified.length === 1 ? " wasn't" : "s weren't"} checked: this
+            company hasn&apos;t stated it yet.
+          </p>
+        )}
 
         {company.websiteUrl === null ? null : (
           <p className="flex items-center gap-1.5">
