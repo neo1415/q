@@ -24,6 +24,7 @@ import {
 import type {
   OnboardingQRecommendations,
   OnboardingStepManifest,
+  QRecommendationPublicSourceType,
 } from "@capital-q/onboarding";
 import { quoteOccursIn } from "@capital-q/q-knowledge";
 
@@ -75,20 +76,95 @@ export type RecommendationStore = Pick<
   "recommend" | "pending"
 >;
 
-export type BoundOnboardingPort = OnboardingToolPort & {
-  /** The latest view this port saw, for the caller's outcome. */
-  readonly view: () => OnboardingSessionView | null;
-  /** Steps this port wrote, in order. */
-  readonly recorded: () => readonly string[];
-  /** Q's recommendations still waiting on the person, as Q would say them. */
-  readonly pendingRecommendations: () => Promise<
+/**
+ * What Q read in a public source, offered as a recommendation (BIZ-009).
+ * Code composes these from a validated research reading; no model calls
+ * this, and nothing here is ever an answer.
+ */
+export type FoundRecommendation = {
+  readonly stepKey: string;
+  readonly value: string | readonly string[] | number;
+  /** Said to the person with it: where it was found, in a few words. */
+  readonly because: string;
+  readonly sources: readonly {
+    readonly sourceType: QRecommendationPublicSourceType;
+    readonly url: string;
+  }[];
+};
+
+export type FoundRecommendationOutcome =
+  /** Held for the person's decision, nothing on the record for the step. */
+  | "RECOMMENDED"
+  /** Held beside a different answer they gave: both stand until they decide. */
+  | "DIFFERS_FROM_ANSWER"
+  /** What they already said: nothing to offer. */
+  | "SAME_AS_ANSWER"
+  /** A recommendation is already waiting on that step. */
+  | "ALREADY_PENDING"
+  /** They set the step aside; Q does not bring it back unasked. */
+  | "SET_ASIDE"
+  /** The reading names none of the step's choices: left unknown. */
+  | "UNRESOLVED"
+  | "REJECTED";
+
+export type FoundRecommendationPort = {
+  readonly recommendFound: (items: readonly FoundRecommendation[]) => Promise<
     readonly {
       readonly stepKey: string;
-      readonly value: string;
-      readonly rationale: string | null;
+      readonly outcome: FoundRecommendationOutcome;
     }[]
   >;
+  /** The session as it stands, for which findings are ready to offer. */
+  readonly answeredSteps: () => Promise<ReadonlySet<string>>;
 };
+
+/** One value, whatever order a list was given in. */
+function sameValue(
+  a: OnboardingResponseValue,
+  b: OnboardingResponseValue,
+): boolean {
+  const norm = (value: OnboardingResponseValue): string => {
+    if (value.type === "MULTI_SELECT") {
+      return JSON.stringify({
+        ...value,
+        optionKeys: [...value.optionKeys].sort(),
+      });
+    }
+    if (value.type === "RESOURCE_REFERENCE") {
+      return JSON.stringify({
+        ...value,
+        resourceIds: [...value.resourceIds].sort(),
+      });
+    }
+    if (value.type === "RANGE") {
+      return JSON.stringify({ type: "RANGE", value: Number(value.value) });
+    }
+    if (value.type === "TEXT") {
+      return JSON.stringify({
+        type: "TEXT",
+        text: value.text.trim().toLowerCase().replace(/\s+/g, " "),
+      });
+    }
+    return JSON.stringify(value);
+  };
+  return norm(a) === norm(b);
+}
+
+export type BoundOnboardingPort = OnboardingToolPort &
+  FoundRecommendationPort & {
+    /** The latest view this port saw, for the caller's outcome. */
+    readonly view: () => OnboardingSessionView | null;
+    /** Steps this port wrote, in order. */
+    readonly recorded: () => readonly string[];
+    /** Q's recommendations still waiting on the person, as Q would say them. */
+    readonly pendingRecommendations: () => Promise<
+      readonly {
+        readonly stepKey: string;
+        readonly value: string;
+        readonly rationale: string | null;
+      }[]
+    >;
+  };
 
 /**
  * One concept, one answer (G): an open optional step in a concept family
@@ -945,6 +1021,106 @@ export function createOnboardingPort(input: {
       }
       return results;
     },
+    recommendFound: async (items) => {
+      const results: {
+        stepKey: string;
+        outcome: FoundRecommendationOutcome;
+      }[] = [];
+      if (store === undefined) {
+        return items.map((item) => ({
+          stepKey: item.stepKey,
+          outcome: "REJECTED" as const,
+        }));
+      }
+      const view = await current();
+      const waiting = await pendingNow().catch(() => []);
+      const setAside = new Set(
+        view.progress.eligibleSteps
+          .filter((row) => row.status === "SKIPPED")
+          .map((row) => row.stepKey),
+      );
+      for (const item of items) {
+        const step = steps.get(item.stepKey);
+        if (step === undefined) {
+          results.push({ stepKey: item.stepKey, outcome: "REJECTED" });
+          continue;
+        }
+        if (waiting.some((held) => held.stepKey === step.stepKey)) {
+          results.push({ stepKey: step.stepKey, outcome: "ALREADY_PENDING" });
+          continue;
+        }
+        if (setAside.has(step.stepKey)) {
+          results.push({ stepKey: step.stepKey, outcome: "SET_ASIDE" });
+          continue;
+        }
+        let resolved = await resolve(item);
+        const c = step.configuration;
+        if (
+          !resolved.ok &&
+          typeof item.value === "object" &&
+          c.stepType === "reference_select" &&
+          c.resourceType === "TAXONOMY_NODE"
+        ) {
+          // Each phrase alone: what a page names clearly is offered, and
+          // what it does not stays unknown rather than sinking the rest.
+          const ids: string[] = [];
+          for (const phrase of item.value.slice(0, 8)) {
+            const one = await resolve({
+              stepKey: step.stepKey,
+              value: [phrase],
+            });
+            if (one.ok && one.value.type === "RESOURCE_REFERENCE") {
+              for (const id of one.value.resourceIds) {
+                if (!ids.includes(id)) ids.push(id);
+              }
+            }
+          }
+          if (ids.length > 0) {
+            resolved = {
+              ok: true,
+              step,
+              value: {
+                type: "RESOURCE_REFERENCE",
+                resourceType: "TAXONOMY_NODE",
+                resourceIds: ids.slice(0, c.maxItems),
+              },
+            };
+          }
+        }
+        if (!resolved.ok) {
+          results.push({ stepKey: step.stepKey, outcome: "UNRESOLVED" });
+          continue;
+        }
+        const answered = view.responses.find(
+          (r) => r.stepKey === step.stepKey,
+        )?.value;
+        if (answered !== undefined && sameValue(answered, resolved.value)) {
+          results.push({ stepKey: step.stepKey, outcome: "SAME_AS_ANSWER" });
+          continue;
+        }
+        try {
+          await store.recommend({
+            userId,
+            sessionId: input.onboardingSessionId,
+            stepKey: step.stepKey,
+            value: resolved.value,
+            rationale: item.because,
+            runId: input.runId ?? null,
+            sources: item.sources,
+          });
+          results.push({
+            stepKey: step.stepKey,
+            outcome:
+              answered === undefined ? "RECOMMENDED" : "DIFFERS_FROM_ANSWER",
+          });
+        } catch {
+          results.push({ stepKey: step.stepKey, outcome: "REJECTED" });
+        }
+      }
+      return results;
+    },
+    answeredSteps: async () =>
+      new Set((await current()).responses.map((r) => r.stepKey)),
     accept: async (stepKeys) => {
       const results: OnboardingRecordResult[] = [];
       const heardList = await heard;

@@ -9,6 +9,8 @@ import type { UserId } from "@capital-q/security";
 
 import {
   OnboardingSessionIdSchema,
+  OnboardingSourceRefSchema,
+  type OnboardingSourceRef,
   type OnboardingSuggestionId,
 } from "../contracts/index.js";
 import {
@@ -44,7 +46,27 @@ export type QRecommendation = {
   readonly rationale: string | null;
   /** SHA-256 of the canonical payload: what an approval binds to. */
   readonly payloadSha256: string;
+  /**
+   * Where Q found it, when it came from a public source (BIZ-009): the
+   * page it was read from. Empty for a recommendation Q made from what
+   * the person said.
+   */
+  readonly sources: readonly OnboardingSourceRef[];
 };
+
+/**
+ * The public sources a recommendation may cite (BIZ-009). Provenance for
+ * the person to tap, never a reason to trust it: a recommendation is Q's
+ * reading until the person accepts it, whatever it cites.
+ */
+export const Q_RECOMMENDATION_PUBLIC_SOURCE_TYPES = [
+  "PUBLIC_WEBSITE",
+  "PUBLIC_PROFILE",
+  "PUBLIC_REGISTRY",
+  "PUBLIC_WEB",
+] as const;
+export type QRecommendationPublicSourceType =
+  (typeof Q_RECOMMENDATION_PUBLIC_SOURCE_TYPES)[number];
 
 export type OnboardingQRecommendations = {
   /** Hold a recommendation; supersedes the step's pending one. */
@@ -55,6 +77,13 @@ export type OnboardingQRecommendations = {
     readonly value: OnboardingResponseValue;
     readonly rationale: string;
     readonly runId: string | null;
+    /** The public pages it was read from, when it was (BIZ-009). */
+    readonly sources?:
+      | readonly {
+          readonly sourceType: QRecommendationPublicSourceType;
+          readonly url: string;
+        }[]
+      | undefined;
   }) => Promise<QRecommendation>;
   /** The session's pending Q recommendations, oldest first. */
   readonly pending: (input: {
@@ -93,6 +122,14 @@ export function createOnboardingQRecommendations(options: {
 
   const isQ = (refs: readonly { readonly sourceType: string }[]) =>
     refs.some((ref) => ref.sourceType === Q_RECOMMENDATION_SOURCE);
+  const publicOf = (
+    refs: readonly OnboardingSourceRef[],
+  ): readonly OnboardingSourceRef[] =>
+    refs.filter((ref) =>
+      (Q_RECOMMENDATION_PUBLIC_SOURCE_TYPES as readonly string[]).includes(
+        ref.sourceType,
+      ),
+    );
 
   return {
     recommend: (input) =>
@@ -140,6 +177,17 @@ export function createOnboardingQRecommendations(options: {
               sourceType: Q_RECOMMENDATION_SOURCE,
               sourceId: (input.runId ?? "interview").slice(0, 200),
             },
+            // Validated like any other reference; a URL too long to keep
+            // whole is not kept at all rather than cut into another URL.
+            ...(input.sources ?? [])
+              .slice(0, 4)
+              .filter((source) => source.url.length <= 200)
+              .map((source) =>
+                OnboardingSourceRefSchema.parse({
+                  sourceType: source.sourceType,
+                  sourceId: source.url,
+                }),
+              ),
           ],
           confidence: null,
           modelRunId: null,
@@ -151,6 +199,7 @@ export function createOnboardingQRecommendations(options: {
           value: created.suggestedValue,
           rationale: created.rationale ?? null,
           payloadSha256: payloadSha256(created.suggestedValue),
+          sources: publicOf(created.sourceRefs),
         };
       }),
     pending: (input) =>
@@ -172,6 +221,7 @@ export function createOnboardingQRecommendations(options: {
             value: s.suggestedValue,
             rationale: s.rationale ?? null,
             payloadSha256: payloadSha256(s.suggestedValue),
+            sources: publicOf(s.sourceRefs),
           }));
       }),
   };

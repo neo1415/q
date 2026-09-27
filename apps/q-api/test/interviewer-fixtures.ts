@@ -131,6 +131,10 @@ export function investorSession(options: WorldOptions): InvestorWorld {
     readonly stepKey: string;
     readonly value: OnboardingResponseValue;
     readonly rationale: string | null;
+    readonly sources: readonly {
+      readonly sourceType: string;
+      readonly sourceId: string;
+    }[];
     status: "PENDING" | "ACCEPTED" | "EXPIRED";
   };
   const kept: Kept[] = [];
@@ -501,6 +505,10 @@ export function investorSession(options: WorldOptions): InvestorWorld {
           stepKey: input.stepKey,
           value: input.value,
           rationale: input.rationale,
+          sources: (input.sources ?? []).map((source) => ({
+            sourceType: source.sourceType,
+            sourceId: source.url,
+          })),
           status: "PENDING",
         };
         kept.push(item);
@@ -510,6 +518,7 @@ export function investorSession(options: WorldOptions): InvestorWorld {
           value: item.value,
           rationale: item.rationale,
           payloadSha256: JSON.stringify(item.value),
+          sources: item.sources,
         });
       },
       pending: () =>
@@ -522,6 +531,7 @@ export function investorSession(options: WorldOptions): InvestorWorld {
               value: k.value,
               rationale: k.rationale,
               payloadSha256: JSON.stringify(k.value),
+              sources: k.sources,
             })),
         ),
     },

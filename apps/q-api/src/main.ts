@@ -193,7 +193,18 @@ import {
   readFeatureSnapshotById,
 } from "@capital-q/discovery";
 
-import { composePresence } from "./composition/presence.js";
+import {
+  composePresence,
+  createPresenceReadPort,
+} from "./composition/presence.js";
+import {
+  createCompaniesHouseRegistry,
+  createInvestorResearchReader,
+  createSecEdgarRegistry,
+  investorResearchReadFrom,
+} from "./composition/investor-research.js";
+import { createInvestorResearch } from "./voice/investor-research.js";
+import { createOnboardingPort } from "./voice/onboarding-port.js";
 import { createPresenceTrigger } from "./voice/presence-trigger.js";
 import { composeResearch } from "./composition/research.js";
 import { createSupabaseRequestAuthenticator } from "./security/supabase-authenticator.js";
@@ -1344,14 +1355,81 @@ const speechSynthesis = speechWithFallback([
 const voiceBindings = createVoiceSessionBindings();
 // The interview as a tool-calling Q run (ADR 0016): the same firewall,
 // tool pipeline and gateway as every Q answer.
+const onboardingRecommendations = createOnboardingQRecommendations({
+  transactions: database.transactions,
+});
+// Research first (BIZ-009, R13): an investor's own public sources, read as
+// soon as the firm is known, offered back as recommendations with their
+// source. The web through founder presence's read port (Bright Data reads
+// only a link the person gave, C5); a registry only when its key or
+// contact is configured.
+const researchSecrets = config.secrets.researchProviders;
+const investorRegistries = [
+  ...(researchSecrets.companiesHouse === undefined
+    ? []
+    : [
+        createCompaniesHouseRegistry({
+          apiKey: researchSecrets.companiesHouse.reveal(),
+        }),
+      ]),
+  ...(researchSecrets.secEdgarUserAgent === undefined
+    ? []
+    : [
+        createSecEdgarRegistry({
+          userAgent: researchSecrets.secEdgarUserAgent,
+        }),
+      ]),
+];
+const investorResearch =
+  researchComposition.research === undefined && investorRegistries.length === 0
+    ? undefined
+    : createInvestorResearch({
+        read:
+          researchComposition.research === undefined
+            ? () => Promise.resolve([])
+            : investorResearchReadFrom(
+                createPresenceReadPort({
+                  research: researchComposition.research,
+                  ...(researchComposition.profiles === undefined
+                    ? {}
+                    : { profiles: researchComposition.profiles }),
+                  logger,
+                }),
+              ),
+        registries: investorRegistries,
+        reader: createInvestorResearchReader({
+          gateway: modelGateway,
+          dataPosture: demoDataPosture,
+          logger,
+        }),
+        // The person's own session, under their own token: what was found
+        // is held the moment it is found, as a durable recommendation.
+        portFor: ({ actor, session, onboardingSessionId }) =>
+          createOnboardingPort({
+            session,
+            onboardingSessionId,
+            journeyType: "investor",
+            ownerUserId: actor.userId,
+            personTurns: [],
+            recommendations: onboardingRecommendations,
+          }),
+        logger,
+      });
+logger.info(
+  {
+    investorResearch:
+      investorResearch === undefined ? "unconfigured" : "configured",
+    registries: investorRegistries.map((registry) => registry.name),
+  },
+  "investor research composed",
+);
 const interviewAgent = createInterviewAgent({
   gateway: modelGateway,
   firewall,
   logger,
   memory: memoryService,
-  recommendations: createOnboardingQRecommendations({
-    transactions: database.transactions,
-  }),
+  recommendations: onboardingRecommendations,
+  investorResearch,
   // Which choices the person handed to Q, read independently of the
   // acting model: a delegated write is permitted only for those.
   delegation: createQDelegationReader({

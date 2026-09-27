@@ -8,7 +8,9 @@ import {
   CorrelationIdSchema,
   QRunIdSchema,
   type ModelMessage,
+  type OnboardingSessionView,
 } from "@capital-q/contracts";
+import { INVESTOR_STEPS } from "@capital-q/investor-onboarding";
 import {
   acceptStructuredOutput,
   type ModelGateway,
@@ -63,6 +65,8 @@ import {
   type RecommendationStore,
 } from "./onboarding-port.js";
 import { createReplySentenceStream } from "./reply-stream.js";
+import type { InvestorResearch } from "./investor-research.js";
+import { createResearchPublicLinksTool } from "./investor-research-tool.js";
 import { SPOKEN_QUESTIONS } from "./step-copy.js";
 import { textStatedIn } from "./value-support.js";
 
@@ -216,6 +220,12 @@ export type InterviewAgentDependencies = {
    * available.
    */
   readonly researchAvailable?: boolean | undefined;
+  /**
+   * Research first (BIZ-009): reads an investor's own public sources as
+   * soon as the firm is known and holds what it finds as recommendations
+   * with their source. Absent: an investor is simply asked.
+   */
+  readonly investorResearch?: InvestorResearch | undefined;
   /** Milliseconds now; injectable so a test can run out the clock. */
   readonly now?: (() => number) | undefined;
   /** The whole turn's deadline; tests shorten it. */
@@ -292,6 +302,8 @@ export const ELSEWHERE_NOTE = `Outside onboarding, Q on their Home page can also
  */
 export function turnNotesFor(input: {
   readonly pausing: boolean;
+  /** Research first (BIZ-009): what to say about it this turn, once. */
+  readonly research?: "STARTED" | "NOTHING_FOUND" | null | undefined;
   readonly lookup:
     | { readonly kind: "RUN"; readonly question: string }
     | { readonly kind: "RUNNING" }
@@ -324,6 +336,15 @@ export function turnNotesFor(input: {
     case undefined:
       break;
   }
+  if (input.research === "STARTED") {
+    notes.push(
+      "Research is starting: Capital Q is looking at public sources about them and their firm (their website, public filings, links they gave). Say so once in one short sentence, adding that nothing is used until they confirm.",
+    );
+  } else if (input.research === "NOTHING_FOUND") {
+    notes.push(
+      "The public research found nothing useful about their firm: say so in a few words and carry on asking normally.",
+    );
+  }
   if (input.pronounce !== null) {
     notes.push(
       `They corrected how to say "${input.pronounce.term.slice(0, 80)}": say it as "${input.pronounce.sayAs.slice(0, 120)}" from now on, and acknowledge it in a few words.`,
@@ -332,6 +353,24 @@ export function turnNotesFor(input: {
   // Every turn: the registry's view of what Q does beyond this loop.
   notes.push(ELSEWHERE_NOTE);
   return notes.join("\n").slice(0, 1_500);
+}
+
+/** The firm the investor named, or the one they typed at sign-up. */
+export function firmNameOf(
+  view: OnboardingSessionView | null,
+  signupOrganisation: string | null,
+): string {
+  const value: unknown = view?.responses.find(
+    (r) => r.stepKey === INVESTOR_STEPS.organisationName,
+  )?.value;
+  const text =
+    typeof value === "object" &&
+    value !== null &&
+    "text" in value &&
+    typeof value.text === "string"
+      ? value.text.trim()
+      : "";
+  return (text || signupOrganisation?.trim() || "").slice(0, 160);
 }
 
 export function createInterviewAgent(
@@ -494,11 +533,47 @@ export function createInterviewAgent(
               }),
             ),
           ];
+    // Research first (BIZ-009): as soon as the firm is known, Q reads its
+    // public sources. Detached: nothing here waits for the web.
+    const research =
+      input.journeyType === "investor"
+        ? dependencies.investorResearch
+        : undefined;
+    const considerResearch = (
+      view: OnboardingSessionView | null,
+      links?: {
+        readonly websiteUrl: string | null;
+        readonly profileUrls: readonly string[];
+      },
+    ): boolean =>
+      research?.consider({
+        actor,
+        session: input.session,
+        onboardingSessionId: input.onboardingSessionId,
+        identity: {
+          firmName: firmNameOf(view, input.signup?.organisationName ?? null),
+          websiteUrl: links?.websiteUrl ?? null,
+          profileUrls: links?.profileUrls ?? [],
+        },
+      }) ?? false;
+    const linksTool =
+      research === undefined
+        ? []
+        : [
+            createResearchPublicLinksTool({
+              ownerUserId: actor.userId,
+              personTurns: [
+                ...(utterance.length === 0 ? [] : [utterance]),
+                ...thread.filter((t) => t.role === "PERSON").map((t) => t.text),
+              ],
+              research: (links) => considerResearch(port.view(), links),
+            }),
+          ];
     const tools = createQToolExecutor({
       // Nothing said, nothing to write: an opening offers only reads, so
       // no answer can be recorded that the person did not give.
       registry: createQToolRegistry(
-        [...createOnboardingTools(port), ...noteTool].filter(
+        [...createOnboardingTools(port), ...noteTool, ...linksTool].filter(
           (tool) => !opening || tool.classification === "READ_ONLY",
         ),
       ),
@@ -515,6 +590,15 @@ export function createInterviewAgent(
     };
     const offered = await tools.offer(context);
     let state = await port.state();
+    if (research !== undefined) {
+      considerResearch(port.view());
+      // What research found and can now be offered is held before the
+      // model reads the state, so this very turn can say it.
+      if ((await research.offerReady(input.onboardingSessionId, port)) > 0) {
+        state = await port.state();
+      }
+    }
+    const researchNote = research?.takeNote(input.onboardingSessionId) ?? null;
     const authority = (await delegationRead) ?? NO_TURN_AUTHORITY;
     const listed = (keys: ReadonlySet<string>): string =>
       keys.size === 0
@@ -561,7 +645,12 @@ export function createInterviewAgent(
         ? authority.pronounce
         : null;
     const pausing = authority.pausing && !opening;
-    const turnNotes = turnNotesFor({ pausing, lookup, pronounce });
+    const turnNotes = turnNotesFor({
+      pausing,
+      lookup,
+      pronounce,
+      research: researchNote,
+    });
 
     // Every round is rendered afresh from the onboarding state and what Q
     // has already done this turn, never from a provider's native tool
@@ -854,6 +943,10 @@ export function createInterviewAgent(
       },
       "interview q run traced",
     );
+
+    // The firm may have been named this turn: research starts now, while
+    // the person reads the reply.
+    considerResearch(view);
 
     return {
       reply,

@@ -256,7 +256,9 @@ export type { OnboardingTaxonomyResolver } from "./application/ports.js";
 export {
   createOnboardingQRecommendations,
   payloadSha256,
+  Q_RECOMMENDATION_PUBLIC_SOURCE_TYPES,
   Q_RECOMMENDATION_SOURCE,
   type OnboardingQRecommendations,
   type QRecommendation,
+  type QRecommendationPublicSourceType,
 } from "./application/q-recommendations.js";
