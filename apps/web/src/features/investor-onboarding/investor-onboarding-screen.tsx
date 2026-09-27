@@ -11,6 +11,7 @@ import { EmptyState, InlineNotice, Skeleton } from "@capital-q/ui/states";
 
 import { createInvestorOnboardingClient } from "./adapters/compose";
 import { INVESTOR_VOCABULARY } from "./conversation-adapter";
+import { reviewLines } from "../onboarding-conversation/conversation";
 import { QOnboardingWorkspace } from "../onboarding-conversation/q-onboarding-workspace";
 import { OnboardingProgress } from "../onboarding-kit/components/onboarding-progress";
 import { OnboardingShell } from "../onboarding-kit/components/onboarding-shell";
@@ -106,17 +107,61 @@ export function InvestorOnboardingScreen({
   const { session } = state;
 
   if (session.status === "complete" || session.step === undefined) {
+    // The mandate itself, as recorded, is what "Review my mandate" is for.
+    // Discover orders companies against it as soon as it is complete; this
+    // screen never claims a ranking state it has not read.
+    const review =
+      session.raw === undefined
+        ? []
+        : reviewLines(session.raw, INVESTOR_VOCABULARY, session.labels);
     return (
-      <div className="mx-auto flex min-h-dvh w-full max-w-(--cq-layout-narrow) flex-col justify-center gap-6 px-4 py-10">
-        <EmptyState
-          title="Investor setup is complete."
-          description="Your mandate is stored and private to your organisation. Discover will use it once recommendations are built; nothing is ranked for you yet."
-          action={
-            <Link href="/discover" className={buttonClassName("primary")}>
-              Go to Discover
-            </Link>
-          }
-        />
+      <div className="mx-auto flex min-h-dvh w-full max-w-(--cq-layout-reading) flex-col gap-6 px-4 py-10">
+        <header className="flex flex-col gap-2">
+          <h1 className="cq-title-xl text-(--cq-text-primary)">Your mandate</h1>
+          <p className="cq-body-sm text-(--cq-text-secondary)">
+            Private to your organisation. Discover orders the companies you see
+            against it; change anything by telling Q.
+          </p>
+        </header>
+        {review.length === 0 ? (
+          <p className="cq-body-sm text-(--cq-text-secondary)">
+            Your mandate couldn&apos;t be shown here just now. It is still on
+            record.
+          </p>
+        ) : (
+          <div className="flex flex-col gap-6" data-mandate-review>
+            {review.map((group) => (
+              <section key={group.label} className="flex flex-col gap-2">
+                <h2 className="cq-label text-(--cq-text-secondary)">
+                  {group.label}
+                </h2>
+                <dl className="flex flex-col gap-2">
+                  {group.items.map((item) => (
+                    <div
+                      key={item.stepKey}
+                      className="flex flex-col gap-0.5 sm:flex-row sm:gap-4"
+                    >
+                      <dt className="cq-body-sm text-(--cq-text-secondary) sm:w-48 sm:shrink-0">
+                        {item.title}
+                      </dt>
+                      <dd className="cq-body-sm text-(--cq-text-primary)">
+                        {item.value ?? "Not stated"}
+                      </dd>
+                    </div>
+                  ))}
+                </dl>
+              </section>
+            ))}
+          </div>
+        )}
+        <div className="flex flex-wrap gap-2">
+          <Link href="/discover" className={buttonClassName("primary")}>
+            Go to Discover
+          </Link>
+          <Link href="/home#q" className={buttonClassName("secondary")}>
+            Change it with Q
+          </Link>
+        </div>
       </div>
     );
   }

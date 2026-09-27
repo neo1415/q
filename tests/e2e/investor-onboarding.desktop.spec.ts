@@ -256,7 +256,9 @@ test.describe("investor onboarding (desktop, real API)", () => {
     await page.getByRole("button", { name: "Go to Discover" }).click();
     await expect(page).toHaveURL(/\/discover$/);
     await page.goto("/onboarding/investor");
-    await expect(page.getByText("Investor setup is complete.")).toBeVisible();
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Your mandate" }),
+    ).toBeVisible();
 
     // R25: the profile shows the whole mandate as answered, each group
     // with its edit path; an unanswered step reads "Not added", never 0.
