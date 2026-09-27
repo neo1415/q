@@ -583,6 +583,10 @@ describe("the answer is told what this run can do (CQ-QX-008)", () => {
         offers: [
           expect.objectContaining({ destination: "SETTINGS" }),
           expect.objectContaining({ destination: "HOME" }),
+          // Unsend, block, unblock, report (chat) and dismiss a reminder.
+          expect.objectContaining({ destination: "RELATIONSHIPS" }),
+          expect.objectContaining({ destination: "RELATIONSHIPS" }),
+          expect.objectContaining({ destination: "RELATIONSHIPS" }),
           expect.objectContaining({ destination: "RELATIONSHIPS" }),
           expect.objectContaining({ destination: "RELATIONSHIPS" }),
         ],
