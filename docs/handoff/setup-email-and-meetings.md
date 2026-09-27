@@ -7,7 +7,7 @@ tags: [setup, gmail, calendar, meetings, email]
 
 # Setting up email and meetings for Capital Q
 
-This guide is for the founder. It covers the accounts only you can create. Nothing here is built in the app yet: BIZ-007 (Gmail) and BIZ-008 (reminders and meetings) start once these accounts exist.
+This guide is for the founder. It covers the accounts only you can create. **The binding names and addresses are in the 'FINAL SETUP CONTRACT' section at the end; where older steps above differ (Resend, redirect URIs 'to be sent later'), the contract wins.** Nothing here is built in the app yet: BIZ-007 (Gmail) and BIZ-008 (reminders and meetings) start once these accounts exist.
 
 ## What we are building, in plain words
 
@@ -150,3 +150,25 @@ The founder puts the SMTP password in the laptop's `.env.local` as `SUPABASE_SMT
 **Meetings: free.** The Google Calendar API creates the invite with a Google Meet link (`conferenceDataVersion=1`), at no cost. Jitsi Meet (meet.jit.si) is a free no-account alternative link.
 
 **Q joining a meeting:** a bot needs a meeting-bot service. Recall.ai gives 5 free hours, then about $0.50/hour. Open-source Vexa can be self-hosted for free but needs its own server. Build this last.
+
+## FINAL SETUP CONTRACT (2026-09-27): the names BIZ-007/008 must build against
+
+The founder is setting these up now, so the cloud builds to match exactly. Do not rename them.
+
+- Google Cloud project: `Capital Q`, with a **separate** OAuth client for the Gmail and Calendar integration, named `Capital Q workspace`. It is kept apart from the existing Supabase "Continue with Google" sign-in client, so sign-in never asks for mail scopes.
+- Env names:
+  - `GOOGLE_WORKSPACE_CLIENT_ID` and `GOOGLE_WORKSPACE_CLIENT_SECRET`
+  - `GOOGLE_TOKEN_ENCRYPTION_KEY` (32 random bytes, base64): refresh tokens are stored encrypted with it
+  - `GOOGLE_PUBSUB_TOPIC=projects/<project-id>/topics/gmail-replies`
+  - `GOOGLE_PUBSUB_PUSH_AUDIENCE=https://capital-qapi-production.up.railway.app/v1/integrations/google/gmail-push`
+  - `GOOGLE_PUBSUB_PUSH_SERVICE_ACCOUNT=gmail-push@<project-id>.iam.gserviceaccount.com`
+  - These go on Railway `@capital-q/api` AND `@capital-q/workers`, and in the laptop `.env.local`.
+- OAuth redirect URIs (registered on the client):
+  - `https://capital-qapi-production.up.railway.app/v1/integrations/google/callback`
+  - `http://localhost:3001/v1/integrations/google/callback`
+- Scopes: `openid`, `email`, `gmail.send`, `gmail.metadata`, `calendar.events`. Nothing else.
+- Pub/Sub: topic `gmail-replies`, with `gmail-api-push@system.gserviceaccount.com` as Publisher. A push subscription `gmail-replies-push` to the audience URL above, with authentication through service account `gmail-push`; the API verifies the Google-signed OIDC token and its audience. Build a `history.list` polling fallback as well, every 5 min per connected mailbox, so replies still arrive if push is misconfigured.
+- App email (reminders, notifications) uses the same free SMTP as Supabase auth:
+  - env `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_SENDER` on Railway api and workers;
+  - the lead also copies them into the hosted Supabase auth SMTP settings.
+- Meetings: Calendar `events.insert` with `conferenceDataVersion=1` and a `hangoutsMeet` create request; `sendUpdates=all` only after the person approves (Prepare → Approve → Execute).
