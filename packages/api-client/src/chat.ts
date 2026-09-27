@@ -1,5 +1,7 @@
 import {
   CHAT_UNREAD_PATH,
+  ChatAttachmentAccessDtoSchema,
+  RELATIONSHIP_MESSAGE_ATTACHMENT_PATH,
   ChatThreadDtoSchema,
   ChatUnreadDtoSchema,
   IDEMPOTENCY_KEY_HEADER,
@@ -111,4 +113,18 @@ export function unsendChatMessage(
 
 export function getChatUnread(session: ApiSession) {
   return call(session, "GET", CHAT_UNREAD_PATH, ChatUnreadDtoSchema);
+}
+
+/** A one-minute signed read of a shared file or voice note (party only). */
+export function getChatAttachment(
+  session: ApiSession,
+  relationshipId: string,
+  messageId: string,
+) {
+  return call(
+    session,
+    "GET",
+    pathFor(RELATIONSHIP_MESSAGE_ATTACHMENT_PATH, relationshipId, messageId),
+    ChatAttachmentAccessDtoSchema,
+  );
 }

@@ -15,7 +15,15 @@ describe("Supabase signed download", () => {
       supabaseUrl: "https://project.example.invalid",
       secretKey: "disabled-locally-000000000000",
       fetch: (url, init) => {
-        calls.push({ url: String(url), init: init ?? {} });
+        calls.push({
+          url:
+            typeof url === "string"
+              ? url
+              : url instanceof URL
+                ? url.href
+                : url.url,
+          init: init ?? {},
+        });
         return Promise.resolve(
           new Response(
             JSON.stringify({
@@ -35,7 +43,10 @@ describe("Supabase signed download", () => {
     expect(calls[0]?.url).toBe(
       "https://project.example.invalid/storage/v1/object/sign/cq-documents-private/raw/t/abc",
     );
-    expect(JSON.parse(String(calls[0]?.init.body))).toEqual({ expiresIn: 60 });
+    const body = calls[0]?.init.body;
+    expect(typeof body === "string" ? JSON.parse(body) : null).toEqual({
+      expiresIn: 60,
+    });
     expect(file.url).toBe(
       "https://project.example.invalid/storage/v1/object/sign/cq-documents-private/raw/t/abc?token=signed&download=Seed%20deck.pdf",
     );

@@ -62,16 +62,18 @@ The controlling sources say:
   `supabase_realtime` publication under RLS so a server-held realtime
   channel (or an SSE bridge like q-stream over LISTEN/NOTIFY) can replace
   polling without a schema change.
-- Attachments are references to the sender organisation's own documents
-  that went through the existing upload pipeline and scanned CLEAN; the
-  message stores a title/type/size snapshot, never a key or URL, and bytes
-  never pass the app origin. The schema and contract also carry
-  `VOICE_NOTE` (a document reference plus duration), but the upload policy
-  admits no audio type yet, so the web does not record voice notes.
-- Opening a shared file needs a counterpart download path (a short-lived
-  signed read, authorised per thread). None exists in V1 (Evidence returns
-  no download URL by design); it is the next integration point, together
-  with audio admissibility for voice notes.
+- Attachments and voice notes reference the sender organisation's own
+  document, pinned to the exact version shared, after the upload pipeline
+  scanned it CLEAN. The message keeps a title/type/size snapshot, never a
+  key or URL. Voice notes are `audio/webm` or `audio/mp4` (admitted only
+  when name, declared type and bytes agree), scanned and stored, never
+  parsed. A party opens either through a one-minute signed read issued by
+  Evidence; bytes go browser↔storage, never through the app.
+- Read RLS also requires the relationship's projected state to be
+  CONNECTED (defence in depth beside the server's history fold).
+- Until a malware scanner is attached (workers run with no scanner today),
+  no version is ever CLEAN, so nothing can be shared or opened: chat text
+  works everywhere, files and voice notes wait for the scanner.
 - Q: present, but acts only when a person invokes it (@Q or the Ask Q
   button). It reads a thread only for a party (list_messages tool), and
   sends only as a Prepare→Approve `chat.message.send`. Reminders and

@@ -21,6 +21,7 @@ Element.prototype.scrollIntoView = vi.fn();
 
 const askAbout = vi.fn();
 const send = vi.fn<(...args: unknown[]) => Promise<unknown>>();
+const attachment = vi.fn<(...args: unknown[]) => Promise<unknown>>();
 vi.mock("@/components/app-shell/global-q", () => ({
   useGlobalQ: () => ({ askAbout, open: false, setOpen: () => undefined }),
 }));
@@ -30,6 +31,7 @@ vi.mock("@/features/onboarding-kit/material-actions", () => ({
   materialUploadCompleteAction: vi.fn(),
 }));
 vi.mock("../src/features/chat/chat-actions", () => ({
+  chatAttachmentAction: (...args: unknown[]) => attachment(...args),
   chatThreadAction: vi.fn(() =>
     Promise.resolve({ ok: false, kind: "NETWORK", message: "" }),
   ),
@@ -41,6 +43,7 @@ vi.mock("../src/features/chat/chat-actions", () => ({
 
 const { RelationshipChat } =
   await import("../src/features/chat/relationship-chat");
+const { voiceContainer } = await import("../src/features/chat/voice-recorder");
 
 const REL = "00000000-0000-4000-8000-00000000c001";
 const thread = (status: ChatThreadDto["status"]): ChatThreadDto => ({
@@ -141,5 +144,80 @@ describe("RelationshipChat", () => {
     expect(
       screen.getByText(/Messages open once you're connected/),
     ).toBeTruthy();
+  });
+
+  it("plays a voice note from a short-lived read, and opens a file in a new tab", async () => {
+    const base = thread("OPEN").messages[0];
+    if (base === undefined) throw new Error("fixture");
+    const voice = {
+      ...base,
+      messageId: "00000000-0000-4000-8000-00000000d0e1",
+      kind: "VOICE_NOTE" as const,
+      body: null,
+      voiceDurationMs: 7000,
+      attachment: {
+        documentId: "00000000-0000-4000-8000-00000000d0f1",
+        title: "voice-note.webm",
+        mimeType: "audio/webm",
+        sizeBytes: 10,
+      },
+    };
+    const file = {
+      ...base,
+      messageId: "00000000-0000-4000-8000-00000000d0f2",
+      kind: "ATTACHMENT" as const,
+      body: null,
+      attachment: {
+        documentId: "00000000-0000-4000-8000-00000000d0f2",
+        title: "Seed deck",
+        mimeType: "application/pdf",
+        sizeBytes: 10,
+      },
+    };
+    attachment.mockResolvedValue({
+      ok: true,
+      value: {
+        url: "https://storage.example.invalid/object/sign/a?token=t",
+        mimeType: "audio/webm",
+      },
+    });
+    const opened = vi.spyOn(window, "open").mockImplementation(() => null);
+    const { container } = render(
+      <RelationshipChat
+        relationshipId={REL}
+        counterpart="Apex"
+        initial={{ ...thread("OPEN"), messages: [voice, file] }}
+      />,
+    );
+    expect(screen.getByText("0:07")).toBeTruthy();
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /Play voice note/ }));
+      await Promise.resolve();
+    });
+    expect(container.querySelector("audio")?.getAttribute("src")).toContain(
+      "/object/sign/",
+    );
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Open Seed deck" }));
+      await Promise.resolve();
+    });
+    expect(opened).toHaveBeenCalledWith(
+      expect.stringContaining("/object/sign/"),
+      "_blank",
+      "noopener,noreferrer",
+    );
+    opened.mockRestore();
+  });
+
+  it("records into a container the upload admits, or says it can't", () => {
+    expect(voiceContainer((t) => t === "audio/webm")).toEqual({
+      mimeType: "audio/webm",
+      extension: "webm",
+    });
+    expect(voiceContainer((t) => t === "audio/mp4")).toEqual({
+      mimeType: "audio/mp4",
+      extension: "m4a",
+    });
+    expect(voiceContainer(() => false)).toBeNull();
   });
 });

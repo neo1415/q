@@ -6,6 +6,7 @@ import { z } from "zod";
 
 import {
   ApiProblemError,
+  getChatAttachment,
   getChatThread,
   listDocuments,
   markChatRead,
@@ -102,6 +103,11 @@ const SendInput = z.discriminatedUnion("kind", [
     documentId: Id,
     body: ChatMessageBodySchema.optional(),
   }),
+  z.object({
+    kind: z.literal("VOICE_NOTE"),
+    documentId: Id,
+    durationMs: z.number().int().min(1).max(600_000),
+  }),
 ]);
 
 export async function sendChatMessageAction(
@@ -165,4 +171,23 @@ export async function shareableDocumentsAction(): Promise<
       ready: document.currentVersion?.malwareScanStatus === "CLEAN",
     })),
   );
+}
+
+/**
+ * A one-minute signed read of a shared file or voice note. The browser
+ * fetches the bytes from storage directly; the URL is used once and never
+ * kept.
+ */
+export async function chatAttachmentAction(
+  rawRelationshipId: string,
+  rawMessageId: string,
+): Promise<
+  ChatActionResult<{ readonly url: string; readonly mimeType: string }>
+> {
+  const relationshipId = Id.parse(rawRelationshipId);
+  const messageId = Id.parse(rawMessageId);
+  return run(async (session) => {
+    const access = await getChatAttachment(session, relationshipId, messageId);
+    return { url: access.url, mimeType: access.mimeType };
+  });
 }

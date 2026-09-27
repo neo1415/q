@@ -11,7 +11,7 @@ import {
 
 import type { ChatMessageDto, ChatThreadDto } from "@capital-q/contracts";
 import { Button } from "@capital-q/ui/button";
-import { FileText, ICON_SIZE, Upload } from "@capital-q/ui/icons";
+import { FileText, ICON_SIZE, Play, Upload } from "@capital-q/ui/icons";
 
 import { useGlobalQ } from "@/components/app-shell/global-q";
 import { QAperture } from "@/features/q-aperture";
@@ -22,12 +22,14 @@ import {
 import { formatRelationshipDate } from "@/features/relationships/relationship-words";
 
 import {
+  chatAttachmentAction,
   chatThreadAction,
   markChatReadAction,
   sendChatMessageAction,
   shareableDocumentsAction,
   unsendChatMessageAction,
 } from "./chat-actions";
+import { VoiceRecorder } from "./voice-recorder";
 
 /**
  * The 1:1 chat on one relationship (R34; ADR 0019).
@@ -66,6 +68,11 @@ const newKey = () =>
     ? crypto.randomUUID()
     : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
+export function formatDuration(ms: number): string {
+  const seconds = Math.max(1, Math.round(ms / 1000));
+  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
+}
+
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export function RelationshipChat({
@@ -90,6 +97,10 @@ export function RelationshipChat({
     initial === null ? "Messages couldn't load just now." : null,
   );
   const [busy, setBusy] = useState(false);
+  const [playing, setPlaying] = useState<{
+    readonly messageId: string;
+    readonly url: string;
+  } | null>(null);
   const [documents, setDocuments] = useState<
     readonly { id: string; name: string; ready: boolean }[] | null
   >(null);
@@ -150,7 +161,8 @@ export function RelationshipChat({
   const deliver = async (
     message:
       | { kind: "TEXT"; body: string }
-      | { kind: "ATTACHMENT"; documentId: string; body?: string },
+      | { kind: "ATTACHMENT"; documentId: string; body?: string }
+      | { kind: "VOICE_NOTE"; documentId: string; durationMs: number },
   ): Promise<boolean> => {
     const key = newKey();
     for (let attempt = 0; attempt <= CHECK_RETRIES; attempt += 1) {
@@ -206,41 +218,80 @@ export function RelationshipChat({
     }
   };
 
+  /** Browser → private storage through the document pipeline; the new document id. */
+  const uploadToStorage = async (file: File): Promise<string | null> => {
+    const target = await materialUploadTargetAction({
+      documentType: "UNCLASSIFIED",
+      filename: file.name,
+      mimeType: file.type || "application/octet-stream",
+      sizeBytes: file.size,
+    });
+    if (!target.ok) {
+      setNotice(target.message);
+      return null;
+    }
+    // Bytes go from the browser to private storage, never through us.
+    const put = await fetch(target.value.url, {
+      method: target.value.method,
+      headers: target.value.headers,
+      body: file,
+    });
+    if (!put.ok) {
+      setNotice("That file didn't upload. Please try again.");
+      return null;
+    }
+    const done = await materialUploadCompleteAction(
+      target.value.uploadSessionId,
+    );
+    if (!done.ok) {
+      setNotice(done.message);
+      return null;
+    }
+    return done.value.documentId;
+  };
+
+  const sendVoiceNote = async (file: File, durationMs: number) => {
+    setBusy(true);
+    setNotice("Sending your voice note…");
+    try {
+      const documentId = await uploadToStorage(file);
+      if (documentId !== null) {
+        await deliver({ kind: "VOICE_NOTE", documentId, durationMs });
+      }
+    } catch {
+      setNotice("That voice note didn't send. Please try again.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const openAttachment = async (message: ChatMessageDto) => {
+    const result = await chatAttachmentAction(
+      relationshipId,
+      message.messageId,
+    );
+    if (!result.ok) {
+      setNotice(result.message);
+      return;
+    }
+    if (message.kind === "VOICE_NOTE") {
+      setPlaying({ messageId: message.messageId, url: result.value.url });
+    } else {
+      // A one-minute signed read, straight from storage, in a new tab.
+      window.open(result.value.url, "_blank", "noopener,noreferrer");
+    }
+  };
+
   const upload = async (file: File) => {
     setBusy(true);
     setNotice("Uploading…");
     try {
-      const target = await materialUploadTargetAction({
-        documentType: "UNCLASSIFIED",
-        filename: file.name,
-        mimeType: file.type || "application/octet-stream",
-        sizeBytes: file.size,
-      });
-      if (!target.ok) {
-        setNotice(target.message);
-        return;
-      }
-      // Bytes go from the browser to private storage, never through us.
-      const put = await fetch(target.value.url, {
-        method: target.value.method,
-        headers: target.value.headers,
-        body: file,
-      });
-      if (!put.ok) {
-        setNotice("That file didn't upload. Please try again.");
-        return;
-      }
-      const done = await materialUploadCompleteAction(
-        target.value.uploadSessionId,
-      );
-      if (!done.ok) {
-        setNotice(done.message);
-        return;
-      }
+      const documentId = await uploadToStorage(file);
+      if (documentId === null) return;
       const caption = draft.trim();
       const sent = await deliver({
         kind: "ATTACHMENT",
-        documentId: done.value.documentId,
+        documentId,
         ...(caption.length > 0 && !Q_PREFIX.test(caption)
           ? { body: caption }
           : {}),
@@ -349,11 +400,44 @@ export function RelationshipChat({
                   </p>
                 ) : (
                   <>
-                    {message.attachment === null ? null : (
-                      <p className="cq-body-sm flex items-center gap-2 text-(--cq-text-primary)">
-                        <FileText size={ICON_SIZE.compact} aria-hidden="true" />
-                        <span>{message.attachment.title}</span>
-                      </p>
+                    {message.attachment === null ? null : message.kind ===
+                      "VOICE_NOTE" ? (
+                      playing?.messageId === message.messageId ? (
+                        // The signed URL lasts a minute; the element has
+                        // already fetched the bytes by then.
+                        <audio
+                          controls
+                          autoPlay
+                          src={playing.url}
+                          className="max-w-full"
+                          aria-label={`Voice note from ${message.mine ? "you" : message.senderName}`}
+                        />
+                      ) : (
+                        <Button
+                          variant="secondary"
+                          onClick={() => void openAttachment(message)}
+                        >
+                          <Play size={ICON_SIZE.regular} aria-hidden="true" />
+                          Play voice note
+                          {message.voiceDurationMs === null ? null : (
+                            <span className="cq-numeric text-(--cq-text-secondary)">
+                              {formatDuration(message.voiceDurationMs)}
+                            </span>
+                          )}
+                        </Button>
+                      )
+                    ) : (
+                      <Button
+                        variant="quiet"
+                        className="-mx-2 max-w-full justify-start"
+                        onClick={() => void openAttachment(message)}
+                        aria-label={`Open ${message.attachment.title}`}
+                      >
+                        <FileText size={ICON_SIZE.regular} aria-hidden="true" />
+                        <span className="truncate">
+                          {message.attachment.title}
+                        </span>
+                      </Button>
                     )}
                     {message.body === null ? null : (
                       <p className="cq-body whitespace-pre-wrap break-words">
@@ -442,6 +526,13 @@ export function RelationshipChat({
               <FileText size={ICON_SIZE.regular} aria-hidden="true" />
               Share a document
             </Button>
+            <VoiceRecorder
+              disabled={busy}
+              onRecorded={(file, durationMs) =>
+                void sendVoiceNote(file, durationMs)
+              }
+              onError={setNotice}
+            />
             <input
               ref={fileInput}
               type="file"
