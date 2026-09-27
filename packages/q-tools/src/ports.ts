@@ -222,6 +222,72 @@ export type QToolPorts = {
   readonly visibility?: VisibilityIntelligencePort | undefined;
   /** Handle claims for approval (BIZ-004); absent means the tool does not exist. */
   readonly handleClaims?: HandleClaimPort | undefined;
+  /**
+   * Approval by conversation (live test 2026-09-27 #1); absent means the
+   * approve tool does not exist and approval stays on the card.
+   */
+  readonly pendingProposals?: PendingProposalPort | undefined;
+};
+
+/**
+ * A change Q prepared in this conversation, as the Approval Engine holds it
+ * for the person reading it now, in plain terms:
+ *
+ * - PENDING: waiting for their decision; nothing has changed.
+ * - SAVING: approved, the change is being applied.
+ * - SAVED: applied (the action executed).
+ * - NOT_SAVED: approved but the change did not go through.
+ * - DECLINED: they declined it.
+ * - EXPIRED: it lapsed or was withdrawn before a decision; nothing changed.
+ */
+export const PROPOSAL_PLAIN_STATUSES = [
+  "PENDING",
+  "SAVING",
+  "SAVED",
+  "NOT_SAVED",
+  "DECLINED",
+  "EXPIRED",
+] as const;
+export type ProposalPlainStatus = (typeof PROPOSAL_PLAIN_STATUSES)[number];
+
+export type ConversationProposal = {
+  readonly proposalId: string;
+  readonly summary: string;
+  readonly status: ProposalPlainStatus;
+};
+
+/** Who is asking, in which run: the composition resolves the conversation from it. */
+export type PendingProposalContext = {
+  readonly actor: ActorContext;
+  readonly runId: string;
+  readonly correlationId: string;
+};
+
+/**
+ * The proposals of the conversation this run belongs to, and the one way
+ * to approve one of them: the Approval Engine's own approve, exactly as the
+ * card's Approve button calls it (approver authorised, payload hash
+ * recomputed, expiry checked, idempotent on a repeat), followed by the
+ * paused run's resumption, which executes through the execution gate.
+ */
+export type PendingProposalPort = {
+  /**
+   * Every proposal in this run's conversation that is addressed to this
+   * actor, oldest first, with its CURRENT status read from the Approval
+   * Engine as the actor. A proposal the actor may not read is left out.
+   */
+  readonly inConversation: (
+    context: PendingProposalContext,
+  ) => Promise<readonly ConversationProposal[]>;
+  /**
+   * Approves exactly this proposal's stored payload and reports its status
+   * afterwards. CHANGED: the stored payload no longer matches what was
+   * proposed, so nothing was approved.
+   */
+  readonly approve: (
+    context: PendingProposalContext,
+    proposalId: string,
+  ) => Promise<{ readonly status: ProposalPlainStatus | "CHANGED" }>;
 };
 
 /**

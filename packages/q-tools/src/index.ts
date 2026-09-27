@@ -52,8 +52,12 @@ export type {
   InvestorFeedCompany,
   InvestorFeedDecision,
   InvestorFeedPort,
+  ConversationProposal,
   HandleClaimPort,
+  PendingProposalContext,
+  PendingProposalPort,
   ProfileChangePort,
+  ProposalPlainStatus,
   QToolPorts,
   PitchMomentPort,
   RelationshipIntelligencePort,
@@ -67,6 +71,16 @@ export {
   type ProposeHandleClaimInput,
   type ProposeHandleClaimOutput,
 } from "./tools/handle-claim.js";
+export { PROPOSAL_PLAIN_STATUSES } from "./ports.js";
+export {
+  APPROVE_PENDING_OUTCOMES,
+  APPROVE_PENDING_PROPOSAL,
+  ApprovePendingProposalInputSchema,
+  ApprovePendingProposalOutputSchema,
+  createApprovePendingProposalTool,
+  type ApprovePendingProposalInput,
+  type ApprovePendingProposalOutput,
+} from "./tools/pending-proposal.js";
 export {
   createProposeProfileChangeTool,
   FIELDS_BY_PROFILE,

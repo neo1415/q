@@ -223,6 +223,13 @@ export const Q_CAPABILITIES: readonly QCapability[] = Object.freeze([
     "Claims a Capital Q handle and makes the shareable Q Card (with its QR code) for their own company or investor organisation, applied when they approve.",
     { approval: "PREPARE_APPROVE", executes: ["handle.claim"] },
   ),
+  // The person's own decision, relayed: it prepares nothing and executes
+  // only what the Approval Engine already holds for their approval.
+  tool(
+    "approve_pending_proposal",
+    "RECORDS",
+    "Approves, when they say so, the one change Q prepared in this conversation that is waiting for their decision, exactly as the Approve button on its card does.",
+  ),
   tool(
     "propose_share_raise",
     "VISIBILITY",

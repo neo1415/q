@@ -15,6 +15,7 @@ import { createDiscoverySlateTool } from "./tools/discovery-slate.js";
 import { createFindProspectiveInvestorsTool } from "./tools/find-prospective-investors.js";
 import { createRecommendationExplanationTool } from "./tools/recommendation-explanation.js";
 import { createProposeHandleClaimTool } from "./tools/handle-claim.js";
+import { createApprovePendingProposalTool } from "./tools/pending-proposal.js";
 import { createProposeProfileChangeTool } from "./tools/profile-change.js";
 import { createRelationshipTools } from "./tools/relationships.js";
 import { createGetPitchMomentTool } from "./tools/pitch-moment.js";
@@ -72,6 +73,11 @@ export function createDefaultQTools(
     ...(ports.handleClaims === undefined
       ? []
       : [createProposeHandleClaimTool(ports, ports.handleClaims)]),
+    // Approval by conversation: the one waiting change, approved as the
+    // card approves it (live test 2026-09-27 #1).
+    ...(ports.pendingProposals === undefined
+      ? []
+      : [createApprovePendingProposalTool(ports.pendingProposals)]),
   ];
 }
 

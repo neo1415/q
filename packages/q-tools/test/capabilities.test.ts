@@ -39,6 +39,7 @@ const EVERY_PORT: QToolPorts = {
   pitchMoments: STUB,
   visibility: STUB,
   handleClaims: STUB,
+  pendingProposals: STUB,
 };
 
 const EVERY_TOOL = [
@@ -82,6 +83,13 @@ describe("the capability registry is complete", () => {
         // The loop's writes are scoped delegation over the person's own
         // onboarding (ADR 0016), not Approval Engine work.
         expect(capability.approval, providerName).toBe("INSTANT");
+        continue;
+      }
+      if (providerName === "approve_pending_proposal") {
+        // The person's own decision on a change another capability
+        // prepared: it proposes nothing, so it has no action of its own.
+        expect(capability.approval, providerName).toBe("INSTANT");
+        expect(capability.executes, providerName).toEqual([]);
         continue;
       }
       expect(capability.approval, providerName).toBe(
