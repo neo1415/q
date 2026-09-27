@@ -18,6 +18,10 @@ import {
   type SeededInterest,
   type SeededInvestor,
 } from "./accounts.js";
+import {
+  createPostgresSeedAutoVerifier,
+  seedSyntheticAttestation,
+} from "./auto-verify.js";
 import { FICTIONAL_COMPANIES } from "./companies.js";
 import { SeedError, createSeedHttp } from "./http.js";
 import { FICTIONAL_INTERESTS, FICTIONAL_INVESTORS } from "./investors.js";
@@ -141,6 +145,49 @@ async function main(): Promise<number> {
           console.log(l),
         ),
       );
+    }
+
+    // R43, TEMPORARY until BIZ-006 (/ops): decide the seeded companies'
+    // verification requests here, under this run's own attestation, because
+    // hosted workers cannot hold one. TODO(BIZ-006): remove with auto-verify.ts.
+    const environment = process.env["CAPITAL_Q_ENV"];
+    const { attestation, reason } = seedSyntheticAttestation({
+      hosted,
+      environment,
+      databaseUrl,
+      supabaseUrl: target.supabaseUrl,
+      hostedAttested:
+        process.env["CAPITAL_Q_SYNTHETIC_DEMO_ATTESTED"]?.trim() === "true",
+      syntheticProjectRef:
+        process.env["CAPITAL_Q_SYNTHETIC_SUPABASE_PROJECT_REF"],
+    });
+    console.log(
+      attestation === null
+        ? `verification: not attested (${reason ?? "unknown"}); requests stay PENDING`
+        : "verification (synthetic attestation):",
+    );
+    if (attestation !== null) {
+      const autoVerify = createPostgresSeedAutoVerifier(
+        database,
+        attestation,
+        environment,
+      );
+      for (const company of FICTIONAL_COMPANIES) {
+        const seeded = companies.get(company.key);
+        if (seeded === undefined) continue;
+        const actor = await records.actorFor(seeded.authUserId);
+        if (actor.organisationId === undefined) {
+          console.log(`  ${company.name}: founder has no organisation`);
+          continue;
+        }
+        const outcome = await autoVerify({
+          tenantId: actor.tenantId,
+          organisationId: actor.organisationId,
+        });
+        console.log(
+          `  ${company.name}: +${String(outcome.verified)} verified${outcome.refused.length > 0 ? ` · refused ${outcome.refused.join(", ")}` : ""}`,
+        );
+      }
     }
 
     console.log(`investors (${String(FICTIONAL_INVESTORS.length)}):`);

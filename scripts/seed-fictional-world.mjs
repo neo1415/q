@@ -24,10 +24,17 @@
  *   CQ_SEED_DATABASE_URL=<pooler url, sslmode=require>
  *   CQ_SEED_API_URL=https://<hosted api>
  *   CAPITAL_Q_SYNTHETIC_SUPABASE_PROJECT_REF=<ref>
+ *   CAPITAL_Q_SYNTHETIC_DEMO_ATTESTED=true
  *   CQ_SEED_ACCOUNT_PASSWORD=<12+ chars, for the demo accounts>
  *   pnpm seed:fictional -- --hosted
  * --hosted refuses unless the Supabase URL and the database URL are both
  * the project CAPITAL_Q_SYNTHETIC_SUPABASE_PROJECT_REF attests.
+ *
+ * R43 (TEMPORARY until BIZ-006 /ops): with that attestation the seed itself
+ * decides its synthetic founders' verification requests through the
+ * product's own synthetic decider, because hosted workers cannot hold the
+ * attestation. Without it, requests stay PENDING. See
+ * apps/q-api/src/dev/fictional-world/auto-verify.ts.
  *
  * Budget: the seed never calls a model. Every provider key in the child
  * process is still set to a NON-EMPTY disabled value, because an empty one
