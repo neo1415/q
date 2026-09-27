@@ -101,6 +101,7 @@ insert into rls_inventory (schema_name, table_name, classification, authenticate
   ('onboarding', 'interview_questions',    'INTERNAL_SERVER_ONLY', '{}'),
   ('onboarding', 'utterances',             'INTERNAL_SERVER_ONLY', '{}'),
   ('onboarding', 'interview_turns',        'INTERNAL_SERVER_ONLY', '{}'),
+  ('onboarding', 'nudge_states',           'INTERNAL_SERVER_ONLY', '{}'),
   ('onboarding', 'session_creation_requests', 'INTERNAL_SERVER_ONLY', '{}'),
   ('onboarding', 'session_mutation_requests', 'INTERNAL_SERVER_ONLY', '{}'),
   ('evidence', 'sources',                  'INTERNAL_SERVER_ONLY', '{}'),
