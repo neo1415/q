@@ -4,8 +4,13 @@ import { describe, expect, it } from "vitest";
 
 import { createEventRegistry, createJobSchema } from "@capital-q/contracts";
 import {
+  createSlateInvalidationService,
   RECOMMENDATION_REFRESH_QUEUE,
+  REFRESH_TRIGGER_EVENTS,
   RefreshRecommendationSlateJob,
+  refreshDirectiveFor,
+  type RequestRefreshInput,
+  type SlateRepository,
   type BuildSlateResult,
   type RecommendationSlate,
   type RefreshQueue,
@@ -22,6 +27,7 @@ import {
   type ActorContext,
 } from "@capital-q/security";
 
+import { createProductionEventRegistry } from "../src/event-registry.js";
 import { createDomainEventHandler } from "../src/events/document-processing-handler.js";
 import type { QueueClient, QueueMessage } from "../src/queue/pgmq.js";
 import type { BuildPrincipalResolver } from "../src/recommendations/build-principal.js";
@@ -446,5 +452,170 @@ describe("domain events reach the slate invalidation", () => {
       errorCode: "RECOMMENDATION_REFRESH_FAILED",
     });
     expect(logger.lines.some((l) => l.level === "warn")).toBe(true);
+  });
+});
+
+/**
+ * ADR 0019 (c): a company becoming discoverable reaches every CURRENT
+ * slate. The event is the companies context's own, validated by the
+ * production registry, handed to the real directive and the real
+ * invalidation service; the fake stops at the slate store and the
+ * requester, which is where the builder's work is queued.
+ */
+describe("a company becoming discoverable reaches every CURRENT slate", () => {
+  const unused = () => Promise.reject(new Error("unused in this test"));
+  const currentSlate = (investor: string, mandate: string) => ({
+    id: randomUUID(),
+    tenantId: TENANT_A,
+    investorOrganisationId: investor,
+    mandateId: mandate,
+    mandateVersion: 1,
+    mode: "INVESTOR_DISCOVER" as const,
+    status: "CURRENT" as const,
+    eligibilityPolicyVersion: "eligibility.v3",
+    structuredGeneratorVersion: "structured-mandate.v4",
+    semanticGeneratorVersion: null,
+    featureSchemaVersion: "recommendation-features.v1",
+    rankerVersion: "deterministic-ranker.v1",
+    rankingConfigVersion: "ranking-config.v3",
+    taxonomyVersion: null,
+    generationFingerprint: null,
+    itemCount: 0,
+    diagnostics: null,
+    generatedAt: new Date().toISOString(),
+    publishedAt: new Date().toISOString(),
+    expiresAt: new Date(Date.now() + 3_600_000).toISOString(),
+    invalidatedAt: null,
+    invalidationReason: null,
+    supersededAt: null,
+    supersedesSlateId: null,
+    failureCode: null,
+  });
+  const OTHER_INVESTOR = "11111111-0000-4000-8000-000000000014";
+  const OTHER_MANDATE = "33333333-0000-4000-8000-000000000032";
+
+  function harness() {
+    const listed: number[] = [];
+    const slates: SlateRepository = {
+      beginBuild: unused,
+      insertItems: unused,
+      publish: unused,
+      fail: unused,
+      invalidate: () => Promise.resolve(true),
+      expire: unused,
+      findById: unused,
+      findCurrent: unused,
+      findCurrentContaining: () => Promise.resolve([]),
+      findCurrentForInvestor: unused,
+      listCurrent: (limit) => {
+        listed.push(limit);
+        return Promise.resolve([
+          currentSlate(INVESTOR, MANDATE),
+          currentSlate(OTHER_INVESTOR, OTHER_MANDATE),
+        ]);
+      },
+      findItem: unused,
+      pageItems: unused,
+      listHistory: unused,
+    };
+    const requests: RequestRefreshInput[] = [];
+    const invalidation = createSlateInvalidationService({
+      slates,
+      requester: {
+        request: (input) => {
+          requests.push(input);
+          return Promise.resolve({
+            kind: "ENQUEUED",
+            request: {
+              id: randomUUID(),
+              tenantId: input.tenantId,
+              investorOrganisationId: input.investorOrganisationId,
+              mandateId: input.mandateId,
+              mode: input.mode,
+              status: "PENDING",
+              priority: input.priority,
+              reason: input.reason,
+              requestSequence: 1,
+              claimedSequence: null,
+              attempts: 0,
+            },
+          });
+        },
+      },
+    });
+    const handle = createDomainEventHandler({
+      registry: createProductionEventRegistry(),
+      queues: {
+        send: () => Promise.resolve(1),
+        read: () => Promise.resolve([]),
+        remove: () => Promise.resolve(),
+        archive: () => Promise.resolve(),
+        delayVisibility: () => Promise.resolve(),
+      },
+      pipelineVersion: "evidence-processing-v1",
+      recommendations: {
+        onEvent: (event) => invalidation.apply(refreshDirectiveFor(event)),
+      },
+      logger: createRecordingLogger(),
+    });
+    return { handle, requests, listed };
+  }
+
+  const companyEvent = (
+    type: string,
+    data: Record<string, unknown>,
+  ): QueueMessage => {
+    const companyId = randomUUID();
+    return {
+      msgId: 11,
+      readCount: 1,
+      enqueuedAt: new Date().toISOString(),
+      message: {
+        specVersion: "1.0",
+        id: randomUUID(),
+        type,
+        source: "capitalq://api/companies",
+        time: new Date().toISOString(),
+        subject: `company/${companyId}`,
+        dataContentType: "application/json",
+        eventVersion: 1,
+        tenantId: TENANT_A,
+        organisationId: randomUUID(),
+        correlationId: `cor_${randomUUID()}`,
+        aggregate: { type: "company", id: companyId, version: 2 },
+        data: { companyId, version: 2, ...data },
+      },
+    };
+  };
+
+  it("marketplace_ready asks every CURRENT slate's key for a rebuild", async () => {
+    const h = harness();
+    const outcome = await h.handle(
+      companyEvent(REFRESH_TRIGGER_EVENTS.COMPANY_READINESS_CHANGED, {
+        readinessState: "marketplace_ready",
+        policyVersion: "marketplace-readiness.v1",
+      }),
+    );
+    expect(outcome).toEqual({ kind: "ARCHIVE" });
+    expect(h.listed).toHaveLength(1);
+    expect(h.requests.map((r) => [r.investorOrganisationId, r.reason])).toEqual(
+      [
+        [INVESTOR, "COMPANY_READINESS_CHANGED"],
+        [OTHER_INVESTOR, "COMPANY_READINESS_CHANGED"],
+      ],
+    );
+  });
+
+  it("network_visible asks every CURRENT slate's key for a rebuild", async () => {
+    const h = harness();
+    await h.handle(
+      companyEvent(REFRESH_TRIGGER_EVENTS.COMPANY_VISIBILITY_CHANGED, {
+        visibility: "network_visible",
+      }),
+    );
+    expect(h.requests.map((r) => r.mandateId)).toEqual([
+      MANDATE,
+      OTHER_MANDATE,
+    ]);
   });
 });
