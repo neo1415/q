@@ -514,6 +514,20 @@ export function registerOnboardingRoutes(
   const nudges = dependencies.nudges;
   if (nudges !== undefined) {
     const nudgePath = `${ONBOARDING_PATH}${ONBOARDING_NUDGE_SEGMENT}`;
+    // Reading whether today's Home reminder is due changes nothing: a page
+    // render, or a prefetch of it, never uses the day's reminder up. The
+    // POST below claims it, once the card is actually on screen.
+    app.get(
+      `${nudgePath}${ONBOARDING_NUDGE_BRIEFING_SEGMENT}`,
+      { onRequest: withActor },
+      async (request, reply) => {
+        const nudge = await nudges.peek(getOnboardingActor(request).userId, {
+          surface: "BRIEFING",
+        });
+        void reply.header("Cache-Control", "no-store");
+        return OnboardingBriefingNudgeResponseSchema.parse({ nudge });
+      },
+    );
     app.post(
       `${nudgePath}${ONBOARDING_NUDGE_BRIEFING_SEGMENT}`,
       { onRequest: withActor },

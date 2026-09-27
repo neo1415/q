@@ -53,6 +53,10 @@ function build(principal: AuthenticatedPrincipal | null) {
   const app = createApp(parseApiConfig({ NODE_ENV: "test" }), security, {
     onboarding: runtime,
     onboardingNudges: {
+      peek: (userId: UserId, request: { surface: string }) => {
+        calls.push({ method: `peek:${request.surface}`, userId });
+        return Promise.resolve(NUDGE);
+      },
       claimBriefing: (userId: UserId) => {
         calls.push({ method: "claimBriefing", userId });
         return Promise.resolve(NUDGE);
@@ -88,6 +92,17 @@ describe("/v1/onboarding/nudge", () => {
     expect(response.json()).toEqual({ nudge: NUDGE });
     expect(response.headers["cache-control"]).toBe("no-store");
     expect(calls).toEqual([{ method: "claimBriefing", userId: USER_ID }]);
+  });
+
+  it("reads whether today's reminder is due without claiming it", async () => {
+    const { app, calls } = build(PRINCIPAL);
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/onboarding/nudge/briefing",
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({ nudge: NUDGE });
+    expect(calls).toEqual([{ method: "peek:BRIEFING", userId: USER_ID }]);
   });
 
   it("records 'later' and 'stop', and refuses anything else", async () => {

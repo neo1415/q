@@ -274,6 +274,19 @@ export function appendOnboardingInterviewTurns(
 const nudge = `${ONBOARDING_PATH}${ONBOARDING_NUDGE_SEGMENT}`;
 
 /**
+ * `GET /v1/onboarding/nudge/briefing` -- whether a Home setup reminder is
+ * due now. Changes nothing, so a render or prefetch never uses it up.
+ */
+export function peekBriefingOnboardingNudge(session: ApiSession) {
+  return call(
+    session,
+    "GET",
+    `${nudge}${ONBOARDING_NUDGE_BRIEFING_SEGMENT}`,
+    OnboardingBriefingNudgeResponseSchema,
+  );
+}
+
+/**
  * `POST /v1/onboarding/nudge/briefing` -- today's setup reminder for Home,
  * if one is due (recorded as given) or was already given there today.
  */

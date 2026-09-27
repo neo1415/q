@@ -99,6 +99,7 @@ export {
   appendOnboardingInterviewTurns,
   chooseOnboardingNudge,
   claimBriefingOnboardingNudge,
+  peekBriefingOnboardingNudge,
   listOnboardingInterviewTurns,
   sayToOnboarding,
   completeOnboardingSession,
