@@ -9,7 +9,12 @@ import type {
   QVoiceTurnState,
 } from "@capital-q/contracts";
 
-import { readVoiceTurnAction, startVoiceSessionAction } from "./actions";
+import {
+  readVoiceTurnAction,
+  sendVoiceScreenAction,
+  startVoiceSessionAction,
+} from "./actions";
+import { currentScreen } from "../q/screen";
 import { storeVoicePreference, useVoicePreference } from "./voice-preference";
 import { useVoiceSession } from "./use-voice-session";
 import type {
@@ -221,6 +226,8 @@ export function useVoiceInterview(
         ...(thread.organisationHint === undefined
           ? {}
           : { organisationHint: thread.organisationHint }),
+        // R21: the screen the line opens on; moves follow below.
+        screen: currentScreen(),
         voice: chosen,
       });
       if (!started.ok) {
@@ -270,7 +277,16 @@ export function useVoiceInterview(
     }
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
+    // R21: the screen the server has for this line; sent again only when
+    // the person has moved (a route, or the document open in the viewer).
+    let sentScreen = JSON.stringify(currentScreen());
     const tick = async () => {
+      const screen = currentScreen();
+      const screenKey = JSON.stringify(screen);
+      if (screenKey !== sentScreen) {
+        sentScreen = screenKey;
+        void sendVoiceScreenAction(voiceSessionId, screen);
+      }
       const read = await readVoiceTurnAction(voiceSessionId);
       if (cancelled) {
         return;

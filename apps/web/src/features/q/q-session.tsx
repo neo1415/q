@@ -28,8 +28,10 @@ import {
 } from "./active-conversation";
 import { Q_CONVERSATION_PARAM } from "./chats-list";
 import { turnsFrom, workingLabel, type QTurn } from "./conversation";
-import { navigationToFollow } from "./follow-navigation";
+import { performClientAction } from "./client-actions";
+import { followOfTurns } from "./follow-navigation";
 import { useQSubject, type QSubject } from "./q-subject";
+import { setOpenDocument } from "./screen";
 import { spokenNotYetStored, type SpokenLine } from "./spoken";
 import { useQConversation, type QConversation } from "./use-q-conversation";
 
@@ -311,6 +313,10 @@ export function QSessionProvider({
       void voiceEnd();
       return;
     }
+    // R20/R33: theme, reload or their website, carried by Q's answer.
+    if (followed.clientAction !== undefined && followed.clientAction !== null) {
+      performClientAction(followed.clientAction);
+    }
     const path = destinationPath(followed.navigate);
     if (path !== null) {
       act();
@@ -324,6 +330,7 @@ export function QSessionProvider({
    * when the conversation opened is never followed.
    */
   const followedTurns = useRef<Set<string> | null>(null);
+  const voiceActive = voice.active;
   useEffect(() => {
     if (q.loading) {
       followedTurns.current = null;
@@ -335,16 +342,27 @@ export function QSessionProvider({
       );
       return;
     }
-    const path = destinationPath(
-      navigationToFollow(turns, followedTurns.current),
-    );
+    const followed = followOfTurns(turns, followedTurns.current);
+    // While the line is open, a spoken answer's moves are the voice
+    // board's to make, after Q has said them; making them here too would
+    // cut the sentence short and open a website twice.
+    if (voiceActive) return;
+    // R20/R33: the app's own actions the answer carries, done once.
+    for (const action of followed.actions) performClientAction(action);
+    const path = destinationPath(followed.navigate);
     if (path !== null) {
       act();
       router.push(path);
     }
-  }, [turns, q.loading, act, router]);
+  }, [turns, q.loading, act, router, voiceActive]);
 
   const [artifactId, setArtifactId] = useState<string | null>(null);
+  // R21: the document open in the viewer is part of what is on screen,
+  // for typed and spoken turns alike.
+  useEffect(() => {
+    setOpenDocument(artifactId);
+    return () => setOpenDocument(null);
+  }, [artifactId]);
   const openArtifact = useCallback((id: string) => {
     setArtifactId(id);
   }, []);

@@ -8,6 +8,8 @@ import {
   CreateQVoiceSessionResponseSchema,
   QVoiceTurnStateSchema,
   qVoiceTurnPath,
+  qVoiceScreenPath,
+  type QScreenContext,
   Q_VOICE_SESSIONS_PATH,
   IDEMPOTENCY_KEY_HEADER,
   Q_APPROVAL_APPROVE_SUFFIX,
@@ -159,6 +161,31 @@ export function getQVoiceTurnState(
     qVoiceTurnPath(voiceSessionId),
     QVoiceTurnStateSchema,
   );
+}
+
+/** Where the person is now, while the line is open (R21; owner only). 204. */
+export async function setQVoiceScreen(
+  session: ApiSession,
+  voiceSessionId: string,
+  screen: QScreenContext,
+): Promise<void> {
+  const doFetch = session.fetch ?? fetch;
+  const response = await doFetch(
+    `${session.baseUrl.replace(/\/$/, "")}${qVoiceScreenPath(voiceSessionId)}`,
+    {
+      method: "POST",
+      headers: {
+        accept: "application/json",
+        "content-type": "application/json",
+        authorization: `Bearer ${session.accessToken}`,
+      },
+      body: JSON.stringify(screen),
+      cache: "no-store",
+    },
+  );
+  if (!response.ok) {
+    throw await readProblemResponse(response);
+  }
 }
 
 export function createQVoiceSession(

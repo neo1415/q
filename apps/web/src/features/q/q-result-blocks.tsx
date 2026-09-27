@@ -4,6 +4,7 @@ import Link from "next/link";
 
 import {
   qArtifactExportFormats,
+  QWebsiteUrlSchema,
   type QSubjectRef,
   type QUiIntent,
 } from "@capital-q/contracts";
@@ -49,7 +50,13 @@ import type { QTurnObjectBlock } from "./conversation";
  * exists, rather than by shipping a link to a 404 now.
  */
 const INTENT_ROUTES: Readonly<
-  Record<Exclude<QUiIntent["kind"], "NAVIGATE">, string | null>
+  Record<
+    Exclude<
+      QUiIntent["kind"],
+      "NAVIGATE" | "SET_THEME" | "RELOAD_PAGE" | "OPEN_WEBSITE"
+    >,
+    string | null
+  >
 > = {
   OPEN_COMPANY: null,
   FOCUS_SECTION: null,
@@ -61,6 +68,15 @@ function intentHref(intent: QUiIntent): string | null {
   // A named surface, through the same route map spoken navigation uses.
   if (intent.kind === "NAVIGATE") {
     return destinationPath(intent.destination);
+  }
+  // Client actions happen as the answer arrives (client-actions.ts); a
+  // website also gets its own link card below, never an in-app route.
+  if (
+    intent.kind === "SET_THEME" ||
+    intent.kind === "RELOAD_PAGE" ||
+    intent.kind === "OPEN_WEBSITE"
+  ) {
+    return null;
   }
   const route = INTENT_ROUTES[intent.kind];
   if (route === null) {
@@ -77,6 +93,13 @@ function intentHref(intent: QUiIntent): string | null {
   }
 }
 
+/** A website intent's URL, re-validated here: http(s) only, or null. */
+function safeWebsite(intent: QUiIntent): string | null {
+  if (intent.kind !== "OPEN_WEBSITE") return null;
+  const url = QWebsiteUrlSchema.safeParse(intent.url);
+  return url.success ? url.data : null;
+}
+
 function intentLabel(intent: QUiIntent): string {
   switch (intent.kind) {
     case "OPEN_COMPANY":
@@ -89,6 +112,12 @@ function intentLabel(intent: QUiIntent): string {
       return "See the sources";
     case "NAVIGATE":
       return DESTINATION_LABELS[intent.destination];
+    case "SET_THEME":
+      return "Appearance";
+    case "RELOAD_PAGE":
+      return "Reload";
+    case "OPEN_WEBSITE":
+      return "Open the website";
   }
 }
 
@@ -411,6 +440,27 @@ export function QResultBlocks({
           }
 
           case "UI_INTENT": {
+            // Their own website, opened in a new tab as the answer arrived;
+            // the link stays for a browser that blocked the automatic open.
+            const website = safeWebsite(block.intent);
+            if (website !== null) {
+              return (
+                <QResultCard
+                  key={key}
+                  label="Your website"
+                  actions={
+                    <a
+                      href={website}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={buttonClassName("secondary", "compact")}
+                    >
+                      Open {new URL(website).hostname}
+                    </a>
+                  }
+                />
+              );
+            }
             const href = intentHref(block.intent);
             // Ignored rather than guessed, exactly as a spoken
             // destination with no route is.

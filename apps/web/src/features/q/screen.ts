@@ -43,3 +43,27 @@ export function screenOf(pathname: string): QScreenContext {
   }
   return { route: "OTHER" };
 }
+
+/**
+ * The document open in Q's viewer, if any (R21): one per tab, set by the
+ * Q session while its viewer shows it. Part of what is on screen, so a
+ * typed or spoken "what's in this?" is about that document.
+ */
+let openDocumentId: string | null = null;
+
+export function setOpenDocument(documentId: string | null): void {
+  openDocumentId =
+    documentId !== null && UUID.test(documentId)
+      ? documentId.toLowerCase()
+      : null;
+}
+
+/** What is on screen now: the route's context, plus the open document. */
+export function currentScreen(
+  pathname: string = window.location.pathname,
+): QScreenContext {
+  const screen = screenOf(pathname);
+  return openDocumentId === null || screen.documentId !== undefined
+    ? screen
+    : { ...screen, documentId: openDocumentId };
+}

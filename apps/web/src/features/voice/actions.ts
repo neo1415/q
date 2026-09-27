@@ -4,6 +4,7 @@ import {
   ApiProblemError,
   createQVoiceSession,
   getQVoiceTurnState,
+  setQVoiceScreen,
 } from "@capital-q/api-client";
 import { loadWebServerConfig } from "@capital-q/config/web";
 import {
@@ -11,6 +12,7 @@ import {
   type CreateQVoiceSessionRequest,
   type CreateQVoiceSessionResponse,
   type QVoiceTurnState,
+  QScreenContextSchema,
   UuidSchema,
 } from "@capital-q/contracts";
 
@@ -129,6 +131,40 @@ export async function readVoiceTurnAction(
           "I lost the line there. Give me a second and I'll pick it back up.",
       };
     }
+    return translate(error);
+  }
+}
+
+/**
+ * Where the person is now, while the line is open (R21), so a spoken turn
+ * reaches Q with the screen exactly as a typed one does. Best effort: a
+ * screen that fails to arrive only means Q knows the previous one.
+ */
+export async function sendVoiceScreenAction(
+  rawVoiceSessionId: unknown,
+  rawScreen: unknown,
+): Promise<VoiceActionResult<null>> {
+  const id = UuidSchema.safeParse(rawVoiceSessionId);
+  const screen = QScreenContextSchema.safeParse(rawScreen);
+  if (!id.success || !screen.success) {
+    return failure("That screen isn't valid.");
+  }
+  const accessToken = await getSessionAccessToken();
+  if (accessToken === null) {
+    return failure("Please sign in again to continue.");
+  }
+  const { qApiBaseUrl } = loadWebServerConfig();
+  if (qApiBaseUrl === undefined) {
+    return failure("Q isn't connected on this build yet.");
+  }
+  try {
+    await setQVoiceScreen(
+      { baseUrl: qApiBaseUrl, accessToken },
+      id.data,
+      screen.data,
+    );
+    return { ok: true, value: null };
+  } catch (error) {
     return translate(error);
   }
 }

@@ -146,6 +146,7 @@ export {
   listQConversations,
   createQVoiceSession,
   getQVoiceTurnState,
+  setQVoiceScreen,
   getQApproval,
   getQRun,
   rejectQApproval,

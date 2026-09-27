@@ -42,7 +42,13 @@ export function useFollowTurn(
 
   useEffect(() => {
     if (turn === null || turn.sequence <= followed.current) return;
-    if (turn.navigate === null && turn.handoff === null) return;
+    if (
+      turn.navigate === null &&
+      turn.handoff === null &&
+      (turn.clientAction ?? null) === null
+    ) {
+      return;
+    }
     followed.current = turn.sequence;
     const at = Date.now();
     if (timer.current !== null) window.clearTimeout(timer.current);
