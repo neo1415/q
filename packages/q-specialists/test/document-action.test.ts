@@ -57,7 +57,7 @@ const actor = ActorContextSchema.parse({
   actorType: "HUMAN",
 });
 
-function request(): QAnswerRequest {
+function request(subjects: QAnswerRequest["subjects"] = []): QAnswerRequest {
   const runId = randomUUID();
   return {
     runId: runId as QAnswerRequest["runId"],
@@ -66,7 +66,7 @@ function request(): QAnswerRequest {
     actor,
     correlationId: "cor_test",
     capability: "ANSWER",
-    subjects: [],
+    subjects,
     retrieval: { kind: "NOT_CONFIGURED" },
     plan: PermittedContextPlanSchema.parse({
       contractVersion: 1,
@@ -190,6 +190,8 @@ function seam(options: {
   readonly prepareFails?: boolean;
   /** The person's own mandate, as the tool would return it. */
   readonly ownMandate?: GetInvestorMandateOutput | "NOT_AN_INVESTOR" | null;
+  /** The run's subjects (own context adds the founder's own company). */
+  readonly subjects?: QAnswerRequest["subjects"];
 }) {
   const investigated: CompanyIntelligenceRequest[] = [];
   const prepared: Record<string, unknown>[] = [];
@@ -268,7 +270,7 @@ function seam(options: {
     turns,
   });
   return {
-    run: () => answer.answer(request()),
+    run: () => answer.answer(request(options.subjects ?? [])),
     investigated,
     prepared,
     stored,
@@ -529,5 +531,50 @@ describe("gap 3 · a document of the person's own mandate", () => {
       expect(s.stored).toHaveLength(1);
       expect(s.stored[0]?.content).not.toMatch(/which company/i);
     }
+  });
+});
+
+describe('a founder\'s "PDF describing my company" ends on a real PDF card (fake provider, end to end in the seam)', () => {
+  const OWN = "c0000000-0000-4000-8000-00000000000c";
+
+  it("reads their own company from the run, composes a brief, files it, and replies with the card", async () => {
+    const s = seam({
+      history: [message("USER", "give me a PDF describing my company")],
+      reading: {
+        kind: "TOOL_REQUEST",
+        confidence: "HIGH",
+        transcript: "CLEAR",
+        question: null,
+        aboutNamedOther: false,
+        tool: {
+          kind: "PREPARE_DOCUMENT",
+          destination: null,
+          visibility: null,
+          documentType: "INVESTMENT_BRIEF",
+          subjectName: null,
+        },
+      },
+      result: { ...publicResult(DESCRIBED, 3), companyId: OWN },
+      // Own context (CQ-QX-008) binds the founder's company to the run.
+      subjects: [{ kind: "COMPANY", companyId: OWN }],
+    });
+    const outcome = await s.run();
+    expect(outcome.kind).toBe("ANSWERED");
+    // Acted on, never answered as chat, and no "which company?".
+    expect(s.delegated()).toBe(0);
+    expect(s.investigated).toHaveLength(1);
+    expect(JSON.stringify(s.investigated[0]?.company)).toContain(OWN);
+    expect(s.prepared).toHaveLength(1);
+    expect(s.prepared[0]?.["artifactType"]).toBe("INVESTMENT_BRIEF");
+    const reply = s.stored[0];
+    expect(reply?.content).not.toMatch(/which company/i);
+    // The card the web renders, READY, which is what offers the PDF.
+    expect(reply?.blocks).toEqual([
+      expect.objectContaining({
+        kind: "ARTIFACT_REFERENCE",
+        artifactId: ARTIFACT,
+        status: "READY",
+      }),
+    ]);
   });
 });
