@@ -2,7 +2,6 @@ import { z } from "zod";
 
 import {
   ChatMessageBodySchema,
-  UtcTimestampSchema,
   UuidSchema,
   type PermittedContextPlan,
   type QTaskClass,
@@ -30,11 +29,10 @@ import { admitted } from "./relationships.js";
  * non-party, whatever id a model passes.
  *
  * - list_messages reads the thread as it stands (unsent words are gone).
- * - propose_chat_message / propose_reminder / propose_meeting write one
- *   thing: a proposal on this run's board for the Approval Engine. The
- *   message is posted only as the approved `chat.message.send`, as the
- *   approver. Reminders and meetings are prepared the same way; their
- *   execution waits for Calendar (BIZ-008) and says so.
+ * - propose_chat_message writes one thing: a proposal on this run's
+ *   board for the Approval Engine. The message is posted only as the
+ *   approved `chat.message.send`, as the approver. Reminders and meetings
+ *   (BIZ-008) are prepared on the same board by ./schedule.ts.
  */
 
 export const LIST_MESSAGES = "relationship.messages.list" as const;
@@ -44,7 +42,10 @@ export const PROPOSE_MEETING = "relationship.meeting.propose" as const;
 
 export const CHAT_MESSAGE_SEND = "chat.message.send" as const;
 export const REMINDER_CREATE = "reminder.create" as const;
-export const MEETING_PROPOSE = "meeting.propose" as const;
+// BIZ-008 action types (lead-owned action names, for review).
+export const MEETING_SCHEDULE = "meeting.schedule" as const;
+export const MEETING_RESCHEDULE = "meeting.reschedule" as const;
+export const MEETING_CANCEL = "meeting.cancel" as const;
 
 export type ChatProposal =
   | {
@@ -59,21 +60,43 @@ export type ChatProposal =
   | {
       readonly actionType: typeof REMINDER_CREATE;
       readonly payload: {
-        readonly relationshipId: string;
-        readonly counterpartName: string;
+        /** Absent for a personal reminder about no relationship. */
+        readonly relationshipId?: string | undefined;
+        readonly counterpartName?: string | undefined;
         readonly title: string;
         readonly remindAt: string;
         readonly note?: string | undefined;
+        readonly channel: "IN_APP" | "EMAIL";
       };
     }
   | {
-      readonly actionType: typeof MEETING_PROPOSE;
+      readonly actionType: typeof MEETING_SCHEDULE;
       readonly payload: {
         readonly relationshipId: string;
         readonly counterpartName: string;
         readonly purpose: string;
-        readonly proposedStarts: readonly string[];
+        readonly startsAt: string;
         readonly durationMinutes: number;
+        readonly timeZone?: string | undefined;
+      };
+    }
+  | {
+      readonly actionType: typeof MEETING_RESCHEDULE;
+      readonly payload: {
+        readonly meetingId: string;
+        readonly relationshipId: string;
+        readonly purpose: string;
+        readonly startsAt: string;
+        readonly durationMinutes: number;
+      };
+    }
+  | {
+      readonly actionType: typeof MEETING_CANCEL;
+      readonly payload: {
+        readonly meetingId: string;
+        readonly relationshipId: string;
+        readonly purpose: string;
+        readonly startsAt: string;
       };
     };
 
@@ -102,7 +125,7 @@ export type ChatIntelligencePort = {
   }) => "PREPARED" | "ONE_PER_TURN";
 };
 
-const PURPOSES: readonly QTaskClass[] = [
+export const PURPOSES: readonly QTaskClass[] = [
   "OWN_COMPANY_QUESTION",
   "COUNTERPARTY_COMPANY_QUESTION",
   "INVESTOR_QUESTION",
@@ -111,14 +134,14 @@ const PURPOSES: readonly QTaskClass[] = [
   "GENERAL_QUESTION",
 ];
 
-const SCOPES = [
+export const SCOPES = [
   "RELATIONSHIP_CONTEXT",
   "COMPANY_PROFILE",
   "INVESTOR_PROFILE",
   "NETWORK_VISIBLE_DATA",
 ] as const;
 
-const RelationshipRef = {
+export const RelationshipRef = {
   relationshipId: UuidSchema.optional().describe(
     "The relationship's id, when the conversation is about a relationship.",
   ),
@@ -130,7 +153,7 @@ const RelationshipRef = {
   ),
 };
 
-function exactlyOne(input: {
+export function exactlyOne(input: {
   readonly relationshipId?: string | undefined;
   readonly companyId?: string | undefined;
   readonly investorOrganisationId?: string | undefined;
@@ -143,7 +166,7 @@ function exactlyOne(input: {
     ].filter((id) => id !== undefined).length === 1
   );
 }
-const ONE_REF = {
+export const ONE_REF = {
   message:
     "name exactly one of relationshipId, companyId or investorOrganisationId",
 };
@@ -152,7 +175,7 @@ const ONE_REF = {
  * One relationship for this run: bound by the firewall when named by id,
  * or found through an admitted counterparty. Null when neither.
  */
-async function resolveRelationship(
+export async function resolveRelationship(
   input: {
     readonly relationshipId?: string | undefined;
     readonly companyId?: string | undefined;
@@ -301,47 +324,13 @@ export type ProposeChatMessageInput = z.infer<
   typeof ProposeChatMessageInputSchema
 >;
 
-export const ProposeReminderInputSchema = z
-  .object({
-    ...RelationshipRef,
-    title: z
-      .string()
-      .trim()
-      .min(1)
-      .max(200)
-      .describe("What to be reminded of."),
-    remindAt: UtcTimestampSchema.describe("When, as an ISO 8601 UTC time."),
-    note: z.string().trim().max(1000).optional(),
-  })
-  .strict()
-  .refine(exactlyOne, ONE_REF);
-export type ProposeReminderInput = z.infer<typeof ProposeReminderInputSchema>;
-
-export const ProposeMeetingInputSchema = z
-  .object({
-    ...RelationshipRef,
-    purpose: z.string().trim().min(1).max(500),
-    proposedStarts: z
-      .array(UtcTimestampSchema)
-      .min(1)
-      .max(3)
-      .describe("One to three proposed start times, ISO 8601 UTC."),
-    durationMinutes: z.number().int().min(15).max(180),
-  })
-  .strict()
-  .refine(exactlyOne, ONE_REF);
-export type ProposeMeetingInput = z.infer<typeof ProposeMeetingInputSchema>;
-
 type ProposalGrant = {
   readonly relationshipId: string;
   readonly counterpartName: string;
   readonly connected: boolean;
 };
 
-function proposalTool<
-  I extends
-    ProposeChatMessageInput | ProposeReminderInput | ProposeMeetingInput,
->(
+function proposalTool<I extends ProposeChatMessageInput>(
   chat: ChatIntelligencePort,
   relationships: RelationshipIntelligencePort,
   spec: {
@@ -438,44 +427,6 @@ export function createChatTools(
         },
       }),
       summary: (_input, grant) => `Message ${grant.counterpartName}`,
-    }),
-    proposalTool(chat, relationships, {
-      id: PROPOSE_REMINDER,
-      providerName: "propose_reminder",
-      description:
-        "Prepares a reminder about one relationship (for example, to follow up) for the person to approve. It becomes a calendar reminder once Calendar is connected.",
-      input: ProposeReminderInputSchema,
-      requiresConnection: false,
-      proposal: (input, grant) => ({
-        actionType: REMINDER_CREATE,
-        payload: {
-          relationshipId: grant.relationshipId,
-          counterpartName: grant.counterpartName,
-          title: input.title,
-          remindAt: input.remindAt,
-          ...(input.note === undefined ? {} : { note: input.note }),
-        },
-      }),
-      summary: (input) => `Reminder: ${input.title}`,
-    }),
-    proposalTool(chat, relationships, {
-      id: PROPOSE_MEETING,
-      providerName: "propose_meeting",
-      description:
-        "Prepares a meeting proposal with the other side of one connected relationship (purpose, one to three times, length) for the person to approve. It becomes a calendar invite with a Meet link once Calendar is connected.",
-      input: ProposeMeetingInputSchema,
-      requiresConnection: true,
-      proposal: (input, grant) => ({
-        actionType: MEETING_PROPOSE,
-        payload: {
-          relationshipId: grant.relationshipId,
-          counterpartName: grant.counterpartName,
-          purpose: input.purpose,
-          proposedStarts: [...input.proposedStarts],
-          durationMinutes: input.durationMinutes,
-        },
-      }),
-      summary: (_input, grant) => `Meeting with ${grant.counterpartName}`,
     }),
   ];
 }

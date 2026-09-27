@@ -25,6 +25,7 @@ import { createRecordChangeTools } from "./tools/record-changes.js";
 import { createProposeProfileChangeTool } from "./tools/profile-change.js";
 import { createProposeEmailTool } from "./tools/email.js";
 import { createChatTools } from "./tools/chat.js";
+import { createScheduleTools } from "./tools/schedule.js";
 import { createRelationshipTools } from "./tools/relationships.js";
 import { createGetPitchMomentTool } from "./tools/pitch-moment.js";
 import { createVisibilityTools } from "./tools/visibility.js";
@@ -79,6 +80,12 @@ export function createDefaultQTools(
     ...(ports.chat === undefined || ports.relationships === undefined
       ? []
       : createChatTools(ports.chat, ports.relationships)),
+    // BIZ-008: calls and reminders, prepared on the same board.
+    ...(ports.schedule === undefined ||
+    ports.chat === undefined ||
+    ports.relationships === undefined
+      ? []
+      : createScheduleTools(ports.schedule, ports.chat, ports.relationships)),
     // BIZ-002: every profile field the page edits, Q can prepare.
     ...(ports.profileChanges === undefined
       ? []

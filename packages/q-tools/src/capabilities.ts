@@ -532,19 +532,40 @@ export const Q_CAPABILITIES: readonly QCapability[] = Object.freeze([
     "Drafts a chat message to the other side of a connected relationship, optionally sharing one of their own documents; it is posted as them when they approve.",
     { approval: "PREPARE_APPROVE", executes: ["chat.message.send"] },
   ),
+  // --- end R34 ------------------------------------------------------------
+  // --- BIZ-008 meetings + reminders (B8 worker block; keep together) -----
   tool(
-    "propose_reminder",
+    "find_meeting_times",
     "RELATIONSHIP",
-    "Prepares a reminder about a relationship for them to approve; it becomes a calendar reminder once Calendar is connected.",
-    { approval: "PREPARE_APPROVE", executes: ["reminder.create"] },
+    "Finds three free times for a call with the other side of a relationship, from their own Google Calendar, in their working hours and time zone.",
   ),
   tool(
     "propose_meeting",
     "RELATIONSHIP",
-    "Prepares a meeting proposal (purpose, times, length) with the other side of a connected relationship for them to approve; it becomes a calendar invite with a Meet link once Calendar is connected.",
-    { approval: "PREPARE_APPROVE", executes: ["meeting.propose"] },
+    "Prepares a call with the other side of a connected relationship at one time; when they approve, a Google Calendar invite with a Meet link goes to the other side's people.",
+    { approval: "PREPARE_APPROVE", executes: ["meeting.schedule"] },
   ),
-  // --- end R34 ------------------------------------------------------------
+  tool(
+    "propose_meeting_change",
+    "RELATIONSHIP",
+    "Moves or cancels a call they organised, updating the calendar invite for everyone when they approve.",
+    {
+      approval: "PREPARE_APPROVE",
+      executes: ["meeting.reschedule", "meeting.cancel"],
+    },
+  ),
+  tool(
+    "propose_reminder",
+    "RELATIONSHIP",
+    "Prepares a reminder (about a relationship or anything else) for them to approve; when due it shows in Needs you and by email.",
+    { approval: "PREPARE_APPROVE", executes: ["reminder.create"] },
+  ),
+  tool(
+    "list_schedule",
+    "RELATIONSHIP",
+    "Reads their upcoming calls (with the prep brief, ready 24 hours before) and open reminders.",
+  ),
+  // --- end BIZ-008 ----------------------------------------------------------
   tool(
     "list_incoming_interest",
     "RELATIONSHIP",

@@ -206,13 +206,13 @@ export {
   LIST_MESSAGES,
   ListMessagesInputSchema,
   ListMessagesOutputSchema,
-  MEETING_PROPOSE,
+  MEETING_CANCEL,
+  MEETING_RESCHEDULE,
+  MEETING_SCHEDULE,
   PROPOSE_CHAT_MESSAGE,
   PROPOSE_MEETING,
   PROPOSE_REMINDER,
   ProposeChatMessageInputSchema,
-  ProposeMeetingInputSchema,
-  ProposeReminderInputSchema,
   REMINDER_CREATE,
   type ChatIntelligencePort,
   type ChatProposal,
@@ -220,9 +220,23 @@ export {
   type ListMessagesInput,
   type ListMessagesOutput,
   type ProposeChatMessageInput,
+} from "./tools/chat.js";
+// BIZ-008: meetings and reminders.
+export {
+  createScheduleTools,
+  FIND_MEETING_TIMES,
+  FindMeetingTimesInputSchema,
+  FindMeetingTimesOutputSchema,
+  LIST_SCHEDULE,
+  PROPOSE_MEETING_CHANGE,
+  ProposeMeetingChangeInputSchema,
+  ProposeMeetingInputSchema,
+  ProposeReminderInputSchema,
+  type ProposeMeetingChangeInput,
   type ProposeMeetingInput,
   type ProposeReminderInput,
-} from "./tools/chat.js";
+  type ScheduleIntelligencePort,
+} from "./tools/schedule.js";
 export {
   createProposeEmailTool,
   PROPOSE_EMAIL,

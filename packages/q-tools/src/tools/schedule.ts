@@ -1,0 +1,718 @@
+import { z } from "zod";
+
+import {
+  Q_TASK_CLASSES,
+  UtcTimestampSchema,
+  UuidSchema,
+  type PermittedContextPlan,
+} from "@capital-q/contracts";
+import type { ActorContext } from "@capital-q/security";
+
+import {
+  allow,
+  defineQTool,
+  deny,
+  type AnyQToolDefinition,
+} from "../definition.js";
+import { actorWideScope } from "../plan.js";
+import type { RelationshipIntelligencePort } from "../ports.js";
+import {
+  ChatProposalOutputSchema,
+  exactlyOne,
+  MEETING_CANCEL,
+  MEETING_RESCHEDULE,
+  MEETING_SCHEDULE,
+  ONE_REF,
+  PROPOSE_MEETING,
+  PROPOSE_REMINDER,
+  PURPOSES,
+  REMINDER_CREATE,
+  RelationshipRef,
+  resolveRelationship,
+  SCOPES,
+  type ChatIntelligencePort,
+  type ChatProposalOutput,
+} from "./chat.js";
+
+/**
+ * Meetings and reminders for Q (BIZ-008; R11, R14, R33: "set up a call with
+ * X next week", "remind me Friday to follow up", by text and by voice).
+ *
+ * - find_meeting_times reads three free times from the person's own
+ *   calendar for one relationship Q may discuss this run.
+ * - propose_meeting prepares `meeting.schedule` (one exact time) on the
+ *   run's board; the invite goes out only when the person approves it.
+ * - propose_meeting_change prepares `meeting.reschedule` / `meeting.cancel`
+ *   for a call they organised.
+ * - propose_reminder prepares `reminder.create`, about a relationship or
+ *   about nothing in particular.
+ * - list_schedule reads their own calls (with any prep brief that is
+ *   ready) and open reminders.
+ *
+ * Nothing here books, sends or writes. The Approval Engine executes, and
+ * its authorize steps check the party and the organiser again.
+ */
+
+export const FIND_MEETING_TIMES = "relationship.meeting.find_times" as const;
+export const PROPOSE_MEETING_CHANGE = "relationship.meeting.change" as const;
+export const LIST_SCHEDULE = "schedule.list" as const;
+
+type Refusal =
+  | "NOT_A_PARTY"
+  | "NOT_CONNECTED"
+  | "CALENDAR_NOT_CONNECTED"
+  | "NO_RECIPIENTS"
+  | "NOT_FOUND"
+  | "NOT_ORGANISER"
+  | "CANCELLED"
+  | "INVALID_TIME"
+  | "UNAVAILABLE";
+
+/** The schedule as Q may see it, for the invoker only. */
+export type ScheduleIntelligencePort = {
+  readonly findSlots: (
+    actor: ActorContext,
+    input: {
+      readonly relationshipId: string;
+      readonly durationMinutes: number;
+      readonly from?: Date | undefined;
+      readonly to?: Date | undefined;
+      readonly timeZone?: string | undefined;
+    },
+  ) => Promise<
+    | {
+        readonly status: "OK";
+        readonly timeZone: string;
+        readonly slots: readonly { readonly start: Date; readonly end: Date }[];
+      }
+    | { readonly status: Refusal }
+  >;
+  /** Their own upcoming calls and open reminders. */
+  readonly upcoming: (actor: ActorContext) => Promise<{
+    readonly meetings: readonly {
+      readonly id: string;
+      readonly relationshipId: string;
+      readonly purpose: string;
+      readonly startsAt: string;
+      readonly endsAt: string;
+      readonly timeZone: string;
+      readonly organisedByYou: boolean;
+      readonly attendees: readonly string[];
+      readonly hasBrief: boolean;
+    }[];
+    readonly reminders: readonly {
+      readonly id: string;
+      readonly title: string;
+      readonly dueAt: string;
+      readonly relationshipId: string | null;
+    }[];
+  }>;
+  /** A call they organised, or null. */
+  readonly organisedMeeting: (
+    actor: ActorContext,
+    meetingId: string,
+  ) => Promise<{
+    readonly id: string;
+    readonly relationshipId: string;
+    readonly purpose: string;
+    readonly startsAt: string;
+    readonly endsAt: string;
+    readonly status: string;
+  } | null>;
+  readonly brief: (
+    actor: ActorContext,
+    meetingId: string,
+  ) => Promise<string | null>;
+};
+
+const TimeZone = z
+  .string()
+  .regex(/^[A-Za-z]+(\/[A-Za-z0-9_+-]+){0,2}$/)
+  .max(64);
+const Duration = z.number().int().min(15).max(180);
+
+function ownConversation(actor: ActorContext, plan: PermittedContextPlan) {
+  if (actor.actorType !== "HUMAN") return false;
+  const scope = actorWideScope(plan, "OWN_Q_CONVERSATION");
+  return scope !== undefined && scope.filter.userId === actor.userId;
+}
+
+function localLabel(instant: Date, timeZone: string): string {
+  try {
+    return new Intl.DateTimeFormat("en-GB", {
+      timeZone,
+      weekday: "short",
+      day: "numeric",
+      month: "short",
+      hour: "2-digit",
+      minute: "2-digit",
+    }).format(instant);
+  } catch {
+    return instant.toISOString();
+  }
+}
+
+// --- find_meeting_times ----------------------------------------------------
+
+export const FindMeetingTimesInputSchema = z
+  .object({
+    ...RelationshipRef,
+    durationMinutes: Duration.default(30).describe("Length, 15-180 minutes."),
+    from: UtcTimestampSchema.optional().describe(
+      "Start of the window to search, ISO 8601 UTC (e.g. next Monday 00:00 in their zone). Default: now.",
+    ),
+    to: UtcTimestampSchema.optional().describe(
+      "End of the window, ISO 8601 UTC. Default: seven days after `from`.",
+    ),
+    timeZone: TimeZone.optional().describe(
+      "Their IANA time zone, if they said one; otherwise their calendar's.",
+    ),
+  })
+  .strict()
+  .refine(exactlyOne, ONE_REF);
+export type FindMeetingTimesInput = z.input<typeof FindMeetingTimesInputSchema>;
+
+export const FindMeetingTimesOutputSchema = z
+  .object({
+    status: z.enum([
+      "OK",
+      "NOT_CONNECTED",
+      "CALENDAR_NOT_CONNECTED",
+      "UNAVAILABLE",
+    ]),
+    counterpartName: z.string(),
+    timeZone: z.string().nullable(),
+    slots: z
+      .array(
+        z
+          .object({
+            startsAt: z.string(),
+            endsAt: z.string(),
+            local: z.string(),
+          })
+          .strict(),
+      )
+      .max(3),
+    guidance: z.string(),
+  })
+  .strict();
+export type FindMeetingTimesOutput = z.infer<
+  typeof FindMeetingTimesOutputSchema
+>;
+
+type RelationshipGrant = {
+  readonly relationshipId: string;
+  readonly counterpartName: string;
+  readonly connected: boolean;
+};
+
+async function relationshipGrant(
+  input: {
+    readonly relationshipId?: string | undefined;
+    readonly companyId?: string | undefined;
+    readonly investorOrganisationId?: string | undefined;
+  },
+  actor: ActorContext,
+  plan: PermittedContextPlan,
+  chat: ChatIntelligencePort,
+  relationships: RelationshipIntelligencePort,
+): Promise<RelationshipGrant | null> {
+  const relationshipId = await resolveRelationship(
+    input,
+    actor,
+    plan,
+    relationships,
+  );
+  if (relationshipId === null) return null;
+  const thread = await chat.thread(actor, relationshipId);
+  if (thread === null) return null;
+  return {
+    relationshipId,
+    counterpartName: thread.counterpartName,
+    connected: thread.connected,
+  };
+}
+
+const GUIDANCE: Readonly<Record<string, string>> = {
+  OK: "Offer these times in their zone and ask which one; then prepare it with propose_meeting.",
+  NOT_CONNECTED:
+    "Calls open once they are connected with them: interest expressed and accepted.",
+  CALENDAR_NOT_CONNECTED:
+    "Their Google account is not connected with Calendar. Offer to take them to Settings to connect Google.",
+  UNAVAILABLE: "Their calendar could not be read just now; try again shortly.",
+};
+
+function createFindMeetingTimesTool(
+  schedule: ScheduleIntelligencePort,
+  chat: ChatIntelligencePort,
+  relationships: RelationshipIntelligencePort,
+): AnyQToolDefinition {
+  return defineQTool<
+    z.output<typeof FindMeetingTimesInputSchema>,
+    FindMeetingTimesOutput,
+    RelationshipGrant
+  >({
+    id: FIND_MEETING_TIMES,
+    version: 1,
+    status: "ACTIVE",
+    providerName: "find_meeting_times",
+    description:
+      "Finds three free times for a call with the other side of one relationship, from the person's own Google Calendar (and the other side's busy times where they connected theirs), inside working hours in the person's time zone. Use it first when they ask to set up a call or meeting.",
+    classification: "READ_ONLY",
+    riskClass: "SAFE_READ",
+    requiredCapabilities: [],
+    supportedPurposes: [...PURPOSES],
+    requiredScopeKinds: [...SCOPES],
+    approval: "NONE",
+    idempotency: "SAFE_TO_REPEAT",
+    owner: "q-tools",
+    visibleStage: "REVIEWING_RELATIONSHIP",
+    input: FindMeetingTimesInputSchema,
+    output: FindMeetingTimesOutputSchema,
+    authorize: async (input, { actor, plan }) => {
+      try {
+        const grant = await relationshipGrant(
+          input,
+          actor,
+          plan,
+          chat,
+          relationships,
+        );
+        return grant === null
+          ? deny("NOT_AVAILABLE")
+          : allow("CONFIDENTIAL", grant);
+      } catch {
+        return deny("NOT_AVAILABLE");
+      }
+    },
+    execute: async (input, context, grant) => {
+      const found = await schedule.findSlots(context.actor, {
+        relationshipId: grant.relationshipId,
+        durationMinutes: input.durationMinutes,
+        from: input.from === undefined ? undefined : new Date(input.from),
+        to: input.to === undefined ? undefined : new Date(input.to),
+        timeZone: input.timeZone,
+      });
+      if (found.status !== "OK") {
+        const status =
+          found.status === "NOT_CONNECTED" ||
+          found.status === "CALENDAR_NOT_CONNECTED"
+            ? found.status
+            : "UNAVAILABLE";
+        return {
+          status,
+          counterpartName: grant.counterpartName,
+          timeZone: null,
+          slots: [],
+          guidance: GUIDANCE[status] ?? "",
+        };
+      }
+      return {
+        status: "OK",
+        counterpartName: grant.counterpartName,
+        timeZone: found.timeZone,
+        slots: found.slots.map((slot) => ({
+          startsAt: slot.start.toISOString(),
+          endsAt: slot.end.toISOString(),
+          local: localLabel(slot.start, found.timeZone),
+        })),
+        guidance:
+          found.slots.length === 0
+            ? "No free time in that window; offer a wider one."
+            : (GUIDANCE.OK ?? ""),
+      };
+    },
+  });
+}
+
+// --- propose_meeting --------------------------------------------------------
+
+export const ProposeMeetingInputSchema = z
+  .object({
+    ...RelationshipRef,
+    purpose: z
+      .string()
+      .trim()
+      .min(1)
+      .max(500)
+      .describe("What the call is for; it becomes the invite's title."),
+    startsAt: UtcTimestampSchema.describe(
+      "The one start time they chose, ISO 8601 UTC (usually one of find_meeting_times' slots).",
+    ),
+    durationMinutes: Duration,
+    timeZone: TimeZone.optional(),
+  })
+  .strict()
+  .refine(exactlyOne, ONE_REF);
+export type ProposeMeetingInput = z.infer<typeof ProposeMeetingInputSchema>;
+
+// --- propose_meeting_change ---------------------------------------------------
+
+export const ProposeMeetingChangeInputSchema = z
+  .object({
+    meetingId: UuidSchema.describe(
+      "A call they organised, by id from list_schedule.",
+    ),
+    change: z.enum(["RESCHEDULE", "CANCEL"]),
+    startsAt: UtcTimestampSchema.optional().describe(
+      "RESCHEDULE only: the new start, ISO 8601 UTC.",
+    ),
+    durationMinutes: Duration.optional(),
+  })
+  .strict()
+  .refine(
+    (input) =>
+      (input.change === "RESCHEDULE") === (input.startsAt !== undefined),
+    {
+      message: "startsAt is required to reschedule and not allowed to cancel",
+    },
+  );
+export type ProposeMeetingChangeInput = z.infer<
+  typeof ProposeMeetingChangeInputSchema
+>;
+
+type MeetingGrant = NonNullable<
+  Awaited<ReturnType<ScheduleIntelligencePort["organisedMeeting"]>>
+>;
+
+// --- propose_reminder ---------------------------------------------------------
+
+export const ProposeReminderInputSchema = z
+  .object({
+    ...RelationshipRef,
+    title: z
+      .string()
+      .trim()
+      .min(1)
+      .max(200)
+      .describe("What to be reminded of, in their words."),
+    remindAt: UtcTimestampSchema.describe(
+      "When, as an ISO 8601 UTC time (e.g. Friday 09:00 in their zone).",
+    ),
+    note: z.string().trim().max(1000).optional(),
+    byEmail: z
+      .boolean()
+      .default(true)
+      .describe(
+        "Also email it to them when due (it always shows in Needs you).",
+      ),
+  })
+  .strict()
+  .refine(
+    (input) =>
+      [
+        input.relationshipId,
+        input.companyId,
+        input.investorOrganisationId,
+      ].filter((id) => id !== undefined).length <= 1,
+    {
+      message:
+        "name at most one of relationshipId, companyId or investorOrganisationId",
+    },
+  );
+export type ProposeReminderInput = z.output<typeof ProposeReminderInputSchema>;
+
+type ReminderGrant = {
+  readonly relationship: RelationshipGrant | null;
+};
+
+// --- list_schedule / get_meeting_brief ------------------------------------------
+
+export const ListScheduleInputSchema = z.object({}).strict();
+export const ListScheduleOutputSchema = z
+  .object({
+    meetings: z.array(
+      z
+        .object({
+          id: z.string(),
+          relationshipId: z.string(),
+          purpose: z.string(),
+          startsAt: z.string(),
+          local: z.string(),
+          organisedByYou: z.boolean(),
+          with: z.array(z.string()),
+          brief: z.string().nullable(),
+        })
+        .strict(),
+    ),
+    reminders: z.array(
+      z
+        .object({
+          id: z.string(),
+          title: z.string(),
+          dueAt: z.string(),
+          relationshipId: z.string().nullable(),
+        })
+        .strict(),
+    ),
+  })
+  .strict();
+export type ListScheduleOutput = z.infer<typeof ListScheduleOutputSchema>;
+
+type OwnGrant = { readonly actor: ActorContext };
+
+// --- the catalogue ----------------------------------------------------------------
+
+export function createScheduleTools(
+  schedule: ScheduleIntelligencePort,
+  chat: ChatIntelligencePort,
+  relationships: RelationshipIntelligencePort,
+): readonly AnyQToolDefinition[] {
+  const proposal = {
+    version: 1,
+    status: "ACTIVE",
+    classification: "SIDE_EFFECT",
+    riskClass: "LOW_RISK_INTERNAL",
+    requiredCapabilities: [],
+    approval: "NONE",
+    idempotency: "SAFE_TO_REPEAT",
+    owner: "q-tools",
+    visibleStage: "WAITING_FOR_APPROVAL",
+    output: ChatProposalOutputSchema,
+  } as const;
+
+  const prepare = (
+    context: { readonly runId: string; readonly actor: ActorContext },
+    entry: Parameters<
+      ChatIntelligencePort["prepareForApproval"]
+    >[0]["proposal"],
+    summary: string,
+  ): ChatProposalOutput => ({
+    status: chat.prepareForApproval({
+      runId: context.runId,
+      tenantId: context.actor.tenantId,
+      actorUserId: context.actor.userId,
+      proposal: entry,
+    }),
+    awaitingApprovalOf: summary,
+  });
+
+  return [
+    createFindMeetingTimesTool(schedule, chat, relationships),
+
+    defineQTool<ProposeMeetingInput, ChatProposalOutput, RelationshipGrant>({
+      ...proposal,
+      id: PROPOSE_MEETING,
+      providerName: "propose_meeting",
+      description:
+        "Prepares a call with the other side of one connected relationship at one exact time, for the person to approve. On approval it becomes a Google Calendar invite with a Meet link, sent from their calendar to the other side's people. Use find_meeting_times first unless they named a time.",
+      supportedPurposes: [...PURPOSES],
+      requiredScopeKinds: [...SCOPES],
+      input: ProposeMeetingInputSchema,
+      authorize: async (input, { actor, plan }) => {
+        try {
+          const grant = await relationshipGrant(
+            input,
+            actor,
+            plan,
+            chat,
+            relationships,
+          );
+          return grant === null
+            ? deny("NOT_AVAILABLE")
+            : allow("CONFIDENTIAL", grant);
+        } catch {
+          return deny("NOT_AVAILABLE");
+        }
+      },
+      execute: (input, context, grant) =>
+        Promise.resolve(
+          !grant.connected
+            ? {
+                status: "NOT_CONNECTED" as const,
+                awaitingApprovalOf:
+                  "Calls open once you're connected with them: interest expressed and accepted.",
+              }
+            : prepare(
+                context,
+                {
+                  actionType: MEETING_SCHEDULE,
+                  payload: {
+                    relationshipId: grant.relationshipId,
+                    counterpartName: grant.counterpartName,
+                    purpose: input.purpose,
+                    startsAt: input.startsAt,
+                    durationMinutes: input.durationMinutes,
+                    ...(input.timeZone === undefined
+                      ? {}
+                      : { timeZone: input.timeZone }),
+                  },
+                },
+                `Call with ${grant.counterpartName}`,
+              ),
+        ),
+    }),
+
+    defineQTool<ProposeMeetingChangeInput, ChatProposalOutput, MeetingGrant>({
+      ...proposal,
+      id: PROPOSE_MEETING_CHANGE,
+      providerName: "propose_meeting_change",
+      description:
+        "Prepares moving (RESCHEDULE, with the new start) or cancelling (CANCEL) a call the person organised, for them to approve. On approval the Google Calendar event is updated or deleted and everyone invited is told.",
+      supportedPurposes: [...Q_TASK_CLASSES],
+      requiredScopeKinds: ["OWN_Q_CONVERSATION"],
+      input: ProposeMeetingChangeInputSchema,
+      authorize: async (input, { actor, plan }) => {
+        if (!ownConversation(actor, plan)) return deny("NOT_AVAILABLE");
+        const meeting = await schedule
+          .organisedMeeting(actor, input.meetingId)
+          .catch(() => null);
+        return meeting === null || meeting.status !== "SCHEDULED"
+          ? deny("NOT_AVAILABLE")
+          : allow("CONFIDENTIAL", meeting);
+      },
+      execute: (input, context, meeting) =>
+        Promise.resolve(
+          input.change === "CANCEL" || input.startsAt === undefined
+            ? prepare(
+                context,
+                {
+                  actionType: MEETING_CANCEL,
+                  payload: {
+                    meetingId: meeting.id,
+                    relationshipId: meeting.relationshipId,
+                    purpose: meeting.purpose,
+                    startsAt: meeting.startsAt,
+                  },
+                },
+                `Cancel: ${meeting.purpose}`,
+              )
+            : prepare(
+                context,
+                {
+                  actionType: MEETING_RESCHEDULE,
+                  payload: {
+                    meetingId: meeting.id,
+                    relationshipId: meeting.relationshipId,
+                    purpose: meeting.purpose,
+                    startsAt: input.startsAt,
+                    durationMinutes:
+                      input.durationMinutes ??
+                      Math.round(
+                        (Date.parse(meeting.endsAt) -
+                          Date.parse(meeting.startsAt)) /
+                          60_000,
+                      ),
+                  },
+                },
+                `Move: ${meeting.purpose}`,
+              ),
+        ),
+    }),
+
+    defineQTool<ProposeReminderInput, ChatProposalOutput, ReminderGrant>({
+      ...proposal,
+      id: PROPOSE_REMINDER,
+      providerName: "propose_reminder",
+      description:
+        "Prepares a reminder for the person (optionally about one relationship), for them to approve. When due it shows in Needs you and, unless they say not to, arrives by email.",
+      supportedPurposes: [...Q_TASK_CLASSES],
+      requiredScopeKinds: ["OWN_Q_CONVERSATION", ...SCOPES],
+      input: ProposeReminderInputSchema,
+      authorize: async (input, { actor, plan }) => {
+        if (actor.actorType !== "HUMAN") return deny("NOT_AVAILABLE");
+        const named =
+          input.relationshipId !== undefined ||
+          input.companyId !== undefined ||
+          input.investorOrganisationId !== undefined;
+        if (!named) {
+          return ownConversation(actor, plan)
+            ? allow("INTERNAL", { relationship: null })
+            : deny("NOT_AVAILABLE");
+        }
+        try {
+          const grant = await relationshipGrant(
+            input,
+            actor,
+            plan,
+            chat,
+            relationships,
+          );
+          return grant === null
+            ? deny("NOT_AVAILABLE")
+            : allow("CONFIDENTIAL", { relationship: grant });
+        } catch {
+          return deny("NOT_AVAILABLE");
+        }
+      },
+      execute: (input, context, grant) =>
+        Promise.resolve(
+          prepare(
+            context,
+            {
+              actionType: REMINDER_CREATE,
+              payload: {
+                ...(grant.relationship === null
+                  ? {}
+                  : {
+                      relationshipId: grant.relationship.relationshipId,
+                      counterpartName: grant.relationship.counterpartName,
+                    }),
+                title: input.title,
+                remindAt: input.remindAt,
+                ...(input.note === undefined ? {} : { note: input.note }),
+                channel: input.byEmail ? "EMAIL" : "IN_APP",
+              },
+            },
+            `Reminder: ${input.title}`,
+          ),
+        ),
+    }),
+
+    defineQTool<
+      z.infer<typeof ListScheduleInputSchema>,
+      ListScheduleOutput,
+      OwnGrant
+    >({
+      id: LIST_SCHEDULE,
+      version: 1,
+      status: "ACTIVE",
+      providerName: "list_schedule",
+      description:
+        "Reads the person's own upcoming calls (with whom, when, whether they organised it, and the prep brief once it is ready, 24 hours before) and their open reminders.",
+      classification: "READ_ONLY",
+      riskClass: "SAFE_READ",
+      requiredCapabilities: [],
+      supportedPurposes: [...Q_TASK_CLASSES],
+      requiredScopeKinds: ["OWN_Q_CONVERSATION"],
+      approval: "NONE",
+      idempotency: "SAFE_TO_REPEAT",
+      owner: "q-tools",
+      visibleStage: null,
+      input: ListScheduleInputSchema,
+      output: ListScheduleOutputSchema,
+      authorize: (_input, { actor, plan }) =>
+        Promise.resolve(
+          ownConversation(actor, plan)
+            ? allow<OwnGrant>("CONFIDENTIAL", { actor })
+            : deny<OwnGrant>("NOT_AVAILABLE"),
+        ),
+      execute: async (_input, _context, grant) => {
+        const own = await schedule.upcoming(grant.actor);
+        const meetings = own.meetings.slice(0, 20);
+        const briefs = await Promise.all(
+          meetings.map((meeting, index) =>
+            meeting.hasBrief && index < 3
+              ? schedule.brief(grant.actor, meeting.id)
+              : Promise.resolve(null),
+          ),
+        );
+        return {
+          meetings: meetings.map((meeting, index) => ({
+            id: meeting.id,
+            relationshipId: meeting.relationshipId,
+            purpose: meeting.purpose,
+            startsAt: meeting.startsAt,
+            local: localLabel(new Date(meeting.startsAt), meeting.timeZone),
+            organisedByYou: meeting.organisedByYou,
+            with: [...meeting.attendees],
+            brief: briefs[index] ?? null,
+          })),
+          reminders: own.reminders.slice(0, 30).map((reminder) => ({
+            ...reminder,
+          })),
+        };
+      },
+    }),
+  ];
+}

@@ -22,6 +22,7 @@ import type {
 import type { ActorContext, AuthorizationService } from "@capital-q/security";
 
 import type { ChatIntelligencePort } from "./tools/chat.js";
+import type { ScheduleIntelligencePort } from "./tools/schedule.js";
 import type { OnboardingRemindersPort } from "./tools/onboarding-reminders.js";
 
 /** One company as the investor's feed shows it. */
@@ -285,6 +286,8 @@ export type QToolPorts = {
   readonly email?: EmailIntelligencePort | undefined;
   /** Relationship chat (R34); absent means no chat tool exists. */
   readonly chat?: ChatIntelligencePort | undefined;
+  /** Meetings and reminders (BIZ-008); absent means no schedule tool exists. */
+  readonly schedule?: ScheduleIntelligencePort | undefined;
   /** Profile changes for approval (BIZ-002); absent means the tool does not exist. */
   readonly profileChanges?: ProfileChangePort | undefined;
   /** A pitch's transcript around a moment (R18); absent means no pitch tool. */

@@ -41,6 +41,7 @@ const EVERY_PORT: QToolPorts = {
   relationships: STUB,
   email: STUB,
   chat: STUB,
+  schedule: STUB,
   profileChanges: STUB,
   pitchMoments: STUB,
   visibility: STUB,

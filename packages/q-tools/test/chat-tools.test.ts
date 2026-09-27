@@ -8,6 +8,7 @@ import {
   createQToolRegistry,
   type ChatIntelligencePort,
   type RelationshipIntelligencePort,
+  type ScheduleIntelligencePort,
 } from "../src/index.js";
 import { actorA, actorB, contextFor, fakePorts, planFor } from "./support.js";
 
@@ -79,9 +80,15 @@ function world(options: { readonly connected?: boolean } = {}) {
     },
   };
   const relationships = {} as RelationshipIntelligencePort;
+  const schedule: ScheduleIntelligencePort = {
+    findSlots: () => Promise.resolve({ status: "UNAVAILABLE" }),
+    upcoming: () => Promise.resolve({ meetings: [], reminders: [] }),
+    organisedMeeting: () => Promise.resolve(null),
+    brief: () => Promise.resolve(null),
+  };
   const executor = createQToolExecutor({
     registry: createQToolRegistry(
-      createDefaultQTools(fakePorts({ chat, relationships })),
+      createDefaultQTools(fakePorts({ chat, relationships, schedule })),
     ),
   });
   return { executor, prepared, reads };
@@ -202,7 +209,7 @@ describe("chat proposals", () => {
         arguments: {
           relationshipId: RELATIONSHIP,
           purpose: "First call",
-          proposedStarts: ["2026-10-01T14:00:00.000Z"],
+          startsAt: "2026-10-01T14:00:00.000Z",
           durationMinutes: 30,
         },
       },
@@ -222,6 +229,6 @@ describe("chat proposals", () => {
     );
     expect(
       prepared.map((p) => (p as { actionType: string }).actionType),
-    ).toEqual(["meeting.propose", "reminder.create"]);
+    ).toEqual(["meeting.schedule", "reminder.create"]);
   });
 });
