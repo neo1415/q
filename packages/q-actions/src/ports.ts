@@ -193,6 +193,33 @@ export type QApprovalRepository = {
     tx: TransactionContext,
     input: QApprovalDecision,
   ) => Promise<QApprovalRecord | null>;
+  /**
+   * The approvals still waiting on one approver (R35): requested from
+   * `userId`, for an action taken in `organisationId`, PENDING and not
+   * past `now`. Newest first, at most `limit`. The same predicate the
+   * single read enforces, so the list never shows what the read refuses.
+   */
+  readonly listPendingForApprover: (
+    executor: DatabaseExecutor,
+    input: {
+      readonly tenantId: TenantId;
+      readonly userId: UserId;
+      readonly organisationId: OrganisationId;
+      readonly now: Date;
+      readonly limit: number;
+    },
+  ) => Promise<readonly QPendingApprovalRow[]>;
+};
+
+/** One approval waiting on its approver, with where it was asked. */
+export type QPendingApprovalRow = {
+  readonly approvalId: QApprovalId;
+  readonly runId: QRunId;
+  /** The conversation the run belongs to, when it has one. */
+  readonly conversationId: string | null;
+  readonly summary: string;
+  readonly requestedAt: UtcTimestamp;
+  readonly expiresAt: UtcTimestamp;
 };
 
 export type QActionRepositories = {

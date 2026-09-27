@@ -126,6 +126,19 @@ function fakeEngine(overrides: Partial<QActionService> = {}) {
     },
     executeApproved: () => Promise.reject(new Error("not used")),
     findApprovalForAction: () => Promise.resolve(null),
+    listPendingApprovals: (query) => {
+      calls.getApproval.push(query);
+      return Promise.resolve([
+        {
+          approvalId: APPROVAL_ID as never,
+          runId: VIEW.runId,
+          conversationId: null,
+          summary: "Make your company visible to investors",
+          requestedAt: VIEW.requestedAt,
+          expiresAt: VIEW.expiresAt,
+        },
+      ]);
+    },
     ...overrides,
   };
   const orchestrator: QOrchestrator = {
@@ -173,6 +186,37 @@ function buildApp(options: {
 }
 
 const settle = () => new Promise((resolve) => setTimeout(resolve, 20));
+
+describe("GET /v1/q/approvals (R35)", () => {
+  it("refuses an unauthenticated caller before touching the engine", async () => {
+    const { service, calls } = fakeEngine();
+    const app = buildApp({ principal: null, service });
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/q/approvals",
+    });
+    expect(response.statusCode).toBe(401);
+    expect(calls.getApproval).toHaveLength(0);
+    await app.close();
+  });
+
+  it("lists what waits on the resolved actor, and only for that actor", async () => {
+    const { service, calls } = fakeEngine();
+    const app = buildApp({ principal: PRINCIPAL, context: CONTEXT, service });
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/q/approvals",
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.headers["cache-control"]).toBe("no-store");
+    const body = response.json<{ items: { approvalId: string }[] }>();
+    expect(body.items.map((item) => item.approvalId)).toEqual([APPROVAL_ID]);
+    expect((calls.getApproval[0] as { actor: ActorContext }).actor).toEqual(
+      CONTEXT,
+    );
+    await app.close();
+  });
+});
 
 describe("GET /v1/q/approvals/:approvalId", () => {
   it("refuses an unauthenticated caller before touching the engine", async () => {

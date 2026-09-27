@@ -87,6 +87,7 @@ import {
   type QActionRepositories,
   type QApprovalPolicy,
   type QApprovalRecord,
+  type QPendingApprovalRow,
 } from "../ports.js";
 import type { QActionRegistry } from "../registry.js";
 
@@ -163,6 +164,15 @@ export type QActionService = {
     command: ProposeQActionCommand,
   ) => Promise<ProposeQActionResult>;
   readonly getApproval: (query: QApprovalQuery) => Promise<QApprovalView>;
+  /**
+   * The approvals still waiting on the caller (R35), for Q's briefing.
+   * Only a human acting in an organisation context has any; anyone else
+   * gets an empty list, never an error that says why.
+   */
+  readonly listPendingApprovals: (query: {
+    readonly actor: ActorContext;
+    readonly limit?: number | undefined;
+  }) => Promise<readonly QPendingApprovalRow[]>;
   readonly approve: (
     command: DecideQApprovalCommand,
   ) => Promise<DecideQApprovalResult>;
@@ -835,6 +845,22 @@ export function createQActionService(
       null,
     );
     return toApprovalView(approval, action, clock.now());
+  };
+
+  const listPendingApprovals: QActionService["listPendingApprovals"] = async (
+    query,
+  ) => {
+    const { actor } = query;
+    if (actor.actorType !== "HUMAN" || actor.organisationId === undefined) {
+      return [];
+    }
+    return repositories.approvals.listPendingForApprover(sql, {
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      organisationId: actor.organisationId,
+      now: clock.now(),
+      limit: Math.min(Math.max(query.limit ?? 20, 1), 20),
+    });
   };
 
   type Decision = "APPROVED" | "REJECTED";
@@ -1585,6 +1611,7 @@ export function createQActionService(
   return {
     propose,
     getApproval,
+    listPendingApprovals,
     approve: (command) => decide(command, "APPROVED"),
     reject: (command) => decide(command, "REJECTED"),
     executeApproved,

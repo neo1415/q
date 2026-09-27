@@ -13,6 +13,7 @@ import {
 import {
   QActionProposalIdSchema,
   QApprovalIdSchema,
+  QConversationIdSchema,
   QRunIdSchema,
 } from "./ids.js";
 import { QSubjectRefsSchema } from "./subject.js";
@@ -98,3 +99,32 @@ export const RejectQApprovalRequestSchema = z
 export type RejectQApprovalRequest = z.infer<
   typeof RejectQApprovalRequestSchema
 >;
+
+/**
+ * PUBLIC. `GET /v1/q/approvals` — the approvals still waiting on the
+ * caller (R35): requested from them, in the organisation context they
+ * act in, PENDING and not past expiry. Newest first and bounded; the
+ * conversation that holds each is named so it can be opened there.
+ * Nothing about anyone else's approvals is ever in it.
+ */
+export const Q_PENDING_APPROVALS_MAX = 20;
+
+export const QPendingApprovalSchema = z
+  .object({
+    approvalId: QApprovalIdSchema,
+    runId: QRunIdSchema,
+    conversationId: QConversationIdSchema.nullable(),
+    summary: z.string().trim().min(1).max(Q_ACTION_SUMMARY_MAX_LENGTH),
+    requestedAt: UtcTimestampSchema,
+    expiresAt: UtcTimestampSchema,
+  })
+  .strict();
+export type QPendingApproval = z.infer<typeof QPendingApprovalSchema>;
+
+export const QPendingApprovalListSchema = z
+  .object({
+    contractVersion: QContractVersionSchema,
+    items: z.array(QPendingApprovalSchema).max(Q_PENDING_APPROVALS_MAX),
+  })
+  .strict();
+export type QPendingApprovalList = z.infer<typeof QPendingApprovalListSchema>;

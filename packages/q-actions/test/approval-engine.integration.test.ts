@@ -636,7 +636,7 @@ describe("@capital-q/q-actions against local PostgreSQL", () => {
     const world = await commitWorld();
     try {
       const { founder, colleague, outsider, service } = world;
-      const { approval } = await propose(world, founder, {});
+      const { approval, action: proposed } = await propose(world, founder, {});
       // Another tenant's action carries its own marker in the summary.
       const foreign = await propose(world, outsider, {
         note: MARKERS.crossTenant,
@@ -715,6 +715,32 @@ describe("@capital-q/q-actions against local PostgreSQL", () => {
         approvalId: approval.id,
       });
       expect(view.status).toBe("PENDING");
+
+      // R35: the pending list is the single read's predicate as a list —
+      // the approver sees their own; nobody else sees it, and the foreign
+      // tenant's never appears.
+      const mine = await service.listPendingApprovals({ actor: founder.actor });
+      expect(mine.map((item) => item.approvalId)).toEqual([approval.id]);
+      expect(mine[0]?.runId).toBe(proposed.runId);
+      for (const actor of [
+        colleague.actor,
+        { ...founder.actor, organisationId: world.orgB },
+        {
+          ...founder.actor,
+          organisationId: undefined,
+          membershipId: undefined,
+        },
+      ]) {
+        expect(
+          await service.listPendingApprovals({ actor: actor as ActorContext }),
+        ).toEqual([]);
+      }
+      const theirs = await service.listPendingApprovals({
+        actor: outsider.actor,
+      });
+      expect(theirs.map((item) => item.approvalId)).toEqual([
+        foreign.approval.id,
+      ]);
     } finally {
       await cleanup(world);
     }

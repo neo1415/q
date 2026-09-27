@@ -23,6 +23,7 @@ import {
   ListQConversationsResponseSchema,
   QConversationDetailSchema,
   QApprovalViewSchema,
+  QPendingApprovalListSchema,
   QRunSummarySchema,
   type AppendQRunMessageRequest,
   type CreateQRunRequest,
@@ -112,6 +113,11 @@ const approvalPath = (approvalId: string) =>
  * returned view means the decision was recorded; execution is reported by
  * the action's own status, never assumed.
  */
+
+/** `GET /v1/q/approvals` — the approvals still waiting on the caller (R35). */
+export function listPendingQApprovals(session: ApiSession) {
+  return call(session, "GET", Q_APPROVALS_PATH, QPendingApprovalListSchema);
+}
 
 /** `GET /v1/q/approvals/:approvalId` — the approval as its requested approver may read it. */
 export function getQApproval(session: ApiSession, approvalId: string) {

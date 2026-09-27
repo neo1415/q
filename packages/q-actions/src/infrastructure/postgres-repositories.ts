@@ -23,6 +23,7 @@ import type {
   QActionRecord,
   QActionRepositories,
   QApprovalRecord,
+  QPendingApprovalRow,
 } from "../ports.js";
 
 /**
@@ -120,6 +121,15 @@ const ApprovalRow = z.object({
   revoked_by_user_id: UserIdSchema.nullable(),
   approval_payload_hash: QActionPayloadHashSchema.nullable(),
   version: z.number().int().min(1),
+});
+
+const PendingRow = z.object({
+  id: QApprovalIdSchema,
+  run_id: QRunIdSchema,
+  conversation_id: z.string().uuid().nullable(),
+  summary: z.string().min(1),
+  requested_at: Timestamp,
+  expires_at: Timestamp,
 });
 
 function toApproval(row: unknown): QApprovalRecord {
@@ -281,6 +291,34 @@ export function createPostgresQActionRepositories(): QActionRepositories {
           tenantId: r.tenant_id,
           requestedFromUserId: r.requested_from_user_id,
         };
+      },
+      listPendingForApprover: async (executor, input) => {
+        const rows = await executor`
+          select p.id, a.run_id, r.conversation_id, a.summary,
+                 p.requested_at, p.expires_at
+            from q_runtime.approvals p
+            join q_runtime.actions a
+              on a.id = p.action_id and a.tenant_id = p.tenant_id
+            left join q_runtime.runs r
+              on r.id = a.run_id and r.tenant_id = a.tenant_id
+           where p.tenant_id = ${input.tenantId}
+             and p.requested_from_user_id = ${input.userId}
+             and a.organisation_id = ${input.organisationId}
+             and p.status = 'PENDING'
+             and p.expires_at > ${input.now.toISOString()}::text::timestamptz
+           order by p.requested_at desc, p.id desc
+           limit ${input.limit}`;
+        return rows.map((row): QPendingApprovalRow => {
+          const r = PendingRow.parse(row);
+          return {
+            approvalId: r.id,
+            runId: r.run_id,
+            conversationId: r.conversation_id,
+            summary: r.summary,
+            requestedAt: r.requested_at,
+            expiresAt: r.expires_at,
+          };
+        });
       },
       listForAction: async (executor, tenantId, actionId) => {
         const rows = await executor`

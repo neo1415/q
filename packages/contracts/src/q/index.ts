@@ -408,10 +408,15 @@ export {
   Q_APPROVAL_REJECTION_REASON_MAX_LENGTH,
   QApprovalActionViewSchema,
   QApprovalViewSchema,
+  Q_PENDING_APPROVALS_MAX,
+  QPendingApprovalListSchema,
+  QPendingApprovalSchema,
   RejectQApprovalRequestSchema,
   type ApproveQApprovalRequest,
   type QApprovalActionView,
   type QApprovalView,
+  type QPendingApproval,
+  type QPendingApprovalList,
   type RejectQApprovalRequest,
 } from "./approval.js";
 

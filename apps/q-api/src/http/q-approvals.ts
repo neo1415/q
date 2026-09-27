@@ -6,8 +6,10 @@ import {
   Q_APPROVAL_APPROVE_SUFFIX,
   Q_APPROVAL_REJECT_SUFFIX,
   Q_APPROVALS_PATH,
+  Q_CONTRACT_VERSION,
   QApprovalIdSchema,
   QApprovalViewSchema,
+  QPendingApprovalListSchema,
   RejectQApprovalRequestSchema,
   type CorrelationId,
   type QApprovalId,
@@ -71,6 +73,27 @@ export function registerQApprovalRoutes(
   const withContext = requireActorContextHook(dependencies);
   const service = dependencies.qActions;
   const approvalPath = `${Q_APPROVALS_PATH}/:approvalId`;
+
+  /*
+    What is still waiting on the caller (R35): their own pending approvals,
+    for Q's briefing. The engine applies the single read's predicate, so
+    the list never names an approval the caller could not open.
+  */
+  app.get(
+    Q_APPROVALS_PATH,
+    { onRequest: withContext },
+    async (request, reply) => {
+      const items = await service.listPendingApprovals({
+        actor: getActorContext(request),
+      });
+      return reply.header("Cache-Control", "no-store").send(
+        QPendingApprovalListSchema.parse({
+          contractVersion: Q_CONTRACT_VERSION,
+          items,
+        }),
+      );
+    },
+  );
 
   app.get(approvalPath, { onRequest: withContext }, async (request, reply) => {
     const view = await service.getApproval({

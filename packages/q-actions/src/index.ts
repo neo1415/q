@@ -52,6 +52,7 @@ export {
   type QApprovalDecision,
   type QApprovalPolicy,
   type QApprovalRecord,
+  type QPendingApprovalRow,
   type QApprovalRepository,
 } from "./ports.js";
 export {

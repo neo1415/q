@@ -148,6 +148,7 @@ export {
   getQVoiceTurnState,
   setQVoiceScreen,
   getQApproval,
+  listPendingQApprovals,
   getQRun,
   rejectQApproval,
 } from "./q.js";
