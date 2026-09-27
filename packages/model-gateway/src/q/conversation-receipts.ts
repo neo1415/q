@@ -1,9 +1,12 @@
 import { z } from "zod";
 
-import type {
-  ModelMessage,
-  QNavigateDestination,
-  QResultBlock,
+import {
+  Q_CLIENT_ACTION_TOOLS,
+  type ModelMessage,
+  type QNavigateDestination,
+  type QResultBlock,
+  type QScreenContext,
+  type QScreenRoute,
 } from "@capital-q/contracts";
 import type { QCapabilityManifest } from "@capital-q/q-runtime";
 import type { ActorContext } from "@capital-q/security";
@@ -142,6 +145,48 @@ const SCREEN_NAMES: Readonly<Record<QNavigateDestination, string>> = {
   COMPANY_VISIBILITY: "their company's visibility settings",
 };
 
+/** Where the person is, in their terms (R21). */
+const SCREEN_ROUTE_NAMES: Readonly<Record<QScreenRoute, string | null>> = {
+  HOME: "Home (Q's own page)",
+  DISCOVER: "Discover (the feed)",
+  CAPITAL: "Capital (their raise)",
+  PROFILE: "their profile",
+  COMPANY_VISIBILITY: "their company's visibility settings",
+  COMPANY_INTEREST: "their company's incoming interest",
+  COMPANY: "a company's page",
+  PITCH: "their pitch",
+  RELATIONSHIP_COMPANY: "their relationship with a company",
+  RELATIONSHIP_INVESTOR: "their relationship with an investor",
+  VERIFICATION: "verification",
+  ONBOARDING: "their setup",
+  OTHER: null,
+};
+
+/**
+ * Where the person is as they ask (R21), from the screen the run carries
+ * through the Context Firewall: the route, and only entities it bound.
+ */
+export function screenLines(screen: QScreenContext | undefined): string[] {
+  if (screen === undefined) return [];
+  const name = SCREEN_ROUTE_NAMES[screen.route];
+  const shown = [
+    ...(screen.companyId === undefined
+      ? []
+      : [`the company ${screen.companyId}`]),
+    ...(screen.investorOrganisationId === undefined
+      ? []
+      : [`the investor organisation ${screen.investorOrganisationId}`]),
+    ...(screen.documentId === undefined
+      ? []
+      : [`their document ${screen.documentId} open`]),
+  ];
+  return [
+    `WHERE THEY ARE NOW (Capital Q, from their screen as they asked): ${
+      name === null ? "a Capital Q screen without a name here" : `on ${name}`
+    }${shown.length === 0 ? "" : `, showing ${shown.join(" and ")}`}. You know what screen they are on: when they ask where they are or what they are looking at, say it plainly (for example "You're on your profile."); never say you cannot see their screen.`,
+  ];
+}
+
 const DOCUMENT_NAMES: Readonly<Record<string, string>> = {
   PITCH_DECK: "a pitch deck",
   INVESTMENT_BRIEF: "an investment brief",
@@ -161,8 +206,10 @@ export function capabilityNote(
     readonly classification?: string | undefined;
   }[],
   receipts: readonly QReceipt[],
+  screen?: QScreenContext | undefined,
 ): ModelMessage {
   const lines: string[] = [
+    ...screenLines(screen),
     "WHAT YOU CAN DO IN THIS CONVERSATION (Capital Q, authoritative; you can do nothing else):",
   ];
   const named = (tools: typeof offeredTools): string =>
@@ -174,11 +221,19 @@ export function capabilityNote(
       .join("; ");
   // A change-preparing tool listed as a read told the model it could only
   // read, and "edit my profile" was declined (R20).
+  // The app's own actions in their browser (theme, reload, their website)
+  // happen at once when called, never "for approval" (R20/R33).
+  const isClientAction = (tool: (typeof offeredTools)[number]) =>
+    (Q_CLIENT_ACTION_TOOLS as readonly string[]).includes(tool.name);
+  const clientActions = offeredTools.filter(isClientAction);
   const reads = offeredTools.filter(
-    (tool) => (tool.classification ?? "READ_ONLY") === "READ_ONLY",
+    (tool) =>
+      !isClientAction(tool) &&
+      (tool.classification ?? "READ_ONLY") === "READ_ONLY",
   );
   const changes = offeredTools.filter(
     (tool) =>
+      !isClientAction(tool) &&
       (tool.classification ?? "READ_ONLY") !== "READ_ONLY" &&
       tool.name !== APPROVE_PENDING_TOOL,
   );
@@ -193,11 +248,17 @@ export function capabilityNote(
       `- Prepare these changes when they ask, for their approval (nothing changes until they approve; until a status or tool result says saved, it is not saved yet): ${named(changes)}.`,
     );
   }
+  if (clientActions.length > 0) {
+    lines.push(
+      `- Do these in their browser at once when they ask, by calling the tool (it happens as your answer arrives; say it in a few words): ${named(clientActions)}.`,
+    );
+  }
   if (manifest !== undefined && manifest.navigate.length > 0) {
     lines.push(
       `- Capital Q opens these screens when they ask to be taken there, including when they leave the choice to you: ${manifest.navigate
         .map((d) => SCREEN_NAMES[d])
         .join(", ")}.`,
+      "- Capital Q has no other screens. When they ask for a screen or page it does not have, say plainly that it doesn't exist in Capital Q and offer the nearest of the screens above by name; never say you took them anywhere.",
     );
   }
   if (manifest !== undefined && manifest.documents.length > 0) {

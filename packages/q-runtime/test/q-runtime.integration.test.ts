@@ -322,6 +322,40 @@ describe("@capital-q/q-runtime against local PostgreSQL", () => {
     });
   });
 
+  it("R21: records the screen on the run, with only the entities that resolved, and reads it back", async () => {
+    await withWorld(async ({ tx, service, adminA, companyA }) => {
+      const result = await service.createRun({
+        actor: adminA.actor,
+        input: {
+          ...request(),
+          screen: {
+            route: "COMPANY",
+            companyId: companyA,
+            // Not this person's (nor anybody's): dropped, never written.
+            documentId: randomUUID(),
+          },
+        },
+        idempotencyKey: "create-screen-0001",
+        correlationId: CORRELATION(),
+      });
+      expect(result.run.screen).toEqual({
+        route: "COMPANY",
+        companyId: companyA,
+      });
+      const rows = await tx.sql<
+        { screen: unknown }[]
+      >`select screen from q_runtime.runs where id = ${result.run.id}`;
+      expect(rows[0]?.screen).toEqual({ route: "COMPANY", companyId: companyA });
+      const without = await service.createRun({
+        actor: adminA.actor,
+        input: request(),
+        idempotencyKey: "create-screen-0002",
+        correlationId: CORRELATION(),
+      });
+      expect(without.run.screen).toBeNull();
+    });
+  });
+
   it("reads the run back as its owner through the public projection", async () => {
     await withWorld(async ({ service, adminA }) => {
       const created = await service.createRun({

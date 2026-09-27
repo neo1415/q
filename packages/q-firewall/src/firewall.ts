@@ -12,6 +12,7 @@ import {
   type QDeniedScope,
   type QKnowledgeScopeKind,
   type QScopeFilter,
+  type QScreenContext,
   type QSensitivityClass,
   type QSubjectRef,
 } from "@capital-q/contracts";
@@ -173,6 +174,33 @@ function denialForDisclosure(
   }
 }
 
+/** The screen with only the entities some permitted scope is bound to. */
+function screenWithin(
+  screen: QScreenContext,
+  permitted: readonly QAuthorisedKnowledgeScope[],
+): QScreenContext {
+  const bound = (ref: QSubjectRef) =>
+    permitted.some(
+      (scope) =>
+        scope.subject !== undefined &&
+        JSON.stringify(scope.subject) === JSON.stringify(ref),
+    );
+  const { companyId, investorOrganisationId, documentId } = screen;
+  return {
+    route: screen.route,
+    ...(companyId !== undefined && bound({ kind: "COMPANY", companyId })
+      ? { companyId }
+      : {}),
+    ...(investorOrganisationId !== undefined &&
+    bound({ kind: "INVESTOR_ORGANISATION", investorOrganisationId })
+      ? { investorOrganisationId }
+      : {}),
+    ...(documentId !== undefined && bound({ kind: "DOCUMENT", documentId })
+      ? { documentId }
+      : {}),
+  };
+}
+
 function fingerprintOf(
   plan: Omit<PermittedContextPlan, "fingerprint">,
 ): string {
@@ -183,6 +211,7 @@ function fingerprintOf(
     purpose: plan.purpose,
     subjects: plan.subjects,
     viewing: plan.viewing ?? null,
+    screen: plan.screen ?? null,
     scopes: [...plan.scopes].sort((a, b) =>
       `${a.kind}:${JSON.stringify(a.subject ?? null)}`.localeCompare(
         `${b.kind}:${JSON.stringify(b.subject ?? null)}`,
@@ -746,6 +775,12 @@ export function createContextFirewall(
       )
         ? { viewing: request.viewing }
         : {}),
+      // R21: the route is the person's own screen, so it always rides; an
+      // entity it names rides only when the firewall bound that entity for
+      // this actor, exactly as a named subject would be.
+      ...(request.screen === undefined || request.screen === null
+        ? {}
+        : { screen: screenWithin(request.screen, permitted) }),
       scopes: permitted,
       denied: denied.slice(0, 64),
       maxSensitivity,

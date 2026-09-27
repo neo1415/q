@@ -26,7 +26,7 @@ import {
   type UtcTimestamp,
   type QResultBlock,
 } from "@capital-q/contracts";
-import type { QViewingMoment } from "@capital-q/contracts";
+import type { QScreenContext, QViewingMoment } from "@capital-q/contracts";
 import type { OrganisationId, TenantId, UserId } from "@capital-q/security";
 
 /**
@@ -105,6 +105,11 @@ export type QRunRecord = {
    * authorised it for them at creation; null (or absent) otherwise.
    */
   readonly viewing?: QViewingMoment | null | undefined;
+  /**
+   * R21: the screen the person asked from: the route, and only the
+   * entities that resolved for them at creation; null when none was sent.
+   */
+  readonly screen?: QScreenContext | null | undefined;
   /** NULL until the orchestrator, prompt registry and model policy exist. */
   readonly orchestrationVersion: string | null;
   readonly promptBundleVersion: string | null;
@@ -131,6 +136,8 @@ export type NewQRun = {
   readonly subjects: readonly QSubjectRef[];
   /** R18: already authorised for the actor; never a client's word. */
   readonly viewing?: QViewingMoment | null | undefined;
+  /** R21: the route plus only the on-screen entities that resolved. */
+  readonly screen?: QScreenContext | null | undefined;
   readonly correlationId: CorrelationId;
 };
 

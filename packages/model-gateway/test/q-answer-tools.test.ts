@@ -177,6 +177,7 @@ function build(options: {
     },
   ];
   const stages: string[] = [];
+  const completed: unknown[] = [];
   const repositories = {
     messages: {
       listForRun: () => Promise.resolve([...messages]),
@@ -202,7 +203,17 @@ function build(options: {
     runEvents: {
       // Stages only: the durable q.message.completed the seam now appends
       // (CQ-Q-009) carries no visible stage.
-      append: (_tx: unknown, input: { visibleStage: string | null }) => {
+      append: (
+        _tx: unknown,
+        input: {
+          visibleStage: string | null;
+          eventType?: string;
+          payload?: unknown;
+        },
+      ) => {
+        if (input.eventType === "q.message.completed") {
+          completed.push(input.payload);
+        }
         if (input.visibleStage !== null) {
           stages.push(input.visibleStage);
         }
@@ -241,7 +252,7 @@ function build(options: {
     retrieval: { kind: "NOT_CONFIGURED" },
     plan: plan(),
   };
-  return { seam, alpha, messages, stages, logLines, request };
+  return { seam, alpha, messages, stages, logLines, request, completed };
 }
 
 const call = (
@@ -250,6 +261,79 @@ const call = (
 ): FakeBehaviour => ({
   kind: "TOOL_CALLS",
   calls: [{ callId: id, name: "get_company", arguments: args }],
+});
+
+const SET_THEME_OFFERED: QOfferedTool = {
+  toolName: "client.theme.set",
+  toolVersion: 1,
+  classification: "SIDE_EFFECT",
+  definition: {
+    name: "set_theme",
+    description: "Switches the appearance.",
+    inputJsonSchema: { type: "object", properties: {} },
+  },
+  visibleStage: null,
+};
+
+describe("client actions and the screen reach the answer (R20/R21/R33)", () => {
+  it("a client-action tool's authorised result rides on the answer as a UI_INTENT block", async () => {
+    const tools = toolPort([SET_THEME_OFFERED], (p) => ({
+      ...succeeded(p, {
+        status: "SCREEN_WILL_DO_IT",
+        clientAction: { kind: "SET_THEME", theme: "dark" },
+      }),
+      toolName: "client.theme.set",
+      classification: "SIDE_EFFECT",
+    }));
+    const { seam, request, completed } = build({
+      script: [
+        {
+          kind: "TOOL_CALLS",
+          calls: [{ callId: "t1", name: "set_theme", arguments: { theme: "dark" } }],
+        },
+        { kind: "TEXT", text: JSON.stringify(analystResult("Dark mode is on.")) },
+      ],
+      tools,
+    });
+    expect((await seam.answer(request)).kind).toBe("ANSWERED");
+    const last = completed.at(-1) as { message: { blocks?: unknown[] } };
+    expect(last.message.blocks).toEqual([
+      { kind: "UI_INTENT", intent: { kind: "SET_THEME", theme: "dark" } },
+    ]);
+  });
+
+  it("a failed or unrelated tool result carries no client action", async () => {
+    const tools = toolPort([GET_COMPANY], (p) =>
+      succeeded(p, { clientAction: { kind: "RELOAD_PAGE" } }),
+    );
+    const { seam, request, completed } = build({
+      script: [
+        call("c1"),
+        { kind: "TEXT", text: JSON.stringify(analystResult("ok")) },
+      ],
+      tools,
+    });
+    await seam.answer(request);
+    const last = completed.at(-1) as { message: { blocks?: unknown[] } };
+    expect(last.message.blocks ?? []).toEqual([]);
+  });
+
+  it("the planner is told which screen the person is on, from the plan (typed and voice alike)", async () => {
+    const { seam, alpha, request } = build({
+      script: [{ kind: "TEXT", text: JSON.stringify(analystResult("ok")) }],
+    });
+    await seam.answer({
+      ...request,
+      plan: { ...request.plan, screen: { route: "PROFILE" } },
+    });
+    const sent = alpha.calls[0]?.request.messages ?? [];
+    const note = sent.find((m) =>
+      m.content.includes("WHAT YOU CAN DO IN THIS CONVERSATION"),
+    );
+    expect(note?.content).toContain("WHERE THEY ARE NOW");
+    expect(note?.content).toContain("on their profile");
+    expect(note?.content).toContain("never say you cannot see their screen");
+  });
 });
 
 describe("answer seam tool loop", () => {

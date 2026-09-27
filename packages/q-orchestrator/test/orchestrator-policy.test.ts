@@ -116,8 +116,11 @@ describe("graph state", () => {
         "preflight",
         "retrieval",
         "runId",
+        // R21: a closed route name plus entity ids (no text).
+        "screen",
         "subjects",
         "tenantId",
+        // R18: the authorised pitch moment (ids and a position).
         "viewing",
       ].sort(),
     );

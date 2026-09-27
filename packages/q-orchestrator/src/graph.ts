@@ -221,6 +221,7 @@ export function buildQGraph(
       capability: state.capability,
       subjects: state.subjects,
       viewing: state.viewing,
+      screen: state.screen,
     });
   }
 

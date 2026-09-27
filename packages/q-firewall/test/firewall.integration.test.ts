@@ -503,6 +503,36 @@ describe("@capital-q/q-firewall against local PostgreSQL", () => {
     });
   });
 
+  it("R21 screen: the plan carries the route always, and an on-screen company only when it is bound for the asker", async () => {
+    await withWorld(async (world) => {
+      const screen = { route: "COMPANY" as const, companyId: world.companyAlpha };
+      // Not visible to the investor: the route rides, the company does not.
+      const hidden = await world.firewall.plan({
+        ...ask(world.apexAdmin, "ANSWER", [company(world.companyAlpha)]),
+        screen,
+      });
+      if (hidden.outcome === "AUTHORISED") {
+        expect(hidden.plan.screen).toEqual({ route: "COMPANY" });
+      }
+      await makeNetworkVisible(world);
+      const visible = await world.firewall.plan({
+        ...ask(world.apexAdmin, "ANSWER", [company(world.companyAlpha)]),
+        screen,
+      });
+      expect(visible.outcome).toBe("AUTHORISED");
+      if (visible.outcome !== "AUTHORISED") return;
+      expect(visible.plan.screen).toEqual(screen);
+      // Their own profile: a route and nothing else.
+      const profile = await world.firewall.plan({
+        ...ask(world.apexAdmin, "ANSWER", []),
+        screen: { route: "PROFILE" },
+      });
+      if (profile.outcome === "AUTHORISED") {
+        expect(profile.plan.screen).toEqual({ route: "PROFILE" });
+      }
+    });
+  });
+
   it("R18 viewing: the plan carries the viewed pitch moment only when the company is bound for the asker", async () => {
     await withWorld(async (world) => {
       const viewing = {

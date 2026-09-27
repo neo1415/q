@@ -14,6 +14,7 @@ import type {
   QRunHandle,
   QRunId,
   QSensitivityClass,
+  QScreenContext,
   QSubjectRef,
   QViewingMoment,
   QToolClassification,
@@ -97,6 +98,8 @@ export type ContextFirewallRequest = {
   readonly requestedLabels?: readonly QContextLabel[] | undefined;
   /** R18: the run's authorised viewing moment; the plan carries it only if the company is bound. */
   readonly viewing?: QViewingMoment | null | undefined;
+  /** R21: the run's screen; the plan keeps the route and only bound entities. */
+  readonly screen?: QScreenContext | null | undefined;
 };
 
 export type ContextFirewallDecision =

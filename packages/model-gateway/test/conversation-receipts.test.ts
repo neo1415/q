@@ -110,6 +110,45 @@ describe("the capability note says what the run can do, and nothing else", () =>
     }
   });
 
+  it("client actions are done at once, never 'for approval'; a screen Capital Q lacks is said not to exist (R20/R33, live test #4/#5)", () => {
+    const note = capabilityNote(
+      FULL,
+      [
+        {
+          name: "set_theme",
+          description: "Switches the appearance. More.",
+          classification: "SIDE_EFFECT",
+        },
+        {
+          name: "propose_profile_change",
+          description: "Prepares a change.",
+          classification: "SIDE_EFFECT",
+        },
+      ],
+      [],
+    ).content;
+    const lines = note.split("\n");
+    const atOnce = lines.find((line) => line.includes("at once")) ?? "";
+    expect(atOnce).toContain("set_theme");
+    expect(atOnce).not.toContain("propose_profile_change");
+    const approval = lines.find((line) => line.startsWith("- Prepare")) ?? "";
+    expect(approval).toContain("propose_profile_change");
+    expect(approval).not.toContain("set_theme");
+    expect(note).toContain("Capital Q has no other screens");
+    expect(note).toContain("offer the nearest");
+    // No screen sent: no claim about where they are.
+    expect(note).not.toContain("WHERE THEY ARE NOW");
+  });
+
+  it("says where the person is from the screen the plan carries (R21)", () => {
+    const note = capabilityNote(FULL, [], [], {
+      route: "COMPANY",
+      companyId: ID(7),
+    }).content;
+    expect(note).toContain("on a company's page");
+    expect(note).toContain(`the company ${ID(7)}`);
+  });
+
   it("a tool that prepares a change is named as one, never as a read (R20)", () => {
     const note = capabilityNote(
       FULL,

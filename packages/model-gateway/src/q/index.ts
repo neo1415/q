@@ -4,6 +4,7 @@ import { z } from "zod";
 
 import {
   MODEL_TOOL_RESULT_MAX_CHARS,
+  QClientActionToolResultSchema,
   QMessageIdSchema,
   type ModelBudget,
   type ModelFailureClass,
@@ -1451,6 +1452,28 @@ export function createModelGatewayQAnswer(
       // The message and its durable completion event commit together
       // (CQ-Q-009 §16-§18): the event carries the persisted message, so a
       // client that missed every live delta converges on this text.
+      // What client-action tools allowed this turn (R20/R33): carried as
+      // UI_INTENT blocks on the answer, which the screen performs once as
+      // it arrives. Only from a tool's own authorised result, never words.
+      const clientActionBlocks: QResultBlock[] = [];
+      const collectClientAction = (outcome: QToolCallOutcome): void => {
+        if (!outcome.result.ok) return;
+        const read = QClientActionToolResultSchema.safeParse(
+          outcome.result.data,
+        );
+        if (!read.success) return;
+        const block: QResultBlock = {
+          kind: "UI_INTENT",
+          intent: read.data.clientAction,
+        };
+        if (
+          !clientActionBlocks.some(
+            (known) => JSON.stringify(known) === JSON.stringify(block),
+          )
+        ) {
+          clientActionBlocks.push(block);
+        }
+      };
       const persistAnswer = (
         content: string,
         /**
@@ -1461,9 +1484,11 @@ export function createModelGatewayQAnswer(
          * unbounded column there is where a provider's whole response
          * object would eventually land.
          */
-        blocks?: QResponseMessage["blocks"],
-      ) =>
-        transactions.run(async (tx) => {
+        given?: QResponseMessage["blocks"],
+      ) => {
+        const carried = [...(given ?? []), ...clientActionBlocks];
+        const blocks = carried.length === 0 ? undefined : carried;
+        return transactions.run(async (tx) => {
           const stored = await repositories.messages.insert(tx, {
             id: messageId,
             tenantId: request.tenantId,
@@ -1492,6 +1517,7 @@ export function createModelGatewayQAnswer(
           );
           return stored;
         });
+      };
       const toolCalls: QToolCallObservation[] = [];
       // Public sources this run read, for the one human-safe presentation
       // of a source in the answer (CQ-Q-VOICE-001 R3). Public fields only.
@@ -1618,6 +1644,7 @@ export function createModelGatewayQAnswer(
           classification: tool.classification,
         })),
         receipts,
+        plan.screen,
       );
       let messages: ModelMessage[] =
         offered.length === 0
@@ -1770,6 +1797,7 @@ export function createModelGatewayQAnswer(
                 latencyMs: outcome.latencyMs,
               });
               collectSources(outcome);
+              collectClientAction(outcome);
               notePlatformLookup(outcome);
               noteRecommendationGrounds(outcome);
               if (call.name === APPROVE_PENDING_TOOL && outcome.result.ok) {

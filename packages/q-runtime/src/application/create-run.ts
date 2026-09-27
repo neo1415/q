@@ -247,6 +247,11 @@ export function createCreateQRun(dependencies: QRuntimeDependencies) {
     const beforeScreen = refs;
     refs = await withScreenEntities(subjects, actor, refs, input.screen);
     const onScreen = refs.slice(beforeScreen.length);
+    // The run keeps which screen it was asked from (the route), and only
+    // the entities that are this run's subjects now: one that did not
+    // resolve is not written down anywhere.
+    const screen =
+      input.screen === undefined ? null : screenKept(input.screen, refs);
     const keptByConversation = (all: readonly QSubjectRef[]) =>
       all.filter((ref) => !onScreen.includes(ref));
 
@@ -300,6 +305,7 @@ export function createCreateQRun(dependencies: QRuntimeDependencies) {
         consequenceClass: consequenceClassFor(input.capability),
         subjects: refs,
         viewing,
+        screen,
         correlationId: command.correlationId,
       });
 
@@ -375,6 +381,29 @@ export function createCreateQRun(dependencies: QRuntimeDependencies) {
         return { run, conversation, message, created: false };
       }
     });
+  };
+}
+
+/** The screen as the run records it: the route, and only entities in `refs`. */
+function screenKept(
+  screen: NonNullable<CreateQRunRequest["screen"]>,
+  refs: readonly QSubjectRef[],
+): NonNullable<CreateQRunRequest["screen"]> {
+  const has = (ref: QSubjectRef) =>
+    refs.some((known) => JSON.stringify(known) === JSON.stringify(ref));
+  const { companyId, investorOrganisationId, documentId } = screen;
+  return {
+    route: screen.route,
+    ...(companyId !== undefined && has({ kind: "COMPANY", companyId })
+      ? { companyId }
+      : {}),
+    ...(investorOrganisationId !== undefined &&
+    has({ kind: "INVESTOR_ORGANISATION", investorOrganisationId })
+      ? { investorOrganisationId }
+      : {}),
+    ...(documentId !== undefined && has({ kind: "DOCUMENT", documentId })
+      ? { documentId }
+      : {}),
   };
 }
 

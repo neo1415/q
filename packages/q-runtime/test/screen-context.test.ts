@@ -35,7 +35,10 @@ const person = ActorContextSchema.parse({
 });
 
 function harness(resolves: (ref: QSubjectRef) => boolean | "throws") {
-  const runs: { subjects: readonly QSubjectRef[] }[] = [];
+  const runs: {
+    subjects: readonly QSubjectRef[];
+    screen?: QScreenContext | null;
+  }[] = [];
   const conversations: { subjects: readonly QSubjectRef[] }[] = [];
   const resolved: QSubjectRef[] = [];
   const dependencies = {
@@ -69,7 +72,13 @@ function harness(resolves: (ref: QSubjectRef) => boolean | "throws") {
         setSubjects: () => Promise.resolve(),
       },
       runs: {
-        insert: (_tx: unknown, input: { subjects: readonly QSubjectRef[] }) => {
+        insert: (
+          _tx: unknown,
+          input: {
+            subjects: readonly QSubjectRef[];
+            screen?: QScreenContext | null;
+          },
+        ) => {
           runs.push(input);
           return Promise.resolve({
             id: randomUUID(),
@@ -150,6 +159,28 @@ describe("the screen context on a Q run", () => {
     await h.ask({ route: "COMPANY", companyId: COMPANY });
     expect(h.runs[0]?.subjects).toEqual([company]);
     expect(h.conversations[0]?.subjects).toEqual([]);
+  });
+
+  it("the run records the screen: the route, and only the entities that resolved", async () => {
+    const h = harness((ref) => ref.kind !== "COMPANY");
+    await h.ask({
+      route: "COMPANY",
+      companyId: COMPANY,
+      documentId: DOCUMENT,
+    });
+    expect(h.runs[0]?.screen).toEqual({
+      route: "COMPANY",
+      documentId: DOCUMENT,
+    });
+  });
+
+  it("a screen with only a route is still recorded, so Q knows where they are", async () => {
+    const h = harness(() => true);
+    await h.ask({ route: "PROFILE" });
+    expect(h.runs[0]?.screen).toEqual({ route: "PROFILE" });
+    const none = harness(() => true);
+    await none.ask(undefined);
+    expect(none.runs[0]?.screen).toBeNull();
   });
 
   it("the contract refuses anything beyond route and entity ids", () => {
