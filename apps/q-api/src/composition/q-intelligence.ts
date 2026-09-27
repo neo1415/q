@@ -9,6 +9,7 @@ import {
   type QProfileUpdateNotebook,
   type QUserStatementRecorder,
   type QMemoryRecall,
+  type QOnboardingNudgePort,
   type QOwnOnboardingPort,
 } from "@capital-q/model-gateway/q";
 import type { ModelDataPosture } from "@capital-q/contracts";
@@ -111,6 +112,8 @@ export type QIntelligenceDependencies = {
   readonly memory?: QMemoryRecall | undefined;
   /** The person's own onboarding, for Home Q (CQ-QX-007). Absent: not read. */
   readonly ownOnboarding?: QOwnOnboardingPort | undefined;
+  /** Setup reminders at a natural pause (founder directive 2026-09-27). */
+  readonly onboardingNudge?: QOnboardingNudgePort | undefined;
   /**
    * Where an answer goes as it is written. Absent means it goes out only
    * when it is finished; the stored message and its completion event are
@@ -246,6 +249,9 @@ export function composeQIntelligence(
     ...(dependencies.ownOnboarding === undefined
       ? {}
       : { ownOnboarding: dependencies.ownOnboarding }),
+    ...(dependencies.onboardingNudge === undefined
+      ? {}
+      : { onboardingNudge: dependencies.onboardingNudge }),
     ...(dependencies.deltas === undefined
       ? {}
       : { deltas: dependencies.deltas }),

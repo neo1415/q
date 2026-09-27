@@ -53,6 +53,7 @@ import {
 import { createRequestDatabaseClient } from "@capital-q/database";
 import { createOutboxWriter } from "@capital-q/eventing";
 import {
+  createOnboardingNudges,
   createOnboardingQRecommendations,
   createOwnOnboardingSummaryReader,
 } from "@capital-q/onboarding";
@@ -987,8 +988,17 @@ const profileFindingsReader = createProfileFindingsReader({
   logger,
 });
 
+// Setup reminders (founder directive 2026-09-27): the versioned policy
+// over the person's own setup, keyed by the actor's own user id. Q says it
+// at a natural pause; "later", "stop" and "let's finish it" are tools.
+const onboardingNudges = createOnboardingNudges({ sql: database.sql });
+
 const qTools = createQTools({
   ports: {
+    onboardingReminders: {
+      choose: (actor, choice) => onboardingNudges.choose(actor.userId, choice),
+      unfinished: (actor) => onboardingNudges.continueTarget(actor.userId),
+    },
     companies,
     capital,
     mandates,
@@ -1443,6 +1453,18 @@ const qIntelligence = composeQIntelligence({
       name: await displayNameFor(actor),
       journeys: await ownOnboardingSummaries.read(actor.userId),
     }),
+  },
+  onboardingNudge: {
+    peek: (actor: ActorContext, conversationId: string) =>
+      onboardingNudges.peek(actor.userId, {
+        surface: "Q_NOTE",
+        conversationId,
+      }),
+    markShown: (actor: ActorContext, conversationId: string) =>
+      onboardingNudges.markShown(actor.userId, {
+        surface: "Q_NOTE",
+        conversationId,
+      }),
   },
   // The same bus the run stream publishes from, so an answer reaches a
   // person as it is written rather than after it.
