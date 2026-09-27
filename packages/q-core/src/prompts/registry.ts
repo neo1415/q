@@ -32,6 +32,7 @@ import { TURN_READER_V8 } from "./tasks/turn-reader.v8.js";
 import { TURN_READER_V9 } from "./tasks/turn-reader.v9.js";
 import { TURN_READER_V10 } from "./tasks/turn-reader.v10.js";
 import { TURN_READER_V11 } from "./tasks/turn-reader.v11.js";
+import { TURN_READER_V12 } from "./tasks/turn-reader.v12.js";
 import { MEMORY_EXTRACTOR_V1 } from "./tasks/memory-extractor.v1.js";
 import { FIT_EXPLANATION_V1 } from "./tasks/fit-explanation.v1.js";
 import { FOUNDER_ONBOARDING_EXTRACTION_V1 } from "./tasks/founder-onboarding-extraction.v1.js";
@@ -239,6 +240,7 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition<unknown, unknown>[] =
     TURN_READER_V9,
     TURN_READER_V10,
     TURN_READER_V11,
+    TURN_READER_V12,
     MEMORY_EXTRACTOR_V1,
     GATEQ_INTERVIEWER_V1,
   ];

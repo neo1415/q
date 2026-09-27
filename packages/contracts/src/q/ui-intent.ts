@@ -110,6 +110,8 @@ export const Q_NAVIGATE_DESTINATIONS = [
   "VERIFICATION",
   "PITCH",
   "COMPANY_INTEREST",
+  // R30 #7: the Saved list (/discover/saved).
+  "SAVED",
 ] as const satisfies readonly QVoiceDestination[];
 
 export type QNavigateDestination = (typeof Q_NAVIGATE_DESTINATIONS)[number];

@@ -158,6 +158,7 @@ export { TURN_READER_V8 } from "./prompts/tasks/turn-reader.v8.js";
 export { TURN_READER_V9 } from "./prompts/tasks/turn-reader.v9.js";
 export { TURN_READER_V10 } from "./prompts/tasks/turn-reader.v10.js";
 export { TURN_READER_V11 } from "./prompts/tasks/turn-reader.v11.js";
+export { TURN_READER_V12 } from "./prompts/tasks/turn-reader.v12.js";
 export {
   TURN_READER_SCHEMA_NAME,
   TURN_READER_SCHEMA_VERSION,

@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  createDefaultPromptRegistry,
   stepQuestionSequence,
   TURN_READER_V10,
   TURN_READER_V11,
@@ -141,9 +140,7 @@ describe("stepQuestionSequence", () => {
 });
 
 describe("TURN_READER v11", () => {
-  it("is the active reader and extends v10 with the sequence rules", () => {
-    const registry = createDefaultPromptRegistry();
-    expect(registry.getActive("TURN_READER").definition.version).toBe(11);
+  it("extends v10 with the sequence rules", () => {
     expect(TURN_READER_V11.template).toContain("SEQUENCE (null unless");
     expect(TURN_READER_V11.template).toContain("RELATIONSHIPS (");
     expect(TURN_READER_V11.template.length).toBeGreaterThan(

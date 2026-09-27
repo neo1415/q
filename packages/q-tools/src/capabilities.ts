@@ -155,6 +155,7 @@ const SCREEN_DOES: Readonly<Record<QNavigateDestination, string>> = {
     "Opens Pitch & media: their pitch video (upload, replace, remove, who can play it) and transcript.",
   COMPANY_INTEREST:
     "Opens their company's incoming investor interest, to read and answer it.",
+  SAVED: "Opens Saved: the companies they saved from Discover to come back to.",
 };
 
 /** Screens that belong to a company's own people. */

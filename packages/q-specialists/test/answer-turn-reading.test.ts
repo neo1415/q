@@ -576,6 +576,7 @@ describe("the answer is told what this run can do (CQ-QX-008)", () => {
           "DISCOVER",
           "RELATIONSHIPS",
           "SETTINGS",
+          "SAVED",
         ],
         documents: [],
         visibilityChange: false,

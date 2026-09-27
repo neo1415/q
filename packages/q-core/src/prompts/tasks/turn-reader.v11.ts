@@ -35,7 +35,7 @@ export const TURN_READER_V11: PromptDefinition<
 > = {
   ...TURN_READER_V10,
   version: 11,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   changeDescription:
     "R35: a requested series of questions (START with count and topic) or a request to stop one (STOP) is recorded as sequence; code tracks progress.",
   effectiveFrom: "2026-09-27",

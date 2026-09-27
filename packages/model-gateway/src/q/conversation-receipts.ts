@@ -149,6 +149,7 @@ const SCREEN_NAMES: Readonly<Record<QNavigateDestination, string>> = {
   VERIFICATION: "their company's verification",
   PITCH: "their pitch (video and deck)",
   COMPANY_INTEREST: "their company's incoming interest",
+  SAVED: "their Saved list",
 };
 
 /** Where the person is, in their terms (R21). */

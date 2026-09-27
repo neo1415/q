@@ -193,6 +193,7 @@ const DESTINATION_LINES: Readonly<Record<QNavigateDestination, string>> = {
   VERIFICATION: "Opening verification.",
   PITCH: "Opening Pitch & media.",
   COMPANY_INTEREST: "Opening your investor interest.",
+  SAVED: "Opening Saved.",
 };
 
 /** A real screen, as offered back to someone who named one that isn't. */
@@ -207,6 +208,7 @@ const DESTINATION_NAMES: Readonly<Record<QNavigateDestination, string>> = {
   VERIFICATION: "Verification",
   PITCH: "Pitch & media",
   COMPANY_INTEREST: "your investor interest",
+  SAVED: "Saved",
 };
 
 /**

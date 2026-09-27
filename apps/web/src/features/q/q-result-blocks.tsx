@@ -164,6 +164,7 @@ const DESTINATION_LABELS: Readonly<
   VERIFICATION: "Open Verification",
   PITCH: "Open Pitch & media",
   COMPANY_INTEREST: "Open investor interest",
+  SAVED: "Open Saved",
 };
 
 function subjectLabel(subject: QSubjectRef): string {
