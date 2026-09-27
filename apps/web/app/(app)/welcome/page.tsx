@@ -22,7 +22,7 @@ export const dynamic = "force-dynamic";
 
 /**
  * Arrival (CQ-Q-VOICE-001 rework). A person Capital Q already knows goes
- * straight to Home; a new person meets Q first. `?again=1` lets anyone
+ * straight to Discover; a new person meets Q first. `?again=1` lets anyone
  * come back to it.
  */
 export default async function WelcomePage({
@@ -33,7 +33,7 @@ export default async function WelcomePage({
   const config = loadWebServerConfig();
   const params = await searchParams;
   if (config.qApiBaseUrl === undefined) {
-    redirect("/home");
+    redirect("/discover");
   }
   const context = await resolveOwnContext();
   if (params["again"] !== "1") {
@@ -42,7 +42,12 @@ export default async function WelcomePage({
     const unfinished =
       context.kind === "NONE" ? await resolveUnfinishedSetup() : null;
     if (arrivalFor(context, unfinished) === "RETURNING") {
-      redirect("/home");
+      // Discover is home (founder directive, 2026-09-27). A setup left
+      // part-way with no company or organisation yet has nothing to
+      // discover from, so Q welcomes that person back on its own page.
+      redirect(
+        unfinished !== null && context.kind === "NONE" ? "/home" : "/discover",
+      );
     }
   }
   let knownName: string | null = null;

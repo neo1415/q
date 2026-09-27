@@ -8,10 +8,15 @@ import { ICON_SIZE, ICON_STROKE } from "@capital-q/ui/icons";
 
 import { useHomeHref } from "@/features/q/active-conversation";
 
-import { isActiveRoute, MOBILE_NAVIGATION } from "./navigation";
+import {
+  isActiveRoute,
+  MOBILE_CENTRE_HREF,
+  MOBILE_NAVIGATION,
+} from "./navigation";
 
 /**
- * Canonical mobile navigation: five fixed tabs, each a 44 px+ target with a
+ * Canonical mobile navigation: five fixed tabs, Discover first and Q in the
+ * centre (founder directive, 2026-09-27), each a 44 px+ target with a
  * visible icon and label. Labels are set a step smaller and tighter than
  * caption so "Relationships" fits a 360 px phone without truncating. The active tab is marked by aria-current, weight
  * and an indicator bar as well as colour.
@@ -46,11 +51,27 @@ export function MobileNavigation() {
                     className="absolute inset-x-4 top-0 h-0.5 rounded-b-full bg-(--cq-accent)"
                   />
                 ) : null}
-                <Icon
-                  aria-hidden="true"
-                  size={ICON_SIZE.prominent + 2}
-                  strokeWidth={active ? 2 : ICON_STROKE}
-                />
+                {item.href === MOBILE_CENTRE_HREF ? (
+                  // Q is the centre of the bar: its mark on a soft accent
+                  // disc, so it reads as Q without any glow in the chrome.
+                  <span
+                    aria-hidden="true"
+                    data-nav-centre
+                    className="flex size-8 items-center justify-center rounded-full bg-(--cq-accent-soft) text-(--cq-accent)"
+                  >
+                    <Icon
+                      aria-hidden="true"
+                      size={ICON_SIZE.prominent + 2}
+                      strokeWidth={2}
+                    />
+                  </span>
+                ) : (
+                  <Icon
+                    aria-hidden="true"
+                    size={ICON_SIZE.prominent + 2}
+                    strokeWidth={active ? 2 : ICON_STROKE}
+                  />
+                )}
                 <span className="truncate">{item.label}</span>
               </Link>
             </li>

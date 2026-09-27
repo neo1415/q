@@ -25,8 +25,8 @@ test.describe("authentication (mobile)", () => {
   test("a signed-out visitor to a protected route is sent to sign-in with a return path", async ({
     page,
   }) => {
-    // Home is the default destination, so it needs no return parameter.
-    await page.goto("/home");
+    // Arrival is the default destination, so it needs no return parameter.
+    await page.goto("/welcome");
     await expect(page).toHaveURL(/\/auth\/sign-in$/);
     await expect(
       page.getByRole("heading", { name: "Sign in", level: 1 }),
@@ -123,7 +123,7 @@ test.describe("authentication (mobile)", () => {
 
     // The session is gone: protected routes redirect again and no session
     // cookie remains in the browser.
-    await page.goto("/home");
+    await page.goto("/welcome");
     await expect(page).toHaveURL(/\/auth\/sign-in$/);
     const cookies = await page.context().cookies();
     expect(
@@ -182,7 +182,7 @@ test.describe("authentication (mobile)", () => {
     ];
     for (const attempt of attempts) {
       await page.goto(`/auth/sign-in?next=${encodeURIComponent(attempt)}`);
-      await expect(page.locator('input[name="next"]')).toHaveValue("/home");
+      await expect(page.locator('input[name="next"]')).toHaveValue("/welcome");
     }
     await page.goto("/auth/sign-in?next=%2Fprofile");
     await expect(page.locator('input[name="next"]')).toHaveValue("/profile");
@@ -203,11 +203,11 @@ test.describe("authentication (mobile)", () => {
     await page.getByLabel("Email").fill(email);
     await page.getByLabel("Password").fill(TEST_PASSWORD);
     await page.getByRole("button", { name: "Continue" }).click();
-    await expect(page).toHaveURL(/^http:\/\/127\.0\.0\.1:\d+\/home$/);
+    await expect(page).toHaveURL(/^http:\/\/127\.0\.0\.1:\d+\/discover$/);
 
     // And a signed-in visitor with a hostile next is kept on-origin too.
     await page.goto("/auth/sign-in?next=%2F%2Fevil.example");
-    await expect(page).toHaveURL(/^http:\/\/127\.0\.0\.1:\d+\/home$/);
+    await expect(page).toHaveURL(/^http:\/\/127\.0\.0\.1:\d+\/discover$/);
   });
 
   test("password recovery: generic response, emailed link, new password works, old one does not", async ({
@@ -239,7 +239,7 @@ test.describe("authentication (mobile)", () => {
     const newPassword = `${TEST_PASSWORD}-rotated`;
     await page.getByLabel("New password").fill(newPassword);
     await page.getByRole("button", { name: "Update password" }).click();
-    await expect(page).toHaveURL(/\/home$/);
+    await expect(page).toHaveURL(/\/discover$/);
 
     await signOutThroughUi(page);
 
@@ -248,7 +248,7 @@ test.describe("authentication (mobile)", () => {
       "Email or password wasn't recognised.",
     );
     await signInThroughUi(page, email, newPassword);
-    await expect(page).toHaveURL(/\/home$/);
+    await expect(page).toHaveURL(/\/discover$/);
   });
 
   test("an emailed sign-in link signs the person in through the callback", async ({
@@ -266,7 +266,7 @@ test.describe("authentication (mobile)", () => {
 
     const link = await waitForAuthLink(request, email);
     await page.goto(link);
-    await expect(page).toHaveURL(/\/home$/);
+    await expect(page).toHaveURL(/\/discover$/);
     await page.goto("/profile");
     await expect(page.getByText(email)).toBeVisible();
   });

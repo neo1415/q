@@ -32,7 +32,7 @@ export async function signUpThroughUi(
   await page.getByLabel("Password").fill(password);
   await page.getByRole("button", { name: "Create account" }).click();
   // A new account lands on the first-run welcome; a returning one on Q.
-  await expect(page).toHaveURL(/\/(welcome|home)(\?.*)?$/, {
+  await expect(page).toHaveURL(/\/(welcome|home|discover)(\?.*)?$/, {
     timeout: 60_000,
   });
 }

@@ -13,9 +13,11 @@ import { QNavIcon } from "./q-nav-icon";
 
 /**
  * The information architecture (doc 17 §§6–8, as amended by ADR 0017).
- * Four primary areas plus Profile. The first is Q's own page, labelled
+ * Four primary areas plus Profile. Discover comes first: it is where the
+ * product starts (founder directive, 2026-09-27). Q's own page is labelled
  * "Q" (lead decision, 2026-09-25); its route stays /home so every
- * `/home?c=` link keeps working. Q is also the floating dock (F1).
+ * `/home?c=` link keeps working (/q redirects there). Q is also the
+ * floating dock (F1), so it is never more than one tap away.
  */
 
 export type NavigationItem = {
@@ -37,12 +39,18 @@ export type NavigationItem = {
 };
 
 export const PRIMARY_NAVIGATION: readonly NavigationItem[] = [
-  { href: "/home", label: "Q", icon: QNavIcon },
   { href: "/discover", label: "Discover", icon: Compass },
+  { href: "/home", label: "Q", icon: QNavIcon },
   { href: "/capital", label: "Capital", icon: Landmark },
   // Every canonical relationship of the person's side (R27).
   { href: "/relationships", label: "Relationships", icon: Users },
 ];
+
+const byHref = (href: NavigationItem["href"]): NavigationItem => {
+  const item = PRIMARY_NAVIGATION.find((entry) => entry.href === href);
+  if (item === undefined) throw new Error(`No primary navigation for ${href}`);
+  return item;
+};
 
 export const PROFILE_NAVIGATION: NavigationItem = {
   href: "/profile",
@@ -69,11 +77,22 @@ export const FOUNDER_MEDIA_NAVIGATION: NavigationItem = {
   icon: Play,
 };
 
-/** Mobile carries Profile as the fifth and last tab. */
+/**
+ * The phone's tab bar (founder directive, 2026-09-27): Discover first, Q in
+ * the centre, Profile last. There is no separate Chats area -- a person's
+ * conversations with Q live on the Q page and their relationship threads
+ * under Relationships -- so the fourth slot is Capital.
+ */
 export const MOBILE_NAVIGATION: readonly NavigationItem[] = [
-  ...PRIMARY_NAVIGATION,
+  byHref("/discover"),
+  byHref("/relationships"),
+  byHref("/home"),
+  byHref("/capital"),
   PROFILE_NAVIGATION,
 ];
+
+/** The centre tab, drawn as Q's own mark rather than a plain icon. */
+export const MOBILE_CENTRE_HREF = "/home" satisfies NavigationItem["href"];
 
 export function isActiveRoute(pathname: string, href: string): boolean {
   return pathname === href || pathname.startsWith(`${href}/`);

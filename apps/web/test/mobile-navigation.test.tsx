@@ -19,10 +19,10 @@ describe("MobileNavigation", () => {
     const links = nav.querySelectorAll("a");
     expect(links).toHaveLength(5);
     expect([...links].map((link) => link.textContent)).toEqual([
-      "Q",
       "Discover",
-      "Capital",
       "Relationships",
+      "Q",
+      "Capital",
       "Profile",
     ]);
   });
@@ -45,10 +45,10 @@ describe("MobileNavigation", () => {
     expect(isActiveRoute("/capital/objectives/1", "/capital")).toBe(true);
     expect(isActiveRoute("/capitalisation", "/capital")).toBe(false);
     expect(MOBILE_NAVIGATION.map((item) => item.href)).toEqual([
-      "/home",
       "/discover",
-      "/capital",
       "/relationships",
+      "/home",
+      "/capital",
       "/profile",
     ]);
   });

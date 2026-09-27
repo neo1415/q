@@ -30,6 +30,14 @@ const nextConfig: NextConfig = {
       { source: "/@:handle([A-Za-z0-9-]+)", destination: "/u/:handle" },
     ]);
   },
+  // Q's page lives at /home, where every `/home?c=` link already points.
+  // /q is its short address; the query string (a conversation id) is
+  // carried across. Temporary, so the canonical route can still move.
+  redirects() {
+    return Promise.resolve([
+      { source: "/q", destination: "/home", permanent: false },
+    ]);
+  },
   headers() {
     return Promise.resolve([
       { source: "/(.*)", headers: securityHeaders },
