@@ -351,6 +351,8 @@ export {
   QRecordPageSchema,
   QOpenRecordPageIntentSchema,
   QOpenSetupIntentSchema,
+  QSetDiscoverFiltersIntentSchema,
+  type QSetDiscoverFiltersIntent,
   type QRecordPage,
   type QMotionChoice,
   QClientActionIntentSchema,

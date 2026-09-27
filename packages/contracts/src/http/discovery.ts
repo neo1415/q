@@ -1,6 +1,8 @@
 import { z } from "zod";
 
 import { UuidSchema } from "../common/ids.js";
+import { CurrencyCodeSchema } from "../common/money.js";
+import { StageCodeSchema } from "./companies.js";
 import { PitchSummaryDtoSchema } from "./media.js";
 
 /**
@@ -49,6 +51,12 @@ export const DiscoveryNoteDtoSchema = z.enum([
   "NONE_PASS_HARD_RULES",
   /** Companies are discoverable and pass the hard rules; none matched the mandate. */
   "NONE_MATCH_MANDATE",
+  /**
+   * The reader's own Discover filters left nothing on this first page's
+   * scan (lead-owned contract change, ux/discover-filters). Never said when
+   * no filter is applied.
+   */
+  "NONE_MATCH_FILTERS",
 ]);
 export type DiscoveryNoteDto = z.infer<typeof DiscoveryNoteDtoSchema>;
 
@@ -61,6 +69,242 @@ export const MandateRuleCodeDtoSchema = z
   .string()
   .regex(/^[a-z][a-z0-9_.]*$/)
   .max(64);
+
+// ---------------------------------------------------------------------------
+// Discover filters (lead-owned contract change, ux/discover-filters; doc 19
+// §15 explicit filters, ADR 0020).
+//
+// Optional query parameters on GET /v1/discovery/companies. They narrow the
+// served slate at read time: ranks stay the slate's, nothing is re-ranked,
+// and the cursor carries a fingerprint of the filters so every page of one
+// scroll is read under the same ones. A request whose filters differ from
+// its cursor's starts again from the first page (SLATE_RESTARTED).
+//
+// Unknown never excludes silently: a company whose sector, stage or
+// country is not stated, or whose raise is not shared with this reader,
+// stays and is marked (`filterUnknown`), unless the reader asked for
+// disclosed raises only. "Verified only" and "has pitch" ask for a
+// positive fact, so only a company that has it passes.
+// ---------------------------------------------------------------------------
+
+export const DISCOVER_FILTER_DIMENSIONS = [
+  "sector",
+  "stage",
+  "country",
+  "raise",
+] as const;
+export const DiscoverFilterDimensionSchema = z.enum(DISCOVER_FILTER_DIMENSIONS);
+export type DiscoverFilterDimension = z.infer<
+  typeof DiscoverFilterDimensionSchema
+>;
+
+/** A non-negative exact amount, bounded; never a float. */
+export const DiscoverRaiseAmountSchema = z
+  .string()
+  .regex(
+    /^(?:0|[1-9]\d{0,14})(?:\.\d{1,2})?$/,
+    "expected an amount such as 500000",
+  );
+
+export const DISCOVER_FILTER_LIST_MAX = 12;
+
+export const DiscoverRaiseFilterSchema = z
+  .object({
+    min: DiscoverRaiseAmountSchema.optional(),
+    max: DiscoverRaiseAmountSchema.optional(),
+    currency: CurrencyCodeSchema,
+  })
+  .strict();
+export type DiscoverRaiseFilter = z.infer<typeof DiscoverRaiseFilterSchema>;
+
+export const DiscoverFiltersSchema = z
+  .object({
+    /** Taxonomy node ids (sector vocabularies); a parent includes its children. */
+    sectorNodeIds: z
+      .array(UuidSchema)
+      .max(DISCOVER_FILTER_LIST_MAX)
+      .default([]),
+    stageCodes: z
+      .array(StageCodeSchema)
+      .max(DISCOVER_FILTER_LIST_MAX)
+      .default([]),
+    /** ISO 3166-1 alpha-2, uppercase, as company records store them. */
+    countryCodes: z
+      .array(z.string().regex(/^[A-Z]{2}$/))
+      .max(DISCOVER_FILTER_LIST_MAX)
+      .default([]),
+    raise: DiscoverRaiseFilterSchema.nullable().default(null),
+    /** Only companies whose raise is shared with this reader (and in range). */
+    raiseDisclosedOnly: z.boolean().default(false),
+    verifiedOnly: z.boolean().default(false),
+    hasPitch: z.boolean().default(false),
+  })
+  .strict();
+export type DiscoverFilters = z.infer<typeof DiscoverFiltersSchema>;
+
+export const NO_DISCOVER_FILTERS: DiscoverFilters = Object.freeze({
+  sectorNodeIds: [],
+  stageCodes: [],
+  countryCodes: [],
+  raise: null,
+  raiseDisclosedOnly: false,
+  verifiedOnly: false,
+  hasPitch: false,
+});
+
+/** True when nothing narrows the slate. */
+export function isEmptyDiscoverFilters(filters: DiscoverFilters): boolean {
+  return (
+    filters.sectorNodeIds.length === 0 &&
+    filters.stageCodes.length === 0 &&
+    filters.countryCodes.length === 0 &&
+    (filters.raise === null ||
+      (filters.raise.min === undefined && filters.raise.max === undefined)) &&
+    !filters.raiseDisclosedOnly &&
+    !filters.verifiedOnly &&
+    !filters.hasPitch
+  );
+}
+
+/** How many filter groups are on: the badge on the filter button. */
+export function activeDiscoverFilterCount(filters: DiscoverFilters): number {
+  return [
+    filters.sectorNodeIds.length > 0,
+    filters.stageCodes.length > 0,
+    filters.countryCodes.length > 0,
+    (filters.raise !== null &&
+      (filters.raise.min !== undefined || filters.raise.max !== undefined)) ||
+      filters.raiseDisclosedOnly,
+    filters.verifiedOnly,
+    filters.hasPitch,
+  ].filter(Boolean).length;
+}
+
+/** Sorted, de-duplicated, empty raise dropped: equal filters compare equal. */
+export function canonicalDiscoverFilters(
+  filters: DiscoverFilters,
+): DiscoverFilters {
+  const sorted = (values: readonly string[]): string[] =>
+    [...new Set(values)].sort();
+  const raise =
+    filters.raise === null ||
+    (filters.raise.min === undefined && filters.raise.max === undefined)
+      ? null
+      : {
+          ...(filters.raise.min === undefined
+            ? {}
+            : { min: filters.raise.min }),
+          ...(filters.raise.max === undefined
+            ? {}
+            : { max: filters.raise.max }),
+          currency: filters.raise.currency,
+        };
+  return {
+    sectorNodeIds: sorted(filters.sectorNodeIds.map((id) => id.toLowerCase())),
+    stageCodes: sorted(filters.stageCodes),
+    countryCodes: sorted(filters.countryCodes),
+    raise,
+    raiseDisclosedOnly: filters.raiseDisclosedOnly,
+    verifiedOnly: filters.verifiedOnly,
+    hasPitch: filters.hasPitch,
+  };
+}
+
+/** The query parameters, all optional; lists are comma-separated. */
+export const DISCOVER_FILTER_QUERY_KEYS = [
+  "sector",
+  "stage",
+  "country",
+  "raiseMin",
+  "raiseMax",
+  "raiseCurrency",
+  "raiseDisclosedOnly",
+  "verifiedOnly",
+  "hasPitch",
+] as const;
+
+const list = (value: unknown): string[] =>
+  typeof value === "string" && value.length > 0
+    ? value
+        .split(",")
+        .map((part) => part.trim())
+        .filter((part) => part.length > 0)
+    : [];
+const flag = z.enum(["true", "false"]).optional();
+
+/**
+ * Parses the query string's filter parameters (external input: `unknown`
+ * until here). A raise bound without a currency is refused rather than
+ * guessed: money is never currency-less.
+ */
+export const DiscoverFiltersQuerySchema = z
+  .object({
+    sector: z.string().max(600).optional(),
+    stage: z.string().max(400).optional(),
+    country: z.string().max(100).optional(),
+    raiseMin: DiscoverRaiseAmountSchema.optional(),
+    raiseMax: DiscoverRaiseAmountSchema.optional(),
+    raiseCurrency: CurrencyCodeSchema.optional(),
+    raiseDisclosedOnly: flag,
+    verifiedOnly: flag,
+    hasPitch: flag,
+  })
+  .refine(
+    (q) =>
+      (q.raiseMin === undefined && q.raiseMax === undefined) ||
+      q.raiseCurrency !== undefined,
+    { message: "a raise bound needs raiseCurrency", path: ["raiseCurrency"] },
+  )
+  .transform((q, ctx): DiscoverFilters => {
+    const parsed = DiscoverFiltersSchema.safeParse({
+      sectorNodeIds: list(q.sector),
+      stageCodes: list(q.stage),
+      countryCodes: list(q.country).map((code) => code.toUpperCase()),
+      raise:
+        q.raiseCurrency === undefined ||
+        (q.raiseMin === undefined && q.raiseMax === undefined)
+          ? null
+          : {
+              ...(q.raiseMin === undefined ? {} : { min: q.raiseMin }),
+              ...(q.raiseMax === undefined ? {} : { max: q.raiseMax }),
+              currency: q.raiseCurrency,
+            },
+      raiseDisclosedOnly: q.raiseDisclosedOnly === "true",
+      verifiedOnly: q.verifiedOnly === "true",
+      hasPitch: q.hasPitch === "true",
+    });
+    if (!parsed.success) {
+      for (const issue of parsed.error.issues) {
+        ctx.addIssue({
+          code: "custom",
+          message: issue.message,
+          path: issue.path,
+        });
+      }
+      return z.NEVER;
+    }
+    return canonicalDiscoverFilters(parsed.data);
+  });
+
+/** The query parameters for a set of filters; none for an empty set. */
+export function discoverFiltersToQuery(
+  filters: DiscoverFilters,
+): Record<string, string> {
+  const f = canonicalDiscoverFilters(filters);
+  const out: Record<string, string> = {};
+  if (f.sectorNodeIds.length > 0) out.sector = f.sectorNodeIds.join(",");
+  if (f.stageCodes.length > 0) out.stage = f.stageCodes.join(",");
+  if (f.countryCodes.length > 0) out.country = f.countryCodes.join(",");
+  if (f.raise !== null) {
+    if (f.raise.min !== undefined) out.raiseMin = f.raise.min;
+    if (f.raise.max !== undefined) out.raiseMax = f.raise.max;
+    out.raiseCurrency = f.raise.currency;
+  }
+  if (f.raiseDisclosedOnly) out.raiseDisclosedOnly = "true";
+  if (f.verifiedOnly) out.verifiedOnly = "true";
+  if (f.hasPitch) out.hasPitch = "true";
+  return out;
+}
 
 export const DiscoveredCompanyDtoSchema = z
   .object({
@@ -98,6 +342,14 @@ export const DiscoveredCompanyDtoSchema = z
      * read: the client then shows the card as not saved yet.
      */
     viewerSaved: z.boolean().optional(),
+    /**
+     * Filters the reader applied that this company's shared facts could
+     * not answer (its sector or stage is not stated, or its raise is not
+     * shared with this reader). Unknown never excludes silently: the
+     * company stays and the card says which filter it was not checked
+     * against. Absent when no filter was applied.
+     */
+    filterUnknown: z.array(DiscoverFilterDimensionSchema).max(4).optional(),
   })
   .strict();
 export type DiscoveredCompanyDto = z.infer<typeof DiscoveredCompanyDtoSchema>;

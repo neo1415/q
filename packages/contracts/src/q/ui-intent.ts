@@ -1,6 +1,12 @@
 import { z } from "zod";
 
 import { UuidSchema } from "../common/ids.js";
+import { StageCodeSchema } from "../http/companies.js";
+import {
+  DISCOVER_FILTER_LIST_MAX,
+  DiscoverRaiseFilterSchema,
+} from "../http/discovery.js";
+import { TaxonomyCanonicalCodeSchema } from "../http/taxonomy.js";
 import { QEvidenceRefsSchema } from "./evidence-ref.js";
 import type { QVoiceChoice, QVoiceDestination } from "./voice.js";
 
@@ -242,7 +248,37 @@ export const QOpenSetupIntentSchema = z
   })
   .strict();
 
+/**
+ * Discover filters, set by asking ("show me only fintech in Nigeria";
+ * lead-owned contract change, ux/discover-filters). Replaces the reader's
+ * filters on their own screen, exactly as the filter sheet does. Sectors
+ * travel as taxonomy canonical codes, because a model knows "fintech" and
+ * not a node id; the browser resolves them against the vocabulary it lists
+ * and drops what it cannot resolve. Narrowing a feed changes nothing
+ * server-side and is undone from the same control.
+ */
+export const QSetDiscoverFiltersIntentSchema = z
+  .object({
+    kind: z.literal("SET_DISCOVER_FILTERS"),
+    sectorCodes: z
+      .array(TaxonomyCanonicalCodeSchema)
+      .max(DISCOVER_FILTER_LIST_MAX),
+    stageCodes: z.array(StageCodeSchema).max(DISCOVER_FILTER_LIST_MAX),
+    countryCodes: z
+      .array(z.string().regex(/^[A-Z]{2}$/))
+      .max(DISCOVER_FILTER_LIST_MAX),
+    raise: DiscoverRaiseFilterSchema.nullable(),
+    raiseDisclosedOnly: z.boolean(),
+    verifiedOnly: z.boolean(),
+    hasPitch: z.boolean(),
+  })
+  .strict();
+export type QSetDiscoverFiltersIntent = z.infer<
+  typeof QSetDiscoverFiltersIntentSchema
+>;
+
 export const QClientActionIntentSchema = z.discriminatedUnion("kind", [
+  QSetDiscoverFiltersIntentSchema,
   QOpenRecordPageIntentSchema,
   QSetThemeIntentSchema,
   QReloadPageIntentSchema,
@@ -267,6 +303,7 @@ export const Q_CLIENT_ACTION_TOOLS = [
   "sign_out",
   "open_page",
   "continue_onboarding",
+  "set_discover_filters",
 ] as const;
 
 /**
@@ -313,6 +350,7 @@ export const QUiIntentSchema = z.discriminatedUnion("kind", [
   QSignOutIntentSchema,
   QOpenRecordPageIntentSchema,
   QOpenSetupIntentSchema,
+  QSetDiscoverFiltersIntentSchema,
 ]);
 
 export type QUiIntent = z.infer<typeof QUiIntentSchema>;
