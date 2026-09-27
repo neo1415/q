@@ -38,6 +38,7 @@ function qTurn(id: string, blocks: Extract<QTurn, { kind: "Q" }>["blocks"]) {
     text: "Done.",
     streaming: false,
     sourceCount: 0,
+    publicSources: [],
     findings: [],
     uncertainties: [],
     blocks,

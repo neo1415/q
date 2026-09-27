@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import {
   PermittedContextPlanSchema,
   Q_CONTEXT_FIREWALL_POLICY_VERSION,
+  QResultBlockSchema,
   type PermittedContextPlan,
 } from "@capital-q/contracts";
 import type { CompanyAnalystResult } from "@capital-q/q-core";
@@ -223,6 +224,7 @@ function build(options: {
     },
   ];
   const stages: string[] = [];
+  const answerBlocks: unknown[] = [];
   const repositories = {
     messages: {
       listForRun: () => Promise.resolve([...messages]),
@@ -231,8 +233,11 @@ function build(options: {
       listRecentForConversationOfRun: () => Promise.resolve([...messages]),
       insert: (
         _tx: unknown,
-        input: { role: "USER" | "Q"; content: string },
+        input: { role: "USER" | "Q"; content: string; blocks?: unknown[] },
       ) => {
+        if (input.role === "Q") {
+          answerBlocks.push(...(input.blocks ?? []));
+        }
         const message = {
           ...messages[0],
           id: randomUUID(),
@@ -277,7 +282,7 @@ function build(options: {
     retrieval: { kind: "NOT_CONFIGURED" },
     plan: plan(),
   };
-  return { seam, alpha, messages, stages, request };
+  return { seam, alpha, messages, stages, request, answerBlocks };
 }
 
 const researchCall: FakeBehaviour = {
@@ -454,12 +459,12 @@ describe("answer seam: Q decides to research", () => {
   });
 });
 
-describe("answer seam: one source presentation (R3)", () => {
-  it("presents a source the model cited by label as title, domain, date and link", async () => {
+describe("answer seam: answer first, sources attached (R3, R23, R38)", () => {
+  it("removes a source label from the prose and attaches the page under Sources", async () => {
     const tools = toolPort([RESEARCH], (p) =>
       researchOutcome(p, "Northstar now operates in Nigeria, Ghana and Kenya."),
     );
-    const { seam, request, messages } = build({
+    const { seam, request, messages, answerBlocks } = build({
       script: [
         researchCall,
         {
@@ -474,10 +479,29 @@ describe("answer seam: one source presentation (R3)", () => {
     });
     await seam.answer(request);
     const answer = messages.at(-1)?.content ?? "";
+    expect(answer).toContain("A recent article reports a Kenya hub.");
     expect(answer).not.toContain("S1");
-    expect(answer).toContain(
-      "(Northstar expands to Kenya (news.example.com, published 2026-09-02, https://news.example.com/2026/09/northstar))",
+    expect(answer).not.toContain("https://");
+    expect(answerBlocks).toContainEqual({
+      kind: "PUBLIC_SOURCE",
+      url: "https://news.example.com/2026/09/northstar",
+      domain: "news.example.com",
+      title: "Northstar expands to Kenya",
+      publishedOn: "2026-09-02",
+      retrievedOn: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/) as string,
+    });
+    for (const block of answerBlocks) {
+      expect(QResultBlockSchema.safeParse(block).success).toBe(true);
+    }
+  });
+
+  it("tells the model to answer first and name a source only when asked", () => {
+    expect(RESEARCH_NOTE).toContain("Answer first");
+    expect(RESEARCH_NOTE).toContain(
+      "name a source only when asked where something came from",
     );
+    expect(RESEARCH_NOTE).toContain("never fact");
+    expect(RESEARCH_NOTE).not.toMatch(/Cite a source by its title/);
   });
 });
 

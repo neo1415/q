@@ -2,6 +2,8 @@
 
 import { Q_CONFIDENCE_LABELS, type QFindingType } from "@capital-q/contracts";
 
+import { formatDay } from "@/components/date-format";
+
 import type { QTurn, QTurnObjectBlock } from "./conversation";
 import { QResultBlocks } from "./q-result-blocks";
 
@@ -76,15 +78,19 @@ export function QEvidence({
 }) {
   const { evidence } = splitBlocks(turn.blocks);
   const count =
-    turn.findings.length + turn.uncertainties.length + evidence.length;
-  if (count === 0 && turn.sourceCount === 0) return null;
+    turn.findings.length +
+    turn.uncertainties.length +
+    evidence.length +
+    turn.publicSources.length;
+  const sourceTotal = turn.sourceCount + turn.publicSources.length;
+  if (count === 0 && sourceTotal === 0) return null;
   return (
     <details className="cq-q-evidence" data-q-evidence>
       <summary className="cq-q-evidence-summary">
         Sources
         <span className="cq-caption text-(--cq-text-tertiary)">
-          {turn.sourceCount > 0
-            ? ` · ${sources(turn.sourceCount)}`
+          {sourceTotal > 0
+            ? ` · ${sources(sourceTotal)}`
             : count > 0
               ? ` · ${String(count)}`
               : ""}
@@ -132,6 +138,33 @@ export function QEvidence({
                       Would settle it: {item.missing.join(", ")}.
                     </span>
                   ) : null}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+        {turn.publicSources.length > 0 ? (
+          <div className="flex flex-col gap-2" data-q-public-sources>
+            <span className="cq-label text-(--cq-text-tertiary)">
+              Public sources, unverified
+            </span>
+            <ul className="flex flex-col gap-2">
+              {turn.publicSources.map((source) => (
+                <li key={source.url} className="flex flex-col gap-0.5">
+                  <a
+                    className="cq-body text-(--cq-text-primary) underline underline-offset-2"
+                    href={source.url}
+                    target="_blank"
+                    rel="noopener noreferrer nofollow"
+                  >
+                    {source.title}
+                  </a>
+                  <span className="cq-caption text-(--cq-text-secondary)">
+                    {source.domain} ·{" "}
+                    {source.publishedOn === null
+                      ? `read ${formatDay(source.retrievedOn)}`
+                      : formatDay(source.publishedOn)}
+                  </span>
                 </li>
               ))}
             </ul>

@@ -314,6 +314,7 @@ export {
   QResultBlocksSchema,
   QTextBlockSchema,
   QUiIntentBlockSchema,
+  QPublicSourceBlockSchema,
   QUncertaintyBlockSchema,
   type QResultBlock,
   type QResultBlockKind,

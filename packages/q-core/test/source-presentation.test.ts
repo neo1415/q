@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import {
   citePublicSources,
+  publicSourceBlockFields,
+  withoutPublicSourceLabels,
   describePublicSource,
   presentPublicSource,
   type PublicSourceLike,
@@ -88,5 +90,34 @@ describe("citePublicSources", () => {
     expect(citePublicSources("The GS1 barcode and iOS1 build.", SOURCES)).toBe(
       "The GS1 barcode and iOS1 build.",
     );
+  });
+});
+
+describe("withoutPublicSourceLabels (R23, R38)", () => {
+  it("removes labels of sources this run read and leaves everything else", () => {
+    expect(
+      withoutPublicSourceLabels(
+        "Pitchbook (source S1) says $86m. Tracxn S2, records $27m; S3 is silent.",
+        SOURCES,
+      ),
+    ).toBe("Pitchbook says $86m. Tracxn, records $27m; S3 is silent.");
+    expect(withoutPublicSourceLabels("See source S1.", [])).toBe(
+      "See source S1.",
+    );
+    expect(
+      withoutPublicSourceLabels("The GS1 barcode and iOS1 build.", SOURCES),
+    ).toBe("The GS1 barcode and iOS1 build.");
+  });
+
+  it("projects a source into the block's public fields", () => {
+    const fields = publicSourceBlockFields(UNTITLED);
+    const p = presentPublicSource(UNTITLED);
+    expect(fields).toEqual({
+      url: p.url,
+      domain: p.domain,
+      title: p.title,
+      publishedOn: p.publishedOn,
+      retrievedOn: p.retrievedOn,
+    });
   });
 });

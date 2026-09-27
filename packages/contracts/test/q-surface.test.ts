@@ -136,6 +136,14 @@ const completedRun = {
       title: "Investment brief",
     },
     { kind: "UI_INTENT", intent: { kind: "OPEN_COMPANY", companyId: UUID } },
+    {
+      kind: "PUBLIC_SOURCE",
+      url: "https://news.example.com/2026/09/northstar",
+      domain: "news.example.com",
+      title: "Northstar expands to Kenya",
+      publishedOn: "2026-09-02",
+      retrievedOn: "2026-09-27",
+    },
   ],
   createdAt: NOW,
   startedAt: NOW,
@@ -274,6 +282,8 @@ describe("type-level guarantees", () => {
           return block.artifactId;
         case "UI_INTENT":
           return block.intent.kind;
+        case "PUBLIC_SOURCE":
+          return block.url;
         default: {
           const unreachable: never = block;
           return unreachable;
@@ -299,5 +309,40 @@ describe("type-level guarantees", () => {
 
     expect(company.kind).toBe("COMPANY");
     expect(wrong.kind).toBe("COMPANY");
+  });
+});
+
+describe("PUBLIC_SOURCE block (R23, R38)", () => {
+  const source = {
+    kind: "PUBLIC_SOURCE",
+    url: "https://news.example.com/2026/09/northstar",
+    domain: "news.example.com",
+    title: "Northstar expands to Kenya",
+    publishedOn: "2026-09-02",
+    retrievedOn: "2026-09-27",
+  } as const;
+
+  it("carries a public page's fields and nothing else", () => {
+    expect(QResultBlockSchema.safeParse(source).success).toBe(true);
+    expect(
+      QResultBlockSchema.safeParse({ ...source, publishedOn: null }).success,
+    ).toBe(true);
+    expect(
+      QResultBlockSchema.safeParse({ ...source, evidenceSourceId: "x" })
+        .success,
+    ).toBe(false);
+  });
+
+  it("is only ever an http(s) page with day-precision dates", () => {
+    expect(
+      QResultBlockSchema.safeParse({ ...source, url: "javascript:alert(1)" })
+        .success,
+    ).toBe(false);
+    expect(
+      QResultBlockSchema.safeParse({
+        ...source,
+        retrievedOn: "2026-09-27T10:00:00Z",
+      }).success,
+    ).toBe(false);
   });
 });

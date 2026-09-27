@@ -36,6 +36,7 @@ function q(
     text,
     streaming,
     sourceCount: 0,
+    publicSources: [],
     findings: [],
     uncertainties: [],
     blocks,

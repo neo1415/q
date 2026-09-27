@@ -482,6 +482,8 @@ export {
 export {
   citeAuthorisedFacts,
   citePublicSources,
+  withoutPublicSourceLabels,
+  publicSourceBlockFields,
   describePublicSource,
   type CitableFact,
   presentPublicSource,

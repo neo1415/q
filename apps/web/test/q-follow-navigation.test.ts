@@ -21,6 +21,7 @@ function qTurn(
     text: "Taking you to Discover.",
     streaming,
     sourceCount: 0,
+    publicSources: [],
     findings: [],
     uncertainties: [],
     blocks,

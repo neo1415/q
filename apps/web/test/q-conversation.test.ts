@@ -228,6 +228,45 @@ describe("C5R1-W03 · a conversation outlives its runs", () => {
     expect(turns[2]).toMatchObject({ text: "What worries you most?" });
   });
 
+  it("carries public web sources beside the answer, not in it (R23, R38)", () => {
+    const withSource = apply([
+      durable("q.message.completed", {
+        message: {
+          messageId: Q_MESSAGE,
+          runId: RUN,
+          role: "Q",
+          text: "Public sources say Northstar opened a Kenya hub.",
+          blocks: [
+            {
+              kind: "PUBLIC_SOURCE",
+              url: "https://news.example.com/2026/09/northstar",
+              domain: "news.example.com",
+              title: "Northstar expands to Kenya",
+              publishedOn: "2026-09-02",
+              retrievedOn: "2026-09-27",
+            },
+          ],
+          createdAt: NOW,
+        },
+      }),
+    ]);
+    const [turn] = turnsFrom(withSource, []);
+    expect(turn).toMatchObject({
+      kind: "Q",
+      text: "Public sources say Northstar opened a Kenya hub.",
+      publicSources: [
+        {
+          url: "https://news.example.com/2026/09/northstar",
+          domain: "news.example.com",
+          title: "Northstar expands to Kenya",
+          publishedOn: "2026-09-02",
+          retrievedOn: "2026-09-27",
+        },
+      ],
+      blocks: [],
+    });
+  });
+
   it("reports how many sources an answer cites, and never their identifiers", () => {
     const withEvidence = apply([
       durable("q.message.completed", {

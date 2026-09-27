@@ -44,6 +44,11 @@ export type QTurn =
        * render time — not something this projection may pre-empt (§18).
        */
       readonly sourceCount: number;
+      /**
+       * Public web pages Q read for this answer (R23, R38): the answer is
+       * said first and these sit behind Sources. Public fields only.
+       */
+      readonly publicSources: readonly QTurnPublicSource[];
       /** What Q found, in plain statements, as the server labelled them. */
       readonly findings: readonly QTurnFinding[];
       /** What Q could not settle, and what would settle it. */
@@ -84,6 +89,27 @@ export type QTurnObjectBlock = Extract<
   }
 >;
 
+export type QTurnPublicSource = Omit<
+  Extract<QResultBlock, { kind: "PUBLIC_SOURCE" }>,
+  "kind"
+>;
+
+function publicSourcesOf(
+  blocks: readonly QResultBlock[] | undefined,
+): readonly QTurnPublicSource[] {
+  if (blocks === undefined) {
+    return [];
+  }
+  const sources: QTurnPublicSource[] = [];
+  for (const block of blocks) {
+    if (block.kind === "PUBLIC_SOURCE") {
+      const { kind: _kind, ...source } = block;
+      sources.push(source);
+    }
+  }
+  return sources;
+}
+
 function objectBlocksOf(
   blocks: readonly QResultBlock[] | undefined,
 ): readonly QTurnObjectBlock[] {
@@ -109,7 +135,9 @@ function objectBlocksOf(
       case "TEXT":
       case "EVIDENCE":
       case "FINDING":
+      // PUBLIC_SOURCE is carried as the turn's own public sources.
       case "UNCERTAINTY":
+      case "PUBLIC_SOURCE":
         return false;
     }
   });
@@ -249,6 +277,7 @@ export function turnsFrom(
         text,
         streaming: false,
         sourceCount: sourceCountOf(message.blocks),
+        publicSources: publicSourcesOf(message.blocks),
         findings: findingsOf(message.blocks),
         uncertainties: uncertaintiesOf(message.blocks),
         blocks: objectBlocksOf(message.blocks),
@@ -294,6 +323,7 @@ export function turnsFrom(
       text: state.partial.text,
       streaming: true,
       sourceCount: 0,
+      publicSources: [],
       findings: [],
       uncertainties: [],
       // A partial answer has no blocks: they arrive with the persisted

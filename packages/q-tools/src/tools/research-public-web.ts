@@ -151,7 +151,7 @@ export type ResearchPublicWebOutput = z.infer<
 >;
 
 const GUIDANCE =
-  "Public sources are unverified and may be stale. Cite each as its title, domain and date (link the public URL). Compare with authorised facts: say what corroborates, what conflicts, what only one side mentions, and where dates may explain a difference. Ask the person to clarify a material mismatch instead of resolving it yourself.";
+  "Public sources are unverified and may be stale. Capital Q attaches each source to the answer under Sources, so answer first and name a source (title or site and date) only when the person asks where something came from. Compare with authorised facts: say what corroborates, what conflicts, what only one side mentions, and where dates may explain a difference. Ask the person to clarify a material mismatch instead of resolving it yourself.";
 
 type Grant = {
   readonly subject: ResearchSubject | null;

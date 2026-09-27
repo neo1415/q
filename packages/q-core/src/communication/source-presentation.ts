@@ -111,6 +111,50 @@ export function citePublicSources(
   );
 }
 
+/**
+ * The conversational answer's form (R23, R38): the answer comes first and
+ * the public pages it rests on travel beside it as structured sources,
+ * behind the Sources disclosure. A "(source S1)" the model still writes is
+ * removed rather than expanded into a title, domain, date and link in the
+ * middle of a sentence; an index that names no source is left alone, so
+ * nothing the person or a document said is touched.
+ */
+export function withoutPublicSourceLabels(
+  text: string,
+  sources: readonly PublicSourceLike[],
+): string {
+  if (sources.length === 0) {
+    return text;
+  }
+  const known = new Set(sources.map((source) => source.index));
+  return text.replace(
+    /[ \t]*\(?\b(?:public web )?source\s+S(\d{1,2})\b\)?|[ \t]*\bS(\d{1,2})\b(?=[\s.,;:)])/gi,
+    (match, a: string | undefined, b: string | undefined) =>
+      known.has(Number(a ?? b)) ? "" : match,
+  );
+}
+
+/**
+ * What a client shows behind Sources for one public page: the same
+ * presentation as everywhere else, in the result-block's fields.
+ */
+export function publicSourceBlockFields(source: PublicSourceLike): {
+  readonly url: string;
+  readonly domain: string;
+  readonly title: string;
+  readonly publishedOn: string | null;
+  readonly retrievedOn: string;
+} {
+  const p = presentPublicSource(source);
+  return {
+    url: p.url,
+    domain: p.domain,
+    title: p.title,
+    publishedOn: p.publishedOn,
+    retrievedOn: p.retrievedOn,
+  };
+}
+
 /** The part of an authorised fact a citation needs. */
 export type CitableFact = {
   readonly ref?: string | undefined;

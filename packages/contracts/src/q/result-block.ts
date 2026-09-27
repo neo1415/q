@@ -45,6 +45,7 @@ export const Q_RESULT_BLOCK_KINDS = [
   "ACTION_PROPOSAL",
   "ARTIFACT_REFERENCE",
   "UI_INTENT",
+  "PUBLIC_SOURCE",
 ] as const;
 
 export type QResultBlockKind = (typeof Q_RESULT_BLOCK_KINDS)[number];
@@ -192,6 +193,37 @@ export const QUiIntentBlockSchema = z
   .object({ kind: z.literal("UI_INTENT"), intent: QUiIntentSchema })
   .strict();
 
+/**
+ * A public web page Q read for this answer (R23, R38). The answer is said
+ * first; the page sits behind the Sources disclosure with the only fields
+ * a person needs to judge and follow it. Unlike the reference blocks this
+ * carries the page's public fields rather than an id: it is a public URL,
+ * not a guarded record, and there is nothing for a client to resolve. It
+ * is unverified by definition -- a public source is never a verified fact.
+ */
+export const QPublicSourceBlockSchema = z
+  .object({
+    kind: z.literal("PUBLIC_SOURCE"),
+    url: z
+      .string()
+      .url()
+      .max(2048)
+      .refine((value) => /^https?:\/\//i.test(value), {
+        message: "a public source is an http(s) page",
+      }),
+    domain: z.string().trim().min(1).max(253),
+    /** The page title, or the domain when the page had none. */
+    title: z.string().trim().min(1).max(160),
+    /** YYYY-MM-DD when the page was dated; otherwise null. */
+    publishedOn: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/)
+      .nullable(),
+    /** YYYY-MM-DD when Capital Q read it. */
+    retrievedOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  })
+  .strict();
+
 export const QResultBlockSchema = z.discriminatedUnion("kind", [
   QTextBlockSchema,
   QCompanyReferenceBlockSchema,
@@ -204,6 +236,7 @@ export const QResultBlockSchema = z.discriminatedUnion("kind", [
   QActionProposalBlockSchema,
   QArtifactReferenceBlockSchema,
   QUiIntentBlockSchema,
+  QPublicSourceBlockSchema,
 ]);
 
 export type QResultBlock = z.infer<typeof QResultBlockSchema>;

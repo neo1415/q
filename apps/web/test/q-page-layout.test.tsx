@@ -114,6 +114,7 @@ function answer(id: string, artifactIds: readonly string[]): QTurn {
     text: "Here it is.",
     streaming: false,
     sourceCount: 0,
+    publicSources: [],
     findings: [],
     uncertainties: [],
     blocks: artifactIds.map((artifactId) => ({
