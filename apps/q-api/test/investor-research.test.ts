@@ -389,7 +389,7 @@ const SESSION = "f0000000-0000-4000-8000-000000000010";
 
 async function pendingOf(world: InvestorWorld) {
   return world.recommendations.pending({
-    userId: actor.userId as never,
+    userId: actor.userId,
     sessionId: SESSION,
   });
 }
@@ -421,9 +421,7 @@ describe("findings are held as recommendations with their source, never as answe
     for (const item of pending) {
       expect(item.sources[0]).toEqual({
         sourceType: "PUBLIC_WEBSITE",
-        sourceId: expect.stringContaining(
-          "kestrelridge.vc",
-        ) as unknown as string,
+        sourceId: expect.stringContaining("kestrelridge.vc") as string,
       });
       expect(item.rationale).toContain("found on their website");
     }
@@ -638,7 +636,7 @@ describe("a link reaches research only from the person's own words", () => {
         quote: "Our site is kestrelridge dot vc",
       },
       context,
-      { userId: actor.userId } as never,
+      { userId: actor.userId },
     );
     expect(ok).toEqual({ outcome: "RESEARCHING" });
     expect(asked).toEqual([
@@ -652,7 +650,7 @@ describe("a link reaches research only from the person's own words", () => {
         quote: "Our site is kestrelridge dot vc",
       },
       context,
-      { userId: actor.userId } as never,
+      { userId: actor.userId },
     );
     expect(invented).toMatchObject({ outcome: "REFUSED" });
     expect(asked).toHaveLength(1);

@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import type {
   OnboardingSessionView,
   OnboardingStepView,
+  OnboardingSuggestionView,
 } from "@capital-q/contracts";
 
 import {
@@ -11,6 +12,7 @@ import {
   pendingQuestion,
   progressLines,
   promptFor,
+  publicSourceOf,
   RESUME_AFTER_MS,
   stillNeeded,
   taxonomyProposal,
@@ -505,5 +507,70 @@ describe("acknowledgeValue", () => {
         VOCABULARY,
       ),
     ).toBe("Stage: seed. Noted.");
+  });
+});
+
+describe("publicSourceOf", () => {
+  const suggestion = (
+    sourceRefs: OnboardingSuggestionView["sourceRefs"],
+  ): OnboardingSuggestionView => ({
+    id: "99999999-9999-4999-8999-999999999999",
+    stepKey: "I1.check_size",
+    targetField: "checkSize",
+    suggestedValue: { type: "TEXT", text: "$250k" },
+    confidence: null,
+    status: "PENDING",
+    sourceRefs,
+    createdAt: "2026-09-13T10:02:00.000Z",
+  });
+
+  it("links the first public page the suggestion was read from, labelled by its kind", () => {
+    expect(
+      publicSourceOf(
+        suggestion([
+          { sourceType: "USER_UTTERANCE", sourceId: "turn-1" },
+          {
+            sourceType: "PUBLIC_WEBSITE",
+            sourceId: "https://fund.example/team",
+          },
+          { sourceType: "PUBLIC_WEB", sourceId: "https://news.example/a" },
+        ]),
+      ),
+    ).toEqual({
+      url: "https://fund.example/team",
+      label: "From your website",
+    });
+    expect(
+      publicSourceOf(
+        suggestion([
+          {
+            sourceType: "PUBLIC_REGISTRY",
+            sourceId: "http://registry.example/1",
+          },
+        ]),
+      ),
+    ).toEqual({
+      url: "http://registry.example/1",
+      label: "From a public registry",
+    });
+  });
+
+  it("is null for the person's own words and for anything that is not a web page", () => {
+    expect(publicSourceOf(suggestion([]))).toBeNull();
+    expect(
+      publicSourceOf(
+        suggestion([
+          { sourceType: "USER_UTTERANCE", sourceId: "https://x.example" },
+        ]),
+      ),
+    ).toBeNull();
+    expect(
+      publicSourceOf(
+        suggestion([
+          { sourceType: "PUBLIC_PROFILE", sourceId: "javascript:alert(1)" },
+          { sourceType: "PUBLIC_WEB", sourceId: "not a url" },
+        ]),
+      ),
+    ).toBeNull();
   });
 });

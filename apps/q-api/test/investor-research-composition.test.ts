@@ -11,6 +11,12 @@ import {
   createSecEdgarRegistry,
 } from "../src/composition/investor-research.js";
 
+/** The URL a fetch was called with, whichever form it came in. */
+function urlOf(input: string | URL | Request): string {
+  if (typeof input === "string") return input;
+  return input instanceof URL ? input.href : input.url;
+}
+
 /**
  * Investor research's adapters (BIZ-009), with a fake gateway and recorded
  * registry responses: no live model or network call.
@@ -100,7 +106,7 @@ describe("registries, when configured, read into bounded public pages", () => {
       apiKey: "ch-test-key-0000",
       fetch: (input, init) => {
         const headers = new Headers(init?.headers);
-        calls.push({ url: String(input), auth: headers.get("authorization") });
+        calls.push({ url: urlOf(input), auth: headers.get("authorization") });
         return Promise.resolve(
           Response.json({
             items: [
@@ -134,7 +140,7 @@ describe("registries, when configured, read into bounded public pages", () => {
       userAgent: "Capital Q ops@example.test",
       fetch: (input, init) => {
         agents.push(new Headers(init?.headers).get("user-agent"));
-        const url = String(input);
+        const url = urlOf(input);
         if (url.includes("search-index")) {
           return Promise.resolve(
             Response.json({ hits: { hits: [{ _id: "1999001" }] } }),

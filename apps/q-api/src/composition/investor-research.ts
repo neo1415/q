@@ -141,7 +141,7 @@ async function getJson(
     signal: AbortSignal.timeout(REGISTRY_TIMEOUT_MS),
   });
   if (!response.ok) return null;
-  return (await response.json()) as unknown;
+  return await response.json();
 }
 
 function field(from: unknown, key: string): unknown {
