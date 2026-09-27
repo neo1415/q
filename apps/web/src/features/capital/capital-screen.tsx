@@ -15,6 +15,7 @@ import { PageSection } from "@/components/app-shell/page-container";
 import { apiSession, resolveOwnContext } from "@/features/q/context";
 import { ownRelationships } from "@/features/relationships/relationship-data";
 import { RelationshipList } from "@/features/relationships/relationship-list";
+import { formatDay } from "@/components/date-format";
 
 /**
  * Capital: the objective and the relationships behind it (doc 17 §§105-107;
@@ -54,16 +55,7 @@ function label(
 
 /** A calendar date as people write it; the stored value is untouched. */
 function formatDate(value: string): string {
-  const parsed = new Date(`${value.slice(0, 10)}T00:00:00Z`);
-  if (Number.isNaN(parsed.getTime())) {
-    return value;
-  }
-  return new Intl.DateTimeFormat("en-GB", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-    timeZone: "UTC",
-  }).format(parsed);
+  return formatDay(value.slice(0, 10));
 }
 
 async function currentObjective(

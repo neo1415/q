@@ -14,6 +14,7 @@ import {
   type PersonEditableField,
 } from "@capital-q/contracts";
 import { COUNTRY_OPTIONS, STAGE_OPTIONS } from "@capital-q/founder-onboarding";
+import { formatLongDay } from "@/components/date-format";
 
 /**
  * The editable profile fields (BIZ-002), as the page presents them.
@@ -232,15 +233,7 @@ export function displayValue(
     );
   }
   if (input.kind === "date") {
-    const date = new Date(`${value}T00:00:00Z`);
-    return Number.isNaN(date.getTime())
-      ? value
-      : date.toLocaleDateString("en-GB", {
-          day: "numeric",
-          month: "long",
-          year: "numeric",
-          timeZone: "UTC",
-        });
+    return formatLongDay(value);
   }
   return value;
 }

@@ -27,6 +27,7 @@ import {
   revokeShareAction,
   shareRaiseAction,
 } from "./visibility-actions";
+import { formatLongDay } from "@/components/date-format";
 
 /**
  * The visibility control centre (CQ-BIZ-003; business research §6.2).
@@ -552,7 +553,12 @@ function PreviewBody({ preview }: { readonly preview: AudiencePreviewDto }) {
               .join(", ") || null,
           ],
           ["Stage", stageLabel(profile.currentStageCode)],
-          ["Founded", profile.foundedDate],
+          [
+            "Founded",
+            profile.foundedDate == null
+              ? profile.foundedDate
+              : formatLongDay(profile.foundedDate),
+          ],
           ["In short", profile.shortDescription],
           ["Description", profile.primaryDescription],
         ];

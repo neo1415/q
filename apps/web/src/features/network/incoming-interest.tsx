@@ -11,6 +11,7 @@ import {
   answerInterestAction,
   type AnswerActionResult,
 } from "./interest-actions";
+import { formatDay } from "@/components/date-format";
 
 /**
  * The founder's inbox of investor interest (CQ-NET-011; doc 17 §83-§86).
@@ -57,13 +58,7 @@ const TYPE_LABELS: Readonly<Record<string, string>> = {
   OTHER: "Investor",
 };
 
-function when(timestamp: string): string {
-  return new Date(timestamp).toLocaleDateString(undefined, {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
-}
+const when = formatDay;
 
 function Row({
   item,

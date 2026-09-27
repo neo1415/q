@@ -20,6 +20,7 @@ import { SourcesDisclosure } from "@/components/sources-disclosure";
 import { artifactTypeLabel } from "./artifact-type";
 import { readQArtifactAction, readQArtifactVersionAction } from "./actions";
 import { ArtifactDownloads, artifactFileUrl } from "./artifact-download";
+import { formatDayTime } from "@/components/date-format";
 
 /**
  * Reading what Q composed (QX-003E).
@@ -99,13 +100,7 @@ export function pageForKey(
   }
 }
 
-function whenLabel(iso: string): string {
-  const at = new Date(iso);
-  return at.toLocaleString(undefined, {
-    dateStyle: "medium",
-    timeStyle: "short",
-  });
-}
+const whenLabel = formatDayTime;
 
 const typeLabel = artifactTypeLabel;
 

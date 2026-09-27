@@ -14,6 +14,7 @@ import { buttonClassName } from "@capital-q/ui/button";
 
 import { useGlobalQ } from "@/components/app-shell/global-q";
 import { SourcesDisclosure } from "@/components/sources-disclosure";
+import { formatDay } from "@/components/date-format";
 
 /**
  * What else is known about a profile, beside what the person declared
@@ -71,15 +72,8 @@ function hostOf(url: string): string {
 
 function dayOf(iso: string | null): string | null {
   if (iso === null) return null;
-  const date = new Date(iso);
-  return Number.isNaN(date.getTime())
-    ? null
-    : date.toLocaleDateString("en-GB", {
-        day: "numeric",
-        month: "short",
-        year: "numeric",
-        timeZone: "UTC",
-      });
+  const day = formatDay(iso);
+  return day === iso ? null : day;
 }
 
 /**

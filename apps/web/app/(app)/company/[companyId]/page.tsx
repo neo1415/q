@@ -18,6 +18,7 @@ import { countryLabel, stageLabel } from "@/features/company/declared-labels";
 import { ExpressInterest } from "@/features/network/express-interest";
 import { apiSession } from "@/features/q/context";
 import { QPageSubject } from "@/features/q/q-subject";
+import { formatLongDay } from "@/components/date-format";
 
 export const metadata: Metadata = { title: "Company" };
 export const dynamic = "force-dynamic";
@@ -79,7 +80,12 @@ export default async function CompanyPage({
   const rows: readonly (readonly [string, string])[] = [
     ["Stage", stageLabel(company.currentStageCode) ?? "Not declared"],
     ["Where", place === "" ? "Not declared" : place],
-    ["Founded", company.foundedDate ?? "Not declared"],
+    [
+      "Founded",
+      company.foundedDate == null
+        ? "Not declared"
+        : formatLongDay(company.foundedDate),
+    ],
     ["Legal name", company.legalName ?? "Not declared"],
   ];
 

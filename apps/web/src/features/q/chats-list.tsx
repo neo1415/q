@@ -14,6 +14,7 @@ import {
   listQConversationsAction,
 } from "./actions";
 import { Q_CONVERSATIONS_CHANGED_EVENT } from "./use-q-conversation";
+import { formatStamp } from "@/components/date-format";
 
 /**
  * A person's conversations with Q, as a collapsible list (ADR 0012).
@@ -45,18 +46,7 @@ function writeFolded(folded: boolean): void {
   }
 }
 
-function whenLabel(iso: string): string {
-  const at = new Date(iso);
-  const now = new Date();
-  const sameDay = at.toDateString() === now.toDateString();
-  if (sameDay) {
-    return at.toLocaleTimeString(undefined, {
-      hour: "numeric",
-      minute: "2-digit",
-    });
-  }
-  return at.toLocaleDateString(undefined, { month: "short", day: "numeric" });
-}
+const whenLabel = (iso: string) => formatStamp(iso);
 
 export function ChatsList({
   variant = "sidebar",

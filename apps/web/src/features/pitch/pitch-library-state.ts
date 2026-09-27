@@ -3,6 +3,7 @@ import type {
   DiscoveredCompanyDto,
   MediaAssetDto,
 } from "@capital-q/contracts";
+import { formatDay } from "@/components/date-format";
 
 /**
  * The founder's pitch history, read into rows (VID).
@@ -78,14 +79,7 @@ export function formatPitchDuration(seconds: number | null): string | null {
     : `${String(minutes)}m ${String(rest).padStart(2, "0")}s`;
 }
 
-function dayOf(iso: string): string {
-  return new Date(iso).toLocaleDateString("en-GB", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-    timeZone: "UTC",
-  });
-}
+const dayOf = formatDay;
 
 function captionsOf(pitch: MediaAssetDto): string {
   switch (pitch.captionState) {

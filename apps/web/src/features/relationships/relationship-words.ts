@@ -2,6 +2,7 @@ import type {
   RelationshipStateV1,
   RelationshipSummaryDto,
 } from "@capital-q/contracts";
+import { formatDay } from "@/components/date-format";
 
 /**
  * How a relationship is said, in one place (CQ-WEB-030; doc 17 §83-§86).
@@ -78,14 +79,7 @@ export function nextStepSentence(
 
 /** A calendar date as people write it. */
 export function formatRelationshipDate(value: string): string {
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return value;
-  return new Intl.DateTimeFormat("en-GB", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-    timeZone: "UTC",
-  }).format(parsed);
+  return formatDay(value);
 }
 
 /** Where a row opens, for the side reading it. */
