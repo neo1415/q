@@ -666,7 +666,7 @@ function asNumberString(value: unknown): string | null {
  * bare host gets the scheme the profile expects. Live, "Savage Bridge dot
  * com" was recorded as the company's website, letter for letter.
  */
-function spokenUrl(text: string): string {
+export function spokenUrl(text: string): string {
   let host = text
     .trim()
     .toLowerCase()

@@ -10,7 +10,7 @@ import {
 } from "@capital-q/q-tools";
 import { capability } from "@capital-q/security";
 
-import { spokenUrl } from "./interviewer.js";
+import { spokenUrl } from "./interview-steps.js";
 import { textStatedIn } from "./value-support.js";
 
 /**
