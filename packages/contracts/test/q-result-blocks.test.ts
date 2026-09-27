@@ -76,6 +76,14 @@ const BLOCK_FIXTURES: Readonly<Record<string, unknown>> = {
   },
   EVIDENCE: { kind: "EVIDENCE", evidenceRefs: [evidenceRef] },
   FINDING: { kind: "FINDING", finding: publicFinding },
+  PUBLIC_SOURCE: {
+    kind: "PUBLIC_SOURCE",
+    url: "https://zino.example/about",
+    domain: "zino.example",
+    title: "About Zino Aviation",
+    publishedOn: null,
+    retrievedOn: "2026-09-27",
+  },
   UNCERTAINTY: {
     kind: "UNCERTAINTY",
     statement: "I could not establish current monthly burn.",
