@@ -1,0 +1,251 @@
+import { randomBytes } from "node:crypto";
+
+import { describe, expect, it } from "vitest";
+
+import {
+  CALENDAR_EVENTS_SCOPE,
+  createGoogleCalendarProvider,
+  createIntegrationsService,
+  createTokenCipher,
+  GoogleProviderError,
+  SecretToken,
+  type GoogleHttp,
+  type GoogleHttpRequest,
+} from "@capital-q/integrations";
+import {
+  createFakeEmailProvider,
+  createFakeGoogleOAuth,
+  createInMemoryIntegrationsStore,
+  createRecordingActivityWriter,
+  FAKE_ACCESS_TOKEN,
+  FAKE_REFRESH_TOKEN,
+  inlineTransactions,
+} from "@capital-q/integrations/testing";
+
+/**
+ * BIZ-008: the Google Calendar adapter against a scripted HTTP double
+ * (nothing reaches Google), and the service's per-person calendar gate.
+ */
+
+const ACCESS = { accessToken: new SecretToken(FAKE_ACCESS_TOKEN) };
+const EVENT_ID = "0123456789abcdef0123456789abcdef";
+
+type Call = { url: string; request: GoogleHttpRequest };
+
+function scripted(
+  responses: readonly { status: number; body?: unknown }[],
+): GoogleHttp & { calls: Call[] } {
+  const calls: Call[] = [];
+  let index = 0;
+  const http = ((url: string, request: GoogleHttpRequest) => {
+    calls.push({ url, request });
+    const next = responses[Math.min(index, responses.length - 1)];
+    index += 1;
+    return Promise.resolve({
+      status: next?.status ?? 500,
+      json: () => Promise.resolve(next?.body ?? {}),
+    });
+  }) as GoogleHttp & { calls: Call[] };
+  http.calls = calls;
+  return http;
+}
+
+const EVENT = {
+  eventId: EVENT_ID,
+  summary: "Call: Ada Ventures and Acme",
+  description: "Intro",
+  start: new Date("2026-10-06T09:00:00Z"),
+  end: new Date("2026-10-06T09:30:00Z"),
+  timeZone: "Europe/London",
+  attendees: [{ email: "ada@example.invalid", displayName: "Ada" }],
+};
+
+describe("Google Calendar adapter", () => {
+  it("inserts with a Meet create request, conferenceDataVersion=1 and sendUpdates=all", async () => {
+    const http = scripted([
+      {
+        status: 200,
+        body: {
+          id: EVENT_ID,
+          hangoutLink: "https://meet.google.com/abc-defg-hij",
+        },
+      },
+    ]);
+    const result = await createGoogleCalendarProvider(http).insert(
+      ACCESS,
+      EVENT,
+    );
+    expect(result.meetLink).toBe("https://meet.google.com/abc-defg-hij");
+    const [call] = http.calls;
+    expect(call?.url).toContain("conferenceDataVersion=1");
+    expect(call?.url).toContain("sendUpdates=all");
+    const body = JSON.parse(call?.request.body ?? "{}") as {
+      id: string;
+      attendees: { email: string }[];
+      conferenceData: {
+        createRequest: {
+          requestId: string;
+          conferenceSolutionKey: { type: string };
+        };
+      };
+    };
+    expect(body.id).toBe(EVENT_ID);
+    expect(body.conferenceData.createRequest.conferenceSolutionKey.type).toBe(
+      "hangoutsMeet",
+    );
+    expect(body.conferenceData.createRequest.requestId).toBe(EVENT_ID);
+    expect(body.attendees.map((a) => a.email)).toEqual(["ada@example.invalid"]);
+    expect(call?.request.headers.authorization).toBe(
+      `Bearer ${FAKE_ACCESS_TOKEN}`,
+    );
+  });
+
+  it("treats a 409 on retry as the same event and reads its link back", async () => {
+    const http = scripted([
+      { status: 409 },
+      {
+        status: 200,
+        body: {
+          id: EVENT_ID,
+          conferenceData: {
+            entryPoints: [
+              {
+                entryPointType: "video",
+                uri: "https://meet.google.com/xyz-abcd-efg",
+              },
+            ],
+          },
+        },
+      },
+    ]);
+    const result = await createGoogleCalendarProvider(http).insert(
+      ACCESS,
+      EVENT,
+    );
+    expect(result.meetLink).toBe("https://meet.google.com/xyz-abcd-efg");
+    expect(http.calls).toHaveLength(2);
+    expect(http.calls[1]?.request.method).toBe("GET");
+  });
+
+  it("never accepts a non-Meet link", async () => {
+    const http = scripted([
+      {
+        status: 200,
+        body: { id: EVENT_ID, hangoutLink: "https://evil.example/x" },
+      },
+      { status: 200, body: { id: EVENT_ID } },
+    ]);
+    const result = await createGoogleCalendarProvider(http).insert(
+      ACCESS,
+      EVENT,
+    );
+    expect(result.meetLink).toBeNull();
+  });
+
+  it("cancels with sendUpdates=all and treats already-gone as done", async () => {
+    const http = scripted([{ status: 410 }]);
+    await createGoogleCalendarProvider(http).cancel(ACCESS, EVENT_ID);
+    expect(http.calls[0]?.request.method).toBe("DELETE");
+    expect(http.calls[0]?.url).toContain("sendUpdates=all");
+  });
+
+  it("moves with a PATCH of the times", async () => {
+    const http = scripted([{ status: 200, body: { id: EVENT_ID } }]);
+    await createGoogleCalendarProvider(http).move(ACCESS, EVENT_ID, {
+      start: EVENT.start,
+      end: EVENT.end,
+      timeZone: "UTC",
+    });
+    expect(http.calls[0]?.request.method).toBe("PATCH");
+    expect(http.calls[0]?.url).toContain("sendUpdates=all");
+  });
+
+  it("reads busy times and refuses a calendar Google could not read", async () => {
+    const ok = scripted([
+      {
+        status: 200,
+        body: {
+          calendars: {
+            primary: {
+              busy: [
+                { start: "2026-10-06T09:00:00Z", end: "2026-10-06T10:00:00Z" },
+              ],
+            },
+          },
+        },
+      },
+    ]);
+    const busy = await createGoogleCalendarProvider(ok).busy(ACCESS, {
+      from: new Date("2026-10-06T00:00:00Z"),
+      to: new Date("2026-10-07T00:00:00Z"),
+    });
+    expect(busy).toHaveLength(1);
+    const broken = scripted([
+      {
+        status: 200,
+        body: { calendars: { primary: { errors: [{ reason: "notFound" }] } } },
+      },
+    ]);
+    await expect(
+      createGoogleCalendarProvider(broken).busy(ACCESS, {
+        from: new Date(),
+        to: new Date(),
+      }),
+    ).rejects.toBeInstanceOf(GoogleProviderError);
+  });
+});
+
+describe("calendarOf", () => {
+  const TENANT = "00000000-0000-4000-8000-00000000000a";
+  const USER = "00000000-0000-4000-8000-0000000000b1";
+  const KEY = randomBytes(32).toString("base64");
+
+  async function world(scopes: readonly string[]) {
+    const store = createInMemoryIntegrationsStore();
+    const cipher = createTokenCipher(KEY);
+    await store.connectAccount({
+      tenantId: TENANT,
+      userId: USER,
+      googleSubject: "1234",
+      email: "organiser@example.invalid",
+      scopes,
+      refreshTokenCiphertext: cipher.encrypt(
+        new SecretToken(FAKE_REFRESH_TOKEN),
+        USER,
+      ),
+      keyVersion: 1,
+      historyId: null,
+    });
+    const http = scripted([
+      { status: 200, body: { timeZone: "Europe/London" } },
+    ]);
+    const service = createIntegrationsService({
+      store,
+      transactions: inlineTransactions,
+      activity: createRecordingActivityWriter(),
+      google: {
+        oauth: createFakeGoogleOAuth(),
+        cipher,
+        email: createFakeEmailProvider(),
+        calendar: createGoogleCalendarProvider(http),
+      },
+    });
+    return { service, http };
+  }
+
+  it("binds the person's own connection and mints access from the sealed token", async () => {
+    const w = await world(["openid", CALENDAR_EVENTS_SCOPE]);
+    const calendar = await w.service.calendarOf(USER);
+    expect(calendar?.email).toBe("organiser@example.invalid");
+    expect(await calendar?.timeZone()).toBe("Europe/London");
+    expect(JSON.stringify(calendar)).not.toContain(FAKE_ACCESS_TOKEN);
+  });
+
+  it("is null without the calendar scope or a connection", async () => {
+    const w = await world(["openid"]);
+    expect(await w.service.calendarOf(USER)).toBeNull();
+    expect(
+      await w.service.calendarOf("00000000-0000-4000-8000-0000000000b2"),
+    ).toBeNull();
+  });
+});

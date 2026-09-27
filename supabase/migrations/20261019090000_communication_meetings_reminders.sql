@@ -62,7 +62,6 @@ create table communication.meetings (
   updated_at           timestamptz not null default clock_timestamp(),
   check (ends_at > starts_at and ends_at <= starts_at + interval '8 hours'),
   check ((status = 'CANCELLED') = (cancelled_at is not null)),
-  check (status <> 'SCHEDULED' or meet_link is not null),
   unique (id, tenant_id),
   foreign key (relationship_id, tenant_id)
     references network.relationships (id, tenant_id) on delete restrict

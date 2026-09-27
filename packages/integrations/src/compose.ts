@@ -2,6 +2,7 @@ import type { DatabaseExecutor, TransactionManager } from "@capital-q/database";
 import type { Logger } from "@capital-q/observability";
 
 import { createTokenCipher } from "./crypto.js";
+import { createGoogleCalendarProvider } from "./google/calendar.js";
 import { createGmailEmailProvider } from "./google/gmail.js";
 import { platformGoogleHttp, type GoogleHttp } from "./google/http.js";
 import { createGoogleOAuthClient } from "./google/oauth.js";
@@ -49,6 +50,7 @@ export function composeGoogleIntegrations(options: {
             oauth: createGoogleOAuthClient({ ...options.oauth, http }),
             cipher: createTokenCipher(options.tokenEncryptionKey.reveal()),
             email: createGmailEmailProvider(http),
+            calendar: createGoogleCalendarProvider(http),
             pushTopic: options.pushTopic,
           },
     logger: options.logger,

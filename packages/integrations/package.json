@@ -31,11 +31,13 @@
     "@capital-q/network": "workspace:*",
     "@capital-q/observability": "workspace:*",
     "@capital-q/security": "workspace:*",
+    "nodemailer": "7.0.13",
     "zod": "4.5.4"
   },
   "devDependencies": {
     "@capital-q/config": "workspace:*",
     "@types/node": "^24.13.3",
+    "@types/nodemailer": "8.0.2",
     "typescript": "5.9.3"
   }
 }

@@ -57,6 +57,19 @@ export {
 } from "./google/oauth.js";
 export { createGmailEmailProvider, GMAIL_API } from "./google/gmail.js";
 export {
+  CALENDAR_API,
+  createGoogleCalendarProvider,
+  type CalendarAttendee,
+  type CalendarEventInput,
+  type CalendarProvider,
+} from "./google/calendar.js";
+export {
+  createSmtpAppEmailSender,
+  unavailableAppEmailSender,
+  type AppEmail,
+  type AppEmailSender,
+} from "./smtp.js";
+export {
   createGoogleKeySource,
   decodeGmailNotification,
   GOOGLE_CERTS_URL,
@@ -75,8 +88,10 @@ export type {
   RelationshipContact,
 } from "./store.js";
 export {
+  CALENDAR_EVENTS_SCOPE,
   createIntegrationsService,
   IntegrationUnavailableError,
+  type ConnectedCalendar,
   OAUTH_STATE_TTL_MS,
   type CompleteConnectOutcome,
   type IntegrationsService,

@@ -33,6 +33,10 @@
       "types": "./dist/google-workspace.d.ts",
       "default": "./dist/google-workspace.js"
     },
+    "./app-email": {
+      "types": "./dist/app-email.d.ts",
+      "default": "./dist/app-email.js"
+    },
     "./speech-providers": {
       "types": "./dist/speech-providers.d.ts",
       "default": "./dist/speech-providers.js"

@@ -9,7 +9,7 @@
  */
 
 export type GoogleHttpRequest = {
-  readonly method: "GET" | "POST" | "DELETE";
+  readonly method: "GET" | "POST" | "PATCH" | "DELETE";
   readonly headers: Readonly<Record<string, string>>;
   readonly body?: string | undefined;
   readonly signal?: AbortSignal | undefined;

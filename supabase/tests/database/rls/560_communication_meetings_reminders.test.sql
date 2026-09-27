@@ -18,7 +18,7 @@ create extension if not exists pgtap with schema extensions;
 \ir support/fixture.psql
 select pg_temp.rls_setup();
 
-select plan(27);
+select plan(26);
 
 insert into core.companies (id, tenant_id, organisation_id, canonical_name, slug) values
   ('00000000-0000-4000-8000-0000000009c1', pg_temp.rls_id('tenant_a'), pg_temp.rls_id('org_a'), 'Meet Co A', 'meet-co-a');
@@ -66,10 +66,6 @@ select throws_ok(
   $$ insert into communication.meetings (tenant_id, relationship_id, organiser_user_id, organiser_tenant_id, purpose, starts_at, ends_at, time_zone, google_event_id, idempotency_key)
      values (pg_temp.rls_id('tenant_a'), '00000000-0000-4000-8000-000000009b01', pg_temp.rls_id('user_b'), pg_temp.rls_id('tenant_b'), 'x', now(), now() - interval '1 hour', 'UTC', 'abcde12346', 'q-action:fixture-m-3') $$,
   '23514', null, 'a meeting ends after it starts');
-select throws_ok(
-  $$ insert into communication.meetings (tenant_id, relationship_id, organiser_user_id, organiser_tenant_id, purpose, starts_at, ends_at, time_zone, google_event_id, idempotency_key, status)
-     values (pg_temp.rls_id('tenant_a'), '00000000-0000-4000-8000-000000009b01', pg_temp.rls_id('user_b'), pg_temp.rls_id('tenant_b'), 'x', now(), now() + interval '1 hour', 'UTC', 'abcde12347', 'q-action:fixture-m-4', 'SCHEDULED') $$,
-  '23514', null, 'a scheduled meeting has its Meet link');
 select throws_ok(
   $$ insert into communication.meetings (tenant_id, relationship_id, organiser_user_id, organiser_tenant_id, purpose, starts_at, ends_at, time_zone, google_event_id, idempotency_key)
      values (pg_temp.rls_id('tenant_a'), '00000000-0000-4000-8000-000000009b01', pg_temp.rls_id('user_b'), pg_temp.rls_id('tenant_b'), 'x', now(), now() + interval '1 hour', 'UTC', 'abcde12348', 'q-action:fixture-m-1') $$,

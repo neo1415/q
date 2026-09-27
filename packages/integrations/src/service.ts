@@ -12,6 +12,10 @@ import {
   type TokenCipher,
 } from "./crypto.js";
 import type { EmailProvider, MailboxAccess } from "./email-provider.js";
+import type {
+  CalendarEventInput,
+  CalendarProvider,
+} from "./google/calendar.js";
 import { GoogleProviderError } from "./google/http.js";
 import { hasRequiredScopes, type GoogleOAuthClient } from "./google/oauth.js";
 import {
@@ -60,6 +64,8 @@ export type IntegrationsServiceDependencies = {
         readonly oauth: GoogleOAuthClient;
         readonly cipher: TokenCipher;
         readonly email: EmailProvider;
+        /** BIZ-008: Calendar on the same connection (calendar.events). */
+        readonly calendar?: CalendarProvider | undefined;
         /** Pub/Sub topic for Gmail push; absent means poll only. */
         readonly pushTopic?: string | undefined;
       }
@@ -117,6 +123,11 @@ export type IntegrationsService = {
   readonly mailboxOf: (
     userId: string,
   ) => Promise<{ readonly email: string } | null>;
+  /**
+   * The person's own calendar, or null when Google is not configured, they
+   * have not connected, or their grant lacks `calendar.events`.
+   */
+  readonly calendarOf: (userId: string) => Promise<ConnectedCalendar | null>;
   readonly sendApprovedEmail: (
     command: SendApprovedEmailCommand,
   ) => Promise<SendApprovedEmailOutcome>;
@@ -140,6 +151,35 @@ export type IntegrationsService = {
     relationshipId: string,
   ) => Promise<readonly RelationshipMailItem[]>;
 };
+
+/**
+ * One person's connected Google Calendar (BIZ-008), bound to their own
+ * connection. Each call mints (or reuses) a short-lived access token from
+ * the sealed refresh token; nothing here returns a token.
+ */
+export type ConnectedCalendar = {
+  readonly email: string;
+  readonly busy: (window: {
+    readonly from: Date;
+    readonly to: Date;
+  }) => Promise<readonly { readonly start: Date; readonly end: Date }[]>;
+  readonly timeZone: () => Promise<string>;
+  readonly insert: (
+    event: CalendarEventInput,
+  ) => Promise<{ readonly meetLink: string | null }>;
+  readonly move: (
+    eventId: string,
+    times: {
+      readonly start: Date;
+      readonly end: Date;
+      readonly timeZone: string;
+    },
+  ) => Promise<void>;
+  readonly cancel: (eventId: string) => Promise<void>;
+};
+
+export const CALENDAR_EVENTS_SCOPE =
+  "https://www.googleapis.com/auth/calendar.events";
 
 export class IntegrationUnavailableError extends Error {
   constructor() {
@@ -478,6 +518,26 @@ export function createIntegrationsService(
       if (google === undefined) return null;
       const account = await store.findConnectedByUser(userId);
       return account === null ? null : { email: account.email };
+    },
+
+    calendarOf: async (userId) => {
+      const calendar = google?.calendar;
+      if (calendar === undefined) return null;
+      const account = await store.findConnectedByUser(userId);
+      if (account === null || !account.scopes.includes(CALENDAR_EVENTS_SCOPE)) {
+        return null;
+      }
+      return {
+        email: account.email,
+        busy: async (window) => calendar.busy(await accessFor(account), window),
+        timeZone: async () => calendar.timeZone(await accessFor(account)),
+        insert: async (event) =>
+          calendar.insert(await accessFor(account), event),
+        move: async (eventId, times) =>
+          calendar.move(await accessFor(account), eventId, times),
+        cancel: async (eventId) =>
+          calendar.cancel(await accessFor(account), eventId),
+      };
     },
 
     sendApprovedEmail: async (command) => {
