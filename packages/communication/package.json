@@ -1,0 +1,40 @@
+{
+  "name": "@capital-q/communication",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Capital Q communication bounded context (R34, CQ-COMM-001): the 1:1 chat thread on a canonical relationship. Append-only messages (edits and unsends are revisions), read cursors, attachments as references to the sender organisation's own scanned documents, and message_sent as relationship activity.",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./testing": {
+      "types": "./dist/testing/index.d.ts",
+      "default": "./dist/testing/index.js"
+    }
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "clean": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\""
+  },
+  "dependencies": {
+    "@capital-q/contracts": "workspace:*",
+    "@capital-q/database": "workspace:*",
+    "@capital-q/network": "workspace:*",
+    "@capital-q/security": "workspace:*",
+    "zod": "4.5.4"
+  },
+  "devDependencies": {
+    "@capital-q/config": "workspace:*",
+    "@types/node": "^24.13.3",
+    "typescript": "5.9.3"
+  }
+}

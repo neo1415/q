@@ -193,6 +193,8 @@ create table communication.read_receipts (
   conversation_id        uuid not null,
   tenant_id              uuid not null,
   user_id                uuid not null references identity.user_profiles (id) on delete restrict,
+  -- Which party the reader reads for ("Seen" is the other side's cursor).
+  reader_side            text not null check (reader_side in ('COMPANY', 'INVESTOR')),
   -- A cursor, not history: it only ever moves forward (server-enforced).
   last_read_message_id   uuid not null references communication.messages (id) on delete restrict,
   last_read_at           timestamptz not null default clock_timestamp(),

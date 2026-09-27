@@ -33,8 +33,8 @@ insert into communication.conversations (id, tenant_id, relationship_id) values
 insert into communication.messages (id, tenant_id, conversation_id, sender_user_id, sender_side, kind, body, idempotency_key) values
   ('00000000-0000-4000-8000-000000008d01', pg_temp.rls_id('tenant_a'), '00000000-0000-4000-8000-000000008f01', pg_temp.rls_id('user_a'), 'COMPANY', 'TEXT', 'Hello from A', 'fixture-a-0001'),
   ('00000000-0000-4000-8000-000000008d02', pg_temp.rls_id('tenant_a'), '00000000-0000-4000-8000-000000008f01', pg_temp.rls_id('user_b'), 'INVESTOR', 'TEXT', 'Hello from B', 'fixture-b-0001');
-insert into communication.read_receipts (conversation_id, tenant_id, user_id, last_read_message_id) values
-  ('00000000-0000-4000-8000-000000008f01', pg_temp.rls_id('tenant_a'), pg_temp.rls_id('user_b'), '00000000-0000-4000-8000-000000008d01');
+insert into communication.read_receipts (conversation_id, tenant_id, user_id, reader_side, last_read_message_id) values
+  ('00000000-0000-4000-8000-000000008f01', pg_temp.rls_id('tenant_a'), pg_temp.rls_id('user_b'), 'INVESTOR', '00000000-0000-4000-8000-000000008d01');
 
 -- Shape ------------------------------------------------------------------------
 select is((select bool_and(relrowsecurity) from pg_class where oid in (
