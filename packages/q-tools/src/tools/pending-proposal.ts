@@ -2,10 +2,13 @@ import { z } from "zod";
 
 import type { QTaskClass } from "@capital-q/contracts";
 
+import type { ActorContext } from "@capital-q/security";
+
 import {
   allow,
   defineQTool,
   deny,
+  QToolArgumentError,
   type AnyQToolDefinition,
 } from "../definition.js";
 import { actorWideScope } from "../plan.js";
@@ -47,8 +50,18 @@ export const ApprovePendingProposalInputSchema = z
       .trim()
       .min(1)
       .max(128)
+      .optional()
       .describe(
         "The id of the change waiting for their decision, as listed among what you already produced in this conversation.",
+      ),
+    approvalId: z
+      .string()
+      .trim()
+      .min(1)
+      .max(128)
+      .optional()
+      .describe(
+        "Instead of proposalId: the approvalId of an item list_pending_approvals returned (a change prepared in another conversation), when they clearly mean that listed item.",
       ),
   })
   .strict();
@@ -81,6 +94,8 @@ export const APPROVE_PENDING_OUTCOMES = [
   "NONE_PENDING",
   /** More than one change is waiting: ask which, listing `pending`. */
   "SEVERAL_PENDING",
+  /** The approvalId is not one waiting for them: nothing was approved. */
+  "NOT_FOUND",
   /** The named id is not the change waiting; `pending` lists the one that is. */
   "NOT_THE_PENDING_ONE",
 ] as const;
@@ -114,6 +129,29 @@ function view(proposal: ConversationProposal) {
   };
 }
 
+/** Exactly one of the two ids; anything else is the model's mistake to fix. */
+function oneId(input: ApprovePendingProposalInput): void {
+  if ((input.proposalId === undefined) === (input.approvalId === undefined)) {
+    throw new QToolArgumentError(
+      "Give exactly one of proposalId (this conversation) or approvalId (from list_pending_approvals).",
+    );
+  }
+}
+
+/**
+ * An inbox item (lead decision 2026-09-27): the approval the person
+ * referred to from list_pending_approvals, read as them; the same engine
+ * decision follows, payload-bound and idempotent.
+ */
+async function inboxProposal(
+  port: PendingProposalPort,
+  at: { actor: ActorContext; runId: string; correlationId: string },
+  approvalId: string,
+): Promise<ConversationProposal | null> {
+  if (port.inboxItem === undefined) return null;
+  return port.inboxItem(at, approvalId).catch(() => null);
+}
+
 export function createApprovePendingProposalTool(
   port: PendingProposalPort,
 ): AnyQToolDefinition {
@@ -127,7 +165,7 @@ export function createApprovePendingProposalTool(
     status: "ACTIVE",
     providerName: "approve_pending_proposal",
     description:
-      "Approves the one change you prepared earlier in this conversation that is still waiting for the person's decision, when they have now clearly approved it themselves (by voice or text). Pass that change's id. Do not call it when they want the change altered first (prepare the altered version instead: it needs its own approval), when they are only asking about it, or on your own initiative. The result's outcome is the only basis for saying whether the change is saved: SAVED, SAVING, NOT_SAVED, CHANGED or EXPIRED after an approval; ALREADY_DECIDED with its current status; NONE_PENDING; SEVERAL_PENDING (ask which, from the list); NOT_THE_PENDING_ONE.",
+      "Approves the one change you prepared earlier in this conversation that is still waiting for the person's decision, when they have now clearly approved it themselves (by voice or text). Pass that change's id, or the approvalId of an item list_pending_approvals returned when they clearly mean that item. Do not call it when they want the change altered first (prepare the altered version instead: it needs its own approval), when they are only asking about it, or on your own initiative. The result's outcome is the only basis for saying whether the change is saved: SAVED, SAVING, NOT_SAVED, CHANGED or EXPIRED after an approval; ALREADY_DECIDED with its current status; NONE_PENDING; SEVERAL_PENDING (ask which, from the list); NOT_THE_PENDING_ONE.",
     classification: "SIDE_EFFECT",
     riskClass: "LOW_RISK_INTERNAL",
     // The approver's authority is the Approval Engine's to check
@@ -154,11 +192,41 @@ export function createApprovePendingProposalTool(
       return Promise.resolve(allow<null>("CONFIDENTIAL", null));
     },
     execute: async (input, context) => {
+      oneId(input);
       const at = {
         actor: context.actor,
         runId: context.runId,
         correlationId: context.correlationId,
       };
+      if (input.approvalId !== undefined) {
+        const item = await inboxProposal(port, at, input.approvalId);
+        if (item === null) {
+          return { outcome: "NOT_FOUND", proposal: null, pending: [] };
+        }
+        if (item.status !== "PENDING") {
+          return {
+            outcome: "ALREADY_DECIDED",
+            proposal: view(item),
+            pending: [],
+          };
+        }
+        const approved = await port.approve(at, item.proposalId);
+        return {
+          outcome:
+            approved.status === "CHANGED" ||
+            approved.status === "SAVED" ||
+            approved.status === "SAVING" ||
+            approved.status === "NOT_SAVED" ||
+            approved.status === "EXPIRED"
+              ? approved.status
+              : "ALREADY_DECIDED",
+          proposal: {
+            ...view(item),
+            status: approved.status === "CHANGED" ? "PENDING" : approved.status,
+          },
+          pending: [],
+        };
+      }
       const proposals = await port.inConversation(at);
       const pending = proposals.filter(
         (proposal) => proposal.status === "PENDING",
@@ -234,6 +302,8 @@ export const DECLINE_PENDING_OUTCOMES = [
   "ALREADY_DECIDED",
   /** The named id is not a change waiting for them here; `pending` lists those that are. */
   "NOT_PENDING_HERE",
+  /** The approvalId is not one waiting for them: nothing was declined. */
+  "NOT_FOUND",
 ] as const;
 
 export const DeclinePendingProposalOutputSchema = z
@@ -261,7 +331,7 @@ export function createDeclinePendingProposalTool(
     status: "ACTIVE",
     providerName: "decline_pending_proposal",
     description:
-      "Declines a change you prepared earlier in this conversation that is still waiting for the person's decision, when they have clearly said no to it themselves (by voice or text), exactly as the Decline button on its card does. Nothing is changed. Pass that change's id. Not for a change they want altered (prepare the altered version instead) and never on your own initiative. Report only what the outcome says: DECLINED, ALREADY_DECIDED, or NOT_PENDING_HERE with the ones that are waiting.",
+      "Declines a change you prepared earlier in this conversation that is still waiting for the person's decision, when they have clearly said no to it themselves (by voice or text), exactly as the Decline button on its card does. Nothing is changed. Pass that change's id, or the approvalId of an item list_pending_approvals returned when they clearly mean that item. Not for a change they want altered (prepare the altered version instead) and never on your own initiative. Report only what the outcome says: DECLINED, ALREADY_DECIDED, or NOT_PENDING_HERE with the ones that are waiting.",
     classification: "SIDE_EFFECT",
     riskClass: "LOW_RISK_INTERNAL",
     // The approver's authority is the Approval Engine's to check.
@@ -286,6 +356,7 @@ export function createDeclinePendingProposalTool(
       return Promise.resolve(allow<null>("CONFIDENTIAL", null));
     },
     execute: async (input, context) => {
+      oneId(input);
       const at = {
         actor: context.actor,
         runId: context.runId,
@@ -295,11 +366,17 @@ export function createDeclinePendingProposalTool(
       const pending = proposals.filter(
         (proposal) => proposal.status === "PENDING",
       );
-      const named = proposals.find(
-        (proposal) => proposal.proposalId === input.proposalId,
-      );
+      const named =
+        input.approvalId !== undefined
+          ? await inboxProposal(port, at, input.approvalId)
+          : proposals.find(
+              (proposal) => proposal.proposalId === input.proposalId,
+            );
       const listed = pending.slice(-6).map(view);
-      if (named === undefined) {
+      if (named === undefined || named === null) {
+        if (input.approvalId !== undefined) {
+          return { outcome: "NOT_FOUND", proposal: null, pending: listed };
+        }
         return { outcome: "NOT_PENDING_HERE", proposal: null, pending: listed };
       }
       if (named.status !== "PENDING") {

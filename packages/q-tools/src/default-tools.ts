@@ -20,6 +20,8 @@ import {
   createDeclinePendingProposalTool,
 } from "./tools/pending-proposal.js";
 import { createOwnWorkTools } from "./tools/own-work.js";
+import { createOwnRecordTools } from "./tools/own-records.js";
+import { createRecordChangeTools } from "./tools/record-changes.js";
 import { createProposeProfileChangeTool } from "./tools/profile-change.js";
 import { createProposeEmailTool } from "./tools/email.js";
 import { createChatTools } from "./tools/chat.js";
@@ -112,6 +114,11 @@ export function createDefaultQTools(
     ...(ports.clientActions === true ? createClientActionTools(ports) : []),
     // R33: their approvals inbox, their documents, Save / Unsave / Pass.
     ...createOwnWorkTools(ports),
+    // R33: the record forms as Prepare → Approve, and their own records.
+    ...(ports.recordChanges === undefined
+      ? []
+      : createRecordChangeTools(ports, ports.recordChanges)),
+    ...createOwnRecordTools(ports),
   ];
 }
 

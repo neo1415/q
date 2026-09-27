@@ -51,6 +51,10 @@ const EVERY_PORT: QToolPorts = {
   approvalInbox: STUB,
   discoveryDecisions: STUB,
   documents: STUB,
+  recordChanges: STUB,
+  ownRecords: STUB,
+  evidenceDocuments: STUB,
+  relationshipMail: STUB,
 };
 
 const EVERY_TOOL = [
@@ -129,6 +133,14 @@ describe("the capability registry is complete", () => {
       "get_q_card",
       "list_pending_approvals",
       "list_my_documents",
+      "propose_raise_change",
+      "propose_mandate_change",
+      "propose_team_change",
+      "propose_q_card_change",
+      "propose_investor_visibility",
+      "read_my_record",
+      "list_uploaded_documents",
+      "read_relationship_email",
     ]) {
       expect(listed.has(name), name).toBe(true);
       expect(

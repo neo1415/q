@@ -1,5 +1,6 @@
 import {
   MODEL_TOOL_RESULT_MAX_CHARS,
+  MODEL_TOOLS_MAX,
   sensitivityWithin,
 } from "@capital-q/contracts";
 import { getMeter, getTracer, type Logger } from "@capital-q/observability";
@@ -341,8 +342,28 @@ export function createQToolExecutor(
   }
 
   return {
-    offer: (context) =>
-      Promise.resolve(registry.eligible(context).map(toOfferedTool)),
+    offer: (context) => {
+      const eligible = registry.eligible(context);
+      // The gateway refuses a request with more tools than MODEL_TOOLS_MAX,
+      // which would fail the whole turn. Past the bound, the run keeps the
+      // first MODEL_TOOLS_MAX (registry order) and says so in the log, so a
+      // growing catalogue degrades one tool, never the conversation.
+      if (eligible.length > MODEL_TOOLS_MAX) {
+        logger?.warn(
+          {
+            qRunId: context.runId,
+            eligible: eligible.length,
+            dropped: eligible
+              .slice(MODEL_TOOLS_MAX)
+              .map((record) => record.definition.providerName),
+          },
+          "more tools eligible than one model request carries",
+        );
+      }
+      return Promise.resolve(
+        eligible.slice(0, MODEL_TOOLS_MAX).map(toOfferedTool),
+      );
+    },
     execute,
   };
 }

@@ -242,14 +242,6 @@ const OFFERS: readonly QCapability[] = [
     "VERIFICATION",
     "A verification request attests to their authority over the company; the person submits it themselves on the verification screen.",
   ),
-  offer(
-    "capital_raise_edit",
-    "RECORDS",
-    "Set, change, close or replace their raise (capital objective)",
-    "CAPITAL",
-    "The raise form is the one write path for a capital objective today; no Approval Engine action exists for it yet.",
-    true,
-  ),
 ];
 
 export const Q_CAPABILITIES: readonly QCapability[] = Object.freeze([
@@ -408,6 +400,66 @@ export const Q_CAPABILITIES: readonly QCapability[] = Object.freeze([
     "RELATIONSHIP",
     "Removes a company from their Saved list.",
     { acts: true },
+  ),
+  tool(
+    "open_page",
+    "NAVIGATION",
+    "Opens one company's page, or their relationship with a company or an investor, by id.",
+    { acts: true },
+  ),
+  tool(
+    "propose_raise_change",
+    "RECORDS",
+    "Creates, changes, closes or replaces their company's raise, applied when they approve.",
+    { approval: "PREPARE_APPROVE", executes: ["capital.objective.change"] },
+  ),
+  tool(
+    "propose_mandate_change",
+    "RECORDS",
+    "Creates, changes, activates or closes their investor mandate, applied when they approve.",
+    { approval: "PREPARE_APPROVE", executes: ["investor.mandate.change"] },
+  ),
+  tool(
+    "propose_team_change",
+    "PROFILE",
+    "Changes their founder profile, their company's team facts, or their own role and title, applied when they approve.",
+    {
+      approval: "PREPARE_APPROVE",
+      executes: ["company.team.change", "investor.representative.update"],
+    },
+  ),
+  tool(
+    "propose_q_card_change",
+    "HANDLE",
+    "Changes their Q Card's details (findable by search engines, which fields it shows), applied when they approve.",
+    { approval: "PREPARE_APPROVE", executes: ["q_card.update"] },
+  ),
+  tool(
+    "propose_investor_visibility",
+    "VISIBILITY",
+    "Changes who can see their investor organisation, applied when they approve.",
+    { approval: "PREPARE_APPROVE", executes: ["investor.visibility.set"] },
+  ),
+  tool(
+    "read_my_record",
+    "RECORDS",
+    "Reads their own records as their screens show them: verification, readiness, network and audience previews, team, raise history, Q's public findings, their investor organisation, role and mandates.",
+  ),
+  tool(
+    "reassess_marketplace_readiness",
+    "RECORDS",
+    "Checks their company's marketplace readiness again.",
+    { acts: true },
+  ),
+  tool(
+    "list_uploaded_documents",
+    "DOCUMENT",
+    "Lists the documents their company uploaded and whether Q has read them.",
+  ),
+  tool(
+    "read_relationship_email",
+    "RELATIONSHIP",
+    "Reads the email exchanged on one of their relationships, from their connected Gmail.",
   ),
   tool(
     "pass_company",

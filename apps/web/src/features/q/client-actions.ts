@@ -25,7 +25,25 @@ export type ClientActionEffects = {
   readonly setQMotion: (motion: "full" | "calm" | "off") => void;
   readonly setVoice: (voice: "FEMALE" | "MALE") => void;
   readonly signOut: () => void;
+  /** Goes to an in-app path built below from the fixed route map. */
+  readonly goTo: (path: string) => void;
 };
+
+/** R33: a record's own page, from its kind and a validated id only. */
+export function recordPagePath(
+  page: "COMPANY" | "RELATIONSHIP_COMPANY" | "RELATIONSHIP_INVESTOR",
+  id: string,
+): string {
+  const safe = encodeURIComponent(id.toLowerCase());
+  switch (page) {
+    case "COMPANY":
+      return `/company/${safe}`;
+    case "RELATIONSHIP_COMPANY":
+      return `/relationships/company/${safe}`;
+    case "RELATIONSHIP_INVESTOR":
+      return `/relationships/investor/${safe}`;
+  }
+}
 
 export const BROWSER_EFFECTS: ClientActionEffects = {
   setTheme: (theme) => {
@@ -47,6 +65,9 @@ export const BROWSER_EFFECTS: ClientActionEffects = {
   },
   // The Sign out button's own steps: forget which chats were open on this
   // tab, then the server action that ends the session and redirects.
+  goTo: (path) => {
+    window.location.assign(path);
+  },
   signOut: () => {
     forgetActiveConversations();
     void import("@/auth/actions").then(({ signOutAction }) => signOutAction());
@@ -80,6 +101,9 @@ export function performClientAction(
       return true;
     case "SIGN_OUT":
       effects.signOut();
+      return true;
+    case "OPEN_RECORD_PAGE":
+      effects.goTo(recordPagePath(action.page, action.id));
       return true;
   }
 }

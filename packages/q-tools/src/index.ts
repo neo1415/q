@@ -61,6 +61,12 @@ export type {
   ProposalPlainStatus,
   ApprovalInboxPort,
   DiscoveryDecisionPort,
+  EvidenceDocumentsPort,
+  OwnRecordKind,
+  OwnRecordsPort,
+  RecordChange,
+  RecordChangePort,
+  RelationshipMailPort,
   OwnDocumentsPort,
   QToolPorts,
   PitchMomentPort,
@@ -79,6 +85,8 @@ export {
   SET_Q_MOTION,
   SET_VOICE,
   SIGN_OUT,
+  OPEN_PAGE,
+  createOpenPageTool,
   OPEN_WEBSITE,
   OpenWebsiteInputSchema,
   RELOAD_PAGE,
@@ -101,7 +109,7 @@ export {
   type ProposeHandleClaimInput,
   type ProposeHandleClaimOutput,
 } from "./tools/handle-claim.js";
-export { PROPOSAL_PLAIN_STATUSES } from "./ports.js";
+export { OWN_RECORD_KINDS, PROPOSAL_PLAIN_STATUSES } from "./ports.js";
 export {
   APPROVE_PENDING_OUTCOMES,
   APPROVE_PENDING_PROPOSAL,
@@ -128,6 +136,31 @@ export {
   SAVE_COMPANY,
   UNSAVE_COMPANY,
 } from "./tools/own-work.js";
+export {
+  createListUploadedDocumentsTool,
+  createOwnRecordTools,
+  createReadMyRecordTool,
+  createReadRelationshipEmailTool,
+  createReassessReadinessTool,
+  LIST_UPLOADED_DOCUMENTS,
+  READ_MY_RECORD,
+  READ_RELATIONSHIP_EMAIL,
+  REASSESS_READINESS,
+} from "./tools/own-records.js";
+export {
+  createProposeInvestorVisibilityTool,
+  createProposeMandateChangeTool,
+  createProposeQCardChangeTool,
+  createProposeRaiseChangeTool,
+  createProposeTeamChangeTool,
+  createRecordChangeTools,
+  ProposeRecordChangeOutputSchema,
+  PROPOSE_INVESTOR_VISIBILITY,
+  PROPOSE_MANDATE_CHANGE,
+  PROPOSE_Q_CARD_CHANGE,
+  PROPOSE_RAISE_CHANGE,
+  PROPOSE_TEAM_CHANGE,
+} from "./tools/record-changes.js";
 export {
   createProposeProfileChangeTool,
   FIELDS_BY_PROFILE,

@@ -4,6 +4,7 @@ import {
   Q_TASK_CLASSES,
   QClientActionToolResultSchema,
   QMotionChoiceSchema,
+  QRecordPageSchema,
   QThemeChoiceSchema,
   QWebsiteUrlSchema,
   type PermittedContextPlan,
@@ -43,6 +44,7 @@ export const OPEN_WEBSITE = "client.website.open" as const;
 export const SET_Q_MOTION = "client.q_motion.set" as const;
 export const SET_VOICE = "client.voice.set" as const;
 export const SIGN_OUT = "client.session.sign_out" as const;
+export const OPEN_PAGE = "client.page.open" as const;
 
 function ownConversation(
   actor: ActorContext,
@@ -315,8 +317,74 @@ export function createSignOutTool(): AnyQToolDefinition {
   });
 }
 
+export const OpenPageInputSchema = z
+  .object({
+    page: QRecordPageSchema.describe(
+      "COMPANY: a company's page. RELATIONSHIP_COMPANY: their relationship with a company. RELATIONSHIP_INVESTOR: their relationship with an investor organisation.",
+    ),
+    id: z
+      .string()
+      .uuid()
+      .describe(
+        "The company's or investor organisation's id, exactly as a tool or the screen gave it. Never guessed from a name.",
+      ),
+  })
+  .strict();
+export type OpenPageInput = z.infer<typeof OpenPageInputSchema>;
+
+/**
+ * Open one record's page (R33). The page authorises the read server-side,
+ * as for a typed URL; this step only refuses what the person could not
+ * open anyway -- a company not in their tenant, or a relationship they are
+ * not a party to -- so Q never takes them to a dead end.
+ */
+export function createOpenPageTool(
+  ports: Pick<QToolPorts, "companies" | "relationships">,
+): AnyQToolDefinition {
+  return defineQTool<
+    OpenPageInput,
+    QClientActionToolResult,
+    QClientActionToolResult
+  >({
+    ...COMMON,
+    id: OPEN_PAGE,
+    providerName: "open_page",
+    description:
+      "Opens one record's own page on their screen: a company's page, or their relationship with a company or an investor organisation. Use the id a tool or the screen gave. NOT_AVAILABLE means that page is not theirs to open.",
+    input: OpenPageInputSchema,
+    authorize: async (input, { actor, plan }) => {
+      if (!ownConversation(actor, plan)) {
+        return deny<QClientActionToolResult>("NOT_AVAILABLE");
+      }
+      let openable = false;
+      if (input.page === "COMPANY") {
+        const id = CompanyIdSchema.safeParse(input.id);
+        const profile = id.success
+          ? await ports.companies
+              .findCanonicalCompanyProfile(id.data)
+              .catch(() => null)
+          : null;
+        openable = profile !== null && profile.tenantId === actor.tenantId;
+      } else if (ports.relationships !== undefined) {
+        const standing =
+          input.page === "RELATIONSHIP_COMPANY"
+            ? await ports.relationships
+                .withCompany(actor, input.id)
+                .catch(() => null)
+            : await ports.relationships
+                .withInvestor(actor, input.id)
+                .catch(() => null);
+        openable = standing !== null;
+      }
+      return openable
+        ? allowed({ kind: "OPEN_RECORD_PAGE", page: input.page, id: input.id })
+        : deny<QClientActionToolResult>("NOT_AVAILABLE");
+    },
+  });
+}
+
 export function createClientActionTools(
-  ports: Pick<QToolPorts, "companies">,
+  ports: Pick<QToolPorts, "companies" | "relationships">,
 ): readonly AnyQToolDefinition[] {
   return [
     createSetThemeTool(),
@@ -325,5 +393,6 @@ export function createClientActionTools(
     createSetQMotionTool(),
     createSetVoiceTool(),
     createSignOutTool(),
+    createOpenPageTool(ports),
   ];
 }

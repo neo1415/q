@@ -11,6 +11,7 @@ import { buttonClassName } from "@capital-q/ui/button";
 
 import { destinationPath } from "../voice/destinations";
 import { ArtifactCard } from "./artifact-card";
+import { recordPagePath } from "./client-actions";
 import type { QTurnObjectBlock } from "./conversation";
 
 /**
@@ -58,6 +59,7 @@ const INTENT_ROUTES: Readonly<
       | "SET_Q_MOTION"
       | "SET_VOICE"
       | "SIGN_OUT"
+      | "OPEN_RECORD_PAGE"
     >,
     string | null
   >
@@ -84,6 +86,9 @@ function intentHref(intent: QUiIntent): string | null {
     intent.kind === "SIGN_OUT"
   ) {
     return null;
+  }
+  if (intent.kind === "OPEN_RECORD_PAGE") {
+    return recordPagePath(intent.page, intent.id);
   }
   const route = INTENT_ROUTES[intent.kind];
   if (route === null) {
@@ -131,6 +136,10 @@ function intentLabel(intent: QUiIntent): string {
       return "Q's voice";
     case "SIGN_OUT":
       return "Sign out";
+    case "OPEN_RECORD_PAGE":
+      return intent.page === "COMPANY"
+        ? "Open the company"
+        : "Open the relationship";
   }
 }
 

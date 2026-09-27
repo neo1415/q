@@ -26,6 +26,7 @@ function effects() {
     setQMotion: (motion) => done.push(`motion:${motion}`),
     setVoice: (voice) => done.push(`voice:${voice}`),
     signOut: () => done.push("sign-out"),
+    goTo: (path) => done.push(`go:${path}`),
   };
   return { port, done };
 }
@@ -63,6 +64,16 @@ describe("performing a client action", () => {
       performClientAction({ kind: "SET_VOICE", voice: "MALE" }, port),
     ).toBe(true);
     expect(performClientAction({ kind: "SIGN_OUT" }, port)).toBe(true);
+    expect(
+      performClientAction(
+        {
+          kind: "OPEN_RECORD_PAGE",
+          page: "RELATIONSHIP_INVESTOR",
+          id: "c0000000-0000-4000-8000-000000000001",
+        },
+        port,
+      ),
+    ).toBe(true);
     expect(done).toEqual([
       "theme:dark",
       "reload",
@@ -70,6 +81,7 @@ describe("performing a client action", () => {
       "motion:calm",
       "voice:MALE",
       "sign-out",
+      "go:/relationships/investor/c0000000-0000-4000-8000-000000000001",
     ]);
   });
 
@@ -82,6 +94,12 @@ describe("performing a client action", () => {
       { kind: "SET_Q_MOTION", motion: "wild" },
       { kind: "SET_VOICE", voice: "ROBOT" },
       { kind: "SIGN_OUT", redirect: "https://evil.example" },
+      { kind: "OPEN_RECORD_PAGE", page: "COMPANY", id: "../admin" },
+      {
+        kind: "OPEN_RECORD_PAGE",
+        page: "ADMIN",
+        id: "c0000000-0000-4000-8000-000000000001",
+      },
       { kind: "RUN_SCRIPT", code: "x" },
       null,
     ]) {

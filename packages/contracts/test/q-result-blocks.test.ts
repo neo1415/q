@@ -202,6 +202,7 @@ describe("QUiIntent", () => {
     SET_Q_MOTION: { kind: "SET_Q_MOTION", motion: "calm" },
     SET_VOICE: { kind: "SET_VOICE", voice: "FEMALE" },
     SIGN_OUT: { kind: "SIGN_OUT" },
+    OPEN_RECORD_PAGE: { kind: "OPEN_RECORD_PAGE", page: "COMPANY", id: UUID },
   };
 
   it("parses every supported intent", () => {

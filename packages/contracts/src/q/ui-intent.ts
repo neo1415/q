@@ -31,6 +31,7 @@ export const Q_UI_INTENT_KINDS = [
   "SET_Q_MOTION",
   "SET_VOICE",
   "SIGN_OUT",
+  "OPEN_RECORD_PAGE",
 ] as const;
 
 export type QUiIntentKind = (typeof Q_UI_INTENT_KINDS)[number];
@@ -204,7 +205,30 @@ export const QSignOutIntentSchema = z
   .object({ kind: z.literal("SIGN_OUT") })
   .strict();
 
+/**
+ * R33: open one record's own page by id: a company, or the person's
+ * relationship with a company or an investor organisation. The browser
+ * builds the path from its fixed route map; the page authorises the read
+ * server-side, as it does for a typed URL.
+ */
+export const Q_RECORD_PAGES = [
+  "COMPANY",
+  "RELATIONSHIP_COMPANY",
+  "RELATIONSHIP_INVESTOR",
+] as const;
+export const QRecordPageSchema = z.enum(Q_RECORD_PAGES);
+export type QRecordPage = z.infer<typeof QRecordPageSchema>;
+
+export const QOpenRecordPageIntentSchema = z
+  .object({
+    kind: z.literal("OPEN_RECORD_PAGE"),
+    page: QRecordPageSchema,
+    id: UuidSchema,
+  })
+  .strict();
+
 export const QClientActionIntentSchema = z.discriminatedUnion("kind", [
+  QOpenRecordPageIntentSchema,
   QSetThemeIntentSchema,
   QReloadPageIntentSchema,
   QOpenWebsiteIntentSchema,
@@ -225,6 +249,7 @@ export const Q_CLIENT_ACTION_TOOLS = [
   "set_q_motion",
   "set_voice",
   "sign_out",
+  "open_page",
 ] as const;
 
 /**
@@ -238,6 +263,7 @@ export const Q_INSTANT_ACTION_TOOLS = [
   "unsave_company",
   "pass_company",
   "decline_pending_proposal",
+  "reassess_marketplace_readiness",
 ] as const;
 
 /**
@@ -267,6 +293,7 @@ export const QUiIntentSchema = z.discriminatedUnion("kind", [
   QSetQMotionIntentSchema,
   QSetVoiceIntentSchema,
   QSignOutIntentSchema,
+  QOpenRecordPageIntentSchema,
 ]);
 
 export type QUiIntent = z.infer<typeof QUiIntentSchema>;

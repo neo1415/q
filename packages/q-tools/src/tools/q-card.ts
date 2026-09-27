@@ -70,7 +70,7 @@ type Grant = {
 };
 
 /** Their own subject of `kind`, bound in the plan; exactly one, or null. */
-async function ownSubject(
+export async function ownSubject(
   ports: Pick<QToolPorts, "companies" | "investors">,
   actor: ActorContext,
   plan: PermittedContextPlan,

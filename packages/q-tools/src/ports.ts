@@ -287,6 +287,14 @@ export type QToolPorts = {
   readonly discoveryDecisions?: DiscoveryDecisionPort | undefined;
   /** R33: their own documents. */
   readonly documents?: OwnDocumentsPort | undefined;
+  /** R33: changes to their own records, for approval. */
+  readonly recordChanges?: RecordChangePort | undefined;
+  /** R33: reads of their own records. */
+  readonly ownRecords?: OwnRecordsPort | undefined;
+  /** R33: their organisation's uploaded documents (metadata). */
+  readonly evidenceDocuments?: EvidenceDocumentsPort | undefined;
+  /** R33 / BIZ-007: a relationship's email thread. */
+  readonly relationshipMail?: RelationshipMailPort | undefined;
 };
 
 /**
@@ -357,6 +365,152 @@ export type PendingProposalPort = {
     context: PendingProposalContext,
     proposalId: string,
   ) => Promise<{ readonly status: ProposalPlainStatus }>;
+  /**
+   * R33 (lead decision 2026-09-27): an approval from the person's inbox
+   * (another conversation), by its approval id. Read as the actor: one
+   * not addressed to them is null. Deciding it is the same engine call,
+   * payload-bound and idempotent.
+   */
+  readonly inboxItem?: (
+    context: PendingProposalContext,
+    approvalId: string,
+  ) => Promise<ConversationProposal | null>;
+};
+
+/**
+ * R33: a change to one of the person's own records that the app's own
+ * forms make (raise, mandate, founder profile and team, their role, Q Card
+ * details, the investor organisation's visibility), prepared for the
+ * Approval Engine. The tool resolves the subject from the actor and the
+ * plan, never from the model; the composition validates `fields` against
+ * the route's own request schema, reads what it needs (the current raise,
+ * the mandate), and answers REFUSED with a person-facing reason when it
+ * does not fit. Nothing here executes.
+ */
+export type RecordChange =
+  | {
+      readonly kind: "CAPITAL_OBJECTIVE";
+      readonly companyId: string;
+      readonly operation: "CREATE" | "UPDATE" | "CLOSE" | "REPLACE";
+      readonly fields: Readonly<Record<string, unknown>>;
+    }
+  | {
+      readonly kind: "INVESTOR_MANDATE";
+      readonly investorOrganisationId: string;
+      readonly operation: "CREATE" | "UPDATE" | "ACTIVATE" | "CLOSE";
+      /** Absent: the organisation's current mandate. */
+      readonly mandateId: string | null;
+      readonly fields: Readonly<Record<string, unknown>>;
+    }
+  | {
+      readonly kind: "FOUNDER_PROFILE" | "TEAM_FACTS" | "COMPANY_MEMBERSHIP";
+      readonly companyId: string;
+      readonly fields: Readonly<Record<string, unknown>>;
+    }
+  | {
+      readonly kind: "INVESTOR_REPRESENTATIVE" | "INVESTOR_VISIBILITY";
+      readonly investorOrganisationId: string;
+      readonly fields: Readonly<Record<string, unknown>>;
+    }
+  | {
+      readonly kind: "Q_CARD";
+      readonly subjectType: "COMPANY" | "INVESTOR_ORGANISATION";
+      readonly subjectId: string;
+      readonly fields: Readonly<Record<string, unknown>>;
+    };
+
+export type RecordChangePort = {
+  readonly prepare: (entry: {
+    readonly runId: string;
+    readonly actor: ActorContext;
+    readonly change: RecordChange;
+  }) => Promise<{
+    readonly status: "PREPARED" | "ONE_PER_TURN" | "REFUSED";
+    readonly awaitingApprovalOf: string | null;
+    readonly reason: string | null;
+  }>;
+};
+
+/**
+ * R33: reads of the person's own records the app's screens show, each
+ * through the owning context's service as the actor. `null`: nothing to
+ * show, or not theirs (one answer). The data is the screen's own DTO.
+ */
+export const OWN_RECORD_KINDS = [
+  "VERIFICATION_STATUS",
+  "MARKETPLACE_READINESS",
+  "COMPANY_NETWORK_PREVIEW",
+  "COMPANY_AUDIENCE_PREVIEW",
+  "COMPANY_TEAM",
+  "RAISE_HISTORY",
+  "PROFILE_FINDINGS",
+  "INVESTOR_ORGANISATION",
+  "INVESTOR_NETWORK_PREVIEW",
+  "INVESTOR_REPRESENTATIVE",
+  "INVESTOR_MANDATES",
+] as const;
+export type OwnRecordKind = (typeof OWN_RECORD_KINDS)[number];
+
+export type OwnRecordsPort = {
+  readonly read: (
+    actor: ActorContext,
+    query: {
+      readonly record: OwnRecordKind;
+      readonly subjectType: "COMPANY" | "INVESTOR_ORGANISATION";
+      readonly subjectId: string;
+      /** COMPANY_AUDIENCE_PREVIEW only. */
+      readonly audience?: string | undefined;
+      readonly relationshipId?: string | undefined;
+    },
+  ) => Promise<unknown>;
+  /** Re-runs the readiness assessment, as the page's button does. */
+  readonly reassessReadiness: (
+    actor: ActorContext,
+    companyId: string,
+    correlationId: string,
+  ) => Promise<unknown>;
+};
+
+/**
+ * R33: the documents the person's organisation uploaded (evidence), read
+ * through the evidence service as the actor (document.view). Metadata
+ * only: their content reaches Q through authorised retrieval, never here.
+ */
+export type EvidenceDocumentsPort = {
+  readonly list: (
+    actor: ActorContext,
+    companyId: string,
+  ) => Promise<
+    readonly {
+      readonly documentId: string;
+      readonly title: string;
+      readonly documentType: string;
+      readonly status: string;
+      readonly processing: string | null;
+      readonly updatedAt: string;
+    }[]
+  >;
+};
+
+/**
+ * R33 / BIZ-007: the email exchanged on one relationship, from the
+ * person's own connected Gmail (the Relationships page's thread).
+ */
+export type RelationshipMailPort = {
+  readonly list: (
+    actor: ActorContext,
+    relationshipId: string,
+  ) => Promise<
+    | readonly {
+        readonly direction: string;
+        readonly status: string;
+        readonly from: string;
+        readonly to: string;
+        readonly subject: string;
+        readonly at: string;
+      }[]
+    | null
+  >;
 };
 
 /**
