@@ -59,7 +59,11 @@ export default async function VerificationPage({
     <PageContainer>
       <PageHeader
         title="Verification"
-        description="Capital Q verifies a founder's identity and your organisation before your company can appear in investor recommendations."
+        description={
+          context.kind === "INVESTOR"
+            ? "Capital Q verifies founders' identities and their organisations. Your own organisation's standing is on your profile."
+            : "Capital Q verifies a founder's identity and your organisation before your company can appear in investor recommendations."
+        }
       />
       {loaded?.ok === true ? (
         <VerificationStandings verification={loaded.value} notice={notice} />
@@ -71,6 +75,16 @@ export default async function VerificationPage({
           action={
             <Link href="/verification" className={buttonClassName("secondary")}>
               Try again
+            </Link>
+          }
+        />
+      ) : context.kind === "INVESTOR" ? (
+        <EmptyState
+          title="This is a founder's page."
+          description="What Capital Q has verified about your organisation is on your profile."
+          action={
+            <Link href="/profile" className={buttonClassName("secondary")}>
+              Go to Profile
             </Link>
           }
         />

@@ -46,6 +46,17 @@ export default async function PitchPage() {
             </Link>
           }
         />
+      ) : context.kind === "INVESTOR" ? (
+        // An investor has no pitch to make; they watch them (R30 #16).
+        <EmptyState
+          title="Pitches are made by founders."
+          description="As an investor you watch them: every discoverable company's pitch plays in Discover."
+          action={
+            <Link href="/discover" className={buttonClassName("secondary")}>
+              Go to Discover
+            </Link>
+          }
+        />
       ) : (
         <EmptyState
           title="A pitch belongs to a company."

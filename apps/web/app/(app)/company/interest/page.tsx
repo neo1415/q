@@ -34,6 +34,27 @@ export default async function InvestorInterestPage() {
     />
   );
 
+  if (context.kind === "INVESTOR") {
+    // The investor's own side of interest is their relationships (R30 #16).
+    return (
+      <PageContainer>
+        {header}
+        <EmptyState
+          title="This is a founder's page."
+          description="Interest you have expressed, and each company's answer, is under Relationships."
+          action={
+            <Link
+              href="/relationships"
+              className={buttonClassName("secondary")}
+            >
+              Go to Relationships
+            </Link>
+          }
+        />
+      </PageContainer>
+    );
+  }
+
   if (context.kind !== "FOUNDER" || session === null) {
     return (
       <PageContainer>
