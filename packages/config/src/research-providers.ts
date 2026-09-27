@@ -39,6 +39,13 @@ export const researchProviderEnvShape = {
   BRIGHT_DATA_SERP_ZONE: zone.optional(),
   /** The Web Unlocker zone; page extraction goes through Bright Data only when set. */
   BRIGHT_DATA_UNLOCKER_ZONE: zone.optional(),
+  /** UK Companies House REST API key (BIZ-009); absent means the registry is skipped. */
+  COMPANIES_HOUSE_API_KEY: z.string().trim().min(8).max(200).optional(),
+  /**
+   * SEC EDGAR's required contact User-Agent ("Capital Q ops@example.com",
+   * BIZ-009); absent means EDGAR is skipped.
+   */
+  SEC_EDGAR_USER_AGENT: z.string().trim().min(8).max(200).optional(),
 };
 
 export type BrightDataSecrets = {
@@ -54,6 +61,10 @@ export type ResearchProviderSecrets = {
   readonly brightData: BrightDataSecrets | undefined;
   /** SerpApi search; absent means one search index only. */
   readonly serpApi: ProviderCredential | undefined;
+  /** Companies House; absent means investor research skips it. */
+  readonly companiesHouse?: ProviderCredential | undefined;
+  /** The contact EDGAR requires; absent means investor research skips it. */
+  readonly secEdgarUserAgent?: string | undefined;
 };
 
 export type ResearchProviderConfigStatus = {
@@ -70,8 +81,15 @@ export function toResearchProviderSecrets(parsed: {
   readonly BRIGHT_DATA_SERP_ZONE?: string | undefined;
   readonly BRIGHT_DATA_UNLOCKER_ZONE?: string | undefined;
   readonly SERP_API_KEY?: string | undefined;
+  readonly COMPANIES_HOUSE_API_KEY?: string | undefined;
+  readonly SEC_EDGAR_USER_AGENT?: string | undefined;
 }): ResearchProviderSecrets {
   return {
+    companiesHouse:
+      parsed.COMPANIES_HOUSE_API_KEY === undefined
+        ? undefined
+        : new ProviderCredential(parsed.COMPANIES_HOUSE_API_KEY),
+    secEdgarUserAgent: parsed.SEC_EDGAR_USER_AGENT,
     serpApi:
       parsed.SERP_API_KEY === undefined
         ? undefined

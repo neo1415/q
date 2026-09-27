@@ -21,7 +21,8 @@ import {
  * decimal strings, never floats, with the currency beside them.
  */
 
-export const INVESTOR_RESEARCH_READER_SCHEMA_NAME = "InvestorResearchReaderResult";
+export const INVESTOR_RESEARCH_READER_SCHEMA_NAME =
+  "InvestorResearchReaderResult";
 export const INVESTOR_RESEARCH_READER_SCHEMA_VERSION = 1;
 
 const OptionSchema = z.object({
@@ -90,11 +91,7 @@ const citedList = (maxItems: number) =>
     .nullable();
 
 /** A plain non-negative decimal amount, in whole units of the currency. */
-const AmountSchema = z
-  .string()
-  .trim()
-  .max(20)
-  .nullable();
+const AmountSchema = z.string().trim().max(20).nullable();
 
 export const InvestorResearchReaderResultSchema = z
   .object({
@@ -102,7 +99,7 @@ export const InvestorResearchReaderResultSchema = z
     wrongSubject: z.boolean(),
     /** One of investorTypeOptions' keys. */
     investorType: citedText(64),
-    /** Their stated thesis, one or two sentences, attributed. */
+    /** Their stated thesis, one or two sentences, close to the page's words. */
     thesis: citedText(400),
     /** stageOptions' keys. */
     stages: citedList(5),

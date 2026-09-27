@@ -32,7 +32,7 @@ Currencies: {{currencyOptions}}
 WHAT TO PRODUCE
 Fill a field only when a page states it about THIS investor. Every filled field names the page (sourceIndex) and copies the page's own words that say it (quote), exactly as written on that page, short.
 - investorType: the key of the investor type the pages describe them as.
-- thesis: what they say they invest in and why, in one or two plain sentences, attributed ("Their site says they back...").
+- thesis: what they say they invest in and why, in one or two plain sentences, as close to the page's own words as you can, written as they would say it about themselves ("We back...").
 - stages: the keys of the stages they say they invest at. A stage mix read only from the names of portfolio companies is not a stated stage: leave it null.
 - sectors: the sectors or product areas they say they invest in, in the page's words.
 - geographies: the regions or countries they say they invest in, in the page's words.

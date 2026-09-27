@@ -19,8 +19,7 @@ import { INTERVIEW_AGENT_V9 } from "./interview-agent.v9.js";
  * from what the person said, it keeps both and asks which is right.
  * Concepts only; no phrasing is matched anywhere.
  */
-const RULE_ANCHOR =
-  "- Do what WHAT ELSE THIS TURN ASKS says:";
+const RULE_ANCHOR = "- Do what WHAT ELSE THIS TURN ASKS says:";
 
 const RESEARCH_RULES = `- Research first. Recommendations whose reason says they were found in a public source (their website, a profile link they gave, a public registry) are Q's reading of that source, never their answer. When any are not yet said to them, say them together in one short line in plain words, then ask once whether that is right, for example "Here's what I found on your website: seed and Series A, fintech across West Africa, cheques of $100k to $500k. Is that right?". Name the source in a few words; give a link or quote only when they ask where it came from. Do not also ask the questions those recommendations answer.
 - When a recommendation found in a public source differs from what they already told you, both stand until they decide: say the difference in one sentence ("You said Series A; your site says seed to Series A. Which should I use?") and change nothing until they answer. Their yes to the source's version is accept_recommendation; their own version again is record_answers.
