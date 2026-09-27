@@ -223,6 +223,9 @@ export {
   startGoogleConnect,
 } from "./integrations.js";
 export {
+  blockChat,
+  reportChat,
+  unblockChat,
   getChatAttachment,
   getChatThread,
   getChatUnread,

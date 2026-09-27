@@ -29,6 +29,11 @@ import {
   shareableDocumentsAction,
   unsendChatMessageAction,
 } from "./chat-actions";
+import {
+  ChatSafetyDialogs,
+  ChatSafetyMenu,
+  type ChatSafetyDialog,
+} from "./chat-safety";
 import { VoiceRecorder } from "./voice-recorder";
 
 /**
@@ -42,6 +47,10 @@ import { VoiceRecorder } from "./voice-recorder";
  * from the thread reaches Q unless the person asks. Files go straight from
  * the browser to private storage through the document pipeline and are
  * shared once they have been checked.
+ *
+ * Safety (doc 10): the options menu blocks or unblocks messages and reports
+ * the conversation; each message from the other side can be reported. A
+ * blocked thread keeps its history and shows no composer.
  */
 
 const POLL_MS = 3000;
@@ -73,6 +82,12 @@ export function formatDuration(ms: number): string {
   return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
 }
 
+function blockedNotice(byYourSide: boolean): string {
+  return byYourSide
+    ? "You blocked messages. Unblock from the options menu to send again."
+    : "You can't message this relationship right now.";
+}
+
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export function RelationshipChat({
@@ -89,6 +104,10 @@ export function RelationshipChat({
     () => initial?.messages.slice() ?? [],
   );
   const [status, setStatus] = useState<Status>(initial?.status ?? "OPEN");
+  const [blockedByYourSide, setBlockedByYourSide] = useState(
+    initial?.blockedByYourSide ?? false,
+  );
+  const [safety, setSafety] = useState<ChatSafetyDialog | null>(null);
   const [seenId, setSeenId] = useState<string | null>(
     initial?.counterpartLastReadMessageId ?? null,
   );
@@ -124,6 +143,7 @@ export function RelationshipChat({
     if (!result.ok) return;
     const thread = result.value;
     setStatus(thread.status);
+    setBlockedByYourSide(thread.blockedByYourSide);
     setSeenId(thread.counterpartLastReadMessageId);
     cursor.current = thread.cursor;
     if (thread.messages.length > 0) {
@@ -177,7 +197,8 @@ export function RelationshipChat({
         await wait(4000);
         continue;
       }
-      if (result.kind === "CLOSED") setStatus("NOT_CONNECTED");
+      // Not connected, or blocked: the thread says which.
+      if (result.kind === "CLOSED") void poll();
       setNotice(result.message);
       return false;
     }
@@ -328,6 +349,10 @@ export function RelationshipChat({
     else setNotice(result.message);
   };
 
+  // The caller's side, from their own messages; the other side's messages
+  // are the ones that can be reported.
+  const ownSide = messages.find((message) => message.mine)?.side ?? null;
+
   const lastMine = [...messages]
     .reverse()
     .find((message) => message.mine && !message.unsent);
@@ -349,20 +374,39 @@ export function RelationshipChat({
         >
           Messages
         </h2>
-        <Button
-          variant="quiet"
-          onClick={() => invokeQ(draft.replace(Q_PREFIX, "").trim())}
-        >
-          <QAperture state="IDLE" size="chrome" />
-          Ask Q
-        </Button>
+        <div className="flex items-center gap-1">
+          <Button
+            variant="quiet"
+            onClick={() => invokeQ(draft.replace(Q_PREFIX, "").trim())}
+          >
+            <QAperture state="IDLE" size="chrome" />
+            Ask Q
+          </Button>
+          <ChatSafetyMenu
+            blockedByYourSide={blockedByYourSide}
+            onChoose={setSafety}
+          />
+        </div>
       </div>
+      <ChatSafetyDialogs
+        relationshipId={relationshipId}
+        counterpart={counterpart}
+        dialog={safety}
+        onClose={() => setSafety(null)}
+        onDone={(done) => {
+          setSafety(null);
+          setNotice(done);
+          void poll();
+        }}
+      />
 
       {messages.length === 0 ? (
         <p className="cq-body text-(--cq-text-secondary)">
           {status === "OPEN"
             ? `No messages yet. Say hello to ${counterpart}.`
-            : "Messages open once you're connected: when interest has been expressed and accepted."}
+            : status === "BLOCKED"
+              ? blockedNotice(blockedByYourSide)
+              : "Messages open once you're connected: when interest has been expressed and accepted."}
         </p>
       ) : (
         <ol
@@ -468,6 +512,19 @@ export function RelationshipChat({
                     Unsend
                   </Button>
                 ) : null}
+                {!message.mine && !message.unsent && message.side !== ownSide ? (
+                  <Button
+                    variant="quiet"
+                    size="compact"
+                    className="min-h-11"
+                    aria-label={`Report message from ${message.senderName}`}
+                    onClick={() =>
+                      setSafety({ kind: "REPORT", messageId: message.messageId })
+                    }
+                  >
+                    Report
+                  </Button>
+                ) : null}
               </span>
             </li>
           ))}
@@ -480,6 +537,12 @@ export function RelationshipChat({
           {notice}
         </p>
       )}
+
+      {status === "BLOCKED" && messages.length > 0 ? (
+        <p className="cq-body-sm text-(--cq-text-secondary)">
+          {blockedNotice(blockedByYourSide)}
+        </p>
+      ) : null}
 
       {status === "OPEN" ? (
         <form

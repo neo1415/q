@@ -6,16 +6,21 @@ import { z } from "zod";
 
 import {
   ApiProblemError,
+  blockChat,
   getChatAttachment,
   getChatThread,
   listDocuments,
   markChatRead,
+  reportChat,
   sendChatMessage,
+  unblockChat,
   unsendChatMessage,
   type ApiSession,
 } from "@capital-q/api-client";
 import {
+  CHAT_REPORT_NOTE_MAX_LENGTH,
   ChatMessageBodySchema,
+  ChatReportReasonCodeSchema,
   type ChatMessageDto,
   type ChatThreadDto,
 } from "@capital-q/contracts";
@@ -189,5 +194,65 @@ export async function chatAttachmentAction(
   return run(async (session) => {
     const access = await getChatAttachment(session, relationshipId, messageId);
     return { url: access.url, mimeType: access.mimeType };
+  });
+}
+
+// --- Block and report (R34 safety) -------------------------------------------
+// Each press carries a key made once by the browser, so a retry of the
+// same press never writes twice.
+
+export async function blockChatAction(
+  rawRelationshipId: string,
+  rawKey: string,
+): Promise<ChatActionResult<null>> {
+  const relationshipId = Id.parse(rawRelationshipId);
+  const key = Key.parse(rawKey);
+  return run(async (session) => {
+    await blockChat(session, relationshipId, `web:block:${key}`);
+    return null;
+  });
+}
+
+export async function unblockChatAction(
+  rawRelationshipId: string,
+  rawKey: string,
+): Promise<ChatActionResult<null>> {
+  const relationshipId = Id.parse(rawRelationshipId);
+  const key = Key.parse(rawKey);
+  return run(async (session) => {
+    await unblockChat(session, relationshipId, `web:unblock:${key}`);
+    return null;
+  });
+}
+
+const ReportInput = z
+  .object({
+    reasonCode: ChatReportReasonCodeSchema,
+    messageId: Id.optional(),
+    note: z.string().trim().max(CHAT_REPORT_NOTE_MAX_LENGTH).optional(),
+  })
+  .strict();
+
+export async function reportChatAction(
+  rawRelationshipId: string,
+  rawReport: unknown,
+  rawKey: string,
+): Promise<ChatActionResult<null>> {
+  const relationshipId = Id.parse(rawRelationshipId);
+  const report = ReportInput.parse(rawReport);
+  const key = Key.parse(rawKey);
+  const note = report.note === undefined || report.note.length === 0 ? undefined : report.note;
+  return run(async (session) => {
+    await reportChat(
+      session,
+      relationshipId,
+      {
+        reasonCode: report.reasonCode,
+        ...(report.messageId === undefined ? {} : { messageId: report.messageId }),
+        ...(note === undefined ? {} : { note }),
+      },
+      `web:report:${key}`,
+    );
+    return null;
   });
 }

@@ -3,12 +3,17 @@ import {
   ChatAttachmentAccessDtoSchema,
   RELATIONSHIP_MESSAGE_ATTACHMENT_PATH,
   ChatThreadDtoSchema,
+  ChatReportResultDtoSchema,
   ChatUnreadDtoSchema,
   IDEMPOTENCY_KEY_HEADER,
+  RELATIONSHIP_CHAT_BLOCK_PATH,
+  RELATIONSHIP_CHAT_REPORTS_PATH,
+  RELATIONSHIP_CHAT_UNBLOCK_PATH,
   RELATIONSHIP_MESSAGE_UNSEND_PATH,
   RELATIONSHIP_MESSAGES_PATH,
   RELATIONSHIP_MESSAGES_READ_PATH,
   SendChatMessageResultDtoSchema,
+  type ReportChatRequest,
   type SendChatMessageRequest,
 } from "@capital-q/contracts";
 
@@ -126,5 +131,45 @@ export function getChatAttachment(
     "GET",
     pathFor(RELATIONSHIP_MESSAGE_ATTACHMENT_PATH, relationshipId, messageId),
     ChatAttachmentAccessDtoSchema,
+  );
+}
+
+/** `204`: messaging on this relationship stops both ways (R34 safety). */
+export function blockChat(
+  session: ApiSession,
+  relationshipId: string,
+  idempotencyKey: string,
+): Promise<void> {
+  return noContent(session, pathFor(RELATIONSHIP_CHAT_BLOCK_PATH, relationshipId), {
+    headers: { [IDEMPOTENCY_KEY_HEADER]: idempotencyKey },
+  });
+}
+
+/** `204`: the caller's side lifts its block, if it holds one. */
+export function unblockChat(
+  session: ApiSession,
+  relationshipId: string,
+  idempotencyKey: string,
+): Promise<void> {
+  return noContent(
+    session,
+    pathFor(RELATIONSHIP_CHAT_UNBLOCK_PATH, relationshipId),
+    { headers: { [IDEMPOTENCY_KEY_HEADER]: idempotencyKey } },
+  );
+}
+
+/** A report for Capital Q's integrity review; once per key. */
+export function reportChat(
+  session: ApiSession,
+  relationshipId: string,
+  report: ReportChatRequest,
+  idempotencyKey: string,
+) {
+  return call(
+    session,
+    "POST",
+    pathFor(RELATIONSHIP_CHAT_REPORTS_PATH, relationshipId),
+    ChatReportResultDtoSchema,
+    { body: report, headers: { [IDEMPOTENCY_KEY_HEADER]: idempotencyKey } },
   );
 }

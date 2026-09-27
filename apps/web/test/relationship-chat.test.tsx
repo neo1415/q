@@ -22,6 +22,8 @@ Element.prototype.scrollIntoView = vi.fn();
 const askAbout = vi.fn();
 const send = vi.fn<(...args: unknown[]) => Promise<unknown>>();
 const attachment = vi.fn<(...args: unknown[]) => Promise<unknown>>();
+const block = vi.fn<(...args: unknown[]) => Promise<unknown>>();
+const report = vi.fn<(...args: unknown[]) => Promise<unknown>>();
 vi.mock("@/components/app-shell/global-q", () => ({
   useGlobalQ: () => ({ askAbout, open: false, setOpen: () => undefined }),
 }));
@@ -39,6 +41,9 @@ vi.mock("../src/features/chat/chat-actions", () => ({
   sendChatMessageAction: (...args: unknown[]) => send(...args),
   shareableDocumentsAction: vi.fn(),
   unsendChatMessageAction: vi.fn(),
+  blockChatAction: (...args: unknown[]) => block(...args),
+  unblockChatAction: vi.fn(),
+  reportChatAction: (...args: unknown[]) => report(...args),
 }));
 
 const { RelationshipChat } =
@@ -71,12 +76,15 @@ const thread = (status: ChatThreadDto["status"]): ChatThreadDto => ({
   cursor: null,
   counterpartLastReadMessageId: null,
   unread: 1,
+  blockedByYourSide: false,
 });
 
 afterEach(() => {
   cleanup();
   askAbout.mockReset();
   send.mockReset();
+  block.mockReset();
+  report.mockReset();
 });
 
 describe("RelationshipChat", () => {
@@ -219,5 +227,69 @@ describe("RelationshipChat", () => {
       extension: "m4a",
     });
     expect(voiceContainer(() => false)).toBeNull();
+  });
+
+  it("tells the blocked side only that it can't message, with no composer", () => {
+    render(
+      <RelationshipChat
+        relationshipId={REL}
+        counterpart="Apex"
+        initial={{ ...thread("OPEN"), status: "BLOCKED" }}
+      />,
+    );
+    expect(screen.queryByLabelText("Message Apex")).toBeNull();
+    expect(
+      screen.getByText("You can't message this relationship right now."),
+    ).toBeTruthy();
+    // History stays.
+    expect(screen.getByText("Deck is attached")).toBeTruthy();
+  });
+
+  it("tells the side that blocked how to unblock", () => {
+    render(
+      <RelationshipChat
+        relationshipId={REL}
+        counterpart="Apex"
+        initial={{ ...thread("OPEN"), status: "BLOCKED", blockedByYourSide: true }}
+      />,
+    );
+    expect(screen.getByText(/You blocked messages/)).toBeTruthy();
+  });
+
+  it("reports the other side's message with a reason and an optional note, after confirmation", async () => {
+    report.mockResolvedValue({ ok: true, value: null });
+    render(
+      <RelationshipChat
+        relationshipId={REL}
+        counterpart="Apex"
+        initial={thread("OPEN")}
+      />,
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: "Report message from Ada" }),
+    );
+    const sendReport = await screen.findByRole("button", { name: "Send report" });
+    // No reason chosen yet: nothing can be sent.
+    expect((sendReport as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(screen.getByLabelText("Scam or fraud"));
+    fireEvent.change(screen.getByLabelText("Add detail (optional)"), {
+      target: { value: "  Asked for a fee  " },
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Send report" }));
+      await Promise.resolve();
+    });
+    expect(report).toHaveBeenCalledWith(
+      REL,
+      {
+        reasonCode: "SCAM",
+        messageId: "00000000-0000-4000-8000-00000000d001",
+        note: "Asked for a fee",
+      },
+      expect.any(String),
+    );
+    expect(
+      await screen.findByText("Report sent. Capital Q will review it."),
+    ).toBeTruthy();
   });
 });
