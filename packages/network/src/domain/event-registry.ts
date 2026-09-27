@@ -174,6 +174,27 @@ export const ReplyReceivedRelationshipEvent = defineRelationshipEvent({
     "The other side replied to an email sent on this relationship. Matched by the thread of the message Capital Q sent.",
 });
 
+/**
+ * A chat message on the relationship thread (R34). Activity, never a state
+ * move: talking is not interest, a match or an outcome. The payload names
+ * the communication message and nothing else -- never its words.
+ */
+export const ChatActivityPayloadSchema = z
+  .object({
+    messageId: UuidSchema,
+  })
+  .strict();
+export type ChatActivityPayload = z.infer<typeof ChatActivityPayloadSchema>;
+
+export const RELATIONSHIP_EVENT_MESSAGE_SENT = "message_sent" as const;
+export const MessageSentRelationshipEvent = defineRelationshipEvent({
+  type: RELATIONSHIP_EVENT_MESSAGE_SENT,
+  payloadSchema: ChatActivityPayloadSchema,
+  allowedVisibilityScopes: ["relationship_shared"],
+  description:
+    "A person on one side sent a message on the relationship's chat thread.",
+});
+
 export type RelationshipEventRegistry = {
   readonly get: (eventType: string) => RelationshipEventDefinition | undefined;
   readonly types: () => readonly string[];
@@ -249,4 +270,5 @@ export const RELATIONSHIP_EVENT_DEFINITIONS: readonly RelationshipEventDefinitio
     InterestDeclinedRelationshipEvent,
     OutreachSentRelationshipEvent,
     ReplyReceivedRelationshipEvent,
+    MessageSentRelationshipEvent,
   ];

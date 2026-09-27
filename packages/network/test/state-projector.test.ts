@@ -218,6 +218,20 @@ describe("relationship-state.v1 examples", () => {
     ]);
   });
 
+  it("treats a chat message as activity: no state move, no anomaly (R34)", () => {
+    const projection = projectRelationshipState([
+      event(1, "discovered", "investor_private"),
+      event(2, "interest_expressed"),
+      event(3, "message_sent"),
+      event(4, "connection_accepted"),
+      event(5, "message_sent"),
+    ]);
+    expect(projection?.state).toBe("CONNECTED");
+    expect(projection?.stateSince).toBe(at(4));
+    expect(projection?.anomalies).toEqual([]);
+    expect(projection?.unrecognised).toBe(0);
+  });
+
   it("has no projection for an empty history", () => {
     expect(projectRelationshipState([])).toBeNull();
   });
