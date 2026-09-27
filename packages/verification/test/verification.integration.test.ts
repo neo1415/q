@@ -33,7 +33,10 @@ import {
 
 import {
   createCompanyVerificationService,
+  createPostgresPendingSyntheticClaimSource,
+  createSyntheticAutoVerifySweep,
   createSyntheticVerificationDecider,
+  syntheticAutoVerifyAttestation,
   createVerificationClaimsReadinessPort,
   VERIFICATION_EVENTS,
   type CompanyVerificationService,
@@ -400,6 +403,93 @@ describe("@capital-q/verification against local PostgreSQL", () => {
         reason: "PRINCIPAL_NOT_SYNTHETIC",
       });
       expect(await pendingIds(world.tx, world.tenantA)).toHaveLength(2);
+    });
+  });
+
+  // R43, temporary until BIZ-006 /ops: the hosted staging workers' sweep.
+  describe("SYNTHETIC_AUTO_VERIFY_POLICY sweep", () => {
+    const sweepFor = (world: World, environment: string) => {
+      const source = createPostgresPendingSyntheticClaimSource(world.tx.sql);
+      return {
+        source,
+        sweep: createSyntheticAutoVerifySweep({
+          // Only this world's tenant, so other local rows cannot move counts.
+          source: {
+            pendingSyntheticClaims: async (limit) =>
+              (await source.pendingSyntheticClaims(limit)).filter(
+                (c) => c.tenantId === world.tenantA,
+              ),
+          },
+          decide: world.decider(
+            syntheticAutoVerifyAttestation(environment),
+            environment,
+          ),
+          correlation: CORRELATION,
+          limit: 5000,
+        }),
+      };
+    };
+
+    it("verifies a synthetic founder's requests on staging once; a rerun writes nothing", async () => {
+      await withWorld(async (world) => {
+        await request(world, world.adminA);
+        const ids = await pendingIds(world.tx, world.tenantA);
+        const { source, sweep } = sweepFor(world, "staging");
+        const offered = (await source.pendingSyntheticClaims(5000)).map(
+          (c) => c.claimId,
+        );
+        expect(offered).toEqual(expect.arrayContaining(ids));
+
+        expect(await sweep()).toMatchObject({ considered: 2, verified: 2 });
+        expect(await sweep()).toMatchObject({ considered: 0, verified: 0 });
+
+        const [counts] = await world.tx.sql<
+          { decided: number; audits: number; events: number }[]
+        >`select
+            (select count(*)::int from evidence.verification_claims
+              where tenant_id = ${world.tenantA} and status = 'VERIFIED') as decided,
+            (select count(*)::int from audit.material_actions
+              where tenant_id = ${world.tenantA}
+                and action_type = 'verification.claim.decided') as audits,
+            (select count(*)::int from events.outbox
+              where tenant_id = ${world.tenantA}
+                and event_type = 'verification.claim.decided') as events`;
+        expect(counts).toEqual({ decided: 2, audits: 2, events: 2 });
+        const [basis] = await world.tx.sql<{ decision_basis: string }[]>`
+          select decision_basis from evidence.verification_claims
+           where tenant_id = ${world.tenantA} and status = 'VERIFIED' limit 1`;
+        expect(basis?.decision_basis).toContain("SYNTHETIC_AUTO_VERIFY_POLICY");
+        expect((await readinessOf(world)).founderIdentity).toBe("VERIFIED");
+      });
+    });
+
+    it.each(["realMemberA", "selfMarkedA"] as const)(
+      "never offers or verifies %s's request",
+      async (who) => {
+        await withWorld(async (world) => {
+          await request(world, world[who]);
+          const ids = await pendingIds(world.tx, world.tenantA);
+          const { source, sweep } = sweepFor(world, "staging");
+          const offered = (await source.pendingSyntheticClaims(5000)).map(
+            (c) => c.claimId,
+          );
+          for (const id of ids) expect(offered).not.toContain(id);
+          expect(await sweep()).toMatchObject({ verified: 0 });
+          expect(await pendingIds(world.tx, world.tenantA)).toHaveLength(2);
+        });
+      },
+    );
+
+    it("decides nothing in production", async () => {
+      await withWorld(async (world) => {
+        await request(world, world.adminA);
+        const { sweep } = sweepFor(world, "production");
+        expect(await sweep()).toMatchObject({
+          verified: 0,
+          refused: { PRODUCTION_POSTURE: 2 },
+        });
+        expect(await pendingIds(world.tx, world.tenantA)).toHaveLength(2);
+      });
     });
   });
 

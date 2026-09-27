@@ -84,3 +84,18 @@ export type SyntheticPrincipalPort = {
     userId: string,
   ) => Promise<boolean>;
 };
+
+/**
+ * R43 (temporary until BIZ-006 /ops): current PENDING requests whose
+ * requester — and, for a PERSON subject, whose subject — carry the
+ * synthetic marker, oldest first, across tenants. A privileged worker
+ * read that only narrows what the decider is offered; the decider
+ * re-checks every condition. TODO(BIZ-006): delete.
+ */
+export type PendingSyntheticClaimSource = {
+  readonly pendingSyntheticClaims: (
+    limit: number,
+  ) => Promise<
+    readonly { readonly tenantId: string; readonly claimId: string }[]
+  >;
+};

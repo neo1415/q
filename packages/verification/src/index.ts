@@ -38,9 +38,18 @@ export {
   type SyntheticDecisionRefusal,
   type SyntheticDemoAttestation,
 } from "./domain/attestation.js";
+export {
+  SYNTHETIC_AUTO_VERIFY_POLICY,
+  syntheticAutoVerifyAttestation,
+} from "./domain/auto-verify-policy.js";
+export {
+  createSyntheticAutoVerifySweep,
+  type SyntheticAutoVerifySweepResult,
+} from "./application/auto-verify-sweep.js";
 export type {
   NewPendingClaim,
   NewSyntheticDecision,
+  PendingSyntheticClaimSource,
   SyntheticPrincipalPort,
   VerificationClaimRepository,
 } from "./application/ports.js";
@@ -63,6 +72,7 @@ export {
   type CompanyVerificationService,
 } from "./application/service.js";
 export {
+  createPostgresPendingSyntheticClaimSource,
   createPostgresSyntheticPrincipalPort,
   createPostgresVerificationClaimRepository,
 } from "./infrastructure/postgres-verification-repository.js";

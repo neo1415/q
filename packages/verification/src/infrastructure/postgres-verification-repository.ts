@@ -10,6 +10,7 @@ import {
 import type { DatabaseExecutor } from "@capital-q/database";
 
 import type {
+  PendingSyntheticClaimSource,
   SyntheticPrincipalPort,
   VerificationClaimRepository,
 } from "../application/ports.js";
@@ -203,6 +204,49 @@ export function createPostgresSyntheticPrincipalPort(): SyntheticPrincipalPort {
           join auth.users u on u.id = p.auth_user_id
          where p.id = ${userId}`;
       return row === undefined ? false : SyntheticRow.parse(row).synthetic;
+    },
+  };
+}
+
+const PendingRow = z.object({ tenant_id: z.string(), id: z.string() });
+
+/**
+ * R43 sweep candidates (temporary until BIZ-006 /ops; TODO(BIZ-006):
+ * delete). The same marker test as `isSynthetic`, applied to the requester
+ * and to a PERSON subject, so a real founder's request is never even
+ * offered and cannot starve the bounded sweep. Uses the partial PENDING
+ * index; "current" is the highest revision for the subject.
+ */
+export function createPostgresPendingSyntheticClaimSource(
+  executor: DatabaseExecutor,
+): PendingSyntheticClaimSource {
+  return {
+    pendingSyntheticClaims: async (limit) => {
+      const rows = await executor`
+        select c.tenant_id, c.id
+          from evidence.verification_claims c
+          join identity.user_profiles rp on rp.id = c.requested_by_user_id
+          join auth.users ru on ru.id = rp.auth_user_id
+         where c.status = 'PENDING'
+           and coalesce(ru.raw_app_meta_data -> 'synthetic' = 'true'::jsonb, false)
+           and (c.subject_type <> 'PERSON' or exists (
+                 select 1
+                   from identity.user_profiles sp
+                   join auth.users su on su.id = sp.auth_user_id
+                  where sp.id = c.subject_id
+                    and coalesce(su.raw_app_meta_data -> 'synthetic' = 'true'::jsonb, false)))
+           and c.revision = (
+                 select max(v.revision)
+                   from evidence.verification_claims v
+                  where v.tenant_id = c.tenant_id
+                    and v.claim_type = c.claim_type
+                    and v.subject_key = c.subject_key)
+         order by c.created_at, c.id
+         limit ${limit}`;
+      return rows.map((row) => {
+        const parsed = PendingRow.parse(row);
+        return { tenantId: parsed.tenant_id, claimId: parsed.id };
+      });
     },
   };
 }
