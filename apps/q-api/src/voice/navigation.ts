@@ -1,4 +1,9 @@
-import type { QVoiceDestination } from "@capital-q/contracts";
+import {
+  QClientActionIntentSchema,
+  type QClientActionIntent,
+  type QNavigateDestination,
+  type QResultBlock,
+} from "@capital-q/contracts";
 import {
   EMPTY_FAILURES,
   FAILURE_THRESHOLD,
@@ -9,49 +14,31 @@ import {
 } from "@capital-q/q-core";
 
 /**
- * What a spoken sentence asks the screen to do, read deterministically
- * (CQ-Q-VOICE-001 rework). The interviewer reads these through its model;
- * the welcome and the open conversation had no reader at all, so "take me
- * to Discover" reached Q as a question and Q, correctly, could not do it.
- * These patterns are narrow on purpose: a sentence that merely mentions a
- * page ("what is Discover?") is a question, not a request to go there.
+ * Where a spoken turn takes the screen, and what it has the browser do
+ * (R20/R21; ADR 0011). Read from Q's answer — the UI_INTENT blocks the
+ * answer carries, exactly as a typed turn's screen follows them — never
+ * from the words: the turn reader (a model) chose the tool, and code
+ * validated it. The latest navigation wins; so does the latest action.
  */
-
-const GO = String.raw`(?:take me|bring me|go|move|jump|switch|head|navigate|send me)(?: over| back| straight)? to|open(?: up)?|show me|let'?s (?:go|see)|i(?: would|'d) like to (?:see|go to)|can (?:i|we) (?:see|go to)`;
-
-const PAGES: readonly (readonly [QVoiceDestination, RegExp])[] = [
-  ["DISCOVER", /\b(?:discover(?:y)?|discover page|feed)\b/i],
-  ["HOME", /\b(?:home|the home page|the main page|the dashboard|the start)\b/i],
-  ["PROFILE", /\b(?:my )?(?:profile|profile page|my page|my details)\b/i],
-  [
-    "CAPITAL",
-    /\b(?:capital|the capital page|fundraising|my raise|the raise)\b/i,
-  ],
-  [
-    "COMPANY_VISIBILITY",
-    /\b(?:visibility|company visibility|who can see (?:us|me|my company))\b/i,
-  ],
-  [
-    "INTERVIEW",
-    /\b(?:interview|setup|onboarding|questions|where we left off)\b/i,
-  ],
-  ["FORM", /\b(?:the form|forms?|typing it in|fill (?:it|the form) in)\b/i],
-];
-
-const GO_RE = new RegExp(
-  String.raw`\b(?:${GO})\b\s+(?:the |my |our )?([a-z' ]{2,40})`,
-  "i",
-);
-
-/** A destination the person asked to be taken to, or null when they did not. */
-export function spokenDestination(text: string): QVoiceDestination | null {
-  const match = GO_RE.exec(text);
-  if (match === null) return null;
-  const named = match[1] ?? "";
-  for (const [destination, pattern] of PAGES) {
-    if (pattern.test(named)) return destination;
+export function followOfAnswer(
+  blocks: readonly QResultBlock[] | undefined,
+): {
+  readonly navigate: QNavigateDestination | null;
+  readonly clientAction: QClientActionIntent | null;
+} {
+  let navigate: QNavigateDestination | null = null;
+  let clientAction: QClientActionIntent | null = null;
+  for (const block of blocks ?? []) {
+    if (block.kind !== "UI_INTENT") continue;
+    const intent = block.intent;
+    if (intent.kind === "NAVIGATE") {
+      navigate = intent.destination;
+      continue;
+    }
+    const action = QClientActionIntentSchema.safeParse(intent);
+    if (action.success) clientAction = action.data;
   }
-  return null;
+  return { navigate, clientAction };
 }
 
 /**
@@ -224,22 +211,6 @@ let resumeTurn = 0;
 export function resumeAcknowledgement(): string {
   resumeTurn += 1;
   return rotate(RESUME_ACKS, resumeTurn);
-}
-
-const DESTINATION_LINES: Readonly<Record<QVoiceDestination, string>> = {
-  HOME: "Taking you home now.",
-  PROFILE: "Opening your profile.",
-  CAPITAL: "Taking you to Capital.",
-  DISCOVER: "Taking you to Discover.",
-  COMPANY_VISIBILITY: "Opening your visibility settings.",
-  INTERVIEW: "Taking you back to the setup.",
-  INTERVIEW_FOUNDER: "Let's set up your company.",
-  INTERVIEW_INVESTOR: "Let's set up your mandate.",
-  FORM: "Leaving you with the form.",
-};
-
-export function destinationLine(destination: QVoiceDestination): string {
-  return DESTINATION_LINES[destination];
 }
 
 /**

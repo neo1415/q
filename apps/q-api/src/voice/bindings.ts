@@ -1,5 +1,6 @@
 import type {
   CreateQVoiceSessionRequest,
+  QScreenContext,
   QVoiceChoice,
 } from "@capital-q/contracts";
 import type { ActorContext } from "@capital-q/security";
@@ -25,6 +26,12 @@ export type VoiceThread = {
   conversationId: CreateQVoiceSessionRequest["conversationId"];
   readonly subjects: CreateQVoiceSessionRequest["subjects"];
   readonly onboarding: CreateQVoiceSessionRequest["onboarding"];
+  /**
+   * R21: the screen the person is on now, as their browser last said
+   * (on opening the line, then on every move). A request, never authority:
+   * each spoken turn's run resolves its entities for them or drops them.
+   */
+  screen?: QScreenContext | undefined;
   /** Q's first minute with a new person: no onboarding session yet. */
   readonly welcome?: boolean | undefined;
   /**

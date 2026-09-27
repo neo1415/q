@@ -936,6 +936,29 @@ const qTools = createQTools({
       late: () => ({ actions: qActions, orchestrator }),
       logger,
     }),
+    // Live test 2026-09-27 #4: "is my card saved?" -- the Q Card screen's
+    // own read, authorised again by the service (card.view).
+    qCards: {
+      getCard: async (actor, subject) => {
+        const card = await publicIdentity.getCard({
+          actor,
+          subject: {
+            subjectType: subject.subjectType,
+            subjectId: subject.subjectId,
+          },
+        });
+        return card === null
+          ? null
+          : {
+              handle: card.handle,
+              indexable: card.indexable,
+              updatedAt: card.updatedAt,
+            };
+      },
+    },
+    // R20/R33: a person's screen reads every Home Q answer, so the app's
+    // own browser actions (theme, reload, their website) are Q's too.
+    clientActions: true,
   },
   logger,
 });

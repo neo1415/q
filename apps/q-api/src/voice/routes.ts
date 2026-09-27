@@ -11,7 +11,9 @@ import {
   parseContract,
   Q_VOICE_SESSIONS_PATH,
   Q_VOICE_SPEECH_PATH,
+  Q_VOICE_SCREEN_PATH,
   Q_VOICE_TURN_PATH,
+  QScreenContextSchema,
   QVoiceTurnStateSchema,
 } from "@capital-q/contracts";
 import { fetchMe } from "@capital-q/api-client";
@@ -177,6 +179,44 @@ export function registerQVoiceRoutes(
         degraded: false,
       };
       return reply.code(200).send(QVoiceTurnStateSchema.parse(state));
+    },
+  );
+
+  /**
+   * `POST /v1/q/voice/sessions/:voiceSessionId/screen` — where the person
+   * is now, while the line is open (R21). Spoken turns reach the planner
+   * with the screen exactly as typed ones do. Owner only: another person's
+   * session is not found. What is recorded is only the validated shape;
+   * each turn's run resolves its entities for the asker or drops them.
+   */
+  app.post(
+    Q_VOICE_SCREEN_PATH,
+    { onRequest: withContext },
+    async (request, reply) => {
+      const actor = getActorContext(request);
+      const params = request.params as { voiceSessionId?: string };
+      const binding = dependencies.bindings.byVoiceSessionId(
+        params.voiceSessionId ?? "",
+      );
+      if (binding === null || binding.actor.userId !== actor.userId) {
+        return reply.code(404).send({
+          type: "about:blank",
+          title: "Not found",
+          status: 404,
+          detail: "No such voice session.",
+        });
+      }
+      const screen = QScreenContextSchema.safeParse(request.body);
+      if (!screen.success) {
+        return reply.code(400).send({
+          type: "about:blank",
+          title: "Bad request",
+          status: 400,
+          detail: "That is not a screen.",
+        });
+      }
+      binding.thread.screen = screen.data;
+      return reply.code(204).send();
     },
   );
 
@@ -611,6 +651,7 @@ export function registerQVoiceRoutes(
           conversationId: input.conversationId,
           subjects: input.subjects,
           onboarding: input.onboarding,
+          ...(input.screen === undefined ? {} : { screen: input.screen }),
           welcome: input.welcome === true,
           ...(input.organisationHint === undefined
             ? {}

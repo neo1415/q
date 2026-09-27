@@ -22,6 +22,7 @@ import {
 } from "@capital-q/security";
 
 import type { VoiceSessionBinding } from "../src/voice/bindings.js";
+import { createVoiceTurnBoard } from "../src/voice/turn-board.js";
 import type { VoiceSpeaker } from "../src/voice/provider.js";
 import {
   createVoiceTurnHandler,
@@ -1053,6 +1054,93 @@ describe("a spoken question for Q", () => {
     } finally {
       spy.mockRestore();
     }
+  });
+
+  it("carries the screen to the planner, and the screen follows the answer's navigation block, never the words (R21, ADR 0011)", async () => {
+    const runtime = fakeRuntime();
+    const board = createVoiceTurnBoard();
+    const handle = createVoiceTurnHandler({
+      qRuntime: runtime.service,
+      qStream: fakeStream([
+        event("q.message.completed", {
+          message: {
+            id: "f0000000-0000-4000-8000-000000000030",
+            role: "Q",
+            text: "Taking you to Discover.",
+            blocks: [
+              {
+                kind: "UI_INTENT",
+                intent: { kind: "NAVIGATE", destination: "DISCOVER" },
+              },
+              {
+                kind: "UI_INTENT",
+                intent: { kind: "SET_THEME", theme: "dark" },
+              },
+            ],
+          },
+        }),
+        event("q.run.completed", { status: "COMPLETED" }),
+      ]),
+      logger,
+      board,
+    });
+    const speaker = fakeSpeaker();
+    await handle(
+      binding({
+        conversationId: undefined,
+        subjects: undefined,
+        onboarding: undefined,
+        screen: { route: "PROFILE" },
+      }),
+      [{ role: "user", content: "take me to discover" }],
+      new AbortController().signal,
+      speaker,
+    );
+    // Asked of Q, like a typed turn, with the screen it was asked from.
+    expect(runtime.calls.createRun).toHaveLength(1);
+    expect(
+      (runtime.calls.createRun[0] as { input: { screen?: unknown } }).input
+        .screen,
+    ).toEqual({ route: "PROFILE" });
+    const turn = board.read("vs-1");
+    expect(turn.navigate).toBe("DISCOVER");
+    expect(turn.clientAction).toEqual({ kind: "SET_THEME", theme: "dark" });
+    expect(speaker.spoken.join(" ")).toContain("Taking you to Discover.");
+  });
+
+  it("moves nothing when Q's answer carries no navigation, whatever was said", async () => {
+    const runtime = fakeRuntime();
+    const board = createVoiceTurnBoard();
+    const handle = createVoiceTurnHandler({
+      qRuntime: runtime.service,
+      qStream: fakeStream([
+        event("q.message.completed", {
+          message: {
+            id: "f0000000-0000-4000-8000-000000000031",
+            role: "Q",
+            text: 'Capital Q doesn\'t have a "queue" page. The nearest is Discover. Shall I take you there?',
+          },
+        }),
+        event("q.run.completed", { status: "COMPLETED" }),
+      ]),
+      logger,
+      board,
+    });
+    await handle(
+      binding({
+        conversationId: undefined,
+        subjects: undefined,
+        onboarding: undefined,
+      }),
+      [{ role: "user", content: "take me to the queue page" }],
+      new AbortController().signal,
+      fakeSpeaker(),
+    );
+    expect(board.read("vs-1").navigate).toBeNull();
+    expect(
+      (runtime.calls.createRun[0] as { input: { screen?: unknown } }).input
+        .screen,
+    ).toBeUndefined();
   });
 
   it("speaks a run's public failure and nothing internal", async () => {

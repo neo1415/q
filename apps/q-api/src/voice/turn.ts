@@ -40,16 +40,15 @@ import {
 import type { PresenceFound } from "./presence-trigger.js";
 import {
   declines,
-  destinationLine,
   endsUnfinished,
   fillerLine,
+  followOfAnswer,
   spokenVisibility,
   type SpokenVisibility,
   isNonLexical,
   recoveryLine,
   recoverySettled,
   resumeAcknowledgement,
-  spokenDestination,
   wantsToEndVoice,
   withoutContinueSignal,
 } from "./navigation.js";
@@ -846,6 +845,9 @@ export function createVoiceTurnHandler(
         message: { text },
         modality: "VOICE",
         ...(subjects === undefined ? {} : { subjects: [...subjects] }),
+        // R21: where they are now, as their browser last said; resolved
+        // for them on this run or dropped, exactly like a typed turn's.
+        ...(thread.screen === undefined ? {} : { screen: thread.screen }),
         ...(thread.conversationId === undefined
           ? {}
           : { conversationId: thread.conversationId }),
@@ -860,6 +862,9 @@ export function createVoiceTurnHandler(
     if (thread.conversationId !== undefined) {
       dependencies.board?.record(binding.voiceSessionId, {
         ...dependencies.board.read(binding.voiceSessionId),
+        // A new turn: the last one's move is not made again.
+        navigate: null,
+        clientAction: null,
         conversationId: QConversationIdSchema.parse(thread.conversationId),
       });
     }
@@ -949,6 +954,19 @@ export function createVoiceTurnHandler(
             break;
           }
           case "q.message.completed": {
+            // The screen follows Q's answer: a navigation or a client
+            // action it carries, after Q has said so (useFollowTurn).
+            const follow = followOfAnswer(event.data.message.blocks);
+            if (follow.navigate !== null || follow.clientAction !== null) {
+              dependencies.board?.record(binding.voiceSessionId, {
+                ...dependencies.board.read(binding.voiceSessionId),
+                asking: null,
+                navigate: follow.navigate,
+                clientAction: follow.clientAction,
+                handoff: null,
+                degraded: false,
+              });
+            }
             const text = event.data.message.text;
             if (!streamedDeltas && text !== undefined) {
               answerGiven = true;
@@ -1934,21 +1952,9 @@ export function createVoiceTurnHandler(
         ? { kind: "SPOKEN", path: "MOVE" }
         : { kind: "INTERRUPTED", path: "MOVE" };
     }
-    // "Take me to Discover", outside the interview (which reads it itself).
-    if (binding.thread.onboarding === undefined) {
-      const destination = spokenDestination(text);
-      if (destination !== null && destination !== "FORM") {
-        dependencies.board?.record(binding.voiceSessionId, {
-          asking: null,
-          navigate: destination,
-          handoff: null,
-          degraded: false,
-        });
-        return (await speakLine(speaker, destinationLine(destination), signal))
-          ? { kind: "SPOKEN", path: "MOVE" }
-          : { kind: "INTERRUPTED", path: "MOVE" };
-      }
-    }
+    // "Take me to Discover" is no longer matched here from the words (ADR
+    // 0011, R20): it reaches Q like any turn, and the screen follows the
+    // navigation block Q's answer carries (askQ), exactly as typed.
     let outcome: VoiceTurnOutcome;
     if (binding.thread.welcome === true) {
       outcome = await welcomeTurn(binding, text, signal, speaker);

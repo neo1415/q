@@ -2,34 +2,49 @@ import { describe, expect, it } from "vitest";
 
 import {
   fillerLine,
+  followOfAnswer,
   isNonLexical,
   recoveryLine,
   recoverySettled,
   resumeAcknowledgement,
-  spokenDestination,
   wantsToEndVoice,
 } from "../src/voice/navigation.js";
 import { unsaidPartOf } from "../src/voice/turn.js";
 
-describe("spoken navigation, read deterministically", () => {
-  it("hears a request to be taken somewhere and names the fixed destination", () => {
-    expect(spokenDestination("Take me to the discover page.")).toBe("DISCOVER");
-    expect(spokenDestination("can you open my profile")).toBe("PROFILE");
-    expect(spokenDestination("Let's go home")).toBe("HOME");
-    expect(spokenDestination("show me the capital page")).toBe("CAPITAL");
-    expect(spokenDestination("take me back to the interview")).toBe(
-      "INTERVIEW",
-    );
-    expect(spokenDestination("switch to the form please")).toBe("FORM");
+describe("spoken navigation follows Q's answer, never the words (ADR 0011, R20)", () => {
+  it("takes the navigation and the client action the answer carries; the latest wins", () => {
+    expect(
+      followOfAnswer([
+        { kind: "TEXT", text: "Taking you to Discover." },
+        { kind: "UI_INTENT", intent: { kind: "NAVIGATE", destination: "HOME" } },
+        {
+          kind: "UI_INTENT",
+          intent: { kind: "NAVIGATE", destination: "DISCOVER" },
+        },
+      ]),
+    ).toEqual({ navigate: "DISCOVER", clientAction: null });
+    expect(
+      followOfAnswer([
+        { kind: "UI_INTENT", intent: { kind: "SET_THEME", theme: "dark" } },
+      ]),
+    ).toEqual({
+      navigate: null,
+      clientAction: { kind: "SET_THEME", theme: "dark" },
+    });
   });
 
-  it("does not mistake a question about a page for a request to go there", () => {
-    expect(spokenDestination("What is Discover?")).toBeNull();
-    expect(spokenDestination("Is my profile public?")).toBeNull();
-    expect(spokenDestination("We are raising capital")).toBeNull();
-    expect(spokenDestination("take me through the numbers")).toBeNull();
+  it("an answer without such blocks moves nothing, whatever was said", () => {
+    expect(followOfAnswer(undefined)).toEqual({
+      navigate: null,
+      clientAction: null,
+    });
+    expect(
+      followOfAnswer([{ kind: "TEXT", text: "Take me to the queue page." }]),
+    ).toEqual({ navigate: null, clientAction: null });
   });
+});
 
+describe("voice lines, read deterministically", () => {
   it("hears the person ending the voice conversation", () => {
     for (const line of [
       "End the chat.",

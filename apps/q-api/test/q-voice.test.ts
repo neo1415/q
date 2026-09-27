@@ -216,6 +216,57 @@ describe("POST /v1/q/voice/sessions", () => {
     await app.close();
   });
 
+  it("keeps the screen the line opened on, and each move the owner reports; nobody else's (R21)", async () => {
+    const bindings = createVoiceSessionBindings();
+    const app = buildApp({
+      principal: PRINCIPAL,
+      context: CONTEXT,
+      provider: fakeProvider(),
+      bindings,
+    });
+    const opened = await app.inject({
+      method: "POST",
+      url: "/v1/q/voice/sessions",
+      headers: AUTH,
+      payload: { voice: "FEMALE", screen: { route: "PROFILE" } },
+    });
+    expect(opened.statusCode).toBe(201);
+    const { voiceSessionId } = opened.json<{ voiceSessionId: string }>();
+    expect(bindings.byVoiceSessionId(voiceSessionId)?.thread.screen).toEqual({
+      route: "PROFILE",
+    });
+    const moved = await app.inject({
+      method: "POST",
+      url: `/v1/q/voice/sessions/${voiceSessionId}/screen`,
+      headers: AUTH,
+      payload: { route: "DISCOVER" },
+    });
+    expect(moved.statusCode).toBe(204);
+    expect(bindings.byVoiceSessionId(voiceSessionId)?.thread.screen).toEqual({
+      route: "DISCOVER",
+    });
+    // Not a screen: refused, and the last good one stands.
+    const bad = await app.inject({
+      method: "POST",
+      url: `/v1/q/voice/sessions/${voiceSessionId}/screen`,
+      headers: AUTH,
+      payload: { route: "DISCOVER", pixels: "..." },
+    });
+    expect(bad.statusCode).toBe(400);
+    // Another session id: not found, nothing recorded.
+    const other = await app.inject({
+      method: "POST",
+      url: "/v1/q/voice/sessions/f0000000-0000-4000-8000-0000000000ff/screen",
+      headers: AUTH,
+      payload: { route: "HOME" },
+    });
+    expect(other.statusCode).toBe(404);
+    expect(bindings.byVoiceSessionId(voiceSessionId)?.thread.screen).toEqual({
+      route: "DISCOVER",
+    });
+    await app.close();
+  });
+
   it("rejects a body that tries to name authority", async () => {
     const provider = fakeProvider();
     const app = buildApp({
