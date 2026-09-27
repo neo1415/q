@@ -49,8 +49,12 @@ export async function generateMetadata({
     result.subjectType,
     publicExternalFields(result.fields),
   );
-  const url = `${appOrigin()}/@${result.handle}`;
+  const origin = appOrigin();
+  const url = `${origin}/@${result.handle}`;
   return {
+    // The og:image beside this route is a relative URL: resolved against the
+    // configured origin, never Next's localhost fallback.
+    metadataBase: new URL(origin),
     title: result.name,
     ...(tagline === null ? {} : { description: tagline }),
     alternates: { canonical: url },

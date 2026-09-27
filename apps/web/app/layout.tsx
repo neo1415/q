@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { GeistMono } from "geist/font/mono";
 import { GeistSans } from "geist/font/sans";
 
+import { loadWebServerConfig } from "@capital-q/config/web";
 import { THEME_COLORS } from "@capital-q/ui/tokens";
 
 import { THEME_BOOT_SCRIPT } from "@/features/appearance/theme";
@@ -10,7 +11,7 @@ import { ServiceWorkerRegistration } from "@/pwa/service-worker-registration";
 
 import "./globals.css";
 
-export const metadata: Metadata = {
+const METADATA: Metadata = {
   title: { default: "Capital Q", template: "%s · Capital Q" },
   description:
     "Investment intelligence for private capital. Q helps founders and investors reach a capital objective with evidence, not noise.",
@@ -30,6 +31,27 @@ export const metadata: Metadata = {
   // Screen, so both are declared.
   other: { "apple-mobile-web-app-capable": "yes" },
 };
+
+/**
+ * The configured web origin (`CQ_WEB_ORIGIN`) as the base for every
+ * relative metadata URL (og:image, canonical). Without it Next falls back
+ * to `http://localhost:3000`, which is what share previews then fetch.
+ * Read at request time, not build time: the origin is deployment config.
+ * A build that cannot load the config yet leaves the base unset rather
+ * than failing; any page that emits an absolute URL also sets it itself.
+ */
+function metadataBase(): URL | undefined {
+  try {
+    return new URL(loadWebServerConfig().auth.appOrigin);
+  } catch {
+    return undefined;
+  }
+}
+
+export function generateMetadata(): Metadata {
+  const base = metadataBase();
+  return base === undefined ? METADATA : { ...METADATA, metadataBase: base };
+}
 
 export const viewport: Viewport = {
   width: "device-width",
