@@ -73,6 +73,8 @@ const COMMON = {
   // below requires their own conversation.
   requiredCapabilities: [],
   supportedPurposes: [...Q_TASK_CLASSES],
+  // Always on (R33): the app's own controls, asked for mid-anything.
+  core: true,
   requiredScopeKinds: ["OWN_Q_CONVERSATION"],
   approval: "NONE",
   idempotency: "SAFE_TO_REPEAT",

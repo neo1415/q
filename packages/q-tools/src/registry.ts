@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import {
+  MODEL_TOOLS_MAX,
   ModelToolDefinitionSchema,
   QToolNameSchema,
   type ModelToolDefinition,
@@ -44,8 +45,14 @@ export type QToolRegistry = {
   readonly get: (id: QToolName, version: number) => QToolRecord | undefined;
   readonly getActive: (id: QToolName) => QToolRecord | undefined;
   readonly list: () => readonly QToolRecord[];
-  /** The minimum tool set for this context, in stable id order. */
+  /**
+   * The tool set for this context: the core, then the tools serving this
+   * run's purpose, in a deterministic priority order, bounded by
+   * MODEL_TOOLS_MAX. What the bound cut is in `ranked` past the bound.
+   */
   readonly eligible: (context: QToolExecutionContext) => readonly QToolRecord[];
+  /** Every tool relevant to this context, in priority order, unbounded. */
+  readonly ranked: (context: QToolExecutionContext) => readonly QToolRecord[];
   /** Resolve a model's proposal to the record that was offered, if any. */
   readonly offeredByProviderName: (
     context: QToolExecutionContext,
@@ -164,29 +171,47 @@ export function createQToolRegistry(
   records.sort((a, b) => a.versionId.localeCompare(b.versionId));
   Object.freeze(records);
 
-  const eligible = (context: QToolExecutionContext): readonly QToolRecord[] => {
+  /**
+   * Relevance, then priority (R33, lead decision 2026-09-27): the core
+   * first; then the tools that declare fewer purposes, being the more
+   * specific to this one; then id. Deterministic for the same catalogue
+   * and plan, so the same run always offers the same tools.
+   */
+  const ranked = (context: QToolExecutionContext): readonly QToolRecord[] => {
     if (context.actor.actorType !== "HUMAN") {
       return [];
     }
     const kinds = planScopeKinds(context.plan);
     const purpose = context.plan.purpose.taskClass;
+    const core = (record: QToolRecord) => record.definition.core === true;
     return [...activeById.values()]
-      .filter(({ definition }) =>
-        definition.supportedPurposes.includes(purpose),
+      .filter(
+        (record) =>
+          core(record) || record.definition.supportedPurposes.includes(purpose),
       )
       .filter(
         ({ definition }) =>
           definition.requiredScopeKinds.length === 0 ||
           definition.requiredScopeKinds.some((kind) => kinds.has(kind)),
       )
-      .sort((a, b) => a.definition.id.localeCompare(b.definition.id));
+      .sort(
+        (a, b) =>
+          Number(core(b)) - Number(core(a)) ||
+          a.definition.supportedPurposes.length -
+            b.definition.supportedPurposes.length ||
+          a.definition.id.localeCompare(b.definition.id),
+      );
   };
+
+  const eligible = (context: QToolExecutionContext): readonly QToolRecord[] =>
+    ranked(context).slice(0, MODEL_TOOLS_MAX);
 
   return {
     get: (id, version) => byVersion.get(versionIdOf(id, version)),
     getActive: (id) => activeById.get(id),
     list: () => records,
     eligible,
+    ranked,
     offeredByProviderName: (context, providerName) =>
       eligible(context).find(
         (record) => record.definition.providerName === providerName,

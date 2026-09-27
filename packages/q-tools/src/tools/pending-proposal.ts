@@ -172,6 +172,8 @@ export function createApprovePendingProposalTool(
     // (q.action.approve plus the action's own approver policy).
     requiredCapabilities: [],
     supportedPurposes: [...PURPOSES],
+    // Always on (R33): a person decides whatever the turn is about.
+    core: true,
     requiredScopeKinds: ["OWN_Q_CONVERSATION"],
     approval: "NONE",
     idempotency: "SAFE_TO_REPEAT",
@@ -337,6 +339,8 @@ export function createDeclinePendingProposalTool(
     // The approver's authority is the Approval Engine's to check.
     requiredCapabilities: [],
     supportedPurposes: [...PURPOSES],
+    // Always on (R33): a person decides whatever the turn is about.
+    core: true,
     requiredScopeKinds: ["OWN_Q_CONVERSATION"],
     approval: "NONE",
     idempotency: "SAFE_TO_REPEAT",

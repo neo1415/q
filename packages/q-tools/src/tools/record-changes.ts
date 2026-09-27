@@ -178,6 +178,11 @@ export function createProposeRaiseChangeTool(
     {
       ...COMMON,
       id: PROPOSE_RAISE_CHANGE,
+      supportedPurposes: [
+        "OWN_COMPANY_QUESTION",
+        "ACTION_PREPARATION",
+        "GENERAL_QUESTION",
+      ],
       providerName: "propose_raise_change",
       description: `Prepares a change to their own company's raise (capital objective), exactly as the Capital page's form makes it: create one, update target (amount + currency), targetStage, instrumentCode, targetCloseDate or useOfFundsSummary, close it with a closureReason (ACHIEVED, CLOSED_BY_FOUNDER, DISCONTINUED), or replace it with a new raise. ${RESULT_NOTE}`,
       requiredScopeKinds: ["COMPANY_PROFILE"],
@@ -260,6 +265,11 @@ export function createProposeMandateChangeTool(
   >({
     ...COMMON,
     id: PROPOSE_MANDATE_CHANGE,
+    supportedPurposes: [
+      "INVESTOR_QUESTION",
+      "ACTION_PREPARATION",
+      "GENERAL_QUESTION",
+    ],
     providerName: "propose_mandate_change",
     description: `Prepares a change to their own investor organisation's mandate, as the mandate form makes it: create one, update name, discoveryMode, chequeRange, minStageCode, maxStageCode or rawMandateText, activate it, or close it. Sector and constraint preferences stay on the mandate form: offer to open their profile for those. ${RESULT_NOTE}`,
     requiredScopeKinds: ["INVESTOR_PROFILE", "INVESTOR_MANDATE"],
@@ -481,6 +491,11 @@ export function createProposeInvestorVisibilityTool(
   >({
     ...COMMON,
     id: PROPOSE_INVESTOR_VISIBILITY,
+    supportedPurposes: [
+      "INVESTOR_QUESTION",
+      "ACTION_PREPARATION",
+      "GENERAL_QUESTION",
+    ],
     providerName: "propose_investor_visibility",
     description: `Prepares a change to who can see their own investor organisation on Capital Q (visible to founders on the network, or private), as the profile's visibility control makes it. ${RESULT_NOTE}`,
     requiredScopeKinds: ["INVESTOR_PROFILE"],

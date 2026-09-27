@@ -343,26 +343,23 @@ export function createQToolExecutor(
 
   return {
     offer: (context) => {
-      const eligible = registry.eligible(context);
-      // The gateway refuses a request with more tools than MODEL_TOOLS_MAX,
-      // which would fail the whole turn. Past the bound, the run keeps the
-      // first MODEL_TOOLS_MAX (registry order) and says so in the log, so a
-      // growing catalogue degrades one tool, never the conversation.
-      if (eligible.length > MODEL_TOOLS_MAX) {
+      const ranked = registry.ranked(context);
+      // The bound is applied by the registry (core first, then priority);
+      // what it cut is logged so a crowded purpose is seen, not silent.
+      if (ranked.length > MODEL_TOOLS_MAX) {
         logger?.warn(
           {
             qRunId: context.runId,
-            eligible: eligible.length,
-            dropped: eligible
+            purpose: context.plan.purpose.taskClass,
+            eligible: ranked.length,
+            dropped: ranked
               .slice(MODEL_TOOLS_MAX)
               .map((record) => record.definition.providerName),
           },
-          "more tools eligible than one model request carries",
+          "more tools relevant than one model request carries",
         );
       }
-      return Promise.resolve(
-        eligible.slice(0, MODEL_TOOLS_MAX).map(toOfferedTool),
-      );
+      return Promise.resolve(registry.eligible(context).map(toOfferedTool));
     },
     execute,
   };

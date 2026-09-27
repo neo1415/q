@@ -131,6 +131,12 @@ export function createReadMyRecordTool(
   return defineQTool<ReadMyRecordInput, OwnRecordOutput, Subject>({
     ...READ,
     id: READ_MY_RECORD,
+    supportedPurposes: [
+      "OWN_COMPANY_QUESTION",
+      "INVESTOR_QUESTION",
+      "ACTION_PREPARATION",
+      "GENERAL_QUESTION",
+    ],
     providerName: "read_my_record",
     description:
       "Reads one of their own records exactly as its screen shows it: verification status, marketplace readiness, how the network or one audience sees their company, their team and role, their raise history, what Q found about them publicly, their investor organisation, how founders see it, their role there, or their mandates. NONE means there is nothing to show; never guess it.",
@@ -178,6 +184,7 @@ export function createReassessReadinessTool(
     classification: "SIDE_EFFECT",
     riskClass: "LOW_RISK_INTERNAL",
     id: REASSESS_READINESS,
+    supportedPurposes: ["OWN_COMPANY_QUESTION", "ACTION_PREPARATION"],
     providerName: "reassess_marketplace_readiness",
     description:
       "Checks their company's marketplace readiness again, as the visibility page's check does, and returns the fresh assessment. Nothing they declared changes.",
@@ -244,6 +251,11 @@ export function createListUploadedDocumentsTool(
   >({
     ...READ,
     id: LIST_UPLOADED_DOCUMENTS,
+    supportedPurposes: [
+      "OWN_COMPANY_QUESTION",
+      "ACTION_PREPARATION",
+      "GENERAL_QUESTION",
+    ],
     providerName: "list_uploaded_documents",
     description:
       "Lists the documents their company uploaded (decks, financials and the like): title, type, status and whether Q has finished reading each. Not their contents.",
@@ -317,6 +329,13 @@ export function createReadRelationshipEmailTool(
   >({
     ...READ,
     id: READ_RELATIONSHIP_EMAIL,
+    supportedPurposes: [
+      "RELATIONSHIP_QUESTION",
+      "COUNTERPARTY_COMPANY_QUESTION",
+      "INVESTOR_QUESTION",
+      "ACTION_PREPARATION",
+      "GENERAL_QUESTION",
+    ],
     providerName: "read_relationship_email",
     description:
       "Reads the email exchanged on one of their relationships from their own connected Gmail, newest first: direction, status, from, to, subject and when (not the bodies). NOT_CONNECTED_OR_NONE: Gmail is not connected or there is no email; offer Settings to connect it.",

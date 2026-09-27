@@ -89,6 +89,14 @@ export type QToolDefinition<I, O, G> = {
   readonly requiredCapabilities: readonly Capability[];
   /** Task classes (the firewall's derived purpose) the tool may be offered for. */
   readonly supportedPurposes: readonly QTaskClass[];
+  /**
+   * The always-on core (R33): the app's own controls a person may ask for
+   * mid-anything -- navigation, the client actions, approving, declining
+   * and listing what waits for them. Offered for every purpose (the scope
+   * kinds and the tool's authorize step still apply) and kept first when
+   * a run is over the model's tool bound. Absent: false.
+   */
+  readonly core?: boolean | undefined;
   /** Offered only when the plan holds at least one of these scope kinds; empty = always. */
   readonly requiredScopeKinds: readonly QKnowledgeScopeKind[];
   readonly approval: "NONE";

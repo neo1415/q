@@ -33,8 +33,13 @@ import {
  * in the person's own conversation.
  */
 
-function ownPlan(actor = actorA, userId = actor.userId): PermittedContextPlan {
-  const plan = planFor(actor, "GENERAL_QUESTION", [
+function ownPlan(
+  actor = actorA,
+  userId = actor.userId,
+  purpose:
+    "GENERAL_QUESTION" | "COUNTERPARTY_COMPANY_QUESTION" = "GENERAL_QUESTION",
+): PermittedContextPlan {
+  const plan = planFor(actor, purpose, [
     { kind: "OWN_Q_CONVERSATION", sensitivity: "CONFIDENTIAL" },
   ]);
   return {
@@ -124,7 +129,10 @@ describe("Save, Unsave and Pass from a conversation", () => {
     const { executor, seen } = world();
     const outcome = await executor.execute(
       call("save_company", { companyId: COMPANY_A }),
-      contextFor(actorA, ownPlan()),
+      contextFor(
+        actorA,
+        ownPlan(actorA, actorA.userId, "COUNTERPARTY_COMPANY_QUESTION"),
+      ),
     );
     expect(outcome.status).toBe("SUCCEEDED");
     expect((outcome.result as { data: unknown }).data).toEqual({
@@ -137,7 +145,14 @@ describe("Save, Unsave and Pass from a conversation", () => {
     expect(decision?.clientEventId).toMatch(/^q-[0-9a-f]{40}$/);
     // Same run, same decision: the same key, so a retry records nothing twice.
     expect(decision?.clientEventId).toBe(
-      decisionEventId(contextFor(actorA, ownPlan()).runId, "SAVE", COMPANY_A),
+      decisionEventId(
+        contextFor(
+          actorA,
+          ownPlan(actorA, actorA.userId, "COUNTERPARTY_COMPANY_QUESTION"),
+        ).runId,
+        "SAVE",
+        COMPANY_A,
+      ),
     );
     expect(decisionEventId("run-1", "PASS", COMPANY_A)).not.toBe(
       decisionEventId("run-1", "SAVE", COMPANY_A),
@@ -148,7 +163,10 @@ describe("Save, Unsave and Pass from a conversation", () => {
     const { executor } = world(true);
     const refused = await executor.execute(
       call("pass_company", { companyId: COMPANY_A }),
-      contextFor(actorA, ownPlan()),
+      contextFor(
+        actorA,
+        ownPlan(actorA, actorA.userId, "COUNTERPARTY_COMPANY_QUESTION"),
+      ),
     );
     expect((refused.result as { data: unknown }).data).toEqual({
       status: "NOT_AVAILABLE",
@@ -157,7 +175,10 @@ describe("Save, Unsave and Pass from a conversation", () => {
     });
     const named = await executor.execute(
       call("unsave_company", { companyId: "Alpha Robotics" }),
-      contextFor(actorA, ownPlan()),
+      contextFor(
+        actorA,
+        ownPlan(actorA, actorA.userId, "COUNTERPARTY_COMPANY_QUESTION"),
+      ),
     );
     expect(named.status).not.toBe("SUCCEEDED");
   });

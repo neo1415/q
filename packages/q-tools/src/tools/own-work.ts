@@ -94,6 +94,8 @@ export function createListPendingApprovalsTool(
   >({
     ...OWN,
     id: LIST_PENDING_APPROVALS,
+    // Always on (R33): "what's waiting for me?" whatever the turn is about.
+    core: true,
     providerName: "list_pending_approvals",
     description:
       "Lists every change waiting for the person's approval, across all their conversations, newest first, as their approvals list shows it (a summary of each and when it expires). Call it when they ask what is waiting for them, what needs their approval or what they have not decided yet. Nothing is approved by reading.",
@@ -162,6 +164,12 @@ export function createListMyDocumentsTool(
   return defineQTool<ListMyDocumentsInput, ListMyDocumentsOutput, null>({
     ...OWN,
     id: LIST_MY_DOCUMENTS,
+    supportedPurposes: [
+      "OWN_COMPANY_QUESTION",
+      "INVESTOR_QUESTION",
+      "ACTION_PREPARATION",
+      "GENERAL_QUESTION",
+    ],
     providerName: "list_my_documents",
     description:
       "Lists the documents Q has prepared for the person (pitch decks, briefs, one-pagers, mandates), newest first, with each one's title, type, status and latest version. Call it when they ask what documents they have, for an earlier deck or brief, or which version is current. Each document's own card has its PDF and PowerPoint downloads.",
@@ -269,6 +277,13 @@ export function createDiscoveryDecisionTool(
           ? UNSAVE_COMPANY
           : PASS_COMPANY,
     providerName: words.name,
+    // An investor's feed decisions: about a named counterparty company,
+    // so a turn about one (or preparing an action) carries them.
+    supportedPurposes: [
+      "COUNTERPARTY_COMPANY_QUESTION",
+      "COMPARISON",
+      "ACTION_PREPARATION",
+    ],
     description: words.description,
     // Their own feed decision, reversible from the page; the interaction
     // service re-runs the feed's eligibility for this company.
