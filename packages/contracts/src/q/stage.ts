@@ -41,7 +41,8 @@ export const Q_VISIBLE_STAGE_LABELS: Readonly<Record<QVisibleStage, string>> = {
   UNDERSTANDING_REQUEST: "Understanding your request",
   REVIEWING_COMPANY: "Reviewing company information",
   CHECKING_EVIDENCE: "Checking evidence",
-  SEARCHING_PUBLIC_SOURCES: "Searching public sources",
+  // R38: web research is quiet; the person sees neutral work, then Sources.
+  SEARCHING_PUBLIC_SOURCES: "Looking into it",
   REVIEWING_INVESTOR_CRITERIA: "Reviewing investor criteria",
   COMPARING_OPPORTUNITIES: "Comparing opportunities",
   REVIEWING_RELATIONSHIP: "Reviewing relationship context",

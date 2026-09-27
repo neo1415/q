@@ -259,7 +259,7 @@ export function registerQVoiceRoutes(
           type: "about:blank",
           title: "Not Found",
           status: 404,
-          detail: "Q can't speak on this build.",
+          detail: "Q can't speak right now.",
         });
       }
       const actor = getActorContext(request);
@@ -499,7 +499,7 @@ export function registerQVoiceRoutes(
           type: "about:blank",
           title: "Not Found",
           status: 404,
-          detail: "Voice isn't available on this build.",
+          detail: "Voice isn't available right now.",
         });
       }
       const voice = transport.voices.includes(input.voice)

@@ -12,7 +12,7 @@ import { VOICE_STATE_LABELS, type VoiceState } from "./session";
 
 export type QPresenceProps = {
   readonly state: VoiceState;
-  /** Public stage text while Q works ("Searching public sources"). */
+  /** Public stage text while Q works ("Looking into it"). */
   readonly detail?: string | undefined;
   readonly inputLevel: () => number;
   readonly outputLevel: () => number;

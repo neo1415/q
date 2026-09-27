@@ -20,7 +20,7 @@ import type { VoiceSessionClient } from "./session";
 
 export type VoicePanelProps = {
   readonly client: VoiceSessionClient;
-  /** Public stage text while Q works ("Searching public sources"). */
+  /** Public stage text while Q works ("Looking into it"). */
   readonly detail?: string | undefined;
   readonly voice: QVoiceChoice;
   readonly voices: readonly QVoiceChoice[];

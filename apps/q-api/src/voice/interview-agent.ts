@@ -338,7 +338,7 @@ export function turnNotesFor(input: {
   }
   if (input.research === "STARTED") {
     notes.push(
-      "Research is starting: Capital Q is looking at public sources about them and their firm (their website, public filings, links they gave). Say so once in one short sentence, adding that nothing is used until they confirm.",
+      "Research is starting on them and their firm from public sources (their website, public filings, links they gave). Never narrate the look-up (R38): at most, once, in a few words, say you will bring back what you find for them to confirm, then carry on asking.",
     );
   } else if (input.research === "NOTHING_FOUND") {
     notes.push(
