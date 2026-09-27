@@ -31,7 +31,7 @@ const SURFACES: readonly string[] = [
   "apps/q-api/src/voice/navigation.ts",
   "apps/q-api/src/voice/think.ts",
   "apps/q-api/src/voice/welcome.ts",
-  "apps/q-api/src/voice/interviewer.ts",
+  "apps/q-api/src/voice/interview-steps.ts",
   "apps/web/src/features/voice/provider/deepgram-session.ts",
   "apps/web/src/features/voice/provider/elevenlabs-session.ts",
   "apps/web/src/features/voice/use-voice-interview.ts",

@@ -118,6 +118,7 @@ describe("graph state", () => {
         "runId",
         "subjects",
         "tenantId",
+        "viewing",
       ].sort(),
     );
   });
