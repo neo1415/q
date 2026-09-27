@@ -300,6 +300,8 @@ export type FakeCalendar = OrganiserCalendar & {
   readonly moved: string[];
   readonly cancelled: string[];
   busyTimes: { start: Date; end: Date }[];
+  /** How many times free/busy was read from this calendar. */
+  busyQueries: number;
   failInsert: Error | null;
 };
 
@@ -314,8 +316,12 @@ export function createFakeCalendar(
     moved: [],
     cancelled: [],
     busyTimes: [],
+    busyQueries: 0,
     failInsert: null,
-    busy: () => Promise.resolve(fake.busyTimes),
+    busy: () => {
+      fake.busyQueries += 1;
+      return Promise.resolve(fake.busyTimes);
+    },
     timeZone: () => Promise.resolve(timeZone),
     insert: (event) => {
       if (fake.failInsert !== null) return Promise.reject(fake.failInsert);

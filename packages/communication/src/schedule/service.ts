@@ -21,8 +21,9 @@ import type {
  * Meetings, reminders and notifications (BIZ-008; R11, R14, R34).
  *
  *   slots       three free times in the organiser's working hours, from
- *               their own calendar's busy times (and, where the other side
- *               has connected theirs, its busy blocks: never its events)
+ *               their own calendar's busy times ONLY: the other side's
+ *               calendar is never read (no consent to share busy times
+ *               exists yet; coordinator decision, default off)
  *   schedule    Google Calendar event with a Meet link, invites sent
  *               (sendUpdates=all) to the counterparty's own people only;
  *               `meeting_scheduled` commits with SCHEDULED; the organiser
@@ -430,21 +431,9 @@ export function createScheduleService(
       }
       try {
         const timeZone = await organiserZone(calendar, input.timeZone);
-        const busy: Interval[] = [...(await calendar.busy({ from, to }))];
-        // The other side's busy blocks, where they connected a calendar:
-        // used only to avoid a clash, never shown or stored.
-        const resolved = await counterpartOf(input.actor, input.relationshipId);
-        if (resolved !== null) {
-          const people = await directory.counterpartPeople({
-            relationshipId: input.relationshipId,
-            counterpart: resolved.counterpart,
-          });
-          for (const person of people.slice(0, 5)) {
-            const theirs = await calendars(person.userId).catch(() => null);
-            if (theirs === null) continue;
-            busy.push(...(await theirs.busy({ from, to }).catch(() => [])));
-          }
-        }
+        const busy: readonly Interval[] = await calendar.busy({ from, to });
+        // Never the other side's calendar: reading someone's free/busy
+        // needs their explicit consent, and no such opt-in exists.
         return {
           outcome: "OK",
           timeZone,

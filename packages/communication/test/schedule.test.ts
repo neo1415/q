@@ -166,9 +166,9 @@ describe("slot proposal", () => {
     expect(slots[1]?.start.toISOString()).toBe("2026-10-12T13:00:00.000Z");
   });
 
-  it("uses the counterparty's busy blocks where they connected a calendar", async () => {
+  it("never queries the counterparty's calendar, even when they connected one", async () => {
     const w = world();
-    w.founderCalendar.busyTimes = [
+    w.investorCalendar.busyTimes = [
       {
         start: new Date("2026-10-05T08:00:00Z"),
         end: new Date("2026-10-05T16:30:00Z"),
@@ -179,6 +179,8 @@ describe("slot proposal", () => {
       relationshipId: REL,
       durationMinutes: 30,
     });
+    expect(w.founderCalendar.busyQueries).toBe(0);
+    expect(w.investorCalendar.busyQueries).toBe(1);
     expect(result.outcome).toBe("OK");
     if (result.outcome !== "OK") return;
     expect(result.timeZone).toBe("Europe/London");

@@ -257,7 +257,7 @@ function createFindMeetingTimesTool(
     status: "ACTIVE",
     providerName: "find_meeting_times",
     description:
-      "Finds three free times for a call with the other side of one relationship, from the person's own Google Calendar (and the other side's busy times where they connected theirs), inside working hours in the person's time zone. Use it first when they ask to set up a call or meeting.",
+      "Finds three free times for a call with the other side of one relationship, from the person's own Google Calendar only (the other side's calendar is never read), inside working hours in the person's time zone. Use it first when they ask to set up a call or meeting.",
     classification: "READ_ONLY",
     riskClass: "SAFE_READ",
     requiredCapabilities: [],
