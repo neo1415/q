@@ -165,6 +165,25 @@ export function createUnconfiguredQRetrieval(): QRetrievalPort {
  * provider whose data policy is unsuitable. Until then the only
  * implementation reports that no model execution is configured.
  */
+/**
+ * One step of a requested series of questions (R35). Structurally the
+ * conversation core's `QuestionSequenceStep`, restated here so the
+ * runtime does not depend on the core.
+ */
+export type QQuestionSequenceStep =
+  | {
+      readonly kind: "ASK" | "REASK";
+      readonly topic: string;
+      readonly number: number;
+      readonly total: number;
+    }
+  | {
+      readonly kind: "FINISHED";
+      readonly topic: string;
+      readonly total: number;
+    }
+  | { readonly kind: "STOPPED"; readonly topic: string };
+
 export type QAnswerRequest = QOrchestrationSubjectContext & {
   /**
    * The server-resolved actor the run belongs to, re-validated by the
@@ -196,6 +215,13 @@ export type QAnswerRequest = QOrchestrationSubjectContext & {
    * answer as if nothing had been asked (B1, 2026-09-25).
    */
   readonly turnUnread?: boolean | undefined;
+  /**
+   * A series of questions the person asked Q to put to them, and what
+   * this turn must do about it (R35): decided by the conversation core
+   * from the turn's reading, never by the answer's model. Absent: no
+   * series is in hand.
+   */
+  readonly questionSequence?: QQuestionSequenceStep | undefined;
   /**
    * What this run can do beyond the tools the model is offered, built by
    * code from what is composed (CQ-QX-008): the screens Capital Q opens,

@@ -8,6 +8,7 @@ import {
   TranscriptQualitySchema,
   TurnKindSchema,
 } from "../../conversation/reading.js";
+import { QuestionSequenceReadingSchema } from "../../conversation/question-sequence.js";
 import { TaskFrameSchema } from "./common.js";
 
 /**
@@ -336,3 +337,15 @@ export const TurnReaderV9ResultSchema = TurnReaderV8ResultSchema.extend({
     .default([]),
 }).strict();
 export type TurnReaderV9Result = z.infer<typeof TurnReaderV9ResultSchema>;
+
+/**
+ * v11 (R35): v9, plus a series of questions the person asked Q to put to
+ * them, or a request to stop one. The reader records the request; the
+ * conversation core (question-sequence.ts) tracks progress.
+ */
+export const TURN_READER_V11_SCHEMA_VERSION = 11;
+
+export const TurnReaderV11ResultSchema = TurnReaderV9ResultSchema.extend({
+  sequence: QuestionSequenceReadingSchema.nullable().default(null),
+}).strict();
+export type TurnReaderV11Result = z.infer<typeof TurnReaderV11ResultSchema>;

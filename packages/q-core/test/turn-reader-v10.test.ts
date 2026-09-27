@@ -13,9 +13,10 @@ import {
  * rather than being told the screen doesn't exist. v9's rules stay.
  */
 describe("TURN_READER v10", () => {
-  it("is the active turn reader, names RELATIONSHIPS once, and keeps v9's rules", () => {
+  it("names RELATIONSHIPS once and keeps v9's rules", () => {
+    // v11 (R35) is the active reader now and carries v10's template.
     const registry = createDefaultPromptRegistry();
-    expect(registry.getActive("TURN_READER").definition.version).toBe(10);
+    expect(registry.getActive("TURN_READER").definition.version).toBe(11);
     expect(TURN_READER_V10.template.split("RELATIONSHIPS (").length - 1).toBe(
       1,
     );

@@ -147,6 +147,7 @@ export {
   type QAnswerRequest,
   type QCapabilityManifest,
   type QResearchDirective,
+  type QQuestionSequenceStep,
   type QCancelInput,
   type QOrchestrationInput,
   type QOrchestrationSubjectContext,

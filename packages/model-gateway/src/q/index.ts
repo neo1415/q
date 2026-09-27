@@ -62,6 +62,7 @@ import {
   type QAnswerPort,
   type QAnswerRequest,
   type QOfferedTool,
+  type QQuestionSequenceStep,
   type QRuntimeRepositories,
   type QToolCallOutcome,
   type QToolExecutionContext,
@@ -573,6 +574,28 @@ export function clearsOnPurpose(update: {
 export const TURN_UNREAD_NOTE =
   "CAPITAL Q COULD NOT READ WHAT KIND OF REQUEST THIS MESSAGE IS just now, so no document, file, screen change or record change can be started on this turn. If they asked for any of those, say plainly that you could not start it just now and that asking again in a moment should work. Never write a requested document's content into the chat instead, and never say it is done.";
 
+/**
+ * A series of questions the person asked for (R35), as trusted text: the
+ * step was decided by the conversation core from the turn's reading, so
+ * the model is told exactly which question it is on and never keeps the
+ * count itself. The topic is the reader's few words, quoted as data.
+ */
+export function questionSequenceNote(step: QQuestionSequenceStep): string {
+  const about = `about "${step.topic.replace(/["\s]+/g, " ").trim()}"`;
+  switch (step.kind) {
+    case "ASK":
+      return step.number === 1
+        ? `THEY ASKED YOU TO PUT ${step.total} QUESTION(S) TO THEM ${about}, one at a time. Ask question 1 of ${step.total} now: exactly one question, then stop and wait for their answer. Do not list the other questions.`
+        : `YOU ARE PUTTING ${step.total} QUESTIONS TO THEM ${about}, one at a time, and they just answered question ${step.number - 1}. Acknowledge the answer in a few words at most, then ask question ${step.number} of ${step.total}: exactly one new question you have not asked before. Do not ask whether to continue.`;
+    case "REASK":
+      return `YOU ARE PUTTING ${step.total} QUESTIONS TO THEM ${about}, one at a time; question ${step.number} is still unanswered. Respond to what they just said, then put question ${step.number} to them again, briefly.`;
+    case "FINISHED":
+      return `THAT WAS THEIR ANSWER TO THE LAST OF THE ${step.total} QUESTIONS ${about}. Acknowledge it briefly and close the series; ask no further question of it.`;
+    case "STOPPED":
+      return `THEY ASKED YOU TO STOP THE QUESTIONS ${about}. Stop: acknowledge in a few words and ask none of the remaining questions.`;
+  }
+}
+
 export function environmentNotesFor(
   facts: readonly AuthorisedFact[],
   tools: readonly QOfferedTool[] = [],
@@ -588,6 +611,8 @@ export function environmentNotesFor(
     readonly openDocumentTitle?: string | undefined;
     /** The turn could not be read: nothing can be started this turn. */
     readonly turnUnread?: boolean | undefined;
+    /** A requested series of questions and this turn's step in it (R35). */
+    readonly questionSequence?: QQuestionSequenceStep | undefined;
   } = {},
 ): string {
   const factsNote =
@@ -626,6 +651,11 @@ export function environmentNotesFor(
       // as ordinary chat was answered with the document's content in the
       // chat, or nothing, and no file (B1).
       ...(options.turnUnread === true ? [TURN_UNREAD_NOTE] : []),
+      // Near the top for the same reason: a series cut off by truncation
+      // is the one-question-and-stop bug again (R35).
+      ...(options.questionSequence === undefined
+        ? []
+        : [questionSequenceNote(options.questionSequence)]),
       ...(options.openDocumentTitle === undefined
         ? []
         : [
@@ -1330,6 +1360,9 @@ export function createModelGatewayQAnswer(
             ),
             ...(openDocumentTitle === undefined ? {} : { openDocumentTitle }),
             ...(request.turnUnread === true ? { turnUnread: true } : {}),
+            ...(request.questionSequence === undefined
+              ? {}
+              : { questionSequence: request.questionSequence }),
           },
         ),
         variables,

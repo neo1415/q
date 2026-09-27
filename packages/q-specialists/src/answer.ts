@@ -13,10 +13,12 @@ import {
   readingFromTurnReader,
   reduceConversation,
   researchDirectiveFor,
+  stepQuestionSequence,
   unclearTurnReply,
   withoutRecommendationClaims,
   type ConversationState,
   type FailureOperation,
+  type QuestionSequence,
   type TurnToolV8,
 } from "@capital-q/q-core";
 import {
@@ -971,6 +973,25 @@ export function createSpecialistQAnswer(
   /** Unclear turns in a row, per conversation (bounded with the rest). */
   const unclearInARow = new Map<string, number>();
 
+  /**
+   * A series of questions the person asked Q to put to them, per
+   * conversation (R35). In memory and bounded like the rest of the core's
+   * state: a restart forgets where a series was, never a fact.
+   */
+  const sequences = new Map<string, QuestionSequence>();
+  const keepSequence = (
+    conversationId: string,
+    next: QuestionSequence | null,
+  ) => {
+    sequences.delete(conversationId);
+    if (next === null) return;
+    sequences.set(conversationId, next);
+    if (sequences.size > MAX_CONVERSATIONS) {
+      const oldest = sequences.keys().next().value;
+      if (oldest !== undefined) sequences.delete(oldest);
+    }
+  };
+
   const answerTurn = async (
     request: QAnswerRequest,
   ): Promise<QAnswerOutcome> => {
@@ -1125,12 +1146,34 @@ export function createSpecialistQAnswer(
         return acted;
       }
     }
+    // Where a requested series of questions stands, decided from the
+    // reading alone (R35): the answer is told which question it is on,
+    // and the series moves only once that answer has landed.
+    const series = stepQuestionSequence(
+      sequences.get(conversationId) ?? null,
+      read === null ? null : { kind: read.kind, sequence: read.sequence },
+    );
+    if (series.step !== null) {
+      logger?.info(
+        {
+          qRunId: request.runId,
+          sequence: series.step.kind,
+          ...("number" in series.step ? { number: series.step.number } : {}),
+          total: "total" in series.step ? series.step.total : null,
+        },
+        "q question series",
+      );
+    }
     const outcome = await answerOnce({
       ...request,
       research,
       capabilities: manifestOf(capabilities),
       ...(turnUnread ? { turnUnread: true } : {}),
+      ...(series.step === null ? {} : { questionSequence: series.step }),
     });
+    if (outcome.kind === "ANSWERED" && series.step !== null) {
+      keepSequence(conversationId, series.next);
+    }
     if (outcome.kind === "FAILED") {
       const operation = operationOf(outcome.diagnosticCode);
       if (operation !== null) {

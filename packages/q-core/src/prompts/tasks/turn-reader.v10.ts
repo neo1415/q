@@ -33,7 +33,7 @@ export const TURN_READER_V10: PromptDefinition<
 > = {
   ...TURN_READER_V9,
   version: 10,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   changeDescription:
     "R27: the Relationships page is a NAVIGATE destination (RELATIONSHIPS).",
   effectiveFrom: "2026-09-27",

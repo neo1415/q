@@ -87,3 +87,15 @@ export {
   unclearTurnReply,
   type UnclearTurnReply,
 } from "./unclear.js";
+export {
+  QUESTION_SEQUENCE_ACTIONS,
+  QUESTION_SEQUENCE_MAX,
+  QUESTION_SEQUENCE_TOPIC_MAX,
+  QuestionSequenceReadingSchema,
+  stepQuestionSequence,
+  type QuestionSequence,
+  type QuestionSequenceReading,
+  type QuestionSequenceStep,
+  type QuestionSequenceTurn,
+  type QuestionSequenceTurnReading,
+} from "./question-sequence.js";
