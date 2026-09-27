@@ -584,6 +584,7 @@ describe("the answer is told what this run can do (CQ-QX-008)", () => {
           expect.objectContaining({ destination: "SETTINGS" }),
           expect.objectContaining({ destination: "HOME" }),
           expect.objectContaining({ destination: "RELATIONSHIPS" }),
+          expect.objectContaining({ destination: "RELATIONSHIPS" }),
         ],
       },
     ]);
