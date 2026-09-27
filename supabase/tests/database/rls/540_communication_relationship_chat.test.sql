@@ -16,7 +16,7 @@ create extension if not exists pgtap with schema extensions;
 \ir support/fixture.psql
 select pg_temp.rls_setup();
 
-select plan(26);
+select plan(30);
 
 -- Company A (tenant A) ↔ investor B (tenant B); company R (tenant R, whose
 -- only member is revoked) ↔ investor B.
@@ -25,9 +25,9 @@ insert into core.companies (id, tenant_id, organisation_id, canonical_name, slug
   ('00000000-0000-4000-8000-0000000008c2', pg_temp.rls_id('tenant_r'), pg_temp.rls_id('org_r'), 'Chat Co R', 'chat-co-r');
 insert into core.investor_organisations (id, tenant_id, organisation_id, investor_type, display_name) values
   ('00000000-0000-4000-8000-0000000008e2', pg_temp.rls_id('tenant_b'), pg_temp.rls_id('org_b'), 'VC', 'Chat Capital B');
-insert into network.relationships (id, tenant_id, company_id, investor_organisation_id) values
-  ('00000000-0000-4000-8000-000000008b01', pg_temp.rls_id('tenant_a'), '00000000-0000-4000-8000-0000000008c1', '00000000-0000-4000-8000-0000000008e2'),
-  ('00000000-0000-4000-8000-000000008b02', pg_temp.rls_id('tenant_r'), '00000000-0000-4000-8000-0000000008c2', '00000000-0000-4000-8000-0000000008e2');
+insert into network.relationships (id, tenant_id, company_id, investor_organisation_id, current_state) values
+  ('00000000-0000-4000-8000-000000008b01', pg_temp.rls_id('tenant_a'), '00000000-0000-4000-8000-0000000008c1', '00000000-0000-4000-8000-0000000008e2', 'CONNECTED'),
+  ('00000000-0000-4000-8000-000000008b02', pg_temp.rls_id('tenant_r'), '00000000-0000-4000-8000-0000000008c2', '00000000-0000-4000-8000-0000000008e2', 'CONNECTED');
 insert into communication.conversations (id, tenant_id, relationship_id) values
   ('00000000-0000-4000-8000-000000008f01', pg_temp.rls_id('tenant_a'), '00000000-0000-4000-8000-000000008b01');
 insert into communication.messages (id, tenant_id, conversation_id, sender_user_id, sender_side, kind, body, idempotency_key) values
@@ -121,6 +121,31 @@ select is((select count(*)::int from communication.conversations), 0,
   'a person whose membership was revoked sees no thread, not even their organisation''s');
 select is((select count(*)::int from communication.messages), 0,
   'and no message');
+
+-- Not yet connected: a party reads nothing (defence in depth) ----------------------
+select pg_temp.act_as_privileged();
+update network.relationships set current_state = 'INTEREST_EXPRESSED'
+ where id = '00000000-0000-4000-8000-000000008b01';
+select pg_temp.act_as_user_a();
+select is((select count(*)::int from communication.messages), 0,
+  'a party reads no message while the relationship is not connected');
+select is((select count(*)::int from communication.conversations), 0,
+  'nor the thread');
+select pg_temp.act_as_privileged();
+update network.relationships set current_state = 'CONNECTED'
+ where id = '00000000-0000-4000-8000-000000008b01';
+
+-- Voice notes: the document bucket admits the two audio containers -------------------
+select ok((select 'audio/webm' = any(allowed_mime_types) and 'audio/mp4' = any(allowed_mime_types)
+             and 'application/pdf' = any(allowed_mime_types)
+             from storage.buckets where id = 'cq-documents-private'),
+  'the document bucket admits audio/webm and audio/mp4 and keeps the business formats');
+select throws_ok(
+  $$ insert into communication.messages (tenant_id, conversation_id, sender_user_id, sender_side, kind, document_id,
+       attachment_title, attachment_mime_type, idempotency_key)
+     values (pg_temp.rls_id('tenant_a'), '00000000-0000-4000-8000-000000008f01', pg_temp.rls_id('user_a'), 'COMPANY', 'ATTACHMENT',
+             gen_random_uuid(), 'x', 'application/pdf', 'fixture-a-0009') $$,
+  '23514', null, 'a shared document names the exact version shared');
 
 -- Anonymous --------------------------------------------------------------------------
 select pg_temp.act_as_anonymous();

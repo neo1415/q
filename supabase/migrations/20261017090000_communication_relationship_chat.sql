@@ -8,9 +8,13 @@
 -- Parties: the active members of the relationship's company organisation
 -- and of its investor organisation, resolved from the canonical rows, never
 -- from anything a client sends. Messaging opens only on a CONNECTED
--- relationship (Product Specification §6.6.6); that rule is the server's,
--- because it is business state. RLS here is the second wall: a person who
--- is not a member of either party organisation reads nothing.
+-- relationship (Product Specification §6.6.6). The server decides that from
+-- the relationship history; RLS is the second wall: only a member of one of
+-- the two party organisations, on a relationship whose projected state is
+-- CONNECTED, reads anything.
+--
+-- Also here: the private document bucket admits audio/webm and audio/mp4
+-- so voice notes travel the same upload, scan and storage path as files.
 --
 -- Writes: server-side only (the privileged server role), after the
 -- application has authorised the person as a party. No client role may
@@ -66,6 +70,8 @@ as $$
       join core.companies co on co.id = r.company_id
       join core.investor_organisations io on io.id = r.investor_organisation_id
      where c.id = target_conversation_id
+       -- Defence in depth: messaging belongs to the Match.
+       and r.current_state = 'CONNECTED'
        and (
          (select private.is_organisation_member(co.organisation_id))
          or (select private.is_organisation_member(io.organisation_id))
@@ -98,6 +104,9 @@ create table communication.messages (
   -- A document the sender's own organisation holds, uploaded through the
   -- document pipeline. The bytes stay in private storage.
   document_id             uuid references evidence.documents (id) on delete restrict,
+  -- The exact version that was shared: a later upload never changes what
+  -- the other side was sent.
+  document_version_id     uuid references evidence.document_versions (id) on delete restrict,
   -- Snapshot of what the other side is shown. Never a storage key or URL.
   attachment_title        text check (attachment_title is null or length(attachment_title) between 1 and 300),
   attachment_mime_type    text check (attachment_mime_type is null or attachment_mime_type ~ '^[^/[:space:]]+/[^/[:space:]]+$'),
@@ -118,7 +127,8 @@ create table communication.messages (
   check (kind not in ('ATTACHMENT', 'VOICE_NOTE')
          or (document_id is not null and attachment_title is not null and attachment_mime_type is not null)),
   check (kind = 'VOICE_NOTE' or voice_duration_ms is null),
-  check ((document_id is null) = (attachment_title is null))
+  check ((document_id is null) = (attachment_title is null)),
+  check ((document_id is null) = (document_version_id is null))
 );
 
 comment on table communication.messages is
@@ -226,3 +236,16 @@ begin
   end if;
 end
 $$;
+
+-- ---------------------------------------------------------------------------
+-- Voice notes: the private document bucket admits two audio containers.
+-- The upload boundary still checks extension, declared type and the bytes
+-- themselves; the bucket list is only the storage provider's own ceiling.
+-- ---------------------------------------------------------------------------
+
+update storage.buckets
+   set allowed_mime_types = (
+         select array_agg(distinct t order by t)
+           from unnest(allowed_mime_types || array['audio/webm', 'audio/mp4']) as t
+       )
+ where id = 'cq-documents-private';
