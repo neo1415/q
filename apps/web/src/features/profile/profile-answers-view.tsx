@@ -134,7 +134,7 @@ function AnswerGroupView({
                   <Link
                     href={href}
                     aria-label={`Add ${line.title.toLowerCase()}`}
-                    className="cq-body-sm inline-flex min-h-11 shrink-0 items-center text-(--cq-text-secondary) underline decoration-(--cq-border-strong) underline-offset-4 hover:text-(--cq-text-primary) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
+                    className="cq-body-sm inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center text-(--cq-text-secondary) underline decoration-(--cq-border-strong) underline-offset-4 hover:text-(--cq-text-primary) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
                   >
                     Add
                   </Link>

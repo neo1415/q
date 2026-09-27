@@ -83,7 +83,7 @@ export function SignInForm({
           {passwordState.status === "error" ? (
             <FormNotice tone="danger">{passwordState.message}</FormNotice>
           ) : null}
-          <SubmitButton pendingLabel="Signing in…">Continue</SubmitButton>
+          <SubmitButton pendingLabel="Signing in…">Sign in</SubmitButton>
         </form>
       ) : (
         <form action={linkAction} className="flex flex-col gap-5">
@@ -100,7 +100,10 @@ export function SignInForm({
 
       <div className="flex flex-col items-start gap-1 cq-body-sm">
         {mode === "password" ? (
-          <Link href="/auth/forgot-password" className={linkClassName()}>
+          <Link
+            href="/auth/forgot-password"
+            className={linkClassName("inline-flex min-h-11 items-center")}
+          >
             Forgot password?
           </Link>
         ) : null}

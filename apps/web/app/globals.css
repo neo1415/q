@@ -151,7 +151,8 @@
 
   /* The appearance choice: three plain options, the current one filled. */
   .cq-appearance-option {
-    min-height: 36px;
+    /* A 44 px touch target (R30 #12). */
+    min-height: 44px;
     border-radius: 999px;
     border: 1px solid var(--cq-border-subtle);
     padding: 0 14px;
@@ -1152,6 +1153,13 @@
     transition:
       color var(--cq-motion-fast) var(--cq-ease),
       background-color var(--cq-motion-fast) var(--cq-ease);
+  }
+  /* Dense on a desktop; a 44 px touch target below it (R30 #12). */
+  @media (max-width: 1023px) {
+    .cq-stage-quiet {
+      min-height: 44px;
+      min-width: 44px;
+    }
   }
   .cq-stage-quiet:hover,
   .cq-stage-quiet:focus-visible {

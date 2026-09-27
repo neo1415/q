@@ -7,8 +7,9 @@ import { cx } from "../primitives/class-names.js";
  * primary action per local decision area is the caller's discipline.
  *
  * Sizes are mobile-first: `regular` is a 44 px touch control and relaxes to
- * 40 px on large screens; `compact` is for dense desktop contexts and keeps a
- * 44 px hit area through its outer padding box.
+ * 40 px on large screens; `compact` is for dense desktop contexts: it is a
+ * 44 px touch control below the large breakpoint and compact only there
+ * (R30 #12: a 32 px compact button was measured on a phone).
  */
 
 export const BUTTON_VARIANTS = [
@@ -36,7 +37,7 @@ const variantClass: Record<ButtonVariant, string> = {
 };
 
 const sizeClass: Record<ButtonSize, string> = {
-  compact: "h-8 px-3 cq-label",
+  compact: "h-11 px-3 cq-label lg:h-8",
   regular: "h-11 px-4 cq-body-sm lg:h-10",
   large: "h-12 px-5 cq-body",
 };
@@ -96,7 +97,7 @@ export type IconButtonProps = Omit<
 };
 
 const iconSizeClass: Record<Exclude<ButtonSize, "large">, string> = {
-  compact: "size-8",
+  compact: "size-11 lg:size-8",
   regular: "size-11 lg:size-10",
 };
 

@@ -38,7 +38,8 @@ import {
  * looks like, so the first paint and the markup agree.
  */
 
-const LABELS: Readonly<Record<ThemeChoice, string>> = {
+/** One vocabulary for the choice wherever it is offered (R30 #29). */
+export const THEME_LABELS: Readonly<Record<ThemeChoice, string>> = {
   system: "Device",
   light: "Light",
   dark: "Dark",
@@ -103,7 +104,7 @@ export function ThemeToggle({
                 : "cq-appearance-option"
             }
           >
-            {LABELS[option]}
+            {THEME_LABELS[option]}
           </button>
         ))}
       </div>

@@ -56,7 +56,7 @@ test.describe("authentication (mobile)", () => {
 
     const email = page.getByLabel("Email");
     const password = page.getByLabel("Password");
-    const submit = page.getByRole("button", { name: "Continue" });
+    const submit = page.getByRole("button", { name: "Sign in" });
     await expect(email).toHaveAttribute("autocomplete", "email");
     await expect(email).toHaveAttribute("inputmode", "email");
     await expect(password).toHaveAttribute("autocomplete", "current-password");
@@ -143,7 +143,7 @@ test.describe("authentication (mobile)", () => {
     await page.goto("/auth/sign-in?next=%2Fprofile");
     await page.getByLabel("Email").fill(email);
     await page.getByLabel("Password").fill(TEST_PASSWORD);
-    await page.getByRole("button", { name: "Continue" }).click();
+    await page.getByRole("button", { name: "Sign in" }).click();
     await expect(page).toHaveURL(/\/profile$/);
   });
 
@@ -159,7 +159,7 @@ test.describe("authentication (mobile)", () => {
       "Email or password wasn't recognised.",
     );
     // Controls are restored after failure: no stuck pending state.
-    await expect(page.getByRole("button", { name: "Continue" })).toBeEnabled();
+    await expect(page.getByRole("button", { name: "Sign in" })).toBeEnabled();
 
     await signInThroughUi(page, uniqueEmail("nobody"), TEST_PASSWORD);
     await expect(formError(page)).toContainText(
@@ -202,7 +202,7 @@ test.describe("authentication (mobile)", () => {
     });
     await page.getByLabel("Email").fill(email);
     await page.getByLabel("Password").fill(TEST_PASSWORD);
-    await page.getByRole("button", { name: "Continue" }).click();
+    await page.getByRole("button", { name: "Sign in" }).click();
     await expect(page).toHaveURL(/^http:\/\/127\.0\.0\.1:\d+\/discover$/);
 
     // And a signed-in visitor with a hostile next is kept on-origin too.

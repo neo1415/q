@@ -45,7 +45,7 @@ export async function signInThroughUi(
   await page.goto("/auth/sign-in");
   await page.getByLabel("Email").fill(email);
   await page.getByLabel("Password").fill(password);
-  await page.getByRole("button", { name: "Continue" }).click();
+  await page.getByRole("button", { name: "Sign in" }).click();
 }
 
 /** Click Sign out on Profile and wait for the provider session to end. */

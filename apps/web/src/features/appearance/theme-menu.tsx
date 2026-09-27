@@ -17,8 +17,8 @@ import {
   MenuTrigger,
 } from "@capital-q/ui/menu";
 
-import { isThemeChoice, type ThemeChoice } from "./theme";
-import { useThemeChoice } from "./theme-toggle";
+import { isThemeChoice, THEME_DISPLAY_ORDER, type ThemeChoice } from "./theme";
+import { THEME_LABELS, useThemeChoice } from "./theme-toggle";
 
 /**
  * The theme as one icon (R24): the icon of the current choice, opening a
@@ -30,11 +30,10 @@ import { useThemeChoice } from "./theme-toggle";
 const OPTIONS: readonly {
   readonly value: ThemeChoice;
   readonly label: string;
-}[] = [
-  { value: "light", label: "Light" },
-  { value: "dark", label: "Dark" },
-  { value: "system", label: "System" },
-];
+}[] = THEME_DISPLAY_ORDER.map((value) => ({
+  value,
+  label: THEME_LABELS[value],
+}));
 
 const ICONS = { system: Monitor, light: Sun, dark: Moon } as const;
 
@@ -46,7 +45,8 @@ export function ThemeMenu({
   const [choice, choose] = useThemeChoice();
   const Icon = ICONS[choice];
   const current =
-    OPTIONS.find((option) => option.value === choice)?.label ?? "System";
+    OPTIONS.find((option) => option.value === choice)?.label ??
+    THEME_LABELS.system;
   return (
     <MenuRoot>
       <MenuTrigger>

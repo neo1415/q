@@ -173,7 +173,7 @@ test.describe("theme switch, signed in", () => {
     expect(box?.height ?? 0).toBeGreaterThanOrEqual(44);
     await trigger.click();
     const menu = page.getByRole("menu");
-    for (const name of ["Light", "Dark", "System"]) {
+    for (const name of ["Light", "Device", "Dark"]) {
       await expect(menu.getByRole("menuitemradio", { name })).toBeVisible();
     }
     await menu.getByRole("menuitemradio", { name: "Dark" }).click();
