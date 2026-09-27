@@ -32,7 +32,7 @@ export const TURN_READER_V12: PromptDefinition<
 > = {
   ...TURN_READER_V11,
   version: 12,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   changeDescription:
     "R30 #7: the Saved page is a NAVIGATE destination (SAVED).",
   effectiveFrom: "2026-09-27",

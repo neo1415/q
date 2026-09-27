@@ -14,9 +14,9 @@ import {
  */
 describe("TURN_READER v10", () => {
   it("names RELATIONSHIPS once and keeps v9's rules", () => {
-    // v12 (R30 #7) is the active reader now and carries v10's template.
+    // v13 (R33) is the active reader now and carries v10's template.
     const registry = createDefaultPromptRegistry();
-    expect(registry.getActive("TURN_READER").definition.version).toBe(12);
+    expect(registry.getActive("TURN_READER").definition.version).toBe(13);
     expect(TURN_READER_V10.template.split("RELATIONSHIPS (").length - 1).toBe(
       1,
     );
