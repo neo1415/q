@@ -182,9 +182,12 @@ import {
   createVisibilityActionBoard,
 } from "./composition/visibility-actions.js";
 import { createInvestorFeedPort } from "./composition/investor-feed.js";
+import { createDiscoveryDecisionPort } from "./composition/discovery-decisions.js";
 import {
   createDiscoveryService,
+  createInteractionSignalService,
   createPostgresCompanyCardPort,
+  createPostgresInteractionRepository,
   createCurrentSlateExplanationService,
   createPostgresDiscoveryRepository,
   createPostgresInvestorDecisionReader,
@@ -1010,6 +1013,42 @@ const qTools = createQTools({
     // R20/R33: a person's screen reads every Home Q answer, so the app's
     // own browser actions (theme, reload, their website) are Q's too.
     clientActions: true,
+    // R33: what waits for their approval, across conversations: the
+    // Approval Engine's own listing, as the actor (composed below).
+    approvalInbox: {
+      pending: async (actor) =>
+        (await qActions.listPendingApprovals({ actor, limit: 20 })).map(
+          (row) => ({
+            approvalId: row.approvalId,
+            summary: row.summary,
+            requestedAt: row.requestedAt,
+            expiresAt: row.expiresAt,
+          }),
+        ),
+    },
+    // R33: their own documents, the artifact service's own list, as them.
+    documents: {
+      list: async (actor, limit) =>
+        (await qArtifacts.service.list(actor, { limit })).items.map((item) => ({
+          artifactId: item.artifactId,
+          type: item.type,
+          status: item.status,
+          title: item.title,
+          currentVersion: item.currentVersion,
+          updatedAt: item.updatedAt,
+        })),
+    },
+    // R33: Save / Unsave / Pass, recorded by the interaction service the
+    // Discover buttons call, with the feed's own eligibility re-run.
+    discoveryDecisions: createDiscoveryDecisionPort(
+      createInteractionSignalService({
+        ports: slateRead.eligibilityPorts,
+        eligibility: slateRead.eligibility,
+        slates: slateRead.slates,
+        repository: createPostgresInteractionRepository({ sql: database.sql }),
+        logger,
+      }),
+    ),
   },
   logger,
 });

@@ -70,7 +70,7 @@ export type ConversationApprovalDependencies = {
   readonly late: () => {
     readonly actions: Pick<
       QActionService,
-      "findApprovalForAction" | "getApproval" | "approve"
+      "findApprovalForAction" | "getApproval" | "approve" | "reject"
     >;
     readonly orchestrator: QOrchestrator | undefined;
   };
@@ -216,5 +216,36 @@ export function createConversationApprovalPort(
     };
   };
 
-  return { inConversation, approve };
+  /**
+   * R33: "no, don't". The Approval Engine's own reject, the call the
+   * card's Decline makes, as this person; nothing executes.
+   */
+  const decline = async (
+    context: PendingProposalContext,
+    proposalId: string,
+  ): Promise<{ readonly status: ProposalPlainStatus }> => {
+    const { actor } = context;
+    const before = await viewOf(actor, proposalId, context.correlationId);
+    if (before === null) {
+      throw new Error("the proposal is not readable as this person");
+    }
+    try {
+      await late().actions.reject({
+        actor,
+        approvalId: before.approvalId,
+        correlationId: CorrelationIdSchema.parse(context.correlationId),
+      });
+    } catch (error: unknown) {
+      if (
+        !(error instanceof QApprovalAlreadyDecidedError) &&
+        !(error instanceof QApprovalExpiredError)
+      ) {
+        throw error;
+      }
+    }
+    const after = await viewOf(actor, proposalId, context.correlationId);
+    return { status: after === null ? "EXPIRED" : plainProposalStatus(after) };
+  };
+
+  return { inConversation, approve, decline };
 }

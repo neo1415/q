@@ -74,6 +74,7 @@ function viewOf(row: Row): QApprovalView {
 
 function harness(rows: Row[]) {
   const approvals: string[] = [];
+  const declines: string[] = [];
   const resumed: string[] = [];
   const byApproval = (id: string) => rows.find((row) => row.approvalId === id);
   const dependencies: ConversationApprovalDependencies = {
@@ -132,6 +133,20 @@ function harness(rows: Row[]) {
             action: { runId: RUN_EARLIER },
           } as never);
         },
+        reject: (command) => {
+          const row = byApproval(command.approvalId);
+          if (row === undefined || row.owner !== command.actor.userId) {
+            return Promise.reject(new QApprovalNotPermittedError());
+          }
+          const decided = row.approval === "PENDING";
+          if (decided) {
+            declines.push(row.proposalId);
+            row.approval = "REJECTED";
+            row.action = "REJECTED";
+            row.canDecide = false;
+          }
+          return Promise.resolve({ decided } as never);
+        },
       },
       orchestrator: {
         start: () => Promise.reject(new Error("unused")),
@@ -150,6 +165,7 @@ function harness(rows: Row[]) {
   return {
     port: createConversationApprovalPort(dependencies),
     approvals,
+    declines,
     resumed,
   };
 }
@@ -247,5 +263,30 @@ describe("createConversationApprovalPort", () => {
     const { port, approvals } = harness([row]);
     await expect(port.approve(at(STRANGER), row.proposalId)).rejects.toThrow();
     expect(approvals).toEqual([]);
+  });
+});
+
+describe("declining by conversation (R33)", () => {
+  it("rejects through the engine as the person, once, and nothing executes", async () => {
+    const row = pending();
+    const { port, declines, resumed } = harness([row]);
+    const decline = port.decline;
+    expect(decline).toBeDefined();
+    if (decline === undefined) return;
+    expect(await decline(at(OWNER), row.proposalId)).toEqual({
+      status: "DECLINED",
+    });
+    expect(await decline(at(OWNER), row.proposalId)).toEqual({
+      status: "DECLINED",
+    });
+    expect(declines).toEqual([row.proposalId]);
+    expect(resumed).toEqual([]);
+  });
+
+  it("never declines another person's change", async () => {
+    const row = pending({ owner: randomUUID() });
+    const { port, declines } = harness([row]);
+    await expect(port.decline?.(at(OWNER), row.proposalId)).rejects.toThrow();
+    expect(declines).toEqual([]);
   });
 });
