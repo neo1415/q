@@ -16,6 +16,7 @@ import { Button } from "@capital-q/ui/button";
 import { ChevronRight, CircleAlert, ICON_SIZE } from "@capital-q/ui/icons";
 
 import { useGlobalQ } from "@/components/app-shell/global-q";
+import { SourcesDisclosure } from "@/components/sources-disclosure";
 
 import {
   browserFeedPositionStore,
@@ -425,19 +426,21 @@ function Statement({
       <p className="cq-body break-words text-(--cq-text-primary)">
         {displayValue(factKey, statement)}
       </p>
-      <dl className="flex flex-wrap gap-x-4 gap-y-0.5">
-        {axes.map(([term, value, code]) => (
-          <div
-            key={term}
-            className="flex gap-1"
-            data-axis={term.toLowerCase()}
-            data-value={code}
-          >
-            <dt className="cq-caption text-(--cq-text-tertiary)">{term}</dt>
-            <dd className="cq-caption text-(--cq-text-secondary)">{value}</dd>
-          </div>
-        ))}
-      </dl>
+      <SourcesDisclosure>
+        <dl className="flex flex-wrap gap-x-4 gap-y-0.5">
+          {axes.map(([term, value, code]) => (
+            <div
+              key={term}
+              className="flex gap-1"
+              data-axis={term.toLowerCase()}
+              data-value={code}
+            >
+              <dt className="cq-caption text-(--cq-text-tertiary)">{term}</dt>
+              <dd className="cq-caption text-(--cq-text-secondary)">{value}</dd>
+            </div>
+          ))}
+        </dl>
+      </SourcesDisclosure>
     </div>
   );
 }

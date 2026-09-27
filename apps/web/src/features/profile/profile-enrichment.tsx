@@ -13,6 +13,7 @@ import Link from "next/link";
 import { buttonClassName } from "@capital-q/ui/button";
 
 import { useGlobalQ } from "@/components/app-shell/global-q";
+import { SourcesDisclosure } from "@/components/sources-disclosure";
 
 /**
  * What else is known about a profile, beside what the person declared
@@ -148,35 +149,37 @@ export function ProfileFindings({
               <p className="cq-body-sm text-(--cq-text-primary)">
                 {finding.statement}
               </p>
-              <p className="cq-caption text-(--cq-text-tertiary)">
-                {TRUTH_WORDS[finding.truthClass]} ·{" "}
-                {EVIDENCE_WORDS[finding.evidenceStatus]}
-                {finding.lifecycleStatus === "CURRENT"
-                  ? ""
-                  : ` · ${LIFECYCLE_WORDS[finding.lifecycleStatus]}`}
-              </p>
-              {finding.sources.length === 0 ? null : (
-                <ul className="flex flex-col gap-0.5">
-                  {finding.sources.map((source) => (
-                    <li key={source.url} className="cq-caption">
-                      <a
-                        href={source.url}
-                        target="_blank"
-                        rel="noopener noreferrer nofollow"
-                        className="text-(--cq-text-secondary) underline decoration-(--cq-border-strong) underline-offset-4 hover:text-(--cq-text-primary)"
-                      >
-                        {source.title ?? hostOf(source.url)}
-                      </a>
-                      {dayOf(source.retrievedAt) === null ? null : (
-                        <span className="text-(--cq-text-tertiary)">
-                          {" "}
-                          · read {dayOf(source.retrievedAt)}
-                        </span>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-              )}
+              <SourcesDisclosure count={finding.sources.length}>
+                <p className="cq-caption text-(--cq-text-tertiary)">
+                  {TRUTH_WORDS[finding.truthClass]} ·{" "}
+                  {EVIDENCE_WORDS[finding.evidenceStatus]}
+                  {finding.lifecycleStatus === "CURRENT"
+                    ? ""
+                    : ` · ${LIFECYCLE_WORDS[finding.lifecycleStatus]}`}
+                </p>
+                {finding.sources.length === 0 ? null : (
+                  <ul className="flex flex-col gap-0.5">
+                    {finding.sources.map((source) => (
+                      <li key={source.url} className="cq-caption">
+                        <a
+                          href={source.url}
+                          target="_blank"
+                          rel="noopener noreferrer nofollow"
+                          className="text-(--cq-text-secondary) underline decoration-(--cq-border-strong) underline-offset-4 hover:text-(--cq-text-primary)"
+                        >
+                          {source.title ?? hostOf(source.url)}
+                        </a>
+                        {dayOf(source.retrievedAt) === null ? null : (
+                          <span className="text-(--cq-text-tertiary)">
+                            {" "}
+                            · read {dayOf(source.retrievedAt)}
+                          </span>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </SourcesDisclosure>
               <div>
                 <button
                   type="button"

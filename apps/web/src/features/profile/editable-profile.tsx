@@ -14,6 +14,8 @@ import { Input, Textarea } from "@capital-q/ui/input";
 import { Select } from "@capital-q/ui/select";
 import { cx } from "@capital-q/ui";
 
+import { SourcesDisclosure } from "@/components/sources-disclosure";
+
 import {
   saveCompanyFieldAction,
   saveInvestorFieldAction,
@@ -50,7 +52,8 @@ export type EditableProfileProps = {
   /**
    * How a declared value is described on the three axes, in words, e.g.
    * "Your statement · self-reported". The same for every declared field:
-   * the profile holds what the person said, nothing more.
+   * the profile holds what the person said, nothing more. Said once, one
+   * tap away under "Sources", not beneath every value (R23; ADR 0018).
    */
   readonly provenance: string;
   /** False when the server says this person may view but not edit. */
@@ -116,7 +119,6 @@ export function EditableProfile({
             key={spec.field}
             spec={spec}
             value={values[spec.field] ?? null}
-            provenance={provenance}
             editable={editable}
             editing={editing === spec.field}
             onEdit={() => setEditing(spec.field)}
@@ -149,6 +151,12 @@ export function EditableProfile({
           />
         ))}
       </dl>
+      <SourcesDisclosure>
+        <p className="cq-caption text-(--cq-text-secondary)">
+          {provenance}. Every value above is what was stated here; nothing in it
+          is verified unless Capital Q says so.
+        </p>
+      </SourcesDisclosure>
       <p className="sr-only" role="status" aria-live="polite">
         {announcement}
       </p>
@@ -159,7 +167,6 @@ export function EditableProfile({
 function EditableRow({
   spec,
   value,
-  provenance,
   editable,
   editing,
   onEdit,
@@ -168,7 +175,6 @@ function EditableRow({
 }: {
   readonly spec: FieldSpec<string>;
   readonly value: string | null;
-  readonly provenance: string;
   readonly editable: boolean;
   readonly editing: boolean;
   readonly onEdit: () => void;
@@ -232,11 +238,6 @@ function EditableRow({
                   )}
                 >
                   {shown}
-                </p>
-              )}
-              {shown === null ? null : (
-                <p className="cq-caption text-(--cq-text-tertiary)">
-                  {provenance}
                 </p>
               )}
             </div>

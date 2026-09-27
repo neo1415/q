@@ -6,8 +6,8 @@ import type { QTurn, QTurnObjectBlock } from "./conversation";
 import { QResultBlocks } from "./q-result-blocks";
 
 /**
- * What an answer rests on, behind one disclosure (founder direction,
- * 2026-09-25): the answer is heard and read first, clean; the findings,
+ * What an answer rests on, behind one "Sources" disclosure (founder
+ * direction, 2026-09-25; R23, ADR 0018): the answer is heard and read first, clean; the findings,
  * what is still open, what Q needs to know and the sources are one press
  * away, never in the way. Everything the server sent is still here --
  * collapsed is not removed -- and nothing is invented: no percentage, no
@@ -81,7 +81,7 @@ export function QEvidence({
   return (
     <details className="cq-q-evidence" data-q-evidence>
       <summary className="cq-q-evidence-summary">
-        Evidence
+        Sources
         <span className="cq-caption text-(--cq-text-tertiary)">
           {turn.sourceCount > 0
             ? ` · ${sources(turn.sourceCount)}`
