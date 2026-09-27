@@ -189,6 +189,7 @@ export default async function ProfilePage() {
                   subjectType="COMPANY"
                   subjectId={company.id}
                   subjectLabel={company.canonicalName}
+                  hasWebsite={Boolean(company.websiteUrl)}
                 />
                 <ProfileVerification state={data.verification} />
                 <ProfileQEntry
@@ -228,6 +229,7 @@ export default async function ProfilePage() {
                   subjectType="INVESTOR_ORGANISATION"
                   subjectId={investor.id}
                   subjectLabel={investor.displayName}
+                  hasWebsite={Boolean(investor.websiteUrl)}
                 />
                 <section aria-labelledby="investor-verified">
                   <h3
@@ -382,6 +384,7 @@ function FindingsSlot(props: {
   readonly subjectType: ProfileFindingSubjectType;
   readonly subjectId: string;
   readonly subjectLabel: string;
+  readonly hasWebsite?: boolean | undefined;
 }) {
   return (
     <Suspense
@@ -389,6 +392,7 @@ function FindingsSlot(props: {
         <ProfileFindings
           subjectLabel={props.subjectLabel}
           state={{ status: "LOADING" }}
+          hasWebsite={props.hasWebsite}
         />
       }
     >
@@ -401,13 +405,21 @@ async function FindingsRead({
   subjectType,
   subjectId,
   subjectLabel,
+  hasWebsite,
 }: {
   readonly subjectType: ProfileFindingSubjectType;
   readonly subjectId: string;
   readonly subjectLabel: string;
+  readonly hasWebsite?: boolean | undefined;
 }) {
   const state = await loadProfileFindings(subjectType, subjectId);
-  return <ProfileFindings subjectLabel={subjectLabel} state={state} />;
+  return (
+    <ProfileFindings
+      subjectLabel={subjectLabel}
+      state={state}
+      hasWebsite={hasWebsite}
+    />
+  );
 }
 
 /**

@@ -98,10 +98,16 @@ export type FindingsState =
 export function ProfileFindings({
   subjectLabel,
   state,
+  hasWebsite = false,
 }: {
   /** How the subject is named in a question to Q ("Kivu Freight", "me"). */
   readonly subjectLabel: string;
   readonly state: FindingsState;
+  /**
+   * Whether a website is on record. The empty state must not ask for
+   * what is already there (R30 #18).
+   */
+  readonly hasWebsite?: boolean | undefined;
 }) {
   const { askAbout } = useGlobalQ();
   const headingId = `found-${subjectLabel.replace(/\W+/g, "-").toLowerCase()}`;
@@ -127,7 +133,9 @@ export function ProfileFindings({
         </p>
       ) : state.findings.length === 0 ? (
         <p className="cq-body-sm pt-3 text-(--cq-text-secondary)">
-          Nothing found yet. Q looks once it knows your name and website.
+          {hasWebsite
+            ? "Nothing found yet. Your name and website are on record; ask Q to look and what it finds shows here."
+            : "Nothing found yet. Q looks once it knows your name and website."}
         </p>
       ) : (
         <ul className="flex flex-col divide-y divide-(--cq-border-subtle)">

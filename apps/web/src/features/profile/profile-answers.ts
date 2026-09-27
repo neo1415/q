@@ -229,22 +229,36 @@ export function answerGroups(
     { ...vocabulary, reviewGroups: groups },
     labels,
   );
+  // A statement shows once (R30 #30): the same free text recorded under
+  // two steps (a thesis that is also the person's own criteria) is kept
+  // where it first appears. Short values ("Seed", "Yes") legitimately
+  // repeat and are never folded.
+  const seen = new Set<string>();
+  const repeated = (value: string | null): boolean => {
+    if (value === null || value.length < 40) return false;
+    const key = value.trim().toLowerCase();
+    if (seen.has(key)) return true;
+    seen.add(key);
+    return false;
+  };
   return lines.map((group) => {
     const spec = groups.find((candidate) => candidate.label === group.label);
     return {
       id: spec?.id ?? group.label.toLowerCase(),
       label: group.label,
-      lines: group.items.map((item) => {
-        const currencyStep = MONEY_STEPS[item.stepKey];
-        return {
-          stepKey: item.stepKey,
-          title: TITLE_OVERRIDES[item.stepKey] ?? item.title,
-          value:
-            currencyStep === undefined || item.value === null
-              ? item.value
-              : moneyValue(view, item.stepKey, currencyStep),
-        };
-      }),
+      lines: group.items
+        .filter((item) => !repeated(item.value))
+        .map((item) => {
+          const currencyStep = MONEY_STEPS[item.stepKey];
+          return {
+            stepKey: item.stepKey,
+            title: TITLE_OVERRIDES[item.stepKey] ?? item.title,
+            value:
+              currencyStep === undefined || item.value === null
+                ? item.value
+                : moneyValue(view, item.stepKey, currencyStep),
+          };
+        }),
     };
   });
 }

@@ -139,6 +139,24 @@ describe("answerGroups (investor)", () => {
   });
 });
 
+describe("answerGroups: one statement, shown once (R30 #30)", () => {
+  it("keeps a thesis recorded under two steps where it first appears", () => {
+    const thesis =
+      "We back operators building credit rails for informal traders, not decks.";
+    const groups = answerGroups(
+      "investor",
+      view("investor", [...INVESTOR_ELIGIBLE, "I6.custom_criteria"], {
+        "I6.custom_criteria": { type: "TEXT", text: thesis },
+        "I11.additional_context": { type: "TEXT", text: thesis },
+      }),
+    );
+    const shown = groups
+      .flatMap((group) => group.lines)
+      .filter((l) => l.value === thesis);
+    expect(shown).toHaveLength(1);
+  });
+});
+
 describe("answerGroups (founder)", () => {
   const groups = answerGroups(
     "founder",
