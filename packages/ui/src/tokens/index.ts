@@ -53,6 +53,7 @@ export const Z_LAYERS = [
   "popover",
   "sheet",
   "modal",
+  "modal-popover",
   "toast",
 ] as const;
 export type ZLayer = (typeof Z_LAYERS)[number];

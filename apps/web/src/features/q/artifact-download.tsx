@@ -4,6 +4,18 @@ import { useState } from "react";
 
 import type { QArtifactExportFormat } from "@capital-q/contracts";
 import { buttonClassName } from "@capital-q/ui/button";
+import {
+  ChevronDown,
+  Download,
+  ICON_SIZE,
+  ICON_STROKE,
+} from "@capital-q/ui/icons";
+import {
+  MenuContent,
+  MenuItem,
+  MenuRoot,
+  MenuTrigger,
+} from "@capital-q/ui/menu";
 import { InlineNotice } from "@capital-q/ui/states";
 
 /**
@@ -11,9 +23,9 @@ import { InlineNotice } from "@capital-q/ui/states";
  *
  * One control for the card and the viewer, so both offer the same files
  * for the same artifact: a PDF for every type, and PowerPoint where the
- * artifact is a deck.
+ * artifact is a deck (R36: one download control, never a row of them).
  *
- * Each is a real link to the one narrow server route (the Q API's token is
+ * A single file is a real link to the one narrow server route (the Q API's token is
  * in an HttpOnly cookie, so no script here can call the Q API), and a
  * click fetches the file instead of navigating to it. A plain link that
  * failed used to open a page of JSON — a dead end in a new tab. Fetched,
@@ -43,6 +55,12 @@ export function artifactFileUrl(
 const LABELS: Readonly<Record<QArtifactExportFormat, string>> = {
   pdf: "PDF",
   pptx: "PowerPoint",
+};
+
+/** What the menu says, so nobody has to guess what a PowerPoint is saved as. */
+const MENU_LABELS: Readonly<Record<QArtifactExportFormat, string>> = {
+  pdf: "PDF document",
+  pptx: "PowerPoint (.pptx)",
 };
 
 /** The name the server put on the file, or a plain one. */
@@ -89,20 +107,28 @@ function saveFile(blob: Blob, name: string): void {
   }, 0);
 }
 
+/**
+ * One file: one button that says which file. Several: one Download menu,
+ * so a card carries a single download control however many formats exist.
+ */
 export function ArtifactDownloads({
   artifactId,
   formats,
   version,
+  layer = "page",
 }: {
   readonly artifactId: string;
   readonly formats: readonly QArtifactExportFormat[];
   /** The version on screen; null for whatever is current. */
   readonly version: number | null;
+  /** `modal` inside the viewer, so the menu opens above it. */
+  readonly layer?: "page" | "modal" | undefined;
 }) {
   const [busy, setBusy] = useState<QArtifactExportFormat | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
 
   const download = async (format: QArtifactExportFormat) => {
+    if (busy !== null) return;
     setBusy(format);
     setFailure(null);
     try {
@@ -121,14 +147,22 @@ export function ArtifactDownloads({
     }
   };
 
+  const icon = (
+    <Download
+      aria-hidden="true"
+      size={ICON_SIZE.compact}
+      strokeWidth={ICON_STROKE}
+    />
+  );
+  const only = formats.length === 1 ? formats[0] : undefined;
+
   return (
     <>
-      {formats.map((format) => (
+      {only !== undefined ? (
         <a
-          key={format}
-          className={buttonClassName("secondary", "compact")}
-          href={artifactFileUrl(artifactId, format, version)}
-          aria-busy={busy === format}
+          className={buttonClassName("secondary", "regular")}
+          href={artifactFileUrl(artifactId, only, version)}
+          aria-busy={busy === only}
           aria-disabled={busy !== null}
           onClick={(event) => {
             // Modified clicks keep what a link does (open in a new tab,
@@ -144,13 +178,57 @@ export function ArtifactDownloads({
               return;
             }
             event.preventDefault();
-            if (busy === null) void download(format);
+            void download(only);
           }}
-          data-q-artifact-download={format}
+          data-q-artifact-download={only}
         >
-          {busy === format ? "Preparing…" : LABELS[format]}
+          {icon}
+          {busy === only ? (
+            "Preparing…"
+          ) : (
+            // The space outside the hidden word is what separates the two
+            // in the accessible name ("Download PDF"); at the start of the
+            // visible line it collapses away.
+            <span>
+              <span className="sr-only">Download</span> {LABELS[only]}
+            </span>
+          )}
         </a>
-      ))}
+      ) : (
+        <MenuRoot>
+          <MenuTrigger>
+            <button
+              type="button"
+              className={buttonClassName("secondary", "regular")}
+              aria-busy={busy !== null}
+              data-q-artifact-download-menu
+            >
+              {icon}
+              {busy === null ? "Download" : "Preparing…"}
+              <ChevronDown
+                aria-hidden="true"
+                size={ICON_SIZE.compact}
+                strokeWidth={ICON_STROKE}
+              />
+            </button>
+          </MenuTrigger>
+          <MenuContent align="end" layer={layer}>
+            {formats.map((format) => (
+              <MenuItem
+                key={format}
+                disabled={busy !== null}
+                onClick={() => {
+                  void download(format);
+                }}
+              >
+                <span data-q-artifact-download={format}>
+                  {MENU_LABELS[format]}
+                </span>
+              </MenuItem>
+            ))}
+          </MenuContent>
+        </MenuRoot>
+      )}
       {failure === null ? null : (
         <InlineNotice
           tone="warning"

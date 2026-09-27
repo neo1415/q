@@ -74,6 +74,9 @@
   --cq-z-popover: 30;
   --cq-z-sheet: 40;
   --cq-z-modal: 50;
+  /* A menu opened from inside a modal (a viewer's Download): portalled to
+     the body like every popover, so it must clear the modal it came from. */
+  --cq-z-modal-popover: 55;
   --cq-z-toast: 60;
 
   /* Layout widths (doc 18 §22). */

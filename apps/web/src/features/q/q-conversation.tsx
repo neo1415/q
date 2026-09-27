@@ -1062,10 +1062,21 @@ export function QConversationPanel({
           }}
         >
           {openArtifact === null ? null : (
-            <DialogViewerContent title="Document">
+            <DialogViewerContent
+              title="Document"
+              onSwipeDismiss={closeArtifact}
+            >
               <ArtifactViewer
                 artifactId={openArtifact}
                 onClose={closeArtifact}
+                onEditWithQ={(title) => {
+                  // Back to the conversation, where the revision is asked
+                  // for and written like any other answer (CQ-QACT-001).
+                  closeArtifact();
+                  sayOrAsk(
+                    `Edit "${title}" with me — what would you change first?`,
+                  );
+                }}
                 revision={
                   turns.findLast(
                     (turn) =>

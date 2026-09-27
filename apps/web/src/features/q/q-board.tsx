@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useEffect, useState, useSyncExternalStore } from "react";
 
-import { qArtifactExportFormats } from "@capital-q/contracts";
 import { cx } from "@capital-q/ui";
 import { buttonClassName } from "@capital-q/ui/button";
 import { ICON_SIZE, ICON_STROKE, Pin, PinOff, X } from "@capital-q/ui/icons";
@@ -11,7 +10,7 @@ import { ICON_SIZE, ICON_STROKE, Pin, PinOff, X } from "@capital-q/ui/icons";
 import { ViewTransition } from "@/components/view-transition";
 
 import { artifactTypeLabel } from "./artifact-type";
-import { ArtifactDownloads } from "./artifact-download";
+import { ArtifactCard } from "./artifact-card";
 import { slideSource } from "./artifact-viewer";
 import { arrangeBoard, boardObjects, type BoardObject } from "./board";
 import type { QTurn } from "./conversation";
@@ -206,50 +205,30 @@ function ObjectBody({
     case "ARTIFACT": {
       const block = object.blocks[0];
       if (block?.kind !== "ARTIFACT_REFERENCE") return null;
-      const ready = block.status === "READY";
+      // The same card as the answer's (R36), with the first slide above it
+      // for a deck: the picture is itself a way in.
       return (
-        <div className="flex flex-col gap-3">
-          {ready && block.type === "PITCH_DECK" ? (
-            <button
-              type="button"
-              className="cq-q-board-slide-button"
-              onClick={() => onOpenArtifact(block.artifactId)}
-              aria-label={`Open ${block.title}`}
-            >
-              <SlidePreview artifactId={block.artifactId} title={block.title} />
-            </button>
-          ) : null}
-          <p className="cq-body-sm font-medium text-(--cq-text-primary)">
-            {block.title}
-          </p>
-          <p className="cq-caption text-(--cq-text-secondary)">
-            {ready
-              ? "A private draft. Nothing has been shared or sent."
-              : block.status === "PREPARING"
-                ? "Q is still preparing this."
-                : "Q couldn't finish preparing this one."}
-          </p>
-          {ready ? (
-            <div className="flex flex-wrap gap-2">
+        <ArtifactCard
+          block={block}
+          framed={false}
+          onOpen={onOpenArtifact}
+          onAsk={onAsk}
+          preview={
+            block.type === "PITCH_DECK" ? (
               <button
                 type="button"
-                className={buttonClassName("secondary", "compact")}
+                className="cq-q-board-slide-button"
                 onClick={() => onOpenArtifact(block.artifactId)}
-                data-q-artifact-open={block.artifactId}
+                aria-label={`Open ${block.title}`}
               >
-                Open
+                <SlidePreview
+                  artifactId={block.artifactId}
+                  title={block.title}
+                />
               </button>
-              {/* Download is its own control, apart from Open (doc 17
-                  §91): a PDF for every type, PowerPoint for a deck
-                  (BIZ-001), through the same control the answer card uses. */}
-              <ArtifactDownloads
-                artifactId={block.artifactId}
-                formats={qArtifactExportFormats(block.type)}
-                version={null}
-              />
-            </div>
-          ) : null}
-        </div>
+            ) : undefined
+          }
+        />
       );
     }
     case "COMPARISON":

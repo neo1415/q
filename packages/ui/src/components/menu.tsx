@@ -22,17 +22,25 @@ export function MenuContent({
   children,
   align = "start",
   className,
+  layer = "page",
 }: {
   readonly children: ReactNode;
   readonly align?: "start" | "center" | "end" | undefined;
   readonly className?: string | undefined;
+  /**
+   * `modal` for a menu opened from inside a dialog: the menu is portalled
+   * to the body, so on the page layer it would open behind the dialog.
+   */
+  readonly layer?: "page" | "modal" | undefined;
 }) {
   return (
     <BaseMenu.Portal>
       <BaseMenu.Positioner
         align={align}
         sideOffset={6}
-        className="z-(--cq-z-popover)"
+        className={
+          layer === "modal" ? "z-(--cq-z-modal-popover)" : "z-(--cq-z-popover)"
+        }
       >
         <BaseMenu.Popup
           className={cx(
@@ -63,7 +71,7 @@ export function MenuItem({
       onClick={onClick}
       disabled={disabled}
       className={cx(
-        "flex min-h-10 cursor-default select-none items-center gap-2 rounded-sm px-2.5 cq-body-sm outline-none data-[disabled]:opacity-50 data-[highlighted]:bg-(--cq-surface-subtle)",
+        "flex min-h-11 cursor-default select-none items-center gap-2 rounded-sm px-2.5 cq-body-sm outline-none data-[disabled]:opacity-50 data-[highlighted]:bg-(--cq-surface-subtle)",
         tone === "danger" ? "text-(--cq-danger)" : "text-(--cq-text-primary)",
       )}
     >

@@ -114,7 +114,7 @@ beforeEach(() => {
 });
 
 describe("QX-003E · the card in an answer", () => {
-  it("offers View and Edit with Q once the document is ready", async () => {
+  it("offers Open, the PDF and Edit with Q once the document is ready", async () => {
     const onOpenArtifact = vi.fn();
     const onAsk = vi.fn();
     render(
@@ -137,16 +137,18 @@ describe("QX-003E · the card in an answer", () => {
     ).toBeTruthy();
     // It says what it is: a private draft, not something that went out.
     expect(screen.getByText(/private draft/i)).toBeTruthy();
-    await userEvent.click(screen.getByText("View"));
+    await userEvent.click(screen.getByRole("button", { name: "Open" }));
     expect(onOpenArtifact).toHaveBeenCalledWith(ARTIFACT);
     await userEvent.click(screen.getByText("Edit with Q"));
     expect(onAsk).toHaveBeenCalled();
     // A brief downloads as a PDF from the card (BIZ-001), and only as a
     // PDF: there is no PowerPoint of a document that has no slides.
-    expect(screen.getByText("PDF").getAttribute("href")).toBe(
-      `/api/q-artifact/${ARTIFACT}/pdf`,
-    );
-    expect(screen.queryByText("PowerPoint")).toBeNull();
+    expect(
+      screen.getByRole("link", { name: "Download PDF" }).getAttribute("href"),
+    ).toBe(`/api/q-artifact/${ARTIFACT}/pdf`);
+    // One file, so one button: no menu to open for a single choice.
+    expect(screen.queryByRole("button", { name: /Download/ })).toBeNull();
+    expect(screen.queryByText(/PowerPoint/)).toBeNull();
   });
 
   it("offers nothing to open while it is still being prepared", () => {
@@ -166,10 +168,16 @@ describe("QX-003E · the card in an answer", () => {
       />,
     );
     expect(screen.getByText(/still preparing/i)).toBeTruthy();
-    expect(screen.queryByText("View")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Open" })).toBeNull();
     expect(screen.queryByText("Edit with Q")).toBeNull();
     // No bytes exist yet, so there is no download to offer.
     expect(screen.queryByText("PDF")).toBeNull();
+    // A skeleton holds the card's shape, hidden from assistive technology,
+    // so the actions arriving later do not move the answer.
+    const card = document.querySelector('[data-q-artifact-card="PREPARING"]');
+    expect(
+      card?.querySelector('[aria-hidden="true"] .animate-pulse'),
+    ).toBeTruthy();
   });
 
   it("says so, rather than nothing, when preparing failed", () => {
@@ -188,7 +196,32 @@ describe("QX-003E · the card in an answer", () => {
       />,
     );
     expect(screen.getByText(/couldn't finish preparing/i)).toBeTruthy();
-    expect(screen.queryByText("View")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Open" })).toBeNull();
+  });
+
+  it("says what to do when preparing failed: ask Q to try again", async () => {
+    const onAsk = vi.fn();
+    render(
+      <QResultBlocks
+        blocks={[
+          {
+            kind: "ARTIFACT_REFERENCE",
+            artifactId: ARTIFACT,
+            type: "INVESTMENT_BRIEF",
+            status: "FAILED",
+            title: "Investment brief",
+          },
+        ]}
+        onAsk={onAsk}
+        onOpenArtifact={vi.fn()}
+      />,
+    );
+    await userEvent.click(
+      screen.getByRole("button", { name: "Ask Q to try again" }),
+    );
+    expect(onAsk).toHaveBeenCalledWith(
+      "Please try preparing that document again.",
+    );
   });
 });
 
@@ -406,15 +439,22 @@ describe("QX-004 · the deck in the viewer", () => {
   it("offers PowerPoint and PDF for the version actually on screen", async () => {
     render(<ArtifactViewer artifactId={ARTIFACT} onClose={vi.fn()} />);
     await screen.findByAltText("Slide 1");
-    expect(screen.getByText("PowerPoint").getAttribute("href")).toBe(
-      `/api/q-artifact/${ARTIFACT}/pptx?version=2`,
+    await userEvent.click(screen.getByRole("button", { name: /Download/ }));
+    await userEvent.click(
+      await screen.findByRole("menuitem", { name: "PowerPoint (.pptx)" }),
     );
+    await waitFor(() => {
+      expect(asked).toContain(`/api/q-artifact/${ARTIFACT}/pptx?version=2`);
+    });
 
     await userEvent.click(screen.getByText("V1"));
+    await screen.findByText(/an earlier version/);
+    await userEvent.click(screen.getByRole("button", { name: /Download/ }));
+    await userEvent.click(
+      await screen.findByRole("menuitem", { name: "PDF document" }),
+    );
     await waitFor(() => {
-      expect(screen.getByText("PDF").getAttribute("href")).toBe(
-        `/api/q-artifact/${ARTIFACT}/pdf?version=1`,
-      );
+      expect(asked).toContain(`/api/q-artifact/${ARTIFACT}/pdf?version=1`);
     });
   });
 
@@ -447,12 +487,38 @@ describe("QX-004 · the deck in the viewer", () => {
       />,
     );
     expect(screen.getByText("Investor deck")).toBeTruthy();
-    expect(screen.getByText("PDF").getAttribute("href")).toBe(
-      `/api/q-artifact/${ARTIFACT}/pdf`,
+  });
+
+  it("puts a deck's two files behind one Download menu, reachable by keyboard", async () => {
+    render(
+      <QResultBlocks
+        blocks={[
+          {
+            kind: "ARTIFACT_REFERENCE",
+            artifactId: ARTIFACT,
+            type: "PITCH_DECK",
+            status: "READY",
+            title: "Northstar Logistics — investor deck",
+          },
+        ]}
+        onAsk={vi.fn()}
+        onOpenArtifact={vi.fn()}
+      />,
     );
-    expect(screen.getByText("PowerPoint").getAttribute("href")).toBe(
-      `/api/q-artifact/${ARTIFACT}/pptx`,
-    );
+    const trigger = screen.getByRole("button", { name: /Download/ });
+    trigger.focus();
+    await userEvent.keyboard("{Enter}");
+    const items = await screen.findAllByRole("menuitem");
+    expect(items.map((item) => item.textContent)).toEqual([
+      "PDF document",
+      "PowerPoint (.pptx)",
+    ]);
+    await userEvent.keyboard("{Escape}");
+    await waitFor(() => {
+      expect(screen.queryByRole("menuitem")).toBeNull();
+    });
+    // Focus goes back to the control that opened the menu.
+    expect(document.activeElement).toBe(trigger);
   });
 
   it("offers a brief as a PDF in the viewer, and no PowerPoint of a document with no slides", async () => {
@@ -466,12 +532,12 @@ describe("QX-004 · the deck in the viewer", () => {
     });
     // Was: no download at all, so a founder who asked for a PDF of their
     // brief had none. The version on screen is the version downloaded.
-    expect(screen.getByText("PDF").getAttribute("href")).toBe(
-      `/api/q-artifact/${ARTIFACT}/pdf?version=2`,
-    );
+    expect(
+      screen.getByRole("link", { name: "Download PDF" }).getAttribute("href"),
+    ).toBe(`/api/q-artifact/${ARTIFACT}/pdf?version=2`);
     // A button to nowhere is worse than the absence of one: a brief has
     // no slides, so there is nothing to write a PPTX from.
-    expect(screen.queryByText("PowerPoint")).toBeNull();
+    expect(screen.queryByText(/PowerPoint/)).toBeNull();
     // And no slides are asked for.
     expect(asked).toEqual([]);
   });
@@ -585,7 +651,7 @@ describe("BIZ-001 · downloading from the card", () => {
     ).toBeTruthy();
     // Still on the card, and the button is still there to try again.
     expect(screen.getByText("PDF")).toBeTruthy();
-    expect(screen.getByText("View")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Open" })).toBeTruthy();
   });
 
   it("says the connection dropped when the request never came back", async () => {
@@ -594,7 +660,10 @@ describe("BIZ-001 · downloading from the card", () => {
       vi.fn(() => Promise.reject(new Error("offline"))),
     );
     render(card("PITCH_DECK"));
-    await userEvent.click(screen.getByText("PowerPoint"));
+    await userEvent.click(screen.getByRole("button", { name: /Download/ }));
+    await userEvent.click(
+      await screen.findByRole("menuitem", { name: "PowerPoint (.pptx)" }),
+    );
     await waitFor(() => {
       expect(
         screen.getByText("I lost the connection to Q. Please try again."),
@@ -605,6 +674,6 @@ describe("BIZ-001 · downloading from the card", () => {
   it("offers a PDF for a type this build has not heard of", () => {
     render(card("INVESTMENT_MEMO"));
     expect(screen.getByText("PDF")).toBeTruthy();
-    expect(screen.queryByText("PowerPoint")).toBeNull();
+    expect(screen.queryByText(/PowerPoint/)).toBeNull();
   });
 });

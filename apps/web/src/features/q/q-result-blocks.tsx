@@ -3,7 +3,6 @@
 import Link from "next/link";
 
 import {
-  qArtifactExportFormats,
   QWebsiteUrlSchema,
   type QSubjectRef,
   type QUiIntent,
@@ -11,8 +10,7 @@ import {
 import { buttonClassName } from "@capital-q/ui/button";
 
 import { destinationPath } from "../voice/destinations";
-import { artifactTypeLabel } from "./artifact-type";
-import { ArtifactDownloads } from "./artifact-download";
+import { ArtifactCard } from "./artifact-card";
 import type { QTurnObjectBlock } from "./conversation";
 
 /**
@@ -365,80 +363,17 @@ export function QResultBlocks({
               </QResultCard>
             );
 
-          case "ARTIFACT_REFERENCE": {
-            /**
-             * Something Q composed (QX-003E).
-             *
-             * The status is on the card because "prepared" and "still
-             * being prepared" are different things to somebody about to
-             * send a document to an investor, and an absence would make
-             * them guess. The files are on the card (CQ-QACT-002: "just
-             * give me the PDF" is answered with the PDF, not a trip into a
-             * viewer): a PDF for every type and PowerPoint for a deck
-             * (BIZ-001). Older versions stay in the viewer.
-             */
-            const ready = block.status === "READY";
+          case "ARTIFACT_REFERENCE":
+            // Something Q composed (QX-003E, R36): one card language for
+            // the answer and the Board. Older versions stay in the viewer.
             return (
-              <QResultCard
+              <ArtifactCard
                 key={key}
-                label={artifactTypeLabel(block.type)}
-                title={block.title}
-                actions={
-                  <>
-                    {ready && onOpenArtifact !== undefined ? (
-                      <button
-                        type="button"
-                        className={buttonClassName("secondary", "compact")}
-                        onClick={() => {
-                          onOpenArtifact(block.artifactId);
-                        }}
-                        data-q-artifact-open={block.artifactId}
-                      >
-                        View
-                      </button>
-                    ) : null}
-                    {ready ? (
-                      // "Just give me the PDF" (CQ-QACT-002), for every
-                      // type (BIZ-001): the file the person asked for is one
-                      // tap from the answer that made it, not behind the
-                      // viewer. The current version, through the same narrow
-                      // route the viewer uses, so the session cookie is the
-                      // only authority it carries.
-                      <ArtifactDownloads
-                        artifactId={block.artifactId}
-                        formats={qArtifactExportFormats(block.type)}
-                        version={null}
-                      />
-                    ) : null}
-                    {ready && onAsk !== undefined ? (
-                      <button
-                        type="button"
-                        className={buttonClassName("quiet", "compact")}
-                        onClick={() => {
-                          // A normal question in the same thread: the
-                          // revision is composed and written by the same
-                          // authorised path any other answer takes.
-                          onAsk(
-                            "Edit this document with me — what would you change first?",
-                          );
-                        }}
-                      >
-                        Edit with Q
-                      </button>
-                    ) : null}
-                  </>
-                }
-              >
-                <p className="cq-body-sm text-(--cq-text-secondary)">
-                  {block.status === "READY"
-                    ? "A private draft in your workspace. Nothing has been shared or sent."
-                    : block.status === "PREPARING"
-                      ? "Q is still preparing this."
-                      : "Q couldn't finish preparing this one."}
-                </p>
-              </QResultCard>
+                block={block}
+                onOpen={onOpenArtifact}
+                onAsk={onAsk}
+              />
             );
-          }
 
           case "UI_INTENT": {
             // Their own website, opened in a new tab as the answer arrived;
