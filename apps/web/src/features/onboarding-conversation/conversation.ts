@@ -290,6 +290,34 @@ export function promptFor(
   }
 }
 
+/**
+ * Where Q found a suggestion, when it read it in a public source (BIZ-009):
+ * the page, for the person to open on tap. Null for what Q picked up from
+ * their own words. Provenance on demand, never a badge (R23).
+ */
+export function publicSourceOf(
+  suggestion: OnboardingSuggestionView,
+): { readonly url: string; readonly label: string } | null {
+  const labels: Readonly<Record<string, string>> = {
+    PUBLIC_WEBSITE: "From your website",
+    PUBLIC_PROFILE: "From your profile link",
+    PUBLIC_REGISTRY: "From a public registry",
+    PUBLIC_WEB: "From a public page",
+  };
+  for (const ref of suggestion.sourceRefs) {
+    const label = labels[ref.sourceType];
+    if (label === undefined) continue;
+    try {
+      const url = new URL(ref.sourceId);
+      if (url.protocol !== "https:" && url.protocol !== "http:") continue;
+      return { url: url.toString(), label };
+    } catch {
+      continue;
+    }
+  }
+  return null;
+}
+
 /** One thing Q picked up, for the inline confirmation card (§21). */
 export type PickedUp = {
   readonly suggestion: OnboardingSuggestionView;

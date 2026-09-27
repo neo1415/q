@@ -50,6 +50,7 @@ import {
   PAUSED_LINE,
   pauseIntent,
   pickedUp,
+  publicSourceOf,
   progressLines,
   promptFor,
   remainingCount,
@@ -1396,7 +1397,11 @@ export function QOnboardingWorkspace({
           data-q-picked-up
         >
           <span className="cq-label text-(--cq-text-secondary)">
-            I picked up
+            {otherProposals.some(
+              (item) => publicSourceOf(item.suggestion) !== null,
+            )
+              ? "Here's what I found. Is this right?"
+              : "I picked up"}
           </span>
           <ul className="flex flex-col gap-2">
             {otherProposals.map((item) => (
@@ -1410,6 +1415,23 @@ export function QOnboardingWorkspace({
                     {item.label} ·{" "}
                   </span>
                   {item.value}
+                  {(() => {
+                    const source = publicSourceOf(item.suggestion);
+                    return source === null ? null : (
+                      <>
+                        {" "}
+                        <a
+                          href={source.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="cq-caption text-(--cq-text-secondary) underline underline-offset-2"
+                          data-suggestion-source
+                        >
+                          {source.label}
+                        </a>
+                      </>
+                    );
+                  })()}
                 </span>
                 <span className="flex gap-1">
                   <Button
