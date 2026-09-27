@@ -45,6 +45,46 @@ export const QViewingMomentSchema = z
 export type QViewingMoment = z.infer<typeof QViewingMomentSchema>;
 
 /**
+ * The screens a person can be on when they ask (R21). A closed list the
+ * web maps its routes onto; OTHER for anything else. Not pixels.
+ */
+export const Q_SCREEN_ROUTES = [
+  "HOME",
+  "DISCOVER",
+  "CAPITAL",
+  "PROFILE",
+  "COMPANY_VISIBILITY",
+  "COMPANY_INTEREST",
+  "COMPANY",
+  "PITCH",
+  "RELATIONSHIP_COMPANY",
+  "RELATIONSHIP_INVESTOR",
+  "VERIFICATION",
+  "ONBOARDING",
+  "OTHER",
+] as const;
+export const QScreenRouteSchema = z.enum(Q_SCREEN_ROUTES);
+export type QScreenRoute = z.infer<typeof QScreenRouteSchema>;
+
+/**
+ * What is on the person's screen as they ask (R21): the screen, and the
+ * canonical entities it shows -- a company, an investor organisation, an
+ * open Q document. The pitch and playback position travel as `viewing`
+ * (R18), not here. A request, never authority: each entity is resolved
+ * for the asker through its owning context exactly like a named subject,
+ * and one that does not resolve is dropped silently, as if absent.
+ */
+export const QScreenContextSchema = z
+  .object({
+    route: QScreenRouteSchema,
+    companyId: UuidSchema.optional(),
+    investorOrganisationId: UuidSchema.optional(),
+    documentId: UuidSchema.optional(),
+  })
+  .strict();
+export type QScreenContext = z.infer<typeof QScreenContextSchema>;
+
+/**
  * PUBLIC. The body a client sends to start a Q run (doc 22 §67).
  *
  * Strict, and deliberately small. What a client may say: which capability it
@@ -72,6 +112,8 @@ export const CreateQRunRequestSchema = z
     conversationId: QConversationIdSchema.optional(),
     /** R18: asked while watching a pitch; authorised server-side or dropped. */
     viewing: QViewingMomentSchema.optional(),
+    /** R21: what is on screen; each entity resolved for the asker or dropped. */
+    screen: QScreenContextSchema.optional(),
   })
   .strict();
 

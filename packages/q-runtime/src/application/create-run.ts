@@ -238,6 +238,18 @@ export function createCreateQRun(dependencies: QRuntimeDependencies) {
       }
     }
 
+    // R21: what is on the person's screen is a request, never authority.
+    // Each entity it shows is resolved for this actor through its owning
+    // context, exactly like a named subject, and joins this run's subjects
+    // only then; one that does not resolve is dropped silently. It is
+    // this turn's context, so it is not written to the conversation's
+    // subjects and does not carry forward.
+    const beforeScreen = refs;
+    refs = await withScreenEntities(subjects, actor, refs, input.screen);
+    const onScreen = refs.slice(beforeScreen.length);
+    const keptByConversation = (all: readonly QSubjectRef[]) =>
+      all.filter((ref) => !onScreen.includes(ref));
+
     refs = await withOwnContext(dependencies, actor, refs);
 
     const keyHash = hashRunIdempotencyKey(command.idempotencyKey);
@@ -264,7 +276,7 @@ export function createCreateQRun(dependencies: QRuntimeDependencies) {
           tenantId: actor.tenantId,
           userId: actor.userId,
           organisationId,
-          subjects: refs,
+          subjects: keptByConversation(refs),
         }));
 
       // A turn that names a subject changes what the conversation is
@@ -274,7 +286,7 @@ export function createCreateQRun(dependencies: QRuntimeDependencies) {
           tx,
           actor.tenantId,
           conversation.id,
-          refs,
+          keptByConversation(refs),
         );
       }
 
@@ -364,4 +376,46 @@ export function createCreateQRun(dependencies: QRuntimeDependencies) {
       }
     });
   };
+}
+
+/** The screen's entities as subjects, each resolved for the actor or dropped. */
+async function withScreenEntities(
+  subjects: QRuntimeDependencies["subjects"],
+  actor: ActorContext,
+  refs: readonly QSubjectRef[],
+  screen: CreateQRunRequest["screen"],
+): Promise<readonly QSubjectRef[]> {
+  if (screen === undefined) return refs;
+  const shown: QSubjectRef[] = [
+    ...(screen.companyId === undefined
+      ? []
+      : [{ kind: "COMPANY" as const, companyId: screen.companyId }]),
+    ...(screen.investorOrganisationId === undefined
+      ? []
+      : [
+          {
+            kind: "INVESTOR_ORGANISATION" as const,
+            investorOrganisationId: screen.investorOrganisationId,
+          },
+        ]),
+    ...(screen.documentId === undefined
+      ? []
+      : [{ kind: "DOCUMENT" as const, documentId: screen.documentId }]),
+  ];
+  let out = refs;
+  for (const ref of shown) {
+    const already = out.some(
+      (known) => JSON.stringify(known) === JSON.stringify(ref),
+    );
+    if (
+      already ||
+      out.length >= Q_SUBJECTS_MAX ||
+      !subjects.supports(ref.kind)
+    ) {
+      continue;
+    }
+    const resolved = await subjects.resolve(actor, ref).catch(() => null);
+    if (resolved !== null) out = [...out, ref];
+  }
+  return out;
 }

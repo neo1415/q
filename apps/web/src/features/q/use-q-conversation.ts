@@ -26,6 +26,7 @@ import {
   type QSubjectInput,
 } from "./actions";
 import type { PendingTurn } from "./conversation";
+import { screenOf } from "./screen";
 import {
   forgetPendingAsk,
   readPendingAsk,
@@ -424,6 +425,8 @@ export function useQConversation(
           }),
           idempotencyKey,
           extras?.viewing,
+          // R21: the screen they asked from, resolved or dropped server-side.
+          screenOf(window.location.pathname),
         );
         if (!started.ok) {
           forgetPendingAsk(idempotencyKey);

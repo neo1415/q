@@ -22,6 +22,7 @@ import { loadWebServerConfig } from "@capital-q/config/web";
 import {
   Q_MESSAGE_TEXT_MAX_LENGTH,
   QConversationIdSchema,
+  QScreenContextSchema,
   QViewingMomentSchema,
   type ListQConversationsResponse,
   type QArtifactDetail,
@@ -209,6 +210,12 @@ export async function askQAction(
    * question.
    */
   rawViewing?: unknown,
+  /**
+   * What is on screen (R21): the screen and the entity ids it shows. A
+   * request, never authority: the Q API resolves each id for this person
+   * or drops it. Anything malformed is dropped here.
+   */
+  rawScreen?: unknown,
 ): Promise<QActionResult<QStartedRun>> {
   const parsed = QuestionSchema.safeParse(rawQuestion);
   if (!parsed.success) {
@@ -251,6 +258,10 @@ export async function askQAction(
     rawViewing === undefined
       ? undefined
       : QViewingMomentSchema.safeParse(rawViewing).data;
+  const screen =
+    rawScreen === undefined
+      ? undefined
+      : QScreenContextSchema.safeParse(rawScreen).data;
 
   const idempotencyKey =
     rawIdempotencyKey === undefined
@@ -270,6 +281,7 @@ export async function askQAction(
           modality: "TEXT",
           ...(subjects === undefined ? {} : { subjects }),
           ...(viewing === undefined ? {} : { viewing }),
+          ...(screen === undefined ? {} : { screen }),
           ...(inConversation === undefined
             ? {}
             : { conversationId: inConversation }),
