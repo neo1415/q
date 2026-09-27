@@ -1,8 +1,16 @@
 import { describe, expect, it } from "vitest";
 
 import { parseApiConfig } from "@capital-q/config/api";
-import { createChatService, type ChatParty } from "@capital-q/communication";
-import { createInMemoryChatStore } from "@capital-q/communication/testing";
+import {
+  createChatSafetyService,
+  createChatService,
+  type ChatParty,
+  type ChatSafetyAuditEntry,
+} from "@capital-q/communication";
+import {
+  createInMemoryChatSafetyStore,
+  createInMemoryChatStore,
+} from "@capital-q/communication/testing";
 import {
   AuthUserIdSchema,
   MembershipIdSchema,
@@ -40,14 +48,25 @@ const COMPANY_ORG = "d0000000-0000-4000-8000-000000000001";
 
 function build(options: { connected?: boolean; org?: string } = {}) {
   const store = createInMemoryChatStore();
+  const parties = (actor: ActorContext, relationshipId: string) =>
+    Promise.resolve<ChatParty | null>(
+      relationshipId === REL && actor.organisationId === COMPANY_ORG
+        ? { side: "COMPANY", connected: options.connected ?? true }
+        : null,
+    );
+  const safetyStore = createInMemoryChatSafetyStore(store);
+  const audits: ChatSafetyAuditEntry[] = [];
+  const chatSafety = createChatSafetyService({
+    store: safetyStore,
+    parties,
+    audit: (_tx, entry) => {
+      audits.push(entry);
+      return Promise.resolve();
+    },
+  });
   const chat = createChatService({
     store,
-    parties: (actor, relationshipId) =>
-      Promise.resolve<ChatParty | null>(
-        relationshipId === REL && actor.organisationId === COMPANY_ORG
-          ? { side: "COMPANY", connected: options.connected ?? true }
-          : null,
-      ),
+    parties,
     documents: (_actor, documentId) =>
       Promise.resolve(
         documentId === DOC
@@ -93,8 +112,9 @@ function build(options: { connected?: boolean; org?: string } = {}) {
   };
   const app = createApp(parseApiConfig({ NODE_ENV: "test" }), security, {
     chat,
+    chatSafety,
   }).app;
-  return { app, store };
+  return { app, store, safetyStore, audits };
 }
 
 const send = (body: unknown, key?: string) => ({
@@ -228,5 +248,99 @@ describe("/v1/relationships/:relationshipId/messages", () => {
       url: `/v1/relationships/${REL}/messages/${id}/attachment`,
     });
     expect(refused.statusCode).toBe(404);
+  });
+
+  it("blocks and unblocks for the caller's side, idempotently, with audit", async () => {
+    const { app, safetyStore, audits } = build();
+    const post = (path: string, key?: string) => ({
+      method: "POST" as const,
+      url: `/v1/relationships/${REL}/messages/${path}`,
+      headers: key === undefined ? {} : { "idempotency-key": key },
+    });
+    expect((await app.inject(post("block"))).statusCode).toBe(422);
+    expect((await app.inject(post("block", "block-key-0001"))).statusCode).toBe(204);
+    expect((await app.inject(post("block", "block-key-0001"))).statusCode).toBe(204);
+    expect(safetyStore.blockRows).toHaveLength(1);
+
+    const refused = await app.inject(
+      send({ kind: "TEXT", body: "blocked?" }, "chat-key-0020"),
+    );
+    expect(refused.statusCode).toBe(409);
+    expect(refused.json<{ detail: string }>().detail).toBe(
+      "You can't message this relationship right now.",
+    );
+    const thread = await app.inject({
+      method: "GET",
+      url: `/v1/relationships/${REL}/messages`,
+    });
+    expect(thread.json()).toMatchObject({
+      status: "BLOCKED",
+      blockedByYourSide: true,
+    });
+
+    expect((await app.inject(post("unblock", "unblock-key-0001"))).statusCode).toBe(204);
+    expect(
+      (await app.inject(send({ kind: "TEXT", body: "back" }, "chat-key-0021")))
+        .statusCode,
+    ).toBe(201);
+    expect(audits.map((a) => a.actionType)).toEqual([
+      "chat.blocked",
+      "chat.unblocked",
+    ]);
+
+    const stranger = build({ org: "d0000000-0000-4000-8000-000000000009" });
+    expect(
+      (await stranger.app.inject(post("block", "block-key-0002"))).statusCode,
+    ).toBe(404);
+  });
+
+  it("tells the blocked side only that it can't message right now", async () => {
+    const { app, store } = build();
+    store.blocks.set(REL, new Set(["INVESTOR"]));
+    const refused = await app.inject(
+      send({ kind: "TEXT", body: "hello?" }, "chat-key-0030"),
+    );
+    expect(refused.statusCode).toBe(409);
+    expect(refused.json<{ detail: string }>().detail).toBe(
+      "You can't message this relationship right now.",
+    );
+    expect(JSON.stringify(refused.json())).not.toMatch(/INVESTOR|blocked by/i);
+    const thread = await app.inject({
+      method: "GET",
+      url: `/v1/relationships/${REL}/messages`,
+    });
+    expect(thread.json()).toMatchObject({
+      status: "BLOCKED",
+      blockedByYourSide: false,
+    });
+  });
+
+  it("files a report once per key and validates it", async () => {
+    const { app, safetyStore, audits } = build();
+    const report = (payload: unknown, key?: string) => ({
+      method: "POST" as const,
+      url: `/v1/relationships/${REL}/messages/reports`,
+      payload: payload as Record<string, unknown>,
+      headers: key === undefined ? {} : { "idempotency-key": key },
+    });
+    expect((await app.inject(report({ reasonCode: "SPAM" }))).statusCode).toBe(422);
+    expect(
+      (await app.inject(report({ reasonCode: "SPAM", note: "x".repeat(501) }, "report-key-0001")))
+        .statusCode,
+    ).toBe(422);
+    expect(
+      (await app.inject(report({ reasonCode: "NOPE" }, "report-key-0002"))).statusCode,
+    ).toBe(422);
+    const first = await app.inject(
+      report({ reasonCode: "SPAM", note: "Keeps pitching" }, "report-key-0003"),
+    );
+    expect(first.statusCode).toBe(201);
+    expect(first.json()).toMatchObject({ status: "OPEN", deduplicated: false });
+    const again = await app.inject(
+      report({ reasonCode: "SPAM", note: "Keeps pitching" }, "report-key-0003"),
+    );
+    expect(again.statusCode).toBe(200);
+    expect(safetyStore.reports).toHaveLength(1);
+    expect(audits).toHaveLength(1);
   });
 });

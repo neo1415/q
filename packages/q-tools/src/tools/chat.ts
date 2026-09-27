@@ -107,6 +107,8 @@ export type ChatIntelligencePort = {
     relationshipId: string,
   ) => Promise<{
     readonly connected: boolean;
+    /** Either side blocked messaging (R34 safety); nothing can be sent. */
+    readonly blocked?: boolean | undefined;
     readonly counterpartName: string;
     readonly messages: readonly {
       readonly from: "YOU" | "YOUR_SIDE" | "OTHER_SIDE";
@@ -286,7 +288,7 @@ function createListMessagesTool(
     },
     execute: (_input, _context, grant) =>
       Promise.resolve({
-        open: grant.thread.connected,
+        open: grant.thread.connected && grant.thread.blocked !== true,
         counterpartName: grant.thread.counterpartName,
         messages: grant.thread.messages.map((message) => ({ ...message })),
       }),
@@ -301,8 +303,9 @@ export const ChatProposalOutputSchema = z
      * PREPARED: shown to the person for approval; nothing happened yet.
      * ONE_PER_TURN: another action is being prepared in this answer.
      * NOT_CONNECTED: messages open once both sides are connected.
+     * BLOCKED: messaging is blocked on this relationship; nothing is sent.
      */
-    status: z.enum(["PREPARED", "ONE_PER_TURN", "NOT_CONNECTED"]),
+    status: z.enum(["PREPARED", "ONE_PER_TURN", "NOT_CONNECTED", "BLOCKED"]),
     awaitingApprovalOf: z.string(),
   })
   .strict();
@@ -328,6 +331,7 @@ type ProposalGrant = {
   readonly relationshipId: string;
   readonly counterpartName: string;
   readonly connected: boolean;
+  readonly blocked: boolean;
 };
 
 function proposalTool<I extends ProposeChatMessageInput>(
@@ -375,6 +379,7 @@ function proposalTool<I extends ProposeChatMessageInput>(
           relationshipId,
           counterpartName: thread.counterpartName,
           connected: thread.connected,
+          blocked: thread.blocked === true,
         });
       } catch {
         return deny("NOT_AVAILABLE");
@@ -386,6 +391,13 @@ function proposalTool<I extends ProposeChatMessageInput>(
           status: "NOT_CONNECTED" as const,
           awaitingApprovalOf:
             "Messages open once you're connected with them: interest expressed and accepted.",
+        });
+      }
+      // Never a way around a block; the person unblocks on the chat itself.
+      if (spec.requiresConnection && grant.blocked) {
+        return Promise.resolve({
+          status: "BLOCKED" as const,
+          awaitingApprovalOf: "You can't message this relationship right now.",
         });
       }
       const status = chat.prepareForApproval({

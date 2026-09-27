@@ -102,6 +102,12 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   ),
   "api/http/chat.ts POST RELATIONSHIP_MESSAGE_UNSEND_PATH":
     cap("offer.chat_unsend"),
+  // R34 safety: person-only, offered as the chat screen.
+  "api/http/chat.ts POST RELATIONSHIP_CHAT_BLOCK_PATH": cap("offer.chat_block"),
+  "api/http/chat.ts POST RELATIONSHIP_CHAT_UNBLOCK_PATH":
+    cap("offer.chat_unblock"),
+  "api/http/chat.ts POST RELATIONSHIP_CHAT_REPORTS_PATH":
+    cap("offer.chat_report"),
   "api/http/chat.ts GET RELATIONSHIP_MESSAGE_ATTACHMENT_PATH": exempt(
     "a shared file's download to the browser from the chat; Q names shared files through list_messages",
   ),

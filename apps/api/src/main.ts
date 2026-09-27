@@ -153,7 +153,11 @@ import {
   createSharedDocumentDownloads,
   DocumentIdSchema,
 } from "@capital-q/evidence";
-import { composeChat, composeSchedule } from "@capital-q/communication";
+import {
+  composeChat,
+  composeChatSafety,
+  composeSchedule,
+} from "@capital-q/communication";
 import {
   createCloudflareStreamVideoProvider,
   createCompanyMediaOwnerResolver,
@@ -177,6 +181,7 @@ import {
 import { createSupabaseAccessTokenAuthenticator } from "@capital-q/security/supabase";
 
 import { apiServiceIdentity, createApp } from "./app.js";
+import { createChatSafetyAudit } from "./chat-safety-audit.js";
 import { createProductionEventRegistry } from "./event-registry.js";
 import { createSupabaseRequestAuthenticator } from "./security/supabase-authenticator.js";
 
@@ -887,6 +892,15 @@ const chat = composeChat({
   newCorrelationId: createCorrelationId,
 });
 
+// Chat safety (R34; doc 10): block, unblock and report, each audited in
+// its own transaction.
+const chatSafety = composeChatSafety({
+  sql: database.sql,
+  transactions: database.transactions,
+  interests,
+  audit: createChatSafetyAudit(audit),
+});
+
 // Meetings, reminders and notifications (BIZ-008): the person's own
 // calendar through the integrations context. Reminder email is the
 // workers' job; the API sends none.
@@ -916,6 +930,7 @@ const { app, logger } = createApp(config, security, {
   companyNetworkView,
   interests,
   chat,
+  chatSafety,
   schedule,
   gateq,
   gateqApply,

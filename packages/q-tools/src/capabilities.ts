@@ -243,6 +243,29 @@ const OFFERS: readonly QCapability[] = [
     "RELATIONSHIPS",
     "Unsending is the author's own time-bound undo on a message already delivered; Q never retracts a message on someone's behalf.",
   ),
+  // R34 safety (doc 10): person-only. Q offers the chat screen when the
+  // person asks; it never blocks or reports on its own reading of a thread.
+  offer(
+    "chat_block",
+    "RELATIONSHIP",
+    "Block messages on a relationship's chat (from the chat's menu), so neither side can send until they unblock",
+    "RELATIONSHIPS",
+    "Blocking is a person's own safety decision about someone else; Q never blocks on inference, only takes them to the chat's menu when they ask.",
+  ),
+  offer(
+    "chat_unblock",
+    "RELATIONSHIP",
+    "Unblock a relationship's chat they blocked (from the chat's menu)",
+    "RELATIONSHIPS",
+    "Lifting a block reopens contact with someone they chose to stop; only the person decides that, on the chat itself.",
+  ),
+  offer(
+    "chat_report",
+    "RELATIONSHIP",
+    "Report a chat message or conversation to Capital Q (from the message or the chat's menu), with a reason",
+    "RELATIONSHIPS",
+    "A report is the person's own account of someone else's conduct; Q never files one on their behalf or on inference.",
+  ),
   // BIZ-008 (B8 worker block).
   offer(
     "reminder_dismiss",

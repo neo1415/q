@@ -35,8 +35,10 @@ import {
 } from "@capital-q/investors";
 import {
   ChatAttachmentUnavailableError,
+  ChatBlockedError,
   ChatIdempotencyConflictError,
   ChatNotConnectedError,
+  ChatReportReasonError,
   ChatNotFoundError,
 } from "@capital-q/communication";
 import {
@@ -355,6 +357,21 @@ function toProblem(
   if (error instanceof ChatNotConnectedError) {
     return createProblemDetails({
       code: "RESOURCE_CONFLICT",
+      requestId,
+      detail: error.message,
+    });
+  }
+  // R34 safety: the same sentence to both sides; never who blocked.
+  if (error instanceof ChatBlockedError) {
+    return createProblemDetails({
+      code: "RESOURCE_CONFLICT",
+      requestId,
+      detail: error.message,
+    });
+  }
+  if (error instanceof ChatReportReasonError) {
+    return createProblemDetails({
+      code: "VALIDATION_FAILED",
       requestId,
       detail: error.message,
     });

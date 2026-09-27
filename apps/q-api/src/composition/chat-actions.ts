@@ -8,6 +8,7 @@ import {
 } from "@capital-q/contracts";
 import {
   ChatAttachmentUnavailableError,
+  ChatBlockedError,
   ChatNotConnectedError,
   ChatNotFoundError,
   type ChatService,
@@ -74,7 +75,7 @@ const MessageResultSchema = z
   .object({ messageId: UuidSchema, alreadySent: z.boolean() })
   .strict();
 
-type Party = { readonly connected: boolean } | null;
+type Party = { readonly connected: boolean; readonly blocked: boolean } | null;
 
 async function partyOf(
   chat: ChatService,
@@ -84,7 +85,7 @@ async function partyOf(
   if (actor.actorType !== "HUMAN") return null;
   return chat
     .readForQ({ actor, relationshipId, limit: 1 })
-    .then((read) => ({ connected: read.connected }))
+    .then((read) => ({ connected: read.connected, blocked: read.blocked }))
     .catch(() => null);
 }
 
@@ -123,6 +124,8 @@ export function createChatMessageSendAction(dependencies: {
       const party = await partyOf(chat, actor, payload.relationshipId);
       if (party === null) return { outcome: "DENY", code: "NOT_A_PARTY" };
       if (!party.connected) return { outcome: "DENY", code: "NOT_CONNECTED" };
+      // A block stops approved messages too (R34 safety).
+      if (party.blocked) return { outcome: "DENY", code: "BLOCKED" };
       return { outcome: "ALLOW" };
     },
     executor: {
@@ -161,6 +164,13 @@ export function createChatMessageSendAction(dependencies: {
             return {
               outcome: "FAILED",
               failureCode: "NOT_CONNECTED",
+              retryable: false,
+            };
+          }
+          if (error instanceof ChatBlockedError) {
+            return {
+              outcome: "FAILED",
+              failureCode: "BLOCKED",
               retryable: false,
             };
           }
@@ -284,6 +294,7 @@ export function createChatIntelligencePort(dependencies: {
       if (read === null) return null;
       return {
         connected: read.connected,
+        blocked: read.blocked,
         counterpartName:
           (await dependencies.counterpartName(actor, relationshipId)) ??
           "the other side",

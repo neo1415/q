@@ -91,6 +91,19 @@ describe("chat.message.send", () => {
     });
   });
 
+  it("refuses to authorise or post while messaging is blocked", async () => {
+    const { action, store } = world();
+    store.blocks.set(RELATIONSHIP, new Set(["COMPANY"]));
+    expect(await action.authorize(payload, actor)).toMatchObject({
+      outcome: "DENY",
+      code: "BLOCKED",
+    });
+    expect(
+      await action.executor.execute(approved("q_action:r:blocked") as never, context),
+    ).toMatchObject({ outcome: "FAILED", failureCode: "BLOCKED", retryable: false });
+    expect(store.rows).toHaveLength(0);
+  });
+
   it("posts once per execution identity, as the approver, marked as via Q", async () => {
     const { action, store } = world();
     const first = await action.executor.execute(

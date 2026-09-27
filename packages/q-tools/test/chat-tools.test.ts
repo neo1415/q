@@ -48,7 +48,9 @@ function relationshipPlan(
   };
 }
 
-function world(options: { readonly connected?: boolean } = {}) {
+function world(
+  options: { readonly connected?: boolean; readonly blocked?: boolean } = {},
+) {
   const prepared: unknown[] = [];
   const reads: string[] = [];
   const chat: ChatIntelligencePort = {
@@ -59,6 +61,7 @@ function world(options: { readonly connected?: boolean } = {}) {
         actor.userId === actorB.userId && relationshipId === RELATIONSHIP
           ? {
               connected: options.connected ?? true,
+              blocked: options.blocked ?? false,
               counterpartName: "Apex",
               messages: [
                 {
@@ -194,6 +197,36 @@ describe("chat proposals", () => {
       data: { status: "NOT_CONNECTED" },
     });
     expect(prepared).toEqual([]);
+  });
+
+  it("does not prepare a message while messaging is blocked, and reads as not open", async () => {
+    const { executor, prepared } = world({ blocked: true });
+    const context = contextFor(actorB, relationshipPlan(base(actorB), RELATIONSHIP));
+    const outcome = await executor.execute(
+      {
+        callId: "c6",
+        name: "propose_chat_message",
+        arguments: { relationshipId: RELATIONSHIP, body: "Hello" },
+      },
+      context,
+    );
+    expect(outcome.result).toMatchObject({
+      ok: true,
+      data: {
+        status: "BLOCKED",
+        awaitingApprovalOf: "You can't message this relationship right now.",
+      },
+    });
+    expect(prepared).toEqual([]);
+    const read = await executor.execute(
+      {
+        callId: "c7",
+        name: "list_messages",
+        arguments: { relationshipId: RELATIONSHIP },
+      },
+      context,
+    );
+    expect(read.result).toMatchObject({ ok: true, data: { open: false } });
   });
 
   it("prepares a meeting and a reminder as proposals", async () => {

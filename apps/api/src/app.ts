@@ -163,6 +163,8 @@ export type ApiModules = {
     | undefined;
   /** R34: relationship chat. Absent: no chat route registers. */
   readonly chat?: ChatRoutesDependencies["chat"] | undefined;
+  /** R34 safety: block, unblock, report. Registers only beside `chat`. */
+  readonly chatSafety?: ChatRoutesDependencies["safety"] | undefined;
   /** BIZ-008: meetings, reminders, notifications. Absent: none register. */
   readonly schedule?: ScheduleRoutesDependencies["schedule"] | undefined;
   /** BIZ-004: handles and the Q Card. Absent: no card or /@handle route. */
@@ -301,6 +303,7 @@ export function createApp(
       authenticator: security.authenticator,
       resolver: security.resolver,
       chat: modules.chat,
+      safety: modules.chatSafety,
     });
   }
 
