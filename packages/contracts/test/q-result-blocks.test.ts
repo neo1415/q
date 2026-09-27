@@ -196,6 +196,9 @@ describe("QUiIntent", () => {
     },
     SHOW_EVIDENCE: { kind: "SHOW_EVIDENCE", evidenceRefs: [evidenceRef] },
     NAVIGATE: { kind: "NAVIGATE", destination: "DISCOVER" },
+    SET_THEME: { kind: "SET_THEME", theme: "light" },
+    RELOAD_PAGE: { kind: "RELOAD_PAGE" },
+    OPEN_WEBSITE: { kind: "OPEN_WEBSITE", url: "https://zino.example" },
   };
 
   it("parses every supported intent", () => {

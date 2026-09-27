@@ -296,6 +296,7 @@ export type PendingProposalPort = {
     context: PendingProposalContext,
     proposalId: string,
   ) => Promise<{ readonly status: ProposalPlainStatus | "CHANGED" }>;
+};
 
 /**
  * The person's own Q Card, read as the Q Card screen reads it (the public
