@@ -259,6 +259,7 @@ import {
   createMemoryLearner,
   withLearning,
 } from "./composition/memory-learner.js";
+import { ownRecordTerms } from "./voice/vocabulary.js";
 
 // Q configuration is loaded from its own schema, separate from the application
 // API even where the current fields coincide.
@@ -1628,6 +1629,43 @@ const { app, logger: appLogger } = createApp(
             welcome: welcomeHost,
             turn: voiceTurn,
             memory: { termsFor: memoryLearner.termsFor },
+            // Their own records' names, for the recogniser (founder live
+            // 2026-09-27, #6): read by the resolved actor's own
+            // organisation and user id only, never from anything said.
+            ownNames: {
+              namesFor: async (actor: ActorContext) => {
+                const organisationId = actor.organisationId;
+                const [company, firm, personName] = await Promise.all([
+                  organisationId === undefined ||
+                  companies.findOrganisationCompany === undefined
+                    ? Promise.resolve(null)
+                    : companies.findOrganisationCompany(
+                        actor.tenantId,
+                        organisationId,
+                      ),
+                  organisationId === undefined
+                    ? Promise.resolve(null)
+                    : ownInvestorOrganisations.findByOrganisation(
+                        database.sql,
+                        actor.tenantId,
+                        organisationId,
+                      ),
+                  displayNameFor(actor),
+                ]);
+                const profile =
+                  company === null
+                    ? null
+                    : await companies.findCanonicalCompanyProfile(company.id);
+                return ownRecordTerms({
+                  companyNames: [
+                    company?.canonicalName ?? null,
+                    profile?.legalName ?? null,
+                  ],
+                  firmName: firm?.displayName ?? null,
+                  personName,
+                });
+              },
+            },
             logger,
           },
         }),

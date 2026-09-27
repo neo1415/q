@@ -69,3 +69,30 @@ export const ASR_KEYWORDS: readonly string[] = [
   "SaaS",
   "B2B",
 ];
+
+/**
+ * The names on a person's own records as recogniser terms (founder live
+ * 2026-09-27, #6): their company's canonical and legal names, their firm's
+ * and their own. Values from records, never from what they said; one of
+ * each, however cased, and nothing a recogniser cannot use.
+ */
+export function ownRecordTerms(records: {
+  readonly companyNames: readonly (string | null)[];
+  readonly firmName: string | null;
+  readonly personName: string | null;
+}): readonly string[] {
+  const seen = new Set<string>();
+  const terms: string[] = [];
+  for (const name of [
+    ...records.companyNames,
+    records.firmName,
+    records.personName,
+  ]) {
+    const term = name?.replace(/\s+/g, " ").trim() ?? "";
+    const key = term.toLowerCase();
+    if (term.length < 2 || term.length > 60 || seen.has(key)) continue;
+    seen.add(key);
+    terms.push(term);
+  }
+  return terms;
+}

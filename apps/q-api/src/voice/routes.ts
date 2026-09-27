@@ -121,6 +121,15 @@ export type QVoiceRoutesDependencies = ActorContextDependencies & {
   readonly memory?:
     | { readonly termsFor: (actor: ActorContext) => Promise<readonly string[]> }
     | undefined;
+  /**
+   * The names on the person's own records — their company (canonical and
+   * legal), their firm, their own name — for the recogniser, so it hears
+   * "Zino Aviation" rather than "Zener Aviation" (founder live
+   * 2026-09-27, #6). Read for the resolved actor's own organisation only.
+   */
+  readonly ownNames?:
+    | { readonly namesFor: (actor: ActorContext) => Promise<readonly string[]> }
+    | undefined;
 };
 
 export function registerQVoiceRoutes(
@@ -601,6 +610,15 @@ export function registerQVoiceRoutes(
           request.log.debug({ err: error }, "remembered terms unavailable");
         }
       }
+      // Their own records' names, likewise best effort.
+      let ownNames: readonly string[] = [];
+      if (dependencies.ownNames !== undefined) {
+        try {
+          ownNames = await dependencies.ownNames.namesFor(actor);
+        } catch (error: unknown) {
+          request.log.debug({ err: error }, "own record names unavailable");
+        }
+      }
       const issuedAt = now();
       const voiceSessionId = randomUUID();
       let credentials: {
@@ -625,6 +643,7 @@ export function registerQVoiceRoutes(
             // The organisation they typed at sign-up: the one name in this
             // conversation the recogniser could not know.
             terms: [
+              ...ownNames,
               ...(input.organisationHint === undefined
                 ? []
                 : [input.organisationHint]),

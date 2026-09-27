@@ -128,6 +128,7 @@ export type QApiModules = {
         | "speech"
         | "speechThrottle"
         | "memory"
+        | "ownNames"
       >)
     | undefined;
 };
@@ -342,6 +343,10 @@ export function createApp(
       speech: modules.voice.speech,
       speechThrottle: modules.voice.speechThrottle,
       now: modules.voice.now,
+      // Both were composed but never reached the route, so the recogniser
+      // was told no remembered or recorded name (founder live, #6).
+      memory: modules.voice.memory,
+      ownNames: modules.voice.ownNames,
     });
     /**
      * One Q, whatever the input was (QX-004 core gate).
