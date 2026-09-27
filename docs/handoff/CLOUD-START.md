@@ -179,6 +179,12 @@ lead-owned files touched, open questions.
 - Run the live paraphrase eval for R20 (small, founder-budgeted): profile edits never NAVIGATE, and "take me to my profile" still does.
 - Lead decisions made: TURN_READER v7 edited in place is accepted (never deployed); keep `negation.ts` and `promises.ts` (live users outside the interviewer).
 
+**Branches to merge FIRST in the cloud (pushed, not merged, 2026-09-27):**
+
+- `ux/minimal-q` @ 52f85c3 (UXM): R24 Home Q layout complete, R23 Sources disclosure plus ADR 0018 (review it), R28 Settings. Web tsc, eslint and vitest are green per the worker; the e2e specs were updated but NOT run. Still to do in the same lane: R27 /relationships index page and nav entry, R25 profile completeness, and R23 on the onboarding intelligence and materials steps.
+- `biz/009-investor-research` @ 62b2455 (B9): research-first investor onboarding (INVESTOR_RESEARCH_READER v1, INTERVIEW_AGENT v10, provenance-checked recommendations). The last commit is WIP: run the web tsc (build ui first), eslint, and add the `publicSourceOf` unit test. Known bug outside its scope: `correlation()` in `apps/q-api/src/composition/presence.ts` parses a bare UUID where a `cor_` id is required.
+- Then **R43** (auto-verify seeded synthetic accounts) early, because it gates the seeded world showing in Discover.
+
 ## 8. The queue: the Monday definition of done, in order
 
 This is playbook section 0, in the same order, with the state at handoff. Finish higher items first and **deploy each item as it lands**, so Monday shows the best achievable product even if the bottom is unfinished. Labels: **NOT STARTED**, **PARTLY BUILT**, **DONE-NOT-DEPLOYED**, **LIVE**.

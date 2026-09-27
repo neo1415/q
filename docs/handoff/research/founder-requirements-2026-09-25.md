@@ -88,3 +88,9 @@ R31. Cloud readiness: be ready to move to Claude cloud at the founder's say-so. 
 - **R40. Beyond industry standards.** Research UI/UX across the whole product against the spec and everything the founder has said, and exceed it.
 - **R41. When everything above is done and time/credits remain:** return to Q intelligence (seamless typed and voice conversation, knows what to do), then test EVERYTHING with every tool available (browser, API, e2e), deploying continuously.
 - **R42. Autonomy.** The cloud does everything it can without waiting for the founder, as long as it costs no money. Anything that truly needs the founder is left ready to plug in.
+- **R43. Seeded companies and investors are automatically VERIFIED**, until the /ops admin console exists where the founder verifies them by hand. Hosted verification stays PENDING because Railway workers lack the synthetic vars.
+  - Fix generally: the verification decider auto-decides VERIFIED for accounts carrying the synthetic marker in app_metadata, on the attested synthetic project only. Real users are never auto-verified.
+  - Then rerun the seed idempotently and confirm the fictional companies appear in investors' Discover on the live site.
+  - Remove the auto-verify once BIZ-006 /ops ships.
+- **R25 is still open and the founder re-flagged it:** the profile must show everything answered in onboarding. UXM did not reach it.
+- **Fixed 2026-09-27 by the lead:** voice no longer says "One moment." before replies (removed the 6 s spoken beat in `apps/q-api/src/voice/think.ts`).
