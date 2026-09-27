@@ -160,6 +160,13 @@ export type QConversationMessage = {
    * out of history by construction rather than by review.
    */
   readonly blocks?: readonly QResultBlock[] | undefined;
+  /**
+   * The spoken utterance this person's turn is a form of, when it came by
+   * voice (`domain/utterances.ts`). Stored as the reserved provider message
+   * reference: an opaque id, never a payload. Server-internal; never sent
+   * to a client.
+   */
+  readonly utteranceRef?: string | undefined;
   readonly createdAt: UtcTimestamp;
 };
 
@@ -177,6 +184,8 @@ export type NewQConversationMessage = {
   readonly content: string;
   /** Q's own turns only; a person's turn is what they typed. */
   readonly blocks?: readonly QResultBlock[] | undefined;
+  /** A person's spoken turn only: the utterance it is a form of. */
+  readonly utteranceRef?: string | undefined;
 };
 
 export type QRunEventRecord = {

@@ -40,6 +40,13 @@ export type CreateQRunCommand = {
   readonly input: CreateQRunRequest;
   readonly idempotencyKey: string;
   readonly correlationId: CorrelationId;
+  /**
+   * Server-internal, never from a client body: the spoken utterance the
+   * person's words are a form of, named by the voice channel. A newer
+   * message of the same utterance supersedes this one when the
+   * conversation is read (`domain/utterances.ts`).
+   */
+  readonly utteranceRef?: string | undefined;
 };
 
 export type CreateQRunResult = {
@@ -315,6 +322,9 @@ export function createCreateQRun(dependencies: QRuntimeDependencies) {
         runId: run.id,
         role: "USER",
         content: input.message.text,
+        ...(command.utteranceRef === undefined
+          ? {}
+          : { utteranceRef: command.utteranceRef }),
       });
 
       await appendRunEvent(repositories, tx, run, {

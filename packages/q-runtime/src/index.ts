@@ -71,6 +71,10 @@ export {
   hashRunIdempotencyKey,
 } from "./domain/idempotency.js";
 export {
+  UTTERANCE_REF_PATTERN,
+  withoutSupersededUtterances,
+} from "./domain/utterances.js";
+export {
   createCapitalObjectiveQSubjectResolver,
   createCompanyQSubjectResolver,
   createDocumentQSubjectResolver,

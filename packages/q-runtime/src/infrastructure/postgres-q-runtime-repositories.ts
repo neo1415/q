@@ -35,6 +35,10 @@ import {
   type QRunEventRecord,
   type QRunRecord,
 } from "../contracts/index.js";
+import {
+  UTTERANCE_REF_PATTERN,
+  withoutSupersededUtterances,
+} from "../domain/utterances.js";
 
 /**
  * PostgreSQL for the `q_runtime` schema.
@@ -171,6 +175,7 @@ const MessageRow = z.object({
     .transform((value) =>
       value === null ? undefined : QResultBlocksSchema.safeParse(value).data,
     ),
+  provider_message_ref: z.string().nullable(),
   created_at: Timestamp,
 });
 
@@ -185,6 +190,9 @@ function toMessage(row: unknown): QConversationMessage {
     content: r.content,
     contentType: r.content_type,
     ...(r.result_blocks === undefined ? {} : { blocks: r.result_blocks }),
+    ...(r.provider_message_ref === null
+      ? {}
+      : { utteranceRef: r.provider_message_ref }),
     createdAt: r.created_at,
   };
 }
@@ -238,7 +246,8 @@ function selectRun(executor: DatabaseExecutor) {
 function selectMessage(executor: DatabaseExecutor) {
   return executor`
     select m.id, m.tenant_id, m.conversation_id, m.run_id, m.role, m.content,
-           m.content_type, m.result_blocks, m.created_at
+           m.content_type, m.result_blocks, m.provider_message_ref,
+           m.created_at
       from q_runtime.conversation_messages m`;
 }
 
@@ -506,17 +515,27 @@ export function createPostgresQRuntimeRepositories(): QRuntimeRepositories {
         // is the allowlist: anything it cannot express -- internal state,
         // a provider payload, a private evidence reference -- cannot
         // reach this column at all.
+        // Only a person's spoken turn names an utterance, and only an id
+        // of the reserved column's own shape is written.
+        const utteranceRef =
+          input.role === "USER" &&
+          input.utteranceRef !== undefined &&
+          UTTERANCE_REF_PATTERN.test(input.utteranceRef)
+            ? input.utteranceRef
+            : null;
         const blocks =
           input.blocks === undefined || input.blocks.length === 0
             ? null
             : (QResultBlocksSchema.safeParse(input.blocks).data ?? null);
         const rows = await tx.sql`
           insert into q_runtime.conversation_messages
-            (id, tenant_id, conversation_id, run_id, role, content, result_blocks)
+            (id, tenant_id, conversation_id, run_id, role, content, result_blocks,
+             provider_message_ref)
           values (coalesce(${input.id ?? null}::uuid, gen_random_uuid()),
                   ${input.tenantId}, ${input.conversationId}, ${input.runId},
                   ${input.role}, ${input.content},
-                  ${blocks === null ? null : JSON.stringify(blocks)}::text::jsonb)
+                  ${blocks === null ? null : JSON.stringify(blocks)}::text::jsonb,
+                  ${utteranceRef})
           returning id`;
         const { id } = IdRow.parse(rows[0]);
         const created = await findMessageById(
@@ -555,7 +574,7 @@ export function createPostgresQRuntimeRepositories(): QRuntimeRepositories {
              and m.conversation_id = ${conversationId}
            order by m.created_at desc, m.id desc
            limit ${limit}`;
-        return rows.map(toMessage).reverse();
+        return withoutSupersededUtterances(rows.map(toMessage).reverse());
       },
       listRecentForConversationOfRun: async (
         executor,
@@ -576,7 +595,7 @@ export function createPostgresQRuntimeRepositories(): QRuntimeRepositories {
                 limit 1)
            order by m.created_at desc, m.id desc
            limit ${limit}`;
-        return rows.map(toMessage).reverse();
+        return withoutSupersededUtterances(rows.map(toMessage).reverse());
       },
     },
 
