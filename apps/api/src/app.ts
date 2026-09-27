@@ -38,6 +38,10 @@ import {
   type ChatRoutesDependencies,
 } from "./http/chat.js";
 import {
+  registerScheduleRoutes,
+  type ScheduleRoutesDependencies,
+} from "./http/schedule.js";
+import {
   registerNetworkInterestRoutes,
   type NetworkInterestRoutesDependencies,
 } from "./http/network-interests.js";
@@ -159,6 +163,8 @@ export type ApiModules = {
     | undefined;
   /** R34: relationship chat. Absent: no chat route registers. */
   readonly chat?: ChatRoutesDependencies["chat"] | undefined;
+  /** BIZ-008: meetings, reminders, notifications. Absent: none register. */
+  readonly schedule?: ScheduleRoutesDependencies["schedule"] | undefined;
   /** BIZ-004: handles and the Q Card. Absent: no card or /@handle route. */
   readonly publicIdentity?:
     QCardRoutesDependencies["publicIdentity"] | undefined;
@@ -295,6 +301,15 @@ export function createApp(
       authenticator: security.authenticator,
       resolver: security.resolver,
       chat: modules.chat,
+    });
+  }
+
+  // Meetings, reminders and notifications (BIZ-008).
+  if (modules.schedule !== undefined) {
+    registerScheduleRoutes(app, {
+      authenticator: security.authenticator,
+      resolver: security.resolver,
+      schedule: modules.schedule,
     });
   }
 

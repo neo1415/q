@@ -230,3 +230,15 @@ export {
   sendChatMessage,
   unsendChatMessage,
 } from "./chat.js";
+export {
+  cancelMeeting,
+  createReminder,
+  dismissReminder,
+  findMeetingSlots,
+  getMeetingBrief,
+  listNotifications,
+  listRelationshipMeetings,
+  listReminders,
+  markNotificationsRead,
+  scheduleMeeting,
+} from "./schedule.js";

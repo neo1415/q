@@ -67,6 +67,31 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "api/http/capital-objectives.ts POST `${byId}${CAPITAL_OBJECTIVE_REPLACE_SUFFIX}`":
     cap("tool.propose_raise_change"),
 
+  // BIZ-008 meetings, reminders, notifications.
+  "api/http/schedule.ts GET RELATIONSHIP_MEETINGS_PATH":
+    cap("tool.list_schedule"),
+  "api/http/schedule.ts POST RELATIONSHIP_MEETING_SLOTS_PATH": cap(
+    "tool.find_meeting_times",
+  ),
+  "api/http/schedule.ts POST RELATIONSHIP_MEETINGS_PATH": cap(
+    "tool.propose_meeting",
+  ),
+  "api/http/schedule.ts POST MEETING_CANCEL_PATH": cap(
+    "tool.propose_meeting_change",
+  ),
+  "api/http/schedule.ts GET MEETING_BRIEF_PATH": cap("tool.list_schedule"),
+  "api/http/schedule.ts GET REMINDERS_PATH": cap("tool.list_schedule"),
+  "api/http/schedule.ts POST REMINDERS_PATH": cap("tool.propose_reminder"),
+  "api/http/schedule.ts POST REMINDER_DISMISS_PATH": cap(
+    "offer.reminder_dismiss",
+  ),
+  "api/http/schedule.ts GET NOTIFICATIONS_PATH": exempt(
+    "the notices panel's own feed of what already happened (a reminder due, an invite, a brief ready); Q reads the calls and reminders behind them with list_schedule",
+  ),
+  "api/http/schedule.ts POST NOTIFICATIONS_READ_PATH": exempt(
+    "the read marker the notices panel records as notices are seen; not something a person asks for",
+  ),
+
   // R34 relationship chat.
   "api/http/chat.ts GET RELATIONSHIP_MESSAGES_PATH": cap("tool.list_messages"),
   "api/http/chat.ts POST RELATIONSHIP_MESSAGES_PATH": cap(

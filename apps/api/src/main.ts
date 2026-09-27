@@ -12,6 +12,7 @@ import { loadDatabaseConfig } from "@capital-q/config/database";
 import { loadGoogleWorkspaceConfig } from "@capital-q/config/google-workspace";
 import {
   composeGoogleIntegrations,
+  unavailableAppEmailSender,
   createGoogleKeySource,
   platformGoogleHttp,
 } from "@capital-q/integrations";
@@ -152,7 +153,7 @@ import {
   createSharedDocumentDownloads,
   DocumentIdSchema,
 } from "@capital-q/evidence";
-import { composeChat } from "@capital-q/communication";
+import { composeChat, composeSchedule } from "@capital-q/communication";
 import {
   createCloudflareStreamVideoProvider,
   createCompanyMediaOwnerResolver,
@@ -886,6 +887,17 @@ const chat = composeChat({
   newCorrelationId: createCorrelationId,
 });
 
+// Meetings, reminders and notifications (BIZ-008): the person's own
+// calendar through the integrations context. Reminder email is the
+// workers' job; the API sends none.
+const schedule = composeSchedule({
+  sql: database.sql,
+  transactions: database.transactions,
+  interests,
+  calendars: (userId) => integrations.calendarOf(userId),
+  email: unavailableAppEmailSender,
+});
+
 const { app, logger } = createApp(config, security, {
   organisations,
   companies,
@@ -904,6 +916,7 @@ const { app, logger } = createApp(config, security, {
   companyNetworkView,
   interests,
   chat,
+  schedule,
   gateq,
   gateqApply,
   capital,

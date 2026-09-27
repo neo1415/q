@@ -242,6 +242,14 @@ const OFFERS: readonly QCapability[] = [
     "RELATIONSHIPS",
     "Unsending is the author's own time-bound undo on a message already delivered; Q never retracts a message on someone's behalf.",
   ),
+  // BIZ-008 (B8 worker block).
+  offer(
+    "reminder_dismiss",
+    "RELATIONSHIP",
+    "Dismiss a reminder they have dealt with (on the reminder itself)",
+    "RELATIONSHIPS",
+    "Dismissing is the person clearing their own notice once they have acted on it; Q never decides that something was done.",
+  ),
   offer(
     "verification_request",
     "RECORDS",
