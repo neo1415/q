@@ -17,19 +17,16 @@ import { Q_CAPABILITIES } from "@capital-q/q-tools";
  * so this runs without composing either service. The key is
  * `<app>/<file> <METHOD> <path expression>` exactly as written.
  *
- * Exemptions come in two kinds, both stated:
- * - a plain reason: not a person's action (transport, webhook, public or
- *   anonymous surface, reference data, the Q conversation itself);
- * - `BACKLOG:` a person's action with no Q tool yet. Listed in
- *   docs/handoff/research/q-capability-inventory-2026-09-27.md; each one
- *   moves to a capability id when its tool lands.
+ * An exemption is a stated reason why a route is not a person's action
+ * (transport, webhook, public or anonymous surface, reference data, the Q
+ * conversation itself) or cannot be a tool (a file download, a consent).
+ * There is no backlog: a person's action without a Q capability fails.
  */
 
 type Coverage = { readonly capability: string } | { readonly exempt: string };
 
 const cap = (capability: string): Coverage => ({ capability });
 const exempt = (reason: string): Coverage => ({ exempt: reason });
-const backlog = (what: string): Coverage => ({ exempt: `BACKLOG: ${what}` });
 
 const HEALTH = exempt("liveness/readiness probe; not a person's action");
 const ONBOARDING_SETUP = exempt(
@@ -59,16 +56,16 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   'api/app.ts GET "/health/live"': HEALTH,
   'api/app.ts GET "/health/ready"': HEALTH,
 
-  "api/http/capital-objectives.ts POST base": cap("offer.capital_raise_edit"),
+  "api/http/capital-objectives.ts POST base": cap("tool.propose_raise_change"),
   "api/http/capital-objectives.ts GET base": cap("tool.get_capital_objective"),
   "api/http/capital-objectives.ts GET `${base}${CAPITAL_OBJECTIVE_CURRENT_SEGMENT}`":
     cap("tool.get_capital_objective"),
   "api/http/capital-objectives.ts GET byId": cap("tool.get_capital_objective"),
-  "api/http/capital-objectives.ts PATCH byId": cap("offer.capital_raise_edit"),
+  "api/http/capital-objectives.ts PATCH byId": cap("tool.propose_raise_change"),
   "api/http/capital-objectives.ts POST `${byId}${CAPITAL_OBJECTIVE_CLOSE_SUFFIX}`":
-    cap("offer.capital_raise_edit"),
+    cap("tool.propose_raise_change"),
   "api/http/capital-objectives.ts POST `${byId}${CAPITAL_OBJECTIVE_REPLACE_SUFFIX}`":
-    cap("offer.capital_raise_edit"),
+    cap("tool.propose_raise_change"),
 
   "api/http/companies.ts POST COMPANIES_PATH": ONBOARDING_SETUP,
   "api/http/companies.ts GET `${COMPANIES_PATH}/:companyId`":
@@ -79,29 +76,28 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "api/http/companies.ts POST `${COMPANIES_PATH}/:companyId${COMPANY_VISIBILITY_SEGMENT}`":
     cap("hand.set_visibility"),
   "api/http/companies.ts GET `${COMPANIES_PATH}/:companyId${COMPANY_MARKETPLACE_READINESS_SEGMENT}`":
-    backlog("read their company's marketplace readiness"),
+    cap("tool.read_my_record"),
   "api/http/companies.ts POST `${COMPANIES_PATH}/:companyId${COMPANY_MARKETPLACE_READINESS_ASSESS_SEGMENT}`":
-    backlog("re-assess their company's marketplace readiness"),
+    cap("tool.reassess_marketplace_readiness"),
   "api/http/companies.ts GET `${COMPANIES_PATH}/:companyId${COMPANY_NETWORK_PREVIEW_SEGMENT}`":
-    backlog("preview how the network sees their company"),
+    cap("tool.read_my_record"),
 
-  "api/http/company-team.ts GET `${base}${COMPANY_TEAM_ME_SUFFIX}`": backlog(
-    "read their own team membership",
+  "api/http/company-team.ts GET `${base}${COMPANY_TEAM_ME_SUFFIX}`": cap(
+    "tool.read_my_record",
   ),
-  "api/http/company-team.ts PUT `${base}${COMPANY_TEAM_ME_SUFFIX}`": backlog(
-    "set their own team membership (role/title)",
+  "api/http/company-team.ts PUT `${base}${COMPANY_TEAM_ME_SUFFIX}`": cap(
+    "tool.propose_team_change",
   ),
   "api/http/company-team.ts GET `${base}${COMPANY_FOUNDER_PROFILE_ME_SUFFIX}`":
-    backlog("read their founder profile"),
+    cap("tool.read_my_record"),
   "api/http/company-team.ts PATCH `${base}${COMPANY_FOUNDER_PROFILE_ME_SUFFIX}`":
-    backlog(
-      "edit their founder profile (not yet a propose_profile_change field set)",
-    ),
-  "api/http/company-team.ts GET `${base}${COMPANY_TEAM_FACTS_SUFFIX}`": backlog(
-    "read their company's team facts",
+    cap("tool.propose_team_change"),
+  "api/http/company-team.ts GET `${base}${COMPANY_TEAM_FACTS_SUFFIX}`": cap(
+    "tool.read_my_record",
   ),
-  "api/http/company-team.ts PATCH `${base}${COMPANY_TEAM_FACTS_SUFFIX}`":
-    backlog("edit their company's team facts"),
+  "api/http/company-team.ts PATCH `${base}${COMPANY_TEAM_FACTS_SUFFIX}`": cap(
+    "tool.propose_team_change",
+  ),
 
   "api/http/discovery.ts GET DISCOVERY_COMPANIES_PATH": cap(
     "tool.discovery_slate",
@@ -120,11 +116,11 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
     "offer.document_upload",
   ),
   "api/http/documents.ts GET sessionById": cap("offer.document_upload"),
-  "api/http/documents.ts GET DOCUMENTS_PATH": backlog(
-    "list the evidence documents they uploaded",
+  "api/http/documents.ts GET DOCUMENTS_PATH": cap(
+    "tool.list_uploaded_documents",
   ),
-  "api/http/documents.ts GET `${DOCUMENTS_PATH}/:documentId`": backlog(
-    "read one evidence document they uploaded",
+  "api/http/documents.ts GET `${DOCUMENTS_PATH}/:documentId`": cap(
+    "tool.list_uploaded_documents",
   ),
 
   "api/http/gateq-apply.ts POST GATEQ_APPLY_START_PATH": PUBLIC,
@@ -160,40 +156,37 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "api/http/integrations.ts DELETE GOOGLE_INTEGRATION_PATH": cap(
     "offer.gmail_connect",
   ),
-  "api/http/integrations.ts GET GOOGLE_RELATIONSHIP_MAIL_PATH": backlog(
-    "read the email thread of a relationship",
+  "api/http/integrations.ts GET GOOGLE_RELATIONSHIP_MAIL_PATH": cap(
+    "tool.read_relationship_email",
   ),
   "api/http/integrations.ts POST GOOGLE_GMAIL_PUSH_PATH": WEBHOOK,
 
-  "api/http/investor-mandates.ts POST base": backlog(
-    "create a mandate outside onboarding",
-  ),
+  "api/http/investor-mandates.ts POST base": cap("tool.propose_mandate_change"),
   "api/http/investor-mandates.ts GET base": cap("tool.get_investor_mandate"),
   "api/http/investor-mandates.ts GET byId": cap("tool.get_investor_mandate"),
-  "api/http/investor-mandates.ts PATCH byId": backlog(
-    "edit their mandate (a Prepare -> Approve action is needed)",
+  "api/http/investor-mandates.ts PATCH byId": cap(
+    "tool.propose_mandate_change",
   ),
-  "api/http/investor-mandates.ts POST `${byId}${suffix}`": backlog(
-    "activate / pause / archive their mandate",
+  "api/http/investor-mandates.ts POST `${byId}${suffix}`": cap(
+    "tool.propose_mandate_change",
   ),
 
   "api/http/investors.ts POST INVESTORS_PATH": ONBOARDING_SETUP,
-  "api/http/investors.ts GET INVESTORS_CURRENT_PATH": backlog(
-    "read their own investor organisation (the profile page's read)",
+  "api/http/investors.ts GET INVESTORS_CURRENT_PATH": cap(
+    "tool.read_my_record",
   ),
-  "api/http/investors.ts GET byId": backlog(
-    "read an investor organisation's profile",
-  ),
+  "api/http/investors.ts GET byId": cap("tool.read_my_record"),
   "api/http/investors.ts PATCH byId": cap("tool.propose_profile_change"),
-  "api/http/investors.ts POST `${byId}${INVESTOR_VISIBILITY_SEGMENT}`": backlog(
-    "change who can see their investor organisation",
+  "api/http/investors.ts POST `${byId}${INVESTOR_VISIBILITY_SEGMENT}`": cap(
+    "tool.propose_investor_visibility",
   ),
-  "api/http/investors.ts GET `${byId}${INVESTOR_NETWORK_PREVIEW_SEGMENT}`":
-    backlog("preview how the network sees their investor organisation"),
+  "api/http/investors.ts GET `${byId}${INVESTOR_NETWORK_PREVIEW_SEGMENT}`": cap(
+    "tool.read_my_record",
+  ),
   "api/http/investors.ts GET `${byId}${INVESTOR_REPRESENTATIVE_ME_SUFFIX}`":
-    backlog("read their own representative record"),
+    cap("tool.read_my_record"),
   "api/http/investors.ts PUT `${byId}${INVESTOR_REPRESENTATIVE_ME_SUFFIX}`":
-    backlog("set their own representative record (role/title)"),
+    cap("tool.propose_team_change"),
 
   "api/http/me.ts PATCH ME_PATH": cap("tool.propose_profile_change"),
   "api/http/me.ts GET ME_PROFILE_PATH": exempt(
@@ -295,9 +288,7 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "api/http/q-cards.ts PUT `${cardPath}${Q_CARD_HANDLE_SEGMENT}`": cap(
     "tool.propose_handle_claim",
   ),
-  "api/http/q-cards.ts PATCH cardPath": backlog(
-    "change their Q Card's details (findable by search engines, contact fields)",
-  ),
+  "api/http/q-cards.ts PATCH cardPath": cap("tool.propose_q_card_change"),
   "api/http/q-cards.ts GET `${PUBLIC_HANDLES_PATH}/:handle`": PUBLIC,
   "api/http/q-cards.ts GET `${PUBLIC_CARD_CODES_PATH}/:code`": PUBLIC,
 
@@ -320,16 +311,17 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "api/http/taxonomy.ts GET `${TAXONOMY_PATH}${TAXONOMY_NODES_SEGMENT}/:nodeId`":
     REFERENCE,
 
-  "api/http/verification.ts GET `${base}${COMPANY_VERIFICATION_SEGMENT}`":
-    backlog("read their company's verification status"),
+  "api/http/verification.ts GET `${base}${COMPANY_VERIFICATION_SEGMENT}`": cap(
+    "tool.read_my_record",
+  ),
   "api/http/verification.ts POST `${base}${COMPANY_VERIFICATION_REQUESTS_SEGMENT}`":
     cap("offer.verification_request"),
 
   "api/http/visibility.ts GET COMPANY_VISIBILITY_STATE_PATH": cap(
     "tool.get_disclosure_state",
   ),
-  "api/http/visibility.ts GET COMPANY_AUDIENCE_PREVIEW_PATH": backlog(
-    "preview what one audience sees of their company",
+  "api/http/visibility.ts GET COMPANY_AUDIENCE_PREVIEW_PATH": cap(
+    "tool.read_my_record",
   ),
   "api/http/visibility.ts POST COMPANY_SHARES_PATH": cap(
     "tool.propose_share_raise",
@@ -341,8 +333,8 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   // ---- apps/q-api -------------------------------------------------------
   'q-api/app.ts GET "/health/live"': HEALTH,
   'q-api/app.ts GET "/health/ready"': HEALTH,
-  "q-api/http/profile-findings.ts GET Q_PROFILE_FINDINGS_PATH": backlog(
-    "read what Q found about their profile (shown on the profile page)",
+  "q-api/http/profile-findings.ts GET Q_PROFILE_FINDINGS_PATH": cap(
+    "tool.read_my_record",
   ),
   "q-api/http/q-approvals.ts GET Q_APPROVALS_PATH": cap(
     "tool.list_pending_approvals",
@@ -427,15 +419,9 @@ const PAGE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "/settings": cap("navigate.SETTINGS"),
   "/verification": cap("navigate.VERIFICATION"),
   "/pitch": cap("navigate.PITCH"),
-  "/company/[companyId]": backlog(
-    "open one company's page by id (OPEN_COMPANY intent has no route map entry yet)",
-  ),
-  "/relationships/company/[companyId]": backlog(
-    "open one relationship with a company by id",
-  ),
-  "/relationships/investor/[investorOrganisationId]": backlog(
-    "open one relationship with an investor by id",
-  ),
+  "/company/[companyId]": cap("tool.open_page"),
+  "/relationships/company/[companyId]": cap("tool.open_page"),
+  "/relationships/investor/[investorOrganisationId]": cap("tool.open_page"),
 };
 
 const APPS = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -516,6 +502,17 @@ describe("every route and page is something Q can do, or exempt with a reason (R
     expect(
       Object.keys(PAGE_COVERAGE).filter((page) => !real.has(page)),
     ).toEqual([]);
+  });
+
+  it("nothing a person does is left as backlog", () => {
+    const backlog = [
+      ...Object.entries(ROUTE_COVERAGE),
+      ...Object.entries(PAGE_COVERAGE),
+    ].filter(
+      ([, coverage]) =>
+        "exempt" in coverage && /backlog/i.test(coverage.exempt),
+    );
+    expect(backlog.map(([key]) => key)).toEqual([]);
   });
 
   it("every capability named is in the registry, and every exemption says why", () => {

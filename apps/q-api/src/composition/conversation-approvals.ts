@@ -247,5 +247,30 @@ export function createConversationApprovalPort(
     return { status: after === null ? "EXPIRED" : plainProposalStatus(after) };
   };
 
-  return { inConversation, approve, decline };
+  /**
+   * An approval from the person's inbox (another conversation), by id,
+   * read as them: getApproval refuses anyone it was not requested from.
+   */
+  const inboxItem = async (
+    context: PendingProposalContext,
+    approvalId: string,
+  ): Promise<ConversationProposal | null> => {
+    const id = QApprovalIdSchema.safeParse(approvalId);
+    if (!id.success) return null;
+    const view = await late()
+      .actions.getApproval({
+        actor: context.actor,
+        approvalId: id.data,
+        correlationId: CorrelationIdSchema.parse(context.correlationId),
+      })
+      .catch(() => null);
+    if (view === null) return null;
+    return {
+      proposalId: view.action.actionId,
+      summary: view.action.summary,
+      status: plainProposalStatus(view),
+    };
+  };
+
+  return { inConversation, approve, decline, inboxItem };
 }

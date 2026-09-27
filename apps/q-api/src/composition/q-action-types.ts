@@ -12,6 +12,7 @@ import { RELATIONSHIP_INTEREST_EXPRESS } from "./express-interest-action.js";
 import { HANDLE_CLAIM } from "./handle-claim-action.js";
 import { INVESTOR_PROFILE_UPDATE } from "./investor-profile-action.js";
 import { PERSON_PROFILE_UPDATE } from "./person-profile-action.js";
+import { RECORD_CHANGE_ACTION_TYPES } from "./record-change-actions.js";
 import { RELATIONSHIP_INTEREST_RESPOND } from "./respond-to-interest-action.js";
 import {
   DISCLOSURE_RAISE_SHARE,
@@ -39,6 +40,7 @@ export const Q_API_ACTION_TYPES: readonly string[] = Object.freeze([
   CHAT_MESSAGE_SEND,
   REMINDER_CREATE,
   MEETING_PROPOSE,
+  ...RECORD_CHANGE_ACTION_TYPES,
 ]);
 
 export function assertComposedActionTypes(registry: QActionRegistry): void {

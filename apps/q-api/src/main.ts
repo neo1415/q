@@ -25,7 +25,11 @@ import {
   createPostgresMaterialActionAuditWriter,
   createPostgresSecurityEventWriter,
 } from "@capital-q/audit";
-import { createPostgresCapitalObjectiveQueryPort } from "@capital-q/capital";
+import { CAPITAL_EVENTS } from "@capital-q/capital/events";
+import {
+  createCapitalService,
+  createPostgresCapitalObjectiveQueryPort,
+} from "@capital-q/capital";
 import {
   CompanyIdSchema,
   createCompanyService,
@@ -192,6 +196,15 @@ import {
 import { createInvestorFeedPort } from "./composition/investor-feed.js";
 import { createDiscoveryDecisionPort } from "./composition/discovery-decisions.js";
 import {
+  createEvidenceDocumentsPort,
+  createOwnRecordsPort,
+  createRelationshipMailPort,
+} from "./composition/own-records.js";
+import {
+  createRecordChangeActions,
+  createRecordChangeBoard,
+} from "./composition/record-change-actions.js";
+import {
   createDiscoveryService,
   createInteractionSignalService,
   createPostgresCompanyCardPort,
@@ -264,7 +277,11 @@ import {
   createPublicIdentityService,
   createSubjectDirectory,
 } from "@capital-q/public-identity";
-import { createVerificationClaimsReadinessPort } from "@capital-q/verification";
+import {
+  createCompanyVerificationService,
+  createVerificationClaimsReadinessPort,
+  VERIFICATION_EVENTS,
+} from "@capital-q/verification";
 import {
   createConversationDigestPort,
   createMemoryLearner,
@@ -955,6 +972,21 @@ const visibilityBoard = createVisibilityActionBoard({ logger });
 // validated, authorised and executed deterministically before anything
 // returns to the model. No SQL, arbitrary HTTP, shell or connector tool
 // exists.
+// The profile page's "Q found" column (BIZ-002), read by the route and,
+// for the person's own profile, by Q (R33).
+const profileFindingsReader = createProfileFindingsReader({
+  companies,
+  investors,
+  firewall,
+  knowledge: createKnowledgeQueryService({
+    sql: database.sql,
+    knowledge: createPostgresKnowledgeRepository(),
+    logger,
+  }),
+  evidence: researchComposition.evidence,
+  logger,
+});
+
 const qTools = createQTools({
   ports: {
     companies,
@@ -1090,6 +1122,21 @@ const qTools = createQTools({
     },
     // R33: Save / Unsave / Pass, recorded by the interaction service the
     // Discover buttons call, with the feed's own eligibility re-run.
+    // R33: the record forms as Prepare -> Approve (the board is composed
+    // with the services below), and the person's own records, read through
+    // the services their screens call.
+    recordChanges: {
+      prepare: (entry) => recordChangeBoard.prepare(entry),
+    },
+    ownRecords: {
+      read: (actor, query) => ownRecords.read(actor, query),
+      reassessReadiness: (actor, companyId, correlationId) =>
+        ownRecords.reassessReadiness(actor, companyId, correlationId),
+    },
+    evidenceDocuments: createEvidenceDocumentsPort(
+      researchComposition.evidence,
+    ),
+    relationshipMail: createRelationshipMailPort(integrations),
     discoveryDecisions: createDiscoveryDecisionPort(
       createInteractionSignalService({
         ports: slateRead.eligibilityPorts,
@@ -1125,6 +1172,9 @@ const companyService = createCompanyService({
   // Only the companies context's own events can leave this writer.
   outbox: createOutboxWriter({ registry: createEventRegistry(COMPANY_EVENTS) }),
   audit: createPostgresMaterialActionAuditWriter(),
+  // R33: readiness (read and reassessed by Q) reads Capital Q's own
+  // verification claims, as in the application API.
+  verification: cardVerification,
 });
 // A requested profile change travels from the answer seam to the proposer
 // on this board (ADR 0011); the Approval Engine does everything after.
@@ -1145,6 +1195,44 @@ const investorService = createInvestorService({
     registry: createEventRegistry(INVESTOR_EVENTS),
   }),
   audit: createPostgresMaterialActionAuditWriter(),
+});
+// R33: the capital and verification contexts, composed as the application
+// API composes them, for the raise as a Q change and the verification read.
+const capitalService = createCapitalService({
+  sql: database.sql,
+  transactions: database.transactions,
+  authorization,
+  companies,
+  outbox: createOutboxWriter({ registry: createEventRegistry(CAPITAL_EVENTS) }),
+  audit: createPostgresMaterialActionAuditWriter(),
+});
+const verificationService = createCompanyVerificationService({
+  sql: database.sql,
+  transactions: database.transactions,
+  authorization,
+  companies,
+  outbox: createOutboxWriter({
+    registry: createEventRegistry(VERIFICATION_EVENTS),
+  }),
+  audit: createPostgresMaterialActionAuditWriter(),
+});
+const recordChangeDependencies = {
+  companies,
+  investors,
+  capital: capitalService,
+  companyService,
+  investorService,
+  publicIdentity,
+  logger,
+};
+const recordChangeBoard = createRecordChangeBoard(recordChangeDependencies);
+const ownRecords = createOwnRecordsPort({
+  companyService,
+  investorService,
+  capital: capitalService,
+  verification: verificationService,
+  visibility: visibilityCentre,
+  profileFindings: profileFindingsReader,
 });
 const qActionRepositories = createPostgresQActionRepositories();
 const qActionRegistry = createQActionRegistry([
@@ -1192,6 +1280,9 @@ const qActionRegistry = createQActionRegistry([
     authorization,
     logger,
   }),
+  // R33: the record forms (raise, mandate, team, role, Q Card details,
+  // investor visibility) as Q changes, each through its own service.
+  ...createRecordChangeActions(recordChangeDependencies),
   // An email on a relationship, from the approver's own Gmail (BIZ-007).
   createEmailSendAction({
     integrations,
@@ -1231,6 +1322,7 @@ const qActionPort = createQActionPort({
     profileChangeBoard.proposer,
     visibilityBoard.proposer,
     handleClaimBoard.proposer,
+    recordChangeBoard.proposer,
     profileBoard,
   ),
   // What Q says about an action is read from the records the engine
@@ -1743,18 +1835,7 @@ const { app, logger: appLogger } = createApp(
     recommendationExplanations,
     // The profile page's "Q found" column (BIZ-002): firewall first, then
     // the own-public-presence envelope, then the cited pages.
-    profileFindings: createProfileFindingsReader({
-      companies,
-      investors,
-      firewall,
-      knowledge: createKnowledgeQueryService({
-        sql: database.sql,
-        knowledge: createPostgresKnowledgeRepository(),
-        logger,
-      }),
-      evidence: researchComposition.evidence,
-      logger,
-    }),
+    profileFindings: profileFindingsReader,
     orchestration: { orchestrator, autostart: Q_ORCHESTRATION_AUTOSTART },
     qActions,
     qStream: { service: qStream },
