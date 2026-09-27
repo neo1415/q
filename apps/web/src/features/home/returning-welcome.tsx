@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 import { ChevronRight, ICON_SIZE, ICON_STROKE } from "@capital-q/ui/icons";
 
@@ -12,6 +12,8 @@ import { useQSurfaceTools } from "@/features/q/q-surface-tools";
 import type { Briefing } from "./briefing";
 import { QBriefing } from "./q-briefing";
 import type { ReturningCard, ReturningGreeting } from "./returning";
+import { remindSetupLaterAction } from "./setup-nudge-actions";
+import { useClaimWhenSeen } from "./use-claim-when-seen";
 
 /**
  * Q welcoming somebody back (CQ-WEB-030; acceptance A and K).
@@ -74,6 +76,15 @@ export function ReturningWelcome({
   const tools = useQSurfaceTools();
   const [asking, setAsking] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  // Today's setup reminder, when this welcome carries it: counted once the
+  // cards are really seen, and gone at once on Later.
+  const [putOff, setPutOff] = useState(false);
+  const reminding = !putOff && cards.some((card) => card.reminder === true);
+  const cardsRef = useRef<HTMLUListElement>(null);
+  useClaimWhenSeen(cardsRef, reminding);
+  const shownCards = putOff
+    ? cards.filter((card) => card.reminder !== true)
+    : cards;
 
   const ask = async (card: ReturningCard, prompt: string) => {
     if (asking !== null) return;
@@ -119,7 +130,7 @@ export function ReturningWelcome({
         </p>
       </div>
 
-      {greeting.leftOff === null ? null : (
+      {greeting.leftOff === null || putOff ? null : (
         // Q's own last question, as Q asked it: where they left off is
         // shown, not paraphrased.
         <figure
@@ -137,13 +148,14 @@ export function ReturningWelcome({
 
       {briefing === undefined ? null : <QBriefing briefing={briefing} />}
 
-      {cards.length > 0 ? (
+      {shownCards.length > 0 ? (
         <ul
+          ref={cardsRef}
           aria-label="Where to start"
           className="grid w-full gap-2 sm:grid-cols-2"
           data-q-returning-cards
         >
-          {cards.map((card) => {
+          {shownCards.map((card) => {
             const action = card.action;
             return (
               <li key={card.id} className="flex">
@@ -187,6 +199,20 @@ export function ReturningWelcome({
             );
           })}
         </ul>
+      ) : null}
+
+      {reminding ? (
+        <button
+          type="button"
+          onClick={() => {
+            setPutOff(true);
+            void remindSetupLaterAction();
+          }}
+          className="inline-flex min-h-11 items-center rounded-md px-3 cq-body-sm text-(--cq-text-secondary) transition-colors duration-(--cq-motion-fast) hover:bg-(--cq-surface-subtle) hover:text-(--cq-text-primary) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--cq-focus-ring)"
+          data-setup-reminder-later
+        >
+          Remind me later
+        </button>
       ) : null}
 
       {/* Polite, so a failed ask is read out without taking focus. */}

@@ -84,10 +84,18 @@ describe("the greeting", () => {
 
   it("asks about the unfinished setup first", () => {
     expect(
-      returningGreeting({ ...investor, unfinished: "investor" }).question,
+      returningGreeting({
+        ...investor,
+        unfinished: "investor",
+        setupReminder: "WELCOME",
+      }).question,
     ).toMatch(/mandate is part-way through/);
     expect(
-      returningGreeting({ ...founder, unfinished: "founder" }).question,
+      returningGreeting({
+        ...founder,
+        unfinished: "founder",
+        setupReminder: "WELCOME",
+      }).question,
     ).toMatch(/setup is part-way through/);
   });
 
@@ -95,6 +103,7 @@ describe("the greeting", () => {
     const greeting = returningGreeting({
       ...investor,
       unfinished: "investor",
+      setupReminder: "WELCOME",
       setup: {
         covered: ["Mandate", "Stage"],
         pending: "What's a typical cheque for you? Just the number is fine.",
@@ -109,7 +118,11 @@ describe("the greeting", () => {
   });
 
   it("claims nothing about progress it was not given", () => {
-    const greeting = returningGreeting({ ...investor, unfinished: "investor" });
+    const greeting = returningGreeting({
+      ...investor,
+      unfinished: "investor",
+      setupReminder: "WELCOME",
+    });
     expect(greeting.question).not.toMatch(/covered/);
     expect(greeting.leftOff).toBeNull();
   });
@@ -184,7 +197,11 @@ describe("chooseReturningCards", () => {
   });
 
   it("an unfinished mandate comes first", () => {
-    const cards = chooseReturningCards({ ...investor, unfinished: "investor" });
+    const cards = chooseReturningCards({
+      ...investor,
+      unfinished: "investor",
+      setupReminder: "WELCOME",
+    });
     expect(ids(cards)).toEqual([
       "continue-setup",
       "talk-setup",
@@ -264,7 +281,11 @@ describe("chooseReturningCards", () => {
   });
 
   it("never more than four, with an unfinished setup kept first", () => {
-    const cards = chooseReturningCards({ ...founder, unfinished: "founder" });
+    const cards = chooseReturningCards({
+      ...founder,
+      unfinished: "founder",
+      setupReminder: "WELCOME",
+    });
     expect(cards).toHaveLength(MAX_RETURNING_CARDS);
     expect(ids(cards)).toEqual([
       "continue-setup",
@@ -283,6 +304,7 @@ describe("chooseReturningCards", () => {
       ...founder,
       context: { kind: "NONE" },
       unfinished: "founder",
+      setupReminder: "WELCOME",
       pitch: "UNKNOWN",
       deck: { kind: "UNKNOWN" },
     });
@@ -303,8 +325,18 @@ describe("chooseReturningCards", () => {
     const everyShape: ReturningFacts[] = [
       founder,
       investor,
-      { ...founder, unfinished: "founder", pitch: "NO" },
-      { ...investor, unfinished: "investor", feed: "NO" },
+      {
+        ...founder,
+        unfinished: "founder",
+        setupReminder: "WELCOME",
+        pitch: "NO",
+      },
+      {
+        ...investor,
+        unfinished: "investor",
+        setupReminder: "WELCOME",
+        feed: "NO",
+      },
       { ...founder, deck: { kind: "PREPARED", artifactId: ARTIFACT } },
     ];
     for (const facts of everyShape) {

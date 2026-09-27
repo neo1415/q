@@ -17,6 +17,15 @@ vi.mock("../src/features/q/actions", () => ({
   askQAction: (...args: unknown[]) => askQAction(...args) as unknown,
 }));
 
+const claimSetupReminderAction = vi.fn(() => Promise.resolve(true));
+const remindSetupLaterAction = vi.fn(() => Promise.resolve(true));
+vi.mock("../src/features/home/setup-nudge-actions", () => ({
+  claimSetupReminderAction: () => claimSetupReminderAction(),
+  remindSetupLaterAction: () => remindSetupLaterAction(),
+}));
+
+const { resetSetupReminderClaim } =
+  await import("../src/features/home/use-claim-when-seen");
 const { ReturningWelcome } =
   await import("../src/features/home/returning-welcome");
 const { QSurfaceToolsContext } =
@@ -49,6 +58,9 @@ function renderWelcome() {
 beforeEach(() => {
   push.mockReset();
   askQAction.mockReset();
+  claimSetupReminderAction.mockClear();
+  remindSetupLaterAction.mockClear();
+  resetSetupReminderClaim();
 });
 afterEach(cleanup);
 
@@ -164,6 +176,7 @@ describe("ReturningWelcome inside the Q surface (K)", () => {
     const partway = {
       ...facts,
       unfinished: "founder",
+      setupReminder: "WELCOME",
       setup: {
         covered: ["Company"],
         pending: "Which stage are you at right now?",
@@ -182,4 +195,62 @@ describe("ReturningWelcome inside the Q surface (K)", () => {
       screen.getByRole("link", { name: /Continue setup/ }).getAttribute("href"),
     ).toBe("/onboarding/founder?from=home");
   });
+});
+
+describe("the setup reminder on the welcome (one prompt a day, at most)", () => {
+  const partway = (setupReminder?: "WELCOME" | "BRIEFING") =>
+    ({
+      ...facts,
+      context: { kind: "NONE" },
+      unfinished: "investor",
+      setup: { covered: [], pending: "What cheque size do you write?" },
+      ...(setupReminder === undefined ? {} : { setupReminder }),
+    }) as const;
+
+  function renderFor(value: ReturnType<typeof partway>) {
+    render(
+      <ReturningWelcome
+        greeting={returningGreeting(value)}
+        cards={chooseReturningCards(value)}
+        subject={undefined}
+      />,
+    );
+  }
+
+  it("on a reminder day it prompts once, and counts the reminder once seen", async () => {
+    renderFor(partway("WELCOME"));
+    expect(
+      screen.getByRole("link", { name: /Continue your mandate/ }),
+    ).toBeTruthy();
+    expect(screen.getByText("What cheque size do you write?")).toBeTruthy();
+    await waitFor(() => {
+      expect(claimSetupReminderAction).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it("Later takes the reminder away at once and puts it off", async () => {
+    renderFor(partway("WELCOME"));
+    await userEvent.click(
+      screen.getByRole("button", { name: "Remind me later" }),
+    );
+    expect(remindSetupLaterAction).toHaveBeenCalledTimes(1);
+    expect(
+      screen.queryByRole("link", { name: /Continue your mandate/ }),
+    ).toBeNull();
+    expect(screen.queryByText("What cheque size do you write?")).toBeNull();
+  });
+
+  for (const surface of [undefined, "BRIEFING"] as const) {
+    it(`says nothing about the setup when the reminder is ${surface ?? "not due"}`, () => {
+      const value = partway(surface);
+      renderFor(value);
+      expect(returningGreeting(value).question).not.toMatch(/part-way/);
+      expect(screen.queryByRole("link", { name: /Continue/ })).toBeNull();
+      expect(screen.queryByText("What cheque size do you write?")).toBeNull();
+      expect(
+        screen.queryByRole("button", { name: "Remind me later" }),
+      ).toBeNull();
+      expect(claimSetupReminderAction).not.toHaveBeenCalled();
+    });
+  }
 });

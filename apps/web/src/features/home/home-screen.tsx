@@ -20,11 +20,13 @@ import {
   chooseReturningCards,
   firstName,
   returningGreeting,
+  type ReturningFacts,
 } from "./returning";
 import type { Briefing } from "./briefing";
 import { resolveBriefing } from "./briefing-facts";
 import { resolveReturningFacts } from "./returning-facts";
 import { ReturningWelcome } from "./returning-welcome";
+import { resolveSetupReminder } from "./setup-reminder";
 
 /**
  * Home is Q (QX-001 §4; doc 17 §60-§63; acceptance A and K).
@@ -180,7 +182,22 @@ export async function HomeScreen({
       // Q's briefing (R35) starts now and is not awaited: the page and Q
       // render first, and the briefing streams in when its reads answer.
       briefing = context.kind === "NONE" ? undefined : resolveBriefing(context);
-      const facts = await resolveReturningFacts(context, unfinished);
+      // Today's setup reminder, read (never claimed) once and given on one
+      // surface only: the briefing's card where there is a briefing, this
+      // welcome otherwise. No reminder today: neither mentions the setup.
+      const [read, reminder] = await Promise.all([
+        resolveReturningFacts(context, unfinished),
+        unfinished === null ? null : resolveSetupReminder(),
+      ]);
+      const facts: ReturningFacts = {
+        ...read,
+        setupReminder:
+          reminder === null
+            ? undefined
+            : briefing === undefined
+              ? "WELCOME"
+              : "BRIEFING",
+      };
       const greeting = returningGreeting(facts);
       welcome = (
         <ReturningWelcome

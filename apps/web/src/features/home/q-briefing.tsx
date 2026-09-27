@@ -1,13 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { ChevronRight, ICON_SIZE, ICON_STROKE } from "@capital-q/ui/icons";
 
 import type { Briefing, BriefingItem } from "./briefing";
 import { decideBriefing } from "./briefing-gate";
 import { remindSetupLaterAction } from "./setup-nudge-actions";
+import { useClaimWhenSeen } from "./use-claim-when-seen";
 
 /**
  * Q's briefing on arrival (R35): one short line and a few cards, each a
@@ -45,8 +46,12 @@ function SetupNudgeCard({
   readonly item: BriefingItem;
   readonly onLater: () => void;
 }) {
+  // Today's reminder is counted once this card is really seen.
+  const ref = useRef<HTMLDivElement>(null);
+  useClaimWhenSeen(ref, true);
   return (
     <div
+      ref={ref}
       className="flex min-h-11 w-full flex-col gap-2 rounded-md border border-(--cq-border-subtle) bg-(--cq-surface) px-3.5 py-2.5"
       data-briefing-card={item.id}
     >

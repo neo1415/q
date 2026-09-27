@@ -1,7 +1,6 @@
 import "server-only";
 
 import {
-  claimBriefingOnboardingNudge,
   discoverCompanies,
   getMarketplaceReadiness,
   listCompanyRelationships,
@@ -21,6 +20,8 @@ import { loadWebServerConfig } from "@capital-q/config/web";
 
 import { apiSession, type OwnContext } from "@/features/q/context";
 import { relationshipHref } from "@/features/relationships/relationship-words";
+
+import { resolveSetupReminder } from "./setup-reminder";
 
 import {
   composeBriefing,
@@ -61,7 +62,7 @@ export type BriefingReads = {
     companyId: string,
   ) => Promise<MarketplaceReadinessAssessment>;
   readonly companySlate: () => Promise<DiscoveryCompanySlateDto>;
-  /** Today's setup reminder, if the server's policy gives one. */
+  /** Today's setup reminder, if the server's policy gives one (read only). */
   readonly setupNudge: () => Promise<OnboardingBriefingNudgeResponse>;
 };
 
@@ -250,7 +251,8 @@ export async function resolveBriefing(
           listIncomingInterest(session, companyId),
         readiness: (companyId) => getMarketplaceReadiness(session, companyId),
         companySlate: () => discoverCompanies(session, { limit: SLATE_LOOK }),
-        setupNudge: () => claimBriefingOnboardingNudge(session),
+        // A read: the card claims the reminder once it is seen.
+        setupNudge: () => resolveSetupReminder().then((nudge) => ({ nudge })),
       },
       new Date(),
     );

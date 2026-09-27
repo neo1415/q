@@ -40,7 +40,21 @@ export type ReturningFacts = {
    * beyond "part-way through".
    */
   readonly setup?: SetupFacts | undefined;
+  /**
+   * Which Home surface carries today's setup reminder, when the server's
+   * reminder policy says one is due (founder directive 2026-09-27): the
+   * briefing's card for somebody with a company or organisation, this
+   * welcome for somebody whose setup has not named one yet. Absent: no
+   * reminder today, and the welcome says nothing about the setup -- one
+   * prompt a day at most, never two, and none on a day off.
+   */
+  readonly setupReminder?: "WELCOME" | "BRIEFING" | undefined;
 };
+
+/** Whether this welcome is where today's setup reminder is given. */
+export function welcomeReminds(facts: ReturningFacts): boolean {
+  return facts.unfinished !== null && facts.setupReminder === "WELCOME";
+}
 
 /** An unfinished setup, as its own state tells it. */
 export type SetupFacts = {
@@ -103,8 +117,7 @@ export function returningGreeting(facts: ReturningFacts): ReturningGreeting {
   const name = firstName(facts.name);
   const headline = name === null ? "Welcome back." : `Welcome back, ${name}.`;
   const question = questionFor(facts);
-  const leftOff =
-    facts.unfinished === null ? null : (facts.setup?.pending ?? null);
+  const leftOff = welcomeReminds(facts) ? (facts.setup?.pending ?? null) : null;
   return { headline, question, leftOff, spoken: `${headline} ${question}` };
 }
 
@@ -122,7 +135,7 @@ function joinParts(parts: readonly string[]): string {
  */
 function questionFor(facts: ReturningFacts): string {
   const { unfinished } = facts;
-  if (unfinished !== null) {
+  if (unfinished !== null && welcomeReminds(facts)) {
     // Where they left off, in the journey's own terms: what is settled,
     // then the offer. The question Q was on is shown beside this as Q's
     // own sentence (`leftOff`), not paraphrased into it.
@@ -177,6 +190,8 @@ export type ReturningCard = {
   readonly title: string;
   readonly description: string;
   readonly action: ReturningCardAction;
+  /** Part of today's setup reminder: claimed when seen, put off by Later. */
+  readonly reminder?: true | undefined;
 };
 
 /** Enough to choose from without becoming a menu. */
@@ -188,7 +203,7 @@ export function chooseReturningCards(
   const cards: ReturningCard[] = [];
   // A setup left part-way comes first: it is the one thing only they can
   // finish, and everything else works better once it is done.
-  if (facts.unfinished !== null) {
+  if (facts.unfinished !== null && welcomeReminds(facts)) {
     cards.push(...continueCards(facts.unfinished));
   }
   switch (facts.context.kind) {
@@ -206,8 +221,10 @@ export function chooseReturningCards(
       if (facts.unfinished !== null) {
         cards.push({
           id: "ask",
-          title: "Ask Q first",
-          description: "Not ready to carry on? Ask Q how the rest works.",
+          title: welcomeReminds(facts) ? "Ask Q first" : "Ask Q",
+          description: welcomeReminds(facts)
+            ? "Not ready to carry on? Ask Q how the rest works."
+            : "Ask Q how Capital Q works for you.",
           action: { kind: "ASK_Q", prompt: "How do I get started?" },
         });
       }
@@ -230,12 +247,14 @@ function continueCards(journey: "founder" | "investor"): ReturningCard[] {
         journey === "investor" ? "Continue your mandate" : "Continue setup",
       description: "Pick up at the question we were on.",
       action: { kind: "NAVIGATE", href: `${path}?from=home` },
+      reminder: true,
     },
     {
       id: "talk-setup",
       title: "Talk it through",
       description: "Carry on out loud; Q asks, you answer.",
       action: { kind: "NAVIGATE", href: `${path}?talk=1` },
+      reminder: true,
     },
   ];
 }
