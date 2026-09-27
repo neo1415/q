@@ -131,6 +131,17 @@ export type InvestorResearch = {
   ) => Promise<number>;
   readonly status: (onboardingSessionId: string) => InvestorResearchStatus;
   /**
+   * The steps whose found recommendation is held but has not been said to
+   * the person yet. A recommendation held between turns was never heard,
+   * so it cannot be approved until a reply has said it.
+   */
+  readonly unsaid: (onboardingSessionId: string) => ReadonlySet<string>;
+  /** A reply said these; from now on the person has heard them. */
+  readonly markSaid: (
+    onboardingSessionId: string,
+    stepKeys: Iterable<string>,
+  ) => void;
+  /**
    * What to tell the person about the research, once per fact: that it is
    * starting (the notice), or that nothing useful was found.
    */
@@ -353,6 +364,7 @@ type SessionResearch = {
   status: InvestorResearchStatus;
   findings: ResearchFinding[];
   offered: Set<string>;
+  unsaid: Set<string>;
   noticeSaid: boolean;
   nothingSaid: boolean;
 };
@@ -396,16 +408,18 @@ export function createInvestorResearch(
     // write fails; the person can still say it themselves.
     for (const f of ready) research.offered.add(f.stepKey);
     const results = await port.recommendFound(ready);
-    return results.filter(
+    const held = results.filter(
       (r) => r.outcome === "RECOMMENDED" || r.outcome === "DIFFERS_FROM_ANSWER",
-    ).length;
+    );
+    for (const r of held) research.unsaid.add(r.stepKey);
+    return held.length;
   };
 
   const run = async (
     research: SessionResearch,
     input: Parameters<InvestorResearch["consider"]>[0],
   ): Promise<void> => {
-    const correlationId = CorrelationIdSchema.parse(randomUUID());
+    const correlationId = CorrelationIdSchema.parse(`cor_${randomUUID()}`);
     const { actor, identity } = input;
     const registries = dependencies.registries ?? [];
     const [web, ...fromRegistries] = await Promise.allSettled([
@@ -484,6 +498,7 @@ export function createInvestorResearch(
         findings: [],
         // What an earlier read already offered is not offered again.
         offered: new Set(earlier?.offered ?? []),
+        unsaid: new Set(earlier?.unsaid ?? []),
         noticeSaid: earlier?.noticeSaid ?? false,
         nothingSaid: earlier?.nothingSaid ?? false,
       };
@@ -506,6 +521,13 @@ export function createInvestorResearch(
     },
     status: (onboardingSessionId) =>
       bySession.get(onboardingSessionId)?.status ?? "NONE",
+    unsaid: (onboardingSessionId) =>
+      new Set(bySession.get(onboardingSessionId)?.unsaid ?? []),
+    markSaid: (onboardingSessionId, stepKeys) => {
+      const research = bySession.get(onboardingSessionId);
+      if (research === undefined) return;
+      for (const key of stepKeys) research.unsaid.delete(key);
+    },
     takeNote: (onboardingSessionId) => {
       const research = bySession.get(onboardingSessionId);
       if (research === undefined) return null;

@@ -242,6 +242,11 @@ export function createOnboardingPort(input: {
   readonly raisedChecks?: ReadonlySet<string> | undefined;
   /** The Q run, for a recommendation's provenance. */
   readonly runId?: string | undefined;
+  /**
+   * Steps whose pending recommendation was held between turns (research
+   * found it) and has not been said yet: not heard, so not approvable.
+   */
+  readonly unheardSteps?: ReadonlySet<string> | undefined;
 }): BoundOnboardingPort {
   const steps = new Map(
     definitionFor(input.journeyType).steps.map(
@@ -261,7 +266,11 @@ export function createOnboardingPort(input: {
    * began. Only those may be accepted — one made in this very turn has
    * not been said to anybody yet.
    */
-  const heard = pendingNow().catch(() => []);
+  const heard = pendingNow()
+    .then((list) =>
+      list.filter((r) => input.unheardSteps?.has(r.stepKey) !== true),
+    )
+    .catch(() => []);
   /** The person's own words carry this write, or it does not happen. */
   const said = (quote: string): boolean =>
     input.personTurns.some((turn) => quoteOccursIn(quote, turn));
