@@ -24,7 +24,8 @@
  *   node scripts/seed/narrated-deck-videos.mjs --publish --only ledgerfold
  *   node scripts/seed/narrated-deck-videos.mjs --publish
  *
- * Needs ffmpeg, ffprobe, pdftoppm and pdftotext on PATH.
+ * Needs ffmpeg, ffprobe, pdftoppm and pdftotext on PATH. Behind an egress
+ * proxy (the cloud VM), run with NODE_USE_ENV_PROXY=1 so Node's fetch uses it.
  */
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
