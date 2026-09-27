@@ -51,6 +51,7 @@ const NOTE_TEXT: Readonly<Record<DiscoveryNoteDto, string>> = {
     "Companies are discoverable, but your hard rules exclude every one of them.",
   NONE_MATCH_MANDATE:
     "Companies are discoverable, but none matches your mandate yet.",
+  NONE_MATCH_FILTERS: "No companies match these filters.",
 };
 
 function Reasons({

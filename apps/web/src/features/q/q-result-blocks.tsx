@@ -61,6 +61,7 @@ const INTENT_ROUTES: Readonly<
       | "SIGN_OUT"
       | "OPEN_RECORD_PAGE"
       | "OPEN_SETUP"
+      | "SET_DISCOVER_FILTERS"
     >,
     string | null
   >
@@ -93,6 +94,10 @@ function intentHref(intent: QUiIntent): string | null {
   }
   if (intent.kind === "OPEN_SETUP") {
     return setupPath(intent.journey);
+  }
+  // The filters are applied as the answer arrives; the card opens the feed.
+  if (intent.kind === "SET_DISCOVER_FILTERS") {
+    return "/discover";
   }
   const route = INTENT_ROUTES[intent.kind];
   if (route === null) {
@@ -148,6 +153,8 @@ function intentLabel(intent: QUiIntent): string {
       return intent.journey === "investor"
         ? "Continue your mandate"
         : "Continue setup";
+    case "SET_DISCOVER_FILTERS":
+      return "Open Discover";
   }
 }
 

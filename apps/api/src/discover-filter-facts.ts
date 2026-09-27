@@ -90,7 +90,7 @@ export function createDiscoverFilterFacts(ports: {
     verified: async (companyIds) => {
       const standings = await Promise.all(
         (await identities(companyIds)).map(async (company) => ({
-          companyId: company.id as string,
+          companyId: company.id,
           standing: await ports
             .verification()
             .companyStandings({

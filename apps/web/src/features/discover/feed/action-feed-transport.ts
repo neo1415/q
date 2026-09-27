@@ -1,3 +1,5 @@
+import type { DiscoverFilters } from "@capital-q/contracts";
+
 import type { FeedTransport } from "./feed-transport";
 import { loadSlatePageAction, recordDecisionAction } from "./feed-actions";
 import { authorisePlaybackAction } from "./playback-source";
@@ -15,10 +17,16 @@ import type { PlaybackSource } from "../player/pitch-playback";
  * server chose, and the reducer puts the flag back.
  */
 
-export function actionFeedTransport(): FeedTransport {
+/**
+ * `filters` are bound for the transport's life: every page of one scroll
+ * is asked under the same filters, and a change of filters is a new feed.
+ */
+export function actionFeedTransport(
+  filters: DiscoverFilters | null = null,
+): FeedTransport {
   return {
     loadSlate: async ({ cursor }) => {
-      const result = await loadSlatePageAction(cursor ?? null);
+      const result = await loadSlatePageAction(cursor ?? null, filters);
       if (!result.ok) throw new Error(result.message);
       return result.value;
     },

@@ -12,6 +12,7 @@ import {
 
 import type {
   DiscoveredCompanyDto,
+  DiscoverFilters,
   DiscoveryCompanySlateDto,
   DiscoveryNoteDto,
   PlaybackAuthorizationDto,
@@ -38,6 +39,17 @@ import {
   authorisePlaybackViaAction,
 } from "./feed/action-feed-transport";
 import type { FeedPreloadPolicy } from "./feed/feed-state";
+import {
+  DiscoverFilterButton,
+  DiscoverFilterRow,
+  DiscoverFilterSheet,
+} from "./filters/discover-filter-controls";
+import {
+  filtersKey,
+  isEmptyDiscoverFilters,
+  type SectorOption,
+} from "./filters/discover-filters";
+import { useDiscoverFilters } from "./filters/use-discover-filters";
 import {
   feedPlaybackAuthorizations,
   type FeedPlaybackAuthorizations,
@@ -94,6 +106,7 @@ const NOTE_TEXT: Readonly<Record<DiscoveryNoteDto, string>> = {
     "Companies are discoverable, but your hard rules exclude every one of them.",
   NONE_MATCH_MANDATE:
     "Companies are discoverable, but none matches your mandate yet.",
+  NONE_MATCH_FILTERS: "No companies match these filters.",
 };
 
 /** "12 companies are", "1 company is": the count is the market, not a score. */
@@ -284,18 +297,89 @@ export type InvestorFeedInitial = {
   }[];
 };
 
+/**
+ * Discover with its filters (ux/discover-filters). The filters belong to
+ * this wrapper; the feed below is keyed by them, so a change of filters is
+ * a new feed from the first page -- a fresh cursor, never a page of one
+ * filter set continued under another. The server's first page is the
+ * unfiltered one, so it seeds only an unfiltered feed.
+ */
 export function InvestorFeedScreen({
   initial = null,
+  sectors = [],
 }: {
   readonly initial?: InvestorFeedInitial | null;
+  /** The industry vocabulary, for the sector filter. */
+  readonly sectors?: readonly SectorOption[];
 } = {}) {
-  const transport = useMemo(() => actionFeedTransport(), []);
+  const discoverFilters = useDiscoverFilters(sectors);
+  const { filters, setFilters, clear, notice } = discoverFilters;
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const unfiltered = isEmptyDiscoverFilters(filters);
+  const openSheet = useCallback(() => setSheetOpen(true), []);
+  const controls: FeedFilterControls = {
+    active: !unfiltered,
+    notice,
+    button: <DiscoverFilterButton filters={filters} onOpen={openSheet} />,
+    row: (className: string) => (
+      <DiscoverFilterRow
+        filters={filters}
+        sectors={sectors}
+        onChange={setFilters}
+        onOpen={openSheet}
+        className={className}
+      />
+    ),
+    clear,
+  };
+  return (
+    <>
+      <InvestorFeed
+        key={filtersKey(filters)}
+        initial={unfiltered ? initial : null}
+        filters={unfiltered ? null : filters}
+        controls={controls}
+      />
+      <DiscoverFilterSheet
+        filters={filters}
+        sectors={sectors}
+        onChange={setFilters}
+        open={sheetOpen}
+        onOpenChange={setSheetOpen}
+      />
+    </>
+  );
+}
+
+type FeedFilterControls = {
+  readonly active: boolean;
+  readonly notice: string | null;
+  /** The phone's button over the stage. */
+  readonly button: React.ReactNode;
+  /** The row, with the classes that decide where it shows. */
+  readonly row: (className: string) => React.ReactNode;
+  readonly clear: () => void;
+};
+
+function InvestorFeed({
+  initial,
+  filters,
+  controls,
+}: {
+  readonly initial: InvestorFeedInitial | null;
+  readonly filters: DiscoverFilters | null;
+  readonly controls: FeedFilterControls;
+}) {
+  const transport = useMemo(() => actionFeedTransport(filters), [filters]);
   const reducedMotion = useReducedMotionPreference();
   const budget = useFeedBudget();
   const feed = useInvestorFeed({
     transport,
     budget,
     initialSlate: initial?.slate ?? null,
+    // A filtered scroll is not the position to come back to: restoring it
+    // could page through the whole slate looking for a filtered-out card.
+    ...(filters === null ? {} : { positionStore: null }),
   });
   const { setOpen, open: qOpen } = useGlobalQ();
   const session = useQSessionOptional();
@@ -619,6 +703,37 @@ export function InvestorFeedScreen({
     return <p className="cq-status-line">Loading your recommendations…</p>;
   }
 
+  if (
+    card === null &&
+    controls.active &&
+    feed.state.status !== "FAILED" &&
+    !notes.includes("NO_ACTIVE_MANDATE") &&
+    !notes.includes("RECOMMENDATIONS_REFRESHING")
+  ) {
+    /*
+      The reader's own filters emptied the feed: say that, and offer the
+      way back, rather than a sentence about the market that the filters,
+      not the market, made true.
+    */
+    return (
+      <div className="flex flex-col gap-4">
+        {controls.row("flex")}
+        {controls.notice === null ? null : (
+          <p className="cq-status-line">{controls.notice}</p>
+        )}
+        <EmptyState
+          title="No companies match these filters."
+          description="Your recommendations are unchanged; these filters leave none of them in view."
+          action={
+            <Button variant="primary" onClick={controls.clear}>
+              Clear filters
+            </Button>
+          }
+        />
+      </div>
+    );
+  }
+
   if (card === null) {
     /*
       A feed that could not load is not an empty feed. Saying "nothing to
@@ -787,6 +902,9 @@ export function InvestorFeedScreen({
           {tapPaused ? "Paused" : ""}
         </span>
 
+        {/* One compact control over the pitch; the row is the desktop's. */}
+        <div className="cq-feed-filter lg:hidden">{controls.button}</div>
+
         {/*
           The scrim is always there on a phone (founder feedback,
           2026-09-27): stage canvas, solid at the bottom and at least 92%
@@ -796,6 +914,7 @@ export function InvestorFeedScreen({
           On a desktop the panel sits beside the pitch, on the canvas.
         */}
         <div className="cq-feed-overlay bg-[linear-gradient(to_top,var(--cq-stage-canvas)_0%,color-mix(in_oklch,var(--cq-stage-canvas)_92%,transparent)_calc(100%-48px),transparent_100%)] lg:bg-none">
+          {controls.row("hidden lg:flex")}
           <FeedCard
             key={card.companyId}
             company={card}
@@ -820,10 +939,15 @@ export function InvestorFeedScreen({
             }}
             onAskQ={() => setOpen(true)}
             feedNotes={
-              notes.length === 0 && unverifiableLine === null ? null : (
+              notes.length === 0 &&
+              unverifiableLine === null &&
+              controls.notice === null ? null : (
                 <div className="flex flex-col gap-1">
                   <Notes notes={notes} />
                   {unverifiableLine}
+                  {controls.notice === null ? null : (
+                    <p className="cq-status-line">{controls.notice}</p>
+                  )}
                 </div>
               )
             }

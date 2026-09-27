@@ -11,6 +11,8 @@ import {
   InteractionRecordedDtoSchema,
   RecommendationExplanationDtoSchema,
   SavedCompaniesDtoSchema,
+  discoverFiltersToQuery,
+  type DiscoverFilters,
   type PassCompanyRequest,
   type SaveCompanyRequest,
 } from "@capital-q/contracts";
@@ -22,12 +24,21 @@ import { call, type ApiSession } from "./request.js";
 type Page = {
   readonly limit?: number | undefined;
   readonly cursor?: string | undefined;
+  /** Discover filters; the same filters must accompany every page's cursor. */
+  readonly filters?: DiscoverFilters | undefined;
 };
 
 function query(page: Page): string {
   const params = new URLSearchParams();
   if (page.limit !== undefined) params.set("limit", String(page.limit));
   if (page.cursor !== undefined) params.set("cursor", page.cursor);
+  if (page.filters !== undefined) {
+    for (const [key, value] of Object.entries(
+      discoverFiltersToQuery(page.filters),
+    )) {
+      params.set(key, value);
+    }
+  }
   return params.size === 0 ? "" : `?${params.toString()}`;
 }
 

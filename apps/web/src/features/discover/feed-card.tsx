@@ -27,6 +27,7 @@ import { useDockAvoid } from "../q-dock";
 
 import type { FeedPreloadPolicy } from "./feed/feed-state";
 import { actionPlaybackSource } from "./feed/action-feed-transport";
+import { FILTER_UNKNOWN_TEXT } from "./filters/discover-filters";
 import { ruleList } from "./mandate-rules";
 import { shareCompany, type ShareOutcome } from "./share-company";
 import { attachHlsOrNativeSource } from "./player/hls-source";
@@ -184,6 +185,7 @@ export function FeedCard({
   const decisions = useRef<HTMLDivElement>(null);
   useDockAvoid(decisions);
   const unverified = company.unverifiedExclusions ?? [];
+  const filterUnknown = company.filterUnknown ?? [];
   const sheetDrag = useRef<number | null>(null);
   const [expanded, setExpanded] = useState(false);
   const [confirming, setConfirming] = useState(false);
@@ -244,6 +246,19 @@ export function FeedCard({
 
         {place === "" ? null : (
           <p className="cq-caption text-(--cq-text-secondary)">{place}</p>
+        )}
+
+        {/*
+          Filters the reader applied that this company could not be checked
+          against (not stated, or a raise not shared with them): it stays
+          in view and says which, in one short line (ux/discover-filters).
+        */}
+        {filterUnknown.length === 0 ? null : (
+          <p className="cq-caption text-(--cq-text-secondary)">
+            {filterUnknown
+              .map((dimension) => FILTER_UNKNOWN_TEXT[dimension])
+              .join(" · ")}
+          </p>
         )}
 
         <button

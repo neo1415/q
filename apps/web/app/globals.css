@@ -798,6 +798,31 @@
     opacity: 0.4;
     cursor: default;
   }
+  /* Discover filters on a phone: one control beside the feed nav, on
+     stage tokens, so the pitch keeps its clean overlay. */
+  .cq-feed-filter {
+    position: absolute;
+    top: calc(12px + var(--cq-safe-top));
+    right: 64px;
+  }
+  .cq-feed-filter-button {
+    position: relative;
+    display: inline-flex;
+    width: 44px;
+    height: 44px;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--cq-stage-border);
+    border-radius: var(--cq-radius-full);
+    background: var(--cq-stage-surface);
+    color: var(--cq-stage-text);
+    cursor: pointer;
+  }
+  .cq-feed-filter-button > span {
+    position: absolute;
+    top: -4px;
+    right: -4px;
+  }
 
   @media (min-width: 1024px) {
     .cq-feed {

@@ -2,9 +2,11 @@ import {
   QClientActionIntentSchema,
   QWebsiteUrlSchema,
   type QClientActionIntent,
+  type QSetDiscoverFiltersIntent,
 } from "@capital-q/contracts";
 
 import { applyTheme, storeTheme } from "@/features/appearance/theme";
+import { queueDiscoverFiltersIntent } from "@/features/discover/filters/discover-filters";
 import { storeQMotion } from "@/features/q-aperture/q-motion";
 import { storeVoicePreference } from "@/features/voice/voice-preference";
 
@@ -27,6 +29,11 @@ export type ClientActionEffects = {
   readonly signOut: () => void;
   /** Goes to an in-app path built below from the fixed route map. */
   readonly goTo: (path: string) => void;
+  /**
+   * Sets the reader's Discover filters, as the filter sheet does, and
+   * brings Discover up when they are elsewhere (ux/discover-filters).
+   */
+  readonly setDiscoverFilters: (intent: QSetDiscoverFiltersIntent) => void;
 };
 
 /** Their own unfinished setup, from the fixed route map. */
@@ -52,6 +59,8 @@ export function recordPagePath(
   }
 }
 
+const DISCOVER_PATH: string = "/discover";
+
 export const BROWSER_EFFECTS: ClientActionEffects = {
   setTheme: (theme) => {
     applyTheme(theme);
@@ -74,6 +83,13 @@ export const BROWSER_EFFECTS: ClientActionEffects = {
   // tab, then the server action that ends the session and redirects.
   goTo: (path) => {
     window.location.assign(path);
+  },
+  setDiscoverFilters: (intent) => {
+    queueDiscoverFiltersIntent(intent);
+    // Elsewhere, Discover takes the queued intent when it opens.
+    if (window.location.pathname !== DISCOVER_PATH) {
+      BROWSER_EFFECTS.goTo(DISCOVER_PATH);
+    }
   },
   signOut: () => {
     forgetActiveConversations();
@@ -114,6 +130,9 @@ export function performClientAction(
       return true;
     case "OPEN_SETUP":
       effects.goTo(setupPath(action.journey));
+      return true;
+    case "SET_DISCOVER_FILTERS":
+      effects.setDiscoverFilters(action);
       return true;
   }
 }

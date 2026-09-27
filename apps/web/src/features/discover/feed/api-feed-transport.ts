@@ -5,6 +5,7 @@ import {
   unsaveCompany,
   type ApiSession,
 } from "@capital-q/api-client";
+import type { DiscoverFilters } from "@capital-q/contracts";
 
 import type { FeedTransport } from "./feed-transport";
 
@@ -23,10 +24,16 @@ import type { FeedTransport } from "./feed-transport";
  * reported so the server can attribute the interaction, never so the
  * client can claim a context it is not in.
  */
-export function apiFeedTransport(session: ApiSession): FeedTransport {
+export function apiFeedTransport(
+  session: ApiSession,
+  filters: DiscoverFilters | null = null,
+): FeedTransport {
   return {
     loadSlate: ({ cursor }) =>
-      discoverCompanies(session, cursor === undefined ? {} : { cursor }),
+      discoverCompanies(session, {
+        ...(cursor === undefined ? {} : { cursor }),
+        ...(filters === null ? {} : { filters }),
+      }),
 
     decide: ({ companyId, intent, slateId, clientEventId }) => {
       // `slateId` is optional on the wire and omitted rather than sent as

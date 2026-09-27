@@ -27,6 +27,10 @@ function effects() {
     setVoice: (voice) => done.push(`voice:${voice}`),
     signOut: () => done.push("sign-out"),
     goTo: (path) => done.push(`go:${path}`),
+    setDiscoverFilters: (intent) =>
+      done.push(
+        `filters:${intent.sectorCodes.join("+")}:${intent.countryCodes.join("+")}`,
+      ),
   };
   return { port, done };
 }
@@ -46,6 +50,25 @@ function qTurn(id: string, blocks: Extract<QTurn, { kind: "Q" }>["blocks"]) {
 }
 
 describe("performing a client action", () => {
+  it("sets the Discover filters, and refuses a malformed filter intent (ux/discover-filters)", () => {
+    const { port, done } = effects();
+    const intent = {
+      kind: "SET_DISCOVER_FILTERS",
+      sectorCodes: ["fintech"],
+      stageCodes: [],
+      countryCodes: ["NG"],
+      raise: null,
+      raiseDisclosedOnly: false,
+      verifiedOnly: false,
+      hasPitch: false,
+    };
+    expect(performClientAction(intent, port)).toBe(true);
+    expect(
+      performClientAction({ ...intent, countryCodes: ["Nigeria"] }, port),
+    ).toBe(false);
+    expect(done).toEqual(["filters:fintech:NG"]);
+  });
+
   it("dispatches each kind to the page's own effect", () => {
     const { port, done } = effects();
     expect(

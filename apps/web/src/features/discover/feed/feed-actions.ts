@@ -10,9 +10,10 @@ import {
   type ApiSession,
 } from "@capital-q/api-client";
 import { loadWebServerConfig } from "@capital-q/config/web";
-import type {
-  DiscoveryCompanySlateDto,
-  InteractionRecordedDto,
+import {
+  DiscoverFiltersSchema,
+  type DiscoveryCompanySlateDto,
+  type InteractionRecordedDto,
 } from "@capital-q/contracts";
 
 import { getSessionAccessToken } from "@/auth/session";
@@ -54,9 +55,21 @@ const NO_SESSION = "You are signed out. Sign in and try again.";
 /** `GET /v1/discovery/companies` — one page of the slate, by cursor. */
 export async function loadSlatePageAction(
   cursor: string | null,
+  rawFilters: unknown = null,
 ): Promise<FeedActionResult<DiscoveryCompanySlateDto>> {
   const active = await session();
   if (active === null) return { ok: false, message: NO_SESSION };
+
+  // The filters arrive from the browser: input, validated here, never
+  // trusted as shape. The API validates them again at its own boundary.
+  const filters =
+    rawFilters === null ? null : DiscoverFiltersSchema.safeParse(rawFilters);
+  if (filters !== null && !filters.success) {
+    return {
+      ok: false,
+      message: "Those filters aren't valid. Clear them and try again.",
+    };
+  }
 
   const parsed = cursor === null ? null : CursorInput.safeParse(cursor);
   if (parsed !== null && !parsed.success) {
@@ -67,10 +80,10 @@ export async function loadSlatePageAction(
   }
 
   try {
-    const slate = await discoverCompanies(
-      active,
-      parsed === null ? {} : { cursor: parsed.data },
-    );
+    const slate = await discoverCompanies(active, {
+      ...(parsed === null ? {} : { cursor: parsed.data }),
+      ...(filters === null ? {} : { filters: filters.data }),
+    });
     return { ok: true, value: slate };
   } catch {
     // The message is deliberately plain: a failed page is not a verdict on

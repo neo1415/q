@@ -7,6 +7,7 @@ import {
   authorisePitchPlayback,
   discoverCompanies,
   discoverInvestors,
+  listTaxonomyNodes,
 } from "@capital-q/api-client";
 import { buttonClassName } from "@capital-q/ui/button";
 import { EmptyState } from "@capital-q/ui/states";
@@ -90,7 +91,21 @@ export default async function DiscoverPage() {
       (CQ-WEB-020/021). Either read failing just means the client loads as
       before; neither is fatal to the page.
     */
-    const slate = await discoverCompanies(session, {}).catch(() => null);
+    const [slate, sectors] = await Promise.all([
+      discoverCompanies(session, {}).catch(() => null),
+      // The sector filter's options: the industry vocabulary, reference
+      // data. Failing leaves the filter without sectors, nothing more.
+      listTaxonomyNodes(session, "industry", { status: "ACTIVE", limit: 100 })
+        .then((page) =>
+          page.items.map((node) => ({
+            nodeId: node.id,
+            code: node.canonicalCode,
+            label: node.displayName,
+            depth: node.depth,
+          })),
+        )
+        .catch(() => []),
+    ]);
     /*
      * The cards the preload window can reach first (spec §9.5: active, the
      * next one buffering, the one after a poster) are authorised here, in
@@ -138,6 +153,7 @@ export default async function DiscoverPage() {
         <h1 className="sr-only">Discover</h1>
         <InvestorFeedScreen
           initial={slate === null ? null : { slate, authorization, warm }}
+          sectors={sectors}
         />
       </>
     );
