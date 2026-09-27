@@ -67,6 +67,22 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "api/http/capital-objectives.ts POST `${byId}${CAPITAL_OBJECTIVE_REPLACE_SUFFIX}`":
     cap("tool.propose_raise_change"),
 
+  // R34 relationship chat.
+  "api/http/chat.ts GET RELATIONSHIP_MESSAGES_PATH": cap("tool.list_messages"),
+  "api/http/chat.ts POST RELATIONSHIP_MESSAGES_PATH": cap(
+    "tool.propose_chat_message",
+  ),
+  "api/http/chat.ts POST RELATIONSHIP_MESSAGES_READ_PATH": exempt(
+    "the read receipt the chat screen records as messages come into view; not something a person asks for",
+  ),
+  "api/http/chat.ts POST RELATIONSHIP_MESSAGE_UNSEND_PATH":
+    cap("offer.chat_unsend"),
+  "api/http/chat.ts GET RELATIONSHIP_MESSAGE_ATTACHMENT_PATH": exempt(
+    "a shared file's download to the browser from the chat; Q names shared files through list_messages",
+  ),
+  "api/http/chat.ts GET CHAT_UNREAD_PATH": exempt(
+    "the unread badge the app shell polls; Q reads the messages themselves with list_messages",
+  ),
   "api/http/companies.ts POST COMPANIES_PATH": ONBOARDING_SETUP,
   "api/http/companies.ts GET `${COMPANIES_PATH}/:companyId`":
     cap("tool.get_company"),

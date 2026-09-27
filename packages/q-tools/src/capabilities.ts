@@ -236,6 +236,13 @@ const OFFERS: readonly QCapability[] = [
     "The file comes from their own device through the browser's file picker (the attach control next to Q's input).",
   ),
   offer(
+    "chat_unsend",
+    "RELATIONSHIP",
+    "Unsend a chat message they sent (on the message itself, in the relationship's chat)",
+    "RELATIONSHIPS",
+    "Unsending is the author's own time-bound undo on a message already delivered; Q never retracts a message on someone's behalf.",
+  ),
+  offer(
     "verification_request",
     "RECORDS",
     "Ask for their company to be verified",
