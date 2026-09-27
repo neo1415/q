@@ -210,3 +210,11 @@ export {
   resolveCardCode,
   updateQCard,
 } from "./q-cards.js";
+export {
+  disconnectGoogle,
+  getEmailDraft,
+  getGoogleConnection,
+  listRelationshipMail,
+  reviseEmailDraft,
+  startGoogleConnect,
+} from "./integrations.js";

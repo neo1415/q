@@ -109,6 +109,12 @@ export type QConversation = {
   /** Decide on what Q has prepared and is waiting for (CQ-Q-008). */
   readonly approve: () => Promise<void>;
   readonly decline: () => Promise<void>;
+  /**
+   * The person edited what Q prepared (BIZ-007: an email's words). The
+   * server voided the old approval and requested a new one on the same
+   * run; follow the run again so the new proposal arrives as the first did.
+   */
+  readonly revised: () => void;
 };
 
 export type QConversationOptions = {
@@ -543,6 +549,13 @@ export function useQConversation(
     [follow, runState.approval],
   );
   const approve = useCallback(() => decide("APPROVE"), [decide]);
+  const revised = useCallback(() => {
+    const open = openRun.current;
+    if (open === null) return;
+    setRunState((current) => ({ ...current, approval: null }));
+    finished.current = false;
+    follow(open);
+  }, [follow]);
   const decline = useCallback(() => decide("REJECT"), [decide]);
 
   const refresh = useCallback(async () => {
@@ -575,6 +588,7 @@ export function useQConversation(
     stop,
     approve,
     decline,
+    revised,
     refresh,
   };
 }

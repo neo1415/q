@@ -12,6 +12,8 @@ import {
 } from "@/components/app-shell/page-container";
 
 import { AskQAboutRelationship } from "./relationship-actions";
+import { RelationshipMail } from "@/features/integrations/relationship-mail";
+
 import { RelationshipTimeline } from "./relationship-timeline";
 import {
   formatRelationshipDate,
@@ -110,6 +112,13 @@ export function RelationshipDetail({
               counterpart={counterpart}
             />
           </PageSection>
+        )}
+
+        {relationship === null ? null : (
+          <RelationshipMail
+            relationshipId={relationship.relationshipId}
+            counterpart={counterpart}
+          />
         )}
       </div>
     </PageContainer>

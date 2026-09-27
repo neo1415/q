@@ -7,6 +7,7 @@ import {
   PageSection,
 } from "@/components/app-shell/page-container";
 import { ThemeToggle } from "@/features/appearance/theme-toggle";
+import { GmailConnection } from "@/features/integrations/gmail-connection";
 import { QMotionToggle } from "@/features/q-aperture";
 import { VoiceSetting } from "@/features/settings/voice-setting";
 
@@ -17,10 +18,16 @@ export const metadata: Metadata = { title: "Settings" };
  *
  * Every choice here is a per-device preference the browser keeps (theme,
  * Q motion, Q's voice); nothing is fetched to render the page, so it opens
- * at once. Notifications and connected accounts come later and say so,
- * rather than offering switches that do nothing.
+ * at once. Connected accounts (BIZ-007: Gmail) read their own status after
+ * the page opens. Notifications come later and say so, rather than
+ * offering switches that do nothing.
  */
-export default function SettingsPage() {
+export default async function SettingsPage({
+  searchParams,
+}: {
+  readonly searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const google = (await searchParams)["google"];
   return (
     <PageContainer width="reading">
       <PageHeader title="Settings" />
@@ -40,6 +47,16 @@ export default function SettingsPage() {
           <dl className="divide-y divide-(--cq-border-subtle) border-y border-(--cq-border-subtle)">
             <SettingRow term="Voice">
               <VoiceSetting />
+            </SettingRow>
+          </dl>
+        </PageSection>
+
+        <PageSection id="connected-accounts" title="Connected accounts">
+          <dl className="divide-y divide-(--cq-border-subtle) border-y border-(--cq-border-subtle)">
+            <SettingRow term="Gmail">
+              <GmailConnection
+                outcome={typeof google === "string" ? google : undefined}
+              />
             </SettingRow>
           </dl>
         </PageSection>

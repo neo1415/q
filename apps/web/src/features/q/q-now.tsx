@@ -2,6 +2,7 @@
 
 import { buttonClassName } from "@capital-q/ui/button";
 
+import { EmailDraftEditor } from "../integrations/email-draft-editor";
 import { openQuestions } from "./board";
 import { workingLabel } from "./conversation";
 import type { QSessionValue } from "./q-session";
@@ -89,6 +90,14 @@ export function QNow({
             <pre className="cq-caption whitespace-pre-wrap font-sans text-(--cq-text-secondary)">
               {proposal.preview}
             </pre>
+          ) : null}
+          {proposal?.actionType === "email.send" ? (
+            // The email draft (BIZ-007): editable here; saving asks again.
+            <EmailDraftEditor
+              key={approval.approvalId}
+              approvalId={approval.approvalId}
+              onRevised={() => q.revised()}
+            />
           ) : null}
           <div className="flex flex-wrap gap-2">
             <button
