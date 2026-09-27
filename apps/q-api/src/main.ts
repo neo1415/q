@@ -52,7 +52,11 @@ import {
   createOnboardingQRecommendations,
   createOwnOnboardingSummaryReader,
 } from "@capital-q/onboarding";
-import { createPostgresDocumentQueryPort } from "@capital-q/evidence";
+import { composeChat } from "@capital-q/communication";
+import {
+  createPostgresDocumentQueryPort,
+  DocumentIdSchema,
+} from "@capital-q/evidence";
 import {
   createInvestorService,
   createPostgresInvestorMandateQueryPort,
@@ -91,7 +95,11 @@ import { createQDelegationReader } from "@capital-q/model-gateway/q";
 import { createGoogleModelProvider } from "@capital-q/model-gateway/providers/google";
 import { createGroqModelProvider } from "@capital-q/model-gateway/providers/groq";
 import { createOpenAIModelProvider } from "@capital-q/model-gateway/providers/openai";
-import { createLogger, createTelemetryRuntime } from "@capital-q/observability";
+import {
+  createCorrelationId,
+  createLogger,
+  createTelemetryRuntime,
+} from "@capital-q/observability";
 import { createPostgresOrganisationQueryPort } from "@capital-q/organisations";
 import { createRecommendationNarrator } from "@capital-q/q-specialists";
 import {
@@ -274,6 +282,13 @@ import {
   createEmailSendAction,
   createRelationshipCounterparts,
 } from "./composition/email-action.js";
+import {
+  createChatActionBoard,
+  createChatIntelligencePort,
+  createChatMessageSendAction,
+  createMeetingProposeAction,
+  createReminderCreateAction,
+} from "./composition/chat-actions.js";
 
 // Q configuration is loaded from its own schema, separate from the application
 // API even where the current fields coincide.
@@ -833,6 +848,32 @@ const relationshipCounterparts = createRelationshipCounterparts({
       : null;
   },
 });
+// Relationship chat (R34): the same composition api uses. Q reads a thread
+// only for a party, and posts only as an approved `chat.message.send`.
+const chatBoard = createChatActionBoard();
+const chat = composeChat({
+  sql: database.sql,
+  transactions: database.transactions,
+  interests: interestService,
+  ownDocument: async (actor, documentId) => {
+    const parsed = DocumentIdSchema.safeParse(documentId);
+    if (!parsed.success) return null;
+    const { document, currentVersion } =
+      await researchComposition.evidence.getDocumentWithVersion({
+        actor,
+        documentId: parsed.data,
+      });
+    return currentVersion === null
+      ? null
+      : {
+          title: document.title,
+          mimeType: currentVersion.mimeType,
+          sizeBytes: currentVersion.sizeBytes,
+          malwareScanStatus: currentVersion.malwareScanStatus,
+        };
+  },
+  newCorrelationId: createCorrelationId,
+});
 // Handles and the Q Card (BIZ-004), composed as the application API
 // composes them: the same service, the same allowlisted subject facts.
 const cardVerification = createVerificationClaimsReadinessPort({
@@ -974,6 +1015,14 @@ const qTools = createQTools({
       counterparts: relationshipCounterparts,
       integrations,
       board: emailBoard,
+    }),
+    // R34: the relationship chat, for the person who invoked Q.
+    chat: createChatIntelligencePort({
+      chat,
+      board: chatBoard,
+      counterpartName: async (actor, relationshipId) =>
+        (await relationshipCounterparts.of(actor, relationshipId))?.name ??
+        null,
     }),
     // BIZ-002: every profile field the page edits, Q can prepare.
     profileChanges: profileChangeBoard,
@@ -1148,6 +1197,10 @@ const qActionRegistry = createQActionRegistry([
     counterparts: relationshipCounterparts,
     logger,
   }),
+  // R34: chat message, reminder and meeting from the relationship chat.
+  createChatMessageSendAction({ chat, logger }),
+  createReminderCreateAction({ chat }),
+  createMeetingProposeAction({ chat }),
 ]);
 // Every composed action has a capability entry (R20): the list the
 // completeness test reads is the list composed here.
@@ -1173,6 +1226,7 @@ const qActionPort = createQActionPort({
   proposer: chainProposers(
     relationshipBoard.proposer,
     emailBoard.proposer,
+    chatBoard.proposer,
     profileChangeBoard.proposer,
     visibilityBoard.proposer,
     handleClaimBoard.proposer,

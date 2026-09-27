@@ -3,6 +3,11 @@ import type { QActionRegistry } from "@capital-q/q-actions";
 import { COMPANY_PROFILE_UPDATE } from "./company-profile-action.js";
 import { COMPANY_VISIBILITY_SET } from "./company-visibility-action.js";
 import { EMAIL_SEND } from "./email-action.js";
+import {
+  CHAT_MESSAGE_SEND,
+  MEETING_PROPOSE,
+  REMINDER_CREATE,
+} from "./chat-actions.js";
 import { RELATIONSHIP_INTEREST_EXPRESS } from "./express-interest-action.js";
 import { HANDLE_CLAIM } from "./handle-claim-action.js";
 import { INVESTOR_PROFILE_UPDATE } from "./investor-profile-action.js";
@@ -30,6 +35,10 @@ export const Q_API_ACTION_TYPES: readonly string[] = Object.freeze([
   HANDLE_CLAIM,
   INVESTOR_PROFILE_UPDATE,
   EMAIL_SEND,
+  // R34: relationship chat (reminders and meetings await Calendar).
+  CHAT_MESSAGE_SEND,
+  REMINDER_CREATE,
+  MEETING_PROPOSE,
 ]);
 
 export function assertComposedActionTypes(registry: QActionRegistry): void {
