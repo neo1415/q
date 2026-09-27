@@ -1,4 +1,4 @@
-# ADR 0019 — Unknown never excludes
+# ADR 0020 — Unknown never excludes
 
 ## Status
 
