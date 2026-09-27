@@ -28,7 +28,7 @@ import type {
   VoiceChannelHandlers,
   VoiceSpeaker,
 } from "../src/voice/provider.js";
-import type { Interviewer } from "../src/voice/interviewer.js";
+import type { InterviewAgent } from "../src/voice/interview-agent.js";
 import type { VoiceTurnHandler } from "../src/voice/turn.js";
 
 /**
@@ -121,7 +121,7 @@ function buildApp(options: {
   readonly context?: ActorContext | undefined;
   readonly provider: RealtimeVoiceProvider;
   readonly bindings: VoiceSessionBindings;
-  readonly interviewer?: Interviewer | undefined;
+  readonly interviewAgent?: InterviewAgent | undefined;
 }): FastifyInstance {
   const security: QApiSecurityDependencies = {
     authenticator: { authenticate: () => Promise.resolve(options.principal) },
@@ -141,10 +141,10 @@ function buildApp(options: {
       voice: {
         provider: options.provider,
         bindings: options.bindings,
-        ...(options.interviewer === undefined
+        ...(options.interviewAgent === undefined
           ? {}
           : {
-              interviewer: options.interviewer,
+              interviewAgent: options.interviewAgent,
               apiBaseUrl: "http://api.invalid",
             }),
       },
@@ -239,23 +239,24 @@ describe("POST /v1/q/voice/sessions", () => {
     // The acceptance fixture: a text opener, a voice opener, then one more
     // per dropped line -- three "Welcome back"s for one arrival. A resumed
     // line (a reconnect, a voice switch, voice turned on over a question
-    // already on screen) must not ask the interviewer to open again, and
-    // the opening is what the interviewer records.
+    // already on screen) must not ask the loop to open again, and the
+    // opening is what the loop records.
     const openings: string[] = [];
-    const interviewer = {
+    const interviewAgent = {
       turn: (input: { readonly utterance: string }) => {
         openings.push(input.utterance);
         return Promise.resolve({
           reply: "Welcome back. What's a typical cheque for you?",
         });
       },
-    } as unknown as Interviewer;
+      researchEnded: () => undefined,
+    } as unknown as InterviewAgent;
     const app = buildApp({
       principal: PRINCIPAL,
       context: CONTEXT,
       provider: fakeProvider(),
       bindings: createVoiceSessionBindings(),
-      interviewer,
+      interviewAgent,
     });
     const onboarding = {
       sessionId: "f0000000-0000-4000-8000-000000000011",

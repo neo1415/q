@@ -17,7 +17,6 @@ import {
 import type { QVoiceRoutesDependencies } from "./routes.js";
 import type { InterviewAgent } from "./interview-agent.js";
 import { signupContextFromToken } from "./interview-steps.js";
-import type { Interviewer } from "./interviewer.js";
 
 /**
  * One turn of the Q interview, over HTTP (QX-004 core gate: one Q).
@@ -48,9 +47,8 @@ export type QInterviewRouteDependencies = ActorContextDependencies & {
    */
   readonly identity?: QVoiceRoutesDependencies["identity"] | undefined;
   readonly path: string;
-  readonly interviewer: Interviewer;
-  /** The interview as a tool-calling Q run (ADR 0016). When present, it answers. */
-  readonly agent?: InterviewAgent | undefined;
+  /** The interview as a tool-calling Q run (ADR 0016): the one conductor. */
+  readonly agent: InterviewAgent;
   /** Where the onboarding session lives; the interviewer calls it as the person. */
   readonly apiBaseUrl: string;
   readonly correlation: () => string;
@@ -79,14 +77,8 @@ export function registerQInterviewRoute(
 
       const actor = getActorContext(request);
       const input = QInterviewTurnRequestSchema.parse(request.body ?? {});
-      const conductor = dependencies.agent;
-      const turn = (
-        turnInput: Parameters<Interviewer["turn"]>[0],
-      ): ReturnType<Interviewer["turn"]> =>
-        conductor === undefined
-          ? dependencies.interviewer.turn(turnInput)
-          : conductor.turn({ ...turnInput, actor });
-      const outcome = await turn({
+      const outcome = await dependencies.agent.turn({
+        actor,
         session: { baseUrl: dependencies.apiBaseUrl, accessToken },
         onboardingSessionId: input.onboardingSessionId,
         journeyType: input.journeyType === "investor" ? "investor" : "founder",

@@ -31,7 +31,6 @@ import {
   VoiceSessionLimitError,
   type VoiceSessionBindings,
 } from "./bindings.js";
-import type { Interviewer } from "./interviewer.js";
 import type { RealtimeVoiceProvider } from "./provider.js";
 import { bounded, speakable } from "./speech.js";
 
@@ -94,9 +93,10 @@ export type QVoiceRoutesDependencies = ActorContextDependencies & {
   /** The Deepgram transport, when composed; preferred when both exist. */
   readonly deepgram?: DeepgramVoiceProvider | undefined;
   readonly bindings: VoiceSessionBindings;
-  /** Composes Q's opening line for an interview session, when present. */
-  readonly interviewer?: Interviewer | undefined;
-  /** The interview as a tool-calling Q run (ADR 0016); typed turns use it. */
+  /**
+   * The interview as a tool-calling Q run (ADR 0016): composes Q's
+   * opening line for an interview session, when present.
+   */
   readonly interviewAgent?: InterviewAgent | undefined;
   /** The application API origin, needed for the opening line. */
   readonly apiBaseUrl?: string | undefined;
@@ -462,7 +462,7 @@ export function registerQVoiceRoutes(
       // person already has on screen, which the browser hands the provider.
       const resume = input.resume === true;
       let firstMessage: string | undefined;
-      const interviewer = dependencies.interviewer;
+      const agent = dependencies.interviewAgent;
       const apiBaseUrl = dependencies.apiBaseUrl;
       let knownName: string | null = null;
       if (
@@ -501,18 +501,12 @@ export function registerQVoiceRoutes(
       } else if (
         !resume &&
         input.onboarding !== undefined &&
-        interviewer !== undefined &&
+        agent !== undefined &&
         apiBaseUrl !== undefined
       ) {
         try {
-          const agent = dependencies.interviewAgent;
-          const conduct = (
-            turnInput: Parameters<typeof interviewer.turn>[0],
-          ): ReturnType<typeof interviewer.turn> =>
-            agent === undefined
-              ? interviewer.turn(turnInput)
-              : agent.turn({ ...turnInput, actor });
-          const opening = await conduct({
+          const opening = await agent.turn({
+            actor,
             session: { baseUrl: apiBaseUrl, accessToken },
             onboardingSessionId: input.onboarding.sessionId,
             // The opening line is where sign-up context matters most:

@@ -145,7 +145,6 @@ import {
   createPostgresMemoryRepository,
 } from "@capital-q/q-knowledge";
 import {
-  ActorContextSchema,
   OrganisationIdSchema,
   TenantIdSchema,
   createAuthorizationService,
@@ -201,7 +200,6 @@ import { createSupabaseRequestAuthenticator } from "./security/supabase-authenti
 import { attachVoiceChannel } from "./voice/attach.js";
 import { createVoiceSessionBindings } from "./voice/bindings.js";
 import { createInterviewAgent } from "./voice/interview-agent.js";
-import { createInterviewer } from "./voice/interviewer.js";
 import { createLoggingPronunciationTeacher } from "./voice/pronunciation.js";
 import { createElevenLabsPronunciationTeacher } from "./voice/providers/elevenlabs-pronunciation.js";
 import { createVoiceTurnBoard } from "./voice/turn-board.js";
@@ -1344,40 +1342,6 @@ const speechSynthesis = speechWithFallback([
       ]),
 ]);
 const voiceBindings = createVoiceSessionBindings();
-// Q conducting the interview: one model-driven turn per utterance, every
-// reading validated and recorded through the onboarding runtime.
-const interviewer = createInterviewer({
-  gateway: modelGateway,
-  // Doc 15 §62: where the deployment attested the material is invented,
-  // the free route may carry the interview. Elsewhere this is
-  // REAL_CUSTOMER and the reviewed ceilings decide, exactly as before.
-  // Without it a staging interview had no eligible route the moment one
-  // provider was spent, which is the whole of the QX-004 §0 defect.
-  dataPosture: demoDataPosture,
-  logger,
-  personality: config.voice.personality,
-  // Never inline audio tags in what Q says (CQ-VOICE-010). A tag written
-  // into the reply is in the transcript, the thread and memory, and a voice
-  // that cannot render it reads it out ("[laughs]" measured as "Halfs" on
-  // turbo v2.5). How a reply sounds travels beside it, never inside it, so
-  // Q_VOICE_EXPRESSIVE no longer reaches a prompt.
-  expressive: false,
-  // The interview meets the same person twice and knows it (ADR 0012).
-  memory: {
-    recallText: (attribution) =>
-      voiceTimings.measure("memory", "recall", () =>
-        memoryLearner.recall.recall({
-          actor: ActorContextSchema.parse({
-            userId: attribution.userId,
-            tenantId: attribution.tenantId,
-            actorType: "HUMAN",
-          }),
-          runId: "interview",
-          subjects: [],
-        }),
-      ),
-  },
-});
 // The interview as a tool-calling Q run (ADR 0016): the same firewall,
 // tool pipeline and gateway as every Q answer.
 const interviewAgent = createInterviewAgent({
@@ -1402,7 +1366,7 @@ const welcomeHost = createWelcomeHost({
   gateway: modelGateway,
   logger,
   personality: config.voice.personality,
-  // As for the interviewer: no stage directions inside what Q says.
+  // No stage directions inside what Q says (CQ-VOICE-010).
   expressive: false,
 });
 const pronunciation =
@@ -1425,7 +1389,6 @@ const voiceTurn = timedVoiceTurns(
   createVoiceTurnHandler({
     qRuntime,
     qStream,
-    interviewer,
     interviewAgent,
     board: voiceTurnBoard,
     welcome: welcomeHost,
@@ -1540,7 +1503,6 @@ const { app, logger: appLogger } = createApp(
             deepgram: deepgramProvider,
             speech: speechSynthesis,
             bindings: voiceBindings,
-            interviewer,
             interviewAgent,
             apiBaseUrl: config.voice.apiBaseUrl,
             board: voiceTurnBoard,

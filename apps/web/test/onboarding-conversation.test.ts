@@ -8,12 +8,10 @@ import type {
 import {
   acknowledgeValue,
   gapValue,
-  pauseIntent,
   pendingQuestion,
   progressLines,
   promptFor,
   RESUME_AFTER_MS,
-  resumeIntent,
   stillNeeded,
   taxonomyProposal,
   welcomeBack,
@@ -382,37 +380,6 @@ describe("progressLines", () => {
  * the reply and the screen shows it as written. What the module still owns
  * is the deterministic vocabulary around it, tested above and below.
  */
-
-describe("resume and pause (CQ-Q-VOICE-001 B §24-§25)", () => {
-  it("hears the explicit ways back to the interview", () => {
-    for (const phrase of [
-      "Let's continue.",
-      "Continue the interview.",
-      "Where were we?",
-      "Back to onboarding.",
-      "Carry on.",
-      "Let's finish this.",
-      "OK, let's continue",
-    ]) {
-      expect(resumeIntent(phrase), phrase).toBe(true);
-    }
-    expect(resumeIntent("Series A")).toBe(false);
-    expect(resumeIntent("We continue to sell in Ghana")).toBe(false);
-  });
-
-  it("hears a pause, which persists and never completes", () => {
-    for (const phrase of [
-      "Let's stop here.",
-      "I'll finish this later.",
-      "Pause the interview.",
-      "Let's finish this later",
-    ]) {
-      expect(pauseIntent(phrase), phrase).toBe(true);
-    }
-    expect(pauseIntent("Let's finish this.")).toBe(false);
-    expect(pauseIntent("We stopped selling hardware")).toBe(false);
-  });
-});
 
 describe("gaps answered in place (CQ-Q-VOICE-001 B §16, §21)", () => {
   const question = {

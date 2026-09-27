@@ -35,7 +35,10 @@ export const INTERVIEW_CONDUCTOR_V11: PromptDefinition<
 > = {
   ...INTERVIEW_CONDUCTOR_V10,
   version: 11,
-  status: "ACTIVE",
+  // Retired with the legacy conductor (P0-1): the interview loop
+  // (INTERVIEW_AGENT) is the only conductor. Kept resolvable so a run
+  // recorded against it stays explainable.
+  status: "DEPRECATED",
   changeDescription:
     "CQ-QX-005 round 3: a question about their own answers names the steps it is about (reading.question.about) and the platform answers it from stored state; a turn that answers and asks is read as the answer with the question beside it.",
   effectiveFrom: "2026-09-24",

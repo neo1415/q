@@ -73,6 +73,9 @@ function render(
   });
 }
 
+/** Families whose every version is DEPRECATED: retired, never removed. */
+const RETIRED_FAMILIES: ReadonlySet<string> = new Set(["INTERVIEW_CONDUCTOR"]);
+
 describe("registry", () => {
   it("registers exactly the published prompt families, each with one ACTIVE version", () => {
     expect([...PROMPT_IDS].sort()).toEqual(
@@ -81,7 +84,8 @@ describe("registry", () => {
         // CQ-Q-VOICE-001 rework: the charter sized for a live turn.
         "Q_SYSTEM_VOICE",
         "FOUNDER_ONBOARDING_EXTRACTION",
-        // CQ-Q-VOICE-001: Q conducts the onboarding interview.
+        // CQ-Q-VOICE-001: Q conducted the onboarding interview; retired
+        // by P0-1 (the loop conducts it), every version still resolvable.
         "INTERVIEW_CONDUCTOR",
         "WELCOME_CONDUCTOR",
         // CQ-KNW-001: reads one authorised passage and proposes claims.
@@ -108,6 +112,19 @@ describe("registry", () => {
       ].sort(),
     );
     for (const id of PROMPT_IDS) {
+      if (RETIRED_FAMILIES.has(id)) {
+        // A retired family has no ACTIVE version, and every version it
+        // published stays resolvable by exact number.
+        const versions = registry.list().filter((r) => r.definition.id === id);
+        expect(
+          versions.every((r) => r.definition.status === "DEPRECATED"),
+        ).toBe(true);
+        for (let version = 1; version <= versions.length; version += 1) {
+          expect(registry.get(id, version)).toBeDefined();
+        }
+        expect(() => registry.getActive(id)).toThrow();
+        continue;
+      }
       const active = registry.getActive(id);
       // Exactly one ACTIVE version per family, and every published version
       // still resolvable by exact number — a superseded prompt is retired,

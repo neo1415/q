@@ -429,7 +429,7 @@ describe("a spoken interview answer", () => {
     expect(said.length).toBeGreaterThan(0);
   });
 
-  it("pauses and resumes from the session, without touching the runtime", async () => {
+  it("reads no pause or resume from the words: without the loop both go to the one the API delegates to (P0-1, ADR 0011)", async () => {
     let says = 0;
     const fetchFake: typeof fetch = (input, init) => {
       const url =
@@ -438,10 +438,21 @@ describe("a spoken interview answer", () => {
           : input instanceof URL
             ? input.toString()
             : input.url;
+      void init;
       if (url.endsWith("/say")) {
         says += 1;
+        const body: SayOnboardingResponse = {
+          view: view(),
+          understood: null,
+          reply: "Of course, we can stop here.",
+          navigate: null,
+          researching: null,
+          degraded: false,
+          askingAbout: [],
+          pending: { recommendations: [], held: [] },
+        };
+        return Promise.resolve(Response.json(body));
       }
-      void init;
       return Promise.resolve(Response.json(view()));
     };
     const handle = createVoiceTurnHandler({
@@ -468,11 +479,11 @@ describe("a spoken interview answer", () => {
       new AbortController().signal,
       speaker,
     );
-    expect(speaker.spoken).toEqual([
-      "Of course. Everything so far is saved. Come back whenever suits you and we'll pick up exactly here.",
-      "Right, back to it. What stage is the company at?",
-    ]);
-    expect(says).toBe(0);
+    // No word list answered them: both turns went to the interview.
+    expect(says).toBe(2);
+    expect(speaker.spoken.join(" ")).not.toContain(
+      "Everything so far is saved",
+    );
   });
 });
 
@@ -661,9 +672,6 @@ describe("a spoken question for Q", () => {
         apiBaseUrl: "http://api.test",
         fetch: () => Promise.resolve(Response.json(view())),
       },
-      interviewer: {
-        turn: () => Promise.reject(new Error("the legacy path must not run")),
-      } as never,
       interviewAgent: {
         turn: (input) => {
           seen.push({
@@ -728,9 +736,6 @@ describe("a spoken question for Q", () => {
         apiBaseUrl: "http://api.test",
         fetch: () => Promise.resolve(Response.json(view())),
       },
-      interviewer: {
-        turn: () => Promise.reject(new Error("the legacy path must not run")),
-      } as never,
       interviewAgent: {
         turn: async (input) => {
           input.onSentence?.("Seed it is.");
@@ -796,12 +801,6 @@ describe("a spoken question for Q", () => {
         apiBaseUrl: "http://api.test",
         fetch: () => Promise.resolve(Response.json(view())),
       },
-      interviewer: {
-        turn: () => Promise.reject(new Error("the legacy path must not run")),
-        researchEnded: () => {
-          throw new Error("the legacy engine must not be told");
-        },
-      } as never,
       interviewAgent: {
         turn: () =>
           Promise.resolve({
@@ -945,7 +944,8 @@ describe("a spoken question for Q", () => {
       new AbortController().signal,
       speaker,
     );
-    expect(next).toEqual({ kind: "SPOKEN", path: "MOVE" });
+    // No word list takes "let me think" any more (P0-1): it is Q's to read.
+    expect(next).toEqual({ kind: "SPOKEN", path: "Q" });
     expect(speaker.spoken.join(" ")).not.toContain(
       "to finish what I was saying",
     );
@@ -957,7 +957,9 @@ describe("a spoken question for Q", () => {
       new AbortController().signal,
       speaker,
     );
-    expect(runtime.calls.createRun).toHaveLength(2);
+    // Three runs: the first question, "let me think" (Q's to read now),
+    // and "go on" as a fresh sentence.
+    expect(runtime.calls.createRun).toHaveLength(3);
     expect(speaker.spoken.join(" ")).not.toMatch(/picking up|where I stopped/i);
   });
 

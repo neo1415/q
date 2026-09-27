@@ -47,14 +47,10 @@ import {
   BRIDGE_LINE,
   gapValue,
   isTaxonomySuggestion,
-  PAUSED_LINE,
-  pauseIntent,
   pickedUp,
   progressLines,
   promptFor,
   remainingCount,
-  resumeIntent,
-  resumeLine,
   reviewLines,
   stillNeeded,
   taxonomyProposal,
@@ -741,16 +737,8 @@ export function QOnboardingWorkspace({
       push("PERSON", trimmed);
       settleReading();
       setNarrowedTo(null);
-      // The interview's own moves (§24-§25): leaving for now, or coming back
-      // from a tangent. Both are answered from the session, not the runtime.
-      if (pauseIntent(trimmed)) {
-        push("Q", PAUSED_LINE);
-        return;
-      }
-      if (resumeIntent(trimmed)) {
-        push("Q", resumeLine(prompt));
-        return;
-      }
+      // A pause or a return to the interview is read by the loop like any
+      // other turn (P0-1; ADR 0011): no word list decides it here.
       // A question for Q is not pre-sorted here by its words (CQ-QX-005;
       // ADR 0011): the interviewer reads every turn, answers a question
       // in the turn itself, and says when something real needs looking

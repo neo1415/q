@@ -643,24 +643,11 @@ export function acknowledgeValue(
 }
 
 /**
- * The interview's own moves — a pause, a resume — are
- * one implementation shared with the spoken thread (CQ-Q-VOICE-001 C):
- * `@capital-q/onboarding/interview`. Re-exported here so this planner
- * stays the thread's single vocabulary.
+ * What the thread shows after a look-up Q ran mid-interview, before the
+ * live question shows again: transport copy, not a reading of anything
+ * the person said. (A pause or a return is the loop's to read, P0-1.)
  */
-export {
-  BRIDGE_LINE,
-  PAUSED_LINE,
-  pauseIntent,
-  resumeIntent,
-} from "@capital-q/onboarding/interview";
-
-/** What Q says when the person asks to continue (§24). */
-export function resumeLine(prompt: QPrompt | null): string {
-  return prompt === null
-    ? "We're all caught up. There's nothing left for me to ask right now."
-    : `Right, back to it. ${prompt.text}`;
-}
+export const BRIDGE_LINE = "Back to where we were.";
 
 /** The value a review line shows, or a plain "not yet" (§29). */
 export function reviewLines(

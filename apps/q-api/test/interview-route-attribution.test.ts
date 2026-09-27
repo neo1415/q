@@ -14,16 +14,14 @@ import {
 
 import { createApp, type QApiSecurityDependencies } from "../src/app.js";
 import { createVoiceSessionBindings } from "../src/voice/bindings.js";
-import type {
-  Interviewer,
-  InterviewTurnInput,
-} from "../src/voice/interviewer.js";
+import type { InterviewAgent } from "../src/voice/interview-agent.js";
+import type { InterviewTurnInput } from "../src/voice/interview-steps.js";
 import type { RealtimeVoiceProvider } from "../src/voice/provider.js";
 
 /**
  * The typed interview is attributed to the person who typed (P1).
  *
- * The route used to hand the interviewer a constant all-zero tenant and
+ * The route used to hand the conductor a constant all-zero tenant and
  * user. Every model call it made then failed its usage-ledger write on the
  * tenant foreign key, and — the part a person feels — memory was recalled
  * for nobody, so Q forgot between sessions what they had told it. The
@@ -57,7 +55,7 @@ const provider: RealtimeVoiceProvider = {
 
 function build(context: ActorContext | undefined) {
   const seen: InterviewTurnInput[] = [];
-  const interviewer = {
+  const interviewAgent = {
     turn: (input: InterviewTurnInput) => {
       seen.push(input);
       return Promise.resolve({
@@ -73,7 +71,8 @@ function build(context: ActorContext | undefined) {
         degraded: false,
       });
     },
-  } as unknown as Interviewer;
+    researchEnded: () => undefined,
+  } as unknown as InterviewAgent;
   const security: QApiSecurityDependencies = {
     authenticator: { authenticate: () => Promise.resolve(PRINCIPAL) },
     resolver: {
@@ -92,7 +91,7 @@ function build(context: ActorContext | undefined) {
     voice: {
       provider,
       bindings: createVoiceSessionBindings(),
-      interviewer,
+      interviewAgent,
       apiBaseUrl: "http://api.test",
     },
   }).app;
@@ -113,7 +112,9 @@ describe("POST /v1/q/interview/turn attribution", () => {
     const response = await app.inject({
       method: "POST",
       url: "/v1/q/interview/turn",
-      headers: { authorization: "Bearer eyJhbGciOiJub25lIn0.eyJzdWIiOiJ4In0.c2ln" },
+      headers: {
+        authorization: "Bearer eyJhbGciOiJub25lIn0.eyJzdWIiOiJ4In0.c2ln",
+      },
       payload: turn,
     });
     expect(response.statusCode).toBe(200);
@@ -128,7 +129,9 @@ describe("POST /v1/q/interview/turn attribution", () => {
     const response = await app.inject({
       method: "POST",
       url: "/v1/q/interview/turn",
-      headers: { authorization: "Bearer eyJhbGciOiJub25lIn0.eyJzdWIiOiJ4In0.c2ln" },
+      headers: {
+        authorization: "Bearer eyJhbGciOiJub25lIn0.eyJzdWIiOiJ4In0.c2ln",
+      },
       payload: turn,
     });
     expect(response.statusCode).toBe(200);

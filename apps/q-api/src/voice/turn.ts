@@ -23,13 +23,6 @@ import {
   type QSubjectRef,
 } from "@capital-q/contracts";
 import type { QActionService } from "@capital-q/q-actions";
-import {
-  PAUSED_LINE,
-  pauseIntent,
-  resumeIntent,
-  TAKE_YOUR_TIME_LINE,
-  thinkingIntent,
-} from "@capital-q/onboarding/interview";
 import { createCorrelationId, type Logger } from "@capital-q/observability";
 import type {
   QOrchestrator,
@@ -39,8 +32,11 @@ import type {
 } from "@capital-q/q-runtime";
 
 import type { VoiceSessionBinding } from "./bindings.js";
-import { signupContextFromToken } from "./interview-steps.js";
-import type { Interviewer } from "./interviewer.js";
+import {
+  signupContextFromToken,
+  type InterviewTurnInput,
+  type InterviewTurnOutcome,
+} from "./interview-steps.js";
 import type { PresenceFound } from "./presence-trigger.js";
 import {
   declines,
@@ -114,14 +110,9 @@ export type VoiceTurnDependencies = {
     | { readonly orchestrator: QOrchestrator; readonly autostart: boolean }
     | undefined;
   /**
-   * Q conducting the interview (interviewer.ts). When present, every
-   * interview turn goes through it; the scripted per-step reading below
-   * remains only as the fallback when no model is composed.
-   */
-  readonly interviewer?: Interviewer | undefined;
-  /**
    * The interview as a tool-calling Q run (ADR 0016). When present, a
-   * spoken interview turn goes through the same loop a typed one does.
+   * spoken interview turn goes through the same loop a typed one does;
+   * without it the turn goes to the one the API delegates to.
    */
   readonly interviewAgent?: InterviewAgent | undefined;
   /** Where each turn's asking/navigation is posted for the screen. */
@@ -1172,45 +1163,32 @@ export function createVoiceTurnHandler(
       accessToken: binding.accessToken,
       ...(api.fetch === undefined ? {} : { fetch: api.fetch }),
     };
-    const interviewer = dependencies.interviewer;
-    if (interviewer !== undefined) {
+    const agent = dependencies.interviewAgent;
+    if (agent !== undefined) {
       // Q leads. What the person said is read in full, validated by the
       // runtime, and answered in Q's own words; a question for Q becomes
       // a run in the bound conversation exactly as before.
       const recentTurns = transcriptOf(binding).slice(0, -1);
-      const agent = dependencies.interviewAgent;
       /**
        * The loop's reply is spoken as it is written (latency, voice lane):
        * each finished sentence goes to the speaker at once instead of
-       * after the whole turn. The legacy interviewer has no stream and is
-       * spoken whole, as before.
+       * after the whole turn.
        */
-      const live = agent === undefined ? null : createLiveReply();
-      const voicing =
-        live === null
-          ? Promise.resolve()
-          : speaker.speak(
-              tap(live.spoken, (part) => {
-                rememberSpoken(binding, part);
-              }),
-            );
-      const conduct = (
-        turnInput: Parameters<Interviewer["turn"]>[0],
-      ): ReturnType<Interviewer["turn"]> =>
-        agent === undefined
-          ? interviewer.turn(turnInput)
-          : agent.turn({
-              ...turnInput,
-              actor: binding.actor,
-              ...(live === null
-                ? {}
-                : {
-                    onSentence: (sentence: string) => {
-                      if (!signal.aborted) live.push(sentence);
-                    },
-                  }),
-            });
-      let conducted: Awaited<ReturnType<Interviewer["turn"]>>;
+      const live = createLiveReply();
+      const voicing = speaker.speak(
+        tap(live.spoken, (part) => {
+          rememberSpoken(binding, part);
+        }),
+      );
+      const conduct = (turnInput: InterviewTurnInput) =>
+        agent.turn({
+          ...turnInput,
+          actor: binding.actor,
+          onSentence: (sentence: string) => {
+            if (!signal.aborted) live.push(sentence);
+          },
+        });
+      let conducted: InterviewTurnOutcome;
       try {
         conducted = await conduct({
           session,
@@ -1322,7 +1300,7 @@ export function createVoiceTurnHandler(
           },
         );
         // The engine that handed the look-up over is told how it ended.
-        (agent ?? interviewer).researchEnded(
+        agent.researchEnded(
           onboarding.sessionId,
           lastRunFailed.get(binding) !== true,
         );
@@ -1377,26 +1355,6 @@ export function createVoiceTurnHandler(
     const before = await getOnboardingSession(session, onboarding.sessionId);
     if (signal.aborted) {
       return { kind: "INTERRUPTED", path: "INTERVIEW" };
-    }
-    if (thinkingIntent(text)) {
-      return (await speakLine(speaker, TAKE_YOUR_TIME_LINE, signal))
-        ? { kind: "SPOKEN", path: "MOVE" }
-        : { kind: "INTERRUPTED", path: "MOVE" };
-    }
-    if (pauseIntent(text)) {
-      return (await speakLine(speaker, PAUSED_LINE, signal))
-        ? { kind: "SPOKEN", path: "MOVE" }
-        : { kind: "INTERRUPTED", path: "MOVE" };
-    }
-    if (resumeIntent(text)) {
-      const prompt = before.currentStep?.prompt;
-      const line =
-        prompt === undefined || before.session.status !== "ACTIVE"
-          ? "We're all caught up. There's nothing left for me to ask right now."
-          : `Right, back to it. ${prompt}`;
-      return (await speakLine(speaker, line, signal))
-        ? { kind: "SPOKEN", path: "MOVE" }
-        : { kind: "INTERRUPTED", path: "MOVE" };
     }
     const proposal = pendingTaxonomyProposal(before);
     if (proposal !== null && AFFIRMATIVE.test(text)) {
@@ -1996,10 +1954,6 @@ export function createVoiceTurnHandler(
       outcome = await welcomeTurn(binding, text, signal, speaker);
     } else if (binding.thread.onboarding !== undefined) {
       outcome = await answerInterview(binding, text, signal, speaker);
-    } else if (thinkingIntent(text)) {
-      outcome = (await speakLine(speaker, TAKE_YOUR_TIME_LINE, signal))
-        ? { kind: "SPOKEN", path: "MOVE" }
-        : { kind: "INTERRUPTED", path: "MOVE" };
     } else {
       outcome = await askQ(binding, text, signal, speaker);
     }

@@ -120,7 +120,6 @@ export type QApiModules = {
         | "provider"
         | "bindings"
         | "now"
-        | "interviewer"
         | "interviewAgent"
         | "apiBaseUrl"
         | "board"
@@ -335,7 +334,7 @@ export function createApp(
       identity: security.identity,
       provider: modules.voice.provider,
       bindings: modules.voice.bindings,
-      interviewer: modules.voice.interviewer,
+      interviewAgent: modules.voice.interviewAgent,
       apiBaseUrl: modules.voice.apiBaseUrl,
       board: modules.voice.board,
       welcome: modules.voice.welcome,
@@ -355,15 +354,14 @@ export function createApp(
      * interviewer and somewhere to read the session from.
      */
     const interviewApiBaseUrl = modules.voice.apiBaseUrl;
-    const typedInterviewer = modules.voice.interviewer;
-    if (interviewApiBaseUrl !== undefined && typedInterviewer !== undefined) {
+    const interviewAgent = modules.voice.interviewAgent;
+    if (interviewApiBaseUrl !== undefined && interviewAgent !== undefined) {
       registerQInterviewRoute(app, {
         authenticator: security.authenticator,
         resolver: security.resolver,
         identity: security.identity,
         path: `${Q_INTERVIEW_PATH}${Q_INTERVIEW_TURN_SEGMENT}`,
-        interviewer: typedInterviewer,
-        agent: modules.voice.interviewAgent,
+        agent: interviewAgent,
         apiBaseUrl: interviewApiBaseUrl,
         correlation: () => randomUUID(),
       });
