@@ -94,6 +94,10 @@ export function createTestConfirmRequiredAction(): {
       summary: "Q wants to record a test note about this company.",
       preview: payload.note,
     }),
+    // The note is the words; the company and recipient are the consequence.
+    revisable: (previous, next) =>
+      previous.companyId === next.companyId &&
+      previous.recipientUserId === next.recipientUserId,
     // A note beginning FORBIDDEN stands for an action the person may not
     // take: proposal refuses it, and approval could never create the right.
     authorize: (payload) =>

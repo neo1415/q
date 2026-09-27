@@ -581,6 +581,98 @@ describe("@capital-q/q-actions against local PostgreSQL", () => {
     }
   });
 
+  it("REVISION (BIZ-007): an edit voids the old approval; only the new words execute, once", async () => {
+    const world = await commitWorld();
+    try {
+      const { founder, colleague, service, executor } = world;
+      const { action, approval } = await propose(world, founder, {});
+      const revised = await service.revise({
+        actor: founder.actor,
+        approvalId: approval.id,
+        correlationId: CORRELATION(),
+        payload: {
+          companyId: COMPANY,
+          note: "Please record this, edited by one word.",
+        },
+      });
+      // A new proposal on the same run, bound to a new hash.
+      expect(revised.action.runId).toBe(action.runId);
+      expect(revised.action.id).not.toBe(action.id);
+      expect(revised.action.payloadHash).not.toBe(action.payloadHash);
+      expect(revised.approval.status).toBe("PENDING");
+      expect(await runStatus(action.runId)).toBe("AWAITING_APPROVAL");
+
+      // The old approval is void: it can be neither approved nor executed.
+      const old = await service.getApproval({
+        actor: founder.actor,
+        approvalId: approval.id,
+      });
+      expect(old.status).toBe("REVOKED");
+      expect(old.action.actionStatus).toBe("WITHDRAWN");
+      await expect(
+        service.approve({
+          actor: founder.actor,
+          approvalId: approval.id,
+          correlationId: CORRELATION(),
+        }),
+      ).rejects.toThrow();
+      expect(
+        await service.executeApproved({
+          actor: founder.actor,
+          runId: action.runId,
+          tenantId: founder.actor.tenantId,
+          correlationId: CORRELATION(),
+          actionId: action.id,
+        }),
+      ).toMatchObject({ kind: "NOT_APPROVED" });
+
+      // Another target is another action, and only the approver may edit.
+      await expect(
+        service.revise({
+          actor: founder.actor,
+          approvalId: revised.approval.id,
+          correlationId: CORRELATION(),
+          payload: { companyId: randomUUID(), note: "Elsewhere." },
+        }),
+      ).rejects.toThrow();
+      await expect(
+        service.revise({
+          actor: colleague.actor,
+          approvalId: revised.approval.id,
+          correlationId: CORRELATION(),
+          payload: { companyId: COMPANY, note: "Mine now." },
+        }),
+      ).rejects.toThrow();
+
+      // Approve the revision; the run resumes with the ORIGINAL action id
+      // and the port resolves it to the revision. Twice executes once.
+      await service.approve({
+        actor: founder.actor,
+        approvalId: revised.approval.id,
+        correlationId: CORRELATION(),
+      });
+      const current = await service.currentRevision(
+        founder.actor.tenantId,
+        action.runId,
+        action.id,
+      );
+      expect(current).toBe(revised.action.id);
+      const execute = () =>
+        service.executeApproved({
+          actor: founder.actor,
+          runId: action.runId,
+          tenantId: founder.actor.tenantId,
+          correlationId: CORRELATION(),
+          actionId: current,
+        });
+      expect(await execute()).toEqual({ kind: "EXECUTED" });
+      expect(await execute()).toEqual({ kind: "ALREADY_EXECUTED" });
+      expect(executor.executions()).toBe(1);
+    } finally {
+      await cleanup(world);
+    }
+  });
+
   it("changing targets or the definition version also invalidates an approval (hash covers them)", async () => {
     const world = await commitWorld();
     try {
