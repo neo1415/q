@@ -359,7 +359,7 @@ describe("@capital-q/discovery hard eligibility against local PostgreSQL", () =>
         await tx.sql`insert into taxonomy.entity_assignments (tenant_id, entity_type, entity_id, node_id, assignment_source)
         values (${tenantC}, 'COMPANY', ${companyId}, ${node("business_model", "marketplace")}, 'q_inferred')`;
         const [inferred] = await evaluate([companyId]);
-        expect(inferred?.eligibilityPolicyVersion).toBe("eligibility.v2");
+        expect(inferred?.eligibilityPolicyVersion).toBe("eligibility.v3");
         expect(inferred?.decision).toBe("UNDETERMINED");
         expect(inferred?.reasonCodes).toEqual(["COMPANY_TAXONOMY_UNKNOWN"]);
 

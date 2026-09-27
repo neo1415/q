@@ -233,14 +233,14 @@ function buildSnapshot(): RecommendationFeatureSnapshot {
       mode: "INVESTOR_DISCOVER" as const,
       mandateId: MANDATE,
       taxonomyVersion: null,
-      eligibilityPolicyVersion: "eligibility.v2" as const,
+      eligibilityPolicyVersion: "eligibility.v3" as const,
     },
     mandateId: MANDATE,
     mandateVersion: 1,
     companyId: COMPANY,
     companyTenantId: COMPANY_TENANT,
     companyProjectionVersion: 1,
-    eligibilityPolicyVersion: "eligibility.v2" as const,
+    eligibilityPolicyVersion: "eligibility.v3" as const,
     eligibilityDecision: "ELIGIBLE" as const,
     candidateProvenance: {
       structured: {
@@ -260,7 +260,7 @@ function buildSnapshot(): RecommendationFeatureSnapshot {
 }
 
 const VERSIONS = {
-  eligibilityPolicyVersion: "eligibility.v2" as const,
+  eligibilityPolicyVersion: "eligibility.v3" as const,
   structuredGeneratorVersion: "structured-mandate.v4" as const,
   semanticGeneratorVersion: "semantic-mandate.v1" as const,
   featureSchemaVersion: FEATURE_SCHEMA_VERSION,

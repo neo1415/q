@@ -850,7 +850,7 @@ function eligibility(w: World): EligibilityService {
           mode: "INVESTOR_DISCOVER",
           mandateId: active?.mandateId ?? null,
           taxonomyVersion: null,
-          eligibilityPolicyVersion: "eligibility.v2",
+          eligibilityPolicyVersion: "eligibility.v3",
         },
         results,
       });

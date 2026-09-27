@@ -8,8 +8,12 @@ import {
 } from "../src/eligibility/contracts.js";
 import {
   DECLARED_TAXONOMY_SOURCES,
+  declaredHardExclusions,
   evaluateHardEligibility,
+  excludingRules,
   RELATIONSHIP_STATES_CLOSED_TO_DISCOVERY,
+  unverifiableHardExclusions,
+  unverifiedExclusions,
   type EligibilityEvaluationInput,
 } from "../src/eligibility/policy.js";
 import type {
@@ -201,10 +205,10 @@ describe("eligibility policy v1 — golden scenarios", () => {
     ] as const;
 
     it("pins the policy version this behaviour belongs to", () => {
-      expect(ELIGIBILITY_POLICY_VERSION).toBe("eligibility.v2");
+      expect(ELIGIBILITY_POLICY_VERSION).toBe("eligibility.v3");
     });
 
-    it("an undeclared classification on the excluded node, alone in the vocabulary → UNKNOWN, UNDETERMINED, never FAIL", () => {
+    it("an undeclared classification on the excluded node, alone in the vocabulary → UNKNOWN, kept (v3), never FAIL", () => {
       for (const source of UNDECLARED) {
         const r = evaluateHardEligibility(
           input({
@@ -214,7 +218,7 @@ describe("eligibility policy v1 — golden scenarios", () => {
             ],
           }),
         );
-        expect(r.decision, source).toBe("UNDETERMINED");
+        expect(r.decision, source).toBe("ELIGIBLE");
         expect(outcomeOf(r, "HARD_EXCLUSION_TAXONOMY"), source).toEqual({
           criterion: "HARD_EXCLUSION_TAXONOMY",
           outcome: "UNKNOWN",
@@ -256,8 +260,9 @@ describe("eligibility policy v1 — golden scenarios", () => {
           ],
         }),
       );
-      expect(r.decision).toBe("UNDETERMINED");
+      expect(r.decision).toBe("ELIGIBLE");
       expect(outcomeOf(r, "HARD_EXCLUSION_TAXONOMY")?.outcome).toBe("UNKNOWN");
+      expect(unverifiedExclusions(r)).toEqual(["taxonomy"]);
     });
 
     it("a declared classification elsewhere answers the vocabulary; a Q inference on the excluded node does not override it → PASS", () => {
@@ -308,9 +313,10 @@ describe("eligibility policy v1 — golden scenarios", () => {
         }),
       );
       expect([inferred.decision, confirmed.decision]).toEqual([
-        "UNDETERMINED",
+        "ELIGIBLE",
         "INELIGIBLE",
       ]);
+      expect(excludingRules(confirmed)).toEqual(["taxonomy"]);
     });
   });
 
@@ -413,7 +419,7 @@ describe("eligibility policy v1 — golden scenarios", () => {
     expect(seedIsFine.decision).toBe("ELIGIBLE");
   });
 
-  it("G. required stage, company stage unknown → UNDETERMINED, not mismatch", () => {
+  it("G. required stage, company stage unknown → kept with the rule reported unverified (v3), not mismatch", () => {
     const r = evaluateHardEligibility(
       input({
         mandate: mandate({
@@ -428,11 +434,13 @@ describe("eligibility policy v1 — golden scenarios", () => {
         company: company({ currentStageCode: null }),
       }),
     );
-    expect(r.decision).toBe("UNDETERMINED");
+    expect(r.decision).toBe("ELIGIBLE");
     expect(r.reasonCodes).toEqual(["COMPANY_STAGE_UNKNOWN"]);
+    expect(outcomeOf(r, "HARD_EXCLUSION_STAGE")?.outcome).toBe("UNKNOWN");
+    expect(unverifiedExclusions(r)).toEqual(["stage"]);
   });
 
-  it("unknown geography under a hard geography rule → UNDETERMINED; known and outside → INELIGIBLE", () => {
+  it("unknown geography under a hard geography rule → kept, unverified; known and outside → INELIGIBLE", () => {
     const rule = mandate({
       constraints: [
         constraint({
@@ -449,12 +457,13 @@ describe("eligibility policy v1 — golden scenarios", () => {
           company: company({ headquartersCountry: null }),
         }),
       ).decision,
-    ).toBe("UNDETERMINED");
+    ).toBe("ELIGIBLE");
     const outside = evaluateHardEligibility(
       input({ mandate: rule, company: company({ headquartersCountry: "DE" }) }),
     );
     expect(outside.decision).toBe("INELIGIBLE");
     expect(outside.reasonCodes).toEqual(["GEOGRAPHY_OUTSIDE_HARD_MANDATE"]);
+    expect(excludingRules(outside)).toEqual(["geography.country"]);
     expect(
       evaluateHardEligibility(
         input({
@@ -465,12 +474,13 @@ describe("eligibility policy v1 — golden scenarios", () => {
     ).toBe("ELIGIBLE");
   });
 
-  it("unknown taxonomy under a taxonomy exclusion → UNDETERMINED; classified elsewhere in that vocabulary → PASS", () => {
+  it("unknown taxonomy under a taxonomy exclusion → kept, unverified; classified elsewhere in that vocabulary → PASS", () => {
     const rule = mandate({ taxonomyPreferences: [taxonomyRule()] });
     const unclassified = evaluateHardEligibility(
       input({ mandate: rule, classifications: [] }),
     );
-    expect(unclassified.decision).toBe("UNDETERMINED");
+    expect(unclassified.decision).toBe("ELIGIBLE");
+    expect(unverifiedExclusions(unclassified)).toEqual(["taxonomy"]);
     expect(unclassified.reasonCodes).toEqual(["COMPANY_TAXONOMY_UNKNOWN"]);
 
     const otherVocabularyOnly = evaluateHardEligibility(
@@ -485,7 +495,10 @@ describe("eligibility policy v1 — golden scenarios", () => {
         ],
       }),
     );
-    expect(otherVocabularyOnly.decision).toBe("UNDETERMINED");
+    expect(otherVocabularyOnly.decision).toBe("ELIGIBLE");
+    expect(
+      outcomeOf(otherVocabularyOnly, "HARD_EXCLUSION_TAXONOMY")?.outcome,
+    ).toBe("UNKNOWN");
 
     const answered = evaluateHardEligibility(
       input({
@@ -502,7 +515,7 @@ describe("eligibility policy v1 — golden scenarios", () => {
     expect(answered.decision).toBe("ELIGIBLE");
   });
 
-  it("a hard exclusion on a dimension canonical state cannot answer → UNDETERMINED, naming only the dimension", () => {
+  it("a hard exclusion on a dimension canonical state cannot answer → kept (ADR 0019), naming only the dimension", () => {
     const r = evaluateHardEligibility(
       input({
         mandate: mandate({
@@ -515,8 +528,13 @@ describe("eligibility policy v1 — golden scenarios", () => {
         }),
       }),
     );
-    expect(r.decision).toBe("UNDETERMINED");
+    // The live defect: an unmapped red_flag exclusion made every company
+    // UNDETERMINED and the feed empty. Unknown never excludes.
+    expect(r.decision).toBe("ELIGIBLE");
     expect(r.reasonCodes).toEqual(["HARD_CRITERION_NOT_EVALUABLE"]);
+    // Slate-level, not per company: it is the same for every company.
+    expect(unverifiedExclusions(r)).toEqual([]);
+    expect(excludingRules(r)).toEqual([]);
     const other = outcomeOf(r, "HARD_EXCLUSION_OTHER");
     expect(other?.detail).toBe("red_flag");
     expect(JSON.stringify(r)).not.toContain("secret_red_flag_code");
@@ -727,7 +745,7 @@ describe("eligibility policy v1 — golden scenarios", () => {
       ...ELIGIBILITY_CRITERIA,
     ]);
     expect(first.reasonCodes).toEqual([...first.reasonCodes].sort());
-    expect(first.decision).toBe("UNDETERMINED");
+    expect(first.decision).toBe("ELIGIBLE");
     // Different evaluation time, same decision and reasons.
     const later = evaluateHardEligibility({
       ...base,
@@ -754,5 +772,51 @@ describe("eligibility policy v1 — golden scenarios", () => {
         /PRIVATE|DECK|DOCUMENT|MEMORY|NOTE|RESEARCH|WEB|TAVILY|CONVERSATION|TRANSCRIPT|INFERRED|MODEL/,
       );
     }
+  });
+});
+
+describe("ADR 0019: a hard exclusion excludes only on positive evidence", () => {
+  const redFlag = constraint({
+    dimension: "red_flag",
+    value: { kind: "codes", values: ["litigation"] },
+  });
+  const seedOnly = constraint({
+    dimension: "stage",
+    operator: "NOT_IN",
+    value: { kind: "codes", values: ["seed"] },
+  });
+
+  it("an unevaluable exclusion keeps every company and is reported once per mandate", () => {
+    const m = mandate({ constraints: [redFlag, seedOnly] });
+    const kept = evaluateHardEligibility(
+      input({ mandate: m, company: company({ currentStageCode: "seed" }) }),
+    );
+    expect(kept.decision).toBe("ELIGIBLE");
+    expect(outcomeOf(kept, "HARD_EXCLUSION_OTHER")).toMatchObject({
+      outcome: "UNKNOWN",
+      reasonCode: "HARD_CRITERION_NOT_EVALUABLE",
+      detail: "red_flag",
+    });
+    if (m.kind !== "FOUND") throw new Error("fixture");
+    expect(unverifiableHardExclusions(m.mandate)).toEqual(["red_flag"]);
+    expect(declaredHardExclusions(m.mandate)).toEqual(["red_flag", "stage"]);
+  });
+
+  it("a positive match on a checkable exclusion still excludes, whatever else is unknown", () => {
+    const m = mandate({ constraints: [redFlag, seedOnly] });
+    const excluded = evaluateHardEligibility(
+      input({ mandate: m, company: company({ currentStageCode: "series_b" }) }),
+    );
+    expect(excluded.decision).toBe("INELIGIBLE");
+    expect(excluded.reasonCodes).toEqual([
+      "HARD_CRITERION_NOT_EVALUABLE",
+      "STAGE_OUTSIDE_HARD_MANDATE",
+    ]);
+    expect(excludingRules(excluded)).toEqual(["stage"]);
+  });
+
+  it("UNKNOWN on a gate that is not an exclusion still withholds: no ACTIVE mandate is UNDETERMINED", () => {
+    const r = evaluateHardEligibility(input({ mandate: { kind: "NONE" } }));
+    expect(r.decision).toBe("UNDETERMINED");
   });
 });

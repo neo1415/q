@@ -32,8 +32,14 @@ import { z } from "zod";
  * v2: only declared company classifications (user_selected, admin_curated)
  * answer a taxonomy hard exclusion. v1 let a Q inference or an extracted
  * suggestion on an excluded node make a company INELIGIBLE.
+ *
+ * v3 (ADR 0019): a declared hard exclusion excludes only on positive
+ * evidence that the company matches it. When the fact is missing, or V1
+ * cannot evaluate the rule's dimension at all, the criterion stays UNKNOWN
+ * and is reported, but it no longer makes the company UNDETERMINED: v2
+ * turned one unmapped `red_flag` exclusion into an empty feed.
  */
-export const ELIGIBILITY_POLICY_VERSION = "eligibility.v2" as const;
+export const ELIGIBILITY_POLICY_VERSION = "eligibility.v3" as const;
 
 /** Doc 19 §11. REC-001 evaluates INVESTOR_DISCOVER; the others are reserved. */
 export const RECOMMENDATION_MODES = [
@@ -50,9 +56,12 @@ export type RecommendationMode = z.infer<typeof RecommendationModeSchema>;
 export const ELIGIBILITY_SUPPORTED_MODES = ["INVESTOR_DISCOVER"] as const;
 
 /**
- * Tri-state. UNKNOWN ≠ MISMATCH: missing hard-gate information makes a
- * company UNDETERMINED, never INELIGIBLE. Only an explicit hard rule that is
- * definitively violated makes it INELIGIBLE.
+ * Tri-state. UNKNOWN ≠ MISMATCH: missing hard-gate information never makes
+ * a company INELIGIBLE. Only an explicit hard rule that is definitively
+ * violated does. A declared hard exclusion that cannot be checked leaves
+ * the company ELIGIBLE with the UNKNOWN criterion on the result (v3);
+ * UNDETERMINED is kept for gates that are not exclusions (the mandate
+ * itself, a relationship state this policy does not understand).
  */
 export const ELIGIBILITY_DECISIONS = [
   "ELIGIBLE",

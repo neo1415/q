@@ -1139,7 +1139,7 @@ describe("input refusal (§92 A–L)", () => {
   });
 
   it("a snapshot computed under a superseded eligibility policy or candidate generator is refused, even with a self-consistent fingerprint", () => {
-    expect(ELIGIBILITY_POLICY_VERSION).toBe("eligibility.v2");
+    expect(ELIGIBILITY_POLICY_VERSION).toBe("eligibility.v3");
     expect(STRUCTURED_GENERATOR_VERSION).toBe("structured-mandate.v4");
     const staleEligibility = refingerprint({
       ...good,

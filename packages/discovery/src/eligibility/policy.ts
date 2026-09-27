@@ -19,19 +19,23 @@ import type {
 } from "./ports.js";
 
 /**
- * Eligibility policy v2. Pure: snapshots in, decision out. Nothing here
+ * Eligibility policy v3. Pure: snapshots in, decision out. Nothing here
  * reads a database, calls a model, looks at a clock or knows what anybody
  * browsed, said to Q, uploaded or was found about on the public web.
  *
  * Decision rule, in this order of precedence:
  *
- *   any criterion FAIL     → INELIGIBLE   (an explicit hard rule is violated)
- *   else any UNKNOWN       → UNDETERMINED (a hard rule exists, the fact does not)
- *   else                   → ELIGIBLE
+ *   any criterion FAIL          → INELIGIBLE   (an explicit hard rule is violated)
+ *   else any gate UNKNOWN       → UNDETERMINED (mandate or relationship unclear)
+ *   else                        → ELIGIBLE     (hard exclusions it could not
+ *                                               check stay UNKNOWN on the result)
  *
  * A FAIL stands even when something else is unknown: a closed company is
  * ineligible whether or not its stage is known. An UNKNOWN never becomes a
- * FAIL: missing data lowers certainty, it never means "poor company".
+ * FAIL: missing data lowers certainty, it never means "poor company". And
+ * since v3 (ADR 0019) an UNKNOWN hard *exclusion* never withholds either:
+ * an exclusion removes a company only on positive evidence that it matches,
+ * so a rule that could not be checked is reported, not silently applied.
  *
  * Hard rules come from exactly two declared places (doc 19 §13, §15;
  * investors module): a mandate constraint with importance HARD_EXCLUSION,
@@ -216,30 +220,22 @@ function taxonomyCriterion(
  * Hard exclusions declared on dimensions that no canonical company field
  * answers in V1 (red flags, business attributes, founder attributes,
  * declared sector codes, investment role). The rule is real and the fact is
- * missing, so the honest outcome is UNKNOWN — not a silent pass, and never
- * a fill-in from a document, a memory or a model.
+ * missing, so the honest outcome is UNKNOWN — not a silent pass, not an
+ * exclusion (ADR 0019), and never a fill-in from a document, a memory or a
+ * model.
  */
 function otherHardCriterion(
   mandate: MandateSnapshotForEligibility,
 ): CriterionResult {
-  const other = mandate.constraints.filter(
-    (c) =>
-      c.isHardExclusion &&
-      c.importance === "HARD_EXCLUSION" &&
-      c.automatedUse === "ELIGIBLE" &&
-      c.dimension !== STAGE_DIMENSION &&
-      c.dimension !== GEOGRAPHY_DIMENSION,
-  );
-  if (other.length === 0)
+  const [first] = unverifiableHardExclusions(mandate);
+  if (first === undefined) {
     return result("HARD_EXCLUSION_OTHER", "NOT_APPLICABLE");
-  const [first] = [...other].sort((a, b) =>
-    a.dimension.localeCompare(b.dimension),
-  );
+  }
   return result(
     "HARD_EXCLUSION_OTHER",
     "UNKNOWN",
     "HARD_CRITERION_NOT_EVALUABLE",
-    first?.dimension,
+    first,
   );
 }
 
@@ -262,10 +258,112 @@ function relationshipCriterion(
   );
 }
 
+/**
+ * Declared hard exclusions. Their UNKNOWN means "could not be checked", and
+ * an unchecked exclusion never withholds (ADR 0019): it is reported through
+ * `unverifiedExclusions` instead.
+ */
+export const HARD_EXCLUSION_CRITERIA: readonly EligibilityCriterion[] = [
+  "HARD_EXCLUSION_TAXONOMY",
+  "HARD_EXCLUSION_STAGE",
+  "HARD_EXCLUSION_GEOGRAPHY",
+  "HARD_EXCLUSION_OTHER",
+];
+
+/** The rule code a person recognises for each company-answerable exclusion. */
+const EXCLUSION_RULE_CODE: Readonly<
+  Partial<Record<EligibilityCriterion, string>>
+> = {
+  HARD_EXCLUSION_TAXONOMY: "taxonomy",
+  HARD_EXCLUSION_STAGE: STAGE_DIMENSION,
+  HARD_EXCLUSION_GEOGRAPHY: GEOGRAPHY_DIMENSION,
+};
+
 function decide(criteria: readonly CriterionResult[]): EligibilityDecision {
   if (criteria.some((c) => c.outcome === "FAIL")) return "INELIGIBLE";
-  if (criteria.some((c) => c.outcome === "UNKNOWN")) return "UNDETERMINED";
+  if (
+    criteria.some(
+      (c) =>
+        c.outcome === "UNKNOWN" &&
+        !HARD_EXCLUSION_CRITERIA.includes(c.criterion),
+    )
+  ) {
+    return "UNDETERMINED";
+  }
   return "ELIGIBLE";
+}
+
+/**
+ * The declared exclusions this company's own facts could not answer (its
+ * stage, country or sector is not stated), as rule codes. Per company, so
+ * a card can say so. Exclusions on dimensions V1 cannot evaluate for any
+ * company are `unverifiableHardExclusions`, reported once per slate.
+ */
+export function unverifiedExclusions(result: EligibilityResult): string[] {
+  const out: string[] = [];
+  for (const c of result.criteria) {
+    const code = EXCLUSION_RULE_CODE[c.criterion];
+    if (c.outcome === "UNKNOWN" && code !== undefined) out.push(code);
+  }
+  return out;
+}
+
+/** The rule codes of every declared exclusion that removed this company. */
+export function excludingRules(result: EligibilityResult): string[] {
+  const out: string[] = [];
+  for (const c of result.criteria) {
+    if (
+      c.outcome !== "FAIL" ||
+      !HARD_EXCLUSION_CRITERIA.includes(c.criterion)
+    ) {
+      continue;
+    }
+    const code = EXCLUSION_RULE_CODE[c.criterion] ?? c.detail;
+    if (code !== undefined && code !== null) out.push(code);
+  }
+  return out;
+}
+
+/**
+ * Hard exclusions declared on dimensions no canonical company field answers
+ * in V1, distinct and sorted: the same for every company, so said once per
+ * slate rather than on every card.
+ */
+export function unverifiableHardExclusions(
+  mandate: MandateSnapshotForEligibility,
+): string[] {
+  return [
+    ...new Set(
+      mandate.constraints
+        .filter(
+          (c) =>
+            c.isHardExclusion &&
+            c.importance === "HARD_EXCLUSION" &&
+            c.automatedUse === "ELIGIBLE" &&
+            c.dimension !== STAGE_DIMENSION &&
+            c.dimension !== GEOGRAPHY_DIMENSION,
+        )
+        .map((c) => c.dimension),
+    ),
+  ].sort();
+}
+
+/** Every declared hard exclusion on the mandate, as rule codes, distinct and sorted. */
+export function declaredHardExclusions(
+  mandate: MandateSnapshotForEligibility,
+): string[] {
+  const codes = new Set<string>(
+    mandate.constraints
+      .filter(
+        (c) =>
+          c.isHardExclusion &&
+          c.importance === "HARD_EXCLUSION" &&
+          c.automatedUse === "ELIGIBLE",
+      )
+      .map((c) => c.dimension),
+  );
+  if (declaredExclusions(mandate).length > 0) codes.add("taxonomy");
+  return [...codes].sort();
 }
 
 export function evaluateHardEligibility(

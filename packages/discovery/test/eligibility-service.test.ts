@@ -287,7 +287,7 @@ describe("eligibility service", () => {
       mode: "INVESTOR_DISCOVER",
       mandateId: ACTIVE_MANDATE,
       taxonomyVersion: { industry: 1 },
-      eligibilityPolicyVersion: "eligibility.v2",
+      eligibilityPolicyVersion: "eligibility.v3",
     });
     expect(results.map((r) => [r.companyId, r.decision])).toEqual([
       [COMPANY, "ELIGIBLE"],
@@ -520,7 +520,7 @@ describe("eligibility service", () => {
     const line = JSON.stringify(logs[0]);
     expect(logs[0]).toMatchObject({
       mode: "INVESTOR_DISCOVER",
-      eligibilityPolicyVersion: "eligibility.v2",
+      eligibilityPolicyVersion: "eligibility.v3",
       mandateVersion: 2,
       requested: 2,
       evaluated: 2,

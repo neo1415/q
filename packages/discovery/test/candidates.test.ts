@@ -449,7 +449,7 @@ function eligibility(w: World): EligibilityService {
           mode: "INVESTOR_DISCOVER",
           mandateId: active?.mandateId ?? null,
           taxonomyVersion: null,
-          eligibilityPolicyVersion: "eligibility.v2",
+          eligibilityPolicyVersion: "eligibility.v3",
         },
         results,
       });
@@ -728,14 +728,22 @@ describe("structured candidate service", () => {
     expect(ids(await generated(w))).toContain(companyId(1));
   });
 
-  it("I, J. hard-excluded and not-ready companies are found raw and removed by REC-001, never rankable; unclassified ones become UNDETERMINED, not eligible", async () => {
+  it("I, J. hard-excluded and not-ready companies are found raw and removed by REC-001, never rankable; unclassified ones stay, the exclusion reported unverified (ADR 0019)", async () => {
     const r = await generated(withGamblingExclusion(world()));
     expect(r.diagnostics.rawHits).toBe(11);
-    expect(ids(r)).toEqual([companyId(1), companyId(3)]);
     expect(ids(r)).not.toContain(companyId(6));
     expect(ids(r)).not.toContain(companyId(7));
     expect(r.diagnostics.ineligible).toBe(2);
-    expect(r.diagnostics.undetermined).toBe(3);
+    expect(r.diagnostics.undetermined).toBe(0);
+    // Unclassified companies are kept, each carrying the unchecked rule.
+    const unverified = r.candidates.filter(
+      (c) =>
+        c.eligibility.criteria.find(
+          (x) => x.criterion === "HARD_EXCLUSION_TAXONOMY",
+        )?.outcome === "UNKNOWN",
+    );
+    expect(unverified).toHaveLength(3);
+    expect(r.candidates).toHaveLength(5);
   });
 
   it("K, Q. a private, undisclosed company in another organisation is never listed and never output", async () => {
@@ -759,7 +767,7 @@ describe("structured candidate service", () => {
     expect(reasons(r, 11)).toEqual(["STAGE_OVERLAP"]);
   });
 
-  it("UNDETERMINED is not rankable: a hard rule the company cannot answer keeps it out, counted separately", async () => {
+  it("an exclusion V1 cannot evaluate (red_flag) keeps every candidate: unknown never excludes (ADR 0019)", async () => {
     const w = world();
     const active = w.mandates[0];
     if (active === undefined) throw new Error("fixture");
@@ -778,9 +786,18 @@ describe("structured candidate service", () => {
       ],
     };
     const r = await generated(w);
-    expect(r.candidates).toEqual([]);
-    expect(r.diagnostics.undetermined).toBe(6);
+    const baseline = await generated(world());
+    // The live defect was an empty pool here. The same candidates as
+    // without the rule, each carrying the unevaluable criterion.
+    expect(ids(r)).toEqual(ids(baseline));
+    expect(r.candidates).toHaveLength(6);
+    expect(r.diagnostics.undetermined).toBe(0);
     expect(r.diagnostics.ineligible).toBe(1);
+    for (const c of r.candidates) {
+      expect(c.eligibility.reasonCodes).toContain(
+        "HARD_CRITERION_NOT_EVALUABLE",
+      );
+    }
   });
 
   it("L. DRAFT preferences have no effect; no ACTIVE mandate is a typed empty result, never a DRAFT fallback", async () => {
@@ -1031,6 +1048,6 @@ describe("structured candidate service", () => {
       expect("rank" in c).toBe(false);
     }
     expect(r.generatorVersion).toBe("structured-mandate.v4");
-    expect(r.eligibilityPolicyVersion).toBe("eligibility.v2");
+    expect(r.eligibilityPolicyVersion).toBe("eligibility.v3");
   });
 });

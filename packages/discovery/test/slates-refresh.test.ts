@@ -374,7 +374,7 @@ function collectingQueue(): RefreshQueue & {
 }
 
 const VERSIONS = {
-  eligibilityPolicyVersion: "eligibility.v2" as const,
+  eligibilityPolicyVersion: "eligibility.v3" as const,
   structuredGeneratorVersion: "structured-mandate.v4" as const,
   semanticGeneratorVersion: "semantic-mandate.v1" as const,
   featureSchemaVersion: FEATURE_SCHEMA_VERSION,
