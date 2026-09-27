@@ -17,7 +17,11 @@ test.describe("desktop application shell", () => {
       "page",
     );
     await expect(sidebar.getByRole("link", { name: "Profile" })).toBeVisible();
-    await expect(sidebar.getByRole("link", { name: "Ask Q" })).toBeVisible();
+    // No separate "Ask Q" entry: the Q page is Q (R24).
+    await expect(sidebar.getByRole("link", { name: "Ask Q" })).toHaveCount(0);
+    // On the Q page the sidebar starts as a rail; it expands on request.
+    const toggle = sidebar.getByRole("button", { name: "Expand sidebar" });
+    await expect(toggle).toHaveAttribute("aria-expanded", "false");
 
     // Exactly one Primary navigation is exposed: the mobile one is display:none.
     await expect(page.getByRole("navigation", { name: "Primary" })).toHaveCount(
@@ -28,6 +32,10 @@ test.describe("desktop application shell", () => {
 
     await nav.getByRole("link", { name: "Discover" }).click();
     await expect(page).toHaveURL(/\/discover$/);
+    // Elsewhere it starts open.
+    await expect(
+      sidebar.getByRole("button", { name: "Collapse sidebar" }),
+    ).toHaveAttribute("aria-expanded", "true");
     await expect(nav.getByRole("link", { name: "Discover" })).toHaveAttribute(
       "aria-current",
       "page",

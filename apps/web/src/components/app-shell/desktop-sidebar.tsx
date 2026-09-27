@@ -2,32 +2,42 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Suspense } from "react";
+import { Suspense, useState } from "react";
 
 import { cx } from "@capital-q/ui";
 import { ContextIndicator } from "@capital-q/ui/context-indicator";
-import { ICON_SIZE, ICON_STROKE } from "@capital-q/ui/icons";
+import {
+  History,
+  ICON_SIZE,
+  ICON_STROKE,
+  PanelLeft,
+  Plus,
+} from "@capital-q/ui/icons";
+import { Tooltip } from "@capital-q/ui/tooltip";
 
-import { ThemeToggle } from "@/features/appearance/theme-toggle";
-import { QMotionToggle } from "@/features/q-aperture";
+import { ThemeMenu } from "@/features/appearance/theme-menu";
 import { useHomeHref } from "@/features/q/active-conversation";
 import { ChatsListForRoute } from "@/features/q/chats-list";
 
 import type { ShellContext } from "./app-shell";
-import { GlobalQTrigger } from "./global-q";
 import {
   FOUNDER_MEDIA_NAVIGATION,
   isActiveRoute,
   PRIMARY_NAVIGATION,
   PROFILE_NAVIGATION,
 } from "./navigation";
+import { sidebarCollapsed, type SidebarOverride } from "./sidebar-state";
 
 /**
- * Desktop progressive enhancement of the same information architecture: a
- * compact light sidebar with the three primary areas, an honest organisation
- * context area, a Q shortcut and Profile kept secondary at the bottom.
+ * Desktop progressive enhancement of the same information architecture.
  * Hidden below the desktop breakpoint, where the bottom navigation is
  * canonical.
+ *
+ * Collapsible (R24). On the Q page it starts as a narrow rail of icons, so
+ * Q has the width; elsewhere it starts open. A choice made on one kind of
+ * page holds until the person moves to the other kind. The conversations
+ * list is the one way into past chats (no separate "Ask Q" entry: the Q
+ * page is Q, and the dock is Q everywhere else).
  */
 export function DesktopSidebar({
   context,
@@ -37,80 +47,142 @@ export function DesktopSidebar({
   const pathname = usePathname();
   // Home is the conversation this tab was in, not a new chat each visit.
   const home = useHomeHref();
+  const [override, setOverride] = useState<SidebarOverride | null>(null);
+  const collapsed = sidebarCollapsed(pathname, override);
+  const onQ = isActiveRoute(pathname, "/home");
+  const setCollapsed = (next: boolean) => {
+    setOverride({ onQ, collapsed: next });
+  };
+
+  const items = [
+    ...PRIMARY_NAVIGATION,
+    ...(context.scope === "founder_private" ? [FOUNDER_MEDIA_NAVIGATION] : []),
+  ];
 
   return (
-    <aside className="cq-shell-sidebar">
-      <div className="px-5 pt-6 pb-4">
-        <Link
-          href={home}
-          className="cq-title-md inline-block rounded-xs text-(--cq-text-primary)"
+    <aside
+      className="cq-shell-sidebar"
+      data-collapsed={collapsed ? "" : undefined}
+      data-sidebar
+    >
+      <div
+        className={cx(
+          "flex items-center gap-2 pt-4 pb-3",
+          collapsed ? "flex-col px-2" : "justify-between pr-2 pl-5",
+        )}
+      >
+        {collapsed ? null : (
+          <Link
+            href={home}
+            className="cq-title-md inline-block rounded-xs text-(--cq-text-primary)"
+          >
+            Capital Q
+          </Link>
+        )}
+        <Tooltip
+          content={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          side="right"
         >
-          Capital Q
-        </Link>
+          <button
+            type="button"
+            className="cq-sidebar-icon"
+            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+            aria-expanded={!collapsed}
+            onClick={() => {
+              setCollapsed(!collapsed);
+            }}
+            data-sidebar-toggle
+          >
+            <PanelLeft
+              aria-hidden="true"
+              size={ICON_SIZE.regular}
+              strokeWidth={ICON_STROKE}
+            />
+          </button>
+        </Tooltip>
       </div>
 
-      <nav aria-label="Primary" className="px-3">
+      <nav aria-label="Primary" className={collapsed ? "px-2" : "px-3"}>
         <ul className="flex flex-col gap-0.5">
-          {PRIMARY_NAVIGATION.map((item) => (
+          {items.map((item) => (
             <li key={item.href}>
               <SidebarLink
                 href={item.href === "/home" ? home : item.href}
                 label={item.label}
                 Icon={item.icon}
                 active={isActiveRoute(pathname, item.href)}
+                compact={collapsed}
               />
             </li>
           ))}
-          {context.scope === "founder_private" ? (
-            <li>
-              <SidebarLink
-                href={FOUNDER_MEDIA_NAVIGATION.href}
-                label={FOUNDER_MEDIA_NAVIGATION.label}
-                Icon={FOUNDER_MEDIA_NAVIGATION.icon}
-                active={isActiveRoute(pathname, FOUNDER_MEDIA_NAVIGATION.href)}
-              />
-            </li>
-          ) : null}
         </ul>
       </nav>
 
-      {/* The person's conversations with Q, collapsible (ADR 0012). */}
-      <Suspense fallback={null}>
-        <ChatsListForRoute variant="sidebar" />
-      </Suspense>
+      {collapsed ? (
+        /* The conversations control, folded to its two actions. */
+        <div className="flex flex-col items-center gap-0.5 px-2 pt-6">
+          <Tooltip content="New chat" side="right">
+            <Link
+              href="/home"
+              className="cq-sidebar-icon"
+              aria-label="New chat"
+            >
+              <Plus
+                aria-hidden="true"
+                size={ICON_SIZE.regular}
+                strokeWidth={ICON_STROKE}
+              />
+            </Link>
+          </Tooltip>
+          <Tooltip content="Chats" side="right">
+            <button
+              type="button"
+              className="cq-sidebar-icon"
+              aria-label="Show chats"
+              onClick={() => {
+                setCollapsed(false);
+              }}
+              data-sidebar-chats
+            >
+              <History
+                aria-hidden="true"
+                size={ICON_SIZE.regular}
+                strokeWidth={ICON_STROKE}
+              />
+            </button>
+          </Tooltip>
+        </div>
+      ) : (
+        <>
+          {/* The person's conversations with Q, collapsible (ADR 0012). */}
+          <Suspense fallback={null}>
+            <ChatsListForRoute variant="sidebar" />
+          </Suspense>
 
-      <div className="mt-6 flex flex-col gap-3 border-t border-(--cq-border-subtle) px-5 pt-5">
-        {/* An unset organisation is one honest cue, not a section about
-            its absence (design/visual-debt.md, sidebar row). */}
-        {context.scope === "unset" ? null : (
-          <p className="cq-label text-(--cq-text-secondary)">Organisation</p>
+          <div className="mt-6 flex flex-col gap-2 border-t border-(--cq-border-subtle) px-5 pt-5">
+            {/* Where this person is acting: the scope, out of the input. */}
+            <ContextIndicator scope={context.scope} detail={context.label} />
+          </div>
+        </>
+      )}
+
+      <div
+        className={cx(
+          "mt-auto flex gap-1 border-t border-(--cq-border-subtle) py-3",
+          collapsed ? "flex-col items-center px-2" : "items-center px-3",
         )}
-        <ContextIndicator scope={context.scope} detail={context.label} />
-      </div>
-
-      <div className="px-3 pt-6">
-        <GlobalQTrigger variant="sidebar" />
-      </div>
-
-      <div className="mt-auto flex flex-col gap-2 border-t border-(--cq-border-subtle) px-3 py-3">
-        {/* The appearance choice lives in the chrome, visible without
-            opening anything (ADR 0017 F4). */}
-        <div className="flex items-center justify-between gap-2 pl-3">
-          <span className="cq-caption text-(--cq-text-secondary)">Theme</span>
-          <ThemeToggle display="icons" />
+      >
+        <div className={collapsed ? "" : "min-w-0 flex-1"}>
+          <SidebarLink
+            href={PROFILE_NAVIGATION.href}
+            label={PROFILE_NAVIGATION.label}
+            Icon={PROFILE_NAVIGATION.icon}
+            active={isActiveRoute(pathname, PROFILE_NAVIGATION.href)}
+            compact={collapsed}
+          />
         </div>
-        <div className="flex items-center justify-between gap-2 pl-3">
-          <span className="cq-caption text-(--cq-text-secondary)">
-            Q motion
-          </span>
-          <QMotionToggle />
-        </div>
-        <SidebarLink
-          href={PROFILE_NAVIGATION.href}
-          label={PROFILE_NAVIGATION.label}
-          Icon={PROFILE_NAVIGATION.icon}
-          active={isActiveRoute(pathname, PROFILE_NAVIGATION.href)}
-        />
+        {/* The appearance choice, one icon (R24; ADR 0017 F4). */}
+        <ThemeMenu align={collapsed ? "start" : "end"} />
       </div>
     </aside>
   );
@@ -121,18 +193,22 @@ function SidebarLink({
   label,
   Icon,
   active,
+  compact,
 }: {
   readonly href: string;
   readonly label: string;
   readonly Icon: (typeof PRIMARY_NAVIGATION)[number]["icon"];
   readonly active: boolean;
+  readonly compact: boolean;
 }) {
-  return (
+  const link = (
     <Link
       href={href}
       aria-current={active ? "page" : undefined}
+      aria-label={compact ? label : undefined}
       className={cx(
-        "relative flex min-h-10 items-center gap-3 rounded-md px-3 cq-body-sm transition-colors duration-(--cq-motion-fast)",
+        "relative flex min-h-11 items-center rounded-md cq-body-sm transition-colors duration-(--cq-motion-fast)",
+        compact ? "w-11 justify-center" : "gap-3 px-3",
         active
           ? "bg-(--cq-accent-soft) font-medium text-(--cq-text-primary)"
           : "text-(--cq-text-secondary) hover:bg-(--cq-surface-subtle) hover:text-(--cq-text-primary)",
@@ -149,7 +225,14 @@ function SidebarLink({
         size={ICON_SIZE.regular}
         strokeWidth={ICON_STROKE}
       />
-      <span>{label}</span>
+      {compact ? null : <span>{label}</span>}
     </Link>
+  );
+  return compact ? (
+    <Tooltip content={label} side="right">
+      {link}
+    </Tooltip>
+  ) : (
+    link
   );
 }

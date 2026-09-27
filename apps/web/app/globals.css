@@ -78,6 +78,26 @@
     display: none;
   }
 
+  /* A 44 px icon control in the sidebar (R24; WCAG 2.5.8). */
+  .cq-sidebar-icon {
+    display: inline-flex;
+    width: 44px;
+    height: 44px;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--cq-radius-md);
+    color: var(--cq-text-secondary);
+    transition:
+      color var(--cq-motion-fast) var(--cq-ease),
+      background-color var(--cq-motion-fast) var(--cq-ease);
+  }
+  .cq-sidebar-icon:hover,
+  .cq-sidebar-icon[aria-current="page"] {
+    color: var(--cq-text-primary);
+    background-color: var(--cq-surface-subtle);
+  }
+
   .cq-shell-body {
     display: flex;
     min-width: 0;
@@ -1178,6 +1198,42 @@
     border: none;
     cursor: pointer;
   }
+  /* Mute and End, inside the typing field while the line is open (R24). */
+  .cq-q-field-control {
+    display: inline-flex;
+    min-height: 44px;
+    align-items: center;
+    gap: 6px;
+    border-radius: var(--cq-radius-md);
+    padding: 0 12px;
+    font: inherit;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--cq-text-primary);
+    background: var(--cq-surface-subtle);
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: background-color var(--cq-motion-fast) var(--cq-ease);
+  }
+  .cq-q-field-control:hover,
+  .cq-q-field-control:focus-visible {
+    background: var(--cq-surface-strong);
+    border-color: var(--cq-border-strong);
+    outline: none;
+  }
+  .cq-q-field-control:active {
+    transform: scale(0.97);
+  }
+  .cq-q-field-control:disabled {
+    opacity: 0.5;
+    cursor: default;
+  }
+  .cq-q-field-control.is-active,
+  .cq-q-field-control.is-end {
+    background: var(--cq-text-primary);
+    color: var(--cq-text-inverse);
+  }
+
   .cq-stage-input {
     flex: 1 1 auto;
     min-height: 44px;
@@ -1263,6 +1319,15 @@
       background-color: var(--cq-surface);
       padding-top: var(--cq-safe-top);
       padding-left: var(--cq-safe-left);
+      overflow-x: hidden;
+      overflow-y: auto;
+      scrollbar-width: thin;
+      transition: width var(--cq-motion-base) var(--cq-ease);
+    }
+
+    /* Folded to a rail of icons (R24): the Q page's default. */
+    .cq-shell-sidebar[data-collapsed] {
+      width: 64px;
     }
 
     .cq-shell-header,

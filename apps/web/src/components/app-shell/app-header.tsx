@@ -2,12 +2,14 @@ import Link from "next/link";
 
 import { ContextIndicator } from "@capital-q/ui/context-indicator";
 
+import { ThemeMenu } from "@/features/appearance/theme-menu";
+
 import { AccountMenu } from "./account-menu";
 import type { ShellContext } from "./app-shell";
 
 /**
- * Compact mobile top bar: wordmark, the current context and the account
- * menu (whose first row is the theme). Q is the floating dock on a phone
+ * Compact mobile top bar: wordmark, the current context (the scope, never
+ * inside the input), the theme as one icon and the account menu. Q is the floating dock on a phone
  * (ADR 0017 F1), not a header button. Hidden on desktop.
  */
 export function AppHeader({ context }: { readonly context: ShellContext }) {
@@ -26,6 +28,7 @@ export function AppHeader({ context }: { readonly context: ShellContext }) {
             detail={context.label}
             compact
           />
+          <ThemeMenu align="end" />
           <AccountMenu founder={context.scope === "founder_private"} />
         </div>
       </div>

@@ -53,7 +53,10 @@ const NAMES: Readonly<Record<ThemeChoice, string>> = {
 
 const ICONS = { system: Monitor, light: Sun, dark: Moon } as const;
 
-function useThemeChoice(): readonly [ThemeChoice, (next: ThemeChoice) => void] {
+export function useThemeChoice(): readonly [
+  ThemeChoice,
+  (next: ThemeChoice) => void,
+] {
   const choice = useSyncExternalStore<ThemeChoice>(
     subscribeToTheme,
     readStoredTheme,

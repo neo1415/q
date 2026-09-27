@@ -18,9 +18,8 @@ import { ArtifactDownloads, artifactFileUrl } from "./artifact-download";
  * textarea and deliberately not JSON — the point of an artifact is that
  * somebody can read it and decide whether to send it.
  *
- * On a wide screen it is a panel beside Q, so the conversation stays
- * reachable and "Edit with Q" is one sentence away rather than one
- * navigation. On a narrow one it takes the screen, with a plain way back.
+ * It opens as a large modal over the Q page (R24), closable with its own
+ * Close, Escape or the backdrop; the conversation is still there beneath.
  *
  * A deck is the same document with slides (QX-004 §5-§7). The slides are
  * drawn by the Q API from the stored version and arrive as SVG, so the
@@ -188,7 +187,7 @@ export function ArtifactViewer({
 
   return (
     <aside
-      className="flex min-h-0 flex-col gap-4 overflow-y-auto rounded-lg border border-(--cq-border-subtle) bg-(--cq-surface-raised) p-4"
+      className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto bg-(--cq-surface-raised) p-4 sm:p-6"
       aria-label="Document"
       data-q-artifact-viewer={artifactId}
     >
@@ -212,11 +211,11 @@ export function ArtifactViewer({
         </div>
         <button
           type="button"
-          className={buttonClassName("quiet", "compact")}
+          className={buttonClassName("quiet", "regular")}
           onClick={onClose}
           data-q-artifact-close
         >
-          Back to Q
+          Close
         </button>
       </div>
 

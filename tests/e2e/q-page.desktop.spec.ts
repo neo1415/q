@@ -29,6 +29,15 @@ test("opens as the voice stage, with Talk first and typing beside it", async ({
   const stage = page.locator("[data-q-workspace]");
   await expect(stage).toHaveAttribute("data-q-stage", "ready");
   await expect(page.locator("[data-q-workspace] .cq-aperture")).toBeVisible();
+  // Q is on screen without scrolling, every side bar is closed (R24).
+  await expect(page.locator("[data-q-workspace] .cq-aperture")).toBeInViewport({
+    ratio: 1,
+  });
+  await expect(page.locator("[data-sidebar]")).toHaveAttribute(
+    "data-collapsed",
+    "",
+  );
+  await expect(page.locator("[data-q-aside]")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Talk with Q" })).toBeVisible();
   await expect(page.getByRole("textbox", { name: "Ask Q" })).toBeVisible();
   // No microphone was requested just by arriving.

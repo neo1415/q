@@ -301,7 +301,7 @@ describe("QX-003E · the viewer", () => {
   it("gets out of the way when asked", async () => {
     const onClose = vi.fn();
     render(<ArtifactViewer artifactId={ARTIFACT} onClose={onClose} />);
-    await userEvent.click(screen.getByText("Back to Q"));
+    await userEvent.click(screen.getByRole("button", { name: "Close" }));
     expect(onClose).toHaveBeenCalled();
   });
 });

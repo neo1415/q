@@ -16,8 +16,14 @@ import type { QSessionValue } from "./q-session";
 export function QNow({
   session,
   onAct,
+  quietWhenIdle = false,
 }: {
   readonly session: QSessionValue;
+  /**
+   * On the stage, an idle "Now" says nothing worth the space (R23): it
+   * renders only when something runs, waits or asks.
+   */
+  readonly quietWhenIdle?: boolean | undefined;
   /** Answer one of Q's questions (typed, or down the open line). */
   readonly onAct: (text: string) => void;
 }) {
@@ -32,6 +38,7 @@ export function QNow({
   const questions = openQuestions(turns);
   const stage = workingLabel(q.state);
   const nothing = !q.working && approval === null && questions.length === 0;
+  if (nothing && quietWhenIdle) return null;
 
   return (
     <section

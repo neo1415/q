@@ -7,6 +7,10 @@ import { expect, test } from "@playwright/test";
 test("fits the phone and opens the Board as a sheet", async ({ page }) => {
   await page.goto("/home");
   await expect(page.locator("[data-q-workspace]")).toBeVisible();
+  // Q is on screen on arrival, not scrolled away above the welcome (R24).
+  await expect(page.locator("[data-q-workspace] .cq-aperture")).toBeInViewport({
+    ratio: 1,
+  });
   const overflow = await page.evaluate(
     () =>
       document.documentElement.scrollWidth -
