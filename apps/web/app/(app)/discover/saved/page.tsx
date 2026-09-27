@@ -6,7 +6,6 @@ import {
   listSavedCompanies,
 } from "@capital-q/api-client";
 import { buttonClassName } from "@capital-q/ui/button";
-import { ChevronRight, ICON_SIZE } from "@capital-q/ui/icons";
 import { EmptyState } from "@capital-q/ui/states";
 
 import {
@@ -14,6 +13,7 @@ import {
   PageHeader,
 } from "@/components/app-shell/page-container";
 import { countryLabel, stageLabel } from "@/features/company/declared-labels";
+import { SavedCompanies } from "@/features/discover/saved-companies";
 import { apiSession } from "@/features/q/context";
 
 export const metadata: Metadata = { title: "Saved" };
@@ -76,43 +76,20 @@ export default async function SavedPage() {
           }
         />
       ) : (
-        <ul className="flex flex-col divide-y divide-(--cq-border-subtle)">
-          {companies.map((company) => {
+        <SavedCompanies
+          companies={companies.map((company) => {
             const facts = [
               stageLabel(company.currentStageCode),
               countryLabel(company.headquartersCountry),
             ].filter((part): part is string => part !== null);
-            return (
-              <li key={company.companyId}>
-                <Link
-                  href={`/company/${encodeURIComponent(company.companyId)}`}
-                  className="flex min-h-11 items-center gap-3 py-3 text-(--cq-text-primary) hover:text-(--cq-accent)"
-                >
-                  <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                    <span className="cq-body font-medium">
-                      {company.canonicalName}
-                    </span>
-                    {facts.length === 0 ? null : (
-                      <span className="cq-caption text-(--cq-text-secondary)">
-                        {facts.join(" · ")}
-                      </span>
-                    )}
-                    {company.shortDescription === null ? null : (
-                      <span className="cq-body-sm text-(--cq-text-secondary)">
-                        {company.shortDescription}
-                      </span>
-                    )}
-                  </span>
-                  <ChevronRight
-                    aria-hidden="true"
-                    size={ICON_SIZE.compact}
-                    className="shrink-0 text-(--cq-text-tertiary)"
-                  />
-                </Link>
-              </li>
-            );
+            return {
+              companyId: company.companyId,
+              name: company.canonicalName,
+              facts: facts.length === 0 ? null : facts.join(" · "),
+              description: company.shortDescription,
+            };
           })}
-        </ul>
+        />
       )}
     </PageContainer>
   );
