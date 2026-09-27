@@ -8,7 +8,7 @@ import {
   Q_CONTEXT_FIREWALL_POLICY_VERSION,
   type QResultBlock,
 } from "@capital-q/contracts";
-import type { QTurnReader } from "@capital-q/model-gateway/q";
+import type { QTurnReader, QTurnReading } from "@capital-q/model-gateway/q";
 import type { TurnReaderV8Result as TurnReaderV3Result } from "@capital-q/q-core";
 import type { GetInvestorMandateOutput } from "@capital-q/q-tools";
 import type {
@@ -30,6 +30,7 @@ import {
   personsRecentWords,
   sameCompanyName,
 } from "../src/company/document-request.js";
+import type { OwnRecordNames } from "../src/company/own-names.js";
 import type { ArtifactPreparation } from "../src/company/prepare-artifact.js";
 
 /**
@@ -185,8 +186,10 @@ function prepareReading(
 
 function seam(options: {
   readonly history: readonly QConversationMessage[];
-  readonly reading: TurnReaderV3Result;
+  readonly reading: QTurnReading;
   readonly result?: CompanyIntelligenceResult;
+  /** The names on the person's own records (failure 6). */
+  readonly ownRecords?: OwnRecordNames;
   /** The artifact service fails when asked to file the document. */
   readonly prepareFails?: boolean;
   /** The person's own mandate, as the tool would return it. */
@@ -229,6 +232,13 @@ function seam(options: {
       },
     },
     artifacts,
+    ...(options.ownRecords === undefined
+      ? {}
+      : {
+          ownRecords: {
+            read: () => Promise.resolve(options.ownRecords as OwnRecordNames),
+          },
+        }),
     ...(options.ownMandate === undefined
       ? {}
       : {
@@ -579,5 +589,131 @@ describe('a founder\'s "PDF describing my company" ends on a real PDF card (fake
         status: "READY",
       }),
     ]);
+  });
+});
+
+describe("founder live 2026-09-27 · own company binds; misheard names resolve; several documents in one turn", () => {
+  const OWN = "c0000000-0000-4000-8000-00000000000c";
+  const RECORDS: OwnRecordNames = {
+    company: { companyId: OWN, names: ["Zino Aviation", "ZINO AVIATION LTD"] },
+    firm: { names: ["Harbour Angels"] },
+    person: { names: ["Adaeze Okafor"] },
+  };
+  const ownResult = { ...publicResult(DESCRIBED, 3), companyId: OWN };
+
+  function deck(subjectName: string | null) {
+    return {
+      kind: "PREPARE_DOCUMENT" as const,
+      destination: null,
+      visibility: null,
+      documentType: "PITCH_DECK" as const,
+      subjectName,
+    };
+  }
+
+  it("makes the deck about their own company whatever name the reader heard for it, typed or spoken, never asking which", async () => {
+    // What the reader may hand over for "my company": nothing, the
+    // recorded name the person never said, a misheard form they did say,
+    // or their own name ("a deck for me").
+    const cases: readonly { said: string; heard: string | null }[] = [
+      { said: "make a pitch deck for my company", heard: null },
+      { said: "a deck on the business I run, please", heard: "Zino Aviation" },
+      { said: "pitch deck for Zener Aviation", heard: "Zener Aviation" },
+      { said: "deck for Xeno Aviation, my company", heard: "Xeno Aviation" },
+      { said: "everything about me, as a deck", heard: "Adaeze Okafor" },
+    ];
+    for (const { said, heard } of cases) {
+      const s = seam({
+        history: [message("USER", said)],
+        reading: prepareReading(heard),
+        result: ownResult,
+        subjects: [{ kind: "COMPANY", companyId: OWN }],
+        ownRecords: RECORDS,
+      });
+      await s.run();
+      expect(s.stored[0]?.content, said).not.toMatch(/which company/i);
+      // Their record, never a public search for the misheard form.
+      expect(s.investigated, said).toHaveLength(1);
+      expect(s.investigated[0]?.company, said).toEqual({
+        kind: "COMPANY",
+        companyId: OWN,
+      });
+      expect(s.prepared, said).toHaveLength(1);
+      expect(s.stored[0]?.content, said).toContain("Zino Aviation");
+    }
+  });
+
+  it("keeps a different company different: a name near none of their records is researched as said", async () => {
+    for (const other of ["Acme Rockets", "Delta Aviation", "Kino Aviation"]) {
+      const s = seam({
+        history: [message("USER", `make a pitch deck for ${other}`)],
+        reading: prepareReading(other),
+        result: ownResult,
+        subjects: [{ kind: "COMPANY", companyId: OWN }],
+        ownRecords: RECORDS,
+      });
+      await s.run();
+      const publicSearch = s.investigated.find(
+        (request) => request.company.kind === "PUBLIC_COMPANY",
+      );
+      expect(publicSearch?.company, other).toEqual({
+        kind: "PUBLIC_COMPANY",
+        name: other,
+      });
+    }
+  });
+
+  it("still asks when the reader names a company that is neither said nor theirs", async () => {
+    const s = seam({
+      history: [message("USER", "make me a pitch deck")],
+      reading: prepareReading("Acme Rockets"),
+      ownRecords: RECORDS,
+    });
+    await s.run();
+    expect(s.investigated).toHaveLength(0);
+    expect(s.stored[0]?.content).toMatch(/which company/i);
+  });
+
+  it("researches a misheard name as recorded when it is their own firm, not their company", async () => {
+    const s = seam({
+      history: [message("USER", "a pitch deck on Harbor Angles")],
+      reading: prepareReading("Harbor Angles"),
+      ownRecords: { ...RECORDS, company: null },
+    });
+    await s.run();
+    expect(s.investigated[0]?.company).toEqual({
+      kind: "PUBLIC_COMPANY",
+      name: "Harbour Angels",
+    });
+    expect(s.investigated[0]?.question).toContain("Harbour Angels");
+  });
+
+  it("makes every document asked for in one turn, each with its card, in one message", async () => {
+    const s = seam({
+      history: [
+        message(
+          "USER",
+          "a PDF of my mandate and a PPTX pitch deck for my company",
+        ),
+      ],
+      reading: {
+        ...ownMandateReading(),
+        moreDocuments: [deck(null), deck(null)],
+      },
+      ownMandate: mandateRecord("ACTIVE"),
+      result: ownResult,
+      subjects: [{ kind: "COMPANY", companyId: OWN }],
+      ownRecords: RECORDS,
+    });
+    await s.run();
+    expect(s.delegated()).toBe(0);
+    // The mandate and one deck: the same document asked twice is made once.
+    expect(s.prepared.map((input) => input["artifactType"])).toEqual([
+      "INVESTOR_MANDATE",
+      "PITCH_DECK",
+    ]);
+    expect(s.stored).toHaveLength(1);
+    expect(s.stored[0]?.blocks).toHaveLength(2);
+    expect(s.stored[0]?.content).not.toMatch(/which company/i);
   });
 });

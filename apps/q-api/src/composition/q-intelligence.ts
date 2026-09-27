@@ -43,6 +43,7 @@ import {
   createSpecialistQAnswer,
   createToolCanonicalPort,
   createToolOwnMandatePort,
+  createToolOwnRecordsPort,
   type ArtifactPreparation,
   type QVisibilityNotebook,
 } from "@capital-q/q-specialists";
@@ -301,6 +302,19 @@ export function composeQIntelligence(
     // Their own mandate, for a mandate document (gap 3): read through the
     // same tool, under the run's plan.
     ownMandate: createToolOwnMandatePort(tools, logger),
+    // The names on their own records, so a company name they said —
+    // misheard by speech-to-text or not — resolves to what is theirs
+    // before anything is researched (founder live 2026-09-27, #6).
+    ownRecords: createToolOwnRecordsPort({
+      tools,
+      ...(dependencies.ownOnboarding === undefined
+        ? {}
+        : {
+            personName: async (actor) =>
+              (await dependencies.ownOnboarding?.read(actor))?.name ?? null,
+          }),
+      ...(logger === undefined ? {} : { logger }),
+    }),
     // The tools the answer's model is offered for this run: with what is
     // composed they pick the run's entries of the capability registry
     // (R20), which the turn reader and the answer's note are given.

@@ -45,6 +45,12 @@ import {
 } from "@capital-q/q-runtime";
 
 import type { QSpecialist, QSpecialistProbe } from "./contracts.js";
+import type { QOwnRecordsPort } from "./own-records-port.js";
+import {
+  NO_OWN_RECORDS,
+  resolveOwnRecord,
+  type OwnRecordMatch,
+} from "./company/own-names.js";
 import type {
   CompanyIntelligenceRequest,
   CompanyIntelligenceResult,
@@ -141,6 +147,20 @@ export type SpecialistQAnswerDependencies = {
         ) => Promise<GetInvestorMandateOutput | "NOT_AN_INVESTOR" | null>;
       }
     | undefined;
+  /**
+   * The names on the person's own records (their company, firm and own
+   * name), read under this run's plan, so a company name they said —
+   * misheard or not — is checked against what is theirs before anything
+   * is researched (founder live 2026-09-27, failure 6). Absent: no name
+   * is resolved and the reading is used as said.
+   */
+  readonly ownRecords?: QOwnRecordsPort | undefined;
+};
+
+/** What one requested document came to: a line, and its card when made. */
+type DocumentReply = {
+  readonly content: string;
+  readonly blocks?: readonly QResultBlock[] | undefined;
 };
 
 /** The proposer's side of a visibility reading; nothing here applies it. */
@@ -448,6 +468,36 @@ export function createSpecialistQAnswer(
    * The reply is the result, briefly: the person asked for a document,
    * not for an account of one.
    */
+  /**
+   * The person's own record a name the reader heard refers to, if any
+   * (founder live 2026-09-27, failure 6). Read only when a name was heard;
+   * a failed read resolves nothing and the name is used as heard.
+   */
+  async function ownRecordFor(
+    request: QAnswerRequest,
+    heard: string | null,
+  ): Promise<(OwnRecordMatch & { readonly companyId: string | null }) | null> {
+    const port = dependencies.ownRecords;
+    if (heard === null || port === undefined) return null;
+    const records = await port.read(request).catch((error: unknown) => {
+      if (request.signal?.aborted === true) throw error;
+      logger?.warn(
+        { err: error, qRunId: request.runId },
+        "the person's own records were not read to resolve a name",
+      );
+      return NO_OWN_RECORDS;
+    });
+    const match = resolveOwnRecord(heard, records);
+    if (match === null) return null;
+    if (!match.exact) {
+      logger?.info(
+        { qRunId: request.runId, resolvedTo: match.kind },
+        "a name the person said resolved to one of their own records",
+      );
+    }
+    return { ...match, companyId: records.company?.companyId ?? null };
+  }
+
   async function prepareDocument(
     request: QAnswerRequest,
     history: readonly QConversationMessage[],
@@ -460,11 +510,28 @@ export function createSpecialistQAnswer(
     readonly blocks?: readonly QResultBlock[] | undefined;
   }> {
     const noun = ask.documentType === "PITCH_DECK" ? "deck" : "brief";
+    const record = request.subjects.find(
+      (subject): subject is Extract<typeof subject, { kind: "COMPANY" }> =>
+        subject.kind === "COMPANY",
+    );
+    // The name the reader heard, checked against the person's own records
+    // before anything else: their own company named (or misheard) is their
+    // own company, and research uses the name as recorded.
+    const mine = await ownRecordFor(request, ask.subjectName);
+    const ownCompany =
+      mine !== null &&
+      record !== undefined &&
+      (mine.kind === "OWN_COMPANY" ||
+        (mine.kind === "OWN_PERSON" && mine.companyId !== null)) &&
+      mine.companyId === record.companyId;
+    const subjectName = ownCompany
+      ? null
+      : (mine?.recordedName ?? ask.subjectName);
     // Asked for again: the one already made.
     const existing = existingDocumentCard({
       history,
       documentType: ask.documentType,
-      subjectName: ask.subjectName,
+      subjectName,
     });
     if (existing !== null) {
       return {
@@ -477,18 +544,16 @@ export function createSpecialistQAnswer(
     const latest = [...history].reverse().find((m) => m.role === "USER");
     const said = latest?.content ?? "";
     const personsWords = personsRecentWords(history);
-    const record = request.subjects.find(
-      (subject): subject is Extract<typeof subject, { kind: "COMPANY" }> =>
-        subject.kind === "COMPANY",
-    );
-    if (ask.subjectName === null && record === undefined) {
+    if (subjectName === null && record === undefined) {
       return { content: `Which company should the ${noun} be about?` };
     }
     if (
-      ask.subjectName !== null &&
-      !namedByPerson(ask.subjectName, personsWords)
+      subjectName !== null &&
+      mine === null &&
+      !namedByPerson(subjectName, personsWords)
     ) {
-      // The reader named a company the person never did.
+      // The reader named a company the person never did, and it is none
+      // of theirs.
       return { content: `Which company should the ${noun} be about?` };
     }
 
@@ -506,8 +571,13 @@ export function createSpecialistQAnswer(
         {
           company: { kind: "PUBLIC_COMPANY", name },
           // The person's own recent words: what the search may be built
-          // from, and what the findings are read against.
-          question: personsWords,
+          // from, and what the findings are read against. A name resolved
+          // to one of their own records travels as recorded: it is their
+          // own identity, and the misheard form names nobody.
+          question:
+            mine === null
+              ? personsWords
+              : `${personsWords}\n${mine.recordedName}`,
           publicResearch: true,
         },
         context,
@@ -522,19 +592,19 @@ export function createSpecialistQAnswer(
       );
       // Their company, unless they named another one.
       const theirs =
-        ask.subjectName === null ||
+        subjectName === null ||
         (onRecord.companyName !== null &&
           onRecord.companyName !== undefined &&
-          sameCompanyName(onRecord.companyName, ask.subjectName));
+          sameCompanyName(onRecord.companyName, subjectName));
       if (theirs) {
         result = onRecord;
         subject = record;
       } else {
-        result = await investigatePublic(ask.subjectName);
+        result = await investigatePublic(subjectName);
         subject = undefined;
       }
     } else {
-      result = await investigatePublic(ask.subjectName ?? "");
+      result = await investigatePublic(subjectName ?? "");
       subject = undefined;
     }
     last = result;
@@ -545,7 +615,7 @@ export function createSpecialistQAnswer(
       return { content: publicBlockedMessage(result.blocked) };
     }
 
-    const name = result.companyName ?? ask.subjectName ?? "your company";
+    const name = result.companyName ?? subjectName ?? "your company";
     const preparation = await prepareOrReviseArtifact({
       artifacts: artifacts as ArtifactPreparation,
       request,
@@ -616,25 +686,22 @@ export function createSpecialistQAnswer(
    */
   async function prepareOwnMandate(
     request: QAnswerRequest,
-    conversationId: QConversationMessage["conversationId"],
     preparation: ArtifactPreparation,
-  ): Promise<QAnswerOutcome> {
+  ): Promise<DocumentReply> {
     const port = dependencies.ownMandate;
     const record = port === undefined ? null : await port.read(request);
     if (record === "NOT_AN_INVESTOR") {
-      return recordAnswer(
-        request,
-        conversationId,
-        "A mandate document is for an investor's own mandate, and there isn't one set up for you here.",
-      );
+      return {
+        content:
+          "A mandate document is for an investor's own mandate, and there isn't one set up for you here.",
+      };
     }
     const document = record === null ? null : composeOwnMandateDocument(record);
     if (document === null) {
-      return recordAnswer(
-        request,
-        conversationId,
-        "There's no mandate on your record yet, so there's nothing to put in a document. Set it up with me and I'll make it.",
-      );
+      return {
+        content:
+          "There's no mandate on your record yet, so there's nothing to put in a document. Set it up with me and I'll make it.",
+      };
     }
     try {
       const summary = await preparation.port.prepare({
@@ -648,13 +715,11 @@ export function createSpecialistQAnswer(
           content: document.content,
         },
       });
-      return recordAnswer(
-        request,
-        conversationId,
-        document.draft
+      return {
+        content: document.draft
           ? "Here's your mandate as it stands. It's marked as a draft because it isn't confirmed yet. Download the PDF from the card."
           : "Here's your mandate. Download the PDF from the card.",
-        [
+        blocks: [
           {
             kind: "ARTIFACT_REFERENCE",
             artifactId: summary.artifactId,
@@ -663,19 +728,95 @@ export function createSpecialistQAnswer(
             title: summary.title,
           },
         ],
-      );
+      };
     } catch (error: unknown) {
       if (request.signal?.aborted === true) throw error;
       logger?.warn(
         { err: error, qRunId: request.runId },
         "the mandate document could not be filed",
       );
-      return recordAnswer(
-        request,
-        conversationId,
-        "I couldn't prepare your mandate document just now. Ask me again in a moment and I'll make it.",
-      );
+      return {
+        content:
+          "I couldn't prepare your mandate document just now. Ask me again in a moment and I'll make it.",
+      };
     }
+  }
+
+  /**
+   * One requested document, made (or why not, said plainly). Null: this
+   * seam is not composed to make that kind of document.
+   */
+  async function documentReply(
+    request: QAnswerRequest,
+    tool: TurnToolV8,
+    history: readonly QConversationMessage[],
+  ): Promise<DocumentReply | null> {
+    if (tool.kind !== "PREPARE_DOCUMENT" || artifacts === undefined) {
+      return null;
+    }
+    if (tool.documentType === "OWN_MANDATE") {
+      if (dependencies.ownMandate === undefined) return null;
+      return prepareOwnMandate(request, artifacts);
+    }
+    const companyDocument =
+      tool.documentType === "PITCH_DECK" ||
+      tool.documentType === "INVESTMENT_BRIEF"
+        ? tool.documentType
+        : null;
+    if (companyDocument === null) return null;
+    const noun = companyDocument === "PITCH_DECK" ? "deck" : "brief";
+    try {
+      return await prepareDocument(request, history, {
+        documentType: companyDocument,
+        subjectName: tool.subjectName,
+      });
+    } catch (error: unknown) {
+      if (request.signal?.aborted === true) throw error;
+      // Asked for a document and not given one: said so, by name, never
+      // answered as if nothing had been asked (B1).
+      logger?.warn(
+        {
+          err: error,
+          qRunId: request.runId,
+          documentType: tool.documentType,
+        },
+        "a document Q was asked for could not be prepared",
+      );
+      return {
+        content: `I couldn't prepare the ${noun} just now. Ask me again in a moment and I'll make it.`,
+      };
+    }
+  }
+
+  /**
+   * Every document the turn asked for, each made in turn, answered in one
+   * message with each card (founder live 2026-09-27, failure 7: "a PDF of
+   * my mandate AND a PPTX deck" made neither). The same document asked
+   * twice is made once. Null: none of them is something this seam makes.
+   */
+  async function actOnDocuments(
+    request: QAnswerRequest,
+    conversationId: QConversationMessage["conversationId"],
+    tools: readonly TurnToolV8[],
+    history: readonly QConversationMessage[],
+  ): Promise<QAnswerOutcome | null> {
+    const seen = new Set<string>();
+    const replies: DocumentReply[] = [];
+    for (const tool of tools) {
+      const key = `${tool.documentType ?? ""}:${tool.subjectName?.toLowerCase() ?? ""}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const reply = await documentReply(request, tool, history);
+      if (reply !== null) replies.push(reply);
+    }
+    if (replies.length === 0) return null;
+    const blocks = replies.flatMap((reply) => reply.blocks ?? []);
+    return recordAnswer(
+      request,
+      conversationId,
+      replies.map((reply) => reply.content).join("\n\n"),
+      blocks.length === 0 ? undefined : blocks,
+    );
   }
 
   /**
@@ -699,52 +840,18 @@ export function createSpecialistQAnswer(
     history: readonly QConversationMessage[],
     /** The screens this run can open, from the capability registry. */
     navigable: readonly QNavigateDestination[],
+    moreDocuments: readonly TurnToolV8[] = [],
   ): Promise<QAnswerOutcome | null> {
     const company = request.subjects.find(
       (subject) => subject.kind === "COMPANY",
     );
-    if (
-      tool.kind === "PREPARE_DOCUMENT" &&
-      tool.documentType === "OWN_MANDATE"
-    ) {
-      if (artifacts === undefined || dependencies.ownMandate === undefined) {
-        return null;
-      }
-      return prepareOwnMandate(request, conversationId, artifacts);
-    }
-    const companyDocument =
-      tool.documentType === "PITCH_DECK" ||
-      tool.documentType === "INVESTMENT_BRIEF"
-        ? tool.documentType
-        : null;
-    if (tool.kind === "PREPARE_DOCUMENT" && companyDocument !== null) {
-      if (artifacts === undefined) return null;
-      const noun = companyDocument === "PITCH_DECK" ? "deck" : "brief";
-      let done: Awaited<ReturnType<typeof prepareDocument>>;
-      try {
-        done = await prepareDocument(request, history, {
-          documentType: companyDocument,
-          subjectName: tool.subjectName,
-        });
-      } catch (error: unknown) {
-        if (request.signal?.aborted === true) throw error;
-        // Asked for a document and not given one: said so, by name, never
-        // answered as if nothing had been asked (B1).
-        logger?.warn(
-          {
-            err: error,
-            qRunId: request.runId,
-            documentType: tool.documentType,
-          },
-          "a document Q was asked for could not be prepared",
-        );
-        return recordAnswer(
-          request,
-          conversationId,
-          `I couldn't prepare the ${noun} just now. Ask me again in a moment and I'll make it.`,
-        );
-      }
-      return recordAnswer(request, conversationId, done.content, done.blocks);
+    if (tool.kind === "PREPARE_DOCUMENT") {
+      return actOnDocuments(
+        request,
+        conversationId,
+        [tool, ...moreDocuments],
+        history,
+      );
     }
     if (tool.kind === "NAVIGATE" && tool.unknownScreen !== null) {
       logger?.info(
@@ -1006,6 +1113,7 @@ export function createSpecialistQAnswer(
         tool,
         history,
         manifestOf(capabilities).navigate,
+        read?.moreDocuments ?? [],
       );
       if (acted !== null) {
         remember(

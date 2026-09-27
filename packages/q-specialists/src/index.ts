@@ -152,6 +152,15 @@ export {
 } from "./company/prepare-artifact.js";
 export { createToolOwnMandatePort } from "./own-mandate-port.js";
 export {
+  createToolOwnRecordsPort,
+  type QOwnRecordsPort,
+} from "./own-records-port.js";
+export {
+  resolveOwnRecord,
+  type OwnRecordMatch,
+  type OwnRecordNames,
+} from "./company/own-names.js";
+export {
   composeOwnMandateDocument,
   OWN_MANDATE_ARTIFACT_TYPE,
   type OwnMandateDocument,
