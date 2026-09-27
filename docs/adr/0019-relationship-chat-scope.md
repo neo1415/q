@@ -62,9 +62,16 @@ The controlling sources say:
   `supabase_realtime` publication under RLS so a server-held realtime
   channel (or an SSE bridge like q-stream over LISTEN/NOTIFY) can replace
   polling without a schema change.
-- Attachments and voice notes are document references to the sender
-  organisation's own documents that went through the existing upload
-  pipeline (scan first); bytes never pass the app origin.
+- Attachments are references to the sender organisation's own documents
+  that went through the existing upload pipeline and scanned CLEAN; the
+  message stores a title/type/size snapshot, never a key or URL, and bytes
+  never pass the app origin. The schema and contract also carry
+  `VOICE_NOTE` (a document reference plus duration), but the upload policy
+  admits no audio type yet, so the web does not record voice notes.
+- Opening a shared file needs a counterpart download path (a short-lived
+  signed read, authorised per thread). None exists in V1 (Evidence returns
+  no download URL by design); it is the next integration point, together
+  with audio admissibility for voice notes.
 - Q: present, but acts only when a person invokes it (@Q or the Ask Q
   button). It reads a thread only for a party (list_messages tool), and
   sends only as a Prepare→Approve `chat.message.send`. Reminders and
