@@ -262,3 +262,20 @@ export {
   type QRecommendation,
   type QRecommendationPublicSourceType,
 } from "./application/q-recommendations.js";
+export {
+  decideOnboardingNudge,
+  EMPTY_NUDGE_STATE,
+  minutesLeft,
+  nudgeStreak,
+  ONBOARDING_NUDGE_POLICY,
+  ONBOARDING_NUDGE_SURFACES,
+  recordNudgeChoice,
+  recordNudgeShown,
+  type OnboardingNudgeChoice,
+  type OnboardingNudgeDecision,
+  type OnboardingNudgePolicyConfig,
+  type OnboardingNudgeProgress,
+  type OnboardingNudgeQuiet,
+  type OnboardingNudgeState,
+  type OnboardingNudgeSurface,
+} from "./domain/nudge-policy.js";
