@@ -159,6 +159,18 @@ lead-owned files touched, open questions.
 | `vn3/voice-stutter`    | VN3          | R22 voice stutter                                                                                                                           | branch created at `d6085ed`, no commits yet                                    |
 | `docs/cloud-handoff`   | DOCS         | this handoff                                                                                                                                | merge onto recovery (docs only)                                                |
 
+**Founder decisions, 2026-09-27:**
+
+- **Narrated deck videos are made IN THE CLOUD** (R19, part of item 5).
+  - `sudo apt-get install -y ffmpeg` on the VM.
+  - Render the deck PDF slides to images; write a short Q script per company yourself (no paid model).
+  - Narrate with ElevenLabs through the deployed q-api speak relay or the ElevenLabs API credential. Keep to about 12k characters in total for 12 companies; the Creator plan has ~100k left.
+  - Mux to MP4 (9:16 or 16:9, 60-90 s).
+  - Publish through the DEPLOYED app's own pitch upload flow, signed in as each seeded founder. `POST /v1/companies/:id/pitch` returns a direct Cloudflare upload URL; upload the bytes there. So the cloud needs no Cloudflare key.
+  - Label each video "AI-narrated". No voice cloning.
+- **Seeded world goes to hosted:** run the SEED runner with `--hosted` once it's merged. It is idempotent, sets the synthetic marker in app_metadata, and demo passwords come from env. The founder keeps registering their own fresh accounts to test the real flows.
+- **Auth:** hosted `site_url` and redirect allow list are fixed (2026-09-27). Email delivery needs the founder's free SMTP: see `setup-email-and-meetings.md`, "Update 2026-09-27".
+
 ## 8. The queue: the Monday definition of done, in order
 
 This is playbook section 0, in the same order, with the state at handoff. Finish higher items first and **deploy each item as it lands**, so Monday shows the best achievable product even if the bottom is unfinished. Labels: **NOT STARTED**, **PARTLY BUILT**, **DONE-NOT-DEPLOYED**, **LIVE**.
