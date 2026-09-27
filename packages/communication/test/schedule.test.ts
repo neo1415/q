@@ -1,0 +1,439 @@
+import { describe, expect, it } from "vitest";
+
+import type { ActorContext } from "@capital-q/security";
+
+import {
+  createScheduleService,
+  googleEventIdFor,
+  proposeSlots,
+  type ChatParty,
+} from "../src/index.js";
+import {
+  createFakeAppEmail,
+  createFakeCalendar,
+  createInMemoryScheduleStore,
+  createRecordingMeetingActivity,
+  createStaticMeetingDirectory,
+  inlineScheduleTransactions,
+} from "../src/testing/index.js";
+
+/**
+ * BIZ-008 against fakes: no Google, no SMTP, no model. Slots, the
+ * approved schedule (idempotent, counterparty-only invitees, activity,
+ * T-15 reminder), organiser-only move/cancel, reminders delivered in-app
+ * and by email, and the T-24h prep brief.
+ */
+
+const REL = "00000000-0000-4000-8000-00000000c001";
+const COMPANY_TENANT = "00000000-0000-4000-8000-0000000000a1";
+const INVESTOR_TENANT = "00000000-0000-4000-8000-0000000000a2";
+
+function actor(userId: string, tenantId: string): ActorContext {
+  return {
+    userId,
+    tenantId,
+    organisationId: "00000000-0000-4000-8000-0000000000c1",
+    membershipId: "00000000-0000-4000-8000-0000000000e1",
+    actorType: "HUMAN",
+  } as ActorContext;
+}
+
+const INVESTOR = actor("00000000-0000-4000-8000-0000000000b1", INVESTOR_TENANT);
+const FOUNDER = actor("00000000-0000-4000-8000-0000000000f1", COMPANY_TENANT);
+const STRANGER = actor("00000000-0000-4000-8000-0000000000e9", INVESTOR_TENANT);
+
+// Monday 5 October 2026, 08:00 London (07:00 UTC).
+const NOW = new Date("2026-10-05T07:00:00Z");
+
+function world(options: { connected?: boolean; now?: Date } = {}) {
+  let clock = options.now ?? NOW;
+  const store = createInMemoryScheduleStore();
+  const activity = createRecordingMeetingActivity();
+  const email = createFakeAppEmail();
+  const investorCalendar = createFakeCalendar("ben@vc.example.invalid");
+  const founderCalendar = createFakeCalendar("ada@co.example.invalid");
+  const parties = (a: ActorContext, relationshipId: string) => {
+    if (relationshipId !== REL) return Promise.resolve(null);
+    const party: ChatParty | null =
+      a.userId === INVESTOR.userId
+        ? { side: "INVESTOR", connected: options.connected ?? true }
+        : a.userId === FOUNDER.userId
+          ? { side: "COMPANY", connected: options.connected ?? true }
+          : null;
+    return Promise.resolve(party);
+  };
+  let ids = 0;
+  const service = createScheduleService({
+    store,
+    transactions: inlineScheduleTransactions,
+    parties,
+    directory: createStaticMeetingDirectory({
+      relationshipTenant: COMPANY_TENANT,
+      people: {
+        COMPANY: [
+          {
+            userId: FOUNDER.userId,
+            tenantId: COMPANY_TENANT,
+            name: "Ada",
+            email: "ada@co.example.invalid",
+          },
+        ],
+        INVESTOR_ORGANISATION: [
+          {
+            userId: INVESTOR.userId,
+            tenantId: INVESTOR_TENANT,
+            name: "Ben",
+            email: "ben@vc.example.invalid",
+          },
+        ],
+      },
+      persons: {
+        [INVESTOR.userId]: { name: "Ben", email: "ben@vc.example.invalid" },
+        [FOUNDER.userId]: { name: "Ada", email: "ada@co.example.invalid" },
+      },
+    }),
+    calendars: (userId) =>
+      Promise.resolve(
+        userId === INVESTOR.userId
+          ? investorCalendar
+          : userId === FOUNDER.userId
+            ? founderCalendar
+            : null,
+      ),
+    activity,
+    email,
+    now: () => clock,
+    newId: () => `00000000-0000-4000-8000-${String(++ids).padStart(12, "0")}`,
+  });
+  return {
+    service,
+    store,
+    activity,
+    email,
+    investorCalendar,
+    founderCalendar,
+    advance: (to: Date) => {
+      clock = to;
+    },
+  };
+}
+
+const SCHEDULE = {
+  actor: INVESTOR,
+  relationshipId: REL,
+  purpose: "Intro call",
+  startsAt: new Date("2026-10-06T09:00:00Z"),
+  durationMinutes: 30,
+  idempotencyKey: "q-action:0001-schedule",
+  correlationId: "cor_00000000-0000-4000-8000-000000000001",
+};
+
+describe("slot proposal", () => {
+  it("offers three weekday times inside 09:00-17:30 local, spread across days, avoiding busy", () => {
+    const slots = proposeSlots({
+      now: NOW,
+      from: NOW,
+      to: new Date("2026-10-12T00:00:00Z"),
+      durationMinutes: 30,
+      timeZone: "Europe/London",
+      busy: [
+        // Monday 09:00-12:00 London is taken.
+        {
+          start: new Date("2026-10-05T08:00:00Z"),
+          end: new Date("2026-10-05T11:00:00Z"),
+        },
+      ],
+    });
+    expect(slots.map((s) => s.start.toISOString())).toEqual([
+      "2026-10-05T11:00:00.000Z",
+      "2026-10-06T08:00:00.000Z",
+      "2026-10-07T08:00:00.000Z",
+    ]);
+  });
+
+  it("skips weekends and respects the organiser's zone", () => {
+    const friday = new Date("2026-10-09T15:00:00Z");
+    const slots = proposeSlots({
+      now: friday,
+      from: friday,
+      to: new Date("2026-10-14T00:00:00Z"),
+      durationMinutes: 60,
+      timeZone: "America/New_York",
+      busy: [],
+    });
+    // Friday 11:00 New York is past the one-hour lead; next is 12:00 EDT.
+    expect(slots[0]?.start.toISOString()).toBe("2026-10-09T16:00:00.000Z");
+    expect(slots[1]?.start.toISOString()).toBe("2026-10-12T13:00:00.000Z");
+  });
+
+  it("uses the counterparty's busy blocks where they connected a calendar", async () => {
+    const w = world();
+    w.founderCalendar.busyTimes = [
+      {
+        start: new Date("2026-10-05T08:00:00Z"),
+        end: new Date("2026-10-05T16:30:00Z"),
+      },
+    ];
+    const result = await w.service.findSlots({
+      actor: INVESTOR,
+      relationshipId: REL,
+      durationMinutes: 30,
+    });
+    expect(result.outcome).toBe("OK");
+    if (result.outcome !== "OK") return;
+    expect(result.timeZone).toBe("Europe/London");
+    expect(result.slots).toHaveLength(3);
+    expect(result.slots[0]?.start.toISOString()).toBe(
+      "2026-10-06T08:00:00.000Z",
+    );
+  });
+
+  it("refuses a non-party, an unconnected relationship and an unconnected calendar", async () => {
+    expect(
+      (
+        await world().service.findSlots({
+          actor: STRANGER,
+          relationshipId: REL,
+          durationMinutes: 30,
+        })
+      ).outcome,
+    ).toBe("REFUSED");
+    const unconnected = await world({ connected: false }).service.findSlots({
+      actor: INVESTOR,
+      relationshipId: REL,
+      durationMinutes: 30,
+    });
+    expect(unconnected).toEqual({ outcome: "REFUSED", code: "NOT_CONNECTED" });
+  });
+});
+
+describe("schedule, reschedule, cancel", () => {
+  it("creates one event with a Meet link, invites only the other side, records activity and a T-15 reminder", async () => {
+    const w = world();
+    const result = await w.service.schedule(SCHEDULE);
+    expect(result.outcome).toBe("OK");
+    if (result.outcome !== "OK") return;
+    expect(result.meeting.meetLink).toBe(
+      "https://meet.google.com/abc-defg-hij",
+    );
+    expect(result.alreadyScheduled).toBe(false);
+    const [event] = w.investorCalendar.inserted;
+    expect(event?.eventId).toBe(googleEventIdFor(result.meeting.id));
+    expect(event?.attendees.map((a) => a.email)).toEqual([
+      "ada@co.example.invalid",
+    ]);
+    expect(w.activity.recorded).toEqual([
+      { eventType: "meeting_scheduled", meetingId: result.meeting.id },
+    ]);
+    const reminder = w.store.reminders.find(
+      (r) => r.meetingId === result.meeting.id,
+    );
+    expect(reminder?.dueAt.toISOString()).toBe("2026-10-06T08:45:00.000Z");
+    expect(reminder?.channel).toBe("EMAIL");
+    expect(w.store.notifications.map((n) => [n.userId, n.kind])).toEqual([
+      [FOUNDER.userId, "MEETING_SCHEDULED"],
+    ]);
+  });
+
+  it("is idempotent per execution identity: a retry never invites twice", async () => {
+    const w = world();
+    await w.service.schedule(SCHEDULE);
+    const again = await w.service.schedule(SCHEDULE);
+    expect(again.outcome === "OK" && again.alreadyScheduled).toBe(true);
+    expect(w.investorCalendar.inserted).toHaveLength(1);
+    expect(w.activity.recorded).toHaveLength(1);
+  });
+
+  it("retries a failed insert with the same event id", async () => {
+    const w = world();
+    w.investorCalendar.failInsert = Object.assign(new Error("503"), {
+      code: "UNAVAILABLE",
+      retryable: true,
+    });
+    const failed = await w.service.schedule(SCHEDULE);
+    expect(failed).toEqual({
+      outcome: "FAILED",
+      code: "CALENDAR_UNAVAILABLE",
+      retryable: true,
+    });
+    w.investorCalendar.failInsert = null;
+    const retried = await w.service.schedule(SCHEDULE);
+    expect(retried.outcome).toBe("OK");
+    expect(w.store.meetings).toHaveLength(1);
+    expect(w.investorCalendar.inserted).toHaveLength(1);
+  });
+
+  it("refuses a time in the past and a non-party", async () => {
+    const w = world();
+    expect(
+      await w.service.schedule({
+        ...SCHEDULE,
+        startsAt: new Date("2026-10-01T09:00:00Z"),
+      }),
+    ).toEqual({ outcome: "REFUSED", code: "INVALID_TIME" });
+    expect(await w.service.schedule({ ...SCHEDULE, actor: STRANGER })).toEqual({
+      outcome: "REFUSED",
+      code: "NOT_A_PARTY",
+    });
+    expect(w.investorCalendar.inserted).toHaveLength(0);
+  });
+
+  it("lets only the organiser move or cancel; cancel deletes the event and records meeting_cancelled once", async () => {
+    const w = world();
+    const scheduled = await w.service.schedule(SCHEDULE);
+    if (scheduled.outcome !== "OK") throw new Error("not scheduled");
+    const id = scheduled.meeting.id;
+    expect(
+      await w.service.cancel({
+        actor: FOUNDER,
+        meetingId: id,
+        correlationId: SCHEDULE.correlationId,
+      }),
+    ).toEqual({ outcome: "REFUSED", code: "NOT_FOUND" });
+
+    const moved = await w.service.reschedule({
+      actor: INVESTOR,
+      meetingId: id,
+      startsAt: new Date("2026-10-07T13:00:00Z"),
+      correlationId: SCHEDULE.correlationId,
+    });
+    expect(moved.outcome === "OK" && moved.meeting.endsAt).toBe(
+      "2026-10-07T13:30:00.000Z",
+    );
+    expect(
+      w.store.reminders.find((r) => r.meetingId === id)?.dueAt.toISOString(),
+    ).toBe("2026-10-07T12:45:00.000Z");
+
+    const cancelled = await w.service.cancel({
+      actor: INVESTOR,
+      meetingId: id,
+      correlationId: SCHEDULE.correlationId,
+    });
+    expect(cancelled).toEqual({ outcome: "OK", alreadyDone: false });
+    const again = await w.service.cancel({
+      actor: INVESTOR,
+      meetingId: id,
+      correlationId: SCHEDULE.correlationId,
+    });
+    expect(again).toEqual({ outcome: "OK", alreadyDone: true });
+    expect(w.investorCalendar.cancelled).toEqual([googleEventIdFor(id)]);
+    expect(w.activity.recorded.map((r) => r.eventType)).toEqual([
+      "meeting_scheduled",
+      "meeting_rescheduled",
+      "meeting_cancelled",
+    ]);
+    expect(w.store.reminders.find((r) => r.meetingId === id)?.status).toBe(
+      "CANCELLED",
+    );
+  });
+
+  it("shows the Meet link only to invited people", async () => {
+    const w = world();
+    await w.service.schedule(SCHEDULE);
+    const seen = await w.service.listMeetings(FOUNDER, REL);
+    expect(seen?.[0]?.meetLink).toBe("https://meet.google.com/abc-defg-hij");
+    expect(await w.service.listMeetings(STRANGER, REL)).toBeNull();
+  });
+});
+
+describe("reminders and briefs", () => {
+  it("delivers a due reminder in-app once and by email once", async () => {
+    const w = world();
+    const created = await w.service.createReminder({
+      actor: FOUNDER,
+      title: "Follow up with Ben",
+      dueAt: new Date("2026-10-09T09:00:00Z"),
+      relationshipId: REL,
+      channel: "EMAIL",
+      idempotencyKey: "q-action:0002-reminder",
+    });
+    expect(created.outcome).toBe("OK");
+    expect(await w.service.deliverDue("cor")).toEqual({
+      delivered: 0,
+      emailed: 0,
+    });
+    w.advance(new Date("2026-10-09T09:00:30Z"));
+    expect(await w.service.deliverDue("cor")).toEqual({
+      delivered: 1,
+      emailed: 1,
+    });
+    expect(await w.service.deliverDue("cor")).toEqual({
+      delivered: 0,
+      emailed: 0,
+    });
+    expect(w.email.sent).toEqual([
+      {
+        to: "ada@co.example.invalid",
+        subject: "Reminder: Follow up with Ben",
+        text: "Follow up with Ben\n\nOpen Capital Q to act on it.",
+      },
+    ]);
+    const notices = await w.service.listNotifications(FOUNDER);
+    expect(notices.unread).toBe(1);
+    await w.service.markNotificationsRead(
+      FOUNDER,
+      notices.items.map((n) => n.id),
+    );
+    expect((await w.service.listNotifications(FOUNDER)).unread).toBe(0);
+  });
+
+  it("retries a failed email next tick without a second in-app notice", async () => {
+    const w = world();
+    await w.service.createReminder({
+      actor: FOUNDER,
+      title: "Send the deck",
+      dueAt: NOW,
+      channel: "EMAIL",
+      idempotencyKey: "own-reminder-0001",
+    });
+    w.email.fail = true;
+    expect(await w.service.deliverDue("cor")).toEqual({
+      delivered: 1,
+      emailed: 0,
+    });
+    w.email.fail = false;
+    expect(await w.service.deliverDue("cor")).toEqual({
+      delivered: 0,
+      emailed: 1,
+    });
+    expect(w.store.notifications).toHaveLength(1);
+  });
+
+  it("refuses a reminder about a relationship the person is not party to", async () => {
+    const w = world();
+    expect(
+      await w.service.createReminder({
+        actor: STRANGER,
+        title: "Snoop",
+        dueAt: NOW,
+        relationshipId: REL,
+        channel: "IN_APP",
+        idempotencyKey: "own-reminder-0002",
+      }),
+    ).toEqual({ outcome: "REFUSED", code: "NOT_A_PARTY" });
+  });
+
+  it("prepares one prep brief for the organiser within 24 hours of the call", async () => {
+    const w = world();
+    await w.service.schedule(SCHEDULE);
+    await w.service.createReminder({
+      actor: INVESTOR,
+      title: "Ask about churn",
+      dueAt: new Date("2026-10-10T09:00:00Z"),
+      relationshipId: REL,
+      channel: "IN_APP",
+      idempotencyKey: "own-reminder-0003",
+    });
+    // 26 hours before: not yet.
+    expect(await w.service.prepareBriefs("cor")).toBe(0);
+    w.advance(new Date("2026-10-05T09:30:00Z"));
+    expect(await w.service.prepareBriefs("cor")).toBe(1);
+    expect(await w.service.prepareBriefs("cor")).toBe(0);
+    const meetingId = w.store.meetings[0]?.id ?? "";
+    const brief = await w.service.brief(INVESTOR, meetingId);
+    expect(brief?.body).toContain("Prep brief: Intro call");
+    expect(brief?.body).toContain("With: Ada Ventures (Ada)");
+    expect(brief?.body).toContain("- Ask about churn");
+    expect(await w.service.brief(FOUNDER, meetingId)).toBeNull();
+  });
+});

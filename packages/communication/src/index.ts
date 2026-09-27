@@ -35,7 +35,47 @@ export type {
 export { createPostgresChatStore } from "./postgres.js";
 export {
   composeChat,
+  composeSchedule,
   createChatDocuments,
   createNetworkChatParties,
   type OwnDocumentLookup,
 } from "./compose.js";
+
+// BIZ-008: meetings, reminders, notifications.
+export {
+  createScheduleService,
+  googleEventIdFor,
+  type AppEmailPort,
+  type CalendarDirectory,
+  type MeetingView,
+  type OrganiserCalendar,
+  type ReminderView,
+  type ScheduleOutcome,
+  type ScheduleRefusal,
+  type ScheduleService,
+  type ScheduleServiceDependencies,
+} from "./schedule/service.js";
+export {
+  isKnownTimeZone,
+  proposeSlots,
+  SLOT_POLICY,
+  type Interval,
+} from "./schedule/slots.js";
+export {
+  composePrepBrief,
+  PREP_BRIEF_COMPOSER_VERSION,
+} from "./schedule/brief.js";
+export type {
+  MeetingActivityWriter,
+  MeetingDirectory,
+  MeetingParticipant,
+  MeetingRecord,
+  NotificationRecord,
+  ReminderRecord,
+  ScheduleStore,
+} from "./schedule/store.js";
+export {
+  createNetworkMeetingActivityWriter,
+  createPostgresMeetingDirectory,
+  createPostgresScheduleStore,
+} from "./schedule/postgres.js";

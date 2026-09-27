@@ -4,6 +4,18 @@ import type { ActorContext } from "@capital-q/security";
 
 import { createPostgresChatStore } from "./postgres.js";
 import {
+  createNetworkMeetingActivityWriter,
+  createPostgresMeetingDirectory,
+  createPostgresScheduleStore,
+} from "./schedule/postgres.js";
+import {
+  createScheduleService,
+  type AppEmailPort,
+  type CalendarDirectory,
+  type ScheduleService,
+  type ScheduleServiceDependencies,
+} from "./schedule/service.js";
+import {
   createChatService,
   type ChatDocumentPort,
   type ChatDownloadPort,
@@ -82,5 +94,29 @@ export function composeChat(options: {
     documents: createChatDocuments(options.ownDocument),
     downloads: options.downloads,
     newCorrelationId: options.newCorrelationId,
+  });
+}
+
+/** Meetings, reminders and notifications (BIZ-008): api, q-api, workers. */
+export function composeSchedule(options: {
+  readonly sql: DatabaseExecutor;
+  readonly transactions: TransactionManager;
+  readonly interests: Pick<InterestService, "relationshipById">;
+  readonly calendars: CalendarDirectory;
+  readonly email: AppEmailPort;
+  readonly logger?: ScheduleServiceDependencies["logger"];
+}): ScheduleService {
+  return createScheduleService({
+    store: createPostgresScheduleStore({
+      sql: options.sql,
+      transactions: options.transactions,
+    }),
+    transactions: options.transactions,
+    parties: createNetworkChatParties(options.interests),
+    directory: createPostgresMeetingDirectory({ sql: options.sql }),
+    calendars: options.calendars,
+    activity: createNetworkMeetingActivityWriter(),
+    email: options.email,
+    logger: options.logger,
   });
 }
