@@ -60,7 +60,7 @@ select is(
   (select count(*)::int from pg_proc p
      join pg_namespace n on n.oid = p.pronamespace
     where n.nspname = 'private' and p.prosecdef),
-  4, 'exactly the four reviewed SECURITY DEFINER helpers exist in private');
+  5, 'exactly the five reviewed SECURITY DEFINER helpers exist in private (R34 adds is_conversation_party)');
 
 select ok(not has_function_privilege('anon', 'private.current_app_user_id()', 'execute'),
   'anon cannot execute private.current_app_user_id');

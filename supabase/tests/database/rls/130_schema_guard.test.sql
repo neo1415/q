@@ -265,7 +265,9 @@ select is(
   (select coalesce(string_agg(p.proname, ', ' order by 1), '')
      from pg_proc p join pg_namespace n on n.oid = p.pronamespace
     where n.nspname = 'private' and p.prosecdef
-      and p.proname not in ('handle_new_auth_user', 'current_app_user_id', 'is_tenant_member', 'is_organisation_member')),
+      and p.proname not in ('handle_new_auth_user', 'current_app_user_id', 'is_tenant_member', 'is_organisation_member',
+                            -- R34: party check for chat RLS, reviewed 2026-09-27 (search_path '', boolean only, membership-based).
+                            'is_conversation_party')),
   '',
   'the set of SECURITY DEFINER helpers is exactly the reviewed set (new ones are listed on failure)');
 
