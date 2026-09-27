@@ -102,6 +102,8 @@ import {
 } from "@capital-q/taxonomy";
 import {
   createDecidedClaimOwnerLookup,
+  createPostgresPendingSyntheticClaimSource,
+  createSyntheticAutoVerifySweep,
   createSyntheticVerificationDecider,
   createVerificationClaimsReadinessPort,
 } from "@capital-q/verification";
@@ -142,6 +144,10 @@ import { createPipelineMetrics } from "./documents/metrics.js";
 import { createUnavailableMalwareScanner } from "./documents/malware.js";
 import { createDomainEventHandler } from "./events/document-processing-handler.js";
 import { createProductionEventRegistry } from "./event-registry.js";
+import {
+  runSyntheticAutoVerifySweeps,
+  verificationAttestationFor,
+} from "./verification/auto-verify.js";
 import { withVerificationDecisions } from "./verification/decide-handler.js";
 import { withReadinessAfterVerification } from "./verification/readiness-handler.js";
 import { withRelationshipProjection } from "./network/relationship-projection-handler.js";
@@ -579,13 +585,45 @@ const mediaModeration = createPostgresAutomatedModeration({
  * is null wherever real people are served, so there the decider refuses
  * every request by name and each stays PENDING.
  */
+// R43, temporary until BIZ-006 /ops (TODO(BIZ-006)): without the
+// allowance, hosted staging falls back to SYNTHETIC_AUTO_VERIFY_POLICY,
+// which needs no synthetic variable and still verifies only accounts
+// whose app_metadata marks them synthetic. Production gets neither.
+const verification = verificationAttestationFor({
+  syntheticDemo,
+  environment: config.runtime.deploymentEnvironment,
+});
 const verificationDecider = createSyntheticVerificationDecider({
   sql: database.sql,
   transactions: database.transactions,
   outbox: createOutboxWriter({ registry }),
-  attestation: syntheticDemo,
+  attestation: verification.attestation,
   environment: config.runtime.deploymentEnvironment,
 });
+// Requests already PENDING (the earlier seed, or events consumed while the
+// decider refused) are offered to the same decider at startup and then
+// every 10 minutes, at most 200 per run.
+const syntheticAutoVerifySweep =
+  verification.attestation === null
+    ? undefined
+    : createSyntheticAutoVerifySweep({
+        source: createPostgresPendingSyntheticClaimSource(database.sql),
+        decide: verificationDecider,
+        correlation: () => CorrelationIdSchema.parse(`cor_${randomUUID()}`),
+        limit: 200,
+        onFailure: (claimId, error) =>
+          logger.warn(
+            { claimId, err: error },
+            "synthetic auto-verify decision failed",
+          ),
+      });
+logger.info(
+  {
+    source: verification.source,
+    sweep: syntheticAutoVerifySweep !== undefined,
+  },
+  "verification decider composed",
+);
 
 /**
  * CQ-VERIFY-002: readiness follows a verification decision. The Companies
@@ -772,6 +810,16 @@ await Promise.all([
   ...(documents === undefined
     ? []
     : [documents.run(shutdownController.signal)]),
+  ...(syntheticAutoVerifySweep === undefined
+    ? []
+    : [
+        runSyntheticAutoVerifySweeps({
+          sweep: syntheticAutoVerifySweep,
+          intervalMs: 10 * 60 * 1000,
+          signal: shutdownController.signal,
+          logger,
+        }),
+      ]),
 ]);
 await database.close();
 await telemetry.shutdown();
