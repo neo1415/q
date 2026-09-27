@@ -1214,7 +1214,7 @@ describe("a spoken question for Q", () => {
     expect(resumed).toHaveLength(1);
     // The fake run never reports its end, so Q says the yes is recorded
     // and under way rather than claiming it is done.
-    expect(yes.spoken.join(" ")).toMatch(/yes is recorded|Done/);
+    expect(yes.spoken.join(" ")).toMatch(/^(Saved|Approved)\./);
     // A yes was the decision; no run was started for the word "yes".
     expect(runtime.calls.createRun).toHaveLength(1);
   });
@@ -1294,7 +1294,7 @@ describe("a spoken question for Q", () => {
       "Change what I call you to John. Shall I go ahead?",
     ]);
     expect(approvals.approve).toHaveLength(1);
-    expect(yes.spoken.join(" ")).toMatch(/yes is recorded|Done/);
+    expect(yes.spoken.join(" ")).toMatch(/^(Saved|Approved)\./);
     // The remainder became the next turn: a run of its own, after the yes.
     expect(runtime.calls.createRun).toHaveLength(2);
     expect(

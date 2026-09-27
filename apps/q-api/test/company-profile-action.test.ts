@@ -282,7 +282,7 @@ describe("the profile update board", () => {
         { companyId: COMPANY, version: 8, fields: ["websiteUrl"] },
       ),
     ).toBe(
-      "Done. Your company profile now reads: Website: https://kivu-freight.example.",
+      "Saved. Your company profile now reads: Website: https://kivu-freight.example.",
     );
   });
 });

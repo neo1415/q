@@ -114,7 +114,7 @@ export function createPersonProfileUpdateAction(
     ],
     describe: describePersonProfileChanges,
     confirm: (payload) =>
-      `Done. Your profile now reads: ${describePersonProfileChanges(payload).preview.split("\n").join("; ")}.`,
+      `Saved. Your profile now reads: ${describePersonProfileChanges(payload).preview.split("\n").join("; ")}.`,
     authorize: (payload, actor) => {
       if (actor.actorType !== "HUMAN") {
         return Promise.resolve({ outcome: "DENY", code: "NOT_A_PERSON" });

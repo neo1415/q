@@ -784,10 +784,10 @@ export function createVoiceTurnHandler(
         );
         line =
           ended === "COMPLETED"
-            ? "Done, that's in. What would you like to do next?"
+            ? "Saved. What would you like to do next?"
             : ended === "FAILED"
-              ? "I recorded your yes, but the change didn't go through. Ask me again in a moment, or change it from your company page."
-              : "Your yes is recorded and it's going in now.";
+              ? "Approved, but it didn't go through, so it's not saved. Ask me again in a moment, or change it from your company page."
+              : "Approved. It's being saved now.";
       } else {
         await approvals.reject({
           actor: binding.actor,

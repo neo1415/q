@@ -100,7 +100,7 @@ describe("what Q says about an action", () => {
     expect(outcome.kind).toBe("AWAITING_APPROVAL");
     expect(events).toEqual(["proposed", "claimed"]);
     expect(said).toEqual([
-      "I've prepared this for your approval: Update your company profile. Website: https://kivu-freight.example. Approve it and it goes in; decline and nothing changes.",
+      "Update your company profile. Website: https://kivu-freight.example. Not saved yet: tap Approve on the card, or tell me to go ahead.",
     ]);
   });
 

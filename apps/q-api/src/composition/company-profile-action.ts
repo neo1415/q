@@ -201,7 +201,7 @@ export function createCompanyProfileUpdateAction(
       describe: (payload) => describeCompanyProfileChanges(payload.changes),
       // Said after the gate persisted EXECUTED, from the approved payload.
       confirm: (payload) =>
-        `Done. Your company profile now reads: ${describeCompanyProfileChanges(payload.changes).preview.split("\n").join("; ")}.`,
+        `Saved. Your company profile now reads: ${describeCompanyProfileChanges(payload.changes).preview.split("\n").join("; ")}.`,
       authorize: async (payload, actor) => {
         if (actor.actorType !== "HUMAN") {
           return { outcome: "DENY", code: "NOT_A_PERSON" };

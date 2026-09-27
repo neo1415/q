@@ -64,7 +64,9 @@ function sentence(text: string): string {
 }
 
 export function proposedLine(summary: string): string {
-  return `I've prepared this for your approval: ${sentence(summary)} Approve it and it goes in; decline and nothing changes.`;
+  // Plain status (R23/R37, live 2026-09-27 #2): what it is, and that it
+  // is not saved until approved, on the card or by saying so.
+  return `${sentence(summary)} Not saved yet: tap Approve on the card, or tell me to go ahead.`;
 }
 
 export function refusedLine(reason: string): string {

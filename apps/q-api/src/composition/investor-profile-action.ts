@@ -134,7 +134,7 @@ export function createInvestorProfileUpdateAction(
     ],
     describe: (payload) => describeInvestorProfileChanges(payload.changes),
     confirm: (payload) =>
-      `Done. Your investor profile now reads: ${describeInvestorProfileChanges(payload.changes).preview.split("\n").join("; ")}.`,
+      `Saved. Your investor profile now reads: ${describeInvestorProfileChanges(payload.changes).preview.split("\n").join("; ")}.`,
     authorize: async (payload, actor) => {
       if (actor.actorType !== "HUMAN") {
         return { outcome: "DENY", code: "NOT_A_PERSON" };
