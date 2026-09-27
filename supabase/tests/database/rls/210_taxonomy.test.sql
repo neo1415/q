@@ -19,7 +19,12 @@ select results_eq(
   $$ values ('business_model'), ('company_stage'), ('customer_type'), ('geography'), ('impact_theme'),
             ('industry'), ('product_category'), ('regulatory_profile'), ('technology') $$,
   'the nine V1 vocabularies exist');
-select ok((select bool_and(version = 1) from taxonomy.vocabularies), 'every vocabulary is at version 1');
+select results_eq(
+  $$ select code, version from taxonomy.vocabularies order by code $$,
+  $$ values ('business_model', 1), ('company_stage', 1), ('customer_type', 1), ('geography', 2),
+            ('impact_theme', 1), ('industry', 1), ('product_category', 1), ('regulatory_profile', 1),
+            ('technology', 1) $$,
+  'every vocabulary is at version 1 except geography, which the additive Africa expansion moved to 2 (CQ-ACCEPT-001, ADR 0005)');
 select ok((select count(*) from taxonomy.nodes) between 100 and 400, 'a useful, not exhaustive, node set is seeded');
 select ok((select count(*) from taxonomy.aliases) >= 40, 'aliases are seeded');
 select ok((select count(*) from taxonomy.node_edges) >= 10, 'semantic edges are seeded');

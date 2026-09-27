@@ -105,19 +105,24 @@ select is(
 
 select results_eq(
   $$ select code from permissions.capabilities order by code $$,
-  $$ values ('capital_objective.close'), ('capital_objective.create'), ('capital_objective.edit'),
+  $$ values ('artifact.create'), ('artifact.revise'), ('artifact.view'),
+            ('capital_objective.close'), ('capital_objective.create'), ('capital_objective.edit'),
             ('capital_objective.view'), ('company.create'), ('company.edit'), ('company.financials.edit'),
-            ('company.financials.view'), ('company.team.manage'), ('company.team.self_edit'),
+            ('company.financials.view'), ('company.interest.respond'), ('company.interest.view'),
+            ('company.team.manage'), ('company.team.self_edit'),
             ('company.team.view'), ('company.view'), ('data_room.share'),
             ('disclosure.inspect'), ('disclosure.manage'),
             ('document.create'), ('document.download'), ('document.manage'), ('document.view'),
-            ('evidence.record'), ('evidence.view'),
-            ('investor.create'), ('investor.edit'), ('investor.mandate.create'),
+            ('evidence.record'), ('evidence.view'), ('handle.manage'),
+            ('investor.create'), ('investor.edit'),
+            ('investor.gateway.create'), ('investor.gateway.edit'), ('investor.gateway.publish'),
+            ('investor.gateway.view'), ('investor.interest.express'), ('investor.mandate.create'),
             ('investor.mandate.edit'), ('investor.mandate.view'), ('investor.representative.self_edit'),
             ('investor.view'), ('media.create'), ('media.manage'), ('media.view'),
             ('organisation.admin'), ('organisation.view'),
-            ('q.action.approve') $$,
-  'seeded capability codes match the known reference set');
+            ('q.action.approve'),
+            ('verification.decide'), ('verification.request'), ('verification.view') $$,
+  'seeded capability codes match the known reference set (GateQ, artifacts, verification, network interest and handle migrations extend it)');
 select results_eq(
   $$ select code from permissions.roles order by code $$,
   $$ values ('organisation_admin'), ('organisation_member') $$,
@@ -128,29 +133,38 @@ select results_eq(
        join permissions.capabilities c on c.id = rc.capability_id
       where r.code = 'organisation_admin' and rc.effect = 'ALLOW'
       order by c.code $$,
-  $$ values ('capital_objective.close'), ('capital_objective.create'), ('capital_objective.edit'),
-            ('capital_objective.view'), ('company.create'), ('company.edit'), ('company.team.manage'),
+  $$ values ('artifact.create'), ('artifact.revise'), ('artifact.view'),
+            ('capital_objective.close'), ('capital_objective.create'), ('capital_objective.edit'),
+            ('capital_objective.view'), ('company.create'), ('company.edit'),
+            ('company.interest.respond'), ('company.interest.view'), ('company.team.manage'),
             ('company.team.self_edit'), ('company.team.view'), ('company.view'),
             ('disclosure.inspect'), ('disclosure.manage'),
             ('document.create'), ('document.download'), ('document.manage'), ('document.view'),
-            ('evidence.record'), ('evidence.view'),
-            ('investor.create'), ('investor.edit'), ('investor.mandate.create'),
+            ('evidence.record'), ('evidence.view'), ('handle.manage'),
+            ('investor.create'), ('investor.edit'),
+            ('investor.gateway.create'), ('investor.gateway.edit'), ('investor.gateway.publish'),
+            ('investor.gateway.view'), ('investor.interest.express'), ('investor.mandate.create'),
             ('investor.mandate.edit'), ('investor.mandate.view'), ('investor.representative.self_edit'),
             ('investor.view'), ('media.create'), ('media.manage'), ('media.view'),
-            ('organisation.admin'), ('organisation.view'), ('q.action.approve') $$,
-  'organisation_admin maps to organisation, company, team, investor, mandate, capital, disclosure, document, evidence, media and Q approval capabilities only (CQ-Q-008 adds q.action.approve)');
+            ('organisation.admin'), ('organisation.view'), ('q.action.approve'),
+            ('verification.request'), ('verification.view') $$,
+  'organisation_admin maps to organisation, company, team, investor, mandate, gateway, interest, capital, disclosure, document, evidence, media, artifact, handle, verification-request and Q approval capabilities only; never financials, data_room.share or verification.decide');
 select results_eq(
   $$ select c.code from permissions.role_capabilities rc
        join permissions.roles r on r.id = rc.role_id
        join permissions.capabilities c on c.id = rc.capability_id
       where r.code = 'organisation_member' and rc.effect = 'ALLOW'
       order by c.code $$,
-  $$ values ('capital_objective.view'), ('company.team.self_edit'), ('company.team.view'), ('company.view'),
+  $$ values ('artifact.create'), ('artifact.revise'), ('artifact.view'),
+            ('capital_objective.view'), ('company.interest.respond'), ('company.interest.view'),
+            ('company.team.self_edit'), ('company.team.view'), ('company.view'),
             ('document.create'), ('document.download'), ('document.view'),
             ('evidence.record'), ('evidence.view'),
+            ('investor.gateway.view'), ('investor.interest.express'),
             ('investor.mandate.view'), ('investor.representative.self_edit'), ('investor.view'),
-            ('media.create'), ('media.view'), ('organisation.view'), ('q.action.approve') $$,
-  'organisation_member may publish and replace a pitch but not delete one; everything else stays view, self-edit, document, evidence-recording and approving Q actions Q prepared for them (CQ-ORG-001, CQ-COMP-001, CQ-COMP-002, CQ-INV-001, CQ-INV-002, CQ-CAP-001, CQ-EVD-001, CQ-MEDIA-001, CQ-Q-008)');
+            ('media.create'), ('media.view'), ('organisation.view'), ('q.action.approve'),
+            ('verification.request'), ('verification.view') $$,
+  'organisation_member may publish and replace a pitch but not delete one, read but never edit or publish a gateway, express and answer interest, draft artifacts and request verification; no handle.manage; everything else stays view, self-edit, document, evidence-recording and approving Q actions Q prepared for them (CQ-ORG-001, CQ-COMP-001, CQ-COMP-002, CQ-INV-001, CQ-INV-002, CQ-CAP-001, CQ-EVD-001, CQ-MEDIA-001, CQ-Q-008)');
 
 -- ===========================================================================
 -- Fixtures (as the migration owner; RLS bypassed)
