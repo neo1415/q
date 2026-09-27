@@ -2,7 +2,7 @@ import { z } from "zod";
 
 import { UuidSchema } from "../common/ids.js";
 import { QEvidenceRefsSchema } from "./evidence-ref.js";
-import type { QVoiceDestination } from "./voice.js";
+import type { QVoiceChoice, QVoiceDestination } from "./voice.js";
 
 /**
  * A known Capital Q UI action Q may suggest (doc 12 §70-71).
@@ -28,6 +28,9 @@ export const Q_UI_INTENT_KINDS = [
   "SET_THEME",
   "RELOAD_PAGE",
   "OPEN_WEBSITE",
+  "SET_Q_MOTION",
+  "SET_VOICE",
+  "SIGN_OUT",
 ] as const;
 
 export type QUiIntentKind = (typeof Q_UI_INTENT_KINDS)[number];
@@ -100,6 +103,11 @@ export const Q_NAVIGATE_DESTINATIONS = [
   "DISCOVER",
   "COMPANY_VISIBILITY",
   "RELATIONSHIPS",
+  // R33: every page a person can open from the app's own navigation.
+  "SETTINGS",
+  "VERIFICATION",
+  "PITCH",
+  "COMPANY_INTEREST",
 ] as const satisfies readonly QVoiceDestination[];
 
 export type QNavigateDestination = (typeof Q_NAVIGATE_DESTINATIONS)[number];
@@ -167,10 +175,42 @@ export const QOpenWebsiteIntentSchema = z
   .object({ kind: z.literal("OPEN_WEBSITE"), url: QWebsiteUrlSchema })
   .strict();
 
+/** R33: Q's motion on this device, as the Settings control sets it. */
+export const Q_MOTION_CHOICES = ["full", "calm", "off"] as const;
+export const QMotionChoiceSchema = z.enum(Q_MOTION_CHOICES);
+export type QMotionChoice = z.infer<typeof QMotionChoiceSchema>;
+
+export const QSetQMotionIntentSchema = z
+  .object({ kind: z.literal("SET_Q_MOTION"), motion: QMotionChoiceSchema })
+  .strict();
+
+/**
+ * R33: which voice Q speaks in on this device, as the Settings control
+ * sets it. The same two values as `Q_VOICE_CHOICES` (voice.ts), restated
+ * because voice.ts reads this module's schemas at load time.
+ */
+export const QSetVoiceIntentSchema = z
+  .object({
+    kind: z.literal("SET_VOICE"),
+    voice: z.enum(["FEMALE", "MALE"] satisfies readonly QVoiceChoice[]),
+  })
+  .strict();
+
+/**
+ * R33: sign out of this browser, through the same server action the Sign
+ * out button submits (this session only; other devices keep theirs).
+ */
+export const QSignOutIntentSchema = z
+  .object({ kind: z.literal("SIGN_OUT") })
+  .strict();
+
 export const QClientActionIntentSchema = z.discriminatedUnion("kind", [
   QSetThemeIntentSchema,
   QReloadPageIntentSchema,
   QOpenWebsiteIntentSchema,
+  QSetQMotionIntentSchema,
+  QSetVoiceIntentSchema,
+  QSignOutIntentSchema,
 ]);
 export type QClientActionIntent = z.infer<typeof QClientActionIntentSchema>;
 
@@ -182,6 +222,22 @@ export const Q_CLIENT_ACTION_TOOLS = [
   "set_theme",
   "reload_page",
   "open_website",
+  "set_q_motion",
+  "set_voice",
+  "sign_out",
+] as const;
+
+/**
+ * R33: the tools that change something of the person's own AT ONCE, at
+ * their word, reversible from the page (Save, Unsave, Pass; declining a
+ * waiting change). Not client actions (the server records them) and not
+ * "for approval": the answer tells a model these happen when called.
+ */
+export const Q_INSTANT_ACTION_TOOLS = [
+  "save_company",
+  "unsave_company",
+  "pass_company",
+  "decline_pending_proposal",
 ] as const;
 
 /**
@@ -208,6 +264,9 @@ export const QUiIntentSchema = z.discriminatedUnion("kind", [
   QSetThemeIntentSchema,
   QReloadPageIntentSchema,
   QOpenWebsiteIntentSchema,
+  QSetQMotionIntentSchema,
+  QSetVoiceIntentSchema,
+  QSignOutIntentSchema,
 ]);
 
 export type QUiIntent = z.infer<typeof QUiIntentSchema>;

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   Q_CLIENT_ACTION_TOOLS,
+  Q_INSTANT_ACTION_TOOLS,
   Q_NAVIGATE_DESTINATIONS,
 } from "@capital-q/contracts";
 
@@ -43,9 +44,12 @@ const EVERY_PORT: QToolPorts = {
   pitchMoments: STUB,
   visibility: STUB,
   handleClaims: STUB,
-  pendingProposals: STUB,
+  pendingProposals: { inConversation: STUB, approve: STUB, decline: STUB },
   qCards: STUB,
   clientActions: true,
+  approvalInbox: STUB,
+  discoveryDecisions: STUB,
+  documents: STUB,
 };
 
 const EVERY_TOOL = [
@@ -93,15 +97,20 @@ describe("the capability registry is complete", () => {
       }
       if (
         providerName === "approve_pending_proposal" ||
-        (Q_CLIENT_ACTION_TOOLS as readonly string[]).includes(providerName)
+        (Q_CLIENT_ACTION_TOOLS as readonly string[]).includes(providerName) ||
+        (Q_INSTANT_ACTION_TOOLS as readonly string[]).includes(providerName)
       ) {
         // The person's own decision on a change another capability
         // prepared, or the app's own action in their browser, reversible
         // there: done at once, never an Approval Engine action of its own.
         expect(capability.approval, providerName).toBe("INSTANT");
         expect(capability.executes, providerName).toEqual([]);
+        expect(capability.acts, providerName).toBe(true);
         continue;
       }
+      expect(capability.acts, providerName).toBe(
+        tool.classification !== "READ_ONLY",
+      );
       expect(capability.approval, providerName).toBe(
         tool.classification === "READ_ONLY" ? "INSTANT" : "PREPARE_APPROVE",
       );
@@ -113,7 +122,13 @@ describe("the capability registry is complete", () => {
 
   it("the client actions and the Q Card read are registered tools (live test 2026-09-27 #4)", () => {
     const listed = new Set(toolEntries.map((entry) => entry.providerName));
-    for (const name of [...Q_CLIENT_ACTION_TOOLS, "get_q_card"]) {
+    for (const name of [
+      ...Q_CLIENT_ACTION_TOOLS,
+      ...Q_INSTANT_ACTION_TOOLS,
+      "get_q_card",
+      "list_pending_approvals",
+      "list_my_documents",
+    ]) {
       expect(listed.has(name), name).toBe(true);
       expect(
         EVERY_TOOL.some((tool) => tool.providerName === name),
@@ -130,6 +145,29 @@ describe("the capability registry is complete", () => {
         : [],
     );
     expect([...screens].sort()).toEqual([...Q_NAVIGATE_DESTINATIONS].sort());
+  });
+
+  it("what only the person can do is offered with a real screen and a reason (R33)", () => {
+    const offers = Q_CAPABILITIES.flatMap((capability) =>
+      capability.performedBy.kind === "OFFER"
+        ? [{ id: capability.id, offer: capability.performedBy.offer }]
+        : [],
+    );
+    expect(offers.map((entry) => entry.id)).toEqual(
+      expect.arrayContaining([
+        "offer.gmail_connect",
+        "offer.pitch_video_upload",
+      ]),
+    );
+    for (const { id, offer } of offers) {
+      expect(
+        (Q_NAVIGATE_DESTINATIONS as readonly string[]).includes(
+          offer.destination,
+        ),
+        id,
+      ).toBe(true);
+      expect(offer.reason.length, id).toBeGreaterThan(20);
+    }
   });
 
   it("ids are unique and every entry states its eligibility", () => {

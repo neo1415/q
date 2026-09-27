@@ -15,7 +15,11 @@ import { createDiscoverySlateTool } from "./tools/discovery-slate.js";
 import { createFindProspectiveInvestorsTool } from "./tools/find-prospective-investors.js";
 import { createRecommendationExplanationTool } from "./tools/recommendation-explanation.js";
 import { createProposeHandleClaimTool } from "./tools/handle-claim.js";
-import { createApprovePendingProposalTool } from "./tools/pending-proposal.js";
+import {
+  createApprovePendingProposalTool,
+  createDeclinePendingProposalTool,
+} from "./tools/pending-proposal.js";
+import { createOwnWorkTools } from "./tools/own-work.js";
 import { createProposeProfileChangeTool } from "./tools/profile-change.js";
 import { createProposeEmailTool } from "./tools/email.js";
 import { createRelationshipTools } from "./tools/relationships.js";
@@ -85,6 +89,15 @@ export function createDefaultQTools(
     ...(ports.pendingProposals === undefined
       ? []
       : [createApprovePendingProposalTool(ports.pendingProposals)]),
+    // R33: "no, don't" to a waiting change, as the card's Decline does.
+    ...(ports.pendingProposals?.decline === undefined
+      ? []
+      : [
+          createDeclinePendingProposalTool(
+            ports.pendingProposals,
+            ports.pendingProposals.decline,
+          ),
+        ]),
     // Founder live test 2026-09-27 #4: "is my card saved?".
     ...(ports.qCards === undefined
       ? []
@@ -92,6 +105,8 @@ export function createDefaultQTools(
     // R20/R33: the app's own actions in their browser (theme, reload,
     // their own website), where a screen reads the answer.
     ...(ports.clientActions === true ? createClientActionTools(ports) : []),
+    // R33: their approvals inbox, their documents, Save / Unsave / Pass.
+    ...createOwnWorkTools(ports),
   ];
 }
 

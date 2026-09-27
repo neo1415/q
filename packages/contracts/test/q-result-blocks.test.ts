@@ -199,6 +199,9 @@ describe("QUiIntent", () => {
     SET_THEME: { kind: "SET_THEME", theme: "light" },
     RELOAD_PAGE: { kind: "RELOAD_PAGE" },
     OPEN_WEBSITE: { kind: "OPEN_WEBSITE", url: "https://zino.example" },
+    SET_Q_MOTION: { kind: "SET_Q_MOTION", motion: "calm" },
+    SET_VOICE: { kind: "SET_VOICE", voice: "FEMALE" },
+    SIGN_OUT: { kind: "SIGN_OUT" },
   };
 
   it("parses every supported intent", () => {

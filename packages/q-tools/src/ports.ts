@@ -277,6 +277,12 @@ export type QToolPorts = {
    * absent, the client-action tools do not exist.
    */
   readonly clientActions?: boolean | undefined;
+  /** R33: approvals waiting for this person, across conversations. */
+  readonly approvalInbox?: ApprovalInboxPort | undefined;
+  /** R33: Save, Unsave and Pass from a conversation. */
+  readonly discoveryDecisions?: DiscoveryDecisionPort | undefined;
+  /** R33: their own documents. */
+  readonly documents?: OwnDocumentsPort | undefined;
 };
 
 /**
@@ -338,6 +344,77 @@ export type PendingProposalPort = {
     context: PendingProposalContext,
     proposalId: string,
   ) => Promise<{ readonly status: ProposalPlainStatus | "CHANGED" }>;
+  /**
+   * R33: declines exactly this proposal through the Approval Engine's own
+   * reject, the call the card's Decline button makes, and reports its
+   * status afterwards. Absent: declining stays on the card.
+   */
+  readonly decline?: (
+    context: PendingProposalContext,
+    proposalId: string,
+  ) => Promise<{ readonly status: ProposalPlainStatus }>;
+};
+
+/**
+ * R33: every approval waiting for this person, across conversations, read
+ * as the approvals list reads it (the Approval Engine's own listing, which
+ * returns only approvals requested from this actor).
+ */
+export type ApprovalInboxPort = {
+  readonly pending: (actor: ActorContext) => Promise<
+    readonly {
+      readonly approvalId: string;
+      readonly summary: string;
+      readonly requestedAt: string;
+      readonly expiresAt: string;
+    }[]
+  >;
+};
+
+/**
+ * R33: an investor's own Save, Unsave and Pass, recorded by the same
+ * interaction service the Discover buttons call (surface Q_CONVERSATION),
+ * which re-runs the feed's own eligibility and refuses a company the
+ * person could not act on. NOT_AVAILABLE says nothing about why.
+ */
+export type DiscoveryDecisionPort = {
+  readonly decide: (
+    actor: ActorContext,
+    decision: {
+      readonly type: "SAVE" | "UNSAVE" | "PASS";
+      readonly companyId: string;
+      /** Idempotency identity, derived by the tool from the run. */
+      readonly clientEventId: string;
+    },
+  ) => Promise<
+    | {
+        readonly status: "RECORDED";
+        readonly deduplicated: boolean;
+        readonly saved: boolean | null;
+        readonly passed: boolean | null;
+      }
+    | { readonly status: "NOT_AVAILABLE" }
+  >;
+};
+
+/**
+ * R33: the person's own documents (artifacts Q prepared for them), read as
+ * their documents list reads them: the artifact service, as the actor.
+ */
+export type OwnDocumentsPort = {
+  readonly list: (
+    actor: ActorContext,
+    limit: number,
+  ) => Promise<
+    readonly {
+      readonly artifactId: string;
+      readonly type: string;
+      readonly status: string;
+      readonly title: string;
+      readonly currentVersion: number;
+      readonly updatedAt: string;
+    }[]
+  >;
 };
 
 /**

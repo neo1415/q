@@ -559,11 +559,24 @@ describe("the answer is told what this run can do (CQ-QX-008)", () => {
     await run.answer.answer(request());
     // No company in the run, no artifact service composed here, no
     // visibility notebook: screens only, and never the visibility one.
+    // R33: what only the person can do comes with its screen, and a
+    // company's own screens (Pitch, Verification) wait for a company.
     expect(run.capabilities).toEqual([
       {
-        navigate: ["HOME", "PROFILE", "CAPITAL", "DISCOVER", "RELATIONSHIPS"],
+        navigate: [
+          "HOME",
+          "PROFILE",
+          "CAPITAL",
+          "DISCOVER",
+          "RELATIONSHIPS",
+          "SETTINGS",
+        ],
         documents: [],
         visibilityChange: false,
+        offers: [
+          expect.objectContaining({ destination: "SETTINGS" }),
+          expect.objectContaining({ destination: "HOME" }),
+        ],
       },
     ]);
   });

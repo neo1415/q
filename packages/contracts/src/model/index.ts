@@ -324,7 +324,13 @@ export const MODEL_MESSAGES_MAX = 64;
 export const ModelToolNameSchema = z.string().regex(/^[a-z][a-z0-9_]{1,63}$/);
 export type ModelToolName = z.infer<typeof ModelToolNameSchema>;
 
-export const MODEL_TOOLS_MAX = 16;
+/**
+ * Tools on one attempt. R33 (Q can do everything the app can) put 30+
+ * eligible tools in a Home Q run; at 16 the gateway refused the whole
+ * request. Every provider routed to accepts 128; 48 leaves headroom while
+ * keeping a bound on the prompt the tool list costs.
+ */
+export const MODEL_TOOLS_MAX = 48;
 export const MODEL_TOOL_DESCRIPTION_MAX_CHARS = 1_000;
 /** Bounded tool result text handed back to a model (JSON). */
 export const MODEL_TOOL_RESULT_MAX_CHARS = 32_000;

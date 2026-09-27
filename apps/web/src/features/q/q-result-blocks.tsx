@@ -51,7 +51,13 @@ const INTENT_ROUTES: Readonly<
   Record<
     Exclude<
       QUiIntent["kind"],
-      "NAVIGATE" | "SET_THEME" | "RELOAD_PAGE" | "OPEN_WEBSITE"
+      | "NAVIGATE"
+      | "SET_THEME"
+      | "RELOAD_PAGE"
+      | "OPEN_WEBSITE"
+      | "SET_Q_MOTION"
+      | "SET_VOICE"
+      | "SIGN_OUT"
     >,
     string | null
   >
@@ -72,7 +78,10 @@ function intentHref(intent: QUiIntent): string | null {
   if (
     intent.kind === "SET_THEME" ||
     intent.kind === "RELOAD_PAGE" ||
-    intent.kind === "OPEN_WEBSITE"
+    intent.kind === "OPEN_WEBSITE" ||
+    intent.kind === "SET_Q_MOTION" ||
+    intent.kind === "SET_VOICE" ||
+    intent.kind === "SIGN_OUT"
   ) {
     return null;
   }
@@ -116,6 +125,12 @@ function intentLabel(intent: QUiIntent): string {
       return "Reload";
     case "OPEN_WEBSITE":
       return "Open the website";
+    case "SET_Q_MOTION":
+      return "Q motion";
+    case "SET_VOICE":
+      return "Q's voice";
+    case "SIGN_OUT":
+      return "Sign out";
   }
 }
 
@@ -128,6 +143,10 @@ const DESTINATION_LABELS: Readonly<
   DISCOVER: "Open Discover",
   COMPANY_VISIBILITY: "Open visibility settings",
   RELATIONSHIPS: "Open Relationships",
+  SETTINGS: "Open Settings",
+  VERIFICATION: "Open Verification",
+  PITCH: "Open Pitch & media",
+  COMPANY_INTEREST: "Open investor interest",
 };
 
 function subjectLabel(subject: QSubjectRef): string {

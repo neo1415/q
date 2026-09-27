@@ -1,5 +1,4 @@
 import {
-  Q_CLIENT_ACTION_TOOLS,
   type QNavigateDestination,
   type QResponseMessage,
   type QResultBlock,
@@ -187,6 +186,10 @@ const DESTINATION_LINES: Readonly<Record<QNavigateDestination, string>> = {
   DISCOVER: "Taking you to Discover.",
   COMPANY_VISIBILITY: "Opening your visibility settings.",
   RELATIONSHIPS: "Opening your relationships.",
+  SETTINGS: "Opening Settings.",
+  VERIFICATION: "Opening verification.",
+  PITCH: "Opening Pitch & media.",
+  COMPANY_INTEREST: "Opening your investor interest.",
 };
 
 /** A real screen, as offered back to someone who named one that isn't. */
@@ -197,6 +200,10 @@ const DESTINATION_NAMES: Readonly<Record<QNavigateDestination, string>> = {
   DISCOVER: "Discover",
   COMPANY_VISIBILITY: "your visibility settings",
   RELATIONSHIPS: "your relationships",
+  SETTINGS: "Settings",
+  VERIFICATION: "Verification",
+  PITCH: "Pitch & media",
+  COMPANY_INTEREST: "your investor interest",
 };
 
 /**
@@ -967,6 +974,17 @@ export function createSpecialistQAnswer(
         hand.kind === "PREPARE_DOCUMENT" ? [hand.documentType] : [],
       ),
       visibilityChange: hands.some((hand) => hand.kind === "SET_VISIBILITY"),
+      // R33: what only the person can do, with the screen that has it.
+      offers: capabilities.flatMap((capability) =>
+        capability.performedBy.kind === "OFFER"
+          ? [
+              {
+                does: capability.does,
+                destination: capability.performedBy.offer.destination,
+              },
+            ]
+          : [],
+      ),
     };
   };
 
@@ -1027,14 +1045,11 @@ export function createSpecialistQAnswer(
     // turn and cached by composition. The reader is told the actions the
     // answer's model takes, or "make a Q card" reads as a document.
     const capabilities = await capabilitiesOf(request);
+    // R20/R33: every tool that changes something is an action to the
+    // reader (a Prepare → Approve change, the app's own action in their
+    // browser, a Save or Pass): "reload the page" is not a screen.
     const actions = capabilities.flatMap((capability) =>
-      capability.performedBy.kind === "TOOL" &&
-      (capability.approval === "PREPARE_APPROVE" ||
-        // R20/R33: the app's own actions in their browser are actions
-        // too: "reload the page" is not a screen to navigate to.
-        (Q_CLIENT_ACTION_TOOLS as readonly string[]).includes(
-          capability.performedBy.providerName,
-        ))
+      capability.performedBy.kind === "TOOL" && capability.acts
         ? [{ name: capability.performedBy.providerName, does: capability.does }]
         : [],
     );

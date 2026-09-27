@@ -74,6 +74,18 @@ export type QCapabilityRunFacts = {
   readonly visibility: boolean;
 };
 
+/**
+ * R33: what only the person can do, on a screen (an OAuth consent, a
+ * password, a file picked from their device, a camera): Q offers the exact
+ * screen that has the control and takes them there when they say so,
+ * never a dead end and never a claim that it did it.
+ */
+export type QCapabilityOffer = {
+  readonly destination: QNavigateDestination;
+  /** Why this cannot be a tool. */
+  readonly reason: string;
+};
+
 export type QCapability = {
   readonly id: string;
   readonly group: QCapabilityGroup;
@@ -82,8 +94,15 @@ export type QCapability = {
   readonly does: string;
   readonly performedBy:
     | { readonly kind: "TOOL"; readonly providerName: string }
-    | { readonly kind: "HAND"; readonly hand: QCapabilityHand };
+    | { readonly kind: "HAND"; readonly hand: QCapabilityHand }
+    | { readonly kind: "OFFER"; readonly offer: QCapabilityOffer };
   readonly approval: QCapabilityApproval;
+  /**
+   * It changes something when called, at once (a client action, a Save or
+   * Pass, declining a waiting change): the turn reader is told it is an
+   * action, not a screen or a document. PREPARE_APPROVE entries act too.
+   */
+  readonly acts: boolean;
   /** Approval Engine action types this can lead to (PREPARE_APPROVE only). */
   readonly executes: readonly string[];
   /** The eligibility rule, stated. */
@@ -102,15 +121,18 @@ function tool(
     readonly approval?: QCapabilityApproval;
     readonly executes?: readonly string[];
     readonly surfaces?: readonly QCapabilitySurface[];
+    readonly acts?: boolean;
   } = {},
 ): QCapability {
+  const approval = options.approval ?? "INSTANT";
   return {
     id: `tool.${providerName}`,
     group,
     surfaces: options.surfaces ?? ["HOME_Q"],
     does,
     performedBy: { kind: "TOOL", providerName },
-    approval: options.approval ?? "INSTANT",
+    approval,
+    acts: approval === "PREPARE_APPROVE" || options.acts === true,
     executes: options.executes ?? [],
     eligibility: OFFERED,
     eligible: (facts) => facts.offeredTools.has(providerName),
@@ -125,7 +147,23 @@ const SCREEN_DOES: Readonly<Record<QNavigateDestination, string>> = {
   COMPANY_VISIBILITY: "Opens their company's visibility settings.",
   RELATIONSHIPS:
     "Opens their Relationships page: every company-investor relationship of their side, where each stands.",
+  SETTINGS:
+    "Opens Settings: theme, Q motion, Q's voice and connected accounts (Gmail).",
+  VERIFICATION:
+    "Opens their company's verification: what is verified and asking for verification.",
+  PITCH:
+    "Opens Pitch & media: their pitch video (upload, replace, remove, who can play it) and transcript.",
+  COMPANY_INTEREST:
+    "Opens their company's incoming investor interest, to read and answer it.",
 };
+
+/** Screens that belong to a company's own people. */
+const COMPANY_SCREENS: ReadonlySet<QNavigateDestination> = new Set([
+  "COMPANY_VISIBILITY",
+  "VERIFICATION",
+  "PITCH",
+  "COMPANY_INTEREST",
+]);
 
 const NAVIGATION: readonly QCapability[] = Q_NAVIGATE_DESTINATIONS.map(
   (destination): QCapability => ({
@@ -135,19 +173,88 @@ const NAVIGATION: readonly QCapability[] = Q_NAVIGATE_DESTINATIONS.map(
     does: SCREEN_DOES[destination],
     performedBy: { kind: "HAND", hand: { kind: "NAVIGATE", destination } },
     approval: "INSTANT",
+    acts: false,
     executes: [],
-    eligibility:
-      destination === "COMPANY_VISIBILITY"
-        ? "a company is a subject of the run"
-        : "always, on Home Q",
+    eligibility: COMPANY_SCREENS.has(destination)
+      ? "a company is a subject of the run"
+      : "always, on Home Q",
     eligible: (facts) =>
       facts.surface === "HOME_Q" &&
-      (destination !== "COMPANY_VISIBILITY" || facts.company),
+      (!COMPANY_SCREENS.has(destination) || facts.company),
   }),
 );
 
+function offer(
+  id: string,
+  group: QCapabilityGroup,
+  does: string,
+  destination: QNavigateDestination,
+  reason: string,
+  companyOnly: boolean = COMPANY_SCREENS.has(destination),
+): QCapability {
+  return {
+    id: `offer.${id}`,
+    group,
+    surfaces: ["HOME_Q"],
+    does,
+    performedBy: { kind: "OFFER", offer: { destination, reason } },
+    approval: "INSTANT",
+    acts: false,
+    executes: [],
+    eligibility: companyOnly
+      ? "a company is a subject of the run (it is a company's own)"
+      : "always, on Home Q",
+    eligible: (facts) =>
+      facts.surface === "HOME_Q" && (!companyOnly || facts.company),
+  };
+}
+
+/**
+ * R33: what a person does themselves on a screen. Each is offered with
+ * the screen that has the control; none is a dead end.
+ */
+const OFFERS: readonly QCapability[] = [
+  offer(
+    "gmail_connect",
+    "SETTINGS",
+    "Connect or disconnect their Gmail",
+    "SETTINGS",
+    "Google's OAuth consent is given by the person in Google's own window; no tool may hold or grant it.",
+  ),
+  offer(
+    "pitch_video_upload",
+    "MEDIA",
+    "Upload, replace or remove their pitch video and choose who can play it",
+    "PITCH",
+    "The video file comes from their own device through the browser's file picker and goes straight to the video CDN; removal is on the same screen.",
+  ),
+  offer(
+    "document_upload",
+    "DOCUMENT",
+    "Upload a document of their own (a deck, financials) for Q to read",
+    "HOME",
+    "The file comes from their own device through the browser's file picker (the attach control next to Q's input).",
+  ),
+  offer(
+    "verification_request",
+    "RECORDS",
+    "Ask for their company to be verified",
+    "VERIFICATION",
+    "A verification request attests to their authority over the company; the person submits it themselves on the verification screen.",
+  ),
+  offer(
+    "capital_raise_edit",
+    "RECORDS",
+    "Set, change, close or replace their raise (capital objective)",
+    "CAPITAL",
+    "The raise form is the one write path for a capital objective today; no Approval Engine action exists for it yet.",
+    true,
+  ),
+];
+
 export const Q_CAPABILITIES: readonly QCapability[] = Object.freeze([
   ...NAVIGATION,
+  ...OFFERS,
   {
     id: "hand.set_visibility",
     group: "VISIBILITY",
@@ -155,6 +262,7 @@ export const Q_CAPABILITIES: readonly QCapability[] = Object.freeze([
     does: "Prepares a change to who can see their company (discoverable or not), for their approval.",
     performedBy: { kind: "HAND", hand: { kind: "SET_VISIBILITY" } },
     approval: "PREPARE_APPROVE",
+    acts: true,
     executes: ["company.visibility.set"],
     eligibility: "a visibility proposer is composed and a company is a subject",
     eligible: (facts) =>
@@ -170,6 +278,7 @@ export const Q_CAPABILITIES: readonly QCapability[] = Object.freeze([
       hand: { kind: "PREPARE_DOCUMENT", documentType: "PITCH_DECK" },
     },
     approval: "INSTANT",
+    acts: false,
     executes: [],
     eligibility: "an artifact service is composed",
     eligible: (facts) => facts.surface === "HOME_Q" && facts.artifacts,
@@ -184,6 +293,7 @@ export const Q_CAPABILITIES: readonly QCapability[] = Object.freeze([
       hand: { kind: "PREPARE_DOCUMENT", documentType: "INVESTMENT_BRIEF" },
     },
     approval: "INSTANT",
+    acts: false,
     executes: [],
     eligibility: "an artifact service is composed",
     eligible: (facts) => facts.surface === "HOME_Q" && facts.artifacts,
@@ -198,6 +308,7 @@ export const Q_CAPABILITIES: readonly QCapability[] = Object.freeze([
       hand: { kind: "PREPARE_DOCUMENT", documentType: "OWN_MANDATE" },
     },
     approval: "INSTANT",
+    acts: false,
     executes: [],
     eligibility:
       "an artifact service and the own-mandate port are composed, and the actor's own investor organisation is bound",
@@ -232,6 +343,7 @@ export const Q_CAPABILITIES: readonly QCapability[] = Object.freeze([
     "approve_pending_proposal",
     "RECORDS",
     "Approves, when they say so, the one change Q prepared in this conversation that is waiting for their decision, exactly as the Approve button on its card does.",
+    { acts: true },
   ),
   tool(
     "get_q_card",
@@ -243,12 +355,65 @@ export const Q_CAPABILITIES: readonly QCapability[] = Object.freeze([
     "set_theme",
     "SETTINGS",
     "Switches the app's appearance to light, dark or system.",
+    { acts: true },
   ),
-  tool("reload_page", "NAVIGATION", "Reloads the page they are on."),
+  tool("reload_page", "NAVIGATION", "Reloads the page they are on.", {
+    acts: true,
+  }),
   tool(
     "open_website",
     "NAVIGATION",
     "Opens their own website (from their own record, or as they gave it) in a new tab.",
+    { acts: true },
+  ),
+  tool(
+    "set_q_motion",
+    "SETTINGS",
+    "Sets how much Q moves on this device: full, calm or off.",
+    { acts: true },
+  ),
+  tool(
+    "set_voice",
+    "SETTINGS",
+    "Switches the voice Q speaks in on this device (female or male).",
+    { acts: true },
+  ),
+  tool("sign_out", "SETTINGS", "Signs them out of Capital Q in this browser.", {
+    acts: true,
+  }),
+  tool(
+    "decline_pending_proposal",
+    "RECORDS",
+    "Declines, when they say no, a change Q prepared in this conversation that is waiting for their decision, exactly as the Decline button on its card does.",
+    { acts: true },
+  ),
+  tool(
+    "list_pending_approvals",
+    "RECORDS",
+    "Lists every change waiting for their approval, across their conversations.",
+  ),
+  tool(
+    "list_my_documents",
+    "DOCUMENT",
+    "Lists the documents Q prepared for them (decks, briefs, one-pagers), newest first, with versions.",
+  ),
+  tool(
+    "save_company",
+    "RELATIONSHIP",
+    "Saves a company to their Saved list in Discover.",
+    { acts: true },
+  ),
+  tool(
+    "unsave_company",
+    "RELATIONSHIP",
+    "Removes a company from their Saved list.",
+    { acts: true },
+  ),
+  tool(
+    "pass_company",
+    "RELATIONSHIP",
+    "Passes on a company in their Discover feed.",
+    { acts: true },
   ),
   tool(
     "propose_share_raise",

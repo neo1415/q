@@ -23,6 +23,9 @@ function effects() {
       done.push(`open:${url}`);
       return true;
     },
+    setQMotion: (motion) => done.push(`motion:${motion}`),
+    setVoice: (voice) => done.push(`voice:${voice}`),
+    signOut: () => done.push("sign-out"),
   };
   return { port, done };
 }
@@ -53,10 +56,20 @@ describe("performing a client action", () => {
         port,
       ),
     ).toBe(true);
+    expect(
+      performClientAction({ kind: "SET_Q_MOTION", motion: "calm" }, port),
+    ).toBe(true);
+    expect(
+      performClientAction({ kind: "SET_VOICE", voice: "MALE" }, port),
+    ).toBe(true);
+    expect(performClientAction({ kind: "SIGN_OUT" }, port)).toBe(true);
     expect(done).toEqual([
       "theme:dark",
       "reload",
       "open:https://zino-aviation.example",
+      "motion:calm",
+      "voice:MALE",
+      "sign-out",
     ]);
   });
 
@@ -66,6 +79,9 @@ describe("performing a client action", () => {
       { kind: "OPEN_WEBSITE", url: "javascript:alert(1)" },
       { kind: "OPEN_WEBSITE", url: "/profile" },
       { kind: "SET_THEME", theme: "neon" },
+      { kind: "SET_Q_MOTION", motion: "wild" },
+      { kind: "SET_VOICE", voice: "ROBOT" },
+      { kind: "SIGN_OUT", redirect: "https://evil.example" },
       { kind: "RUN_SCRIPT", code: "x" },
       null,
     ]) {

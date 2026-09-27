@@ -235,6 +235,16 @@ export type QCapabilityManifest = {
   readonly navigate: readonly QNavigateDestination[];
   readonly documents: readonly string[];
   readonly visibilityChange: boolean;
+  /**
+   * R33: what only the person can do, on a screen (an OAuth consent, a
+   * password, a file from their device): Q offers the screen by name.
+   */
+  readonly offers?:
+    | readonly {
+        readonly does: string;
+        readonly destination: QNavigateDestination;
+      }[]
+    | undefined;
 };
 
 export type QResearchDirective = {

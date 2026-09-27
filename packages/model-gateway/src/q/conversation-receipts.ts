@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import {
   Q_CLIENT_ACTION_TOOLS,
+  Q_INSTANT_ACTION_TOOLS,
   type ModelMessage,
   type QNavigateDestination,
   type QResultBlock,
@@ -144,6 +145,10 @@ const SCREEN_NAMES: Readonly<Record<QNavigateDestination, string>> = {
   DISCOVER: "Discover",
   COMPANY_VISIBILITY: "their company's visibility settings",
   RELATIONSHIPS: "their relationships",
+  SETTINGS: "Settings",
+  VERIFICATION: "their company's verification",
+  PITCH: "their pitch (video and deck)",
+  COMPANY_INTEREST: "their company's incoming interest",
 };
 
 /** Where the person is, in their terms (R21). */
@@ -228,14 +233,21 @@ export function capabilityNote(
   const isClientAction = (tool: (typeof offeredTools)[number]) =>
     (Q_CLIENT_ACTION_TOOLS as readonly string[]).includes(tool.name);
   const clientActions = offeredTools.filter(isClientAction);
+  // R33: their own reversible decisions (Save, Pass, declining a waiting
+  // change) are recorded when called, never "for approval".
+  const isInstant = (tool: (typeof offeredTools)[number]) =>
+    (Q_INSTANT_ACTION_TOOLS as readonly string[]).includes(tool.name);
+  const instant = offeredTools.filter(isInstant);
   const reads = offeredTools.filter(
     (tool) =>
       !isClientAction(tool) &&
+      !isInstant(tool) &&
       (tool.classification ?? "READ_ONLY") === "READ_ONLY",
   );
   const changes = offeredTools.filter(
     (tool) =>
       !isClientAction(tool) &&
+      !isInstant(tool) &&
       (tool.classification ?? "READ_ONLY") !== "READ_ONLY" &&
       tool.name !== APPROVE_PENDING_TOOL,
   );
@@ -253,6 +265,18 @@ export function capabilityNote(
   if (clientActions.length > 0) {
     lines.push(
       `- Do these in their browser at once when they ask, by calling the tool (it happens as your answer arrives; say it in a few words): ${named(clientActions)}.`,
+    );
+  }
+  if (instant.length > 0) {
+    lines.push(
+      `- Do these for them at once when they clearly ask, by calling the tool (it is recorded when called and they can undo it on the page; report only what its result says): ${named(instant)}.`,
+    );
+  }
+  if (manifest?.offers !== undefined && manifest.offers.length > 0) {
+    lines.push(
+      `- These they do themselves on a screen (a sign-in, a consent or a file from their device), so offer to take them there and never say you did them: ${manifest.offers
+        .map((offer) => `${offer.does} (${SCREEN_NAMES[offer.destination]})`)
+        .join("; ")}.`,
     );
   }
   if (manifest !== undefined && manifest.navigate.length > 0) {

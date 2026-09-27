@@ -211,3 +211,111 @@ export function createApprovePendingProposalTool(
     },
   });
 }
+
+/**
+ * DECLINE_PENDING_PROPOSAL — `proposal.pending.decline` v1 (R33).
+ *
+ * The other half of approval by conversation: "no, don't do that". Whether
+ * a sentence declines is meaning, so the model decides and names the
+ * change (ADR 0011). Declining changes nothing in the world, so any change
+ * of this conversation that is still waiting for this person may be named;
+ * the Approval Engine's own reject (the card's Decline) records it.
+ */
+export const DECLINE_PENDING_PROPOSAL = "proposal.pending.decline" as const;
+
+export const DeclinePendingProposalInputSchema =
+  ApprovePendingProposalInputSchema;
+export type DeclinePendingProposalInput = ApprovePendingProposalInput;
+
+export const DECLINE_PENDING_OUTCOMES = [
+  /** Declined; nothing changed. */
+  "DECLINED",
+  /** Already decided; `proposal` carries its status. */
+  "ALREADY_DECIDED",
+  /** The named id is not a change waiting for them here; `pending` lists those that are. */
+  "NOT_PENDING_HERE",
+] as const;
+
+export const DeclinePendingProposalOutputSchema = z
+  .object({
+    outcome: z.enum(DECLINE_PENDING_OUTCOMES),
+    proposal: ProposalViewSchema.nullable(),
+    pending: z.array(ProposalViewSchema).max(6),
+  })
+  .strict();
+export type DeclinePendingProposalOutput = z.infer<
+  typeof DeclinePendingProposalOutputSchema
+>;
+
+export function createDeclinePendingProposalTool(
+  port: PendingProposalPort,
+  decline: NonNullable<PendingProposalPort["decline"]>,
+): AnyQToolDefinition {
+  return defineQTool<
+    DeclinePendingProposalInput,
+    DeclinePendingProposalOutput,
+    null
+  >({
+    id: DECLINE_PENDING_PROPOSAL,
+    version: 1,
+    status: "ACTIVE",
+    providerName: "decline_pending_proposal",
+    description:
+      "Declines a change you prepared earlier in this conversation that is still waiting for the person's decision, when they have clearly said no to it themselves (by voice or text), exactly as the Decline button on its card does. Nothing is changed. Pass that change's id. Not for a change they want altered (prepare the altered version instead) and never on your own initiative. Report only what the outcome says: DECLINED, ALREADY_DECIDED, or NOT_PENDING_HERE with the ones that are waiting.",
+    classification: "SIDE_EFFECT",
+    riskClass: "LOW_RISK_INTERNAL",
+    // The approver's authority is the Approval Engine's to check.
+    requiredCapabilities: [],
+    supportedPurposes: [...PURPOSES],
+    requiredScopeKinds: ["OWN_Q_CONVERSATION"],
+    approval: "NONE",
+    idempotency: "SAFE_TO_REPEAT",
+    owner: "q-tools",
+    visibleStage: null,
+    input: DeclinePendingProposalInputSchema,
+    output: DeclinePendingProposalOutputSchema,
+    authorize: (_input, { actor, plan }) => {
+      const scope = actorWideScope(plan, "OWN_Q_CONVERSATION");
+      if (
+        actor.actorType !== "HUMAN" ||
+        scope === undefined ||
+        scope.filter.userId !== actor.userId
+      ) {
+        return Promise.resolve(deny<null>("NOT_AVAILABLE"));
+      }
+      return Promise.resolve(allow<null>("CONFIDENTIAL", null));
+    },
+    execute: async (input, context) => {
+      const at = {
+        actor: context.actor,
+        runId: context.runId,
+        correlationId: context.correlationId,
+      };
+      const proposals = await port.inConversation(at);
+      const pending = proposals.filter(
+        (proposal) => proposal.status === "PENDING",
+      );
+      const named = proposals.find(
+        (proposal) => proposal.proposalId === input.proposalId,
+      );
+      const listed = pending.slice(-6).map(view);
+      if (named === undefined) {
+        return { outcome: "NOT_PENDING_HERE", proposal: null, pending: listed };
+      }
+      if (named.status !== "PENDING") {
+        return {
+          outcome: "ALREADY_DECIDED",
+          proposal: view(named),
+          pending: listed,
+        };
+      }
+      const declined = await decline(at, named.proposalId);
+      return {
+        outcome:
+          declined.status === "DECLINED" ? "DECLINED" : "ALREADY_DECIDED",
+        proposal: { ...view(named), status: declined.status },
+        pending: [],
+      };
+    },
+  });
+}
