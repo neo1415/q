@@ -37,9 +37,6 @@ const BodySchema = z
 
 /** A stream comment every few seconds while a turn is still working. */
 const KEEP_ALIVE_MS = 5_000;
-/** If nothing has been said by then, one short beat so the person knows Q is there. */
-const SLOW_TURN_BEAT_MS = 6_000;
-const SLOW_TURN_BEAT = "One moment.";
 
 /**
  * The longest a turn may run before this route ends it in Q's own words.
@@ -226,10 +223,11 @@ export function registerVoiceThinkRoute(
       wroteContent = true;
       raw.write(chunk(id, { content: text }, null));
     };
-    // A long turn (research, a document being read) must not look like
-    // a dead line to the provider or to the person: a comment keeps the
-    // stream open, and a short spoken beat lands before the silence
-    // gets awkward. At most one beat per turn; nothing when Q is quick.
+    // A long turn (research, a document being read) must not look like a
+    // dead line to the provider: an empty delta keeps the stream open.
+    // Nothing is spoken while Q works. A spoken "One moment." before
+    // most answers was a verbal tic the founder rejected (2026-09-27);
+    // the stage shows that Q is thinking.
     const keepAlive = setInterval(() => {
       // An empty delta rather than an SSE comment: every OpenAI-shaped
       // parser accepts it, and the provider's is not ours to test.
@@ -237,15 +235,6 @@ export function registerVoiceThinkRoute(
         raw.write(chunk(id, { content: "" }, null));
       }
     }, KEEP_ALIVE_MS);
-    const beat = setTimeout(() => {
-      // A beat is a beat, not a sentence Q said: it ends in a space so the
-      // answer that follows does not arrive as "One moment.African fintech"
-      // (hosted, 2026-09-22), and `wroteContent` stays false so a turn that
-      // then runs out of time is told it ran out rather than cut short.
-      if (!wroteContent && open && !controller.signal.aborted) {
-        raw.write(chunk(id, { content: `${SLOW_TURN_BEAT} ` }, null));
-      }
-    }, SLOW_TURN_BEAT_MS);
     // Our own deadline, ahead of the provider's. The line is written
     // before the turn is cancelled, because cancelling closes writing.
     const deadline = setTimeout(() => {
@@ -298,7 +287,6 @@ export function registerVoiceThinkRoute(
     } finally {
       if (inFlight.get(line) === controller) inFlight.delete(line);
       clearInterval(keepAlive);
-      clearTimeout(beat);
       clearTimeout(deadline);
       if (open) {
         raw.write(chunk(id, {}, "stop"));

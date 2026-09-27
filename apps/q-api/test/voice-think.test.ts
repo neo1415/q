@@ -154,9 +154,8 @@ describe("the think route", () => {
       await vi.advanceTimersByTimeAsync(25_000);
       const response = await pending;
       const body = response.body;
-      // The beat, with the space that keeps it from running into whatever
-      // follows it.
-      expect(body).toContain('"content":"One moment. "');
+      // No filler beat is spoken while Q works (founder, 2026-09-27).
+      expect(body).not.toContain("One moment");
       // And then a sentence the person can answer, rather than nothing.
       expect(body).toContain("taking longer than I want to keep you waiting");
       expect(body.trim().endsWith("data: [DONE]")).toBe(true);

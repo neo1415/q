@@ -676,7 +676,7 @@ export function createVoiceTurnHandler(
         : { kind: "INTERRUPTED", path: "MOVE" };
     }
     if (!item.done) {
-      if (!(await speakLine(speaker, "Still on it, one moment.", signal))) {
+      if (!(await speakLine(speaker, "Still working on that.", signal))) {
         held.set(binding, item);
         return { kind: "INTERRUPTED", path: "Q" };
       }
