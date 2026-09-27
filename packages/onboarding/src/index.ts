@@ -279,3 +279,12 @@ export {
   type OnboardingNudgeState,
   type OnboardingNudgeSurface,
 } from "./domain/nudge-policy.js";
+export {
+  createOnboardingNudges,
+  nudgeJourney,
+  type OnboardingNudge,
+  type OnboardingNudgeRequest,
+  type OnboardingNudges,
+  type OnboardingNudgeStateRepository,
+} from "./application/nudges.js";
+export { createPostgresOnboardingNudgeStateRepository } from "./infrastructure/postgres-nudge-state-repository.js";

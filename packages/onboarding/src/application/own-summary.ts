@@ -59,6 +59,13 @@ export type OwnOnboardingSummary = {
   readonly answered: readonly string[];
   /** Questions on their path not answered yet (skipped ones included). */
   readonly open: readonly string[];
+  /** Required steps on their path, and how many are answered or skipped. */
+  readonly requiredCount: number;
+  readonly requiredDoneCount: number;
+  /** The journey's own names for the parts with required steps still open. */
+  readonly remainingTopics: readonly string[];
+  /** When they last worked on this setup. */
+  readonly lastActivityAt: string;
 };
 
 export type OwnOnboardingCompletion = "SESSION" | "ACTIVE_MANDATE" | null;
@@ -209,6 +216,31 @@ export function createOwnOnboardingSummaryReader(options: {
         );
         const answered: string[] = [];
         const open: string[] = [];
+        const required = progress.eligibleSteps.filter((step) => step.required);
+        const requiredDone = required.filter(
+          (step) => step.status === "COMPLETED" || step.status === "SKIPPED",
+        );
+        const phaseLabels = new Map(
+          aggregate.definition.version.schema.phases.map((phase) => [
+            phase.phaseKey,
+            phase.label,
+          ]),
+        );
+        const remainingTopics = [
+          ...new Set(
+            required
+              .filter(
+                (step) =>
+                  step.status !== "COMPLETED" && step.status !== "SKIPPED",
+              )
+              .map((step) =>
+                step.phaseKey === undefined
+                  ? undefined
+                  : phaseLabels.get(step.phaseKey),
+              )
+              .filter((label): label is string => label !== undefined),
+          ),
+        ];
         for (const step of progress.eligibleSteps) {
           const prompt = promptOf(aggregate.stepsByKey.get(step.stepKey));
           if (prompt === null) continue;
@@ -243,6 +275,10 @@ export function createOwnOnboardingSummaryReader(options: {
               : null,
           answered: answered.slice(0, LIST_MAX),
           open: open.slice(0, LIST_MAX),
+          requiredCount: required.length,
+          requiredDoneCount: requiredDone.length,
+          remainingTopics: remainingTopics.slice(0, LIST_MAX),
+          lastActivityAt: session.lastActivityAt,
         });
       }
       return summaries;
