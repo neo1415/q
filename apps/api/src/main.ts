@@ -22,7 +22,11 @@ import {
 } from "@capital-q/audit";
 import { createRequestDatabaseClient } from "@capital-q/database";
 import { createOutboxWriter } from "@capital-q/eventing";
-import { createLogger, createTelemetryRuntime } from "@capital-q/observability";
+import {
+  createCorrelationId,
+  createLogger,
+  createTelemetryRuntime,
+} from "@capital-q/observability";
 import {
   createFounderOnboardingIntegration,
   FOUNDER_INTERVIEW_CUES,
@@ -143,7 +147,9 @@ import {
   DOCUMENT_STORAGE_BUCKET,
   DOCUMENT_UPLOAD_MAX_OPEN_SESSIONS,
   DOCUMENT_UPLOAD_SESSION_TTL_SECONDS,
+  DocumentIdSchema,
 } from "@capital-q/evidence";
+import { composeChat } from "@capital-q/communication";
 import {
   createCloudflareStreamVideoProvider,
   createCompanyMediaOwnerResolver,
@@ -841,6 +847,30 @@ const integrations = composeGoogleIntegrations({
   pushTopic: googleWorkspace.push?.topic,
 });
 
+// Relationship chat (R34): parties through Network as the caller, shared
+// documents through Evidence as the caller (their own, scanned clean).
+const chat = composeChat({
+  sql: database.sql,
+  transactions: database.transactions,
+  interests,
+  ownDocument: async (actor, documentId) => {
+    const parsed = DocumentIdSchema.safeParse(documentId);
+    if (!parsed.success) return null;
+    const { document, currentVersion } = await evidence.getDocumentWithVersion(
+      { actor, documentId: parsed.data },
+    );
+    return currentVersion === null
+      ? null
+      : {
+          title: document.title,
+          mimeType: currentVersion.mimeType,
+          sizeBytes: currentVersion.sizeBytes,
+          malwareScanStatus: currentVersion.malwareScanStatus,
+        };
+  },
+  newCorrelationId: createCorrelationId,
+});
+
 const { app, logger } = createApp(config, security, {
   organisations,
   companies,
@@ -858,6 +888,7 @@ const { app, logger } = createApp(config, security, {
   companyPitches: discoverablePitches,
   companyNetworkView,
   interests,
+  chat,
   gateq,
   gateqApply,
   capital,

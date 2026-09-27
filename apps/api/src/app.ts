@@ -33,6 +33,7 @@ import {
   type IntegrationRoutesDependencies,
 } from "./http/integrations.js";
 import { registerMediaWebhookRoutes } from "./http/media-webhooks.js";
+import { registerChatRoutes, type ChatRoutesDependencies } from "./http/chat.js";
 import {
   registerNetworkInterestRoutes,
   type NetworkInterestRoutesDependencies,
@@ -152,6 +153,8 @@ export type ApiModules = {
   readonly integrations?:
     | Pick<IntegrationRoutesDependencies, "integrations" | "webOrigin" | "push">
     | undefined;
+  /** R34: relationship chat. Absent: no chat route registers. */
+  readonly chat?: ChatRoutesDependencies["chat"] | undefined;
   /** BIZ-004: handles and the Q Card. Absent: no card or /@handle route. */
   readonly publicIdentity?:
     QCardRoutesDependencies["publicIdentity"] | undefined;
@@ -278,6 +281,15 @@ export function createApp(
       authenticator: security.authenticator,
       resolver: security.resolver,
       interests: modules.interests,
+    });
+  }
+
+  // Relationship chat (R34): the thread on a connected relationship.
+  if (modules.chat !== undefined) {
+    registerChatRoutes(app, {
+      authenticator: security.authenticator,
+      resolver: security.resolver,
+      chat: modules.chat,
     });
   }
 

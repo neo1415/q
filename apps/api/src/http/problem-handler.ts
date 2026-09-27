@@ -34,6 +34,12 @@ import {
   InvestorVersionConflictError,
 } from "@capital-q/investors";
 import {
+  ChatAttachmentUnavailableError,
+  ChatIdempotencyConflictError,
+  ChatNotConnectedError,
+  ChatNotFoundError,
+} from "@capital-q/communication";
+import {
   InterestAlreadyAnsweredError,
   InterestCompanyNotFoundError,
   InterestIdempotencyConflictError,
@@ -329,7 +335,9 @@ function toProblem(
     error instanceof DisclosureResourceNotFoundError ||
     // Absent, another tenant's and another organisation's (BIZ-004).
     error instanceof QCardSubjectNotFoundError ||
-    error instanceof QCardNotFoundError
+    error instanceof QCardNotFoundError ||
+    // Not a party, no such thread or message: one answer (R34).
+    error instanceof ChatNotFoundError
   ) {
     return createProblemDetails({ code: "RESOURCE_NOT_FOUND", requestId });
   }
@@ -341,6 +349,25 @@ function toProblem(
       requestId,
       detail: error.message,
     });
+  }
+
+  // R34: about the caller's own thread or document; safe to say plainly.
+  if (error instanceof ChatNotConnectedError) {
+    return createProblemDetails({
+      code: "RESOURCE_CONFLICT",
+      requestId,
+      detail: error.message,
+    });
+  }
+  if (error instanceof ChatAttachmentUnavailableError) {
+    return createProblemDetails({
+      code: "VALIDATION_FAILED",
+      requestId,
+      detail: error.message,
+    });
+  }
+  if (error instanceof ChatIdempotencyConflictError) {
+    return createProblemDetails({ code: "IDEMPOTENCY_CONFLICT", requestId });
   }
 
   if (error instanceof InterestIdempotencyConflictError) {

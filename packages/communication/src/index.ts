@@ -32,3 +32,9 @@ export type {
   ChatStore,
 } from "./store.js";
 export { createPostgresChatStore } from "./postgres.js";
+export {
+  composeChat,
+  createChatDocuments,
+  createNetworkChatParties,
+  type OwnDocumentLookup,
+} from "./compose.js";
