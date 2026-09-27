@@ -28,6 +28,10 @@ import {
   registerMediaRoutes,
   type MediaRoutesDependencies,
 } from "./http/media.js";
+import {
+  registerIntegrationRoutes,
+  type IntegrationRoutesDependencies,
+} from "./http/integrations.js";
 import { registerMediaWebhookRoutes } from "./http/media-webhooks.js";
 import {
   registerNetworkInterestRoutes,
@@ -144,6 +148,10 @@ export type ApiModules = {
     VerificationRoutesDependencies["verification"] | undefined;
   /** CQ-BIZ-003: the visibility control centre. */
   readonly visibility?: VisibilityRoutesDependencies["visibility"] | undefined;
+  /** BIZ-007: a person's own connected Gmail and reply push. */
+  readonly integrations?:
+    | Pick<IntegrationRoutesDependencies, "integrations" | "webOrigin" | "push">
+    | undefined;
   /** BIZ-004: handles and the Q Card. Absent: no card or /@handle route. */
   readonly publicIdentity?:
     QCardRoutesDependencies["publicIdentity"] | undefined;
@@ -374,6 +382,14 @@ export function createApp(
       authenticator: security.authenticator,
       resolver: security.resolver,
       verification: modules.verification,
+    });
+  }
+
+  if (modules.integrations !== undefined) {
+    registerIntegrationRoutes(app, {
+      authenticator: security.authenticator,
+      resolver: security.resolver,
+      ...modules.integrations,
     });
   }
 

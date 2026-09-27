@@ -9,6 +9,12 @@
 
 import { loadApiConfig } from "@capital-q/config/api";
 import { loadDatabaseConfig } from "@capital-q/config/database";
+import { loadGoogleWorkspaceConfig } from "@capital-q/config/google-workspace";
+import {
+  composeGoogleIntegrations,
+  createGoogleKeySource,
+  platformGoogleHttp,
+} from "@capital-q/integrations";
 import { requireSupabaseAuthConfig } from "@capital-q/config/supabase-auth";
 import {
   createPostgresMaterialActionAuditWriter,
@@ -824,6 +830,17 @@ const publicIdentity = createPublicIdentityService({
   }),
 });
 
+// A person's own Gmail (BIZ-007): connect, disconnect, reply push. The
+// same composition q-api (which sends) and workers (which poll) use.
+const googleWorkspace = loadGoogleWorkspaceConfig(process.env);
+const integrations = composeGoogleIntegrations({
+  sql: database.sql,
+  transactions: database.transactions,
+  oauth: googleWorkspace.oauth,
+  tokenEncryptionKey: googleWorkspace.tokenEncryptionKey,
+  pushTopic: googleWorkspace.push?.topic,
+});
+
 const { app, logger } = createApp(config, security, {
   organisations,
   companies,
@@ -854,6 +871,18 @@ const { app, logger } = createApp(config, security, {
   verification,
   visibility,
   publicIdentity,
+  integrations: {
+    integrations,
+    webOrigin: googleWorkspace.webOrigin,
+    push:
+      googleWorkspace.push === undefined
+        ? undefined
+        : {
+            audience: googleWorkspace.push.audience,
+            serviceAccountEmail: googleWorkspace.push.serviceAccountEmail,
+            keys: createGoogleKeySource(platformGoogleHttp),
+          },
+  },
 });
 
 app.addHook("onClose", async () => {
