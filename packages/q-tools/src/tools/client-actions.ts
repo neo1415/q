@@ -1,6 +1,8 @@
 import { z } from "zod";
 
 import {
+  DISCOVER_FILTER_LIST_MAX,
+  DiscoverRaiseAmountSchema,
   Q_TASK_CLASSES,
   QClientActionToolResultSchema,
   QMotionChoiceSchema,
@@ -45,6 +47,7 @@ export const SET_Q_MOTION = "client.q_motion.set" as const;
 export const SET_VOICE = "client.voice.set" as const;
 export const SIGN_OUT = "client.session.sign_out" as const;
 export const OPEN_PAGE = "client.page.open" as const;
+export const SET_DISCOVER_FILTERS = "client.discover_filters.set" as const;
 
 function ownConversation(
   actor: ActorContext,
@@ -385,6 +388,122 @@ export function createOpenPageTool(
   });
 }
 
+export const SetDiscoverFiltersInputSchema = z
+  .object({
+    sectors: z
+      .array(z.string().regex(/^[a-z0-9][a-z0-9._-]{0,127}$/))
+      .max(DISCOVER_FILTER_LIST_MAX)
+      .optional()
+      .describe(
+        "Sector taxonomy codes, lower_snake_case: fintech, banking, insurance, capital_markets, digital_health, medical_devices, clean_energy, energy_access, ecommerce, retail_technology, supply_chain, mobility, agritech, edtech, proptech, developer_tools, data_infrastructure, hr_technology, identity_security. Empty for any sector.",
+      ),
+    stages: z
+      .array(
+        z
+          .string()
+          .regex(/^[a-z][a-z0-9_]*$/)
+          .max(64),
+      )
+      .max(DISCOVER_FILTER_LIST_MAX)
+      .optional()
+      .describe(
+        "Company stage codes: pre_seed, seed, series_a, series_b, series_c_plus. Empty for any stage.",
+      ),
+    countries: z
+      .array(z.string().regex(/^[A-Za-z]{2}$/))
+      .max(DISCOVER_FILTER_LIST_MAX)
+      .optional()
+      .describe(
+        "Headquarters countries as ISO 3166-1 alpha-2 codes (Nigeria is NG, Kenya KE). Empty for anywhere.",
+      ),
+    raiseMin: DiscoverRaiseAmountSchema.optional().describe(
+      "Smallest raise, a plain number in raiseCurrency units.",
+    ),
+    raiseMax: DiscoverRaiseAmountSchema.optional().describe(
+      "Largest raise, a plain number in raiseCurrency units.",
+    ),
+    raiseCurrency: z
+      .string()
+      .regex(/^[A-Z]{3}$/)
+      .optional()
+      .describe(
+        "ISO 4217 currency for raiseMin/raiseMax, e.g. USD. Required with either.",
+      ),
+    raiseDisclosedOnly: z
+      .boolean()
+      .optional()
+      .describe(
+        "Only companies whose raise is shared with them. Otherwise companies that have not shared a raise stay, marked.",
+      ),
+    verifiedOnly: z.boolean().optional(),
+    hasPitch: z
+      .boolean()
+      .optional()
+      .describe("Only companies with a pitch video."),
+  })
+  .strict();
+export type SetDiscoverFiltersInput = z.infer<
+  typeof SetDiscoverFiltersInputSchema
+>;
+
+/**
+ * Discover filters by asking ("show me only fintech in Nigeria";
+ * ux/discover-filters). The same control as the filter sheet: it narrows
+ * what their own feed shows, on their own screen, and is cleared there.
+ * It sets the whole filter, so "only fintech" replaces what was set. No
+ * server state changes and nothing about any company is read here.
+ */
+export function createSetDiscoverFiltersTool(): AnyQToolDefinition {
+  return defineQTool<
+    SetDiscoverFiltersInput,
+    QClientActionToolResult,
+    QClientActionToolResult
+  >({
+    ...COMMON,
+    id: SET_DISCOVER_FILTERS,
+    providerName: "set_discover_filters",
+    description:
+      'Sets the filters on their Discover feed, exactly as the filter control does: sector, stage, country, raise size, verified only, has a pitch video. It replaces the current filters; call it with nothing set to clear them. Call it when they ask Discover to show only some companies ("only fintech in Nigeria").',
+    input: SetDiscoverFiltersInputSchema,
+    authorize: (input, { actor, plan }) => {
+      if (!ownConversation(actor, plan)) {
+        return Promise.resolve(deny<QClientActionToolResult>("NOT_AVAILABLE"));
+      }
+      const bounded =
+        input.raiseMin !== undefined || input.raiseMax !== undefined;
+      // A raise bound without a currency is not money: refused, not guessed.
+      if (bounded && input.raiseCurrency === undefined) {
+        return Promise.resolve(deny<QClientActionToolResult>("NOT_AVAILABLE"));
+      }
+      return Promise.resolve(
+        allowed({
+          kind: "SET_DISCOVER_FILTERS",
+          sectorCodes: [...new Set(input.sectors ?? [])],
+          stageCodes: [...new Set(input.stages ?? [])],
+          countryCodes: [
+            ...new Set((input.countries ?? []).map((c) => c.toUpperCase())),
+          ],
+          raise:
+            bounded && input.raiseCurrency !== undefined
+              ? {
+                  ...(input.raiseMin === undefined
+                    ? {}
+                    : { min: input.raiseMin }),
+                  ...(input.raiseMax === undefined
+                    ? {}
+                    : { max: input.raiseMax }),
+                  currency: input.raiseCurrency,
+                }
+              : null,
+          raiseDisclosedOnly: input.raiseDisclosedOnly === true,
+          verifiedOnly: input.verifiedOnly === true,
+          hasPitch: input.hasPitch === true,
+        }),
+      );
+    },
+  });
+}
+
 export function createClientActionTools(
   ports: Pick<QToolPorts, "companies" | "relationships">,
 ): readonly AnyQToolDefinition[] {
@@ -396,5 +515,6 @@ export function createClientActionTools(
     createSetVoiceTool(),
     createSignOutTool(),
     createOpenPageTool(ports),
+    createSetDiscoverFiltersTool(),
   ];
 }

@@ -46,6 +46,7 @@ const CORE = [
   "set_voice",
   "sign_out",
   "open_page",
+  "set_discover_filters",
   "approve_pending_proposal",
   "decline_pending_proposal",
   "list_pending_approvals",

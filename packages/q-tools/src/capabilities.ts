@@ -413,6 +413,12 @@ export const Q_CAPABILITIES: readonly QCapability[] = Object.freeze([
     acts: true,
   }),
   tool(
+    "set_discover_filters",
+    "NAVIGATION",
+    "Sets the filters on their Discover feed (sector, stage, country, raise size, verified only, has a pitch video), as the filter control does.",
+    { acts: true },
+  ),
+  tool(
     "decline_pending_proposal",
     "RECORDS",
     "Declines, when they say no, a change Q prepared in this conversation that is waiting for their decision, exactly as the Decline button on its card does.",

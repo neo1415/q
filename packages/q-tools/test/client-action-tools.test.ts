@@ -128,6 +128,47 @@ describe("client action tools", () => {
     expect(intentOf(outcome)).toEqual({ kind: "SET_THEME", theme: "dark" });
   });
 
+  it("set_discover_filters carries the filters, normalised (ux/discover-filters)", async () => {
+    const outcome = await executor().execute(
+      call("set_discover_filters", {
+        sectors: ["fintech", "fintech"],
+        countries: ["ng"],
+        raiseMax: "2000000",
+        raiseCurrency: "USD",
+        hasPitch: true,
+      }),
+      contextFor(actorA, ownPlan()),
+    );
+    expect(outcome.status).toBe("SUCCEEDED");
+    expect(intentOf(outcome)).toEqual({
+      kind: "SET_DISCOVER_FILTERS",
+      sectorCodes: ["fintech"],
+      stageCodes: [],
+      countryCodes: ["NG"],
+      raise: { max: "2000000", currency: "USD" },
+      raiseDisclosedOnly: false,
+      verifiedOnly: false,
+      hasPitch: true,
+    });
+  });
+
+  it("set_discover_filters with nothing set clears; a raise bound without a currency is refused", async () => {
+    const cleared = await executor().execute(
+      call("set_discover_filters", {}),
+      contextFor(actorA, ownPlan()),
+    );
+    expect(intentOf(cleared)).toMatchObject({
+      kind: "SET_DISCOVER_FILTERS",
+      sectorCodes: [],
+      raise: null,
+    });
+    const refused = await executor().execute(
+      call("set_discover_filters", { raiseMin: "100000" }),
+      contextFor(actorA, ownPlan()),
+    );
+    expect(refused.status).not.toBe("SUCCEEDED");
+  });
+
   it("reload_page carries a reload", async () => {
     const outcome = await executor().execute(
       call("reload_page", {}),
