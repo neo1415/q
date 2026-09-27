@@ -243,6 +243,10 @@ import { createProfileChangeBoard } from "./composition/profile-change-board.js"
 import { createProfileFindingsReader } from "./composition/profile-findings.js";
 import { createHandleClaimAction } from "./composition/handle-claim-action.js";
 import { assertComposedActionTypes } from "./composition/q-action-types.js";
+import {
+  createConversationApprovalPort,
+  plainProposalStatus,
+} from "./composition/conversation-approvals.js";
 import { createHandleClaimBoard } from "./composition/handle-claim-board.js";
 import {
   createPostgresPublicIdentityRepository,
@@ -924,6 +928,14 @@ const qTools = createQTools({
       prepareForApproval: visibilityBoard.prepareForApproval,
     },
     handleClaims: handleClaimBoard,
+    // Approval by conversation: the one change waiting for this person in
+    // this conversation, approved as the card approves it (live test
+    // 2026-09-27 #1). The engine and orchestrator are composed below.
+    pendingProposals: createConversationApprovalPort({
+      runtime: qRuntime,
+      late: () => ({ actions: qActions, orchestrator }),
+      logger,
+    }),
   },
   logger,
 });
@@ -1170,12 +1182,18 @@ const qIntelligence = composeQIntelligence({
       const detail = await qArtifacts.service.read(actor, artifactId);
       return { status: detail.artifact.status };
     },
+    // Read as the person, in plain terms: SAVED only when the action
+    // executed, never from the approval row alone (live test 2026-09-27 #2).
     action: async (actor: ActorContext, proposalId: string) => {
       const approval = await qActions.findApprovalForAction(
         actor.tenantId,
         QActionProposalIdSchema.parse(proposalId),
       );
-      return approval === null ? null : { status: approval.status };
+      if (approval === null) return null;
+      const view = await qActions
+        .getApproval({ actor, approvalId: approval.id })
+        .catch(() => null);
+      return view === null ? null : { status: plainProposalStatus(view) };
     },
   },
   visibility: profileBoard,
