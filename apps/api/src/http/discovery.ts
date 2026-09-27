@@ -1,10 +1,14 @@
 import type { FastifyInstance, FastifyRequest } from "fastify";
 
 import {
+  DISCOVER_FILTER_QUERY_KEYS,
+  DiscoverFiltersQuerySchema,
   DISCOVERY_COMPANIES_PATH,
   DISCOVERY_INVESTORS_PATH,
   DiscoveryCompanySlateDtoSchema,
   DiscoveryInvestorSlateDtoSchema,
+  parseContract,
+  type DiscoverFilters,
 } from "@capital-q/contracts";
 import type {
   DiscoveryService,
@@ -72,6 +76,24 @@ function pageOf(request: FastifyRequest): {
   };
 }
 
+/**
+ * The Discover filter parameters, if any (lead-owned contract change,
+ * ux/discover-filters). The query is external input: only the named keys
+ * are read, and a malformed one is refused, never a silently wider feed.
+ */
+function filtersOf(request: FastifyRequest): DiscoverFilters {
+  const query = request.query as Record<string, unknown>;
+  const picked: Record<string, unknown> = {};
+  for (const key of DISCOVER_FILTER_QUERY_KEYS) {
+    if (query[key] !== undefined) picked[key] = query[key];
+  }
+  return parseContract(
+    DiscoverFiltersQuerySchema,
+    picked,
+    "The Discover filters are not valid.",
+  );
+}
+
 export function registerDiscoveryRoutes(
   app: FastifyInstance,
   dependencies: DiscoveryRoutesDependencies,
@@ -90,10 +112,12 @@ export function registerDiscoveryRoutes(
     { onRequest: withContext },
     async (request, reply) => {
       const page = pageOf(request);
+      const filters = filtersOf(request);
       const served = await slates.pageCompanies({
         actor: getActorContext(request),
         limit: page.limit,
         cursor: page.cursor,
+        filters,
       });
       // One batched read for the whole page, after the reader has decided
       // which companies this viewer may see (doc 20 §78). Only a
@@ -130,6 +154,9 @@ export function registerDiscoveryRoutes(
             reasons: [],
             reasonCodes: item.reasonCodes,
             unverifiedExclusions: item.unverifiedExclusions,
+            ...(item.filterUnknown === undefined
+              ? {}
+              : { filterUnknown: item.filterUnknown }),
             ...(states === null
               ? {}
               : { viewerSaved: states.get(item.companyId)?.saved === true }),

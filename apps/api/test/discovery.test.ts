@@ -2,7 +2,10 @@ import { describe, expect, it } from "vitest";
 import type { FastifyInstance } from "fastify";
 
 import { parseApiConfig } from "@capital-q/config/api";
-import { DISCOVERY_COMPANIES_PATH } from "@capital-q/contracts";
+import {
+  DISCOVERY_COMPANIES_PATH,
+  NO_DISCOVER_FILTERS,
+} from "@capital-q/contracts";
 import {
   InteractionStateSchema,
   SlateCursorRejectedError,
@@ -165,7 +168,14 @@ describe("GET /v1/discovery/companies (persisted slates)", () => {
     });
     expect(response.statusCode).toBe(200);
     expect(response.headers["cache-control"]).toBe("no-store");
-    expect(queries).toEqual([{ actor: CONTEXT, limit: 5, cursor: "abc" }]);
+    expect(queries).toEqual([
+      {
+        actor: CONTEXT,
+        limit: 5,
+        cursor: "abc",
+        filters: NO_DISCOVER_FILTERS,
+      },
+    ]);
     expect(response.json()).toEqual({
       slateId: SLATE,
       rankingVersion: "ranking-config.v1",
@@ -212,7 +222,12 @@ describe("GET /v1/discovery/companies (persisted slates)", () => {
     });
     expect(response.statusCode).toBe(200);
     expect(queries).toEqual([
-      { actor: CONTEXT, limit: undefined, cursor: null },
+      {
+        actor: CONTEXT,
+        limit: undefined,
+        cursor: null,
+        filters: NO_DISCOVER_FILTERS,
+      },
     ]);
     expect(response.json()).toMatchObject({
       slateId: null,
@@ -256,6 +271,67 @@ describe("GET /v1/discovery/companies (persisted slates)", () => {
 // call with exactly the page's company ids, the DTO's pitch shape and
 // nothing more, null for a company the port did not return, and no call at
 // all for an empty page.
+describe("GET /v1/discovery/companies — Discover filters (ux/discover-filters)", () => {
+  const FINTECH = "eacf7107-9af3-5b76-91a2-3c169e396347";
+
+  it("parses the filter parameters and hands them to the reader, canonically", async () => {
+    const { app, queries } = buildApp({ principal: PRINCIPAL, page: PAGE });
+    const response = await app.inject({
+      method: "GET",
+      url: `${DISCOVERY_COMPANIES_PATH}?sector=${FINTECH}&country=ng&stage=seed&raiseMin=100000&raiseCurrency=USD&verifiedOnly=true&hasPitch=true&cursor=abc`,
+    });
+    expect(response.statusCode).toBe(200);
+    expect(queries[0]?.filters).toEqual({
+      sectorNodeIds: [FINTECH],
+      stageCodes: ["seed"],
+      countryCodes: ["NG"],
+      raise: { min: "100000", currency: "USD" },
+      raiseDisclosedOnly: false,
+      verifiedOnly: true,
+      hasPitch: true,
+    });
+    expect(queries[0]?.cursor).toBe("abc");
+    await app.close();
+  });
+
+  it("a malformed filter is refused (422), never a silently wider feed", async () => {
+    const { app, queries } = buildApp({ principal: PRINCIPAL, page: PAGE });
+    for (const query of [
+      "raiseMin=100",
+      "sector=fintech",
+      "raiseMin=1e6&raiseCurrency=USD",
+      "verifiedOnly=yes",
+    ]) {
+      const response = await app.inject({
+        method: "GET",
+        url: `${DISCOVERY_COMPANIES_PATH}?${query}`,
+      });
+      expect(response.statusCode, query).toBe(422);
+    }
+    expect(queries).toEqual([]);
+    await app.close();
+  });
+
+  it("says which filters a card could not be checked against", async () => {
+    const first = PAGE.items[0];
+    if (first === undefined) throw new Error("fixture");
+    const { app } = buildApp({
+      principal: PRINCIPAL,
+      page: {
+        ...PAGE,
+        items: [{ ...first, filterUnknown: ["raise"] }],
+      },
+    });
+    const response = await app.inject({
+      method: "GET",
+      url: `${DISCOVERY_COMPANIES_PATH}?raiseMax=500000&raiseCurrency=USD`,
+    });
+    const body: { items: { filterUnknown?: string[] }[] } = response.json();
+    expect(body.items[0]?.filterUnknown).toEqual(["raise"]);
+    await app.close();
+  });
+});
+
 describe("GET /v1/discovery/companies — the viewer's saved state (R30 #7)", () => {
   it("marks each item with the viewer's own saved state", async () => {
     const { app } = buildApp({

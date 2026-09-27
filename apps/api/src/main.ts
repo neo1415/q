@@ -182,6 +182,7 @@ import { createSupabaseAccessTokenAuthenticator } from "@capital-q/security/supa
 
 import { apiServiceIdentity, createApp } from "./app.js";
 import { createChatSafetyAudit } from "./chat-safety-audit.js";
+import { createDiscoverFilterFacts } from "./discover-filter-facts.js";
 import { createProductionEventRegistry } from "./event-registry.js";
 import { createSupabaseRequestAuthenticator } from "./security/supabase-authenticator.js";
 
@@ -631,6 +632,15 @@ const slates = createSlateReadPipeline({
   sql: database.sql,
   disclosure,
   queue: createPostgresRefreshQueue({ sql: database.sql }),
+  // Discover filters (ux/discover-filters). The verification reader and
+  // the pitch port are composed further down; they are read per request.
+  filterFacts: createDiscoverFilterFacts({
+    companies: disclosurePorts.companies,
+    capital: disclosurePorts.capital,
+    disclosure,
+    verification: () => cardVerification,
+    pitches: () => discoverablePitches,
+  }),
 });
 
 /**
