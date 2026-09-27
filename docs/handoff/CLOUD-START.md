@@ -171,6 +171,14 @@ lead-owned files touched, open questions.
 - **Seeded world goes to hosted:** run the SEED runner with `--hosted` once it's merged. It is idempotent, sets the synthetic marker in app_metadata, and demo passwords come from env. The founder keeps registering their own fresh accounts to test the real flows.
 - **Auth:** hosted `site_url` and redirect allow list are fixed (2026-09-27). Email delivery needs the founder's free SMTP: see `setup-email-and-meetings.md`, "Update 2026-09-27".
 
+**E3 final round merged 2026-09-27** (e28b558..83b9388): R20 capability registry, R21 screen context (entities only), legacy interviewer deleted, "edit my profile" via Q fixed (two causes), the Q Card via Q fixed. **Open follow-ups, owners to assign:**
+
+- Remove the word-matching `spokenDestination` in `apps/q-api/src/voice/navigation.ts` (it breaks ADR 0011 and R20). Voice navigation should come from Q's answer navigation blocks, like typed turns.
+- Add a `q_runtime.runs.screen` column (migration) so the planner knows which screen, not only the entities on it. Send the open-document id from the artifact viewer state, and send `screen` on voice turns too.
+- Web form confirm-then-leave: in `apps/web/src/features/onboarding-kit/runtime-port.ts` `saveResponse`, when the review confirmation lands and `canComplete` is true, confirm the rest and complete (mirror `confirm_and_finish`).
+- Run the live paraphrase eval for R20 (small, founder-budgeted): profile edits never NAVIGATE, and "take me to my profile" still does.
+- Lead decisions made: TURN_READER v7 edited in place is accepted (never deployed); keep `negation.ts` and `promises.ts` (live users outside the interviewer).
+
 ## 8. The queue: the Monday definition of done, in order
 
 This is playbook section 0, in the same order, with the state at handoff. Finish higher items first and **deploy each item as it lands**, so Monday shows the best achievable product even if the bottom is unfinished. Labels: **NOT STARTED**, **PARTLY BUILT**, **DONE-NOT-DEPLOYED**, **LIVE**.
