@@ -423,7 +423,7 @@ function Statement({
   ];
   return (
     <div className="flex min-w-0 flex-col gap-1">
-      <p className="cq-body break-words text-(--cq-text-primary)">
+      <p className="cq-body break-words whitespace-pre-line text-(--cq-text-primary)">
         {displayValue(factKey, statement)}
       </p>
       <SourcesDisclosure>
