@@ -1,4 +1,5 @@
 import type {
+  PublicCardDto,
   PublicCardField,
   QCardField,
   QCardSubjectType,
@@ -45,6 +46,63 @@ export function cardTagline(
   return found.value.length > 180
     ? `${found.value.slice(0, 177)}…`
     : found.value;
+}
+
+/**
+ * The fields this visitor may be shown, re-checked on the page. The API's
+ * projection already decides the audience (public_external for anyone,
+ * network_visible too for a signed-in participant); this is the second
+ * layer, so a projection bug can never put a members-only value on the
+ * page an anonymous scanner sees.
+ */
+export function fieldsForAudience(
+  card: Pick<PublicCardDto, "audience" | "fields">,
+): readonly PublicCardField[] {
+  return card.audience === "PARTICIPANT"
+    ? card.fields
+    : card.fields.filter((field) => field.scope === "public_external");
+}
+
+/** Only what anyone may see: for metadata, JSON-LD and link previews. */
+export function publicExternalFields(
+  fields: readonly PublicCardField[],
+): readonly PublicCardField[] {
+  return fields.filter((field) => field.scope === "public_external");
+}
+
+/**
+ * The line that says what kind of organisation this is -- the card's
+ * "role" line: "Seed · Nairobi, Kenya", "Venture capital · Kenya". Built
+ * only from the fields handed in; absent parts are left out, never
+ * guessed, and nothing at all returns null.
+ */
+export function cardDescriptor(
+  subjectType: QCardSubjectType,
+  fields: readonly PublicCardField[],
+): string | null {
+  const read = (key: QCardField): string | null => {
+    const field = fields.find((candidate) => candidate.key === key);
+    return field === undefined ? null : cardFieldValue(field);
+  };
+  const parts =
+    subjectType === "COMPANY"
+      ? [
+          read("currentStageCode"),
+          [read("headquartersCity"), read("headquartersCountry")]
+            .filter((part) => part !== null)
+            .join(", ") || null,
+        ]
+      : [read("investorType"), read("hqCountry")];
+  const present = parts.filter((part) => part !== null);
+  return present.length === 0 ? null : present.join(" · ");
+}
+
+/** "https://www.kivu.africa/" -> "kivu.africa", for a link's visible text. */
+export function websiteLabel(url: string): string {
+  return url
+    .replace(/^https?:\/\//, "")
+    .replace(/^www\./, "")
+    .replace(/\/$/, "");
 }
 
 /** A handle suggestion from a name: lowercase, hyphenated, trimmed to fit. */

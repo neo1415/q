@@ -149,6 +149,7 @@ describe("the card", () => {
     render(
       <QCard
         name="Kivu Freight"
+        descriptor="Seed · Nairobi, Kenya"
         tagline="Cross-border freight booking."
         handle="kivu"
         displayUrl="capitalq.example/@kivu"
@@ -159,6 +160,7 @@ describe("the card", () => {
       name: "Q Card for Kivu Freight",
     });
     expect(within(card).getByText("@kivu")).toBeTruthy();
+    expect(within(card).getByText("Seed · Nairobi, Kenya")).toBeTruthy();
     expect(
       within(card).getByText("Cross-border freight booking."),
     ).toBeTruthy();

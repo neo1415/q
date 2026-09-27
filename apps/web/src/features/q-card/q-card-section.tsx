@@ -10,8 +10,13 @@ import {
 
 import { apiSession } from "@/features/q/context";
 
-import { cardFieldLabel, suggestHandle } from "./card-content";
-import { appOrigin, displayUrlFor } from "./public-card-data";
+import {
+  cardDescriptor,
+  cardFieldLabel,
+  publicExternalFields,
+  suggestHandle,
+} from "./card-content";
+import { appOrigin, displayUrlFor, loadPublicCard } from "./public-card-data";
 import { QCard, type CardBrand } from "./q-card";
 import { QCardPanel } from "./q-card-panel";
 import { qrSvg } from "./qr";
@@ -22,6 +27,20 @@ import { qrSvg } from "./qr";
  * The preview is drawn from the owner's own declared values -- what the
  * owner sees, not what a stranger sees; the public page is one link away.
  */
+
+/**
+ * The card's "role" line as a stranger would read it: from the public
+ * projection's public_external fields only, since a printed card travels
+ * beyond Capital Q. A failed read leaves the line off; the card still works.
+ */
+async function publicDescriptor(
+  subjectType: QCardSubjectType,
+  handle: string,
+): Promise<string | null> {
+  const card = await loadPublicCard(handle).catch(() => null);
+  if (card === null || card.kind !== "CARD") return null;
+  return cardDescriptor(subjectType, publicExternalFields(card.fields));
+}
 
 async function loadCard(
   subjectType: QCardSubjectType,
@@ -68,6 +87,8 @@ export async function QCardSection({
     .map((key) => ({ key, label: cardFieldLabel(key) }));
   const handle = card?.handle ?? null;
   const origin = appOrigin();
+  const descriptor =
+    handle === null ? null : await publicDescriptor(subjectType, handle);
 
   return (
     <QCardPanel
@@ -82,6 +103,7 @@ export async function QCardSection({
         card === null || handle === null ? null : (
           <QCard
             name={name}
+            descriptor={descriptor}
             tagline={tagline}
             handle={handle}
             displayUrl={displayUrlFor(handle)}
