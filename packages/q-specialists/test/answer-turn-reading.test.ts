@@ -273,6 +273,12 @@ describe("a request for one of Q's own hands (CQ-QACT-001)", () => {
     );
   });
 
+  it("says the page word once when the person already said it (R30 #26)", () => {
+    expect(unknownScreenLine("the queue page", "HOME", [])).toBe(
+      'Capital Q doesn\'t have a "queue" page.',
+    );
+  });
+
   it("never navigates on a guess, and never to a surface the run has no subject for", async () => {
     const guess = seam({
       said: "discover?",

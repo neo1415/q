@@ -36,6 +36,7 @@ import {
   PERSON_PROFILE_UPDATE,
   PersonProfileUpdatePayloadSchema,
 } from "./person-profile-action.js";
+import { savedReadsLine } from "./saved-line.js";
 
 /**
  * The first real Q action: a change to the person's own company profile
@@ -201,7 +202,10 @@ export function createCompanyProfileUpdateAction(
       describe: (payload) => describeCompanyProfileChanges(payload.changes),
       // Said after the gate persisted EXECUTED, from the approved payload.
       confirm: (payload) =>
-        `Saved. Your company profile now reads: ${describeCompanyProfileChanges(payload.changes).preview.split("\n").join("; ")}.`,
+        savedReadsLine(
+          "Your company profile",
+          describeCompanyProfileChanges(payload.changes).preview,
+        ),
       authorize: async (payload, actor) => {
         if (actor.actorType !== "HUMAN") {
           return { outcome: "DENY", code: "NOT_A_PERSON" };

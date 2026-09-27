@@ -225,6 +225,9 @@ export function unknownScreenLine(
     .replace(/[^\p{L}\p{N}\s'-]/gu, " ")
     .replace(/\s+/g, " ")
     .trim()
+    // "the queue page" is named with its own "page": said once, not twice.
+    .replace(/\s+(page|screen|tab)$/iu, "")
+    .replace(/^(the|my|a)\s+/iu, "")
     .slice(0, 60);
   const opening =
     plain.length === 0

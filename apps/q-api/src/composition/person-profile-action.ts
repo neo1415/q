@@ -14,6 +14,7 @@ import {
   UserIdSchema,
   type PersonProfileStore,
 } from "@capital-q/security";
+import { savedReadsLine } from "./saved-line.js";
 
 /**
  * What Capital Q shows about the person themselves (ADR 0011; BIZ-002):
@@ -114,7 +115,10 @@ export function createPersonProfileUpdateAction(
     ],
     describe: describePersonProfileChanges,
     confirm: (payload) =>
-      `Saved. Your profile now reads: ${describePersonProfileChanges(payload).preview.split("\n").join("; ")}.`,
+      savedReadsLine(
+        "Your profile",
+        describePersonProfileChanges(payload).preview,
+      ),
     authorize: (payload, actor) => {
       if (actor.actorType !== "HUMAN") {
         return Promise.resolve({ outcome: "DENY", code: "NOT_A_PERSON" });

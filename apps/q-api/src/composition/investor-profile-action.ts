@@ -15,6 +15,7 @@ import {
 import type { Logger } from "@capital-q/observability";
 import { defineQAction, type AnyQActionDefinition } from "@capital-q/q-actions";
 import { capability, type AuthorizationService } from "@capital-q/security";
+import { savedReadsLine } from "./saved-line.js";
 
 /**
  * A change to the approver's own investor organisation profile (BIZ-002).
@@ -134,7 +135,10 @@ export function createInvestorProfileUpdateAction(
     ],
     describe: (payload) => describeInvestorProfileChanges(payload.changes),
     confirm: (payload) =>
-      `Saved. Your investor profile now reads: ${describeInvestorProfileChanges(payload.changes).preview.split("\n").join("; ")}.`,
+      savedReadsLine(
+        "Your investor profile",
+        describeInvestorProfileChanges(payload.changes).preview,
+      ),
     authorize: async (payload, actor) => {
       if (actor.actorType !== "HUMAN") {
         return { outcome: "DENY", code: "NOT_A_PERSON" };
