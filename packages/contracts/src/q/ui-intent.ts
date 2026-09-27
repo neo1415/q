@@ -99,6 +99,7 @@ export const Q_NAVIGATE_DESTINATIONS = [
   "CAPITAL",
   "DISCOVER",
   "COMPANY_VISIBILITY",
+  "RELATIONSHIPS",
 ] as const satisfies readonly QVoiceDestination[];
 
 export type QNavigateDestination = (typeof Q_NAVIGATE_DESTINATIONS)[number];

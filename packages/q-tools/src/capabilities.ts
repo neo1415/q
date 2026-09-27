@@ -123,6 +123,8 @@ const SCREEN_DOES: Readonly<Record<QNavigateDestination, string>> = {
   CAPITAL: "Opens the Capital screen (their raise).",
   DISCOVER: "Opens Discover (the feed).",
   COMPANY_VISIBILITY: "Opens their company's visibility settings.",
+  RELATIONSHIPS:
+    "Opens their Relationships page: every company-investor relationship of their side, where each stands.",
 };
 
 const NAVIGATION: readonly QCapability[] = Q_NAVIGATE_DESTINATIONS.map(

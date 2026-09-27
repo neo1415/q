@@ -143,6 +143,7 @@ const SCREEN_NAMES: Readonly<Record<QNavigateDestination, string>> = {
   CAPITAL: "Capital",
   DISCOVER: "Discover",
   COMPANY_VISIBILITY: "their company's visibility settings",
+  RELATIONSHIPS: "their relationships",
 };
 
 /** Where the person is, in their terms (R21). */
@@ -155,6 +156,7 @@ const SCREEN_ROUTE_NAMES: Readonly<Record<QScreenRoute, string | null>> = {
   COMPANY_INTEREST: "their company's incoming interest",
   COMPANY: "a company's page",
   PITCH: "their pitch",
+  RELATIONSHIPS: "their relationships",
   RELATIONSHIP_COMPANY: "their relationship with a company",
   RELATIONSHIP_INVESTOR: "their relationship with an investor",
   VERIFICATION: "verification",

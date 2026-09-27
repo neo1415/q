@@ -129,6 +129,7 @@ const DESTINATION_LABELS: Readonly<
   CAPITAL: "Open Capital",
   DISCOVER: "Open Discover",
   COMPANY_VISIBILITY: "Open visibility settings",
+  RELATIONSHIPS: "Open Relationships",
 };
 
 function subjectLabel(subject: QSubjectRef): string {

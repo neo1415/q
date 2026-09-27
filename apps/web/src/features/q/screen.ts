@@ -12,6 +12,7 @@ const EXACT: Readonly<Record<string, QScreenRoute>> = {
   "/capital": "CAPITAL",
   "/profile": "PROFILE",
   "/company/visibility": "COMPANY_VISIBILITY",
+  "/relationships": "RELATIONSHIPS",
   "/company/interest": "COMPANY_INTEREST",
   "/pitch": "PITCH",
   "/verification": "VERIFICATION",

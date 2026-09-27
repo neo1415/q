@@ -184,6 +184,7 @@ const DESTINATION_LINES: Readonly<Record<QNavigateDestination, string>> = {
   CAPITAL: "Taking you to Capital.",
   DISCOVER: "Taking you to Discover.",
   COMPANY_VISIBILITY: "Opening your visibility settings.",
+  RELATIONSHIPS: "Opening your relationships.",
 };
 
 /** A real screen, as offered back to someone who named one that isn't. */
@@ -193,6 +194,7 @@ const DESTINATION_NAMES: Readonly<Record<QNavigateDestination, string>> = {
   CAPITAL: "Capital",
   DISCOVER: "Discover",
   COMPANY_VISIBILITY: "your visibility settings",
+  RELATIONSHIPS: "your relationships",
 };
 
 /**

@@ -21,6 +21,7 @@ describe("the screen context the web sends with a question", () => {
       route: "COMPANY",
       companyId: ID,
     });
+    expect(screenOf("/relationships")).toEqual({ route: "RELATIONSHIPS" });
     expect(screenOf(`/relationships/investor/${ID}`)).toEqual({
       route: "RELATIONSHIP_INVESTOR",
       investorOrganisationId: ID,

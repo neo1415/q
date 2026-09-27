@@ -561,7 +561,7 @@ describe("the answer is told what this run can do (CQ-QX-008)", () => {
     // visibility notebook: screens only, and never the visibility one.
     expect(run.capabilities).toEqual([
       {
-        navigate: ["HOME", "PROFILE", "CAPITAL", "DISCOVER"],
+        navigate: ["HOME", "PROFILE", "CAPITAL", "DISCOVER", "RELATIONSHIPS"],
         documents: [],
         visibilityChange: false,
       },
