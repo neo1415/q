@@ -69,3 +69,23 @@ export type PrivateDocumentStorageProvider = {
   /** Idempotent: deleting an object that is already gone is success. */
   readonly deleteObject: (object: StoredObjectRef) => Promise<void>;
 };
+
+/**
+ * A short-lived, single-object read (R34: a file shared in a relationship
+ * chat). Issued only after the caller's own context authorised the reader;
+ * the storage layer never decides who may read. Handed over once, never
+ * persisted, never logged.
+ */
+export type DirectDownloadAuthorization = {
+  readonly url: string;
+  readonly providerExpiresAt: string;
+};
+
+export type PrivateDocumentDownloadAuthorizer = {
+  readonly createDownloadAuthorization: (input: {
+    readonly object: StoredObjectRef;
+    readonly expiresInSeconds: number;
+    /** Set: the browser saves the file under this name. Absent: inline. */
+    readonly downloadFilename?: string | undefined;
+  }) => Promise<DirectDownloadAuthorization>;
+};

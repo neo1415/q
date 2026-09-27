@@ -17,6 +17,17 @@ const REL = "00000000-0000-4000-8000-00000000c001";
 const OTHER_REL = "00000000-0000-4000-8000-00000000c002";
 const DOC = "00000000-0000-4000-8000-00000000d001";
 const PENDING_DOC = "00000000-0000-4000-8000-00000000d002";
+const VOICE = "00000000-0000-4000-8000-00000000d003";
+const DOC_VERSION = "00000000-0000-4000-8000-00000000d0a1";
+const DOC_TENANT = "00000000-0000-4000-8000-00000000d0b1";
+const snapshot = (documentId: string, mimeType: string) => ({
+  documentId,
+  documentVersionId: DOC_VERSION,
+  documentTenantId: DOC_TENANT,
+  title: mimeType.startsWith("audio/") ? "Voice note" : "Seed deck",
+  mimeType,
+  sizeBytes: 1024,
+});
 
 function actor(userId: string, organisationId: string): ActorContext {
   return {
@@ -73,26 +84,35 @@ function world(options: { connected?: boolean } = {}) {
         : documentId === DOC
           ? {
               outcome: "READY" as const,
-              snapshot: {
-                documentId: DOC,
-                title: "Seed deck",
-                mimeType: "application/pdf",
-                sizeBytes: 1024,
-              },
+              snapshot: snapshot(DOC, "application/pdf"),
             }
-          : documentId === PENDING_DOC
-            ? { outcome: "NOT_READY" as const }
-            : { outcome: "NOT_FOUND" as const },
+          : documentId === VOICE
+            ? {
+                outcome: "READY" as const,
+                snapshot: snapshot(VOICE, "audio/webm"),
+              }
+            : documentId === PENDING_DOC
+              ? { outcome: "NOT_READY" as const }
+              : { outcome: "NOT_FOUND" as const },
     );
   let n = 0;
+  const downloads: { disposition: string; documentVersionId: string }[] = [];
   const service = createChatService({
     store,
     parties,
     documents,
+    downloads: (share) => {
+      downloads.push(share);
+      return Promise.resolve({
+        url: "https://storage.example.invalid/object/sign/x?token=t",
+        expiresAt: "2026-09-27T09:01:00.000Z",
+        mimeType: "application/pdf",
+      });
+    },
     newCorrelationId: () =>
       `cor_00000000-0000-4000-8000-${String(n++).padStart(12, "0")}`,
   });
-  return { service, store, resolved };
+  return { service, store, resolved, downloads };
 }
 
 const text = (body: string) => ({ kind: "TEXT" as const, body });
@@ -256,6 +276,102 @@ describe("relationship chat", () => {
         relationshipId: REL,
         request: { kind: "VOICE_NOTE", documentId: DOC, durationMs: 4000 },
         idempotencyKey: "key-00000010",
+      }),
+    ).rejects.toBeInstanceOf(ChatAttachmentUnavailableError);
+  });
+
+  it("opens a shared file for either party, never once unsent, never for a stranger", async () => {
+    const { service, downloads } = world();
+    const file = await service.send({
+      actor: FOUNDER,
+      relationshipId: REL,
+      request: { kind: "ATTACHMENT", documentId: DOC },
+      idempotencyKey: "key-00000020",
+    });
+    const voice = await service.send({
+      actor: FOUNDER,
+      relationshipId: REL,
+      request: { kind: "VOICE_NOTE", documentId: VOICE, durationMs: 3000 },
+      idempotencyKey: "key-00000021",
+    });
+    const plain = await service.send({
+      actor: FOUNDER,
+      relationshipId: REL,
+      request: text("no file"),
+      idempotencyKey: "key-00000022",
+    });
+
+    await service.attachment({
+      actor: INVESTOR,
+      relationshipId: REL,
+      messageId: file.message.messageId,
+    });
+    await service.attachment({
+      actor: INVESTOR,
+      relationshipId: REL,
+      messageId: voice.message.messageId,
+    });
+    expect(downloads).toEqual([
+      {
+        documentTenantId: DOC_TENANT,
+        documentId: DOC,
+        documentVersionId: DOC_VERSION,
+        disposition: "ATTACHMENT",
+      },
+      {
+        documentTenantId: DOC_TENANT,
+        documentId: VOICE,
+        documentVersionId: DOC_VERSION,
+        disposition: "INLINE",
+      },
+    ]);
+
+    await expect(
+      service.attachment({
+        actor: STRANGER,
+        relationshipId: REL,
+        messageId: file.message.messageId,
+      }),
+    ).rejects.toBeInstanceOf(ChatNotFoundError);
+    await expect(
+      service.attachment({
+        actor: INVESTOR,
+        relationshipId: REL,
+        messageId: plain.message.messageId,
+      }),
+    ).rejects.toBeInstanceOf(ChatNotFoundError);
+    await service.unsend({
+      actor: FOUNDER,
+      relationshipId: REL,
+      messageId: file.message.messageId,
+      idempotencyKey: "key-00000023",
+    });
+    await expect(
+      service.attachment({
+        actor: INVESTOR,
+        relationshipId: REL,
+        messageId: file.message.messageId,
+      }),
+    ).rejects.toBeInstanceOf(ChatNotFoundError);
+    expect(downloads).toHaveLength(2);
+  });
+
+  it("never sends audio as a document or a document as a voice note", async () => {
+    const { service } = world();
+    await expect(
+      service.send({
+        actor: FOUNDER,
+        relationshipId: REL,
+        request: { kind: "VOICE_NOTE", documentId: DOC, durationMs: 3000 },
+        idempotencyKey: "key-00000024",
+      }),
+    ).rejects.toBeInstanceOf(ChatAttachmentUnavailableError);
+    await expect(
+      service.send({
+        actor: FOUNDER,
+        relationshipId: REL,
+        request: { kind: "ATTACHMENT", documentId: VOICE },
+        idempotencyKey: "key-00000025",
       }),
     ).rejects.toBeInstanceOf(ChatAttachmentUnavailableError);
   });

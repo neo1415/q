@@ -59,10 +59,27 @@ export type ChatDocumentPort = (
   | { readonly outcome: "NOT_FOUND" }
 >;
 
+/**
+ * A short-lived read of the exact version a message shared, issued by the
+ * Evidence context once this context has authorised the reader.
+ */
+export type ChatDownloadPort = (share: {
+  readonly documentTenantId: string;
+  readonly documentId: string;
+  readonly documentVersionId: string;
+  readonly disposition: "INLINE" | "ATTACHMENT";
+}) => Promise<{
+  readonly url: string;
+  readonly expiresAt: string;
+  readonly mimeType: string;
+}>;
+
 export type ChatServiceDependencies = {
   readonly store: ChatStore;
   readonly parties: ChatPartyResolver;
   readonly documents: ChatDocumentPort;
+  /** Absent: shared files cannot be opened on this deployment. */
+  readonly downloads?: ChatDownloadPort | undefined;
   readonly newCorrelationId: () => string;
 };
 
@@ -210,6 +227,13 @@ export function createChatService(dependencies: ChatServiceDependencies) {
       if (document.outcome !== "READY") {
         throw new ChatAttachmentUnavailableError(document.outcome);
       }
+      // A voice note is audio; audio is never passed off as a document.
+      if (
+        (request.kind === "VOICE_NOTE") !==
+        document.snapshot.mimeType.startsWith("audio/")
+      ) {
+        throw new ChatAttachmentUnavailableError("NOT_FOUND");
+      }
       attachment = document.snapshot;
     }
 
@@ -351,6 +375,50 @@ export function createChatService(dependencies: ChatServiceDependencies) {
         qActionId: null,
         idempotencyKey: input.idempotencyKey,
         correlationId: dependencies.newCorrelationId(),
+      });
+    },
+
+    /**
+     * Open a shared file or voice note: only a party to the thread it was
+     * sent on (either side), only while it has not been unsent, and only
+     * the exact version that was shared.
+     */
+    attachment: async (input: {
+      readonly actor: ActorContext;
+      readonly relationshipId: string;
+      readonly messageId: string;
+    }): Promise<{
+      readonly url: string;
+      readonly expiresAt: string;
+      readonly mimeType: string;
+    }> => {
+      await partyOf(input.actor, input.relationshipId);
+      const conversation = await store.conversationFor(input.relationshipId);
+      if (
+        conversation === null ||
+        !UUID.test(input.messageId) ||
+        dependencies.downloads === undefined
+      ) {
+        throw new ChatNotFoundError();
+      }
+      const folded = foldChatRows(
+        await store.findWithRevisions(conversation.id, input.messageId),
+      )[0];
+      const attachment = folded?.original.attachment ?? null;
+      if (
+        folded === undefined ||
+        folded.original.id !== input.messageId ||
+        folded.unsent ||
+        attachment === null
+      ) {
+        throw new ChatNotFoundError();
+      }
+      return dependencies.downloads({
+        documentTenantId: attachment.documentTenantId,
+        documentId: attachment.documentId,
+        documentVersionId: attachment.documentVersionId,
+        disposition:
+          folded.original.kind === "VOICE_NOTE" ? "INLINE" : "ATTACHMENT",
       });
     },
 

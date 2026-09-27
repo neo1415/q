@@ -147,6 +147,7 @@ import {
   DOCUMENT_STORAGE_BUCKET,
   DOCUMENT_UPLOAD_MAX_OPEN_SESSIONS,
   DOCUMENT_UPLOAD_SESSION_TTL_SECONDS,
+  createSharedDocumentDownloads,
   DocumentIdSchema,
 } from "@capital-q/evidence";
 import { composeChat } from "@capital-q/communication";
@@ -863,12 +864,20 @@ const chat = composeChat({
     return currentVersion === null
       ? null
       : {
+          versionId: currentVersion.id,
           title: document.title,
           mimeType: currentVersion.mimeType,
           sizeBytes: currentVersion.sizeBytes,
           malwareScanStatus: currentVersion.malwareScanStatus,
         };
   },
+  // Opening a shared file: a one-minute signed read of the exact version,
+  // straight from private storage. No storage credential, no downloads.
+  downloads:
+    storage === undefined
+      ? undefined
+      : createSharedDocumentDownloads({ sql: database.sql, storage })
+          .authorizeSharedVersion,
   newCorrelationId: createCorrelationId,
 });
 

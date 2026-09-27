@@ -4,6 +4,8 @@ import type {
   StoredObjectMetadata,
   StoredObjectRef,
   StoredObjectStream,
+  DirectDownloadAuthorization,
+  PrivateDocumentDownloadAuthorizer,
 } from "../application/storage-port.js";
 import { DocumentStorageUnavailableError } from "../domain/errors.js";
 
@@ -74,7 +76,7 @@ function providerExpiryFromToken(token: string): string {
 
 export function createSupabaseDocumentStorageProvider(
   options: SupabaseStorageProviderOptions,
-): PrivateDocumentStorageProvider {
+): PrivateDocumentStorageProvider & PrivateDocumentDownloadAuthorizer {
   const base = `${options.supabaseUrl.replace(/\/+$/, "")}/storage/v1`;
   const call = options.fetch ?? fetch;
   const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
@@ -137,6 +139,38 @@ export function createSupabaseDocumentStorageProvider(
           "x-upsert": "false",
         },
         providerExpiresAt: providerExpiryFromToken(token),
+      };
+    },
+
+    createDownloadAuthorization: async (
+      input,
+    ): Promise<DirectDownloadAuthorization> => {
+      const response = await request(
+        `/object/sign/${objectPath(input.object)}`,
+        {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ expiresIn: input.expiresInSeconds }),
+        },
+      );
+      if (!response.ok) throw new DocumentStorageUnavailableError();
+      const body: unknown = await response.json().catch(() => null);
+      const signed =
+        typeof body === "object" && body !== null
+          ? (body as { readonly signedURL?: unknown }).signedURL
+          : undefined;
+      if (typeof signed !== "string" || !signed.startsWith("/object/sign/")) {
+        throw new DocumentStorageUnavailableError();
+      }
+      const download =
+        input.downloadFilename === undefined
+          ? ""
+          : `&download=${encodeURIComponent(input.downloadFilename)}`;
+      return {
+        url: `${base}${signed}${download}`,
+        providerExpiresAt: new Date(
+          Date.now() + input.expiresInSeconds * 1000,
+        ).toISOString(),
       };
     },
 

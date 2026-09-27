@@ -23,6 +23,9 @@ export const RELATIONSHIP_MESSAGES_READ_PATH =
 /** `POST` unsend one of the caller's own messages (a tombstone). */
 export const RELATIONSHIP_MESSAGE_UNSEND_PATH =
   "/v1/relationships/:relationshipId/messages/:messageId/unsend" as const;
+/** `GET` a short-lived read of one shared file or voice note. */
+export const RELATIONSHIP_MESSAGE_ATTACHMENT_PATH =
+  "/v1/relationships/:relationshipId/messages/:messageId/attachment" as const;
 /** `GET` unread counts across the caller's threads. */
 export const CHAT_UNREAD_PATH = "/v1/chat/unread" as const;
 
@@ -154,3 +157,19 @@ export const ChatUnreadDtoSchema = z
   })
   .strict();
 export type ChatUnreadDto = z.infer<typeof ChatUnreadDtoSchema>;
+
+/**
+ * A signed, single-object read that expires in about a minute. The browser
+ * fetches the bytes straight from private storage; nothing is proxied and
+ * the URL is never stored.
+ */
+export const ChatAttachmentAccessDtoSchema = z
+  .object({
+    url: z.url(),
+    expiresAt: UtcTimestampSchema,
+    mimeType: z.string().min(3).max(129),
+  })
+  .strict();
+export type ChatAttachmentAccessDto = z.infer<
+  typeof ChatAttachmentAccessDtoSchema
+>;

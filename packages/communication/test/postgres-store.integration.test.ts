@@ -39,7 +39,10 @@ describe("@capital-q/communication against PostgreSQL", () => {
     company: randomUUID(),
     investor: randomUUID(),
     relationship: randomUUID(),
+    document: randomUUID(),
+    version: randomUUID(),
   };
+  const shares: unknown[] = [];
   let founder: ActorContext;
   let investor: ActorContext;
 
@@ -79,8 +82,12 @@ describe("@capital-q/communication against PostgreSQL", () => {
         values (${ids.company}, ${ids.tenantCo}, ${ids.orgCo}, 'Chat Co', ${`chat-co-${ids.company.slice(0, 8)}`})`;
       await sql`insert into core.investor_organisations (id, tenant_id, organisation_id, investor_type, display_name)
         values (${ids.investor}, ${ids.tenantInv}, ${ids.orgInv}, 'VC', 'Chat Capital')`;
-      await sql`insert into network.relationships (id, tenant_id, company_id, investor_organisation_id)
-        values (${ids.relationship}, ${ids.tenantCo}, ${ids.company}, ${ids.investor})`;
+      await sql`insert into network.relationships (id, tenant_id, company_id, investor_organisation_id, current_state)
+        values (${ids.relationship}, ${ids.tenantCo}, ${ids.company}, ${ids.investor}, 'CONNECTED')`;
+      await sql`insert into evidence.documents (id, tenant_id, company_id, owner_organisation_id, document_type, title, visibility_scope, sensitivity_class, created_by_user_id)
+        values (${ids.document}, ${ids.tenantCo}, ${ids.company}, ${ids.orgCo}, 'PITCH_DECK', 'Seed deck', 'founder_private', 'RESTRICTED', ${users[0] ?? ""})`;
+      await sql`insert into evidence.document_versions (id, tenant_id, document_id, version_number, storage_bucket, storage_key, original_filename, mime_type, size_bytes, sha256, uploaded_by_user_id)
+        values (${ids.version}, ${ids.tenantCo}, ${ids.document}, 1, 'cq-documents-private', ${`raw/${ids.tenantCo}/${ids.version.replaceAll("-", "")}`}, 'deck.pdf', 'application/pdf', 2048, ${"a".repeat(64)}, ${users[0] ?? ""})`;
     });
     const actor = (userId: string, tenantId: string, organisationId: string) =>
       ({
@@ -107,7 +114,30 @@ describe("@capital-q/communication against PostgreSQL", () => {
                 ? { side: "INVESTOR", connected: true }
                 : null,
         ),
-      documents: () => Promise.resolve({ outcome: "NOT_FOUND" }),
+      documents: (_actor, documentId) =>
+        Promise.resolve(
+          documentId === ids.document
+            ? {
+                outcome: "READY" as const,
+                snapshot: {
+                  documentId: ids.document,
+                  documentVersionId: ids.version,
+                  documentTenantId: ids.tenantCo,
+                  title: "Seed deck",
+                  mimeType: "application/pdf",
+                  sizeBytes: 2048,
+                },
+              }
+            : { outcome: "NOT_FOUND" as const },
+        ),
+      downloads: (share) => {
+        shares.push(share);
+        return Promise.resolve({
+          url: "https://storage.example.invalid/object/sign/x?token=t",
+          expiresAt: "2026-09-27T09:01:00.000Z",
+          mimeType: "application/pdf",
+        });
+      },
       newCorrelationId: () => `cor_${randomUUID()}`,
     });
   });
@@ -204,5 +234,39 @@ describe("@capital-q/communication against PostgreSQL", () => {
     await expect(
       db.sql`update communication.messages set body = 'x' where id = ${second.message.messageId}`,
     ).rejects.toMatchObject({ code: "55000" });
+  });
+
+  it("pins the shared version and opens it for the other side", async () => {
+    const sent = await service.send({
+      actor: founder,
+      relationshipId: ids.relationship,
+      request: {
+        kind: "ATTACHMENT",
+        documentId: ids.document,
+        body: "Our deck",
+      },
+      idempotencyKey: "it-key-0010",
+    });
+    const row = await db.sql<
+      { document_version_id: string; document_tenant_id: string }[]
+    >`
+      select document_version_id, document_tenant_id from communication.messages where id = ${sent.message.messageId}`;
+    expect(row[0]).toEqual({
+      document_version_id: ids.version,
+      document_tenant_id: ids.tenantCo,
+    });
+    await service.attachment({
+      actor: investor,
+      relationshipId: ids.relationship,
+      messageId: sent.message.messageId,
+    });
+    expect(shares).toEqual([
+      {
+        documentTenantId: ids.tenantCo,
+        documentId: ids.document,
+        documentVersionId: ids.version,
+        disposition: "ATTACHMENT",
+      },
+    ]);
   });
 });

@@ -37,6 +37,8 @@ type MessageRow = {
   kind: ChatMessageRow["kind"];
   body: string | null;
   document_id: string | null;
+  document_version_id: string | null;
+  document_tenant_id: string | null;
   attachment_title: string | null;
   attachment_mime_type: string | null;
   attachment_size_bytes: string | number | null;
@@ -57,11 +59,15 @@ function toRow(row: MessageRow): ChatMessageRow {
     body: row.body,
     attachment:
       row.document_id === null ||
+      row.document_version_id === null ||
+      row.document_tenant_id === null ||
       row.attachment_title === null ||
       row.attachment_mime_type === null
         ? null
         : {
             documentId: row.document_id,
+            documentVersionId: row.document_version_id,
+            documentTenantId: row.document_tenant_id,
             title: row.attachment_title,
             mimeType: row.attachment_mime_type,
             sizeBytes:
@@ -81,7 +87,8 @@ const SELECT_MESSAGE = (sql: DatabaseExecutor) => sql`
   select m.id, m.conversation_id, m.sender_user_id,
          coalesce(nullif(btrim(p.display_name), ''),
                   nullif(btrim(concat_ws(' ', p.given_name, p.family_name)), '')) as sender_name,
-         m.sender_side, m.kind, m.body, m.document_id, m.attachment_title,
+         m.sender_side, m.kind, m.body, m.document_id, m.document_version_id,
+         m.document_tenant_id, m.attachment_title,
          m.attachment_mime_type, m.attachment_size_bytes, m.voice_duration_ms,
          m.revises_message_id, m.q_action_id, m.created_at
     from communication.messages m
@@ -150,11 +157,15 @@ export function createPostgresChatStore(options: {
       const inserted = await tx.sql<{ id: string }[]>`
         insert into communication.messages
           (tenant_id, conversation_id, sender_user_id, sender_side, kind, body,
-           document_id, attachment_title, attachment_mime_type, attachment_size_bytes,
+           document_id, document_version_id, document_tenant_id,
+           attachment_title, attachment_mime_type, attachment_size_bytes,
            voice_duration_ms, revises_message_id, q_action_id, idempotency_key)
         values (${conversation.tenantId}, ${conversation.id}, ${input.senderUserId},
                 ${input.senderSide}, ${input.kind}, ${input.body},
-                ${input.attachment?.documentId ?? null}, ${input.attachment?.title ?? null},
+                ${input.attachment?.documentId ?? null},
+                ${input.attachment?.documentVersionId ?? null},
+                ${input.attachment?.documentTenantId ?? null},
+                ${input.attachment?.title ?? null},
                 ${input.attachment?.mimeType ?? null}, ${input.attachment?.sizeBytes ?? null},
                 ${input.voiceDurationMs}, ${input.revisesMessageId}, ${input.qActionId},
                 ${input.idempotencyKey})
@@ -208,6 +219,14 @@ export function createPostgresChatStore(options: {
         where m.conversation_id = ${conversationId} and m.id = ${messageId}`;
       const row = rows[0];
       return row === undefined ? null : toRow(row);
+    },
+
+    findWithRevisions: async (conversationId, messageId) => {
+      const rows = await sql<MessageRow[]>`${SELECT_MESSAGE(sql)}
+        where m.conversation_id = ${conversationId}
+          and (m.id = ${messageId} or m.revises_message_id = ${messageId})
+        order by m.created_at asc, m.id asc`;
+      return rows.map(toRow);
     },
 
     listRecent: async (conversationId, limit) => {

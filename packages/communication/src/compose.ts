@@ -6,6 +6,7 @@ import { createPostgresChatStore } from "./postgres.js";
 import {
   createChatService,
   type ChatDocumentPort,
+  type ChatDownloadPort,
   type ChatPartyResolver,
   type ChatService,
 } from "./service.js";
@@ -33,6 +34,7 @@ export type OwnDocumentLookup = (
   actor: ActorContext,
   documentId: string,
 ) => Promise<{
+  readonly versionId: string;
   readonly title: string;
   readonly mimeType: string;
   readonly sizeBytes: number;
@@ -51,6 +53,9 @@ export function createChatDocuments(
       outcome: "READY",
       snapshot: {
         documentId,
+        documentVersionId: document.versionId,
+        // The sender's own document: it lives in the sender's tenant.
+        documentTenantId: actor.tenantId,
         title: document.title.slice(0, 300),
         mimeType: document.mimeType,
         sizeBytes: document.sizeBytes,
@@ -65,6 +70,7 @@ export function composeChat(options: {
   readonly transactions: TransactionManager;
   readonly interests: Pick<InterestService, "relationshipById">;
   readonly ownDocument: OwnDocumentLookup;
+  readonly downloads?: ChatDownloadPort | undefined;
   readonly newCorrelationId: () => string;
 }): ChatService {
   return createChatService({
@@ -74,6 +80,7 @@ export function composeChat(options: {
     }),
     parties: createNetworkChatParties(options.interests),
     documents: createChatDocuments(options.ownDocument),
+    downloads: options.downloads,
     newCorrelationId: options.newCorrelationId,
   });
 }

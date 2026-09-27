@@ -12,6 +12,9 @@ export type ChatRowKind =
 
 export type ChatAttachmentSnapshot = {
   readonly documentId: string;
+  /** The exact version shared, in the sender's (document-owning) tenant. */
+  readonly documentVersionId: string;
+  readonly documentTenantId: string;
   readonly title: string;
   readonly mimeType: string;
   readonly sizeBytes: number | null;
@@ -69,6 +72,11 @@ export type ChatStore = {
     conversationId: string,
     messageId: string,
   ) => Promise<ChatMessageRow | null>;
+  /** One original and all of its revisions, oldest first. */
+  readonly findWithRevisions: (
+    conversationId: string,
+    messageId: string,
+  ) => Promise<readonly ChatMessageRow[]>;
   /** The newest `limit` originals and every revision of them, oldest first. */
   readonly listRecent: (
     conversationId: string,

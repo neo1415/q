@@ -23,6 +23,7 @@ import { createApp, type ApiSecurityDependencies } from "../src/app.js";
 
 const REL = "00000000-0000-4000-8000-00000000c001";
 const OTHER = "00000000-0000-4000-8000-00000000c002";
+const DOC = "00000000-0000-4000-8000-00000000d001";
 
 function contextFor(org: string): ActorContext {
   return {
@@ -47,7 +48,28 @@ function build(options: { connected?: boolean; org?: string } = {}) {
           ? { side: "COMPANY", connected: options.connected ?? true }
           : null,
       ),
-    documents: () => Promise.resolve({ outcome: "NOT_FOUND" }),
+    documents: (_actor, documentId) =>
+      Promise.resolve(
+        documentId === DOC
+          ? {
+              outcome: "READY" as const,
+              snapshot: {
+                documentId: DOC,
+                documentVersionId: "00000000-0000-4000-8000-00000000d0a1",
+                documentTenantId: "c0000000-0000-4000-8000-000000000001",
+                title: "Seed deck",
+                mimeType: "application/pdf",
+                sizeBytes: 10,
+              },
+            }
+          : { outcome: "NOT_FOUND" as const },
+      ),
+    downloads: () =>
+      Promise.resolve({
+        url: "https://storage.example.invalid/storage/v1/object/sign/b/k?token=t",
+        expiresAt: "2026-09-27T09:01:00.000Z",
+        mimeType: "application/pdf",
+      }),
     newCorrelationId: () => "cor_00000000-0000-4000-8000-000000000001",
   });
   const context = contextFor(options.org ?? COMPANY_ORG);
@@ -181,5 +203,30 @@ describe("/v1/relationships/:relationshipId/messages", () => {
     expect(unsent.statusCode).toBe(204);
     const unread = await app.inject({ method: "GET", url: "/v1/chat/unread" });
     expect(unread.json()).toEqual({ items: [] });
+  });
+
+  it("hands a party a short-lived read of a shared file, and a stranger a 404", async () => {
+    const { app } = build();
+    const sent = await app.inject(
+      send({ kind: "ATTACHMENT", documentId: DOC }, "chat-key-0010"),
+    );
+    expect(sent.statusCode).toBe(201);
+    const id = sent.json<{ message: { messageId: string } }>().message
+      .messageId;
+    const open = await app.inject({
+      method: "GET",
+      url: `/v1/relationships/${REL}/messages/${id}/attachment`,
+    });
+    expect(open.statusCode).toBe(200);
+    expect(open.headers["cache-control"]).toBe("no-store");
+    expect(open.json<{ url: string }>().url).toContain("/object/sign/");
+    expect(JSON.stringify(sent.json())).not.toContain("d0a1");
+
+    const stranger = build({ org: "d0000000-0000-4000-8000-000000000009" });
+    const refused = await stranger.app.inject({
+      method: "GET",
+      url: `/v1/relationships/${REL}/messages/${id}/attachment`,
+    });
+    expect(refused.statusCode).toBe(404);
   });
 });

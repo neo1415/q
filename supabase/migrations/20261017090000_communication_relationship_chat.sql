@@ -107,6 +107,8 @@ create table communication.messages (
   -- The exact version that was shared: a later upload never changes what
   -- the other side was sent.
   document_version_id     uuid references evidence.document_versions (id) on delete restrict,
+  -- The sender's tenant, which owns the document (never the thread's).
+  document_tenant_id      uuid references identity.tenants (id) on delete restrict,
   -- Snapshot of what the other side is shown. Never a storage key or URL.
   attachment_title        text check (attachment_title is null or length(attachment_title) between 1 and 300),
   attachment_mime_type    text check (attachment_mime_type is null or attachment_mime_type ~ '^[^/[:space:]]+/[^/[:space:]]+$'),
@@ -128,7 +130,8 @@ create table communication.messages (
          or (document_id is not null and attachment_title is not null and attachment_mime_type is not null)),
   check (kind = 'VOICE_NOTE' or voice_duration_ms is null),
   check ((document_id is null) = (attachment_title is null)),
-  check ((document_id is null) = (document_version_id is null))
+  check ((document_id is null) = (document_version_id is null)),
+  check ((document_id is null) = (document_tenant_id is null))
 );
 
 comment on table communication.messages is

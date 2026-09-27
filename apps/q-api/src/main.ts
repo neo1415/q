@@ -866,6 +866,7 @@ const chat = composeChat({
     return currentVersion === null
       ? null
       : {
+          versionId: currentVersion.id,
           title: document.title,
           mimeType: currentVersion.mimeType,
           sizeBytes: currentVersion.sizeBytes,

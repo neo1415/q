@@ -63,6 +63,8 @@ export type {
   EvidenceServiceDependencies,
 } from "./application/dependencies.js";
 export type {
+  DirectDownloadAuthorization,
+  PrivateDocumentDownloadAuthorizer,
   DirectUploadAuthorization,
   PrivateDocumentStorageProvider,
   StoredObjectMetadata,
@@ -248,3 +250,8 @@ export {
 export { createPostgresDocumentExtractionRepository } from "./infrastructure/postgres-extraction-repository.js";
 
 export const PACKAGE_NAME = "@capital-q/evidence" as const;
+export {
+  createSharedDocumentDownloads,
+  SHARED_DOWNLOAD_TTL_SECONDS,
+  type SharedDocumentDownloads,
+} from "./application/shared-download.js";

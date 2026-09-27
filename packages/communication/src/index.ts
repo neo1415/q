@@ -17,6 +17,7 @@ export {
   createChatService,
   foldChatRows,
   type ChatDocumentPort,
+  type ChatDownloadPort,
   type ChatParty,
   type ChatPartyResolver,
   type ChatService,

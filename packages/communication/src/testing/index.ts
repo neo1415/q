@@ -121,6 +121,8 @@ export function createInMemoryChatStore(
             row.id === messageId && row.conversationId === conversationId,
         ) ?? null,
       ),
+    findWithRevisions: (conversationId, messageId) =>
+      Promise.resolve(withRevisions(conversationId, new Set([messageId]))),
     listRecent: (conversationId, limit) => {
       const originals = ordered(conversationId)
         .filter((row) => row.revisesMessageId === null)

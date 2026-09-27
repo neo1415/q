@@ -2,6 +2,7 @@ import type { FastifyInstance, FastifyRequest } from "fastify";
 
 import {
   CHAT_UNREAD_PATH,
+  ChatAttachmentAccessDtoSchema,
   ChatListQuerySchema,
   ChatThreadDtoSchema,
   ChatUnreadDtoSchema,
@@ -9,6 +10,7 @@ import {
   IdempotencyKeyHeaderSchema,
   MarkChatReadRequestSchema,
   parseContract,
+  RELATIONSHIP_MESSAGE_ATTACHMENT_PATH,
   RELATIONSHIP_MESSAGE_UNSEND_PATH,
   RELATIONSHIP_MESSAGES_PATH,
   RELATIONSHIP_MESSAGES_READ_PATH,
@@ -133,6 +135,22 @@ export function registerChatRoutes(
         idempotencyKey,
       });
       return reply.status(204).header("Cache-Control", "no-store").send();
+    },
+  );
+
+  // A one-minute signed read of a shared file or voice note, for a party
+  // only. The browser fetches the bytes from storage directly.
+  app.get(
+    RELATIONSHIP_MESSAGE_ATTACHMENT_PATH,
+    { onRequest: withContext },
+    async (request, reply) => {
+      const access = await chat.attachment({
+        actor: getActorContext(request),
+        relationshipId: param(request, "relationshipId"),
+        messageId: param(request, "messageId"),
+      });
+      void reply.header("Cache-Control", "no-store");
+      return ChatAttachmentAccessDtoSchema.parse(access);
     },
   );
 
