@@ -42,8 +42,5 @@ export const TURN_READER_V8: PromptDefinition<
     schemaVersion: TURN_READER_V8_SCHEMA_VERSION,
     schema: TurnReaderV8ResultSchema,
   },
-  template: TURN_READER_V7.template.replace(
-    V7_NAVIGATE_TAIL,
-    V8_NAVIGATE_TAIL,
-  ),
+  template: TURN_READER_V7.template.replace(V7_NAVIGATE_TAIL, V8_NAVIGATE_TAIL),
 };

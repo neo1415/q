@@ -6,10 +6,7 @@ import {
   type ClientActionEffects,
 } from "../src/features/q/client-actions";
 import { followOfTurns } from "../src/features/q/follow-navigation";
-import {
-  currentScreen,
-  setOpenDocument,
-} from "../src/features/q/screen";
+import { currentScreen, setOpenDocument } from "../src/features/q/screen";
 
 /**
  * Client actions (R20/R33; founder live test 2026-09-27 #4) and the open
@@ -46,9 +43,9 @@ function qTurn(id: string, blocks: Extract<QTurn, { kind: "Q" }>["blocks"]) {
 describe("performing a client action", () => {
   it("dispatches each kind to the page's own effect", () => {
     const { port, done } = effects();
-    expect(performClientAction({ kind: "SET_THEME", theme: "dark" }, port)).toBe(
-      true,
-    );
+    expect(
+      performClientAction({ kind: "SET_THEME", theme: "dark" }, port),
+    ).toBe(true);
     expect(performClientAction({ kind: "RELOAD_PAGE" }, port)).toBe(true);
     expect(
       performClientAction(
@@ -81,7 +78,10 @@ describe("performing a client action", () => {
     vi.resetModules();
     const applyTheme = vi.fn();
     const storeTheme = vi.fn();
-    vi.doMock("@/features/appearance/theme", () => ({ applyTheme, storeTheme }));
+    vi.doMock("@/features/appearance/theme", () => ({
+      applyTheme,
+      storeTheme,
+    }));
     const fresh = await import("../src/features/q/client-actions");
     fresh.BROWSER_EFFECTS.setTheme("light");
     expect(applyTheme).toHaveBeenCalledWith("light");

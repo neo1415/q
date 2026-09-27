@@ -505,7 +505,10 @@ describe("@capital-q/q-firewall against local PostgreSQL", () => {
 
   it("R21 screen: the plan carries the route always, and an on-screen company only when it is bound for the asker", async () => {
     await withWorld(async (world) => {
-      const screen = { route: "COMPANY" as const, companyId: world.companyAlpha };
+      const screen = {
+        route: "COMPANY" as const,
+        companyId: world.companyAlpha,
+      };
       // Not visible to the investor: the route rides, the company does not.
       const hidden = await world.firewall.plan({
         ...ask(world.apexAdmin, "ANSWER", [company(world.companyAlpha)]),

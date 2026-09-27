@@ -345,7 +345,10 @@ describe("@capital-q/q-runtime against local PostgreSQL", () => {
       const rows = await tx.sql<
         { screen: unknown }[]
       >`select screen from q_runtime.runs where id = ${result.run.id}`;
-      expect(rows[0]?.screen).toEqual({ route: "COMPANY", companyId: companyA });
+      expect(rows[0]?.screen).toEqual({
+        route: "COMPANY",
+        companyId: companyA,
+      });
       const without = await service.createRun({
         actor: adminA.actor,
         input: request(),

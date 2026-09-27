@@ -16,7 +16,10 @@ describe("spoken navigation follows Q's answer, never the words (ADR 0011, R20)"
     expect(
       followOfAnswer([
         { kind: "TEXT", text: "Taking you to Discover." },
-        { kind: "UI_INTENT", intent: { kind: "NAVIGATE", destination: "HOME" } },
+        {
+          kind: "UI_INTENT",
+          intent: { kind: "NAVIGATE", destination: "HOME" },
+        },
         {
           kind: "UI_INTENT",
           intent: { kind: "NAVIGATE", destination: "DISCOVER" },

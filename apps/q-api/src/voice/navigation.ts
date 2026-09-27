@@ -20,9 +20,7 @@ import {
  * from the words: the turn reader (a model) chose the tool, and code
  * validated it. The latest navigation wins; so does the latest action.
  */
-export function followOfAnswer(
-  blocks: readonly QResultBlock[] | undefined,
-): {
+export function followOfAnswer(blocks: readonly QResultBlock[] | undefined): {
   readonly navigate: QNavigateDestination | null;
   readonly clientAction: QClientActionIntent | null;
 } {

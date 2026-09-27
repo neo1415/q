@@ -80,8 +80,7 @@ async function ownSubject(
     return null;
   }
   const owned = new Set<string>();
-  const scopeKind =
-    kind === "COMPANY" ? "COMPANY_PROFILE" : "INVESTOR_PROFILE";
+  const scopeKind = kind === "COMPANY" ? "COMPANY_PROFILE" : "INVESTOR_PROFILE";
   for (const scope of scopesOfKind(plan, scopeKind)) {
     if (scope.subject === undefined) continue;
     if (kind === "COMPANY") {

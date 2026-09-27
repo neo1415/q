@@ -289,9 +289,14 @@ describe("client actions and the screen reach the answer (R20/R21/R33)", () => {
       script: [
         {
           kind: "TOOL_CALLS",
-          calls: [{ callId: "t1", name: "set_theme", arguments: { theme: "dark" } }],
+          calls: [
+            { callId: "t1", name: "set_theme", arguments: { theme: "dark" } },
+          ],
         },
-        { kind: "TEXT", text: JSON.stringify(analystResult("Dark mode is on.")) },
+        {
+          kind: "TEXT",
+          text: JSON.stringify(analystResult("Dark mode is on.")),
+        },
       ],
       tools,
     });

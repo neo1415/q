@@ -90,7 +90,11 @@ export const SetThemeInputSchema = z
 export type SetThemeInput = z.infer<typeof SetThemeInputSchema>;
 
 export function createSetThemeTool(): AnyQToolDefinition {
-  return defineQTool<SetThemeInput, QClientActionToolResult, QClientActionToolResult>({
+  return defineQTool<
+    SetThemeInput,
+    QClientActionToolResult,
+    QClientActionToolResult
+  >({
     ...COMMON,
     id: SET_THEME,
     providerName: "set_theme",
@@ -110,7 +114,11 @@ export const ReloadPageInputSchema = z.object({}).strict();
 export type ReloadPageInput = z.infer<typeof ReloadPageInputSchema>;
 
 export function createReloadPageTool(): AnyQToolDefinition {
-  return defineQTool<ReloadPageInput, QClientActionToolResult, QClientActionToolResult>({
+  return defineQTool<
+    ReloadPageInput,
+    QClientActionToolResult,
+    QClientActionToolResult
+  >({
     ...COMMON,
     id: RELOAD_PAGE,
     providerName: "reload_page",
@@ -177,7 +185,11 @@ async function ownRecordHosts(
 export function createOpenWebsiteTool(
   ports: Pick<QToolPorts, "companies">,
 ): AnyQToolDefinition {
-  return defineQTool<OpenWebsiteInput, QClientActionToolResult, QClientActionToolResult>({
+  return defineQTool<
+    OpenWebsiteInput,
+    QClientActionToolResult,
+    QClientActionToolResult
+  >({
     ...COMMON,
     id: OPEN_WEBSITE,
     providerName: "open_website",
@@ -201,7 +213,8 @@ export function createOpenWebsiteTool(
       const said = (context.conversation?.latestUserText ?? "").toLowerCase();
       const theirWords = said.includes(host);
       const theirRecord =
-        !theirWords && (await ownRecordHosts(ports, actor, plan)).includes(host);
+        !theirWords &&
+        (await ownRecordHosts(ports, actor, plan)).includes(host);
       return theirWords || theirRecord
         ? allowed({ kind: "OPEN_WEBSITE", url: new URL(input.url).toString() })
         : deny<QClientActionToolResult>("NOT_AVAILABLE");

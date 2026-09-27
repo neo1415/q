@@ -206,7 +206,7 @@ export function capabilityNote(
     readonly classification?: string | undefined;
   }[],
   receipts: readonly QReceipt[],
-  screen?: QScreenContext | undefined,
+  screen?: QScreenContext,
 ): ModelMessage {
   const lines: string[] = [
     ...screenLines(screen),

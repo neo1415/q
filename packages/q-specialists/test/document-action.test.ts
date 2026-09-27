@@ -9,7 +9,7 @@ import {
   type QResultBlock,
 } from "@capital-q/contracts";
 import type { QTurnReader } from "@capital-q/model-gateway/q";
-import type { TurnReaderV5Result as TurnReaderV3Result } from "@capital-q/q-core";
+import type { TurnReaderV8Result as TurnReaderV3Result } from "@capital-q/q-core";
 import type { GetInvestorMandateOutput } from "@capital-q/q-tools";
 import type {
   QAnswerRequest,
@@ -175,6 +175,7 @@ function prepareReading(
     tool: {
       kind: "PREPARE_DOCUMENT",
       destination: null,
+      unknownScreen: null,
       visibility: null,
       documentType: "PITCH_DECK",
       subjectName,
@@ -460,6 +461,7 @@ function ownMandateReading(): TurnReaderV3Result {
     tool: {
       kind: "PREPARE_DOCUMENT",
       destination: null,
+      unknownScreen: null,
       visibility: null,
       documentType: "OWN_MANDATE",
       subjectName: null,
@@ -549,6 +551,7 @@ describe('a founder\'s "PDF describing my company" ends on a real PDF card (fake
         tool: {
           kind: "PREPARE_DOCUMENT",
           destination: null,
+          unknownScreen: null,
           visibility: null,
           documentType: "INVESTMENT_BRIEF",
           subjectName: null,
