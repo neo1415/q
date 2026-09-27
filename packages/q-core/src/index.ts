@@ -110,6 +110,7 @@ export { INTERVIEW_AGENT_V6 } from "./prompts/tasks/interview-agent.v6.js";
 export { INTERVIEW_AGENT_V7 } from "./prompts/tasks/interview-agent.v7.js";
 export { INTERVIEW_AGENT_V8 } from "./prompts/tasks/interview-agent.v8.js";
 export { INTERVIEW_AGENT_V9 } from "./prompts/tasks/interview-agent.v9.js";
+export { INTERVIEW_AGENT_V10 } from "./prompts/tasks/interview-agent.v10.js";
 export { DELEGATION_READER_V1 } from "./prompts/tasks/delegation-reader.v1.js";
 export { DELEGATION_READER_V2 } from "./prompts/tasks/delegation-reader.v2.js";
 export { DELEGATION_READER_V3 } from "./prompts/tasks/delegation-reader.v3.js";
@@ -217,6 +218,16 @@ export {
   type PresenceReaderResult,
   type PresenceReaderVariables,
 } from "./prompts/schemas/presence-reader.js";
+export { INVESTOR_RESEARCH_READER_V1 } from "./prompts/tasks/investor-research-reader.v1.js";
+export {
+  INVESTOR_RESEARCH_READER_SCHEMA_NAME,
+  INVESTOR_RESEARCH_READER_SCHEMA_VERSION,
+  INVESTOR_RESEARCH_READER_UNTRUSTED,
+  InvestorResearchReaderResultSchema,
+  InvestorResearchReaderVariablesSchema,
+  type InvestorResearchReaderResult,
+  type InvestorResearchReaderVariables,
+} from "./prompts/schemas/investor-research-reader.js";
 export {
   WELCOME_CONDUCTOR_SCHEMA_NAME,
   WELCOME_CONDUCTOR_SCHEMA_VERSION,
