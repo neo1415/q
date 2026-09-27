@@ -337,11 +337,19 @@ export function InvestorFeedScreen({
   }, [feed.card]);
   useQMomentSource(() => {
     const current = cardRef.current;
-    if (current === null || current.pitch === null) return null;
+    if (current === null) return null;
+    // No pitch playing or paused (poster, or none): still "this company"
+    // for Q (R21), without a moment.
+    const company = {
+      kind: "SCREEN_COMPANY" as const,
+      companyId: current.companyId,
+      companyLabel: current.canonicalName,
+    };
+    if (current.pitch === null) return company;
     const video = stageRef.current?.querySelector<HTMLVideoElement>(
       "[data-slot-active] video",
     );
-    if (video === null || video === undefined) return null;
+    if (video === null || video === undefined) return company;
     return {
       kind: "PITCH_MOMENT",
       companyId: current.companyId,

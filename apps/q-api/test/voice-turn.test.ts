@@ -1083,6 +1083,12 @@ describe("a spoken question for Q", () => {
         subjects: undefined,
         onboarding: undefined,
         screen: { route: "PROFILE" },
+        viewing: {
+          kind: "PITCH_PLAYBACK",
+          companyId: "c0000000-0000-4000-8000-0000000000c1",
+          mediaAssetId: "d0000000-0000-4000-8000-0000000000d1",
+          positionSeconds: 62,
+        },
       }),
       [{ role: "user", content: "take me to discover" }],
       new AbortController().signal,
@@ -1094,6 +1100,11 @@ describe("a spoken question for Q", () => {
       (runtime.calls.createRun[0] as { input: { screen?: unknown } }).input
         .screen,
     ).toEqual({ route: "PROFILE" });
+    // R35: and the pitch moment on it, authorised by the run or dropped.
+    expect(
+      (runtime.calls.createRun[0] as { input: { viewing?: unknown } }).input
+        .viewing,
+    ).toMatchObject({ kind: "PITCH_PLAYBACK", positionSeconds: 62 });
     const turn = board.read("vs-1");
     expect(turn.navigate).toBe("DISCOVER");
     expect(turn.clientAction).toEqual({ kind: "SET_THEME", theme: "dark" });

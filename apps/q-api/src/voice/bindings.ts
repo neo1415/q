@@ -1,6 +1,7 @@
 import type {
   CreateQVoiceSessionRequest,
   QScreenContext,
+  QViewingMoment,
   QVoiceChoice,
 } from "@capital-q/contracts";
 import type { ActorContext } from "@capital-q/security";
@@ -32,6 +33,11 @@ export type VoiceThread = {
    * each spoken turn's run resolves its entities for them or drops them.
    */
   screen?: QScreenContext | undefined;
+  /**
+   * R18: the pitch moment on that screen, as their browser last said. A
+   * request, never authority: each run authorises it for them or drops it.
+   */
+  viewing?: QViewingMoment | undefined;
   /** Q's first minute with a new person: no onboarding session yet. */
   readonly welcome?: boolean | undefined;
   /**

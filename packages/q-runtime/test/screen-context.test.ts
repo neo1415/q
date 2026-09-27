@@ -183,6 +183,23 @@ describe("the screen context on a Q run", () => {
     expect(none.runs[0]?.screen).toBeNull();
   });
 
+  it("R35: the Discover card on screen is 'this company' -- a subject, with no words read", async () => {
+    // The request carries no phrase to match: whatever the person says
+    // ("what is this about?", "save it", "I'm interested"), the screen
+    // names the company and the run binds it.
+    const h = harness(() => true);
+    await h.ask({ route: "DISCOVER", companyId: COMPANY });
+    expect(h.runs[0]?.subjects).toEqual([company]);
+    expect(h.runs[0]?.screen).toEqual({
+      route: "DISCOVER",
+      companyId: COMPANY,
+    });
+    // A card the person may not see is dropped, as if absent.
+    const refused = harness(() => false);
+    await refused.ask({ route: "DISCOVER", companyId: COMPANY });
+    expect(refused.runs[0]?.subjects ?? []).toEqual([]);
+  });
+
   it("the contract refuses anything beyond route and entity ids", () => {
     const base = {
       capability: "ANSWER",

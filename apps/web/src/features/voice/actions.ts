@@ -12,7 +12,7 @@ import {
   type CreateQVoiceSessionRequest,
   type CreateQVoiceSessionResponse,
   type QVoiceTurnState,
-  QScreenContextSchema,
+  QVoiceScreenUpdateSchema,
   UuidSchema,
 } from "@capital-q/contracts";
 
@@ -145,7 +145,7 @@ export async function sendVoiceScreenAction(
   rawScreen: unknown,
 ): Promise<VoiceActionResult<null>> {
   const id = UuidSchema.safeParse(rawVoiceSessionId);
-  const screen = QScreenContextSchema.safeParse(rawScreen);
+  const screen = QVoiceScreenUpdateSchema.safeParse(rawScreen);
   if (!id.success || !screen.success) {
     return failure("That screen isn't valid.");
   }

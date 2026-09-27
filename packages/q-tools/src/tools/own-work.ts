@@ -15,6 +15,7 @@ import {
   type AnyQToolDefinition,
 } from "../definition.js";
 import { actorWideScope } from "../plan.js";
+import { actionTarget } from "./relationships.js";
 import type {
   ApprovalInboxPort,
   DiscoveryDecisionPort,
@@ -291,9 +292,11 @@ export function createDiscoveryDecisionTool(
     riskClass: "LOW_RISK_INTERNAL",
     input: DiscoveryDecisionInputSchema,
     output: DiscoveryDecisionOutputSchema,
-    authorize: (_input, { actor, plan }) =>
+    // Their own conversation, and a company the run is about (on screen,
+    // watched or asked about) -- never one a model produced from nowhere.
+    authorize: (input, { actor, plan }) =>
       Promise.resolve(
-        ownConversation(actor, plan)
+        ownConversation(actor, plan) && actionTarget(plan, input.companyId)
           ? allow<null>("INTERNAL", null)
           : deny<null>("NOT_AVAILABLE"),
       ),

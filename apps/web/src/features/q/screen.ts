@@ -1,4 +1,10 @@
-import type { QScreenContext, QScreenRoute } from "@capital-q/contracts";
+import type {
+  QScreenContext,
+  QScreenRoute,
+  QViewingMoment,
+} from "@capital-q/contracts";
+
+import { viewingOf, type QMomentSource } from "./q-moment";
 
 /**
  * What is on screen as the person asks Q (R21): the route mapped onto the
@@ -59,11 +65,49 @@ export function setOpenDocument(documentId: string | null): void {
       : null;
 }
 
-/** What is on screen now: the route's context, plus the open document. */
+/**
+ * What the page says is in front of the person (R18/R21): the Discover
+ * card's company, and its pitch and position when one is playing or
+ * paused. Registered by the page (through the global Q moment source) and
+ * read at every turn, so "what is this about?" asked into an open dock or
+ * a live voice line is about the card on screen at that instant -- not
+ * the one showing when Q was opened.
+ */
+let focusSource: QMomentSource | null = null;
+
+export function setScreenFocusSource(source: QMomentSource | null): void {
+  focusSource = source;
+}
+
+function focusNow() {
+  try {
+    return focusSource?.() ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** The pitch moment on screen now, as the run contract carries it; or none. */
+export function currentViewing(): QViewingMoment | undefined {
+  const focus = focusNow();
+  return focus?.kind === "PITCH_MOMENT" && UUID.test(focus.companyId)
+    ? viewingOf(focus)
+    : undefined;
+}
+
+/** What is on screen now: the route's context, the focused company, the open document. */
 export function currentScreen(
   pathname: string = window.location.pathname,
 ): QScreenContext {
-  const screen = screenOf(pathname);
+  let screen = screenOf(pathname);
+  const focus = focusNow();
+  if (
+    screen.companyId === undefined &&
+    focus !== null &&
+    UUID.test(focus.companyId)
+  ) {
+    screen = { ...screen, companyId: focus.companyId.toLowerCase() };
+  }
   return openDocumentId === null || screen.documentId !== undefined
     ? screen
     : { ...screen, documentId: openDocumentId };

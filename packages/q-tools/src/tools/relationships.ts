@@ -115,6 +115,38 @@ export function admitted(
   return !named && actorWideScope(plan, "NETWORK_VISIBLE_DATA") !== undefined;
 }
 
+/**
+ * The company an action may be taken on (R35: "save this", "pass", "I'm
+ * interested"). When the run is about companies -- on screen, being
+ * watched, or asked about by the client -- only one of those, and only if
+ * the firewall bound it: a company neither on screen nor asked about is
+ * never acted on, whatever id a model produces. With no company in the run
+ * (Home: "save Northwind"), the one the person named in words, as
+ * admitted() decides.
+ */
+export function actionTarget(
+  plan: PermittedContextPlan,
+  companyId: string,
+): boolean {
+  const companies = plan.subjects.filter(
+    (subject) => subject.kind === "COMPANY",
+  );
+  if (companies.length === 0) {
+    return admitted(plan, { kind: "COMPANY", id: companyId });
+  }
+  return (
+    companies.some(
+      (subject) =>
+        subject.kind === "COMPANY" && subject.companyId === companyId,
+    ) &&
+    boundScopeFor(
+      plan,
+      "COMPANY_PROFILE",
+      (filter) => filter.companyId === companyId,
+    ) !== undefined
+  );
+}
+
 // ---------------------------------------------------------------------------
 // get_relationship
 // ---------------------------------------------------------------------------
@@ -490,7 +522,7 @@ function createProposeExpressInterestTool(
     input: ProposeExpressInterestInputSchema,
     output: ProposalOutputSchema,
     authorize: async (input, { actor, plan }) => {
-      if (!admitted(plan, { kind: "COMPANY", id: input.companyId })) {
+      if (!actionTarget(plan, input.companyId)) {
         return deny("NOT_AVAILABLE");
       }
       if (!(await relationships.mayExpressInterest(actor, input.companyId))) {

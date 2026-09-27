@@ -9,7 +9,7 @@ import {
   QVoiceTurnStateSchema,
   qVoiceTurnPath,
   qVoiceScreenPath,
-  type QScreenContext,
+  type QVoiceScreenUpdate,
   Q_VOICE_SESSIONS_PATH,
   IDEMPOTENCY_KEY_HEADER,
   Q_APPROVAL_APPROVE_SUFFIX,
@@ -173,7 +173,7 @@ export function getQVoiceTurnState(
 export async function setQVoiceScreen(
   session: ApiSession,
   voiceSessionId: string,
-  screen: QScreenContext,
+  screen: QVoiceScreenUpdate,
 ): Promise<void> {
   const doFetch = session.fetch ?? fetch;
   const response = await doFetch(

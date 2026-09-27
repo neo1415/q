@@ -25,6 +25,7 @@ import {
   type QMomentSource,
 } from "@/features/q/q-moment";
 import { QSheetConversation } from "@/features/q/q-sheet";
+import { setScreenFocusSource } from "@/features/q/screen";
 import { QSessionProvider, useQSessionOptional } from "@/features/q/q-session";
 import {
   QSubjectProvider,
@@ -95,9 +96,12 @@ export function GlobalQProvider({
   const momentSource = useRef<QMomentSource | null>(null);
   const registerMomentSource = useCallback((source: QMomentSource | null) => {
     momentSource.current = source;
+    // R21: the same source answers every turn's screen, not just opening.
+    setScreenFocusSource(source);
   }, []);
   const openWith = useCallback((explicitSeed: string | null) => {
-    const at = momentSource.current?.() ?? null;
+    const read = momentSource.current?.() ?? null;
+    const at = read?.kind === "PITCH_MOMENT" ? read : null;
     setMoment(at);
     setSeed(explicitSeed ?? (at === null ? null : momentDraft(at)));
     setRequested(true);

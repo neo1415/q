@@ -264,6 +264,34 @@ describe("POST /v1/q/voice/sessions", () => {
     expect(bindings.byVoiceSessionId(voiceSessionId)?.thread.screen).toEqual({
       route: "DISCOVER",
     });
+    // R35: the Discover card and the pitch moment on it, for spoken turns;
+    // the next update without a moment clears it.
+    const card = "c0000000-0000-4000-8000-0000000000c1";
+    const viewing = {
+      kind: "PITCH_PLAYBACK",
+      companyId: card,
+      mediaAssetId: "d0000000-0000-4000-8000-0000000000d1",
+      positionSeconds: 60,
+    };
+    const watching = await app.inject({
+      method: "POST",
+      url: `/v1/q/voice/sessions/${voiceSessionId}/screen`,
+      headers: AUTH,
+      payload: { route: "DISCOVER", companyId: card, viewing },
+    });
+    expect(watching.statusCode).toBe(204);
+    const thread = bindings.byVoiceSessionId(voiceSessionId)?.thread;
+    expect(thread?.screen).toEqual({ route: "DISCOVER", companyId: card });
+    expect(thread?.viewing).toEqual(viewing);
+    await app.inject({
+      method: "POST",
+      url: `/v1/q/voice/sessions/${voiceSessionId}/screen`,
+      headers: AUTH,
+      payload: { route: "DISCOVER", companyId: card },
+    });
+    expect(bindings.byVoiceSessionId(voiceSessionId)?.thread.viewing).toBe(
+      undefined,
+    );
     await app.close();
   });
 

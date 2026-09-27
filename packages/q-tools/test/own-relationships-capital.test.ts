@@ -593,3 +593,137 @@ describe("R35: the relationship and capital part of the product is Q's to read",
     expect(JSON.stringify(outcome)).not.toContain(PRIVATE_AMOUNT);
   });
 });
+
+/**
+ * R35 (Discover live report): the founder paused a pitch and asked "what
+ * is this about?"; Q said it could not see it. The web now reports the
+ * card on screen (company, pitch, position) on every turn; the Q API binds
+ * it as the run's subject and keeps the authorised moment on the plan.
+ * Here: with that plan, the pitch, the company and the person's own
+ * Save / Pass / Express Interest are offered and act on that company --
+ * and never on one that is neither on screen nor asked about.
+ */
+describe("R35: the company on screen in Discover", () => {
+  const PITCH = "66666666-0000-4000-8000-000000000001";
+  const decided: { type: string; companyId: string }[] = [];
+  const expressed: string[] = [];
+  const screenPorts = fakePorts({
+    companies,
+    capital,
+    disclosure,
+    authorization: fakeAuthorization(),
+    relationships: {
+      ...relationships,
+      mayExpressInterest: () => Promise.resolve(true),
+      prepareForApproval: (entry) => {
+        expressed.push(entry.payload.companyId ?? "");
+        return "PREPARED";
+      },
+    },
+    investorFeed,
+    discoveryDecisions: {
+      decide: (_actor, decision) => {
+        decided.push({ type: decision.type, companyId: decision.companyId });
+        return Promise.resolve({
+          status: "RECORDED",
+          deduplicated: false,
+          saved: decision.type === "SAVE",
+          passed: decision.type === "PASS",
+        });
+      },
+    },
+    pitchMoments: {
+      momentAround: () =>
+        Promise.resolve({
+          status: "AVAILABLE",
+          cues: [
+            { startMs: 60_000, endMs: 64_000, text: "We store grid power." },
+          ],
+        }),
+    } as never,
+  });
+  const screenExecutor = createQToolExecutor({
+    registry: createQToolRegistry(createDefaultQTools(screenPorts)),
+  });
+
+  /** What the firewall builds for a turn asked with Northwind's card on screen, paused at 1:02. */
+  function onScreen(actor: ActorContext): PermittedContextPlan {
+    const base = unnamedPlan(actor, "COUNTERPARTY_COMPANY_QUESTION");
+    const withCompany = planFor(actor, "COUNTERPARTY_COMPANY_QUESTION", [
+      {
+        kind: "COMPANY_PROFILE",
+        sensitivity: "NETWORK_VISIBLE",
+        companyId: NORTHWIND,
+      },
+    ]);
+    return PermittedContextPlanSchema.parse({
+      ...base,
+      subjects: withCompany.subjects,
+      scopes: [...base.scopes, ...withCompany.scopes],
+      viewing: {
+        kind: "PITCH_PLAYBACK",
+        companyId: NORTHWIND,
+        mediaAssetId: PITCH,
+        positionSeconds: 62,
+      },
+    });
+  }
+
+  const run = (name: string, args: Record<string, unknown>) =>
+    screenExecutor.execute(
+      { callId: randomUUID(), name, arguments: args },
+      contextFor(investorI, onScreen(investorI)),
+    );
+
+  it("offers the pitch, the company, its raise and their own actions on it", async () => {
+    const offered = (
+      await screenExecutor.offer(contextFor(investorI, onScreen(investorI)))
+    ).map((tool) => tool.definition.name);
+    for (const name of [
+      "get_pitch_moment",
+      "get_company",
+      "get_capital_objective",
+      "save_company",
+      "pass_company",
+      "propose_express_interest",
+      "list_my_relationships",
+    ]) {
+      expect(offered).toContain(name);
+    }
+  });
+
+  it("'save this' / 'pass' / 'I'm interested' act on the company on screen", async () => {
+    decided.length = 0;
+    expressed.length = 0;
+    expect(
+      (await run("save_company", { companyId: NORTHWIND })).result,
+    ).toMatchObject({ ok: true, data: { status: "DONE", saved: true } });
+    expect(
+      (await run("pass_company", { companyId: NORTHWIND })).result,
+    ).toMatchObject({ ok: true, data: { status: "DONE", passed: true } });
+    expect(
+      (await run("propose_express_interest", { companyId: NORTHWIND })).result,
+    ).toMatchObject({ ok: true, data: { status: "PREPARED" } });
+    expect(decided).toEqual([
+      { type: "SAVE", companyId: NORTHWIND },
+      { type: "PASS", companyId: NORTHWIND },
+    ]);
+    // Express Interest is only prepared: the person approves it.
+    expect(expressed).toEqual([NORTHWIND]);
+  });
+
+  it("never acts on a company that is neither on screen nor asked about", async () => {
+    decided.length = 0;
+    expressed.length = 0;
+    for (const name of [
+      "save_company",
+      "pass_company",
+      "propose_express_interest",
+    ]) {
+      const outcome = await run(name, { companyId: KESTREL });
+      expect(outcome.status).not.toBe("SUCCEEDED");
+    }
+    expect(decided).toEqual([]);
+    expect(expressed).toEqual([]);
+  });
+});

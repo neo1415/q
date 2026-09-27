@@ -859,6 +859,7 @@ export function createVoiceTurnHandler(
         // R21: where they are now, as their browser last said; resolved
         // for them on this run or dropped, exactly like a typed turn's.
         ...(thread.screen === undefined ? {} : { screen: thread.screen }),
+        ...(thread.viewing === undefined ? {} : { viewing: thread.viewing }),
         ...(thread.conversationId === undefined
           ? {}
           : { conversationId: thread.conversationId }),

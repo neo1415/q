@@ -43,8 +43,21 @@ export function viewingOf(moment: QMoment): {
   };
 }
 
-/** A page's way of saying what is on screen right now, read when Q opens. */
-export type QMomentSource = () => QMoment | null;
+/**
+ * The company in front of the person when no pitch is playing (poster
+ * shown, or no pitch): still "this company" for Q (R21), but no moment.
+ */
+export type QScreenCompany = {
+  readonly kind: "SCREEN_COMPANY";
+  readonly companyId: string;
+  readonly companyLabel: string;
+};
+
+/**
+ * A page's way of saying what is on screen right now: read when Q opens
+ * (for the draft) and again at every turn, typed or spoken (R21).
+ */
+export type QMomentSource = () => QMoment | QScreenCompany | null;
 
 /** 102 -> "1:42"; 3725 -> "1:02:05". */
 export function formatPlaybackPosition(seconds: number): string {

@@ -46,6 +46,20 @@ export const qVoiceTurnPath = (voiceSessionId: string) =>
  */
 export const Q_VOICE_SCREEN_PATH =
   "/v1/q/voice/sessions/:voiceSessionId/screen" as const;
+
+/**
+ * The body of Q_VOICE_SCREEN_PATH: the screen, plus the pitch moment on it
+ * when one is playing or paused (R18). A spoken "what is this about?" has
+ * no other channel for `viewing`; like a typed turn's, it is authorised
+ * for the asker on each run or dropped.
+ */
+export const QVoiceScreenUpdateSchema = z
+  .object({
+    ...QScreenContextSchema.shape,
+    viewing: QViewingMomentSchema.optional(),
+  })
+  .strict();
+export type QVoiceScreenUpdate = z.infer<typeof QVoiceScreenUpdateSchema>;
 export const qVoiceScreenPath = (voiceSessionId: string) =>
   `/v1/q/voice/sessions/${encodeURIComponent(voiceSessionId)}/screen`;
 

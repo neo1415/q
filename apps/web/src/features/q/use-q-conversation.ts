@@ -26,7 +26,7 @@ import {
   type QSubjectInput,
 } from "./actions";
 import type { PendingTurn } from "./conversation";
-import { currentScreen } from "./screen";
+import { currentScreen, currentViewing } from "./screen";
 import {
   forgetPendingAsk,
   readPendingAsk,
@@ -434,7 +434,9 @@ export function useQConversation(
             relationshipId: options.relationshipId,
           }),
           idempotencyKey,
-          extras?.viewing,
+          // R18/R21: the pitch on screen as they ask, read now (the dock
+          // may have opened on another card); else the opening's moment.
+          currentViewing() ?? extras?.viewing,
           // R21: the screen they asked from, resolved or dropped server-side.
           currentScreen(),
         );

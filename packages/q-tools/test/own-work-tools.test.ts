@@ -39,8 +39,11 @@ function ownPlan(
   purpose:
     "GENERAL_QUESTION" | "COUNTERPARTY_COMPANY_QUESTION" = "GENERAL_QUESTION",
 ): PermittedContextPlan {
+  // The actor-wide scopes a real plan carries (R35: an action's company
+  // is admitted under the network scope when no company is on screen).
   const plan = planFor(actor, purpose, [
     { kind: "OWN_Q_CONVERSATION", sensitivity: "CONFIDENTIAL" },
+    { kind: "NETWORK_VISIBLE_DATA", sensitivity: "NETWORK_VISIBLE" },
   ]);
   return {
     ...plan,

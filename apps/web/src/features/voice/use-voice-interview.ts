@@ -14,7 +14,7 @@ import {
   sendVoiceScreenAction,
   startVoiceSessionAction,
 } from "./actions";
-import { currentScreen } from "../q/screen";
+import { currentScreen, currentViewing } from "../q/screen";
 import { storeVoicePreference, useVoicePreference } from "./voice-preference";
 import { useVoiceSession } from "./use-voice-session";
 import type {
@@ -279,13 +279,25 @@ export function useVoiceInterview(
     let timer: ReturnType<typeof setTimeout> | undefined;
     // R21: the screen the server has for this line; sent again only when
     // the person has moved (a route, or the document open in the viewer).
+    // R18: with the pitch moment on it, so a spoken "what is this about?"
+    // is about the card and the moment on screen. The position is sent in
+    // five-second steps: enough to find the passage, not a post a second.
     let sentScreen = JSON.stringify(currentScreen());
     const tick = async () => {
       const screen = currentScreen();
-      const screenKey = JSON.stringify(screen);
+      const viewing = currentViewing();
+      const screenKey = JSON.stringify([
+        screen,
+        viewing === undefined
+          ? null
+          : [viewing.mediaAssetId, Math.floor(viewing.positionSeconds / 5)],
+      ]);
       if (screenKey !== sentScreen) {
         sentScreen = screenKey;
-        void sendVoiceScreenAction(voiceSessionId, screen);
+        void sendVoiceScreenAction(
+          voiceSessionId,
+          viewing === undefined ? screen : { ...screen, viewing },
+        );
       }
       const read = await readVoiceTurnAction(voiceSessionId);
       if (cancelled) {

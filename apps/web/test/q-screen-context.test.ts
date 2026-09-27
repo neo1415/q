@@ -1,8 +1,16 @@
 import { describe, expect, it } from "vitest";
 
-import { QScreenContextSchema } from "@capital-q/contracts";
+import {
+  QScreenContextSchema,
+  QVoiceScreenUpdateSchema,
+} from "@capital-q/contracts";
 
-import { screenOf } from "../src/features/q/screen";
+import {
+  currentScreen,
+  currentViewing,
+  screenOf,
+  setScreenFocusSource,
+} from "../src/features/q/screen";
 
 /**
  * The screen a question is asked from (R21): the route on the closed list
@@ -49,5 +57,68 @@ describe("the screen context the web sends with a question", () => {
         true,
       );
     }
+  });
+});
+
+/**
+ * R35: the Discover card in front of the person, read at every turn (not
+ * only when Q opened), so a question typed into an open dock or spoken on
+ * a live line is about the card and the moment on screen now.
+ */
+describe("the card on screen in Discover", () => {
+  const PITCH = "d0000000-0000-4000-8000-000000000001";
+  const OTHER = "c0000000-0000-4000-8000-000000000002";
+
+  it("reports the company, and the pitch moment when one is playing or paused", () => {
+    let focus:
+      | {
+          kind: "PITCH_MOMENT";
+          companyId: string;
+          companyLabel: string;
+          mediaAssetId: string;
+          positionSeconds: number;
+        }
+      | { kind: "SCREEN_COMPANY"; companyId: string; companyLabel: string }
+      | null = {
+      kind: "PITCH_MOMENT",
+      companyId: ID,
+      companyLabel: "Northwind",
+      mediaAssetId: PITCH,
+      positionSeconds: 62.7,
+    };
+    setScreenFocusSource(() => focus);
+    try {
+      expect(currentScreen("/discover")).toEqual({
+        route: "DISCOVER",
+        companyId: ID,
+      });
+      expect(currentViewing()).toEqual({
+        kind: "PITCH_PLAYBACK",
+        companyId: ID,
+        mediaAssetId: PITCH,
+        positionSeconds: 62,
+      });
+      expect(
+        QVoiceScreenUpdateSchema.safeParse({
+          ...currentScreen("/discover"),
+          viewing: currentViewing(),
+        }).success,
+      ).toBe(true);
+      // The next card, poster only: still "this company", no moment.
+      focus = { kind: "SCREEN_COMPANY", companyId: OTHER, companyLabel: "B" };
+      expect(currentScreen("/discover")).toEqual({
+        route: "DISCOVER",
+        companyId: OTHER,
+      });
+      expect(currentViewing()).toBeUndefined();
+      // A route that names its own company keeps it.
+      expect(currentScreen(`/company/${ID}`).companyId).toBe(ID);
+      // Nothing in focus, or a page that has gone: the route alone.
+      focus = null;
+      expect(currentScreen("/discover")).toEqual({ route: "DISCOVER" });
+    } finally {
+      setScreenFocusSource(null);
+    }
+    expect(currentScreen("/discover")).toEqual({ route: "DISCOVER" });
   });
 });

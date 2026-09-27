@@ -13,7 +13,7 @@ import {
   Q_VOICE_SPEECH_PATH,
   Q_VOICE_SCREEN_PATH,
   Q_VOICE_TURN_PATH,
-  QScreenContextSchema,
+  QVoiceScreenUpdateSchema,
   QVoiceTurnStateSchema,
 } from "@capital-q/contracts";
 import { fetchMe } from "@capital-q/api-client";
@@ -215,7 +215,7 @@ export function registerQVoiceRoutes(
           detail: "No such voice session.",
         });
       }
-      const screen = QScreenContextSchema.safeParse(request.body);
+      const screen = QVoiceScreenUpdateSchema.safeParse(request.body);
       if (!screen.success) {
         return reply.code(400).send({
           type: "about:blank",
@@ -224,7 +224,11 @@ export function registerQVoiceRoutes(
           detail: "That is not a screen.",
         });
       }
-      binding.thread.screen = screen.data;
+      const { viewing, ...shown } = screen.data;
+      binding.thread.screen = shown;
+      // R18: the pitch moment on screen, for spoken turns; replaced (or
+      // cleared) by every update, so a moved-on card never lingers.
+      binding.thread.viewing = viewing;
       return reply.code(204).send();
     },
   );

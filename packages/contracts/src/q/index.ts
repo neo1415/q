@@ -204,6 +204,8 @@ export {
   Q_VOICE_WS_PATH,
   Q_VOICE_TURN_PATH,
   Q_VOICE_SCREEN_PATH,
+  QVoiceScreenUpdateSchema,
+  type QVoiceScreenUpdate,
   Q_VOICE_THINK_PATH,
   Q_VOICE_SPEECH_PATH,
   Q_SPEECH_MAX_CHARS,
