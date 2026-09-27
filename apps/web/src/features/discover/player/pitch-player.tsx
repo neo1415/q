@@ -7,6 +7,16 @@ import type {
   PlaybackAuthorizationDto,
 } from "@capital-q/contracts";
 import { Button } from "@capital-q/ui/button";
+import {
+  Captions,
+  CaptionsOff,
+  ICON_SIZE,
+  ICON_STROKE,
+  Pause,
+  Play,
+  Volume2,
+  VolumeX,
+} from "@capital-q/ui/icons";
 
 import type { FeedPreloadPolicy } from "../feed/feed-state";
 import {
@@ -14,6 +24,7 @@ import {
   type AttachSource,
   type PlaybackSource,
 } from "./pitch-playback";
+import { claimActivePlayer, releaseActivePlayer } from "./active-player";
 import { usePitchPlayback } from "./use-pitch-playback";
 
 /**
@@ -63,6 +74,16 @@ export function pitchFrame(aspectRatio: string | null | undefined): {
   };
 }
 
+/** Set every text track on the element to showing or hidden. */
+function showCaptions(video: HTMLVideoElement | null, on: boolean): void {
+  const tracks = video?.textTracks;
+  if (tracks === undefined) return;
+  for (let index = 0; index < tracks.length; index += 1) {
+    const track = tracks[index];
+    if (track !== undefined) track.mode = on ? "showing" : "hidden";
+  }
+}
+
 type PitchPlayerProps = {
   readonly company: DiscoveredCompanyDto;
   /** The tier this card is in, from the feed controller. */
@@ -88,7 +109,26 @@ type PitchPlayerProps = {
   readonly onMutedChange?: ((muted: boolean) => void) | undefined;
   /** The server's authorization for the first card, so its poster is SSR'd. */
   readonly initialAuthorization?: PlaybackAuthorizationDto | null | undefined;
+  /**
+   * Poster first, and nothing fetched or played until somebody presses
+   * Play (R36): for a page with a pitch on it rather than a feed of them.
+   * Until then the controller's tier is capped at POSTER, so no media
+   * bytes move; pressing Play lifts the cap and starts it.
+   */
+  readonly startOnRequest?: boolean | undefined;
 };
+
+/**
+ * The tier a request-to-play player is really in: the controller's, but
+ * never beyond a poster until it has been asked to play.
+ */
+export function requestedPolicy(
+  policy: FeedPreloadPolicy,
+  requested: boolean,
+): FeedPreloadPolicy {
+  if (requested || policy === "NONE") return policy;
+  return "POSTER";
+}
 
 export function PitchPlayer({
   company,
@@ -101,6 +141,7 @@ export function PitchPlayer({
   muted: controlledMuted,
   onMutedChange,
   initialAuthorization = null,
+  startOnRequest = false,
 }: PitchPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [ownMuted, setOwnMuted] = useState(true);
@@ -110,10 +151,15 @@ export function PitchPlayer({
     else setOwnMuted(next);
   };
   const [playing, setPlaying] = useState(false);
+  /** Somebody pressed Play on a request-to-play player. */
+  const [requested, setRequested] = useState(!startOnRequest);
+  /** A press that is waiting for its source to attach. */
+  const pendingPlay = useRef(false);
+  const [captionsOn, setCaptionsOn] = useState(true);
 
   const { intent, posterUrl, playbackUrl, failed } = usePitchPlayback({
     mediaAssetId: company.pitch?.mediaAssetId ?? null,
-    policy,
+    policy: requestedPolicy(policy, requested),
     authorize,
     reducedMotion,
     initialAuthorization,
@@ -134,6 +180,20 @@ export function PitchPlayer({
     const video = videoRef.current;
     if (video === null) return;
 
+    if (startOnRequest) {
+      // Only a press starts it, even once it is ACTIVE; a hold (Q
+      // speaking, another preview opened) still pauses it.
+      if (hold) {
+        if (!video.paused) video.pause();
+        return;
+      }
+      if (pendingPlay.current && playbackUrl !== null) {
+        pendingPlay.current = false;
+        void video.play().catch(() => undefined);
+      }
+      return;
+    }
+
     if (!intent.autoplay || playbackUrl === null || hold) {
       if (!video.paused) video.pause();
       return;
@@ -144,7 +204,38 @@ export function PitchPlayer({
     // the same fact as a video that is running, and a browser may refuse
     // autoplay under its own policy without either of them being wrong.
     void video.play().catch(() => undefined);
-  }, [intent.autoplay, playbackUrl, hold]);
+  }, [intent.autoplay, playbackUrl, hold, startOnRequest]);
+
+  // Leaving the page is leaving the claim.
+  useEffect(() => {
+    const video = videoRef.current;
+    return () => {
+      if (video !== null) releaseActivePlayer(video);
+    };
+  }, []);
+
+  // Captions are a choice, carried to the element's own track list: the
+  // `default` attribute is read once, when the track is added.
+  useEffect(() => {
+    showCaptions(videoRef.current, captionsOn);
+  }, [captionsOn, playbackUrl]);
+
+  const startPlaying = () => {
+    const video = videoRef.current;
+    if (!requested) {
+      // The source is not attached yet: lift the cap, and play as soon
+      // as it is.
+      pendingPlay.current = true;
+      setRequested(true);
+      return;
+    }
+    void video?.play().catch(() => undefined);
+  };
+  const onPlay = () => {
+    const video = videoRef.current;
+    if (video !== null) claimActivePlayer(video);
+    setPlaying(true);
+  };
 
   // Muting is a property, not an attribute: React sets the attribute on
   // first render only, and the element's own state is what the browser
@@ -179,7 +270,7 @@ export function PitchPlayer({
           aria-label={`Pitch from ${company.canonicalName}`}
           data-policy={policy}
           data-playing={playing ? "true" : "false"}
-          onPlay={() => setPlaying(true)}
+          onPlay={onPlay}
           onPause={() => setPlaying(false)}
         />
         {intent.attach || failed ? (
@@ -208,7 +299,7 @@ export function PitchPlayer({
             ) : null}
             {failed ? (
               <span className="cq-caption text-(--cq-text-secondary)">
-                This pitch could not be loaded right now.
+                This pitch couldn&apos;t load right now. Try again in a moment.
               </span>
             ) : null}
           </div>
@@ -217,8 +308,13 @@ export function PitchPlayer({
     );
   }
 
+  // A request-to-play player always offers Play when it is not playing:
+  // another player taking the page pauses it, and it must be resumable.
+  const explicitPlay = startOnRequest || intent.requiresExplicitPlay;
+  const captions = pitch.captionState === "AVAILABLE";
+
   return (
-    <div className="cq-pitch flex flex-col gap-3">
+    <div className="cq-pitch flex flex-col gap-3" data-pitch-player>
       {/*
         A known aspect ratio at all times, so a poster arriving or a source
         attaching never moves the page (doc 20 §60, CLS), and a height that
@@ -231,7 +327,10 @@ export function PitchPlayer({
       >
         <video
           ref={videoRef}
-          className="size-full object-cover"
+          // Contained, not cropped: a narrated deck video (16:9, the
+          // slides are the picture) must never lose its edges to a frame
+          // whose ratio was unknown.
+          className="size-full object-contain"
           // Inline on iOS; fullscreen takeover is not a feed.
           playsInline
           muted={muted}
@@ -243,7 +342,7 @@ export function PitchPlayer({
           aria-label={`Pitch from ${company.canonicalName}`}
           data-policy={policy}
           data-playing={playing ? "true" : "false"}
-          onPlay={() => setPlaying(true)}
+          onPlay={onPlay}
           onPause={() => setPlaying(false)}
         >
           {/*
@@ -252,16 +351,38 @@ export function PitchPlayer({
             API decides under the playback rule. Only once a source is
             attached, so a cold card fetches nothing.
           */}
-          {pitch.captionState === "AVAILABLE" && playbackUrl !== null ? (
+          {captions && playbackUrl !== null ? (
             <track
               kind="captions"
               srcLang="en"
               label="English (generated)"
               src={`/api/pitch-captions/${company.companyId}/${pitch.mediaAssetId}`}
-              default
+              default={captionsOn}
             />
           ) : null}
         </video>
+
+        {/*
+          Poster first (R36): one large, plain Play over the still, the
+          same action as the Play below, so the obvious place to press
+          works. Hidden from assistive technology because the labelled
+          button below is the one it should find, once.
+        */}
+        {explicitPlay && !playing && !failed ? (
+          <button
+            type="button"
+            tabIndex={-1}
+            aria-hidden="true"
+            className="absolute inset-0 flex items-center justify-center"
+            onClick={startPlaying}
+            disabled={requested && playbackUrl === null}
+            data-pitch-poster-play
+          >
+            <span className="flex size-14 items-center justify-center rounded-full bg-(--cq-surface-raised) text-(--cq-text-primary) shadow-(--cq-shadow-overlay)">
+              <Play size={ICON_SIZE.prominent} strokeWidth={ICON_STROKE} />
+            </span>
+          </button>
+        ) : null}
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
@@ -271,16 +392,28 @@ export function PitchPlayer({
           with a word on it, not an icon overlay, so it is reachable by
           keyboard and announced by a screen reader.
         */}
-        {intent.requiresExplicitPlay && !playing ? (
+        {explicitPlay && !playing ? (
           <Button
             variant="secondary"
-            size="compact"
-            onClick={() => {
-              void videoRef.current?.play().catch(() => undefined);
-            }}
-            disabled={playbackUrl === null}
+            onClick={startPlaying}
+            disabled={requested && playbackUrl === null}
           >
+            <Play
+              aria-hidden="true"
+              size={ICON_SIZE.regular}
+              strokeWidth={ICON_STROKE}
+            />
             Play
+          </Button>
+        ) : null}
+        {explicitPlay && playing ? (
+          <Button variant="secondary" onClick={() => videoRef.current?.pause()}>
+            <Pause
+              aria-hidden="true"
+              size={ICON_SIZE.regular}
+              strokeWidth={ICON_STROKE}
+            />
+            Pause
           </Button>
         ) : null}
 
@@ -291,24 +424,54 @@ export function PitchPlayer({
         {intent.attach ? (
           <Button
             variant="quiet"
-            size="compact"
             aria-pressed={!muted}
             onClick={() => setMuted(!muted)}
           >
+            {muted ? (
+              <VolumeX
+                aria-hidden="true"
+                size={ICON_SIZE.regular}
+                strokeWidth={ICON_STROKE}
+              />
+            ) : (
+              <Volume2
+                aria-hidden="true"
+                size={ICON_SIZE.regular}
+                strokeWidth={ICON_STROKE}
+              />
+            )}
             {muted ? "Unmute" : "Mute"}
           </Button>
         ) : null}
 
-        {pitch.captionState === "AVAILABLE" ? (
-          <span className="cq-caption text-(--cq-text-tertiary)">
-            Captions on (generated)
-          </span>
+        {captions ? (
+          <Button
+            variant="quiet"
+            aria-pressed={captionsOn}
+            onClick={() => setCaptionsOn((on) => !on)}
+            data-pitch-captions
+          >
+            {captionsOn ? (
+              <Captions
+                aria-hidden="true"
+                size={ICON_SIZE.regular}
+                strokeWidth={ICON_STROKE}
+              />
+            ) : (
+              <CaptionsOff
+                aria-hidden="true"
+                size={ICON_SIZE.regular}
+                strokeWidth={ICON_STROKE}
+              />
+            )}
+            Captions
+          </Button>
         ) : null}
       </div>
 
       {failed ? (
         <p className="cq-caption text-(--cq-text-secondary)">
-          This pitch could not be loaded right now.
+          This pitch couldn&apos;t load right now. Try again in a moment.
         </p>
       ) : null}
     </div>

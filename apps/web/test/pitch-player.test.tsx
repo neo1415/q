@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import { StrictMode } from "react";
 import { renderToString } from "react-dom/server";
 import userEvent from "@testing-library/user-event";
@@ -429,7 +429,7 @@ describe("the player element", () => {
       />,
     );
 
-    expect(await screen.findByText(/could not be loaded/i)).toBeTruthy();
+    expect(await screen.findByText(/couldn.t load/i)).toBeTruthy();
     expect(play).not.toHaveBeenCalled();
   });
 });
@@ -562,5 +562,195 @@ describe("authorization lifetime", () => {
     );
 
     await waitFor(() => expect(authorize.mock.calls.length).toBeGreaterThan(1));
+  });
+});
+
+/**
+ * R36 · a pitch on a page, not in a feed: poster first, explicit Play,
+ * captions a choice, and one player at a time.
+ */
+describe("R36 · poster first, on request", () => {
+  it("shows the poster and fetches no media until Play is pressed", async () => {
+    const authorize = vi.fn(() =>
+      Promise.resolve(authorization({ mediaAssetId: FIRST_PITCH_ID })),
+    );
+    const { container } = render(
+      <PitchPlayer
+        company={company(1)}
+        policy="ACTIVE"
+        authorize={authorize}
+        reducedMotion={false}
+        startOnRequest
+      />,
+    );
+    const video = videoIn(container);
+    await waitFor(() => {
+      expect(video.getAttribute("poster")).toBe("https://cdn.test/sample.jpg");
+    });
+    // A poster, not a source: no media bytes move and nothing plays.
+    expect(video.getAttribute("src")).toBeNull();
+    expect(video.hasAttribute("preload")).toBe(false);
+    expect(play).not.toHaveBeenCalled();
+
+    await userEvent.click(screen.getByRole("button", { name: "Play" }));
+    await waitFor(() => expect(play).toHaveBeenCalledTimes(1));
+    expect(video.getAttribute("src")).toBe("https://cdn.test/sample.mp4");
+    // Still muted and inline: pressing Play is not turning the sound on.
+    expect(video.muted).toBe(true);
+    expect(video.hasAttribute("playsinline")).toBe(true);
+  });
+
+  it("offers Pause while playing and Play again once paused", async () => {
+    const authorize = vi.fn(() =>
+      Promise.resolve(authorization({ mediaAssetId: FIRST_PITCH_ID })),
+    );
+    const { container } = render(
+      <PitchPlayer
+        company={company(1)}
+        policy="ACTIVE"
+        authorize={authorize}
+        reducedMotion={false}
+        startOnRequest
+      />,
+    );
+    await userEvent.click(await screen.findByRole("button", { name: "Play" }));
+    const video = videoIn(container);
+    await waitFor(() => expect(play).toHaveBeenCalled());
+    fireMedia(video, "play");
+    expect(await screen.findByRole("button", { name: "Pause" })).toBeTruthy();
+    fireMedia(video, "pause");
+    expect(await screen.findByRole("button", { name: "Play" })).toBeTruthy();
+  });
+
+  it("turns captions off and on, saying which is on", async () => {
+    const authorize = vi.fn(() =>
+      Promise.resolve(authorization({ mediaAssetId: FIRST_PITCH_ID })),
+    );
+    render(
+      <PitchPlayer
+        company={company(1)}
+        policy="ACTIVE"
+        authorize={authorize}
+        reducedMotion={false}
+        startOnRequest
+      />,
+    );
+    const toggle = screen.getByRole("button", { name: "Captions" });
+    expect(toggle.getAttribute("aria-pressed")).toBe("true");
+    await userEvent.click(toggle);
+    expect(toggle.getAttribute("aria-pressed")).toBe("false");
+  });
+
+  it("frames a landscape narrated pitch whole, without cropping it", () => {
+    const narrated = company(1);
+    const { container } = render(
+      <PitchPlayer
+        company={{
+          ...narrated,
+          pitch:
+            narrated.pitch === null
+              ? null
+              : { ...narrated.pitch, aspectRatio: "16:9" },
+        }}
+        policy="POSTER"
+        authorize={vi.fn(() => Promise.resolve(authorization()))}
+        reducedMotion={false}
+        startOnRequest
+      />,
+    );
+    const frame = container.querySelector<HTMLElement>("[data-pitch-frame]");
+    expect(frame?.style.aspectRatio).toBe("16 / 9");
+    expect(videoIn(container).className).toContain("object-contain");
+  });
+});
+
+function fireMedia(video: HTMLVideoElement, type: "play" | "pause"): void {
+  Object.defineProperty(video, "paused", {
+    configurable: true,
+    get: () => type === "pause",
+  });
+  act(() => {
+    video.dispatchEvent(new Event(type));
+  });
+}
+
+describe("R36 · one active player across a page", () => {
+  it("pauses the one that was playing when another starts", async () => {
+    const authorize = vi.fn((id: string) =>
+      Promise.resolve(authorization({ mediaAssetId: id })),
+    );
+    const { container } = render(
+      <>
+        <PitchPlayer
+          company={company(1)}
+          policy="ACTIVE"
+          authorize={authorize}
+          reducedMotion={false}
+          startOnRequest
+        />
+        <PitchPlayer
+          company={company(2)}
+          policy="ACTIVE"
+          authorize={authorize}
+          reducedMotion={false}
+          startOnRequest
+        />
+      </>,
+    );
+    const [first, second] = [...container.querySelectorAll("video")];
+    if (first === undefined || second === undefined) throw new Error("two");
+    const pauseFirst = vi.fn();
+    first.pause = pauseFirst;
+
+    const [playFirst] = screen.getAllByRole("button", { name: "Play" });
+    if (playFirst === undefined) throw new Error("no Play");
+    await userEvent.click(playFirst);
+    await waitFor(() => expect(play).toHaveBeenCalledTimes(1));
+    fireMedia(first, "play");
+
+    const playSecond = screen.getAllByRole("button", { name: "Play" })[0];
+    if (playSecond === undefined) throw new Error("no second Play");
+    await userEvent.click(playSecond);
+    await waitFor(() => expect(play).toHaveBeenCalledTimes(2));
+    fireMedia(second, "play");
+    expect(pauseFirst).toHaveBeenCalledTimes(1);
+  });
+
+  it("never leaves two playing, whatever order they start and stop in", async () => {
+    const { claimActivePlayer, releaseActivePlayer } =
+      await import("../src/features/discover/player/active-player");
+    // A small deterministic generator: the property is checked over many
+    // interleavings rather than the one a person thought of.
+    let seed = 7;
+    const next = (n: number) => {
+      seed = (seed * 1103515245 + 12345) % 2147483648;
+      return seed % n;
+    };
+    const players = Array.from({ length: 4 }, () => {
+      const media = {
+        paused: true,
+        pause() {
+          media.paused = true;
+        },
+      };
+      return media;
+    });
+    for (let step = 0; step < 500; step += 1) {
+      const media = players[next(players.length)];
+      if (media === undefined) continue;
+      switch (next(3)) {
+        case 0:
+          media.paused = false;
+          claimActivePlayer(media);
+          break;
+        case 1:
+          media.pause();
+          break;
+        default:
+          media.pause();
+          releaseActivePlayer(media);
+      }
+      expect(players.filter((p) => !p.paused).length).toBeLessThanOrEqual(1);
+    }
   });
 });

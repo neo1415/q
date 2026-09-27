@@ -738,6 +738,7 @@ export function PitchUpload({
                 policy="ACTIVE"
                 authorize={authorize}
                 reducedMotion={reducedMotion}
+                startOnRequest
                 hold={holdPreview}
               />
             </div>

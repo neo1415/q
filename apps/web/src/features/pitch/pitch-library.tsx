@@ -323,6 +323,7 @@ export function PitchLibrary({
                     policy="ACTIVE"
                     authorize={authorize}
                     reducedMotion={reducedMotion}
+                    startOnRequest
                   />
                 </div>
               ) : null}
