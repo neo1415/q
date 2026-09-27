@@ -1,6 +1,10 @@
 import { z } from "zod";
 
-import { parseConfig, type EnvironmentInput } from "./common.js";
+import {
+  parseConfig,
+  runtimeEnvShape,
+  type EnvironmentInput,
+} from "./common.js";
 import { ProviderCredential } from "./model-providers.js";
 
 /**
@@ -18,6 +22,12 @@ import { ProviderCredential } from "./model-providers.js";
  * Pub/Sub push audience (the same service) plus the callback path, or the
  * laptop API when no audience is set. `GOOGLE_WORKSPACE_REDIRECT_URI`
  * overrides it only if a deployment ever needs to.
+ *
+ * The laptop defaults (web on 127.0.0.1:3000, API on localhost:3001) apply
+ * only when `CAPITAL_Q_ENV` is `local`. Anywhere else a missing web origin
+ * or redirect URI is named in `missing` and the integration stays off:
+ * production once redirected a person to 127.0.0.1 after Google consent
+ * because `CQ_WEB_ORIGIN` was unset and the fallback was silent.
  */
 
 export const GOOGLE_WORKSPACE_ENV_NAMES = [
@@ -46,6 +56,7 @@ const optionalValue = z.preprocess(
 );
 
 const envSchema = z.object({
+  CAPITAL_Q_ENV: runtimeEnvShape.CAPITAL_Q_ENV,
   GOOGLE_WORKSPACE_CLIENT_ID: optionalValue,
   GOOGLE_WORKSPACE_CLIENT_SECRET: optionalValue,
   GOOGLE_TOKEN_ENCRYPTION_KEY: optionalValue,
@@ -97,8 +108,11 @@ export type GoogleWorkspaceConfig = {
         readonly serviceAccountEmail: string;
       }
     | undefined;
-  /** Where the browser returns after the OAuth callback. */
-  readonly webOrigin: string;
+  /**
+   * Where the browser returns after the OAuth callback. Undefined outside
+   * `local` when `CQ_WEB_ORIGIN` is unset; `oauth` is then undefined too.
+   */
+  readonly webOrigin: string | undefined;
   /** Names still needed. Never a value. */
   readonly missing: readonly string[];
 };
@@ -114,11 +128,18 @@ export function loadGoogleWorkspaceConfig(
     missing.push("GOOGLE_WORKSPACE_CLIENT_SECRET");
   if (parsed.GOOGLE_TOKEN_ENCRYPTION_KEY === undefined)
     missing.push("GOOGLE_TOKEN_ENCRYPTION_KEY");
+  const local = parsed.CAPITAL_Q_ENV === "local";
   const redirectUri =
     parsed.GOOGLE_WORKSPACE_REDIRECT_URI ??
     (parsed.GOOGLE_PUBSUB_PUSH_AUDIENCE === undefined
-      ? LOCAL_REDIRECT_URI
+      ? local
+        ? LOCAL_REDIRECT_URI
+        : undefined
       : `${new URL(parsed.GOOGLE_PUBSUB_PUSH_AUDIENCE).origin}${GOOGLE_CALLBACK_PATH}`);
+  if (redirectUri === undefined) missing.push("GOOGLE_WORKSPACE_REDIRECT_URI");
+  const webOriginValue =
+    parsed.CQ_WEB_ORIGIN ?? (local ? LOCAL_WEB_ORIGIN : undefined);
+  if (webOriginValue === undefined) missing.push("CQ_WEB_ORIGIN");
   const tokenEncryptionKey =
     parsed.GOOGLE_TOKEN_ENCRYPTION_KEY === undefined
       ? undefined
@@ -127,7 +148,9 @@ export function loadGoogleWorkspaceConfig(
     oauth:
       parsed.GOOGLE_WORKSPACE_CLIENT_ID !== undefined &&
       parsed.GOOGLE_WORKSPACE_CLIENT_SECRET !== undefined &&
-      tokenEncryptionKey !== undefined
+      tokenEncryptionKey !== undefined &&
+      redirectUri !== undefined &&
+      webOriginValue !== undefined
         ? {
             clientId: parsed.GOOGLE_WORKSPACE_CLIENT_ID,
             clientSecret: new ProviderCredential(
@@ -147,7 +170,8 @@ export function loadGoogleWorkspaceConfig(
             serviceAccountEmail: parsed.GOOGLE_PUBSUB_PUSH_SERVICE_ACCOUNT,
           }
         : undefined,
-    webOrigin: new URL(parsed.CQ_WEB_ORIGIN ?? LOCAL_WEB_ORIGIN).origin,
+    webOrigin:
+      webOriginValue === undefined ? undefined : new URL(webOriginValue).origin,
     missing,
   };
 }

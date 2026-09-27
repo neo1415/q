@@ -885,6 +885,16 @@ const { app, logger } = createApp(config, security, {
   },
 });
 
+if (googleWorkspace.oauth === undefined) {
+  // Names only. Outside local a missing web origin or redirect URI is one
+  // of them, and the integration stays off rather than sending a person
+  // to a laptop address after Google consent.
+  logger.warn(
+    { missing: googleWorkspace.missing },
+    "Google workspace integration disabled: configuration missing",
+  );
+}
+
 app.addHook("onClose", async () => {
   await database.close();
 });

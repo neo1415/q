@@ -131,4 +131,17 @@ describe("parseWebServerConfig", () => {
       }).apiBaseUrl,
     ).toBe("http://127.0.0.1:3001");
   });
+
+  it("never falls back to a loopback origin outside local", () => {
+    for (const env of ["preview", "staging", "production"] as const) {
+      expect(() =>
+        parseWebServerConfig({
+          NODE_ENV: "production",
+          CAPITAL_Q_ENV: env,
+          CQ_API_URL: "https://api.capitalq.test",
+          ...SUPABASE_ENV,
+        }),
+      ).toThrow(ConfigurationError);
+    }
+  });
 });

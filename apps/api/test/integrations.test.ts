@@ -70,7 +70,7 @@ function pushToken(aud: string): string {
   return `${body}.${sign("RSA-SHA256", Buffer.from(body), privateKey).toString("base64url")}`;
 }
 
-function build() {
+function build(options: { readonly webOrigin?: string | undefined } = {}) {
   const oauth = createFakeGoogleOAuth();
   const integrations = createIntegrationsService({
     store: createInMemoryIntegrationsStore(),
@@ -103,7 +103,10 @@ function build() {
   const app = createApp(parseApiConfig({ NODE_ENV: "test" }), security, {
     integrations: {
       integrations,
-      webOrigin: "https://app.example.invalid",
+      webOrigin:
+        "webOrigin" in options
+          ? options.webOrigin
+          : "https://app.example.invalid",
       push: {
         audience: AUDIENCE,
         serviceAccountEmail: PUSH_ACCOUNT,
@@ -202,5 +205,18 @@ describe("/v1/integrations/google", () => {
     });
     expect(none.statusCode).toBe(401);
     await app.close();
+  });
+});
+
+describe("an unconfigured web origin", () => {
+  it("never redirects the browser to a guessed address: the callback answers unavailable", async () => {
+    const { app } = build({ webOrigin: undefined });
+    const callback = await app.inject({
+      method: "GET",
+      url: "/v1/integrations/google/callback?state=s&code=c",
+    });
+    expect(callback.statusCode).not.toBe(303);
+    expect(callback.headers.location).toBeUndefined();
+    expect(callback.json()).toMatchObject({ code: "PROVIDER_UNAVAILABLE" });
   });
 });

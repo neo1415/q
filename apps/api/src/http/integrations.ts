@@ -50,7 +50,8 @@ import {
 export type IntegrationRoutesDependencies = ActorContextDependencies & {
   readonly integrations: IntegrationsService;
   /** Where the browser lands after the OAuth callback. */
-  readonly webOrigin: string;
+  /** Undefined when not configured; the integration is then unavailable. */
+  readonly webOrigin: string | undefined;
   /** Pub/Sub push verification; absent: the push route answers 503. */
   readonly push:
     | {
@@ -130,13 +131,18 @@ export function registerIntegrationRoutes(
   // top-level redirect; the one-time state binds this to the person who
   // started it, and is consumed before anything else happens.
   app.get(GOOGLE_OAUTH_CALLBACK_PATH, async (request, reply) => {
-    if (!integrations.available) return send(reply, unavailable(request));
+    // Never a guessed origin: without a configured one there is nowhere
+    // honest to send the browser, so the integration is simply off.
+    const webOrigin = dependencies.webOrigin;
+    if (!integrations.available || webOrigin === undefined) {
+      return send(reply, unavailable(request));
+    }
     const outcome = await integrations.completeConnect({
       state: queryValue(request, "state"),
       code: queryValue(request, "code"),
       error: queryValue(request, "error"),
     });
-    const target = new URL(outcome.returnTo, dependencies.webOrigin);
+    const target = new URL(outcome.returnTo, webOrigin);
     target.searchParams.set("google", outcome.outcome.toLowerCase());
     return reply
       .header("Cache-Control", "no-store")
