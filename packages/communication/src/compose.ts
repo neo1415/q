@@ -3,6 +3,12 @@ import type { InterestService } from "@capital-q/network";
 import type { ActorContext } from "@capital-q/security";
 
 import { createPostgresChatStore } from "./postgres.js";
+import { createPostgresChatSafetyStore } from "./safety-postgres.js";
+import {
+  createChatSafetyService,
+  type ChatSafetyAuditPort,
+  type ChatSafetyService,
+} from "./safety.js";
 import {
   createNetworkMeetingActivityWriter,
   createPostgresMeetingDirectory,
@@ -94,6 +100,23 @@ export function composeChat(options: {
     documents: createChatDocuments(options.ownDocument),
     downloads: options.downloads,
     newCorrelationId: options.newCorrelationId,
+  });
+}
+
+/** Block and report (R34 safety): the api composes it with its audit writer. */
+export function composeChatSafety(options: {
+  readonly sql: DatabaseExecutor;
+  readonly transactions: TransactionManager;
+  readonly interests: Pick<InterestService, "relationshipById">;
+  readonly audit: ChatSafetyAuditPort;
+}): ChatSafetyService {
+  return createChatSafetyService({
+    store: createPostgresChatSafetyStore({
+      sql: options.sql,
+      transactions: options.transactions,
+    }),
+    parties: createNetworkChatParties(options.interests),
+    audit: options.audit,
   });
 }
 

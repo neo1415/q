@@ -26,6 +26,15 @@ export const RELATIONSHIP_MESSAGE_UNSEND_PATH =
 /** `GET` a short-lived read of one shared file or voice note. */
 export const RELATIONSHIP_MESSAGE_ATTACHMENT_PATH =
   "/v1/relationships/:relationshipId/messages/:messageId/attachment" as const;
+/** `POST` block this relationship's chat for the caller's side (Idempotency-Key). */
+export const RELATIONSHIP_CHAT_BLOCK_PATH =
+  "/v1/relationships/:relationshipId/messages/block" as const;
+/** `POST` lift the caller's side's block (Idempotency-Key). */
+export const RELATIONSHIP_CHAT_UNBLOCK_PATH =
+  "/v1/relationships/:relationshipId/messages/unblock" as const;
+/** `POST` report a message or the thread for integrity review (Idempotency-Key). */
+export const RELATIONSHIP_CHAT_REPORTS_PATH =
+  "/v1/relationships/:relationshipId/messages/reports" as const;
 /** `GET` unread counts across the caller's threads. */
 export const CHAT_UNREAD_PATH = "/v1/chat/unread" as const;
 
@@ -114,6 +123,12 @@ export const ChatThreadStatusSchema = z.enum([
   "OPEN",
   /** A party, but the relationship has not been mutually connected yet. */
   "NOT_CONNECTED",
+  /**
+   * A side has blocked messaging. The history stays readable; nothing new
+   * can be sent in either direction. Which side blocked is said only to
+   * the side that did (`blockedByYourSide`).
+   */
+  "BLOCKED",
 ]);
 export type ChatThreadStatus = z.infer<typeof ChatThreadStatusSchema>;
 
@@ -128,6 +143,8 @@ export const ChatThreadDtoSchema = z
     /** How far the other side has read (for "Seen"). */
     counterpartLastReadMessageId: UuidSchema.nullable(),
     unread: z.number().int().min(0),
+    /** The caller's own side holds an active block (it can lift it). */
+    blockedByYourSide: z.boolean(),
   })
   .strict();
 export type ChatThreadDto = z.infer<typeof ChatThreadDtoSchema>;
@@ -173,3 +190,50 @@ export const ChatAttachmentAccessDtoSchema = z
 export type ChatAttachmentAccessDto = z.infer<
   typeof ChatAttachmentAccessDtoSchema
 >;
+
+// --- Block and report (R34 safety; doc 10) ------------------------------------
+
+/**
+ * Report reasons are reference data (`communication.report_reasons`); the
+ * database is the authority on which codes exist. This list mirrors the
+ * seeded rows so the report picker needs no round trip; a code the
+ * database does not know is refused there.
+ */
+export const ChatReportReasonCodeSchema = z
+  .string()
+  .regex(/^[A-Z][A-Z_]{1,39}$/);
+export type ChatReportReasonCode = z.infer<typeof ChatReportReasonCodeSchema>;
+
+export const CHAT_REPORT_REASONS: readonly {
+  readonly code: ChatReportReasonCode;
+  readonly label: string;
+}[] = Object.freeze([
+  { code: "SPAM", label: "Spam or unwanted messages" },
+  { code: "HARASSMENT", label: "Harassment or abuse" },
+  { code: "INAPPROPRIATE", label: "Inappropriate content" },
+  { code: "MISLEADING", label: "Misleading or false information" },
+  { code: "SCAM", label: "Scam or fraud" },
+  { code: "PRIVACY", label: "Shares private information" },
+  { code: "OTHER", label: "Something else" },
+]);
+
+export const CHAT_REPORT_NOTE_MAX_LENGTH = 500;
+
+export const ReportChatRequestSchema = z
+  .object({
+    reasonCode: ChatReportReasonCodeSchema,
+    /** One message on the thread; absent to report the thread as a whole. */
+    messageId: UuidSchema.optional(),
+    note: z.string().trim().min(1).max(CHAT_REPORT_NOTE_MAX_LENGTH).optional(),
+  })
+  .strict();
+export type ReportChatRequest = z.infer<typeof ReportChatRequestSchema>;
+
+export const ChatReportResultDtoSchema = z
+  .object({
+    reportId: UuidSchema,
+    status: z.literal("OPEN"),
+    deduplicated: z.boolean(),
+  })
+  .strict();
+export type ChatReportResultDto = z.infer<typeof ChatReportResultDtoSchema>;

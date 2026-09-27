@@ -9,10 +9,22 @@
 
 export {
   ChatAttachmentUnavailableError,
+  ChatBlockedError,
   ChatIdempotencyConflictError,
   ChatNotConnectedError,
   ChatNotFoundError,
+  ChatReportReasonError,
 } from "./errors.js";
+// R34 safety: block and report.
+export {
+  createChatSafetyService,
+  type ChatSafetyAuditEntry,
+  type ChatSafetyAuditPort,
+  type ChatSafetyService,
+  type ChatSafetyServiceDependencies,
+} from "./safety.js";
+export type { ChatSafetyAuditHook, ChatSafetyStore } from "./safety-store.js";
+export { createPostgresChatSafetyStore } from "./safety-postgres.js";
 export {
   createChatService,
   foldChatRows,
@@ -35,6 +47,7 @@ export type {
 export { createPostgresChatStore } from "./postgres.js";
 export {
   composeChat,
+  composeChatSafety,
   composeSchedule,
   createChatDocuments,
   createNetworkChatParties,

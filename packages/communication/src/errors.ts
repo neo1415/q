@@ -40,3 +40,22 @@ export class ChatIdempotencyConflictError extends Error {
     this.name = "ChatIdempotencyConflictError";
   }
 }
+
+/**
+ * A side has blocked messaging on this relationship. Said the same way to
+ * both sides: the blocked side is never told who blocked.
+ */
+export class ChatBlockedError extends Error {
+  constructor() {
+    super("You can't message this relationship right now.");
+    this.name = "ChatBlockedError";
+  }
+}
+
+/** The report reason is not one of the reference reasons. */
+export class ChatReportReasonError extends Error {
+  constructor() {
+    super("Choose a reason for the report.");
+    this.name = "ChatReportReasonError";
+  }
+}

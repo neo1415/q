@@ -10,6 +10,7 @@ import type { ActorContext } from "@capital-q/security";
 
 import {
   ChatAttachmentUnavailableError,
+  ChatBlockedError,
   ChatIdempotencyConflictError,
   ChatNotConnectedError,
   ChatNotFoundError,
@@ -218,6 +219,11 @@ export function createChatService(dependencies: ChatServiceDependencies) {
     if (actor.actorType !== "HUMAN") throw new ChatNotFoundError();
     const party = await partyOf(actor, input.relationshipId);
     if (!party.connected) throw new ChatNotConnectedError();
+    // A block by either side stops messages both ways (R34 safety). The
+    // refusal never says which side blocked.
+    if ((await store.activeBlockSides(input.relationshipId)).length > 0) {
+      throw new ChatBlockedError();
+    }
 
     let attachment: ChatAttachmentSnapshot | null = null;
     if (request.kind !== "TEXT") {
@@ -274,7 +280,13 @@ export function createChatService(dependencies: ChatServiceDependencies) {
     }): Promise<ChatThreadDto> => {
       const { actor } = query;
       const party = await partyOf(actor, query.relationshipId);
-      const status = party.connected ? "OPEN" : "NOT_CONNECTED";
+      const blockSides = await store.activeBlockSides(query.relationshipId);
+      const blockedByYourSide = blockSides.includes(party.side);
+      const status = !party.connected
+        ? "NOT_CONNECTED"
+        : blockSides.length > 0
+          ? "BLOCKED"
+          : "OPEN";
       const conversation = await store.conversationFor(query.relationshipId);
       const other: ChatSide = party.side === "COMPANY" ? "INVESTOR" : "COMPANY";
       if (conversation === null) {
@@ -285,6 +297,7 @@ export function createChatService(dependencies: ChatServiceDependencies) {
           cursor: null,
           counterpartLastReadMessageId: null,
           unread: 0,
+          blockedByYourSide,
         };
       }
       const limit = Math.min(query.limit ?? DEFAULT_PAGE, CHAT_PAGE_MAX);
@@ -315,6 +328,7 @@ export function createChatService(dependencies: ChatServiceDependencies) {
         cursor,
         counterpartLastReadMessageId: seen,
         unread,
+        blockedByYourSide,
       };
     },
 
@@ -443,6 +457,8 @@ export function createChatService(dependencies: ChatServiceDependencies) {
     }): Promise<{
       readonly side: ChatSide;
       readonly connected: boolean;
+      /** Messaging is blocked (by either side); nothing can be sent. */
+      readonly blocked: boolean;
       readonly messages: readonly {
         readonly from: "YOU" | "YOUR_SIDE" | "OTHER_SIDE";
         readonly senderName: string;
@@ -454,9 +470,16 @@ export function createChatService(dependencies: ChatServiceDependencies) {
     }> => {
       const { actor } = query;
       const party = await partyOf(actor, query.relationshipId);
+      const blocked =
+        (await store.activeBlockSides(query.relationshipId)).length > 0;
       const conversation = await store.conversationFor(query.relationshipId);
       if (conversation === null) {
-        return { side: party.side, connected: party.connected, messages: [] };
+        return {
+          side: party.side,
+          connected: party.connected,
+          blocked,
+          messages: [],
+        };
       }
       const limit = Math.min(query.limit ?? Q_READ_MAX, Q_READ_MAX);
       const folded = foldChatRows(
@@ -465,6 +488,7 @@ export function createChatService(dependencies: ChatServiceDependencies) {
       return {
         side: party.side,
         connected: party.connected,
+        blocked,
         messages: folded.map((message) => ({
           from:
             message.original.senderUserId === actor.userId

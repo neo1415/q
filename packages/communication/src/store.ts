@@ -111,6 +111,13 @@ export type ChatStore = {
     userId: string,
     side: ChatSide,
   ) => Promise<number>;
+  /**
+   * The sides holding an active block on this relationship (R34 safety).
+   * Empty when messaging is not blocked.
+   */
+  readonly activeBlockSides: (
+    relationshipId: string,
+  ) => Promise<readonly ChatSide[]>;
   /** Unread counts on every thread of one party organisation, for one reader. */
   readonly unreadForOrganisation: (
     organisationId: string,

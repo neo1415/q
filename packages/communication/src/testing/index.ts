@@ -18,6 +18,8 @@ export type InMemoryChatStore = ChatStore & {
   /** relationshipId -> party organisations, for unread-by-organisation. */
   readonly parties: Map<string, { company: string; investor: string }>;
   readonly names: Map<string, string>;
+  /** relationshipId -> sides holding an active block. */
+  readonly blocks: Map<string, Set<ChatSide>>;
 };
 
 export function createInMemoryChatStore(
@@ -36,6 +38,7 @@ export function createInMemoryChatStore(
   const activity: { relationshipId: string; messageId: string }[] = [];
   const parties = new Map<string, { company: string; investor: string }>();
   const names = new Map<string, string>();
+  const blocks = new Map<string, Set<ChatSide>>();
 
   const ordered = (conversationId: string) =>
     rows.filter((row) => row.conversationId === conversationId);
@@ -63,6 +66,9 @@ export function createInMemoryChatStore(
     activity,
     parties,
     names,
+    blocks,
+    activeBlockSides: (relationshipId) =>
+      Promise.resolve([...(blocks.get(relationshipId) ?? [])]),
     conversationFor: (relationshipId) =>
       Promise.resolve(conversations.get(relationshipId) ?? null),
     append: (input) => {
@@ -70,6 +76,13 @@ export function createInMemoryChatStore(
       const existing = keys.get(key);
       if (existing !== undefined) {
         return Promise.resolve({ row: existing, deduplicated: true });
+      }
+      // The block guard trigger: nothing new while a block is active.
+      if (
+        input.kind !== "TOMBSTONE" &&
+        (blocks.get(input.relationshipId)?.size ?? 0) > 0
+      ) {
+        return Promise.reject(new Error("block guard"));
       }
       let conversation = conversations.get(input.relationshipId);
       if (conversation === undefined) {
@@ -190,6 +203,10 @@ export function createInMemoryChatStore(
   };
 }
 
+export {
+  createInMemoryChatSafetyStore,
+  type InMemoryChatSafetyStore,
+} from "./safety.js";
 export {
   createFakeAppEmail,
   createFakeCalendar,

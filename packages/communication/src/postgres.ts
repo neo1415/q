@@ -14,6 +14,7 @@ import {
   RelationshipIdSchema,
 } from "@capital-q/network";
 
+import { ChatBlockedError } from "./errors.js";
 import type {
   AppendChatMessageInput,
   ChatConversation,
@@ -210,6 +211,11 @@ export function createPostgresChatStore(options: {
           );
           if (existing !== null) return { row: existing, deduplicated: true };
         }
+        // The block guard trigger: a block landed between the service's
+        // check and this insert.
+        if ((error as { code?: unknown }).code === "55000") {
+          throw new ChatBlockedError();
+        }
         throw error;
       }
     },
@@ -310,6 +316,13 @@ export function createPostgresChatStore(options: {
                where r.conversation_id = ${conversationId} and r.user_id = ${userId}),
              ('-infinity'::timestamptz, '00000000-0000-0000-0000-000000000000'::uuid))`;
       return rows[0]?.n ?? 0;
+    },
+
+    activeBlockSides: async (relationshipId) => {
+      const rows = await sql<{ blocker_side: ChatMessageRow["senderSide"] }[]>`
+        select blocker_side from communication.blocks
+         where relationship_id = ${relationshipId} and lifted_at is null`;
+      return rows.map((row) => row.blocker_side);
     },
 
     unreadForOrganisation: async (organisationId, userId) => {
