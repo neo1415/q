@@ -41,7 +41,7 @@ export const TURN_READER_V9: PromptDefinition<
 > = {
   ...TURN_READER_V8,
   version: 9,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   changeDescription:
     "Founder live 2026-09-27: v8's unknown-screen rule, plus every document asked for in one message is read (moreDocuments), and subjectName stays null whenever the person means their own company, however they refer to it.",
   effectiveFrom: "2026-09-27",
