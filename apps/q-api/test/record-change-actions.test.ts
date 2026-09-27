@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import {
   CAPITAL_OBJECTIVE_CHANGE,
   COMPANY_TEAM_CHANGE,
+  createRecordChangeActions,
   createRecordChangeBoard,
   requestFor,
 } from "../src/composition/record-change-actions.js";
@@ -140,5 +141,89 @@ describe("the record change board", () => {
     expect(
       await b.proposer.propose({ runId: "run-4", actor: other } as never),
     ).toBeNull();
+  });
+});
+
+describe("approval-time capability checks (defence in depth)", () => {
+  function actions(allow: boolean) {
+    const asked: { code: string; resourceType: string; resourceId: string }[] =
+      [];
+    const ORG = (actor as { organisationId: string }).organisationId;
+    const TENANT = (actor as { tenantId: string }).tenantId;
+    const defs = createRecordChangeActions({
+      companies: {
+        findCanonicalCompanyProfile: (id: string) =>
+          Promise.resolve({ id, tenantId: TENANT, organisationId: ORG }),
+      } as never,
+      investors: {
+        findCanonicalInvestorOrganisation: (id: string) =>
+          Promise.resolve({ id, tenantId: TENANT, organisationId: ORG }),
+      } as never,
+      capital: {} as never,
+      companyService: {} as never,
+      investorService: {} as never,
+      publicIdentity: {} as never,
+      authorization: {
+        authorize: (request: {
+          capability: string;
+          resource: { resourceType: string; resourceId: string };
+        }) => {
+          asked.push({
+            code: request.capability,
+            resourceType: request.resource.resourceType,
+            resourceId: request.resource.resourceId,
+          });
+          return Promise.resolve({ outcome: allow ? "ALLOW" : "DENY" });
+        },
+      } as never,
+    });
+    const byType = (type: string) => {
+      const found = defs.find((d) => d.actionType === type);
+      if (found === undefined) throw new Error(type);
+      return found;
+    };
+    return { byType, asked };
+  }
+
+  it("a raise replacement needs close on the raise and create on the company, as the capital service checks", async () => {
+    const { byType, asked } = actions(true);
+    const verdict = await byType(CAPITAL_OBJECTIVE_CHANGE).authorize(
+      {
+        companyId: COMPANY,
+        operation: "REPLACE",
+        capitalObjectiveId: OBJECTIVE,
+        fields: {},
+      },
+      actor,
+    );
+    expect(verdict).toEqual({ outcome: "ALLOW" });
+    expect(asked).toEqual([
+      {
+        code: "capital_objective.close",
+        resourceType: "capital_objective",
+        resourceId: OBJECTIVE,
+      },
+      {
+        code: "capital_objective.create",
+        resourceType: "company",
+        resourceId: COMPANY,
+      },
+    ]);
+  });
+
+  it("an approver without the capability is refused at approval", async () => {
+    const { byType, asked } = actions(false);
+    const verdict = await byType(COMPANY_TEAM_CHANGE).authorize(
+      { companyId: COMPANY, part: "TEAM_FACTS", fields: { teamSize: 3 } },
+      actor,
+    );
+    expect(verdict).toEqual({ outcome: "DENY", code: "NOT_PERMITTED" });
+    expect(asked).toEqual([
+      {
+        code: "company.team.manage",
+        resourceType: "company",
+        resourceId: COMPANY,
+      },
+    ]);
   });
 });

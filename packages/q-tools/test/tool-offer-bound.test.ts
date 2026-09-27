@@ -21,22 +21,21 @@ import { COMPANY_A, actorA, contextFor, planFor } from "./support.js";
  * kind in the plan, for each purpose.
  */
 
-const STUB = {} as never;
-const EVERY_PORT = new Proxy(
-  {
-    clientActions: true,
-    pendingProposals: {
-      inConversation: STUB,
-      approve: STUB,
-      decline: STUB,
-      inboxItem: STUB,
-    },
-  } as Record<string, unknown>,
-  {
-    get: (target, key: string) => (key in target ? target[key] : STUB),
-    has: () => true,
+const STUB: unknown = {};
+const GIVEN: Readonly<Record<string, unknown>> = {
+  clientActions: true,
+  pendingProposals: {
+    inConversation: STUB,
+    approve: STUB,
+    decline: STUB,
+    inboxItem: STUB,
   },
-) as unknown as QToolPorts;
+};
+// Every port composed: factories only capture ports, none is called here.
+const EVERY_PORT = new Proxy(GIVEN, {
+  get: (target, key: string): unknown => target[key] ?? STUB,
+  has: () => true,
+}) as unknown as QToolPorts;
 
 const CORE = [
   "set_theme",

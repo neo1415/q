@@ -41,7 +41,11 @@ import {
   type QActionProposer,
 } from "@capital-q/q-actions";
 import type { RecordChange, RecordChangePort } from "@capital-q/q-tools";
-import type { ActorContext } from "@capital-q/security";
+import {
+  capability,
+  type ActorContext,
+  type AuthorizationService,
+} from "@capital-q/security";
 
 /**
  * R33: the app's own record forms, as Approval Engine actions (lead-owned
@@ -292,6 +296,7 @@ export type RecordChangeDependencies = {
   readonly companyService: CompanyService;
   readonly investorService: InvestorService;
   readonly publicIdentity: PublicIdentityService;
+  readonly authorization: AuthorizationService;
   readonly logger?: Logger | undefined;
 };
 
@@ -340,6 +345,54 @@ async function ownInvestor(
     : { outcome: "DENY", code: "NOT_AVAILABLE" };
 }
 
+/**
+ * Defence in depth (lead decision 2026-09-27): at approval the approver
+ * must also hold the capability the owning service will check, on the same
+ * resource type and id it checks it on (read from each service: capital
+ * use-cases, investors mandate/representative/visibility use-cases,
+ * companies team use-cases, public-identity service). The service checks
+ * again at execution.
+ */
+async function holds(
+  deps: RecordChangeDependencies,
+  actor: ActorContext,
+  checks: readonly {
+    readonly code: string;
+    readonly resourceType: string;
+    readonly resourceId: string;
+  }[],
+): Promise<Verdict> {
+  if (actor.organisationId === undefined) {
+    return { outcome: "DENY", code: "NOT_AVAILABLE" };
+  }
+  for (const check of checks) {
+    const decision = await deps.authorization.authorize({
+      actor,
+      capability: capability(check.code),
+      resource: {
+        kind: "RESOURCE",
+        tenantId: actor.tenantId,
+        organisationId: actor.organisationId,
+        resourceType: check.resourceType,
+        resourceId: check.resourceId,
+      },
+    });
+    if (decision.outcome !== "ALLOW") {
+      return { outcome: "DENY", code: "NOT_PERMITTED" };
+    }
+  }
+  return { outcome: "ALLOW" };
+}
+
+/** Ownership first (one answer for "not yours"), then the capabilities. */
+async function both(
+  owned: Promise<Verdict>,
+  then: () => Promise<Verdict>,
+): Promise<Verdict> {
+  const first = await owned;
+  return first.outcome === "ALLOW" ? then() : first;
+}
+
 /** The shared executor shape: run, or FAILED with a code, logged. */
 async function run(
   deps: RecordChangeDependencies,
@@ -381,7 +434,41 @@ export function createRecordChangeActions(
       preview: previewOf(payload.fields),
     }),
     confirm: (payload) => `Done. ${RAISE_SUMMARY[payload.operation]}: saved.`,
-    authorize: (payload, actor) => ownCompany(deps, actor, payload.companyId),
+    authorize: (payload, actor) =>
+      both(ownCompany(deps, actor, payload.companyId), () => {
+        const onCompany = (code: string) => ({
+          code,
+          resourceType: "company",
+          resourceId: payload.companyId,
+        });
+        const onObjective = (code: string) => ({
+          code,
+          resourceType: "capital_objective",
+          resourceId: payload.capitalObjectiveId ?? "",
+        });
+        if (
+          payload.operation !== "CREATE" &&
+          payload.capitalObjectiveId === null
+        ) {
+          return Promise.resolve<Verdict>({
+            outcome: "DENY",
+            code: "NOT_AVAILABLE",
+          });
+        }
+        switch (payload.operation) {
+          case "CREATE":
+            return holds(deps, actor, [onCompany("capital_objective.create")]);
+          case "UPDATE":
+            return holds(deps, actor, [onObjective("capital_objective.edit")]);
+          case "CLOSE":
+            return holds(deps, actor, [onObjective("capital_objective.close")]);
+          case "REPLACE":
+            return holds(deps, actor, [
+              onObjective("capital_objective.close"),
+              onCompany("capital_objective.create"),
+            ]);
+        }
+      }),
     executor: {
       execute: (action, context) =>
         run(
@@ -483,7 +570,30 @@ export function createRecordChangeActions(
     }),
     confirm: (payload) => `Done. ${MANDATE_SUMMARY[payload.operation]}: saved.`,
     authorize: (payload, actor) =>
-      ownInvestor(deps, actor, payload.investorOrganisationId),
+      both(ownInvestor(deps, actor, payload.investorOrganisationId), () => {
+        if (payload.operation === "CREATE") {
+          return holds(deps, actor, [
+            {
+              code: "investor.mandate.create",
+              resourceType: "investor_organisation",
+              resourceId: payload.investorOrganisationId,
+            },
+          ]);
+        }
+        if (payload.mandateId === null) {
+          return Promise.resolve<Verdict>({
+            outcome: "DENY",
+            code: "NOT_AVAILABLE",
+          });
+        }
+        return holds(deps, actor, [
+          {
+            code: "investor.mandate.edit",
+            resourceType: "investor_mandate",
+            resourceId: payload.mandateId,
+          },
+        ]);
+      }),
     executor: {
       execute: (action, context) =>
         run(
@@ -566,7 +676,19 @@ export function createRecordChangeActions(
       preview: previewOf(payload.fields),
     }),
     confirm: (payload) => `Done. ${TEAM_SUMMARY[payload.part]}: saved.`,
-    authorize: (payload, actor) => ownCompany(deps, actor, payload.companyId),
+    authorize: (payload, actor) =>
+      both(ownCompany(deps, actor, payload.companyId), () =>
+        holds(deps, actor, [
+          {
+            code:
+              payload.part === "TEAM_FACTS"
+                ? "company.team.manage"
+                : "company.team.self_edit",
+            resourceType: "company",
+            resourceId: payload.companyId,
+          },
+        ]),
+      ),
     executor: {
       execute: (action, context) =>
         run(
@@ -637,7 +759,15 @@ export function createRecordChangeActions(
     }),
     confirm: () => "Done. Your role is saved.",
     authorize: (payload, actor) =>
-      ownInvestor(deps, actor, payload.investorOrganisationId),
+      both(ownInvestor(deps, actor, payload.investorOrganisationId), () =>
+        holds(deps, actor, [
+          {
+            code: "investor.representative.self_edit",
+            resourceType: "investor_organisation",
+            resourceId: payload.investorOrganisationId,
+          },
+        ]),
+      ),
     executor: {
       execute: (action, context) =>
         run(
@@ -685,9 +815,22 @@ export function createRecordChangeActions(
     }),
     confirm: () => "Done. Your Q Card is updated.",
     authorize: (payload, actor) =>
-      payload.subjectType === "COMPANY"
-        ? ownCompany(deps, actor, payload.subjectId)
-        : ownInvestor(deps, actor, payload.subjectId),
+      both(
+        payload.subjectType === "COMPANY"
+          ? ownCompany(deps, actor, payload.subjectId)
+          : ownInvestor(deps, actor, payload.subjectId),
+        () =>
+          holds(deps, actor, [
+            {
+              code: "handle.manage",
+              resourceType:
+                payload.subjectType === "COMPANY"
+                  ? "company"
+                  : "investor_organisation",
+              resourceId: payload.subjectId,
+            },
+          ]),
+      ),
     executor: {
       execute: (action, context) =>
         run(
@@ -756,7 +899,15 @@ export function createRecordChangeActions(
         ? "Done. Founders on Capital Q can now find your organisation."
         : "Done. Your organisation is private again.",
     authorize: (payload, actor) =>
-      ownInvestor(deps, actor, payload.investorOrganisationId),
+      both(ownInvestor(deps, actor, payload.investorOrganisationId), () =>
+        holds(deps, actor, [
+          {
+            code: "investor.edit",
+            resourceType: "investor_organisation",
+            resourceId: payload.investorOrganisationId,
+          },
+        ]),
+      ),
     executor: {
       execute: (action, context) =>
         run(

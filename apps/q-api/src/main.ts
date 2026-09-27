@@ -1223,6 +1223,7 @@ const recordChangeDependencies = {
   companyService,
   investorService,
   publicIdentity,
+  authorization,
   logger,
 };
 const recordChangeBoard = createRecordChangeBoard(recordChangeDependencies);
