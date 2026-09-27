@@ -435,6 +435,11 @@ export function createInterviewAgent(
       recommendations: dependencies.recommendations,
       raisedChecks: raisedChecks.get(input.onboardingSessionId),
       runId,
+      // Found by research between turns and not said yet: not approvable.
+      unheardSteps:
+        input.journeyType === "investor"
+          ? dependencies.investorResearch?.unsaid(input.onboardingSessionId)
+          : undefined,
     });
     // The newest turns verbatim, the older ones as a bounded summary
     // (P0-5): the whole conversation, within a fixed budget.
@@ -572,6 +577,9 @@ export function createInterviewAgent(
       }
     }
     const researchNote = research?.takeNote(input.onboardingSessionId) ?? null;
+    // What this turn's reply will say for the first time.
+    const unsaidShown =
+      research?.unsaid(input.onboardingSessionId) ?? new Set<string>();
     const authority = (await delegationRead) ?? NO_TURN_AUTHORITY;
     const listed = (keys: ReadonlySet<string>): string =>
       keys.size === 0
@@ -920,6 +928,9 @@ export function createInterviewAgent(
     // The firm may have been named this turn: research starts now, while
     // the person reads the reply.
     considerResearch(view);
+    if (result !== undefined) {
+      research?.markSaid(input.onboardingSessionId, unsaidShown);
+    }
 
     return {
       reply,
