@@ -445,3 +445,85 @@ describe("answer seam tool loop", () => {
     expect(alpha.calls).toHaveLength(1);
   });
 });
+
+describe("approval by conversation (live 2026-09-27 #1, #2)", () => {
+  const APPROVE: QOfferedTool = {
+    toolName: "proposal.pending.approve",
+    toolVersion: 1,
+    classification: "SIDE_EFFECT",
+    definition: {
+      name: "approve_pending_proposal",
+      description: "Approves the one change waiting for their decision.",
+      inputJsonSchema: { type: "object", properties: {} },
+    },
+    visibleStage: null,
+  };
+  const approveCall: FakeBehaviour = {
+    kind: "TOOL_CALLS",
+    calls: [
+      {
+        callId: "a1",
+        name: "approve_pending_proposal",
+        arguments: { proposalId: "p-1" },
+      },
+    ],
+  };
+  const result = (outcome: string, status: string | null) => ({
+    outcome,
+    proposal:
+      status === null
+        ? null
+        : { proposalId: "p-1", summary: "Headline", status },
+    pending: [],
+  });
+
+  const answerAfter = async (data: unknown, text: string) => {
+    const tools = toolPort([APPROVE], (p) => ({
+      ...succeeded(p, data),
+      toolName: "proposal.pending.approve",
+      classification: "SIDE_EFFECT",
+    }));
+    const { seam, request, messages } = build({
+      script: [
+        approveCall,
+        { kind: "TEXT", text: JSON.stringify(analystResult(text)) },
+      ],
+      tools,
+    });
+    const outcome = await seam.answer(request);
+    expect(outcome.kind).toBe("ANSWERED");
+    expect(tools.executed.map((p) => p.name)).toEqual([
+      "approve_pending_proposal",
+    ]);
+    return messages.at(-1)?.content ?? "";
+  };
+
+  it("says saved only from the tool's SAVED result", async () => {
+    const saved = await answerAfter(
+      result("SAVED", "SAVED"),
+      "Anything else for your profile?",
+    );
+    expect(saved.startsWith("Saved.")).toBe(true);
+
+    const lapsed = await answerAfter(
+      result("EXPIRED", "EXPIRED"),
+      "Anything else for your profile?",
+    );
+    expect(lapsed).toMatch(/^Not saved/);
+    expect(lapsed).not.toMatch(/^Saved/);
+
+    const repeat = await answerAfter(
+      result("ALREADY_DECIDED", "SAVED"),
+      "Anything else?",
+    );
+    expect(repeat.startsWith("Already saved.")).toBe(true);
+  });
+
+  it("adds no status when nothing was approved, leaving the question to the model", async () => {
+    const none = await answerAfter(
+      result("SEVERAL_PENDING", null),
+      "Which one do you want to approve?",
+    );
+    expect(none).toBe("Which one do you want to approve?");
+  });
+});

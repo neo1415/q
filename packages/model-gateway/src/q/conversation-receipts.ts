@@ -1,3 +1,5 @@
+import { z } from "zod";
+
 import type {
   ModelMessage,
   QNavigateDestination,
@@ -51,6 +53,28 @@ export type QReceipt =
     };
 
 const RECEIPTS_MAX = 12;
+
+/**
+ * The provider name of the q-tools tool that approves the one waiting
+ * change (`proposal.pending.approve`). It decides nothing new, so it is
+ * named beside the changes it approves rather than as a change of its own.
+ * q-tools is not a runtime dependency of this package, hence the literal.
+ */
+export const APPROVE_PENDING_TOOL = "approve_pending_proposal";
+
+/**
+ * What a change's status lets Q say, in the person's terms. The statuses
+ * are the plain ones q-api reads from the Approval Engine; anything else
+ * is shown as given and claims nothing.
+ */
+const CHANGE_STATUS_MEANS: Readonly<Record<string, string>> = {
+  PENDING: "not saved yet, waiting for their approval",
+  SAVING: "approved, still being saved",
+  SAVED: "saved",
+  NOT_SAVED: "approved but it did not go through, so it is not saved",
+  DECLINED: "declined, nothing changed",
+  EXPIRED: "lapsed before a decision, nothing changed",
+};
 
 /**
  * Every document card and action proposal in this conversation, newest
@@ -154,14 +178,19 @@ export function capabilityNote(
     (tool) => (tool.classification ?? "READ_ONLY") === "READ_ONLY",
   );
   const changes = offeredTools.filter(
-    (tool) => (tool.classification ?? "READ_ONLY") !== "READ_ONLY",
+    (tool) =>
+      (tool.classification ?? "READ_ONLY") !== "READ_ONLY" &&
+      tool.name !== APPROVE_PENDING_TOOL,
+  );
+  const canApprove = offeredTools.some(
+    (tool) => tool.name === APPROVE_PENDING_TOOL,
   );
   if (reads.length > 0) {
     lines.push(`- Read and look things up with these tools: ${named(reads)}.`);
   }
   if (changes.length > 0) {
     lines.push(
-      `- Prepare these changes when they ask, for their approval (nothing changes until they approve; say it is ready for approval, never done): ${named(changes)}.`,
+      `- Prepare these changes when they ask, for their approval (nothing changes until they approve; until a status or tool result says saved, it is not saved yet): ${named(changes)}.`,
     );
   }
   if (manifest !== undefined && manifest.navigate.length > 0) {
@@ -188,16 +217,72 @@ export function capabilityNote(
   lines.push(
     "- You cannot end, clear or start a conversation: they start a new one with New chat in their chats list. You cannot send messages, schedule, pay or change records beyond the above.",
     "- Say something was done, opened, prepared, saved, sent or ended ONLY when a tool result in this turn or a record below says so. Otherwise say plainly what you can do instead.",
+    // Live 2026-09-27: "the authorised conversation record states…". The
+    // person needs the status, not where it was read from.
+    "- About a change, state its status in a few plain words (saved; or not saved yet and how to approve it) and never explain it with Capital Q's internal terms: records, authorisation, context, supplied or the conversation record. One change has one status: never call the same change both waiting for approval and done.",
   );
+  if (canApprove) {
+    lines.push(
+      `- When they clearly approve a change below whose status is PENDING, in whatever words, approve it with ${APPROVE_PENDING_TOOL} and its id; if they want it different first, prepare the new version instead, which needs its own approval. Without that tool's SAVED result it is not saved yet: they can also tap Approve on its card.`,
+    );
+  }
   if (receipts.length > 0) {
     lines.push(
       "WHAT YOU HAVE ALREADY PRODUCED IN THIS CONVERSATION (Capital Q's records, current status):",
       ...receipts.map((receipt) =>
         receipt.kind === "DOCUMENT"
           ? `- Document "${receipt.title.slice(0, 160)}" (${receipt.type}), status ${receipt.status}: it is the card shown with your earlier reply${receipt.status === "READY" ? ", and its PDF downloads from that card" : ""}.`
-          : `- Proposed action: ${receipt.summary.slice(0, 200)} (${receipt.actionType}), status ${receipt.status}.`,
+          : `- Change you prepared (id ${receipt.id}): ${receipt.summary.slice(0, 200)} (${receipt.actionType}), status ${receipt.status}${CHANGE_STATUS_MEANS[receipt.status] === undefined ? "" : `: ${CHANGE_STATUS_MEANS[receipt.status] ?? ""}`}.`,
       ),
     );
   }
-  return { role: "SYSTEM", content: lines.join("\n").slice(0, 4_000) };
+  return { role: "SYSTEM", content: lines.join("\n").slice(0, 5_000) };
+}
+
+/** The part of `approve_pending_proposal`'s result a status line reads. */
+const ApprovalResultSchema = z.object({
+  outcome: z.string(),
+  proposal: z.object({ status: z.string() }).nullable(),
+});
+
+/**
+ * What Capital Q says after the person approved a change by conversation,
+ * from the tool's result and nothing else (live 2026-09-27 #1, #2): the
+ * analyst never claims an action, so the status is code's to say, plainly.
+ * Null for outcomes that approved nothing and need the model's question
+ * (none waiting, several waiting, a different one named).
+ */
+export function approvalStatusLine(data: unknown): string | null {
+  const read = ApprovalResultSchema.safeParse(data);
+  if (!read.success) return null;
+  const { outcome, proposal } = read.data;
+  switch (outcome) {
+    case "SAVED":
+      return "Saved.";
+    case "SAVING":
+      return "Approved. It's being saved now.";
+    case "NOT_SAVED":
+      return "Approved, but it didn't go through, so it's not saved. You can try again from its card.";
+    case "CHANGED":
+      return "Not saved: that change is no longer exactly what you were shown, so I didn't approve it. Ask me to prepare it again.";
+    case "EXPIRED":
+      return "Not saved: that approval has lapsed. Ask me to prepare it again.";
+    case "ALREADY_DECIDED":
+      switch (proposal?.status ?? "") {
+        case "SAVED":
+          return "Already saved.";
+        case "SAVING":
+          return "Already approved. It's being saved now.";
+        case "DECLINED":
+          return "Not saved: you declined that one. Ask me to prepare it again if you want it.";
+        case "EXPIRED":
+          return "Not saved: that approval has lapsed. Ask me to prepare it again.";
+        case "NOT_SAVED":
+          return "Not saved: that one didn't go through. You can try again from its card.";
+        default:
+          return null;
+      }
+    default:
+      return null;
+  }
 }

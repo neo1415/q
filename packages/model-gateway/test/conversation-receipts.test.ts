@@ -169,3 +169,73 @@ describe("the capability note says what the run can do, and nothing else", () =>
     expect(note).toContain("ONLY when a tool result");
   });
 });
+
+describe("a change's status is its real one, said plainly (live 2026-09-27 #1, #2)", () => {
+  const FULL: QCapabilityManifest = {
+    navigate: ["HOME", "PROFILE"],
+    documents: [],
+    visibilityChange: false,
+  };
+  const APPROVE = {
+    name: "approve_pending_proposal",
+    description: "Approves the one change waiting for their decision.",
+    classification: "SIDE_EFFECT",
+  };
+  const PROPOSE = {
+    name: "propose_profile_change",
+    description: "Prepares a change to the person's own profile.",
+    classification: "SIDE_EFFECT",
+  };
+  const change = (status: string) =>
+    ({
+      kind: "ACTION",
+      id: ID(7),
+      actionType: "person.profile.update",
+      summary: "Update your profile. Headline: Angel investor.",
+      status,
+    }) as const;
+
+  it("names each change by its id with what its status allows Q to say", () => {
+    const pending = capabilityNote(
+      FULL,
+      [APPROVE, PROPOSE],
+      [change("PENDING")],
+    ).content;
+    const line =
+      pending.split("\n").find((entry) => entry.includes(ID(7))) ?? "";
+    expect(line).toContain("status PENDING");
+    expect(line).toContain("not saved yet");
+    expect(line).not.toMatch(/: saved\.$/);
+
+    const saved = capabilityNote(FULL, [APPROVE], [change("SAVED")]).content;
+    const savedLine =
+      saved.split("\n").find((entry) => entry.includes(ID(7))) ?? "";
+    expect(savedLine).toContain("status SAVED: saved.");
+  });
+
+  it("offers approval by conversation only with the tool, and never as a change of its own", () => {
+    const withTool = capabilityNote(FULL, [APPROVE, PROPOSE], []).content;
+    const changeLine =
+      withTool
+        .split("\n")
+        .find((line) => line.startsWith("- Prepare these changes")) ?? "";
+    expect(changeLine).toContain("propose_profile_change");
+    expect(changeLine).not.toContain("approve_pending_proposal");
+    expect(withTool).toContain("approve it with approve_pending_proposal");
+    expect(withTool).toContain("needs its own approval");
+
+    const without = capabilityNote(FULL, [PROPOSE], []).content;
+    expect(without).not.toContain("approve_pending_proposal");
+  });
+
+  it("never tells the model to call a waiting change done, nor to cite records", () => {
+    const note = capabilityNote(
+      FULL,
+      [APPROVE, PROPOSE],
+      [change("PENDING")],
+    ).content;
+    expect(note).not.toContain("ready for approval");
+    expect(note).toContain("never call the same change both");
+    expect(note).toContain("internal terms");
+  });
+});

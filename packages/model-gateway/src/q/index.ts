@@ -95,6 +95,8 @@ export {
 } from "./result-blocks.js";
 export { createQTurnReader, type QTurnReader } from "./turn-reader.js";
 export {
+  APPROVE_PENDING_TOOL,
+  approvalStatusLine,
   capabilityNote,
   collectReceipts,
   type QCapabilityManifest,
@@ -102,6 +104,8 @@ export {
   type QReceiptPort,
 } from "./conversation-receipts.js";
 import {
+  APPROVE_PENDING_TOOL,
+  approvalStatusLine,
   capabilityNote,
   collectReceipts,
   type QReceiptPort,
@@ -1590,6 +1594,9 @@ export function createModelGatewayQAnswer(
         }
       };
       let modelCalls = 0;
+      // What Capital Q says about a change approved by conversation this
+      // turn, from the approve tool's result (live 2026-09-27 #1, #2).
+      let approvalLine: string | null = null;
       // The order matters more than the words: a model handed tools and a
       // response shape at once reaches for the shape first.
       // What this run can do and what the conversation already produced,
@@ -1765,6 +1772,10 @@ export function createModelGatewayQAnswer(
               collectSources(outcome);
               notePlatformLookup(outcome);
               noteRecommendationGrounds(outcome);
+              if (call.name === APPROVE_PENDING_TOOL && outcome.result.ok) {
+                approvalLine =
+                  approvalStatusLine(outcome.result.data) ?? approvalLine;
+              }
               results.push(toolResultMessage(call, outcome));
             }
             messages = [...messages, assistant, ...results];
@@ -2016,6 +2027,7 @@ export function createModelGatewayQAnswer(
         // request is not preparing one. The action port says it, from the
         // proposal it actually created or the refusal it actually got.
         const content = [
+          ...(approvalLine === null ? [] : [approvalLine]),
           guarded.text,
           ...(recordedStatements.length === 0
             ? []
