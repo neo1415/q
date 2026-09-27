@@ -1,6 +1,12 @@
 import type { ComponentType } from "react";
 
-import { CircleUser, Compass, Landmark, Play } from "@capital-q/ui/icons";
+import {
+  CircleUser,
+  Compass,
+  Landmark,
+  Play,
+  Settings,
+} from "@capital-q/ui/icons";
 
 import { QNavIcon } from "./q-nav-icon";
 
@@ -12,7 +18,8 @@ import { QNavIcon } from "./q-nav-icon";
  */
 
 export type NavigationItem = {
-  readonly href: "/home" | "/discover" | "/capital" | "/profile" | "/pitch";
+  readonly href:
+    "/home" | "/discover" | "/capital" | "/profile" | "/pitch" | "/settings";
   readonly label: string;
   readonly icon: ComponentType<{
     readonly size?: number;
@@ -32,6 +39,13 @@ export const PROFILE_NAVIGATION: NavigationItem = {
   href: "/profile",
   label: "Profile",
   icon: CircleUser,
+};
+
+/** Settings (R28): per-device preferences, from the account menu. */
+export const SETTINGS_NAVIGATION: NavigationItem = {
+  href: "/settings",
+  label: "Settings",
+  icon: Settings,
 };
 
 /**

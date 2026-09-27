@@ -12,7 +12,6 @@ import {
   PageContainer,
   PageSection,
 } from "@/components/app-shell/page-container";
-import { ThemeToggle } from "@/features/appearance/theme-toggle";
 import { SignOutButton } from "@/features/auth";
 import { EditableProfile } from "@/features/profile/editable-profile";
 import {
@@ -30,7 +29,6 @@ import {
   PERSON_FIELDS,
 } from "@/features/profile/profile-fields";
 import { QCardSection } from "@/features/q-card/q-card-section";
-import { QMotionToggle } from "@/features/q-aperture";
 import { apiSession, resolveOwnContext } from "@/features/q/context";
 import { QPageSubject } from "@/features/q/q-subject";
 
@@ -321,21 +319,6 @@ export default async function ProfilePage() {
           </div>
         </PageSection>
 
-        <PageSection
-          id="appearance"
-          title="Appearance"
-          description="How Capital Q looks on this device."
-        >
-          <dl className="divide-y divide-(--cq-border-subtle) border-y border-(--cq-border-subtle)">
-            <SettingRow term="Theme">
-              <ThemeToggle />
-            </SettingRow>
-            <SettingRow term="Q motion">
-              <QMotionToggle />
-            </SettingRow>
-          </dl>
-        </PageSection>
-
         <div>
           <SignOutButton />
         </div>
@@ -416,23 +399,6 @@ async function FindingsRead({
 }) {
   const state = await loadProfileFindings(subjectType, subjectId);
   return <ProfileFindings subjectLabel={subjectLabel} state={state} />;
-}
-
-function SettingRow({
-  term,
-  children,
-}: {
-  readonly term: string;
-  readonly children: React.ReactNode;
-}) {
-  return (
-    <div className="flex flex-col gap-1.5 py-4 sm:flex-row sm:items-center sm:gap-6">
-      <dt className="cq-label shrink-0 text-(--cq-text-secondary) sm:w-40">
-        {term}
-      </dt>
-      <dd className="min-w-0 flex-1">{children}</dd>
-    </div>
-  );
 }
 
 function Unavailable({ what }: { readonly what: string }) {

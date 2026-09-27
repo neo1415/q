@@ -28,6 +28,7 @@ export const PROTECTED_PATH_PREFIXES = [
   "/profile",
   "/onboarding",
   "/relationships",
+  "/settings",
   // Setting a new password needs the recovery session the callback created.
   "/auth/update-password",
 ] as const;

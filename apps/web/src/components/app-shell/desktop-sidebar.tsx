@@ -25,6 +25,7 @@ import {
   isActiveRoute,
   PRIMARY_NAVIGATION,
   PROFILE_NAVIGATION,
+  SETTINGS_NAVIGATION,
 } from "./navigation";
 import { sidebarCollapsed, type SidebarOverride } from "./sidebar-state";
 
@@ -183,6 +184,25 @@ export function DesktopSidebar({
         </div>
         {/* The appearance choice, one icon (R24; ADR 0017 F4). */}
         <ThemeMenu align={collapsed ? "start" : "end"} />
+        <Tooltip content={SETTINGS_NAVIGATION.label} side="right">
+          <Link
+            href={SETTINGS_NAVIGATION.href}
+            aria-label={SETTINGS_NAVIGATION.label}
+            aria-current={
+              isActiveRoute(pathname, SETTINGS_NAVIGATION.href)
+                ? "page"
+                : undefined
+            }
+            className="cq-sidebar-icon"
+            data-settings-link
+          >
+            <SETTINGS_NAVIGATION.icon
+              aria-hidden="true"
+              size={ICON_SIZE.regular}
+              strokeWidth={ICON_STROKE}
+            />
+          </Link>
+        </Tooltip>
       </div>
     </aside>
   );
