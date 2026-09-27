@@ -5,6 +5,7 @@ import { createPostgresCapitalObjectiveQueryPort } from "@capital-q/capital";
 import { createPostgresCompanyQueryPort } from "@capital-q/companies";
 import {
   CorrelationIdSchema,
+  QArtifactContentSchema,
   QInternalFindingSchema,
   QRunIdSchema,
   createEventRegistry,
@@ -270,26 +271,59 @@ export function createSeedRecords(database: RequestDatabase) {
     return { created, existing: company.claims.length - created };
   };
 
-  /** The company's deck, composed once; later runs find it and leave it. */
+  /**
+   * The company's deck. Composed from the seed file on every run and
+   * compared with the stored current version: identical means nothing is
+   * written; different (the story in companies.ts changed) appends a new
+   * version, because an artifact is never overwritten.
+   */
   const seedDeck = async (
     actor: ActorContext,
     companyId: string,
     company: FictionalCompany,
-  ): Promise<{ readonly artifactId: string; readonly created: boolean }> => {
+  ): Promise<{
+    readonly artifactId: string;
+    readonly outcome: "composed" | "revised" | "unchanged";
+  }> => {
+    const subject = { kind: "COMPANY" as const, companyId };
+    const draft = composePitchDeck({
+      companyName: company.name,
+      result: intelligenceFrom(companyId, company, stableUuid("draft")),
+      direction: company.direction ?? "MINIMAL_INSTITUTIONAL",
+    });
+    if (draft === null) {
+      throw new SeedError(`${company.name}: too little to compose a deck from`);
+    }
+    const fingerprint = createHash("sha256")
+      .update(JSON.stringify(QArtifactContentSchema.parse(draft.content)))
+      .update(draft.title)
+      .update(draft.summary)
+      .digest("hex");
+
     const listed = await artifacts.list(actor, {
       limit: 100,
       subjectId: companyId,
     });
     const found = listed.items.find((item) => item.type === "PITCH_DECK");
     if (found !== undefined) {
-      return { artifactId: found.artifactId, created: false };
+      const current = (await artifacts.read(actor, found.artifactId)).current;
+      if (current !== null && current !== undefined) {
+        const stored = createHash("sha256")
+          .update(JSON.stringify(QArtifactContentSchema.parse(current.content)))
+          .update(current.title)
+          .update(current.summary)
+          .digest("hex");
+        if (stored === fingerprint) {
+          return { artifactId: found.artifactId, outcome: "unchanged" };
+        }
+      }
     }
-    // Provenance: a stable run id per company. No Q run was executed; the
-    // plan below is the firewall's real decision for that id.
+
+    // Provenance: a stable run id per company and content. No Q run was
+    // executed; the plan below is the firewall's real decision for that id.
     const runId = QRunIdSchema.parse(
-      stableUuid(`fictional-world:deck:${company.key}`),
+      stableUuid(`fictional-world:deck:${company.key}:${fingerprint}`),
     );
-    const subject = { kind: "COMPANY" as const, companyId };
     const decision = await firewall.plan({
       actor,
       runId,
@@ -302,13 +336,17 @@ export function createSeedRecords(database: RequestDatabase) {
         `${company.name}: firewall ${decision.outcome} (${decision.reason})`,
       );
     }
-    const composed = composePitchDeck({
-      companyName: company.name,
-      result: intelligenceFrom(companyId, company, runId),
-      direction: company.direction ?? "MINIMAL_INSTITUTIONAL",
-    });
-    if (composed === null) {
-      throw new SeedError(`${company.name}: too little to compose a deck from`);
+    if (found !== undefined) {
+      await artifacts.reviseArtifact({
+        actorContext: actor,
+        permittedContextPlan: decision.plan,
+        qRunId: runId,
+        artifactId: found.artifactId,
+        instruction:
+          "The fictional-world seed story changed; recomposed from the seed file.",
+        content: draft,
+      });
+      return { artifactId: found.artifactId, outcome: "revised" };
     }
     const detail = await artifacts.prepareArtifact({
       actorContext: actor,
@@ -316,9 +354,9 @@ export function createSeedRecords(database: RequestDatabase) {
       qRunId: runId,
       subject,
       artifactType: "PITCH_DECK",
-      content: composed,
+      content: draft,
     });
-    return { artifactId: detail.artifact.artifactId, created: true };
+    return { artifactId: detail.artifact.artifactId, outcome: "composed" };
   };
 
   /** The rendered files, exactly as the export route renders them. */
@@ -388,7 +426,8 @@ export function intelligenceFrom(
   return {
     companyId,
     companyName: company.name,
-    canonicalDescription: `${company.shortDescription} Fictional demo company.`,
+    // The cover line is the first sentence of this, so it carries the marker.
+    canonicalDescription: `${company.shortDescription.replace(/\.$/, "")} (fictional demo company).`,
     specialistVersion: "fictional-world-seed/v1",
     asOf: new Date().toISOString(),
     blocked: null,

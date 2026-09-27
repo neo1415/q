@@ -148,7 +148,7 @@ async function main(): Promise<number> {
       writeFileSync(join(dir, "deck.pdf"), files.pdf);
       writeFileSync(join(dir, "deck.pptx"), files.pptx);
       console.log(
-        `  ${company.name}: claims +${String(claims.created)} (${String(claims.existing)} existing) · deck ${deck.created ? "composed" : "existing"} v${String(files.version.version)} · ${String(files.version.content.deck?.slides.length ?? 0)} slides`,
+        `  ${company.name}: claims +${String(claims.created)} (${String(claims.existing)} existing) · deck ${deck.outcome} v${String(files.version.version)} · ${String(files.version.content.deck?.slides.length ?? 0)} slides`,
       );
       manifestCompanies.push({
         key: company.key,
