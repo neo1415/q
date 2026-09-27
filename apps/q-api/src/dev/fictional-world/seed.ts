@@ -85,11 +85,36 @@ async function main(): Promise<number> {
       );
     }
   }
+  if (hosted) {
+    // Hosted means the synthetic staging project and nothing else: the same
+    // attestation demo-verify-seed and the model gateway check. A real
+    // customer project can never be named here by accident.
+    const declared = process.env["CAPITAL_Q_SYNTHETIC_SUPABASE_PROJECT_REF"]
+      ?.trim()
+      .toLowerCase();
+    const ref = /^([a-z0-9]{16,})\.supabase\.(co|com|net)$/i
+      .exec(new URL(target.supabaseUrl).hostname)?.[1]
+      ?.toLowerCase();
+    if (declared === undefined || declared.length === 0) {
+      throw new SeedError(
+        "--hosted needs CAPITAL_Q_SYNTHETIC_SUPABASE_PROJECT_REF naming the synthetic project",
+      );
+    }
+    if (ref !== declared || !databaseUrl.includes(declared)) {
+      throw new SeedError(
+        "--hosted: CQ_SEED_SUPABASE_URL and CQ_SEED_DATABASE_URL must both be the attested synthetic project",
+      );
+    }
+  }
+  // Hosted demo accounts get a password only from the environment; the
+  // local default is dev:bootstrap's synthetic, this-machine-only one.
   const password =
     process.env["CQ_SEED_ACCOUNT_PASSWORD"] ??
     (hosted ? undefined : "CapitalQ-dev-2026!");
-  if (password === undefined) {
-    throw new SeedError("CQ_SEED_ACCOUNT_PASSWORD is required with --hosted");
+  if (password === undefined || password.length < 12) {
+    throw new SeedError(
+      "CQ_SEED_ACCOUNT_PASSWORD (12+ characters) is required with --hosted",
+    );
   }
   const outDir = resolve(argument("--out") ?? ".tmp/fictional-world");
 

@@ -16,7 +16,18 @@
  * otherwise set CQ_SEED_SUPABASE_URL, CQ_SEED_SUPABASE_PUBLISHABLE_KEY,
  * CQ_SEED_SUPABASE_SECRET_KEY, CQ_SEED_DATABASE_URL and CQ_SEED_API_URL
  * yourself. Anything that is not loopback is refused unless --hosted is
- * passed (and then CQ_SEED_ACCOUNT_PASSWORD is required).
+ * passed.
+ *
+ * Hosted (the synthetic staging project only; the operator runs it):
+ *   CQ_SEED_SUPABASE_URL=https://<ref>.supabase.co
+ *   CQ_SEED_SUPABASE_PUBLISHABLE_KEY=...  CQ_SEED_SUPABASE_SECRET_KEY=...
+ *   CQ_SEED_DATABASE_URL=<pooler url, sslmode=require>
+ *   CQ_SEED_API_URL=https://<hosted api>
+ *   CAPITAL_Q_SYNTHETIC_SUPABASE_PROJECT_REF=<ref>
+ *   CQ_SEED_ACCOUNT_PASSWORD=<12+ chars, for the demo accounts>
+ *   pnpm seed:fictional -- --hosted
+ * --hosted refuses unless the Supabase URL and the database URL are both
+ * the project CAPITAL_Q_SYNTHETIC_SUPABASE_PROJECT_REF attests.
  *
  * Budget: the seed never calls a model. Every provider key in the child
  * process is still set to a NON-EMPTY disabled value, because an empty one
