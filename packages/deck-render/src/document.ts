@@ -78,7 +78,7 @@ export function artifactKindName(type: string): string {
 }
 
 const NOTICE =
-  "Q composed this from what Capital Q holds on record. It is a private draft: it is not verified evidence, it does not change your company record, and nothing here has been shared or sent.";
+  "Q composed this from what Capital Q holds on record. It is a private draft: it is not verified evidence, it changes nothing on your record, and nothing here has been shared or sent.";
 
 function provenanceOf(finding: {
   readonly truthClass: string;

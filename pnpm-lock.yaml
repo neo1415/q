@@ -255,6 +255,9 @@ importers:
       '@capital-q/security':
         specifier: workspace:*
         version: link:../../packages/security
+      '@capital-q/taxonomy':
+        specifier: workspace:*
+        version: link:../../packages/taxonomy
       '@capital-q/verification':
         specifier: workspace:*
         version: link:../../packages/verification

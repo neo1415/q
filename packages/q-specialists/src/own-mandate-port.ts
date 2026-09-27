@@ -6,6 +6,8 @@ import {
 } from "@capital-q/q-tools";
 import type { QAnswerRequest, QToolPort } from "@capital-q/q-runtime";
 
+import type { MandateLabels } from "./own-mandate-document.js";
+
 /**
  * The person's own mandate for a mandate document (gap 3), read through
  * the same get_investor_mandate tool the model could call, under this
@@ -15,12 +17,15 @@ import type { QAnswerRequest, QToolPort } from "@capital-q/q-runtime";
 export function createToolOwnMandatePort(
   tools: QToolPort,
   logger?: Logger,
+  labels?: MandateLabels,
 ): {
   readonly read: (
     request: QAnswerRequest,
   ) => Promise<GetInvestorMandateOutput | "NOT_AN_INVESTOR" | null>;
+  readonly labels?: MandateLabels | undefined;
 } {
   return {
+    ...(labels === undefined ? {} : { labels }),
     read: async (request) => {
       const own = ownInvestorOrganisationIn(request.plan);
       if (own === null) return "NOT_AN_INVESTOR";

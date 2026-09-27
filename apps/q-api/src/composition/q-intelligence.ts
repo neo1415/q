@@ -49,6 +49,8 @@ import {
   type QVisibilityNotebook,
 } from "@capital-q/q-specialists";
 
+import { MANDATE_LABELS } from "./mandate-labels.js";
+
 /**
  * Q's intelligence composition (CQ-C5-R1 §6-§12).
  *
@@ -310,7 +312,7 @@ export function composeQIntelligence(
       : { visibility: dependencies.visibility }),
     // Their own mandate, for a mandate document (gap 3): read through the
     // same tool, under the run's plan.
-    ownMandate: createToolOwnMandatePort(tools, logger),
+    ownMandate: createToolOwnMandatePort(tools, logger, MANDATE_LABELS),
     // The names on their own records, so a company name they said —
     // misheard by speech-to-text or not — resolves to what is theirs
     // before anything is researched (founder live 2026-09-27, #6).

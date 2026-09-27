@@ -32,11 +32,37 @@ const DIMENSION_HEADINGS: Readonly<Record<string, string>> = {
   "custom.text": "In their own words",
 };
 
-/** A code as a reader would say it: words, not snake case. */
+/**
+ * The display names a reader knows these codes by: the taxonomy's and the
+ * onboarding definition's own labels, supplied by composition (this module
+ * holds no vocabulary). A code no labeller knows is said as words, never
+ * as a raw code.
+ */
+export type MandateLabels = {
+  /** A taxonomy or definition code, optionally within a vocabulary. */
+  readonly code: (code: string, vocabularyCode?: string) => string | undefined;
+  readonly investorType: (code: string) => string | undefined;
+  readonly deploymentState: (code: string) => string | undefined;
+};
+
+const NO_LABELS: MandateLabels = {
+  code: () => undefined,
+  investorType: () => undefined,
+  deploymentState: () => undefined,
+};
+
+/** The last resort for a code nothing labels: words, not snake case. */
 function words(code: string): string {
-  const spaced = code.replace(/_/g, " ").trim();
+  const spaced = code.replace(/_/g, " ").trim().toLowerCase();
   return spaced.charAt(0).toUpperCase() + spaced.slice(1);
 }
+
+/** Which vocabulary a constraint dimension's codes come from, when known. */
+const DIMENSION_VOCABULARY: Readonly<Record<string, string>> = {
+  stage: "company_stage",
+  "geography.country": "geography",
+  sector: "industry",
+};
 
 function amount(value: string, currency: string): string {
   const [whole = "0", fraction] = value.split(".");
@@ -62,16 +88,28 @@ function strength(constraint: Constraint): string {
   }
 }
 
-function valueOf(constraint: Constraint): string {
+function valueOf(
+  constraint: Constraint,
+  label: (code: string, vocabulary?: string) => string,
+): string {
   const value = constraint.value;
+  const vocabulary = DIMENSION_VOCABULARY[constraint.dimension];
   switch (value.kind) {
     case "codes":
-      return value.values.map(words).join(", ");
+      return value.values.map((code) => label(code, vocabulary)).join(", ");
     case "amount":
       return amount(value.amount, value.currency);
     case "text":
       return value.text;
   }
+}
+
+/** One declared constraint as a sentence: its value, then how it counts. */
+function sentence(text: string, how: string): string {
+  // Free text is the person's own words: their full stop stays theirs, and
+  // how the preference counts is said apart from it, never inside it.
+  const trimmed = text.trim().replace(/[.!?]+$/, "");
+  return `${trimmed} (${how}).`;
 }
 
 export type OwnMandateDocument = {
@@ -87,7 +125,10 @@ export type OwnMandateDocument = {
  */
 export function composeOwnMandateDocument(
   record: GetInvestorMandateOutput,
+  labels: MandateLabels = NO_LABELS,
 ): OwnMandateDocument | null {
+  const label = (code: string, vocabulary?: string): string =>
+    labels.code(code, vocabulary) ?? words(code);
   // The active mandate when there is one; otherwise the one being defined.
   const mandate =
     record.mandates.find((m) => m.status === "ACTIVE") ?? record.mandates[0];
@@ -105,13 +146,19 @@ export function composeOwnMandateDocument(
   const profile = [
     ...(record.investorType === null
       ? []
-      : [`Invests as: ${words(record.investorType)}.`]),
+      : [
+          `Invests as: ${labels.investorType(record.investorType) ?? words(record.investorType)}.`,
+        ]),
     ...(record.deploymentState === null
       ? []
-      : [`Deploying capital: ${words(record.deploymentState)}.`]),
+      : [
+          `Deploying capital: ${labels.deploymentState(record.deploymentState) ?? words(record.deploymentState)}.`,
+        ]),
     ...(mandate.discoveryMode === null
       ? []
-      : [`Discovery: ${words(mandate.discoveryMode.toLowerCase())}.`]),
+      : [
+          `Discovery: ${label(mandate.discoveryMode.toLowerCase(), "discovery_mode")}.`,
+        ]),
   ];
   if (profile.length > 0) {
     sections.push({
@@ -160,8 +207,8 @@ export function composeOwnMandateDocument(
       minStageCode !== null &&
       maxStageCode !== null &&
       minStageCode !== maxStageCode
-        ? `${words(minStageCode)} to ${words(maxStageCode)}`
-        : words(minStageCode ?? maxStageCode ?? "");
+        ? `${label(minStageCode, "company_stage")} to ${label(maxStageCode, "company_stage")}`
+        : label(minStageCode ?? maxStageCode ?? "", "company_stage");
     sections.push({ heading: "Stages", body: `${range}.`, findings: [] });
   } else if (stageConstraints.length === 0) {
     gaps.push("Stages are not yet stated.");
@@ -182,7 +229,7 @@ export function composeOwnMandateDocument(
   }
   for (const [dimension, list] of byDimension) {
     const body = list
-      .map((c) => `${valueOf(c)} (${strength(c)}).`)
+      .map((c) => sentence(valueOf(c, label), strength(c)))
       .join(" ")
       .slice(0, 6_000);
     sections.push({
@@ -191,10 +238,20 @@ export function composeOwnMandateDocument(
       findings: [],
     });
   }
-  if (!byDimension.has("geography.country")) {
+  // A dimension is stated whether it was filed as a constraint or as a
+  // taxonomy preference in that vocabulary: absence in one is not absence.
+  const preferredIn = (vocabulary: string) =>
+    mandate.taxonomyPreferences.some((p) => p.vocabularyCode === vocabulary);
+  if (!byDimension.has("geography.country") && !preferredIn("geography")) {
     gaps.push("Geography is not yet stated.");
   }
-  if (!byDimension.has("sector") && mandate.taxonomyPreferences.length === 0) {
+  const sectorVocabularies = new Set(["industry", "product_category"]);
+  if (
+    !byDimension.has("sector") &&
+    !mandate.taxonomyPreferences.some((p) =>
+      sectorVocabularies.has(p.vocabularyCode),
+    )
+  ) {
     gaps.push("Sectors are not yet stated.");
   }
 
@@ -203,14 +260,14 @@ export function composeOwnMandateDocument(
   if (preferred.length > 0) {
     sections.push({
       heading: "Categories they back",
-      body: `${preferred.map((p) => words(p.canonicalCode)).join(", ")}.`,
+      body: `${preferred.map((p) => label(p.canonicalCode, p.vocabularyCode)).join(", ")}.`,
       findings: [],
     });
   }
   if (excluded.length > 0) {
     sections.push({
       heading: "Categories excluded",
-      body: `${excluded.map((p) => words(p.canonicalCode)).join(", ")}.`,
+      body: `${excluded.map((p) => label(p.canonicalCode, p.vocabularyCode)).join(", ")}.`,
       findings: [],
     });
   }

@@ -49,6 +49,7 @@
     "@capital-q/q-specialists": "workspace:*",
     "@capital-q/q-tools": "workspace:*",
     "@capital-q/security": "workspace:*",
+    "@capital-q/taxonomy": "workspace:*",
     "@capital-q/verification": "workspace:*",
     "@elevenlabs/elevenlabs-js": "2.68.0",
     "fastify": "^5.12.1",

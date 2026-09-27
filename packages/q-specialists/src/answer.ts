@@ -29,6 +29,7 @@ import { ownInvestorOrganisationIn } from "@capital-q/model-gateway/q";
 
 import {
   composeOwnMandateDocument,
+  type MandateLabels,
   OWN_MANDATE_ARTIFACT_TYPE,
 } from "./own-mandate-document.js";
 import type { DatabaseExecutor, TransactionManager } from "@capital-q/database";
@@ -146,6 +147,8 @@ export type SpecialistQAnswerDependencies = {
         readonly read: (
           request: QAnswerRequest,
         ) => Promise<GetInvestorMandateOutput | "NOT_AN_INVESTOR" | null>;
+        /** Display names for the record's codes; absent, codes are said as words. */
+        readonly labels?: MandateLabels | undefined;
       }
     | undefined;
   /**
@@ -707,7 +710,8 @@ export function createSpecialistQAnswer(
           "A mandate document is for an investor's own mandate, and there isn't one set up for you here.",
       };
     }
-    const document = record === null ? null : composeOwnMandateDocument(record);
+    const document =
+      record === null ? null : composeOwnMandateDocument(record, port?.labels);
     if (document === null) {
       return {
         content:

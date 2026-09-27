@@ -162,6 +162,7 @@ export {
 } from "./company/own-names.js";
 export {
   composeOwnMandateDocument,
+  type MandateLabels,
   OWN_MANDATE_ARTIFACT_TYPE,
   type OwnMandateDocument,
 } from "./own-mandate-document.js";
