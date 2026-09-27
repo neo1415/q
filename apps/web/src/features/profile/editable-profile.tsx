@@ -39,7 +39,7 @@ import {
  * page holds, Escape (or Cancel) puts it back. Nothing is shown as saved
  * until the server says it is -- a profile edit is a statement about the
  * company, so it is server-confirmed, never optimistic. Unknown reads as
- * "Not stated", never as blank or zero.
+ * "Not added", never as blank or zero.
  */
 
 export type EditableProfileProps = {
@@ -221,7 +221,7 @@ function EditableRow({
           <div className="flex items-start justify-between gap-3">
             <div className="flex min-w-0 flex-col gap-0.5 sm:pt-2">
               {shown === null ? (
-                <p className="cq-body text-(--cq-text-tertiary)">Not stated</p>
+                <p className="cq-body text-(--cq-text-tertiary)">Not added</p>
               ) : spec.input.kind === "url" ? (
                 <a
                   href={shown}
@@ -339,7 +339,7 @@ function FieldEditor({
           {...common}
           value={draft}
           autoFocus
-          placeholder="Not stated"
+          placeholder="Not added"
           options={
             value !== null &&
             !spec.input.options.some((option) => option.value === value)

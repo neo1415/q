@@ -1,11 +1,15 @@
 import "server-only";
 
 import {
+  ApiProblemError,
   getCompany,
   getCompanyVerification,
+  getCurrentCapitalObjective,
   getCurrentInvestorOrganisation,
+  getCurrentOnboardingSession,
   getMyProfile,
   getProfileFindings,
+  getTaxonomyNode,
   type ApiSession,
 } from "@capital-q/api-client";
 import { loadWebServerConfig } from "@capital-q/config/web";
@@ -19,6 +23,13 @@ import type {
 import { getSessionAccessToken } from "@/auth/session";
 import type { OwnContext } from "@/features/q/context";
 
+import {
+  answerGroups,
+  raiseFromObjective,
+  taxonomyIdsIn,
+  type AnswerGroup,
+  type ProfileJourney,
+} from "./profile-answers";
 import type { FindingsState, VerificationState } from "./profile-enrichment";
 
 /**
@@ -82,6 +93,85 @@ export async function loadProfileFindings(
   return read === undefined
     ? { status: "UNAVAILABLE" }
     : { status: "READ", findings: read.findings };
+}
+
+export type AnswersState =
+  | { readonly status: "READ"; readonly groups: readonly AnswerGroup[] }
+  /** No onboarding session for this journey: nothing was ever answered. */
+  | { readonly status: "NONE" }
+  | { readonly status: "UNAVAILABLE" };
+
+function notFound(error: unknown): boolean {
+  return error instanceof ApiProblemError && error.status === 404;
+}
+
+/**
+ * What the person answered in onboarding (R25), under their own session:
+ * their latest onboarding session for the side they act for, taxonomy ids
+ * labelled, and -- for a founder -- the canonical capital objective in
+ * place of the raise answers once one exists. Each read is bounded; a
+ * label that can't be read leaves the answer as "n selected" rather than
+ * holding the page.
+ */
+export async function loadProfileAnswers(
+  session: ApiSession | null,
+  context: OwnContext,
+): Promise<AnswersState> {
+  if (session === null) return { status: "UNAVAILABLE" };
+  if (context.kind !== "FOUNDER" && context.kind !== "INVESTOR") {
+    return { status: "NONE" };
+  }
+  const journey: ProfileJourney =
+    context.kind === "FOUNDER" ? "founder" : "investor";
+
+  const [view, objective] = await Promise.all([
+    within(async () => {
+      try {
+        return await getCurrentOnboardingSession(session, journey);
+      } catch (error) {
+        if (notFound(error)) return null;
+        throw error;
+      }
+    }),
+    context.kind === "FOUNDER"
+      ? within(async () => {
+          try {
+            return await getCurrentCapitalObjective(session, context.companyId);
+          } catch (error) {
+            if (notFound(error)) return null;
+            throw error;
+          }
+        })
+      : Promise.resolve(null),
+  ]);
+
+  if (view === undefined) return { status: "UNAVAILABLE" };
+  if (view === null) {
+    return objective === null || objective === undefined
+      ? { status: "NONE" }
+      : { status: "READ", groups: [raiseFromObjective(objective)] };
+  }
+
+  const ids = taxonomyIdsIn(view);
+  const nodes = await Promise.all(
+    ids.map((id) => within(() => getTaxonomyNode(session, id))),
+  );
+  const labels: Record<string, string> = {};
+  for (const node of nodes) {
+    if (node !== undefined) labels[node.id] = node.displayName;
+  }
+
+  const groups = answerGroups(journey, view, labels);
+  if (objective === null || objective === undefined) {
+    return { status: "READ", groups };
+  }
+  const raise = raiseFromObjective(objective);
+  return {
+    status: "READ",
+    groups: groups.some((group) => group.id === "raise")
+      ? groups.map((group) => (group.id === "raise" ? raise : group))
+      : [...groups, raise],
+  };
 }
 
 export async function loadProfilePage(

@@ -19,7 +19,7 @@ import type { ProfileFinding } from "@capital-q/contracts";
  * keyboard alone; a save sends the version the page holds, through the
  * server action that calls the one write path; nothing reads as saved
  * until the server says so; a version conflict is said plainly and never
- * overwrites; unknown reads "Not stated"; a name can't be emptied; Q's
+ * overwrites; unknown reads "Not added"; a name can't be emptied; Q's
  * findings are kept apart from declared values, said in words on the
  * three axes with their pages, never as a percentage; and "Ask Q" /
  * "Edit with Q" open the one Q with a draft the person sends themselves.
@@ -118,9 +118,9 @@ function renderPerson(values = { displayName: "Ada", headline: null }) {
 }
 
 describe("editing a profile field", () => {
-  it("shows unknown as Not stated, with an Add control, and a stated value with its provenance", () => {
+  it("shows unknown as Not added, with an Add control, and a stated value with its provenance", () => {
     renderPerson();
-    expect(within(row("headline")).getByText("Not stated")).toBeTruthy();
+    expect(within(row("headline")).getByText("Not added")).toBeTruthy();
     expect(row("headline").dataset["state"]).toBe("unknown");
     expect(
       within(row("headline")).getByRole("button", { name: "Add headline" }),
@@ -258,7 +258,7 @@ describe("editing a profile field", () => {
     );
     const alert = await screen.findByRole("alert");
     expect(alert.textContent).toContain("changed since the page was opened");
-    expect(within(row("websiteUrl")).getByText("Not stated")).toBeTruthy();
+    expect(within(row("websiteUrl")).getByText("Not added")).toBeTruthy();
     fireEvent.click(within(alert).getByRole("button", { name: "Reload" }));
     expect(refresh).toHaveBeenCalled();
   });

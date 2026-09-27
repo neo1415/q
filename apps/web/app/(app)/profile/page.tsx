@@ -14,7 +14,10 @@ import {
 } from "@/components/app-shell/page-container";
 import { SignOutButton } from "@/features/auth";
 import { EditableProfile } from "@/features/profile/editable-profile";
+import type { ProfileJourney } from "@/features/profile/profile-answers";
+import { ProfileAnswers } from "@/features/profile/profile-answers-view";
 import {
+  loadProfileAnswers,
   loadProfileFindings,
   loadProfilePage,
 } from "@/features/profile/profile-data";
@@ -168,14 +171,17 @@ export default async function ProfilePage() {
             title={company.canonicalName}
             description="Your company's declared profile: what investors see once you make it visible."
             main={
-              <EditableProfile
-                kind="COMPANY"
-                subjectId={company.id}
-                fields={COMPANY_FIELDS}
-                values={fieldValues(COMPANY_FIELDS, company)}
-                version={company.version}
-                provenance={DECLARED}
-              />
+              <>
+                <EditableProfile
+                  kind="COMPANY"
+                  subjectId={company.id}
+                  fields={COMPANY_FIELDS}
+                  values={fieldValues(COMPANY_FIELDS, company)}
+                  version={company.version}
+                  provenance={DECLARED}
+                />
+                <AnswersSlot journey="founder" />
+              </>
             }
             aside={
               <>
@@ -204,14 +210,17 @@ export default async function ProfilePage() {
             title={investor.displayName}
             description="Your investor organisation's declared profile: what founders see once you make it visible."
             main={
-              <EditableProfile
-                kind="INVESTOR_ORGANISATION"
-                subjectId={investor.id}
-                fields={INVESTOR_FIELDS}
-                values={fieldValues(INVESTOR_FIELDS, investor)}
-                version={investor.version}
-                provenance={DECLARED}
-              />
+              <>
+                <EditableProfile
+                  kind="INVESTOR_ORGANISATION"
+                  subjectId={investor.id}
+                  fields={INVESTOR_FIELDS}
+                  values={fieldValues(INVESTOR_FIELDS, investor)}
+                  version={investor.version}
+                  provenance={DECLARED}
+                />
+                <AnswersSlot journey="investor" />
+              </>
             }
             aside={
               <>
@@ -399,6 +408,39 @@ async function FindingsRead({
 }) {
   const state = await loadProfileFindings(subjectType, subjectId);
   return <ProfileFindings subjectLabel={subjectLabel} state={state} />;
+}
+
+/**
+ * The onboarding answers (R25), streamed like the findings: the declared
+ * fields paint at once, and the answers arrive when the onboarding
+ * session (and its taxonomy labels) have been read.
+ */
+function AnswersSlot({ journey }: { readonly journey: ProfileJourney }) {
+  return (
+    <div className="pt-6">
+      <Suspense
+        fallback={
+          <p
+            className="cq-body-sm text-(--cq-text-tertiary)"
+            data-answers="loading"
+          >
+            Reading what you told Q…
+          </p>
+        }
+      >
+        <AnswersRead journey={journey} />
+      </Suspense>
+    </div>
+  );
+}
+
+async function AnswersRead({ journey }: { readonly journey: ProfileJourney }) {
+  const [session, context] = await Promise.all([
+    apiSession(),
+    resolveOwnContext(),
+  ]);
+  const state = await loadProfileAnswers(session, context);
+  return <ProfileAnswers journey={journey} state={state} />;
 }
 
 function Unavailable({ what }: { readonly what: string }) {
