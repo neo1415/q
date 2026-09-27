@@ -60,3 +60,31 @@ R28. Settings page (theme, Q motion, voice, notifications, connected accounts la
 R29. Seeded content: fictional founders/companies with full stories, decks AND videos (narrated deck videos, R19), and investors. Discover videos full screen height, centre aligned, action buttons as icons (not big text boxes).
 R30. Audit the whole user flow and journey (founder and investor), then fix.
 R31. Cloud readiness: be ready to move to Claude cloud at the founder's say-so. Hand over EVERYTHING (not summaries): state, branches, queue, requirements, decisions, memory, sources, rules. Install graphify there if possible. Cloud lead runs multiple agents like here, every agent on Opus 5.5 at medium effort, each told which sources/files to read. It works unsupervised: builds, tests, deploys, and the founder returns to a far-along product.
+
+## Added 2026-09-27 (founder, before the cloud switch): all to be built, priorities first
+
+- **R32. Integrations are now UNBLOCKED.** The founder set up Google Cloud (Gmail + Calendar + Pub/Sub, Testing mode) and Brevo SMTP. Values are in the laptop `.env.local` and the cloud environment variables, with the names in the setup contract in `setup-email-and-meetings.md`.
+  - Build BIZ-007 (Gmail approve-send plus reply tracking) and BIZ-008 (reminders, Calendar invites with Meet links).
+  - The founder AUTHORISED the cloud to set the Railway service variables these need, copying them from its env. The earlier "Railway vars are founder-only" rule is lifted for these integration credentials.
+  - Hosted Supabase auth already sends through Brevo (set 2026-09-27, 100 per hour).
+- **R33. Q can do EVERYTHING the app can, typed AND voice, within authorisation.**
+  - Every function goes into the R20 registry so Q knows instantly: email, meetings, reminders, chat, uploads, profile, visibility, documents, media, research, relationships, navigation, settings.
+  - AND every capability also has its real page and UI. Never "Q can do it, so no page".
+- **R34. Relationship chat.** People with a relationship can chat 1:1: founder↔investor, founder↔founder, investor↔investor. Check the specs first; if they conflict, write an ADR, not a silent redesign.
+  - Realtime over WebSocket, hosted on Railway (or Supabase Realtime if cleaner).
+  - Text, file uploads (decks, docs), voice notes.
+  - Q is present in the chat but listens only when a person invokes it.
+  - From the chat: set reminders (these become Calendar reminders), propose meetings (Calendar plus Meet), share documents. The same Prepare→Approve rules apply.
+  - The cloud gets whatever credentials it can by itself. Anything it can't do, it leaves plug-and-play for the founder.
+- **R35. Proactive Q.** On login, Q reviews the account (new relationships, messages, new pitches from relevant companies, profile gaps, pending approvals, reminders) and greets the person with a short briefing plus cards.
+  - Bug to fix: when asked for multiple questions, Q asks one and stops. It must continue proactively through a requested sequence.
+- **R36. Artifact and media viewers and cards:** much better UI and UX.
+- **R37. UX writing:** research best practice and apply it across the product. Minimal, clear, human.
+- **R38. Don't make web searching obvious.** No "searching the internet…" theatre. Results just arrive, with sources on tap.
+- **R39. "Almighty, personal" Q (after the main product).** Deep research, then build:
+  - Q is hyper-competent across everything an investor or founder needs for investing and raising.
+  - It feels personal to each user through memory, preferences and style.
+  - It can spin up its own sub-agents to parallelise tool calls, research and drafting: orchestration within the Q runtime, typed tools, the Context Firewall and budget; LangGraph only if it fits the existing architecture.
+- **R40. Beyond industry standards.** Research UI/UX across the whole product against the spec and everything the founder has said, and exceed it.
+- **R41. When everything above is done and time/credits remain:** return to Q intelligence (seamless typed and voice conversation, knows what to do), then test EVERYTHING with every tool available (browser, API, e2e), deploying continuously.
+- **R42. Autonomy.** The cloud does everything it can without waiting for the founder, as long as it costs no money. Anything that truly needs the founder is left ready to plug in.
