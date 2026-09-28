@@ -108,6 +108,33 @@ conflicts the spec found while applying them (spec §17.2).
 | C10 | Reduced motion and feed video are already resolved by ADR-001 (poster plus explicit Play).                                                                                                                                                                                                                                                  |
 | C11 | A voice session may persist across pages, with an always-visible mic-live indicator on the dock and a one-tap Stop (doc 17 §55). Compatible with ADR 0010: the binding is to the actor and thread, not to a page, and navigation changes neither.                                                                                           |
 
+### Amendments — 2026-09-28 (founder live test)
+
+Founder-directed after the 2026-09-28 live test (items 5–7 and the
+2026-09-27 Discover directive); recorded so F3 and C4 are not contradicted
+silently.
+
+- **A1 — Home Q is a chat thread by default.** Amends F3. The default view
+  is a plain conversation: the person's messages on the right, Q's replies
+  on the left, with structured replies (lists, tables, key-value cards,
+  labelled callouts) rendered from a safe Markdown subset as text nodes
+  only, as they stream. Sources, companies and investors are collapsed
+  chips under a reply that expand in place (ADR 0018 keeps the evidence
+  invariants: hidden on tap, never removed or restated as fact). The Board
+  stays, but opens only on its icon or when Q files a document; it no
+  longer opens itself. There is no separate live-transcript strip above
+  the thread, and the composer is compact and grows with its content. The
+  Stage's voice presence, the Aperture (F2) and the Dock (F1) are
+  unchanged. Implemented in `e7635555`.
+- **A2 — Share on the Discover rail.** Amends C4 to that extent only. The
+  rail may carry a labelled **Share** action that shares the company's
+  address inside Capital Q and its name (Web Share, else copy link). It
+  shares no pitch, playback URL or signed material; the address grants
+  nothing (whoever opens it signs in and is authorised again); nothing is
+  counted, recorded or ranked on it, so it carries no like/share-count
+  semantics and never feeds recommendations. Implemented in `2c17f3a3`
+  (`apps/web/src/features/discover/share-company.ts`).
+
 ### Prohibitions that still hold (spec §14.4)
 
 Relaxed **for Q only**: glow and bloom; animated light; a shader or 3D
