@@ -137,6 +137,11 @@ export type ScheduleIntelligencePort = {
    * Calendar's own setting, or null. Never UTC by default.
    */
   readonly timeZoneOf?: (actor: ActorContext) => Promise<string | null>;
+  /** Whether a call could be booked now: party, connection, Calendar. */
+  readonly canSchedule?: (
+    actor: ActorContext,
+    relationshipId: string,
+  ) => Promise<"OK" | Refusal>;
 };
 
 const TimeZone = z
@@ -628,6 +633,20 @@ export function createScheduleTools(
             status: "NOT_CONNECTED" as const,
             awaitingApprovalOf:
               "Calls open once you're connected with them: interest expressed and accepted.",
+          };
+        }
+        // Said now, not after they approve something that cannot run.
+        const bookable =
+          schedule.canSchedule === undefined
+            ? "OK"
+            : await schedule
+                .canSchedule(context.actor, grant.relationshipId)
+                .catch(() => "OK" as const);
+        if (bookable === "CALENDAR_NOT_CONNECTED") {
+          return {
+            status: "CALENDAR_NOT_CONNECTED" as const,
+            awaitingApprovalOf:
+              "Nothing prepared: their Google account is not connected with Calendar, so no invite can be sent. Offer to take them to Settings to connect Google, then prepare it again.",
           };
         }
         const at = await instantOf(input, context);

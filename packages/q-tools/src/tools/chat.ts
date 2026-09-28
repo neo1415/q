@@ -308,8 +308,15 @@ export const ChatProposalOutputSchema = z
      * ONE_PER_TURN: another action is being prepared in this answer.
      * NOT_CONNECTED: messages open once both sides are connected.
      * BLOCKED: messaging is blocked on this relationship; nothing is sent.
+     * CALENDAR_NOT_CONNECTED: a call needs their Google Calendar connected.
      */
-    status: z.enum(["PREPARED", "ONE_PER_TURN", "NOT_CONNECTED", "BLOCKED"]),
+    status: z.enum([
+      "PREPARED",
+      "ONE_PER_TURN",
+      "NOT_CONNECTED",
+      "BLOCKED",
+      "CALENDAR_NOT_CONNECTED",
+    ]),
     awaitingApprovalOf: z.string(),
   })
   .strict();

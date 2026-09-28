@@ -62,7 +62,9 @@ function ownPlan(actor = actorB): PermittedContextPlan {
   };
 }
 
-function world(options: { calendarZone?: string | null } = {}) {
+function world(
+  options: { calendarZone?: string | null; calendarConnected?: boolean } = {},
+) {
   const prepared: { actionType: string; payload: unknown }[] = [];
   const chat: ChatIntelligencePort = {
     thread: (actor, relationshipId) =>
@@ -120,6 +122,10 @@ function world(options: { calendarZone?: string | null } = {}) {
       ),
     brief: () => Promise.resolve(null),
     timeZoneOf: () => Promise.resolve(options.calendarZone ?? null),
+    canSchedule: () =>
+      Promise.resolve(
+        options.calendarConnected === false ? "CALENDAR_NOT_CONNECTED" : "OK",
+      ),
   };
   const executor = createQToolExecutor({
     registry: createQToolRegistry(
@@ -325,6 +331,25 @@ describe("schedule tools", () => {
       expect(JSON.stringify(refused.result)).toContain(
         "time zone is not known",
       );
+    });
+
+    it("says Calendar is not connected before anything is prepared", async () => {
+      const { executor, prepared } = world({ calendarConnected: false });
+      const outcome = await executor.execute(
+        meetingAt({ day: "tomorrow", time: "14:00" }),
+        contextFor(
+          actorB,
+          withZone(
+            relationshipPlan(base(actorB), RELATIONSHIP),
+            "Europe/London",
+          ),
+        ),
+      );
+      expect(prepared).toEqual([]);
+      expect(outcome.result).toMatchObject({
+        ok: true,
+        data: { status: "CALENDAR_NOT_CONNECTED" },
+      });
     });
 
     it("sets a reminder for Friday 9 AM in their zone", async () => {
