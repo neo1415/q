@@ -107,7 +107,8 @@ export function QComposer({
   const trimmed = value.trim();
   const canSubmit = trimmed.length > 0 && !disabled && !submitting;
 
-  // JS fallback for browsers without `field-sizing: content`.
+  // JS fallback for browsers without `field-sizing: content`; the class's
+  // max-height caps it, and past the cap the field scrolls.
   function resize(element: HTMLTextAreaElement) {
     element.style.height = "auto";
     element.style.height = `${String(element.scrollHeight)}px`;
@@ -157,12 +158,17 @@ export function QComposer({
       onSubmit={handleSubmit}
       aria-labelledby={`${inputId}-title`}
       className={cx(
-        "flex flex-col gap-3 rounded-lg border border-(--cq-border) bg-(--cq-surface-raised) p-3 shadow-(--cq-shadow-xs) transition-colors duration-(--cq-motion-fast) focus-within:border-(--cq-border-strong)",
+        "flex flex-col gap-2 rounded-lg border border-(--cq-border) bg-(--cq-surface-raised) px-2 py-1 shadow-(--cq-shadow-xs) transition-colors duration-(--cq-motion-fast) focus-within:border-(--cq-border-strong)",
         className,
       )}
     >
-      <div className="flex items-start gap-3">
-        <QMark size="md" state={submitting ? "WORKING" : "IDLE"} />
+      {/* One line: the mark, the field, and its controls. The field grows
+          with what is typed up to a cap, then scrolls inside itself, so the
+          composer never pushes a conversation off a phone's screen. */}
+      <div className="flex items-end gap-1" data-q-composer-row>
+        <div className="flex h-11 flex-none items-center pl-1">
+          <QMark size="sm" state={submitting ? "WORKING" : "IDLE"} />
+        </div>
         <div className="flex min-w-0 flex-1 flex-col">
           <label id={`${inputId}-title`} htmlFor={inputId} className="sr-only">
             Ask Q
@@ -186,18 +192,11 @@ export function QComposer({
               }
             }}
             onKeyDown={handleKeyDown}
-            className="cq-body min-h-8 w-full resize-none bg-transparent py-1 text-(--cq-text-primary) outline-none placeholder:text-(--cq-text-tertiary) [field-sizing:content] disabled:opacity-50"
+            className="cq-body max-h-40 min-h-11 w-full resize-none overflow-y-auto bg-transparent px-1 py-2.5 text-(--cq-text-primary) outline-none placeholder:text-(--cq-text-tertiary) [field-sizing:content] disabled:opacity-50"
+            data-q-composer-input
           />
         </div>
-      </div>
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex min-w-0 items-center gap-1">
-          {showContext ? (
-            <ContextIndicator scope={contextScope} detail={contextDetail} />
-          ) : null}
-          {actions}
-        </div>
-        <div className="flex items-center gap-1">
+        <div className="flex flex-none items-center gap-1">
           {onAttach !== undefined ? (
             <>
               <input
@@ -267,6 +266,14 @@ export function QComposer({
           </IconButton>
         </div>
       </div>
+      {showContext || actions !== undefined ? (
+        <div className="flex min-w-0 items-center gap-1 pb-1">
+          {showContext ? (
+            <ContextIndicator scope={contextScope} detail={contextDetail} />
+          ) : null}
+          {actions}
+        </div>
+      ) : null}
       {attachments.length > 0 ? (
         <ul
           aria-label="Attached"

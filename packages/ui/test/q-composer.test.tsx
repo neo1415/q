@@ -78,4 +78,39 @@ describe("QComposer", () => {
     render(<QComposer />);
     expect(screen.getByText("No context set")).toBeTruthy();
   });
+
+  it("is one compact line by default: field, microphone and send in one row", () => {
+    render(
+      <QComposer onSubmit={vi.fn()} onVoice={vi.fn()} showContext={false} />,
+    );
+    const input = screen.getByRole("textbox", { name: "Ask Q" });
+    expect(input.getAttribute("rows")).toBe("1");
+    const row = input.closest("[data-q-composer-row]");
+    expect(row).not.toBeNull();
+    expect(
+      row?.contains(screen.getByRole("button", { name: "Send to Q" })),
+    ).toBe(true);
+    expect(
+      row?.contains(screen.getByRole("button", { name: "Talk with Q" })),
+    ).toBe(true);
+    // Nothing else below it when there is no context and nothing live.
+    const form = screen.getByRole("form", { name: "Ask Q" });
+    expect(form.children).toHaveLength(1);
+  });
+
+  it("grows with what is typed up to a cap, then scrolls inside itself", async () => {
+    const user = userEvent.setup();
+    render(<QComposer onSubmit={vi.fn()} />);
+    const input = screen.getByRole("textbox", { name: "Ask Q" });
+    expect(input.className).toMatch(/\[field-sizing:content\]/);
+    expect(input.className).toMatch(/\bmax-h-40\b/);
+    expect(input.className).toMatch(/\boverflow-y-auto\b/);
+    Object.defineProperty(input, "scrollHeight", {
+      configurable: true,
+      get: () => 96,
+    });
+    await user.type(input, "one{Shift>}{Enter}{/Shift}two");
+    // The fallback sizes to the content; the class's max-height caps it.
+    expect((input as HTMLTextAreaElement).style.height).toBe("96px");
+  });
 });
