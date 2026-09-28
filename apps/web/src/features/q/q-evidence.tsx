@@ -67,6 +67,26 @@ export function splitBlocks(blocks: readonly QTurnObjectBlock[]): {
   return { visible, evidence };
 }
 
+/** How much sits behind an answer's Sources, for the control's label. */
+export function evidenceSummary(
+  turn: Extract<QTurn, { kind: "Q" }>,
+  includeBlocks = true,
+): { readonly count: number; readonly label: string } | null {
+  const { evidence } = splitBlocks(turn.blocks);
+  const count =
+    turn.findings.length +
+    turn.uncertainties.length +
+    (includeBlocks ? evidence.length : 0) +
+    turn.publicSources.length;
+  const sourceTotal = turn.sourceCount + turn.publicSources.length;
+  if (count === 0 && sourceTotal === 0) return null;
+  return {
+    count,
+    label:
+      sourceTotal > 0 ? sources(sourceTotal) : count > 0 ? String(count) : "",
+  };
+}
+
 export function QEvidence({
   turn,
   onAsk,
@@ -76,113 +96,127 @@ export function QEvidence({
   readonly onAsk?: ((question: string) => void) | undefined;
   readonly onOpenArtifact?: ((artifactId: string) => void) | undefined;
 }) {
-  const { evidence } = splitBlocks(turn.blocks);
-  const count =
-    turn.findings.length +
-    turn.uncertainties.length +
-    evidence.length +
-    turn.publicSources.length;
-  const sourceTotal = turn.sourceCount + turn.publicSources.length;
-  if (count === 0 && sourceTotal === 0) return null;
+  const summary = evidenceSummary(turn);
+  if (summary === null) return null;
   return (
     <details className="cq-q-evidence" data-q-evidence>
       <summary className="cq-q-evidence-summary">
         Sources
         <span className="cq-caption text-(--cq-text-tertiary)">
-          {sourceTotal > 0
-            ? ` · ${sources(sourceTotal)}`
-            : count > 0
-              ? ` · ${String(count)}`
-              : ""}
+          {summary.label === "" ? "" : ` · ${summary.label}`}
         </span>
       </summary>
-      <div className="flex flex-col gap-4 pt-3 text-left">
-        {turn.findings.length > 0 ? (
-          <dl className="cq-q-answer-findings flex flex-col">
-            {turn.findings.map((finding) => (
-              <div
-                key={finding.id}
-                className="flex flex-col gap-1 py-3 sm:flex-row sm:gap-4"
-              >
-                <dt className="cq-label shrink-0 text-(--cq-text-tertiary) sm:w-28">
-                  {FINDING_LABELS[finding.type]}
-                </dt>
-                <dd className="flex flex-col gap-1">
-                  <span className="cq-body text-(--cq-text-primary)">
-                    {finding.statement}
-                  </span>
-                  <span className="cq-caption text-(--cq-text-secondary)">
-                    {Q_CONFIDENCE_LABELS[finding.confidence]}
-                    {finding.sourceCount > 0
-                      ? ` · ${sources(finding.sourceCount)}`
-                      : ""}
-                  </span>
-                </dd>
-              </div>
-            ))}
-          </dl>
-        ) : null}
-        {turn.uncertainties.length > 0 ? (
-          <div className="flex flex-col gap-2">
-            <span className="cq-label text-(--cq-text-tertiary)">
-              Still open
-            </span>
-            <ul className="flex flex-col gap-2">
-              {turn.uncertainties.map((item) => (
-                <li key={item.statement} className="flex flex-col gap-0.5">
-                  <span className="cq-body text-(--cq-text-primary)">
-                    {item.statement}
-                  </span>
-                  {item.missing.length > 0 ? (
-                    <span className="cq-caption text-(--cq-text-secondary)">
-                      Would settle it: {item.missing.join(", ")}.
-                    </span>
-                  ) : null}
-                </li>
-              ))}
-            </ul>
-          </div>
-        ) : null}
-        {turn.publicSources.length > 0 ? (
-          <div className="flex flex-col gap-2" data-q-public-sources>
-            <span className="cq-label text-(--cq-text-tertiary)">
-              Public sources, unverified
-            </span>
-            <ul className="flex flex-col gap-2">
-              {turn.publicSources.map((source) => (
-                <li key={source.url} className="flex flex-col gap-0.5">
-                  <a
-                    className="cq-body text-(--cq-text-primary) underline underline-offset-2"
-                    href={source.url}
-                    target="_blank"
-                    rel="noopener noreferrer nofollow"
-                  >
-                    {source.title}
-                  </a>
-                  <span className="cq-caption text-(--cq-text-secondary)">
-                    {source.domain} ·{" "}
-                    {source.publishedOn === null
-                      ? `read ${formatDay(source.retrievedOn)}`
-                      : formatDay(source.publishedOn)}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        ) : null}
-        {evidence.length > 0 ? (
-          <QResultBlocks
-            blocks={evidence}
-            onAsk={onAsk}
-            onOpenArtifact={onOpenArtifact}
-          />
-        ) : null}
-        {turn.sourceCount > 0 ? (
-          <span className="cq-caption text-(--cq-text-secondary)">
-            Based on {sources(turn.sourceCount)} on record.
-          </span>
-        ) : null}
-      </div>
+      <QEvidenceBody
+        turn={turn}
+        onAsk={onAsk}
+        onOpenArtifact={onOpenArtifact}
+      />
     </details>
+  );
+}
+
+/**
+ * What is behind Sources: findings, what is still open, public pages and
+ * the recorded-source count. `includeBlocks` false where the companies
+ * and investors the answer named have their own control beside it.
+ */
+export function QEvidenceBody({
+  turn,
+  onAsk,
+  onOpenArtifact,
+  includeBlocks = true,
+}: {
+  readonly turn: Extract<QTurn, { kind: "Q" }>;
+  readonly onAsk?: ((question: string) => void) | undefined;
+  readonly onOpenArtifact?: ((artifactId: string) => void) | undefined;
+  readonly includeBlocks?: boolean | undefined;
+}) {
+  const evidence = includeBlocks ? splitBlocks(turn.blocks).evidence : [];
+  return (
+    <div className="flex flex-col gap-4 pt-3 text-left">
+      {turn.findings.length > 0 ? (
+        <dl className="cq-q-answer-findings flex flex-col">
+          {turn.findings.map((finding) => (
+            <div
+              key={finding.id}
+              className="flex flex-col gap-1 py-3 sm:flex-row sm:gap-4"
+            >
+              <dt className="cq-label shrink-0 text-(--cq-text-tertiary) sm:w-28">
+                {FINDING_LABELS[finding.type]}
+              </dt>
+              <dd className="flex flex-col gap-1">
+                <span className="cq-body text-(--cq-text-primary)">
+                  {finding.statement}
+                </span>
+                <span className="cq-caption text-(--cq-text-secondary)">
+                  {Q_CONFIDENCE_LABELS[finding.confidence]}
+                  {finding.sourceCount > 0
+                    ? ` · ${sources(finding.sourceCount)}`
+                    : ""}
+                </span>
+              </dd>
+            </div>
+          ))}
+        </dl>
+      ) : null}
+      {turn.uncertainties.length > 0 ? (
+        <div className="flex flex-col gap-2">
+          <span className="cq-label text-(--cq-text-tertiary)">Still open</span>
+          <ul className="flex flex-col gap-2">
+            {turn.uncertainties.map((item) => (
+              <li key={item.statement} className="flex flex-col gap-0.5">
+                <span className="cq-body text-(--cq-text-primary)">
+                  {item.statement}
+                </span>
+                {item.missing.length > 0 ? (
+                  <span className="cq-caption text-(--cq-text-secondary)">
+                    Would settle it: {item.missing.join(", ")}.
+                  </span>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+      {turn.publicSources.length > 0 ? (
+        <div className="flex flex-col gap-2" data-q-public-sources>
+          <span className="cq-label text-(--cq-text-tertiary)">
+            Public sources, unverified
+          </span>
+          <ul className="flex flex-col gap-2">
+            {turn.publicSources.map((source) => (
+              <li key={source.url} className="flex flex-col gap-0.5">
+                <a
+                  className="cq-body text-(--cq-text-primary) underline underline-offset-2"
+                  href={source.url}
+                  target="_blank"
+                  rel="noopener noreferrer nofollow"
+                >
+                  {source.title}
+                </a>
+                <span className="cq-caption text-(--cq-text-secondary)">
+                  {source.domain} ·{" "}
+                  {source.publishedOn === null
+                    ? `read ${formatDay(source.retrievedOn)}`
+                    : formatDay(source.publishedOn)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+      {evidence.length > 0 ? (
+        <QResultBlocks
+          blocks={evidence}
+          onAsk={onAsk}
+          onOpenArtifact={onOpenArtifact}
+        />
+      ) : null}
+      {turn.sourceCount > 0 ? (
+        <span className="cq-caption text-(--cq-text-secondary)">
+          Based on {sources(turn.sourceCount)} on record.
+        </span>
+      ) : null}
+    </div>
   );
 }

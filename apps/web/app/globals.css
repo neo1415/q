@@ -395,45 +395,208 @@
       height: 100dvh;
     }
   }
-  /* Captions: a few lines, then "Read all". */
-  .cq-q-caption {
-    max-width: 46ch;
+  /*
+   * The composer's strip. On a phone the bottom navigation beneath it
+   * already clears the home indicator; on a wide screen nothing does, so
+   * the strip keeps the safe-area inset itself.
+   */
+  .cq-q-controls {
+    padding-bottom: 8px;
+  }
+  @media (min-width: 1024px) {
+    .cq-q-controls {
+      padding-bottom: max(16px, var(--cq-safe-bottom));
+    }
+  }
+  /*
+   * The Home thread (founder direction A, 2026-09-28): the person's words
+   * in a bubble on the right, Q's reply as a plain row on the left, and
+   * what a reply rests on behind small chips beneath it.
+   */
+  .cq-q-bubble {
+    align-self: flex-end;
+    max-width: min(85%, 36rem);
+    border-radius: var(--cq-radius-lg);
+    border-bottom-right-radius: var(--cq-radius-xs);
+    padding: 8px 14px;
     white-space: pre-wrap;
-    font-weight: 500;
+    overflow-wrap: anywhere;
+    color: var(--cq-stage-text);
+    background: var(--cq-stage-surface);
+    border: 1px solid var(--cq-stage-border);
   }
-  .cq-q-caption-clamp {
-    display: -webkit-box;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 4;
-    line-clamp: 4;
-    overflow: hidden;
+  .cq-q-bubble.is-live {
+    color: var(--cq-stage-text-muted);
   }
-  /* Finished turns: history, faded, never bubbles. */
-  .cq-q-history {
+  .cq-q-chip {
+    display: inline-flex;
+    min-height: 32px;
+    align-items: center;
+    gap: 4px;
+    border-radius: var(--cq-radius-full);
+    padding: 0 12px;
+    font: inherit;
+    font-size: 13px;
+    color: var(--cq-text-secondary);
+    background: transparent;
+    border: 1px solid var(--cq-border-subtle);
+    cursor: pointer;
+    /* A 44 px target around a small chip (touch, doc 18). */
+    position: relative;
+  }
+  .cq-q-chip::after {
+    content: "";
+    position: absolute;
+    inset: -6px -2px;
+  }
+  .cq-q-chip:hover,
+  .cq-q-chip:focus-visible {
+    color: var(--cq-text-primary);
+    border-color: var(--cq-border-strong);
+  }
+  .cq-q-chip[aria-expanded="true"] {
+    color: var(--cq-text-primary);
+    background: var(--cq-surface-sunken);
+  }
+  .cq-q-chip-caret {
+    transition: transform var(--cq-motion-fast) var(--cq-ease);
+  }
+  .cq-q-chip[aria-expanded="true"] .cq-q-chip-caret {
+    transform: rotate(180deg);
+  }
+  /* Q's answer text as structure (founder direction D). */
+  .cq-md {
     display: flex;
-    max-height: 30vh;
     flex-direction: column;
     gap: 10px;
-    overflow-y: auto;
-    mask-image: linear-gradient(to bottom, transparent, black 40%);
-    padding-top: 24px;
-    scrollbar-width: thin;
+    overflow-wrap: anywhere;
   }
-  .cq-q-history-person,
-  .cq-q-history-q {
-    font-size: 14px;
-    line-height: 1.45;
-    white-space: pre-wrap;
+  .cq-md-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding-left: 1.25rem;
   }
-  .cq-q-history-person {
-    align-self: flex-end;
-    max-width: 80%;
-    text-align: right;
+  .cq-md-list .cq-md-list {
+    margin-top: 4px;
+  }
+  .cq-md-list > li::marker {
     color: var(--cq-text-tertiary);
   }
-  .cq-q-history-q {
-    max-width: 90%;
+  .cq-md-code {
+    border-radius: var(--cq-radius-xs);
+    padding: 1px 4px;
+    font-family: var(--font-mono);
+    font-size: 0.9em;
+    background: var(--cq-surface-sunken);
+  }
+  .cq-md-pre {
+    overflow-x: auto;
+    border-radius: var(--cq-radius-md);
+    padding: 10px 12px;
+    font-family: var(--font-mono);
+    font-size: 13px;
+    background: var(--cq-surface-sunken);
+  }
+  .cq-md-table {
+    overflow-x: auto;
+    border-radius: var(--cq-radius-md);
+    border: 1px solid var(--cq-border-subtle);
+  }
+  .cq-md-table table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+    font-variant-numeric: tabular-nums;
+  }
+  .cq-md-table th,
+  .cq-md-table td {
+    padding: 8px 12px;
+    vertical-align: top;
+    border-top: 1px solid var(--cq-border-subtle);
+  }
+  .cq-md-table thead th {
+    border-top: none;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--cq-text-tertiary);
+    background: var(--cq-surface-sunken);
+  }
+  .cq-md-table tbody th {
+    font-weight: 500;
     color: var(--cq-text-secondary);
+  }
+  .cq-md-kv {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+    gap: 1px;
+    overflow: hidden;
+    border-radius: var(--cq-radius-md);
+    border: 1px solid var(--cq-border-subtle);
+    background: var(--cq-border-subtle);
+  }
+  .cq-md-kv-row {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 8px 12px;
+    background: var(--cq-surface);
+  }
+  .cq-md-kv-row dt {
+    font-size: 12px;
+    color: var(--cq-text-tertiary);
+  }
+  .cq-md-kv-row dd {
+    font-weight: 500;
+    color: var(--cq-text-primary);
+  }
+  .cq-md-quote,
+  .cq-md-callout {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    border-left: 3px solid var(--cq-border);
+    border-radius: var(--cq-radius-sm);
+    padding: 8px 12px;
+    color: var(--cq-text-secondary);
+  }
+  .cq-md-callout {
+    color: var(--cq-text-primary);
+    background: var(--cq-surface-sunken);
+  }
+  .cq-md-callout-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .cq-md-callout.is-info {
+    border-left-color: var(--cq-info);
+  }
+  .cq-md-callout.is-info .cq-md-callout-label {
+    color: var(--cq-info);
+  }
+  .cq-md-callout.is-positive {
+    border-left-color: var(--cq-positive);
+    background: var(--cq-positive-soft);
+  }
+  .cq-md-callout.is-positive .cq-md-callout-label {
+    color: var(--cq-positive);
+  }
+  .cq-md-callout.is-warning {
+    border-left-color: var(--cq-warning);
+    background: var(--cq-warning-soft);
+  }
+  .cq-md-callout.is-warning .cq-md-callout-label {
+    color: var(--cq-warning);
+  }
+  .cq-md-callout.is-danger {
+    border-left-color: var(--cq-danger);
+    background: var(--cq-danger-soft);
+  }
+  .cq-md-callout.is-danger .cq-md-callout-label {
+    color: var(--cq-danger);
   }
   .cq-q-evidence {
     width: 100%;
@@ -488,10 +651,6 @@
   }
   .cq-q-evidence[open] > .cq-q-evidence-summary::before {
     transform: rotate(90deg);
-  }
-  .cq-q-history .cq-q-evidence {
-    border-top: none;
-    padding-top: 0;
   }
   /*
    * The Board and Now (ADR 0017 F3): objects Q produced, on the stage's

@@ -1,9 +1,7 @@
 // @vitest-environment jsdom
-import { act, render, renderHook, screen } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-
-import type { QTurn } from "../src/features/q/conversation";
 
 /**
  * The Q page's layout defaults (R24).
@@ -11,8 +9,8 @@ import type { QTurn } from "../src/features/q/conversation";
  * - On the Q page every side bar starts collapsed: the desktop sidebar is a
  *   rail, and the Board is closed.
  * - Elsewhere the sidebar starts open.
- * - The Board opens by itself only when Q makes a file in this visit;
- *   documents already in a restored conversation do not open it.
+ * - The Board no longer opens by itself: what Q makes is in the chat
+ *   thread, inline (founder direction A, 2026-09-28).
  */
 
 let pathname = "/home";
@@ -32,8 +30,6 @@ const { DesktopSidebar } =
   await import("../src/components/app-shell/desktop-sidebar");
 const { sidebarCollapsed } =
   await import("../src/components/app-shell/sidebar-state");
-const { artifactIdsIn, freshArtifact, useBoardAutoOpen } =
-  await import("../src/features/q/board-open");
 
 beforeEach(() => {
   pathname = "/home";
@@ -104,99 +100,5 @@ describe("R24 · the sidebar", () => {
     render(<DesktopSidebar context={INVESTOR} />);
     expect(screen.getByRole("button", { name: /^Theme: / })).toBeTruthy();
     expect(screen.queryByRole("group", { name: "Theme" })).toBeNull();
-  });
-});
-
-function answer(id: string, artifactIds: readonly string[]): QTurn {
-  return {
-    kind: "Q",
-    id,
-    text: "Here it is.",
-    streaming: false,
-    sourceCount: 0,
-    publicSources: [],
-    findings: [],
-    uncertainties: [],
-    blocks: artifactIds.map((artifactId) => ({
-      kind: "ARTIFACT_REFERENCE" as const,
-      artifactId,
-      type: "INVESTMENT_MEMO" as const,
-      status: "READY" as const,
-      title: "Memo",
-    })),
-  } as unknown as QTurn;
-}
-
-const ASK: QTurn = {
-  kind: "PERSON",
-  id: "p1",
-  text: "Make me a memo",
-  unconfirmed: false,
-};
-
-describe("R24 · the Board opens by itself only for a new file", () => {
-  it("finds the artifacts a conversation points at", () => {
-    const turns = [ASK, answer("q1", ["a1"]), answer("q2", ["a2", "a1"])];
-    expect([...artifactIdsIn(turns)]).toEqual(["a1", "a2"]);
-    expect(freshArtifact(new Set(["a1"]), turns)).toBe("a2");
-    expect(freshArtifact(new Set(["a1", "a2"]), turns)).toBeUndefined();
-  });
-
-  it("opens when Q makes a document during the visit", () => {
-    const onFresh = vi.fn();
-    const { rerender } = renderHook(
-      ({ turns }: { turns: readonly QTurn[] }) => {
-        useBoardAutoOpen({
-          turns,
-          loading: false,
-          conversationId: null,
-          onFresh,
-        });
-      },
-      { initialProps: { turns: [] as readonly QTurn[] } },
-    );
-    act(() => {
-      rerender({ turns: [ASK, answer("q1", [])] });
-    });
-    expect(onFresh).not.toHaveBeenCalled();
-    act(() => {
-      rerender({ turns: [ASK, answer("q1", []), answer("q2", ["deck-1"])] });
-    });
-    expect(onFresh).toHaveBeenCalledTimes(1);
-    expect(onFresh).toHaveBeenCalledWith("deck-1");
-    // The same document again is not a new file.
-    act(() => {
-      rerender({
-        turns: [ASK, answer("q1", []), answer("q2", ["deck-1"]), ASK],
-      });
-    });
-    expect(onFresh).toHaveBeenCalledTimes(1);
-  });
-
-  it("does not open for documents already in a restored conversation", () => {
-    const onFresh = vi.fn();
-    const restored = [ASK, answer("q1", ["old-memo"])];
-    const { rerender } = renderHook(
-      ({ turns, loading }: { turns: readonly QTurn[]; loading: boolean }) => {
-        useBoardAutoOpen({
-          turns,
-          loading,
-          conversationId: "c1",
-          onFresh,
-        });
-      },
-      { initialProps: { turns: [] as readonly QTurn[], loading: true } },
-    );
-    act(() => {
-      rerender({ turns: restored, loading: false });
-    });
-    expect(onFresh).not.toHaveBeenCalled();
-    act(() => {
-      rerender({
-        turns: [...restored, answer("q2", ["new-deck"])],
-        loading: false,
-      });
-    });
-    expect(onFresh).toHaveBeenCalledWith("new-deck");
   });
 });
