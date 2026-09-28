@@ -241,3 +241,38 @@ describe("the page's primary actions", () => {
     expect(document.querySelector('[data-card-action="website"]')).toBe(null);
   });
 });
+
+describe("the card's photo and cover (founder directive 2026-09-28)", () => {
+  const photo = "https://storage.example/sign/img/p.webp?token=t";
+  const cover = "https://storage.example/sign/img/c.webp?token=t";
+
+  it("shows the logo and cover the audience may see, never as text facts", () => {
+    const { container } = render(
+      <PublicCardView
+        card={card("PUBLIC", [
+          { key: "photo", value: photo, scope: "public_external" },
+          { key: "cover", value: cover, scope: "public_external" },
+        ])}
+      />,
+    );
+    expect(
+      container.querySelector("[data-card-photo]")?.getAttribute("src"),
+    ).toBe(photo);
+    expect(
+      container.querySelector("[data-card-cover]")?.getAttribute("src"),
+    ).toBe(cover);
+    expect(container.querySelector('[data-card-field="photo"]')).toBeNull();
+    expect(container.textContent).not.toContain("storage.example");
+  });
+
+  it("keeps a members-only cover off the anonymous page", () => {
+    const { container } = render(
+      <PublicCardView
+        card={card("PUBLIC", [
+          { key: "cover", value: cover, scope: "network_visible" },
+        ])}
+      />,
+    );
+    expect(container.querySelector("[data-card-cover]")).toBeNull();
+  });
+});

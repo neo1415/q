@@ -128,7 +128,7 @@ function world(options: { readonly denyEdit?: boolean } = {}) {
     },
     openObjectStream: (object) => {
       const bytes = objects.get(object.key) ?? new Uint8Array();
-      return done({ body: [bytes] });
+      return done({ body: once(bytes) });
     },
     putObject: ({ object, body }) => {
       objects.set(object.key, body);
@@ -171,6 +171,10 @@ function world(options: { readonly denyEdit?: boolean } = {}) {
     processor: createSharpImageProcessor(),
   });
   return { service, rows, objects, deleted };
+}
+
+async function* once(bytes: Uint8Array): AsyncIterable<Uint8Array> {
+  yield await Promise.resolve(bytes);
 }
 
 async function photo(width: number, height: number): Promise<Uint8Array> {

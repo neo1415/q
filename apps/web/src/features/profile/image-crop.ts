@@ -81,8 +81,9 @@ export function sourceRect(
 ): { sx: number; sy: number; sw: number; sh: number } {
   const scale = coverScale(image, frame) * state.zoom;
   return {
-    sx: -state.x / scale,
-    sy: -state.y / scale,
+    // Offsets are <= 0; max() also normalises -0 to 0.
+    sx: Math.max(0, -state.x / scale),
+    sy: Math.max(0, -state.y / scale),
     sw: frame.width / scale,
     sh: frame.height / scale,
   };
