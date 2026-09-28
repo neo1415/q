@@ -31,11 +31,29 @@ function editHref(journey: ProfileJourney, group: AnswerGroup): string {
 
 export function ProfileAnswers({
   journey,
-  state,
+  state: fullState,
+  include,
+  emptyText,
+  provenance = true,
 }: {
   readonly journey: ProfileJourney;
   readonly state: AnswersState;
+  /** Only these answer groups (a profile section shows its own). */
+  readonly include?: readonly string[] | undefined;
+  /** What an empty section says instead of the general setup prompt. */
+  readonly emptyText?: string | undefined;
+  /** Whether to add the "How this is known" note (once per page). */
+  readonly provenance?: boolean | undefined;
 }) {
+  const state: AnswersState =
+    include === undefined || fullState.status !== "READ"
+      ? fullState
+      : {
+          status: "READ",
+          groups: fullState.groups.filter((group) =>
+            include.includes(group.id),
+          ),
+        };
   if (state.status === "UNAVAILABLE") {
     return (
       <p
@@ -51,8 +69,10 @@ export function ProfileAnswers({
       <div className="flex flex-col items-start gap-3" data-answers="none">
         <p className="cq-body-sm text-(--cq-text-secondary)">
           {journey === "founder"
-            ? "Team, traction and your raise appear here once you tell Q about them."
-            : "Your mandate appears here once you tell Q how you invest."}
+            ? (emptyText ??
+              "Team, traction and your raise appear here once you tell Q about them.")
+            : (emptyText ??
+              "Your mandate appears here once you tell Q how you invest.")}
         </p>
         <Link
           href={
@@ -77,16 +97,18 @@ export function ProfileAnswers({
           href={editHref(journey, group)}
         />
       ))}
-      <details className="max-w-(--cq-layout-reading)">
-        <summary className="cq-caption inline-flex min-h-11 cursor-pointer items-center text-(--cq-text-tertiary) hover:text-(--cq-text-secondary) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)">
-          How this is known
-        </summary>
-        <p className="cq-body-sm pt-1 text-(--cq-text-secondary)">
-          {journey === "founder"
-            ? "These are your own statements from setup, not yet backed by a document. Add documents under Pitch & media and Q links them as evidence; nothing here is marked verified until it is checked."
-            : "This is your mandate as you declared it. Discover works from it, and it is never rewritten from what you watch or save."}
-        </p>
-      </details>
+      {provenance ? (
+        <details className="max-w-(--cq-layout-reading)">
+          <summary className="cq-caption inline-flex min-h-11 cursor-pointer items-center text-(--cq-text-tertiary) hover:text-(--cq-text-secondary) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)">
+            How this is known
+          </summary>
+          <p className="cq-body-sm pt-1 text-(--cq-text-secondary)">
+            {journey === "founder"
+              ? "These are your own statements from setup, not yet backed by a document. Add documents under Pitch & media and Q links them as evidence; nothing here is marked verified until it is checked."
+              : "This is your mandate as you declared it. Discover works from it, and it is never rewritten from what you watch or save."}
+          </p>
+        </details>
+      ) : null}
     </div>
   );
 }

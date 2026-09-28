@@ -322,8 +322,9 @@ describe("profile images", () => {
       correlationId,
     });
     expect(removed.cover).toBeNull();
-    expect(
-      [...rows.values()].map((row) => row.status).sort(),
-    ).toEqual(["REMOVED", "SUPERSEDED"]);
+    expect([...rows.values()].map((row) => row.status).sort()).toEqual([
+      "REMOVED",
+      "SUPERSEDED",
+    ]);
   });
 });

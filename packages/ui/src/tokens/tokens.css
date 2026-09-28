@@ -10,6 +10,16 @@
 :root {
   color-scheme: light;
 
+  /*
+   * Type families (founder directive 2026-09-28, item 16): body UI uses the
+   * platform's own professional sans -- the stack LinkedIn uses -- so text
+   * renders in the reader's native face with no font download.
+   */
+  --cq-font-ui:
+    -apple-system, system-ui, BlinkMacSystemFont, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
+  --cq-font-mono: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+
   /* Surfaces: canvas → section → surface → raised overlay. */
   --cq-canvas: oklch(0.985 0.004 92);
   --cq-surface: oklch(0.995 0.002 92);

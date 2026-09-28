@@ -208,6 +208,12 @@ export {
 } from "./visibility.js";
 
 export {
+  completeProfileImageUpload,
+  createProfileImageUpload,
+  getProfileImages,
+  removeProfileImage,
+} from "./profile-images.js";
+export {
   claimHandle,
   getPublicHandle,
   getQCard,

@@ -9,11 +9,9 @@
  * utilities read the canonical `--cq-*` tokens directly (ADR-001 Decision 3).
  */
 @theme {
-  --font-sans:
-    var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system, "Segoe UI",
-    sans-serif;
-  --font-mono:
-    var(--font-geist-mono), ui-monospace, "SFMono-Regular", Menlo, monospace;
+  /* Body UI reads the --cq-* family tokens (tokens.css). */
+  --font-sans: var(--cq-font-ui);
+  --font-mono: var(--font-geist-mono), var(--cq-font-mono);
 
   --radius-xs: 4px;
   --radius-sm: 6px;

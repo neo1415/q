@@ -23,8 +23,35 @@ const SPECS: ReadonlyMap<string, FieldSpec<string>> = new Map(
   [...COMPANY_FIELDS, ...INVESTOR_FIELDS].map((spec) => [spec.field, spec]),
 );
 
+/** The two image fields: their value is a signed URL, never shown as text. */
+export const CARD_IMAGE_FIELDS: ReadonlySet<QCardField> = new Set([
+  "photo",
+  "cover",
+]);
+
+const IMAGE_LABELS: Readonly<Partial<Record<QCardField, string>>> = {
+  photo: "Logo or photo",
+  cover: "Cover photo",
+};
+
 export function cardFieldLabel(key: QCardField): string {
-  return SPECS.get(key)?.label ?? key;
+  return IMAGE_LABELS[key] ?? SPECS.get(key)?.label ?? key;
+}
+
+/** A card's text fields: everything except the image URLs. */
+export function textFields(
+  fields: readonly PublicCardField[],
+): readonly PublicCardField[] {
+  return fields.filter((field) => !CARD_IMAGE_FIELDS.has(field.key));
+}
+
+/** The signed URL of a card image the audience may see, or null. */
+export function cardImage(
+  fields: readonly PublicCardField[],
+  key: "photo" | "cover",
+): string | null {
+  const value = fields.find((field) => field.key === key)?.value;
+  return value !== undefined && /^https?:\/\//.test(value) ? value : null;
 }
 
 export function cardFieldValue(field: PublicCardField): string {

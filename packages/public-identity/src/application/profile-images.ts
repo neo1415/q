@@ -142,11 +142,7 @@ export type ProfileImageProcessor = {
 };
 
 export type ProfileImageStatus =
-  | "PENDING"
-  | "READY"
-  | "SUPERSEDED"
-  | "REMOVED"
-  | "FAILED";
+  "PENDING" | "READY" | "SUPERSEDED" | "REMOVED" | "FAILED";
 
 export type ProfileImageRow = {
   readonly id: string;

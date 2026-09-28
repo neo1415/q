@@ -1,7 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
 import { GeistMono } from "geist/font/mono";
-import { GeistSans } from "geist/font/sans";
 
 import { loadWebServerConfig } from "@capital-q/config/web";
 import { THEME_COLORS } from "@capital-q/ui/tokens";
@@ -81,11 +80,7 @@ export default function RootLayout({
     // suppressHydrationWarning: the boot script below sets `data-theme` on
     // this element before React hydrates it, on purpose. It covers this
     // element's own attributes only, never its children.
-    <html
-      lang="en"
-      className={`${GeistSans.variable} ${GeistMono.variable}`}
-      suppressHydrationWarning
-    >
+    <html lang="en" className={GeistMono.variable} suppressHydrationWarning>
       <head>
         {/*
          * The person's own appearance choice, applied before anything is

@@ -9,6 +9,7 @@ import {
   getCurrentOnboardingSession,
   getMyProfile,
   getProfileFindings,
+  getProfileImages,
   getTaxonomyNode,
   type ApiSession,
 } from "@capital-q/api-client";
@@ -18,6 +19,8 @@ import type {
   InvestorOrganisationDto,
   PersonProfileDto,
   ProfileFindingSubjectType,
+  ProfileImagesDto,
+  ProfileImageSubjectType,
 } from "@capital-q/contracts";
 
 import { getSessionAccessToken } from "@/auth/session";
@@ -206,4 +209,21 @@ export async function loadProfilePage(
     investor: investor ?? null,
     verification,
   };
+}
+
+/**
+ * A subject's current photo and cover, as short-lived signed URLs the
+ * browser loads from storage directly. A failed read is "no images": the
+ * profile renders with initials and a plain cover.
+ */
+export async function loadProfileImages(
+  session: ApiSession | null,
+  subjectType: ProfileImageSubjectType,
+  subjectId: string,
+): Promise<ProfileImagesDto | null> {
+  if (session === null) return null;
+  return (
+    (await within(() => getProfileImages(session, subjectType, subjectId))) ??
+    null
+  );
 }

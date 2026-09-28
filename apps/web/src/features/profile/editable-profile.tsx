@@ -14,6 +14,7 @@ import { Input, Textarea } from "@capital-q/ui/input";
 import { Select } from "@capital-q/ui/select";
 import { cx } from "@capital-q/ui";
 
+import { SeeMore } from "@/components/see-more";
 import { SourcesDisclosure } from "@/components/sources-disclosure";
 
 import {
@@ -231,6 +232,8 @@ function EditableRow({
                 >
                   {shown}
                 </a>
+              ) : spec.input.kind === "textarea" ? (
+                <SeeMore text={shown} />
               ) : (
                 <p
                   className={cx(

@@ -176,8 +176,7 @@ export type ApiModules = {
     QCardRoutesDependencies["publicIdentity"] | undefined;
   /** Profile photos and covers. Absent: no image routes register. */
   readonly profileImages?:
-    | ProfileImageRoutesDependencies["profileImages"]
-    | undefined;
+    ProfileImageRoutesDependencies["profileImages"] | undefined;
 };
 
 /**
