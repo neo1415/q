@@ -188,13 +188,16 @@ describe("the screen includes the document open in Q's viewer (R21)", () => {
 
   it("adds the open document to the route's context, and drops it when closed", () => {
     setOpenDocument(DOC);
-    expect(currentScreen("/home")).toEqual({ route: "HOME", documentId: DOC });
+    const { timeZone: _withDoc, ...withDoc } = currentScreen("/home") ?? {};
+    expect(withDoc).toEqual({ route: "HOME", documentId: DOC });
     setOpenDocument(null);
-    expect(currentScreen("/home")).toEqual({ route: "HOME" });
+    const { timeZone: _closed, ...closed } = currentScreen("/home") ?? {};
+    expect(closed).toEqual({ route: "HOME" });
   });
 
   it("ignores an id that is not one", () => {
     setOpenDocument("not-a-uuid");
-    expect(currentScreen("/profile")).toEqual({ route: "PROFILE" });
+    const { timeZone: _tz, ...screen } = currentScreen("/profile") ?? {};
+    expect(screen).toEqual({ route: "PROFILE" });
   });
 });
