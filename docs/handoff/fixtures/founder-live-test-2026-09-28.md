@@ -43,3 +43,10 @@ Google sign-in redirect_uri_mismatch (Cloud Console); malware scanner for chat f
 - DONE, deployed 5f5eb36: #8 "Building your list" reloads itself every 6 s, at most 10 times per session (sessionStorage counter), until the slate is ready.
 - DIAGNOSED #1 (Q "can't create a PDF"): not a missing registry lookup. Home Q can only PREPARE_DOCUMENT three types: PITCH_DECK, INVESTMENT_BRIEF, OWN_MANDATE (packages/q-tools/src/capabilities.ts ~L300-345, eligible when artifacts are composed). The founder asked for a PDF of "an assessment of how I come across", which is none of those, so the answer model truthfully had no document type. Fix: add a general "export this answer / any Q-written report as a PDF" document type (e.g. Q_REPORT: the answer's own text and sources rendered through deck-render/BIZ-001 export), registered as a PREPARE_DOCUMENT hand, plus a test that any answer can be exported. Also make the answer note say which document types exist so Q offers the nearest one instead of refusing.
 - Next in order: #4 stuck approvals, #3 emails/Meet (check `railway logs --service @capital-q/workers | grep -iE "meeting|reminder|smtp"` and whether Gmail was reconnected with calendar scope), #2 relative dates, #5-#7 chat layout, then #12-#16.
+
+## Added by the founder 2026-09-28 (second message) — in progress
+
+- Chat layout (#5-#7) + structured live responses: lists, comparison cards, tables, colour-coded (with labels) rendered as Q streams — worker CHATUI, branch ux/chat-structured.
+- Emails / Meet links / stuck approvals / "2 PM tomorrow": hosted logs showed no meeting ever reached execution. Worker MEET, branch fix/meet-approvals.
+- LinkedIn-style profile + cover/profile photo upload, LinkedIn-like system font stack; Q Card: choose which onboarding fields show, Save success state (Save silently failed), beautiful /@handle page with See more; Q can revise its own PDF/PPTX (new version) and export any answer as PDF. Worker PROF, branch ux/profile-qcard.
+- Noted for later: founders see other founders' pitches; founder Investors page + contact rules (check sources); multiple pitch videos per founder.
