@@ -830,10 +830,12 @@ if (!gmailIntegrations.available) {
 // SMTP relay in the setup contract when SMTP_* are set.
 const appEmail = loadAppEmailConfig(process.env);
 if (appEmail.smtp === undefined) {
-  logger.info(
+  logger.error(
     { missing: appEmail.missing },
     "reminder email disabled: SMTP not configured (in-app delivery continues)",
   );
+} else {
+  logger.info({}, "reminder email enabled: SMTP configured");
 }
 const schedule = composeSchedule({
   sql: database.sql,

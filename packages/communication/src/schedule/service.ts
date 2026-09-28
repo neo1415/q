@@ -168,6 +168,8 @@ export type ScheduleService = {
       readonly slots: readonly Interval[];
     }>
   >;
+  /** The person's own Google Calendar zone, or null when unknown. */
+  readonly timeZoneOf: (actor: ActorContext) => Promise<string | null>;
   /** Precondition check for authorize steps: party, connection, calendar. */
   readonly canSchedule: (
     actor: ActorContext,
@@ -386,8 +388,22 @@ export function createScheduleService(
     const resolved = await counterpartOf(actor, relationshipId);
     if (resolved === null) return "NOT_A_PARTY";
     if (!resolved.party.connected) return "NOT_CONNECTED";
-    const calendar = await calendars(actor.userId).catch(() => null);
-    if (calendar === null) return "CALENDAR_NOT_CONNECTED";
+    const calendar = await calendars(actor.userId).catch((error: unknown) => {
+      logger?.warn(
+        { err: error, relationshipId },
+        "calendar lookup failed for a meeting",
+      );
+      return null;
+    });
+    if (calendar === null) {
+      // No Google connection with calendar.events for this person, or no
+      // Google configuration on this service at all (logged at startup).
+      logger?.warn(
+        { relationshipId },
+        "meeting refused: google calendar not connected for the organiser",
+      );
+      return "CALENDAR_NOT_CONNECTED";
+    }
     return calendar;
   }
 
@@ -412,6 +428,14 @@ export function createScheduleService(
   }
 
   return {
+    timeZoneOf: async (actor) => {
+      if (actor.actorType !== "HUMAN") return null;
+      const calendar = await calendars(actor.userId).catch(() => null);
+      if (calendar === null) return null;
+      const zone = await calendar.timeZone().catch(() => null);
+      return zone !== null && isKnownTimeZone(zone) ? zone : null;
+    },
+
     canSchedule: async (actor, relationshipId) => {
       const checked = await precheck(actor, relationshipId);
       return typeof checked === "string" ? checked : "OK";
@@ -539,11 +563,19 @@ export function createScheduleService(
       } catch (error: unknown) {
         await store.markMeetingFailed(record.id);
         logger?.warn(
-          { meetingId: record.id },
+          { meetingId: record.id, err: error },
           "calendar insert failed for an approved meeting",
         );
         return providerFailure(error);
       }
+      logger?.info(
+        {
+          meetingId: record.id,
+          attendees: record.participants.length - 1,
+          hasMeetLink: meetLink !== null,
+        },
+        "calendar event created",
+      );
       await transactions.run(async (tx) => {
         await store.markMeetingScheduled(tx, record.id, meetLink);
         await activity.record(tx, {
@@ -846,9 +878,16 @@ export function createScheduleService(
           });
           await store.markReminderEmailed(reminder.id, current);
           emailed += 1;
-        } catch {
+          logger?.info({ reminderId: reminder.id }, "reminder email sent");
+        } catch (error: unknown) {
           // In-app delivery stands; the email is retried next tick.
-          logger?.warn({ reminderId: reminder.id }, "reminder email failed");
+          logger?.warn(
+            {
+              reminderId: reminder.id,
+              errorName: error instanceof Error ? error.name : typeof error,
+            },
+            "reminder email failed",
+          );
         }
       }
       return { delivered, emailed };

@@ -12,6 +12,7 @@ import {
   allow,
   defineQTool,
   deny,
+  QToolArgumentError,
   type AnyQToolDefinition,
 } from "../definition.js";
 import { actorWideScope } from "../plan.js";
@@ -33,6 +34,14 @@ import {
   type ChatIntelligencePort,
   type ChatProposalOutput,
 } from "./chat.js";
+import {
+  isKnownTimeZone,
+  localLabel as zonedLabel,
+  LocalWhenSchema,
+  resolveLocalWhen,
+  unresolvedMessage,
+  type LocalWhen,
+} from "./local-time.js";
 
 /**
  * Meetings and reminders for Q (BIZ-008; R11, R14, R33: "set up a call with
@@ -123,6 +132,11 @@ export type ScheduleIntelligencePort = {
     actor: ActorContext,
     meetingId: string,
   ) => Promise<string | null>;
+  /**
+   * The person's zone when their device sent none: their Google
+   * Calendar's own setting, or null. Never UTC by default.
+   */
+  readonly timeZoneOf?: (actor: ActorContext) => Promise<string | null>;
 };
 
 const TimeZone = z
@@ -130,6 +144,14 @@ const TimeZone = z
   .regex(/^[A-Za-z]+(\/[A-Za-z0-9_+-]+){0,2}$/)
   .max(64);
 const Duration = z.number().int().min(15).max(180);
+
+const ONE_TIME = { message: "give exactly one of when or startsAt" };
+function oneTime(input: {
+  readonly when?: unknown;
+  readonly startsAt?: unknown;
+}): boolean {
+  return (input.when === undefined) !== (input.startsAt === undefined);
+}
 
 function ownConversation(actor: ActorContext, plan: PermittedContextPlan) {
   if (actor.actorType !== "HUMAN") return false;
@@ -336,15 +358,23 @@ export const ProposeMeetingInputSchema = z
       .min(1)
       .max(500)
       .describe("What the call is for; it becomes the invite's title."),
-    startsAt: UtcTimestampSchema.describe(
-      "The one start time they chose, ISO 8601 UTC (usually one of find_meeting_times' slots).",
+    when: LocalWhenSchema.optional().describe(
+      'The time as they said it ("2 PM tomorrow" is day tomorrow, time 14:00). Capital Q resolves it in their time zone. Use this, not startsAt, whenever they named a time.',
     ),
-    durationMinutes: Duration,
-    timeZone: TimeZone.optional(),
+    startsAt: UtcTimestampSchema.optional().describe(
+      "Only for a slot find_meeting_times returned: its startsAt exactly as given.",
+    ),
+    durationMinutes: Duration.default(30).describe(
+      "Length, 15-180 minutes; 30 unless they said.",
+    ),
+    timeZone: TimeZone.optional().describe(
+      "Only when they named a zone or city for the time (IANA, e.g. America/New_York); otherwise theirs is known.",
+    ),
   })
   .strict()
-  .refine(exactlyOne, ONE_REF);
-export type ProposeMeetingInput = z.infer<typeof ProposeMeetingInputSchema>;
+  .refine(exactlyOne, ONE_REF)
+  .refine(oneTime, ONE_TIME);
+export type ProposeMeetingInput = z.output<typeof ProposeMeetingInputSchema>;
 
 // --- propose_meeting_change ---------------------------------------------------
 
@@ -354,19 +384,28 @@ export const ProposeMeetingChangeInputSchema = z
       "A call they organised, by id from list_schedule.",
     ),
     change: z.enum(["RESCHEDULE", "CANCEL"]),
+    when: LocalWhenSchema.optional().describe(
+      "RESCHEDULE only: the new time as they said it; resolved in their time zone.",
+    ),
     startsAt: UtcTimestampSchema.optional().describe(
-      "RESCHEDULE only: the new start, ISO 8601 UTC.",
+      "RESCHEDULE only, instead of when: a slot find_meeting_times returned, exactly as given.",
     ),
     durationMinutes: Duration.optional(),
+    timeZone: TimeZone.optional(),
   })
   .strict()
   .refine(
     (input) =>
-      (input.change === "RESCHEDULE") === (input.startsAt !== undefined),
+      (input.change === "RESCHEDULE") ===
+      (input.startsAt !== undefined || input.when !== undefined),
     {
-      message: "startsAt is required to reschedule and not allowed to cancel",
+      message:
+        "a new time (when or startsAt) is required to reschedule and not allowed to cancel",
     },
-  );
+  )
+  .refine((input) => input.startsAt === undefined || input.when === undefined, {
+    message: "give when or startsAt, not both",
+  });
 export type ProposeMeetingChangeInput = z.infer<
   typeof ProposeMeetingChangeInputSchema
 >;
@@ -386,8 +425,14 @@ export const ProposeReminderInputSchema = z
       .min(1)
       .max(200)
       .describe("What to be reminded of, in their words."),
-    remindAt: UtcTimestampSchema.describe(
-      "When, as an ISO 8601 UTC time (e.g. Friday 09:00 in their zone).",
+    when: LocalWhenSchema.optional().describe(
+      'When, as they said it ("Friday at 9" is day friday, time 09:00); resolved in their time zone.',
+    ),
+    remindAt: UtcTimestampSchema.optional().describe(
+      "Only instead of when, for an exact instant Capital Q gave you (ISO 8601 with offset).",
+    ),
+    timeZone: TimeZone.optional().describe(
+      "Only when they named a zone or city for the time; otherwise theirs is known.",
     ),
     note: z.string().trim().max(1000).optional(),
     byEmail: z
@@ -409,6 +454,10 @@ export const ProposeReminderInputSchema = z
       message:
         "name at most one of relationshipId, companyId or investorOrganisationId",
     },
+  )
+  .refine(
+    (input) => (input.when === undefined) !== (input.remindAt === undefined),
+    { message: "give exactly one of when or remindAt" },
   );
 export type ProposeReminderInput = z.output<typeof ProposeReminderInputSchema>;
 
@@ -457,7 +506,65 @@ export function createScheduleTools(
   schedule: ScheduleIntelligencePort,
   chat: ChatIntelligencePort,
   relationships: RelationshipIntelligencePort,
+  options: { readonly now?: (() => Date) | undefined } = {},
 ): readonly AnyQToolDefinition[] {
+  const now = options.now ?? (() => new Date());
+
+  /**
+   * The one instant the person named, and the zone it was named in.
+   * Precedence for the zone: one they named, their device's (sent with
+   * the turn), their calendar's. Never UTC by accident: with none known
+   * the model is told to ask.
+   */
+  const instantOf = async (
+    input: {
+      readonly when?: LocalWhen | undefined;
+      readonly startsAt?: string | undefined;
+      readonly timeZone?: string | undefined;
+    },
+    context: {
+      readonly actor: ActorContext;
+      readonly plan: PermittedContextPlan;
+    },
+  ): Promise<{
+    readonly iso: string;
+    readonly timeZone: string | undefined;
+  }> => {
+    const named =
+      input.timeZone !== undefined && isKnownTimeZone(input.timeZone)
+        ? input.timeZone
+        : undefined;
+    const device = context.plan.screen?.timeZone;
+    let zone =
+      named ??
+      (device !== undefined && isKnownTimeZone(device) ? device : undefined);
+    if (zone === undefined && schedule.timeZoneOf !== undefined) {
+      zone =
+        (await schedule.timeZoneOf(context.actor).catch(() => null)) ??
+        undefined;
+    }
+    if (input.when === undefined) {
+      if (input.startsAt === undefined) {
+        throw new QToolArgumentError(
+          "Give the time: when (their day and HH:MM) or startsAt (a slot find_meeting_times returned).",
+        );
+      }
+      return { iso: new Date(input.startsAt).toISOString(), timeZone: zone };
+    }
+    const resolved = resolveLocalWhen(input.when, zone, now());
+    if (resolved.kind !== "OK") {
+      throw new QToolArgumentError(unresolvedMessage(resolved.kind));
+    }
+    return {
+      iso: resolved.instant.toISOString(),
+      timeZone: resolved.timeZone,
+    };
+  };
+  const labelled = (summary: string, iso: string, zone: string | undefined) =>
+    zone === undefined
+      ? summary
+      : `${summary}, ${zonedLabel(new Date(iso), zone)}`;
+
   const proposal = {
     version: 1,
     status: "ACTIVE",
@@ -515,32 +622,31 @@ export function createScheduleTools(
           return deny("NOT_AVAILABLE");
         }
       },
-      execute: (input, context, grant) =>
-        Promise.resolve(
-          !grant.connected
-            ? {
-                status: "NOT_CONNECTED" as const,
-                awaitingApprovalOf:
-                  "Calls open once you're connected with them: interest expressed and accepted.",
-              }
-            : prepare(
-                context,
-                {
-                  actionType: MEETING_SCHEDULE,
-                  payload: {
-                    relationshipId: grant.relationshipId,
-                    counterpartName: grant.counterpartName,
-                    purpose: input.purpose,
-                    startsAt: input.startsAt,
-                    durationMinutes: input.durationMinutes,
-                    ...(input.timeZone === undefined
-                      ? {}
-                      : { timeZone: input.timeZone }),
-                  },
-                },
-                `Call with ${grant.counterpartName}`,
-              ),
-        ),
+      execute: async (input, context, grant) => {
+        if (!grant.connected) {
+          return {
+            status: "NOT_CONNECTED" as const,
+            awaitingApprovalOf:
+              "Calls open once you're connected with them: interest expressed and accepted.",
+          };
+        }
+        const at = await instantOf(input, context);
+        return prepare(
+          context,
+          {
+            actionType: MEETING_SCHEDULE,
+            payload: {
+              relationshipId: grant.relationshipId,
+              counterpartName: grant.counterpartName,
+              purpose: input.purpose,
+              startsAt: at.iso,
+              durationMinutes: input.durationMinutes,
+              ...(at.timeZone === undefined ? {} : { timeZone: at.timeZone }),
+            },
+          },
+          labelled(`Call with ${grant.counterpartName}`, at.iso, at.timeZone),
+        );
+      },
     }),
 
     defineQTool<ProposeMeetingChangeInput, ChatProposalOutput, MeetingGrant>({
@@ -561,43 +667,44 @@ export function createScheduleTools(
           ? deny("NOT_AVAILABLE")
           : allow("CONFIDENTIAL", meeting);
       },
-      execute: (input, context, meeting) =>
-        Promise.resolve(
-          input.change === "CANCEL" || input.startsAt === undefined
-            ? prepare(
-                context,
-                {
-                  actionType: MEETING_CANCEL,
-                  payload: {
-                    meetingId: meeting.id,
-                    relationshipId: meeting.relationshipId,
-                    purpose: meeting.purpose,
-                    startsAt: meeting.startsAt,
-                  },
+      execute: async (input, context, meeting) => {
+        const at =
+          input.change === "CANCEL" ? null : await instantOf(input, context);
+        return at === null
+          ? prepare(
+              context,
+              {
+                actionType: MEETING_CANCEL,
+                payload: {
+                  meetingId: meeting.id,
+                  relationshipId: meeting.relationshipId,
+                  purpose: meeting.purpose,
+                  startsAt: meeting.startsAt,
                 },
-                `Cancel: ${meeting.purpose}`,
-              )
-            : prepare(
-                context,
-                {
-                  actionType: MEETING_RESCHEDULE,
-                  payload: {
-                    meetingId: meeting.id,
-                    relationshipId: meeting.relationshipId,
-                    purpose: meeting.purpose,
-                    startsAt: input.startsAt,
-                    durationMinutes:
-                      input.durationMinutes ??
-                      Math.round(
-                        (Date.parse(meeting.endsAt) -
-                          Date.parse(meeting.startsAt)) /
-                          60_000,
-                      ),
-                  },
+              },
+              `Cancel: ${meeting.purpose}`,
+            )
+          : prepare(
+              context,
+              {
+                actionType: MEETING_RESCHEDULE,
+                payload: {
+                  meetingId: meeting.id,
+                  relationshipId: meeting.relationshipId,
+                  purpose: meeting.purpose,
+                  startsAt: at.iso,
+                  durationMinutes:
+                    input.durationMinutes ??
+                    Math.round(
+                      (Date.parse(meeting.endsAt) -
+                        Date.parse(meeting.startsAt)) /
+                        60_000,
+                    ),
                 },
-                `Move: ${meeting.purpose}`,
-              ),
-        ),
+              },
+              labelled(`Move: ${meeting.purpose}`, at.iso, at.timeZone),
+            );
+      },
     }),
 
     defineQTool<ProposeReminderInput, ChatProposalOutput, ReminderGrant>({
@@ -635,28 +742,39 @@ export function createScheduleTools(
           return deny("NOT_AVAILABLE");
         }
       },
-      execute: (input, context, grant) =>
-        Promise.resolve(
-          prepare(
-            context,
-            {
-              actionType: REMINDER_CREATE,
-              payload: {
-                ...(grant.relationship === null
-                  ? {}
-                  : {
-                      relationshipId: grant.relationship.relationshipId,
-                      counterpartName: grant.relationship.counterpartName,
-                    }),
-                title: input.title,
-                remindAt: input.remindAt,
-                ...(input.note === undefined ? {} : { note: input.note }),
-                channel: input.byEmail ? "EMAIL" : "IN_APP",
-              },
+      execute: async (input, context, grant) => {
+        const at = await instantOf(
+          {
+            when: input.when,
+            startsAt: input.remindAt,
+            timeZone: input.timeZone,
+          },
+          context,
+        );
+        return prepare(
+          context,
+          {
+            actionType: REMINDER_CREATE,
+            payload: {
+              // Whose reminder it is: the target of a personal one, and
+              // checked against the approver again at every authorize.
+              ownerUserId: context.actor.userId,
+              ...(grant.relationship === null
+                ? {}
+                : {
+                    relationshipId: grant.relationship.relationshipId,
+                    counterpartName: grant.relationship.counterpartName,
+                  }),
+              title: input.title,
+              remindAt: at.iso,
+              ...(at.timeZone === undefined ? {} : { timeZone: at.timeZone }),
+              ...(input.note === undefined ? {} : { note: input.note }),
+              channel: input.byEmail ? "EMAIL" : "IN_APP",
             },
-            `Reminder: ${input.title}`,
-          ),
-        ),
+          },
+          labelled(`Reminder: ${input.title}`, at.iso, at.timeZone),
+        );
+      },
     }),
 
     defineQTool<

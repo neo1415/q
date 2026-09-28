@@ -60,11 +60,15 @@ export type ChatProposal =
   | {
       readonly actionType: typeof REMINDER_CREATE;
       readonly payload: {
+        /** Whose reminder: the approver, checked again at authorize. */
+        readonly ownerUserId?: string | undefined;
         /** Absent for a personal reminder about no relationship. */
         readonly relationshipId?: string | undefined;
         readonly counterpartName?: string | undefined;
         readonly title: string;
         readonly remindAt: string;
+        /** The zone the person named the time in. */
+        readonly timeZone?: string | undefined;
         readonly note?: string | undefined;
         readonly channel: "IN_APP" | "EMAIL";
       };

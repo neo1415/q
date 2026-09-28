@@ -185,9 +185,11 @@ function screenWithin(
         scope.subject !== undefined &&
         JSON.stringify(scope.subject) === JSON.stringify(ref),
     );
-  const { companyId, investorOrganisationId, documentId } = screen;
+  const { companyId, investorOrganisationId, documentId, timeZone } = screen;
   return {
     route: screen.route,
+    // The person's own clock, not data about anyone.
+    ...(timeZone === undefined ? {} : { timeZone }),
     ...(companyId !== undefined && bound({ kind: "COMPANY", companyId })
       ? { companyId }
       : {}),

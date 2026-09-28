@@ -108,7 +108,25 @@ export function currentScreen(
   ) {
     screen = { ...screen, companyId: focus.companyId.toLowerCase() };
   }
+  const zone = deviceTimeZone();
+  if (zone !== undefined) screen = { ...screen, timeZone: zone };
   return openDocumentId === null || screen.documentId !== undefined
     ? screen
     : { ...screen, documentId: openDocumentId };
+}
+
+const ZONE = /^[A-Za-z]+(\/[A-Za-z0-9_+-]+){0,2}$/;
+
+/**
+ * The device's IANA zone, so "tomorrow at 2 PM" is resolved where the
+ * person is (live test 2026-09-28 #2). Anything the contract would refuse
+ * is left out rather than failing the question.
+ */
+function deviceTimeZone(): string | undefined {
+  try {
+    const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    return ZONE.test(zone) && zone.length <= 64 ? zone : undefined;
+  } catch {
+    return undefined;
+  }
 }

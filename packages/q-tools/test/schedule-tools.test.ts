@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { PermittedContextPlan } from "@capital-q/contracts";
 
@@ -62,7 +62,7 @@ function ownPlan(actor = actorB): PermittedContextPlan {
   };
 }
 
-function world() {
+function world(options: { calendarZone?: string | null } = {}) {
   const prepared: { actionType: string; payload: unknown }[] = [];
   const chat: ChatIntelligencePort = {
     thread: (actor, relationshipId) =>
@@ -119,6 +119,7 @@ function world() {
           : null,
       ),
     brief: () => Promise.resolve(null),
+    timeZoneOf: () => Promise.resolve(options.calendarZone ?? null),
   };
   const executor = createQToolExecutor({
     registry: createQToolRegistry(
@@ -192,6 +193,7 @@ describe("schedule tools", () => {
       {
         actionType: "reminder.create",
         payload: {
+          ownerUserId: actorB.userId,
           title: "Follow up with Apex",
           remindAt: "2026-10-09T08:00:00.000Z",
           channel: "EMAIL",
@@ -235,6 +237,122 @@ describe("schedule tools", () => {
         },
       },
     ]);
+  });
+
+  describe("a time as they said it (live 2026-09-28 #2)", () => {
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+    const withZone = (plan: PermittedContextPlan, timeZone?: string) => ({
+      ...plan,
+      screen: {
+        route: "HOME" as const,
+        ...(timeZone === undefined ? {} : { timeZone }),
+      },
+    });
+    const meetingAt = (when: Record<string, string>) => ({
+      callId: "t1",
+      name: "propose_meeting",
+      arguments: { relationshipId: RELATIONSHIP, purpose: "Intro", when },
+    });
+
+    it("books 2 PM tomorrow in the zone their device sent, never refused", async () => {
+      vi.useFakeTimers({ toFake: ["Date"] });
+      vi.setSystemTime(new Date("2026-09-28T10:00:00Z"));
+      const { executor, prepared } = world();
+      const outcome = await executor.execute(
+        meetingAt({ day: "tomorrow", time: "14:00" }),
+        contextFor(
+          actorB,
+          withZone(
+            relationshipPlan(base(actorB), RELATIONSHIP),
+            "Europe/London",
+          ),
+        ),
+      );
+      expect(outcome.result).toMatchObject({
+        ok: true,
+        data: {
+          status: "PREPARED",
+          awaitingApprovalOf:
+            "Call with Apex, Tue 29 Sept, 14:00 (Europe/London)",
+        },
+      });
+      expect(prepared).toEqual([
+        {
+          actionType: "meeting.schedule",
+          payload: {
+            relationshipId: RELATIONSHIP,
+            counterpartName: "Apex",
+            purpose: "Intro",
+            startsAt: "2026-09-29T13:00:00.000Z",
+            durationMinutes: 30,
+            timeZone: "Europe/London",
+          },
+        },
+      ]);
+    });
+
+    it("falls back to their calendar's zone, then asks rather than using UTC", async () => {
+      vi.useFakeTimers({ toFake: ["Date"] });
+      vi.setSystemTime(new Date("2026-09-28T10:00:00Z"));
+      const calendar = world({ calendarZone: "America/New_York" });
+      await calendar.executor.execute(
+        meetingAt({ day: "tomorrow", time: "14:00" }),
+        contextFor(
+          actorB,
+          withZone(relationshipPlan(base(actorB), RELATIONSHIP)),
+        ),
+      );
+      expect(calendar.prepared).toMatchObject([
+        {
+          payload: {
+            startsAt: "2026-09-29T18:00:00.000Z",
+            timeZone: "America/New_York",
+          },
+        },
+      ]);
+
+      const none = world();
+      const refused = await none.executor.execute(
+        meetingAt({ day: "tomorrow", time: "14:00" }),
+        contextFor(
+          actorB,
+          withZone(relationshipPlan(base(actorB), RELATIONSHIP)),
+        ),
+      );
+      expect(none.prepared).toEqual([]);
+      expect(JSON.stringify(refused.result)).toContain(
+        "time zone is not known",
+      );
+    });
+
+    it("sets a reminder for Friday 9 AM in their zone", async () => {
+      vi.useFakeTimers({ toFake: ["Date"] });
+      vi.setSystemTime(new Date("2026-09-28T10:00:00Z"));
+      const { executor, prepared } = world();
+      await executor.execute(
+        {
+          callId: "t3",
+          name: "propose_reminder",
+          arguments: {
+            title: "Follow up",
+            when: { day: "friday", time: "09:00" },
+          },
+        },
+        contextFor(actorB, withZone(ownPlan(), "Asia/Singapore")),
+      );
+      expect(prepared).toMatchObject([
+        {
+          actionType: "reminder.create",
+          payload: {
+            ownerUserId: actorB.userId,
+            remindAt: "2026-10-02T01:00:00.000Z",
+            timeZone: "Asia/Singapore",
+          },
+        },
+      ]);
+    });
   });
 
   it("lists the invoker's own schedule", async () => {

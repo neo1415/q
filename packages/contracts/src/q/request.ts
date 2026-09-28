@@ -81,6 +81,17 @@ export const QScreenContextSchema = z
     companyId: UuidSchema.optional(),
     investorOrganisationId: UuidSchema.optional(),
     documentId: UuidSchema.optional(),
+    /**
+     * The device's IANA time zone as the person asks (live test 2026-09-28
+     * #2): "tomorrow at 2 PM" is resolved by code in this zone, never in
+     * UTC by accident. A request like the rest: a zone the runtime does not
+     * know is ignored, and it grants nothing.
+     */
+    timeZone: z
+      .string()
+      .regex(/^[A-Za-z]+(\/[A-Za-z0-9_+-]+){0,2}$/)
+      .max(64)
+      .optional(),
   })
   .strict();
 export type QScreenContext = z.infer<typeof QScreenContextSchema>;

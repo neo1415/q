@@ -401,9 +401,11 @@ function screenKept(
 ): NonNullable<CreateQRunRequest["screen"]> {
   const has = (ref: QSubjectRef) =>
     refs.some((known) => JSON.stringify(known) === JSON.stringify(ref));
-  const { companyId, investorOrganisationId, documentId } = screen;
+  const { companyId, investorOrganisationId, documentId, timeZone } = screen;
   return {
     route: screen.route,
+    // The person's own clock: not an entity, nothing to resolve.
+    ...(timeZone === undefined ? {} : { timeZone }),
     ...(companyId !== undefined && has({ kind: "COMPANY", companyId })
       ? { companyId }
       : {}),

@@ -219,6 +219,34 @@ describe("reminder.create", () => {
   });
 });
 
+describe("a personal reminder (live 2026-09-28: refused at proposal)", () => {
+  it("targets its owner, so the Approval Engine can propose it, and is only ever theirs", async () => {
+    const { schedule } = world();
+    const action = createReminderCreateAction({ schedule });
+    const payload = {
+      ownerUserId: actor.userId,
+      title: "Call the bank",
+      remindAt: "2026-10-09T08:00:00.000Z",
+      timeZone: "Europe/London",
+      channel: "IN_APP" as const,
+    };
+    // An empty target list is refused by the engine as ACTION_NOT_PERMITTED.
+    expect(action.targets(action.payload.parse(payload))).toEqual([
+      { kind: "USER", userId: actor.userId },
+    ]);
+    expect(
+      action.describe(action.payload.parse(payload), []).preview,
+    ).toContain("9 Oct 2026, 09:00 (Europe/London)");
+    expect(await action.authorize(payload, actor)).toEqual({
+      outcome: "ALLOW",
+    });
+    expect(await action.authorize(payload, stranger)).toEqual({
+      outcome: "DENY",
+      code: "NOT_OWNER",
+    });
+  });
+});
+
 describe("the chat board carries schedule proposals", () => {
   it("validates a meeting proposal against its bound payload", async () => {
     const board = createChatActionBoard();

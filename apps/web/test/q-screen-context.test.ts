@@ -12,6 +12,9 @@ import {
   setScreenFocusSource,
 } from "../src/features/q/screen";
 
+/** The device's zone travels with every screen (live 2026-09-28 #2). */
+const here = { timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone };
+
 /**
  * The screen a question is asked from (R21): the route on the closed list
  * and only the canonical ids the route names; anything else is OTHER.
@@ -91,6 +94,7 @@ describe("the card on screen in Discover", () => {
       expect(currentScreen("/discover")).toEqual({
         route: "DISCOVER",
         companyId: ID,
+        ...here,
       });
       expect(currentViewing()).toEqual({
         kind: "PITCH_PLAYBACK",
@@ -109,16 +113,20 @@ describe("the card on screen in Discover", () => {
       expect(currentScreen("/discover")).toEqual({
         route: "DISCOVER",
         companyId: OTHER,
+        ...here,
       });
       expect(currentViewing()).toBeUndefined();
       // A route that names its own company keeps it.
       expect(currentScreen(`/company/${ID}`).companyId).toBe(ID);
       // Nothing in focus, or a page that has gone: the route alone.
       focus = null;
-      expect(currentScreen("/discover")).toEqual({ route: "DISCOVER" });
+      expect(currentScreen("/discover")).toEqual({
+        route: "DISCOVER",
+        ...here,
+      });
     } finally {
       setScreenFocusSource(null);
     }
-    expect(currentScreen("/discover")).toEqual({ route: "DISCOVER" });
+    expect(currentScreen("/discover")).toEqual({ route: "DISCOVER", ...here });
   });
 });

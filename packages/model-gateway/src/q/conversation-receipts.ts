@@ -174,7 +174,10 @@ const SCREEN_ROUTE_NAMES: Readonly<Record<QScreenRoute, string | null>> = {
  * Where the person is as they ask (R21), from the screen the run carries
  * through the Context Firewall: the route, and only entities it bound.
  */
-export function screenLines(screen: QScreenContext | undefined): string[] {
+export function screenLines(
+  screen: QScreenContext | undefined,
+  now: Date = new Date(),
+): string[] {
   if (screen === undefined) return [];
   const name = SCREEN_ROUTE_NAMES[screen.route];
   const shown = [
@@ -192,7 +195,35 @@ export function screenLines(screen: QScreenContext | undefined): string[] {
     `WHERE THEY ARE NOW (Capital Q, from their screen as they asked): ${
       name === null ? "a Capital Q screen without a name here" : `on ${name}`
     }${shown.length === 0 ? "" : `, showing ${shown.join(" and ")}`}. You know what screen they are on: when they ask where they are or what they are looking at, say it plainly (for example "You're on your profile."); never say you cannot see their screen.`,
+    ...localTimeLines(screen.timeZone, now),
   ];
+}
+
+/**
+ * Their date and time (live test 2026-09-28 #2): the model otherwise has no
+ * idea what "tomorrow" is. The instant a time names is still resolved by
+ * code from the tool's structured `when`; this line only lets Q talk about
+ * days sensibly.
+ */
+function localTimeLines(timeZone: string | undefined, now: Date): string[] {
+  if (timeZone === undefined) return [];
+  try {
+    const local = new Intl.DateTimeFormat("en-GB", {
+      timeZone,
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      hourCycle: "h23",
+    }).format(now);
+    return [
+      `THEIR LOCAL TIME NOW (Capital Q, from their device): ${local} (${timeZone}). When they name a day or time for a call or reminder, pass it as said in the tool's when (day or date, and HH:MM); Capital Q converts it in their time zone. Never ask them to confirm a date they already made clear, such as "2 PM tomorrow".`,
+    ];
+  } catch {
+    return [];
+  }
 }
 
 const DOCUMENT_NAMES: Readonly<Record<string, string>> = {

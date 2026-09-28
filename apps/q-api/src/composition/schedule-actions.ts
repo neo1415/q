@@ -60,10 +60,20 @@ const CounterpartNameSchema = z.string().trim().min(1).max(200);
 
 export const ReminderCreatePayloadSchema = z
   .object({
+    /**
+     * Whose reminder: the Approval Engine needs a target, and a personal
+     * reminder (about no relationship) had none, so every one was refused
+     * at proposal (live 2026-09-28: ACTION_NOT_PERMITTED). Optional only
+     * so proposals made before it still parse; authorize binds it to the
+     * approver.
+     */
+    ownerUserId: UuidSchema.optional(),
     relationshipId: UuidSchema.optional(),
     counterpartName: CounterpartNameSchema.optional(),
     title: ReminderTitleSchema,
     remindAt: UtcTimestampSchema,
+    /** The zone the person named the time in, for what they are shown. */
+    timeZone: TimeZoneSchema.optional(),
     note: ReminderNoteSchema.optional(),
     channel: ReminderChannelSchema,
   })
@@ -119,8 +129,26 @@ const MeetingResultSchema = z
   .strict();
 const CancelResultSchema = z.object({ alreadyDone: z.boolean() }).strict();
 
-const when = (iso: string) =>
-  new Date(iso).toUTCString().replace(":00 GMT", " UTC");
+/** The time as the person reads it: in the zone they named it in, when known. */
+const when = (iso: string, timeZone?: string) => {
+  if (timeZone !== undefined) {
+    try {
+      return `${new Intl.DateTimeFormat("en-GB", {
+        timeZone,
+        weekday: "short",
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+        hourCycle: "h23",
+      }).format(new Date(iso))} (${timeZone})`;
+    } catch {
+      // An unknown zone reads in UTC below.
+    }
+  }
+  return new Date(iso).toUTCString().replace(":00 GMT", " UTC");
+};
 
 /** A schedule outcome as an action result; refusals are final. */
 function asExecution<T, R>(
@@ -151,8 +179,9 @@ const relationshipTarget = (relationshipId: string): readonly QSubjectRef[] => [
 
 export function createReminderCreateAction(dependencies: {
   readonly schedule: ScheduleService;
+  readonly logger?: Logger | undefined;
 }): AnyQActionDefinition {
-  const { schedule } = dependencies;
+  const { schedule, logger } = dependencies;
   return defineQAction<
     ReminderCreatePayload,
     z.infer<typeof ReminderResultSchema>
@@ -165,13 +194,15 @@ export function createReminderCreateAction(dependencies: {
       "Creates the approver's own reminder (optionally about one relationship they are party to); when due it shows in Needs you and, if chosen, arrives by email.",
     payload: ReminderCreatePayloadSchema,
     result: ReminderResultSchema,
-    targets: (payload) =>
-      payload.relationshipId === undefined
-        ? []
-        : relationshipTarget(payload.relationshipId),
+    targets: (payload): readonly QSubjectRef[] =>
+      payload.relationshipId !== undefined
+        ? relationshipTarget(payload.relationshipId)
+        : payload.ownerUserId !== undefined
+          ? [{ kind: "USER", userId: payload.ownerUserId }]
+          : [],
     describe: (payload) => ({
       summary: `Reminder: ${payload.title}`,
-      preview: `${payload.title}\n${when(payload.remindAt)}${payload.channel === "EMAIL" ? " (and by email)" : ""}${payload.note === undefined ? "" : `\n\n${payload.note}`}`,
+      preview: `${payload.title}\n${when(payload.remindAt, payload.timeZone)}${payload.channel === "EMAIL" ? " (and by email)" : ""}${payload.note === undefined ? "" : `\n\n${payload.note}`}`,
     }),
     confirm: (payload, result) =>
       result.alreadyCreated
@@ -180,6 +211,13 @@ export function createReminderCreateAction(dependencies: {
     authorize: async (payload, actor) => {
       if (actor.actorType !== "HUMAN") {
         return { outcome: "DENY", code: "NOT_A_PERSON" };
+      }
+      // A reminder is only ever the approver's own.
+      if (
+        payload.ownerUserId !== undefined &&
+        payload.ownerUserId !== actor.userId
+      ) {
+        return { outcome: "DENY", code: "NOT_OWNER" };
       }
       if (
         payload.relationshipId !== undefined &&
@@ -190,23 +228,39 @@ export function createReminderCreateAction(dependencies: {
       return { outcome: "ALLOW" };
     },
     executor: {
-      execute: async (action, context) =>
-        asExecution(
-          await schedule.createReminder({
-            actor: context.approver,
-            title: action.payload.title,
-            dueAt: new Date(action.payload.remindAt),
-            note: action.payload.note,
-            relationshipId: action.payload.relationshipId,
-            channel: action.payload.channel,
-            idempotencyKey: `q-action:${action.idempotencyKey}`,
-            qActionId: action.actionId,
-          }),
-          (ok) => ({
-            reminderId: ok.reminder.id,
-            alreadyCreated: ok.alreadyCreated,
-          }),
-        ),
+      execute: async (action, context) => {
+        const outcome = await schedule.createReminder({
+          actor: context.approver,
+          title: action.payload.title,
+          dueAt: new Date(action.payload.remindAt),
+          note: action.payload.note,
+          relationshipId: action.payload.relationshipId,
+          channel: action.payload.channel,
+          idempotencyKey: `q-action:${action.idempotencyKey}`,
+          qActionId: action.actionId,
+        });
+        if (outcome.outcome === "OK") {
+          logger?.info(
+            {
+              actionId: action.actionId,
+              reminderId: outcome.reminder.id,
+              dueAt: action.payload.remindAt,
+              channel: action.payload.channel,
+              alreadyCreated: outcome.alreadyCreated,
+            },
+            "reminder created",
+          );
+        } else {
+          logger?.warn(
+            { actionId: action.actionId, code: outcome.code },
+            "approved reminder not created",
+          );
+        }
+        return asExecution(outcome, (ok) => ({
+          reminderId: ok.reminder.id,
+          alreadyCreated: ok.alreadyCreated,
+        }));
+      },
     },
   });
 }
@@ -231,7 +285,7 @@ export function createMeetingScheduleAction(dependencies: {
     targets: (payload) => relationshipTarget(payload.relationshipId),
     describe: (payload) => ({
       summary: `Call with ${payload.counterpartName}`,
-      preview: `${payload.purpose}\n${when(payload.startsAt)}, ${String(payload.durationMinutes)} minutes\nGoogle Meet invite to ${payload.counterpartName}'s people`,
+      preview: `${payload.purpose}\n${when(payload.startsAt, payload.timeZone)}, ${String(payload.durationMinutes)} minutes\nGoogle Meet invite to ${payload.counterpartName}'s people`,
     }),
     confirm: (payload, result) =>
       result.alreadyDone
@@ -245,6 +299,16 @@ export function createMeetingScheduleAction(dependencies: {
     },
     executor: {
       execute: async (action, context) => {
+        logger?.info(
+          {
+            actionId: action.actionId,
+            relationshipId: action.payload.relationshipId,
+            startsAt: action.payload.startsAt,
+            timeZone: action.payload.timeZone ?? null,
+            attempt: context.attempt,
+          },
+          "approved meeting executing",
+        );
         const outcome = await schedule.schedule({
           actor: context.approver,
           relationshipId: action.payload.relationshipId,
@@ -256,9 +320,16 @@ export function createMeetingScheduleAction(dependencies: {
           qActionId: action.actionId,
           correlationId: context.correlationId,
         });
-        if (outcome.outcome === "FAILED") {
+        if (outcome.outcome !== "OK") {
+          // The reason travels to the person through the action's failure
+          // code; here it is for whoever reads the logs.
           logger?.warn(
-            { actionId: action.actionId, attempt: context.attempt },
+            {
+              actionId: action.actionId,
+              attempt: context.attempt,
+              outcome: outcome.outcome,
+              code: outcome.code,
+            },
             "approved meeting not booked",
           );
         }
@@ -402,6 +473,7 @@ export function createScheduleIntelligencePort(
     }),
     organisedMeeting: async (actor, meetingId) =>
       schedule.organisedMeeting(actor, meetingId),
+    timeZoneOf: (actor) => schedule.timeZoneOf(actor),
     brief: async (actor, meetingId) =>
       (await schedule.brief(actor, meetingId))?.body ?? null,
   };
