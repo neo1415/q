@@ -36,3 +36,10 @@ Deployed head at capture: 3242e5b (hosted 80/80 migrations). Every item below is
 ## Founder items still open (from 2026-09-27)
 
 Google sign-in redirect_uri_mismatch (Cloud Console); malware scanner for chat files/voice notes; ADR 0019 peer chat, ADR 0020 unknown-never-excludes; reminder approval class ADR; Share on rail vs ADR 0017 C4; reconnect Gmail for calendar scope.
+
+## Progress 2026-09-28 (lead, low budget)
+
+- DONE, deployed a0044af: #9 mute/unmute is an icon; #10 "1 of N" counter removed; #11 pitches restart on `ended` (streamed MSE sources can ignore `loop`).
+- DONE, deployed 5f5eb36: #8 "Building your list" reloads itself every 6 s, at most 10 times per session (sessionStorage counter), until the slate is ready.
+- DIAGNOSED #1 (Q "can't create a PDF"): not a missing registry lookup. Home Q can only PREPARE_DOCUMENT three types: PITCH_DECK, INVESTMENT_BRIEF, OWN_MANDATE (packages/q-tools/src/capabilities.ts ~L300-345, eligible when artifacts are composed). The founder asked for a PDF of "an assessment of how I come across", which is none of those, so the answer model truthfully had no document type. Fix: add a general "export this answer / any Q-written report as a PDF" document type (e.g. Q_REPORT: the answer's own text and sources rendered through deck-render/BIZ-001 export), registered as a PREPARE_DOCUMENT hand, plus a test that any answer can be exported. Also make the answer note say which document types exist so Q offers the nearest one instead of refusing.
+- Next in order: #4 stuck approvals, #3 emails/Meet (check `railway logs --service @capital-q/workers | grep -iE "meeting|reminder|smtp"` and whether Gmail was reconnected with calendar scope), #2 relative dates, #5-#7 chat layout, then #12-#16.
