@@ -37,10 +37,12 @@ export function PitchVideoPage({
   );
   return (
     <div className="flex flex-col gap-6">
-      <Link href="/pitch" className={buttonClassName("quiet", "compact")}>
-        <ChevronLeft size={ICON_SIZE.regular} aria-hidden="true" />
-        All videos
-      </Link>
+      <div>
+        <Link href="/pitch" className={buttonClassName("quiet", "compact")}>
+          <ChevronLeft size={ICON_SIZE.regular} aria-hidden="true" />
+          All videos
+        </Link>
+      </div>
       <PitchUpload
         companyId={companyId}
         mediaAssetId={mediaAssetId}

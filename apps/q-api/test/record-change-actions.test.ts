@@ -6,6 +6,7 @@ import {
   CAPITAL_OBJECTIVE_CHANGE,
   COMPANY_TEAM_CHANGE,
   createRecordChangeActions,
+  INVESTOR_MANDATE_CHANGE,
   createRecordChangeBoard,
   requestFor,
 } from "../src/composition/record-change-actions.js";
@@ -124,6 +125,50 @@ describe("the record change board", () => {
       actor,
     } as never);
     expect(proposal).toMatchObject({ actionType: COMPANY_TEAM_CHANGE });
+  });
+
+  it("names only a mandate on the organisation's own list, whatever id the model gave (founder live 2026-09-28)", async () => {
+    const ORG = randomUUID();
+    const ACTIVE = randomUUID();
+    const DRAFT = randomUUID();
+    const b = createRecordChangeBoard({
+      capital: {} as never,
+      investorService: {
+        listInvestorMandates: () =>
+          Promise.resolve({
+            items: [
+              { id: DRAFT, status: "DRAFT" },
+              { id: ACTIVE, status: "ACTIVE" },
+            ],
+          }),
+      } as never,
+    });
+    const propose = async (runId: string, mandateId: string | null) => {
+      await b.prepare({
+        runId,
+        actor,
+        change: {
+          kind: "INVESTOR_MANDATE",
+          investorOrganisationId: ORG,
+          operation: "UPDATE",
+          mandateId,
+          fields: { rawMandateText: "Pre-seed fintech." },
+        },
+      });
+      return b.proposer.propose({ runId, actor } as never);
+    };
+    // Live: the model passed the organisation's own id as the mandate's.
+    expect(await propose("run-m1", ORG)).toMatchObject({
+      actionType: INVESTOR_MANDATE_CHANGE,
+      payload: { mandateId: ACTIVE },
+    });
+    expect(await propose("run-m2", null)).toMatchObject({
+      payload: { mandateId: ACTIVE },
+    });
+    // A mandate that is theirs is kept as named.
+    expect(await propose("run-m3", DRAFT)).toMatchObject({
+      payload: { mandateId: DRAFT },
+    });
   });
 
   it("never hands a change to another person's run", async () => {

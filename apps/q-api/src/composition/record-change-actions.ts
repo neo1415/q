@@ -1030,7 +1030,12 @@ export function createRecordChangeBoard(
       }
       case "INVESTOR_MANDATE": {
         let mandateId = change.mandateId;
-        if (change.operation !== "CREATE" && mandateId === null) {
+        // An id the model supplied is input, never proof (founder live
+        // 2026-09-28: it passed the organisation's own id as the mandate's,
+        // the change was approved and then refused at execution). Only a
+        // mandate on this organisation's own list is ever named; anything
+        // else means their current one.
+        if (change.operation !== "CREATE") {
           const page = await deps.investorService
             .listInvestorMandates({
               actor,
@@ -1041,7 +1046,12 @@ export function createRecordChangeBoard(
             })
             .catch(() => null);
           const items = page?.items ?? [];
+          const named =
+            mandateId === null
+              ? undefined
+              : items.find((item) => item.id === mandateId);
           const chosen =
+            named ??
             items.find((item) => item.status === "ACTIVE") ??
             items.find((item) => item.status === "DRAFT");
           if (chosen === undefined) {
