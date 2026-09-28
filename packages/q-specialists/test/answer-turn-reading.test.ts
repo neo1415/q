@@ -582,6 +582,8 @@ describe("the answer is told what this run can do (CQ-QX-008)", () => {
         visibilityChange: false,
         offers: [
           expect.objectContaining({ destination: "SETTINGS" }),
+          // Profile photo and cover (cropped on the profile).
+          expect.objectContaining({ destination: "PROFILE" }),
           expect.objectContaining({ destination: "HOME" }),
           // Unsend, block, unblock, report (chat) and dismiss a reminder.
           expect.objectContaining({ destination: "RELATIONSHIPS" }),
