@@ -301,8 +301,9 @@ describe("the profile panel", () => {
       "wasn't saved",
     );
     expect(
-      (screen.getByRole("button", { name: "Save card" }) as HTMLButtonElement)
-        .disabled,
+      screen
+        .getByRole("button", { name: "Save card" })
+        .hasAttribute("disabled"),
     ).toBe(false);
   });
 });

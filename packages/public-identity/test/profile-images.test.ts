@@ -56,9 +56,11 @@ function world(options: { readonly denyEdit?: boolean } = {}) {
     const row = rows.get(id);
     if (row !== undefined) rows.set(id, { ...row, ...patch });
   };
+  // Synchronous fakes behind the async ports.
+  const done = <T>(value: T): Promise<T> => Promise.resolve(value);
   const repository: ProfileImageRepository = {
-    countRecentPending: async () => 0,
-    insertPending: async (_sql, row) => {
+    countRecentPending: () => done(0),
+    insertPending: (_sql, row) => {
       rows.set(row.id, {
         id: row.id,
         tenantId: row.tenantId,
@@ -77,22 +79,28 @@ function world(options: { readonly denyEdit?: boolean } = {}) {
         uploadExpiresAt: row.uploadExpiresAt,
         readyAt: null,
       });
+      return done(undefined);
     },
-    find: async (_sql, id) => rows.get(id) ?? null,
-    lockReady: async (_tx, subject, kind) =>
-      [...rows.values()].find(
-        (row) =>
-          row.subjectId === subject.subjectId &&
-          row.kind === kind &&
-          row.status === "READY",
-      ) ?? null,
-    findReady: async (_sql, subject) =>
-      [...rows.values()].filter(
-        (row) => row.subjectId === subject.subjectId && row.status === "READY",
+    find: (_sql, id) => done(rows.get(id) ?? null),
+    lockReady: (_tx, subject, kind) =>
+      done(
+        [...rows.values()].find(
+          (row) =>
+            row.subjectId === subject.subjectId &&
+            row.kind === kind &&
+            row.status === "READY",
+        ) ?? null,
       ),
-    end: async (_tx, id, status) => set(id, { status }),
-    markFailed: async (_sql, id) => set(id, { status: "FAILED" }),
-    markReady: async (_tx, id, rendition) => {
+    findReady: (_sql, subject) =>
+      done(
+        [...rows.values()].filter(
+          (row) =>
+            row.subjectId === subject.subjectId && row.status === "READY",
+        ),
+      ),
+    end: (_tx, id, status) => done(set(id, { status })),
+    markFailed: (_sql, id) => done(set(id, { status: "FAILED" })),
+    markReady: (_tx, id, rendition) => {
       set(id, {
         status: "READY",
         objectKey: rendition.objectKey,
@@ -100,62 +108,63 @@ function world(options: { readonly denyEdit?: boolean } = {}) {
         height: rendition.height,
         readyAt: new Date().toISOString(),
       });
-      return rows.get(id) ?? null;
+      return done(rows.get(id) ?? null);
     },
   };
   const storage: ProfileImageStorage = {
-    createUploadAuthorization: async ({ object, contentType }) => ({
-      method: "PUT",
-      url: `https://storage.example.invalid/upload/${object.key}`,
-      headers: { "content-type": contentType },
-    }),
-    createDownloadAuthorization: async ({ object }) => ({
-      url: `https://storage.example.invalid/sign/${object.key}?token=t`,
-    }),
-    statObject: async (object) => {
+    createUploadAuthorization: ({ object, contentType }) =>
+      done({
+        method: "PUT" as const,
+        url: `https://storage.example.invalid/upload/${object.key}`,
+        headers: { "content-type": contentType },
+      }),
+    createDownloadAuthorization: ({ object }) =>
+      done({
+        url: `https://storage.example.invalid/sign/${object.key}?token=t`,
+      }),
+    statObject: (object) => {
       const bytes = objects.get(object.key);
-      return bytes === undefined ? null : { sizeBytes: bytes.byteLength };
+      return done(bytes === undefined ? null : { sizeBytes: bytes.byteLength });
     },
-    openObjectStream: async (object) => {
+    openObjectStream: (object) => {
       const bytes = objects.get(object.key) ?? new Uint8Array();
-      return {
-        body: (async function* () {
-          yield bytes;
-        })(),
-      };
+      return done({ body: [bytes] });
     },
-    putObject: async ({ object, body }) => {
+    putObject: ({ object, body }) => {
       objects.set(object.key, body);
+      return done(undefined);
     },
-    deleteObject: async (object) => {
+    deleteObject: (object) => {
       deleted.push(object.key);
       objects.delete(object.key);
+      return done(undefined);
     },
   };
   const subjects: SubjectDirectory = {
-    find: async (subject) =>
-      subject.subjectId === companyId
-        ? {
-            tenantId,
-            organisationId: orgId,
-            name: "Kivu",
-            facts: {},
-            verified: { organisation: false, founderIdentity: false },
-          }
-        : null,
+    find: (subject) =>
+      done(
+        subject.subjectId === companyId
+          ? {
+              tenantId,
+              organisationId: orgId,
+              name: "Kivu",
+              facts: {},
+              verified: { organisation: false, founderIdentity: false },
+            }
+          : null,
+      ),
   };
   const service = createProfileImageService({
     sql: executor,
     transactions,
     authorization: {
-      authorize: async () => {
-        throw new Error("not used");
-      },
-      requireCapability: async () => {
-        if (options.denyEdit === true) throw new Error("DENIED");
-      },
+      authorize: () => Promise.reject(new Error("not used")),
+      requireCapability: () =>
+        options.denyEdit === true
+          ? Promise.reject(new Error("DENIED"))
+          : done(undefined),
     },
-    audit: { record: async () => randomUUID() as never },
+    audit: { record: () => done(randomUUID() as never) },
     subjects,
     repository,
     storage,
