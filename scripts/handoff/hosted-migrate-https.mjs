@@ -7,6 +7,7 @@
  *       status + dry run: lists the migrations hosted has not applied and
  *       prints each file's statements for review. Writes nothing.
  *   ... hosted-migrate-https.mjs --apply <version> [<version> ...]
+ *       [--founder-approved <version>]  (lifts the refusal for that one version)
  *       applies exactly the named pending versions, in order, each in one
  *       transaction together with its supabase_migrations.schema_migrations
  *       row, so migration history stays what `supabase db push` would write.
@@ -109,7 +110,18 @@ if (applyIndex === -1) {
   process.exit(pending.length === 0 ? 0 : 1);
 }
 
-const wanted = process.argv.slice(applyIndex + 1);
+// `--founder-approved <version>` lifts the refusal below for exactly that
+// version: a migration the founder approved by name, recorded in the
+// ledger. Nothing else is ever lifted.
+const approvedIndex = process.argv.indexOf("--founder-approved");
+const founderApproved =
+  approvedIndex === -1 ? null : (process.argv[approvedIndex + 1] ?? null);
+const wanted = process.argv
+  .slice(applyIndex + 1)
+  .filter(
+    (arg, i, all) =>
+      arg !== "--founder-approved" && all[i - 1] !== "--founder-approved",
+  );
 if (wanted.length === 0) {
   console.error("--apply needs at least one pending version.");
   process.exit(2);
@@ -136,7 +148,11 @@ for (const version of wanted) {
 for (const f of pending.filter((p) => wanted.includes(p.version))) {
   const sql = readFileSync(resolve(dir, f.file), "utf8");
   const flags = REFUSED.filter((pattern) => pattern.test(sql));
-  if (flags.length > 0) {
+  if (flags.length > 0 && founderApproved === f.version) {
+    console.log(
+      `${f.file}: ${flags.map(String).join(", ")} applied under founder approval of ${f.version}.`,
+    );
+  } else if (flags.length > 0) {
     console.error(
       `${f.file}: refused (${flags.map(String).join(", ")}); needs the founder.`,
     );
