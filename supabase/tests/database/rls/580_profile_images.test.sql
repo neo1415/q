@@ -35,7 +35,7 @@ select is((select count(*)::int from pg_policies where schemaname = 'core' and t
   'no policies: server-internal');
 select is((select public from storage.buckets where id = 'cq-profile-images'), false,
   'the image bucket is private: reads are signed URLs');
-select ok(not ('image/svg+xml' = any ((select allowed_mime_types from storage.buckets where id = 'cq-profile-images'))),
+select ok((select not ('image/svg+xml'::text = any (allowed_mime_types)) from storage.buckets where id = 'cq-profile-images'),
   'the bucket refuses SVG (script-bearing)');
 
 -- Rules ------------------------------------------------------------------------
