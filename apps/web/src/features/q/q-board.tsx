@@ -14,6 +14,7 @@ import { ArtifactCard } from "./artifact-card";
 import { slideSource } from "./artifact-viewer";
 import { arrangeBoard, boardObjects, type BoardObject } from "./board";
 import type { QTurn } from "./conversation";
+import { plainFromMarkdown } from "./markdown";
 import { QEvidence } from "./q-evidence";
 import { QResultBlocks } from "./q-result-blocks";
 
@@ -157,7 +158,8 @@ function ObjectBody({
     case "NOTE":
       return (
         <p className="cq-body-sm cq-q-board-note text-(--cq-text-primary)">
-          {object.turn.text}
+          {/* A slim note: the answer's words, not its Markdown syntax. */}
+          {plainFromMarkdown(object.turn.text)}
         </p>
       );
     case "COMPANIES":
