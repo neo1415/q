@@ -4,6 +4,7 @@ import {
   COMPANY_ANALYST_V8,
   COMPANY_ANALYST_V9,
   COMPANY_ANALYST_V10,
+  COMPANY_ANALYST_V11,
   createPromptRegistry,
   PROMPT_DEFINITIONS,
 } from "../src/index.js";
@@ -33,9 +34,10 @@ describe("COMPANY_ANALYST v9", () => {
  * for any wording and for any kind of counterpart, not only investors.
  */
 describe("COMPANY_ANALYST v10", () => {
-  it("is the one active analyst version, v9 retired and still resolvable", () => {
+  it("is retired by v11, as v9 was by it, and both stay resolvable", () => {
     const registry = createPromptRegistry(PROMPT_DEFINITIONS);
-    expect(registry.getActive("COMPANY_ANALYST").definition.version).toBe(10);
+    expect(COMPANY_ANALYST_V10.status).toBe("DEPRECATED");
+    expect(registry.get("COMPANY_ANALYST", 10)?.definition.version).toBe(10);
     expect(COMPANY_ANALYST_V9.status).toBe("DEPRECATED");
     expect(registry.get("COMPANY_ANALYST", 9)?.definition.version).toBe(9);
   });
@@ -49,5 +51,35 @@ describe("COMPANY_ANALYST v10", () => {
     expect(template).not.toContain("which investors would likely invest");
     expect(template).toContain("fit score or peer benchmark");
     expect(template).toContain("ACTING, CORRECTIONS, MANDATES");
+  });
+});
+
+/**
+ * v11 tells the model the answer may be simple Markdown structure (founder
+ * direction D): the Home thread renders it, voice strips it. Presentation
+ * only -- every rule of v10 is still there, and structure never upgrades a
+ * claim.
+ */
+describe("COMPANY_ANALYST v11", () => {
+  it("is the one active analyst version", () => {
+    const registry = createPromptRegistry(PROMPT_DEFINITIONS);
+    expect(registry.getActive("COMPANY_ANALYST").definition.version).toBe(11);
+    expect(COMPANY_ANALYST_V11.status).toBe("ACTIVE");
+  });
+
+  it("allows lists, tables and callouts for structure, keeps unknowns empty and forbids HTML", () => {
+    const template = COMPANY_ANALYST_V11.template;
+    expect(template).toContain("ANSWER FORMAT");
+    expect(template).toContain("a table (header row, then |---|)");
+    expect(template).toContain("a cell left empty when not known");
+    expect(template).toContain("> [!RISK]");
+    expect(template).toContain("No HTML");
+    expect(template).toContain("an inference stays worded as one");
+    // Nothing of v10 was lost.
+    expect(template).toContain("INVOLVED VERSUS SUITED");
+    expect(template).toContain("ACTING, CORRECTIONS, MANDATES");
+    expect(template.replace(/ANSWER FORMAT[\s\S]*?\n\n/, "")).toBe(
+      COMPANY_ANALYST_V10.template,
+    );
   });
 });

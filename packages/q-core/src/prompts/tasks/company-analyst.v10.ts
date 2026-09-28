@@ -40,7 +40,7 @@ export const COMPANY_ANALYST_V10: PromptDefinition<
 > = {
   ...COMPANY_ANALYST_V9,
   version: 10,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   changeDescription:
     "v9's fit-versus-interest rule restated as a concept (already involved = evidence, would suit = labelled inference, read from question and context) instead of keyed to one question's wording.",
   effectiveFrom: "2026-09-25",

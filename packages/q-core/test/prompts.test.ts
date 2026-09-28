@@ -220,7 +220,7 @@ describe("renderer", () => {
     expect(rendered.messages[0]?.content).toContain("You are Q");
     expect(rendered.messages[0]?.content).toContain("OPERATING MODE: DEBRIEF");
     expect(rendered.bundle.bundleVersion).toBe(
-      "q-system.v1_company-analyst.v10_comm.v1",
+      "q-system.v1_company-analyst.v11_comm.v1",
     );
     expect(rendered.bundle.bundleVersion).toMatch(
       /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/,
@@ -319,7 +319,10 @@ describe("renderer", () => {
     // 3,600 since company-analyst/v9 (directive E): ~90 tokens so "which
     // investors would likely invest" is answered with named prospects by
     // fit, kept apart from evidenced interest.
-    expect(rendered.characters / 4).toBeLessThan(3_600);
+    // 3,750 since company-analyst/v11 (founder direction D): ~110 tokens
+    // telling the model when a list, table or callout helps, so Home can
+    // render answers as structure.
+    expect(rendered.characters / 4).toBeLessThan(3_750);
   });
 });
 

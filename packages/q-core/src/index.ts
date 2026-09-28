@@ -304,6 +304,7 @@ export { COMPANY_ANALYST_V7 } from "./prompts/tasks/company-analyst.v7.js";
 export { COMPANY_ANALYST_V8 } from "./prompts/tasks/company-analyst.v8.js";
 export { COMPANY_ANALYST_V9 } from "./prompts/tasks/company-analyst.v9.js";
 export { COMPANY_ANALYST_V10 } from "./prompts/tasks/company-analyst.v10.js";
+export { COMPANY_ANALYST_V11 } from "./prompts/tasks/company-analyst.v11.js";
 export { ARTIFACT_REVISION_V1 } from "./prompts/tasks/artifact-revision.v1.js";
 export {
   ARTIFACT_REVISION_BODY_MAX,
