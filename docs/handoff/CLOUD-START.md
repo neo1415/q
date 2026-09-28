@@ -7,6 +7,8 @@ tags: [handoff, cloud, lead, runbook]
 
 # Capital Q: cloud start
 
+> **UPDATE 2026-09-28 (read first):** state below is from 2026-09-26 and is stale. Current truth: deploy branch `recovery/2026-09-12` (Railway auto-deploys; last pushed 5b4647f), hosted DB 81/81 migrations. What was built on 2026-09-27/28 is in the last ~40 lines of `docs/handoff/research/ledger.md`; the open founder backlog is `docs/handoff/fixtures/founder-live-test-2026-09-28.md` (start there). Tools: hosted migrations over HTTPS with `scripts/handoff/hosted-migrate-https.mjs` (needs `SUPABASE_ACCESS_TOKEN`); Railway CLI uses the account token as `RAILWAY_API_TOKEN` (unset `RAILWAY_TOKEN`); Node fetch through the cloud proxy needs `NODE_USE_ENV_PROXY=1`.
+
 You are the **cloud lead** for Capital Q. The founder moved the work from a Windows laptop to this Claude Code cloud session and expects you to continue **unsupervised**: build, test, deploy, and come back to a far-along product. This file is your entry point. Everything it points at is in the repo.
 
 ## 0. Budget and deadline first (founder rule, read before anything else)
