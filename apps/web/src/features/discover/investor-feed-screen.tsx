@@ -682,6 +682,45 @@ function InvestorFeed({
 
   const card = feed.card;
   const notes = feed.state.notes;
+  // While the slate is still being built, look again every few seconds
+  // (bounded) instead of asking the person to refresh (founder 2026-09-28).
+  const building =
+    card === null && notes.includes("RECOMMENDATIONS_REFRESHING");
+  useEffect(() => {
+    if (!building) {
+      try {
+        window.sessionStorage.removeItem("cq-discover-building");
+      } catch {
+        // Nothing to reset.
+      }
+      return;
+    }
+    // Counted across reloads so a slate that never builds stops after ~1 min.
+    const readTries = () => {
+      try {
+        return Number(
+          window.sessionStorage.getItem("cq-discover-building") ?? "0",
+        );
+      } catch {
+        return 0;
+      }
+    };
+    const timer = window.setInterval(() => {
+      const tries = readTries() + 1;
+      try {
+        window.sessionStorage.setItem("cq-discover-building", String(tries));
+      } catch {
+        // Without storage the ten-reload bound below is per page only.
+      }
+      if (tries > 10) {
+        window.clearInterval(timer);
+        return;
+      }
+      // Only this empty "building" screen reloads; nothing is lost.
+      window.location.reload();
+    }, 6000);
+    return () => window.clearInterval(timer);
+  }, [building]);
   const { unverifiableExclusions, excludingRules, discoverableCount } =
     feed.state;
   /*
