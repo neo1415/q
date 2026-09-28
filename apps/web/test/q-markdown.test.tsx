@@ -181,6 +181,7 @@ describe("Q markdown aloud", () => {
     expect(spoken).toContain("Acme leads, see filing");
     expect(spoken).toContain("ARR is up");
     expect(spoken).toContain("ARR, $1m");
+    expect(spoken).toContain("Risk:");
     expect(spoken).toContain("Churn is high.");
     expect(spoken).not.toContain("https://");
   });

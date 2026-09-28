@@ -243,6 +243,12 @@ export function speakable(text: string): string {
       .replace(/^\s*[-*+]\s+/gm, "")
       .replace(/^\s*\d+[.)]\s+/gm, "")
       .replace(/^\s*>\s?/gm, "")
+      // A callout's marker ("> [!RISK]") is said as its meaning.
+      .replace(
+        /^\s*\[!([A-Za-z]+)\]\s*/gm,
+        (_marker, kind: string) =>
+          `${kind.charAt(0).toUpperCase()}${kind.slice(1).toLowerCase()}: `,
+      )
       // Emphasis and code.
       .replace(/(\*\*|__)(.*?)\1/g, "$2")
       .replace(/(\*|_)(?=\S)(.*?)(?<=\S)\1/g, "$2")

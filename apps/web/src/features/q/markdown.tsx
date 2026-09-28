@@ -786,7 +786,12 @@ export function plainFromMarkdown(source: string): string {
         .replace(/^ {0,3}(```|~~~).*$/, "")
         .replace(/^ {0,3}#{1,6}\s+/, "")
         .replace(/^ {0,3}>\s?/, "")
-        .replace(/^\[![A-Za-z]+\]\s*/, "")
+        // A callout's marker is said as its meaning: "Risk: …".
+        .replace(
+          /^\[!([A-Za-z]+)\]\s*/,
+          (_marker, kind: string) =>
+            `${kind.charAt(0).toUpperCase()}${kind.slice(1).toLowerCase()}: `,
+        )
         .replace(/^(\s*)([-*+]|\d{1,9}[.)])\s+/, "$1")
         .replace(/^\s*\|(.*)\|?\s*$/, (_, cells: string) =>
           splitRow(cells)
