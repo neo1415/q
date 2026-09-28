@@ -50,3 +50,9 @@ Google sign-in redirect_uri_mismatch (Cloud Console); malware scanner for chat f
 - Emails / Meet links / stuck approvals / "2 PM tomorrow": hosted logs showed no meeting ever reached execution. Worker MEET, branch fix/meet-approvals.
 - LinkedIn-style profile + cover/profile photo upload, LinkedIn-like system font stack; Q Card: choose which onboarding fields show, Save success state (Save silently failed), beautiful /@handle page with See more; Q can revise its own PDF/PPTX (new version) and export any answer as PDF. Worker PROF, branch ux/profile-qcard.
 - Noted for later: founders see other founders' pitches; founder Investors page + contact rules (check sources); multiple pitch videos per founder.
+
+## Shipped 2026-09-28 afternoon
+
+- 1a42caf LIVE: chat thread layout + structured streaming (safe built-in markdown renderer, COMPANY_ANALYST v11); meetings/emails/approvals root causes fixed (local-time resolution, typed approval starts a new turn, personal reminders owner-scoped, approved-but-lost runs execute through the gate). Live logs confirm "google workspace configured on q-api" and "reminder email enabled: SMTP configured".
+- 5b4647f deploying: LinkedIn-style profile (cover + photo upload with crop, sections, See more, system font token), Q Card save feedback + per-field toggles + redesigned /@handle, revise_my_document (Q edits its own PDF/PPTX as a new version). Hosted 81/81 (profile_images).
+- Open: Q_REPORT (export any answer as PDF); ADR 0017 amendment (chat thread + Share on rail); founders view other pitches; founder Investors page; multiple pitch videos.
