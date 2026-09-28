@@ -239,13 +239,22 @@ describe("the profile panel", () => {
     });
     renderPanel(CARD);
     expect(screen.getByText(/3 scans of your QR/)).toBeTruthy();
-    fireEvent.change(screen.getByRole("combobox", { name: "Who sees stage" }), {
-      target: { value: "" },
-    });
-    fireEvent.change(
-      screen.getByRole("combobox", { name: "Who sees website" }),
-      { target: { value: "public_external" } },
+    fireEvent.click(
+      screen.getByRole("switch", { name: "Show stage on the card" }),
     );
+    fireEvent.click(
+      screen.getByRole("switch", { name: "Show website on the card" }),
+    );
+    fireEvent.click(
+      within(screen.getByRole("group", { name: "Who sees website" })).getByRole(
+        "radio",
+        { name: "Anyone with the link" },
+      ),
+    );
+    // Making a field public says so before anything is saved.
+    expect(
+      document.querySelector("[data-public-warning]")?.textContent,
+    ).toContain("Website becomes public");
     fireEvent.click(
       screen.getByRole("checkbox", {
         name: /Let search engines list the public page/,
@@ -265,5 +274,35 @@ describe("the profile panel", () => {
         indexable: true,
       },
     );
+    // Success is visible, not only announced.
+    expect((await screen.findByRole("status")).textContent).toContain("Saved.");
+    expect(refresh).toHaveBeenCalled();
+  });
+
+  it("a switched-on field starts members only", () => {
+    renderPanel({ ...CARD, fieldScopes: { canonicalName: "public_external" } });
+    fireEvent.click(
+      screen.getByRole("switch", { name: "Show in one line on the card" }),
+    );
+    const members = within(
+      screen.getByRole("group", { name: "Who sees in one line" }),
+    ).getByRole("radio", { name: "Capital Q members only" });
+    expect((members as HTMLInputElement).checked).toBe(true);
+    expect(document.querySelector("[data-public-warning]")).toBeNull();
+  });
+
+  it("says the change was not saved when the action itself throws, instead of hanging", async () => {
+    updateQCardAction.mockRejectedValue(
+      new Error("Failed to find Server Action"),
+    );
+    renderPanel(CARD);
+    fireEvent.click(screen.getByRole("button", { name: "Save card" }));
+    expect((await screen.findByRole("alert")).textContent).toContain(
+      "wasn't saved",
+    );
+    expect(
+      (screen.getByRole("button", { name: "Save card" }) as HTMLButtonElement)
+        .disabled,
+    ).toBe(false);
   });
 });

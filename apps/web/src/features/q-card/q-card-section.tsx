@@ -13,6 +13,7 @@ import { apiSession } from "@/features/q/context";
 import {
   cardDescriptor,
   cardFieldLabel,
+  cardFieldValue,
   publicExternalFields,
   suggestHandle,
 } from "./card-content";
@@ -62,6 +63,7 @@ export async function QCardSection({
   name,
   tagline,
   brand,
+  values,
 }: {
   readonly subjectType: QCardSubjectType;
   readonly subjectId: string;
@@ -70,6 +72,12 @@ export async function QCardSection({
   readonly tagline: string | null;
   /** BIZ-005 feeds this from the brand kit; absent uses Capital Q tokens. */
   readonly brand?: CardBrand | undefined;
+  /**
+   * The owner's current declared values, keyed by card field (the photo
+   * and cover as "Added" or null), so each switch shows what it puts on
+   * the card.
+   */
+  readonly values?: Readonly<Record<string, string | null>> | undefined;
 }) {
   const card = await loadCard(subjectType, subjectId);
   if (card === "UNAVAILABLE") {
@@ -84,7 +92,25 @@ export async function QCardSection({
     subjectType === "COMPANY" ? COMPANY_CARD_FIELDS : INVESTOR_CARD_FIELDS
   )
     .filter((key) => key !== nameField)
-    .map((key) => ({ key, label: cardFieldLabel(key) }));
+    .map((key) => {
+      const raw = values?.[key];
+      return {
+        key,
+        label: cardFieldLabel(key),
+        ...(values === undefined
+          ? {}
+          : {
+              value:
+                raw === null || raw === undefined
+                  ? null
+                  : cardFieldValue({
+                      key,
+                      value: raw,
+                      scope: "network_visible",
+                    }),
+            }),
+      };
+    });
   const handle = card?.handle ?? null;
   const origin = appOrigin();
   const descriptor =

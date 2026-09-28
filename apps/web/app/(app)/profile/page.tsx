@@ -473,6 +473,12 @@ export default async function ProfilePage() {
                   subjectId={company.id}
                   name={company.canonicalName}
                   tagline={company.shortDescription}
+                  values={{
+                    ...fieldValues(COMPANY_FIELDS, company),
+                    photo:
+                      (orgImages?.avatar ?? null) === null ? null : "Added",
+                    cover: (orgImages?.cover ?? null) === null ? null : "Added",
+                  }}
                 />
               ) : investor !== null ? (
                 <QCardSection
@@ -480,6 +486,12 @@ export default async function ProfilePage() {
                   subjectId={investor.id}
                   name={investor.displayName}
                   tagline={investor.publicDescription}
+                  values={{
+                    ...fieldValues(INVESTOR_FIELDS, investor),
+                    photo:
+                      (orgImages?.avatar ?? null) === null ? null : "Added",
+                    cover: (orgImages?.cover ?? null) === null ? null : "Added",
+                  }}
                 />
               ) : null}
             </ProfileSectionShell>
