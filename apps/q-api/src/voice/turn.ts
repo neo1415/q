@@ -31,6 +31,7 @@ import type {
   QRuntimeService,
 } from "@capital-q/q-runtime";
 
+import type { ApprovedContinuation } from "../composition/approved-continuation.js";
 import type { VoiceSessionBinding } from "./bindings.js";
 import {
   signupContextFromToken,
@@ -126,6 +127,8 @@ export type VoiceTurnDependencies = {
    * tap on screen records, under the same actor.
    */
   readonly approvals?: Pick<QActionService, "approve" | "reject"> | undefined;
+  /** Resume, or execute through the gate when the run cannot resume. */
+  readonly continueApproved?: ApprovedContinuation | undefined;
   /**
    * Reads a reply to a closed question Q asked (ADR 0011): a yes, a no,
    * or neither, from the person's words. Absent means the scripted
@@ -767,7 +770,23 @@ export function createVoiceTurnHandler(
           approvalId,
           correlationId,
         });
-        if (result.decided && orchestration !== undefined) {
+        const continueApproved = dependencies.continueApproved;
+        if (
+          continueApproved !== undefined &&
+          (result.decided || result.action.status === "APPROVED")
+        ) {
+          void continueApproved({
+            actor: binding.actor,
+            runId: result.action.runId,
+            actionId: result.action.id,
+            correlationId,
+          }).catch((error: unknown) => {
+            logger.error(
+              { err: error, qRunId: result.action.runId, correlationId },
+              "approved action did not continue after a spoken approval",
+            );
+          });
+        } else if (result.decided && orchestration !== undefined) {
           void orchestration.orchestrator
             .resume({
               actor: binding.actor,

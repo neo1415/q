@@ -8,7 +8,9 @@ import { QStreamEventSchema, type QStreamEvent } from "@capital-q/contracts";
 /**
  * R30 #6: Q says "tap Approve on the card, or tell me to go ahead", so a
  * run paused on the person's approval is waiting for them, not working:
- * the composer stays usable and what they type is the run's next turn.
+ * the composer stays usable. What they type starts the conversation's
+ * next run (live 2026-09-28 #4): appended to the paused run it was stored
+ * and never answered, so "go ahead" left the change "approval needed".
  */
 
 const RUN = "0198f8b2-9c1a-7a3e-8f2b-1c2d3e4f5a6b";
@@ -16,16 +18,17 @@ const CONVERSATION = "c0000000-0000-4000-8000-000000000001";
 
 const continueQRunAction =
   vi.fn<(...args: unknown[]) => Promise<{ ok: true; value: null }>>();
+const askQAction = vi.fn((..._args: unknown[]) =>
+  Promise.resolve({
+    ok: true,
+    value: { runId: RUN, conversationId: CONVERSATION },
+  }),
+);
 let emit: ((event: QStreamEvent) => void) | null = null;
 
 vi.mock("../src/features/q/actions", () => ({
   readQConversationAction: vi.fn(),
-  askQAction: vi.fn(() =>
-    Promise.resolve({
-      ok: true,
-      value: { runId: RUN, conversationId: CONVERSATION },
-    }),
-  ),
+  askQAction: (...args: unknown[]) => askQAction(...args),
   continueQRunAction: (...args: unknown[]) => continueQRunAction(...args),
   cancelQRunAction: vi.fn(),
   approveQApprovalAction: vi.fn(),
@@ -80,7 +83,7 @@ function Home() {
 }
 
 describe("typed approval while a change waits", () => {
-  it("is not 'working' while waiting, and a typed reply continues the run", async () => {
+  it("is not 'working' while waiting, and a typed reply is a new turn of the conversation", async () => {
     render(<Home />);
     await act(async () => {
       await handle.ask?.("Change my headline to: Credit for Lagos traders");
@@ -111,6 +114,8 @@ describe("typed approval while a change waits", () => {
     await act(async () => {
       await handle.ask?.("go ahead");
     });
-    expect(continueQRunAction).toHaveBeenCalledWith(RUN, "go ahead");
+    expect(continueQRunAction).not.toHaveBeenCalled();
+    const reply = askQAction.mock.calls.find((call) => call[0] === "go ahead");
+    expect(reply?.[1]).toBe(CONVERSATION);
   });
 });

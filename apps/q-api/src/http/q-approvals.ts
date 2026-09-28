@@ -27,6 +27,7 @@ import {
 } from "@capital-q/q-actions";
 import type { QOrchestrator } from "@capital-q/q-runtime";
 
+import type { ApprovedContinuation } from "../composition/approved-continuation.js";
 import {
   EMAIL_SEND,
   EmailSendPayloadSchema,
@@ -61,6 +62,11 @@ export type QApprovalRoutesDependencies = ActorContextDependencies & {
   readonly qActions: QActionService;
   /** Resumes the run after an approval; absent means an approved action waits for a worker. */
   readonly orchestrator?: QOrchestrator | undefined;
+  /**
+   * Resume, or execute through the gate when the run cannot resume
+   * (approved-continuation.ts). Preferred over `orchestrator` when set.
+   */
+  readonly continueApproved?: ApprovedContinuation | undefined;
 };
 
 function correlation(): CorrelationId {
@@ -135,7 +141,26 @@ export function registerQApprovalRoutes(
 
       // The decision is durable; execution is the run's continuation,
       // re-verified by the gate. A retried approve does not resume twice.
-      if (result.decided && dependencies.orchestrator !== undefined) {
+      // A repeated tap on an action still waiting to run (its first
+      // continuation was lost) continues it again; the gate's claim makes
+      // that safe.
+      const continueApproved = dependencies.continueApproved;
+      if (
+        continueApproved !== undefined &&
+        (result.decided || result.action.status === "APPROVED")
+      ) {
+        void continueApproved({
+          actor,
+          runId: result.action.runId,
+          actionId: result.action.id,
+          correlationId,
+        }).catch((error: unknown) => {
+          request.log.error(
+            { err: error, qRunId: result.action.runId, correlationId },
+            "approved action did not continue after approval",
+          );
+        });
+      } else if (result.decided && dependencies.orchestrator !== undefined) {
         const orchestrator = dependencies.orchestrator;
         void orchestrator
           .resume({ actor, runId: result.action.runId, correlationId })

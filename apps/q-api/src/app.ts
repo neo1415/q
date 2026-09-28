@@ -95,6 +95,9 @@ export type QApiModules = {
   readonly orchestration?: QRunRoutesDependencies["orchestration"];
   /** The Approval Engine (CQ-Q-008); absent means no approval routes. */
   readonly qActions?: QApprovalRoutesDependencies["qActions"] | undefined;
+  /** What runs an approved action: resume, or the gate when the run cannot resume. */
+  readonly continueApproved?:
+    QApprovalRoutesDependencies["continueApproved"] | undefined;
   /** The resumable run stream (CQ-Q-009); absent means no events route. */
   readonly qStream?:
     | {
@@ -298,6 +301,7 @@ export function createApp(
       resolver: security.resolver,
       qActions: modules.qActions,
       orchestrator: modules.orchestration?.orchestrator,
+      continueApproved: modules.continueApproved,
     });
   }
 

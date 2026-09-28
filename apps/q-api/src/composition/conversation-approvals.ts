@@ -21,6 +21,8 @@ import type {
 } from "@capital-q/q-tools";
 import type { ActorContext } from "@capital-q/security";
 
+import type { ApprovedContinuation } from "./approved-continuation.js";
+
 /**
  * Approval by conversation (live test 2026-09-27 #1, #2).
  *
@@ -73,6 +75,11 @@ export type ConversationApprovalDependencies = {
       "findApprovalForAction" | "getApproval" | "approve" | "reject"
     >;
     readonly orchestrator: QOrchestrator | undefined;
+    /**
+     * Resume, or execute through the gate when the run cannot resume
+     * (approved-continuation.ts). Absent: resume only.
+     */
+    readonly continueApproved?: ApprovedContinuation | undefined;
   };
   /** How long an approval waits for the change to be applied before answering "saving". */
   readonly applyWithinMs?: number | undefined;
@@ -167,18 +174,38 @@ export function createConversationApprovalPort(
     if (before === null) {
       throw new Error("the proposal is not readable as this person");
     }
-    const { actions, orchestrator } = late();
+    const { actions, orchestrator, continueApproved } = late();
     try {
       const result = await actions.approve({
         actor,
         approvalId: before.approvalId,
         correlationId,
       });
-      if (result.decided && orchestrator !== undefined) {
+      // A repeated approve of an action still waiting to run (its first
+      // continuation was lost) continues it again; the gate's claim makes
+      // that safe.
+      const waiting =
+        result.decided ||
+        (continueApproved !== undefined && result.action.status === "APPROVED");
+      const continuation =
+        continueApproved !== undefined
+          ? () =>
+              continueApproved({
+                actor,
+                runId: result.action.runId,
+                actionId: result.action.id,
+                correlationId,
+              })
+          : orchestrator !== undefined
+            ? () =>
+                orchestrator
+                  .resume({ actor, runId: result.action.runId, correlationId })
+                  .then(() => undefined)
+            : undefined;
+      if (waiting && continuation !== undefined) {
         // The same continuation the card's Approve starts. It runs on its
         // own; this answer waits a bounded time to report what happened.
-        const resumed = orchestrator
-          .resume({ actor, runId: result.action.runId, correlationId })
+        const resumed = continuation()
           .then(() => true)
           .catch((error: unknown) => {
             logger?.error(

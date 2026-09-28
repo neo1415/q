@@ -272,6 +272,7 @@ import {
   createConversationApprovalPort,
   plainProposalStatus,
 } from "./composition/conversation-approvals.js";
+import { createApprovedContinuation } from "./composition/approved-continuation.js";
 import { createHandleClaimBoard } from "./composition/handle-claim-board.js";
 import {
   createPostgresPublicIdentityRepository,
@@ -844,6 +845,31 @@ const profileChangeBoard = createProfileChangeBoard({ logger });
 // through the integrations context. The approved `email.send` executes
 // here, so q-api carries the same Google variables as api and workers.
 const googleWorkspace = loadGoogleWorkspaceConfig(process.env);
+// Approved meeting.*, email.send execute on THIS service: without these
+// every approved call or email fails as "not connected", so say so loudly.
+if (
+  googleWorkspace.oauth === undefined ||
+  googleWorkspace.tokenEncryptionKey === undefined
+) {
+  logger.error(
+    {
+      missing: [
+        ...(googleWorkspace.oauth === undefined
+          ? ["GOOGLE_WORKSPACE_CLIENT_ID", "GOOGLE_WORKSPACE_CLIENT_SECRET"]
+          : []),
+        ...(googleWorkspace.tokenEncryptionKey === undefined
+          ? ["GOOGLE_TOKEN_ENCRYPTION_KEY"]
+          : []),
+      ],
+    },
+    "google workspace not configured on q-api: approved meetings and emails cannot execute",
+  );
+} else {
+  logger.info(
+    {},
+    "google workspace configured on q-api: approved meetings and emails execute here",
+  );
+}
 const integrations = composeGoogleIntegrations({
   sql: database.sql,
   transactions: database.transactions,
@@ -1103,7 +1129,7 @@ const qTools = createQTools({
     // 2026-09-27 #1). The engine and orchestrator are composed below.
     pendingProposals: createConversationApprovalPort({
       runtime: qRuntime,
-      late: () => ({ actions: qActions, orchestrator }),
+      late: () => ({ actions: qActions, orchestrator, continueApproved }),
       logger,
     }),
     // Live test 2026-09-27 #4: "is my card saved?" -- the Q Card screen's
@@ -1327,7 +1353,7 @@ const qActionRegistry = createQActionRegistry([
   // R34: chat message from the relationship chat.
   createChatMessageSendAction({ chat, logger }),
   // BIZ-008: reminders and calls (Google Calendar + Meet).
-  createReminderCreateAction({ schedule }),
+  createReminderCreateAction({ schedule, logger }),
   createMeetingScheduleAction({ schedule, logger }),
   createMeetingRescheduleAction({ schedule }),
   createMeetingCancelAction({ schedule }),
@@ -1560,6 +1586,14 @@ const orchestrator = withLearning(
   }),
   memoryLearner,
 );
+// What runs an approved action, for the card, a spoken yes and a typed
+// yes alike: resume the paused run, or -- when that run can no longer be
+// resumed -- the same execution gate directly (live 2026-09-28 #4).
+const continueApproved = createApprovedContinuation({
+  orchestrator: () => orchestrator,
+  actions: qActionPort,
+  logger,
+});
 
 /**
  * The orchestration boundary. On: an accepted run is orchestrated at once
@@ -1815,6 +1849,7 @@ const voiceTurn = timedVoiceTurns(
     pronunciation,
     // A spoken yes to a proposal is the same decision a tap records.
     approvals: qActions,
+    continueApproved,
     // And whether it was a yes is read from their words (ADR 0011).
     decisions: createDecisionReader({ gateway: modelGateway, logger }),
     ...(presenceComposition === undefined
@@ -1888,6 +1923,7 @@ const { app, logger: appLogger } = createApp(
     profileFindings: profileFindingsReader,
     orchestration: { orchestrator, autostart: Q_ORCHESTRATION_AUTOSTART },
     qActions,
+    continueApproved,
     qStream: { service: qStream },
     // Q as an MCP server, only where a deployment turned it on. The same
     // registry and pipeline a run uses; a different modality, no more

@@ -372,8 +372,8 @@ export function useQConversation(
     ) => {
       const text = question.trim();
       // A run paused on an approval is waiting for the person, not busy:
-      // what they type is its next turn ("go ahead" approves through the
-      // run, the same as the card's button).
+      // what they type starts the conversation's next turn ("go ahead"
+      // approves through the Approval Engine, the same as the card).
       if (text.length === 0 || submitting || (streaming && !awaitingPerson)) {
         return;
       }
@@ -393,7 +393,13 @@ export function useQConversation(
 
       try {
         const open = openRun.current;
-        if (open !== null && !finished.current) {
+        // A run paused on an approval takes no more turns: a message
+        // appended to it is stored and never answered (live 2026-09-28 #4:
+        // "go ahead" sat unanswered and the change stayed "approval
+        // needed"). What they type then is a new turn of the conversation,
+        // where Q approves the waiting change through the Approval Engine
+        // exactly as the card does.
+        if (open !== null && !finished.current && !awaitingPerson) {
           // The run is still live: this is its next turn, and the stream
           // already open will carry the answer.
           const appended = await continueQRunAction(open, text);
