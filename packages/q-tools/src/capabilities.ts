@@ -230,6 +230,13 @@ const OFFERS: readonly QCapability[] = [
     "The video file comes from their own device through the browser's file picker and goes straight to the video CDN; removal is on the same screen.",
   ),
   offer(
+    "profile_photo_upload",
+    "MEDIA",
+    "Add, change or remove their profile photo and cover, or their company's or firm's logo and cover (cropped on the profile)",
+    "PROFILE",
+    "The image comes from their own device through the browser's file picker, is positioned by them, and goes straight to storage; removal is on the same screen.",
+  ),
+  offer(
     "document_upload",
     "DOCUMENT",
     "Upload a document of their own (a deck, financials) for Q to read",
@@ -433,6 +440,12 @@ export const Q_CAPABILITIES: readonly QCapability[] = Object.freeze([
     "list_my_documents",
     "DOCUMENT",
     "Lists the documents Q prepared for them (decks, briefs, one-pagers), newest first, with versions.",
+  ),
+  tool(
+    "revise_my_document",
+    "DOCUMENT",
+    "Edits a document Q prepared for them (a deck, brief, one-pager or mandate) with the changes they ask for, as a new version: the earlier version is kept and the new card has fresh PDF and PowerPoint downloads.",
+    { acts: true },
   ),
   tool(
     "save_company",

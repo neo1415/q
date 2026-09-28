@@ -319,6 +319,8 @@ export const Q_INSTANT_ACTION_TOOLS = [
   "decline_pending_proposal",
   "reassess_marketplace_readiness",
   "set_onboarding_reminders",
+  // A new version of their own private document; the earlier one is kept.
+  "revise_my_document",
 ] as const;
 
 /**

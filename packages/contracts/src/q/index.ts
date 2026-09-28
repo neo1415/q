@@ -303,6 +303,8 @@ export {
   Q_UNCERTAINTY_STATEMENT_MAX_LENGTH,
   QActionProposalBlockSchema,
   QArtifactReferenceBlockSchema,
+  QDocumentToolResultSchema,
+  type QDocumentToolResult,
   QClarificationRequestBlockSchema,
   QCompanyReferenceBlockSchema,
   QComparisonBlockSchema,

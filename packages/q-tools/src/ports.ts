@@ -10,6 +10,7 @@ import type {
 } from "@capital-q/investors";
 import type {
   IncomingInterestDto,
+  PermittedContextPlan,
   RelationshipStatusDto,
   RelationshipSummaryDto,
   VisibilityStateDto,
@@ -315,6 +316,8 @@ export type QToolPorts = {
   readonly discoveryDecisions?: DiscoveryDecisionPort | undefined;
   /** R33: their own documents. */
   readonly documents?: OwnDocumentsPort | undefined;
+  /** Revising one of their own documents into a new version. */
+  readonly documentRevision?: DocumentRevisionPort | undefined;
   /** R33: changes to their own records, for approval. */
   readonly recordChanges?: RecordChangePort | undefined;
   /** R33: reads of their own records. */
@@ -605,6 +608,35 @@ export type OwnDocumentsPort = {
       readonly currentVersion: number;
       readonly updatedAt: string;
     }[]
+  >;
+};
+
+/**
+ * A new version of one of the person's own documents, written from their
+ * requested changes through the artifact service's revise path (versioned:
+ * the earlier version stays; the PDF/PPTX exports are drawn from the new
+ * one). The service re-reads the artifact as the actor and re-authorises
+ * it under the run's plan; NOT_FOUND covers absent, not theirs and gone
+ * alike, NOT_REVISABLE a document with nothing to revise yet.
+ */
+export type DocumentRevisionPort = {
+  readonly revise: (input: {
+    readonly actor: ActorContext;
+    readonly plan: PermittedContextPlan;
+    readonly runId: string;
+    readonly artifactId: string;
+    readonly instruction: string;
+    readonly signal?: AbortSignal | undefined;
+  }) => Promise<
+    | {
+        readonly status: "REVISED";
+        readonly artifactId: string;
+        readonly type: string;
+        readonly artifactStatus: string;
+        readonly title: string;
+        readonly currentVersion: number;
+      }
+    | { readonly status: "NOT_FOUND" | "NOT_REVISABLE" | "FAILED" }
   >;
 };
 

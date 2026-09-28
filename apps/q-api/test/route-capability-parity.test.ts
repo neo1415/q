@@ -245,6 +245,16 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   ),
 
   "api/http/media-webhooks.ts POST CLOUDFLARE_STREAM_WEBHOOK_PATH": WEBHOOK,
+  "api/http/profile-images.ts GET subjectPath": cap(
+    "offer.profile_photo_upload",
+  ),
+  "api/http/profile-images.ts POST `${subjectPath}/:kind${PROFILE_IMAGE_UPLOADS_SEGMENT}`":
+    cap("offer.profile_photo_upload"),
+  "api/http/profile-images.ts POST `${PROFILE_IMAGES_PATH}${PROFILE_IMAGE_UPLOADS_SEGMENT}/:uploadId${PROFILE_IMAGE_COMPLETE_SEGMENT}`":
+    cap("offer.profile_photo_upload"),
+  "api/http/profile-images.ts DELETE `${subjectPath}/:kind`": cap(
+    "offer.profile_photo_upload",
+  ),
   "api/http/media.ts POST pitch": cap("offer.pitch_video_upload"),
   "api/http/media.ts GET pitch": cap("tool.get_pitch_moment"),
   "api/http/media.ts GET `${COMPANIES_PATH}/:companyId/media`": cap(

@@ -1180,6 +1180,12 @@ const qTools = createQTools({
           updatedAt: item.updatedAt,
         })),
     },
+    // Revising one of their documents into a new version (founder
+    // directive 2026-09-28). A closure: the artifact composition is built
+    // further down, and only called once a run is under way.
+    documentRevision: {
+      revise: (input) => qArtifacts.documentRevision.revise(input),
+    },
     // R33: Save / Unsave / Pass, recorded by the interaction service the
     // Discover buttons call, with the feed's own eligibility re-run.
     // R33: the record forms as Prepare -> Approve (the board is composed

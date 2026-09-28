@@ -55,6 +55,8 @@ const CORE = [
   "continue_onboarding",
   // R35: their own interests and relationships, whatever the turn is about.
   "list_my_relationships",
+  // Founder directive 2026-09-28: "change my deck" can come mid-anything.
+  "revise_my_document",
 ];
 
 const registry = createQToolRegistry(createDefaultQTools(EVERY_PORT));

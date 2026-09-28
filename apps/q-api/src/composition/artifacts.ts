@@ -13,6 +13,9 @@ import {
   type ArtifactPreparationPort,
 } from "@capital-q/q-specialists";
 import type { QArtifactReviser } from "@capital-q/model-gateway/q";
+import type { DocumentRevisionPort } from "@capital-q/q-tools";
+import type { ActorContext } from "@capital-q/security";
+import type { PermittedContextPlan } from "@capital-q/contracts";
 
 /**
  * The artifact context, composed (QX-003D; ADR 0013).
@@ -41,6 +44,12 @@ export type QArtifactsComposition = {
    * request to be understood.
    */
   readonly reviser: QArtifactReviser;
+  /**
+   * The same revision, by id, for the `revise_my_document` tool (founder
+   * directive 2026-09-28): the tool names the document from its card or
+   * the documents list; the service still reads it as the actor.
+   */
+  readonly documentRevision: DocumentRevisionPort;
 };
 
 export function createQArtifacts(dependencies: {
@@ -99,52 +108,103 @@ export function createQArtifacts(dependencies: {
       : { logger: dependencies.logger }),
   });
 
+  /**
+   * One revision: read the current version as the actor, rewrite it from
+   * the instruction (grounded only in what it already says), and file the
+   * result as a new version through the service, which re-authorises it
+   * under the run's plan. Null: not theirs, gone, or nothing to revise.
+   */
+  const reviseById = async (input: {
+    readonly actor: ActorContext;
+    readonly plan: PermittedContextPlan;
+    readonly runId: string;
+    readonly artifactId: string;
+    readonly instruction: string;
+    readonly signal?: AbortSignal | undefined;
+  }) => {
+    const detail = await service
+      .read(input.actor, input.artifactId)
+      .catch(() => null);
+    if (detail === null) return { status: "NOT_FOUND" as const };
+    const current = detail.current;
+    if (current === undefined || current === null) {
+      return { status: "NOT_REVISABLE" as const };
+    }
+    const revised = await reviser.revise({
+      base: {
+        title: current.title,
+        summary: current.summary,
+        content: current.content,
+      },
+      instruction: input.instruction,
+      // What the document already carries is what a revision may
+      // restate; nothing else is in scope for a rewrite.
+      grounding: current.content.sections.flatMap((section) => [
+        section.body,
+        ...section.findings.map((finding) => finding.statement),
+      ]),
+      sensitivity: input.plan.maxSensitivity,
+      attribution: {
+        tenantId: input.actor.tenantId,
+        userId: input.actor.userId,
+        qRunId: input.runId,
+        // Its own correlation id: a plan identifier is not one, and
+        // labelling a model call with it would make the trace lie.
+        correlationId: createCorrelationId(),
+      },
+      ...(input.signal === undefined ? {} : { signal: input.signal }),
+    });
+    const written = await service.reviseArtifact({
+      actorContext: input.actor,
+      permittedContextPlan: input.plan,
+      qRunId: input.runId,
+      artifactId: input.artifactId,
+      instruction: input.instruction,
+      content: revised,
+    });
+    return { status: "REVISED" as const, artifact: written.artifact };
+  };
+
   return {
     service,
+    documentRevision: {
+      revise: async (input) => {
+        try {
+          const outcome = await reviseById(input);
+          if (outcome.status !== "REVISED") return outcome;
+          return {
+            status: "REVISED",
+            artifactId: outcome.artifact.artifactId,
+            type: outcome.artifact.type,
+            artifactStatus: outcome.artifact.status,
+            title: outcome.artifact.title,
+            currentVersion: outcome.artifact.currentVersion,
+          };
+        } catch (error: unknown) {
+          if (input.signal?.aborted === true) throw error;
+          dependencies.logger?.warn(
+            { err: error, qRunId: input.runId },
+            "revise_my_document did not complete",
+          );
+          return { status: "FAILED" };
+        }
+      },
+    },
     reviser: {
       reviseFromConversation: async (input) => {
         // Which document they mean comes from their own conversation's
         // cards, never from anything a model said.
         const artifactId = latestArtifactIn(input.history);
         if (artifactId === null) return null;
-        const detail = await service
-          .read(input.actor, artifactId)
-          .catch(() => null);
-        const current = detail?.current;
-        if (current === undefined) return null;
-        const revised = await reviser.revise({
-          base: {
-            title: current.title,
-            summary: current.summary,
-            content: current.content,
-          },
-          instruction: input.instruction,
-          // What the document already carries is what a revision may
-          // restate; nothing else is in scope for a rewrite.
-          grounding: current.content.sections.flatMap((section) => [
-            section.body,
-            ...section.findings.map((finding) => finding.statement),
-          ]),
-          sensitivity: input.plan.maxSensitivity,
-          attribution: {
-            tenantId: input.actor.tenantId,
-            userId: input.actor.userId,
-            qRunId: input.runId,
-            // Its own correlation id: a plan identifier is not one, and
-            // labelling a model call with it would make the trace lie.
-            correlationId: createCorrelationId(),
-          },
-          ...(input.signal === undefined ? {} : { signal: input.signal }),
-        });
-        const written = await service.reviseArtifact({
-          actorContext: input.actor,
-          permittedContextPlan: input.plan,
-          qRunId: input.runId,
+        const outcome = await reviseById({
+          actor: input.actor,
+          plan: input.plan,
+          runId: input.runId,
           artifactId,
           instruction: input.instruction,
-          content: revised,
+          signal: input.signal,
         });
-        return written.artifact;
+        return outcome.status === "REVISED" ? outcome.artifact : null;
       },
     },
     preparation: {

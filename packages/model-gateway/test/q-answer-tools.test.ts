@@ -307,6 +307,65 @@ describe("client actions and the screen reach the answer (R20/R21/R33)", () => {
     ]);
   });
 
+  it("a revised document's card rides on the answer from the tool's own result (founder directive 2026-09-28)", async () => {
+    const REVISE_OFFERED: QOfferedTool = {
+      toolName: "documents.own.revise",
+      toolVersion: 1,
+      classification: "SIDE_EFFECT",
+      definition: {
+        name: "revise_my_document",
+        description: "Revises one of their documents.",
+        inputJsonSchema: { type: "object", properties: {} },
+      },
+      visibleStage: null,
+    };
+    const document = {
+      artifactId: "00000000-0000-4000-8000-00000000a111",
+      type: "PITCH_DECK",
+      status: "READY",
+      title: "Alpha deck",
+      currentVersion: 2,
+    };
+    const tools = toolPort([REVISE_OFFERED], (p) => ({
+      ...succeeded(p, { status: "DOCUMENT_UPDATED", document }),
+      toolName: "documents.own.revise",
+      classification: "SIDE_EFFECT",
+    }));
+    const { seam, request, completed } = build({
+      script: [
+        {
+          kind: "TOOL_CALLS",
+          calls: [
+            {
+              callId: "r1",
+              name: "revise_my_document",
+              arguments: {
+                artifactId: document.artifactId,
+                changes: "Shorter summary",
+              },
+            },
+          ],
+        },
+        {
+          kind: "TEXT",
+          text: JSON.stringify(analystResult("Updated: version 2.")),
+        },
+      ],
+      tools,
+    });
+    expect((await seam.answer(request)).kind).toBe("ANSWERED");
+    const last = completed.at(-1) as { message: { blocks?: unknown[] } };
+    expect(last.message.blocks).toEqual([
+      {
+        kind: "ARTIFACT_REFERENCE",
+        artifactId: document.artifactId,
+        type: "PITCH_DECK",
+        status: "READY",
+        title: "Alpha deck",
+      },
+    ]);
+  });
+
   it("a failed or unrelated tool result carries no client action", async () => {
     const tools = toolPort([GET_COMPANY], (p) =>
       succeeded(p, { clientAction: { kind: "RELOAD_PAGE" } }),

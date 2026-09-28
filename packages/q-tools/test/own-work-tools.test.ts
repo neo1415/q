@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   QClientActionToolResultSchema,
+  QDocumentToolResultSchema,
   type PermittedContextPlan,
 } from "@capital-q/contracts";
 
@@ -14,6 +15,7 @@ import {
   decisionEventId,
   type ConversationProposal,
   type DiscoveryDecisionPort,
+  type DocumentRevisionPort,
   type PendingProposalPort,
   type ProposalPlainStatus,
 } from "../src/index.js";
@@ -321,5 +323,92 @@ describe("declining a waiting change", () => {
       "NOT_PENDING_HERE",
     );
     expect(declined).toEqual([]);
+  });
+});
+
+describe("revising one of their documents (founder directive 2026-09-28)", () => {
+  const ARTIFACT = "00000000-0000-4000-8000-00000000a111";
+  function world(outcome: Awaited<ReturnType<DocumentRevisionPort["revise"]>>) {
+    const calls: { artifactId: string; instruction: string; runId: string }[] =
+      [];
+    const port: DocumentRevisionPort = {
+      revise: (input) => {
+        calls.push({
+          artifactId: input.artifactId,
+          instruction: input.instruction,
+          runId: input.runId,
+        });
+        return Promise.resolve(outcome);
+      },
+    };
+    const executor = createQToolExecutor({
+      registry: createQToolRegistry(
+        createOwnWorkTools({ documentRevision: port }),
+      ),
+    });
+    return { executor, calls };
+  }
+
+  it("files a new version and returns the card data the answer shows", async () => {
+    const { executor, calls } = world({
+      status: "REVISED",
+      artifactId: ARTIFACT,
+      type: "PITCH_DECK",
+      artifactStatus: "READY",
+      title: "Alpha deck",
+      currentVersion: 3,
+    });
+    const outcome = await executor.execute(
+      call("revise_my_document", {
+        artifactId: ARTIFACT,
+        changes: "Shorten the executive summary",
+      }),
+      contextFor(actorA, ownPlan()),
+    );
+    expect(outcome.result.ok).toBe(true);
+    const read = QDocumentToolResultSchema.parse(
+      (outcome.result as { data: unknown }).data,
+    );
+    expect(read.document).toEqual({
+      artifactId: ARTIFACT,
+      type: "PITCH_DECK",
+      status: "READY",
+      title: "Alpha deck",
+      currentVersion: 3,
+    });
+    expect(calls).toEqual([
+      expect.objectContaining({
+        artifactId: ARTIFACT,
+        instruction: "Shorten the executive summary",
+      }),
+    ]);
+  });
+
+  it("says NOT_FOUND for a document that is not theirs, and makes no card", async () => {
+    const { executor } = world({ status: "NOT_FOUND" });
+    const outcome = await executor.execute(
+      call("revise_my_document", {
+        artifactId: ARTIFACT,
+        changes: "Add our Lagos expansion",
+      }),
+      contextFor(actorA, ownPlan()),
+    );
+    expect(outcome.result.ok).toBe(true);
+    const data = (outcome.result as { data: unknown }).data;
+    expect(data).toEqual({ status: "NOT_FOUND" });
+    expect(QDocumentToolResultSchema.safeParse(data).success).toBe(false);
+  });
+
+  it("is refused outside the person's own conversation", async () => {
+    const { executor, calls } = world({ status: "FAILED" });
+    const outcome = await executor.execute(
+      call("revise_my_document", {
+        artifactId: ARTIFACT,
+        changes: "Make it shorter",
+      }),
+      contextFor(actorB, ownPlan(actorA)),
+    );
+    expect(outcome.result.ok).toBe(false);
+    expect(calls).toHaveLength(0);
   });
 });

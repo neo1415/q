@@ -4,6 +4,9 @@ import { z } from "zod";
 
 import {
   Q_TASK_CLASSES,
+  QArtifactIdSchema,
+  QArtifactStatusSchema,
+  QArtifactTypeSchema,
   type PermittedContextPlan,
 } from "@capital-q/contracts";
 import type { ActorContext } from "@capital-q/security";
@@ -19,6 +22,7 @@ import { actionTarget } from "./relationships.js";
 import type {
   ApprovalInboxPort,
   DiscoveryDecisionPort,
+  DocumentRevisionPort,
   OwnDocumentsPort,
 } from "../ports.js";
 
@@ -32,6 +36,7 @@ import type {
 
 export const LIST_PENDING_APPROVALS = "approvals.pending.list" as const;
 export const LIST_MY_DOCUMENTS = "documents.own.list" as const;
+export const REVISE_MY_DOCUMENT = "documents.own.revise" as const;
 export const SAVE_COMPANY = "discovery.company.save" as const;
 export const UNSAVE_COMPANY = "discovery.company.unsave" as const;
 export const PASS_COMPANY = "discovery.company.pass" as const;
@@ -313,9 +318,112 @@ export function createDiscoveryDecisionTool(
   });
 }
 
+// --- revising one of their documents -------------------------------------
+
+export const ReviseMyDocumentInputSchema = z
+  .object({
+    artifactId: QArtifactIdSchema.describe(
+      "The document to change: its id from this conversation's document card or from list_my_documents.",
+    ),
+    changes: z
+      .string()
+      .trim()
+      .min(3)
+      .max(2_000)
+      .describe(
+        "What should change, in the person's own terms (e.g. 'shorten the executive summary', 'add our Lagos expansion to the traction slide').",
+      ),
+  })
+  .strict();
+export type ReviseMyDocumentInput = z.infer<typeof ReviseMyDocumentInputSchema>;
+
+const RevisedDocumentSchema = z
+  .object({
+    artifactId: QArtifactIdSchema,
+    type: QArtifactTypeSchema,
+    status: QArtifactStatusSchema,
+    title: z.string().trim().min(1).max(160),
+    currentVersion: z.number().int().min(1),
+  })
+  .strict();
+
+export const ReviseMyDocumentOutputSchema = z.discriminatedUnion("status", [
+  z
+    .object({
+      status: z.literal("DOCUMENT_UPDATED"),
+      document: RevisedDocumentSchema,
+    })
+    .strict(),
+  z
+    .object({
+      status: z.enum(["NOT_FOUND", "NOT_REVISABLE", "FAILED"]),
+    })
+    .strict(),
+]);
+export type ReviseMyDocumentOutput = z.infer<
+  typeof ReviseMyDocumentOutputSchema
+>;
+
+/**
+ * Q revising a document it prepared (founder directive 2026-09-28): the
+ * person asks for changes and gets a new version, with the earlier one
+ * kept and fresh PDF/PPTX downloads on the new card. It writes only the
+ * person's own private document, so it is INSTANT like preparing one (ADR
+ * 0013 puts the consequential boundary at publish, share and send). The
+ * artifact service finds the document as the actor and re-authorises it
+ * under the run's plan; knowing an id grants nothing.
+ */
+export function createReviseMyDocumentTool(
+  revision: DocumentRevisionPort,
+): AnyQToolDefinition {
+  return defineQTool<ReviseMyDocumentInput, ReviseMyDocumentOutput, null>({
+    ...OWN,
+    id: REVISE_MY_DOCUMENT,
+    // Always offered (R33 core): "change my deck" can come mid-anything,
+    // and a registered capability Q is not offered is one it denies.
+    core: true,
+    providerName: "revise_my_document",
+    description:
+      "Changes a document Q prepared for the person (a pitch deck, brief, one-pager or mandate) by writing a new version with the changes they ask for; the earlier version is kept and the new card has fresh PDF and PowerPoint downloads. Call it whenever they ask to edit, update, fix, shorten, extend or restyle one of their documents. Use the id from the document's card in this conversation, or call list_my_documents first to find it. NOT_FOUND: no such document of theirs. NOT_REVISABLE: it has nothing to revise yet.",
+    classification: "SIDE_EFFECT",
+    riskClass: "LOW_RISK_INTERNAL",
+    visibleStage: null,
+    input: ReviseMyDocumentInputSchema,
+    output: ReviseMyDocumentOutputSchema,
+    authorize: (_input, { actor, plan }) =>
+      Promise.resolve(
+        ownConversation(actor, plan)
+          ? allow<null>("CONFIDENTIAL", null)
+          : deny<null>("NOT_AVAILABLE"),
+      ),
+    execute: async (input, context) => {
+      const outcome = await revision.revise({
+        actor: context.actor,
+        plan: context.plan,
+        runId: context.runId,
+        artifactId: input.artifactId,
+        instruction: input.changes,
+        ...(context.signal === undefined ? {} : { signal: context.signal }),
+      });
+      if (outcome.status !== "REVISED") return { status: outcome.status };
+      const document = RevisedDocumentSchema.safeParse({
+        artifactId: outcome.artifactId,
+        type: outcome.type,
+        status: outcome.artifactStatus,
+        title: outcome.title.slice(0, 160),
+        currentVersion: outcome.currentVersion,
+      });
+      return document.success
+        ? { status: "DOCUMENT_UPDATED", document: document.data }
+        : { status: "FAILED" };
+    },
+  });
+}
+
 export function createOwnWorkTools(ports: {
   readonly approvalInbox?: ApprovalInboxPort | undefined;
   readonly documents?: OwnDocumentsPort | undefined;
+  readonly documentRevision?: DocumentRevisionPort | undefined;
   readonly discoveryDecisions?: DiscoveryDecisionPort | undefined;
 }): readonly AnyQToolDefinition[] {
   const decisions = ports.discoveryDecisions;
@@ -326,6 +434,9 @@ export function createOwnWorkTools(ports: {
     ...(ports.documents === undefined
       ? []
       : [createListMyDocumentsTool(ports.documents)]),
+    ...(ports.documentRevision === undefined
+      ? []
+      : [createReviseMyDocumentTool(ports.documentRevision)]),
     ...(decisions === undefined
       ? []
       : (["SAVE", "UNSAVE", "PASS"] as const).map((type) =>

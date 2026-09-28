@@ -189,6 +189,28 @@ export const QArtifactReferenceBlockSchema = z
   })
   .strict();
 
+/**
+ * A document tool's own result when it filed a new version of one of the
+ * person's documents (`revise_my_document`). The answer path turns exactly
+ * this -- a tool's authorised result, never a model's words -- into the
+ * document's card on the answer, so the new version is one tap away.
+ */
+export const QDocumentToolResultSchema = z
+  .object({
+    status: z.literal("DOCUMENT_UPDATED"),
+    document: z
+      .object({
+        artifactId: QArtifactIdSchema,
+        type: QArtifactTypeSchema,
+        status: QArtifactStatusSchema,
+        title: z.string().trim().min(1).max(160),
+        currentVersion: z.number().int().min(1),
+      })
+      .strict(),
+  })
+  .strict();
+export type QDocumentToolResult = z.infer<typeof QDocumentToolResultSchema>;
+
 export const QUiIntentBlockSchema = z
   .object({ kind: z.literal("UI_INTENT"), intent: QUiIntentSchema })
   .strict();

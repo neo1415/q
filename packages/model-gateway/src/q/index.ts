@@ -5,6 +5,7 @@ import { z } from "zod";
 import {
   MODEL_TOOL_RESULT_MAX_CHARS,
   QClientActionToolResultSchema,
+  QDocumentToolResultSchema,
   QMessageIdSchema,
   type ModelBudget,
   type ModelFailureClass,
@@ -1573,6 +1574,29 @@ export function createModelGatewayQAnswer(
           clientActionBlocks.push(block);
         }
       };
+      // A document the person asked Q to change, filed as a new version by
+      // `revise_my_document`: its card rides on the answer, from the tool's
+      // own authorised result only (founder directive 2026-09-28).
+      const collectDocument = (outcome: QToolCallOutcome): void => {
+        if (!outcome.result.ok) return;
+        const read = QDocumentToolResultSchema.safeParse(outcome.result.data);
+        if (!read.success) return;
+        const block: QResultBlock = {
+          kind: "ARTIFACT_REFERENCE",
+          artifactId: read.data.document.artifactId,
+          type: read.data.document.type,
+          status: read.data.document.status,
+          title: read.data.document.title,
+        };
+        const at = clientActionBlocks.findIndex(
+          (known) =>
+            known.kind === "ARTIFACT_REFERENCE" &&
+            known.artifactId === block.artifactId,
+        );
+        // The latest revision's card replaces an earlier one in this answer.
+        if (at >= 0) clientActionBlocks.splice(at, 1, block);
+        else clientActionBlocks.push(block);
+      };
       // Public sources this run read, attached to the answer as structured
       // sources (CQ-Q-VOICE-001 R3; R23). Public fields only.
       const publicSources: PublicSourceLike[] = [];
@@ -1907,6 +1931,7 @@ export function createModelGatewayQAnswer(
               });
               collectSources(outcome);
               collectClientAction(outcome);
+              collectDocument(outcome);
               notePlatformLookup(outcome);
               noteRecommendationGrounds(outcome);
               if (call.name === APPROVE_PENDING_TOOL && outcome.result.ok) {
