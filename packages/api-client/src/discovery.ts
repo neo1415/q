@@ -5,9 +5,11 @@ import {
   DISCOVERY_COMPANY_UNSAVE_PATH,
   DISCOVERY_EXPLANATION_PATH,
   DISCOVERY_INVESTORS_PATH,
+  DISCOVERY_NETWORK_PITCHES_PATH,
   DISCOVERY_SAVED_PATH,
   DiscoveryCompanySlateDtoSchema,
   DiscoveryInvestorSlateDtoSchema,
+  NetworkPitchPageDtoSchema,
   InteractionRecordedDtoSchema,
   RecommendationExplanationDtoSchema,
   SavedCompaniesDtoSchema,
@@ -59,6 +61,16 @@ export function discoverInvestors(session: ApiSession, page: Page = {}) {
     "GET",
     `${DISCOVERY_INVESTORS_PATH}${query(page)}`,
     DiscoveryInvestorSlateDtoSchema,
+  );
+}
+
+/** `GET /v1/discovery/network-pitches` — videos opened to everyone (ADR 0021). */
+export function listNetworkPitches(session: ApiSession, page: Page = {}) {
+  return call(
+    session,
+    "GET",
+    `${DISCOVERY_NETWORK_PITCHES_PATH}${query(page)}`,
+    NetworkPitchPageDtoSchema,
   );
 }
 

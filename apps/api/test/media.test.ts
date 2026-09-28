@@ -74,6 +74,8 @@ const ASSET = {
   captionState: "NOT_REQUESTED",
   transcriptState: "NOT_REQUESTED",
   moderationStatus: "NOT_REVIEWED",
+  title: null,
+  audience: "INVESTORS",
   replacesMediaAssetId: null,
   supersededAt: null,
   createdByUserId: USER,

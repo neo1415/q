@@ -29,7 +29,10 @@ import {
   type CorrelationId,
   type PitchSummaryDto,
 } from "@capital-q/contracts";
-import type { DiscoverablePitchQueryPort } from "@capital-q/media";
+import {
+  pitchSummary,
+  type DiscoverablePitchQueryPort,
+} from "@capital-q/media";
 import type { ActorContext } from "@capital-q/security";
 import { createCorrelationId } from "@capital-q/observability";
 
@@ -61,6 +64,15 @@ export type CompanyRoutesDependencies = ActorContextDependencies & {
    * network preview is readable by the owning organisation only.
    */
   readonly networkView?: CompanyNetworkViewPort | undefined;
+  /**
+   * Whether this actor watches as an investor (every publishable video of
+   * a company discoverable to them) or as anyone else signed in (only the
+   * videos their owners opened to the network, ADR 0021). Absent: everyone
+   * is treated as a non-investor, so a preview never offers a video the
+   * viewer would be refused.
+   */
+  readonly watchesAsInvestor?:
+    ((actor: ActorContext) => Promise<boolean>) | undefined;
 };
 
 /**
@@ -74,6 +86,36 @@ export type CompanyNetworkViewPort = {
     companyId: CompanyId,
   ) => Promise<CompanyProfileFacts | null>;
 };
+
+/**
+ * The videos a network preview offers this viewer, newest first: every
+ * publishable one for an investor or the owner, only NETWORK ones for
+ * anyone else (ADR 0021), so nothing is offered that playback would refuse.
+ */
+async function pitchesFor(
+  pitches: DiscoverablePitchQueryPort | undefined,
+  companyId: string,
+  audience: "INVESTORS" | "NETWORK",
+): Promise<{
+  pitch: PitchSummaryDto | null;
+  morePitches?: PitchSummaryDto[];
+}> {
+  if (pitches === undefined) return { pitch: null };
+  const set = (await pitches.findDiscoverablePitches([companyId])).get(
+    companyId,
+  );
+  if (set === undefined) return { pitch: null };
+  const offered = [set, ...set.more].filter(
+    (p) => audience === "INVESTORS" || p.audience === "NETWORK",
+  );
+  const [first, ...rest] = offered;
+  return first === undefined
+    ? { pitch: null }
+    : {
+        pitch: pitchSummary(first),
+        ...(rest.length === 0 ? {} : { morePitches: rest.map(pitchSummary) }),
+      };
+}
 
 /**
  * The publishable pitch of one company, in the contract's shape. One
@@ -90,14 +132,7 @@ async function pitchSummaryOf(
   const pitch = (await pitches.findDiscoverablePitches([companyId])).get(
     companyId,
   );
-  return pitch === undefined
-    ? null
-    : {
-        mediaAssetId: pitch.mediaAssetId,
-        aspectRatio: pitch.aspectRatio,
-        durationSeconds: pitch.durationSeconds,
-        captionState: pitch.captionState,
-      };
+  return pitch === undefined ? null : pitchSummary(pitch);
 }
 
 function correlation(): CorrelationId {
@@ -281,10 +316,18 @@ export function registerCompanyRoutes(
         });
       void reply.header("Cache-Control", "no-store");
       const projection = projectCompanyForNetwork(company);
+      const asInvestor =
+        company.organisationId === actor.organisationId ||
+        (dependencies.watchesAsInvestor !== undefined &&
+          (await dependencies.watchesAsInvestor(actor).catch(() => false)));
       return CompanyNetworkPreviewSchema.parse({
         ...projection,
         networkVisible: isNetworkVisible(company.marketplaceVisibility),
-        pitch: await pitchSummaryOf(dependencies.pitches, company.id),
+        ...(await pitchesFor(
+          dependencies.pitches,
+          company.id,
+          asInvestor ? "INVESTORS" : "NETWORK",
+        )),
         // Classified from the projection, never from the company row: a
         // fact the projection does not carry cannot be one (CQ-WEB-024).
         facts: declaredFactsForNetwork(projection),

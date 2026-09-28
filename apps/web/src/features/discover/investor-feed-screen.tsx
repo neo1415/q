@@ -384,6 +384,22 @@ function InvestorFeed({
   const { setOpen, open: qOpen } = useGlobalQ();
   const session = useQSessionOptional();
   const [muted, setMuted] = useState(true);
+  // Which of a company's videos is showing (ADR 0022); the first (newest)
+  // unless the person moved on. The item stays one company, ranked once.
+  const [videoOf, setVideoOf] = useState<Readonly<Record<string, number>>>({});
+  const withVideo = useCallback(
+    (item: DiscoveredCompanyDto): DiscoveredCompanyDto => {
+      const at = videoOf[item.companyId] ?? 0;
+      if (at === 0 || item.pitch === null) return item;
+      const all = [item.pitch, ...(item.morePitches ?? [])];
+      return { ...item, pitch: all[at % all.length] ?? item.pitch };
+    },
+    [videoOf],
+  );
+  const shownItems = useMemo(
+    () => feed.state.items.map(withVideo),
+    [feed.state.items, withVideo],
+  );
   // One owner for this feed's playback authorizations, seeded with the one
   // the server read for the first card (see playback-authorizations.ts).
   const initialAuthorization = initial?.authorization ?? null;
@@ -415,10 +431,10 @@ function InvestorFeed({
    * it: the rail's Ask Q, the dock, or Ctrl/Cmd+K. Read from the element at
    * that instant (it is the truth about the position), never tracked.
    */
-  const cardRef = useRef(feed.card);
+  const cardRef = useRef(feed.card === null ? null : withVideo(feed.card));
   useEffect(() => {
-    cardRef.current = feed.card;
-  }, [feed.card]);
+    cardRef.current = feed.card === null ? null : withVideo(feed.card);
+  }, [feed.card, withVideo]);
   useQMomentSource(() => {
     const current = cardRef.current;
     if (current === null) return null;
@@ -924,7 +940,7 @@ function InvestorFeed({
         data-reduced-motion={reducedMotion ? "" : undefined}
       >
         <FeedMedia
-          items={feed.state.items}
+          items={shownItems}
           index={index}
           policyFor={(companyId) => policyByCompanyId[companyId] ?? "NONE"}
           sourceFor={authorizations.sourceFor}
@@ -956,7 +972,22 @@ function InvestorFeed({
           {controls.row("hidden lg:flex")}
           <FeedCard
             key={card.companyId}
-            company={card}
+            company={withVideo(card)}
+            videos={
+              card.pitch === null || (card.morePitches ?? []).length === 0
+                ? undefined
+                : {
+                    index: videoOf[card.companyId] ?? 0,
+                    count: 1 + (card.morePitches ?? []).length,
+                    onNext: () =>
+                      setVideoOf((known) => ({
+                        ...known,
+                        [card.companyId]:
+                          ((known[card.companyId] ?? 0) + 1) %
+                          (1 + (card.morePitches ?? []).length),
+                      })),
+                  }
+            }
             policy={policyByCompanyId[card.companyId] ?? "ACTIVE"}
             reducedMotion={reducedMotion}
             saved={decision.saved}

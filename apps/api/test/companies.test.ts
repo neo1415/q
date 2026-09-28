@@ -12,7 +12,7 @@ import {
 import { parseApiConfig } from "@capital-q/config/api";
 import type { MarketplaceReadinessAssessment } from "@capital-q/contracts";
 import type {
-  DiscoverablePitch,
+  DiscoverablePitchSet,
   DiscoverablePitchQueryPort,
 } from "@capital-q/media";
 import {
@@ -175,6 +175,7 @@ function buildApp(options: {
   readonly service: CompanyService;
   readonly pitches?: DiscoverablePitchQueryPort | undefined;
   readonly networkView?: CompanyNetworkViewPort | undefined;
+  readonly watchesAsInvestor?: boolean | undefined;
 }): FastifyInstance {
   const security: ApiSecurityDependencies = {
     authenticator: { authenticate: () => Promise.resolve(options.principal) },
@@ -196,6 +197,12 @@ function buildApp(options: {
     ...(options.networkView === undefined
       ? {}
       : { companyNetworkView: options.networkView }),
+    ...(options.watchesAsInvestor === undefined
+      ? {}
+      : {
+          watchesAsInvestor: () =>
+            Promise.resolve(options.watchesAsInvestor === true),
+        }),
   }).app;
 }
 
@@ -722,6 +729,7 @@ describe("the company's publishable pitch (CQ-MEDIA-012)", () => {
     aspectRatio: "9:16",
     durationSeconds: 87,
     captionState: "NOT_REQUESTED",
+    title: null,
   };
 
   function fakePitches(present: boolean): {
@@ -732,14 +740,17 @@ describe("the company's publishable pitch (CQ-MEDIA-012)", () => {
     const port: DiscoverablePitchQueryPort = {
       findDiscoverablePitches: (companyIds) => {
         calls.push([...companyIds]);
-        const answer = new Map<string, DiscoverablePitch>();
+        const answer = new Map<string, DiscoverablePitchSet>();
         if (present) {
           answer.set(COMPANY_A.id, {
-            mediaAssetId: MEDIA_ASSET as DiscoverablePitch["mediaAssetId"],
+            mediaAssetId: MEDIA_ASSET as DiscoverablePitchSet["mediaAssetId"],
             companyId: COMPANY_A.id,
             aspectRatio: "9:16",
             durationSeconds: 87,
             captionState: "NOT_REQUESTED",
+            title: null,
+            audience: "INVESTORS",
+            more: [],
           });
         }
         return Promise.resolve(answer);
@@ -772,6 +783,70 @@ describe("the company's publishable pitch (CQ-MEDIA-012)", () => {
     expect(preview.json<{ pitch: unknown }>().pitch).toEqual(SUMMARY);
     expect(calls).toEqual([[COMPANY_A.id], [COMPANY_A.id]]);
     await app.close();
+  });
+
+  it("offers another organisation's viewer only what they may play: every video to an investor, NETWORK videos to anyone else (ADR 0021)", async () => {
+    const { service } = fakeService({
+      getCompany: () => Promise.reject(new CompanyNotFoundError()),
+    });
+    const video = (n: number, audience: "INVESTORS" | "NETWORK") => ({
+      mediaAssetId:
+        `f0000000-0000-4000-8000-00000000000${String(n)}` as DiscoverablePitchSet["mediaAssetId"],
+      companyId: COMPANY_A.id,
+      aspectRatio: "9:16",
+      durationSeconds: 30,
+      captionState: "NOT_REQUESTED" as const,
+      title: `Video ${String(n)}`,
+      audience,
+    });
+    const port: DiscoverablePitchQueryPort = {
+      findDiscoverablePitches: () =>
+        Promise.resolve(
+          new Map([
+            [
+              COMPANY_A.id,
+              {
+                ...video(1, "INVESTORS"),
+                more: [video(2, "NETWORK"), video(3, "INVESTORS")],
+              },
+            ],
+          ]),
+        ),
+    };
+    const networkView: CompanyNetworkViewPort = {
+      findNetworkVisible: () =>
+        Promise.resolve({
+          ...COMPANY_A,
+          organisationId:
+            "b0000000-0000-4000-8000-0000000000ff" as (typeof COMPANY_A)["organisationId"],
+          marketplaceVisibility: "network_visible",
+        }),
+    };
+    const ids = async (watchesAsInvestor: boolean) => {
+      const app = buildApp({
+        principal: PRINCIPAL,
+        context: CONTEXT,
+        service,
+        pitches: port,
+        networkView,
+        watchesAsInvestor,
+      });
+      const body = (
+        await app.inject({
+          method: "GET",
+          url: `/v1/companies/${COMPANY_A.id}/network-preview`,
+        })
+      ).json<{
+        pitch: { mediaAssetId: string } | null;
+        morePitches?: { mediaAssetId: string }[];
+      }>();
+      await app.close();
+      return [body.pitch, ...(body.morePitches ?? [])].map((p) =>
+        p?.mediaAssetId.slice(-1),
+      );
+    };
+    expect(await ids(true)).toEqual(["1", "2", "3"]);
+    expect(await ids(false)).toEqual(["2"]);
   });
 
   it("is null when nothing is publishable, and null when no port is composed", async () => {

@@ -48,6 +48,7 @@ import {
   type ChosenFile,
   type PitchFlowState,
 } from "./pitch-state";
+import { PitchDetails } from "./pitch-details";
 import { uploadResumable } from "./resumable-upload";
 import {
   clearResume,
@@ -84,6 +85,16 @@ export type PitchUploadProps = {
   readonly onRecordChanged?: (() => void) | undefined;
   /** Pause this screen's preview while another player on the page plays. */
   readonly holdPreview?: boolean | undefined;
+  /**
+   * Which video this screen is about (ADR 0022): absent, the company's
+   * newest live one; null, a new video added beside the others; an id,
+   * that video.
+   */
+  readonly mediaAssetId?: string | null | undefined;
+  /** Told once a new video's record exists, with its id. */
+  readonly onCreated?: ((mediaAssetId: string) => void) | undefined;
+  /** Told once this video was deleted; absent, deleting is not offered. */
+  readonly onDeleted?: (() => void) | undefined;
 };
 
 /**
@@ -149,6 +160,9 @@ export function PitchUpload({
   companyId,
   onRecordChanged,
   holdPreview = false,
+  mediaAssetId: targetAssetId,
+  onCreated,
+  onDeleted,
 }: PitchUploadProps) {
   const [flow, dispatch] = useReducer(pitchFlowReducer, INITIAL_PITCH_FLOW);
   const [company, setCompany] = useState<CompanyDto | null>(null);
@@ -177,7 +191,7 @@ export function PitchUpload({
   // set only in the callback, once the server has answered.
   useEffect(() => {
     let cancelled = false;
-    void loadPitchOverviewAction(companyId).then((result) => {
+    void loadPitchOverviewAction(companyId, targetAssetId).then((result) => {
       if (cancelled) return;
       if (!result.ok) {
         setLoadError(result.message);
@@ -199,7 +213,7 @@ export function PitchUpload({
     return () => {
       cancelled = true;
     };
-  }, [companyId]);
+  }, [companyId, targetAssetId]);
 
   // Polite polling while the provider works. The delay grows with each
   // answer that is not yet READY, and the loop stops on any resting state
@@ -237,21 +251,23 @@ export function PitchUpload({
     let timer: ReturnType<typeof setTimeout> | undefined;
     const ask = (attempt: number) => {
       timer = setTimeout(() => {
-        void loadPitchOverviewAction(companyId).then((result) => {
-          if (cancelled) return;
-          const current = result.ok ? result.value.pitch : null;
-          if (
-            result.ok &&
-            current !== null &&
-            current.mediaAssetId === reviewAssetId &&
-            current.moderationStatus !== "NOT_REVIEWED"
-          ) {
-            setCompany(result.value.company);
-            dispatch({ type: "PITCH_UPDATED", pitch: current });
-            return;
-          }
-          if (attempt + 1 < REVIEW_MAX_ATTEMPTS) ask(attempt + 1);
-        });
+        void loadPitchOverviewAction(companyId, reviewAssetId).then(
+          (result) => {
+            if (cancelled) return;
+            const current = result.ok ? result.value.pitch : null;
+            if (
+              result.ok &&
+              current !== null &&
+              current.mediaAssetId === reviewAssetId &&
+              current.moderationStatus !== "NOT_REVIEWED"
+            ) {
+              setCompany(result.value.company);
+              dispatch({ type: "PITCH_UPDATED", pitch: current });
+              return;
+            }
+            if (attempt + 1 < REVIEW_MAX_ATTEMPTS) ask(attempt + 1);
+          },
+        );
       }, syncDelayMs(attempt));
     };
     ask(0);
@@ -269,7 +285,7 @@ export function PitchUpload({
   useEffect(() => {
     if (readyAssetId === null) return;
     let cancelled = false;
-    void loadPitchOverviewAction(companyId).then((result) => {
+    void loadPitchOverviewAction(companyId, readyAssetId).then((result) => {
       if (!cancelled && result.ok) setCompany(result.value.company);
     });
     void authorisePitchPlaybackAction(companyId, readyAssetId).then(
@@ -333,7 +349,10 @@ export function PitchUpload({
         return;
       }
       dispatch({ type: "PITCH_UPDATED", pitch: result.value });
-      const overview = await loadPitchOverviewAction(companyId);
+      const overview = await loadPitchOverviewAction(
+        companyId,
+        pitch.mediaAssetId,
+      );
       if (overview.ok) setCompany(overview.value.company);
     },
     [companyId],
@@ -486,10 +505,11 @@ export function PitchUpload({
         setGuidance(created.value.guidance);
         record = created.value.pitch;
         dispatch({ type: "CREATED", pitch: record });
+        onCreated?.(record.mediaAssetId);
       }
       await reserveAndSend(file, record, null);
     },
-    [companyId, flow, guidance, reserveAndSend],
+    [companyId, flow, guidance, reserveAndSend, onCreated],
   );
 
   /** Carry on with the file still in memory, or ask for it again. */
@@ -565,17 +585,28 @@ export function PitchUpload({
     flow.kind === "READY" || flow.kind === "PROCESSING" ? flow.pitch : null;
   const standing = describeNetworkStanding(company, current);
 
+  // Once there is a video to watch, the page reads like a short-video
+  // editor: the video tall on the left, what to do with it on the right.
+  const sideBySide = flow.kind === "READY";
   return (
-    <div className="flex flex-col gap-10">
+    <div
+      className={
+        sideBySide
+          ? "flex flex-col gap-10 lg:grid lg:grid-cols-[minmax(0,22rem)_minmax(0,1fr)] lg:items-start lg:gap-x-10"
+          : "flex flex-col gap-10"
+      }
+      data-pitch-editor={sideBySide ? "side-by-side" : "stacked"}
+    >
       <PageSection
         id="pitch-status"
+        className={sideBySide ? "lg:col-start-2 lg:row-start-1" : undefined}
         title="The video"
         description="Investors watch this first. Keep it to what you'd say across a table."
       >
         <section className="cq-panel">
           <header className="cq-panel-header">
             <h3 className="cq-title-sm text-(--cq-text-primary)">
-              {company.canonicalName}
+              {shown?.title ?? company.canonicalName}
             </h3>
             <StatusLine flow={flow} />
           </header>
@@ -702,7 +733,7 @@ export function PitchUpload({
                 >
                   <Upload size={ICON_SIZE.regular} aria-hidden="true" />
                   {flow.kind === "READY"
-                    ? "Replace pitch"
+                    ? "Replace video"
                     : flow.kind === "FAILED"
                       ? "Upload again"
                       : "Choose a video"}
@@ -721,6 +752,7 @@ export function PitchUpload({
       {flow.kind === "READY" ? (
         <PageSection
           id="pitch-preview"
+          className="lg:sticky lg:top-6 lg:col-start-1 lg:row-span-2 lg:row-start-1"
           title="Preview"
           description="What an investor's player will show. Muted until they turn the sound on."
         >
@@ -732,7 +764,7 @@ export function PitchUpload({
               {preview.reason}
             </InlineNotice>
           ) : (
-            <div className="mx-auto w-full max-w-(--cq-layout-narrow) overflow-hidden rounded-(--cq-radius-md) bg-(--cq-stage-surface)">
+            <div className="mx-auto w-full max-w-(--cq-layout-narrow) overflow-hidden rounded-(--cq-radius-lg) bg-(--cq-stage-canvas)">
               <PitchPlayer
                 company={asDiscovered(company, flow.pitch)}
                 policy="ACTIVE"
@@ -748,6 +780,7 @@ export function PitchUpload({
 
       <PageSection
         id="pitch-standing"
+        className={sideBySide ? "lg:col-start-2 lg:row-start-2" : undefined}
         title="Who sees it"
         description="A pitch reaches investors through the same door as the rest of your profile."
       >
@@ -782,6 +815,17 @@ export function PitchUpload({
           <InlineNotice tone="warning" className="mb-4">
             {decisionNotice}
           </InlineNotice>
+        ) : null}
+        {shown !== null && shown.live && onDeleted !== undefined ? (
+          <div className="mb-6">
+            <PitchDetails
+              key={shown.mediaAssetId}
+              companyId={companyId}
+              pitch={shown}
+              onSaved={(pitch) => dispatch({ type: "PITCH_UPDATED", pitch })}
+              onDeleted={onDeleted}
+            />
+          </div>
         ) : null}
         <p className="cq-status-line">
           {standing.visible ? (

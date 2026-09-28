@@ -699,10 +699,19 @@ export function createResolvePlayableAsset(
   const asViewer = async (
     query: AuthorisePlaybackQuery,
   ): Promise<MediaAsset> => {
-    const company = await viewers.resolveViewableCompany(
+    // An investor the feed would show the company to may watch any of its
+    // publishable videos; anyone else signed in, only a video its owner
+    // opened to the network (ADR 0021), and only while the company itself
+    // is visible to the network.
+    const asInvestor = await viewers.resolveViewableCompany(
       query.actor,
       query.companyId,
     );
+    const company =
+      asInvestor ??
+      (viewers.resolveNetworkCompany === undefined
+        ? null
+        : await viewers.resolveNetworkCompany(query.actor, query.companyId));
     if (company === null) {
       throw new MediaAssetNotFoundError();
     }
@@ -719,13 +728,13 @@ export function createResolvePlayableAsset(
       asset === null ||
       asset.ownerId !== query.companyId ||
       asset.ownerOrganisationId !== company.ownerOrganisationId ||
-      toDiscoverablePitch(asset) === null
+      toDiscoverablePitch(asset) === null ||
+      (asInvestor === null && asset.audience !== "NETWORK")
     ) {
       throw new MediaAssetNotFoundError();
     }
     return asset;
   };
-
   return async (query: AuthorisePlaybackQuery): Promise<MediaAsset> =>
     (await asOwner(query)) ?? (await asViewer(query));
 }

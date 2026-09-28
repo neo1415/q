@@ -69,6 +69,7 @@ export type { MediaServiceDependencies } from "./application/dependencies.js";
 export type {
   CompanyPitchQueryPort,
   DiscoverablePitchQueryPort,
+  NetworkPitchQueryPort,
   MediaAssetRepository,
   MediaRepositories,
   PitchTranscriptRepository,
@@ -87,8 +88,12 @@ export {
 export {
   createApplyAutomatedModeration,
   createPostgresAutomatedModeration,
+  createSetPitchDetails,
   createSetPitchPlaybackPolicy,
   OwnerPlaybackPolicySchema,
+  PitchDetailsSchema,
+  type PitchDetails,
+  type SetPitchDetailsCommand,
   type ApplyAutomatedModerationCommand,
   type AutomatedModerationDependencies,
   type AutomatedModerationResult,
@@ -159,6 +164,8 @@ export {
 export {
   createPostgresCompanyPitchQueryPort,
   createPostgresDiscoverablePitchQueryPort,
+  createPostgresNetworkPitchQueryPort,
+  NETWORK_PITCH_PAGE_MAX,
   createPostgresMediaAssetRepository,
   createPostgresMediaRepositories,
   createPostgresPitchTranscriptRepository,

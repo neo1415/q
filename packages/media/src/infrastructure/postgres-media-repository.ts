@@ -11,6 +11,7 @@ import {
 import type {
   CompanyPitchQueryPort,
   DiscoverablePitchQueryPort,
+  NetworkPitchQueryPort,
   MediaAssetRepository,
   MediaRepositories,
   PitchTranscriptRepository,
@@ -24,11 +25,13 @@ import {
   MediaPurposeSchema,
   MediaStatusSchema,
   ModerationStatusSchema,
+  PitchAudienceSchema,
   PlaybackPolicySchema,
+  LIVE_PITCHES_MAX,
   DISCOVERABLE_PITCH_BATCH_MAX,
   toCompanyPitch,
   toDiscoverablePitch,
-  type DiscoverablePitch,
+  type DiscoverablePitchSet,
   TranscriptStateSchema,
   type MediaAsset,
 } from "../contracts/index.js";
@@ -72,6 +75,8 @@ const MediaAssetRow = z.object({
   caption_state: CaptionStateSchema,
   transcript_state: TranscriptStateSchema,
   moderation_status: ModerationStatusSchema,
+  title: z.string().nullable(),
+  audience: PitchAudienceSchema,
   replaces_media_asset_id: MediaAssetIdSchema.nullable(),
   superseded_at: Timestamp.nullable(),
   created_by_user_id: UserIdSchema,
@@ -102,6 +107,8 @@ function toAsset(row: unknown): MediaAsset {
     captionState: r.caption_state,
     transcriptState: r.transcript_state,
     moderationStatus: r.moderation_status,
+    title: r.title,
+    audience: r.audience,
     replacesMediaAssetId: r.replaces_media_asset_id,
     supersededAt: r.superseded_at,
     createdByUserId: r.created_by_user_id,
@@ -119,7 +126,7 @@ function select(executor: DatabaseExecutor) {
            m.purpose, m.provider, m.provider_asset_id, m.status, m.duration_seconds,
            m.width, m.height, m.aspect_ratio, m.playback_policy, m.thumbnail_reference,
            m.caption_state, m.transcript_state, m.moderation_status,
-           m.replaces_media_asset_id, m.superseded_at, m.created_by_user_id,
+           m.title, m.audience, m.replaces_media_asset_id, m.superseded_at, m.created_by_user_id,
            m.created_at, m.ready_at, m.deleted_at, m.version
       from media.media_assets m`;
 }
@@ -147,11 +154,13 @@ export function createPostgresMediaAssetRepository(): MediaAssetRepository {
       const rows = await tx.sql`
         insert into media.media_assets
           (tenant_id, owner_type, owner_id, owner_organisation_id, purpose,
-           playback_policy, created_by_user_id, replaces_media_asset_id)
+           playback_policy, created_by_user_id, replaces_media_asset_id,
+           title, audience)
         values (${input.tenantId}, ${input.ownerType}, ${input.ownerId},
                 ${input.ownerOrganisationId}, ${input.purpose},
                 ${input.playbackPolicy}, ${input.createdByUserId},
-                ${input.replacesMediaAssetId ?? null})
+                ${input.replacesMediaAssetId ?? null},
+                ${input.title ?? null}, ${input.audience ?? "INVESTORS"})
         returning id`;
       const { id } = z.object({ id: MediaAssetIdSchema }).parse(rows[0]);
       const created = await reread(tx, input.tenantId, id);
@@ -181,8 +190,7 @@ export function createPostgresMediaAssetRepository(): MediaAssetRepository {
     },
 
     findCurrentForOwner: async (executor, tenantId, owner, purpose) => {
-      // Exactly the predicate the partial unique index enforces, so this can
-      // return at most one row by construction, not by convention.
+      // The newest live one: several may be live at once (ADR 0022).
       const rows = await executor`
         ${select(executor)}
          where m.tenant_id = ${tenantId}
@@ -190,21 +198,38 @@ export function createPostgresMediaAssetRepository(): MediaAssetRepository {
            and m.owner_id = ${owner.ownerId}
            and m.purpose = ${purpose}
            and m.deleted_at is null
-           and m.superseded_at is null`;
+           and m.superseded_at is null
+         order by m.created_at desc, m.id desc
+         limit 1`;
       return rows.length === 0 ? null : toAsset(rows[0]);
     },
 
-    lockCurrentForOwner: async (tx, tenantId, owner, purpose) => {
+    countLiveForOwner: async (tx, tenantId, owner, purpose) => {
       const rows = await tx.sql`
-        ${select(tx.sql)}
+        select count(*)::int as live
+          from media.media_assets m
          where m.tenant_id = ${tenantId}
            and m.owner_type = ${owner.ownerType}
            and m.owner_id = ${owner.ownerId}
            and m.purpose = ${purpose}
            and m.deleted_at is null
-           and m.superseded_at is null
-         for update`;
-      return rows.length === 0 ? null : toAsset(rows[0]);
+           and m.superseded_at is null`;
+      return z.object({ live: z.number().int() }).parse(rows[0]).live;
+    },
+
+    setDetails: async (tx, input) => {
+      const rows = await tx.sql`
+        update media.media_assets m
+           set title = ${input.title},
+               audience = ${input.audience},
+               version = m.version + 1
+         where m.id = ${input.mediaAssetId}
+           and m.tenant_id = ${input.tenantId}
+           and m.version = ${input.expectedVersion}
+        returning m.id`;
+      return rows.length === 0
+        ? null
+        : reread(tx, input.tenantId, input.mediaAssetId);
     },
 
     listForOwner: async (executor, tenantId, owner) => {
@@ -455,7 +480,7 @@ export function createPostgresDiscoverablePitchQueryPort(options: {
           `discoverable pitch lookup exceeds ${String(DISCOVERABLE_PITCH_BATCH_MAX)} companies`,
         );
       }
-      const pitches = new Map<string, DiscoverablePitch>();
+      const pitches = new Map<string, DiscoverablePitchSet>();
       if (ids.length === 0) {
         return pitches;
       }
@@ -468,14 +493,64 @@ export function createPostgresDiscoverablePitchQueryPort(options: {
            and m.superseded_at is null
            and m.status = 'READY'
            and m.moderation_status = 'ALLOWED'
-           and m.playback_policy <> 'PRIVATE'`;
+           and m.playback_policy <> 'PRIVATE'
+         order by m.owner_id, m.created_at desc, m.id desc`;
       for (const row of rows) {
         const pitch = toDiscoverablePitch(toAsset(row));
-        if (pitch !== null) {
-          pitches.set(pitch.companyId, pitch);
+        if (pitch === null) continue;
+        const set = pitches.get(pitch.companyId);
+        if (set === undefined) {
+          // Newest first: the first row of a company leads its item.
+          pitches.set(pitch.companyId, { ...pitch, more: [] });
+        } else if (set.more.length < LIVE_PITCHES_MAX - 1) {
+          pitches.set(pitch.companyId, { ...set, more: [...set.more, pitch] });
         }
       }
       return pitches;
+    },
+  };
+}
+
+/** Videos per network feed page; a bound, not a target. */
+export const NETWORK_PITCH_PAGE_MAX = 50;
+
+/**
+ * The founders' network feed read (ADR 0021): live, publishable NETWORK
+ * videos across tenants, newest first, keyset-paginated. Each row still
+ * passes `toDiscoverablePitch`, so SQL and the one rule cannot disagree.
+ */
+export function createPostgresNetworkPitchQueryPort(options: {
+  readonly sql: DatabaseExecutor;
+}): NetworkPitchQueryPort {
+  return {
+    findNetworkPitches: async ({
+      excludeOwnerOrganisationId,
+      before,
+      limit,
+    }) => {
+      const bounded = Math.max(1, Math.min(NETWORK_PITCH_PAGE_MAX, limit));
+      const rows = await options.sql`
+        ${select(options.sql)}
+         where m.owner_type = 'COMPANY'
+           and m.purpose = 'FOUNDER_PITCH'
+           and m.audience = 'NETWORK'
+           and m.deleted_at is null
+           and m.superseded_at is null
+           and m.status = 'READY'
+           and m.moderation_status = 'ALLOWED'
+           and m.playback_policy <> 'PRIVATE'
+           and (${excludeOwnerOrganisationId}::uuid is null
+                or m.owner_organisation_id <> ${excludeOwnerOrganisationId}::uuid)
+           and (${before?.createdAt ?? null}::timestamptz is null
+                or (m.created_at, m.id) < (${before?.createdAt ?? null}::timestamptz,
+                                            ${before?.mediaAssetId ?? null}::uuid))
+         order by m.created_at desc, m.id desc
+         limit ${bounded}`;
+      return rows.flatMap((row) => {
+        const asset = toAsset(row);
+        const pitch = toDiscoverablePitch(asset);
+        return pitch === null ? [] : [{ ...pitch, createdAt: asset.createdAt }];
+      });
     },
   };
 }

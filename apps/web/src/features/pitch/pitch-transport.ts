@@ -7,6 +7,7 @@ import {
   getCompany,
   getCompanyPitch,
   listCompanyMedia,
+  setPitchDetails,
   setPitchPlaybackPolicy,
   syncPitch,
   type ApiSession,
@@ -16,6 +17,7 @@ import type {
   CreateCompanyPitchResponse,
   MediaAssetDto,
   MediaUploadSessionDto,
+  PitchAudience,
   PlaybackAuthorizationDto,
 } from "@capital-q/contracts";
 
@@ -34,8 +36,17 @@ export type PitchOverview = {
   readonly pitch: MediaAssetDto | null;
 };
 
+/**
+ * Which video a screen is about (ADR 0022): the company's newest live one,
+ * none yet (a new video being added), or one named video.
+ */
+export type PitchTarget = "CURRENT" | "NEW" | { readonly mediaAssetId: string };
+
 export type PitchTransport = {
-  readonly load: (companyId: string) => Promise<PitchOverview>;
+  readonly load: (
+    companyId: string,
+    target?: PitchTarget,
+  ) => Promise<PitchOverview>;
   /**
    * `POST /pitch` — a record in state CREATED, replacing one by naming it,
    * under the key that makes a retry return the same record.
@@ -88,16 +99,42 @@ export type PitchTransport = {
     playbackPolicy: "AUTHORISED" | "PRIVATE",
     expectedVersion: number,
   ) => Promise<MediaAssetDto>;
+  /** `POST …/details` — the owner's title and audience (ADR 0021/0022). */
+  readonly setDetails: (
+    companyId: string,
+    mediaAssetId: string,
+    details: {
+      readonly title: string | null;
+      readonly audience: PitchAudience;
+    },
+    expectedVersion: number,
+  ) => Promise<MediaAssetDto>;
 };
 
 export function apiPitchTransport(session: ApiSession): PitchTransport {
   return {
-    load: async (companyId) => {
-      const [company, current] = await Promise.all([
+    load: async (companyId, target = "CURRENT") => {
+      if (target === "NEW") {
+        return { company: await getCompany(session, companyId), pitch: null };
+      }
+      if (target === "CURRENT") {
+        const [company, current] = await Promise.all([
+          getCompany(session, companyId),
+          getCompanyPitch(session, companyId),
+        ]);
+        return { company, pitch: current.pitch };
+      }
+      // One named video: the record itself, while it is still live. A
+      // replaced or deleted video is no longer this screen's to show.
+      const [company, media] = await Promise.all([
         getCompany(session, companyId),
-        getCompanyPitch(session, companyId),
+        listCompanyMedia(session, companyId),
       ]);
-      return { company, pitch: current.pitch };
+      const pitch =
+        media.media.find(
+          (asset) => asset.mediaAssetId === target.mediaAssetId && asset.live,
+        ) ?? null;
+      return { company, pitch };
     },
     create: (companyId, replacesMediaAssetId, idempotencyKey) =>
       createPitchMediaAsset(
@@ -149,6 +186,14 @@ export function apiPitchTransport(session: ApiSession): PitchTransport {
       (
         await setPitchPlaybackPolicy(session, companyId, mediaAssetId, {
           playbackPolicy,
+          expectedVersion,
+        })
+      ).pitch,
+    setDetails: async (companyId, mediaAssetId, details, expectedVersion) =>
+      (
+        await setPitchDetails(session, companyId, mediaAssetId, {
+          title: details.title,
+          audience: details.audience,
           expectedVersion,
         })
       ).pitch,

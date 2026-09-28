@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { UtcTimestampSchema } from "../common/time.js";
 import { UuidSchema } from "../common/ids.js";
 import { CurrencyCodeSchema } from "../common/money.js";
 import { StageCodeSchema } from "./companies.js";
@@ -330,6 +331,12 @@ export const DiscoveredCompanyDtoSchema = z
      */
     pitch: PitchSummaryDtoSchema.nullable().default(null),
     /**
+     * The company's other publishable videos, newest first, after `pitch`
+     * (ADR 0022). The item is still one company, ranked once; these are
+     * how it tells its story. Absent from older APIs.
+     */
+    morePitches: z.array(PitchSummaryDtoSchema).max(29).optional(),
+    /**
      * Declared hard exclusions this company's own facts could not answer
      * (its stage, country or sector is not stated). Unknown never excludes
      * (ADR 0020): the company is shown and the investor is told. Optional
@@ -605,3 +612,43 @@ export const SavedCompaniesDtoSchema = z
   .object({ companyIds: z.array(UuidSchema).max(200) })
   .strict();
 export type SavedCompaniesDto = z.infer<typeof SavedCompaniesDtoSchema>;
+
+// ---------------------------------------------------------------------------
+// Founders' network videos (ADR 0021)
+// ---------------------------------------------------------------------------
+
+/**
+ * `GET /v1/discovery/network-pitches` — videos their owners opened to
+ * everyone on Capital Q, newest first, for any signed-in participant.
+ * Each company is shown only when disclosure says this viewer may see it;
+ * the viewer's own organisation's videos are not included. No ranking,
+ * no counters: newest first, cursor pagination.
+ */
+export const DISCOVERY_NETWORK_PITCHES_PATH =
+  "/v1/discovery/network-pitches" as const;
+
+export const NetworkPitchItemDtoSchema = z
+  .object({
+    companyId: UuidSchema,
+    canonicalName: z.string(),
+    shortDescription: z.string().nullable(),
+    headquartersCountry: z.string().nullable(),
+    currentStageCode: z.string().nullable(),
+    pitch: PitchSummaryDtoSchema,
+    postedAt: UtcTimestampSchema,
+  })
+  .strict();
+export type NetworkPitchItemDto = z.infer<typeof NetworkPitchItemDtoSchema>;
+
+export const NetworkPitchPageDtoSchema = z
+  .object({
+    items: z.array(NetworkPitchItemDtoSchema).max(50),
+    nextCursor: z.string().max(200).nullable(),
+  })
+  .strict();
+export type NetworkPitchPageDto = z.infer<typeof NetworkPitchPageDtoSchema>;
+
+/** The network feed's keyset cursor, decoded: the last video's time and id. */
+export const NetworkPitchCursorSchema = z
+  .object({ createdAt: UtcTimestampSchema, mediaAssetId: UuidSchema })
+  .strict();

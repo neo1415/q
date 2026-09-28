@@ -9,6 +9,7 @@ import type {
   CaptionState,
   CompanyPitch,
   DiscoverablePitch,
+  DiscoverablePitchSet,
   MediaAsset,
   MediaAssetId,
   MediaOwnerType,
@@ -18,6 +19,7 @@ import type {
   MediaTechnicalMetadata,
   ModerationStatus,
   NewMediaAsset,
+  PitchAudience,
   PlaybackPolicy,
   TranscriptState,
 } from "../contracts/index.js";
@@ -62,8 +64,9 @@ export type MediaAssetRepository = {
     mediaAssetId: MediaAssetId,
   ) => Promise<MediaAsset | null>;
   /**
-   * The one live, unsuperseded asset of this purpose for this owner. At most
-   * one can exist: the database enforces it with a partial unique index.
+   * The newest live (not deleted, not superseded) asset of this purpose for
+   * this owner: the one a company's profile leads with. Several may be
+   * live at once (ADR 0022).
    */
   readonly findCurrentForOwner: (
     executor: DatabaseExecutor,
@@ -71,12 +74,23 @@ export type MediaAssetRepository = {
     owner: { readonly ownerType: MediaOwnerType; readonly ownerId: string },
     purpose: MediaPurpose,
   ) => Promise<MediaAsset | null>;
-  /** Locks the current asset so a replacement decision cannot race. */
-  readonly lockCurrentForOwner: (
+  /** How many live assets of this purpose the owner has now. */
+  readonly countLiveForOwner: (
     tx: TransactionContext,
     tenantId: TenantId,
     owner: { readonly ownerType: MediaOwnerType; readonly ownerId: string },
     purpose: MediaPurpose,
+  ) => Promise<number>;
+  /** The owner's title and audience for one asset (ADR 0021/0022). */
+  readonly setDetails: (
+    tx: TransactionContext,
+    input: {
+      readonly tenantId: TenantId;
+      readonly mediaAssetId: MediaAssetId;
+      readonly expectedVersion: number;
+      readonly title: string | null;
+      readonly audience: PitchAudience;
+    },
   ) => Promise<MediaAsset | null>;
   /** Newest first, including superseded and deleted assets: this is history. */
   readonly listForOwner: (
@@ -174,7 +188,30 @@ export type DiscoverablePitchQueryPort = {
   /** One query per call. Refuses more than DISCOVERABLE_PITCH_BATCH_MAX ids. */
   readonly findDiscoverablePitches: (
     companyIds: readonly string[],
-  ) => Promise<ReadonlyMap<string, DiscoverablePitch>>;
+  ) => Promise<ReadonlyMap<string, DiscoverablePitchSet>>;
+};
+
+/**
+ * Videos their owners opened to everyone on Capital Q (ADR 0021), newest
+ * first, for the founders' network feed. Cross-tenant like the feed's
+ * batched read and bounded the same way: only live, publishable NETWORK
+ * videos come back, carrying nothing that grants playback. Whether the
+ * company itself may be seen by this viewer is the caller's decision
+ * (disclosure), made for every company before anything is shown.
+ */
+export type NetworkPitchQueryPort = {
+  readonly findNetworkPitches: (input: {
+    /** The viewer's own organisation: their own videos are not "the network". */
+    readonly excludeOwnerOrganisationId: string | null;
+    /** Keyset cursor: strictly older than this (createdAt, id). */
+    readonly before: {
+      readonly createdAt: string;
+      readonly mediaAssetId: string;
+    } | null;
+    readonly limit: number;
+  }) => Promise<
+    readonly (DiscoverablePitch & { readonly createdAt: string })[]
+  >;
 };
 
 /** A pitch's stored transcript (R18): one per asset and language, written once. */
@@ -285,6 +322,21 @@ export type PitchViewerAccessPort = {
     readonly tenantId: TenantId;
     readonly ownerOrganisationId: OrganisationId;
   } | null>;
+  /**
+   * The company, when it is active and visible to the network (ADR-001
+   * network_visible or wider), for any signed-in participant: the gate for
+   * a video its owner opened to everyone on Capital Q (audience NETWORK,
+   * ADR 0021). It never opens an INVESTORS video. Absent: no such viewer.
+   */
+  readonly resolveNetworkCompany?:
+    | ((
+        actor: ActorContext,
+        companyId: string,
+      ) => Promise<{
+        readonly tenantId: TenantId;
+        readonly ownerOrganisationId: OrganisationId;
+      } | null>)
+    | undefined;
 };
 
 export type { OrganisationId };

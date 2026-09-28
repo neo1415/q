@@ -6,6 +6,7 @@ import {
   CompanyPitchResponseSchema,
   CreateCompanyPitchResponseSchema,
   IDEMPOTENCY_KEY_HEADER,
+  MEDIA_DETAILS_SUFFIX,
   MEDIA_PLAYBACK_POLICY_SUFFIX,
   MEDIA_PLAYBACK_SUFFIX,
   MEDIA_SYNC_SUFFIX,
@@ -13,10 +14,12 @@ import {
   MEDIA_UPLOAD_SESSION_SUFFIX,
   MediaUploadSessionDtoSchema,
   PlaybackAuthorizationDtoSchema,
+  SetPitchDetailsResponseSchema,
   SetPitchPlaybackPolicyResponseSchema,
   SyncMediaAssetResponseSchema,
   type CreateCompanyPitchRequest,
   type CreateMediaUploadSessionRequest,
+  type SetPitchDetailsRequest,
   type SetPitchPlaybackPolicyRequest,
 } from "@capital-q/contracts";
 
@@ -187,6 +190,22 @@ export function setPitchPlaybackPolicy(
     "POST",
     `${assetPath(companyId, mediaAssetId)}${MEDIA_PLAYBACK_POLICY_SUFFIX}`,
     SetPitchPlaybackPolicyResponseSchema,
+    { body: request },
+  );
+}
+
+/** `POST …/pitch/:mediaAssetId/details` — the owner's title and audience (ADR 0021/0022). */
+export function setPitchDetails(
+  session: ApiSession,
+  companyId: string,
+  mediaAssetId: string,
+  request: SetPitchDetailsRequest,
+) {
+  return call(
+    session,
+    "POST",
+    `${assetPath(companyId, mediaAssetId)}${MEDIA_DETAILS_SUFFIX}`,
+    SetPitchDetailsResponseSchema,
     { body: request },
   );
 }

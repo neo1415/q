@@ -6,6 +6,8 @@ import { ApiProblemError, type ApiSession } from "@capital-q/api-client";
 import { loadWebServerConfig } from "@capital-q/config/web";
 import {
   IdempotencyKeyHeaderSchema,
+  PITCH_TITLE_MAX,
+  PitchAudienceSchema,
   type CreateCompanyPitchResponse,
   type MediaAssetDto,
   type MediaUploadSessionDto,
@@ -112,12 +114,62 @@ async function run<T>(
   }
 }
 
+/**
+ * The company and one of its videos: the newest live one when no video is
+ * named, none for a new video (`null`), or the named one while it is live.
+ */
 export async function loadPitchOverviewAction(
   rawCompanyId: string,
+  rawMediaAssetId?: string | null,
 ): Promise<PitchActionResult<PitchOverview>> {
   const companyId = UuidInput.safeParse(rawCompanyId);
   if (!companyId.success) return { ok: false, message: NOT_HERE };
-  return run((transport) => transport.load(companyId.data));
+  if (rawMediaAssetId === undefined) {
+    return run((transport) => transport.load(companyId.data));
+  }
+  if (rawMediaAssetId === null) {
+    return run((transport) => transport.load(companyId.data, "NEW"));
+  }
+  const mediaAssetId = UuidInput.safeParse(rawMediaAssetId);
+  if (!mediaAssetId.success) return { ok: false, message: NOT_HERE };
+  return run((transport) =>
+    transport.load(companyId.data, { mediaAssetId: mediaAssetId.data }),
+  );
+}
+
+/** The owner's title and audience for one video (ADR 0021/0022). */
+export async function setPitchDetailsAction(
+  rawCompanyId: string,
+  rawMediaAssetId: string,
+  rawDetails: { readonly title: string | null; readonly audience: string },
+  rawExpectedVersion: number,
+): Promise<PitchActionResult<MediaAssetDto>> {
+  const companyId = UuidInput.safeParse(rawCompanyId);
+  const mediaAssetId = UuidInput.safeParse(rawMediaAssetId);
+  const version = VersionInput.safeParse(rawExpectedVersion);
+  const details = z
+    .object({
+      title: z.string().trim().max(PITCH_TITLE_MAX).nullable(),
+      audience: PitchAudienceSchema,
+    })
+    .safeParse(rawDetails);
+  if (!companyId.success || !mediaAssetId.success) {
+    return { ok: false, message: NOT_HERE };
+  }
+  if (!version.success || !details.success) {
+    return {
+      ok: false,
+      message: `A title can be up to ${String(PITCH_TITLE_MAX)} characters.`,
+    };
+  }
+  return run((transport) =>
+    transport.setDetails(
+      companyId.data,
+      mediaAssetId.data,
+      details.data,
+      version.data,
+    ),
+  );
 }
 
 /**

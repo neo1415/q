@@ -230,7 +230,7 @@ const OFFERS: readonly QCapability[] = [
   offer(
     "pitch_video_upload",
     "MEDIA",
-    "Upload, replace or remove their pitch video and choose who can play it",
+    "Upload several pitch videos, name, replace or remove each, and choose who can watch each one (investors only, or everyone on Capital Q)",
     "PITCH",
     "The video file comes from their own device through the browser's file picker and goes straight to the video CDN; removal is on the same screen.",
   ),

@@ -18,6 +18,7 @@ import {
 } from "@/components/app-shell/page-container";
 import { DiscoverInvestors } from "@/features/discover/discover-screen";
 import { InvestorFeedScreen } from "@/features/discover/investor-feed-screen";
+import { NetworkVideos } from "@/features/discover/network/network-videos";
 import { apiSession, resolveOwnContext } from "@/features/q/context";
 
 export const metadata: Metadata = { title: "Discover" };
@@ -32,7 +33,11 @@ export const dynamic = "force-dynamic";
  * The slate is built server-side by the discovery context under the
  * person's own session. Nothing on this page ranks anything.
  */
-export default async function DiscoverPage() {
+export default async function DiscoverPage({
+  searchParams,
+}: {
+  readonly searchParams?: Promise<{ readonly tab?: string | string[] }>;
+} = {}) {
   const context = await resolveOwnContext();
   const session = await apiSession();
 
@@ -159,6 +164,44 @@ export default async function DiscoverPage() {
     );
   }
 
+  // Founders' videos (ADR 0021) sit beside the investors, one tab each.
+  const tab = (await searchParams)?.tab;
+  const founders = tab === "founders";
+  const tabs = (
+    <nav
+      aria-label="What to discover"
+      className="flex w-fit gap-1 rounded-(--cq-radius-md) border border-(--cq-border-subtle) p-1"
+    >
+      <Link
+        href="/discover"
+        aria-current={founders ? undefined : "page"}
+        className={buttonClassName(founders ? "quiet" : "secondary", "compact")}
+      >
+        Investors
+      </Link>
+      <Link
+        href="/discover?tab=founders"
+        aria-current={founders ? "page" : undefined}
+        className={buttonClassName(founders ? "secondary" : "quiet", "compact")}
+        data-discover-founders-tab
+      >
+        Founders&apos; videos
+      </Link>
+    </nav>
+  );
+  if (founders) {
+    return (
+      <PageContainer>
+        <PageHeader
+          title="Discover"
+          description="Videos other founders chose to share with everyone on Capital Q, newest first."
+        />
+        {tabs}
+        <NetworkVideos />
+      </PageContainer>
+    );
+  }
+
   const slate = await discoverInvestors(session).catch(() => null);
   return (
     <PageContainer>
@@ -166,6 +209,7 @@ export default async function DiscoverPage() {
         title="Discover"
         description="Investors who chose to be discoverable, and what each one has said publicly."
       />
+      {tabs}
       {/* Interest already addressed to the company (CQ-NET-011). */}
       <Link
         href="/company/interest"

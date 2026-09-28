@@ -4,6 +4,7 @@ import { z } from "zod";
 
 import {
   discoverCompanies,
+  listNetworkPitches,
   passCompany,
   saveCompany,
   unsaveCompany,
@@ -14,6 +15,7 @@ import {
   DiscoverFiltersSchema,
   type DiscoveryCompanySlateDto,
   type InteractionRecordedDto,
+  type NetworkPitchPageDto,
 } from "@capital-q/contracts";
 
 import { getSessionAccessToken } from "@/auth/session";
@@ -144,5 +146,34 @@ export async function recordDecisionAction(input: {
     return { ok: true, value: recorded };
   } catch {
     return { ok: false, message: "That did not save. Try again." };
+  }
+}
+
+/**
+ * `GET /v1/discovery/network-pitches` — one page of the videos founders
+ * opened to everyone on Capital Q (ADR 0021), by cursor.
+ */
+export async function loadNetworkPitchesAction(
+  rawCursor: string | null,
+): Promise<FeedActionResult<NetworkPitchPageDto>> {
+  const cursor = rawCursor === null ? null : CursorInput.safeParse(rawCursor);
+  if (cursor !== null && !cursor.success) {
+    return { ok: false, message: "That page could not be loaded." };
+  }
+  const current = await session();
+  if (current === null) return { ok: false, message: NO_SESSION };
+  try {
+    return {
+      ok: true,
+      value: await listNetworkPitches(
+        current,
+        cursor === null ? {} : { cursor: cursor.data },
+      ),
+    };
+  } catch {
+    return {
+      ok: false,
+      message: "Founders' videos couldn't load just now. Try again.",
+    };
   }
 }

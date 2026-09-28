@@ -373,6 +373,8 @@ export const CompanyNetworkPreviewSchema = z
     networkVisible: z.boolean(),
     /** The pitch an investor may play here; see `PitchSummaryDtoSchema`. */
     pitch: PitchSummaryDtoSchema.nullable().default(null),
+    /** The company's other publishable videos, newest first (ADR 0022). */
+    morePitches: z.array(PitchSummaryDtoSchema).max(29).optional(),
     /**
      * The declared fields above, classified (CQ-WEB-024): what is known
      * and how well supported it is. Defaults to empty so a server that

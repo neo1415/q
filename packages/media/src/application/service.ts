@@ -19,6 +19,7 @@ import type { MediaRepositories, PitchViewerAccessPort } from "./ports.js";
 import { createApplyProviderStatusReport } from "./provider-status-use-cases.js";
 import {
   createApplyAutomatedModeration,
+  createSetPitchDetails,
   createSetPitchPlaybackPolicy,
 } from "./publish-use-cases.js";
 import {
@@ -81,6 +82,7 @@ export type MediaService = {
     typeof createApplyProviderStatusReport
   >;
   /** The publish path (CQ-MEDIA-013): the owner's decision, and the platform's. */
+  readonly setPitchDetails: ReturnType<typeof createSetPitchDetails>;
   readonly setPitchPlaybackPolicy: ReturnType<
     typeof createSetPitchPlaybackPolicy
   >;
@@ -148,6 +150,7 @@ export function createMediaService(options: MediaServiceOptions): MediaService {
     syncPitchTranscript: createSyncPitchTranscript(dependencies),
     mayPlayPitch: createMayPlayPitch(dependencies),
     applyProviderStatusReport: createApplyProviderStatusReport(dependencies),
+    setPitchDetails: createSetPitchDetails(dependencies),
     setPitchPlaybackPolicy: createSetPitchPlaybackPolicy(dependencies),
     applyAutomatedModeration: createApplyAutomatedModeration(dependencies),
   };

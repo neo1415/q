@@ -132,6 +132,9 @@ export type ApiModules = {
   /** Absent: a company's network preview is readable by its owner only. */
   readonly companyNetworkView?:
     CompanyRoutesDependencies["networkView"] | undefined;
+  /** ADR 0021. Absent: previews offer only videos opened to the network. */
+  readonly watchesAsInvestor?:
+    CompanyRoutesDependencies["watchesAsInvestor"] | undefined;
   readonly investors?: InvestorRoutesDependencies["investors"] | undefined;
   readonly discovery?:
     | (Pick<DiscoveryRoutesDependencies, "discovery" | "slates"> & {
@@ -141,6 +144,11 @@ export type ApiModules = {
           | undefined;
         /** CQ-MEDIA-012. Absent: every feed item's pitch is null. */
         readonly pitches?: DiscoveryRoutesDependencies["pitches"] | undefined;
+        /** ADR 0021. Absent: the founders' network feed is empty. */
+        readonly networkPitches?:
+          DiscoveryRoutesDependencies["networkPitches"] | undefined;
+        readonly networkCompany?:
+          DiscoveryRoutesDependencies["networkCompany"] | undefined;
       })
     | undefined;
   readonly capital?: CapitalRoutesDependencies["capital"] | undefined;
@@ -253,6 +261,7 @@ export function createApp(
       companies: modules.companies,
       pitches: modules.companyPitches,
       networkView: modules.companyNetworkView,
+      watchesAsInvestor: modules.watchesAsInvestor,
     });
     registerCompanyTeamRoutes(app, {
       authenticator: security.authenticator,
@@ -284,6 +293,8 @@ export function createApp(
       slates: modules.discovery.slates,
       pitches: modules.discovery.pitches,
       interactions: modules.discovery.interactions,
+      networkPitches: modules.discovery.networkPitches,
+      networkCompany: modules.discovery.networkCompany,
     });
     if (modules.discovery.interactions !== undefined) {
       registerRecommendationInteractionRoutes(app, {

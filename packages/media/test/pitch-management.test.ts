@@ -87,6 +87,8 @@ function asset(overrides: Partial<MediaAsset> = {}): MediaAsset {
     captionState: "AVAILABLE",
     transcriptState: "AVAILABLE",
     moderationStatus: "ALLOWED",
+    title: null,
+    audience: "INVESTORS",
     replacesMediaAssetId: null,
     supersededAt: null,
     createdByUserId: FOUNDER,
@@ -151,7 +153,8 @@ function harness(
     findByProviderAssetId: notUnderTest,
     lockById: (_tx, tenantId, id) => find(tenantId, id),
     findCurrentForOwner: () => Promise.resolve(current()),
-    lockCurrentForOwner: () => Promise.resolve(current()),
+    countLiveForOwner: () => Promise.resolve(1),
+    setDetails: () => Promise.resolve(current()),
     listForOwner: () => Promise.resolve([...rows.values()]),
     transitionStatus: (_tx, input) => {
       const row = rows.get(input.mediaAssetId);

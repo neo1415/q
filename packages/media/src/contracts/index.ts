@@ -211,6 +211,22 @@ export const DEFAULT_PITCH_DURATION_POLICY: MediaDurationPolicy = {
 /** Guidance only. A landscape pitch is a pitch. */
 export const PREFERRED_PITCH_ASPECT_RATIO = "9:16" as const;
 
+/**
+ * Who beyond its owner may watch a publishable video (ADR 0021): the
+ * investors the company is discoverable to, or also every signed-in
+ * founder on Capital Q. Reference codes; INVESTORS is the default and no
+ * one's disclosure widens without the owner choosing NETWORK.
+ */
+export const PITCH_AUDIENCES = ["INVESTORS", "NETWORK"] as const;
+export const PitchAudienceSchema = z.enum(PITCH_AUDIENCES);
+export type PitchAudience = z.infer<typeof PitchAudienceSchema>;
+
+/** The owner's name for a video. */
+export const PITCH_TITLE_MAX = 120;
+
+/** Live videos one company may have at once; a bound, not a target. */
+export const LIVE_PITCHES_MAX = 30;
+
 // ---------------------------------------------------------------------------
 // The record
 // ---------------------------------------------------------------------------
@@ -236,6 +252,10 @@ export type MediaAsset = {
   readonly captionState: CaptionState;
   readonly transcriptState: TranscriptState;
   readonly moderationStatus: ModerationStatus;
+  /** The owner's name for the video; display text, never a company fact. */
+  readonly title: string | null;
+  /** Who beyond the owner may watch it once publishable (ADR 0021). */
+  readonly audience: PitchAudience;
   /** Lineage: the asset this one replaced. Replacement never overwrites. */
   readonly replacesMediaAssetId: MediaAssetId | null;
   /** Set when a successor replaced this asset. Superseded is not deleted. */
@@ -257,6 +277,8 @@ export type NewMediaAsset = {
   readonly playbackPolicy: PlaybackPolicy;
   readonly createdByUserId: UserId;
   readonly replacesMediaAssetId?: MediaAssetId | undefined;
+  readonly title?: string | null | undefined;
+  readonly audience?: PitchAudience | undefined;
 };
 
 /**
@@ -275,6 +297,10 @@ export type MediaAssetDto = {
   readonly captionState: CaptionState;
   readonly transcriptState: TranscriptState;
   readonly moderationStatus: ModerationStatus;
+  readonly title: string | null;
+  readonly audience: PitchAudience;
+  /** False once another video replaced it, or it was deleted. */
+  readonly live: boolean;
   readonly replacesMediaAssetId: string | null;
   readonly createdAt: string;
   readonly readyAt: string | null;
@@ -292,6 +318,9 @@ export function toMediaAssetDto(asset: MediaAsset): MediaAssetDto {
     captionState: asset.captionState,
     transcriptState: asset.transcriptState,
     moderationStatus: asset.moderationStatus,
+    title: asset.title,
+    audience: asset.audience,
+    live: asset.deletedAt === null && asset.supersededAt === null,
     replacesMediaAssetId: asset.replacesMediaAssetId,
     createdAt: asset.createdAt,
     readyAt: asset.readyAt,
@@ -361,11 +390,22 @@ export type DiscoverablePitch = {
   readonly aspectRatio: string | null;
   readonly durationSeconds: number | null;
   readonly captionState: CaptionState;
+  readonly title: string | null;
+  readonly audience: PitchAudience;
+};
+
+/**
+ * A company's publishable videos for a feed item (ADR 0022): the newest
+ * leads, the rest follow newest first. Ranking stays per company; the
+ * videos are how the company tells its story, never extra lottery tickets.
+ */
+export type DiscoverablePitchSet = DiscoverablePitch & {
+  readonly more: readonly DiscoverablePitch[];
 };
 
 /**
  * The publishable view of one asset, or null. The single rule for "may
- * this pitch appear on a feed item": the current founder pitch, READY,
+ * this pitch appear on a feed item": a live founder pitch, READY,
  * moderation ALLOWED, policy not PRIVATE. The batched read applies the
  * same predicate in SQL; this is the one place it is written down in code,
  * and the SQL is checked against it.
@@ -388,6 +428,29 @@ export function toDiscoverablePitch(
     aspectRatio: asset.aspectRatio,
     durationSeconds: asset.durationSeconds,
     captionState: asset.captionState,
+    title: asset.title,
+    audience: asset.audience,
+  };
+}
+
+/**
+ * A publishable video as a feed item or profile carries it (the HTTP
+ * PitchSummaryDto): layout facts and the owner's title, nothing that
+ * grants playback.
+ */
+export function pitchSummary(pitch: DiscoverablePitch): {
+  readonly mediaAssetId: string;
+  readonly aspectRatio: string | null;
+  readonly durationSeconds: number | null;
+  readonly captionState: CaptionState;
+  readonly title: string | null;
+} {
+  return {
+    mediaAssetId: pitch.mediaAssetId,
+    aspectRatio: pitch.aspectRatio,
+    durationSeconds: pitch.durationSeconds,
+    captionState: pitch.captionState,
+    title: pitch.title,
   };
 }
 

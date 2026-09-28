@@ -167,6 +167,7 @@ import {
   createMediaOwnerResolverRegistry,
   createMediaService,
   createPostgresDiscoverablePitchQueryPort,
+  createPostgresNetworkPitchQueryPort,
   createUnconfiguredVideoProvider,
 } from "@capital-q/media";
 import {
@@ -778,6 +779,25 @@ const media = createMediaService({
             ownerOrganisationId: facts.organisationId,
           };
     },
+    // A video its owner opened to everyone on Capital Q (ADR 0021): the
+    // same disclosure decision the network preview uses, for any signed-in
+    // participant, and only while the company is active.
+    resolveNetworkCompany: async (actor, companyId) => {
+      const parsedCompanyId = CompanyIdSchema.safeParse(companyId);
+      if (!parsedCompanyId.success) return null;
+      if (!(await isCompanyNetworkVisible(actor, parsedCompanyId.data))) {
+        return null;
+      }
+      const [facts] = await marketplaceFacts.findCanonicalMarketplaceFacts([
+        parsedCompanyId.data,
+      ]);
+      return facts === undefined || facts.companyStatus !== "active"
+        ? null
+        : {
+            tenantId: facts.tenantId,
+            ownerOrganisationId: facts.organisationId,
+          };
+    },
   },
 });
 
@@ -953,11 +973,37 @@ const { app, logger } = createApp(config, security, {
     // The feed's one batched pitch read per page (CQ-MEDIA-012), through
     // the Media context's port: discovery never touches media tables.
     pitches: discoverablePitches,
+    // Founders' network videos (ADR 0021): the media read, then the same
+    // disclosure-checked company read the network preview uses.
+    networkPitches: createPostgresNetworkPitchQueryPort({ sql: database.sql }),
+    networkCompany: async (actor, companyId) => {
+      const parsed = CompanyIdSchema.safeParse(companyId);
+      if (!parsed.success) return null;
+      const company = await companyNetworkView.findNetworkVisible(
+        actor,
+        parsed.data,
+      );
+      return company === null
+        ? null
+        : {
+            canonicalName: company.canonicalName,
+            shortDescription: company.shortDescription,
+            headquartersCountry: company.headquartersCountry,
+            currentStageCode: company.currentStageCode,
+            companyStatus: company.companyStatus,
+          };
+    },
   },
   // The same port answers the founder's own view and network preview, so
   // "what investors will see" is what the feed shows.
   companyPitches: discoverablePitches,
   companyNetworkView,
+  // An investor watches every publishable video of a company discoverable
+  // to them; anyone else only the videos opened to the network (ADR 0021).
+  watchesAsInvestor: async (actor) =>
+    (await slates.eligibilityPorts.investorSubject.investorOrganisationFor(
+      actor,
+    )) !== null,
   interests,
   chat,
   chatSafety,

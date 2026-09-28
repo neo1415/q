@@ -18,6 +18,8 @@ import type { ActorContext, TenantId } from "@capital-q/security";
 
 import {
   MediaAssetIdSchema,
+  PITCH_TITLE_MAX,
+  PitchAudienceSchema,
   type MediaAsset,
   type MediaAssetId,
   type MediaOwnerRef,
@@ -68,6 +70,7 @@ const ACTION = {
     "media.asset.playback_policy_set",
   ),
   moderated: AuditActionTypeSchema.parse("media.asset.moderated"),
+  detailsSet: AuditActionTypeSchema.parse("media.asset.details_set"),
 };
 const PITCH = "FOUNDER_PITCH" as const;
 
@@ -200,6 +203,112 @@ export function createSetPitchPlaybackPolicy(
           },
         ),
       );
+      return updated;
+    });
+  };
+}
+
+/**
+ * The owner's name for a video and who beyond them may watch it (ADR 0021,
+ * ADR 0022). Blank is no title. The audience widens disclosure, so this is
+ * `media.manage`, like the playback policy, and it is audited.
+ */
+export const PitchDetailsSchema = z
+  .object({
+    title: z
+      .string()
+      .trim()
+      .max(PITCH_TITLE_MAX)
+      .transform((title) => (title.length === 0 ? null : title))
+      .nullable(),
+    audience: PitchAudienceSchema,
+  })
+  .strict();
+export type PitchDetails = z.input<typeof PitchDetailsSchema>;
+
+export type SetPitchDetailsCommand = {
+  readonly actor: ActorContext;
+  readonly companyId: string;
+  readonly mediaAssetId: MediaAssetId;
+  readonly details: PitchDetails;
+  /** The version the owner saw. A stale screen does not decide. */
+  readonly expectedVersion: number;
+  readonly correlationId: CorrelationId;
+};
+
+export function createSetPitchDetails(dependencies: MediaServiceDependencies) {
+  const { repositories, transactions, audit } = dependencies;
+
+  return async (command: SetPitchDetailsCommand): Promise<MediaAsset> => {
+    const { actor } = command;
+    const details = PitchDetailsSchema.parse(command.details);
+    const owner = await ownedResource(
+      dependencies,
+      actor,
+      companyRef(command.companyId),
+    );
+    await dependencies.authorization.requireCapability({
+      actor,
+      capability: MEDIA_MANAGE,
+      resource: ownerScope(actor, owner),
+    });
+
+    return transactions.run(async (tx: TransactionContext) => {
+      const asset = await repositories.mediaAssets.lockById(
+        tx,
+        owner.tenantId,
+        command.mediaAssetId,
+      );
+      if (
+        asset === null ||
+        asset.ownerType !== owner.ownerType ||
+        asset.ownerId !== owner.ownerId ||
+        asset.purpose !== PITCH
+      ) {
+        throw new MediaAssetNotFoundError();
+      }
+      if (asset.version !== command.expectedVersion) {
+        throw new MediaAssetConflictError();
+      }
+      if (asset.status === "DELETED") {
+        throw new MediaRuleError("A deleted video can't be changed.");
+      }
+      if (
+        asset.title === details.title &&
+        asset.audience === details.audience
+      ) {
+        return asset;
+      }
+      const updated = await repositories.mediaAssets.setDetails(tx, {
+        tenantId: owner.tenantId,
+        mediaAssetId: asset.id,
+        expectedVersion: asset.version,
+        title: details.title,
+        audience: details.audience,
+      });
+      if (updated === null) {
+        throw new MediaAssetConflictError();
+      }
+      await audit.record(tx, {
+        ...auditActorFromContext(actor),
+        auditEventId: createAuditEventId(),
+        actionType: ACTION.detailsSet,
+        resourceType: RESOURCE_MEDIA,
+        resourceId: asset.id,
+        occurredAt: occurredNow(),
+        outcome: "SUCCEEDED",
+        // Coded states only; the title is the owner's display text and is
+        // not repeated into the audit trail.
+        metadata: {
+          ownerType: asset.ownerType,
+          ownerId: asset.ownerId,
+          purpose: asset.purpose,
+          previousAudience: asset.audience,
+          audience: details.audience,
+          titleChanged: asset.title !== details.title,
+        },
+        correlationId: command.correlationId,
+      });
       return updated;
     });
   };

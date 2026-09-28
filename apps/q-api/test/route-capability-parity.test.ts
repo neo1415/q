@@ -152,6 +152,9 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "api/http/discovery.ts GET DISCOVERY_INVESTORS_PATH": cap(
     "tool.find_prospective_investors",
   ),
+  // Founders' videos (ADR 0021): browsed on Discover's second tab.
+  "api/http/discovery.ts GET DISCOVERY_NETWORK_PITCHES_PATH":
+    cap("navigate.DISCOVER"),
 
   "api/http/documents.ts POST DOCUMENT_UPLOAD_SESSIONS_PATH": cap(
     "offer.document_upload",
@@ -270,6 +273,9 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "api/http/media.ts POST `${pitch}/:mediaAssetId${MEDIA_SYNC_SUFFIX}`": PLAYER,
   "api/http/media.ts POST `${pitch}/:mediaAssetId${MEDIA_PLAYBACK_POLICY_SUFFIX}`":
     cap("offer.pitch_video_upload"),
+  "api/http/media.ts POST `${pitch}/:mediaAssetId${MEDIA_DETAILS_SUFFIX}`": cap(
+    "offer.pitch_video_upload",
+  ),
   "api/http/media.ts POST `${pitch}/:mediaAssetId${MEDIA_PLAYBACK_SUFFIX}`":
     PLAYER,
   "api/http/media.ts GET `${pitch}/:mediaAssetId${MEDIA_TRANSCRIPT_SUFFIX}`":
@@ -489,6 +495,9 @@ const PAGE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "/settings": cap("navigate.SETTINGS"),
   "/verification": cap("navigate.VERIFICATION"),
   "/pitch": cap("navigate.PITCH"),
+  // One video's page and a new video's, both opened from Pitch & media (ADR 0022).
+  "/pitch/new": cap("navigate.PITCH"),
+  "/pitch/[mediaAssetId]": cap("navigate.PITCH"),
   "/company/[companyId]": cap("tool.open_page"),
   "/relationships/company/[companyId]": cap("tool.open_page"),
   "/relationships/investor/[investorOrganisationId]": cap("tool.open_page"),

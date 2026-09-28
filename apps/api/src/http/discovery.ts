@@ -5,9 +5,12 @@ import {
   DiscoverFiltersQuerySchema,
   DISCOVERY_COMPANIES_PATH,
   DISCOVERY_INVESTORS_PATH,
+  DISCOVERY_NETWORK_PITCHES_PATH,
   DiscoveryCompanySlateDtoSchema,
   DiscoveryInvestorSlateDtoSchema,
+  NetworkPitchPageDtoSchema,
   parseContract,
+  NetworkPitchCursorSchema,
   type DiscoverFilters,
 } from "@capital-q/contracts";
 import type {
@@ -15,10 +18,14 @@ import type {
   InteractionSignalService,
   SlateReadService,
 } from "@capital-q/discovery";
-import type {
-  DiscoverablePitch,
-  DiscoverablePitchQueryPort,
+import {
+  NETWORK_PITCH_PAGE_MAX,
+  pitchSummary,
+  type DiscoverablePitchQueryPort,
+  type DiscoverablePitchSet,
+  type NetworkPitchQueryPort,
 } from "@capital-q/media";
+import type { ActorContext } from "@capital-q/security";
 
 import {
   getActorContext,
@@ -53,7 +60,50 @@ export type DiscoveryRoutesDependencies = ActorContextDependencies & {
    */
   readonly interactions?:
     Pick<InteractionSignalService, "stateForCompanies"> | undefined;
+  /**
+   * Videos opened to everyone on Capital Q (ADR 0021), and the company as
+   * this viewer may see it (disclosure: network-visible or wider, else
+   * null). Both absent: the network feed is empty.
+   */
+  readonly networkPitches?: NetworkPitchQueryPort | undefined;
+  readonly networkCompany?:
+    | ((
+        actor: ActorContext,
+        companyId: string,
+      ) => Promise<{
+        readonly canonicalName: string;
+        readonly shortDescription: string | null;
+        readonly headquartersCountry: string | null;
+        readonly currentStageCode: string | null;
+        readonly companyStatus: string;
+      } | null>)
+    | undefined;
 };
+
+function encodeNetworkCursor(createdAt: string, mediaAssetId: string): string {
+  return Buffer.from(JSON.stringify({ createdAt, mediaAssetId })).toString(
+    "base64url",
+  );
+}
+
+function decodeNetworkCursor(
+  cursor: string | null,
+): { readonly createdAt: string; readonly mediaAssetId: string } | null {
+  if (cursor === null) return null;
+  let raw: unknown;
+  try {
+    raw = JSON.parse(Buffer.from(cursor, "base64url").toString("utf8"));
+  } catch {
+    raw = null;
+  }
+  return parseContract(
+    NetworkPitchCursorSchema,
+    raw,
+    "The cursor is not valid.",
+  );
+}
+
+const NETWORK_PAGE_DEFAULT = 18;
 
 type PageQuery = {
   readonly limit?: string | undefined;
@@ -125,7 +175,7 @@ export function registerDiscoveryRoutes(
       // URL: the client asks `/playback` for each item it activates.
       const pitches =
         dependencies.pitches === undefined || served.items.length === 0
-          ? new Map<string, DiscoverablePitch>()
+          ? new Map<string, DiscoverablePitchSet>()
           : await dependencies.pitches.findDiscoverablePitches(
               served.items.map((item) => item.companyId),
             );
@@ -160,15 +210,10 @@ export function registerDiscoveryRoutes(
             ...(states === null
               ? {}
               : { viewerSaved: states.get(item.companyId)?.saved === true }),
-            pitch:
-              pitch === undefined
-                ? null
-                : {
-                    mediaAssetId: pitch.mediaAssetId,
-                    aspectRatio: pitch.aspectRatio,
-                    durationSeconds: pitch.durationSeconds,
-                    captionState: pitch.captionState,
-                  },
+            pitch: pitch === undefined ? null : pitchSummary(pitch),
+            ...(pitch === undefined || pitch.more.length === 0
+              ? {}
+              : { morePitches: pitch.more.map(pitchSummary) }),
           };
         }),
         notes: served.notes,
@@ -176,6 +221,68 @@ export function registerDiscoveryRoutes(
         unverifiableExclusions: served.unverifiableExclusions,
         excludingRules: served.excludingRules,
         discoverableCount: served.discoverableCount,
+      });
+    },
+  );
+
+  // Founders' network videos (ADR 0021): newest first, no ranking. Every
+  // company passes the same disclosure read the network preview uses
+  // before anything about it is returned; a company hidden since its
+  // video was opened simply drops out.
+  app.get(
+    DISCOVERY_NETWORK_PITCHES_PATH,
+    { onRequest: withContext },
+    async (request, reply) => {
+      const actor = getActorContext(request);
+      const page = pageOf(request);
+      const limit = Math.max(
+        1,
+        Math.min(NETWORK_PITCH_PAGE_MAX, page.limit ?? NETWORK_PAGE_DEFAULT),
+      );
+      void reply.header("Cache-Control", "no-store");
+      if (
+        dependencies.networkPitches === undefined ||
+        dependencies.networkCompany === undefined
+      ) {
+        return NetworkPitchPageDtoSchema.parse({ items: [], nextCursor: null });
+      }
+      const rows = await dependencies.networkPitches.findNetworkPitches({
+        excludeOwnerOrganisationId: actor.organisationId ?? null,
+        before: decodeNetworkCursor(page.cursor),
+        limit,
+      });
+      const companies = new Map<
+        string,
+        Awaited<ReturnType<NonNullable<typeof dependencies.networkCompany>>>
+      >();
+      for (const companyId of new Set(rows.map((row) => row.companyId))) {
+        companies.set(
+          companyId,
+          await dependencies.networkCompany(actor, companyId).catch(() => null),
+        );
+      }
+      const items = rows.flatMap((row) => {
+        const company = companies.get(row.companyId) ?? null;
+        if (company === null || company.companyStatus !== "active") return [];
+        return [
+          {
+            companyId: row.companyId,
+            canonicalName: company.canonicalName,
+            shortDescription: company.shortDescription,
+            headquartersCountry: company.headquartersCountry,
+            currentStageCode: company.currentStageCode,
+            pitch: pitchSummary(row),
+            postedAt: row.createdAt,
+          },
+        ];
+      });
+      const last = rows.at(-1);
+      return NetworkPitchPageDtoSchema.parse({
+        items,
+        nextCursor:
+          rows.length === limit && last !== undefined
+            ? encodeNetworkCursor(last.createdAt, last.mediaAssetId)
+            : null,
       });
     },
   );

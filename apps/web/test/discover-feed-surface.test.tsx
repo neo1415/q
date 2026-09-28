@@ -353,6 +353,43 @@ describe("a card", () => {
     expect(save.getAttribute("aria-pressed")).toBe("true");
   });
 
+  it("offers the company's next video on the rail only when it has more than one (ADR 0022)", () => {
+    const onNext = vi.fn();
+    const { rerender } = render(
+      <FeedCard
+        company={company(1)}
+        policy="ACTIVE"
+        reducedMotion={false}
+        saved={false}
+        deciding={false}
+        showMedia={false}
+        onSave={() => undefined}
+        onPass={() => undefined}
+        onAskQ={() => undefined}
+      />,
+    );
+    expect(document.querySelector("[data-feed-next-video]")).toBeNull();
+    rerender(
+      <FeedCard
+        company={company(1)}
+        policy="ACTIVE"
+        reducedMotion={false}
+        saved={false}
+        deciding={false}
+        showMedia={false}
+        onSave={() => undefined}
+        onPass={() => undefined}
+        onAskQ={() => undefined}
+        videos={{ index: 0, count: 3, onNext }}
+      />,
+    );
+    const next = screen.getByRole("button", {
+      name: "Next video from Company 1, video 2 of 3",
+    });
+    fireEvent.click(next);
+    expect(onNext).toHaveBeenCalledTimes(1);
+  });
+
   it("links to the company profile", () => {
     render(
       <FeedCard

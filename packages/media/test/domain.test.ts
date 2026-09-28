@@ -53,6 +53,8 @@ const asset = (overrides: Partial<MediaAsset> = {}): MediaAsset =>
     captionState: "NOT_REQUESTED",
     transcriptState: "NOT_REQUESTED",
     moderationStatus: "NOT_REVIEWED",
+    title: null,
+    audience: "INVESTORS",
     replacesMediaAssetId: null,
     supersededAt: null,
     createdByUserId: "55555555-5555-4555-8555-555555555555",
@@ -183,9 +185,11 @@ describe("the client-facing DTO", () => {
     expect(serialised).not.toContain("CLOUDFLARE");
     expect(Object.keys(dto).sort()).toEqual([
       "aspectRatio",
+      "audience",
       "captionState",
       "createdAt",
       "durationSeconds",
+      "live",
       "mediaAssetId",
       "moderationStatus",
       "playbackPolicy",
@@ -193,6 +197,7 @@ describe("the client-facing DTO", () => {
       "readyAt",
       "replacesMediaAssetId",
       "status",
+      "title",
       "transcriptState",
       "version",
     ]);
@@ -319,6 +324,8 @@ describe("toDiscoverablePitch", () => {
       aspectRatio: "9:16",
       durationSeconds: 87,
       captionState: "AVAILABLE",
+      title: null,
+      audience: "INVESTORS",
     });
     expect(JSON.stringify(pitch)).not.toContain("cf-uid-private");
   });

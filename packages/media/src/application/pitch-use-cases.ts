@@ -14,6 +14,7 @@ import type { TransactionContext } from "@capital-q/database";
 import type { ActorContext } from "@capital-q/security";
 
 import {
+  LIVE_PITCHES_MAX,
   MediaAssetIdSchema,
   toCompanyPitch,
   type CompanyPitch,
@@ -67,10 +68,9 @@ const PITCH = "FOUNDER_PITCH" as const;
 export const CreateCompanyPitchInputSchema = z
   .object({
     /**
-     * The asset the caller believes is current, when replacing one. Its
-     * absence means "there is none"; a mismatch is refused rather than
-     * resolved, because guessing which of two pitches is the pitch is the
-     * ambiguity the single-primary rule exists to prevent.
+     * The live video this one replaces. Absent: this is another video,
+     * added beside the company's others (ADR 0022). A video that is not
+     * live and theirs is refused, never guessed at.
      */
     replacesMediaAssetId: MediaAssetIdSchema.optional(),
   })
@@ -127,13 +127,14 @@ function companyRef(companyId: string): MediaOwnerRef {
 }
 
 /**
- * Creates the company's pitch asset, or replaces the current one.
+ * Adds a pitch video to the company, or replaces one of its live videos.
  *
  * Replacement never overwrites: a new asset is created, the predecessor is
  * marked superseded, and the lineage link between them survives. Both the
- * supersede and the insert happen in one transaction under a row lock, and
- * the database's single-current-pitch index is the final arbiter — two
- * simultaneous replacements cannot both succeed.
+ * supersede and the insert happen in one transaction under the
+ * predecessor's row lock; the conditional supersede and the one-successor
+ * index make two simultaneous replacements of the same video resolve to
+ * one winner.
  */
 export function createCreateCompanyPitch(
   dependencies: MediaServiceDependencies,
@@ -201,29 +202,38 @@ export function createCreateCompanyPitch(
         }
       }
 
-      const current = await repositories.mediaAssets.lockCurrentForOwner(
-        tx,
-        owner.tenantId,
-        owner,
-        PITCH,
-      );
-
+      // Several videos may be live at once (ADR 0022). Without a named
+      // predecessor this adds another; with one, exactly that live video
+      // is replaced, under its row lock, and its lineage kept.
+      let current: MediaAsset | null = null;
       if (input.replacesMediaAssetId === undefined) {
-        if (current !== null) {
-          // A company has one primary pitch. Adding a second is not a
-          // creation, it is a replacement, and the caller must say so.
-          throw new MediaReplacementConflictError(
-            "This company already has a current pitch; replace it explicitly.",
+        const live = await repositories.mediaAssets.countLiveForOwner(
+          tx,
+          owner.tenantId,
+          owner,
+          PITCH,
+        );
+        if (live >= LIVE_PITCHES_MAX) {
+          throw new MediaRuleError(
+            `A company can have at most ${String(LIVE_PITCHES_MAX)} live videos. Delete one to add another.`,
           );
         }
-      } else if (
-        current === null ||
-        current.id !== input.replacesMediaAssetId
-      ) {
-        throw new MediaReplacementConflictError();
-      }
-
-      if (current !== null) {
+      } else {
+        current = await repositories.mediaAssets.lockById(
+          tx,
+          owner.tenantId,
+          input.replacesMediaAssetId,
+        );
+        if (
+          current === null ||
+          current.ownerType !== owner.ownerType ||
+          current.ownerId !== owner.ownerId ||
+          current.purpose !== PITCH ||
+          current.deletedAt !== null ||
+          current.supersededAt !== null
+        ) {
+          throw new MediaReplacementConflictError();
+        }
         const superseded = await repositories.mediaAssets.markSuperseded(tx, {
           tenantId: owner.tenantId,
           mediaAssetId: current.id,
@@ -244,7 +254,15 @@ export function createCreateCompanyPitch(
         // until a deliberate later decision widens it.
         playbackPolicy: "PRIVATE",
         createdByUserId: actor.userId,
-        ...(current === null ? {} : { replacesMediaAssetId: current.id }),
+        // A replacement is the same video re-recorded: it keeps the name
+        // and audience its owner gave it.
+        ...(current === null
+          ? {}
+          : {
+              replacesMediaAssetId: current.id,
+              title: current.title,
+              audience: current.audience,
+            }),
       });
       if (keyHash !== null && requests !== undefined) {
         await requests.record(tx, {

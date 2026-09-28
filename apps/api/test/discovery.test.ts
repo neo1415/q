@@ -16,7 +16,7 @@ import {
   type SlateReadService,
 } from "@capital-q/discovery";
 import type {
-  DiscoverablePitch,
+  DiscoverablePitchSet,
   DiscoverablePitchQueryPort,
 } from "@capital-q/media";
 import {
@@ -67,6 +67,12 @@ function buildApp(options: {
   readonly page: SlatePage | Error;
   readonly pitches?: DiscoverablePitchQueryPort | undefined;
   readonly saved?: readonly string[] | Error | undefined;
+  readonly network?:
+    | Pick<
+        NonNullable<NonNullable<Parameters<typeof createApp>[2]>["discovery"]>,
+        "networkPitches" | "networkCompany"
+      >
+    | undefined;
 }): { readonly app: FastifyInstance; readonly queries: PageCompaniesQuery[] } {
   const queries: PageCompaniesQuery[] = [];
   const slates: SlateReadService = {
@@ -93,6 +99,7 @@ function buildApp(options: {
       ...(options.saved === undefined
         ? {}
         : { interactions: fakeInteractions(options.saved) }),
+      ...(options.network ?? {}),
     },
   });
   return { app, queries };
@@ -390,7 +397,7 @@ describe("GET /v1/discovery/companies — the feed item's pitch", () => {
     ],
   };
 
-  function fakePitches(answer: ReadonlyMap<string, DiscoverablePitch>): {
+  function fakePitches(answer: ReadonlyMap<string, DiscoverablePitchSet>): {
     readonly port: DiscoverablePitchQueryPort;
     readonly calls: string[][];
   } {
@@ -406,15 +413,18 @@ describe("GET /v1/discovery/companies — the feed item's pitch", () => {
 
   it("asks the media port once for the page's companies and places each pitch on its item", async () => {
     const { port, calls } = fakePitches(
-      new Map<string, DiscoverablePitch>([
+      new Map<string, DiscoverablePitchSet>([
         [
           COMPANY,
           {
-            mediaAssetId: MEDIA_ASSET as DiscoverablePitch["mediaAssetId"],
+            mediaAssetId: MEDIA_ASSET as DiscoverablePitchSet["mediaAssetId"],
             companyId: COMPANY,
             aspectRatio: "9:16",
             durationSeconds: 87,
             captionState: "NOT_REQUESTED",
+            title: null,
+            audience: "INVESTORS",
+            more: [],
           },
         ],
         // The port answers for a company that is not on this page: the
@@ -423,11 +433,14 @@ describe("GET /v1/discovery/companies — the feed item's pitch", () => {
           FOREIGN,
           {
             mediaAssetId:
-              "f0000000-0000-4000-8000-000000000009" as DiscoverablePitch["mediaAssetId"],
+              "f0000000-0000-4000-8000-000000000009" as DiscoverablePitchSet["mediaAssetId"],
             companyId: FOREIGN,
             aspectRatio: null,
             durationSeconds: null,
             captionState: "NOT_REQUESTED",
+            title: null,
+            audience: "INVESTORS",
+            more: [],
           },
         ],
       ]),
@@ -447,13 +460,14 @@ describe("GET /v1/discovery/companies — the feed item's pitch", () => {
       items: { companyId: string; pitch: unknown }[];
     }>();
     expect(body.items.map((item) => item.companyId)).toEqual([COMPANY, OTHER]);
-    // Exactly the contract's four fields: no companyId echo, no status, no
+    // Exactly the contract's fields: no companyId echo, no status, no
     // provider id, no URL.
     expect(body.items[0]?.pitch).toEqual({
       mediaAssetId: MEDIA_ASSET,
       aspectRatio: "9:16",
       durationSeconds: 87,
       captionState: "NOT_REQUESTED",
+      title: null,
     });
     expect(body.items[1]?.pitch).toBeNull();
     expect(response.payload).not.toContain(FOREIGN);
@@ -506,6 +520,99 @@ describe("GET /v1/discovery/companies — the feed item's pitch", () => {
         .json<{ items: { pitch: unknown }[] }>()
         .items.map((item) => item.pitch),
     ).toEqual([null, null]);
+    await app.close();
+  });
+});
+
+describe("GET /v1/discovery/network-pitches (ADR 0021)", () => {
+  const video = (n: number, companyId: string) => ({
+    mediaAssetId:
+      `f0000000-0000-4000-8000-00000000010${String(n)}` as DiscoverablePitchSet["mediaAssetId"],
+    companyId,
+    aspectRatio: "9:16",
+    durationSeconds: 40,
+    captionState: "NOT_REQUESTED" as const,
+    title: `Video ${String(n)}`,
+    audience: "NETWORK" as const,
+    createdAt: `2026-09-2${String(9 - n)}T10:00:00.000Z`,
+  });
+  const VISIBLE = "c1000000-0000-4000-8000-000000000001";
+  const HIDDEN = "c1000000-0000-4000-8000-000000000002";
+  const CLOSED = "c1000000-0000-4000-8000-000000000003";
+
+  it("returns only companies disclosure lets this viewer see, newest first, with a cursor that pages", async () => {
+    const asked: unknown[] = [];
+    const { app } = buildApp({
+      principal: PRINCIPAL,
+      page: new Error("not used"),
+      network: {
+        networkPitches: {
+          findNetworkPitches: (input) => {
+            asked.push(input);
+            return Promise.resolve([
+              video(1, VISIBLE),
+              video(2, HIDDEN),
+              video(3, CLOSED),
+            ]);
+          },
+        },
+        networkCompany: (_actor, companyId) =>
+          Promise.resolve(
+            companyId === HIDDEN
+              ? null
+              : {
+                  canonicalName: companyId === VISIBLE ? "Open Co" : "Gone Co",
+                  shortDescription: null,
+                  headquartersCountry: "NG",
+                  currentStageCode: "seed",
+                  companyStatus: companyId === VISIBLE ? "active" : "closed",
+                },
+          ),
+      },
+    });
+    const first = await app.inject({
+      method: "GET",
+      url: "/v1/discovery/network-pitches?limit=3",
+    });
+    expect(first.statusCode).toBe(200);
+    const body = first.json<{
+      items: { companyId: string; canonicalName: string }[];
+      nextCursor: string | null;
+    }>();
+    expect(body.items.map((i) => i.canonicalName)).toEqual(["Open Co"]);
+    expect(body.nextCursor).not.toBeNull();
+    expect(asked[0]).toMatchObject({
+      excludeOwnerOrganisationId: CONTEXT.organisationId,
+      before: null,
+      limit: 3,
+    });
+
+    await app.inject({
+      method: "GET",
+      url: `/v1/discovery/network-pitches?limit=3&cursor=${body.nextCursor ?? ""}`,
+    });
+    expect(asked[1]).toMatchObject({
+      before: {
+        createdAt: video(3, CLOSED).createdAt,
+        mediaAssetId: video(3, CLOSED).mediaAssetId,
+      },
+    });
+
+    const bad = await app.inject({
+      method: "GET",
+      url: "/v1/discovery/network-pitches?cursor=not-a-cursor",
+    });
+    expect(bad.statusCode).toBe(422);
+    await app.close();
+  });
+
+  it("is an empty page when the feed is not composed", async () => {
+    const { app } = buildApp({ principal: PRINCIPAL, page: new Error("x") });
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/discovery/network-pitches",
+    });
+    expect(response.json()).toEqual({ items: [], nextCursor: null });
     await app.close();
   });
 });

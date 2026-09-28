@@ -62,10 +62,23 @@ export const DERIVED_TEXT_STATES = [
 export const DerivedTextStateSchema = z.enum(DERIVED_TEXT_STATES);
 
 /**
+ * Who beyond its owner may watch a publishable video (ADR 0021):
+ * INVESTORS (the investors the company is discoverable to) or NETWORK
+ * (also every signed-in founder on Capital Q). INVESTORS by default.
+ */
+export const PITCH_AUDIENCES = ["INVESTORS", "NETWORK"] as const;
+export const PitchAudienceSchema = z.enum(PITCH_AUDIENCES);
+export type PitchAudience = z.infer<typeof PitchAudienceSchema>;
+export const PITCH_TITLE_MAX = 120;
+/** Live videos one company may have at once (ADR 0022). */
+export const LIVE_PITCHES_MAX = 30;
+
+/**
  * The create request. Strict and nearly empty on purpose: everything that
  * matters — tenant, owner, provider, status, readiness, moderation, playback
  * policy — is decided by the server. The only thing a client may say is
- * which pitch it believes it is replacing.
+ * which live video it is replacing; without one, the upload is another
+ * video beside the company's others (ADR 0022).
  */
 export const CreateCompanyPitchRequestSchema = z
   .object({
@@ -87,6 +100,11 @@ export const MediaAssetDtoSchema = z
     captionState: DerivedTextStateSchema,
     transcriptState: DerivedTextStateSchema,
     moderationStatus: ModerationStatusSchema,
+    /** The owner's name for the video; null when they gave none. */
+    title: z.string().max(PITCH_TITLE_MAX).nullable(),
+    audience: PitchAudienceSchema,
+    /** False once replaced by a re-upload, or deleted. */
+    live: z.boolean(),
     replacesMediaAssetId: UuidSchema.nullable(),
     createdAt: UtcTimestampSchema,
     readyAt: UtcTimestampSchema.nullable(),
@@ -261,6 +279,8 @@ export const PitchSummaryDtoSchema = z
     aspectRatio: z.string().nullable(),
     durationSeconds: z.number().int().nullable(),
     captionState: DerivedTextStateSchema,
+    /** The owner's name for the video (ADR 0022); absent from older APIs. */
+    title: z.string().max(PITCH_TITLE_MAX).nullable().optional(),
   })
   .strict();
 export type PitchSummaryDto = z.infer<typeof PitchSummaryDtoSchema>;
@@ -295,6 +315,32 @@ export const SetPitchPlaybackPolicyResponseSchema = z
   .strict();
 export type SetPitchPlaybackPolicyResponse = z.infer<
   typeof SetPitchPlaybackPolicyResponseSchema
+>;
+
+/*
+ * The owner's name for one video and who may watch it (ADR 0021/0022).
+ * Widening the audience is a disclosure decision: media.manage, audited,
+ * versioned like the playback policy.
+ */
+export const MEDIA_DETAILS_SUFFIX = "/details" as const;
+
+/** `POST .../pitch/:mediaAssetId/details`. A blank title clears it. */
+export const SetPitchDetailsRequestSchema = z
+  .object({
+    title: z.string().max(PITCH_TITLE_MAX).nullable(),
+    audience: PitchAudienceSchema,
+    expectedVersion: ResourceVersionSchema,
+  })
+  .strict();
+export type SetPitchDetailsRequest = z.infer<
+  typeof SetPitchDetailsRequestSchema
+>;
+
+export const SetPitchDetailsResponseSchema = z
+  .object({ pitch: MediaAssetDtoSchema })
+  .strict();
+export type SetPitchDetailsResponse = z.infer<
+  typeof SetPitchDetailsResponseSchema
 >;
 
 // ---------------------------------------------------------------------------

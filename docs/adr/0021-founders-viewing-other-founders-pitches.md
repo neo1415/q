@@ -2,11 +2,12 @@
 
 ## Status
 
-Proposed — 2026-09-28. **Waits on the founder's decision.** Founder live
-test 2026-09-28 item 12 asked that founders can view other founders'
-pitches. The product sources neither grant nor forbid it; this ADR
-records why it is a disclosure decision and proposes the smallest design
-that keeps the existing invariants.
+Accepted — 2026-09-28, founder decision: the sources are not explicit, so
+the recommended opt-in applies, as a per-video dropdown — "Investors only"
+(default) or "Everyone on Capital Q". Founder live test 2026-09-28 item 12
+asked that founders can view other founders' pitches. Implemented with
+ADR 0022 (several videos per company), migration
+`20261022090000_media_multiple_pitches` (`media_assets.audience`).
 
 ## Context
 
@@ -29,11 +30,11 @@ that keeps the existing invariants.
 
 ## Proposed decision
 
-1. **Opt-in per company, off by default.** A new owner setting on the
-   pitch, "Other founders can watch this pitch", separate from the investor
-   playback policy. Existing pitches stay investor-only until their owner
-   turns it on. The setting is stored, audited and revocable like the
-   playback policy.
+1. **Opt-in per video, off by default.** An owner setting on each video,
+   "Who can watch it": Investors only (INVESTORS) or Everyone on Capital Q
+   (NETWORK), separate from the playback policy. Existing videos stay
+   investor-only until their owner changes it. The setting is stored,
+   audited (`media.asset.details_set`) and revocable.
 2. **One playback rule, extended, not a second one.** The viewer path gains
    a founder branch: an authenticated founder may play a pitch only when it
    is publishable (current, READY, moderation ALLOWED, policy not PRIVATE)

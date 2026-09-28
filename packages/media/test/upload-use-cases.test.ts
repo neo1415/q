@@ -106,6 +106,8 @@ function asset(overrides: Partial<MediaAsset> = {}): MediaAsset {
     captionState: "NOT_REQUESTED",
     transcriptState: "NOT_REQUESTED",
     moderationStatus: "NOT_REVIEWED",
+    title: null,
+    audience: "INVESTORS",
     replacesMediaAssetId: null,
     supersededAt: null,
     createdByUserId: FOUNDER,
@@ -142,7 +144,8 @@ function memoryRepository(initial: MediaAsset) {
       ),
     lockById: (_tx, tenantId, id) => find(tenantId, id),
     findCurrentForOwner: () => Promise.resolve(row),
-    lockCurrentForOwner: () => Promise.resolve(row),
+    countLiveForOwner: () => Promise.resolve(1),
+    setDetails: () => Promise.resolve(row),
     listForOwner: () => Promise.resolve(row === null ? [] : [row]),
     transitionStatus: (_tx, input) =>
       Promise.resolve(
@@ -260,6 +263,7 @@ function harness(options: {
   readonly provider?: VideoProvider | undefined;
   readonly deny?: readonly string[] | undefined;
   readonly viewable?: boolean | undefined;
+  readonly networkVisible?: boolean | undefined;
 }) {
   const repository = memoryRepository(options.asset);
   const events: unknown[] = [];
@@ -318,6 +322,12 @@ function harness(options: {
       resolveViewableCompany: (_actor, companyId) =>
         Promise.resolve(
           options.viewable === true && companyId === COMPANY
+            ? { tenantId: TENANT_A, ownerOrganisationId: ORG_A }
+            : null,
+        ),
+      resolveNetworkCompany: (_actor, companyId) =>
+        Promise.resolve(
+          options.networkVisible === true && companyId === COMPANY
             ? { tenantId: TENANT_A, ownerOrganisationId: ORG_A }
             : null,
         ),
@@ -1019,6 +1029,55 @@ describe("authorisePlayback", () => {
       expect(calls).toHaveLength(0);
     },
   );
+
+  describe("a video its owner opened to everyone on Capital Q (ADR 0021)", () => {
+    it("plays for a signed-in founder when the company is visible to the network", async () => {
+      const { provider } = scriptedProvider({});
+      const h = harness({
+        asset: ready({ audience: "NETWORK" }),
+        provider,
+        networkVisible: true,
+      });
+      const grant = await h.service.authorisePlayback({
+        ...query,
+        actor: investor,
+      });
+      expect(grant.authorization.playbackUrl).toContain("signed-token");
+    });
+
+    it.each<[string, Partial<MediaAsset>, boolean]>([
+      ["the video is for investors only", { audience: "INVESTORS" }, true],
+      [
+        "the company is not visible to the network",
+        { audience: "NETWORK" },
+        false,
+      ],
+      [
+        "the video is not publishable",
+        { audience: "NETWORK", moderationStatus: "NOT_REVIEWED" },
+        true,
+      ],
+      [
+        "the video was replaced",
+        { audience: "NETWORK", supersededAt: "2026-09-24T20:02:33.000Z" },
+        true,
+      ],
+    ])(
+      "is not found for a non-investor when %s",
+      async (_label, overrides, networkVisible) => {
+        const { provider, calls } = scriptedProvider({});
+        const h = harness({
+          asset: ready(overrides),
+          provider,
+          networkVisible,
+        });
+        await expect(
+          h.service.authorisePlayback({ ...query, actor: investor }),
+        ).rejects.toBeInstanceOf(MediaAssetNotFoundError);
+        expect(calls).toHaveLength(0);
+      },
+    );
+  });
 
   it("refuses a viewer who names a different company for the same asset", async () => {
     const { provider } = scriptedProvider({});

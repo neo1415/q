@@ -991,6 +991,48 @@ export type Database = {
           },
         ]
       }
+      handles: {
+        Row: {
+          claimed_at: string
+          claimed_by_user_id: string | null
+          handle: string
+          hold_until: string | null
+          id: string
+          organisation_id: string
+          released_at: string | null
+          status: string
+          subject_id: string
+          subject_type: string
+          tenant_id: string
+        }
+        Insert: {
+          claimed_at?: string
+          claimed_by_user_id?: string | null
+          handle: string
+          hold_until?: string | null
+          id?: string
+          organisation_id: string
+          released_at?: string | null
+          status?: string
+          subject_id: string
+          subject_type: string
+          tenant_id: string
+        }
+        Update: {
+          claimed_at?: string
+          claimed_by_user_id?: string | null
+          handle?: string
+          hold_until?: string | null
+          id?: string
+          organisation_id?: string
+          released_at?: string | null
+          status?: string
+          subject_id?: string
+          subject_type?: string
+          tenant_id?: string
+        }
+        Relationships: []
+      }
       investor_creation_requests: {
         Row: {
           created_at: string
@@ -1344,12 +1386,170 @@ export type Database = {
           },
         ]
       }
+      profile_images: {
+        Row: {
+          byte_size: number | null
+          created_at: string
+          created_by_user_id: string
+          declared_byte_size: number
+          declared_content_type: string
+          ended_at: string | null
+          height: number | null
+          id: string
+          kind: string
+          object_key: string | null
+          organisation_id: string | null
+          ready_at: string | null
+          status: string
+          subject_id: string
+          subject_type: string
+          tenant_id: string
+          upload_expires_at: string
+          upload_key: string
+          width: number | null
+        }
+        Insert: {
+          byte_size?: number | null
+          created_at?: string
+          created_by_user_id: string
+          declared_byte_size: number
+          declared_content_type: string
+          ended_at?: string | null
+          height?: number | null
+          id?: string
+          kind: string
+          object_key?: string | null
+          organisation_id?: string | null
+          ready_at?: string | null
+          status?: string
+          subject_id: string
+          subject_type: string
+          tenant_id: string
+          upload_expires_at: string
+          upload_key: string
+          width?: number | null
+        }
+        Update: {
+          byte_size?: number | null
+          created_at?: string
+          created_by_user_id?: string
+          declared_byte_size?: number
+          declared_content_type?: string
+          ended_at?: string | null
+          height?: number | null
+          id?: string
+          kind?: string
+          object_key?: string | null
+          organisation_id?: string | null
+          ready_at?: string | null
+          status?: string
+          subject_id?: string
+          subject_type?: string
+          tenant_id?: string
+          upload_expires_at?: string
+          upload_key?: string
+          width?: number | null
+        }
+        Relationships: []
+      }
+      reserved_handles: {
+        Row: {
+          created_at: string
+          handle: string
+          reason: string
+        }
+        Insert: {
+          created_at?: string
+          handle: string
+          reason: string
+        }
+        Update: {
+          created_at?: string
+          handle?: string
+          reason?: string
+        }
+        Relationships: []
+      }
+      shareable_identities: {
+        Row: {
+          created_at: string
+          created_by_user_id: string | null
+          field_scopes: Json
+          id: string
+          indexable: boolean
+          organisation_id: string
+          public_code: string
+          status: string
+          subject_id: string
+          subject_type: string
+          tenant_id: string
+          updated_at: string
+          version: number
+        }
+        Insert: {
+          created_at?: string
+          created_by_user_id?: string | null
+          field_scopes?: Json
+          id?: string
+          indexable?: boolean
+          organisation_id: string
+          public_code: string
+          status?: string
+          subject_id: string
+          subject_type: string
+          tenant_id: string
+          updated_at?: string
+          version?: number
+        }
+        Update: {
+          created_at?: string
+          created_by_user_id?: string | null
+          field_scopes?: Json
+          id?: string
+          indexable?: boolean
+          organisation_id?: string
+          public_code?: string
+          status?: string
+          subject_id?: string
+          subject_type?: string
+          tenant_id?: string
+          updated_at?: string
+          version?: number
+        }
+        Relationships: []
+      }
+      shareable_identity_scans: {
+        Row: {
+          day: string
+          scans: number
+          shareable_identity_id: string
+        }
+        Insert: {
+          day: string
+          scans?: number
+          shareable_identity_id: string
+        }
+        Update: {
+          day?: string
+          scans?: number
+          shareable_identity_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shareable_identity_scans_shareable_identity_id_fkey"
+            columns: ["shareable_identity_id"]
+            isOneToOne: false
+            referencedRelation: "shareable_identities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      card_field_scopes_valid: { Args: { scopes: Json }; Returns: boolean }
     }
     Enums: {
       [_ in never]: never
@@ -2162,6 +2362,105 @@ export type Database = {
         }
         Relationships: []
       }
+      verification_claims: {
+        Row: {
+          claim_type: string
+          created_at: string
+          decided_at: string | null
+          decided_by_actor_type: string | null
+          decided_by_user_id: string | null
+          decides_claim_id: string | null
+          decision_basis: string | null
+          evidence_source_id: string | null
+          expires_at: string | null
+          id: string
+          method: string | null
+          organisation_id: string
+          provider: string | null
+          provider_reference: string | null
+          requested_by_user_id: string
+          revision: number
+          revocation_reason: string | null
+          revoked_at: string | null
+          status: string
+          subject_domain: string | null
+          subject_id: string | null
+          subject_key: string | null
+          subject_type: string
+          tenant_id: string
+          verified_at: string | null
+        }
+        Insert: {
+          claim_type: string
+          created_at?: string
+          decided_at?: string | null
+          decided_by_actor_type?: string | null
+          decided_by_user_id?: string | null
+          decides_claim_id?: string | null
+          decision_basis?: string | null
+          evidence_source_id?: string | null
+          expires_at?: string | null
+          id?: string
+          method?: string | null
+          organisation_id: string
+          provider?: string | null
+          provider_reference?: string | null
+          requested_by_user_id: string
+          revision: number
+          revocation_reason?: string | null
+          revoked_at?: string | null
+          status: string
+          subject_domain?: string | null
+          subject_id?: string | null
+          subject_key?: string | null
+          subject_type: string
+          tenant_id: string
+          verified_at?: string | null
+        }
+        Update: {
+          claim_type?: string
+          created_at?: string
+          decided_at?: string | null
+          decided_by_actor_type?: string | null
+          decided_by_user_id?: string | null
+          decides_claim_id?: string | null
+          decision_basis?: string | null
+          evidence_source_id?: string | null
+          expires_at?: string | null
+          id?: string
+          method?: string | null
+          organisation_id?: string
+          provider?: string | null
+          provider_reference?: string | null
+          requested_by_user_id?: string
+          revision?: number
+          revocation_reason?: string | null
+          revoked_at?: string | null
+          status?: string
+          subject_domain?: string | null
+          subject_id?: string | null
+          subject_key?: string | null
+          subject_type?: string
+          tenant_id?: string
+          verified_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "verification_claims_decides_claim_id_fkey"
+            columns: ["decides_claim_id"]
+            isOneToOne: false
+            referencedRelation: "verification_claims"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "verification_claims_evidence_source_id_tenant_id_fkey"
+            columns: ["evidence_source_id", "tenant_id"]
+            isOneToOne: false
+            referencedRelation: "sources"
+            referencedColumns: ["id", "tenant_id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -2895,6 +3194,7 @@ export type Database = {
           status: string
           timezone: string | null
           updated_at: string
+          version: number
         }
         Insert: {
           auth_user_id: string
@@ -2910,6 +3210,7 @@ export type Database = {
           status?: string
           timezone?: string | null
           updated_at?: string
+          version?: number
         }
         Update: {
           auth_user_id?: string
@@ -2925,6 +3226,7 @@ export type Database = {
           status?: string
           timezone?: string | null
           updated_at?: string
+          version?: number
         }
         Relationships: []
       }
@@ -2947,6 +3249,7 @@ export type Database = {
       media_assets: {
         Row: {
           aspect_ratio: string | null
+          audience: string
           caption_state: string
           created_at: string
           created_by_user_id: string
@@ -2968,12 +3271,14 @@ export type Database = {
           superseded_at: string | null
           tenant_id: string
           thumbnail_reference: string | null
+          title: string | null
           transcript_state: string
           version: number
           width: number | null
         }
         Insert: {
           aspect_ratio?: string | null
+          audience?: string
           caption_state?: string
           created_at?: string
           created_by_user_id: string
@@ -2995,12 +3300,14 @@ export type Database = {
           superseded_at?: string | null
           tenant_id: string
           thumbnail_reference?: string | null
+          title?: string | null
           transcript_state?: string
           version?: number
           width?: number | null
         }
         Update: {
           aspect_ratio?: string | null
+          audience?: string
           caption_state?: string
           created_at?: string
           created_by_user_id?: string
@@ -3022,6 +3329,7 @@ export type Database = {
           superseded_at?: string | null
           tenant_id?: string
           thumbnail_reference?: string | null
+          title?: string | null
           transcript_state?: string
           version?: number
           width?: number | null
@@ -3030,6 +3338,85 @@ export type Database = {
           {
             foreignKeyName: "media_assets_replaces_media_asset_id_fkey"
             columns: ["replaces_media_asset_id"]
+            isOneToOne: false
+            referencedRelation: "media_assets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pitch_requests: {
+        Row: {
+          created_at: string
+          idempotency_key_hash: string
+          media_asset_id: string
+          organisation_id: string
+          request_hash: string
+          tenant_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          idempotency_key_hash: string
+          media_asset_id: string
+          organisation_id: string
+          request_hash: string
+          tenant_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          idempotency_key_hash?: string
+          media_asset_id?: string
+          organisation_id?: string
+          request_hash?: string
+          tenant_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pitch_requests_media_asset_id_tenant_id_fkey"
+            columns: ["media_asset_id", "tenant_id"]
+            isOneToOne: false
+            referencedRelation: "media_assets"
+            referencedColumns: ["id", "tenant_id"]
+          },
+        ]
+      }
+      pitch_transcripts: {
+        Row: {
+          created_at: string
+          cues: Json
+          id: string
+          language: string
+          media_asset_id: string
+          source: string
+          tenant_id: string
+          vtt: string
+        }
+        Insert: {
+          created_at?: string
+          cues: Json
+          id?: string
+          language: string
+          media_asset_id: string
+          source: string
+          tenant_id: string
+          vtt: string
+        }
+        Update: {
+          created_at?: string
+          cues?: Json
+          id?: string
+          language?: string
+          media_asset_id?: string
+          source?: string
+          tenant_id?: string
+          vtt?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pitch_transcripts_media_asset_id_fkey"
+            columns: ["media_asset_id"]
             isOneToOne: false
             referencedRelation: "media_assets"
             referencedColumns: ["id"]
@@ -3052,6 +3439,245 @@ export type Database = {
   }
   network: {
     Tables: {
+      interest_requests: {
+        Row: {
+          created_at: string
+          idempotency_key_hash: string
+          interest_id: string
+          organisation_id: string
+          request_hash: string
+          tenant_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          idempotency_key_hash: string
+          interest_id: string
+          organisation_id: string
+          request_hash: string
+          tenant_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          idempotency_key_hash?: string
+          interest_id?: string
+          organisation_id?: string
+          request_hash?: string
+          tenant_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "interest_requests_interest_id_fkey"
+            columns: ["interest_id"]
+            isOneToOne: false
+            referencedRelation: "interests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      interest_response_requests: {
+        Row: {
+          created_at: string
+          idempotency_key_hash: string
+          interest_response_id: string
+          organisation_id: string
+          request_hash: string
+          tenant_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          idempotency_key_hash: string
+          interest_response_id: string
+          organisation_id: string
+          request_hash: string
+          tenant_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          idempotency_key_hash?: string
+          interest_response_id?: string
+          organisation_id?: string
+          request_hash?: string
+          tenant_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "interest_response_requests_interest_response_id_fkey"
+            columns: ["interest_response_id"]
+            isOneToOne: false
+            referencedRelation: "interest_responses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      interest_responses: {
+        Row: {
+          created_at: string
+          decision: string
+          id: string
+          interest_id: string
+          relationship_event_id: string
+          relationship_id: string
+          responded_by_user_id: string
+          responded_in_organisation_id: string
+          tenant_id: string
+        }
+        Insert: {
+          created_at?: string
+          decision: string
+          id?: string
+          interest_id: string
+          relationship_event_id: string
+          relationship_id: string
+          responded_by_user_id: string
+          responded_in_organisation_id: string
+          tenant_id: string
+        }
+        Update: {
+          created_at?: string
+          decision?: string
+          id?: string
+          interest_id?: string
+          relationship_event_id?: string
+          relationship_id?: string
+          responded_by_user_id?: string
+          responded_in_organisation_id?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "interest_responses_interest_id_relationship_id_fkey"
+            columns: ["interest_id", "relationship_id"]
+            isOneToOne: false
+            referencedRelation: "interests"
+            referencedColumns: ["id", "relationship_id"]
+          },
+          {
+            foreignKeyName: "interest_responses_relationship_event_id_fkey"
+            columns: ["relationship_event_id"]
+            isOneToOne: true
+            referencedRelation: "relationship_events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "interest_responses_relationship_id_tenant_id_fkey"
+            columns: ["relationship_id", "tenant_id"]
+            isOneToOne: false
+            referencedRelation: "relationships"
+            referencedColumns: ["id", "tenant_id"]
+          },
+        ]
+      }
+      interests: {
+        Row: {
+          created_at: string
+          expressed_by_party: string
+          expressed_by_user_id: string
+          expressed_in_organisation_id: string
+          id: string
+          relationship_event_id: string
+          relationship_id: string
+          status: string
+          tenant_id: string
+          withdrawn_at: string | null
+        }
+        Insert: {
+          created_at?: string
+          expressed_by_party: string
+          expressed_by_user_id: string
+          expressed_in_organisation_id: string
+          id?: string
+          relationship_event_id: string
+          relationship_id: string
+          status?: string
+          tenant_id: string
+          withdrawn_at?: string | null
+        }
+        Update: {
+          created_at?: string
+          expressed_by_party?: string
+          expressed_by_user_id?: string
+          expressed_in_organisation_id?: string
+          id?: string
+          relationship_event_id?: string
+          relationship_id?: string
+          status?: string
+          tenant_id?: string
+          withdrawn_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "interests_relationship_event_id_fkey"
+            columns: ["relationship_event_id"]
+            isOneToOne: true
+            referencedRelation: "relationship_events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "interests_relationship_id_tenant_id_fkey"
+            columns: ["relationship_id", "tenant_id"]
+            isOneToOne: false
+            referencedRelation: "relationships"
+            referencedColumns: ["id", "tenant_id"]
+          },
+        ]
+      }
+      matches: {
+        Row: {
+          created_at: string
+          ended_at: string | null
+          id: string
+          interest_response_id: string
+          match_source: string
+          matched_at: string
+          relationship_id: string
+          status: string
+          tenant_id: string
+        }
+        Insert: {
+          created_at?: string
+          ended_at?: string | null
+          id?: string
+          interest_response_id: string
+          match_source: string
+          matched_at?: string
+          relationship_id: string
+          status?: string
+          tenant_id: string
+        }
+        Update: {
+          created_at?: string
+          ended_at?: string | null
+          id?: string
+          interest_response_id?: string
+          match_source?: string
+          matched_at?: string
+          relationship_id?: string
+          status?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "matches_interest_response_id_fkey"
+            columns: ["interest_response_id"]
+            isOneToOne: true
+            referencedRelation: "interest_responses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "matches_relationship_id_tenant_id_fkey"
+            columns: ["relationship_id", "tenant_id"]
+            isOneToOne: false
+            referencedRelation: "relationships"
+            referencedColumns: ["id", "tenant_id"]
+          },
+        ]
+      }
       relationship_events: {
         Row: {
           actor_id: string
@@ -3120,6 +3746,9 @@ export type Database = {
           id: string
           investor_organisation_id: string
           last_event_sequence: number
+          projected_at: string | null
+          projected_sequence: number
+          projector_version: string
           state_updated_at: string
           tenant_id: string
         }
@@ -3131,6 +3760,9 @@ export type Database = {
           id?: string
           investor_organisation_id: string
           last_event_sequence?: number
+          projected_at?: string | null
+          projected_sequence?: number
+          projector_version?: string
           state_updated_at?: string
           tenant_id: string
         }
@@ -3142,6 +3774,9 @@ export type Database = {
           id?: string
           investor_organisation_id?: string
           last_event_sequence?: number
+          projected_at?: string | null
+          projected_sequence?: number
+          projector_version?: string
           state_updated_at?: string
           tenant_id?: string
         }
@@ -3284,10 +3919,88 @@ export type Database = {
           },
         ]
       }
+      interview_turns: {
+        Row: {
+          channel: string
+          created_at: string
+          id: string
+          role: string
+          session_id: string
+          step_key: string | null
+          text: string
+          turn_ref: string | null
+        }
+        Insert: {
+          channel: string
+          created_at?: string
+          id?: string
+          role: string
+          session_id: string
+          step_key?: string | null
+          text: string
+          turn_ref?: string | null
+        }
+        Update: {
+          channel?: string
+          created_at?: string
+          id?: string
+          role?: string
+          session_id?: string
+          step_key?: string | null
+          text?: string
+          turn_ref?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "interview_turns_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      nudge_states: {
+        Row: {
+          last_conversation_id: string | null
+          last_shown_at: string | null
+          last_surface: string | null
+          policy_version: string
+          shown_count: number
+          snoozed_until: string | null
+          stopped_at: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          last_conversation_id?: string | null
+          last_shown_at?: string | null
+          last_surface?: string | null
+          policy_version: string
+          shown_count?: number
+          snoozed_until?: string | null
+          stopped_at?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          last_conversation_id?: string | null
+          last_shown_at?: string | null
+          last_surface?: string | null
+          policy_version?: string
+          shown_count?: number
+          snoozed_until?: string | null
+          stopped_at?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       responses: {
         Row: {
           created_at: string
           id: string
+          note: string | null
           raw_text: string | null
           response_jsonb: Json
           response_type: string
@@ -3295,10 +4008,12 @@ export type Database = {
           source_modality: string
           step_key: string
           superseded_by_response_id: string | null
+          withdrawn_at: string | null
         }
         Insert: {
           created_at?: string
           id?: string
+          note?: string | null
           raw_text?: string | null
           response_jsonb: Json
           response_type: string
@@ -3306,10 +4021,12 @@ export type Database = {
           source_modality: string
           step_key: string
           superseded_by_response_id?: string | null
+          withdrawn_at?: string | null
         }
         Update: {
           created_at?: string
           id?: string
+          note?: string | null
           raw_text?: string | null
           response_jsonb?: Json
           response_type?: string
@@ -3317,6 +4034,7 @@ export type Database = {
           source_modality?: string
           step_key?: string
           superseded_by_response_id?: string | null
+          withdrawn_at?: string | null
         }
         Relationships: [
           {
@@ -3549,6 +4267,7 @@ export type Database = {
           created_at: string
           id: string
           model_run_id: string | null
+          rationale: string | null
           resolved_at: string | null
           session_id: string
           source_refs: Json
@@ -3562,6 +4281,7 @@ export type Database = {
           created_at?: string
           id?: string
           model_run_id?: string | null
+          rationale?: string | null
           resolved_at?: string | null
           session_id: string
           source_refs?: Json
@@ -3575,6 +4295,7 @@ export type Database = {
           created_at?: string
           id?: string
           model_run_id?: string | null
+          rationale?: string | null
           resolved_at?: string | null
           session_id?: string
           source_refs?: Json
@@ -5109,11 +5830,13 @@ export type Database = {
           objective: string
           orchestration_version: string | null
           prompt_bundle_version: string | null
+          screen: Json | null
           started_at: string | null
           status: string
           subject_refs: Json
           tenant_id: string
           version: number
+          viewing: Json | null
         }
         Insert: {
           actor_organisation_id?: string | null
@@ -5131,11 +5854,13 @@ export type Database = {
           objective: string
           orchestration_version?: string | null
           prompt_bundle_version?: string | null
+          screen?: Json | null
           started_at?: string | null
           status?: string
           subject_refs?: Json
           tenant_id: string
           version?: number
+          viewing?: Json | null
         }
         Update: {
           actor_organisation_id?: string | null
@@ -5153,11 +5878,13 @@ export type Database = {
           objective?: string
           orchestration_version?: string | null
           prompt_bundle_version?: string | null
+          screen?: Json | null
           started_at?: string | null
           status?: string
           subject_refs?: Json
           tenant_id?: string
           version?: number
+          viewing?: Json | null
         }
         Relationships: [
           {

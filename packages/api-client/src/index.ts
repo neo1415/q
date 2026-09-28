@@ -131,6 +131,7 @@ export {
   deletePitchMediaAsset,
   getCompanyPitch,
   listCompanyMedia,
+  setPitchDetails,
   setPitchPlaybackPolicy,
   syncPitch,
 } from "./media.js";
@@ -178,6 +179,7 @@ export { createSseParser, type SseMessage, type SseParser } from "./sse.js";
 export {
   discoverCompanies,
   discoverInvestors,
+  listNetworkPitches,
   getRecommendationExplanation,
   listSavedCompanies,
   passCompany,

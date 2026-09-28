@@ -13,6 +13,7 @@ import {
   ArrowDown,
   Bookmark,
   BookmarkCheck,
+  ChevronRight,
   ChevronUp,
   Globe,
   Handshake,
@@ -155,6 +156,7 @@ export function FeedCard({
   showMedia = true,
   askQMark,
   feedNotes = null,
+  videos,
 }: {
   readonly company: DiscoveredCompanyDto;
   readonly policy: FeedPreloadPolicy;
@@ -174,6 +176,17 @@ export function FeedCard({
   readonly askQMark?: ReactNode;
   /** The feed's own notes, said in the details rather than over the pitch. */
   readonly feedNotes?: ReactNode;
+  /**
+   * When the company has several videos (ADR 0022): which one is showing,
+   * how many there are, and how to move to the next. Absent with one.
+   */
+  readonly videos?:
+    | {
+        readonly index: number;
+        readonly count: number;
+        readonly onNext: () => void;
+      }
+    | undefined;
 }) {
   // Stage first, then where: "Seed · Nigeria".
   const place = [
@@ -474,6 +487,24 @@ export function FeedCard({
             {shared === "COPIED" ? "Link copied" : "Share"}
           </span>
         </Button>
+        {videos === undefined || videos.count < 2 ? null : (
+          <Button
+            variant="quiet"
+            onClick={videos.onNext}
+            className="cq-feed-rail-button"
+            aria-label={`Next video from ${company.canonicalName}, video ${String(
+              ((videos.index + 1) % videos.count) + 1,
+            )} of ${String(videos.count)}`}
+            data-feed-next-video
+          >
+            <ChevronRight
+              aria-hidden="true"
+              size={ICON_SIZE.prominent}
+              strokeWidth={ICON_STROKE}
+            />
+            <span className="cq-feed-rail-label">Next video</span>
+          </Button>
+        )}
         <span className="sr-only" role="status">
           {shared === "COPIED" ? "Link to the company copied." : ""}
         </span>
