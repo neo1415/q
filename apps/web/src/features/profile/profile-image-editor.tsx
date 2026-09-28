@@ -322,34 +322,40 @@ function CropDialog({
   readonly onCropped: (blob: Blob) => void;
 }) {
   const id = useId();
-  const frameRef = useRef<HTMLDivElement>(null);
   const [frame, setFrame] = useState<Size | null>(null);
   const [crop, setCrop] = useState<CropState | null>(null);
   const drag = useRef<{ x: number; y: number; start: CropState } | null>(null);
   const [exportError, setExportError] = useState<string | null>(null);
 
-  // Measure the frame once laid out (and on resize), keeping the crop.
-  const measure = useCallback(() => {
-    const element = frameRef.current;
-    if (element === null) return;
-    const next = { width: element.clientWidth, height: element.clientHeight };
-    if (next.width === 0 || next.height === 0) return;
-    setFrame(next);
-    setCrop((current) =>
-      current === null
-        ? initialCrop(image, next)
-        : clampCrop(current, image, next),
-    );
-  }, [image]);
-  useEffect(() => {
-    measure();
-    const observer =
-      typeof ResizeObserver === "function" ? new ResizeObserver(measure) : null;
-    if (observer !== null && frameRef.current !== null) {
-      observer.observe(frameRef.current);
-    }
-    return () => observer?.disconnect();
-  }, [measure]);
+  // Measure the frame whenever it is laid out (and on resize), keeping the
+  // crop. A callback ref, not an effect: the dialog portals its content in
+  // after this component's first effects run, so a ref read in an effect
+  // was still null, nothing was ever measured and the photo never showed
+  // (founder live 2026-09-28).
+  const frameRef = useCallback(
+    (element: HTMLDivElement | null) => {
+      if (element === null) return;
+      const measure = () => {
+        const next = {
+          width: element.clientWidth,
+          height: element.clientHeight,
+        };
+        if (next.width === 0 || next.height === 0) return;
+        setFrame(next);
+        setCrop((current) =>
+          current === null
+            ? initialCrop(image, next)
+            : clampCrop(current, image, next),
+        );
+      };
+      measure();
+      if (typeof ResizeObserver !== "function") return;
+      const observer = new ResizeObserver(measure);
+      observer.observe(element);
+      return () => observer.disconnect();
+    },
+    [image],
+  );
 
   const onPointerDown = (event: PointerEvent<HTMLDivElement>) => {
     if (crop === null) return;
@@ -447,7 +453,9 @@ function CropDialog({
     <DialogContent
       title={`Position your ${label}`}
       description="Drag to reposition. Use the slider to zoom."
-      className={kind === "COVER" ? "max-w-2xl" : "max-w-md"}
+      // The dialog sets max-w-md itself and `cx` does not merge classes, so
+      // the wider cover frame has to take precedence explicitly.
+      className={kind === "COVER" ? "max-w-2xl!" : undefined}
       actions={
         <>
           <Button variant="quiet" onClick={onCancel}>
