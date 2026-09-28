@@ -23,11 +23,16 @@ export {
 export {
   HANDLE_REFUSALS,
   HandleUnavailableError,
+  PROFILE_IMAGE_REFUSALS,
+  ProfileImageRejectedError,
+  ProfileImageStorageUnavailableError,
+  ProfileImageUploadNotFoundError,
   QCardFieldNotAllowedError,
   QCardNotFoundError,
   QCardSubjectNotFoundError,
   QCardVersionConflictError,
   type HandleRefusal,
+  type ProfileImageRefusal,
 } from "./domain/errors.js";
 export {
   holdUntil,
@@ -51,6 +56,21 @@ export {
   type PublicIdentityService,
   type PublicIdentityServiceDependencies,
 } from "./application/service.js";
+export {
+  createProfileImageService,
+  PROFILE_IMAGE_BUCKET,
+  PROFILE_IMAGE_READ_TTL_SECONDS,
+  type ProcessedImage,
+  type ProfileImageProcessor,
+  type ProfileImageRepository,
+  type ProfileImageRow,
+  type ProfileImageService,
+  type ProfileImageServiceDependencies,
+  type ProfileImageStorage,
+  type ProfileImageSubject,
+} from "./application/profile-images.js";
+export { createPostgresProfileImageRepository } from "./infrastructure/postgres-profile-images.js";
+export { createSharpImageProcessor } from "./infrastructure/sharp-image-processor.js";
 export { createPostgresPublicIdentityRepository } from "./infrastructure/postgres-repository.js";
 export {
   createSubjectDirectory,

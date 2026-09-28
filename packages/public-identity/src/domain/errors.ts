@@ -56,3 +56,49 @@ export class QCardFieldNotAllowedError extends Error {
     this.fields = fields;
   }
 }
+
+/** Profile images: the upload is not (or no longer) this caller's to finish. */
+export class ProfileImageUploadNotFoundError extends Error {
+  constructor() {
+    super("That upload isn't available. Choose the image again.");
+    this.name = "ProfileImageUploadNotFoundError";
+  }
+}
+
+export const PROFILE_IMAGE_REFUSALS = [
+  "NOT_UPLOADED",
+  "TOO_LARGE",
+  "NOT_AN_IMAGE",
+  "TOO_SMALL",
+  "EXPIRED",
+  "TOO_MANY",
+] as const;
+export type ProfileImageRefusal = (typeof PROFILE_IMAGE_REFUSALS)[number];
+
+const IMAGE_MESSAGES: Readonly<Record<ProfileImageRefusal, string>> = {
+  NOT_UPLOADED: "The image didn't finish uploading. Try again.",
+  TOO_LARGE: "That image is too large. Choose one under 8 MB.",
+  NOT_AN_IMAGE: "That file isn't a JPEG, PNG or WebP image.",
+  TOO_SMALL: "That image is too small. Choose one at least 200 pixels wide.",
+  EXPIRED: "The upload took too long. Choose the image again.",
+  TOO_MANY: "Too many uploads in a short time. Try again in a few minutes.",
+};
+
+/** A refused image, said in words the person can act on. */
+export class ProfileImageRejectedError extends Error {
+  readonly reason: ProfileImageRefusal;
+
+  constructor(reason: ProfileImageRefusal) {
+    super(IMAGE_MESSAGES[reason]);
+    this.name = "ProfileImageRejectedError";
+    this.reason = reason;
+  }
+}
+
+/** Image storage or processing is not composed or not answering. */
+export class ProfileImageStorageUnavailableError extends Error {
+  constructor() {
+    super("Image storage isn't available just now.");
+    this.name = "ProfileImageStorageUnavailableError";
+  }
+}

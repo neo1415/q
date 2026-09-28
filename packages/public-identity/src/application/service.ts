@@ -85,6 +85,16 @@ export type PublicIdentityServiceDependencies = {
   readonly audit: MaterialActionAuditWriter;
   readonly subjects: SubjectDirectory;
   readonly repository: PublicIdentityRepository;
+  /**
+   * The subject's current profile images as short-lived signed URLs
+   * (profile-images.ts). Absent: a card never shows images.
+   */
+  readonly cardImages?:
+    | ((subject: QCardSubject) => Promise<{
+        readonly photo: string | null;
+        readonly cover: string | null;
+      }>)
+    | undefined;
   readonly now?: (() => Date) | undefined;
   readonly randomBytes?: ((size: number) => Uint8Array) | undefined;
 };
@@ -395,6 +405,13 @@ export function createPublicIdentityService(
       const facts = await subjects.find(subject);
       if (facts === null) return null;
       const scopes = readStoredScopes(subject.subjectType, card.fieldScopes);
+      // Images are signed only when the card shows them at all; the scope
+      // then decides the audience exactly as for any other field.
+      const images =
+        dependencies.cardImages !== undefined &&
+        (scopes.photo !== undefined || scopes.cover !== undefined)
+          ? await dependencies.cardImages(subject).catch(() => null)
+          : null;
       return {
         kind: "CARD",
         handle: live.handle,
@@ -403,7 +420,11 @@ export function createPublicIdentityService(
         fields: projectCardFields(
           subject.subjectType,
           scopes,
-          facts.facts,
+          {
+            ...facts.facts,
+            photo: images?.photo ?? null,
+            cover: images?.cover ?? null,
+          },
           audience,
         ),
         verified: [

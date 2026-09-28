@@ -901,6 +901,30 @@ export {
 } from "./public-identity.js";
 
 export {
+  CreateProfileImageUploadRequestSchema,
+  PROFILE_IMAGE_COMPLETE_SEGMENT,
+  PROFILE_IMAGE_CONTENT_TYPES,
+  PROFILE_IMAGE_DIMENSIONS,
+  PROFILE_IMAGE_KINDS,
+  PROFILE_IMAGE_MAX_BYTES,
+  PROFILE_IMAGE_SUBJECT_TYPES,
+  PROFILE_IMAGE_UPLOADS_SEGMENT,
+  PROFILE_IMAGES_PATH,
+  ProfileImageContentTypeSchema,
+  ProfileImageDtoSchema,
+  ProfileImageKindSchema,
+  ProfileImagesDtoSchema,
+  ProfileImageSubjectTypeSchema,
+  ProfileImageUploadDtoSchema,
+  type CreateProfileImageUploadRequest,
+  type ProfileImageDto,
+  type ProfileImageKind,
+  type ProfileImagesDto,
+  type ProfileImageSubjectType,
+  type ProfileImageUploadDto,
+} from "./profile-images.js";
+
+export {
   EMAIL_BODY_MAX_LENGTH,
   EMAIL_SUBJECT_MAX_LENGTH,
   EmailAddressSchema,

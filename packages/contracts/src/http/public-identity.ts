@@ -44,7 +44,12 @@ export const Q_CARD_SCOPES = ["public_external", "network_visible"] as const;
 export const QCardScopeSchema = z.enum(Q_CARD_SCOPES);
 export type QCardScope = z.infer<typeof QCardScopeSchema>;
 
-/** The declared fields a company card may show. The name is always public. */
+/**
+ * The declared fields a company card may show. The name is always public.
+ * `photo` and `cover` are the subject's profile images (profile-images.ts):
+ * on the card their value is a short-lived signed read URL, and they reach
+ * an audience only through the same scope as any other field.
+ */
 export const COMPANY_CARD_FIELDS = [
   "canonicalName",
   "shortDescription",
@@ -53,6 +58,8 @@ export const COMPANY_CARD_FIELDS = [
   "headquartersCountry",
   "websiteUrl",
   "foundedDate",
+  "photo",
+  "cover",
 ] as const;
 /** The declared fields an investor organisation card may show. */
 export const INVESTOR_CARD_FIELDS = [
@@ -62,6 +69,8 @@ export const INVESTOR_CARD_FIELDS = [
   "hqCountry",
   "websiteUrl",
   "deploymentState",
+  "photo",
+  "cover",
 ] as const;
 export const QCardFieldSchema = z.enum([
   ...COMPANY_CARD_FIELDS,

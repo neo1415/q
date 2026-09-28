@@ -26,6 +26,7 @@
     "@capital-q/contracts": "workspace:*",
     "@capital-q/database": "workspace:*",
     "@capital-q/security": "workspace:*",
+    "sharp": "0.35.4",
     "zod": "4.5.4"
   },
   "devDependencies": {

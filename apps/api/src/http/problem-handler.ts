@@ -55,6 +55,9 @@ import {
 import type { Logger } from "@capital-q/observability";
 import {
   HandleUnavailableError,
+  ProfileImageRejectedError,
+  ProfileImageStorageUnavailableError,
+  ProfileImageUploadNotFoundError,
   QCardFieldNotAllowedError,
   QCardNotFoundError,
   QCardSubjectNotFoundError,
@@ -338,6 +341,7 @@ function toProblem(
     // Absent, another tenant's and another organisation's (BIZ-004).
     error instanceof QCardSubjectNotFoundError ||
     error instanceof QCardNotFoundError ||
+    error instanceof ProfileImageUploadNotFoundError ||
     // Not a party, no such thread or message: one answer (R34).
     error instanceof ChatNotFoundError
   ) {
@@ -412,6 +416,17 @@ function toProblem(
   }
   if (error instanceof QCardVersionConflictError) {
     return createProblemDetails({ code: "VERSION_CONFLICT", requestId });
+  }
+  // Profile images: a refused image says why in words a person can act on.
+  if (error instanceof ProfileImageRejectedError) {
+    return createProblemDetails({
+      code: error.reason === "TOO_MANY" ? "RATE_LIMITED" : "VALIDATION_FAILED",
+      requestId,
+      detail: error.message,
+    });
+  }
+  if (error instanceof ProfileImageStorageUnavailableError) {
+    return createProblemDetails({ code: "PROVIDER_UNAVAILABLE", requestId });
   }
 
   if (error instanceof InterestAlreadyAnsweredError) {

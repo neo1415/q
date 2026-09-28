@@ -127,8 +127,11 @@ import {
   TenantIdSchema,
 } from "@capital-q/security";
 import {
+  createPostgresProfileImageRepository,
   createPostgresPublicIdentityRepository,
+  createProfileImageService,
   createPublicIdentityService,
+  createSharpImageProcessor,
   createSubjectDirectory,
 } from "@capital-q/public-identity";
 import {
@@ -826,36 +829,53 @@ const investorFacts = createPostgresInvestorProfileQueryPort({
 const cardVerification = createPublicVerificationReader({
   sql: database.sql,
 });
+const cardSubjects = createSubjectDirectory({
+  findCompany: async (companyId) => {
+    const id = CompanyIdSchema.safeParse(companyId);
+    return id.success
+      ? companyFacts.findCanonicalCompanyProfile(id.data)
+      : null;
+  },
+  findInvestor: (investorOrganisationId) =>
+    investorFacts.findCanonicalInvestorProfile(investorOrganisationId),
+  companyVerification: async (subject) => {
+    const standings = await cardVerification.companyStandings({
+      tenantId: TenantIdSchema.parse(subject.tenantId),
+      organisationId: OrganisationIdSchema.parse(subject.organisationId),
+    });
+    return {
+      organisation: standings.organisation.verified,
+      founderIdentity: standings.founderIdentity.verified,
+      demoAttested: {
+        organisation: standings.organisation.syntheticDemo,
+        founderIdentity: standings.founderIdentity.syntheticDemo,
+      },
+    };
+  },
+});
+
+// Profile photos and covers (founder directive 2026-09-28): the same
+// private-storage adapter as documents, pointed at the image bucket; the
+// browser uploads straight to storage and this process only re-encodes.
+const profileImages = createProfileImageService({
+  sql: database.sql,
+  transactions: database.transactions,
+  authorization,
+  audit,
+  subjects: cardSubjects,
+  repository: createPostgresProfileImageRepository(),
+  storage,
+  processor: storage === undefined ? undefined : createSharpImageProcessor(),
+});
+
 const publicIdentity = createPublicIdentityService({
   sql: database.sql,
   transactions: database.transactions,
   authorization,
   audit,
   repository: createPostgresPublicIdentityRepository(),
-  subjects: createSubjectDirectory({
-    findCompany: async (companyId) => {
-      const id = CompanyIdSchema.safeParse(companyId);
-      return id.success
-        ? companyFacts.findCanonicalCompanyProfile(id.data)
-        : null;
-    },
-    findInvestor: (investorOrganisationId) =>
-      investorFacts.findCanonicalInvestorProfile(investorOrganisationId),
-    companyVerification: async (subject) => {
-      const standings = await cardVerification.companyStandings({
-        tenantId: TenantIdSchema.parse(subject.tenantId),
-        organisationId: OrganisationIdSchema.parse(subject.organisationId),
-      });
-      return {
-        organisation: standings.organisation.verified,
-        founderIdentity: standings.founderIdentity.verified,
-        demoAttested: {
-          organisation: standings.organisation.syntheticDemo,
-          founderIdentity: standings.founderIdentity.syntheticDemo,
-        },
-      };
-    },
-  }),
+  subjects: cardSubjects,
+  cardImages: (subject) => profileImages.cardImageUrls(subject),
 });
 
 // A person's own Gmail (BIZ-007): connect, disconnect, reply push. The
@@ -958,6 +978,7 @@ const { app, logger } = createApp(config, security, {
   verification,
   visibility,
   publicIdentity,
+  profileImages,
   integrations: {
     integrations,
     webOrigin: googleWorkspace.webOrigin,

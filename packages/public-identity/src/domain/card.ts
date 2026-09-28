@@ -41,6 +41,8 @@ export const DEFAULT_FIELD_SCOPES: Readonly<
 > = {
   COMPANY: {
     canonicalName: "public_external",
+    photo: "public_external",
+    cover: "public_external",
     shortDescription: "public_external",
     websiteUrl: "public_external",
     currentStageCode: "network_visible",
@@ -50,6 +52,8 @@ export const DEFAULT_FIELD_SCOPES: Readonly<
   },
   INVESTOR_ORGANISATION: {
     displayName: "public_external",
+    photo: "public_external",
+    cover: "public_external",
     investorType: "public_external",
     publicDescription: "public_external",
     websiteUrl: "public_external",

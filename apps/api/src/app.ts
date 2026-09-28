@@ -71,6 +71,10 @@ import {
 } from "./http/investors.js";
 import { registerMeRoute, type MeRouteDependencies } from "./http/me.js";
 import {
+  registerProfileImageRoutes,
+  type ProfileImageRoutesDependencies,
+} from "./http/profile-images.js";
+import {
   registerQCardRoutes,
   type QCardRoutesDependencies,
 } from "./http/q-cards.js";
@@ -170,6 +174,10 @@ export type ApiModules = {
   /** BIZ-004: handles and the Q Card. Absent: no card or /@handle route. */
   readonly publicIdentity?:
     QCardRoutesDependencies["publicIdentity"] | undefined;
+  /** Profile photos and covers. Absent: no image routes register. */
+  readonly profileImages?:
+    | ProfileImageRoutesDependencies["profileImages"]
+    | undefined;
 };
 
 /**
@@ -342,6 +350,14 @@ export function createApp(
       resolver: security.resolver,
       identities: security.identities,
       publicIdentity: modules.publicIdentity,
+    });
+  }
+
+  if (modules.profileImages !== undefined) {
+    registerProfileImageRoutes(app, {
+      authenticator: security.authenticator,
+      resolver: security.resolver,
+      profileImages: modules.profileImages,
     });
   }
 
