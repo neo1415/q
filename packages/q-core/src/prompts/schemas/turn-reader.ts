@@ -349,3 +349,79 @@ export const TurnReaderV11ResultSchema = TurnReaderV9ResultSchema.extend({
   sequence: QuestionSequenceReadingSchema.nullable().default(null),
 }).strict();
 export type TurnReaderV11Result = z.infer<typeof TurnReaderV11ResultSchema>;
+
+/**
+ * v14 (founder live 2026-09-28 #1): any answer as a document. "Give me a
+ * PDF of an assessment of how I come across" fitted none of the three
+ * document types, so Q truthfully said it could not make a PDF. Two types
+ * close that:
+ *
+ *   ANSWER_EXPORT  the answer Q already gave, filed as a document exactly
+ *                  as written (no model rewrites it);
+ *   Q_REPORT       a new written answer on what they ask, which Q writes
+ *                  and then files as a document.
+ *
+ * Only the document types grow; every other field and rule is v11's.
+ */
+export const TURN_DOCUMENT_TYPES_V14 = [
+  ...TURN_DOCUMENT_TYPES_V5,
+  "ANSWER_EXPORT",
+  "Q_REPORT",
+] as const;
+export type TurnDocumentTypeV14 = (typeof TURN_DOCUMENT_TYPES_V14)[number];
+
+export const TurnToolV14Schema = z
+  .object({
+    kind: z.enum(TURN_TOOL_V3_KINDS),
+    destination: QNavigateDestinationSchema.nullable().default(null),
+    unknownScreen: TurnUnknownScreenSchema.nullable().default(null),
+    visibility: z.enum(TURN_TOOL_VISIBILITIES).nullable().default(null),
+    documentType: z.enum(TURN_DOCUMENT_TYPES_V14).nullable().default(null),
+    /** The company as the person named it; null when it is plainly their own, and for the types about no company. */
+    subjectName: z.string().trim().min(1).max(120).nullable().default(null),
+  })
+  .strict()
+  .refine(
+    (tool) => {
+      switch (tool.kind) {
+        case "NAVIGATE":
+          return (
+            (tool.destination === null) !== (tool.unknownScreen === null) &&
+            tool.visibility === null &&
+            tool.documentType === null
+          );
+        case "SET_VISIBILITY":
+          return (
+            tool.visibility !== null &&
+            tool.destination === null &&
+            tool.unknownScreen === null &&
+            tool.documentType === null
+          );
+        case "PREPARE_DOCUMENT":
+          return (
+            tool.documentType !== null &&
+            tool.destination === null &&
+            tool.unknownScreen === null &&
+            tool.visibility === null
+          );
+      }
+    },
+    { message: "a tool carries exactly its own parameters" },
+  );
+export type TurnToolV14 = z.infer<typeof TurnToolV14Schema>;
+
+export const TURN_READER_V14_SCHEMA_VERSION = 14;
+
+export const TurnReaderV14ResultSchema = TurnReaderResultSchema.extend({
+  tool: TurnToolV14Schema.nullable().default(null),
+  moreDocuments: z
+    .array(
+      TurnToolV14Schema.refine((tool) => tool.kind === "PREPARE_DOCUMENT", {
+        message: "only documents may be asked for together",
+      }),
+    )
+    .max(TURN_READER_MORE_DOCUMENTS_MAX)
+    .default([]),
+  sequence: QuestionSequenceReadingSchema.nullable().default(null),
+}).strict();
+export type TurnReaderV14Result = z.infer<typeof TurnReaderV14ResultSchema>;

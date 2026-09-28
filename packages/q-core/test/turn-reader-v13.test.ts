@@ -3,7 +3,6 @@ import { describe, expect, it } from "vitest";
 import { Q_NAVIGATE_DESTINATIONS } from "@capital-q/contracts";
 
 import {
-  createDefaultPromptRegistry,
   TURN_READER_V12,
   TURN_READER_V13,
   TurnReaderV11ResultSchema,
@@ -15,9 +14,7 @@ import {
  * an unknown screen. v12's rules stay.
  */
 describe("TURN_READER v13", () => {
-  it("is the active reader and v12 is deprecated", () => {
-    const registry = createDefaultPromptRegistry();
-    expect(registry.getActive("TURN_READER").definition.version).toBe(13);
+  it("extends v12, which is deprecated", () => {
     expect(TURN_READER_V12.status).toBe("DEPRECATED");
     expect(TURN_READER_V13.template.length).toBeGreaterThan(
       TURN_READER_V12.template.length,

@@ -587,6 +587,15 @@ export const TURN_UNREAD_NOTE =
   "CAPITAL Q COULD NOT READ WHAT KIND OF REQUEST THIS MESSAGE IS just now, so no document, file, screen change or record change can be started on this turn. If they asked for any of those, say plainly that you could not start it just now and that asking again in a moment should work. Never write a requested document's content into the chat instead, and never say it is done.";
 
 /**
+ * They asked for this answer as a document (Q_REPORT, founder live
+ * 2026-09-28 #1). Capital Q files the answer with a PDF after it is
+ * written, so the model writes the piece itself and never refuses or
+ * describes it instead.
+ */
+export const WRITING_DOCUMENT_NOTE =
+  "THEY ASKED FOR THIS AS A DOCUMENT. Your answer IS the document's text: write the piece itself, in full, with a short heading line (# Title) and section headings where they help. Capital Q files your answer as their document with a PDF download right after you finish and shows its card, so never say you cannot make a PDF or document, never describe the document instead of writing it, and never say it is already attached.";
+
+/**
  * A series of questions the person asked for (R35), as trusted text: the
  * step was decided by the conversation core from the turn's reading, so
  * the model is told exactly which question it is on and never keeps the
@@ -623,6 +632,8 @@ export function environmentNotesFor(
     readonly openDocumentTitle?: string | undefined;
     /** The turn could not be read: nothing can be started this turn. */
     readonly turnUnread?: boolean | undefined;
+    /** They asked for this answer as a document (Q_REPORT). */
+    readonly writingDocument?: boolean | undefined;
     /** A requested series of questions and this turn's step in it (R35). */
     readonly questionSequence?: QQuestionSequenceStep | undefined;
     /**
@@ -669,6 +680,9 @@ export function environmentNotesFor(
       // as ordinary chat was answered with the document's content in the
       // chat, or nothing, and no file (B1).
       ...(options.turnUnread === true ? [TURN_UNREAD_NOTE] : []),
+      ...(options.writingDocument === true && options.turnUnread !== true
+        ? [WRITING_DOCUMENT_NOTE]
+        : []),
       // Near the top for the same reason: a series cut off by truncation
       // is the one-question-and-stop bug again (R35).
       ...(options.questionSequence === undefined
@@ -1412,6 +1426,9 @@ export function createModelGatewayQAnswer(
           ),
           ...(openDocumentTitle === undefined ? {} : { openDocumentTitle }),
           ...(request.turnUnread === true ? { turnUnread: true } : {}),
+          ...(request.writingDocument === true
+            ? { writingDocument: true }
+            : {}),
           ...(request.questionSequence === undefined
             ? {}
             : { questionSequence: request.questionSequence }),

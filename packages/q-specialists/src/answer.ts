@@ -18,7 +18,7 @@ import {
   type ConversationState,
   type FailureOperation,
   type QuestionSequence,
-  type TurnToolV8,
+  type TurnToolV14,
 } from "@capital-q/q-core";
 import {
   eligibleCapabilities,
@@ -27,6 +27,10 @@ import {
 } from "@capital-q/q-tools";
 import { ownInvestorOrganisationIn } from "@capital-q/model-gateway/q";
 
+import {
+  ANSWER_DOCUMENT_ARTIFACT_TYPE,
+  composeAnswerDocument,
+} from "./answer-document.js";
 import {
   composeOwnMandateDocument,
   type MandateLabels,
@@ -763,12 +767,148 @@ export function createSpecialistQAnswer(
   }
 
   /**
+   * One of Q's answers filed as a document with a PDF (founder live
+   * 2026-09-28 #1), exactly as written: see answer-document.ts.
+   */
+  async function fileAnswer(
+    request: QAnswerRequest,
+    preparation: ArtifactPreparation,
+    answer: string,
+    question: string | undefined,
+  ): Promise<DocumentReply> {
+    const document = composeAnswerDocument({ answer, question });
+    if (document === null) {
+      return {
+        content:
+          "There's no written answer here yet to put in a document. Ask me what you want it to say and I'll write it and make the PDF.",
+      };
+    }
+    try {
+      const summary = await preparation.port.prepare({
+        actorContext: request.actor,
+        permittedContextPlan: request.plan,
+        qRunId: request.runId,
+        artifactType: ANSWER_DOCUMENT_ARTIFACT_TYPE,
+        content: {
+          title: document.title,
+          summary: document.summary,
+          content: document.content,
+        },
+      });
+      return {
+        content: "Here it is as a document. Download the PDF from the card.",
+        blocks: [
+          {
+            kind: "ARTIFACT_REFERENCE",
+            artifactId: summary.artifactId,
+            type: summary.type,
+            status: summary.status,
+            title: summary.title,
+          },
+        ],
+      };
+    } catch (error: unknown) {
+      if (request.signal?.aborted === true) throw error;
+      logger?.warn(
+        { err: error, qRunId: request.runId },
+        "an answer could not be filed as a document",
+      );
+      return {
+        content:
+          "I couldn't make the document just now. Ask me again in a moment and I'll make it.",
+      };
+    }
+  }
+
+  /**
+   * The answer Q gave before this turn, and what it answered: the one a
+   * "put that in a PDF" means.
+   */
+  function previousAnswer(
+    history: readonly QConversationMessage[],
+  ): { readonly answer: string; readonly question?: string } | null {
+    const latestUser = history.findLastIndex((m) => m.role === "USER");
+    const before = latestUser < 0 ? history : history.slice(0, latestUser);
+    const at = before.findLastIndex(
+      (m) => m.role === "Q" && m.content.trim().length > 0,
+    );
+    if (at < 0) return null;
+    const answer = before[at];
+    if (answer === undefined) return null;
+    const asked = before.slice(0, at).findLast((m) => m.role === "USER");
+    return {
+      answer: answer.content,
+      ...(asked === undefined ? {} : { question: asked.content }),
+    };
+  }
+
+  /**
+   * After a Q_REPORT's answer is written: file it as a document and say
+   * so in one short follow-up with its card, together with any other
+   * document asked for in the same message. The answer stays the answer;
+   * the follow-up is the file. A failure here never unsays the answer.
+   */
+  async function fileWrittenAnswer(
+    request: QAnswerRequest,
+    conversationId: QConversationMessage["conversationId"],
+    outcome: Extract<QAnswerOutcome, { kind: "ANSWERED" }>,
+    others: readonly TurnToolV14[],
+  ): Promise<void> {
+    if (artifacts === undefined || outcome.messageId === null) return;
+    try {
+      const history =
+        await repositories.messages.listRecentForConversationOfRun(
+          sql,
+          request.tenantId,
+          request.runId,
+          64,
+        );
+      const at = history.findIndex((m) => m.id === outcome.messageId);
+      const written = history[at];
+      const asked =
+        at < 0
+          ? undefined
+          : history.slice(0, at).findLast((m) => m.role === "USER");
+      const replies: DocumentReply[] = [
+        written === undefined
+          ? {
+              content:
+                "I couldn't make the document just now. Ask me to put that answer in a PDF and I'll make it.",
+            }
+          : await fileAnswer(
+              request,
+              artifacts,
+              written.content,
+              asked?.content,
+            ),
+      ];
+      for (const other of others) {
+        const reply = await documentReply(request, other, history);
+        if (reply !== null) replies.push(reply);
+      }
+      const blocks = replies.flatMap((reply) => reply.blocks ?? []);
+      await recordAnswer(
+        request,
+        conversationId,
+        replies.map((reply) => reply.content).join("\n\n"),
+        blocks.length === 0 ? undefined : blocks,
+      );
+    } catch (error: unknown) {
+      if (request.signal?.aborted === true) throw error;
+      logger?.warn(
+        { err: error, qRunId: request.runId },
+        "a written answer could not be filed as a document",
+      );
+    }
+  }
+
+  /**
    * One requested document, made (or why not, said plainly). Null: this
    * seam is not composed to make that kind of document.
    */
   async function documentReply(
     request: QAnswerRequest,
-    tool: TurnToolV8,
+    tool: TurnToolV14,
     history: readonly QConversationMessage[],
   ): Promise<DocumentReply | null> {
     if (tool.kind !== "PREPARE_DOCUMENT" || artifacts === undefined) {
@@ -778,6 +918,18 @@ export function createSpecialistQAnswer(
       if (dependencies.ownMandate === undefined) return null;
       return prepareOwnMandate(request, artifacts);
     }
+    if (tool.documentType === "ANSWER_EXPORT") {
+      const previous = previousAnswer(history);
+      if (previous === null) {
+        return {
+          content:
+            "I haven't answered anything in this conversation yet, so there's nothing to put in a document. Ask me what you want it to say and I'll write it and make the PDF.",
+        };
+      }
+      return fileAnswer(request, artifacts, previous.answer, previous.question);
+    }
+    // A Q_REPORT is written by the answer first (answerThenFile).
+    if (tool.documentType === "Q_REPORT") return null;
     const companyDocument =
       tool.documentType === "PITCH_DECK" ||
       tool.documentType === "INVESTMENT_BRIEF"
@@ -817,7 +969,7 @@ export function createSpecialistQAnswer(
   async function actOnDocuments(
     request: QAnswerRequest,
     conversationId: QConversationMessage["conversationId"],
-    tools: readonly TurnToolV8[],
+    tools: readonly TurnToolV14[],
     history: readonly QConversationMessage[],
   ): Promise<QAnswerOutcome | null> {
     const seen = new Set<string>();
@@ -856,11 +1008,11 @@ export function createSpecialistQAnswer(
   async function actOnTool(
     request: QAnswerRequest,
     conversationId: QConversationMessage["conversationId"],
-    tool: TurnToolV8,
+    tool: TurnToolV14,
     history: readonly QConversationMessage[],
     /** The screens this run can open, from the capability registry. */
     navigable: readonly QNavigateDestination[],
-    moreDocuments: readonly TurnToolV8[] = [],
+    moreDocuments: readonly TurnToolV14[] = [],
   ): Promise<QAnswerOutcome | null> {
     const company = request.subjects.find(
       (subject) => subject.kind === "COMPANY",
@@ -1153,7 +1305,17 @@ export function createSpecialistQAnswer(
           read.tool?.kind === "PREPARE_DOCUMENT"))
         ? read.tool
         : null;
-    if (tool !== null) {
+    // A piece Q writes for them as a document (Q_REPORT) is answered
+    // first and filed after; any other document asked with it is made
+    // then too, in the same follow-up.
+    const documents =
+      tool?.kind === "PREPARE_DOCUMENT"
+        ? [tool, ...(read?.moreDocuments ?? [])]
+        : [];
+    const writingDocument =
+      artifacts !== undefined &&
+      documents.some((document) => document.documentType === "Q_REPORT");
+    if (tool !== null && !writingDocument) {
       const acted = await actOnTool(
         request,
         conversationId,
@@ -1193,8 +1355,17 @@ export function createSpecialistQAnswer(
       research,
       capabilities: manifestOf(capabilities),
       ...(turnUnread ? { turnUnread: true } : {}),
+      ...(writingDocument ? { writingDocument: true } : {}),
       ...(series.step === null ? {} : { questionSequence: series.step }),
     });
+    if (writingDocument && outcome.kind === "ANSWERED") {
+      await fileWrittenAnswer(
+        request,
+        conversationId,
+        outcome,
+        documents.filter((document) => document.documentType !== "Q_REPORT"),
+      );
+    }
     if (outcome.kind === "ANSWERED" && series.step !== null) {
       keepSequence(conversationId, series.next);
     }

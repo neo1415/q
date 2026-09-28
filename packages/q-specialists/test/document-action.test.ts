@@ -18,6 +18,7 @@ import type {
 } from "@capital-q/q-runtime";
 import { ActorContextSchema } from "@capital-q/security";
 
+import { composeAnswerDocument } from "../src/answer-document.js";
 import { createSpecialistQAnswer } from "../src/answer.js";
 import type {
   CompanyFinding,
@@ -196,6 +197,8 @@ function seam(options: {
   readonly ownMandate?: GetInvestorMandateOutput | "NOT_AN_INVESTOR" | null;
   /** The run's subjects (own context adds the founder's own company). */
   readonly subjects?: QAnswerRequest["subjects"];
+  /** Sees each request handed to the conversational answer. */
+  readonly onDelegate?: (request: QAnswerRequest) => void;
 }) {
   const investigated: CompanyIntelligenceRequest[] = [];
   const prepared: Record<string, unknown>[] = [];
@@ -247,7 +250,8 @@ function seam(options: {
           },
         }),
     delegate: {
-      answer: () => {
+      answer: (delegatedRequest) => {
+        options.onDelegate?.(delegatedRequest);
         delegated += 1;
         return Promise.resolve({
           kind: "ANSWERED",
@@ -716,5 +720,167 @@ describe("founder live 2026-09-27 · own company binds; misheard names resolve; 
     expect(s.stored).toHaveLength(1);
     expect(s.stored[0]?.blocks).toHaveLength(2);
     expect(s.stored[0]?.content).not.toMatch(/which company/i);
+  });
+});
+
+function answerDocumentReading(
+  documentType: "ANSWER_EXPORT" | "Q_REPORT",
+  moreDocuments: QTurnReading["moreDocuments"] = [],
+): QTurnReading {
+  return {
+    kind: "TOOL_REQUEST",
+    confidence: "HIGH",
+    transcript: "CLEAR",
+    question: null,
+    aboutNamedOther: false,
+    tool: {
+      kind: "PREPARE_DOCUMENT",
+      destination: null,
+      unknownScreen: null,
+      visibility: null,
+      documentType,
+      subjectName: null,
+    },
+    moreDocuments,
+  };
+}
+
+const WRITTEN = [
+  "# How you come across",
+  "",
+  "## Strengths",
+  "- **Clear** problem statement, see [the deck](https://example.test/deck).",
+  "- Traction is `specific`.",
+  "",
+  "## Gaps",
+  "| Area | State |",
+  "| --- | --- |",
+  "| Revenue | not stated |",
+].join("\n");
+
+describe("founder live 2026-09-28 #1 · any answer as a PDF", () => {
+  it("files the answer already given exactly as written, with no model call, and replies with the card", async () => {
+    const s = seam({
+      history: [
+        message("USER", "How do I come across to investors?"),
+        message("Q", WRITTEN),
+        message("USER", "Put that in a PDF."),
+      ],
+      reading: answerDocumentReading("ANSWER_EXPORT"),
+    });
+    await s.run();
+    expect(s.delegated()).toBe(0);
+    expect(s.investigated).toHaveLength(0);
+    expect(s.prepared).toHaveLength(1);
+    expect(s.prepared[0]?.["artifactType"]).toBe("Q_REPORT");
+    const filed = s.prepared[0]?.["content"] as {
+      title: string;
+      content: { sections: { heading: string; body: string }[] };
+    };
+    expect(filed.title).toBe("How you come across");
+    expect(filed.content.sections.map((x) => x.heading)).toEqual([
+      "Strengths",
+      "Gaps",
+    ]);
+    expect(filed.content.sections[0]?.body).toBe(
+      "• Clear problem statement, see the deck (https://example.test/deck).\n• Traction is specific.",
+    );
+    expect(filed.content.sections[1]?.body).toBe(
+      "Area · State\nRevenue · not stated",
+    );
+    expect(s.stored).toHaveLength(1);
+    expect(s.stored[0]?.content).toMatch(/PDF/);
+    expect(s.stored[0]?.blocks).toEqual([
+      expect.objectContaining({ kind: "ARTIFACT_REFERENCE" }),
+    ]);
+  });
+
+  it("says there is nothing to export yet when Q has not answered, and files nothing", async () => {
+    const s = seam({
+      history: [message("USER", "Give me your last answer as a PDF.")],
+      reading: answerDocumentReading("ANSWER_EXPORT"),
+    });
+    await s.run();
+    expect(s.prepared).toHaveLength(0);
+    expect(s.stored).toHaveLength(1);
+    expect(s.stored[0]?.content).not.toMatch(/can't (create|make) a pdf/i);
+  });
+
+  it("writes a new piece as the answer, told it is a document, then files that answer with its card", async () => {
+    const seen: QAnswerRequest[] = [];
+    const answered = message("Q", WRITTEN);
+    const s = seam({
+      history: [
+        message(
+          "USER",
+          "Make me a PDF of an assessment of how I come across to investors.",
+        ),
+        { ...answered, id: "m" as QConversationMessage["id"] },
+      ],
+      reading: answerDocumentReading("Q_REPORT"),
+      onDelegate: (r) => seen.push(r),
+    });
+    await s.run();
+    expect(s.delegated()).toBe(1);
+    expect(seen[0]?.writingDocument).toBe(true);
+    expect(s.prepared).toHaveLength(1);
+    expect(s.prepared[0]?.["artifactType"]).toBe("Q_REPORT");
+    const filed = s.prepared[0]?.["content"] as { summary: string };
+    expect(filed.summary).toContain("how I come across");
+    expect(s.stored).toHaveLength(1);
+    expect(s.stored[0]?.blocks).toEqual([
+      expect.objectContaining({ kind: "ARTIFACT_REFERENCE" }),
+    ]);
+  });
+
+  it("makes another document asked in the same message after the written one, in the same follow-up", async () => {
+    const s = seam({
+      history: [
+        message("USER", "An assessment of me as a PDF, and my mandate too."),
+        { ...message("Q", WRITTEN), id: "m" as QConversationMessage["id"] },
+      ],
+      reading: answerDocumentReading("Q_REPORT", [
+        {
+          kind: "PREPARE_DOCUMENT",
+          destination: null,
+          unknownScreen: null,
+          visibility: null,
+          documentType: "OWN_MANDATE",
+          subjectName: null,
+        },
+      ]),
+      ownMandate: mandateRecord("ACTIVE"),
+    });
+    await s.run();
+    expect(s.delegated()).toBe(1);
+    expect(s.prepared.map((p) => p["artifactType"])).toEqual([
+      "Q_REPORT",
+      "INVESTOR_MANDATE",
+    ]);
+    expect(s.stored).toHaveLength(1);
+    expect(s.stored[0]?.blocks).toHaveLength(2);
+  });
+});
+
+describe("an answer as a document, deterministically", () => {
+  it("keeps the words, drops the markup, and splits at the answer's own headings", () => {
+    const document = composeAnswerDocument({
+      answer: "Short answer with *emphasis* and a rule.\n\n---\n\nDone.",
+      question: "  what   now? ",
+    });
+    expect(document?.title).toBe("Q's answer: what now?");
+    expect(document?.content.sections).toEqual([
+      {
+        heading: "Answer",
+        body: "Short answer with emphasis and a rule.\n\nDone.",
+        findings: [],
+      },
+    ]);
+    expect(document?.summary).toMatch(/not verified fact/);
+  });
+
+  it("is nothing when the answer holds no words", () => {
+    expect(composeAnswerDocument({ answer: "  \n# \n" })).toBeNull();
+    expect(composeAnswerDocument({ answer: "# Title only" })).toBeNull();
   });
 });

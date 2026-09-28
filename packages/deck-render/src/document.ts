@@ -66,6 +66,7 @@ export type ArtifactDocument = {
 const KIND_NAMES: Readonly<Record<string, string>> = {
   INVESTMENT_BRIEF: "Investment brief",
   PITCH_DECK: "Investor deck",
+  Q_REPORT: "Report",
 };
 
 export function artifactKindName(type: string): string {

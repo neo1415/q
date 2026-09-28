@@ -54,7 +54,12 @@ export type QCapabilityHand =
   | { readonly kind: "SET_VISIBILITY" }
   | {
       readonly kind: "PREPARE_DOCUMENT";
-      readonly documentType: "PITCH_DECK" | "INVESTMENT_BRIEF" | "OWN_MANDATE";
+      readonly documentType:
+        | "PITCH_DECK"
+        | "INVESTMENT_BRIEF"
+        | "OWN_MANDATE"
+        | "ANSWER_EXPORT"
+        | "Q_REPORT";
     };
 
 /** What code composed for this run; the hands' eligibility reads only this. */
@@ -355,6 +360,38 @@ export const Q_CAPABILITIES: readonly QCapability[] = Object.freeze([
       facts.artifacts &&
       facts.ownMandate &&
       facts.ownInvestorOrganisation,
+  },
+  // Founder live 2026-09-28 #1: any answer as a document. Refusing a PDF
+  // because the piece was not a deck, a brief or a mandate was a bug.
+  {
+    id: "document.ANSWER_EXPORT",
+    group: "DOCUMENT",
+    surfaces: ["HOME_Q"],
+    does: "Files an answer Q already gave in this conversation as their private document, exactly as written, with a PDF download.",
+    performedBy: {
+      kind: "HAND",
+      hand: { kind: "PREPARE_DOCUMENT", documentType: "ANSWER_EXPORT" },
+    },
+    approval: "INSTANT",
+    acts: false,
+    executes: [],
+    eligibility: "an artifact service is composed",
+    eligible: (facts) => facts.surface === "HOME_Q" && facts.artifacts,
+  },
+  {
+    id: "document.Q_REPORT",
+    group: "DOCUMENT",
+    surfaces: ["HOME_Q"],
+    does: "Writes any other piece they ask for as a document (an assessment, analysis, summary, notes, a plan) and files it as their private document with a PDF download.",
+    performedBy: {
+      kind: "HAND",
+      hand: { kind: "PREPARE_DOCUMENT", documentType: "Q_REPORT" },
+    },
+    approval: "INSTANT",
+    acts: false,
+    executes: [],
+    eligibility: "an artifact service is composed",
+    eligible: (facts) => facts.surface === "HOME_Q" && facts.artifacts,
   },
   tool(
     "propose_profile_change",

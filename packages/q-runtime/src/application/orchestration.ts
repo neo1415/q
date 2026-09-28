@@ -216,6 +216,13 @@ export type QAnswerRequest = QOrchestrationSubjectContext & {
    */
   readonly turnUnread?: boolean | undefined;
   /**
+   * The person asked for this answer as a document (a Q_REPORT, founder
+   * live 2026-09-28 #1): the answer is the document's text, and Capital Q
+   * files it with a PDF once it is written. Decided from the turn's
+   * reading, never by the answer's model.
+   */
+  readonly writingDocument?: boolean | undefined;
+  /**
    * A series of questions the person asked Q to put to them, and what
    * this turn must do about it (R35): decided by the conversation core
    * from the turn's reading, never by the answer's model. Absent: no

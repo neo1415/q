@@ -230,6 +230,9 @@ const DOCUMENT_NAMES: Readonly<Record<string, string>> = {
   PITCH_DECK: "a pitch deck",
   INVESTMENT_BRIEF: "an investment brief",
   OWN_MANDATE: "a document of their own mandate",
+  ANSWER_EXPORT: "an answer you already gave, as a document",
+  Q_REPORT:
+    "any other written piece as a document (an assessment, analysis, summary or plan)",
 };
 
 /**
@@ -325,7 +328,11 @@ export function capabilityNote(
         .map((d) => DOCUMENT_NAMES[d] ?? d.toLowerCase().replace(/_/g, " "))
         .join(
           ", ",
-        )} when they ask, and files it as their private document with a PDF download on its card.`,
+        )} when they ask, and files it as their private document with a PDF download on its card.${
+        manifest.documents.includes("Q_REPORT")
+          ? " Any written answer can be a document: never say you cannot make a PDF or a document."
+          : ""
+      }`,
     );
   }
   if (manifest?.visibilityChange === true) {

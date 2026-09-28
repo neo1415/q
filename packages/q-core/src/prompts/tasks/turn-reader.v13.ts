@@ -33,7 +33,7 @@ export const TURN_READER_V13: PromptDefinition<
 > = {
   ...TURN_READER_V12,
   version: 13,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   changeDescription:
     "R33: Settings, Verification, Pitch & media and company interest are NAVIGATE destinations (SETTINGS, VERIFICATION, PITCH, COMPANY_INTEREST).",
   effectiveFrom: "2026-09-27",
