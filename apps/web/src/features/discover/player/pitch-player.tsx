@@ -308,6 +308,13 @@ export function PitchPlayer({
           playsInline
           muted={muted}
           loop
+          // Streamed (MSE/HLS) sources can ignore `loop`; restart by hand so
+          // a pitch always loops seamlessly (founder, 2026-09-28).
+          onEnded={(event) => {
+            const video = event.currentTarget;
+            video.currentTime = 0;
+            void video.play().catch(() => undefined);
+          }}
           {...(intent.preload === null ? {} : { preload: intent.preload })}
           {...(posterUrl === null ? {} : { poster: posterUrl })}
           aria-label={`Pitch from ${company.canonicalName}`}
@@ -337,9 +344,22 @@ export function PitchPlayer({
                 type="button"
                 className="cq-stage-control"
                 aria-pressed={!muted}
+                aria-label={muted ? "Unmute" : "Mute"}
                 onClick={() => setMuted(!muted)}
               >
-                {muted ? "Unmute" : "Mute"}
+                {muted ? (
+                  <VolumeX
+                    aria-hidden="true"
+                    size={ICON_SIZE.regular}
+                    strokeWidth={ICON_STROKE}
+                  />
+                ) : (
+                  <Volume2
+                    aria-hidden="true"
+                    size={ICON_SIZE.regular}
+                    strokeWidth={ICON_STROKE}
+                  />
+                )}
               </button>
             ) : null}
             {failed ? (
@@ -387,6 +407,13 @@ export function PitchPlayer({
           playsInline
           muted={muted}
           loop
+          // Streamed (MSE/HLS) sources can ignore `loop`; restart by hand so
+          // a pitch always loops seamlessly (founder, 2026-09-28).
+          onEnded={(event) => {
+            const video = event.currentTarget;
+            video.currentTime = 0;
+            void video.play().catch(() => undefined);
+          }}
           // Derived only from the controller's tier. `undefined` when no
           // source is attached, so the browser is told nothing to fetch.
           {...(intent.preload === null ? {} : { preload: intent.preload })}
@@ -497,7 +524,7 @@ export function PitchPlayer({
                 strokeWidth={ICON_STROKE}
               />
             )}
-            {muted ? "Unmute" : "Mute"}
+            <span className="sr-only">{muted ? "Unmute" : "Mute"}</span>
           </Button>
         ) : null}
 

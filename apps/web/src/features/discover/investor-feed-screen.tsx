@@ -973,13 +973,6 @@ function InvestorFeed({
               strokeWidth={ICON_STROKE}
             />
           </button>
-          <p
-            className="cq-caption cq-numeric text-(--cq-text-secondary)"
-            aria-live="polite"
-          >
-            {feed.state.index + 1} of {feed.state.items.length}
-            {feed.state.nextCursor === null ? "" : "+"}
-          </p>
           <button
             type="button"
             className="cq-feed-nav-button"
