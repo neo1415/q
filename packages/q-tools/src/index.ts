@@ -220,6 +220,8 @@ export {
 export {
   CHAT_MESSAGE_SEND,
   ChatProposalOutputSchema,
+  ERRAND_START,
+  type ErrandPlan,
   createChatTools,
   LIST_MESSAGES,
   ListMessagesInputSchema,
@@ -239,6 +241,13 @@ export {
   type ListMessagesOutput,
   type ProposeChatMessageInput,
 } from "./tools/chat.js";
+// Founder direction 2026-09-29: errands, one approval for a plan.
+export {
+  createErrandTools,
+  PROPOSE_ERRAND,
+  ProposeErrandInputSchema,
+  type ProposeErrandInput,
+} from "./tools/errands.js";
 // BIZ-008: meetings and reminders.
 export {
   createScheduleTools,

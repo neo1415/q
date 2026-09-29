@@ -266,3 +266,4 @@ export {
   dismissMeetingAssistant,
   getMeetingAssistant,
 } from "./meeting-assistant.js";
+export { listRelationshipErrands, stopErrand } from "./errands.js";

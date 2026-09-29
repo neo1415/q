@@ -46,6 +46,26 @@ export const REMINDER_CREATE = "reminder.create" as const;
 export const MEETING_SCHEDULE = "meeting.schedule" as const;
 export const MEETING_RESCHEDULE = "meeting.reschedule" as const;
 export const MEETING_CANCEL = "meeting.cancel" as const;
+// Founder direction 2026-09-29: an errand, one approval for an exact plan.
+export const ERRAND_START = "q.errand.start" as const;
+
+/** The plan an errand carries out, approved exactly as shown. */
+export type ErrandPlan = {
+  /** Exactly one: the relationship, or (for Express Interest) the company. */
+  readonly relationshipId?: string | undefined;
+  readonly companyId?: string | undefined;
+  readonly counterpartName: string;
+  readonly expressInterest: boolean;
+  /** Posted once the chat is open; null: no opening message. */
+  readonly openingMessage: string | null;
+  /** What Q may tell them when they ask; null: Q answers nothing. */
+  readonly brief: string | null;
+  /** A call Q books at the first time free on the person's calendar. */
+  readonly bookCall: {
+    readonly purpose: string;
+    readonly durationMinutes: number;
+  } | null;
+};
 
 export type ChatProposal =
   | {
@@ -93,6 +113,10 @@ export type ChatProposal =
         readonly startsAt: string;
         readonly durationMinutes: number;
       };
+    }
+  | {
+      readonly actionType: typeof ERRAND_START;
+      readonly payload: ErrandPlan;
     }
   | {
       readonly actionType: typeof MEETING_CANCEL;

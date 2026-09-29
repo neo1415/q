@@ -25,6 +25,7 @@ import { createRecordChangeTools } from "./tools/record-changes.js";
 import { createProposeProfileChangeTool } from "./tools/profile-change.js";
 import { createProposeEmailTool } from "./tools/email.js";
 import { createChatTools } from "./tools/chat.js";
+import { createErrandTools } from "./tools/errands.js";
 import { createScheduleTools } from "./tools/schedule.js";
 import { createRelationshipTools } from "./tools/relationships.js";
 import { createGetPitchMomentTool } from "./tools/pitch-moment.js";
@@ -80,6 +81,10 @@ export function createDefaultQTools(
     ...(ports.chat === undefined || ports.relationships === undefined
       ? []
       : createChatTools(ports.chat, ports.relationships)),
+    // Founder direction 2026-09-29: errands, on the same board.
+    ...(ports.chat === undefined || ports.relationships === undefined
+      ? []
+      : createErrandTools(ports, ports.chat, ports.relationships)),
     // BIZ-008: calls and reminders, prepared on the same board.
     ...(ports.schedule === undefined ||
     ports.chat === undefined ||

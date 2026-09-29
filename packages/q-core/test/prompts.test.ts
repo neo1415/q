@@ -113,6 +113,8 @@ describe("registry", () => {
         "DELEGATION_READER",
         // BIZ-009: an investor's own public pages, read into their mandate.
         "INVESTOR_RESEARCH_READER",
+        // Founder direction 2026-09-29: Q replying inside an approved errand.
+        "ERRAND_REPLY",
       ].sort(),
     );
     for (const id of PROMPT_IDS) {

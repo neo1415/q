@@ -425,6 +425,12 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   // ---- apps/q-api -------------------------------------------------------
   'q-api/app.ts GET "/health/live"': HEALTH,
   'q-api/app.ts GET "/health/ready"': HEALTH,
+  "q-api/http/errands.ts GET Q_RELATIONSHIP_ERRANDS_PATH": exempt(
+    "the person reading their own errands on a relationship, shown on the relationship itself",
+  ),
+  "q-api/http/errands.ts DELETE Q_ERRAND_PATH": exempt(
+    "the person's own click stopping an errand they approved; stopping never needs Q",
+  ),
   "q-api/http/meeting-assistant.ts GET Q_MEETING_ASSISTANT_PATH": exempt(
     "the organiser reading whether Q is in their call and its notes; shown on the meeting itself",
   ),

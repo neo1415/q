@@ -170,6 +170,7 @@ export const NotificationKindSchema = z.enum([
   "MEETING_PREP_READY",
   "MEETING_NOTES_READY",
   "Q_SCOUT",
+  "Q_ERRAND",
 ]);
 export type NotificationKind = z.infer<typeof NotificationKindSchema>;
 

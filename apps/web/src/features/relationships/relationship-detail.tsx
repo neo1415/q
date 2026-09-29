@@ -25,6 +25,7 @@ import { ScheduleDialog } from "./schedule-dialog";
 import { AskQAboutRelationship } from "./relationship-actions";
 import type { CounterpartProfile } from "./relationship-page-data";
 import { StatusPill } from "./status-pill";
+import { RelationshipErrands } from "./relationship-errands";
 import { RelationshipTimeline } from "./relationship-timeline";
 import {
   NEXT_STEP_WORDS,
@@ -130,6 +131,11 @@ export function RelationshipDetail({
               ) : null}
               {relationship === null ? null : (
                 <>
+                  <RelationshipErrands
+                    relationshipId={relationship.relationshipId}
+                    counterpart={counterpart}
+                    connected={connected}
+                  />
                   {connected ? (
                     <ScheduleDialog kind="call">
                       <RelationshipSchedule

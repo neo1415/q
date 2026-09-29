@@ -63,6 +63,12 @@ import { createPexelsPhotos } from "./composition/stock-photos.js";
 import { createRecallBots } from "./composition/recall-bots.js";
 import { createOpenerFacts } from "./voice/returning-opener.js";
 import { createScout } from "./composition/scout.js";
+import {
+  createErrandReplyComposer,
+  createErrandRunner,
+  createErrandStartAction,
+  createPostgresErrandStore,
+} from "./composition/errands.js";
 import { createMeetingNotesComposer } from "./composition/meeting-notes.js";
 import {
   createProfileAnswerAction,
@@ -1405,6 +1411,16 @@ const ownRecords = createOwnRecordsPort({
   profileFindings: profileFindingsReader,
 });
 const qActionRepositories = createPostgresQActionRepositories();
+// Errands (founder direction 2026-09-29): one approval, an exact plan Q
+// carries forward as the relationship moves.
+const errandRelationships = createRelationshipIntelligencePort({
+  interests: interestService,
+  board: relationshipBoard,
+  ownCompany: runtimeDependencies.ownCompany,
+});
+const actorContextResolver = createPostgresActorContextResolver({
+  sql: database.sql,
+});
 const qActionRegistry = createQActionRegistry([
   createCompanyProfileUpdateAction({
     profiles: companies,
@@ -1468,6 +1484,13 @@ const qActionRegistry = createQActionRegistry([
   createMeetingScheduleAction({ schedule, logger }),
   createMeetingRescheduleAction({ schedule }),
   createMeetingCancelAction({ schedule }),
+  createErrandStartAction({
+    sql: database.sql,
+    interests: interestService,
+    relationships: errandRelationships,
+    chat,
+    logger,
+  }),
 ]);
 // Every composed action has a capability entry (R20): the list the
 // completeness test reads is the list composed here.
@@ -1790,6 +1813,30 @@ setInterval(
   2 * 60 * 1000,
 ).unref();
 
+const errands = createErrandRunner({
+  store: createPostgresErrandStore(database.sql),
+  resolver: actorContextResolver,
+  chat,
+  schedule,
+  relationships: errandRelationships,
+  composer: createErrandReplyComposer({
+    gateway: modelGateway,
+    dataPosture: demoDataPosture,
+    logger,
+  }),
+  nameOf: (userId) =>
+    database.sql<{ display_name: string | null }[]>`
+      select display_name from identity.user_profiles where id = ${userId} limit 1`.then(
+      (rows) => rows[0]?.display_name ?? null,
+    ),
+  logger,
+});
+setInterval(() => {
+  errands.tick().catch((error: unknown) => {
+    logger.warn({ err: error }, "errand run failed");
+  });
+}, 60 * 1000).unref();
+
 // Q's scout (founder direction 2026-09-29): every six hours, what is new on
 // the public web about each recently active founder's own company, each at
 // most once a day; the first run waits a few minutes after a deploy.
@@ -2091,7 +2138,7 @@ const { app, logger: appLogger } = createApp(
     authenticator: createSupabaseRequestAuthenticator(
       createSupabaseAccessTokenAuthenticator(supabaseAuth),
     ),
-    resolver: createPostgresActorContextResolver({ sql: database.sql }),
+    resolver: actorContextResolver,
     identity,
   },
   {
@@ -2103,6 +2150,7 @@ const { app, logger: appLogger } = createApp(
     profileFindings: profileFindingsReader,
     memory: memoryService,
     meetingAssistant,
+    errands,
     orchestration: { orchestrator, autostart: Q_ORCHESTRATION_AUTOSTART },
     qActions,
     continueApproved,

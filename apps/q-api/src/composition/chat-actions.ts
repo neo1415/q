@@ -21,6 +21,7 @@ import {
 } from "@capital-q/q-actions";
 import {
   CHAT_MESSAGE_SEND as CHAT_MESSAGE_SEND_NAME,
+  ERRAND_START as ERRAND_START_NAME,
   MEETING_CANCEL as MEETING_CANCEL_NAME,
   MEETING_RESCHEDULE as MEETING_RESCHEDULE_NAME,
   MEETING_SCHEDULE as MEETING_SCHEDULE_NAME,
@@ -36,6 +37,7 @@ import {
   MeetingSchedulePayloadSchema,
   ReminderCreatePayloadSchema,
 } from "./schedule-actions.js";
+import { ErrandStartPayloadSchema } from "./errands.js";
 
 /**
  * Relationship chat actions (R34; ADR 0019), all Prepare → Approve.
@@ -211,6 +213,8 @@ function schemaFor(proposal: ChatProposal): z.ZodType {
       return MeetingReschedulePayloadSchema;
     case MEETING_CANCEL_NAME:
       return MeetingCancelPayloadSchema;
+    case ERRAND_START_NAME:
+      return ErrandStartPayloadSchema;
   }
 }
 

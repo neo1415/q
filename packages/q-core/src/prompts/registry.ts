@@ -43,6 +43,7 @@ import { TURN_READER_V15 } from "./tasks/turn-reader.v15.js";
 import { MEMORY_EXTRACTOR_V1 } from "./tasks/memory-extractor.v1.js";
 import { MEETING_NOTES_V1 } from "./tasks/meeting-notes.v1.js";
 import { MEETING_NOTES_V2 } from "./tasks/meeting-notes.v2.js";
+import { ERRAND_REPLY_V1 } from "./tasks/errand-reply.v1.js";
 import { FIT_EXPLANATION_V1 } from "./tasks/fit-explanation.v1.js";
 import { FOUNDER_ONBOARDING_EXTRACTION_V1 } from "./tasks/founder-onboarding-extraction.v1.js";
 import { FOUNDER_ONBOARDING_EXTRACTION_V2 } from "./tasks/founder-onboarding-extraction.v2.js";
@@ -260,6 +261,7 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition<unknown, unknown>[] =
     MEMORY_EXTRACTOR_V1,
     MEETING_NOTES_V1,
     MEETING_NOTES_V2,
+    ERRAND_REPLY_V1,
     GATEQ_INTERVIEWER_V1,
   ];
 

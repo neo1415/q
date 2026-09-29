@@ -49,6 +49,8 @@ export const PROMPT_IDS = [
   "DELEGATION_READER",
   /** BIZ-009: an investor's own public pages, read into their mandate's shape. */
   "INVESTOR_RESEARCH_READER",
+  /** Founder direction 2026-09-29: Q replying inside an approved errand. */
+  "ERRAND_REPLY",
 ] as const;
 export type PromptId = (typeof PROMPT_IDS)[number];
 
@@ -72,6 +74,7 @@ export const PROMPT_SLUGS: Readonly<Record<PromptId, string>> = {
   INTERVIEW_AGENT: "interview-agent",
   DELEGATION_READER: "delegation-reader",
   INVESTOR_RESEARCH_READER: "investor-research-reader",
+  ERRAND_REPLY: "errand-reply",
 };
 
 export type PromptKind = "CHARTER" | "TASK";

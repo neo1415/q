@@ -644,6 +644,12 @@ export const Q_CAPABILITIES: readonly QCapability[] = Object.freeze([
     { approval: "PREPARE_APPROVE", executes: ["chat.message.send"] },
   ),
   // --- end R34 ------------------------------------------------------------
+  tool(
+    "propose_errand",
+    "RELATIONSHIP",
+    "Takes on a multi-step job about one relationship for one approval: express interest, message them once connected, answer from an approved brief, book a call, and report back. Stoppable any time.",
+    { approval: "PREPARE_APPROVE", executes: ["q.errand.start"] },
+  ),
   // --- BIZ-008 meetings + reminders (B8 worker block; keep together) -----
   tool(
     "find_meeting_times",

@@ -659,3 +659,16 @@ export {
   type QMeetingFlag,
   type QMeetingFollowUp,
 } from "./meeting-assistant.js";
+export {
+  Q_ERRAND_PATH,
+  Q_ERRAND_STATUSES,
+  Q_RELATIONSHIP_ERRANDS_PATH,
+  QErrandDtoSchema,
+  QErrandListDtoSchema,
+  qErrandPath,
+  qRelationshipErrandsPath,
+  QErrandStoppedDtoSchema,
+  type QErrandDto,
+  type QErrandListDto,
+  type QErrandStoppedDto,
+} from "./errands.js";

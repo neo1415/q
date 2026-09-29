@@ -242,6 +242,16 @@ export {
 } from "./prompts/schemas/memory-extractor.js";
 export { MEETING_NOTES_V1 } from "./prompts/tasks/meeting-notes.v1.js";
 export { MEETING_NOTES_V2 } from "./prompts/tasks/meeting-notes.v2.js";
+export { ERRAND_REPLY_V1 } from "./prompts/tasks/errand-reply.v1.js";
+export {
+  ERRAND_REPLY_SCHEMA_NAME,
+  ERRAND_REPLY_SCHEMA_VERSION,
+  ERRAND_REPLY_UNTRUSTED,
+  ErrandReplyResultSchema,
+  ErrandReplyVariablesSchema,
+  type ErrandReplyResult,
+  type ErrandReplyVariables,
+} from "./prompts/schemas/errand-reply.js";
 export {
   MEETING_NOTES_SCHEMA_NAME,
   MEETING_NOTES_SCHEMA_VERSION,
