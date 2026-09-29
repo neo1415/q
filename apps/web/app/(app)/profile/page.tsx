@@ -309,8 +309,8 @@ export default async function ProfilePage() {
               />
               <EditableSection
                 id="mandate"
-                title="Mandate"
-                description="How you invest, as you declared it. Discover works from it."
+                title="Your organisation"
+                description="Who you are as an investor. Your mandate below is how you invest; Discover works from it."
                 profile={{
                   kind: "INVESTOR_ORGANISATION",
                   subjectId: investor.id,
@@ -326,23 +326,24 @@ export default async function ProfilePage() {
                   avatarUrl={orgImages?.avatar?.url ?? null}
                   coverUrl={orgImages?.cover?.url ?? null}
                 />
-                <AnswersSlot
-                  journey="investor"
-                  include={[
-                    "cheque",
-                    "stages",
-                    "geography",
-                    "sectors",
-                    "thesis",
-                    "preferences",
-                    "exclusions",
-                    "discovery",
-                  ]}
-                />
                 <p className="cq-caption text-(--cq-text-tertiary)">
                   Updated {dayOf(investor.updatedAt)}
                 </p>
               </EditableSection>
+              {/* The mandate, one card per part, each edited in place (ADR 0024). */}
+              <AnswersSlot
+                journey="investor"
+                include={[
+                  "mandate",
+                  "cheque",
+                  "focus",
+                  "criteria",
+                  "founder_fit",
+                  "exclusions",
+                  "discovery",
+                  "thesis",
+                ]}
+              />
             </>
           ) : context.kind === "NONE" && context.unavailable !== true ? (
             <ProfileSectionShell

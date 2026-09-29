@@ -3,11 +3,15 @@ import type {
   OnboardingSessionView,
 } from "@capital-q/contracts";
 import {
+  FOUNDER_DEFINITION_V2,
   FOUNDER_STEPS,
   instrumentLabel,
   STAGE_OPTIONS,
 } from "@capital-q/founder-onboarding";
-import { INVESTOR_STEPS } from "@capital-q/investor-onboarding";
+import {
+  INVESTOR_DEFINITION_V1,
+  INVESTOR_STEPS,
+} from "@capital-q/investor-onboarding";
 import { formatAmountForDisplay } from "@capital-q/ui/money-input";
 
 import { FOUNDER_VOCABULARY } from "@/features/founder-onboarding/conversation-adapter";
@@ -38,6 +42,8 @@ export type AnswerLine = {
   readonly stepKey: string;
   readonly title: string;
   readonly value: string | null;
+  /** A list answer's entries, one chip each; null for a single value. */
+  readonly items?: readonly string[] | null;
 };
 
 export type AnswerGroup = {
@@ -91,43 +97,51 @@ const FOUNDER_GROUPS: readonly GroupSpec[] = [
   },
 ];
 
-/** Investor groups: the role, then the mandate as the investor declared it. */
+/**
+ * Investor groups: the role, then the mandate as the investor declared it,
+ * one card each on the profile (founder design 2026-09-28). The inbound
+ * preference is the organisation's own setting (ADR 0023), shown from
+ * there, not from its setup answer.
+ */
 const INVESTOR_GROUPS: readonly GroupSpec[] = [
   { id: "role", label: "Your role", stepKeys: [I.businessTitle] },
   {
+    id: "mandate",
+    label: "Investment mandate",
+    stepKeys: [I.stages, I.investmentRole],
+  },
+  {
     id: "cheque",
     label: "Cheque size",
-    stepKeys: [I.chequeMin, I.chequeTypical, I.chequeMax, I.investmentRole],
-  },
-  { id: "stages", label: "Stages", stepKeys: [I.stages] },
-  {
-    id: "geography",
-    label: "Geographies",
-    stepKeys: [I.geography, I.geographyStrength],
+    stepKeys: [I.chequeMin, I.chequeTypical, I.chequeMax],
   },
   {
-    id: "sectors",
-    label: "Sectors",
-    stepKeys: [I.sectors, I.sectorStrength, I.sectorsAvoid],
-  },
-  {
-    id: "thesis",
-    label: "Thesis",
-    stepKeys: [I.additionalContext, I.customCriteria],
-  },
-  {
-    id: "preferences",
-    label: "What you look for",
+    id: "focus",
+    label: "Investment focus",
     stepKeys: [
+      I.sectors,
+      I.sectorStrength,
       I.businessModels,
       I.customerTypes,
-      I.capitalIntensity,
-      I.regulatoryAppetite,
-      I.revenueState,
-      I.founderPreferences,
+      I.geography,
+      I.geographyStrength,
+      I.sectorsAvoid,
+    ],
+  },
+  {
+    id: "criteria",
+    label: "Investment criteria",
+    stepKeys: [I.capitalIntensity, I.regulatoryAppetite, I.revenueState],
+  },
+  {
+    id: "founder_fit",
+    label: "Founder fit",
+    stepKeys: [
       I.founderStrength,
+      I.founderPreferences,
       I.greenFlags,
       I.greenFlagStrength,
+      I.customCriteria,
     ],
   },
   {
@@ -137,10 +151,19 @@ const INVESTOR_GROUPS: readonly GroupSpec[] = [
   },
   {
     id: "discovery",
-    label: "Discovery",
-    stepKeys: [I.portfolio, I.discoveryMode, I.inboundPreference],
+    label: "Discovery preferences",
+    stepKeys: [I.discoveryMode, I.portfolio],
   },
+  { id: "thesis", label: "In your words", stepKeys: [I.additionalContext] },
 ];
+
+/**
+ * Facts a card edits beyond the ones it shows: the cheque's currency is
+ * shown inside each amount, and edited beside them.
+ */
+export const EXTRA_EDIT_STEPS: Readonly<Record<string, readonly string[]>> = {
+  cheque: [I.currency],
+};
 
 /** Profile titles where the interview's short title reads oddly on a page. */
 const TITLE_OVERRIDES: Readonly<Record<string, string>> = {
@@ -217,6 +240,35 @@ function moneyValue(
   return currency === null ? amount : `${currency} ${amount}`;
 }
 
+function stepOf(journey: ProfileJourney, stepKey: string) {
+  return (
+    journey === "founder" ? FOUNDER_DEFINITION_V2 : INVESTOR_DEFINITION_V1
+  ).steps.find((step) => step.stepKey === stepKey);
+}
+
+/** A list answer's entries by name (options or categories); null otherwise. */
+function listItems(
+  journey: ProfileJourney,
+  view: OnboardingSessionView,
+  stepKey: string,
+  labels: Readonly<Record<string, string>>,
+): readonly string[] | null {
+  const value = view.responses.find((r) => r.stepKey === stepKey)?.value;
+  if (value === undefined) return null;
+  if (value.type === "RESOURCE_REFERENCE") {
+    return value.resourceIds.map((id) => labels[id] ?? "A category");
+  }
+  if (value.type !== "MULTI_SELECT") return null;
+  const configuration = stepOf(journey, stepKey)?.configuration;
+  const options =
+    configuration?.stepType === "multi_select" ? configuration.options : [];
+  return value.optionKeys.map(
+    (key) =>
+      options.find((option) => option.optionKey === key)?.label ??
+      key.replace(/_/g, " "),
+  );
+}
+
 /** The onboarding answers as profile groups. */
 export function answerGroups(
   journey: ProfileJourney,
@@ -257,6 +309,7 @@ export function answerGroups(
               currencyStep === undefined || item.value === null
                 ? item.value
                 : moneyValue(view, item.stepKey, currencyStep),
+            items: listItems(journey, view, item.stepKey, labels),
           };
         }),
     };

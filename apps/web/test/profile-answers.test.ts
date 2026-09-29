@@ -89,14 +89,14 @@ describe("answerGroups (investor)", () => {
     groups.flatMap((group) => group.lines).find((l) => l.stepKey === stepKey);
 
   it("shows the mandate: stages, cheque with currency, sectors, thesis, role", () => {
+    // One card per part of the mandate (founder design 2026-09-28).
     expect(groups.map((group) => group.id)).toEqual([
       "role",
+      "mandate",
       "cheque",
-      "stages",
-      "geography",
-      "sectors",
-      "thesis",
+      "focus",
       "exclusions",
+      "thesis",
     ]);
     expect(line("I0.business_title")?.value).toBe("Partner");
     expect(line("I2.cheque_min")?.value).toBe("USD 250,000");

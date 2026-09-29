@@ -21,6 +21,7 @@ import type {
   ProfileFindingSubjectType,
   ProfileImagesDto,
   ProfileImageSubjectType,
+  OnboardingResponseValue,
 } from "@capital-q/contracts";
 
 import { getSessionAccessToken } from "@/auth/session";
@@ -99,7 +100,19 @@ export async function loadProfileFindings(
 }
 
 export type AnswersState =
-  | { readonly status: "READ"; readonly groups: readonly AnswerGroup[] }
+  | {
+      readonly status: "READ";
+      readonly groups: readonly AnswerGroup[];
+      /**
+       * ADR 0024: the answers as recorded, keyed by step, so an edit opens
+       * on what is there; and whether the session completed, the only state
+       * a profile edit may revise (an active setup is answered in setup).
+       */
+      readonly responses?: Readonly<Record<string, OnboardingResponseValue>>;
+      readonly completed?: boolean;
+      /** Taxonomy names for the ids the answers hold. */
+      readonly labels?: Readonly<Record<string, string>>;
+    }
   /** No onboarding session for this journey: nothing was ever answered. */
   | { readonly status: "NONE" }
   | { readonly status: "UNAVAILABLE" };
@@ -165,8 +178,15 @@ export async function loadProfileAnswers(
   }
 
   const groups = answerGroups(journey, view, labels);
+  const recorded = {
+    responses: Object.fromEntries(
+      view.responses.map((response) => [response.stepKey, response.value]),
+    ),
+    completed: view.session.status === "COMPLETED",
+    labels,
+  };
   if (objective === null || objective === undefined) {
-    return { status: "READ", groups };
+    return { status: "READ", groups, ...recorded };
   }
   const raise = raiseFromObjective(objective);
   return {
@@ -174,6 +194,7 @@ export async function loadProfileAnswers(
     groups: groups.some((group) => group.id === "raise")
       ? groups.map((group) => (group.id === "raise" ? raise : group))
       : [...groups, raise],
+    ...recorded,
   };
 }
 

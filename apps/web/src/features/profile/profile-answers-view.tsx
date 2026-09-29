@@ -2,7 +2,31 @@ import Link from "next/link";
 
 import { buttonClassName } from "@capital-q/ui/button";
 
-import type { AnswerGroup, ProfileJourney } from "./profile-answers";
+import type { ComponentType } from "react";
+
+import type { OnboardingResponseValue } from "@capital-q/contracts";
+import { FOUNDER_REVISABLE_STEPS } from "@capital-q/founder-onboarding/definition";
+import { INVESTOR_REVISABLE_STEPS } from "@capital-q/investor-onboarding/definition";
+import {
+  CircleUser,
+  Compass,
+  Eye,
+  FileText,
+  ICON_SIZE,
+  Landmark,
+  Lightbulb,
+  Lock,
+  Search,
+  SlidersHorizontal,
+  Users,
+} from "@capital-q/ui/icons";
+
+import { AnswerEditor } from "./answer-editor";
+import {
+  EXTRA_EDIT_STEPS,
+  type AnswerGroup,
+  type ProfileJourney,
+} from "./profile-answers";
 import type { AnswersState } from "./profile-data";
 
 /**
@@ -27,6 +51,31 @@ function editHref(journey: ProfileJourney, group: AnswerGroup): string {
     group.lines.some((line) => line.stepKey === "objective.stage")
     ? "/capital"
     : REVIEW_HREF[journey];
+}
+
+const REVISABLE: Readonly<Record<ProfileJourney, ReadonlySet<string>>> = {
+  founder: FOUNDER_REVISABLE_STEPS,
+  investor: INVESTOR_REVISABLE_STEPS,
+};
+
+/** The facts a card edits in place, or null when setup is where they change. */
+function editableOf(
+  journey: ProfileJourney,
+  group: AnswerGroup,
+  state: AnswersState,
+) {
+  if (state.status !== "READ" || state.completed !== true) return null;
+  const stepKeys = [
+    ...group.lines.map((line) => line.stepKey),
+    ...(EXTRA_EDIT_STEPS[group.id] ?? []),
+  ].filter((key) => REVISABLE[journey].has(key));
+  return stepKeys.length === 0
+    ? null
+    : {
+        stepKeys,
+        responses: state.responses ?? {},
+        labels: state.labels ?? {},
+      };
 }
 
 export function ProfileAnswers({
@@ -89,12 +138,14 @@ export function ProfileAnswers({
   }
 
   return (
-    <div className="flex flex-col gap-8" data-answers="read">
+    <div className="flex flex-col gap-4" data-answers="read">
       {state.groups.map((group) => (
         <AnswerGroupView
           key={group.id}
+          journey={journey}
           group={group}
           href={editHref(journey, group)}
+          editable={editableOf(journey, group, fullState)}
         />
       ))}
       {provenance ? (
@@ -113,28 +164,94 @@ export function ProfileAnswers({
   );
 }
 
+const GROUP_ICONS: Readonly<
+  Record<string, ComponentType<{ size?: number; "aria-hidden"?: "true" }>>
+> = {
+  role: CircleUser,
+  mandate: Landmark,
+  cheque: SlidersHorizontal,
+  focus: Compass,
+  criteria: Search,
+  founder_fit: Users,
+  exclusions: Lock,
+  discovery: Eye,
+  thesis: FileText,
+  sector: Compass,
+  team: Users,
+  traction: Lightbulb,
+  raise: Landmark,
+};
+
+/** Steps shown as a row of chips rather than a sentence. */
+function Chips({ items }: { readonly items: readonly string[] }) {
+  return (
+    <ul className="flex flex-wrap gap-1.5">
+      {items.map((item) => (
+        <li
+          key={item}
+          className="cq-body-sm rounded-full border border-(--cq-border-subtle) bg-(--cq-surface-subtle) px-2.5 py-0.5 text-(--cq-text-primary)"
+        >
+          {item}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 function AnswerGroupView({
+  journey,
   group,
   href,
+  editable,
 }: {
+  readonly journey: ProfileJourney;
   readonly group: AnswerGroup;
   readonly href: string;
+  /** ADR 0024: the card edits in place (a completed setup's revisable facts). */
+  readonly editable: {
+    readonly stepKeys: readonly string[];
+    readonly responses: Readonly<Record<string, OnboardingResponseValue>>;
+    readonly labels: Readonly<Record<string, string>>;
+  } | null;
 }) {
   const headingId = `answers-${group.id}`;
   const lower = group.label.toLowerCase();
+  const Icon = GROUP_ICONS[group.id] ?? FileText;
+  const edit =
+    editable === null ? (
+      <Link
+        href={href}
+        aria-label={`Edit ${lower}`}
+        className={buttonClassName("quiet", "regular", "shrink-0")}
+      >
+        Edit
+      </Link>
+    ) : (
+      <AnswerEditor
+        journey={journey}
+        title={group.label}
+        stepKeys={editable.stepKeys}
+        responses={editable.responses}
+        labels={editable.labels}
+      />
+    );
   return (
-    <section aria-labelledby={headingId} data-answer-group={group.id}>
-      <div className="flex items-center justify-between gap-3 border-b border-(--cq-border-subtle) pb-2">
-        <h3 id={headingId} className="cq-label text-(--cq-text-primary)">
+    <section
+      aria-labelledby={headingId}
+      data-answer-group={group.id}
+      className="rounded-xl border border-(--cq-border-subtle) bg-(--cq-surface) p-4 sm:p-5"
+    >
+      <div className="flex items-center justify-between gap-3 pb-1">
+        <h3
+          id={headingId}
+          className="cq-title-sm flex items-center gap-2 text-(--cq-text-primary)"
+        >
+          <span className="inline-flex size-8 items-center justify-center rounded-lg bg-(--cq-surface-subtle) text-(--cq-text-secondary)">
+            <Icon size={ICON_SIZE.regular} aria-hidden="true" />
+          </span>
           {group.label}
         </h3>
-        <Link
-          href={href}
-          aria-label={`Edit ${lower}`}
-          className={buttonClassName("quiet", "regular", "shrink-0")}
-        >
-          Edit
-        </Link>
+        {edit}
       </div>
       <dl className="flex flex-col">
         {group.lines.map((line) => (
@@ -142,25 +259,20 @@ function AnswerGroupView({
             key={line.stepKey}
             data-answer={line.stepKey}
             data-state={line.value === null ? "unknown" : "stated"}
-            className="flex flex-col gap-0.5 py-3 sm:flex-row sm:items-baseline sm:gap-6"
+            className="flex flex-col gap-1 py-2.5 sm:flex-row sm:items-baseline sm:gap-6"
           >
             <dt className="cq-label shrink-0 text-(--cq-text-secondary) sm:w-40">
               {line.title}
             </dt>
-            <dd className="flex min-w-0 flex-1 items-baseline justify-between gap-3">
+            <dd className="min-w-0 flex-1">
               {line.value === null ? (
-                <>
-                  <span className="cq-body text-(--cq-text-tertiary)">
-                    Not added
-                  </span>
-                  <Link
-                    href={href}
-                    aria-label={`Add ${line.title.toLowerCase()}`}
-                    className="cq-body-sm inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center text-(--cq-text-secondary) underline decoration-(--cq-border-strong) underline-offset-4 hover:text-(--cq-text-primary) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
-                  >
-                    Add
-                  </Link>
-                </>
+                <span className="cq-body text-(--cq-text-tertiary)">
+                  Not added
+                </span>
+              ) : line.items !== undefined &&
+                line.items !== null &&
+                line.items.length > 0 ? (
+                <Chips items={line.items} />
               ) : (
                 <span className="cq-body cq-numeric break-words whitespace-pre-line text-(--cq-text-primary)">
                   {line.value}

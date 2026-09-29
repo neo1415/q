@@ -1,13 +1,22 @@
 // @vitest-environment jsdom
 import { cleanup, render, screen, within } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { ProfileAnswers } from "../src/features/profile/profile-answers-view";
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ refresh: () => undefined }),
+}));
+vi.mock("../src/features/profile/answer-actions", () => ({
+  reviseProfileAnswerAction: () => Promise.resolve({ ok: true }),
+  taxonomyChoicesAction: () => Promise.resolve([]),
+}));
+
+const { ProfileAnswers } =
+  await import("../src/features/profile/profile-answers-view");
 
 afterEach(cleanup);
 
 describe("ProfileAnswers", () => {
-  it("shows values, 'Not added' with an Add link, and an Edit link to the existing edit path", () => {
+  it("shows values, 'Not added', and, while setup is still open, an Edit link to it", () => {
     render(
       <ProfileAnswers
         journey="investor"
@@ -35,11 +44,6 @@ describe("ProfileAnswers", () => {
     expect(within(group).getByText("Not added")).toBeTruthy();
     expect(
       within(group)
-        .getByRole("link", { name: "Add largest" })
-        .getAttribute("href"),
-    ).toBe("/onboarding/investor?review=1");
-    expect(
-      within(group)
         .getByRole("link", { name: "Edit cheque size" })
         .getAttribute("href"),
     ).toBe("/onboarding/investor?review=1");
@@ -47,6 +51,44 @@ describe("ProfileAnswers", () => {
     expect(screen.getByText("How this is known").closest("details")?.open).toBe(
       false,
     );
+  });
+
+  it("edits in place once setup is complete (ADR 0024), with list answers as chips", () => {
+    render(
+      <ProfileAnswers
+        journey="investor"
+        state={{
+          status: "READ",
+          completed: true,
+          responses: {},
+          labels: {},
+          groups: [
+            {
+              id: "mandate",
+              label: "Investment mandate",
+              lines: [
+                {
+                  stepKey: "I2.stages",
+                  title: "Stages",
+                  value: "Seed and Series A",
+                  items: ["Seed", "Series A"],
+                },
+              ],
+            },
+          ],
+        }}
+      />,
+    );
+    const group = screen.getByRole("region", { name: "Investment mandate" });
+    expect(
+      within(group).getByRole("button", { name: "Edit investment mandate" }),
+    ).toBeTruthy();
+    expect(within(group).queryByRole("link", { name: /Edit/ })).toBeNull();
+    expect(
+      within(group)
+        .getAllByRole("listitem")
+        .map((li) => li.textContent),
+    ).toEqual(["Seed", "Series A"]);
   });
 
   it("sends a raise that is already a capital objective to Capital", () => {
