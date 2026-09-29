@@ -168,6 +168,8 @@ export type ApiModules = {
   /** ADR 0023: founders' Connection Requests. Absent: those routes do not register. */
   readonly connections?:
     NetworkInterestRoutesDependencies["connections"] | undefined;
+  /** A gateway's submitted applications, for its organisation. */
+  readonly gateqInbox?: GateQRoutesDependencies["inbox"] | undefined;
   /** CQ-GATE-001: the investor organisation's inbound gateway. */
   readonly gateq?: GateQRoutesDependencies["gateq"] | undefined;
   /** CQ-GATE-002: the public applicant surface. Anonymous by design. */
@@ -366,6 +368,7 @@ export function createApp(
       authenticator: security.authenticator,
       resolver: security.resolver,
       gateq: modules.gateq,
+      inbox: modules.gateqInbox,
     });
   }
 

@@ -87,4 +87,10 @@ export {
   createPostgresApplicationSubmissionRepository,
 } from "./infrastructure/postgres-intake-repositories.js";
 
+export {
+  createPostgresSubmissionInbox,
+  type SubmissionInbox,
+  type SubmittedApplication,
+} from "./infrastructure/postgres-submission-inbox.js";
+
 export const PACKAGE_NAME = "@capital-q/gateq-intake" as const;

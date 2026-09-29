@@ -143,3 +143,28 @@ export const SubmitApplicationResponseSchema = z
     application: ApplicationSummaryDtoSchema,
   })
   .strict();
+
+/** An investor organisation's inbox of submitted applications to one gateway. */
+export const GATEQ_GATEWAY_APPLICATIONS_PATH =
+  "/v1/gateq/gateways/:gatewayId/applications" as const;
+export const gateqGatewayApplicationsPath = (gatewayId: string) =>
+  GATEQ_GATEWAY_APPLICATIONS_PATH.replace(
+    ":gatewayId",
+    encodeURIComponent(gatewayId),
+  );
+
+export const GatewayApplicationDtoSchema = z
+  .object({
+    applicationId: z.string().uuid(),
+    submittedAt: z.string(),
+    application: ApplicationSummaryDtoSchema,
+  })
+  .strict();
+export type GatewayApplicationDto = z.infer<typeof GatewayApplicationDtoSchema>;
+
+export const GatewayApplicationListDtoSchema = z
+  .object({ applications: z.array(GatewayApplicationDtoSchema).max(100) })
+  .strict();
+export type GatewayApplicationListDto = z.infer<
+  typeof GatewayApplicationListDtoSchema
+>;

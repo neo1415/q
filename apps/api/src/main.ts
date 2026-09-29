@@ -108,6 +108,7 @@ import {
   createPostgresApplicationRepository,
   createPostgresApplicationSessionRepository,
   createPostgresApplicationSubmissionRepository,
+  createPostgresSubmissionInbox,
 } from "@capital-q/gateq-intake";
 import {
   createModelGateway,
@@ -1127,6 +1128,7 @@ const { app, logger } = createApp(config, security, {
   schedule,
   gateq,
   gateqApply,
+  gateqInbox: createPostgresSubmissionInbox({ sql: database.sql }),
   capital,
   taxonomy: {
     query: taxonomy.query,

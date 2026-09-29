@@ -2,6 +2,9 @@ import type { FastifyInstance, FastifyRequest } from "fastify";
 
 import {
   CreateGatewayRequestSchema,
+  ApplicationSummaryDtoSchema,
+  GATEQ_GATEWAY_APPLICATIONS_PATH,
+  GatewayApplicationListDtoSchema,
   GATEQ_GATEWAY_PATH,
   GATEQ_GATEWAY_PUBLISH_PATH,
   GATEQ_GATEWAY_QUALIFY_PATH,
@@ -29,6 +32,7 @@ import {
   type GateQService,
   type QualificationResult,
 } from "@capital-q/gateq";
+import type { SubmissionInbox } from "@capital-q/gateq-intake";
 
 import {
   getActorContext,
@@ -60,6 +64,8 @@ import {
 
 export type GateQRoutesDependencies = ActorContextDependencies & {
   readonly gateq: GateQService;
+  /** Submitted applications, read after GateQ authorises the gateway. */
+  readonly inbox?: SubmissionInbox | undefined;
 };
 
 const gatewayIdOf = (request: FastifyRequest): GatewayId =>
@@ -185,6 +191,43 @@ export function registerGateQRoutes(
       return { gateways: gateways.map(gatewayDto) };
     },
   );
+
+  const inbox = dependencies.inbox;
+  if (inbox !== undefined) {
+    app.get(
+      GATEQ_GATEWAY_APPLICATIONS_PATH,
+      { onRequest: withContext },
+      async (request, reply) => {
+        // GateQ's own policy read is the authorisation: a gateway the
+        // caller's organisation does not own is the same 404 as none.
+        const policy = await gateq.getPolicy({
+          actor: getActorContext(request),
+          gatewayId: gatewayIdOf(request),
+        });
+        const rows = await inbox.list({
+          tenantId: policy.gateway.tenantId,
+          gatewayId: policy.gateway.id,
+        });
+        void reply.header("Cache-Control", "no-store");
+        return GatewayApplicationListDtoSchema.parse({
+          applications: rows.flatMap((row) => {
+            const application = ApplicationSummaryDtoSchema.safeParse(
+              row.snapshot,
+            );
+            return application.success
+              ? [
+                  {
+                    applicationId: row.applicationId,
+                    submittedAt: row.submittedAt,
+                    application: application.data,
+                  },
+                ]
+              : [];
+          }),
+        });
+      },
+    );
+  }
 
   app.get(
     GATEQ_GATEWAY_PATH,

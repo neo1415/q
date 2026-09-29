@@ -55,7 +55,11 @@ export function createInvestorCardFacts(deps: {
     const tenantId = TenantIdSchema.parse(tenant);
     const [active] = await deps.mandates.listActiveMandates(tenantId, id.data);
     if (active === undefined) return {};
-    const mandate = await deps.mandates.getMandate(tenantId, id.data, active.id);
+    const mandate = await deps.mandates.getMandate(
+      tenantId,
+      id.data,
+      active.id,
+    );
     if (mandate === null) return {};
 
     const codes = (dimension: string) =>

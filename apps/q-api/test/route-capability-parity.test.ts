@@ -198,6 +198,27 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
     ]),
   ),
   "api/http/gateq.ts GET GATEQ_PUBLIC_GATEWAY_PATH": PUBLIC,
+  "api/http/gateq.ts GET GATEQ_GATEWAY_APPLICATIONS_PATH": exempt(
+    "the organisation reading applications submitted to its own gateway, on its gateway page",
+  ),
+
+  // Spec 6.6.14: money is stated and confirmed by a person on each side;
+  // Q never states, confirms or withdraws a commitment on anyone's behalf.
+  "api/http/commitments.ts GET NETWORK_RELATIONSHIP_COMMITMENTS_PATH": exempt(
+    "a party reading its relationship's commitment, shown on the relationship itself",
+  ),
+  "api/http/commitments.ts POST NETWORK_RELATIONSHIP_COMMITMENTS_PATH": exempt(
+    "money is recorded by a person on one side (spec 6.6.14); never a Q action",
+  ),
+  "api/http/commitments.ts POST NETWORK_COMMITMENT_CONFIRM_PATH": exempt(
+    "consequential financial facts need human confirmation by the other side (spec 6.6.14); never a Q action",
+  ),
+  "api/http/commitments.ts POST NETWORK_COMMITMENT_WITHDRAW_PATH": exempt(
+    "a party withdrawing its relationship's commitment is their own decision; never a Q action",
+  ),
+  "api/http/commitments.ts GET NETWORK_COMPANY_FUNDRAISING_PATH": exempt(
+    "the founder's raise in money, shown on Capital; a Q read tool comes later",
+  ),
 
   "api/http/integrations.ts GET GOOGLE_INTEGRATION_PATH": cap(
     "offer.gmail_connect",
