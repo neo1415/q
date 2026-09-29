@@ -49,10 +49,7 @@ export default async function DiscoverPage({
     */
     return (
       <PageContainer>
-        <PageHeader
-          title="Discover"
-          description="Opportunities ranked by fit and evidence, with the reasons alongside."
-        />
+        <PageHeader title="Discover" />
         <EmptyState
           title="Discover couldn't load."
           description="Nothing is wrong with your setup. Capital Q didn't answer just now; try again in a moment."
@@ -69,10 +66,7 @@ export default async function DiscoverPage({
   if (context.kind === "NONE" || session === null) {
     return (
       <PageContainer>
-        <PageHeader
-          title="Discover"
-          description="Opportunities ranked by fit and evidence, with the reasons alongside."
-        />
+        <PageHeader title="Discover" />
         <EmptyState
           title="Tell Q what you're here to do first."
           description="Discover shows companies to investors and investors to founders. Which one you see follows from your setup."
@@ -204,10 +198,7 @@ export default async function DiscoverPage({
   if (founders) {
     return (
       <PageContainer className="flex flex-col gap-6">
-        <PageHeader
-          title="Discover"
-          description="Videos other founders chose to share with everyone on Capital Q, newest first."
-        />
+        <PageHeader title="Discover" />
         {tabs}
         <NetworkVideos />
       </PageContainer>
@@ -217,10 +208,7 @@ export default async function DiscoverPage({
   const slate = await discoverInvestors(session).catch(() => null);
   return (
     <PageContainer className="flex flex-col gap-6">
-      <PageHeader
-        title="Discover"
-        description="Investors who chose to be discoverable, and what each one has said publicly."
-      />
+      <PageHeader title="Discover" />
       {tabs}
       {slate === null ? (
         <EmptyState

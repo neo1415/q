@@ -40,7 +40,7 @@ export default async function InvestorsPage({
       <PageContainer>
         <PageHeader
           title="Founder requests"
-          description="Founders who asked to connect with your organisation. Accepting connects you both; it is not an investment."
+          description="Accepting connects you. It isn’t an investment."
         />
         {inbox === null ? (
           <EmptyState
@@ -72,10 +72,7 @@ export default async function InvestorsPage({
   if (context.kind !== "FOUNDER" || session === null) {
     return (
       <PageContainer>
-        <PageHeader
-          title="Investors"
-          description="Investors who chose to be discoverable on Capital Q."
-        />
+        <PageHeader title="Investors" />
         <EmptyState
           title={
             context.kind === "NONE" && context.unavailable === true
@@ -105,10 +102,7 @@ export default async function InvestorsPage({
 
   return (
     <PageContainer>
-      <PageHeader
-        title="Investors"
-        description="Investors who chose to be discoverable, what each has said publicly, and whether they take requests from founders."
-      />
+      <PageHeader title="Investors" />
       {slate === null ? (
         <EmptyState
           title="Investors couldn't load."

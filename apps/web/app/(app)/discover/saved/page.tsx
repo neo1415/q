@@ -50,7 +50,7 @@ export default async function SavedPage() {
     <PageContainer>
       <PageHeader
         title="Saved"
-        description="Companies you saved from Discover to come back to. Saving is not interest; the company is not told."
+        description="Saving isn’t interest. The company isn’t told."
       />
       {saved === null ? (
         <EmptyState

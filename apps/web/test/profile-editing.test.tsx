@@ -410,32 +410,25 @@ describe("Signals & verification", () => {
     },
   ];
 
-  it("is one card: nothing found and nothing verified said once, every button wired", () => {
+  it("is one card: nothing found and nothing verified said once, every control wired", () => {
     render(
       <SignalsAndVerification
         subjects={subjects}
         verification={{ status: "NONE" }}
         verificationHref="/verification"
-        reviewDraft="What is missing?"
-        improveDraft="Suggest improvements."
       />,
     );
     expect(screen.getAllByText("What Q found")).toHaveLength(1);
     expect(screen.getAllByText("Nothing found yet")).toHaveLength(1);
     expect(screen.getByText("Nothing verified yet")).toBeTruthy();
     expect(
-      screen.getByRole("link", { name: "Learn about verification" }),
+      screen.getByRole("link", { name: "How verification works" }),
     ).toHaveProperty("pathname", "/verification");
-    const [look, review] = screen.getAllByRole("button", { name: "Ask Q" });
-    fireEvent.click(look as HTMLElement);
-    fireEvent.click(review as HTMLElement);
-    fireEvent.click(screen.getByRole("button", { name: "Improve profile" }));
+    fireEvent.click(screen.getByRole("button", { name: "Ask Q to look" }));
     expect(askAbout.mock.calls).toEqual([
       [
         "Look for public information about Kivu Freight and tell me what you find.",
       ],
-      ["What is missing?"],
-      ["Suggest improvements."],
     ]);
   });
 
@@ -448,14 +441,12 @@ describe("Signals & verification", () => {
         }))}
         verification={null}
         verificationHref={null}
-        reviewDraft="r"
-        improveDraft="i"
       />,
     );
     expect(screen.queryByText("Nothing found yet")).toBeNull();
     // No verification page on this side: the button asks Q instead.
     expect(
-      screen.getByRole("button", { name: "Learn about verification" }),
+      screen.getByRole("button", { name: "How verification works" }),
     ).toBeTruthy();
   });
 });

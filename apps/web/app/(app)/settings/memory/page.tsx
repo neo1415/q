@@ -30,10 +30,13 @@ export default async function QMemoryPage() {
     <PageContainer width="reading" className="flex flex-col gap-6">
       <PageHeader
         title="What Q remembers"
-        description="What you've told Q about yourself and how you like to work. Q uses it in every conversation, so you never have to repeat it. Forget anything that's wrong."
+        description="Q uses this in every conversation. Forget anything wrong."
       />
       {read === null ? (
-        <p className="cq-body text-(--cq-text-secondary)" data-state="unavailable">
+        <p
+          className="cq-body text-(--cq-text-secondary)"
+          data-state="unavailable"
+        >
           Q&apos;s memory couldn&apos;t be read just now. Reload in a moment.
         </p>
       ) : (

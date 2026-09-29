@@ -65,10 +65,7 @@ export default async function SearchPage({
 
   return (
     <PageContainer className="flex flex-col gap-6">
-      <PageHeader
-        title="Search"
-        description="Find someone by their @handle, or founders' videos by company."
-      />
+      <PageHeader title="Search" />
       <form
         action="/search"
         method="get"

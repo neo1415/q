@@ -29,10 +29,7 @@ export default async function PitchVideoRoute({
   if (context.kind !== "FOUNDER") redirect("/pitch");
   return (
     <PageContainer>
-      <PageHeader
-        title="Video"
-        description="Publish it, name it, choose who can watch it, or replace it with a new take."
-      />
+      <PageHeader title="Video" />
       <PitchVideoPage
         companyId={context.companyId}
         mediaAssetId={mediaAssetId}

@@ -30,7 +30,7 @@ export default async function InvestorInterestPage() {
   const header = (
     <PageHeader
       title="Investor interest"
-      description="Investor organisations that would like to explore your company. Accepting connects you both; it is not an investment."
+      description="Accepting connects you. It isn’t an investment."
     />
   );
 

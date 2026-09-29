@@ -12,9 +12,7 @@ import Link from "next/link";
 
 import { buttonClassName } from "@capital-q/ui/button";
 import {
-  ChartColumn,
   ICON_SIZE,
-  Lightbulb,
   Search,
   Shield,
   ShieldCheck,
@@ -249,26 +247,22 @@ export type SignalsSubject = {
 };
 
 /**
- * The profile's right rail (founder design 2026-09-28): one card, three
+ * The profile's right rail (founder design 2026-09-28): one card, two
  * parts. What Q found on public pages (never the profile's value until the
- * person confirms it), what Capital Q verified claim by claim, and a way
- * into Q for a review. Every button opens something real: Q with a draft
+ * person confirms it), and what Capital Q verified claim by claim. Q itself
+ * is always one tap away in the dock, so the rail carries no "ask Q" box. Every button opens something real: Q with a draft
  * the person edits or sends, or the verification page for a company.
  */
 export function SignalsAndVerification({
   subjects,
   verification,
   verificationHref,
-  reviewDraft,
-  improveDraft,
 }: {
   readonly subjects: readonly SignalsSubject[];
   /** A company's standings; null for an organisation without that workflow. */
   readonly verification: VerificationState | null;
   /** Where verification is asked for; null when this side has no page for it. */
   readonly verificationHref: string | null;
-  readonly reviewDraft: string;
-  readonly improveDraft: string;
 }) {
   const { askAbout } = useGlobalQ();
   const primary = subjects[0];
@@ -304,7 +298,6 @@ export function SignalsAndVerification({
       <SignalsPart
         icon={<Search size={ICON_SIZE.compact} aria-hidden="true" />}
         title="What Q found"
-        description="Q's reading of public pages. Not on your profile until you confirm it."
         data="findings"
       >
         {loading ? (
@@ -337,20 +330,20 @@ export function SignalsAndVerification({
             }
             hint={
               unavailable
-                ? "Try again in a moment, or ask Q to look."
+                ? "Try again in a moment."
                 : primary?.hasWebsite === true
-                  ? "Your name and website are on record; ask Q to look for more."
-                  : "Q looks once it knows your name and website."
+                  ? "Nothing public about you yet."
+                  : "Add your website so Q can look."
             }
           />
         )}
         <button
           type="button"
-          className={buttonClassName("secondary", "regular", "w-full")}
+          className={buttonClassName("quiet", "compact", "-ml-2 self-start")}
           onClick={() => askAbout(lookDraft)}
           data-signals-look
         >
-          Ask Q
+          Ask Q to look
         </button>
       </SignalsPart>
 
@@ -363,7 +356,6 @@ export function SignalsAndVerification({
           />
         }
         title="Verified by Capital Q"
-        description="Verification is claim by claim, and says exactly what was checked."
         data="verified"
       >
         {verification !== null && verification.status === "READ" ? (
@@ -394,7 +386,7 @@ export function SignalsAndVerification({
             }
             hint={
               verificationHref === null ? (
-                "Capital Q verifies founders and their organisations; ask Q what applies to you."
+                "Nothing checked yet."
               ) : (
                 <>
                   <Link
@@ -403,7 +395,7 @@ export function SignalsAndVerification({
                   >
                     Add claims
                   </Link>{" "}
-                  to get them verified by Capital Q.
+                  to have them checked.
                 </>
               )
             }
@@ -412,50 +404,23 @@ export function SignalsAndVerification({
         {verificationHref === null ? (
           <button
             type="button"
-            className={buttonClassName("secondary", "regular", "w-full")}
+            className={buttonClassName("quiet", "compact", "-ml-2 self-start")}
             onClick={() =>
               askAbout(
                 "How does verification work on Capital Q, and what can be verified for my organisation?",
               )
             }
           >
-            Learn about verification
+            How verification works
           </button>
         ) : (
           <Link
             href={verificationHref}
-            className={buttonClassName("secondary", "regular", "w-full")}
+            className={buttonClassName("quiet", "compact", "-ml-2 self-start")}
           >
-            Learn about verification
+            How verification works
           </Link>
         )}
-      </SignalsPart>
-
-      <SignalsPart
-        icon={<Lightbulb size={ICON_SIZE.compact} aria-hidden="true" />}
-        title="Need help?"
-        description="Ask Q to review your profile or suggest improvements."
-        data="help"
-      >
-        <div className="flex flex-col gap-2">
-          <button
-            type="button"
-            className={buttonClassName("secondary", "regular", "w-full")}
-            onClick={() => askAbout(reviewDraft)}
-            data-signals-review
-          >
-            Ask Q
-          </button>
-          <button
-            type="button"
-            className={buttonClassName("quiet", "regular", "w-full")}
-            onClick={() => askAbout(improveDraft)}
-            data-signals-improve
-          >
-            <ChartColumn size={ICON_SIZE.compact} aria-hidden="true" />
-            Improve profile
-          </button>
-        </div>
       </SignalsPart>
     </section>
   );
@@ -470,7 +435,7 @@ function SignalsPart({
 }: {
   readonly icon: React.ReactNode;
   readonly title: string;
-  readonly description: string;
+  readonly description?: string | undefined;
   readonly data: string;
   readonly children: React.ReactNode;
 }) {
@@ -489,7 +454,9 @@ function SignalsPart({
           {icon}
           {title}
         </h3>
-        <p className="cq-caption text-(--cq-text-secondary)">{description}</p>
+        {description === undefined ? null : (
+          <p className="cq-caption text-(--cq-text-secondary)">{description}</p>
+        )}
       </div>
       {children}
     </section>

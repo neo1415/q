@@ -234,11 +234,14 @@ export default async function ProfilePage() {
                     Share Q Card
                   </a>
                 ) : null}
-                {company !== null ? (
-                  <Link href="/pitch" className={buttonClassName("secondary")}>
-                    Pitch &amp; media
+                {journey === null ? null : (
+                  <Link
+                    href="/company/visibility"
+                    className={buttonClassName("quiet")}
+                  >
+                    Visibility
                   </Link>
-                ) : null}
+                )}
               </>
             }
           />
@@ -269,7 +272,6 @@ export default async function ProfilePage() {
               <EditableSection
                 id="company"
                 title="Company"
-                description="Your company's declared profile: what investors see once you make it visible."
                 profile={{
                   kind: "COMPANY",
                   subjectId: company.id,
@@ -316,7 +318,6 @@ export default async function ProfilePage() {
               <EditableSection
                 id="mandate"
                 title="Your organisation"
-                description="Who you are as an investor. Your mandate below is how you invest; Discover works from it."
                 profile={{
                   kind: "INVESTOR_ORGANISATION",
                   subjectId: investor.id,
@@ -378,7 +379,6 @@ export default async function ProfilePage() {
                   ? "You and your role"
                   : "You and your team"
               }
-              description="What Capital Q and the people you work with see about you."
               profile={{
                 kind: "PERSON",
                 fields: PERSON_FIELDS,
@@ -402,11 +402,6 @@ export default async function ProfilePage() {
                   }
                 />
               )}
-              <p className="cq-caption text-(--cq-text-tertiary)">
-                Signed in as{" "}
-                <span className="break-all">{user?.email ?? "you"}</span>
-                {` · updated ${dayOf(person.updatedAt)}`}
-              </p>
             </EditableSection>
           )}
 
@@ -427,53 +422,9 @@ export default async function ProfilePage() {
             </ProfileSectionShell>
           ) : null}
 
-          {journey === null ? null : (
-            <ProfileSectionShell
-              id="activity"
-              title="Activity and relationships"
-              description={
-                journey === "founder"
-                  ? "Investors who expressed interest, and where each conversation stands."
-                  : "Companies you are in conversation with, and where each stands."
-              }
-              action={
-                <Link
-                  href="/relationships"
-                  className={buttonClassName("quiet", "regular", "shrink-0")}
-                >
-                  Open Relationships
-                </Link>
-              }
-            >
-              {null}
-            </ProfileSectionShell>
-          )}
-
-          {company !== null ? (
-            <ProfileSectionShell
-              id="documents"
-              title="Documents and pitch"
-              description="Your pitch video and the documents Q links as evidence: upload, replace, preview, publish or withdraw."
-              action={
-                <Link
-                  href="/pitch"
-                  className={buttonClassName("quiet", "regular", "shrink-0")}
-                >
-                  Manage
-                </Link>
-              }
-            >
-              {null}
-            </ProfileSectionShell>
-          ) : null}
-
           {/* The shareable identity (BIZ-004). */}
           {company !== null || investor !== null ? (
-            <ProfileSectionShell
-              id="q-card"
-              title="Q Card"
-              description="Your shareable digital business card: a link and QR that open a page showing only what you choose."
-            >
+            <ProfileSectionShell id="q-card" title="Q Card">
               {company !== null ? (
                 <QCardSection
                   subjectType="COMPANY"
@@ -503,22 +454,6 @@ export default async function ProfilePage() {
               ) : null}
             </ProfileSectionShell>
           ) : null}
-
-          <ProfileSectionShell
-            id="visibility"
-            title="Visibility and discovery"
-            description="Who can see your profile on the network, what they see, and the one switch that changes it."
-            action={
-              <Link
-                href="/company/visibility"
-                className={buttonClassName("quiet", "regular", "shrink-0")}
-              >
-                Manage
-              </Link>
-            }
-          >
-            {null}
-          </ProfileSectionShell>
 
           <div className="border-t border-(--cq-border-subtle) pt-6">
             <SignOutButton />
@@ -566,20 +501,6 @@ export default async function ProfilePage() {
             ]}
             verification={company !== null ? data.verification : null}
             verificationHref={company !== null ? "/verification" : null}
-            reviewDraft={
-              company !== null
-                ? `What is missing or weak in ${company.canonicalName}'s profile, from an investor's point of view?`
-                : investor !== null
-                  ? `What would founders want to know about ${investor.displayName} that our profile doesn't say yet?`
-                  : "What does my profile say about me, and what would make it clearer?"
-            }
-            improveDraft={
-              company !== null
-                ? `Suggest specific improvements to ${company.canonicalName}'s profile that I can approve.`
-                : investor !== null
-                  ? `Suggest specific improvements to ${investor.displayName}'s profile that I can approve.`
-                  : "Suggest specific improvements to my profile that I can approve."
-            }
           />
         </aside>
       </div>
@@ -668,8 +589,6 @@ type SignalsProps = {
   readonly subjects: readonly SignalsSubjectRef[];
   readonly verification: VerificationState | null;
   readonly verificationHref: string | null;
-  readonly reviewDraft: string;
-  readonly improveDraft: string;
 };
 
 /**

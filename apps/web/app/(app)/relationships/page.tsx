@@ -47,16 +47,7 @@ export default async function RelationshipsPage() {
     <PageContainer className="flex flex-col gap-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0 flex-1">
-          <PageHeader
-            title="Relationships"
-            description={
-              side === "INVESTOR"
-                ? "Every company your organisation has discovered or approached, and where each stands."
-                : side === "COMPANY"
-                  ? "Every investor organisation your company is connected with or has approached, and where each stands."
-                  : undefined
-            }
-          />
+          <PageHeader title="Relationships" />
         </div>
         {side === "NONE" ? null : (
           <div className="flex shrink-0 flex-wrap gap-2">

@@ -127,52 +127,61 @@ export function QCardPanel(props: QCardPanelProps) {
               {card.scansLast30Days === 1
                 ? "1 scan of your QR in the last 30 days."
                 : `${card.scansLast30Days} scans of your QR in the last 30 days.`}{" "}
-              Counted by Capital Q only; never who.
+              Never who.
             </p>
           </div>
-          <section
-            aria-labelledby={`${subjectId}-handle`}
-            className="flex flex-col gap-3"
+          {/* The card and its actions first; editing it is one step away. */}
+          <details
+            className="group flex flex-col gap-4 rounded-lg border border-(--cq-border-subtle) px-4 py-2 open:pb-4"
+            data-q-card-customize
           >
-            <h3 id={`${subjectId}-handle`} className="cq-label">
-              Handle
-            </h3>
-            <HandleForm
-              subjectLabel={props.name}
-              initial={card.handle ?? props.suggestedHandle}
-              submitLabel="Change handle"
-              hint="Your old handle keeps redirecting here for 90 days, and nobody else can take it meanwhile."
-              onSubmit={(handle) =>
+            <summary className="cq-body-sm flex min-h-11 cursor-pointer items-center font-medium text-(--cq-text-primary)">
+              Customize card
+            </summary>
+            <section
+              aria-labelledby={`${subjectId}-handle`}
+              className="mt-2 flex flex-col gap-3"
+            >
+              <h3 id={`${subjectId}-handle`} className="cq-label">
+                Handle
+              </h3>
+              <HandleForm
+                subjectLabel={props.name}
+                initial={card.handle ?? props.suggestedHandle}
+                submitLabel="Change handle"
+                hint="Your old handle keeps redirecting here for 90 days, and nobody else can take it meanwhile."
+                onSubmit={(handle) =>
+                  settle(async () => {
+                    const result = await claimHandleAction(subject, handle);
+                    if (!result.ok) return result.message;
+                    setStatus(
+                      result.card.handle === card.handle
+                        ? "Saved. That's already your handle."
+                        : `Saved. Your handle is now @${result.card.handle ?? handle}.`,
+                    );
+                    router.refresh();
+                    return null;
+                  })
+                }
+              />
+            </section>
+            <ScopeForm
+              key={card.version}
+              card={card}
+              fields={props.fields}
+              saved={status === CARD_SAVED ? CARD_SAVED : ""}
+              onChange={() => setStatus("")}
+              onSave={(input) =>
                 settle(async () => {
-                  const result = await claimHandleAction(subject, handle);
+                  const result = await updateQCardAction(subject, input);
                   if (!result.ok) return result.message;
-                  setStatus(
-                    result.card.handle === card.handle
-                      ? "Saved. That's already your handle."
-                      : `Saved. Your handle is now @${result.card.handle ?? handle}.`,
-                  );
+                  setStatus(CARD_SAVED);
                   router.refresh();
                   return null;
                 })
               }
             />
-          </section>
-          <ScopeForm
-            key={card.version}
-            card={card}
-            fields={props.fields}
-            saved={status === CARD_SAVED ? CARD_SAVED : ""}
-            onChange={() => setStatus("")}
-            onSave={(input) =>
-              settle(async () => {
-                const result = await updateQCardAction(subject, input);
-                if (!result.ok) return result.message;
-                setStatus(CARD_SAVED);
-                router.refresh();
-                return null;
-              })
-            }
-          />
+          </details>
         </>
       )}
     </div>

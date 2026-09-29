@@ -19,10 +19,7 @@ export const dynamic = "force-dynamic";
 export default function CapitalPage() {
   return (
     <PageContainer>
-      <PageHeader
-        title="Capital"
-        description="Your objective, the relationships behind it, and what happens next, in one working view."
-      />
+      <PageHeader title="Capital" />
       <CapitalScreen />
     </PageContainer>
   );

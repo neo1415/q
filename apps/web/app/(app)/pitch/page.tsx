@@ -31,7 +31,7 @@ export default async function PitchPage() {
     <PageContainer>
       <PageHeader
         title="Pitch & media"
-        description="Short videos investors watch before they read anything else. Portrait, under three minutes, in your own words. Post as many as you like."
+        description="Portrait, under three minutes."
       />
       {context.kind === "FOUNDER" ? (
         <PitchGrid companyId={context.companyId} />

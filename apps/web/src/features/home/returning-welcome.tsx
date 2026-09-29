@@ -45,9 +45,9 @@ function CardBody({ card }: { readonly card: ReturningCard }) {
         <span className="cq-body-sm font-medium text-(--cq-text-primary)">
           {card.title}
         </span>
-        <span className="cq-caption text-(--cq-text-secondary)">
-          {card.description}
-        </span>
+        {/* The title says where it goes; the line under it is for
+            assistive technology only (minimal Home, 2026-09-29). */}
+        <span className="sr-only">{card.description}</span>
       </span>
       <ChevronRight
         aria-hidden="true"

@@ -18,10 +18,7 @@ export default async function NewPitchVideoPage() {
   if (context.kind !== "FOUNDER") redirect("/pitch");
   return (
     <PageContainer>
-      <PageHeader
-        title="New video"
-        description="It joins your other videos; nothing you already posted changes."
-      />
+      <PageHeader title="New video" />
       <PitchVideoPage companyId={context.companyId} mediaAssetId={null} />
     </PageContainer>
   );
