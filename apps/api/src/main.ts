@@ -192,6 +192,7 @@ import { apiServiceIdentity, createApp } from "./app.js";
 import { createChatSafetyAudit } from "./chat-safety-audit.js";
 import { createDiscoverFilterFacts } from "./discover-filter-facts.js";
 import { createProductionEventRegistry } from "./event-registry.js";
+import { createInvestorCardFacts } from "./investor-card-facts.js";
 import { createSupabaseRequestAuthenticator } from "./security/supabase-authenticator.js";
 
 // Configuration is validated once here at the composition root. Invalid
@@ -925,6 +926,14 @@ const cardVerification = createPublicVerificationReader({
   sql: database.sql,
 });
 const cardSubjects = createSubjectDirectory({
+  // Founder design 2026-09-28: the active mandate's shareable facts, off
+  // on every card until its owner turns one on.
+  findInvestorMandateFacts: createInvestorCardFacts({
+    mandates: createPostgresInvestorMandateQueryPort({ sql: database.sql }),
+    tenantOf: async (investorOrganisationId) =>
+      (await investorFacts.findCanonicalInvestorProfile(investorOrganisationId))
+        ?.tenantId ?? null,
+  }),
   findCompany: async (companyId) => {
     const id = CompanyIdSchema.safeParse(companyId);
     return id.success

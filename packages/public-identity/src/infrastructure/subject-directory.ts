@@ -1,3 +1,5 @@
+import { INVESTOR_MANDATE_CARD_FIELDS } from "@capital-q/contracts";
+
 import type { SubjectDirectory, SubjectFacts } from "../application/ports.js";
 
 /**
@@ -32,7 +34,19 @@ export type InvestorProfileRead = {
   readonly verificationState: string;
 };
 
+/** The active mandate's shareable facts by card field; absent reads as none. */
+export type InvestorMandateCardFacts = Readonly<
+  Partial<Record<(typeof INVESTOR_MANDATE_CARD_FIELDS)[number], string | null>>
+>;
+
 export type SubjectDirectoryPorts = {
+  /**
+   * Founder design 2026-09-28: the investor's active mandate as named
+   * facts a card may show. Optional; absent, those fields are never set.
+   */
+  readonly findInvestorMandateFacts?:
+    | ((investorOrganisationId: string) => Promise<InvestorMandateCardFacts>)
+    | undefined;
   readonly findCompany: (
     companyId: string,
   ) => Promise<CompanyProfileRead | null>;
@@ -90,6 +104,10 @@ export function createSubjectDirectory(
       }
       const investor = await ports.findInvestor(subject.subjectId);
       if (investor === null) return null;
+      const mandate: InvestorMandateCardFacts =
+        (await ports
+          .findInvestorMandateFacts?.(subject.subjectId)
+          .catch(() => ({}))) ?? {};
       return {
         tenantId: investor.tenantId,
         organisationId: investor.organisationId,
@@ -101,6 +119,12 @@ export function createSubjectDirectory(
           hqCountry: investor.hqCountry,
           websiteUrl: investor.websiteUrl,
           deploymentState: investor.deploymentState,
+          ...Object.fromEntries(
+            INVESTOR_MANDATE_CARD_FIELDS.map((key) => [
+              key,
+              mandate[key] ?? null,
+            ]),
+          ),
         },
         // The investors context's own presentation state; anything other
         // than unverified is Capital Q's decision about the organisation.

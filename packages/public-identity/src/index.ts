@@ -74,6 +74,7 @@ export { createSharpImageProcessor } from "./infrastructure/sharp-image-processo
 export { createPostgresPublicIdentityRepository } from "./infrastructure/postgres-repository.js";
 export {
   createSubjectDirectory,
+  type InvestorMandateCardFacts,
   type CompanyProfileRead,
   type InvestorProfileRead,
   type SubjectDirectoryPorts,

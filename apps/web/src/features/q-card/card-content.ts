@@ -32,7 +32,33 @@ export const CARD_IMAGE_FIELDS: ReadonlySet<QCardField> = new Set([
 const IMAGE_LABELS: Readonly<Partial<Record<QCardField, string>>> = {
   photo: "Logo or photo",
   cover: "Cover photo",
+  // The mandate at a glance (founder design 2026-09-28).
+  mandateTypicalCheque: "Typical cheque size",
+  mandateStages: "Stage focus",
+  mandateSectors: "Sectors",
+  mandateBusinessModels: "Business models",
+  mandateCustomerTypes: "Customer types",
+  mandateGeographies: "Geographies",
+  mandateLookFor: "What they look for",
 };
+
+/** Mandate facts that are lists; their value is "; "-separated names. */
+export const CARD_LIST_FIELDS: ReadonlySet<QCardField> = new Set([
+  "mandateStages",
+  "mandateSectors",
+  "mandateBusinessModels",
+  "mandateCustomerTypes",
+  "mandateGeographies",
+  "mandateLookFor",
+]);
+
+/** A list field's names, for chips. */
+export function cardListItems(field: PublicCardField): readonly string[] {
+  return field.value
+    .split(";")
+    .map((item) => item.trim())
+    .filter((item) => item.length > 0);
+}
 
 export function cardFieldLabel(key: QCardField): string {
   return IMAGE_LABELS[key] ?? SPECS.get(key)?.label ?? key;
@@ -55,6 +81,7 @@ export function cardImage(
 }
 
 export function cardFieldValue(field: PublicCardField): string {
+  if (CARD_LIST_FIELDS.has(field.key)) return cardListItems(field).join(", ");
   const spec = SPECS.get(field.key);
   return spec === undefined
     ? field.value

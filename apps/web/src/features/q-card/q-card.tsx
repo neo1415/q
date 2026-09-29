@@ -43,6 +43,8 @@ export type QCardProps = {
   readonly verifiedLabels?: readonly string[] | undefined;
   readonly brand?: CardBrand | undefined;
   readonly className?: string | undefined;
+  /** The page's own heading when the card leads a page (the public card). */
+  readonly nameAs?: "p" | "h1" | undefined;
 };
 
 export function QCard({
@@ -55,7 +57,9 @@ export function QCard({
   verifiedLabels = [],
   brand,
   className,
+  nameAs = "p",
 }: QCardProps) {
+  const Name = nameAs;
   const style = {
     "--cq-card-edge": brand?.accent ?? "var(--cq-qcard-edge)",
   } as CSSProperties;
@@ -97,15 +101,16 @@ export function QCard({
               alt=""
               width={24}
               height={24}
-              className="ml-auto size-6 rounded-(--cq-radius-xs) object-contain"
+              className="ml-auto size-10 rounded-lg object-cover"
+              data-card-photo
             />
           )}
         </div>
 
         <div className="flex min-w-0 flex-col gap-1">
-          <p className="line-clamp-2 text-[clamp(1.35rem,4.2vw,2rem)] leading-tight font-bold break-words">
+          <Name className="line-clamp-2 text-[clamp(1.35rem,4.2vw,2rem)] leading-tight font-bold break-words">
             {name}
-          </p>
+          </Name>
           {descriptor === null || descriptor.length === 0 ? null : (
             <p className="cq-body truncate text-(--cq-qcard-muted)">
               {descriptor}

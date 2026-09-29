@@ -61,6 +61,23 @@ export const COMPANY_CARD_FIELDS = [
   "photo",
   "cover",
 ] as const;
+/**
+ * The investor's declared mandate, as a card may show it (founder design
+ * 2026-09-28: "Investment at a glance"). Each is off until the owner puts
+ * it on the card and chooses who sees it; values are the active mandate's
+ * own names, "; "-separated for lists. Never the raw mandate narrative,
+ * never exclusions.
+ */
+export const INVESTOR_MANDATE_CARD_FIELDS = [
+  "mandateTypicalCheque",
+  "mandateStages",
+  "mandateSectors",
+  "mandateBusinessModels",
+  "mandateCustomerTypes",
+  "mandateGeographies",
+  "mandateLookFor",
+] as const;
+
 /** The declared fields an investor organisation card may show. */
 export const INVESTOR_CARD_FIELDS = [
   "displayName",
@@ -71,6 +88,7 @@ export const INVESTOR_CARD_FIELDS = [
   "deploymentState",
   "photo",
   "cover",
+  ...INVESTOR_MANDATE_CARD_FIELDS,
 ] as const;
 export const QCardFieldSchema = z.enum([
   ...COMPANY_CARD_FIELDS,
@@ -79,6 +97,7 @@ export const QCardFieldSchema = z.enum([
   "publicDescription",
   "hqCountry",
   "deploymentState",
+  ...INVESTOR_MANDATE_CARD_FIELDS,
 ]);
 export type QCardField = z.infer<typeof QCardFieldSchema>;
 
@@ -162,7 +181,7 @@ export const PublicCardDtoSchema = z
     subjectType: QCardSubjectTypeSchema,
     name: z.string().min(1).max(200),
     /** Only fields the audience may see; public first, then network. */
-    fields: z.array(PublicCardFieldSchema).max(12),
+    fields: z.array(PublicCardFieldSchema).max(20),
     verified: z.array(z.enum(PUBLIC_VERIFICATION_LABELS)).max(2),
     /**
      * The subset of `verified` that rests on the synthetic-demo attestation

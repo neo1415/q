@@ -138,7 +138,8 @@ describe("who this is, in one screen", () => {
     expect(
       screen.getByRole("heading", { level: 1, name: "Kivu Freight" }),
     ).toBeTruthy();
-    expect(screen.getByText("Company · Seed · Nairobi, Kenya")).toBeTruthy();
+    // The card's company line (founder design 2026-09-28).
+    expect(screen.getByText("Seed · Nairobi, Kenya")).toBeTruthy();
     expect(
       screen.getByText("Cross-border freight booking for East Africa."),
     ).toBeTruthy();
@@ -274,5 +275,47 @@ describe("the card's photo and cover (founder directive 2026-09-28)", () => {
       />,
     );
     expect(container.querySelector("[data-card-cover]")).toBeNull();
+  });
+});
+
+describe("an investor's mandate at a glance (founder design 2026-09-28)", () => {
+  it("shows the facts the owner put on the card: stats, then chips; nothing else", () => {
+    render(
+      <PublicCardView
+        card={{
+          ...card("PUBLIC", [
+            {
+              key: "mandateTypicalCheque",
+              value: "EUR 3,000,000",
+              scope: "public_external",
+            },
+            {
+              key: "mandateStages",
+              value: "Pre-seed",
+              scope: "public_external",
+            },
+            {
+              key: "mandateSectors",
+              value: "Fintech; B2B SaaS",
+              scope: "public_external",
+            },
+          ]),
+          subjectType: "INVESTOR_ORGANISATION",
+          name: "Zino Aviation",
+        }}
+      />,
+    );
+    const glance = document.querySelector('[data-card-section="glance"]');
+    expect(glance?.textContent).toContain("EUR 3,000,000");
+    expect(glance?.textContent).toContain("Typical cheque size");
+    const sectors = document.querySelector(
+      '[data-card-field="mandateSectors"]',
+    );
+    expect(
+      Array.from(sectors?.querySelectorAll("li") ?? []).map(
+        (li) => li.textContent,
+      ),
+    ).toEqual(["Fintech", "B2B SaaS"]);
+    expect(document.querySelector('[data-card-section="look-for"]')).toBeNull();
   });
 });

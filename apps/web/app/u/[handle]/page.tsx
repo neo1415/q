@@ -7,7 +7,12 @@ import {
   cardTagline,
   publicExternalFields,
 } from "@/features/q-card/card-content";
-import { appOrigin, loadPublicCard } from "@/features/q-card/public-card-data";
+import {
+  appOrigin,
+  displayUrlFor,
+  loadPublicCard,
+} from "@/features/q-card/public-card-data";
+import { qrSvg } from "@/features/q-card/qr";
 import { PublicCardView } from "@/features/q-card/public-card-view";
 
 export const dynamic = "force-dynamic";
@@ -104,7 +109,11 @@ export default async function PublicCardPage({
           }}
         />
       ) : null}
-      <PublicCardView card={card} />
+      <PublicCardView
+        card={card}
+        displayUrl={displayUrlFor(card.handle)}
+        qrSvg={qrSvg(`${appOrigin()}/@${card.handle}`)}
+      />
     </main>
   );
 }
