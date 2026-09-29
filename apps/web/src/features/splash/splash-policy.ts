@@ -11,7 +11,17 @@
 export const SPLASH_SEEN_KEY = "cq.splash.seen";
 export const SPLASH_DONE_EVENT = "cq:splash-done";
 
-const SKIPPED_PATHS = ["/auth/", "/u/", "/c/", "/@", "/api/"];
+// OAuth and email-link returns land mid-flow; public cards and share links
+// are someone else's page. Sign-in and sign-up are a first screen like any
+// other, so they get the splash on a cold entry.
+const SKIPPED_PATHS = [
+  "/auth/callback",
+  "/auth/update-password",
+  "/u/",
+  "/c/",
+  "/@",
+  "/api/",
+];
 
 export const SPLASH_BOOT_SCRIPT = `try{var p=location.pathname;if(sessionStorage.getItem(${JSON.stringify(
   SPLASH_SEEN_KEY,

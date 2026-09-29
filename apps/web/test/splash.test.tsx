@@ -67,11 +67,13 @@ describe("when the splash shows", () => {
   it("never shows on an auth return or a public card", () => {
     expect(boot("/auth/callback")).toBe("off");
     expect(boot("/u/kivu")).toBe("off");
+    // Sign-in is a first screen: it gets the splash.
+    expect(boot("/auth/sign-in")).toBeUndefined();
   });
 
   it("decides in the boot script by the same rule", () => {
     expect(SPLASH_BOOT_SCRIPT).toContain(SPLASH_SEEN_KEY);
-    for (const prefix of ["/auth/", "/u/", "/c/", "/@"]) {
+    for (const prefix of ["/auth/callback", "/u/", "/c/", "/@"]) {
       expect(SPLASH_BOOT_SCRIPT).toContain(JSON.stringify(prefix));
     }
   });
