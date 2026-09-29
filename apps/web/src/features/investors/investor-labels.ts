@@ -33,20 +33,23 @@ export function deploymentLabel(state: string | null): string | null {
     : (DEPLOYMENT_LABELS[state] ?? state.replace(/_/g, " ").toLowerCase());
 }
 
-/** How founders may reach them, in the investor's own terms. */
+/**
+ * How founders may reach them, as a state -- only when it is not the usual
+ * one (founder direction 2026-09-29: states, not sentences on every card).
+ * Qualified requests are the default and say nothing; so does not saying.
+ */
 export function inboundLabel(
   preference: "CLOSED" | "QUALIFIED" | "OPEN" | null | undefined,
-): string {
+): string | null {
   switch (preference) {
     case "OPEN":
-      return "Takes requests from founders";
-    case "QUALIFIED":
-      return "Takes requests from companies that fit their criteria";
+      return "Open to founders";
     case "CLOSED":
-      return "Not taking requests from founders";
+      return "Not taking requests";
+    case "QUALIFIED":
     case null:
     case undefined:
-      return "Hasn't said how founders can reach them";
+      return null;
   }
 }
 

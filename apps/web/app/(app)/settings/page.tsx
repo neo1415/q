@@ -22,8 +22,8 @@ export const metadata: Metadata = { title: "Settings" };
  * Every choice here is a per-device preference the browser keeps (theme,
  * Q motion, Q's voice); nothing is fetched to render the page, so it opens
  * at once. Connected accounts (BIZ-007: Gmail) read their own status after
- * the page opens. Notifications come later and say so, rather than
- * offering switches that do nothing.
+ * the page opens. Notifications (reminders, Q's notices) need no setting,
+ * and the page offers no switch that does nothing.
  */
 export default async function SettingsPage({
   searchParams,
@@ -55,18 +55,16 @@ export default async function SettingsPage({
         </PageSection>
 
         <PageSection id="memory" title="Q's memory">
-          <div className="flex flex-col items-start gap-3">
-            <p className="cq-body-sm text-(--cq-text-secondary)">
-              What Q remembers about you and how you like to work, used in every
-              conversation. Read it, and forget anything that&apos;s wrong.
-            </p>
-            <Link
-              href="/settings/memory"
-              className={buttonClassName("secondary")}
-            >
-              See what Q remembers
-            </Link>
-          </div>
+          <dl className="divide-y divide-(--cq-border-subtle) border-y border-(--cq-border-subtle)">
+            <SettingRow term="What Q remembers">
+              <Link
+                href="/settings/memory"
+                className={buttonClassName("secondary", "compact")}
+              >
+                Review
+              </Link>
+            </SettingRow>
+          </dl>
         </PageSection>
 
         <PageSection id="connected-accounts" title="Connected accounts">
@@ -77,12 +75,6 @@ export default async function SettingsPage({
               />
             </SettingRow>
           </dl>
-        </PageSection>
-
-        <PageSection id="notifications" title="Notifications">
-          <p className="cq-body-sm text-(--cq-text-secondary)" data-coming-soon>
-            Coming soon. Capital Q doesn&apos;t send notifications yet.
-          </p>
         </PageSection>
       </div>
     </PageContainer>

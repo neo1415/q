@@ -103,9 +103,11 @@ function InvestorCard({
           </p>
         )}
         {footer}
-        <p className="cq-caption mt-auto pt-1 text-(--cq-text-secondary)">
-          {inboundLabel(item.inboundPreference)}
-        </p>
+        {inboundLabel(item.inboundPreference) === null ? null : (
+          <span className="cq-caption mt-auto self-start rounded-full border border-(--cq-border-subtle) px-2.5 py-0.5 text-(--cq-text-secondary)">
+            {inboundLabel(item.inboundPreference)}
+          </span>
+        )}
       </div>
     </Link>
   );

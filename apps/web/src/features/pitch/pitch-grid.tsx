@@ -90,8 +90,8 @@ export function PitchGrid({ companyId }: { readonly companyId: string }) {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="cq-body-sm text-(--cq-text-secondary)">
           {videos.length === 0
-            ? "No videos yet. Your first one is what investors watch before they read anything else."
-            : `${String(videos.length)} ${videos.length === 1 ? "video" : "videos"}, each online until you delete it.`}
+            ? "No videos yet."
+            : `${String(videos.length)} ${videos.length === 1 ? "video" : "videos"}`}
         </p>
         <Link
           href="/pitch/new"

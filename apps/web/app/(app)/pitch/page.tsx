@@ -29,10 +29,7 @@ export default async function PitchPage() {
   const context = await resolveOwnContext();
   return (
     <PageContainer>
-      <PageHeader
-        title="Pitch & media"
-        description="Portrait, under three minutes."
-      />
+      <PageHeader title="Pitch & media" />
       {context.kind === "FOUNDER" ? (
         <PitchGrid companyId={context.companyId} />
       ) : context.kind === "NONE" && context.unavailable === true ? (

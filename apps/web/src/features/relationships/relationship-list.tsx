@@ -5,7 +5,7 @@ import { ChevronRight, ICON_SIZE } from "@capital-q/ui/icons";
 
 import {
   formatRelationshipDate,
-  nextStepSentence,
+  NEXT_STEP_WORDS,
   relationshipHref,
   relationshipsNeedingYou,
   STATE_WORDS,
@@ -83,7 +83,7 @@ function RelationshipRow({
           </span>
         </span>
         <span className="cq-caption text-(--cq-text-tertiary)">
-          {nextStepSentence(item.nextStep, item.counterpart.name)}
+          Next: {NEXT_STEP_WORDS[item.nextStep]}
         </span>
       </span>
       {unread > 0 ? (

@@ -89,8 +89,7 @@ export function GmailConnection({
       ) : (
         <div className="flex flex-col items-start gap-2">
           <p className="cq-body-sm text-(--cq-text-secondary)">
-            Let Q draft emails to people on your relationships and tell you when
-            they reply. Nothing is sent until you approve the exact email.
+            Q drafts emails you approve, and tells you when they reply.
           </p>
           <button
             type="button"
