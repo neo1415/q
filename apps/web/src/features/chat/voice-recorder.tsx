@@ -43,7 +43,10 @@ export function VoiceRecorder({
   disabled,
   onRecorded,
   onError,
+  compact = false,
 }: {
+  /** An icon in a composer row rather than a labelled button. */
+  readonly compact?: boolean | undefined;
   readonly disabled: boolean;
   readonly onRecorded: (file: File, durationMs: number) => void;
   readonly onError: (message: string) => void;
@@ -130,7 +133,17 @@ export function VoiceRecorder({
   };
 
   if (elapsedMs === null) {
-    return (
+    return compact ? (
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => void start()}
+        aria-label="Record a voice note"
+        className="flex size-11 shrink-0 items-center justify-center rounded-full bg-(--cq-accent) text-(--cq-text-inverse) hover:bg-(--cq-accent-hover) disabled:opacity-50"
+      >
+        <Mic size={ICON_SIZE.regular} aria-hidden="true" />
+      </button>
+    ) : (
       <Button
         type="button"
         variant="quiet"

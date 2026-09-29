@@ -9,22 +9,17 @@ import type {
 } from "@capital-q/contracts";
 import { buttonClassName } from "@capital-q/ui/button";
 import {
+  ArrowLeft,
   ArrowUpRight,
   Bell,
   CalendarDays,
   ICON_SIZE,
 } from "@capital-q/ui/icons";
 
-import { PageContainer } from "@/components/app-shell/page-container";
 import { RelationshipChat } from "@/features/chat/relationship-chat";
 import { apiSession } from "@/features/q/context";
 
-import { AskQRelationshipPanel } from "./ask-q-relationship";
-import {
-  BackToRelationships,
-  RelationshipHero,
-  RelationshipTabs,
-} from "./relationship-detail";
+import { InfoDialog } from "./info-dialog";
 import type { CounterpartProfile } from "./relationship-page-data";
 import { RelationshipTimeline } from "./relationship-timeline";
 import {
@@ -71,136 +66,131 @@ export async function RelationshipConversation({
           .toSorted((a, b) => Date.parse(a.dueAt) - Date.parse(b.dueAt))
           .at(0);
 
+  // The chat page is a chat (founder direction 2026-09-29: "whatsapp for
+  // that page"): one full-height column, the header carrying who and the
+  // few actions, everything else one tap away in the info sheet.
   return (
-    <PageContainer className="flex flex-col gap-6">
-      <BackToRelationships href={basePath} label={counterpart} />
-      <RelationshipHero
+    <div className="mx-auto flex h-[calc(100dvh-8.5rem)] w-full max-w-3xl flex-col lg:h-[calc(100dvh-1rem)]">
+      <RelationshipChat
+        relationshipId={relationship.relationshipId}
         counterpart={counterpart}
-        relationship={relationship}
-        profile={profile}
-      />
-      <div className="flex flex-wrap gap-2">
-        {profile.profileHref === null ? null : (
-          <Link
-            href={profile.profileHref}
-            className={buttonClassName("secondary", "compact")}
-          >
-            Open profile
-            <ArrowUpRight size={ICON_SIZE.compact} aria-hidden="true" />
-          </Link>
-        )}
-        {connected ? (
-          <Link
-            href={`${basePath}#calls`}
-            className={buttonClassName("secondary", "compact")}
-          >
-            <CalendarDays size={ICON_SIZE.compact} aria-hidden="true" />
-            Book a call
-          </Link>
-        ) : null}
-      </div>
-      <RelationshipTabs
-        basePath={basePath}
-        current="MESSAGES"
-        messageCount={connected ? (thread?.messages.length ?? 0) : null}
-      />
-
-      <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_20rem]">
-        <div className="min-w-0 rounded-xl border border-(--cq-border-subtle) bg-(--cq-surface-raised) p-4 sm:p-5">
-          <RelationshipChat
-            relationshipId={relationship.relationshipId}
-            counterpart={counterpart}
-            initial={thread}
-            tall
-          />
-        </div>
-
-        <aside
-          className="flex min-w-0 flex-col gap-6"
-          aria-label="About this relationship"
-        >
-          <RailCard title="About this relationship">
-            <dl className="flex flex-col gap-3">
-              <RailFact
-                label="Status"
-                value={STATE_WORDS[relationship.state]}
-              />
-              <RailFact
-                label="Since"
-                value={formatRelationshipDate(relationship.stateSince)}
-              />
-              <RailFact
-                label="Next step"
-                value={NEXT_STEP_WORDS[relationship.nextStep]}
-              />
-            </dl>
-          </RailCard>
-
-          {relationship.milestones.length === 0 ? null : (
-            <RailCard title="Relationship timeline">
-              <RelationshipTimeline
-                milestones={relationship.milestones}
-                side={side}
-                counterpart={counterpart}
-              />
-            </RailCard>
-          )}
-
-          <RailCard title="Next reminder">
-            {nextReminder === undefined ? (
-              <p className="cq-body-sm text-(--cq-text-secondary)">
-                No reminder set.
-              </p>
-            ) : (
-              <p className="cq-body-sm text-(--cq-text-primary)">
-                <time
-                  dateTime={nextReminder.dueAt}
-                  className="cq-numeric text-(--cq-text-tertiary)"
-                >
-                  {formatRelationshipDate(nextReminder.dueAt)}
-                </time>{" "}
-                · {nextReminder.title}
-              </p>
-            )}
+        initial={thread}
+        tall
+        headerStart={
+          <>
             <Link
-              href={`${basePath}#reminders`}
-              className={buttonClassName(
-                "quiet",
-                "compact",
-                "-ml-2 self-start",
-              )}
+              href={basePath}
+              aria-label={`Back to ${counterpart}`}
+              className="flex size-11 shrink-0 items-center justify-center rounded-full text-(--cq-text-secondary) hover:bg-(--cq-surface-subtle)"
             >
-              <Bell size={ICON_SIZE.compact} aria-hidden="true" />
-              {nextReminder === undefined
-                ? "Set a reminder"
-                : "Manage reminders"}
+              <ArrowLeft size={ICON_SIZE.regular} aria-hidden="true" />
             </Link>
-          </RailCard>
-
-          <AskQRelationshipPanel counterpart={counterpart} />
-        </aside>
-      </div>
-    </PageContainer>
+            <ChatAvatar name={counterpart} photoUrl={profile.photoUrl} />
+            <span className="flex min-w-0 flex-col">
+              <span className="cq-body truncate font-semibold text-(--cq-text-primary)">
+                {counterpart}
+              </span>
+              <span className="cq-caption truncate text-(--cq-text-secondary)">
+                {STATE_WORDS[relationship.state]}
+              </span>
+            </span>
+          </>
+        }
+        headerEnd={
+          <>
+            {connected ? (
+              <Link
+                href={`${basePath}#calls`}
+                aria-label="Book a call"
+                className="flex size-11 items-center justify-center rounded-full text-(--cq-text-secondary) hover:bg-(--cq-surface-subtle)"
+              >
+                <CalendarDays size={ICON_SIZE.regular} aria-hidden="true" />
+              </Link>
+            ) : null}
+            <InfoDialog title={`About ${counterpart}`}>
+              <div className="flex flex-col gap-5">
+                <dl className="flex flex-col gap-3">
+                  <RailFact
+                    label="Status"
+                    value={STATE_WORDS[relationship.state]}
+                  />
+                  <RailFact
+                    label="Since"
+                    value={formatRelationshipDate(relationship.stateSince)}
+                  />
+                  <RailFact
+                    label="Next step"
+                    value={NEXT_STEP_WORDS[relationship.nextStep]}
+                  />
+                  {nextReminder === undefined ? null : (
+                    <RailFact
+                      label="Reminder"
+                      value={`${formatRelationshipDate(nextReminder.dueAt)} · ${nextReminder.title}`}
+                    />
+                  )}
+                </dl>
+                <div className="flex flex-wrap gap-2">
+                  {profile.profileHref === null ? null : (
+                    <Link
+                      href={profile.profileHref}
+                      className={buttonClassName("secondary", "compact")}
+                    >
+                      Profile
+                      <ArrowUpRight
+                        size={ICON_SIZE.compact}
+                        aria-hidden="true"
+                      />
+                    </Link>
+                  )}
+                  <Link
+                    href={`${basePath}#reminders`}
+                    className={buttonClassName("secondary", "compact")}
+                  >
+                    <Bell size={ICON_SIZE.compact} aria-hidden="true" />
+                    Reminder
+                  </Link>
+                </div>
+                {relationship.milestones.length === 0 ? null : (
+                  <RelationshipTimeline
+                    milestones={relationship.milestones}
+                    side={side}
+                    counterpart={counterpart}
+                  />
+                )}
+              </div>
+            </InfoDialog>
+          </>
+        }
+      />
+    </div>
   );
 }
 
-function RailCard({
-  title,
-  children,
+/** The counterpart's picture or initial, chat-sized. */
+function ChatAvatar({
+  name,
+  photoUrl,
 }: {
-  readonly title: string;
-  readonly children: React.ReactNode;
+  readonly name: string;
+  readonly photoUrl: string | null;
 }) {
-  return (
-    <section
-      aria-label={title}
-      className="flex flex-col gap-3 rounded-xl border border-(--cq-border-subtle) bg-(--cq-surface-raised) p-4"
+  return photoUrl === null ? (
+    <span
+      aria-hidden="true"
+      className="cq-label inline-flex size-10 shrink-0 items-center justify-center rounded-full bg-(--cq-surface-subtle) text-(--cq-text-secondary)"
     >
-      <h2 className="cq-body font-semibold text-(--cq-text-primary)">
-        {title}
-      </h2>
-      {children}
-    </section>
+      {name.trim().slice(0, 1).toUpperCase()}
+    </span>
+  ) : (
+    // A short-lived signed URL; next/image would cache it past expiry.
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={photoUrl}
+      alt=""
+      width={40}
+      height={40}
+      className="size-10 shrink-0 rounded-full object-cover"
+    />
   );
 }
 

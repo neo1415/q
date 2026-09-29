@@ -199,7 +199,7 @@ describe("RelationshipChat", () => {
     );
     expect(screen.getByText("0:07")).toBeTruthy();
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: /Play voice note/ }));
+      fireEvent.click(screen.getByRole("button", { name: /Voice note/ }));
       await Promise.resolve();
     });
     expect(container.querySelector("audio")?.getAttribute("src")).toContain(

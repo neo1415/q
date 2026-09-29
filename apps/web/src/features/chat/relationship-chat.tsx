@@ -7,11 +7,19 @@ import {
   useState,
   type FormEvent,
   type KeyboardEvent,
+  type ReactNode,
 } from "react";
 
 import type { ChatMessageDto, ChatThreadDto } from "@capital-q/contracts";
 import { Button } from "@capital-q/ui/button";
-import { FileText, ICON_SIZE, Play, Upload } from "@capital-q/ui/icons";
+import {
+  ArrowUp,
+  FileText,
+  ICON_SIZE,
+  Play,
+  Plus,
+  Upload,
+} from "@capital-q/ui/icons";
 
 import { useGlobalQ } from "@/components/app-shell/global-q";
 import { QAperture } from "@/features/q-aperture";
@@ -95,13 +103,20 @@ export function RelationshipChat({
   counterpart,
   initial,
   tall = false,
+  headerStart,
+  headerEnd,
 }: {
   readonly relationshipId: string;
   readonly counterpart: string;
   readonly initial: ChatThreadDto | null;
   /** The conversation page: the thread fills the column. */
   readonly tall?: boolean | undefined;
+  /** Who the chat is with: back, avatar, name, state. */
+  readonly headerStart?: ReactNode | undefined;
+  /** The page's own header actions (call, info). */
+  readonly headerEnd?: ReactNode | undefined;
 }) {
+  const [attachOpen, setAttachOpen] = useState(false);
   const { askAbout } = useGlobalQ();
   const [messages, setMessages] = useState<ChatMessageDto[]>(
     () => initial?.messages.slice() ?? [],
@@ -364,32 +379,35 @@ export function RelationshipChat({
   const lastMineIndex =
     lastMine === undefined ? -1 : messages.indexOf(lastMine);
 
+  const hasDraft = draft.trim().length > 0;
   return (
     <section
       aria-labelledby="relationship-chat"
-      className={`flex flex-col gap-3 ${tall ? "" : "max-w-(--cq-layout-reading)"}`}
+      className={`flex min-h-0 flex-col ${tall ? "h-full" : "max-w-(--cq-layout-reading) gap-3"}`}
       data-relationship-chat={status}
     >
-      <div className="flex items-center justify-between gap-3">
-        <h2
-          id="relationship-chat"
-          className="cq-title-sm text-(--cq-text-primary)"
-        >
-          Messages
+      {/* The header (founder direction 2026-09-29: "whatsapp for that
+          page"): who, where things stand, and the few actions, in one row. */}
+      <div className="flex items-center gap-2 border-b border-(--cq-border-subtle) px-2 py-2">
+        <h2 id="relationship-chat" className="sr-only">
+          Messages with {counterpart}
         </h2>
-        <div className="flex items-center gap-1">
-          <Button
-            variant="quiet"
-            onClick={() => invokeQ(draft.replace(Q_PREFIX, "").trim())}
-          >
-            <QAperture state="IDLE" size="chrome" />
-            Ask Q
-          </Button>
-          <ChatSafetyMenu
-            blockedByYourSide={blockedByYourSide}
-            onChoose={setSafety}
-          />
+        <div className="flex min-w-0 flex-1 items-center gap-2">
+          {headerStart}
         </div>
+        {headerEnd}
+        <button
+          type="button"
+          onClick={() => invokeQ(draft.replace(Q_PREFIX, "").trim())}
+          aria-label="Ask Q"
+          className="flex size-11 items-center justify-center rounded-full hover:bg-(--cq-surface-subtle)"
+        >
+          <QAperture state="IDLE" size="chrome" />
+        </button>
+        <ChatSafetyMenu
+          blockedByYourSide={blockedByYourSide}
+          onChoose={setSafety}
+        />
       </div>
       <ChatSafetyDialogs
         relationshipId={relationshipId}
@@ -403,151 +421,145 @@ export function RelationshipChat({
         }}
       />
 
-      {messages.length === 0 ? (
-        <p className="cq-body text-(--cq-text-secondary)">
-          {status === "OPEN"
-            ? `No messages yet. Say hello to ${counterpart}.`
-            : status === "BLOCKED"
-              ? blockedNotice(blockedByYourSide)
-              : "Messages open once you're connected: when interest has been expressed and accepted."}
-        </p>
-      ) : (
-        <ol
-          role="log"
-          aria-live="polite"
-          aria-label={`Messages with ${counterpart}`}
-          className={`flex flex-col gap-3 overflow-y-auto rounded-md border border-(--cq-border-subtle) p-3 ${tall ? "min-h-[40vh] max-h-[65vh]" : "max-h-[60vh]"}`}
-        >
-          {messages.map((message, index) => (
-            <li
-              key={message.messageId}
-              className={`flex max-w-[85%] flex-col gap-1 ${message.mine ? "items-end self-end" : "items-start self-start"}`}
-              data-chat-message={message.mine ? "mine" : "theirs"}
+      <ol
+        role="log"
+        aria-live="polite"
+        aria-label={`Messages with ${counterpart}`}
+        className={`flex min-h-0 flex-1 flex-col gap-1.5 overflow-y-auto px-3 py-4 ${tall ? "" : "max-h-[60vh]"}`}
+      >
+        {messages.length === 0 ? (
+          <li className="m-auto max-w-xs text-center">
+            <p className="cq-body-sm rounded-xl bg-(--cq-surface-subtle) px-4 py-2 text-(--cq-text-secondary)">
+              {status === "OPEN"
+                ? `Say hello to ${counterpart}.`
+                : status === "BLOCKED"
+                  ? blockedNotice(blockedByYourSide)
+                  : "Messages open once you're connected."}
+            </p>
+          </li>
+        ) : null}
+        {messages.map((message, index) => (
+          <li
+            key={message.messageId}
+            className={`group flex max-w-[80%] flex-col gap-0.5 ${message.mine ? "items-end self-end" : "items-start self-start"}`}
+            data-chat-message={message.mine ? "mine" : "theirs"}
+          >
+            <div
+              className={`rounded-2xl px-3 py-2 ${
+                message.mine
+                  ? "rounded-br-sm bg-(--cq-accent-soft) text-(--cq-text-primary)"
+                  : "rounded-bl-sm bg-(--cq-surface-subtle) text-(--cq-text-primary)"
+              }`}
             >
-              <span className="cq-caption text-(--cq-text-tertiary)">
-                {message.mine ? "You" : message.senderName}
-                {" · "}
-                <time dateTime={message.sentAt} className="cq-numeric">
-                  {formatRelationshipDate(message.sentAt)}
-                </time>
-                {message.viaQ ? " · approved from Q" : null}
-              </span>
-              <div
-                className={`rounded-2xl px-4 py-2.5 ${
-                  message.mine
-                    ? "rounded-br-md border border-(--cq-accent)/40 bg-(--cq-accent-soft) text-(--cq-text-primary)"
-                    : "rounded-bl-md bg-(--cq-surface-subtle) text-(--cq-text-primary)"
-                }`}
-              >
-                {message.unsent ? (
-                  <p className="cq-body-sm italic text-(--cq-text-secondary)">
-                    {message.mine
-                      ? "You unsent this message."
-                      : "This message was unsent."}
-                  </p>
-                ) : (
-                  <>
-                    {message.attachment === null ? null : message.kind ===
-                      "VOICE_NOTE" ? (
-                      playing?.messageId === message.messageId ? (
-                        // The signed URL lasts a minute; the element has
-                        // already fetched the bytes by then.
-                        <audio
-                          controls
-                          autoPlay
-                          src={playing.url}
-                          className="max-w-full"
-                          aria-label={`Voice note from ${message.mine ? "you" : message.senderName}`}
-                        />
-                      ) : (
-                        <Button
-                          variant="secondary"
-                          onClick={() => void openAttachment(message)}
-                        >
-                          <Play size={ICON_SIZE.regular} aria-hidden="true" />
-                          Play voice note
-                          {message.voiceDurationMs === null ? null : (
-                            <span className="cq-numeric text-(--cq-text-secondary)">
-                              {formatDuration(message.voiceDurationMs)}
-                            </span>
-                          )}
-                        </Button>
-                      )
+              {message.unsent ? (
+                <p className="cq-body-sm italic text-(--cq-text-secondary)">
+                  {message.mine
+                    ? "You unsent this message."
+                    : "This message was unsent."}
+                </p>
+              ) : (
+                <>
+                  {message.attachment === null ? null : message.kind ===
+                    "VOICE_NOTE" ? (
+                    playing?.messageId === message.messageId ? (
+                      // The signed URL lasts a minute; the element has
+                      // already fetched the bytes by then.
+                      <audio
+                        controls
+                        autoPlay
+                        src={playing.url}
+                        className="max-w-full"
+                        aria-label={`Voice note from ${message.mine ? "you" : message.senderName}`}
+                      />
                     ) : (
                       <Button
                         variant="quiet"
-                        className="-mx-2 max-w-full justify-start"
+                        className="-mx-2"
                         onClick={() => void openAttachment(message)}
-                        aria-label={`Open ${message.attachment.title}`}
                       >
-                        <FileText size={ICON_SIZE.regular} aria-hidden="true" />
-                        <span className="truncate">
-                          {message.attachment.title}
-                        </span>
+                        <Play size={ICON_SIZE.regular} aria-hidden="true" />
+                        Voice note
+                        {message.voiceDurationMs === null ? null : (
+                          <span className="cq-numeric text-(--cq-text-secondary)">
+                            {formatDuration(message.voiceDurationMs)}
+                          </span>
+                        )}
                       </Button>
-                    )}
-                    {message.body === null ? null : (
-                      <p className="cq-body whitespace-pre-wrap break-words">
-                        {message.body}
-                      </p>
-                    )}
-                  </>
-                )}
-              </div>
-              <span className="flex items-center gap-2">
-                {message.edited && !message.unsent ? (
-                  <span className="cq-caption text-(--cq-text-tertiary)">
-                    Edited
-                  </span>
-                ) : null}
+                    )
+                  ) : (
+                    <Button
+                      variant="quiet"
+                      className="-mx-2 max-w-full justify-start"
+                      onClick={() => void openAttachment(message)}
+                      aria-label={`Open ${message.attachment.title}`}
+                    >
+                      <FileText size={ICON_SIZE.regular} aria-hidden="true" />
+                      <span className="truncate">
+                        {message.attachment.title}
+                      </span>
+                    </Button>
+                  )}
+                  {message.body === null ? null : (
+                    <p className="cq-body whitespace-pre-wrap break-words">
+                      {message.body}
+                    </p>
+                  )}
+                </>
+              )}
+              <span className="cq-caption flex justify-end gap-1.5 pt-0.5 text-(--cq-text-tertiary)">
+                {message.viaQ ? <span>via Q</span> : null}
+                {message.edited && !message.unsent ? <span>Edited</span> : null}
+                <time dateTime={message.sentAt} className="cq-numeric">
+                  {formatRelationshipDate(message.sentAt)}
+                </time>
                 {index === lastMineIndex && seenIndex >= lastMineIndex ? (
-                  <span className="cq-caption text-(--cq-text-tertiary)">
-                    Seen
-                  </span>
-                ) : null}
-                {message.mine && !message.unsent ? (
-                  <Button
-                    variant="quiet"
-                    size="compact"
-                    className="min-h-11"
-                    onClick={() => void unsend(message.messageId)}
-                  >
-                    Unsend
-                  </Button>
-                ) : null}
-                {!message.mine &&
-                !message.unsent &&
-                message.side !== ownSide ? (
-                  <Button
-                    variant="quiet"
-                    size="compact"
-                    className="min-h-11"
-                    aria-label={`Report message from ${message.senderName}`}
-                    onClick={() =>
-                      setSafety({
-                        kind: "REPORT",
-                        messageId: message.messageId,
-                      })
-                    }
-                  >
-                    Report
-                  </Button>
+                  <span aria-label="Seen">✓✓</span>
                 ) : null}
               </span>
-            </li>
-          ))}
-          <li ref={end} aria-hidden="true" />
-        </ol>
-      )}
+            </div>
+            {/* Per-message actions out of the way until hovered or
+                focused, as a chat app keeps them. */}
+            <span className="flex gap-1 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
+              {message.mine && !message.unsent ? (
+                <Button
+                  variant="quiet"
+                  size="compact"
+                  className="min-h-8"
+                  onClick={() => void unsend(message.messageId)}
+                >
+                  Unsend
+                </Button>
+              ) : null}
+              {!message.mine && !message.unsent && message.side !== ownSide ? (
+                <Button
+                  variant="quiet"
+                  size="compact"
+                  className="min-h-8"
+                  aria-label={`Report message from ${message.senderName}`}
+                  onClick={() =>
+                    setSafety({
+                      kind: "REPORT",
+                      messageId: message.messageId,
+                    })
+                  }
+                >
+                  Report
+                </Button>
+              ) : null}
+            </span>
+          </li>
+        ))}
+        <li ref={end} aria-hidden="true" />
+      </ol>
 
       {notice === null ? null : (
-        <p role="status" className="cq-body-sm text-(--cq-text-secondary)">
+        <p role="status" className="cq-body-sm px-3 text-(--cq-text-secondary)">
           {notice}
         </p>
       )}
 
       {status === "BLOCKED" && messages.length > 0 ? (
-        <p className="cq-body-sm text-(--cq-text-secondary)">
+        <p className="cq-body-sm px-3 text-(--cq-text-secondary)">
           {blockedNotice(blockedByYourSide)}
         </p>
       ) : null}
@@ -555,74 +567,17 @@ export function RelationshipChat({
       {status === "OPEN" ? (
         <form
           onSubmit={(event) => void submit(event)}
-          className="flex flex-col gap-2"
+          className="flex flex-col gap-2 border-t border-(--cq-border-subtle) px-2 py-2"
         >
-          <label htmlFor="chat-draft" className="sr-only">
-            Message {counterpart}
-          </label>
-          <textarea
-            id="chat-draft"
-            value={draft}
-            maxLength={4000}
-            rows={2}
-            onChange={(event) => setDraft(event.target.value)}
-            onKeyDown={onKeyDown}
-            placeholder={`Message ${counterpart}, or @Q to ask Q`}
-            className="cq-body min-h-11 w-full resize-y rounded-md border border-(--cq-border) bg-(--cq-surface) px-3 py-2 text-(--cq-text-primary) placeholder:text-(--cq-text-tertiary)"
-          />
-          <div className="flex flex-wrap items-center gap-2">
-            <Button
-              type="submit"
-              variant="primary"
-              disabled={busy || draft.trim().length === 0}
-            >
-              Send
-            </Button>
-            <Button
-              type="button"
-              variant="secondary"
-              disabled={busy}
-              onClick={() => fileInput.current?.click()}
-            >
-              <Upload size={ICON_SIZE.regular} aria-hidden="true" />
-              Attach a file
-            </Button>
-            <Button
-              type="button"
-              variant="quiet"
-              disabled={busy}
-              onClick={() => void openDocuments()}
-              aria-expanded={documents !== null}
-            >
-              <FileText size={ICON_SIZE.regular} aria-hidden="true" />
-              Share a document
-            </Button>
-            <VoiceRecorder
-              disabled={busy}
-              onRecorded={(file, durationMs) =>
-                void sendVoiceNote(file, durationMs)
-              }
-              onError={setNotice}
-            />
-            <input
-              ref={fileInput}
-              type="file"
-              className="sr-only"
-              tabIndex={-1}
-              aria-hidden="true"
-              accept=".pdf,.pptx,.docx,.xlsx,.csv,.txt,.png,.jpg,.jpeg"
-              onChange={(event) => {
-                const file = event.target.files?.[0];
-                if (file !== undefined) void upload(file);
-              }}
-            />
-          </div>
           {documents === null ? null : documents.length === 0 ? (
-            <p className="cq-body-sm text-(--cq-text-secondary)">
-              You haven&apos;t uploaded any documents yet.
+            <p className="cq-body-sm px-2 text-(--cq-text-secondary)">
+              No documents yet.
             </p>
           ) : (
-            <ul className="flex flex-col gap-1" aria-label="Your documents">
+            <ul
+              className="flex max-h-48 flex-col gap-1 overflow-y-auto"
+              aria-label="Your documents"
+            >
               {documents.map((document) => (
                 <li key={document.id}>
                   <Button
@@ -644,6 +599,92 @@ export function RelationshipChat({
               ))}
             </ul>
           )}
+          {attachOpen ? (
+            <div className="flex gap-2 px-1" role="group" aria-label="Attach">
+              <Button
+                type="button"
+                variant="secondary"
+                size="compact"
+                disabled={busy}
+                onClick={() => {
+                  setAttachOpen(false);
+                  fileInput.current?.click();
+                }}
+              >
+                <Upload size={ICON_SIZE.compact} aria-hidden="true" />
+                File
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                size="compact"
+                disabled={busy}
+                onClick={() => {
+                  setAttachOpen(false);
+                  void openDocuments();
+                }}
+                aria-expanded={documents !== null}
+              >
+                <FileText size={ICON_SIZE.compact} aria-hidden="true" />
+                Document
+              </Button>
+            </div>
+          ) : null}
+          <div className="flex items-end gap-2">
+            <button
+              type="button"
+              aria-label="Attach"
+              aria-expanded={attachOpen}
+              onClick={() => setAttachOpen((open) => !open)}
+              className="flex size-11 shrink-0 items-center justify-center rounded-full text-(--cq-text-secondary) hover:bg-(--cq-surface-subtle)"
+            >
+              <Plus size={ICON_SIZE.regular} aria-hidden="true" />
+            </button>
+            <label htmlFor="chat-draft" className="sr-only">
+              Message {counterpart}
+            </label>
+            <textarea
+              id="chat-draft"
+              value={draft}
+              maxLength={4000}
+              rows={1}
+              onChange={(event) => setDraft(event.target.value)}
+              onKeyDown={onKeyDown}
+              placeholder="Message"
+              className="cq-body field-sizing-content max-h-40 min-h-11 flex-1 resize-none rounded-3xl border border-(--cq-border-subtle) bg-(--cq-surface) px-4 py-2.5 text-(--cq-text-primary) placeholder:text-(--cq-text-tertiary)"
+            />
+            {hasDraft ? (
+              <button
+                type="submit"
+                disabled={busy}
+                aria-label="Send"
+                className="flex size-11 shrink-0 items-center justify-center rounded-full bg-(--cq-accent) text-(--cq-text-inverse) hover:bg-(--cq-accent-hover) disabled:opacity-50"
+              >
+                <ArrowUp size={ICON_SIZE.regular} aria-hidden="true" />
+              </button>
+            ) : (
+              <VoiceRecorder
+                compact
+                disabled={busy}
+                onRecorded={(file, durationMs) =>
+                  void sendVoiceNote(file, durationMs)
+                }
+                onError={setNotice}
+              />
+            )}
+            <input
+              ref={fileInput}
+              type="file"
+              className="sr-only"
+              tabIndex={-1}
+              aria-hidden="true"
+              accept=".pdf,.pptx,.docx,.xlsx,.csv,.txt,.png,.jpg,.jpeg"
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                if (file !== undefined) void upload(file);
+              }}
+            />
+          </div>
         </form>
       ) : null}
     </section>
