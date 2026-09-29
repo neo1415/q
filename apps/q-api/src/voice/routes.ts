@@ -55,6 +55,10 @@ import {
 } from "./synthesis.js";
 import type { VoiceTurnBoard } from "./turn-board.js";
 import type { WelcomeHost } from "./welcome.js";
+import {
+  composeReturningOpener,
+  type OpenerFacts,
+} from "./returning-opener.js";
 import type { ActorContext } from "@capital-q/security";
 import type { ApplicationIdentityLookup } from "@capital-q/security/postgres";
 
@@ -130,6 +134,9 @@ export type QVoiceRoutesDependencies = ActorContextDependencies & {
   readonly ownNames?:
     | { readonly namesFor: (actor: ActorContext) => Promise<readonly string[]> }
     | undefined;
+  /** What is theirs to deal with now, for a returning person's opener. */
+  readonly openerFacts?:
+    ((actor: ActorContext) => Promise<OpenerFacts>) | undefined;
 };
 
 export function registerQVoiceRoutes(
@@ -603,10 +610,25 @@ export function registerQVoiceRoutes(
         // Q always speaks first. On the open thread there is no interview
         // state to open from, so the line is a plain greeting.
         const first = knownName?.trim().split(/\s+/)[0];
+        const name = first !== undefined && first.length > 0 ? first : null;
+        // Proactive (founder direction 2026-09-29): open with what is
+        // theirs to deal with now, when it can be read quickly; the
+        // plain greeting otherwise.
+        const facts =
+          dependencies.openerFacts === undefined
+            ? null
+            : await Promise.race([
+                dependencies.openerFacts(actor).catch(() => null),
+                new Promise<null>((resolve) =>
+                  setTimeout(() => resolve(null), 1_200),
+                ),
+              ]);
         firstMessage =
-          first !== undefined && first.length > 0
-            ? `Hi ${first}. I'm listening; what would you like to look at?`
-            : "I'm listening. What would you like to look at?";
+          facts !== null
+            ? composeReturningOpener(name, facts, new Date())
+            : name !== null
+              ? `Hi ${name}. I'm listening; what would you like to look at?`
+              : "I'm listening. What would you like to look at?";
       }
 
       // Names the person has taught Q to hear, before the recogniser

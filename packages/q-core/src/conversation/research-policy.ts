@@ -65,11 +65,17 @@ export function decideResearch(
     return { run: false, because: "ANSWER_TURN" };
   }
   const question = reading.question;
+  // Advice outside an interview is researched too (founder direction 2026-09-29: search "to the
+  // highest"): how to price a round or who backs a sector is answered
+  // better from what the market says this month. What leaves is still
+  // only what the egress policy lets through.
   const explicit =
     reading.kind === "RESEARCH_REQUEST" ||
     (question !== null &&
       (question.kind === "REAL_WORLD_EXAMPLE" ||
-        question.kind === "PUBLIC_FACTS"));
+        question.kind === "PUBLIC_FACTS" ||
+        // Not mid-interview: advice there is about the interview itself.
+        (question.kind === "ADVICE" && state.asked === null)));
   const fromTheirRecords =
     question !== null && question.kind === "THEIR_OWN_RECORDS";
   if (!explicit && !fromTheirRecords) {

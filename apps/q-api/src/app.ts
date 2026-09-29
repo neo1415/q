@@ -145,6 +145,7 @@ export type QApiModules = {
         | "speechThrottle"
         | "memory"
         | "ownNames"
+        | "openerFacts"
       >)
     | undefined;
 };
@@ -389,6 +390,7 @@ export function createApp(
       // was told no remembered or recorded name (founder live, #6).
       memory: modules.voice.memory,
       ownNames: modules.voice.ownNames,
+      openerFacts: modules.voice.openerFacts,
     });
     /**
      * One Q, whatever the input was (QX-004 core gate).

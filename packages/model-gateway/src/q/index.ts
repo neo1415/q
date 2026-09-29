@@ -504,7 +504,16 @@ const RESEARCH_NOTE_BRIEF =
  * company conversation, and the alternative was to drop one of them
  * whenever research is offered, which is most of the time.
  */
-export const ENVIRONMENT_NOTES_MAX_CHARS = 2_900;
+export const ENVIRONMENT_NOTES_MAX_CHARS = 4_000;
+
+/**
+ * What Q can do, so it says so rather than claiming it cannot (founder
+ * direction 2026-09-29: "Q must know what it can do... very proactive...
+ * can role-play"). Each happens through Capital Q's own paths, with the
+ * person's approval where it acts; saying so is not doing it.
+ */
+export const CAPABILITIES_NOTE =
+  "WHAT CAPITAL Q CAN DO FOR THEM (say so when relevant; never claim you cannot): research the public web and current news; compare companies and investors; find investors or companies that fit; write decks, briefs, reports and one-pagers as PDF or PowerPoint, with photos and charts, and revise them on request; book calls with a Meet link, set reminders, and join a booked call to take notes and flag what matters; message a connection; update their profile with their approval; remember what they tell you and correct it when told. BE PROACTIVE: notice what would move them toward their goal (a raise, a deal, a better deck) and say it; close a substantive answer with one concrete next step you could take for them, offered as a short question; ask a sharp question when it would unblock them. ROLE-PLAY: when they ask, play an investor grilling their pitch, a founder pitching, or a partner in an IC meeting, in character and realistically tough, then step out and give brief feedback when asked.";
 
 export function subjectIdentifierNotes(
   subjects: readonly QSubjectRef[],
@@ -669,7 +678,7 @@ export function environmentNotesFor(
   // deterministically when it does anyway.
   const statementsNote = `A userStatements knowledgeKey must start with one of: ${recordableNamespacesSentence()}.`;
   const aboutACompany = subjects.some((subject) => subject.kind === "COMPANY");
-  const compose = (researchNote: string | null): string =>
+  const compose = (researchNote: string | null, capabilities = false): string =>
     [
       // First, because this list is hard-truncated at
       // ENVIRONMENT_NOTES_MAX_CHARS and anything near the end is simply
@@ -701,6 +710,7 @@ export function environmentNotesFor(
       statementsNote,
       ...(aboutACompany ? [PROFILE_UPDATE_NOTE] : []),
       DISPLAY_NAME_NOTE,
+      ...(capabilities ? [CAPABILITIES_NOTE] : []),
       "No scoring or ranking service is available; do not produce scores.",
       ...(options.onboardingNudge === undefined
         ? []
@@ -708,6 +718,14 @@ export function environmentNotesFor(
     ].join(" ");
   // The charter variable is bounded; the research guidance is the part that
   // yields first, in two steps, so a run with many subjects still renders.
+  // What Q can do yields before any research guidance does.
+  const withCapabilities = compose(
+    researchOffered ? RESEARCH_NOTE : null,
+    true,
+  );
+  if (withCapabilities.length <= ENVIRONMENT_NOTES_MAX_CHARS) {
+    return withCapabilities;
+  }
   const full = compose(researchOffered ? RESEARCH_NOTE : null);
   if (full.length <= ENVIRONMENT_NOTES_MAX_CHARS) {
     return full;

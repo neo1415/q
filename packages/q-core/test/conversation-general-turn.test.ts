@@ -73,7 +73,7 @@ describe("research is intentional outside the interview too", () => {
     ).toBe("EXPLICIT");
   });
 
-  it("never runs for advice, even advice about what to look for", () => {
+  it("researches advice outside an interview (founder direction 2026-09-29)", () => {
     expect(
       directive(
         read({
@@ -84,7 +84,7 @@ describe("research is intentional outside the interview too", () => {
           },
         }),
       ).mode,
-    ).toBe("NEVER");
+    ).toBe("EXPLICIT");
   });
 
   it("answers their own records from authorised context first, and announces any change of source", () => {
@@ -175,7 +175,7 @@ describe("the prospects fallback (gap 1)", () => {
             question:
               kind === "QUESTION_TO_Q"
                 ? {
-                    kind: "ADVICE",
+                    kind: "OPTIONS",
                     text: "Who would likely invest in us?",
                     about: [],
                   }

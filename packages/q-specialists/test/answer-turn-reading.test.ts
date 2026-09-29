@@ -359,19 +359,16 @@ const advice: TurnReaderResult = {
 };
 
 describe("a general turn is read before it is answered", () => {
-  it("keeps the web out of an advice question, whatever its words", async () => {
+  it("researches an advice question outside an interview (founder direction 2026-09-29)", async () => {
     const { answer, directives } = seam({
       said: "What else should I look for? Check the web if you like.",
       reading: advice,
       outcomes: [],
     });
     await answer.answer(request());
-    // The model never holds the web on this turn. The fallback only lets
-    // code read public sources after the platform's own prospects lookup
-    // comes back thin (gap 1); it is not a research directive.
-    expect(directives).toEqual([
-      { mode: "NEVER", announceSourceChange: false, fallback: true },
-    ]);
+    // Advice is answered with what the market says now; what leaves is
+    // still only what the egress policy allows.
+    expect(directives[0]?.mode).toBe("EXPLICIT");
   });
 
   it("lets a request for a real example reach the web", async () => {

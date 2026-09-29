@@ -74,8 +74,9 @@ export const TaskFrameSchema = {
   /** What the runtime honestly knows about its own limits, trusted text. */
   // 2,600 since 2026-09-17: the research guidance and the profile-change
   // instruction (ADR 0011) together did not fit 2,000 on a company
-  // conversation. The rendered charter stays within its token bound.
-  environmentNotes: z.string().max(2_900),
+  // conversation. 4,000 since 2026-09-29 (founder: the fixed budget was
+  // crowding out what Q can do). The rendered charter stays bounded.
+  environmentNotes: z.string().max(4_000),
 };
 
 /** A finding as a model may state it: vocabulary only, no ids, no references. */

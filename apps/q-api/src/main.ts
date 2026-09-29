@@ -59,6 +59,7 @@ import {
 } from "@capital-q/investor-onboarding";
 import { createPexelsPhotos } from "./composition/stock-photos.js";
 import { createRecallBots } from "./composition/recall-bots.js";
+import { createOpenerFacts } from "./voice/returning-opener.js";
 import { createMeetingNotesComposer } from "./composition/meeting-notes.js";
 import {
   createProfileAnswerAction,
@@ -2097,6 +2098,7 @@ const { app, logger: appLogger } = createApp(
             welcome: welcomeHost,
             turn: voiceTurn,
             memory: { termsFor: memoryLearner.termsFor },
+            openerFacts: createOpenerFacts({ sql: database.sql }),
             // Their own records' names, for the recogniser (founder live
             // 2026-09-27, #6): read by the resolved actor's own
             // organisation and user id only, never from anything said.

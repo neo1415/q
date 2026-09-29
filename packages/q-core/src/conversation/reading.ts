@@ -132,8 +132,8 @@ export type QualitativeMeaning = z.infer<typeof QualitativeMeaningSchema>;
  * OPTIONS and PROGRESS are answered by the consumer from authoritative
  * state. THEIR_OWN_RECORDS ("based on what you know about me") is answered
  * from authorised context first, never silently from the public web.
- * REAL_WORLD_EXAMPLE and PUBLIC_FACTS are the only two that may become a
- * research task, and only under the policy in `research-policy.ts`.
+ * REAL_WORLD_EXAMPLE, PUBLIC_FACTS and (since 2026-09-29) ADVICE may become
+ * a research task, only under the policy in `research-policy.ts`.
  */
 export const QUESTION_KINDS = [
   "ADVICE",
