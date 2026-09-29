@@ -67,3 +67,39 @@ export const MeetingNotesResultSchema = z
   })
   .strict();
 export type MeetingNotesResult = z.infer<typeof MeetingNotesResultSchema>;
+
+/**
+ * v2 (ADR 0027): the structured meeting record -- who attended, what was
+ * agreed, and money mentioned as commitment signals with how firm each
+ * was said to be. A signal is never committed capital (spec §6.6.14).
+ */
+export const MEETING_NOTES_V2_SCHEMA_VERSION = 2;
+
+export const MeetingNotesV2ResultSchema = MeetingNotesResultSchema.extend({
+  attendees: z
+    .array(
+      z
+        .object({
+          name: z.string().trim().min(1).max(120),
+          /** Their side as the call made it clear; null when unclear. */
+          side: z.enum(["FOUNDER", "INVESTOR"]).nullable(),
+        })
+        .strict(),
+    )
+    .max(20),
+  agreements: z.array(z.string().trim().min(3).max(300)).max(12),
+  commitments: z
+    .array(
+      z
+        .object({
+          party: z.string().trim().min(1).max(120),
+          /** The amount exactly as said ("$500K", "two million naira"). */
+          amount: z.string().trim().min(1).max(60),
+          firmness: z.enum(["EXPLORATORY", "SOFT", "FIRM"]),
+          quote: z.string().trim().min(3).max(300),
+        })
+        .strict(),
+    )
+    .max(10),
+}).strict();
+export type MeetingNotesV2Result = z.infer<typeof MeetingNotesV2ResultSchema>;

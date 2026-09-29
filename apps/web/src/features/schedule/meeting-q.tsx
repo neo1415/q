@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useState, useTransition, type ReactNode } from "react";
 
 import type { QMeetingAssistantDto } from "@capital-q/contracts";
 import { Button } from "@capital-q/ui/button";
@@ -14,10 +14,11 @@ import {
 } from "./meeting-q-actions";
 
 /**
- * Q in a meeting, on the meeting itself (founder direction 2026-09-29):
- * the organiser brings Q with one press; Q joins the call under its own
- * name, and afterwards its notes appear here -- what was covered, what to
- * know, what to do next. One state at a time, never a paragraph of help.
+ * Q in a meeting, on the meeting itself (ADR 0027): Q joins every call
+ * booked here under its own name, any participant may remove it, and
+ * afterwards both sides read the same record -- who was there, what was
+ * agreed, money mentioned, what to know, what to do next, and the full
+ * transcript. One state at a time, never a paragraph of help.
  */
 
 const FLAG_WORDS: Readonly<Record<string, string>> = {
@@ -28,6 +29,17 @@ const FLAG_WORDS: Readonly<Record<string, string>> = {
   SIGNAL: "Signal",
 };
 
+const FIRMNESS_WORDS: Readonly<Record<string, string>> = {
+  EXPLORATORY: "Exploring",
+  SOFT: "Soft",
+  FIRM: "Firm",
+};
+
+const SIDE_WORDS: Readonly<Record<string, string>> = {
+  FOUNDER: "Founder side",
+  INVESTOR: "Investor side",
+};
+
 function newKey(): string {
   return `web-q-meet-${crypto.randomUUID()}`;
 }
@@ -35,10 +47,13 @@ function newKey(): string {
 export function MeetingQ({
   meetingId,
   ended,
+  organiser,
 }: {
   readonly meetingId: string;
   /** The call is over: Q can no longer be brought, only read. */
   readonly ended: boolean;
+  /** Only the organiser books Q back after it was removed (ADR 0027). */
+  readonly organiser: boolean;
 }) {
   const [state, setState] = useState<QMeetingAssistantDto | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -67,50 +82,7 @@ export function MeetingQ({
   const status = state.status;
 
   if (status === "DONE") {
-    return (
-      <details className="flex flex-col gap-2" data-meeting-q="DONE">
-        <summary className="cq-label cursor-pointer text-(--cq-text-primary)">
-          Q&apos;s notes
-        </summary>
-        <div className="flex flex-col gap-3 pt-2">
-          {state.summary === null ? null : (
-            <p className="cq-body-sm whitespace-pre-line text-(--cq-text-secondary)">
-              {state.summary}
-            </p>
-          )}
-          {state.flags.length === 0 ? null : (
-            <ul className="flex flex-col gap-1.5" aria-label="Worth knowing">
-              {state.flags.map((flag) => (
-                <li
-                  key={`${flag.kind}:${flag.text}`}
-                  className="cq-body-sm text-(--cq-text-primary)"
-                >
-                  <span className="cq-caption text-(--cq-text-tertiary)">
-                    {FLAG_WORDS[flag.kind] ?? flag.kind}
-                    {flag.speaker === null ? "" : ` · ${flag.speaker}`}
-                  </span>
-                  <br />
-                  {flag.text}
-                </li>
-              ))}
-            </ul>
-          )}
-          {state.followUps.length === 0 ? null : (
-            <ul className="flex flex-col gap-1" aria-label="Follow-ups">
-              {state.followUps.map((item) => (
-                <li
-                  key={item.text}
-                  className="cq-body-sm text-(--cq-text-primary)"
-                >
-                  → {item.text}
-                  {item.owner === null ? "" : ` (${item.owner})`}
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      </details>
-    );
+    return <MeetingRecord record={state} />;
   }
 
   if (status === "IN_CALL" || status === "COMPOSING") {
@@ -150,7 +122,7 @@ export function MeetingQ({
   }
 
   // NONE, CANCELLED or FAILED.
-  if (ended) {
+  if (ended || !organiser) {
     return status === "FAILED" && state.failure !== null ? (
       <p
         className="cq-caption text-(--cq-text-secondary)"
@@ -181,5 +153,146 @@ export function MeetingQ({
         </span>
       )}
     </div>
+  );
+}
+
+function RecordSection({
+  label,
+  children,
+}: {
+  readonly label: string;
+  readonly children: ReactNode;
+}) {
+  return (
+    <section className="flex flex-col gap-1.5" aria-label={label}>
+      <h4 className="cq-caption text-(--cq-text-tertiary)">{label}</h4>
+      {children}
+    </section>
+  );
+}
+
+/**
+ * The record both sides read. Money is shown as said, with its firmness
+ * and the words behind it: a figure in a call is a signal, never committed
+ * capital until someone confirms it (spec 6.6.14).
+ */
+function MeetingRecord({ record }: { readonly record: QMeetingAssistantDto }) {
+  return (
+    <details className="flex flex-col gap-2" data-meeting-q="DONE">
+      <summary className="cq-label cursor-pointer text-(--cq-text-primary)">
+        Meeting record
+      </summary>
+      <div className="flex flex-col gap-4 pt-2">
+        {record.summary === null ? null : (
+          <p className="cq-body-sm whitespace-pre-line text-(--cq-text-secondary)">
+            {record.summary}
+          </p>
+        )}
+        {record.attendees.length === 0 ? null : (
+          <RecordSection label="Who was there">
+            <p className="cq-body-sm text-(--cq-text-primary)">
+              {record.attendees
+                .map((person) =>
+                  person.side === null
+                    ? person.name
+                    : `${person.name} (${SIDE_WORDS[person.side] ?? person.side})`,
+                )
+                .join(", ")}
+            </p>
+          </RecordSection>
+        )}
+        {record.agreements.length === 0 ? null : (
+          <RecordSection label="Agreed">
+            <ul className="flex flex-col gap-1">
+              {record.agreements.map((item) => (
+                <li key={item} className="cq-body-sm text-(--cq-text-primary)">
+                  {item}
+                </li>
+              ))}
+            </ul>
+          </RecordSection>
+        )}
+        {record.commitments.length === 0 ? null : (
+          <RecordSection label="Money mentioned">
+            <ul className="flex flex-col gap-2">
+              {record.commitments.map((item) => (
+                <li
+                  key={`${item.party}:${item.amount}:${item.quote}`}
+                  className="flex flex-col"
+                >
+                  <span className="cq-body-sm text-(--cq-text-primary)">
+                    {item.party} · {item.amount} ·{" "}
+                    {FIRMNESS_WORDS[item.firmness] ?? item.firmness}
+                  </span>
+                  <span className="cq-caption text-(--cq-text-secondary)">
+                    &ldquo;{item.quote}&rdquo;
+                  </span>
+                </li>
+              ))}
+            </ul>
+            <p className="cq-caption text-(--cq-text-tertiary)">
+              As said in the call; not a commitment until confirmed.
+            </p>
+          </RecordSection>
+        )}
+        {record.flags.length === 0 ? null : (
+          <RecordSection label="Worth knowing">
+            <ul className="flex flex-col gap-1.5">
+              {record.flags.map((flag) => (
+                <li
+                  key={`${flag.kind}:${flag.text}`}
+                  className="cq-body-sm text-(--cq-text-primary)"
+                >
+                  <span className="cq-caption text-(--cq-text-tertiary)">
+                    {FLAG_WORDS[flag.kind] ?? flag.kind}
+                    {flag.speaker === null ? "" : ` · ${flag.speaker}`}
+                  </span>
+                  <br />
+                  {flag.text}
+                </li>
+              ))}
+            </ul>
+          </RecordSection>
+        )}
+        {record.followUps.length === 0 ? null : (
+          <RecordSection label="Next">
+            <ul className="flex flex-col gap-1">
+              {record.followUps.map((item) => (
+                <li
+                  key={item.text}
+                  className="cq-body-sm text-(--cq-text-primary)"
+                >
+                  {item.text}
+                  {item.owner === null ? "" : ` (${item.owner})`}
+                </li>
+              ))}
+            </ul>
+          </RecordSection>
+        )}
+        {record.transcript.length === 0 ? null : (
+          <details>
+            <summary className="cq-caption cursor-pointer text-(--cq-text-secondary)">
+              Full transcript
+            </summary>
+            <ol className="flex max-h-80 flex-col gap-1.5 overflow-y-auto pt-2">
+              {record.transcript.map((line, index) => (
+                <li
+                  // Lines have no id; the call's own order is stable.
+                  key={index}
+                  className="cq-body-sm text-(--cq-text-primary)"
+                >
+                  {line.speaker === null ? null : (
+                    <span className="cq-caption text-(--cq-text-tertiary)">
+                      {line.speaker}:{" "}
+                    </span>
+                  )}
+                  {line.text}
+                </li>
+              ))}
+            </ol>
+          </details>
+        )}
+      </div>
+    </details>
   );
 }

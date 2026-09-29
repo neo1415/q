@@ -241,12 +241,15 @@ export {
   type MemoryExtractorVariables,
 } from "./prompts/schemas/memory-extractor.js";
 export { MEETING_NOTES_V1 } from "./prompts/tasks/meeting-notes.v1.js";
+export { MEETING_NOTES_V2 } from "./prompts/tasks/meeting-notes.v2.js";
 export {
   MEETING_NOTES_SCHEMA_NAME,
   MEETING_NOTES_SCHEMA_VERSION,
   MeetingNotesResultSchema,
+  MeetingNotesV2ResultSchema,
   MeetingNotesVariablesSchema,
   type MeetingNotesResult,
+  type MeetingNotesV2Result,
   type MeetingNotesVariables,
 } from "./prompts/schemas/meeting-notes.js";
 export { WELCOME_CONDUCTOR_V1 } from "./prompts/tasks/welcome-conductor.v1.js";

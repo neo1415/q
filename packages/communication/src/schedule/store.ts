@@ -235,7 +235,10 @@ export type MeetingActivityWriter = {
     input: {
       readonly relationshipId: string;
       readonly eventType:
-        "meeting_scheduled" | "meeting_rescheduled" | "meeting_cancelled";
+        | "meeting_scheduled"
+        | "meeting_rescheduled"
+        | "meeting_cancelled"
+        | "meeting_held";
       readonly meetingId: string;
       readonly actorUserId: string;
       readonly correlationId: string;

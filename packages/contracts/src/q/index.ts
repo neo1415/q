@@ -649,6 +649,8 @@ export {
   Q_MEETING_FLAG_KINDS,
   QMeetingAssistantDtoSchema,
   QMeetingAssistantStatusSchema,
+  QMeetingCommitmentSignalSchema,
+  type QMeetingCommitmentSignal,
   QMeetingFlagSchema,
   QMeetingFollowUpSchema,
   qMeetingAssistantPath,

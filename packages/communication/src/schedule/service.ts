@@ -559,7 +559,8 @@ export function createScheduleService(
         ({ meetLink } = await calendar.insert({
           eventId: record.googleEventId,
           summary: record.purpose.slice(0, 200),
-          description: `${record.purpose}\n\nArranged on Capital Q.`,
+          // ADR 0027: consent is asked for here, once, where the call is made.
+          description: `${record.purpose}\n\nArranged on Capital Q. Q from Capital Q joins this call to keep the meeting record for both sides; anyone on the call can ask Q to leave.`,
           start: record.startsAt,
           end: record.endsAt,
           timeZone: record.timeZone,

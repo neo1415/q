@@ -241,6 +241,20 @@ export const MeetingCancelledRelationshipEvent = defineRelationshipEvent({
   description: "The organiser cancelled a call, after approving it.",
 });
 
+/**
+ * The call happened and Q kept its record (ADR 0027): the relationship's
+ * history marks it, which is also the trail of what Capital Q arranged.
+ * Activity only: a meeting held is not interest, a commitment or an outcome.
+ */
+export const RELATIONSHIP_EVENT_MEETING_HELD = "meeting_held" as const;
+export const MeetingHeldRelationshipEvent = defineRelationshipEvent({
+  type: RELATIONSHIP_EVENT_MEETING_HELD,
+  payloadSchema: MeetingActivityPayloadSchema,
+  allowedVisibilityScopes: ["relationship_shared"],
+  description:
+    "A call booked on Capital Q took place and Q recorded it for both sides.",
+});
+
 export type RelationshipEventRegistry = {
   readonly get: (eventType: string) => RelationshipEventDefinition | undefined;
   readonly types: () => readonly string[];
@@ -320,4 +334,5 @@ export const RELATIONSHIP_EVENT_DEFINITIONS: readonly RelationshipEventDefinitio
     MeetingScheduledRelationshipEvent,
     MeetingRescheduledRelationshipEvent,
     MeetingCancelledRelationshipEvent,
+    MeetingHeldRelationshipEvent,
   ];

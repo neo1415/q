@@ -62,10 +62,46 @@ export const QMeetingFollowUpSchema = z
   .strict();
 export type QMeetingFollowUp = z.infer<typeof QMeetingFollowUpSchema>;
 
+export const QMeetingCommitmentSignalSchema = z
+  .object({
+    party: z.string().max(120),
+    amount: z.string().max(60),
+    firmness: z.enum(["EXPLORATORY", "SOFT", "FIRM"]),
+    quote: z.string().max(300),
+  })
+  .strict();
+export type QMeetingCommitmentSignal = z.infer<
+  typeof QMeetingCommitmentSignalSchema
+>;
+
 export const QMeetingAssistantDtoSchema = z
   .object({
     meetingId: UuidSchema,
     status: QMeetingAssistantStatusSchema,
+    /** ADR 0027: the meeting record, for both sides of the call. */
+    attendees: z
+      .array(
+        z
+          .object({
+            name: z.string().max(120),
+            side: z.enum(["FOUNDER", "INVESTOR"]).nullable(),
+          })
+          .strict(),
+      )
+      .max(20),
+    agreements: z.array(z.string().max(300)).max(12),
+    /** Money mentioned, as signals: never committed capital (§6.6.14). */
+    commitments: z.array(QMeetingCommitmentSignalSchema).max(10),
+    transcript: z
+      .array(
+        z
+          .object({
+            speaker: z.string().max(120).nullable(),
+            text: z.string().max(8_000),
+          })
+          .strict(),
+      )
+      .max(2_000),
     /** Present once Q has written its notes. */
     summary: z.string().max(4_000).nullable(),
     flags: z.array(QMeetingFlagSchema).max(20),

@@ -275,10 +275,11 @@ export function RelationshipScheduleControls({
                       </Button>
                     ) : null}
                   </div>
-                  {meeting.organisedByYou && meeting.meetLink !== null ? (
+                  {meeting.meetLink !== null ? (
                     <MeetingQ
                       meetingId={meeting.id}
                       ended={Date.parse(meeting.endsAt) < openedAt}
+                      organiser={meeting.organisedByYou}
                     />
                   ) : null}
                 </li>

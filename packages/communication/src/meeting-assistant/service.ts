@@ -1,6 +1,7 @@
 import type {
   QMeetingAssistantDto,
   QMeetingAssistantStatus,
+  QMeetingCommitmentSignal,
   QMeetingFlag,
   QMeetingFollowUp,
 } from "@capital-q/contracts";
@@ -10,15 +11,16 @@ import type { ActorContext } from "@capital-q/security";
 /**
  * Q in a meeting (founder direction 2026-09-29).
  *
- * The organiser of a booked call asks Q to come. A meeting bot joins the
- * call under Q's name at its start; when the call ends, its captions are
- * turned into notes (a summary, flags, follow-ups) that only the
- * organiser sees, and they are told the notes are ready. Nothing joins a
- * call nobody asked Q to join: every bot is one organiser's own click,
- * idempotent by its key, and the transcript itself is never stored.
+ * ADR 0027: Q attends every call booked on Capital Q (consent is asked at
+ * booking; any participant may remove it). A meeting bot joins under Q's
+ * name at the call's start; when the call ends Q keeps the transcript and
+ * writes the meeting record -- summary, attendees, agreements, money
+ * mentioned as commitment signals, flags, follow-ups -- which both sides
+ * of the call can read, and the relationship's history marks it held.
  *
- * The bot is a paid provider; the collector reads each bot's state only
- * from the call's start until it is settled, never before.
+ * The bot is a paid provider; the collector enlists a call only shortly
+ * before it starts and reads each bot only from the call's start until it
+ * is settled, never before.
  */
 
 type Logger = {
@@ -53,6 +55,9 @@ export type MeetingNotes = {
   readonly summary: string;
   readonly flags: readonly QMeetingFlag[];
   readonly followUps: readonly QMeetingFollowUp[];
+  readonly attendees: QMeetingAssistantDto["attendees"];
+  readonly agreements: readonly string[];
+  readonly commitments: readonly QMeetingCommitmentSignal[];
   readonly composerVersion: string;
 };
 
@@ -77,11 +82,17 @@ type AssistantRow = {
   summary: string | null;
   flags: unknown;
   follow_ups: unknown;
+  transcript: unknown;
+  attendees: unknown;
+  agreements: unknown;
+  commitments: unknown;
   updated_at: Date;
 };
 
 type MeetingRow = {
   id: string;
+  relationship_id: string;
+  organiser_user_id: string;
   organiser_tenant_id: string;
   purpose: string;
   starts_at: Date;
@@ -113,6 +124,8 @@ export type MeetingAssistantService = {
   ) => Promise<MeetingAssistantOutcome>;
   /** Collector tick: settle bots whose calls have started. */
   readonly collect: (limit?: number) => Promise<number>;
+  /** Collector tick: bring Q to every booked call about to start (ADR 0027). */
+  readonly enlist: (limit?: number) => Promise<number>;
 };
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -124,6 +137,10 @@ const TRANSCRIPT_MAX_CHARS = 60_000;
 export const Q_MEETING_BOT_NAME = "Q (Capital Q notes)";
 
 const OPEN = ["REQUESTED", "SCHEDULED", "IN_CALL", "COMPOSING"] as const;
+/** How far ahead of a call Q is enlisted: close enough not to waste a bot. */
+const ENLIST_AHEAD_MS = 30 * 60_000;
+/** The transcript kept, in lines; a long call is still bounded. */
+const TRANSCRIPT_MAX_LINES = 2_000;
 
 function asArray<T>(value: unknown): T[] {
   return Array.isArray(value) ? (value as T[]) : [];
@@ -140,6 +157,10 @@ function toDto(
       summary: null,
       flags: [],
       followUps: [],
+      attendees: [],
+      agreements: [],
+      commitments: [],
+      transcript: [],
       failure: null,
       updatedAt: null,
     };
@@ -150,6 +171,17 @@ function toDto(
     summary: row.summary,
     flags: asArray<QMeetingFlag>(row.flags).slice(0, 20),
     followUps: asArray<QMeetingFollowUp>(row.follow_ups).slice(0, 20),
+    attendees: asArray<QMeetingAssistantDto["attendees"][number]>(
+      row.attendees,
+    ).slice(0, 20),
+    agreements: asArray<string>(row.agreements).slice(0, 12),
+    commitments: asArray<QMeetingCommitmentSignal>(row.commitments).slice(
+      0,
+      10,
+    ),
+    transcript: asArray<QMeetingAssistantDto["transcript"][number]>(
+      row.transcript,
+    ).slice(0, TRANSCRIPT_MAX_LINES),
     failure: row.failure,
     updatedAt: new Date(row.updated_at).toISOString(),
   };
@@ -173,8 +205,16 @@ export function createMeetingAssistantService(dependencies: {
   readonly sql: DatabaseExecutor;
   readonly bots: MeetingBotProvider | undefined;
   readonly composer: MeetingNotesComposer;
-  /** The organiser's display name, for "you" in the notes. */
+  /** The organiser's display name, for the record. */
   readonly nameOf: (userId: string) => Promise<string | null>;
+  /** The call happened: marked on the relationship's history. */
+  readonly onHeld?:
+    | ((meeting: {
+        readonly relationshipId: string;
+        readonly meetingId: string;
+        readonly organiserUserId: string;
+      }) => Promise<void>)
+    | undefined;
   readonly now?: (() => Date) | undefined;
   readonly logger?: Logger | undefined;
 }): MeetingAssistantService {
@@ -188,21 +228,38 @@ export function createMeetingAssistantService(dependencies: {
   ): Promise<MeetingRow | null> {
     if (!UUID.test(meetingId)) return null;
     const rows = await sql<MeetingRow[]>`
-      select id, organiser_tenant_id, purpose, starts_at, ends_at, status, meet_link
+      select id, relationship_id, organiser_user_id, organiser_tenant_id, purpose,
+             starts_at, ends_at, status, meet_link
         from communication.meetings
        where id = ${meetingId} and organiser_user_id = ${actor.userId}`;
     return rows[0] ?? null;
   }
 
-  async function assistantOf(
+  /** The meeting, when this person is a participant (either side). */
+  async function attended(
+    actor: ActorContext,
     meetingId: string,
-    userId: string,
-  ): Promise<AssistantRow | null> {
+  ): Promise<MeetingRow | null> {
+    if (!UUID.test(meetingId)) return null;
+    const rows = await sql<MeetingRow[]>`
+      select m.id, m.relationship_id, m.organiser_user_id, m.organiser_tenant_id,
+             m.purpose, m.starts_at, m.ends_at, m.status, m.meet_link
+        from communication.meetings m
+       where m.id = ${meetingId}
+         and (m.organiser_user_id = ${actor.userId}
+              or exists (select 1 from communication.meeting_participants p
+                          where p.meeting_id = m.id and p.user_id = ${actor.userId}))`;
+    return rows[0] ?? null;
+  }
+
+  /** The meeting's one record (a row per meeting, whoever brought Q). */
+  async function assistantOf(meetingId: string): Promise<AssistantRow | null> {
     const rows = await sql<AssistantRow[]>`
       select id, meeting_id, tenant_id, user_id, provider_bot_id, status, failure,
-             summary, flags, follow_ups, updated_at
+             summary, flags, follow_ups, transcript, attendees, agreements,
+             commitments, updated_at
         from communication.meeting_assistants
-       where meeting_id = ${meetingId} and user_id = ${userId}`;
+       where meeting_id = ${meetingId}`;
     return rows[0] ?? null;
   }
 
@@ -213,6 +270,7 @@ export function createMeetingAssistantService(dependencies: {
       readonly botId?: string | undefined;
       readonly failure?: string | null | undefined;
       readonly notes?: MeetingNotes | undefined;
+      readonly transcript?: readonly MeetingTranscriptLine[] | undefined;
     },
   ): Promise<void> {
     await sql`
@@ -224,6 +282,10 @@ export function createMeetingAssistantService(dependencies: {
              flags = coalesce(${patch.notes === undefined ? null : JSON.stringify(patch.notes.flags)}::jsonb, flags),
              follow_ups = coalesce(${patch.notes === undefined ? null : JSON.stringify(patch.notes.followUps)}::jsonb, follow_ups),
              composer_version = coalesce(${patch.notes?.composerVersion ?? null}, composer_version),
+             attendees = coalesce(${patch.notes === undefined ? null : JSON.stringify(patch.notes.attendees)}::jsonb, attendees),
+             agreements = coalesce(${patch.notes === undefined ? null : JSON.stringify(patch.notes.agreements)}::jsonb, agreements),
+             commitments = coalesce(${patch.notes === undefined ? null : JSON.stringify(patch.notes.commitments)}::jsonb, commitments),
+             transcript = coalesce(${patch.transcript === undefined ? null : JSON.stringify(patch.transcript.slice(0, TRANSCRIPT_MAX_LINES).map((line) => ({ speaker: line.speaker?.slice(0, 120) ?? null, text: line.text.slice(0, 8_000) })))}::jsonb, transcript),
              updated_at = clock_timestamp()
        where id = ${id}`;
   }
@@ -258,7 +320,10 @@ export function createMeetingAssistantService(dependencies: {
       });
       return;
     }
-    await update(row.id, { status: "COMPOSING" });
+    await update(row.id, {
+      status: "COMPOSING",
+      transcript: read.transcript,
+    });
     const notes = await composer.compose({
       tenantId: row.tenant_id,
       userId: row.user_id,
@@ -275,6 +340,18 @@ export function createMeetingAssistantService(dependencies: {
       return;
     }
     await update(row.id, { status: "DONE", notes });
+    await dependencies
+      .onHeld?.({
+        relationshipId: row.relationship_id,
+        meetingId: row.meeting_id,
+        organiserUserId: row.organiser_user_id,
+      })
+      .catch((error: unknown) => {
+        logger?.warn(
+          { err: error, meetingId: row.meeting_id },
+          "meeting held not recorded on the relationship",
+        );
+      });
     await sql`
       insert into communication.notifications
         (tenant_id, user_id, kind, title, body, link_path, reminder_id, meeting_id, dedupe_key)
@@ -286,9 +363,9 @@ export function createMeetingAssistantService(dependencies: {
 
   return {
     read: async (actor, meetingId) => {
-      const meeting = await organised(actor, meetingId);
+      const meeting = await attended(actor, meetingId);
       if (meeting === null) return null;
-      return toDto(await assistantOf(meeting.id, actor.userId), meeting.id);
+      return toDto(await assistantOf(meeting.id), meeting.id);
     },
 
     bring: async (actor, meetingId, idempotencyKey) => {
@@ -303,7 +380,7 @@ export function createMeetingAssistantService(dependencies: {
       }
       if (bots === undefined)
         return { outcome: "REFUSED", code: "UNAVAILABLE" };
-      const existing = await assistantOf(meeting.id, actor.userId);
+      const existing = await assistantOf(meeting.id);
       if (
         existing !== null &&
         (OPEN as readonly string[]).includes(existing.status)
@@ -340,20 +417,20 @@ export function createMeetingAssistantService(dependencies: {
       }
       return {
         outcome: "OK",
-        assistant: toDto(
-          await assistantOf(meeting.id, actor.userId),
-          meeting.id,
-        ),
+        assistant: toDto(await assistantOf(meeting.id), meeting.id),
       };
     },
 
+    // Any participant may remove Q (ADR 0027: consent stays theirs).
     dismiss: async (actor, meetingId) => {
-      const meeting = await organised(actor, meetingId);
+      const meeting = await attended(actor, meetingId);
       if (meeting === null) return { outcome: "REFUSED", code: "NOT_FOUND" };
-      const existing = await assistantOf(meeting.id, actor.userId);
+      const existing = await assistantOf(meeting.id);
       if (
         existing !== null &&
-        (existing.status === "REQUESTED" || existing.status === "SCHEDULED")
+        (existing.status === "REQUESTED" ||
+          existing.status === "SCHEDULED" ||
+          existing.status === "IN_CALL")
       ) {
         if (bots !== undefined && existing.provider_bot_id !== null) {
           await bots
@@ -369,10 +446,7 @@ export function createMeetingAssistantService(dependencies: {
       }
       return {
         outcome: "OK",
-        assistant: toDto(
-          await assistantOf(meeting.id, actor.userId),
-          meeting.id,
-        ),
+        assistant: toDto(await assistantOf(meeting.id), meeting.id),
       };
     },
 
@@ -382,7 +456,9 @@ export function createMeetingAssistantService(dependencies: {
       // Only calls that have started: before that there is nothing to read.
       const rows = await sql<(AssistantRow & MeetingRow)[]>`
         select a.id, a.meeting_id, a.tenant_id, a.user_id, a.provider_bot_id, a.status,
-               a.failure, a.summary, a.flags, a.follow_ups, a.updated_at,
+               a.failure, a.summary, a.flags, a.follow_ups, a.transcript, a.attendees,
+               a.agreements, a.commitments, a.updated_at,
+               m.relationship_id, m.organiser_user_id,
                m.organiser_tenant_id, m.purpose, m.starts_at, m.ends_at,
                m.status as meeting_status, m.meet_link
           from communication.meeting_assistants a
@@ -404,6 +480,55 @@ export function createMeetingAssistantService(dependencies: {
         }
       }
       return settled;
+    },
+
+    enlist: async (limit = 10) => {
+      if (bots === undefined) return 0;
+      const current = now();
+      const calls = await sql<MeetingRow[]>`
+        select m.id, m.relationship_id, m.organiser_user_id, m.organiser_tenant_id,
+               m.purpose, m.starts_at, m.ends_at, m.status, m.meet_link
+          from communication.meetings m
+         where m.status = 'SCHEDULED'
+           and m.meet_link is not null
+           and m.starts_at <= ${new Date(current.getTime() + ENLIST_AHEAD_MS)}
+           and m.ends_at > ${current}
+           and not exists (select 1 from communication.meeting_assistants a
+                            where a.meeting_id = m.id)
+         order by m.starts_at
+         limit ${limit}`;
+      let enlisted = 0;
+      for (const call of calls) {
+        const rows = await sql<{ id: string }[]>`
+          insert into communication.meeting_assistants
+            (meeting_id, tenant_id, user_id, provider, status, idempotency_key)
+          values (${call.id}, ${call.organiser_tenant_id}, ${call.organiser_user_id},
+                  'recall', 'REQUESTED', ${`enlist:${call.id}`})
+          on conflict (meeting_id) do nothing
+          returning id`;
+        const id = rows[0]?.id;
+        if (id === undefined || call.meet_link === null) continue;
+        const startsIn = call.starts_at.getTime() - current.getTime();
+        try {
+          const created = await bots.create({
+            meetingUrl: call.meet_link,
+            joinAt: startsIn > SCHEDULE_NOTICE_MS ? call.starts_at : null,
+            botName: Q_MEETING_BOT_NAME,
+          });
+          await update(id, { status: "SCHEDULED", botId: created.botId });
+          enlisted += 1;
+        } catch (error: unknown) {
+          logger?.warn(
+            { err: error, meetingId: call.id },
+            "meeting bot not created",
+          );
+          await update(id, {
+            status: "FAILED",
+            failure: "Q couldn't be booked into this call.",
+          });
+        }
+      }
+      return enlisted;
     },
   };
 }

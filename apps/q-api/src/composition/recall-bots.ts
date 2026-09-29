@@ -150,8 +150,15 @@ export function createRecallBots(options: {
       }));
       return { state, transcript };
     },
+    // A scheduled bot is deleted; one already in the call is asked to
+    // leave (ADR 0027: any participant may remove Q at any time).
     cancel: async (botId) => {
-      await request(`/bot/${encodeURIComponent(botId)}/`, { method: "DELETE" });
+      const path = `/bot/${encodeURIComponent(botId)}/`;
+      try {
+        await request(path, { method: "DELETE" });
+      } catch {
+        await request(`${path}leave_call/`, { method: "POST" });
+      }
     },
   };
 }

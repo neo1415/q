@@ -15,6 +15,8 @@
  * a credential, a connection or a table.
  */
 
+import { randomUUID } from "node:crypto";
+
 import {
   loadDatabaseConfig,
   resolveDatabaseUrl,
@@ -85,6 +87,7 @@ import {
   composeChat,
   composeSchedule,
   createMeetingAssistantService,
+  createNetworkMeetingActivityWriter,
 } from "@capital-q/communication";
 import {
   createPostgresDocumentQueryPort,
@@ -1753,6 +1756,20 @@ const meetingAssistant = createMeetingAssistantService({
     dataPosture: demoDataPosture,
     logger,
   }),
+  // ADR 0027: the call is marked on the relationship's history once its
+  // record exists, through Network's own appender.
+  onHeld: async (held) => {
+    const writer = createNetworkMeetingActivityWriter();
+    await database.transactions.run((tx) =>
+      writer.record(tx, {
+        relationshipId: held.relationshipId,
+        eventType: "meeting_held",
+        meetingId: held.meetingId,
+        actorUserId: held.organiserUserId,
+        correlationId: `cor_${randomUUID()}`,
+      }),
+    );
+  },
   nameOf: (userId) =>
     database.sql<{ display_name: string | null }[]>`
       select display_name from identity.user_profiles where id = ${userId} limit 1`.then(
@@ -1762,9 +1779,13 @@ const meetingAssistant = createMeetingAssistantService({
 });
 setInterval(
   () => {
-    meetingAssistant.collect().catch((error: unknown) => {
-      logger.warn({ err: error }, "meeting assistant collection failed");
-    });
+    // ADR 0027: every booked call gets Q, enlisted shortly before it starts.
+    meetingAssistant
+      .enlist()
+      .then(() => meetingAssistant.collect())
+      .catch((error: unknown) => {
+        logger.warn({ err: error }, "meeting assistant collection failed");
+      });
   },
   2 * 60 * 1000,
 ).unref();
