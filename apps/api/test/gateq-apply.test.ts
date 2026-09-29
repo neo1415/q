@@ -477,11 +477,17 @@ describe("what one credential may do", () => {
     expect(response.statusCode).toBe(429);
     const body = response.json<Record<string, unknown>>();
     expect(String(body["title"])).toContain("Too many requests");
-    // Nothing about the credential, the quota or where the edge is.
+    // Nothing about the credential, the quota or where the edge is. The
+    // request id is a random UUID that can contain the limit's digits by
+    // chance, so it is checked on its own and left out of the number check.
     const text = JSON.stringify(body);
     expect(text).not.toContain(guest);
     expect(text.toLowerCase()).not.toContain("quota");
-    expect(text).not.toContain(String(GATEQ_GUEST_QUOTAS.TURN.limit));
+    expect(String(body["requestId"])).toMatch(/^req_[0-9a-f-]{36}$/);
+    const { requestId: _requestId, ...rest } = body;
+    expect(JSON.stringify(rest)).not.toContain(
+      String(GATEQ_GUEST_QUOTAS.TURN.limit),
+    );
   });
 
   it("8: the raw credential never reaches the response on any path", async () => {
