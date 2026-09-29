@@ -286,6 +286,23 @@ const OFFERS: readonly QCapability[] = [
     "RELATIONSHIPS",
     "Dismissing is the person clearing their own notice once they have acted on it; Q never decides that something was done.",
   ),
+  // ADR 0023: founders reach investors only by a Connection Request.
+  offer(
+    "connection_request",
+    "RELATIONSHIP",
+    "Look at investors who chose to be discoverable and send one a Connection Request (from the investor's page, opened from Discover or Investors)",
+    "DISCOVER",
+    "A Connection Request introduces their company to an investor; the founder sends it themselves after reading who the investor is, and only where the investor takes requests.",
+    true,
+  ),
+  offer(
+    "connection_request_answer",
+    "RELATIONSHIP",
+    "Accept or decline founders' Connection Requests to their investor organisation (Founder requests, linked from Relationships)",
+    "RELATIONSHIPS",
+    "Accepting or declining is the investor's own decision about a founder; Q never answers a request for them.",
+    false,
+  ),
   offer(
     "verification_request",
     "RECORDS",

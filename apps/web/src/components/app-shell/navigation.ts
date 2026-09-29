@@ -3,6 +3,7 @@ import type { ComponentType } from "react";
 import {
   CircleUser,
   Compass,
+  Handshake,
   Landmark,
   Play,
   Settings,
@@ -28,6 +29,7 @@ export type NavigationItem = {
     | "/relationships"
     | "/profile"
     | "/pitch"
+    | "/investors"
     | "/settings";
   readonly label: string;
   readonly icon: ComponentType<{
@@ -75,6 +77,23 @@ export const FOUNDER_MEDIA_NAVIGATION: NavigationItem = {
   href: "/pitch",
   label: "Pitch & media",
   icon: Play,
+};
+
+/**
+ * Investors (ADR 0023). For a founder: the investors they may look at and
+ * ask to connect with. For an investor: founders' Connection Requests to
+ * their organisation. Same route, the person's own side decides the page;
+ * the server decides what either may see.
+ */
+export const INVESTORS_NAVIGATION: NavigationItem = {
+  href: "/investors",
+  label: "Investors",
+  icon: Handshake,
+};
+export const FOUNDER_REQUESTS_NAVIGATION: NavigationItem = {
+  href: "/investors",
+  label: "Founder requests",
+  icon: Handshake,
 };
 
 /**

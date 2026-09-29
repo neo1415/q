@@ -31,6 +31,8 @@ export {
   MatchIdSchema,
   RelationshipEventIdSchema,
   RelationshipIdSchema,
+  toConnectionRequestDto,
+  toIncomingConnectionRequestDto,
   toIncomingInterestDto,
   toInterestDto,
   toRelationshipDto,

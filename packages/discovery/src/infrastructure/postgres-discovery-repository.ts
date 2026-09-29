@@ -66,7 +66,9 @@ const InvestorRow = z.object({
   inbound_preference: z.string().nullable(),
 });
 
-function toCandidateInvestor(row: z.infer<typeof InvestorRow>): CandidateInvestor {
+function toCandidateInvestor(
+  row: z.infer<typeof InvestorRow>,
+): CandidateInvestor {
   return {
     investorOrganisationId: row.id,
     displayName: row.display_name,

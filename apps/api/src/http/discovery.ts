@@ -1,10 +1,14 @@
 import type { FastifyInstance, FastifyRequest } from "fastify";
 
 import {
+  createProblemDetails,
+  PROBLEM_CONTENT_TYPE,
   DISCOVER_FILTER_QUERY_KEYS,
   DiscoverFiltersQuerySchema,
   DISCOVERY_COMPANIES_PATH,
+  DISCOVERY_INVESTOR_PATH,
   DISCOVERY_INVESTORS_PATH,
+  DiscoveredInvestorProfileDtoSchema,
   DISCOVERY_NETWORK_PITCHES_PATH,
   DiscoveryCompanySlateDtoSchema,
   DiscoveryInvestorSlateDtoSchema,
@@ -43,7 +47,19 @@ import {
  * because a score is not a verdict to show anyone.
  */
 
+/** An investor organisation's own photo and cover (signed URLs), or null. */
+export type InvestorImagesPort = (investorOrganisationId: string) => Promise<{
+  readonly photo: string | null;
+  readonly cover: string | null;
+}>;
+
 export type DiscoveryRoutesDependencies = ActorContextDependencies & {
+  /**
+   * ADR 0023: investors' images on founder-facing reads. Called only for
+   * investors the discovery service already returned to this reader.
+   * Absent, or failing, a card shows the investor's initials.
+   */
+  readonly investorImages?: InvestorImagesPort | undefined;
   readonly discovery: DiscoveryService;
   /** Persisted recommendation slates (CQ-REC-006): the companies feed. */
   readonly slates: SlateReadService;
@@ -287,6 +303,18 @@ export function registerDiscoveryRoutes(
     },
   );
 
+  const imagesOf = async (
+    investorOrganisationId: string,
+  ): Promise<{ photoUrl?: string | null; coverUrl?: string | null }> => {
+    if (dependencies.investorImages === undefined) return {};
+    try {
+      const images = await dependencies.investorImages(investorOrganisationId);
+      return { photoUrl: images.photo, coverUrl: images.cover };
+    } catch {
+      return {};
+    }
+  };
+
   app.get(
     DISCOVERY_INVESTORS_PATH,
     { onRequest: withContext },
@@ -297,12 +325,48 @@ export function registerDiscoveryRoutes(
         limit: page.limit,
         cursor: page.cursor,
       });
+      const items = await Promise.all(
+        slate.items.map(async ({ rank: _rank, ...item }) => ({
+          ...item,
+          ...(await imagesOf(item.investorOrganisationId)),
+        })),
+      );
       void reply.header("Cache-Control", "no-store");
       return DiscoveryInvestorSlateDtoSchema.parse({
         rankingVersion: slate.rankingVersion,
-        items: slate.items.map(({ rank: _rank, ...item }) => item),
+        items,
         notes: slate.notes,
         nextCursor: slate.nextCursor,
+      });
+    },
+  );
+
+  // One investor, as this founder may see them (ADR 0023). Not visible and
+  // absent are the same 404.
+  app.get(
+    DISCOVERY_INVESTOR_PATH,
+    { onRequest: withContext },
+    async (request, reply) => {
+      const raw = (request.params as { investorOrganisationId?: unknown })
+        .investorOrganisationId;
+      const investor = await service.findInvestor(
+        getActorContext(request),
+        typeof raw === "string" ? raw : "",
+      );
+      void reply.header("Cache-Control", "no-store");
+      if (investor === null) {
+        const problem = createProblemDetails({
+          code: "RESOURCE_NOT_FOUND",
+          requestId: request.id,
+        });
+        return reply
+          .status(problem.status)
+          .type(PROBLEM_CONTENT_TYPE)
+          .send(problem);
+      }
+      return DiscoveredInvestorProfileDtoSchema.parse({
+        ...investor,
+        ...(await imagesOf(investor.investorOrganisationId)),
       });
     },
   );

@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 
 import { getChatUnread } from "@capital-q/api-client";
+import { buttonClassName } from "@capital-q/ui/button";
 
 import {
   PageContainer,
@@ -43,10 +45,20 @@ export default async function RelationshipsPage() {
           side === "INVESTOR"
             ? "Every company your organisation has discovered or approached, and where each stands."
             : side === "COMPANY"
-              ? "Every investor organisation that has approached your company, and where each stands."
+              ? "Every investor organisation your company is connected with or has approached, and where each stands."
               : undefined
         }
       />
+      {side === "INVESTOR" ? (
+        // ADR 0023: founders' Connection Requests wait on the investor here.
+        <Link
+          href="/investors"
+          className={buttonClassName("secondary", "compact")}
+          data-founder-requests-link
+        >
+          Founder requests
+        </Link>
+      ) : null}
       {/* BIZ-008: due reminders and notices, before the list. */}
       <NoticesPanel />
       <RelationshipsIndex side={side} items={items} unread={unread} />

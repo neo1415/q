@@ -74,6 +74,7 @@ export const INVESTOR_FIELD_LABELS: Readonly<
   hqCountry: "Country",
   publicDescription: "Description",
   deploymentState: "Deploying capital",
+  inboundPreference: "How founders can reach you",
 };
 
 function changedFields(

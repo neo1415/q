@@ -1,5 +1,14 @@
 import {
   CompanyInterestStatusDtoSchema,
+  ConnectionRequestAnswerDtoSchema,
+  ConnectionRequestResultDtoSchema,
+  ConnectionStatusDtoSchema,
+  IncomingConnectionRequestListDtoSchema,
+  NETWORK_CONNECTION_REQUEST_ACCEPT_PATH,
+  NETWORK_CONNECTION_REQUEST_DECLINE_PATH,
+  NETWORK_CONNECTION_REQUESTS_PATH,
+  NETWORK_INVESTOR_CONNECTION_PATH,
+  NETWORK_INVESTOR_CONNECTION_REQUEST_PATH,
   ExpressInterestResultDtoSchema,
   IDEMPOTENCY_KEY_HEADER,
   IncomingInterestListDtoSchema,
@@ -141,5 +150,77 @@ export function getOwnInterest(session: ApiSession, companyId: string) {
     "GET",
     companyPath(NETWORK_COMPANY_INTEREST_PATH, companyId),
     CompanyInterestStatusDtoSchema,
+  );
+}
+
+function investorPath(template: string, investorOrganisationId: string) {
+  return template.replace(
+    ":investorOrganisationId",
+    encodeURIComponent(investorOrganisationId),
+  );
+}
+
+/**
+ * `POST /v1/network/investors/:investorOrganisationId/connection-request`
+ * — a founder's Connection Request (ADR 0023). Server-confirmed; the key
+ * is generated once per intended request and reused on retry.
+ */
+export function requestConnection(
+  session: ApiSession,
+  investorOrganisationId: string,
+  idempotencyKey: string,
+) {
+  return call(
+    session,
+    "POST",
+    investorPath(
+      NETWORK_INVESTOR_CONNECTION_REQUEST_PATH,
+      investorOrganisationId,
+    ),
+    ConnectionRequestResultDtoSchema,
+    { body: {}, headers: { [IDEMPOTENCY_KEY_HEADER]: idempotencyKey } },
+  );
+}
+
+/** `GET /v1/network/investors/:investorOrganisationId/connection` — where this founder stands. */
+export function getConnectionStatus(
+  session: ApiSession,
+  investorOrganisationId: string,
+) {
+  return call(
+    session,
+    "GET",
+    investorPath(NETWORK_INVESTOR_CONNECTION_PATH, investorOrganisationId),
+    ConnectionStatusDtoSchema,
+  );
+}
+
+/** `GET /v1/network/connection-requests` — the investor's inbox of founders' requests. */
+export function listConnectionRequests(session: ApiSession) {
+  return call(
+    session,
+    "GET",
+    NETWORK_CONNECTION_REQUESTS_PATH,
+    IncomingConnectionRequestListDtoSchema,
+  );
+}
+
+/** `POST /v1/network/connection-requests/:interestId/{accept|decline}` — the investor's answer. */
+export function answerConnectionRequest(
+  session: ApiSession,
+  interestId: string,
+  decision: "ACCEPTED" | "DECLINED",
+  idempotencyKey: string,
+) {
+  const template =
+    decision === "ACCEPTED"
+      ? NETWORK_CONNECTION_REQUEST_ACCEPT_PATH
+      : NETWORK_CONNECTION_REQUEST_DECLINE_PATH;
+  return call(
+    session,
+    "POST",
+    template.replace(":interestId", encodeURIComponent(interestId)),
+    ConnectionRequestAnswerDtoSchema,
+    { body: {}, headers: { [IDEMPOTENCY_KEY_HEADER]: idempotencyKey } },
   );
 }

@@ -42,6 +42,8 @@ import {
   ChatNotFoundError,
 } from "@capital-q/communication";
 import {
+  ConnectionNotAcceptedError,
+  ConnectionNotPermittedError,
   InterestAlreadyAnsweredError,
   InterestCompanyNotFoundError,
   InterestIdempotencyConflictError,
@@ -346,6 +348,23 @@ function toProblem(
     error instanceof ChatNotFoundError
   ) {
     return createProblemDetails({ code: "RESOURCE_NOT_FOUND", requestId });
+  }
+
+  // ADR 0023: the investor's own declared choice, or the caller's role.
+  // Neither says anything private about anyone.
+  if (error instanceof ConnectionNotAcceptedError) {
+    return createProblemDetails({
+      code: "RESOURCE_CONFLICT",
+      requestId,
+      detail: error.message,
+    });
+  }
+  if (error instanceof ConnectionNotPermittedError) {
+    return createProblemDetails({
+      code: "PERMISSION_DENIED",
+      requestId,
+      detail: error.message,
+    });
   }
 
   // Describes the caller, never a company: safe to say plainly.

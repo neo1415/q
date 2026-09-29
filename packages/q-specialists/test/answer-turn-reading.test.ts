@@ -591,6 +591,9 @@ describe("the answer is told what this run can do (CQ-QX-008)", () => {
           expect.objectContaining({ destination: "RELATIONSHIPS" }),
           expect.objectContaining({ destination: "RELATIONSHIPS" }),
           expect.objectContaining({ destination: "RELATIONSHIPS" }),
+          // Answer founders' Connection Requests (ADR 0023); sending one
+          // is a company's own and waits for a company.
+          expect.objectContaining({ destination: "RELATIONSHIPS" }),
         ],
       },
     ]);

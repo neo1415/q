@@ -1238,6 +1238,7 @@ export type Database = {
           display_name: string
           hq_country: string | null
           id: string
+          inbound_preference: string | null
           investor_type: string
           marketplace_visibility: string
           organisation_id: string
@@ -1254,6 +1255,7 @@ export type Database = {
           display_name: string
           hq_country?: string | null
           id?: string
+          inbound_preference?: string | null
           investor_type: string
           marketplace_visibility?: string
           organisation_id: string
@@ -1270,6 +1272,7 @@ export type Database = {
           display_name?: string
           hq_country?: string | null
           id?: string
+          inbound_preference?: string | null
           investor_type?: string
           marketplace_visibility?: string
           organisation_id?: string
@@ -3523,6 +3526,7 @@ export type Database = {
           interest_id: string
           relationship_event_id: string
           relationship_id: string
+          responded_by_party: string
           responded_by_user_id: string
           responded_in_organisation_id: string
           tenant_id: string
@@ -3534,6 +3538,7 @@ export type Database = {
           interest_id: string
           relationship_event_id: string
           relationship_id: string
+          responded_by_party?: string
           responded_by_user_id: string
           responded_in_organisation_id: string
           tenant_id: string
@@ -3545,6 +3550,7 @@ export type Database = {
           interest_id?: string
           relationship_event_id?: string
           relationship_id?: string
+          responded_by_party?: string
           responded_by_user_id?: string
           responded_in_organisation_id?: string
           tenant_id?: string

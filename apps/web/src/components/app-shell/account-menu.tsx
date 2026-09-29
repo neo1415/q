@@ -17,6 +17,8 @@ import {
 
 import {
   FOUNDER_MEDIA_NAVIGATION,
+  FOUNDER_REQUESTS_NAVIGATION,
+  INVESTORS_NAVIGATION,
   PROFILE_NAVIGATION,
   SETTINGS_NAVIGATION,
 } from "./navigation";
@@ -28,10 +30,17 @@ import {
  */
 export function AccountMenu({
   founder = false,
+  investor = false,
 }: {
   /** A founder's context: their pitch is one tap away too (VID). */
   readonly founder?: boolean | undefined;
+  /** An investor's context: founders' requests (ADR 0023). */
+  readonly investor?: boolean | undefined;
 }) {
+  const sideLinks = [
+    ...(founder ? [INVESTORS_NAVIGATION, FOUNDER_MEDIA_NAVIGATION] : []),
+    ...(investor ? [FOUNDER_REQUESTS_NAVIGATION] : []),
+  ];
   return (
     <PopoverRoot>
       <PopoverTrigger>
@@ -50,19 +59,20 @@ export function AccountMenu({
       </PopoverTrigger>
       <PopoverContent title="Account">
         <div className="flex flex-col gap-3 pt-2">
-          {founder ? (
+          {sideLinks.map((item) => (
             <Link
-              href={FOUNDER_MEDIA_NAVIGATION.href}
+              key={item.label}
+              href={item.href}
               className="-mx-2 flex min-h-11 items-center justify-between rounded-md border-t border-(--cq-border-subtle) px-2 cq-body-sm text-(--cq-text-primary) hover:bg-(--cq-surface-subtle)"
             >
-              {FOUNDER_MEDIA_NAVIGATION.label}
+              {item.label}
               <ChevronRight
                 aria-hidden="true"
                 size={ICON_SIZE.compact}
                 strokeWidth={ICON_STROKE}
               />
             </Link>
-          ) : null}
+          ))}
           <Link
             href={PROFILE_NAVIGATION.href}
             className="-mx-2 flex min-h-11 items-center justify-between rounded-md border-t border-(--cq-border-subtle) px-2 cq-body-sm text-(--cq-text-primary) hover:bg-(--cq-surface-subtle)"

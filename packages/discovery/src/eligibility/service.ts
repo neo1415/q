@@ -101,6 +101,21 @@ export type EligibilityService = {
   readonly evaluate: (
     query: EvaluateEligibilityQuery,
   ) => Promise<EligibilityEvaluation>;
+  /**
+   * ADR 0023: whether a company passes an investor organisation's own
+   * declared hard rules (its ACTIVE mandate), for a founder's Connection
+   * Request to an investor who takes QUALIFIED requests. No investor actor
+   * exists here and none is invented: it reads only the mandate and the
+   * company's canonical facts. The founder is sending their company to the
+   * investor, so the discoverability gate is not what is asked; the
+   * relationship standing is not either. Only ELIGIBLE qualifies: no
+   * ACTIVE mandate, or a rule the facts cannot answer, is not consent.
+   */
+  readonly qualifiesForInvestor: (query: {
+    readonly tenantId: string;
+    readonly investorOrganisationId: string;
+    readonly companyId: string;
+  }) => Promise<boolean>;
 };
 
 export type EligibilityServiceDependencies = {
@@ -245,6 +260,43 @@ export function createEligibilityService(
         "hard eligibility evaluated",
       );
       return { context, results };
+    },
+
+    qualifiesForInvestor: async (query) => {
+      const [mandate, taxonomyVersion, facts] = await Promise.all([
+        ports.mandates.activeMandate({
+          tenantId: query.tenantId,
+          investorOrganisationId: query.investorOrganisationId,
+          mandateId: null,
+        }),
+        ports.taxonomyVersions?.currentVersions() ?? Promise.resolve(null),
+        ports.companies.findMany([query.companyId]),
+      ]);
+      const company = facts.find((f) => f.companyId === query.companyId);
+      if (
+        company === undefined ||
+        mandate.kind !== "FOUND" ||
+        mandate.mandate.investorOrganisationId !==
+          query.investorOrganisationId ||
+        mandate.mandate.status !== "ACTIVE"
+      ) {
+        return false;
+      }
+      const classifications = await ports.classifications.listActive([
+        { companyId: company.companyId, tenantId: company.tenantId },
+      ]);
+      const result = evaluateHardEligibility({
+        mode: "INVESTOR_DISCOVER",
+        investorOrganisationId: query.investorOrganisationId,
+        mandate,
+        company,
+        classifications: classifications.get(company.companyId) ?? [],
+        permittedToView: true,
+        relationship: { kind: "NONE" },
+        taxonomyVersion,
+        evaluatedAt: clock().toISOString(),
+      });
+      return result.decision === "ELIGIBLE";
     },
   };
 }

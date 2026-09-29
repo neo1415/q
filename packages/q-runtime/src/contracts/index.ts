@@ -270,7 +270,8 @@ function disclosable(
       // kind forces somebody to decide what history may hand back.
       // ARTIFACT_REFERENCE among them: it names something Q composed and
       // grants nothing, because knowing an identifier has never been
-      // permission to see what it names.
+      // permission to see what it names. PUBLIC_SOURCE is a public web
+      // page's own public fields (R23), no guarded record.
       case "TEXT":
       case "COMPANY_REFERENCE":
       case "INVESTOR_REFERENCE":
@@ -279,6 +280,7 @@ function disclosable(
       case "CLARIFICATION_REQUEST":
       case "ACTION_PROPOSAL":
       case "ARTIFACT_REFERENCE":
+      case "PUBLIC_SOURCE":
         return true;
     }
   });

@@ -22,6 +22,8 @@ import { ChatsListForRoute } from "@/features/q/chats-list";
 import type { ShellContext } from "./app-shell";
 import {
   FOUNDER_MEDIA_NAVIGATION,
+  FOUNDER_REQUESTS_NAVIGATION,
+  INVESTORS_NAVIGATION,
   isActiveRoute,
   PRIMARY_NAVIGATION,
   PROFILE_NAVIGATION,
@@ -57,7 +59,11 @@ export function DesktopSidebar({
 
   const items = [
     ...PRIMARY_NAVIGATION,
-    ...(context.scope === "founder_private" ? [FOUNDER_MEDIA_NAVIGATION] : []),
+    ...(context.scope === "founder_private"
+      ? [INVESTORS_NAVIGATION, FOUNDER_MEDIA_NAVIGATION]
+      : context.scope === "investor_private"
+        ? [FOUNDER_REQUESTS_NAVIGATION]
+        : []),
   ];
 
   return (

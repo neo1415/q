@@ -194,6 +194,36 @@ export function toInterestDto(interest: Interest): InterestDto {
   };
 }
 
+/** A founder's own Connection Request (ADR 0023). */
+export function toConnectionRequestDto(interest: Interest) {
+  return {
+    interestId: interest.id,
+    relationshipId: interest.relationshipId,
+    investorOrganisationId: interest.investorOrganisationId,
+    requestedAt: interest.createdAt,
+    response: interest.response?.decision ?? "PENDING",
+    respondedAt: interest.response?.respondedAt ?? null,
+    connection: connectionDto(interest),
+  } as const;
+}
+
+/** A founder's request as the investor sees it: the company's canonical name only. */
+export function toIncomingConnectionRequestDto(
+  interest: Interest,
+  company: { readonly canonicalName: string },
+) {
+  return {
+    interestId: interest.id,
+    relationshipId: interest.relationshipId,
+    companyId: interest.companyId,
+    companyName: company.canonicalName,
+    requestedAt: interest.createdAt,
+    response: interest.response?.decision ?? "PENDING",
+    respondedAt: interest.response?.respondedAt ?? null,
+    connection: connectionDto(interest),
+  } as const;
+}
+
 /**
  * The company's view of an incoming interest. Names the investor
  * organisation -- the interest was addressed to the company -- and never

@@ -179,6 +179,7 @@ export { createSseParser, type SseMessage, type SseParser } from "./sse.js";
 export {
   discoverCompanies,
   discoverInvestors,
+  getDiscoveredInvestor,
   listNetworkPitches,
   getRecommendationExplanation,
   listSavedCompanies,
@@ -188,7 +189,11 @@ export {
 } from "./discovery.js";
 
 export {
+  answerConnectionRequest,
   answerInterest,
+  getConnectionStatus,
+  listConnectionRequests,
+  requestConnection,
   expressInterest,
   getOwnInterest,
   getRelationshipWithCompany,

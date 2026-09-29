@@ -234,8 +234,11 @@ export const InvestorOrganisationDtoSchema = z.object({
   hqCountry: z.string().nullable(),
   publicDescription: z.string().nullable(),
   deploymentState: InvestorDeploymentStateSchema.nullable(),
-  /** How founders may reach them (ADR 0023); null is not stated. */
-  inboundPreference: InvestorInboundPreferenceSchema.nullable().optional(),
+  /**
+   * How founders may reach them (ADR 0023); null is not stated. Defaults
+   * so a response from an older API still parses as not stated.
+   */
+  inboundPreference: InvestorInboundPreferenceSchema.nullable().default(null),
   verificationState: InvestorVerificationStateSchema,
   /** Who may see this profile. Changed only through the visibility route. */
   visibility: InvestorVisibilityChoiceSchema,
@@ -325,8 +328,6 @@ export type InvestorPortfolioReferenceDto = z.infer<
 // ---------------------------------------------------------------------------
 // Inbound preference seam (CQ-ONB-003 I10; canonical policy arrives with CQ-GATE-001)
 // ---------------------------------------------------------------------------
-
-
 
 export const INVESTORS_PATH = "/v1/investors" as const;
 /** The investor organisation attached to the caller's active organisation. */

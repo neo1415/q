@@ -17,7 +17,7 @@ create extension if not exists pgtap with schema extensions;
 \ir support/fixture.psql
 select pg_temp.rls_setup();
 
-select plan(25);
+select plan(26);
 
 -- Company A in tenant A; the investor organisation in tenant B.
 insert into core.companies (id, tenant_id, organisation_id, canonical_name, slug) values
@@ -57,8 +57,8 @@ select throws_ok(
   '23505', null, 'a history row backs at most one interest');
 select throws_ok(
   $$ insert into network.interests (tenant_id, relationship_id, expressed_by_party, expressed_by_user_id, expressed_in_organisation_id, relationship_event_id)
-     values (pg_temp.rls_id('tenant_a'), '00000000-0000-4000-8000-000000001b01', 'COMPANY', pg_temp.rls_id('user_a'), pg_temp.rls_id('org_a'), '00000000-0000-4000-8000-000000001b13') $$,
-  '23514', null, 'interest is investor pull only (a founder''s push is GateQ)');
+     values (pg_temp.rls_id('tenant_a'), '00000000-0000-4000-8000-000000001b01', 'FOUNDER', pg_temp.rls_id('user_a'), pg_temp.rls_id('org_a'), '00000000-0000-4000-8000-000000001b13') $$,
+  '23514', null, 'the party that reached out is INVESTOR or COMPANY (a founder''s Connection Request, ADR 0023), nothing else');
 select throws_ok(
   $$ insert into network.interests (tenant_id, relationship_id, expressed_by_party, status, expressed_by_user_id, expressed_in_organisation_id, relationship_event_id)
      values (pg_temp.rls_id('tenant_a'), '00000000-0000-4000-8000-000000001b01', 'INVESTOR', 'WITHDRAWN', pg_temp.rls_id('user_b'), pg_temp.rls_id('org_b'), '00000000-0000-4000-8000-000000001b13') $$,
@@ -95,6 +95,13 @@ select is((select count(*)::int from permissions.role_capabilities rc
             where c.code = 'investor.interest.express' and rc.effect = 'ALLOW'
               and r.code in ('organisation_admin', 'organisation_member')), 2,
   'investor.interest.express is granted to admins and members');
+select is((select count(*)::int from permissions.role_capabilities rc
+             join permissions.roles r on r.id = rc.role_id
+             join permissions.capabilities c on c.id = rc.capability_id
+            where c.code in ('company.connection.request', 'investor.connection.view', 'investor.connection.respond')
+              and rc.effect = 'ALLOW'
+              and r.code in ('organisation_admin', 'organisation_member')), 6,
+  'ADR 0023: connection request, view and respond are granted to admins and members');
 
 -- Browser principals: nothing, in either direction --------------------------------------
 select pg_temp.act_as_user_b();

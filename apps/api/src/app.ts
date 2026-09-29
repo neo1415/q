@@ -149,12 +149,18 @@ export type ApiModules = {
           DiscoveryRoutesDependencies["networkPitches"] | undefined;
         readonly networkCompany?:
           DiscoveryRoutesDependencies["networkCompany"] | undefined;
+        /** ADR 0023. Absent: investor cards show initials. */
+        readonly investorImages?:
+          DiscoveryRoutesDependencies["investorImages"] | undefined;
       })
     | undefined;
   readonly capital?: CapitalRoutesDependencies["capital"] | undefined;
   /** CQ-NET-010: Express Interest. Absent: no interest route registers. */
   readonly interests?:
     NetworkInterestRoutesDependencies["interests"] | undefined;
+  /** ADR 0023: founders' Connection Requests. Absent: those routes do not register. */
+  readonly connections?:
+    NetworkInterestRoutesDependencies["connections"] | undefined;
   /** CQ-GATE-001: the investor organisation's inbound gateway. */
   readonly gateq?: GateQRoutesDependencies["gateq"] | undefined;
   /** CQ-GATE-002: the public applicant surface. Anonymous by design. */
@@ -295,6 +301,7 @@ export function createApp(
       interactions: modules.discovery.interactions,
       networkPitches: modules.discovery.networkPitches,
       networkCompany: modules.discovery.networkCompany,
+      investorImages: modules.discovery.investorImages,
     });
     if (modules.discovery.interactions !== undefined) {
       registerRecommendationInteractionRoutes(app, {
@@ -312,6 +319,7 @@ export function createApp(
       authenticator: security.authenticator,
       resolver: security.resolver,
       interests: modules.interests,
+      connections: modules.connections,
     });
   }
 

@@ -58,6 +58,7 @@ function investor(
     hqCountry: null,
     publicDescription: null,
     deploymentState: null,
+    inboundPreference: null,
     ...overrides,
   };
 }
@@ -70,6 +71,7 @@ function repository(input: {
   return {
     discoverableCompanies: () => Promise.resolve(input.companies ?? []),
     discoverableInvestors: () => Promise.resolve(input.investors ?? []),
+    discoverableInvestor: () => Promise.resolve(null),
     ownActiveMandate: () => Promise.resolve(input.mandate ?? null),
     ownSide: () => Promise.resolve("INVESTOR"),
   };
@@ -344,6 +346,7 @@ describe("the investor slate", () => {
         discoverableCompanies: () => Promise.resolve([]),
         discoverableInvestors: () =>
           Promise.resolve([investor("cccccccc-1111-4000-8000-00000000000a")]),
+        discoverableInvestor: () => Promise.resolve(null),
         ownActiveMandate: () => {
           mandateReads += 1;
           return Promise.resolve(null);

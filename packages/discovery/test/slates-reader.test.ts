@@ -225,6 +225,7 @@ function harness(
   const evaluated: string[][] = [];
   const suppressionAsked: string[][] = [];
   const eligibility: EligibilityService = {
+    qualifiesForInvestor: () => Promise.resolve(false),
     evaluate: (query) => {
       evaluated.push([...query.companyIds]);
       return Promise.resolve({

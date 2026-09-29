@@ -29,7 +29,10 @@ export function AppHeader({ context }: { readonly context: ShellContext }) {
             compact
           />
           <ThemeMenu align="end" />
-          <AccountMenu founder={context.scope === "founder_private"} />
+          <AccountMenu
+            founder={context.scope === "founder_private"}
+            investor={context.scope === "investor_private"}
+          />
         </div>
       </div>
     </header>

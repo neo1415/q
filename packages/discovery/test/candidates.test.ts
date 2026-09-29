@@ -403,6 +403,7 @@ function eligibilityPorts(
 /** The real REC-001 policy over the world's canonical facts. */
 function eligibility(w: World): EligibilityService {
   return {
+    qualifiesForInvestor: () => Promise.resolve(false),
     evaluate: ({ actor, mandateId, companyIds }) => {
       w.queries.push("eligibility.evaluate");
       const active = w.mandates.find(

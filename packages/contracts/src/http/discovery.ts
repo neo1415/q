@@ -370,10 +370,38 @@ export const DiscoveredInvestorDtoSchema = z
     hqCountry: z.string().nullable(),
     publicDescription: z.string().nullable(),
     deploymentState: z.string().nullable(),
+    /**
+     * How founders may reach them (ADR 0023): the investor's own declared
+     * choice. Null is not stated; absent on a page from an older API.
+     */
+    inboundPreference: z
+      .enum(["CLOSED", "QUALIFIED", "OPEN"])
+      .nullable()
+      .optional(),
+    /**
+     * The organisation's own photo and cover, as short-lived signed URLs,
+     * minted only after the investor was found visible to this reader.
+     * Absent or null: none uploaded, or not readable right now.
+     */
+    photoUrl: z.string().url().nullable().optional(),
+    coverUrl: z.string().url().nullable().optional(),
     reasons: z.array(DiscoveryReasonDtoSchema).max(8),
   })
   .strict();
 export type DiscoveredInvestorDto = z.infer<typeof DiscoveredInvestorDtoSchema>;
+
+/**
+ * `GET /v1/discovery/investors/:investorOrganisationId` — one investor as
+ * a founder may see them (network-visible and admitted by disclosure; not
+ * the caller's own). Anything else is the same 404 (ADR 0023).
+ */
+export const DISCOVERY_INVESTOR_PATH =
+  "/v1/discovery/investors/:investorOrganisationId" as const;
+export const DiscoveredInvestorProfileDtoSchema =
+  DiscoveredInvestorDtoSchema.omit({ reasons: true });
+export type DiscoveredInvestorProfileDto = z.infer<
+  typeof DiscoveredInvestorProfileDtoSchema
+>;
 
 export const DiscoveryCompanySlateDtoSchema = z
   .object({

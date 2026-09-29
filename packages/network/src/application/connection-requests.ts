@@ -479,7 +479,9 @@ export function createRespondToConnectionRequest(
     readonly surface: InterestResponseSurface;
     readonly idempotencyKey: string;
     readonly correlationId: CorrelationId;
-  }): Promise<ConnectionRequestResult> => {
+  }): Promise<
+    ConnectionRequestResult & { readonly company: CompanyIdentity }
+  > => {
     const investorOrganisationId = await authoriseInvestor(
       dependencies,
       command.actor,
@@ -503,7 +505,11 @@ export function createRespondToConnectionRequest(
     }
     const organisationId = command.actor.organisationId;
     if (organisationId === undefined) throw new ActorContextRequiredError();
-    return answerInterest(dependencies, {
+    const company = await dependencies.companies.findCanonicalCompany(
+      interest.companyId,
+    );
+    if (company === null) throw new InterestNotFoundError();
+    const answered = await answerInterest(dependencies, {
       actor: command.actor,
       interest,
       responderOrganisationId: organisationId,
@@ -513,5 +519,10 @@ export function createRespondToConnectionRequest(
       idempotencyKey: command.idempotencyKey,
       correlationId: command.correlationId,
     });
+    return {
+      interest: answered.interest,
+      deduplicated: answered.deduplicated,
+      company,
+    };
   };
 }

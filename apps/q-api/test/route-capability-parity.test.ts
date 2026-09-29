@@ -153,6 +153,9 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
     "tool.find_prospective_investors",
   ),
   // Founders' videos (ADR 0021): browsed on Discover's second tab.
+  "api/http/discovery.ts GET DISCOVERY_INVESTOR_PATH": cap(
+    "offer.connection_request",
+  ),
   "api/http/discovery.ts GET DISCOVERY_NETWORK_PITCHES_PATH":
     cap("navigate.DISCOVER"),
 
@@ -302,6 +305,16 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   ),
   "api/http/network-interests.ts GET NETWORK_COMPANY_INCOMING_INTEREST_PATH":
     cap("tool.list_incoming_interest"),
+  // ADR 0023: founders' Connection Requests and the investor's inbox. The
+  // accept/decline loop is the "POST path" entry below.
+  "api/http/network-interests.ts POST NETWORK_INVESTOR_CONNECTION_REQUEST_PATH":
+    cap("offer.connection_request"),
+  "api/http/network-interests.ts GET NETWORK_INVESTOR_CONNECTION_PATH": cap(
+    "offer.connection_request",
+  ),
+  "api/http/network-interests.ts GET NETWORK_CONNECTION_REQUESTS_PATH": cap(
+    "offer.connection_request_answer",
+  ),
   "api/http/network-interests.ts POST path": cap(
     "tool.propose_interest_answer",
   ),
@@ -497,6 +510,9 @@ const PAGE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "/pitch": cap("navigate.PITCH"),
   // One video's page and a new video's, both opened from Pitch & media (ADR 0022).
   "/pitch/new": cap("navigate.PITCH"),
+  // ADR 0023: investors for a founder, founders' requests for an investor.
+  "/investors": cap("offer.connection_request"),
+  "/investors/[investorOrganisationId]": cap("offer.connection_request"),
   "/pitch/[mediaAssetId]": cap("navigate.PITCH"),
   "/company/[companyId]": cap("tool.open_page"),
   "/relationships/company/[companyId]": cap("tool.open_page"),

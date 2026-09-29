@@ -14,6 +14,7 @@ import { InlineNotice, Skeleton } from "@capital-q/ui/states";
 
 import {
   loadInvestorVisibilityAction,
+  setInvestorInboundPreferenceAction,
   setInvestorVisibilityAction,
 } from "./visibility-actions";
 
@@ -229,6 +230,16 @@ export function InvestorVisibilityScreen({
         </div>
       </section>
 
+      <InboundPreference
+        investorOrganisationId={investorOrganisationId}
+        investor={investor}
+        onSaved={async (message) => {
+          setSaved(message);
+          await load();
+        }}
+        onError={setError}
+      />
+
       <section
         aria-labelledby="investor-preview"
         className="flex flex-col gap-3"
@@ -324,6 +335,119 @@ export function InvestorVisibilityUnavailable() {
           Set up your mandate
         </Link>
       </div>
+    </section>
+  );
+}
+
+const INBOUND_CHOICES = [
+  {
+    value: "OPEN",
+    label: "Any founder can send a request",
+    hint: "Every founder who can see your profile can ask to connect.",
+  },
+  {
+    value: "QUALIFIED",
+    label: "Only companies that fit my mandate",
+    hint: "A founder can ask only when their company passes the rules your active mandate declares.",
+  },
+  {
+    value: "CLOSED",
+    label: "No requests",
+    hint: "Founders can see your profile but cannot ask to connect.",
+  },
+] as const;
+
+/**
+ * How founders may reach the organisation (ADR 0023). The investor's own
+ * choice; not stated takes no requests. A founder's request is the only
+ * way in, never a cold message.
+ */
+function InboundPreference({
+  investorOrganisationId,
+  investor,
+  onSaved,
+  onError,
+}: {
+  readonly investorOrganisationId: string;
+  readonly investor: InvestorOrganisationDto;
+  readonly onSaved: (message: string) => Promise<void>;
+  readonly onError: (message: string) => void;
+}) {
+  const current = investor.inboundPreference ?? null;
+  const [choice, setChoice] = useState<string | null>(current);
+  const [busy, setBusy] = useState(false);
+  const save = async () => {
+    if (choice === null || choice === current) return;
+    setBusy(true);
+    try {
+      const result = await setInvestorInboundPreferenceAction(
+        investorOrganisationId,
+        choice,
+        investor.version,
+      );
+      if (!result.ok) {
+        onError(result.message);
+        return;
+      }
+      await onSaved("Founders' requests now follow your new choice.");
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <section
+      aria-labelledby="investor-inbound"
+      className="cq-panel max-w-(--cq-layout-reading)"
+      data-investor-inbound
+    >
+      <header className="cq-panel-header">
+        <h2
+          id="investor-inbound"
+          className="cq-title-md text-(--cq-text-primary)"
+        >
+          How founders can reach you
+        </h2>
+      </header>
+      <fieldset className="cq-panel-body flex flex-col gap-3">
+        <legend className="sr-only">How founders can reach you</legend>
+        {current === null ? (
+          <p className="cq-body-sm text-(--cq-text-secondary)">
+            Not set yet, so founders can&apos;t send you requests.
+          </p>
+        ) : null}
+        {INBOUND_CHOICES.map((option) => (
+          <label
+            key={option.value}
+            className="flex min-h-11 cursor-pointer items-start gap-3 rounded-md px-1 py-1.5 hover:bg-(--cq-surface-subtle)"
+          >
+            <input
+              type="radio"
+              name="inbound-preference"
+              value={option.value}
+              checked={choice === option.value}
+              onChange={() => setChoice(option.value)}
+              className="mt-1 size-4 accent-(--cq-accent)"
+            />
+            <span className="flex flex-col gap-0.5">
+              <span className="cq-body text-(--cq-text-primary)">
+                {option.label}
+              </span>
+              <span className="cq-body-sm text-(--cq-text-secondary)">
+                {option.hint}
+              </span>
+            </span>
+          </label>
+        ))}
+        <div>
+          <Button
+            variant="secondary"
+            disabled={busy || choice === null || choice === current}
+            onClick={() => void save()}
+          >
+            {busy ? "Saving…" : "Save"}
+          </Button>
+        </div>
+      </fieldset>
     </section>
   );
 }

@@ -4,6 +4,7 @@ import {
   CreateInvestorOrganisationRequestSchema,
   CreateOrganisationRequestSchema,
   InvestorDeploymentStateSchema,
+  InvestorInboundPreferenceSchema,
   InvestorTypeSchema,
   UpdateInvestorMandateRequestSchema,
   UpdateInvestorOrganisationRequestSchema,
@@ -1095,6 +1096,35 @@ export function createInvestorWriteTargets(
         context.actor,
         context.session,
       );
+      // ADR 0023: how founders may reach this organisation becomes the
+      // organisation's own setting when the investor confirms. The I10 step
+      // predates the column and its published definition is hash-locked, so
+      // the confirmation (which always follows it) records it. Unanswered
+      // stays unset: not stated is never consent.
+      const inbound = InvestorInboundPreferenceSchema.safeParse(
+        singleSelect(values, INVESTOR_STEPS.inboundPreference)?.toUpperCase(),
+      );
+      if (inbound.success) {
+        const investor = await services.investors.getInvestorOrganisation({
+          actor: bound.context,
+          investorOrganisationId: bound.investorOrganisationId,
+        });
+        if (investor.inboundPreference !== inbound.data) {
+          await services.investors.updateInvestorOrganisation({
+            actor: bound.context,
+            investorOrganisationId: bound.investorOrganisationId,
+            input: parseContract(
+              UpdateInvestorOrganisationRequestSchema,
+              {
+                expectedVersion: investor.version,
+                inboundPreference: inbound.data,
+              },
+              "The inbound preference is not valid.",
+            ),
+            correlationId: context.correlationId,
+          });
+        }
+      }
       const mandateId = await mandateInScope(services, bound, values);
       const mandate = await currentMandate(services, bound, mandateId);
       if (mandate.status !== "DRAFT") {

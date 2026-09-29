@@ -61,8 +61,10 @@ import {
   createPostgresInvestorMandateQueryPort,
   createPostgresInvestorOrganisationQueryPort,
   createPostgresInvestorProfileQueryPort,
+  InvestorOrganisationIdSchema,
 } from "@capital-q/investors";
 import {
+  createConnectionService,
   createInterestService,
   createPostgresRelationshipEventRepository,
   createPostgresRelationshipRepository,
@@ -719,6 +721,72 @@ const interests = createInterestService({
   companyVisibility: { isVisibleToInvestor: isCompanyNetworkVisible },
 });
 
+/**
+ * Founder Connection Requests (ADR 0023). The founder's company is their
+ * active organisation's one canonical company; the investor is the one
+ * discovery would show this founder (network-visible, admitted by
+ * disclosure), with the preference the investor declared; QUALIFIED is the
+ * investor's own ACTIVE mandate's hard rules over the company's facts.
+ */
+const companyQuery = createPostgresCompanyQueryPort({ sql: database.sql });
+const investorQuery = createPostgresInvestorOrganisationQueryPort({
+  sql: database.sql,
+});
+const connections = createConnectionService({
+  sql: database.sql,
+  transactions: database.transactions,
+  companies: companyQuery,
+  investors: investorQuery,
+  outbox,
+  audit,
+  authorization,
+  investorSubject: slates.eligibilityPorts.investorSubject,
+  companyVisibility: { isVisibleToInvestor: isCompanyNetworkVisible },
+  founderSubject: {
+    companyFor: async (actor) => {
+      if (actor.organisationId === undefined) return null;
+      const company = await companyQuery.findOrganisationCompany?.(
+        actor.tenantId,
+        actor.organisationId,
+      );
+      return company == null ? null : { companyId: company.id };
+    },
+  },
+  investorReach: {
+    visibleInvestor: async (actor, investorOrganisationId) => {
+      const investor = await discovery.findInvestor(
+        actor,
+        investorOrganisationId,
+      );
+      if (investor === null) return null;
+      const preference = investor.inboundPreference;
+      return {
+        inboundPreference:
+          preference === "OPEN" ||
+          preference === "QUALIFIED" ||
+          preference === "CLOSED"
+            ? preference
+            : null,
+      };
+    },
+    companyQualifies: async (companyId, investorOrganisationId) => {
+      const parsed = InvestorOrganisationIdSchema.safeParse(
+        investorOrganisationId,
+      );
+      if (!parsed.success) return false;
+      const investor = await investorQuery.findCanonicalInvestorOrganisation(
+        parsed.data,
+      );
+      if (investor === null) return false;
+      return slates.eligibility.qualifiesForInvestor({
+        tenantId: investor.tenantId,
+        investorOrganisationId,
+        companyId,
+      });
+    },
+  },
+});
+
 // Pitch media. Composed after discovery because a viewer's right to play
 // a pitch (CQ-MEDIA-011) is the same REC-001 evaluation the feed runs on
 // every page and the interaction service runs on every save: the actor's
@@ -976,6 +1044,13 @@ const { app, logger } = createApp(config, security, {
     // Founders' network videos (ADR 0021): the media read, then the same
     // disclosure-checked company read the network preview uses.
     networkPitches: createPostgresNetworkPitchQueryPort({ sql: database.sql }),
+    // ADR 0023: an investor's own photo and cover on founder-facing reads,
+    // asked only for investors discovery already returned to the reader.
+    investorImages: (investorOrganisationId) =>
+      profileImages.cardImageUrls({
+        subjectType: "INVESTOR_ORGANISATION",
+        subjectId: investorOrganisationId,
+      }),
     networkCompany: async (actor, companyId) => {
       const parsed = CompanyIdSchema.safeParse(companyId);
       if (!parsed.success) return null;
@@ -1005,6 +1080,7 @@ const { app, logger } = createApp(config, security, {
       actor,
     )) !== null,
   interests,
+  connections,
   chat,
   chatSafety,
   schedule,

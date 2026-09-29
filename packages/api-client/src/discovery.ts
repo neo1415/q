@@ -4,7 +4,9 @@ import {
   DISCOVERY_COMPANY_SAVE_PATH,
   DISCOVERY_COMPANY_UNSAVE_PATH,
   DISCOVERY_EXPLANATION_PATH,
+  DISCOVERY_INVESTOR_PATH,
   DISCOVERY_INVESTORS_PATH,
+  DiscoveredInvestorProfileDtoSchema,
   DISCOVERY_NETWORK_PITCHES_PATH,
   DISCOVERY_SAVED_PATH,
   DiscoveryCompanySlateDtoSchema,
@@ -61,6 +63,22 @@ export function discoverInvestors(session: ApiSession, page: Page = {}) {
     "GET",
     `${DISCOVERY_INVESTORS_PATH}${query(page)}`,
     DiscoveryInvestorSlateDtoSchema,
+  );
+}
+
+/** `GET /v1/discovery/investors/:investorOrganisationId` — one investor, as this founder may see them. */
+export function getDiscoveredInvestor(
+  session: ApiSession,
+  investorOrganisationId: string,
+) {
+  return call(
+    session,
+    "GET",
+    DISCOVERY_INVESTOR_PATH.replace(
+      ":investorOrganisationId",
+      encodeURIComponent(investorOrganisationId),
+    ),
+    DiscoveredInvestorProfileDtoSchema,
   );
 }
 

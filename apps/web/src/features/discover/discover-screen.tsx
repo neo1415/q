@@ -177,7 +177,13 @@ export function DiscoverInvestors({
               <div className="flex items-center gap-2">
                 <Landmark size={ICON_SIZE.regular} aria-hidden="true" />
                 <h3 className="cq-title-sm text-(--cq-text-primary)">
-                  {item.displayName}
+                  {/* ADR 0023: the investor's page, where a request is sent. */}
+                  <Link
+                    href={`/investors/${item.investorOrganisationId}`}
+                    className="underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
+                  >
+                    {item.displayName}
+                  </Link>
                 </h3>
               </div>
               {item.publicDescription === null ? null : (

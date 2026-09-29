@@ -378,3 +378,112 @@ export const InterestResponseResultDtoSchema = z
 export type InterestResponseResultDto = z.infer<
   typeof InterestResponseResultDtoSchema
 >;
+
+// ---------------------------------------------------------------------------
+// Founder Connection Requests (ADR 0023; PADL #98, GateQ items 11-13).
+// ---------------------------------------------------------------------------
+
+/**
+ * `POST /v1/network/investors/:investorOrganisationId/connection-request` —
+ * a founder asks, for their company, to connect with an investor who takes
+ * requests (OPEN, or QUALIFIED and the company passes the investor's own
+ * declared rules). Consequential: an Idempotency-Key header is required.
+ * An investor the founder may not see is the same 404 as one that does
+ * not exist; one who does not take this request is RESOURCE_CONFLICT with
+ * a plain reason.
+ *
+ * `GET …/connection` — where this founder stands with that investor.
+ */
+export const NETWORK_INVESTOR_CONNECTION_REQUEST_PATH =
+  "/v1/network/investors/:investorOrganisationId/connection-request" as const;
+export const NETWORK_INVESTOR_CONNECTION_PATH =
+  "/v1/network/investors/:investorOrganisationId/connection" as const;
+
+/** Nothing but the verb: the request carries no message (messaging opens on connection). */
+export const ConnectionRequestRequestSchema = z.object({}).strict();
+
+/** Why an investor does not take this founder's request; each is the investor's own choice. */
+export const CONNECTION_NOT_ACCEPTED_REASONS = [
+  "CLOSED",
+  "NOT_STATED",
+  "NOT_QUALIFIED",
+] as const;
+
+/** A founder's own request, as they see it. */
+export const ConnectionRequestDtoSchema = z
+  .object({
+    interestId: UuidSchema,
+    relationshipId: UuidSchema,
+    investorOrganisationId: UuidSchema,
+    requestedAt: UtcTimestampSchema,
+    response: InterestResponseStatusSchema,
+    respondedAt: UtcTimestampSchema.nullable(),
+    connection: ConnectionDtoSchema.nullable(),
+  })
+  .strict();
+export type ConnectionRequestDto = z.infer<typeof ConnectionRequestDtoSchema>;
+
+export const ConnectionRequestResultDtoSchema = z
+  .object({ request: ConnectionRequestDtoSchema, deduplicated: z.boolean() })
+  .strict();
+export type ConnectionRequestResultDto = z.infer<
+  typeof ConnectionRequestResultDtoSchema
+>;
+
+export const ConnectionStatusDtoSchema = z
+  .object({
+    canRequest: z.boolean(),
+    notAccepted: z.enum(CONNECTION_NOT_ACCEPTED_REASONS).nullable(),
+    request: ConnectionRequestDtoSchema.nullable(),
+  })
+  .strict();
+export type ConnectionStatusDto = z.infer<typeof ConnectionStatusDtoSchema>;
+
+/**
+ * `GET /v1/network/connection-requests` — the investor organisation's
+ * inbox of founders' requests, newest first, each with its answer. Only
+ * the company's institutional facts the investor may already see are
+ * named; nothing founder-private.
+ *
+ * `POST /v1/network/connection-requests/:interestId/{accept|decline}` —
+ * the investor's answer; Idempotency-Key required, no body.
+ */
+export const NETWORK_CONNECTION_REQUESTS_PATH =
+  "/v1/network/connection-requests" as const;
+export const NETWORK_CONNECTION_REQUEST_ACCEPT_PATH =
+  "/v1/network/connection-requests/:interestId/accept" as const;
+export const NETWORK_CONNECTION_REQUEST_DECLINE_PATH =
+  "/v1/network/connection-requests/:interestId/decline" as const;
+
+export const IncomingConnectionRequestDtoSchema = z
+  .object({
+    interestId: UuidSchema,
+    relationshipId: UuidSchema,
+    companyId: UuidSchema,
+    companyName: z.string().min(1).max(200),
+    requestedAt: UtcTimestampSchema,
+    response: InterestResponseStatusSchema,
+    respondedAt: UtcTimestampSchema.nullable(),
+    connection: ConnectionDtoSchema.nullable(),
+  })
+  .strict();
+export type IncomingConnectionRequestDto = z.infer<
+  typeof IncomingConnectionRequestDtoSchema
+>;
+
+export const IncomingConnectionRequestListDtoSchema = z
+  .object({ items: z.array(IncomingConnectionRequestDtoSchema).max(200) })
+  .strict();
+export type IncomingConnectionRequestListDto = z.infer<
+  typeof IncomingConnectionRequestListDtoSchema
+>;
+
+export const ConnectionRequestAnswerDtoSchema = z
+  .object({
+    request: IncomingConnectionRequestDtoSchema,
+    deduplicated: z.boolean(),
+  })
+  .strict();
+export type ConnectionRequestAnswerDto = z.infer<
+  typeof ConnectionRequestAnswerDtoSchema
+>;

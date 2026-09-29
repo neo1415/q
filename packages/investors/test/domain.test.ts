@@ -260,6 +260,7 @@ describe("DTOs", () => {
     publicDescription: "Early-stage B2B.",
     verificationState: "unverified",
     deploymentState: null,
+    inboundPreference: null,
     version: 1,
     createdAt: NOW,
     updatedAt: NOW,

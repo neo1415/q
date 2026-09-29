@@ -7,6 +7,7 @@ import {
   getInvestorNetworkPreview,
   getInvestorOrganisation,
   setInvestorVisibility,
+  updateInvestorOrganisation,
   type ApiSession,
 } from "@capital-q/api-client";
 import { loadWebServerConfig } from "@capital-q/config/web";
@@ -147,6 +148,55 @@ export async function setInvestorVisibilityAction(
       current,
       investorOrganisationId.data,
       { visibility: choice, expectedVersion: expectedVersion.data },
+    );
+    return { ok: true, value: investor };
+  } catch (error) {
+    return translate(error);
+  }
+}
+
+const InboundInput = z.enum(["CLOSED", "QUALIFIED", "OPEN"]);
+
+/**
+ * How founders may reach this organisation (ADR 0023): OPEN, QUALIFIED
+ * (only companies that pass the declared mandate rules) or CLOSED. The
+ * investor's own choice, recorded on their profile through the API.
+ */
+export async function setInvestorInboundPreferenceAction(
+  rawInvestorOrganisationId: string,
+  rawPreference: string,
+  rawExpectedVersion: number,
+): Promise<InvestorVisibilityActionResult<InvestorOrganisationDto>> {
+  const investorOrganisationId = InvestorIdInput.safeParse(
+    rawInvestorOrganisationId,
+  );
+  const preference = InboundInput.safeParse(rawPreference);
+  const expectedVersion = VersionInput.safeParse(rawExpectedVersion);
+  if (
+    !investorOrganisationId.success ||
+    !preference.success ||
+    !expectedVersion.success
+  ) {
+    return {
+      ok: false,
+      message: "That didn't go through. Reload and try again.",
+    };
+  }
+  const current = await session();
+  if (current === null) {
+    return {
+      ok: false,
+      message: "Your session ended. Sign in again to continue.",
+    };
+  }
+  try {
+    const investor = await updateInvestorOrganisation(
+      current,
+      investorOrganisationId.data,
+      {
+        inboundPreference: preference.data,
+        expectedVersion: expectedVersion.data,
+      },
     );
     return { ok: true, value: investor };
   } catch (error) {

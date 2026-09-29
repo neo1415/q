@@ -163,6 +163,7 @@ function memoryInteractions() {
 const eligibility = (
   decision: "ELIGIBLE" | "EXCLUDED",
 ): EligibilityService => ({
+  qualifiesForInvestor: () => Promise.resolve(false),
   evaluate: (query) =>
     Promise.resolve({
       policyVersion: ELIGIBILITY_POLICY_VERSION,

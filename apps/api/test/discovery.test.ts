@@ -59,6 +59,7 @@ const notUnderTest = () => Promise.reject(new Error("not under test"));
 const discovery: DiscoveryService = {
   discoverCompanies: notUnderTest,
   discoverInvestors: notUnderTest,
+  findInvestor: notUnderTest,
   sideFor: () => Promise.resolve("INVESTOR"),
 };
 
