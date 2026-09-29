@@ -885,6 +885,9 @@ export function createScheduleService(
             {
               reminderId: reminder.id,
               errorName: error instanceof Error ? error.name : typeof error,
+              // The transport's own diagnosis (a connection refused, a
+              // recipient rejected), never the message or the credentials.
+              ...transportDiagnosis(error),
             },
             "reminder email failed",
           );
@@ -944,5 +947,19 @@ export function createScheduleService(
       }
       return prepared;
     },
+  };
+}
+
+/** The SMTP failure's code and reply status, when the transport gave them. */
+function transportDiagnosis(error: unknown): {
+  readonly code?: string;
+  readonly responseCode?: number;
+} {
+  if (typeof error !== "object" || error === null) return {};
+  const code = "code" in error ? error.code : undefined;
+  const responseCode = "responseCode" in error ? error.responseCode : undefined;
+  return {
+    ...(typeof code === "string" ? { code: code.slice(0, 40) } : {}),
+    ...(typeof responseCode === "number" ? { responseCode } : {}),
   };
 }
