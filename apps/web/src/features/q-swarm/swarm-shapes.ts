@@ -10,6 +10,8 @@
  * Abstraction is the point: dots suggesting a face, never a portrait.
  */
 
+import { FEMALE_FACE_POINTS, MALE_FACE_POINTS } from "./face-points";
+
 export type SwarmPart =
   | "OUTLINE"
   | "HAIR"
@@ -151,134 +153,63 @@ export function bloomShape(count: number): SwarmPoint[] {
   });
 }
 
-/**
- * An abstract face. Proportions are a portrait's: eyes at mid-height,
- * the mouth a third of the way up from the chin. The two differ where
- * people read them at a glance -- hair length and line, jaw, brow weight.
- */
-export function faceShape(face: SwarmFace, count: number): SwarmPoint[] {
-  const random = seeded(face === "FEMALE" ? 17 : 29);
+const FACE_PARTS: readonly SwarmPart[] = [
+  "OUTLINE",
+  "HAIR",
+  "EYE",
+  "BROW",
+  "NOSE",
+  "MOUTH_UPPER",
+  "MOUTH_LOWER",
+  "BRAIN",
+];
+
+const decoded = new Map<SwarmFace, readonly SwarmPoint[]>();
+
+/** The portrait cloud, decoded once: int16 triples of x, y (thousandths) and part. */
+function portrait(face: SwarmFace): readonly SwarmPoint[] {
+  const cached = decoded.get(face);
+  if (cached !== undefined) return cached;
+  const binary = atob(
+    face === "FEMALE" ? FEMALE_FACE_POINTS : MALE_FACE_POINTS,
+  );
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
+  const values = new Int16Array(bytes.buffer);
   const points: SwarmPoint[] = [];
-  const female = face === "FEMALE";
-  const share = (fraction: number) => Math.max(4, Math.round(count * fraction));
-
-  // Head outline: a softer, narrower jaw for the female face.
-  const jaw = female ? 0.52 : 0.58;
-  points.push(
-    ...ellipse(
-      0,
-      -0.02,
-      female ? 0.42 : 0.45,
-      0.58,
-      share(0.2),
-      "OUTLINE",
-      Math.PI * 0.05,
-      Math.PI * 0.95,
-    ).map((p) => ({
-      ...p,
-      y: p.y > 0.25 ? 0.25 + (p.y - 0.25) * (jaw / 0.58) : p.y,
-    })),
-    ...ellipse(
-      0,
-      -0.02,
-      female ? 0.42 : 0.45,
-      0.58,
-      share(0.12),
-      "OUTLINE",
-      Math.PI * 1.02,
-      Math.PI * 1.98,
-    ),
-  );
-
-  // Hair: long and falling past the jaw, or short and close to the crown.
-  const hairCount = share(female ? 0.2 : 0.12);
-  for (let i = 0; i < hairCount; i++) {
-    const t = random();
-    if (female) {
-      const side = random() < 0.5 ? -1 : 1;
-      const top = random() < 0.4;
-      points.push(
-        top
-          ? {
-              x: (random() - 0.5) * 0.9,
-              y: -0.62 + Math.abs(random() - 0.5) * 0.14,
-              part: "HAIR",
-            }
-          : {
-              x: side * (0.44 + random() * 0.14 + t * 0.06),
-              y: -0.45 + t * 1.15,
-              part: "HAIR",
-            },
-      );
-    } else {
-      const angle = Math.PI * (1.08 + random() * 0.84);
-      const radius = 0.5 + random() * 0.1;
-      points.push({
-        x: Math.cos(angle) * radius,
-        y: Math.sin(angle) * radius * 1.1 - 0.06,
-        part: "HAIR",
-      });
-    }
-  }
-
-  // Brows, eyes, nose, mouth.
-  const brow = female ? 0.012 : 0.025;
-  for (const side of [-1, 1]) {
-    points.push(
-      ...ellipse(
-        side * 0.17,
-        -0.2,
-        0.09,
-        brow + 0.02,
-        share(0.03),
-        "BROW",
-        Math.PI * 1.1,
-        Math.PI * 1.9,
-      ),
-      ...ellipse(side * 0.17, -0.1, 0.07, 0.035, share(0.045), "EYE"),
-    );
-  }
-  const noseCount = share(0.03);
-  points.push(
-    ...Array.from({ length: noseCount }, (_, i) => ({
-      x: 0.01 * Math.sin(i),
-      y: -0.05 + (0.2 * i) / noseCount,
-      part: "NOSE" as const,
-    })),
-    ...ellipse(
-      0,
-      0.27,
-      female ? 0.13 : 0.15,
-      0.035,
-      share(0.05),
-      "MOUTH_UPPER",
-      Math.PI,
-      TAU,
-    ),
-    ...ellipse(
-      0,
-      0.27,
-      female ? 0.13 : 0.15,
-      0.05,
-      share(0.05),
-      "MOUTH_LOWER",
-      0,
-      Math.PI,
-    ),
-  );
-
-  // The brain: a field of points inside the crown, dim until Q thinks.
-  const brainCount = Math.max(0, count - points.length);
-  for (let i = 0; i < brainCount; i++) {
-    const angle = Math.PI * (1.05 + random() * 0.9);
-    const radius = Math.sqrt(random()) * 0.4;
+  for (let i = 0; i + 2 < values.length; i += 3) {
     points.push({
-      x: Math.cos(angle) * radius,
-      y: -0.26 + Math.sin(angle) * radius * 0.85,
-      part: "BRAIN",
+      x: (values[i] ?? 0) / 1000,
+      y: (values[i + 1] ?? 0) / 1000,
+      part: FACE_PARTS[values[i + 2] ?? 0] ?? "OUTLINE",
     });
   }
-  return points.slice(0, count);
+  decoded.set(face, points);
+  return points;
+}
+
+/**
+ * A face (founder live 2026-09-29: "very realistic, but still abstract
+ * enough"): sampled from a real frontal portrait -- a woman's for the
+ * female voice, a man's for the male -- where it is inked, weighted to its
+ * edges and shading, so the swarm draws a real face's structure as light
+ * rather than a diagram of one. Parts are labelled so the eyes, brows,
+ * mouth and the brain above them can move and light on their own.
+ */
+export function faceShape(face: SwarmFace, count: number): SwarmPoint[] {
+  const source = portrait(face);
+  if (source.length === 0) return qShape(count);
+  const random = seeded(face === "FEMALE" ? 17 : 29);
+  return Array.from({ length: count }, (_, i) => {
+    // Evenly through the cloud, so any swarm size keeps every part.
+    const at = source[Math.floor((i * source.length) / count)] ?? source[0];
+    const jitter = count > source.length ? 0.006 : 0;
+    return {
+      x: (at?.x ?? 0) + (random() - 0.5) * jitter,
+      y: (at?.y ?? 0) + (random() - 0.5) * jitter,
+      part: at?.part ?? "OUTLINE",
+    };
+  });
 }
 
 /**

@@ -288,21 +288,26 @@ export function createSwarmEngine(
   const baseAlpha = (part: SwarmPart, mode: SwarmMode): number => {
     if (mode === "MOUTH") return 0.9;
     if (mode !== "FACE") return 0.75;
+    // Features bright, structure soft: the eyes, brows and mouth are what
+    // a person reads a face by.
     switch (part) {
       case "BRAIN":
-        return 0.2;
+        return 0.18;
       case "HAIR":
-        return 0.45;
+        return 0.3;
       case "OUTLINE":
-        return 0.55;
+        return 0.45;
+      case "NOSE":
+        return 0.6;
+      case "BROW":
+        return 0.8;
       case "GLYPH":
       case "FIELD":
+        return 0.85;
       case "EYE":
-      case "BROW":
-      case "NOSE":
       case "MOUTH_UPPER":
       case "MOUTH_LOWER":
-        return 0.85;
+        return 1;
     }
   };
 
@@ -324,19 +329,50 @@ export function createSwarmEngine(
         (input.output > smoothedOutput ? 0.5 : 0.12);
       const still = input.motion === "off";
       const pace = input.motion === "calm" ? 0.45 : 1;
-      const stiffness = 9 * pace;
-      const damping = Math.exp(-6 * dt);
+      // Softer springs: a change of figure flows over a second or so,
+      // like smoke finding a new shape, never a snap.
+      const stiffness = 4.2 * pace;
+      const damping = Math.exp(-4.2 * dt);
+      // Wind (founder live 2026-09-29: "constantly shifting, like wind"):
+      // a slow flow field over every figure, stronger on the free ones,
+      // and a gust now and then that loosens the figure and lets it
+      // gather again. Faces keep their features readable.
+      const figure = input.mode === "FACE" || input.mode === "MOUTH";
+      const gustPhase = (t * pace) % 13;
+      const gust =
+        gustPhase > 10.5 ? Math.sin(((gustPhase - 10.5) / 2.5) * Math.PI) : 0;
+      const windAmp = still
+        ? 0
+        : (figure ? 0.008 : 0.03) + gust * (figure ? 0.045 : 0.12);
+      const gustAngle = Math.floor((t * pace) / 13) * 2.39996;
       const half = size / 2;
-      const scale = size * 0.42;
+      // A face fills more of the frame than the free figures do.
+      const scale = size * (input.mode === "FACE" ? 0.52 : 0.42);
 
       context.clearRect(0, 0, size, size);
       for (const particle of particles) {
         const target = place(particle.target, t * pace, input);
         // A drift of its own, so the swarm keeps breathing in any shape.
-        const drift = still ? 0 : 0.012 + (input.mode === "Q" ? 0.006 : 0);
-        const tx = target.x + Math.sin(t * 0.9 * pace + particle.phase) * drift;
+        const drift = still ? 0 : 0.01 + (input.mode === "Q" ? 0.006 : 0);
+        const tp = t * pace;
+        const flowX =
+          Math.sin(
+            target.y * 3.1 + tp * 0.7 + Math.sin(target.x * 2.3 - tp * 0.4),
+          ) +
+          gust * Math.cos(gustAngle) * 1.5;
+        const flowY =
+          Math.cos(
+            target.x * 2.7 - tp * 0.6 + Math.cos(target.y * 1.9 + tp * 0.5),
+          ) +
+          gust * Math.sin(gustAngle) * 1.5;
+        const tx =
+          target.x +
+          Math.sin(tp * 0.9 + particle.phase) * drift +
+          flowX * windAmp * (0.6 + 0.4 * Math.sin(particle.phase * 5));
         const ty =
-          target.y + Math.cos(t * 1.1 * pace + particle.phase * 1.3) * drift;
+          target.y +
+          Math.cos(tp * 1.1 + particle.phase * 1.3) * drift +
+          flowY * windAmp * (0.6 + 0.4 * Math.cos(particle.phase * 7));
         if (still) {
           particle.x = tx;
           particle.y = ty;
