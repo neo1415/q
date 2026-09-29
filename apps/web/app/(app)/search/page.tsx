@@ -13,13 +13,7 @@ import {
   cardDescriptor,
   publicExternalFields,
 } from "@/features/q-card/card-content";
-import {
-  appOrigin,
-  displayUrlFor,
-  loadPublicCard,
-} from "@/features/q-card/public-card-data";
-import { QCard } from "@/features/q-card/q-card";
-import { qrSvg } from "@/features/q-card/qr";
+import { loadPublicCard } from "@/features/q-card/public-card-data";
 
 export const metadata: Metadata = { title: "Search" };
 export const dynamic = "force-dynamic";
@@ -59,7 +53,6 @@ export default async function SearchPage({
       ? await loadPublicCard(handle).catch(() => null)
       : null;
   const card = found !== null && found.kind === "CARD" ? found : null;
-  const origin = appOrigin();
   const tabHref = (next: Tab) =>
     `/search?${new URLSearchParams({ ...(text.length === 0 ? {} : { q: text }), tab: next }).toString()}`;
 
@@ -124,7 +117,7 @@ export default async function SearchPage({
         <NetworkVideos key={text} text={text} />
       ) : text.length === 0 ? (
         <p className="cq-body-sm text-(--cq-text-secondary)">
-          Type someone&apos;s @handle to open their Q Card.
+          Search by @handle.
         </p>
       ) : card === null ? (
         <p className="cq-body-sm text-(--cq-text-secondary)" role="status">
@@ -133,27 +126,30 @@ export default async function SearchPage({
             : "A handle is 3 to 30 lowercase letters, digits or hyphens."}
         </p>
       ) : (
-        <div className="flex flex-col gap-4" data-find-result={card.handle}>
-          <QCard
-            name={card.name}
-            descriptor={cardDescriptor(
-              card.subjectType,
-              publicExternalFields(card.fields),
-            )}
-            handle={card.handle}
-            displayUrl={displayUrlFor(card.handle)}
-            href={`/@${card.handle}`}
-            qrSvg={qrSvg(`${origin}/@${card.handle}`)}
-          />
-          <div>
-            <Link
-              href={`/@${card.handle}`}
-              className={buttonClassName("secondary")}
-            >
-              Open their page
-            </Link>
-          </div>
-        </div>
+        <Link
+          href={`/@${card.handle}`}
+          data-find-result={card.handle}
+          className="flex min-h-14 items-center gap-3 rounded-xl border border-(--cq-border-subtle) bg-(--cq-surface) px-4 py-3 hover:bg-(--cq-surface-raised) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
+        >
+          <span
+            aria-hidden="true"
+            className="cq-label flex size-10 shrink-0 items-center justify-center rounded-full bg-(--cq-surface-subtle) text-(--cq-text-primary)"
+          >
+            {card.name.trim().slice(0, 1).toUpperCase()}
+          </span>
+          <span className="flex min-w-0 flex-col">
+            <span className="cq-body truncate font-medium text-(--cq-text-primary)">
+              {card.name}
+            </span>
+            <span className="cq-caption truncate text-(--cq-text-secondary)">
+              {cardDescriptor(
+                card.subjectType,
+                publicExternalFields(card.fields),
+              )}
+              {" · "}@{card.handle}
+            </span>
+          </span>
+        </Link>
       )}
     </PageContainer>
   );

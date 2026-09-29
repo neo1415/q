@@ -908,6 +908,35 @@
   .cq-feed-media[data-dragging] .cq-feed-slot {
     transition: none;
   }
+  /* Sideways: the card follows the finger; the verdict shows as a stamp
+     in words, never colour alone (founder direction 2026-09-29). Pass is
+     neutral, not red. */
+  .cq-feed-media[data-swipe] .cq-feed-slot[data-slot-active] {
+    transition: none;
+  }
+  .cq-feed-media[data-swipe]::after {
+    position: absolute;
+    top: 18%;
+    z-index: 2;
+    padding: 0.4rem 1rem;
+    border: 2px solid currentColor;
+    border-radius: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    pointer-events: none;
+  }
+  .cq-feed-media[data-swipe="interested"]::after {
+    content: "Interested";
+    left: 8%;
+    color: var(--cq-accent);
+    rotate: -8deg;
+  }
+  .cq-feed-media[data-swipe="pass"]::after {
+    content: "Pass";
+    right: 8%;
+    color: var(--cq-stage-text);
+    rotate: 8deg;
+  }
   .cq-feed-player,
   .cq-feed-video {
     position: absolute;

@@ -87,6 +87,9 @@ const WHEEL_THRESHOLD = 60;
 const WHEEL_LOCK_MS = 350;
 /** A drag this far, in CSS pixels, is a swipe rather than a tap or a nudge. */
 const SWIPE_THRESHOLD = 48;
+/** Sideways far enough to decide (founder direction 2026-09-29). */
+const DECIDE_THRESHOLD = 110;
+const AXIS_LOCK = 12;
 
 /**
  * Discover, for an investor (CQ-WEB-022).
@@ -437,7 +440,14 @@ function InvestorFeed({
 
   const stageRef = useRef<HTMLDivElement>(null);
   const mediaRef = useRef<HTMLDivElement>(null);
-  const drag = useRef<{ readonly startY: number; dy: number } | null>(null);
+  const drag = useRef<{
+    readonly startY: number;
+    readonly startX: number;
+    dy: number;
+    dx: number;
+    /** Decided by the first few pixels: up/down browses, sideways decides. */
+    axis: "x" | "y" | null;
+  } | null>(null);
 
   const { next, previous } = feed;
 
@@ -679,20 +689,65 @@ function InvestorFeed({
       return;
     }
     const y = event.touches[0]?.clientY;
-    drag.current = y === undefined ? null : { startY: y, dy: 0 };
+    // A touch without an x (some synthetic events) browses up and down.
+    const x = event.touches[0]?.clientX ?? 0;
+    drag.current =
+      y === undefined
+        ? null
+        : { startY: y, startX: x, dy: 0, dx: 0, axis: null };
+  }, []);
+
+  /** The card follows a sideways finger, tilting like a card in a hand. */
+  const setSideways = useCallback((dx: number | null) => {
+    const media = mediaRef.current;
+    const slot = media?.querySelector<HTMLElement>("[data-slot-active]");
+    if (
+      media === null ||
+      media === undefined ||
+      slot === null ||
+      slot === undefined
+    ) {
+      return;
+    }
+    if (dx === null) {
+      slot.style.removeProperty("translate");
+      slot.style.removeProperty("rotate");
+      delete media.dataset["swipe"];
+      return;
+    }
+    slot.style.translate = `${String(dx)}px 0`;
+    slot.style.rotate = `${String(dx / 24)}deg`;
+    if (Math.abs(dx) > 60) {
+      media.dataset["swipe"] = dx > 0 ? "interested" : "pass";
+    } else {
+      delete media.dataset["swipe"];
+    }
   }, []);
 
   const onTouchMove = useCallback(
     (event: React.TouchEvent) => {
       const current = drag.current;
       const y = event.touches[0]?.clientY;
+      const x = event.touches[0]?.clientX ?? current?.startX ?? 0;
       if (current === null || y === undefined) return;
+      const dx = x - current.startX;
+      if (current.axis === null) {
+        if (Math.max(Math.abs(dx), Math.abs(y - current.startY)) < AXIS_LOCK) {
+          return;
+        }
+        current.axis = Math.abs(dx) > Math.abs(y - current.startY) ? "x" : "y";
+      }
+      if (current.axis === "x") {
+        current.dx = dx;
+        setSideways(dx);
+        return;
+      }
       let dy = y - current.startY;
       if ((dy > 0 && !canRetreat) || (dy < 0 && !canAdvance)) dy = 0;
       current.dy = dy;
       setDrag(dy);
     },
-    [canAdvance, canRetreat, setDrag],
+    [canAdvance, canRetreat, setDrag, setSideways],
   );
 
   const onTouchEnd = useCallback(
@@ -700,7 +755,24 @@ function InvestorFeed({
       const current = drag.current;
       drag.current = null;
       setDrag(null);
+      setSideways(null);
       if (current === null) return;
+      if (current.axis === "x") {
+        // Right keeps it (saved, optimistic); left passes. Expressing
+        // interest stays its own confirmed step: it tells the founder.
+        const decided = feed.card;
+        if (decided === null) return;
+        if (current.dx > DECIDE_THRESHOLD) {
+          if (!feed.decisionFor(decided.companyId).saved) {
+            feed.save(decided.companyId);
+          }
+          next();
+        } else if (current.dx < -DECIDE_THRESHOLD) {
+          feed.pass(decided.companyId);
+          next();
+        }
+        return;
+      }
       const end = event.changedTouches[0]?.clientY;
       const travelled = end === undefined ? -current.dy : current.startY - end;
 
@@ -709,13 +781,14 @@ function InvestorFeed({
       if (travelled > 0) next();
       else previous();
     },
-    [next, previous, setDrag],
+    [next, previous, setDrag, setSideways, feed],
   );
 
   const onTouchCancel = useCallback(() => {
     drag.current = null;
     setDrag(null);
-  }, [setDrag]);
+    setSideways(null);
+  }, [setDrag, setSideways]);
 
   const card = feed.card;
   const notes = feed.state.notes;

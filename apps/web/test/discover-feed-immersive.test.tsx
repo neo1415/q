@@ -389,6 +389,35 @@ describe("swipe", () => {
     expect(media?.hasAttribute("data-dragging")).toBe(false);
   });
 
+  it("passes on a swipe left and moves on, the card following the finger (founder direction 2026-09-29)", async () => {
+    const { container } = await renderFeed();
+    const region = feedRegion();
+    const media = container.querySelector<HTMLElement>(".cq-feed-media");
+    const at = (x: number) => [{ clientX: x, clientY: 400, identifier: 0 }];
+    fireEvent.touchStart(region, { touches: at(300) });
+    fireEvent.touchMove(region, { touches: at(220) });
+    fireEvent.touchMove(region, { touches: at(120) });
+    expect(media?.dataset["swipe"]).toBe("pass");
+    // Sideways never scrolls the feed.
+    expect(media?.style.getPropertyValue("--cq-feed-drag")).toBe("");
+    fireEvent.touchEnd(region, { changedTouches: at(120) });
+    await screen.findByRole("heading", { name: "Company 2" });
+    expect(media?.dataset["swipe"]).toBeUndefined();
+  });
+
+  it("keeps it on a swipe right and moves on", async () => {
+    const { container } = await renderFeed();
+    const region = feedRegion();
+    const media = container.querySelector<HTMLElement>(".cq-feed-media");
+    const at = (x: number) => [{ clientX: x, clientY: 400, identifier: 0 }];
+    fireEvent.touchStart(region, { touches: at(100) });
+    fireEvent.touchMove(region, { touches: at(180) });
+    fireEvent.touchMove(region, { touches: at(260) });
+    expect(media?.dataset["swipe"]).toBe("interested");
+    fireEvent.touchEnd(region, { changedTouches: at(260) });
+    await screen.findByRole("heading", { name: "Company 2" });
+  });
+
   it("settles back on a short drag", async () => {
     await renderFeed();
     const region = feedRegion();
