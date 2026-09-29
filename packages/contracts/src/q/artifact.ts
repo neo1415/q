@@ -180,6 +180,36 @@ export const Q_SLIDE_BULLETS_MAX = 6;
 export const Q_SLIDE_BULLET_MAX = 180;
 export const Q_DECK_SLIDES_MAX = 24;
 
+/**
+ * A photograph on a slide (founder direction 2026-09-29): a free stock
+ * photo, never an image of a real person or company presented as theirs.
+ * Only from the stock library's own image host, so a renderer fetches from
+ * one known place and nowhere a model named. Credit travels with it.
+ */
+export const Q_SLIDE_IMAGE_HOST = "images.pexels.com" as const;
+export const QSlideImageSchema = z
+  .object({
+    url: z
+      .string()
+      .url()
+      .max(600)
+      .refine(
+        (value) => {
+          try {
+            const url = new URL(value);
+            return url.protocol === "https:" && url.host === Q_SLIDE_IMAGE_HOST;
+          } catch {
+            return false;
+          }
+        },
+        { message: "expected a stock photo URL" },
+      ),
+    alt: z.string().trim().min(1).max(200),
+    credit: z.string().trim().min(1).max(120),
+  })
+  .strict();
+export type QSlideImage = z.infer<typeof QSlideImageSchema>;
+
 /** One slide. Its grounding lives in the matching section; this is its shape. */
 export const QSlideSchema = z
   .object({
@@ -215,6 +245,8 @@ export const QSlideSchema = z
       .int()
       .min(0)
       .max(Q_ARTIFACT_SECTIONS_MAX - 1),
+    /** A photograph beside the words, when the deck has one for it. */
+    image: QSlideImageSchema.optional(),
   })
   .strict();
 export type QSlide = z.infer<typeof QSlideSchema>;

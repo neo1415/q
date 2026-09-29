@@ -11,6 +11,7 @@ import {
   latestArtifactIn,
   type ArtifactPreparation,
   type ArtifactPreparationPort,
+  type StockPhotoPort,
 } from "@capital-q/q-specialists";
 import type { QArtifactReviser } from "@capital-q/model-gateway/q";
 import type { DocumentRevisionPort } from "@capital-q/q-tools";
@@ -57,6 +58,8 @@ export function createQArtifacts(dependencies: {
   readonly transactions: TransactionManager;
   readonly gateway: ModelGateway;
   readonly logger?: Logger | undefined;
+  /** Stock photos for decks; absent means decks are made without them. */
+  readonly photos?: StockPhotoPort | undefined;
 }): QArtifactsComposition {
   const service = createArtifactService({
     repository: createPostgresArtifactRepository({ sql: dependencies.sql }),
@@ -210,6 +213,7 @@ export function createQArtifacts(dependencies: {
     preparation: {
       port,
       reviser,
+      photos: dependencies.photos,
     },
   };
 }

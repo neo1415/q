@@ -10,6 +10,7 @@ import type { ArtifactPreparationPort } from "./artifact-port.js";
 import type { BriefReviser } from "./brief-reviser.js";
 import type { CompanyIntelligenceResult } from "./contracts.js";
 import { composeInvestmentBrief } from "./investment-brief.js";
+import { illustrateDeck, type StockPhotoPort } from "./deck-photos.js";
 import { composePitchDeck } from "./pitch-deck.js";
 
 /**
@@ -37,6 +38,8 @@ import { composePitchDeck } from "./pitch-deck.js";
 export type ArtifactPreparation = {
   readonly port: ArtifactPreparationPort;
   readonly reviser: BriefReviser;
+  /** Stock photographs for decks; absent means decks go without. */
+  readonly photos?: StockPhotoPort | undefined;
 };
 
 type HistoryLike = readonly {
@@ -252,7 +255,15 @@ export async function prepareOrReviseArtifact(input: {
         qRunId: request.runId,
         ...(company === undefined ? {} : { subject: company }),
         artifactType: ask.artifactType,
-        content: base,
+        content:
+          artifacts.photos === undefined || ask.artifactType !== "PITCH_DECK"
+            ? base
+            : {
+                ...base,
+                content: await illustrateDeck(base.content, artifacts.photos, {
+                  signal: request.signal,
+                }),
+              },
       }),
     };
   } catch (error: unknown) {

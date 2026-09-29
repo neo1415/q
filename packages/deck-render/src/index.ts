@@ -63,3 +63,5 @@ export {
   type BrandInput,
   type DeckTheme,
 } from "./theme.js";
+
+export { fetchSlideImages, type SlideImages } from "./images.js";

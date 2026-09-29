@@ -57,6 +57,7 @@ import {
   createInvestorOnboardingIntegration,
   INVESTOR_REVISABLE_STEPS,
 } from "@capital-q/investor-onboarding";
+import { createPexelsPhotos } from "./composition/stock-photos.js";
 import {
   createProfileAnswerAction,
   type ProfileAnswersPort,
@@ -1583,6 +1584,7 @@ const qArtifacts = createQArtifacts({
   transactions: database.transactions,
   gateway: modelGateway,
   logger,
+  photos: createPexelsPhotos(process.env.PEXELS_API_KEY),
 });
 const qIntelligence = composeQIntelligence({
   // The attestation is the claim about the data; where it holds, every

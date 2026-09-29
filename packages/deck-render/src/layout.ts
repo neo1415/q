@@ -79,7 +79,19 @@ export type RuleBox = {
   readonly colour: string;
 };
 
-export type LaidOutBox = TextBox | ChartBox | RuleBox;
+/** A stock photograph, full-bleed on its side of the slide. */
+export type ImageBox = {
+  readonly kind: "IMAGE";
+  readonly x: number;
+  readonly y: number;
+  readonly width: number;
+  readonly height: number;
+  readonly url: string;
+  readonly alt: string;
+  readonly credit: string;
+};
+
+export type LaidOutBox = TextBox | ChartBox | RuleBox | ImageBox;
 
 export type LaidOutSlide = {
   readonly index: number;
@@ -280,12 +292,14 @@ function layOutSlide(
   index: number,
   theme: DeckTheme,
   scale: number,
+  /** Narrower when a photograph takes the right of the slide. */
+  textWidth: number = SLIDE_WIDTH - MARGIN * 2,
 ): LaidOutSlide {
   const size = (base: number) =>
     Math.max(theme.minimumSize, Math.round(base * scale));
   const boxes: LaidOutBox[] = [];
   const dropped: string[] = [];
-  const width = SLIDE_WIDTH - MARGIN * 2;
+  const width = textWidth;
   const bottom = SLIDE_HEIGHT - MARGIN;
 
   if (slide.layout === "TITLE") {
@@ -513,10 +527,38 @@ export function layOutDeck(deck: QDeck, brand?: BrandInput): LaidOutDeck {
             ink: own.titleInk ?? readableInk(own.background),
             muted: own.titleInk ?? readableInk(own.background),
           };
-    let laid = layOutSlide(slide, index, slideTheme, 1);
+    // A photograph takes the right 40% of a title or bullet slide; the
+    // words keep the left, and still never shrink below the floor.
+    const image =
+      slide.image !== undefined &&
+      (slide.layout === "TITLE" || slide.layout === "BULLETS")
+        ? slide.image
+        : undefined;
+    const imageLeft = Math.round(SLIDE_WIDTH * 0.6);
+    const textWidth =
+      image === undefined ? SLIDE_WIDTH - MARGIN * 2 : imageLeft - MARGIN * 2;
+    let laid = layOutSlide(slide, index, slideTheme, 1, textWidth);
     for (const scale of [0.9, 0.8]) {
       if (laid.dropped.length === 0) break;
-      laid = layOutSlide(slide, index, slideTheme, scale);
+      laid = layOutSlide(slide, index, slideTheme, scale, textWidth);
+    }
+    if (image !== undefined) {
+      laid = {
+        ...laid,
+        boxes: [
+          ...laid.boxes,
+          {
+            kind: "IMAGE",
+            x: imageLeft,
+            y: 0,
+            width: SLIDE_WIDTH - imageLeft,
+            height: SLIDE_HEIGHT,
+            url: image.url,
+            alt: image.alt,
+            credit: image.credit,
+          },
+        ],
+      };
     }
     return own === undefined ? laid : { ...laid, background: own.background };
   });

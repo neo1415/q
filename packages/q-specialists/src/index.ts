@@ -166,3 +166,9 @@ export {
   OWN_MANDATE_ARTIFACT_TYPE,
   type OwnMandateDocument,
 } from "./own-mandate-document.js";
+
+export {
+  illustrateDeck,
+  type StockPhoto,
+  type StockPhotoPort,
+} from "./company/deck-photos.js";

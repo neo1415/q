@@ -1,5 +1,16 @@
-import { PDFDocument, rgb, type PDFPage, type RGB } from "pdf-lib";
+import {
+  clip,
+  endPath,
+  PDFDocument,
+  popGraphicsState,
+  pushGraphicsState,
+  rectangle,
+  rgb,
+  type PDFPage,
+  type RGB,
+} from "pdf-lib";
 import { backgroundBands } from "./background.js";
+import { imageKind, type SlideImages } from "./images.js";
 
 import { drawLine, embedFonts, type EmbeddedFonts } from "./fonts.js";
 import type { LaidOutDeck, TextBox } from "./layout.js";
@@ -60,6 +71,7 @@ function drawText(
 export async function deckToPdf(
   deck: LaidOutDeck,
   meta: { readonly title: string; readonly company?: string | undefined },
+  images: SlideImages = new Map(),
 ): Promise<Uint8Array> {
   const pdf = await PDFDocument.create();
   pdf.setTitle(meta.title);
@@ -99,6 +111,38 @@ export async function deckToPdf(
       }
       if (box.kind === "TEXT") {
         drawText(page, box, deck.height, fonts);
+        continue;
+      }
+      if (box.kind === "IMAGE") {
+        const bytes = images.get(box.url);
+        const kind = bytes === undefined ? null : imageKind(bytes);
+        if (bytes === undefined || kind === null) continue;
+        const embedded =
+          kind === "png"
+            ? await pdf.embedPng(bytes)
+            : await pdf.embedJpg(bytes);
+        // Cover the box, cropping the overflow: a photo is never stretched.
+        const ratio = Math.max(
+          box.width / embedded.width,
+          box.height / embedded.height,
+        );
+        const width = embedded.width * ratio;
+        const height = embedded.height * ratio;
+        // Clipped to its box: the photo covers its side and nothing else.
+        const boxBottom = deck.height - box.y - box.height;
+        page.pushOperators(
+          pushGraphicsState(),
+          rectangle(box.x, boxBottom, box.width, box.height),
+          clip(),
+          endPath(),
+        );
+        page.drawImage(embedded, {
+          x: box.x - (width - box.width) / 2,
+          y: boxBottom - (height - box.height) / 2,
+          width,
+          height,
+        });
+        page.pushOperators(popGraphicsState());
         continue;
       }
       // A chart: drawn from the numbers as vector shapes, never an image.

@@ -4,6 +4,7 @@ import type {
 } from "@capital-q/contracts";
 
 import { documentFromArtifact, documentToPdf } from "./document.js";
+import { fetchSlideImages } from "./images.js";
 import { layOutDeck } from "./layout.js";
 import { deckToPdf } from "./pdf.js";
 import { deckToPptx } from "./pptx.js";
@@ -56,10 +57,11 @@ export async function renderArtifactFile(input: {
   const deck = version.content.deck;
   if (deck !== undefined) {
     const laid = layOutDeck(deck, input.brand);
+    const images = await fetchSlideImages(laid);
     const bytes =
       format === "pptx"
-        ? await deckToPptx(laid, meta)
-        : await deckToPdf(laid, meta);
+        ? await deckToPptx(laid, meta, images)
+        : await deckToPdf(laid, meta, images);
     return {
       bytes,
       contentType: EXPORT_CONTENT_TYPES[format],

@@ -6,6 +6,7 @@ import type { QDeck } from "@capital-q/contracts";
 import {
   deckToPdf,
   deckToPptx,
+  fetchSlideImages,
   inspectDeck,
   layOutDeck,
   slideToSvg,
@@ -193,5 +194,77 @@ describe("the cover the person asked for (ADR 0025)", () => {
     expect(Buffer.from(after).equals(Buffer.from(before))).toBe(false);
     const pptx = await deckToPptx(laid, { title: "x" });
     expect(pptx.byteLength).toBeGreaterThan(0);
+  });
+});
+
+describe("photographs on slides (founder direction 2026-09-29)", () => {
+  const PNG = Uint8Array.from(
+    Buffer.from(
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
+      "base64",
+    ),
+  );
+  const url = "https://images.pexels.com/photos/1/pexels-photo-1.jpeg";
+  const photographed: QDeck = {
+    ...deck,
+    slides: deck.slides.map((slide, i) =>
+      i === 1
+        ? {
+            ...slide,
+            image: {
+              url,
+              alt: "A truck on a road",
+              credit: "Photo by A on Pexels",
+            },
+          }
+        : slide,
+    ),
+  };
+
+  it("gives the photo the right of the slide and keeps the words to the left", () => {
+    const laid = layOutDeck(photographed);
+    const image = laid.slides[1]?.boxes.find((box) => box.kind === "IMAGE");
+    expect(image).toMatchObject({ kind: "IMAGE", url, y: 0 });
+    for (const box of laid.slides[1]?.boxes ?? []) {
+      if (box.kind === "TEXT" && image?.kind === "IMAGE") {
+        expect(box.x + box.width).toBeLessThanOrEqual(image.x);
+      }
+    }
+  });
+
+  it("fetches only from the stock library, and embeds what it fetched", async () => {
+    const laid = layOutDeck(photographed);
+    const asked: string[] = [];
+    const images = await fetchSlideImages(laid, (input) => {
+      asked.push(String(input));
+      return Promise.resolve(new Response(PNG));
+    });
+    expect(asked).toEqual([url]);
+    const pdf = await deckToPdf(laid, { title: "x" }, images);
+    const plain = await deckToPdf(layOutDeck(deck), { title: "x" });
+    expect(pdf.byteLength).toBeGreaterThan(plain.byteLength);
+    const pptx = await deckToPptx(laid, { title: "x" }, images);
+    expect(pptx.byteLength).toBeGreaterThan(0);
+    const elsewhere = layOutDeck({
+      ...deck,
+      slides: [{ ...deck.slides[1]!, image: { url, alt: "a", credit: "c" } }],
+    });
+    const tampered = {
+      ...elsewhere,
+      slides: elsewhere.slides.map((slide) => ({
+        ...slide,
+        boxes: slide.boxes.map((box) =>
+          box.kind === "IMAGE"
+            ? { ...box, url: "https://evil.example/x.png" }
+            : box,
+        ),
+      })),
+    };
+    const none: string[] = [];
+    await fetchSlideImages(tampered, (input) => {
+      none.push(String(input));
+      return Promise.resolve(new Response(PNG));
+    });
+    expect(none).toEqual([]);
   });
 });

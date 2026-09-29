@@ -60,6 +60,13 @@ export function slideToSvg(slide: LaidOutSlide, deck: LaidOutDeck): string {
       );
       continue;
     }
+    if (box.kind === "IMAGE") {
+      // The browser fetches it from the stock library's CDN directly.
+      parts.push(
+        `<image href="${escape(box.url)}" x="${String(box.x)}" y="${String(box.y)}" width="${String(box.width)}" height="${String(box.height)}" preserveAspectRatio="xMidYMid slice"><title>${escape(box.alt)}</title></image>`,
+      );
+      continue;
+    }
     if (box.kind === "TEXT") {
       const family =
         box.role === "TITLE" || box.role === "HEADING"

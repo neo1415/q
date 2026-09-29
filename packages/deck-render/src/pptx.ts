@@ -1,5 +1,6 @@
 import * as pptxgenjs from "pptxgenjs";
 import { backgroundBands } from "./background.js";
+import { imageKind, type SlideImages } from "./images.js";
 
 import type { LaidOutDeck, TextBox } from "./layout.js";
 
@@ -39,6 +40,7 @@ type PptxSlide = {
   background: { color: string };
   addText(text: string, options: PptxTextOptions): unknown;
   addShape(kind: string, options: PptxTextOptions): unknown;
+  addImage(options: PptxTextOptions): unknown;
   addNotes(text: string): unknown;
 };
 type PptxPresentation = {
@@ -106,6 +108,7 @@ function addText(
 export async function deckToPptx(
   deck: LaidOutDeck,
   meta: { readonly title: string; readonly company?: string | undefined },
+  images: SlideImages = new Map(),
 ): Promise<Uint8Array> {
   const Presentation = presentationConstructor();
   const pptx = new Presentation();
@@ -152,6 +155,26 @@ export async function deckToPptx(
       }
       if (box.kind === "TEXT") {
         addText(slide, box, deck.theme);
+        continue;
+      }
+      if (box.kind === "IMAGE") {
+        const bytes = images.get(box.url);
+        const kind = bytes === undefined ? null : imageKind(bytes);
+        if (bytes === undefined || kind === null) continue;
+        // Embedded, not linked: the file opens offline and on any machine.
+        slide.addImage({
+          data: `image/${kind};base64,${Buffer.from(bytes).toString("base64")}`,
+          x: inches(box.x),
+          y: inches(box.y),
+          w: inches(box.width),
+          h: inches(box.height),
+          sizing: {
+            type: "cover",
+            w: inches(box.width),
+            h: inches(box.height),
+          },
+          altText: box.alt,
+        });
         continue;
       }
       // A chart drawn as shapes rather than as a PowerPoint chart object:
