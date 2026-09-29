@@ -63,7 +63,21 @@ const InvestorRow = z.object({
   hq_country: z.string().nullable(),
   public_description: z.string().nullable(),
   deployment_state: z.string().nullable(),
+  inbound_preference: z.string().nullable(),
 });
+
+function toCandidateInvestor(row: z.infer<typeof InvestorRow>): CandidateInvestor {
+  return {
+    investorOrganisationId: row.id,
+    displayName: row.display_name,
+    investorType: row.investor_type,
+    websiteUrl: row.website_url,
+    hqCountry: row.hq_country,
+    publicDescription: row.public_description,
+    deploymentState: row.deployment_state,
+    inboundPreference: row.inbound_preference,
+  };
+}
 
 const MandateRow = z.object({
   id: z.string().uuid(),
@@ -156,7 +170,8 @@ export function createPostgresDiscoveryRepository(options: {
                i.website_url,
                i.hq_country,
                i.public_description,
-               i.deployment_state
+               i.deployment_state,
+               i.inbound_preference
           from core.investor_organisations i
          where i.marketplace_visibility = 'network_visible'
            and (${ownOrganisation}::uuid is null
@@ -167,19 +182,29 @@ export function createPostgresDiscoveryRepository(options: {
       const candidates: CandidateInvestor[] = [];
       for (const raw of rows) {
         const parsed = InvestorRow.safeParse(raw);
-        if (!parsed.success) continue;
-        const row = parsed.data;
-        candidates.push({
-          investorOrganisationId: row.id,
-          displayName: row.display_name,
-          investorType: row.investor_type,
-          websiteUrl: row.website_url,
-          hqCountry: row.hq_country,
-          publicDescription: row.public_description,
-          deploymentState: row.deployment_state,
-        });
+        if (parsed.success) candidates.push(toCandidateInvestor(parsed.data));
       }
       return candidates;
+    },
+
+    discoverableInvestor: async (actor, investorOrganisationId) => {
+      const ownOrganisation = actor.organisationId ?? null;
+      const rows = await sql`
+        select i.id,
+               i.display_name,
+               i.investor_type,
+               i.website_url,
+               i.hq_country,
+               i.public_description,
+               i.deployment_state,
+               i.inbound_preference
+          from core.investor_organisations i
+         where i.id = ${investorOrganisationId}::uuid
+           and i.marketplace_visibility = 'network_visible'
+           and (${ownOrganisation}::uuid is null
+                or i.organisation_id <> ${ownOrganisation}::uuid)`;
+      const parsed = InvestorRow.safeParse(rows[0]);
+      return parsed.success ? toCandidateInvestor(parsed.data) : null;
     },
 
     ownSide: async (actor) => {

@@ -95,6 +95,8 @@ export const DiscoveredInvestorSchema = z
     hqCountry: z.string().nullable(),
     publicDescription: z.string().nullable(),
     deploymentState: z.string().nullable(),
+    /** How founders may reach them (ADR 0023); null is not stated. */
+    inboundPreference: z.string().nullable(),
     reasons: z.array(DiscoveryReasonSchema).max(8),
     rank: z.number().int().min(0),
   })

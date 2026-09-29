@@ -33,6 +33,8 @@ export type CandidateInvestor = {
   readonly hqCountry: string | null;
   readonly publicDescription: string | null;
   readonly deploymentState: string | null;
+  /** How founders may reach them (ADR 0023); null is not stated. */
+  readonly inboundPreference: string | null;
 };
 
 /** The acting investor's own active mandate. Their data, used for them. */
@@ -59,6 +61,11 @@ export type DiscoveryRepository = {
     actor: ActorContext,
     input: { readonly limit: number; readonly afterId: string | null },
   ) => Promise<readonly CandidateInvestor[]>;
+  /** One network-visible investor, not the actor's own; null otherwise. */
+  readonly discoverableInvestor: (
+    actor: ActorContext,
+    investorOrganisationId: string,
+  ) => Promise<CandidateInvestor | null>;
   /** The actor's own active mandate, if they have one. */
   readonly ownActiveMandate: (
     actor: ActorContext,

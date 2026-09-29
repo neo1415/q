@@ -57,6 +57,15 @@ export type DiscoveryService = {
   ) => Promise<DiscoveryInvestorSlate>;
   /** Which slate this person's own organisation should be shown. */
   readonly sideFor: (actor: ActorContext) => Promise<DiscoverySide>;
+  /**
+   * One investor as a founder may see it (ADR 0023): network-visible,
+   * admitted by disclosure, not the actor's own. Null otherwise, with no
+   * difference between "private" and "does not exist".
+   */
+  readonly findInvestor: (
+    actor: ActorContext,
+    investorOrganisationId: string,
+  ) => Promise<Omit<DiscoveredInvestor, "rank" | "reasons"> | null>;
 };
 
 function boundedLimit(limit: number | undefined): number {
@@ -92,6 +101,21 @@ export function createDiscoveryService(
 
   return {
     sideFor: (actor) => repository.ownSide(actor),
+
+    findInvestor: async (actor, investorOrganisationId) => {
+      const candidate = await repository.discoverableInvestor(
+        actor,
+        investorOrganisationId,
+      );
+      if (candidate === null) return null;
+      const [visible] = await permitted(
+        actor,
+        [candidate],
+        "investor_organisation",
+        (item) => item.investorOrganisationId,
+      );
+      return visible ?? null;
+    },
 
     discoverCompanies: async (query) => {
       const limit = boundedLimit(query.limit);
@@ -218,6 +242,7 @@ export function createDiscoveryService(
           hqCountry: candidate.hqCountry,
           publicDescription: candidate.publicDescription,
           deploymentState: candidate.deploymentState,
+          inboundPreference: candidate.inboundPreference,
           reasons: [...fit.reasons],
           rank: fit.score,
         } satisfies DiscoveredInvestor;

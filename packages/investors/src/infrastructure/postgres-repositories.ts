@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import {
   InvestorDeploymentStateSchema,
+  InvestorInboundPreferenceSchema,
   InvestorTypeSchema,
   InvestorVerificationStateSchema,
   UtcTimestampSchema,
@@ -59,6 +60,7 @@ const InvestorRow = z.object({
   public_description: z.string().nullable(),
   verification_state: InvestorVerificationStateSchema,
   deployment_state: InvestorDeploymentStateSchema.nullable(),
+  inbound_preference: InvestorInboundPreferenceSchema.nullable(),
   marketplace_visibility: z.enum(["organisation_private", "network_visible"]),
   version: z.number().int().min(1),
   created_at: Timestamp,
@@ -78,6 +80,7 @@ function toInvestor(row: unknown): InvestorOrganisation {
     publicDescription: r.public_description,
     verificationState: r.verification_state,
     deploymentState: r.deployment_state,
+    inboundPreference: r.inbound_preference,
     visibility: r.marketplace_visibility,
     version: r.version,
     createdAt: r.created_at,
@@ -89,7 +92,7 @@ function investorSelect(executor: DatabaseExecutor) {
   return executor`
     select i.id, i.tenant_id, i.organisation_id, i.investor_type, i.display_name,
            i.website_url, i.hq_country, i.public_description, i.verification_state,
-           i.deployment_state, i.marketplace_visibility,
+           i.deployment_state, i.inbound_preference, i.marketplace_visibility,
            i.version, i.created_at, i.updated_at
       from core.investor_organisations i`;
 }
@@ -102,6 +105,7 @@ const COLUMN_BY_FIELD: Readonly<Record<keyof InvestorProfileChanges, string>> =
     hqCountry: "hq_country",
     publicDescription: "public_description",
     deploymentState: "deployment_state",
+    inboundPreference: "inbound_preference",
   };
 
 /** Whitelisted column mapping. verification_state is not reachable from here. */

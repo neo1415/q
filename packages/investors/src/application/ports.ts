@@ -1,5 +1,6 @@
 import type {
   InvestorDeploymentState,
+  InvestorInboundPreference,
   InvestorType,
 } from "@capital-q/contracts";
 import type { DatabaseExecutor, TransactionContext } from "@capital-q/database";
@@ -46,6 +47,7 @@ export type InvestorProfileChanges = {
   readonly hqCountry?: string | null | undefined;
   readonly publicDescription?: string | null | undefined;
   readonly deploymentState?: InvestorDeploymentState | null | undefined;
+  readonly inboundPreference?: InvestorInboundPreference | null | undefined;
 };
 
 export type InvestorOrganisationRepository = {

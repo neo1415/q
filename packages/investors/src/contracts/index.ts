@@ -3,6 +3,7 @@ import { z } from "zod";
 import {
   createUuidIdSchema,
   type InvestorDeploymentState,
+  type InvestorInboundPreference,
   type InvestorOrganisationDto,
   type InvestorRepresentativeDto,
   type InvestorType,
@@ -69,6 +70,8 @@ export type InvestorOrganisation = {
   readonly verificationState: InvestorVerificationState;
   /** `null` is unknown (not yet answered); never paused, never active. */
   readonly deploymentState: InvestorDeploymentState | null;
+  /** How founders may reach them (ADR 0023); null is not stated. */
+  readonly inboundPreference: InvestorInboundPreference | null;
   /** Who may see the declared profile (default organisation_private). */
   readonly visibility: InvestorVisibilityChoice;
   readonly version: number;
@@ -122,6 +125,7 @@ export function toInvestorOrganisationDto(
     hqCountry: investor.hqCountry,
     publicDescription: investor.publicDescription,
     deploymentState: investor.deploymentState,
+    inboundPreference: investor.inboundPreference,
     verificationState: investor.verificationState,
     visibility: investor.visibility,
     version: investor.version,
