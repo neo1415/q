@@ -781,8 +781,11 @@ describe("a pitch this browser cannot play (R30 #22, #23)", () => {
     act(() => {
       videoIn(container).dispatchEvent(new Event("cq-playback-failed"));
     });
-    expect(screen.getByRole("status").textContent).toContain(
-      "can't play in this browser",
+    // Under a loaded runner the status can land a tick later.
+    await waitFor(() =>
+      expect(screen.getByRole("status").textContent).toContain(
+        "can't play in this browser",
+      ),
     );
   });
 
