@@ -1,5 +1,7 @@
 import Link from "next/link";
 
+import { InvestorCards } from "@/features/investors/investor-cards";
+
 import type {
   DiscoveredCompanyDto,
   DiscoveredInvestorDto,
@@ -7,8 +9,8 @@ import type {
   DiscoveryReasonDto,
 } from "@capital-q/contracts";
 import { buttonClassName } from "@capital-q/ui/button";
-import { Building2, Globe, ICON_SIZE, Landmark } from "@capital-q/ui/icons";
-import { EmptyState, InlineNotice } from "@capital-q/ui/states";
+import { Building2, Globe, ICON_SIZE, Info } from "@capital-q/ui/icons";
+import { EmptyState } from "@capital-q/ui/states";
 
 /**
  * Discover (doc 19 §44-§45; doc 17 §71).
@@ -84,12 +86,21 @@ function Reasons({
 
 function Notes({ notes }: { readonly notes: readonly DiscoveryNoteDto[] }) {
   if (notes.length === 0) return null;
+  // How the list was built, said once and quietly: it is context, not news.
   return (
-    <div className="flex flex-col gap-2">
+    <div className="flex flex-col gap-1" aria-label="How this list was built">
       {notes.map((note) => (
-        <InlineNotice key={note} tone="info" title="How this list was built">
+        <p
+          key={note}
+          className="cq-caption flex items-start gap-1.5 text-(--cq-text-tertiary)"
+        >
+          <Info
+            size={ICON_SIZE.compact}
+            aria-hidden="true"
+            className="mt-0.5 shrink-0"
+          />
           {NOTE_TEXT[note]}
-        </InlineNotice>
+        </p>
       ))}
     </div>
   );
@@ -168,41 +179,12 @@ export function DiscoverInvestors({
           }
         />
       ) : (
-        <ul className="cq-discover-list flex flex-col">
-          {items.map((item) => (
-            <li
-              key={item.investorOrganisationId}
-              className="flex flex-col gap-2 py-5"
-            >
-              <div className="flex items-center gap-2">
-                <Landmark size={ICON_SIZE.regular} aria-hidden="true" />
-                <h3 className="cq-title-sm text-(--cq-text-primary)">
-                  {/* ADR 0023: the investor's page, where a request is sent. */}
-                  <Link
-                    href={`/investors/${item.investorOrganisationId}`}
-                    className="underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
-                  >
-                    {item.displayName}
-                  </Link>
-                </h3>
-              </div>
-              {item.publicDescription === null ? null : (
-                <p className="cq-body max-w-(--cq-layout-narrow) text-(--cq-text-secondary)">
-                  {item.publicDescription}
-                </p>
-              )}
-              <Reasons reasons={item.reasons} />
-              {item.websiteUrl === null ? null : (
-                <p className="flex items-center gap-1.5">
-                  <Globe size={ICON_SIZE.compact} aria-hidden="true" />
-                  <span className="cq-caption break-all text-(--cq-text-tertiary)">
-                    {item.websiteUrl}
-                  </span>
-                </p>
-              )}
-            </li>
-          ))}
-        </ul>
+        // ADR 0023: each card opens the investor's page, where a request
+        // is sent. Order is the server's; the reasons say why each is here.
+        <InvestorCards
+          items={items}
+          footer={(item) => <Reasons reasons={item.reasons} />}
+        />
       )}
     </div>
   );

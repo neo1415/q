@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { ReactNode } from "react";
 
 import type { DiscoveredInvestorDto } from "@capital-q/contracts";
 import { ICON_SIZE, MapPin } from "@capital-q/ui/icons";
@@ -14,8 +15,11 @@ import { inboundLabel, initials, investorTypeLabel } from "./investor-labels";
  */
 export function InvestorCards({
   items,
+  footer,
 }: {
   readonly items: readonly DiscoveredInvestorDto[];
+  /** Under each card's text: Discover's "why shown" reasons. */
+  readonly footer?: ((item: DiscoveredInvestorDto) => ReactNode) | undefined;
 }) {
   return (
     <ul
@@ -24,14 +28,20 @@ export function InvestorCards({
     >
       {items.map((item) => (
         <li key={item.investorOrganisationId}>
-          <InvestorCard item={item} />
+          <InvestorCard item={item} footer={footer?.(item)} />
         </li>
       ))}
     </ul>
   );
 }
 
-function InvestorCard({ item }: { readonly item: DiscoveredInvestorDto }) {
+function InvestorCard({
+  item,
+  footer,
+}: {
+  readonly item: DiscoveredInvestorDto;
+  readonly footer?: ReactNode;
+}) {
   const where = countryLabel(item.hqCountry);
   const photo = item.photoUrl ?? null;
   const cover = item.coverUrl ?? null;
@@ -92,6 +102,7 @@ function InvestorCard({ item }: { readonly item: DiscoveredInvestorDto }) {
             {item.publicDescription}
           </p>
         )}
+        {footer}
         <p className="cq-caption mt-auto pt-1 text-(--cq-text-secondary)">
           {inboundLabel(item.inboundPreference)}
         </p>

@@ -167,31 +167,43 @@ export default async function DiscoverPage({
   // Founders' videos (ADR 0021) sit beside the investors, one tab each.
   const tab = (await searchParams)?.tab;
   const founders = tab === "founders";
+  const tabClass = (active: boolean) =>
+    `cq-body-sm inline-flex min-h-11 items-center border-b-2 px-1 ${
+      active
+        ? "border-(--cq-text-primary) text-(--cq-text-primary)"
+        : "border-transparent text-(--cq-text-secondary) hover:text-(--cq-text-primary)"
+    }`;
   const tabs = (
-    <nav
-      aria-label="What to discover"
-      className="flex w-fit gap-1 rounded-(--cq-radius-md) border border-(--cq-border-subtle) p-1"
-    >
+    <div className="flex flex-wrap items-end justify-between gap-3 border-b border-(--cq-border-subtle)">
+      <nav aria-label="What to discover" className="flex gap-6">
+        <Link
+          href="/discover"
+          aria-current={founders ? undefined : "page"}
+          className={tabClass(!founders)}
+        >
+          Investors
+        </Link>
+        <Link
+          href="/discover?tab=founders"
+          aria-current={founders ? "page" : undefined}
+          className={tabClass(founders)}
+          data-discover-founders-tab
+        >
+          Founders&apos; videos
+        </Link>
+      </nav>
+      {/* Interest already addressed to the company (CQ-NET-011). */}
       <Link
-        href="/discover"
-        aria-current={founders ? undefined : "page"}
-        className={buttonClassName(founders ? "quiet" : "secondary", "compact")}
+        href="/company/interest"
+        className="cq-body-sm mb-2 text-(--cq-text-secondary) underline-offset-4 hover:text-(--cq-text-primary) hover:underline"
       >
-        Investors
+        Investor interest in your company
       </Link>
-      <Link
-        href="/discover?tab=founders"
-        aria-current={founders ? "page" : undefined}
-        className={buttonClassName(founders ? "secondary" : "quiet", "compact")}
-        data-discover-founders-tab
-      >
-        Founders&apos; videos
-      </Link>
-    </nav>
+    </div>
   );
   if (founders) {
     return (
-      <PageContainer>
+      <PageContainer className="flex flex-col gap-6">
         <PageHeader
           title="Discover"
           description="Videos other founders chose to share with everyone on Capital Q, newest first."
@@ -204,19 +216,12 @@ export default async function DiscoverPage({
 
   const slate = await discoverInvestors(session).catch(() => null);
   return (
-    <PageContainer>
+    <PageContainer className="flex flex-col gap-6">
       <PageHeader
         title="Discover"
         description="Investors who chose to be discoverable, and what each one has said publicly."
       />
       {tabs}
-      {/* Interest already addressed to the company (CQ-NET-011). */}
-      <Link
-        href="/company/interest"
-        className={buttonClassName("secondary", "compact")}
-      >
-        Investor interest in your company
-      </Link>
       {slate === null ? (
         <EmptyState
           title="Discover couldn't load."
