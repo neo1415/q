@@ -71,15 +71,15 @@ describe("R24 · the sidebar", () => {
     const aside = container.querySelector("[data-sidebar]");
     expect(aside?.hasAttribute("data-collapsed")).toBe(true);
     expect(screen.queryByText("Ask Q")).toBeNull();
+    // Chats live on the Q page, never in the sidebar (2026-09-29).
     expect(screen.queryByTestId("chats-list")).toBeNull();
-    // The conversations control, folded: New chat and the list.
-    expect(screen.getByRole("link", { name: "New chat" })).toBeTruthy();
+    expect(screen.queryByRole("link", { name: "New chat" })).toBeNull();
 
     const toggle = screen.getByRole("button", { name: "Expand sidebar" });
     expect(toggle.getAttribute("aria-expanded")).toBe("false");
     await userEvent.click(toggle);
     expect(aside?.hasAttribute("data-collapsed")).toBe(false);
-    expect(screen.getByTestId("chats-list")).toBeTruthy();
+    expect(screen.queryByTestId("chats-list")).toBeNull();
     expect(
       screen
         .getByRole("button", { name: "Collapse sidebar" })
@@ -93,7 +93,7 @@ describe("R24 · the sidebar", () => {
     expect(
       container.querySelector("[data-sidebar]")?.hasAttribute("data-collapsed"),
     ).toBe(false);
-    expect(screen.getByTestId("chats-list")).toBeTruthy();
+    expect(screen.queryByTestId("chats-list")).toBeNull();
   });
 
   it("offers the theme as one icon, not three segments", () => {

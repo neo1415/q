@@ -2,22 +2,19 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Suspense, useState } from "react";
+import { useState } from "react";
 
 import { cx } from "@capital-q/ui";
 import { ContextIndicator } from "@capital-q/ui/context-indicator";
 import {
-  History,
   ICON_SIZE,
   ICON_STROKE,
   PanelLeft,
-  Plus,
 } from "@capital-q/ui/icons";
 import { Tooltip } from "@capital-q/ui/tooltip";
 
 import { ThemeMenu } from "@/features/appearance/theme-menu";
 import { useHomeHref } from "@/features/q/active-conversation";
-import { ChatsListForRoute } from "@/features/q/chats-list";
 
 import type { ShellContext } from "./app-shell";
 import {
@@ -39,9 +36,9 @@ import { sidebarCollapsed, type SidebarOverride } from "./sidebar-state";
  *
  * Collapsible (R24). On the Q page it starts as a narrow rail of icons, so
  * Q has the width; elsewhere it starts open. A choice made on one kind of
- * page holds until the person moves to the other kind. The conversations
- * list is the one way into past chats (no separate "Ask Q" entry: the Q
- * page is Q, and the dock is Q everywhere else).
+ * page holds until the person moves to the other kind. Past chats live
+ * on the Q page's Conversations sheet, not here (founder direction
+ * 2026-09-29): the sidebar is navigation only.
  */
 export function DesktopSidebar({
   context,
@@ -127,52 +124,11 @@ export function DesktopSidebar({
         </ul>
       </nav>
 
-      {collapsed ? (
-        /* The conversations control, folded to its two actions. */
-        <div className="flex flex-col items-center gap-0.5 px-2 pt-6">
-          <Tooltip content="New chat" side="right">
-            <Link
-              href="/home"
-              className="cq-sidebar-icon"
-              aria-label="New chat"
-            >
-              <Plus
-                aria-hidden="true"
-                size={ICON_SIZE.regular}
-                strokeWidth={ICON_STROKE}
-              />
-            </Link>
-          </Tooltip>
-          <Tooltip content="Chats" side="right">
-            <button
-              type="button"
-              className="cq-sidebar-icon"
-              aria-label="Show chats"
-              onClick={() => {
-                setCollapsed(false);
-              }}
-              data-sidebar-chats
-            >
-              <History
-                aria-hidden="true"
-                size={ICON_SIZE.regular}
-                strokeWidth={ICON_STROKE}
-              />
-            </button>
-          </Tooltip>
+      {collapsed ? null : (
+        <div className="mt-6 flex flex-col gap-2 border-t border-(--cq-border-subtle) px-5 pt-5">
+          {/* Where this person is acting: the scope, out of the input. */}
+          <ContextIndicator scope={context.scope} detail={context.label} />
         </div>
-      ) : (
-        <>
-          {/* The person's conversations with Q, collapsible (ADR 0012). */}
-          <Suspense fallback={null}>
-            <ChatsListForRoute variant="sidebar" />
-          </Suspense>
-
-          <div className="mt-6 flex flex-col gap-2 border-t border-(--cq-border-subtle) px-5 pt-5">
-            {/* Where this person is acting: the scope, out of the input. */}
-            <ContextIndicator scope={context.scope} detail={context.label} />
-          </div>
-        </>
       )}
 
       <div

@@ -463,6 +463,15 @@
     }
   }
   /*
+   * One scroll on the Q page: the stage is sized to the viewport and
+   * scrolls itself, so the page behind it must not scroll as well
+   * (founder direction 2026-09-29).
+   */
+  html:has(.cq-q-home),
+  html:has(.cq-q-home) body {
+    overflow: hidden;
+  }
+  /*
    * The composer's strip. On a phone the bottom navigation beneath it
    * already clears the home indicator; on a wide screen nothing does, so
    * the strip keeps the safe-area inset itself.

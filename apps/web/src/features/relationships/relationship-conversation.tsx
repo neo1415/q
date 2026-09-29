@@ -72,7 +72,7 @@ export async function RelationshipConversation({
           .at(0);
 
   return (
-    <PageContainer>
+    <PageContainer className="flex flex-col gap-6">
       <BackToRelationships href={basePath} label={counterpart} />
       <RelationshipHero
         counterpart={counterpart}
@@ -106,11 +106,12 @@ export async function RelationshipConversation({
       />
 
       <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_20rem]">
-        <div className="min-w-0">
+        <div className="min-w-0 rounded-xl border border-(--cq-border-subtle) bg-(--cq-surface-raised) p-4 sm:p-5">
           <RelationshipChat
             relationshipId={relationship.relationshipId}
             counterpart={counterpart}
             initial={thread}
+            tall
           />
         </div>
 

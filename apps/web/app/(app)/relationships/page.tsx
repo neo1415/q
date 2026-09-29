@@ -44,20 +44,22 @@ export default async function RelationshipsPage() {
         : "NONE";
 
   return (
-    <PageContainer>
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <PageHeader
-          title="Relationships"
-          description={
-            side === "INVESTOR"
-              ? "Every company your organisation has discovered or approached, and where each stands."
-              : side === "COMPANY"
-                ? "Every investor organisation your company is connected with or has approached, and where each stands."
-                : undefined
-          }
-        />
+    <PageContainer className="flex flex-col gap-6">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0 flex-1">
+          <PageHeader
+            title="Relationships"
+            description={
+              side === "INVESTOR"
+                ? "Every company your organisation has discovered or approached, and where each stands."
+                : side === "COMPANY"
+                  ? "Every investor organisation your company is connected with or has approached, and where each stands."
+                  : undefined
+            }
+          />
+        </div>
         {side === "NONE" ? null : (
-          <div className="flex flex-wrap gap-2">
+          <div className="flex shrink-0 flex-wrap gap-2">
             {side === "INVESTOR" ? (
               // ADR 0023: founders' Connection Requests wait on the investor here.
               <Link

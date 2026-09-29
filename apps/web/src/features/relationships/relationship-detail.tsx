@@ -76,7 +76,7 @@ export function RelationshipDetail({
   const connected = relationship?.state === "CONNECTED";
   const messageCount = thread?.messages.length ?? 0;
   return (
-    <PageContainer>
+    <PageContainer className="flex flex-col gap-6">
       <BackToRelationships />
       <header className="flex flex-col gap-1">
         <h1 className="cq-title-xl text-(--cq-text-primary)">{counterpart}</h1>
@@ -172,7 +172,10 @@ export function RelationshipDetail({
           )}
 
           {relationship === null ? null : (
-            <div id="calls" className="scroll-mt-24">
+            <div
+              id="calls"
+              className="scroll-mt-24 rounded-xl border border-(--cq-border-subtle) bg-(--cq-surface-raised) p-4 sm:p-5"
+            >
               <span id="reminders" className="block scroll-mt-24" />
               <RelationshipSchedule
                 relationshipId={relationship.relationshipId}
@@ -570,7 +573,7 @@ export function RelationshipUnavailable({
   readonly sentence: string;
 }) {
   return (
-    <PageContainer>
+    <PageContainer className="flex flex-col gap-6">
       <BackToRelationships />
       <h1 className="cq-title-xl text-(--cq-text-primary)">Relationship</h1>
       <p className="cq-body max-w-(--cq-layout-reading) text-(--cq-text-secondary)">

@@ -94,10 +94,13 @@ export function RelationshipChat({
   relationshipId,
   counterpart,
   initial,
+  tall = false,
 }: {
   readonly relationshipId: string;
   readonly counterpart: string;
   readonly initial: ChatThreadDto | null;
+  /** The conversation page: the thread fills the column. */
+  readonly tall?: boolean | undefined;
 }) {
   const { askAbout } = useGlobalQ();
   const [messages, setMessages] = useState<ChatMessageDto[]>(
@@ -364,7 +367,7 @@ export function RelationshipChat({
   return (
     <section
       aria-labelledby="relationship-chat"
-      className="flex max-w-(--cq-layout-reading) flex-col gap-3"
+      className={`flex flex-col gap-3 ${tall ? "" : "max-w-(--cq-layout-reading)"}`}
       data-relationship-chat={status}
     >
       <div className="flex items-center justify-between gap-3">
@@ -413,7 +416,7 @@ export function RelationshipChat({
           role="log"
           aria-live="polite"
           aria-label={`Messages with ${counterpart}`}
-          className="flex max-h-[60vh] flex-col gap-3 overflow-y-auto rounded-md border border-(--cq-border-subtle) p-3"
+          className={`flex flex-col gap-3 overflow-y-auto rounded-md border border-(--cq-border-subtle) p-3 ${tall ? "min-h-[40vh] max-h-[65vh]" : "max-h-[60vh]"}`}
         >
           {messages.map((message, index) => (
             <li
@@ -430,10 +433,10 @@ export function RelationshipChat({
                 {message.viaQ ? " · approved from Q" : null}
               </span>
               <div
-                className={`rounded-md px-3 py-2 ${
+                className={`rounded-2xl px-4 py-2.5 ${
                   message.mine
-                    ? "bg-(--cq-accent-soft) text-(--cq-text-primary)"
-                    : "bg-(--cq-surface-subtle) text-(--cq-text-primary)"
+                    ? "rounded-br-md border border-(--cq-accent)/40 bg-(--cq-accent-soft) text-(--cq-text-primary)"
+                    : "rounded-bl-md bg-(--cq-surface-subtle) text-(--cq-text-primary)"
                 }`}
               >
                 {message.unsent ? (
