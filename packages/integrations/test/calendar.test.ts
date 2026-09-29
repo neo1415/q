@@ -160,18 +160,31 @@ describe("Google Calendar adapter", () => {
     expect(http.calls[0]?.url).toContain("sendUpdates=all");
   });
 
-  it("reads busy times and refuses a calendar Google could not read", async () => {
+  it("reads busy times from the events list, within calendar.events", async () => {
     const ok = scripted([
       {
         status: 200,
         body: {
-          calendars: {
-            primary: {
-              busy: [
-                { start: "2026-10-06T09:00:00Z", end: "2026-10-06T10:00:00Z" },
-              ],
+          timeZone: "Africa/Lagos",
+          items: [
+            {
+              status: "confirmed",
+              start: { dateTime: "2026-10-06T09:00:00Z" },
+              end: { dateTime: "2026-10-06T10:00:00Z" },
             },
-          },
+            // Free and cancelled events do not block a slot.
+            {
+              status: "confirmed",
+              transparency: "transparent",
+              start: { dateTime: "2026-10-06T11:00:00Z" },
+              end: { dateTime: "2026-10-06T12:00:00Z" },
+            },
+            {
+              status: "cancelled",
+              start: { dateTime: "2026-10-06T13:00:00Z" },
+              end: { dateTime: "2026-10-06T14:00:00Z" },
+            },
+          ],
         },
       },
     ]);
@@ -179,19 +192,31 @@ describe("Google Calendar adapter", () => {
       from: new Date("2026-10-06T00:00:00Z"),
       to: new Date("2026-10-07T00:00:00Z"),
     });
-    expect(busy).toHaveLength(1);
-    const broken = scripted([
+    expect(busy).toEqual([
       {
-        status: 200,
-        body: { calendars: { primary: { errors: [{ reason: "notFound" }] } } },
+        start: new Date("2026-10-06T09:00:00Z"),
+        end: new Date("2026-10-06T10:00:00Z"),
       },
     ]);
+    // Never freeBusy: it needs a scope Capital Q does not ask for.
+    expect(ok.calls[0]?.url).toContain("/calendars/primary/events");
+    expect(ok.calls[0]?.request.method).toBe("GET");
+    const refused = scripted([{ status: 403, body: { error: "forbidden" } }]);
     await expect(
-      createGoogleCalendarProvider(broken).busy(ACCESS, {
+      createGoogleCalendarProvider(refused).busy(ACCESS, {
         from: new Date(),
         to: new Date(),
       }),
     ).rejects.toBeInstanceOf(GoogleProviderError);
+  });
+
+  it("reads the calendar's zone from the events list", async () => {
+    const http = scripted([
+      { status: 200, body: { timeZone: "Europe/London", items: [] } },
+    ]);
+    expect(await createGoogleCalendarProvider(http).timeZone(ACCESS)).toBe(
+      "Europe/London",
+    );
   });
 });
 

@@ -15,7 +15,8 @@ import {
  * over the REST API with the setup contract's one calendar scope,
  * `calendar.events`. No SDK.
  *
- *   busy        the organiser's own busy times (free/busy on `primary`)
+ *   busy        the organiser's own busy times, from `events.list` on
+ *               `primary` (freeBusy needs a scope Capital Q does not ask for)
  *   timeZone    the organiser's calendar time zone
  *   insert      `events.insert` with a client-chosen event id,
  *               `conferenceDataVersion=1` + a `hangoutsMeet` create
@@ -69,18 +70,30 @@ export type CalendarProvider = {
   readonly cancel: (access: MailboxAccess, eventId: string) => Promise<void>;
 };
 
-const FreeBusySchema = z.object({
-  calendars: z.record(
-    z.string(),
-    z.object({
-      busy: z
-        .array(z.object({ start: z.string(), end: z.string() }))
-        .optional(),
-      errors: z.array(z.unknown()).optional(),
-    }),
-  ),
+const EventListSchema = z.object({
+  timeZone: z.string().optional(),
+  nextPageToken: z.string().nullish(),
+  items: z
+    .array(
+      z.object({
+        status: z.string().optional(),
+        transparency: z.string().optional(),
+        start: z
+          .object({
+            dateTime: z.string().optional(),
+            date: z.string().optional(),
+          })
+          .optional(),
+        end: z
+          .object({
+            dateTime: z.string().optional(),
+            date: z.string().optional(),
+          })
+          .optional(),
+      }),
+    )
+    .optional(),
 });
-const CalendarSchema = z.object({ timeZone: z.string().optional() });
 const EventSchema = z.object({
   id: z.string(),
   hangoutLink: z.string().optional(),
@@ -139,40 +152,58 @@ export function createGoogleCalendarProvider(
   http: GoogleHttp,
 ): CalendarProvider {
   return {
+    // Read from the events list, not freeBusy or the calendar resource:
+    // Capital Q asks only for calendar.events (founder live 2026-09-29:
+    // freeBusy answered 403 for every connected person), and that scope
+    // lists events and reports the calendar's zone on the same response.
     busy: async (access, window) => {
-      const result = await call(
-        http,
-        `${CALENDAR_API}/freeBusy`,
-        {
-          method: "POST",
-          headers: headers(access, true),
-          body: JSON.stringify({
-            timeMin: window.from.toISOString(),
-            timeMax: window.to.toISOString(),
-            items: [{ id: "primary" }],
-          }),
-        },
-        FreeBusySchema,
-      );
-      const primary = result.calendars.primary;
-      if (primary === undefined || (primary.errors?.length ?? 0) > 0) {
-        // Never guess free time from a calendar Google could not read.
-        throw new GoogleProviderError("MALFORMED_RESPONSE", 200);
+      const busy: { start: Date; end: Date }[] = [];
+      let pageToken: string | undefined;
+      for (let page = 0; page < 5; page += 1) {
+        const url = new URL(`${CALENDAR_API}/calendars/primary/events`);
+        url.searchParams.set("timeMin", window.from.toISOString());
+        url.searchParams.set("timeMax", window.to.toISOString());
+        url.searchParams.set("singleEvents", "true");
+        url.searchParams.set("orderBy", "startTime");
+        url.searchParams.set("maxResults", "250");
+        if (pageToken !== undefined)
+          url.searchParams.set("pageToken", pageToken);
+        const result = await call(
+          http,
+          url.toString(),
+          { method: "GET", headers: headers(access) },
+          EventListSchema,
+        );
+        for (const item of result.items ?? []) {
+          // Free events and cancelled ones do not block a slot.
+          if (
+            item.status === "cancelled" ||
+            item.transparency === "transparent"
+          ) {
+            continue;
+          }
+          const start = item.start?.dateTime ?? item.start?.date;
+          const end = item.end?.dateTime ?? item.end?.date;
+          if (start === undefined || end === undefined) continue;
+          busy.push({ start: new Date(start), end: new Date(end) });
+        }
+        pageToken = result.nextPageToken ?? undefined;
+        if (pageToken === undefined) break;
       }
-      return (primary.busy ?? []).map((slot) => ({
-        start: new Date(slot.start),
-        end: new Date(slot.end),
-      }));
+      return busy;
     },
 
     timeZone: async (access) => {
-      const calendar = await call(
+      const url = new URL(`${CALENDAR_API}/calendars/primary/events`);
+      url.searchParams.set("maxResults", "1");
+      url.searchParams.set("timeMin", new Date().toISOString());
+      const result = await call(
         http,
-        `${CALENDAR_API}/calendars/primary`,
+        url.toString(),
         { method: "GET", headers: headers(access) },
-        CalendarSchema,
+        EventListSchema,
       );
-      return calendar.timeZone ?? "UTC";
+      return result.timeZone ?? "UTC";
     },
 
     insert: async (access, event) => {
