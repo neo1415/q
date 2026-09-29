@@ -60,6 +60,7 @@ import {
 import { createPexelsPhotos } from "./composition/stock-photos.js";
 import { createRecallBots } from "./composition/recall-bots.js";
 import { createOpenerFacts } from "./voice/returning-opener.js";
+import { createScout } from "./composition/scout.js";
 import { createMeetingNotesComposer } from "./composition/meeting-notes.js";
 import {
   createProfileAnswerAction,
@@ -1767,6 +1768,22 @@ setInterval(
   },
   2 * 60 * 1000,
 ).unref();
+
+// Q's scout (founder direction 2026-09-29): every six hours, what is new on
+// the public web about each recently active founder's own company, each at
+// most once a day; the first run waits a few minutes after a deploy.
+const scout = createScout({
+  sql: database.sql,
+  provider: researchComposition.provider,
+  logger,
+});
+const runScout = () => {
+  scout.tick().catch((error: unknown) => {
+    logger.warn({ err: error }, "scout run failed");
+  });
+};
+setTimeout(runScout, 5 * 60 * 1000).unref();
+setInterval(runScout, 6 * 60 * 60 * 1000).unref();
 
 // The realtime voice channel (CQ-Q-VOICE-001 C): ElevenLabs as the Speech
 // Engine, composed only when its key and a Speech Engine id are configured.

@@ -19,6 +19,8 @@ export type OpenerFacts = {
   readonly firstReminder: string | null;
   readonly notesReady: number;
   readonly unreadNotices: number;
+  /** What the scout found about their company that they have not seen. */
+  readonly scoutFinding?: string | null | undefined;
 };
 
 const TRIM = 70;
@@ -54,6 +56,9 @@ export function composeReturningOpener(
   }
   if (facts.notesReady > 0) {
     return `${hello} My notes from your last call are ready. Want the short version?`;
+  }
+  if (facts.scoutFinding !== undefined && facts.scoutFinding !== null) {
+    return `${hello} I spotted something new about your company: "${clip(facts.scoutFinding)}". Want the gist?`;
   }
   if (facts.remindersDue > 0 && facts.firstReminder !== null) {
     return `${hello} You asked me to remind you: "${clip(facts.firstReminder)}". Want to deal with it now?`;
@@ -93,8 +98,9 @@ export function createOpenerFacts(dependencies: {
            and due_at < ${dayEnd}
          order by due_at
          limit 20`,
-      sql<{ kind: string; n: number }[]>`
-        select kind, count(*)::int as n from communication.notifications
+      sql<{ kind: string; n: number; body: string | null }[]>`
+        select kind, count(*)::int as n, max(body) as body
+          from communication.notifications
          where user_id = ${actor.userId} and read_at is null
          group by kind`,
     ]);
@@ -109,6 +115,7 @@ export function createOpenerFacts(dependencies: {
       notesReady:
         notices.find((row) => row.kind === "MEETING_NOTES_READY")?.n ?? 0,
       unreadNotices: notices.reduce((sum, row) => sum + row.n, 0),
+      scoutFinding: notices.find((row) => row.kind === "Q_SCOUT")?.body ?? null,
     };
   };
 }

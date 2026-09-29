@@ -72,6 +72,8 @@ export type ResearchComposition = {
   readonly profiles: PublicProfileLookupProvider | undefined;
   readonly statements: QUserStatementRecorder;
   readonly providerStatus: "configured" | "unconfigured";
+  /** The search provider itself, for the scheduled scout's own reads. */
+  readonly provider: PublicWebResearchProvider | undefined;
 };
 
 export type ResearchCompositionDependencies = {
@@ -329,5 +331,6 @@ export function composeResearch(
     evidence,
     gate,
     providerStatus: provider === undefined ? "unconfigured" : "configured",
+    provider,
   };
 }
