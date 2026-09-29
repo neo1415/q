@@ -691,7 +691,7 @@ export function environmentNotesFor(
       ...(options.openDocumentTitle === undefined
         ? []
         : [
-            `THIS PERSON ALREADY HAS A DOCUMENT: "${options.openDocumentTitle}". Any request in THIS message to change it — shorter, longer, less promotional, reworded, a section dropped or expanded — MUST set artifactRequest with kind REVISE, their exact words as quote, and what they want changed in instruction. You cannot change the document yourself and must never say you have; setting the field is how it happens.`,
+            `THIS PERSON ALREADY HAS A DOCUMENT: "${options.openDocumentTitle}". Any request in THIS message to change it — shorter, longer, less promotional, reworded, a section dropped or expanded — MUST set artifactRequest with kind REVISE, their exact words as quote, and what they want changed in instruction. Setting the field is how Capital Q changes it, colours and slides included: never say it cannot be edited, and never say it is changed before Capital Q says so.`,
           ]),
       factsNote,
       ...(tools.length === 0 ? [] : [subjectIdentifierNotes(subjects)]),

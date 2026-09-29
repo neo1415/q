@@ -21,7 +21,9 @@ import { COMPANY_ANALYST_V9 } from "./tasks/company-analyst.v9.js";
 import { COMPANY_ANALYST_V10 } from "./tasks/company-analyst.v10.js";
 import { COMPANY_ANALYST_V11 } from "./tasks/company-analyst.v11.js";
 import { COMPANY_ANALYST_V12 } from "./tasks/company-analyst.v12.js";
+import { COMPANY_ANALYST_V13 } from "./tasks/company-analyst.v13.js";
 import { ARTIFACT_REVISION_V1 } from "./tasks/artifact-revision.v1.js";
+import { ARTIFACT_REVISION_V2 } from "./tasks/artifact-revision.v2.js";
 import { DECISION_READER_V1 } from "./tasks/decision-reader.v1.js";
 import { TURN_READER_V1 } from "./tasks/turn-reader.v1.js";
 import { TURN_READER_V2 } from "./tasks/turn-reader.v2.js";
@@ -37,6 +39,7 @@ import { TURN_READER_V11 } from "./tasks/turn-reader.v11.js";
 import { TURN_READER_V12 } from "./tasks/turn-reader.v12.js";
 import { TURN_READER_V13 } from "./tasks/turn-reader.v13.js";
 import { TURN_READER_V14 } from "./tasks/turn-reader.v14.js";
+import { TURN_READER_V15 } from "./tasks/turn-reader.v15.js";
 import { MEMORY_EXTRACTOR_V1 } from "./tasks/memory-extractor.v1.js";
 import { FIT_EXPLANATION_V1 } from "./tasks/fit-explanation.v1.js";
 import { FOUNDER_ONBOARDING_EXTRACTION_V1 } from "./tasks/founder-onboarding-extraction.v1.js";
@@ -230,7 +233,9 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition<unknown, unknown>[] =
     COMPANY_ANALYST_V10,
     COMPANY_ANALYST_V11,
     COMPANY_ANALYST_V12,
+    COMPANY_ANALYST_V13,
     ARTIFACT_REVISION_V1,
+    ARTIFACT_REVISION_V2,
     FIT_EXPLANATION_V1,
     PRESENCE_READER_V1,
     INVESTOR_RESEARCH_READER_V1,
@@ -249,6 +254,7 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition<unknown, unknown>[] =
     TURN_READER_V12,
     TURN_READER_V13,
     TURN_READER_V14,
+    TURN_READER_V15,
     MEMORY_EXTRACTOR_V1,
     GATEQ_INTERVIEWER_V1,
   ];

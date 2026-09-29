@@ -425,3 +425,17 @@ export const TurnReaderV14ResultSchema = TurnReaderResultSchema.extend({
   sequence: QuestionSequenceReadingSchema.nullable().default(null),
 }).strict();
 export type TurnReaderV14Result = z.infer<typeof TurnReaderV14ResultSchema>;
+
+/**
+ * v15 (founder live 2026-09-29): whether spoken words were meant for Q at
+ * all. Voice hears the room: a call with someone else, a colleague, a
+ * lecture. Q answering those "talks to itself". False only when plainly
+ * not for Q; typed words are always for Q. Defaults to true so a reading
+ * that omits it is answered as before.
+ */
+export const TURN_READER_V15_SCHEMA_VERSION = 15;
+
+export const TurnReaderV15ResultSchema = TurnReaderV14ResultSchema.extend({
+  addressedToQ: z.boolean().default(true),
+}).strict();
+export type TurnReaderV15Result = z.infer<typeof TurnReaderV15ResultSchema>;

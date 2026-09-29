@@ -1214,6 +1214,9 @@ export function createSpecialistQAnswer(
         ? [{ name: capability.performedBy.providerName, does: capability.does }]
         : [],
     );
+    // Spoken turns carry the recogniser's utterance; typed ones never do.
+    // The reader needs to know which: only speech can be overheard.
+    const spoken = latest.utteranceRef !== undefined;
     const readTurn = () =>
       turns.read({
         utterance: latest.content,
@@ -1225,7 +1228,7 @@ export function createSpecialistQAnswer(
             role: m.role === "USER" ? ("USER" as const) : ("Q" as const),
             text: m.content,
           })),
-        modality: "TEXT",
+        modality: spoken ? "VOICE" : "TEXT",
         attribution: {
           tenantId: request.tenantId,
           userId: request.actor.userId,
@@ -1270,6 +1273,19 @@ export function createSpecialistQAnswer(
         "q turn read",
       );
     }
+    // Spoken words plainly meant for someone else (a call, a colleague,
+    // the room) are not a turn to Q: nothing is answered, nothing is
+    // recorded as theirs, and Q keeps listening (founder live 2026-09-29:
+    // answering the room made Q "talk to itself").
+    if (spoken && read !== null && read.addressedToQ === false) {
+      logger?.info({ qRunId: request.runId }, "q turn not addressed to Q");
+      return {
+        kind: "ANSWERED",
+        messageId: null,
+        modelPolicyVersion: "none",
+        promptBundleVersion: "none",
+      };
+    }
     // Words that could not be made out are a transcription matter, not a
     // question: no model is asked (it answered with a meta-statement).
     // One brief prompt; a second unclear turn in a row gets silence, so
@@ -1277,7 +1293,12 @@ export function createSpecialistQAnswer(
     if (read !== null && isUnclearTurn(read)) {
       const before = unclearInARow.get(conversationId) ?? 0;
       unclearInARow.set(conversationId, before + 1);
-      const reply = unclearTurnReply(read, before);
+      // Spoken, an unclear turn is almost always the room, not the
+      // person: asking "say that again?" to background noise is Q talking
+      // to itself. Typed, it is a real message worth one prompt.
+      const reply = spoken
+        ? ({ kind: "SILENT" } as const)
+        : unclearTurnReply(read, before);
       logger?.info(
         { qRunId: request.runId, unclearInARow: before + 1, reply: reply.kind },
         "q turn unclear",

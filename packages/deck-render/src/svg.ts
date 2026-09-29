@@ -39,9 +39,20 @@ function textElement(box: TextBox, fontFamily: string): string {
 /** One slide as a standalone SVG document. */
 export function slideToSvg(slide: LaidOutSlide, deck: LaidOutDeck): string {
   const { theme } = deck;
-  const parts: string[] = [
-    `<rect x="0" y="0" width="${String(deck.width)}" height="${String(deck.height)}" fill="${escape(theme.background)}"/>`,
-  ];
+  const own = slide.background;
+  const parts: string[] =
+    own === undefined || own.length === 0
+      ? [
+          `<rect x="0" y="0" width="${String(deck.width)}" height="${String(deck.height)}" fill="${escape(theme.background)}"/>`,
+        ]
+      : own.length === 1
+        ? [
+            `<rect x="0" y="0" width="${String(deck.width)}" height="${String(deck.height)}" fill="${escape(own[0] ?? theme.background)}"/>`,
+          ]
+        : [
+            `<defs><linearGradient id="cq-cover" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${escape(own[0] ?? theme.background)}"/><stop offset="1" stop-color="${escape(own[1] ?? theme.background)}"/></linearGradient></defs>`,
+            `<rect x="0" y="0" width="${String(deck.width)}" height="${String(deck.height)}" fill="url(#cq-cover)"/>`,
+          ];
   for (const box of slide.boxes) {
     if (box.kind === "RULE") {
       parts.push(

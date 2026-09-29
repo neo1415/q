@@ -240,6 +240,12 @@ export const QVisualDirectionSchema = z
   .trim()
   .regex(/^[A-Z][A-Z0-9_]{2,31}$/, "expected a visual direction code");
 
+/** A colour a person chose for their own deck, as #rrggbb. */
+export const QDeckColourSchema = z
+  .string()
+  .trim()
+  .regex(/^#[0-9a-fA-F]{6}$/, "expected a hex colour");
+
 export const QDeckSchema = z
   .object({
     slides: z.array(QSlideSchema).min(1).max(Q_DECK_SLIDES_MAX),
@@ -262,6 +268,21 @@ export const QDeckSchema = z
      * somebody's identity (QX-004 §3.2).
      */
     markIsDraft: z.boolean().default(false),
+    /**
+     * The cover's look, only when the person asked for it in words ("make
+     * the first page a green and white gradient, the name in black";
+     * founder live 2026-09-29, ADR 0025). One colour is a fill, two are a
+     * gradient from the first to the second. Content like the accent: it
+     * describes their deck, never the Capital Q chrome. Absent is the
+     * direction's own cover.
+     */
+    cover: z
+      .object({
+        background: z.array(QDeckColourSchema).min(1).max(2),
+        titleInk: QDeckColourSchema.optional(),
+      })
+      .strict()
+      .optional(),
   })
   .strict();
 export type QDeck = z.infer<typeof QDeckSchema>;

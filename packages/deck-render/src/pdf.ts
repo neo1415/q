@@ -1,4 +1,5 @@
 import { PDFDocument, rgb, type PDFPage, type RGB } from "pdf-lib";
+import { backgroundBands } from "./background.js";
 
 import { drawLine, embedFonts, type EmbeddedFonts } from "./fonts.js";
 import type { LaidOutDeck, TextBox } from "./layout.js";
@@ -75,6 +76,16 @@ export async function deckToPdf(
       height: deck.height,
       color: colour(deck.theme.background),
     });
+    // The person's own cover (ADR 0025), drawn over the theme's page.
+    for (const band of backgroundBands(laid.background ?? [], deck.height)) {
+      page.drawRectangle({
+        x: 0,
+        y: deck.height - band.y - band.height,
+        width: deck.width,
+        height: band.height,
+        color: colour(band.colour),
+      });
+    }
     for (const box of laid.boxes) {
       if (box.kind === "RULE") {
         page.drawRectangle({

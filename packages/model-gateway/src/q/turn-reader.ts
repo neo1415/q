@@ -4,9 +4,10 @@ import {
   createDefaultPromptRegistry,
   DEFAULT_COMMUNICATION_PROFILE,
   renderPrompt,
-  TurnReaderV14ResultSchema,
+  TurnReaderV15ResultSchema,
   type PromptRegistry,
   type TurnReaderV14Result,
+  type TurnReaderV15Result,
   type TurnReaderV7Variables,
 } from "@capital-q/q-core";
 
@@ -50,9 +51,11 @@ export type QTurnReader = {
  * optional here so a reader that knows neither still fits; absent is none.
  */
 export type QTurnReading = Omit<
-  TurnReaderV14Result,
-  "moreDocuments" | "sequence"
+  TurnReaderV15Result,
+  "moreDocuments" | "sequence" | "addressedToQ"
 > & {
+  /** v15: false when spoken words were plainly for someone else. */
+  readonly addressedToQ?: boolean | undefined;
   readonly moreDocuments?: TurnReaderV14Result["moreDocuments"] | undefined;
   readonly sequence?: TurnReaderV14Result["sequence"] | undefined;
 };
@@ -113,7 +116,7 @@ export function createQTurnReader(dependencies: {
             "You classify one turn and nothing else; Capital Q decides what follows from it.",
           variables,
         });
-        const response = await gateway.execute<TurnReaderV14Result>(
+        const response = await gateway.execute<TurnReaderV15Result>(
           {
             taskClass: "FAST_CLASSIFICATION",
             // A closed classification needs little thought; left unset, a
@@ -126,12 +129,12 @@ export function createQTurnReader(dependencies: {
             attribution: input.attribution,
           },
           {
-            schema: TurnReaderV14ResultSchema,
+            schema: TurnReaderV15ResultSchema,
             ...(input.signal === undefined ? {} : { signal: input.signal }),
           },
         );
         if (response.output.kind !== "STRUCTURED") return null;
-        const parsed = TurnReaderV14ResultSchema.safeParse(
+        const parsed = TurnReaderV15ResultSchema.safeParse(
           (response.output as { readonly value: unknown }).value,
         );
         return parsed.success ? parsed.data : null;

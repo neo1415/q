@@ -39,7 +39,8 @@ export const TURN_READER_V14: PromptDefinition<
 > = {
   ...TURN_READER_V13,
   version: 14,
-  status: "ACTIVE",
+  // Deprecated by v15 (who the words were for, 2026-09-29).
+  status: "DEPRECATED",
   changeDescription:
     "Founder live 2026-09-28 #1: PREPARE_DOCUMENT gains ANSWER_EXPORT (an answer already given, as a document) and Q_REPORT (any other written piece, written and filed as a document).",
   effectiveFrom: "2026-09-28",

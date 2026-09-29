@@ -161,6 +161,7 @@ export { TURN_READER_V11 } from "./prompts/tasks/turn-reader.v11.js";
 export { TURN_READER_V12 } from "./prompts/tasks/turn-reader.v12.js";
 export { TURN_READER_V13 } from "./prompts/tasks/turn-reader.v13.js";
 export { TURN_READER_V14 } from "./prompts/tasks/turn-reader.v14.js";
+export { TURN_READER_V15 } from "./prompts/tasks/turn-reader.v15.js";
 export {
   TURN_READER_SCHEMA_NAME,
   TURN_READER_SCHEMA_VERSION,
@@ -193,9 +194,11 @@ export {
   TURN_DOCUMENT_TYPES_V14,
   TURN_READER_V14_SCHEMA_VERSION,
   TurnReaderV14ResultSchema,
+  TurnReaderV15ResultSchema,
   TurnToolV14Schema,
   type TurnDocumentTypeV14,
   type TurnReaderV14Result,
+  type TurnReaderV15Result,
   type TurnToolV14,
   TurnToolV5Schema,
   type TurnReaderV5Result,
@@ -314,9 +317,18 @@ export { COMPANY_ANALYST_V9 } from "./prompts/tasks/company-analyst.v9.js";
 export { COMPANY_ANALYST_V10 } from "./prompts/tasks/company-analyst.v10.js";
 export { COMPANY_ANALYST_V11 } from "./prompts/tasks/company-analyst.v11.js";
 export { COMPANY_ANALYST_V12 } from "./prompts/tasks/company-analyst.v12.js";
+export {
+  COMPANY_ANALYST_V13,
+  COMPANY_ANALYST_V13_FORMAT_SECTION,
+} from "./prompts/tasks/company-analyst.v13.js";
 export { ARTIFACT_REVISION_V1 } from "./prompts/tasks/artifact-revision.v1.js";
+export { ARTIFACT_REVISION_V2 } from "./prompts/tasks/artifact-revision.v2.js";
 export {
   ARTIFACT_REVISION_BODY_MAX,
+  ARTIFACT_REVISION_SLIDES_MAX,
+  ARTIFACT_REVISION_V2_SCHEMA_VERSION,
+  ArtifactRevisionV2ResultSchema,
+  type ArtifactRevisionV2Result,
   ARTIFACT_REVISION_SCHEMA_NAME,
   ARTIFACT_REVISION_SCHEMA_VERSION,
   ARTIFACT_REVISION_SECTIONS_MAX,

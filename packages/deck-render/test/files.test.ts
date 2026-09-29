@@ -8,6 +8,7 @@ import {
   deckToPptx,
   inspectDeck,
   layOutDeck,
+  slideToSvg,
 } from "../src/index.js";
 
 /**
@@ -151,5 +152,46 @@ describe("QX-004 §7 · the files are real", () => {
     const bytes = await deckToPdf(withEmDash, { title: "t" });
     const reopened = await PDFDocument.load(bytes);
     expect(reopened.getPageCount()).toBe(1);
+  });
+});
+
+describe("the cover the person asked for (ADR 0025)", () => {
+  const covered: QDeck = {
+    ...deck,
+    cover: { background: ["#2e7d32", "#ffffff"], titleInk: "#000000" },
+  };
+
+  it("colours only the cover, in their ink, and says nothing is unreadable", () => {
+    const laid = layOutDeck(covered);
+    expect(laid.slides[0]?.background).toEqual(["#2e7d32", "#ffffff"]);
+    expect(laid.slides[1]?.background).toBeUndefined();
+    const title = laid.slides[0]?.boxes.find(
+      (box) => box.kind === "TEXT" && box.role === "TITLE",
+    );
+    expect(title?.kind === "TEXT" && title.colour).toBe("#000000");
+    // Without a chosen ink, the one that reads on every stop.
+    const inkless = layOutDeck({
+      ...deck,
+      cover: { background: ["#0b3d1a"] },
+    });
+    const light = inkless.slides[0]?.boxes.find(
+      (box) => box.kind === "TEXT" && box.role === "TITLE",
+    );
+    expect(light?.kind === "TEXT" && light.colour).toBe("#ffffff");
+  });
+
+  it("draws a gradient in the SVG and changes the PDF and PPTX it writes", async () => {
+    const plain = layOutDeck(deck);
+    const laid = layOutDeck(covered);
+    const svg = slideToSvg(laid.slides[0] as never, laid);
+    expect(svg).toContain("<linearGradient");
+    expect(svg).toContain('stop-color="#2e7d32"');
+    const [before, after] = await Promise.all([
+      deckToPdf(plain, { title: "x" }),
+      deckToPdf(laid, { title: "x" }),
+    ]);
+    expect(Buffer.from(after).equals(Buffer.from(before))).toBe(false);
+    const pptx = await deckToPptx(laid, { title: "x" });
+    expect(pptx.byteLength).toBeGreaterThan(0);
   });
 });

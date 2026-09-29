@@ -36,7 +36,8 @@ export const COMPANY_ANALYST_V12: PromptDefinition<
 > = {
   ...COMPANY_ANALYST_V11,
   version: 12,
-  status: "ACTIVE",
+  // Deprecated by v13 (live conversation gaps, 2026-09-29).
+  status: "DEPRECATED",
   changeDescription:
     "Founder design 2026-09-28: comparing or choosing between two to four named things also comes back as comparisonCards (name, line, up to four points), side by side with no order or verdict (the charter forbids rankings), under every evidence rule; null otherwise.",
   effectiveFrom: "2026-09-29",

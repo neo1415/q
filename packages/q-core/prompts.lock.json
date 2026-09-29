@@ -1,11 +1,13 @@
 {
   "entries": {
     "artifact-revision/v1": "48f95a797cc00afd36c1afd6bb57660786dc57df154778a63f10bf626a1a5f0e",
+    "artifact-revision/v2": "720135bd152bf5d814d9c5319d98150d4e0f1e85f406a98df0b2b8811315ce60",
     "claim-extraction/v1": "455aed7768b6847996d82c38e3b745243aeebc4b4605677d0a0ac8a172b3adbe",
     "company-analyst/v1": "869c46bf6d2055081a994bff86b1a94e6acbb17649b665aa4347293b584b0f69",
     "company-analyst/v10": "8e9ea95a9a8a1d7ebc349806eb5ea076185f55443de9cc9d3efce0ac098edb32",
     "company-analyst/v11": "28cd6572412322b8c3d9c334c4d16cf9b08b9707707bb8d87439e12ac009f04c",
     "company-analyst/v12": "7a6773f3d9c109af6a3367f24fb3a1525f05e2844cc07717983e2dddae5e46c6",
+    "company-analyst/v13": "6a917091d6b98709857dbab687105fd0bd3587c06645750c9e5c0b0054f6d697",
     "company-analyst/v2": "8cb472a28b71c870562826c144178e38a80603e7b9d82c6d75573da5ccea1e21",
     "company-analyst/v3": "c6f302afe031d6c8f9826a7daddbbf3a5e9375b71e1f6ded5054748595146db9",
     "company-analyst/v4": "f9b36094d18d55f110db8cf94eedbfe065facae1751ea0c202c7eb13c11cf891",
@@ -57,6 +59,7 @@
     "turn-reader/v12": "cb99aa26dfc066503c335606cdc9fb6d4b6a12cc5bdd6a2a358a2cf135248bf8",
     "turn-reader/v13": "111074f957fc56bddc4c72d56ae115648939ab8cdcb0886dd8d2ba4be72e9c5c",
     "turn-reader/v14": "a6cb1479eced009c9431c7da605e23366936222f80ced750c1aaec2811b72fc0",
+    "turn-reader/v15": "152b3ccfc6dd7b46ad979c508b5b0a02760a05f9f54f69cff79071e0e736f9b6",
     "turn-reader/v2": "a1d8508bc131d0bb1c9d4821f8237c2db52d8735190763f3315af80f0624a60b",
     "turn-reader/v3": "0c516967d61db7f839b8b5e9ef9d53c0e4cea969ee88718a5b4fba955d92f0f8",
     "turn-reader/v4": "b028c2844b8800c3e70d8e7a4110e2365db1f341feb9483e0e1fe5bc547984ee",

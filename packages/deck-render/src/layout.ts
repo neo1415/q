@@ -8,6 +8,7 @@ import {
   type BrandInput,
   type DeckTheme,
 } from "./theme.js";
+import { contrastRatio } from "./contrast.js";
 
 /**
  * Where everything on a slide goes (QX-004 §5, §6, §7).
@@ -92,6 +93,12 @@ export type LaidOutSlide = {
    * inspector reports it, and the fitter's job is to get it to empty.
    */
   readonly dropped: readonly string[];
+  /**
+   * This slide's own background, when the person chose one for the cover
+   * (ADR 0025): one stop is a fill, two a top-to-bottom gradient. Absent:
+   * the theme's background.
+   */
+  readonly background?: readonly string[] | undefined;
 };
 
 export type LaidOutDeck = {
@@ -488,13 +495,37 @@ export function layOutDeck(deck: QDeck, brand?: BrandInput): LaidOutDeck {
     brand?.direction ?? deck.direction,
     brand?.accent ?? deck.accent,
   );
+  const cover = deck.cover;
   const slides = deck.slides.map((slide, index) => {
-    let laid = layOutSlide(slide, index, theme, 1);
+    // The cover the person asked for: the first slide, when it is a title
+    // slide. Its text takes their ink, or whichever of black and white
+    // reads best on their colours.
+    const own =
+      cover !== undefined && index === 0 && slide.layout === "TITLE"
+        ? cover
+        : undefined;
+    const slideTheme =
+      own === undefined
+        ? theme
+        : {
+            ...theme,
+            background: own.background[0] ?? theme.background,
+            ink: own.titleInk ?? readableInk(own.background),
+            muted: own.titleInk ?? readableInk(own.background),
+          };
+    let laid = layOutSlide(slide, index, slideTheme, 1);
     for (const scale of [0.9, 0.8]) {
       if (laid.dropped.length === 0) break;
-      laid = layOutSlide(slide, index, theme, scale);
+      laid = layOutSlide(slide, index, slideTheme, scale);
     }
-    return laid;
+    return own === undefined ? laid : { ...laid, background: own.background };
   });
   return { theme, width: SLIDE_WIDTH, height: SLIDE_HEIGHT, slides };
+}
+
+/** Black or white, whichever reads better on every stop of a background. */
+function readableInk(stops: readonly string[]): string {
+  const worst = (ink: string) =>
+    Math.min(...stops.map((stop) => contrastRatio(ink, stop) ?? 21));
+  return worst("#000000") >= worst("#ffffff") ? "#000000" : "#ffffff";
 }

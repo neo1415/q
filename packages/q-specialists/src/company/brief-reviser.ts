@@ -7,11 +7,11 @@ import {
   createDefaultPromptRegistry,
   DEFAULT_COMMUNICATION_PROFILE,
   renderPrompt,
-  type ArtifactRevisionResult,
+  type ArtifactRevisionV2Result,
   type ArtifactRevisionVariables,
   type PromptRegistry,
 } from "@capital-q/q-core";
-import { ArtifactRevisionResultSchema } from "@capital-q/q-core";
+import { ArtifactRevisionV2ResultSchema } from "@capital-q/q-core";
 import {
   isModelGatewayError,
   type ModelGateway,
@@ -20,6 +20,7 @@ import { budgetForTaskClass } from "@capital-q/model-gateway/q";
 import type { Logger } from "@capital-q/observability";
 import {
   applyRevisedBodies,
+  inventsFigures,
   type ComposedInvestmentBrief,
 } from "./investment-brief.js";
 
@@ -58,12 +59,89 @@ export type BriefReviser = {
   }) => Promise<ComposedInvestmentBrief>;
 };
 
-/** The document as the prompt sees it: headings and prose, nothing else. */
+/**
+ * The document as the prompt sees it: headings and prose, and for a deck
+ * its slides by number and its current look. Nothing else.
+ */
 function renderDocument(content: QArtifactContent): string {
-  return content.sections
+  const prose = content.sections
     .map((section) => `## ${section.heading}\n${section.body}`)
-    .join("\n\n")
-    .slice(0, 40_000);
+    .join("\n\n");
+  const deck = content.deck;
+  if (deck === undefined) return prose.slice(0, 40_000);
+  const slides = deck.slides
+    .map((slide, index) =>
+      [
+        `[${String(index + 1)}] ${slide.title}`,
+        ...(slide.subtitle === undefined ? [] : [`  ${slide.subtitle}`]),
+        ...slide.bullets.map((bullet) => `  - ${bullet}`),
+      ].join("\n"),
+    )
+    .join("\n");
+  const look = `Look: ${deck.direction}${deck.accent === undefined ? "" : `, accent ${deck.accent}`}${deck.cover === undefined ? "" : `, cover ${deck.cover.background.join(" to ")}${deck.cover.titleInk === undefined ? "" : `, title ${deck.cover.titleInk}`}`}`;
+  return `${prose}\n\n# SLIDES\n${slides}\n\n${look}`.slice(0, 40_000);
+}
+
+/**
+ * The slides and look v2 returned, applied to a deck. Slide text passes
+ * the same figure check as prose, against what the document already
+ * carries; a line that adds a figure keeps its old text. Colours are the
+ * person's own choice, applied as given (ADR 0025).
+ */
+function applyDeckRevision(
+  content: QArtifactContent,
+  result: ArtifactRevisionV2Result,
+  grounding: readonly string[],
+): QArtifactContent {
+  const deck = content.deck;
+  if (deck === undefined) return content;
+  const known = [
+    ...grounding,
+    ...deck.slides.flatMap((slide) => [
+      slide.title,
+      slide.subtitle ?? "",
+      ...slide.bullets,
+    ]),
+  ];
+  const safe = (text: string | null): text is string =>
+    text !== null && !inventsFigures(text, known);
+  const changes = new Map(result.slides.map((slide) => [slide.number, slide]));
+  const slides = deck.slides.map((slide, index) => {
+    const change = changes.get(index + 1);
+    if (change === undefined) return slide;
+    const bullets =
+      change.bullets !== null && change.bullets.every((b) => safe(b))
+        ? change.bullets
+        : slide.bullets;
+    return {
+      ...slide,
+      title: safe(change.title) ? change.title : slide.title,
+      ...(safe(change.subtitle) ? { subtitle: change.subtitle } : {}),
+      bullets,
+    };
+  });
+  const style = result.style;
+  // What they asked for now, over what the deck already had.
+  const ink = style?.coverTitleInk ?? deck.cover?.titleInk ?? null;
+  const background = style?.coverBackground ?? deck.cover?.background ?? null;
+  const cover =
+    background === null && ink === null
+      ? undefined
+      : {
+          background: background ?? ["#ffffff"],
+          ...(ink === null ? {} : { titleInk: ink }),
+        };
+  return {
+    ...content,
+    deck: {
+      ...deck,
+      slides,
+      ...(style?.accent === null || style?.accent === undefined
+        ? {}
+        : { accent: style.accent }),
+      ...(cover === undefined ? {} : { cover }),
+    },
+  };
 }
 
 export function createBriefReviser(dependencies: {
@@ -79,17 +157,17 @@ export function createBriefReviser(dependencies: {
         operatingMode: "ASSESSMENT",
         communicationProfile: DEFAULT_COMMUNICATION_PROFILE,
         environmentNotes:
-          "You are rewriting prose only. No record, no evidence and no tools are available to you, and any figure you add that the document does not already carry will be discarded.",
+          "You are revising a document the person already has: its prose, its slides and, when they ask, its colours. No record, no evidence and no tools are available to you, and any figure you add that the document does not already carry will be discarded.",
         variables: {
           instruction: input.instruction,
           document: renderDocument(input.base.content),
         },
       });
 
-      let result: ArtifactRevisionResult | undefined;
+      let result: ArtifactRevisionV2Result | undefined;
       try {
         const executed =
-          await dependencies.gateway.execute<ArtifactRevisionResult>(
+          await dependencies.gateway.execute<ArtifactRevisionV2Result>(
             {
               taskClass: "NORMAL_DIALOGUE",
               budget: budgetForTaskClass("NORMAL_DIALOGUE"),
@@ -99,7 +177,7 @@ export function createBriefReviser(dependencies: {
               attribution: input.attribution,
             },
             {
-              schema: ArtifactRevisionResultSchema,
+              schema: ArtifactRevisionV2ResultSchema,
               ...(input.signal === undefined ? {} : { signal: input.signal }),
             },
           );
@@ -132,11 +210,15 @@ export function createBriefReviser(dependencies: {
           revised.set(section.heading, section.body);
         }
       }
-      return applyRevisedBodies({
+      const prose = applyRevisedBodies({
         base: input.base,
         revised,
         grounding: input.grounding,
       });
+      return {
+        ...prose,
+        content: applyDeckRevision(prose.content, result, input.grounding),
+      };
     },
   };
 }

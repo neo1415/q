@@ -573,6 +573,7 @@ export {
   QChartPointSchema,
   QChartSchema,
   QDeckSchema,
+  QDeckColourSchema,
   QSlideLayoutSchema,
   QSlideSchema,
   QVisualDirectionSchema,

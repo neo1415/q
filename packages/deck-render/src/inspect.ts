@@ -1,4 +1,7 @@
+import { contrastRatio } from "./contrast.js";
 import { MARGIN, SLIDE_HEIGHT, SLIDE_WIDTH } from "./theme.js";
+
+export { contrastRatio };
 import {
   measure,
   type LaidOutDeck,
@@ -56,31 +59,6 @@ const LINE_CHARACTERS_MAX = 92;
 const LINES_PER_SLIDE_MAX = 22;
 /** WCAG's own threshold for large text, which every size here is. */
 const CONTRAST_MIN = 3;
-
-function channel(component: number): number {
-  const c = component / 255;
-  return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
-}
-
-function luminance(hex: string): number | null {
-  const match = /^#([0-9a-f]{6})$/i.exec(hex.trim());
-  const digits = match?.[1];
-  if (digits === undefined) return null;
-  const r = Number.parseInt(digits.slice(0, 2), 16);
-  const g = Number.parseInt(digits.slice(2, 4), 16);
-  const b = Number.parseInt(digits.slice(4, 6), 16);
-  return 0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b);
-}
-
-/** WCAG 2.2 contrast ratio, or null when a colour cannot be read. */
-export function contrastRatio(a: string, b: string): number | null {
-  const first = luminance(a);
-  const second = luminance(b);
-  if (first === null || second === null) return null;
-  const lighter = Math.max(first, second);
-  const darker = Math.min(first, second);
-  return (lighter + 0.05) / (darker + 0.05);
-}
 
 function overlaps(
   a: { x: number; y: number; width: number; height: number },
@@ -174,7 +152,10 @@ function inspectSlide(
         `a word on "${slide.title}" is wider than the space it has`,
       );
     }
-    const ratio = contrastRatio(box.colour, theme.background);
+    const ratio = worstContrast(
+      box.colour,
+      slide.background ?? [theme.background],
+    );
     if (ratio !== null && ratio < CONTRAST_MIN) {
       at(
         "LOW_CONTRAST",
@@ -218,4 +199,15 @@ function inspectSlide(
  */
 export function inspectDeck(deck: LaidOutDeck): readonly DeckIssue[] {
   return deck.slides.flatMap((slide) => inspectSlide(slide, deck.theme));
+}
+
+/** The lowest contrast of a colour against any stop of a background. */
+function worstContrast(
+  colour: string,
+  stops: readonly string[],
+): number | null {
+  const ratios = stops
+    .map((stop) => contrastRatio(colour, stop))
+    .filter((ratio): ratio is number => ratio !== null);
+  return ratios.length === 0 ? null : Math.min(...ratios);
 }

@@ -1,4 +1,5 @@
 import * as pptxgenjs from "pptxgenjs";
+import { backgroundBands } from "./background.js";
 
 import type { LaidOutDeck, TextBox } from "./layout.js";
 
@@ -120,7 +121,23 @@ export async function deckToPptx(
 
   for (const laid of deck.slides) {
     const slide = pptx.addSlide();
-    slide.background = { color: hex(deck.theme.background) };
+    const bands = backgroundBands(laid.background ?? [], deck.height);
+    slide.background = {
+      color: hex(bands[0]?.colour ?? deck.theme.background),
+    };
+    // A gradient is bands behind everything else (ADR 0025).
+    if (bands.length > 1) {
+      for (const band of bands) {
+        slide.addShape("rect", {
+          x: 0,
+          y: inches(band.y),
+          w: inches(deck.width),
+          h: inches(band.height),
+          fill: { color: hex(band.colour) },
+          line: { color: hex(band.colour), width: 0 },
+        });
+      }
+    }
     for (const box of laid.boxes) {
       if (box.kind === "RULE") {
         slide.addShape("rect", {

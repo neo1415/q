@@ -59,3 +59,62 @@ export type ArtifactRevisionResult = z.infer<
 
 export const ARTIFACT_REVISION_SCHEMA_NAME = "ArtifactRevisionResult";
 export const ARTIFACT_REVISION_SCHEMA_VERSION = 1;
+
+/**
+ * v2 (founder live 2026-09-29, ADR 0025): a deck's slides and its look.
+ *
+ * Asked to make a deck's first page a green-and-white gradient, Q filed
+ * five versions that were all the same: the revision could change section
+ * prose and nothing else, and a deck is drawn from its slides and its
+ * direction. v2 may also rewrite slide text (under the same no-new-figures
+ * check as prose) and set the colours the person named: the cover's
+ * background and title ink, and the accent. Style is only ever what they
+ * asked for; null otherwise.
+ */
+const HexColourSchema = z
+  .string()
+  .trim()
+  .regex(/^#[0-9a-fA-F]{6}$/);
+
+export const ARTIFACT_REVISION_SLIDES_MAX = 20;
+
+export const ArtifactRevisionV2ResultSchema =
+  ArtifactRevisionResultSchema.extend({
+    slides: z
+      .array(
+        z
+          .object({
+            /** 1-based, as the document shows it. */
+            number: z.number().int().min(1).max(ARTIFACT_REVISION_SLIDES_MAX),
+            title: z.string().trim().min(1).max(160).nullable().default(null),
+            subtitle: z
+              .string()
+              .trim()
+              .min(1)
+              .max(240)
+              .nullable()
+              .default(null),
+            bullets: z
+              .array(z.string().trim().min(1).max(200))
+              .max(6)
+              .nullable()
+              .default(null),
+          })
+          .strict(),
+      )
+      .max(ARTIFACT_REVISION_SLIDES_MAX)
+      .default([]),
+    style: z
+      .object({
+        coverBackground: z.array(HexColourSchema).min(1).max(2).nullable(),
+        coverTitleInk: HexColourSchema.nullable(),
+        accent: HexColourSchema.nullable(),
+      })
+      .strict()
+      .nullable()
+      .default(null),
+  }).strict();
+export type ArtifactRevisionV2Result = z.infer<
+  typeof ArtifactRevisionV2ResultSchema
+>;
+export const ARTIFACT_REVISION_V2_SCHEMA_VERSION = 2;

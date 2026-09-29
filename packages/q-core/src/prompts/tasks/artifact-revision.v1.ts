@@ -48,7 +48,8 @@ export const ARTIFACT_REVISION_V1: PromptDefinition<
 > = {
   id: "ARTIFACT_REVISION",
   version: 1,
-  status: "ACTIVE",
+  // Deprecated by v2 (slides and look, ADR 0025).
+  status: "DEPRECATED",
   kind: "TASK",
   taskClass: "NORMAL_DIALOGUE",
   owner: "q-core",

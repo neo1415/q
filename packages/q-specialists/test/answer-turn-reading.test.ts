@@ -80,6 +80,8 @@ function seam(options: {
     noteVisibility: (entry: Record<string, unknown>) => void;
   };
   readonly offeredTools?: readonly string[];
+  /** A spoken turn: stored with the recogniser's utterance. */
+  readonly spoken?: boolean;
 }) {
   const message: QConversationMessage = {
     id: randomUUID() as QConversationMessage["id"],
@@ -90,6 +92,7 @@ function seam(options: {
     content: options.said,
     contentType: "TEXT",
     createdAt: new Date().toISOString(),
+    ...(options.spoken === true ? { utteranceRef: "utt-1" } : {}),
   };
   const directives: (QResearchDirective | undefined)[] = [];
   const unread: boolean[] = [];
@@ -97,9 +100,11 @@ function seam(options: {
   let reads = 0;
   const heardActions: unknown[] = [];
   const outcomes = [...options.outcomes];
+  const modalities: string[] = [];
   const turns: QTurnReader = {
     read: (input) => {
       reads += 1;
+      modalities.push(input.modality);
       heardActions.push(input.actions ?? []);
       return Promise.resolve(
         typeof options.reading === "function"
@@ -181,6 +186,7 @@ function seam(options: {
     capabilities,
     reads: () => reads,
     heardActions,
+    modalities,
   };
 }
 
@@ -494,6 +500,74 @@ describe("words Q could not make out (lead 2026-09-25)", () => {
     // clear turn went to the model as usual.
     expect(run.stored).toHaveLength(2);
     expect(run.delegated()).toBe(1);
+  });
+});
+
+describe("spoken words that were not for Q (founder live 2026-09-29)", () => {
+  const clear = (
+    addressedToQ: boolean,
+  ): TurnReaderResult & {
+    addressedToQ: boolean;
+  } => ({
+    kind: "QUESTION_TO_Q",
+    confidence: "HIGH",
+    transcript: "CLEAR",
+    question: null,
+    aboutNamedOther: false,
+    tool: null,
+    addressedToQ,
+  });
+
+  it("tells the reader the turn was spoken", async () => {
+    const run = seam({
+      said: "hi",
+      reading: clear(true),
+      outcomes: [],
+      spoken: true,
+    });
+    await run.answer.answer(request());
+    expect(run.modalities).toEqual(["VOICE"]);
+    const typed = seam({ said: "hi", reading: clear(true), outcomes: [] });
+    await typed.answer.answer(request());
+    expect(typed.modalities).toEqual(["TEXT"]);
+  });
+
+  it("answers nothing, records nothing and asks no model for words meant for someone else", async () => {
+    const run = seam({
+      said: "Daniel, please check the Google pages again",
+      reading: clear(false),
+      outcomes: [],
+      spoken: true,
+    });
+    const outcome = await run.answer.answer(request());
+    expect(outcome.kind === "ANSWERED" && outcome.messageId).toBeNull();
+    expect(run.delegated()).toBe(0);
+    expect(run.stored).toHaveLength(0);
+  });
+
+  it("still answers a typed turn whatever the reading says about who it was for", async () => {
+    const run = seam({ said: "hello", reading: clear(false), outcomes: [] });
+    await run.answer.answer(request());
+    expect(run.delegated()).toBe(1);
+  });
+
+  it("never asks the room to say that again: an unclear spoken turn is silent", async () => {
+    const run = seam({
+      said: "machines",
+      reading: {
+        kind: "UNCLEAR_TRANSCRIPT",
+        confidence: "LOW",
+        transcript: "NOISY",
+        question: null,
+        aboutNamedOther: false,
+        tool: null,
+      },
+      outcomes: [],
+      spoken: true,
+    });
+    await run.answer.answer(request());
+    expect(run.stored).toHaveLength(0);
+    expect(run.delegated()).toBe(0);
   });
 });
 

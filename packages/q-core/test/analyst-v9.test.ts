@@ -63,7 +63,7 @@ describe("COMPANY_ANALYST v10", () => {
 describe("COMPANY_ANALYST v11", () => {
   it("was the active analyst version until v12 took over", () => {
     const registry = createPromptRegistry(PROMPT_DEFINITIONS);
-    expect(registry.getActive("COMPANY_ANALYST").definition.version).toBe(12);
+    expect(registry.getActive("COMPANY_ANALYST").definition.version).toBe(13);
     expect(COMPANY_ANALYST_V11.status).toBe("DEPRECATED");
   });
 
@@ -88,7 +88,7 @@ describe("COMPANY_ANALYST v12 (founder design 2026-09-28)", () => {
   it("keeps every v11 rule and adds comparison cards under the evidence rules", async () => {
     const { COMPANY_ANALYST_V12, CompanyAnalystV12ResultSchema } =
       await import("../src/index.js");
-    expect(COMPANY_ANALYST_V12.status).toBe("ACTIVE");
+    expect(COMPANY_ANALYST_V12.status).toBe("DEPRECATED");
     const template = COMPANY_ANALYST_V12.template;
     expect(template).toContain("ANSWER FORMAT");
     expect(template).toContain("also fill comparisonCards");
@@ -117,5 +117,36 @@ describe("COMPANY_ANALYST v12 (founder design 2026-09-28)", () => {
         comparisonCards: { items: [{ name: "A", points: ["b"] }] },
       }).success,
     ).toBe(false);
+  });
+});
+
+describe("COMPANY_ANALYST v13 (founder live 2026-09-29)", () => {
+  it("defines stated facts, knows it makes and revises documents, and resolves misheard names", async () => {
+    const { COMPANY_ANALYST_V12, COMPANY_ANALYST_V13 } =
+      await import("../src/index.js");
+    expect(COMPANY_ANALYST_V13.status).toBe("ACTIVE");
+    const template = COMPANY_ANALYST_V13.template;
+    expect(template).toContain(
+      "userStatements: only a fact they state in THIS message",
+    );
+    expect(template).toContain("never a request, question or unclear words");
+    expect(template).toContain(
+      "Capital Q makes and revises decks and PDFs: never say it cannot.",
+    );
+    expect(template).toContain("the whole change in instruction, specific");
+    expect(template).toContain("Speech mishears names");
+    // The compact sections keep their rules.
+    expect(template).toContain("comparisonCards (no order or verdict");
+    expect(template).toContain("Structure never upgrades a claim.");
+    expect(template).toContain("labelled a likely fit to check");
+    // Everything else is v12's, unchanged.
+    for (const section of [
+      "WHAT CAPITAL Q REMEMBERS ABOUT THIS PERSON",
+      "ACTING, CORRECTIONS, MANDATES",
+      "Produce no score, rating, ranking",
+    ]) {
+      expect(template).toContain(section);
+      expect(COMPANY_ANALYST_V12.template).toContain(section);
+    }
   });
 });
