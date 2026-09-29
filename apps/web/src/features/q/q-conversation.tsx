@@ -759,7 +759,7 @@ export function QConversationPanel({
                     >
                       <QAperture
                         state={presence.state}
-                        size={120}
+                        size={200}
                         inputLevel={client.inputLevel}
                         outputLevel={client.outputLevel}
                       />

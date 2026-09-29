@@ -60,14 +60,17 @@ export type QApertureProps = {
   readonly className?: string | undefined;
 };
 
-/** 160 on a phone, 224 from the desktop breakpoint; read after mount. */
-export function useStageApertureSize(): 160 | 224 {
-  const [size, setSize] = useState<160 | 224>(160);
+/**
+ * 240 on a phone, 360 from the desktop breakpoint; read after mount
+ * (founder live 2026-09-29: the presence should be bigger).
+ */
+export function useStageApertureSize(): 240 | 360 {
+  const [size, setSize] = useState<240 | 360>(240);
   useEffect(() => {
     // A host with no media queries (a test DOM) keeps the phone size.
     if (typeof window.matchMedia !== "function") return;
     const query = window.matchMedia("(min-width: 1024px)");
-    const apply = () => setSize(query.matches ? 224 : 160);
+    const apply = () => setSize(query.matches ? 360 : 240);
     apply();
     query.addEventListener("change", apply);
     return () => query.removeEventListener("change", apply);

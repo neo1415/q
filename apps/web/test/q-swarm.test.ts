@@ -55,7 +55,10 @@ describe("what the swarm forms", () => {
         since: 50_000,
         cue: null,
       }),
-    ).toMatchObject({ mode: "FACE", activity: "THINKING" });
+    ).toMatchObject({
+      mode: SEQUENCES.THINKING[0]?.mode,
+      activity: SEQUENCES.THINKING[0]?.activity,
+    });
   });
 
   it("keeps faces off surfaces too small to read one", () => {
@@ -91,6 +94,17 @@ describe("what the swarm forms", () => {
       "💰",
     );
     expect(cueForSentence("Okay.", 0)).toBeNull();
+  });
+
+  it("is often a formless mass, in every state large enough to show one", () => {
+    for (const state of [
+      "IDLE",
+      "LISTENING",
+      "THINKING",
+      "SPEAKING",
+    ] as const) {
+      expect(SEQUENCES[state].some((b) => b.mode === "FORMLESS")).toBe(true);
+    }
   });
 
   it("gives every particle a point in every shape", () => {

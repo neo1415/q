@@ -41,58 +41,74 @@ const beat = (
 /** The sequences for surfaces large enough to read a face. */
 export const SEQUENCES: Readonly<Record<QApertureState, readonly SwarmBeat[]>> =
   {
+    // Mostly formless at rest (founder live 2026-09-29: "never rests or
+    // settles... formless"), with figures surfacing out of the mass and
+    // dissolving back into it.
     IDLE: [
-      beat("Q", "IDLE", 7),
-      beat("BLOOM", "IDLE", 5),
-      beat("FACE", "IDLE", 7),
-      beat("GALAXY", "IDLE", 6),
-      beat("Q", "IDLE", 5),
+      beat("FORMLESS", "IDLE", 8),
+      beat("Q", "IDLE", 4),
+      beat("FORMLESS", "IDLE", 7),
+      beat("GALAXY", "IDLE", 4),
+      beat("FORMLESS", "IDLE", 6),
+      beat("FACE", "IDLE", 5),
+      beat("FORMLESS", "IDLE", 7),
+      beat("BLOOM", "IDLE", 4),
       beat("GLYPH", "IDLE", 2.5, "👋"),
-      beat("WAVE", "IDLE", 4),
+      beat("WAVE", "IDLE", 3),
     ],
     LISTENING: [
-      beat("FACE", "LISTENING", 7),
-      beat("WAVE", "LISTENING", 5),
       beat("FACE", "LISTENING", 6),
+      beat("FORMLESS", "LISTENING", 4),
+      beat("WAVE", "LISTENING", 5),
+      beat("FORMLESS", "LISTENING", 3),
+      beat("FACE", "LISTENING", 5),
       beat("GLYPH", "LISTENING", 2.5, "👂"),
     ],
     THINKING: [
+      beat("FORMLESS", "THINKING", 4),
       beat("FACE", "THINKING", 5),
       beat("GALAXY", "THINKING", 4),
       beat("GLYPH", "THINKING", 2.5, "💡"),
+      beat("FORMLESS", "THINKING", 3),
       beat("BLOOM", "THINKING", 3.5),
       beat("RING", "THINKING", 3),
     ],
     SPEAKING: [
       beat("FACE", "SPEAKING", 6),
+      beat("FORMLESS", "SPEAKING", 3),
       beat("MOUTH", "SPEAKING", 5),
       beat("WAVE", "SPEAKING", 4),
-      beat("Q", "SPEAKING", 4),
+      beat("FORMLESS", "SPEAKING", 3),
+      beat("Q", "SPEAKING", 3),
       beat("FACE", "SPEAKING", 5),
       beat("BLOOM", "SPEAKING", 3),
     ],
     NEEDS_INPUT: [
       beat("FACE", "ASKING", 6),
       beat("GLYPH", "ASKING", 2.5, "❓"),
-      beat("Q", "ASKING", 4),
+      beat("FORMLESS", "ASKING", 4),
+      beat("Q", "ASKING", 3),
     ],
     NEEDS_APPROVAL: [
-      beat("Q", "ASKING", 5),
+      beat("Q", "ASKING", 4),
       beat("GLYPH", "ASKING", 2.5, "✋"),
+      beat("FORMLESS", "ASKING", 4),
       beat("FACE", "ASKING", 5),
     ],
     WORKING: [
-      beat("RING", "THINKING", 5),
+      beat("RING", "THINKING", 4),
+      beat("FORMLESS", "THINKING", 3),
       beat("GALAXY", "THINKING", 4),
       beat("BLOOM", "THINKING", 3),
     ],
-    COMPLETE: [beat("GLYPH", "IDLE", 2.5, "👍"), beat("Q", "IDLE", 6)],
-    ERROR: [beat("Q", "IDLE", 6)],
+    COMPLETE: [beat("GLYPH", "IDLE", 2.5, "👍"), beat("FORMLESS", "IDLE", 6)],
+    ERROR: [beat("FORMLESS", "IDLE", 6), beat("Q", "IDLE", 4)],
   };
 
 /** Below 72 px a face cannot be read: the moving figures only. */
 const SMALL_MODES: ReadonlySet<SwarmMode> = new Set([
   "Q",
+  "FORMLESS",
   "RING",
   "GALAXY",
   "BLOOM",

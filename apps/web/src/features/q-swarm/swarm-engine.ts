@@ -1,5 +1,6 @@
 import {
   bloomShape,
+  formlessShape,
   faceShape,
   galaxyShape,
   glyphShape,
@@ -26,7 +27,15 @@ import {
  */
 
 export type SwarmMode =
-  "Q" | "FACE" | "RING" | "GLYPH" | "MOUTH" | "WAVE" | "GALAXY" | "BLOOM";
+  | "Q"
+  | "FACE"
+  | "RING"
+  | "GLYPH"
+  | "MOUTH"
+  | "WAVE"
+  | "GALAXY"
+  | "BLOOM"
+  | "FORMLESS";
 
 export type SwarmActivity =
   "IDLE" | "LISTENING" | "THINKING" | "SPEAKING" | "LAUGHING" | "ASKING";
@@ -129,6 +138,8 @@ export function createSwarmEngine(
         return galaxyShape(count);
       case "BLOOM":
         return bloomShape(count);
+      case "FORMLESS":
+        return formlessShape(count);
     }
   };
 
@@ -231,6 +242,26 @@ export function createSwarmEngine(
       const breathe = 0.85 + 0.15 * Math.sin(t * 1.3) + smoothedOutput * 0.2;
       x = Math.cos(angle) * radius * petals * breathe;
       y = Math.sin(angle) * radius * petals * breathe;
+    } else if (input.mode === "FORMLESS") {
+      // Smoke: every point carried on its own slow current, the whole
+      // mass stretching, folding and turning, never the same twice.
+      const radius = Math.hypot(point.x, point.y);
+      const angle =
+        Math.atan2(point.y, point.x) +
+        t * 0.18 +
+        radius * Math.sin(t * 0.23) * 1.4;
+      const stretch = 1 + 0.35 * Math.sin(t * 0.31 + angle * 2);
+      x =
+        Math.cos(angle) * radius * stretch +
+        Math.sin(point.y * 4.1 + t * 0.55) * 0.12 +
+        Math.sin(t * 0.13) * 0.08;
+      y =
+        Math.sin(angle) * radius * (2 - stretch) +
+        Math.cos(point.x * 3.7 - t * 0.47) * 0.12 +
+        Math.cos(t * 0.17) * 0.06;
+      const swell = 1 + smoothedOutput * 0.25 + input.input * 0.15;
+      x *= swell;
+      y *= swell;
     } else if (input.mode === "Q" && input.activity === "SPEAKING") {
       // The Q pulses with the voice.
       x *= 1 + smoothedOutput * 0.1;
@@ -343,7 +374,7 @@ export function createSwarmEngine(
         gustPhase > 10.5 ? Math.sin(((gustPhase - 10.5) / 2.5) * Math.PI) : 0;
       const windAmp = still
         ? 0
-        : (figure ? 0.008 : 0.03) + gust * (figure ? 0.045 : 0.12);
+        : (figure ? 0.012 : 0.045) + gust * (figure ? 0.05 : 0.14);
       const gustAngle = Math.floor((t * pace) / 13) * 2.39996;
       const half = size / 2;
       // A face fills more of the frame than the free figures do.

@@ -139,6 +139,24 @@ export function galaxyShape(count: number): SwarmPoint[] {
   });
 }
 
+/**
+ * A formless mass (founder live 2026-09-29: "never rests... it can just be
+ * a mass, formless"): a soft cloud the engine keeps churning like smoke.
+ */
+export function formlessShape(count: number): SwarmPoint[] {
+  const random = seeded(113);
+  return Array.from({ length: count }, () => {
+    // Roughly gaussian, so the mass is dense at its heart and thins out.
+    const r = Math.sqrt(-2 * Math.log(Math.max(1e-6, random()))) * 0.26;
+    const angle = random() * TAU;
+    return {
+      x: Math.cos(angle) * r,
+      y: Math.sin(angle) * r * 0.85,
+      part: "FIELD" as const,
+    };
+  });
+}
+
 /** A seed field the engine blooms into petals that open and close. */
 export function bloomShape(count: number): SwarmPoint[] {
   const random = seeded(97);
