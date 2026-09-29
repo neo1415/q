@@ -11,6 +11,10 @@ import {
 } from "@capital-q/observability";
 
 import {
+  registerCommitmentRoutes,
+  type CommitmentRoutesDependencies,
+} from "./http/commitments.js";
+import {
   registerCapitalObjectiveRoutes,
   type CapitalRoutesDependencies,
 } from "./http/capital-objectives.js";
@@ -158,6 +162,9 @@ export type ApiModules = {
   /** CQ-NET-010: Express Interest. Absent: no interest route registers. */
   readonly interests?:
     NetworkInterestRoutesDependencies["interests"] | undefined;
+  /** Spec 6.6.14: commitments and the raise. Absent: those routes do not register. */
+  readonly commitments?:
+    CommitmentRoutesDependencies["commitments"] | undefined;
   /** ADR 0023: founders' Connection Requests. Absent: those routes do not register. */
   readonly connections?:
     NetworkInterestRoutesDependencies["connections"] | undefined;
@@ -310,6 +317,15 @@ export function createApp(
         interactions: modules.discovery.interactions,
       });
     }
+  }
+
+  if (modules.commitments !== undefined) {
+    registerCommitmentRoutes(app, {
+      authenticator: security.authenticator,
+      resolver: security.resolver,
+      commitments: modules.commitments,
+      capital: modules.capital,
+    });
   }
 
   // Express Interest (CQ-NET-010): the relationship spine's one command.

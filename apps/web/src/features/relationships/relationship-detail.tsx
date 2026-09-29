@@ -25,6 +25,7 @@ import { ScheduleDialog } from "./schedule-dialog";
 import { AskQAboutRelationship } from "./relationship-actions";
 import type { CounterpartProfile } from "./relationship-page-data";
 import { StatusPill } from "./status-pill";
+import { RelationshipCommitment } from "./relationship-commitment";
 import { RelationshipErrands } from "./relationship-errands";
 import { RelationshipTimeline } from "./relationship-timeline";
 import {
@@ -92,6 +93,15 @@ export function RelationshipDetail({
 
       <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_20rem]">
         <div className="flex min-w-0 flex-col gap-8">
+          {relationship === null || !connected ? null : (
+            <Card title="Commitment" id="commitment">
+              <RelationshipCommitment
+                relationshipId={relationship.relationshipId}
+                counterpart={counterpart}
+              />
+            </Card>
+          )}
+
           {relationship === null ||
           relationship.milestones.length === 0 ? null : (
             <Card title="What happened" id="history">

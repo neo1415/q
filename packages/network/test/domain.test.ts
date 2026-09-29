@@ -133,6 +133,9 @@ describe("relationship event registry", () => {
       "meeting_rescheduled",
       "meeting_cancelled",
       "meeting_held",
+      "commitment_stated",
+      "commitment_confirmed",
+      "commitment_withdrawn",
     ]);
     expect(DiscoveredRelationshipEvent.allowedVisibilityScopes).not.toContain(
       "relationship_shared",
@@ -299,11 +302,20 @@ describe("DTOs", () => {
 
 describe("module surface", () => {
   it("exposes no state setter, no history update or delete, no relationship delete, no answer overwrite, no match ending and no interest withdrawal", () => {
+    // Spec 6.6.14: a commitment withdrawn is an appended status and a
+    // `commitment_withdrawn` history event, never a delete or an interest
+    // withdrawal; only its event names are allowed through.
+    const commitmentEvents = new Set([
+      "CommitmentWithdrawnRelationshipEvent",
+      "RELATIONSHIP_EVENT_COMMITMENT_WITHDRAWN",
+    ]);
     const names = Object.keys(network);
-    for (const forbidden of names.filter((name) =>
-      /set.*state|update|delete|remove|withdraw|end.*match|overwrite/i.test(
-        name,
-      ),
+    for (const forbidden of names.filter(
+      (name) =>
+        !commitmentEvents.has(name) &&
+        /set.*state|update|delete|remove|withdraw|end.*match|overwrite/i.test(
+          name,
+        ),
     )) {
       expect(forbidden, forbidden).toBe("");
     }

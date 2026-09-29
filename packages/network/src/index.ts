@@ -222,4 +222,22 @@ export {
   createPostgresInterestResponseRequestStore,
 } from "./infrastructure/postgres-interest-repositories.js";
 
+// Spec 6.6.14-6.6.15: commitments and the fundraising view.
+export {
+  commitmentBucket,
+  createCommitmentService,
+  type CommitmentOutcome,
+  type CommitmentService,
+} from "./application/commitments.js";
+export {
+  CommitmentActivityPayloadSchema,
+  CommitmentConfirmedRelationshipEvent,
+  CommitmentStatedRelationshipEvent,
+  CommitmentWithdrawnRelationshipEvent,
+  RELATIONSHIP_EVENT_COMMITMENT_CONFIRMED,
+  RELATIONSHIP_EVENT_COMMITMENT_STATED,
+  RELATIONSHIP_EVENT_COMMITMENT_WITHDRAWN,
+  type CommitmentActivityPayload,
+} from "./domain/event-registry.js";
+
 export const PACKAGE_NAME = "@capital-q/network" as const;

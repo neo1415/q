@@ -22,6 +22,7 @@ import {
   createPostgresSecurityEventWriter,
 } from "@capital-q/audit";
 import { createRequestDatabaseClient } from "@capital-q/database";
+import { CorrelationIdSchema } from "@capital-q/contracts";
 import { createOutboxWriter } from "@capital-q/eventing";
 import {
   createCorrelationId,
@@ -66,8 +67,12 @@ import {
   InvestorOrganisationIdSchema,
 } from "@capital-q/investors";
 import {
+  createCommitmentService,
   createConnectionService,
   createInterestService,
+  createRelationshipEventAppender,
+  createRelationshipEventRegistry,
+  RELATIONSHIP_EVENT_DEFINITIONS,
   createPostgresRelationshipEventRepository,
   createPostgresRelationshipRepository,
   type RelationshipQueryPort,
@@ -730,6 +735,25 @@ const interests = createInterestService({
 });
 
 /**
+ * Commitments (spec 6.6.14-6.6.15): stated by one side, confirmed by the
+ * other, each relationship counted once; history through Network's own
+ * appender.
+ */
+const commitments = createCommitmentService({
+  sql: database.sql,
+  transactions: database.transactions,
+  interests,
+  appender: createRelationshipEventAppender({
+    registry: createRelationshipEventRegistry(RELATIONSHIP_EVENT_DEFINITIONS),
+    repositories: {
+      relationships: createPostgresRelationshipRepository(),
+      events: createPostgresRelationshipEventRepository(),
+    },
+  }),
+  newCorrelationId: () => CorrelationIdSchema.parse(createCorrelationId()),
+});
+
+/**
  * Founder Connection Requests (ADR 0023). The founder's company is their
  * active organisation's one canonical company; the investor is the one
  * discovery would show this founder (network-visible, admitted by
@@ -1097,6 +1121,7 @@ const { app, logger } = createApp(config, security, {
     )) !== null,
   interests,
   connections,
+  commitments,
   chat,
   chatSafety,
   schedule,

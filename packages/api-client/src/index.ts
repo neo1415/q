@@ -267,3 +267,10 @@ export {
   getMeetingAssistant,
 } from "./meeting-assistant.js";
 export { listRelationshipErrands, stopErrand } from "./errands.js";
+export {
+  confirmCommitment,
+  getCompanyFundraising,
+  getRelationshipCommitments,
+  stateCommitment,
+  withdrawCommitment,
+} from "./commitments.js";

@@ -3,9 +3,10 @@ import type { ReactNode } from "react";
 
 import {
   ApiProblemError,
+  getCompanyFundraising,
   getCurrentCapitalObjective,
 } from "@capital-q/api-client";
-import type { CapitalObjectiveDto } from "@capital-q/contracts";
+import type { CapitalObjectiveDto, FundraisingDto } from "@capital-q/contracts";
 import { instrumentLabel, STAGE_OPTIONS } from "@capital-q/founder-onboarding";
 import { Badge } from "@capital-q/ui/badge";
 import { buttonClassName } from "@capital-q/ui/button";
@@ -18,6 +19,7 @@ import { RelationshipList } from "@/features/relationships/relationship-list";
 import { formatDay } from "@/components/date-format";
 
 import { AskQChips } from "./ask-q-chips";
+import { FundraisingPanel } from "./fundraising-panel";
 
 /**
  * Capital: the objective and the relationships behind it (doc 17 §§105-107;
@@ -78,13 +80,24 @@ async function currentObjective(
   }
 }
 
+async function fundraisingOf(
+  companyId: string,
+): Promise<FundraisingDto | null> {
+  const session = await apiSession();
+  if (session === null) return null;
+  return getCompanyFundraising(session, companyId).catch(() => null);
+}
+
 export async function CapitalScreen() {
   const context = await resolveOwnContext();
-  const [objective, relationships] = await Promise.all([
+  const [objective, relationships, fundraising] = await Promise.all([
     context.kind === "FOUNDER"
       ? currentObjective(context.companyId)
       : Promise.resolve(null),
     ownRelationships(context),
+    context.kind === "FOUNDER"
+      ? fundraisingOf(context.companyId)
+      : Promise.resolve(null),
   ]);
 
   const asks =
@@ -164,6 +177,11 @@ export async function CapitalScreen() {
               ) : undefined
             }
           />
+        )}
+        {fundraising === null ? null : (
+          <div className="pt-6">
+            <FundraisingPanel fundraising={fundraising} />
+          </div>
         )}
         <div className="pt-4">
           <AskQChips asks={asks} />

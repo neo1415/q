@@ -255,6 +255,47 @@ export const MeetingHeldRelationshipEvent = defineRelationshipEvent({
     "A call booked on Capital Q took place and Q recorded it for both sides.",
 });
 
+/**
+ * Commitments (spec 6.6.14): money one side stated, confirmed by the
+ * other, or withdrawn. Activity only: a commitment is an outcome signal,
+ * never a relationship state; the amount lives on the commitment row, not
+ * in the event.
+ */
+export const CommitmentActivityPayloadSchema = z
+  .object({ commitmentId: UuidSchema })
+  .strict();
+export type CommitmentActivityPayload = z.infer<
+  typeof CommitmentActivityPayloadSchema
+>;
+
+export const RELATIONSHIP_EVENT_COMMITMENT_STATED =
+  "commitment_stated" as const;
+export const CommitmentStatedRelationshipEvent = defineRelationshipEvent({
+  type: RELATIONSHIP_EVENT_COMMITMENT_STATED,
+  payloadSchema: CommitmentActivityPayloadSchema,
+  allowedVisibilityScopes: ["relationship_shared"],
+  description:
+    "One side stated a commitment (soft, firm or invested) for the other side to confirm.",
+});
+
+export const RELATIONSHIP_EVENT_COMMITMENT_CONFIRMED =
+  "commitment_confirmed" as const;
+export const CommitmentConfirmedRelationshipEvent = defineRelationshipEvent({
+  type: RELATIONSHIP_EVENT_COMMITMENT_CONFIRMED,
+  payloadSchema: CommitmentActivityPayloadSchema,
+  allowedVisibilityScopes: ["relationship_shared"],
+  description: "The other side confirmed a stated commitment.",
+});
+
+export const RELATIONSHIP_EVENT_COMMITMENT_WITHDRAWN =
+  "commitment_withdrawn" as const;
+export const CommitmentWithdrawnRelationshipEvent = defineRelationshipEvent({
+  type: RELATIONSHIP_EVENT_COMMITMENT_WITHDRAWN,
+  payloadSchema: CommitmentActivityPayloadSchema,
+  allowedVisibilityScopes: ["relationship_shared"],
+  description: "A party withdrew the relationship's current commitment.",
+});
+
 export type RelationshipEventRegistry = {
   readonly get: (eventType: string) => RelationshipEventDefinition | undefined;
   readonly types: () => readonly string[];
@@ -335,4 +376,7 @@ export const RELATIONSHIP_EVENT_DEFINITIONS: readonly RelationshipEventDefinitio
     MeetingRescheduledRelationshipEvent,
     MeetingCancelledRelationshipEvent,
     MeetingHeldRelationshipEvent,
+    CommitmentStatedRelationshipEvent,
+    CommitmentConfirmedRelationshipEvent,
+    CommitmentWithdrawnRelationshipEvent,
   ];
