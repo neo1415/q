@@ -8,7 +8,6 @@ import type { NextConfig } from "next";
  */
 const securityHeaders = [
   { key: "X-Content-Type-Options", value: "nosniff" },
-  { key: "X-Frame-Options", value: "DENY" },
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
   // Microphone stays reservable for Capital Q's own voice capability later;
   // camera and location are not product features.
@@ -50,6 +49,19 @@ const nextConfig: NextConfig = {
   headers() {
     return Promise.resolve([
       { source: "/(.*)", headers: securityHeaders },
+      // Nothing is framed by another site except the GateQ embed below.
+      {
+        source: "/((?!g/[^/]+/embed$).*)",
+        headers: [{ key: "X-Frame-Options", value: "DENY" }],
+      },
+      {
+        // GateQ embed (spec §1): the one page another site may frame.
+        source: "/g/:publicId/embed",
+        headers: [
+          { key: "Content-Security-Policy", value: "frame-ancestors *" },
+          { key: "Cache-Control", value: "no-store" },
+        ],
+      },
       {
         // Authentication responses are never shared-cacheable: a callback that
         // sets session cookies, or a sign-in page rendered with a notice,

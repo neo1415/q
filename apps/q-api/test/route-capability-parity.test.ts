@@ -193,7 +193,7 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
     ].map((route) => [
       `api/http/gateq.ts ${route}`,
       exempt(
-        "GateQ gateway administration has no screen in the web app yet (API only); R33 requires a page before a Q tool",
+        "GateQ gateway administration is opened from the Gateway page with one press; a Q tool for editing its rules comes later",
       ),
     ]),
   ),
@@ -536,6 +536,12 @@ const PAGE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "/dev/q-presence": exempt("development-only page"),
   "/dev/ui": exempt("development-only page"),
   "/u/[handle]": PUBLIC,
+  // GateQ: a gateway's public page and the embed another site frames.
+  "/g/[publicId]": PUBLIC,
+  "/g/[publicId]/embed": PUBLIC,
+  "/gateway": exempt(
+    "the investor's gateway (link, QR, snippet, inbox), opened from Capital; a navigate capability comes with the Q gateway tool",
+  ),
   "/onboarding/founder": exempt(
     "the founder interview: Q's own onboarding loop (voice INTERVIEW_FOUNDER)",
   ),

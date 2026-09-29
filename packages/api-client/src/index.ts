@@ -274,3 +274,14 @@ export {
   stateCommitment,
   withdrawCommitment,
 } from "./commitments.js";
+export {
+  applicationTurn,
+  createGateway,
+  draftGatewayVersion,
+  getPublicGateway,
+  listGatewayApplications,
+  listGateways,
+  publishGatewayVersion,
+  startApplication,
+  submitApplication,
+} from "./gateq.js";

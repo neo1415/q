@@ -420,6 +420,15 @@ export default tseslint.config(
       },
     },
   },
+  // The GateQ embed loader: plain browser JavaScript pasted into other
+  // sites' pages.
+  {
+    files: ["apps/web/public/gateq-embed.js"],
+    languageOptions: {
+      sourceType: "script",
+      globals: { document: "readonly", URL: "readonly" },
+    },
+  },
   // Parser sandbox fixtures: tiny Node programs a test spawns as a child
   // process to exercise the sandbox's containment (timeout, output bound,
   // scrubbed environment). They are never imported by application code.

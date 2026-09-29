@@ -19,6 +19,8 @@ const SKIPPED_PATHS = [
   "/auth/update-password",
   "/u/",
   "/c/",
+  // A GateQ gateway, often inside someone else's website.
+  "/g/",
   "/@",
   "/api/",
 ];

@@ -169,6 +169,12 @@ export async function CapitalScreen() {
                   >
                     Saved companies
                   </Link>
+                  <Link
+                    href="/gateway"
+                    className={buttonClassName("secondary")}
+                  >
+                    Your gateway
+                  </Link>
                 </span>
               ) : objective === null ? (
                 <Link href="/home#q" className={buttonClassName("secondary")}>
