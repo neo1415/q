@@ -14,6 +14,7 @@ import { RELATIONSHIP_INTEREST_EXPRESS } from "./express-interest-action.js";
 import { HANDLE_CLAIM } from "./handle-claim-action.js";
 import { INVESTOR_PROFILE_UPDATE } from "./investor-profile-action.js";
 import { PERSON_PROFILE_UPDATE } from "./person-profile-action.js";
+import { ONBOARDING_ANSWER_REVISE } from "./profile-answer-action.js";
 import { RECORD_CHANGE_ACTION_TYPES } from "./record-change-actions.js";
 import { RELATIONSHIP_INTEREST_RESPOND } from "./respond-to-interest-action.js";
 import {
@@ -46,6 +47,8 @@ export const Q_API_ACTION_TYPES: readonly string[] = Object.freeze([
   MEETING_RESCHEDULE,
   MEETING_CANCEL,
   ...RECORD_CHANGE_ACTION_TYPES,
+  // ADR 0024: a profile fact first given during onboarding.
+  ONBOARDING_ANSWER_REVISE,
 ]);
 
 export function assertComposedActionTypes(registry: QActionRegistry): void {

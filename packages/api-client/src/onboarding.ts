@@ -16,6 +16,7 @@ import {
   ONBOARDING_PATH,
   ONBOARDING_RESOLVE_SEGMENT,
   ONBOARDING_RESPONSES_SEGMENT,
+  ONBOARDING_REVISIONS_SEGMENT,
   ONBOARDING_SESSIONS_SEGMENT,
   ONBOARDING_SKIP_SEGMENT,
   ONBOARDING_WITHDRAW_SEGMENT,
@@ -97,6 +98,22 @@ export function submitOnboardingResponse(
     session,
     "POST",
     `${byId(sessionId)}${ONBOARDING_RESPONSES_SEGMENT}`,
+    OnboardingSessionViewSchema,
+    { body: request, ...idempotent(idempotencyKey) },
+  );
+}
+
+/** `POST /v1/onboarding/sessions/:sessionId/revisions` — revise a completed answer (ADR 0024). */
+export function reviseOnboardingResponse(
+  session: ApiSession,
+  sessionId: string,
+  request: SubmitOnboardingResponseRequest,
+  idempotencyKey: string,
+) {
+  return call(
+    session,
+    "POST",
+    `${byId(sessionId)}${ONBOARDING_REVISIONS_SEGMENT}`,
     OnboardingSessionViewSchema,
     { body: request, ...idempotent(idempotencyKey) },
   );

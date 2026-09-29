@@ -1293,6 +1293,8 @@ describe("@capital-q/onboarding against local PostgreSQL", () => {
           stepKey: "sectors",
           value: { type: "MULTI_SELECT", optionKeys: ["fintech"] },
           rationale: "Payments fit better.",
+          // No public source was cited for this recommendation.
+          sources: [],
           payloadSha256: second.payloadSha256,
         },
       ]);

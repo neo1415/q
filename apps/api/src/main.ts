@@ -31,11 +31,13 @@ import {
 import {
   createFounderOnboardingIntegration,
   FOUNDER_INTERVIEW_CUES,
+  FOUNDER_REVISABLE_STEPS,
   FOUNDER_UTTERANCE_ALIASES,
 } from "@capital-q/founder-onboarding";
 import {
   createInvestorOnboardingIntegration,
   INVESTOR_INTERVIEW_CUES,
+  INVESTOR_REVISABLE_STEPS,
   INVESTOR_UTTERANCE_ALIASES,
 } from "@capital-q/investor-onboarding";
 import {
@@ -499,6 +501,11 @@ const onboarding = createOnboardingService({
   // (CQ-Q-VOICE-001 A): one sentence may answer many questions, each
   // proposal validated by the definition and confirmed by the person.
   interviewCues: { ...FOUNDER_INTERVIEW_CUES, ...INVESTOR_INTERVIEW_CUES },
+  // ADR 0024: the profile facts a completed onboarding may still revise.
+  revisableSteps: {
+    founder: FOUNDER_REVISABLE_STEPS,
+    investor: INVESTOR_REVISABLE_STEPS,
+  },
   taxonomy: {
     findCandidates: async (input) => {
       const result = await taxonomy.classification.candidates.findCandidates({

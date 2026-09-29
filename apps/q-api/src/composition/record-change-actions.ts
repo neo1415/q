@@ -47,6 +47,13 @@ import {
   type AuthorizationService,
 } from "@capital-q/security";
 
+import {
+  ONBOARDING_ANSWER_REVISE,
+  ProfileAnswerPayloadSchema,
+  resolveProfileAnswer,
+  type ProfileAnswersPort,
+} from "./profile-answer-action.js";
+
 /**
  * R33: the app's own record forms, as Approval Engine actions (lead-owned
  * action types): the raise, the mandate, founder profile / team facts /
@@ -146,6 +153,8 @@ export function requestFor(
 ):
   | { readonly ok: true; readonly fields: Record<string, unknown> }
   | { readonly ok: false; readonly reason: string } {
+  // ADR 0024: an answer is resolved against its step, not a request schema.
+  if (change.kind === "PROFILE_ANSWER") return { ok: true, fields: {} };
   const fields = { ...change.fields };
   const check = (schema: z.ZodType, value: unknown) => {
     const parsed = schema.safeParse(value);
@@ -972,6 +981,8 @@ export function createRecordChangeBoard(
     "capital" | "investorService" | "logger"
   > & {
     readonly now?: (() => number) | undefined;
+    /** ADR 0024: the person's own completed onboarding sessions. */
+    readonly profileAnswers?: ProfileAnswersPort | undefined;
   },
 ): RecordChangeBoard {
   const now = deps.now ?? (() => Date.now());
@@ -1102,6 +1113,33 @@ export function createRecordChangeBoard(
           },
           summary: "Change who can see your investor organisation",
         };
+      case "PROFILE_ANSWER": {
+        const answer = resolveProfileAnswer(change.field, change.value);
+        if ("reason" in answer) return { reason: answer.reason };
+        const own =
+          deps.profileAnswers === undefined
+            ? null
+            : await deps.profileAnswers
+                .completedSession(actor, answer.journey)
+                .catch(() => null);
+        if (own === null) {
+          return {
+            reason:
+              "Your setup isn't finished yet, so this is still an answer in your setup: finish it there first.",
+          };
+        }
+        return {
+          actionType: ONBOARDING_ANSWER_REVISE,
+          payload: {
+            journey: answer.journey,
+            sessionId: own.sessionId,
+            stepKey: answer.stepKey,
+            value: answer.value,
+            preview: answer.preview,
+          },
+          summary: "Update your profile",
+        };
+      }
       case "Q_CARD":
         return {
           actionType: Q_CARD_UPDATE,
@@ -1122,6 +1160,7 @@ export function createRecordChangeBoard(
     [INVESTOR_REPRESENTATIVE_UPDATE]: InvestorRepresentativePayloadSchema,
     [Q_CARD_UPDATE]: QCardUpdatePayloadSchema,
     [INVESTOR_VISIBILITY_SET]: InvestorVisibilityPayloadSchema,
+    [ONBOARDING_ANSWER_REVISE]: ProfileAnswerPayloadSchema,
   };
 
   return {

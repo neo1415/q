@@ -127,7 +127,12 @@ export {
   type ProposeHandleClaimInput,
   type ProposeHandleClaimOutput,
 } from "./tools/handle-claim.js";
-export { OWN_RECORD_KINDS, PROPOSAL_PLAIN_STATUSES } from "./ports.js";
+export {
+  OWN_RECORD_KINDS,
+  PROFILE_ANSWER_FIELDS,
+  PROPOSAL_PLAIN_STATUSES,
+  type ProfileAnswerField,
+} from "./ports.js";
 export {
   APPROVE_PENDING_OUTCOMES,
   APPROVE_PENDING_PROPOSAL,
@@ -174,6 +179,7 @@ export {
 export {
   createProposeInvestorVisibilityTool,
   createProposeMandateChangeTool,
+  createProposeProfileAnswerTool,
   createProposeQCardChangeTool,
   createProposeRaiseChangeTool,
   createProposeTeamChangeTool,
@@ -181,6 +187,7 @@ export {
   ProposeRecordChangeOutputSchema,
   PROPOSE_INVESTOR_VISIBILITY,
   PROPOSE_MANDATE_CHANGE,
+  PROPOSE_PROFILE_ANSWER,
   PROPOSE_Q_CARD_CHANGE,
   PROPOSE_RAISE_CHANGE,
   PROPOSE_TEAM_CHANGE,

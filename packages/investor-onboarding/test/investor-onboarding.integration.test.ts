@@ -34,6 +34,7 @@ import {
   createOnboardingService,
   OnboardingSessionIdSchema,
   OnboardingSessionNotFoundError,
+  OnboardingSessionStateError,
   OnboardingSessionVersionConflictError,
   type OnboardingActor,
   type OnboardingService,
@@ -53,6 +54,7 @@ import { TAXONOMY_EVENTS } from "@capital-q/taxonomy/events";
 import {
   createInvestorDomainServices,
   createInvestorOnboardingIntegration,
+  INVESTOR_REVISABLE_STEPS,
   INVESTOR_STEPS,
   InvestorHandoffContextSchema,
   InvestorMandatesContextSchema,
@@ -206,6 +208,7 @@ describe("@capital-q/investor-onboarding against local PostgreSQL", () => {
       outbox,
       writeTargets: investor.writeTargets,
       stepContextProviders: investor.stepContextProviders,
+      revisableSteps: { investor: INVESTOR_REVISABLE_STEPS },
       subjectResolvers: [
         createInvestorOrganisationOnboardingSubjectResolver(
           createPostgresInvestorOrganisationQueryPort({ sql: tx.sql }),
@@ -797,6 +800,65 @@ describe("@capital-q/investor-onboarding against local PostgreSQL", () => {
         correlationId: CORRELATION(),
       });
       expect(completed.session.status).toBe("COMPLETED");
+
+      // ADR 0024: a completed answer is revised through the same write
+      // targets, merged by dimension: new sectors replace the sectors only,
+      // the geographies stay, and the session stays completed.
+      const [sectorD] = await tx.sql<{ id: string }[]>`
+        select n.id from taxonomy.nodes n join taxonomy.vocabularies v on v.id = n.vocabulary_id
+         where v.code = 'industry' and n.status = 'ACTIVE' order by n.depth, n.canonical_code offset 3 limit 1`;
+      if (sectorD === undefined) throw new Error("industry seed missing");
+      const completedId = OnboardingSessionIdSchema.parse(completed.session.id);
+      const revise = (
+        stepKey: string,
+        value: OnboardingResponseValue,
+        version: number,
+      ) =>
+        world.service.runtime.reviseResponse({
+          actor: newcomer,
+          sessionId: completedId,
+          stepKey,
+          response: { value },
+          expectedSessionVersion: version,
+          idempotencyKey: randomUUID(),
+          correlationId: CORRELATION(),
+        });
+      const revised = await revise(
+        INVESTOR_STEPS.sectors,
+        nodes([sectorA, sectorD.id]),
+        completed.session.version,
+      );
+      expect(revised.session.status).toBe("COMPLETED");
+      const after = new Map(
+        (
+          await tx.sql<{ node_id: string; preference_strength: string }[]>`
+            select node_id, preference_strength from taxonomy.mandate_preferences where mandate_id = ${mandateId}`
+        ).map((p) => [p.node_id, p.preference_strength]),
+      );
+      expect(after.get(sectorD.id)).toBe("STRONG");
+      expect(after.get(sectorA)).toBe("STRONG");
+      expect(after.get(nigeria)).toBe("MUST");
+      const restaged = await revise(
+        INVESTOR_STEPS.stages,
+        multi(["seed"]),
+        revised.session.version,
+      );
+      expect(await mandateRow(tx, mandateId)).toMatchObject({
+        status: "ACTIVE",
+        min_stage_code: "seed",
+        max_stage_code: "seed",
+      });
+      // Not a revisable step, and a stale version: refused, nothing written.
+      await expect(
+        revise(
+          INVESTOR_STEPS.organisationName,
+          text("Renamed"),
+          restaged.session.version,
+        ),
+      ).rejects.toBeInstanceOf(OnboardingSessionStateError);
+      await expect(
+        revise(INVESTOR_STEPS.stages, multi(["seed"]), revised.session.version),
+      ).rejects.toBeInstanceOf(OnboardingSessionVersionConflictError);
 
       // Events: canonical facts come from the Investor domain, not from onboarding.
       const events = await tx.sql<{ event_type: string; payload: unknown }[]>`

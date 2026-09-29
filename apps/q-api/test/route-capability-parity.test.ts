@@ -341,6 +341,10 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "api/http/onboarding.ts POST `${byId}${ONBOARDING_RESPONSES_SEGMENT}`": cap(
     "tool.record_answers",
   ),
+  // ADR 0024: a completed answer revised from the profile, or by Q.
+  "api/http/onboarding.ts POST `${byId}${ONBOARDING_REVISIONS_SEGMENT}`": cap(
+    "tool.propose_profile_answer_change",
+  ),
   "api/http/onboarding.ts POST `${byId}${ONBOARDING_STEPS_SEGMENT}/:stepKey${ONBOARDING_SKIP_SEGMENT}`":
     cap("tool.set_aside"),
   "api/http/onboarding.ts POST `${byId}${ONBOARDING_STEPS_SEGMENT}/:stepKey${ONBOARDING_WITHDRAW_SEGMENT}`":

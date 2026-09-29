@@ -111,6 +111,7 @@ export {
   skipOnboardingStep,
   withdrawOnboardingResponse,
   startOnboardingSession,
+  reviseOnboardingResponse,
   submitOnboardingResponse,
 } from "./onboarding.js";
 

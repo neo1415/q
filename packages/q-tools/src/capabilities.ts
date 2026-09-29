@@ -532,6 +532,12 @@ export const Q_CAPABILITIES: readonly QCapability[] = Object.freeze([
     { approval: "PREPARE_APPROVE", executes: ["investor.mandate.change"] },
   ),
   tool(
+    "propose_profile_answer_change",
+    "PROFILE",
+    "Changes a profile fact first given during onboarding (an investor's sectors, stages, cheque, criteria, exclusions, discovery style; a founder's categories, team facts, traction), applied when they approve.",
+    { approval: "PREPARE_APPROVE", executes: ["onboarding.answer.revise"] },
+  ),
+  tool(
     "propose_team_change",
     "PROFILE",
     "Changes their founder profile, their company's team facts, or their own role and title, applied when they approve.",

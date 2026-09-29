@@ -437,10 +437,10 @@ export function SignalsAndVerification({
         description="Ask Q to review your profile or suggest improvements."
         data="help"
       >
-        <div className="grid grid-cols-2 gap-2">
+        <div className="flex flex-col gap-2">
           <button
             type="button"
-            className={buttonClassName("secondary")}
+            className={buttonClassName("secondary", "regular", "w-full")}
             onClick={() => askAbout(reviewDraft)}
             data-signals-review
           >
@@ -448,7 +448,7 @@ export function SignalsAndVerification({
           </button>
           <button
             type="button"
-            className={buttonClassName("quiet")}
+            className={buttonClassName("quiet", "regular", "w-full")}
             onClick={() => askAbout(improveDraft)}
             data-signals-improve
           >

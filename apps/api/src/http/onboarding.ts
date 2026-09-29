@@ -24,6 +24,7 @@ import {
   ONBOARDING_PATH,
   ONBOARDING_RESOLVE_SEGMENT,
   ONBOARDING_RESPONSES_SEGMENT,
+  ONBOARDING_REVISIONS_SEGMENT,
   ONBOARDING_SESSIONS_SEGMENT,
   ONBOARDING_SKIP_SEGMENT,
   ONBOARDING_WITHDRAW_SEGMENT,
@@ -224,6 +225,32 @@ export function registerOnboardingRoutes(
         "The onboarding response request is not valid.",
       );
       const view = await runtime.submitResponse({
+        actor: getOnboardingActor(request),
+        sessionId: sessionIdParam(request),
+        stepKey: input.stepKey,
+        response: input.response,
+        expectedSessionVersion: input.expectedSessionVersion,
+        idempotencyKey: key,
+        correlationId: correlation(),
+      });
+      void reply.header("Cache-Control", "no-store");
+      return OnboardingSessionViewSchema.parse(view);
+    },
+  );
+
+  // ADR 0024: one answer of a completed session, revised through the same
+  // commit (and write targets) as a submission.
+  app.post(
+    `${byId}${ONBOARDING_REVISIONS_SEGMENT}`,
+    { onRequest: withActor },
+    async (request, reply) => {
+      const key = idempotencyKey(request, "revise an onboarding answer");
+      const input = parseContract(
+        SubmitOnboardingResponseRequestSchema,
+        request.body,
+        "The revision request is not valid.",
+      );
+      const view = await runtime.reviseResponse({
         actor: getOnboardingActor(request),
         sessionId: sessionIdParam(request),
         stepKey: input.stepKey,

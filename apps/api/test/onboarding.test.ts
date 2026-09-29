@@ -116,6 +116,7 @@ function fakeRuntime(overrides: Partial<Runtime> = {}) {
     ),
     getCurrentSession: record("getCurrentSession", () => Promise.resolve(VIEW)),
     getSession: record("getSession", () => Promise.resolve(VIEW)),
+    reviseResponse: record("reviseResponse", () => Promise.resolve(VIEW)),
     submitResponse: record("submitResponse", () =>
       Promise.resolve({
         ...VIEW,
@@ -358,6 +359,29 @@ describe("/v1/onboarding/sessions", () => {
       response: { value: { type: "SINGLE_SELECT", optionKey: "raising_now" } },
       expectedSessionVersion: 1,
       idempotencyKey: KEY["idempotency-key"],
+    });
+
+    // ADR 0024: a completed answer, revised with the same body and key.
+    const revise = await app.inject({
+      method: "POST",
+      url: `/v1/onboarding/sessions/${SESSION_ID}/revisions`,
+      headers: KEY,
+      payload: {
+        stepKey: "intent",
+        response: {
+          value: { type: "SINGLE_SELECT", optionKey: "raising_now" },
+        },
+        expectedSessionVersion: 1,
+      },
+    });
+    expect(revise.statusCode).toBe(200);
+    expect(calls.at(-1)).toMatchObject({
+      method: "reviseResponse",
+      input: {
+        sessionId: SESSION_ID,
+        stepKey: "intent",
+        idempotencyKey: KEY["idempotency-key"],
+      },
     });
 
     const skip = await app.inject({

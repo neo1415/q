@@ -18,6 +18,7 @@ export const ONBOARDING_MUTATION_OPERATIONS = [
   "dismiss_question",
   "say",
   "withdraw",
+  "revise",
 ] as const;
 export type OnboardingMutationOperation =
   (typeof ONBOARDING_MUTATION_OPERATIONS)[number];

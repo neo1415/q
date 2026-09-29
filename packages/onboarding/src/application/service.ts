@@ -40,6 +40,7 @@ import {
   createOnboardingWriteTargetRegistry,
 } from "./registry.js";
 import {
+  type OnboardingRuntimeDependencies,
   createOnboardingUseCases,
   type OnboardingUseCases,
 } from "./use-cases.js";
@@ -58,6 +59,7 @@ export type OnboardingService = {
     | "getCurrentSession"
     | "getSession"
     | "submitResponse"
+    | "reviseResponse"
     | "skipStep"
     | "withdrawResponse"
     | "goBack"
@@ -112,6 +114,8 @@ export type OnboardingServiceOptions = {
   readonly interviewCues?: InterviewCues | undefined;
   /** Capital Q's taxonomy classifier for category phrases (CQ-Q-VOICE-001 A). */
   readonly taxonomy?: OnboardingTaxonomyResolver | undefined;
+  /** ADR 0024: per journey, the answers a completed session may revise. */
+  readonly revisableSteps?: OnboardingRuntimeDependencies["revisableSteps"];
   /** Safe structured logging only; never response content. */
   readonly logger?: Logger | undefined;
 };
@@ -151,6 +155,7 @@ export function createOnboardingService(
     utteranceAliases: options.utteranceAliases,
     interviewCues: options.interviewCues,
     taxonomy: options.taxonomy,
+    revisableSteps: options.revisableSteps,
     idempotency:
       options.repositories?.idempotency ??
       createPostgresOnboardingIdempotencyRepository(),
@@ -171,6 +176,7 @@ export function createOnboardingService(
       getCurrentSession: useCases.getCurrentSession,
       getSession: useCases.getSession,
       submitResponse: useCases.submitResponse,
+      reviseResponse: useCases.reviseResponse,
       skipStep: useCases.skipStep,
       withdrawResponse: useCases.withdrawResponse,
       goBack: useCases.goBack,

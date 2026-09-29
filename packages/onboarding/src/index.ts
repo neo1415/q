@@ -177,6 +177,7 @@ export {
   type AppendOnboardingInterviewTurnsCommand,
   type AppendOnboardingInterviewTurnsResult,
   type ListOnboardingInterviewTurnsQuery,
+  type ReviseOnboardingResponseCommand,
   type SubmitOnboardingResponseCommand,
 } from "./application/use-cases.js";
 export { getOnboardingMetrics } from "./application/metrics.js";

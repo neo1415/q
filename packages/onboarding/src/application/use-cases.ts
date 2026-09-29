@@ -171,6 +171,14 @@ export type OnboardingRuntimeDependencies = {
   readonly subjects: OnboardingSubjectResolverRegistry;
   readonly writeTargets: OnboardingWriteTargetRegistry;
   readonly stepContexts: OnboardingStepContextRegistry;
+  /**
+   * ADR 0024: the steps of each journey whose answer may be revised after
+   * the session completed (profile facts the write targets merge by
+   * dimension). Absent, or a journey not named: nothing is revisable.
+   */
+  readonly revisableSteps?:
+    | Readonly<Partial<Record<OnboardingJourneyType, ReadonlySet<string>>>>
+    | undefined;
   readonly logger?: Logger | undefined;
 };
 
@@ -261,6 +269,9 @@ export type SubmitOnboardingResponseCommand = SessionScopedQuery & {
   readonly idempotencyKey: string;
   readonly correlationId: CorrelationId;
 };
+
+/** ADR 0024: revise one answer of a completed session. */
+export type ReviseOnboardingResponseCommand = SubmitOnboardingResponseCommand;
 
 export type SkipOnboardingStepCommand = SessionScopedQuery & {
   readonly stepKey: string;
@@ -1017,6 +1028,98 @@ export function createOnboardingUseCases(
         stepType: step.stepType,
       });
       safeLog(runtime, "response.committed", committed.session, {
+        stepKey: step.stepKey,
+      });
+      return view(tx.sql, actor, committed.session, committed.changes);
+    });
+  };
+
+  /**
+   * ADR 0024: change one answer after the session completed, through the
+   * same commit as a submission, so the step's write targets merge the new
+   * answer into the canonical records (a mandate dimension, the company's
+   * categories) exactly as onboarding did. Only steps the journey declares
+   * revisable; the session stays COMPLETED.
+   */
+  const reviseResponse = async (
+    raw: ReviseOnboardingResponseCommand,
+  ): Promise<OnboardingSessionView> => {
+    const command = z
+      .object({
+        actor: ActorSchema,
+        sessionId: OnboardingSessionIdSchema,
+        stepKey: OnboardingStepKeySchema,
+        response: z.unknown(),
+        expectedSessionVersion: VersionSchema,
+        idempotencyKey: IdempotencyKeySchema,
+        correlationId: CorrelationIdSchema,
+      })
+      .strict()
+      .parse(raw);
+    const { actor } = command;
+    return transactions.run(async (tx) => {
+      const locked = await sessions.lockForUpdate(
+        tx,
+        command.sessionId,
+        actor.userId,
+      );
+      if (locked === null) {
+        throw new OnboardingSessionNotFoundError();
+      }
+      const idem = await replayOrRecordable(
+        runtime,
+        tx,
+        locked,
+        "revise",
+        command.idempotencyKey,
+        {
+          stepKey: command.stepKey,
+          response: command.response,
+          expectedSessionVersion: command.expectedSessionVersion,
+        },
+      );
+      if (idem.replay) {
+        return view(tx.sql, actor, locked);
+      }
+      if (locked.status !== "COMPLETED") {
+        throw new OnboardingSessionStateError("SESSION_NOT_COMPLETED");
+      }
+      if (locked.version !== command.expectedSessionVersion) {
+        throw new OnboardingSessionVersionConflictError();
+      }
+      const revisable = runtime.revisableSteps?.[locked.journeyType];
+      if (revisable === undefined || !revisable.has(command.stepKey)) {
+        throw new OnboardingSessionStateError("STEP_NOT_REVISABLE");
+      }
+      const aggregate = await aggregateOf(runtime, tx.sql, locked);
+      const step = eligibleStep(aggregate, command.stepKey);
+      const validated = validateOnboardingResponse(step, command.response);
+      const committed = await commitResponse(
+        runtime,
+        tx,
+        actor,
+        aggregate,
+        step,
+        validated,
+        command.correlationId,
+      );
+      await idempotency.recordMutation(tx, {
+        sessionId: locked.id,
+        keyHash: idem.keyHash,
+        operation: "revise",
+        requestHash: idem.requestHash,
+        resultVersion: committed.session.version,
+      });
+      await outbox.enqueue(
+        tx,
+        responseCommittedEvent({
+          session: committed.session,
+          correlationId: command.correlationId,
+          stepKey: step.stepKey,
+          responseId: committed.response.id,
+        }),
+      );
+      safeLog(runtime, "response.revised", committed.session, {
         stepKey: step.stepKey,
       });
       return view(tx.sql, actor, committed.session, committed.changes);
@@ -2661,6 +2764,7 @@ export function createOnboardingUseCases(
     getSession,
     bindSessionContext,
     submitResponse,
+    reviseResponse,
     skipStep,
     withdrawResponse,
     goBack,

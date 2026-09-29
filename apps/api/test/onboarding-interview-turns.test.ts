@@ -56,6 +56,7 @@ function fakeRuntime() {
     getSession: unused,
     getCurrentSession: unused,
     submitResponse: unused,
+    reviseResponse: unused,
     skipStep: unused,
     withdrawResponse: unused,
     goBack: unused,

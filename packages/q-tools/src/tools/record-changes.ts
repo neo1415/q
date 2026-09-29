@@ -19,7 +19,12 @@ import {
   type AnyQToolDefinition,
 } from "../definition.js";
 import { actorWideScope } from "../plan.js";
-import type { QToolPorts, RecordChange, RecordChangePort } from "../ports.js";
+import {
+  PROFILE_ANSWER_FIELDS,
+  type QToolPorts,
+  type RecordChange,
+  type RecordChangePort,
+} from "../ports.js";
 import { ownSubject } from "./q-card.js";
 
 /**
@@ -38,6 +43,7 @@ export const PROPOSE_TEAM_CHANGE = "team.propose" as const;
 export const PROPOSE_Q_CARD_CHANGE = "q_card.propose" as const;
 export const PROPOSE_INVESTOR_VISIBILITY =
   "investor.visibility.propose" as const;
+export const PROPOSE_PROFILE_ANSWER = "profile.answer.propose" as const;
 
 const PURPOSES: readonly QTaskClass[] = [
   "GENERAL_QUESTION",
@@ -271,7 +277,7 @@ export function createProposeMandateChangeTool(
       "GENERAL_QUESTION",
     ],
     providerName: "propose_mandate_change",
-    description: `Prepares a change to their own investor organisation's mandate, as the mandate form makes it: create one, update name, discoveryMode, chequeRange, minStageCode, maxStageCode or rawMandateText, activate it, or close it. Sector and constraint preferences stay on the mandate form: offer to open their profile for those. ${RESULT_NOTE}`,
+    description: `Prepares a change to their own investor organisation's mandate, as the mandate form makes it: create one, update name, discoveryMode, chequeRange, minStageCode, maxStageCode or rawMandateText, activate it, or close it. Sectors, geographies, business models, criteria, founder preferences and exclusions are propose_profile_answer_change. ${RESULT_NOTE}`,
     requiredScopeKinds: ["INVESTOR_PROFILE", "INVESTOR_MANDATE"],
     input: ProposeMandateChangeInputSchema,
     authorize: subjectAuthorizer(ports, "INVESTOR_ORGANISATION"),
@@ -513,6 +519,69 @@ export function createProposeInvestorVisibilityTool(
   });
 }
 
+// --- a profile fact first given during onboarding (ADR 0024) --------------
+
+const PROFILE_ANSWER_FIELD_NAMES = [
+  ...PROFILE_ANSWER_FIELDS.investor,
+  ...PROFILE_ANSWER_FIELDS.founder,
+] as const;
+
+export const ProposeProfileAnswerInputSchema = z
+  .object({
+    field: z
+      .enum(PROFILE_ANSWER_FIELD_NAMES)
+      .describe(
+        `Which profile fact. An investor's: ${PROFILE_ANSWER_FIELDS.investor.join(", ")}. A founder's company: ${PROFILE_ANSWER_FIELDS.founder.join(", ")}.`,
+      ),
+    value: z
+      .union([z.string().max(8000), z.array(z.string().max(200)).max(40)])
+      .describe(
+        "The whole new answer in the person's words: option names or category names (a list replaces the list), a number as digits, or text. The result names the valid choices if a word doesn't fit.",
+      ),
+  })
+  .strict();
+export type ProposeProfileAnswerInput = z.infer<
+  typeof ProposeProfileAnswerInputSchema
+>;
+
+export function createProposeProfileAnswerTool(
+  ports: Pick<QToolPorts, "companies" | "investors">,
+  port: RecordChangePort,
+): AnyQToolDefinition {
+  const prepare = prepareWith(port);
+  const investor = subjectAuthorizer(ports, "INVESTOR_ORGANISATION");
+  const company = subjectAuthorizer(ports, "COMPANY");
+  const investorFields: ReadonlySet<string> = new Set(
+    PROFILE_ANSWER_FIELDS.investor,
+  );
+  return defineQTool<
+    ProposeProfileAnswerInput,
+    ProposeRecordChangeOutput,
+    Grant
+  >({
+    ...COMMON,
+    id: PROPOSE_PROFILE_ANSWER,
+    providerName: "propose_profile_answer_change",
+    description: `Prepares a change to one fact on their own profile that they first gave during onboarding: an investor's sectors, geographies, business models, customer types, stages, cheque sizes, criteria, founder preferences, exclusions, discovery style or portfolio; a founder's company categories, team facts or traction. The change goes into the same records onboarding wrote (their mandate or company). ${RESULT_NOTE}`,
+    requiredScopeKinds: [],
+    input: ProposeProfileAnswerInputSchema,
+    authorize: (input, context) =>
+      investorFields.has(input.field)
+        ? investor(input, context)
+        : company(input, context),
+    execute: (input, context) =>
+      prepare(
+        {
+          kind: "PROFILE_ANSWER",
+          journey: investorFields.has(input.field) ? "investor" : "founder",
+          field: input.field,
+          value: input.value,
+        },
+        context,
+      ),
+  });
+}
+
 export function createRecordChangeTools(
   ports: Pick<QToolPorts, "companies" | "investors">,
   port: RecordChangePort,
@@ -523,5 +592,6 @@ export function createRecordChangeTools(
     createProposeTeamChangeTool(ports, port),
     createProposeQCardChangeTool(ports, port),
     createProposeInvestorVisibilityTool(ports, port),
+    createProposeProfileAnswerTool(ports, port),
   ];
 }

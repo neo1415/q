@@ -45,7 +45,24 @@ import {
 } from "@capital-q/media";
 import { MEDIA_EVENTS } from "@capital-q/media/events";
 import { COMPANY_EVENTS } from "@capital-q/companies/events";
+import { EVIDENCE_EVENTS } from "@capital-q/evidence/events";
+import { ONBOARDING_EVENTS } from "@capital-q/onboarding/events";
+import { ORGANISATION_EVENTS } from "@capital-q/organisations/events";
+import { TAXONOMY_EVENTS } from "@capital-q/taxonomy/events";
 import {
+  createFounderOnboardingIntegration,
+  FOUNDER_REVISABLE_STEPS,
+} from "@capital-q/founder-onboarding";
+import {
+  createInvestorOnboardingIntegration,
+  INVESTOR_REVISABLE_STEPS,
+} from "@capital-q/investor-onboarding";
+import {
+  createProfileAnswerAction,
+  type ProfileAnswersPort,
+} from "./composition/profile-answer-action.js";
+import {
+  CorrelationIdSchema,
   createEventRegistry,
   type ModelDataPosture,
   type QViewingMoment,
@@ -55,6 +72,8 @@ import { createOutboxWriter } from "@capital-q/eventing";
 import {
   createOnboardingNudges,
   createOnboardingQRecommendations,
+  createOnboardingService,
+  OnboardingSessionIdSchema,
   createOwnOnboardingSummaryReader,
 } from "@capital-q/onboarding";
 import { composeChat, composeSchedule } from "@capital-q/communication";
@@ -1282,6 +1301,75 @@ const verificationService = createCompanyVerificationService({
   }),
   audit: createPostgresMaterialActionAuditWriter(),
 });
+/**
+ * ADR 0024: a profile fact first given during onboarding, revised by Q
+ * after approval. The onboarding runtime with the founder and investor
+ * write targets, composed as the API composes it, so a revision merges
+ * into the mandate or the company exactly as onboarding did.
+ */
+const revisionOutbox = createOutboxWriter({
+  registry: createEventRegistry([
+    ...ORGANISATION_EVENTS,
+    ...COMPANY_EVENTS,
+    ...INVESTOR_EVENTS,
+    ...EVIDENCE_EVENTS,
+    ...CAPITAL_EVENTS,
+    ...TAXONOMY_EVENTS,
+    ...ONBOARDING_EVENTS,
+  ]),
+});
+const revisionAudit = createPostgresMaterialActionAuditWriter();
+const founderRevisions = createFounderOnboardingIntegration({
+  outbox: revisionOutbox,
+  audit: revisionAudit,
+  securityEvents: createPostgresSecurityEventWriter({ sql: database.sql }),
+});
+const investorRevisions = createInvestorOnboardingIntegration({
+  outbox: revisionOutbox,
+  audit: revisionAudit,
+  securityEvents: createPostgresSecurityEventWriter({ sql: database.sql }),
+});
+const onboardingRevisions = createOnboardingService({
+  sql: database.sql,
+  transactions: database.transactions,
+  outbox: revisionOutbox,
+  writeTargets: [
+    ...(founderRevisions.writeTargets ?? []),
+    ...(investorRevisions.writeTargets ?? []),
+  ],
+  stepContextProviders: [
+    ...(founderRevisions.stepContextProviders ?? []),
+    ...(investorRevisions.stepContextProviders ?? []),
+  ],
+  revisableSteps: {
+    founder: FOUNDER_REVISABLE_STEPS,
+    investor: INVESTOR_REVISABLE_STEPS,
+  },
+  logger,
+});
+const profileAnswers: ProfileAnswersPort = {
+  completedSession: async (actor, journey) => {
+    const view = await onboardingRevisions.runtime.getCurrentSession({
+      actor: { userId: actor.userId, context: actor },
+      journeyType: journey,
+    });
+    return view === null || view.session.status !== "COMPLETED"
+      ? null
+      : { sessionId: view.session.id, version: view.session.version };
+  },
+  revise: async (input) => {
+    const view = await onboardingRevisions.runtime.reviseResponse({
+      actor: { userId: input.actor.userId, context: input.actor },
+      sessionId: OnboardingSessionIdSchema.parse(input.sessionId),
+      stepKey: input.stepKey,
+      response: { value: input.value },
+      expectedSessionVersion: input.expectedSessionVersion,
+      idempotencyKey: input.idempotencyKey,
+      correlationId: CorrelationIdSchema.parse(input.correlationId),
+    });
+    return { sessionVersion: view.session.version };
+  },
+};
 const recordChangeDependencies = {
   companies,
   investors,
@@ -1292,7 +1380,10 @@ const recordChangeDependencies = {
   authorization,
   logger,
 };
-const recordChangeBoard = createRecordChangeBoard(recordChangeDependencies);
+const recordChangeBoard = createRecordChangeBoard({
+  ...recordChangeDependencies,
+  profileAnswers,
+});
 const ownRecords = createOwnRecordsPort({
   companyService,
   investorService,
@@ -1350,6 +1441,8 @@ const qActionRegistry = createQActionRegistry([
   // R33: the record forms (raise, mandate, team, role, Q Card details,
   // investor visibility) as Q changes, each through its own service.
   ...createRecordChangeActions(recordChangeDependencies),
+  // ADR 0024: a profile fact from onboarding, revised on approval.
+  createProfileAnswerAction({ answers: profileAnswers, logger }),
   // An email on a relationship, from the approver's own Gmail (BIZ-007).
   createEmailSendAction({
     integrations,

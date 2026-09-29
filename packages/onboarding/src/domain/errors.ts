@@ -99,6 +99,9 @@ export const ONBOARDING_STATE_REASONS = [
   "NOTHING_TO_WITHDRAW",
   /** A target the step writes cannot yet represent the answer's absence. */
   "STEP_NOT_WITHDRAWABLE",
+  /** Only a completed session's revisable answers can be revised (ADR 0024). */
+  "SESSION_NOT_COMPLETED",
+  "STEP_NOT_REVISABLE",
 ] as const;
 export type OnboardingStateReason = (typeof ONBOARDING_STATE_REASONS)[number];
 

@@ -23,6 +23,13 @@ export const ONBOARDING_STEPS_SEGMENT = "/steps";
 export const ONBOARDING_SKIP_SEGMENT = "/skip";
 /** Take a step's answer back without replacing it; its history is kept. */
 export const ONBOARDING_WITHDRAW_SEGMENT = "/withdraw";
+/**
+ * `POST /v1/onboarding/sessions/:sessionId/revisions` — change one answer of
+ * a COMPLETED session (ADR 0024), with the same body as a submission. Only
+ * the steps the journey declares revisable; its write targets merge the
+ * new answer into the canonical records. Idempotency-Key required.
+ */
+export const ONBOARDING_REVISIONS_SEGMENT = "/revisions";
 export const ONBOARDING_BACK_SEGMENT = "/back";
 export const ONBOARDING_COMPLETE_SEGMENT = "/complete";
 export const ONBOARDING_SUGGESTIONS_SEGMENT = "/suggestions";

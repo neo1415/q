@@ -1,5 +1,11 @@
 // @vitest-environment jsdom
-import { act, render, screen, waitFor } from "@testing-library/react";
+import {
+  act,
+  configure,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import { StrictMode } from "react";
 import { renderToString } from "react-dom/server";
 import userEvent from "@testing-library/user-event";
@@ -19,6 +25,10 @@ import {
   PitchPlayer,
   pitchFrame,
 } from "../src/features/discover/player/pitch-player";
+
+// A poster is authorised asynchronously; under a full parallel run the
+// default one-second wait is not enough (the same budget other suites use).
+configure({ asyncUtilTimeout: 8000 });
 
 /**
  * The pitch player (CQ-WEB-021).

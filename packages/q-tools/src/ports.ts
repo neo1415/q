@@ -453,7 +453,70 @@ export type RecordChange =
       readonly subjectType: "COMPANY" | "INVESTOR_ORGANISATION";
       readonly subjectId: string;
       readonly fields: Readonly<Record<string, unknown>>;
+    }
+  | {
+      /**
+       * ADR 0024: one profile fact first given during onboarding (a mandate
+       * dimension, the company's categories, team facts), revised on the
+       * person's own completed session. `value` is the person's words for
+       * it; the composition resolves them against the step's own options.
+       */
+      readonly kind: "PROFILE_ANSWER";
+      readonly journey: "founder" | "investor";
+      readonly field: ProfileAnswerField;
+      readonly value: string | readonly string[];
     };
+
+/** The profile facts Q may change through a revised onboarding answer (ADR 0024). */
+export const PROFILE_ANSWER_FIELDS = {
+  investor: [
+    "business_title",
+    "deployment_status",
+    "stages",
+    "cheque_currency",
+    "cheque_min",
+    "cheque_typical",
+    "cheque_max",
+    "investment_role",
+    "geographies",
+    "geography_strength",
+    "sectors",
+    "sector_strength",
+    "sectors_avoid",
+    "business_models",
+    "customer_types",
+    "capital_intensity",
+    "regulatory_appetite",
+    "revenue_expectation",
+    "founder_preferences",
+    "founder_strength",
+    "green_flags",
+    "green_flag_strength",
+    "custom_criteria",
+    "avoid",
+    "hard_exclusions",
+    "sector_exclusions",
+    "portfolio",
+    "discovery_mode",
+    "additional_context",
+  ],
+  founder: [
+    "categories",
+    "founder_role",
+    "founder_count",
+    "full_time",
+    "team_size",
+    "functions",
+    "traction_signal",
+    "pilots",
+    "revenue_status",
+    "customers",
+    "growth",
+  ],
+} as const;
+export type ProfileAnswerField =
+  | (typeof PROFILE_ANSWER_FIELDS.investor)[number]
+  | (typeof PROFILE_ANSWER_FIELDS.founder)[number];
 
 export type RecordChangePort = {
   readonly prepare: (entry: {

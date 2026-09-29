@@ -99,6 +99,47 @@ export const INVESTOR_STEPS = {
   review: "I11.review",
   handoff: "I12.handoff",
 } as const;
+
+/**
+ * ADR 0024: answers an investor may change after onboarding, from their
+ * profile or through Q. Each step's write targets merge its dimension into
+ * the mandate (or the representative, or the organisation's deployment
+ * state). Not here: the bootstrap and mandate-selection steps, the
+ * organisation's name and type (edited on the investor profile), the
+ * inbound preference (Visibility, ADR 0023) and the confirmations.
+ */
+export const INVESTOR_REVISABLE_STEPS: ReadonlySet<string> = new Set([
+  INVESTOR_STEPS.businessTitle,
+  INVESTOR_STEPS.deploymentStatus,
+  INVESTOR_STEPS.stages,
+  INVESTOR_STEPS.currency,
+  INVESTOR_STEPS.chequeMin,
+  INVESTOR_STEPS.chequeTypical,
+  INVESTOR_STEPS.chequeMax,
+  INVESTOR_STEPS.investmentRole,
+  INVESTOR_STEPS.geography,
+  INVESTOR_STEPS.geographyStrength,
+  INVESTOR_STEPS.sectors,
+  INVESTOR_STEPS.sectorStrength,
+  INVESTOR_STEPS.sectorsAvoid,
+  INVESTOR_STEPS.businessModels,
+  INVESTOR_STEPS.customerTypes,
+  INVESTOR_STEPS.capitalIntensity,
+  INVESTOR_STEPS.regulatoryAppetite,
+  INVESTOR_STEPS.revenueState,
+  INVESTOR_STEPS.founderPreferences,
+  INVESTOR_STEPS.founderStrength,
+  INVESTOR_STEPS.greenFlags,
+  INVESTOR_STEPS.greenFlagStrength,
+  INVESTOR_STEPS.customCriteria,
+  INVESTOR_STEPS.avoid,
+  INVESTOR_STEPS.hardExclusions,
+  INVESTOR_STEPS.sectorExclusions,
+  INVESTOR_STEPS.portfolio,
+  INVESTOR_STEPS.discoveryMode,
+  INVESTOR_STEPS.additionalContext,
+]);
+
 export type InvestorStepKey =
   (typeof INVESTOR_STEPS)[keyof typeof INVESTOR_STEPS];
 
