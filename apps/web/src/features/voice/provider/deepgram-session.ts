@@ -2,6 +2,7 @@
 
 import { AgentMicrophone } from "@deepgram/agents";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Q_VOICE_THINKING_BEATS } from "@capital-q/contracts";
 
 import {
   transcriptLineFor,
@@ -11,6 +12,7 @@ import {
   type VoiceState,
   type VoiceTranscriptLine,
 } from "../session";
+import { announceQSaid } from "../../q-swarm/q-said";
 import { AgentSocket } from "./agent-socket";
 import { PcmPlayer } from "./pcm-player";
 
@@ -360,7 +362,14 @@ export function useDeepgramVoiceSession(
             return;
           }
         }
+        // A thinking "hm" is a sound, not a line of the conversation.
+        if (role === "q" && Q_VOICE_THINKING_BEATS.has(content.trim())) {
+          expectSpeech();
+          return;
+        }
         addLine(role, content);
+        // The swarm and the page pointer follow what Q says, as it says it.
+        if (role === "q") announceQSaid(content);
         if (role === "user") setState("THINKING");
         else expectSpeech();
       });

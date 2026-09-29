@@ -1,8 +1,12 @@
 import {
+  bloomShape,
   faceShape,
+  galaxyShape,
   glyphShape,
+  mouthShape,
   qShape,
   ringShape,
+  waveShape,
   type SwarmFace,
   type SwarmPart,
   type SwarmPoint,
@@ -21,7 +25,8 @@ import {
  * the settled shape and schedules nothing.
  */
 
-export type SwarmMode = "Q" | "FACE" | "RING" | "GLYPH";
+export type SwarmMode =
+  "Q" | "FACE" | "RING" | "GLYPH" | "MOUTH" | "WAVE" | "GALAXY" | "BLOOM";
 
 export type SwarmActivity =
   "IDLE" | "LISTENING" | "THINKING" | "SPEAKING" | "LAUGHING" | "ASKING";
@@ -116,6 +121,14 @@ export function createSwarmEngine(
           : glyphShape(input.glyph, count);
       case "Q":
         return qShape(count);
+      case "MOUTH":
+        return mouthShape(count);
+      case "WAVE":
+        return waveShape(count);
+      case "GALAXY":
+        return galaxyShape(count);
+      case "BLOOM":
+        return bloomShape(count);
     }
   };
 
@@ -181,6 +194,47 @@ export function createSwarmEngine(
       const radius = Math.hypot(point.x, point.y);
       x = Math.cos(angle) * radius;
       y = Math.sin(angle) * radius;
+    } else if (input.mode === "MOUTH") {
+      // The lips part with the voice; a laugh opens them wide and shakes.
+      const open =
+        input.activity === "LAUGHING"
+          ? 0.12 + 0.08 * Math.abs(Math.sin(t * 14))
+          : 0.02 + smoothedOutput * 0.28 + Math.abs(Math.sin(t * 7)) * 0.02;
+      if (point.part === "MOUTH_LOWER") y += open;
+      if (point.part === "MOUTH_UPPER") y -= open * 0.35;
+      x *= 1 + smoothedOutput * 0.12;
+    } else if (input.mode === "WAVE") {
+      // A sound wave: the voice (or the person's) drives its height.
+      const level =
+        input.activity === "LISTENING"
+          ? input.input
+          : input.activity === "SPEAKING"
+            ? smoothedOutput
+            : 0.15;
+      const envelope = Math.cos((point.x / 0.75) * (Math.PI / 2));
+      y +=
+        envelope *
+        (0.05 + level * 0.35) *
+        (Math.sin(point.x * 11 - t * 6) * 0.7 +
+          Math.sin(point.x * 23 + t * 9) * 0.3);
+    } else if (input.mode === "GALAXY") {
+      const radius = Math.hypot(point.x, point.y);
+      const angle =
+        Math.atan2(point.y, point.x) + t * (0.9 - radius * 0.8) * 1.2;
+      x = Math.cos(angle) * radius;
+      y = Math.sin(angle) * radius * 0.82;
+    } else if (input.mode === "BLOOM") {
+      // Petals opening and closing, the whole flower turning.
+      const radius = Math.hypot(point.x, point.y);
+      const angle = Math.atan2(point.y, point.x) + t * 0.35;
+      const petals = 0.62 + 0.38 * Math.abs(Math.sin(angle * 3 + t * 0.8));
+      const breathe = 0.85 + 0.15 * Math.sin(t * 1.3) + smoothedOutput * 0.2;
+      x = Math.cos(angle) * radius * petals * breathe;
+      y = Math.sin(angle) * radius * petals * breathe;
+    } else if (input.mode === "Q" && input.activity === "SPEAKING") {
+      // The Q pulses with the voice.
+      x *= 1 + smoothedOutput * 0.1;
+      y *= 1 + smoothedOutput * 0.1;
     }
     return { x, y };
   };
@@ -232,6 +286,7 @@ export function createSwarmEngine(
   };
 
   const baseAlpha = (part: SwarmPart, mode: SwarmMode): number => {
+    if (mode === "MOUTH") return 0.9;
     if (mode !== "FACE") return 0.75;
     switch (part) {
       case "BRAIN":
@@ -241,6 +296,7 @@ export function createSwarmEngine(
       case "OUTLINE":
         return 0.55;
       case "GLYPH":
+      case "FIELD":
       case "EYE":
       case "BROW":
       case "NOSE":

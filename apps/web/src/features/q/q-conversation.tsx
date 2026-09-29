@@ -48,6 +48,8 @@ import {
   workingLabel,
   type QTurn,
 } from "./conversation";
+import { announceQSaid } from "@/features/q-swarm/q-said";
+
 import { plainFromMarkdown, QMarkdown } from "./markdown";
 import { QAnswer } from "./q-answer";
 import { QBoard } from "./q-board";
@@ -396,7 +398,9 @@ export function QConversationPanel({
       return;
     }
     heard.current.add(latest.id);
+    // Voice announces its own lines as they are spoken.
     if (voice.active) return;
+    announceQSaid(plainFromMarkdown(latest.text).slice(0, 400));
     // Said as words: the answer's Markdown is structure on screen, never
     // asterisks and pipes read aloud.
     void say(

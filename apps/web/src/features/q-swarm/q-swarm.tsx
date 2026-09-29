@@ -6,125 +6,43 @@ import { useQMotion } from "../q-aperture/q-motion";
 import type { QApertureState } from "../q-aperture/aperture-state";
 import { useVoicePreference } from "../voice/voice-preference";
 import {
-  createSwarmEngine,
-  type SwarmActivity,
-  type SwarmFrameInput,
-  type SwarmMode,
-} from "./swarm-engine";
+  choreograph,
+  cueForSentence,
+  type SwarmCue,
+} from "./swarm-choreography";
+import { createSwarmEngine, type SwarmFrameInput } from "./swarm-engine";
+import { Q_SAID_EVENT, saidText } from "./q-said";
 
 /**
  * Q's presence as a particle swarm (founder direction 2026-09-29). What it
- * forms is read from Q's real state, never a decorative loop:
- *
- *   IDLE        the Q, breathing; now and then it becomes a face and looks
- *               around, then settles back into the Q
- *   LISTENING   a face, eyes lit with the person's voice
- *   THINKING    a face with lights firing across its brain
- *   SPEAKING    a face whose mouth moves with Q's voice, head nodding
- *   NEEDS_INPUT a face, head tilted, brows up
- *   WORKING     a ring the swarm runs round (the loading state)
- *   COMPLETE    a thumbs up, then the Q
- *   ERROR       the Q, dimmed
+ * forms is read from Q's real state and from what Q is saying, never a
+ * decorative loop: each state has its own sequence of figures (the Q, a
+ * face, a mouth, a sound wave, a galaxy, a bloom, a ring, a glyph), none
+ * held more than nine seconds, and a sentence of Q's takes the swarm for
+ * its moment -- a laugh, a 💰 when it talks about money -- as it is said.
  *
  * The face follows the chosen voice: female voice, female face. Below
- * 72 px a face cannot be read, so small sizes keep to the Q and the ring.
+ * 72 px a face cannot be read, so small sizes keep to the moving figures.
  */
-
-export type QSwarmGesture = "LAUGH" | null;
-
-export function modeFor(
-  state: QApertureState,
-  small: boolean,
-  now: number,
-  gesture: QSwarmGesture,
-  glyph: string | null,
-): {
-  mode: SwarmMode;
-  activity: SwarmActivity;
-  dim: boolean;
-  glyph: string | null;
-} {
-  if (glyph !== null && !small) {
-    return { mode: "GLYPH", activity: "IDLE", dim: false, glyph };
-  }
-  if (gesture === "LAUGH" && !small) {
-    return { mode: "FACE", activity: "LAUGHING", dim: false, glyph: null };
-  }
-  const face = (activity: SwarmActivity) =>
-    small
-      ? { mode: "Q" as const, activity, dim: false, glyph: null }
-      : { mode: "FACE" as const, activity, dim: false, glyph: null };
-  switch (state) {
-    case "LISTENING":
-      return face("LISTENING");
-    case "THINKING":
-      return small
-        ? { mode: "RING", activity: "THINKING", dim: false, glyph: null }
-        : face("THINKING");
-    case "SPEAKING":
-      return face("SPEAKING");
-    case "NEEDS_INPUT":
-      return face("ASKING");
-    case "WORKING":
-      return { mode: "RING", activity: "THINKING", dim: false, glyph: null };
-    case "NEEDS_APPROVAL":
-      return { mode: "Q", activity: "ASKING", dim: false, glyph: null };
-    case "COMPLETE":
-      return small
-        ? { mode: "Q", activity: "IDLE", dim: false, glyph: null }
-        : { mode: "GLYPH", activity: "IDLE", dim: false, glyph: "👍" };
-    case "ERROR":
-      return { mode: "Q", activity: "IDLE", dim: true, glyph: null };
-    case "IDLE": {
-      // Alive at rest: every twenty seconds, six of them as a face that
-      // looks around, on the larger surfaces only.
-      const cycle = (now / 1000) % 20;
-      return !small && cycle > 14
-        ? { mode: "FACE", activity: "IDLE", dim: false, glyph: null }
-        : { mode: "Q", activity: "IDLE", dim: false, glyph: null };
-    }
-  }
-}
 
 export function QSwarm({
   state,
   pixels,
   inputLevel,
   outputLevel,
-  gesture = null,
-  glyph = null,
 }: {
   readonly state: QApertureState;
   readonly pixels: number;
   readonly inputLevel?: (() => number) | undefined;
   readonly outputLevel?: (() => number) | undefined;
-  readonly gesture?: QSwarmGesture | undefined;
-  /** An emoji or symbol for the swarm to form, when Q has one to show. */
-  readonly glyph?: string | null | undefined;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const face = useVoicePreference();
   const { motion } = useQMotion();
-  const live = useRef({
-    state,
-    inputLevel,
-    outputLevel,
-    gesture,
-    glyph,
-    face,
-    motion,
-  });
+  const live = useRef({ state, inputLevel, outputLevel, face, motion });
   useEffect(() => {
-    live.current = {
-      state,
-      inputLevel,
-      outputLevel,
-      gesture,
-      glyph,
-      face,
-      motion,
-    };
-  }, [state, inputLevel, outputLevel, gesture, glyph, face, motion]);
+    live.current = { state, inputLevel, outputLevel, face, motion };
+  }, [state, inputLevel, outputLevel, face, motion]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -149,18 +67,33 @@ export function QSwarm({
       attributeFilter: ["data-theme"],
     });
 
+    // What Q is saying, as it says it: a cue for the moment.
+    let cue: SwarmCue | null = null;
+    const onSaid = (event: Event) => {
+      const text = saidText(event);
+      if (text === null) return;
+      const next = cueForSentence(text, performance.now());
+      if (next !== null) cue = next;
+    };
+    window.addEventListener(Q_SAID_EVENT, onSaid);
+
     let raf = 0;
     let onScreen = true;
+    let lastState: QApertureState | null = null;
+    let since = 0;
     const frame = (now: number) => {
       const current = live.current;
-      const small = pixels < 72;
-      const shape = modeFor(
-        current.state,
-        small,
+      if (current.state !== lastState) {
+        lastState = current.state;
+        since = now;
+      }
+      const shape = choreograph({
+        state: current.state,
+        small: pixels < 72,
         now,
-        current.gesture,
-        current.glyph,
-      );
+        since,
+        cue,
+      });
       const input: SwarmFrameInput = {
         mode: shape.mode,
         activity: shape.activity,
@@ -197,6 +130,7 @@ export function QSwarm({
     canvas.addEventListener("cq:redraw", start);
     start();
     return () => {
+      window.removeEventListener(Q_SAID_EVENT, onSaid);
       canvas.removeEventListener("cq:redraw", start);
       cancelAnimationFrame(raf);
       themeWatch.disconnect();

@@ -19,7 +19,9 @@ export type SwarmPart =
   | "MOUTH_UPPER"
   | "MOUTH_LOWER"
   | "BRAIN"
-  | "GLYPH";
+  | "GLYPH"
+  /** A point of a free figure the engine keeps moving (wave, galaxy, bloom). */
+  | "FIELD";
 
 export type SwarmPoint = {
   readonly x: number;
@@ -83,6 +85,70 @@ export function qShape(count: number): SwarmPoint[] {
 /** A ring the swarm runs round while Q works: the loading state. */
 export function ringShape(count: number): SwarmPoint[] {
   return ellipse(0, 0, 0.58, 0.58, count, "GLYPH");
+}
+
+/**
+ * A mouth, close up: two lips the engine opens with Q's voice. Speaking
+ * as a whole figure (founder direction 2026-09-29: "sometimes it just
+ * forms a mouth speaking").
+ */
+export function mouthShape(count: number): SwarmPoint[] {
+  const random = seeded(43);
+  return Array.from({ length: count }, (_, i) => {
+    const upper = i % 2 === 0;
+    const u = random() * 2 - 1;
+    // A cupid's bow on top, a fuller curve below; filled, not outlined.
+    const edge = upper
+      ? -0.1 - 0.12 * (1 - u * u) + 0.05 * Math.exp(-(u * u) / 0.02)
+      : 0.1 + 0.2 * (1 - u * u);
+    const fill = random();
+    const y = edge * (0.55 + fill * 0.45);
+    return {
+      x: u * 0.68,
+      y,
+      part: upper ? ("MOUTH_UPPER" as const) : ("MOUTH_LOWER" as const),
+    };
+  });
+}
+
+/** A line across the middle the engine turns into a moving sound wave. */
+export function waveShape(count: number): SwarmPoint[] {
+  const random = seeded(59);
+  return Array.from({ length: count }, (_, i) => ({
+    x: (i / Math.max(1, count - 1)) * 1.5 - 0.75,
+    y: (random() - 0.5) * 0.03,
+    part: "FIELD" as const,
+  }));
+}
+
+/** Spiral arms; the engine turns them, so the swarm reads as a galaxy. */
+export function galaxyShape(count: number): SwarmPoint[] {
+  const random = seeded(71);
+  return Array.from({ length: count }, (_, i) => {
+    const arm = i % 3;
+    const along = Math.sqrt(random());
+    const angle = along * 3.4 + (arm * TAU) / 3 + (random() - 0.5) * 0.5;
+    const radius = along * 0.68;
+    return {
+      x: Math.cos(angle) * radius,
+      y: Math.sin(angle) * radius,
+      part: "FIELD" as const,
+    };
+  });
+}
+
+/** A seed field the engine blooms into petals that open and close. */
+export function bloomShape(count: number): SwarmPoint[] {
+  const random = seeded(97);
+  return Array.from({ length: count }, () => {
+    const angle = random() * TAU;
+    const radius = 0.15 + random() * 0.5;
+    return {
+      x: Math.cos(angle) * radius,
+      y: Math.sin(angle) * radius,
+      part: "FIELD" as const,
+    };
+  });
 }
 
 /**
