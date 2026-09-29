@@ -41,7 +41,8 @@ export const COMPANY_ANALYST_V11: PromptDefinition<
 > = {
   ...COMPANY_ANALYST_V10,
   version: 11,
-  status: "ACTIVE",
+  // Deprecated by v12 (comparison cards, founder design 2026-09-28).
+  status: "DEPRECATED",
   changeDescription:
     "Founder direction D: the answer may use a small Markdown subset (bullets, numbered steps, comparison tables with empty cells for unknowns, bold key facts, [!RISK]/[!GAP]/[!STRENGTH]/[!NOTE] callouts); plain sentences for short answers; no HTML, images or code; structure never upgrades a claim.",
   effectiveFrom: "2026-09-28",

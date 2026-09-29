@@ -363,6 +363,44 @@ export type CompanyAnalystV8Result = z.infer<
 >;
 export const COMPANY_ANALYST_V8_SCHEMA_VERSION = 8;
 
+/**
+ * v12 (founder design 2026-09-28): when the person asks to compare or
+ * choose between two to four named companies, investors or options, the
+ * analyst may also return them as cards: a name, a line under it, and the
+ * few points that matter for what they asked. Side by side only: the
+ * charter's rule stands, so there is no order, score or verdict, and
+ * choosing stays the person's. Every point is written under the analyst's
+ * evidence rules; an unknown stays unknown. Null when the answer is not a
+ * comparison. The runtime turns it into a COMPARISON_CARDS block.
+ */
+export const ModelComparisonCardsSchema = z
+  .object({
+    title: z.string().trim().max(120).nullable().default(null),
+    items: z
+      .array(
+        z
+          .object({
+            name: z.string().trim().min(1).max(80),
+            subtitle: z.string().trim().max(120).nullable().default(null),
+            points: z.array(z.string().trim().min(1).max(160)).min(1).max(4),
+          })
+          .strict(),
+      )
+      .min(2)
+      .max(4),
+  })
+  .strict();
+export type ModelComparisonCards = z.infer<typeof ModelComparisonCardsSchema>;
+
+export const CompanyAnalystV12ResultSchema =
+  CompanyAnalystV8ResultSchema.extend({
+    comparisonCards: ModelComparisonCardsSchema.nullable().default(null),
+  }).strict();
+export type CompanyAnalystV12Result = z.infer<
+  typeof CompanyAnalystV12ResultSchema
+>;
+export const COMPANY_ANALYST_V12_SCHEMA_VERSION = 12;
+
 export const NOTHING_REMEMBERED =
   "Nothing is remembered about this person yet.";
 

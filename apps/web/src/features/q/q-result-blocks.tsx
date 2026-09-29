@@ -11,6 +11,7 @@ import { buttonClassName } from "@capital-q/ui/button";
 
 import { destinationPath } from "../voice/destinations";
 import { ArtifactCard } from "./artifact-card";
+import { ComparisonCards } from "./comparison-cards";
 import { recordPagePath, setupPath } from "./client-actions";
 import type { QTurnObjectBlock } from "./conversation";
 
@@ -303,6 +304,9 @@ export function QResultBlocks({
                 }
               />
             );
+
+          case "COMPARISON_CARDS":
+            return <ComparisonCards key={key} block={block} onAsk={onAsk} />;
 
           case "COMPARISON":
             return (

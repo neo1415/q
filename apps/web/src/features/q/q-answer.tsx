@@ -47,6 +47,7 @@ export function replyParts(blocks: readonly QTurnObjectBlock[]): {
       case "ARTIFACT_REFERENCE":
       case "UI_INTENT":
       case "COMPARISON":
+      case "COMPARISON_CARDS":
       case "CLARIFICATION_REQUEST":
         // What the answer produced or needs from the person: in view.
         inline.push(block);

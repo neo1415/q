@@ -89,6 +89,14 @@ const completedRun = {
       rows: [{ label: "Stage", values: ["Seed", "Series A"] }],
     },
     {
+      kind: "COMPARISON_CARDS",
+      title: null,
+      items: [
+        { name: "A", subtitle: null, points: ["Seed"] },
+        { name: "B", subtitle: null, points: ["Not known"] },
+      ],
+    },
+    {
       kind: "EVIDENCE",
       evidenceRefs: [{ kind: "DOCUMENT", documentId: UUID, page: 3 }],
     },
@@ -268,6 +276,8 @@ describe("type-level guarantees", () => {
           return block.investorOrganisationId;
         case "COMPARISON":
           return String(block.rows.length);
+        case "COMPARISON_CARDS":
+          return String(block.items.length);
         case "EVIDENCE":
           return String(block.evidenceRefs.length);
         case "FINDING":

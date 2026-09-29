@@ -82,6 +82,7 @@ export type QTurnObjectBlock = Extract<
       | "COMPANY_REFERENCE"
       | "INVESTOR_REFERENCE"
       | "COMPARISON"
+      | "COMPARISON_CARDS"
       | "CLARIFICATION_REQUEST"
       | "ACTION_PROPOSAL"
       | "ARTIFACT_REFERENCE"
@@ -121,6 +122,7 @@ function objectBlocksOf(
       case "COMPANY_REFERENCE":
       case "INVESTOR_REFERENCE":
       case "COMPARISON":
+      case "COMPARISON_CARDS":
       case "CLARIFICATION_REQUEST":
       case "ACTION_PROPOSAL":
       case "ARTIFACT_REFERENCE":

@@ -66,6 +66,18 @@ export type AnalystResultLike = {
   readonly contradictions?: readonly string[] | undefined;
   readonly clarifyingQuestions?:
     readonly { readonly question: string }[] | undefined;
+  /** v12: named things side by side, already schema-checked. */
+  readonly comparisonCards?:
+    | {
+        readonly title: string | null;
+        readonly items: readonly {
+          readonly name: string;
+          readonly subtitle: string | null;
+          readonly points: readonly string[];
+        }[];
+      }
+    | null
+    | undefined;
 };
 
 const FINDING_TYPES = new Set<string>([
@@ -293,6 +305,21 @@ export function analystResultBlocks(input: {
 }): QResultBlock[] | undefined {
   const idFor = input.findingId ?? (() => randomUUID());
   const blocks: QResultBlock[] = [];
+
+  // The cards lead: they are the answer's shape when the person compared
+  // things. Copied as written, in the order written; nothing here sorts.
+  const cards = input.result.comparisonCards;
+  if (cards !== null && cards !== undefined && cards.items.length >= 2) {
+    blocks.push({
+      kind: "COMPARISON_CARDS",
+      title: cards.title,
+      items: cards.items.map((item) => ({
+        name: item.name,
+        subtitle: item.subtitle,
+        points: [...item.points],
+      })),
+    });
+  }
 
   for (const [index, finding] of withoutContradictedGaps(
     input.result.findings ?? [],

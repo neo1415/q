@@ -148,3 +148,36 @@ describe("what it will not do", () => {
     expect(found.finding.evidenceStatus).toBe("SELF_REPORTED");
   });
 });
+
+describe("a comparison as cards (v12)", () => {
+  it("leads with the cards, in the order written, and adds nothing to them", () => {
+    const blocks = analystResultBlocks({
+      result: {
+        comparisonCards: {
+          title: null,
+          items: [
+            { name: "Zeta", subtitle: null, points: ["Not known"] },
+            { name: "Alpha", subtitle: "Seed", points: ["USD 40k MRR"] },
+          ],
+        },
+      },
+      subjects: [],
+    });
+    expect(blocks?.[0]).toEqual({
+      kind: "COMPARISON_CARDS",
+      title: null,
+      items: [
+        { name: "Zeta", subtitle: null, points: ["Not known"] },
+        { name: "Alpha", subtitle: "Seed", points: ["USD 40k MRR"] },
+      ],
+    });
+  });
+
+  it("produces no cards when the answer is not a comparison", () => {
+    const blocks = analystResultBlocks({
+      result: { comparisonCards: null, findings: [finding()] },
+      subjects: [],
+    });
+    expect(blocks?.some((b) => b.kind === "COMPARISON_CARDS")).toBe(false);
+  });
+});

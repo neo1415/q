@@ -47,6 +47,9 @@ export function splitBlocks(blocks: readonly QTurnObjectBlock[]): {
     switch (block.kind) {
       case "ARTIFACT_REFERENCE":
       case "UI_INTENT":
+      case "COMPARISON_CARDS":
+        // COMPARISON_CARDS is the answer itself, laid out: never tucked
+        // behind Sources.
         visible.push(block);
         break;
       case "ACTION_PROPOSAL":

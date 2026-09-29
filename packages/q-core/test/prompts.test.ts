@@ -220,7 +220,7 @@ describe("renderer", () => {
     expect(rendered.messages[0]?.content).toContain("You are Q");
     expect(rendered.messages[0]?.content).toContain("OPERATING MODE: DEBRIEF");
     expect(rendered.bundle.bundleVersion).toBe(
-      "q-system.v1_company-analyst.v11_comm.v1",
+      "q-system.v1_company-analyst.v12_comm.v1",
     );
     expect(rendered.bundle.bundleVersion).toMatch(
       /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/,

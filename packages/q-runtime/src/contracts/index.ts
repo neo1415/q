@@ -276,6 +276,7 @@ function disclosable(
       case "COMPANY_REFERENCE":
       case "INVESTOR_REFERENCE":
       case "COMPARISON":
+      case "COMPARISON_CARDS":
       case "UNCERTAINTY":
       case "CLARIFICATION_REQUEST":
       case "ACTION_PROPOSAL":

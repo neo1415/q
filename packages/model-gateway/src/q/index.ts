@@ -40,8 +40,8 @@ import {
   publicSourceBlockFields,
   type AuthorisedFact,
   type PublicSourceLike,
-  type CompanyAnalystV8Result,
-  CompanyAnalystV8ResultSchema,
+  type CompanyAnalystV12Result,
+  CompanyAnalystV12ResultSchema,
   DisplayNameRequestSchema,
   NOTHING_REMEMBERED,
   ProfileUpdateSchema,
@@ -153,7 +153,7 @@ export {
  *   run → Context Firewall plan → authorised facts (port) → tools offered
  *   for this plan (port) → resolve bundle → render charter + task with
  *   untrusted fences → bounded tool loop through the gateway → validated
- *   CompanyAnalystV8Result → Q message + bundle version on the run
+ *   CompanyAnalystV12Result → Q message + bundle version on the run
  *
  * The tool loop: while tools are offered, the model is asked with a TEXT
  * output and may either propose tool calls or answer with the JSON the
@@ -889,7 +889,7 @@ export type QToolCallObservation = {
 };
 
 export type QAnswerObservation = {
-  readonly result: CompanyAnalystV8Result;
+  readonly result: CompanyAnalystV12Result;
   readonly providerCode: string;
   readonly modelCode: string;
   readonly promptBundleVersion: string;
@@ -1556,9 +1556,9 @@ export function createModelGatewayQAnswer(
         }
       };
 
-      const options: ModelGatewayExecuteOptions<CompanyAnalystV8Result> = {
+      const options: ModelGatewayExecuteOptions<CompanyAnalystV12Result> = {
         signal: request.signal,
-        schema: CompanyAnalystV8ResultSchema,
+        schema: CompanyAnalystV12ResultSchema,
         onTextDelta,
         // The analyst's lists are independent readings: one statement with
         // a malformed knowledge key must not throw away the profile change
@@ -1812,12 +1812,12 @@ export function createModelGatewayQAnswer(
       }
 
       type AnswerResult = Awaited<
-        ReturnType<typeof gateway.execute<CompanyAnalystV8Result>>
+        ReturnType<typeof gateway.execute<CompanyAnalystV12Result>>
       >;
 
       try {
         let final: AnswerResult | undefined;
-        let analyst: CompanyAnalystV8Result | undefined;
+        let analyst: CompanyAnalystV12Result | undefined;
 
         if (offered.length > 0) {
           took("prepare");
@@ -1829,10 +1829,10 @@ export function createModelGatewayQAnswer(
           ) {
             modelCalls += 1;
             let result: Awaited<
-              ReturnType<typeof gateway.execute<CompanyAnalystV8Result>>
+              ReturnType<typeof gateway.execute<CompanyAnalystV12Result>>
             >;
             try {
-              result = await gateway.execute<CompanyAnalystV8Result>(
+              result = await gateway.execute<CompanyAnalystV12Result>(
                 {
                   ...base,
                   messages,
@@ -1887,7 +1887,7 @@ export function createModelGatewayQAnswer(
                */
               const accepted = acceptStructuredOutput(
                 result.output.text,
-                CompanyAnalystV8ResultSchema,
+                CompanyAnalystV12ResultSchema,
                 { invalidListItems: "DROP" },
               );
               if (accepted.ok) {
@@ -2055,7 +2055,7 @@ export function createModelGatewayQAnswer(
         }
         if (analyst === undefined || final === undefined) {
           modelCalls += 1;
-          final = await gateway.execute<CompanyAnalystV8Result>(
+          final = await gateway.execute<CompanyAnalystV12Result>(
             { ...base, messages, output: rendered.output },
             options,
           );

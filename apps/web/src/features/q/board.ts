@@ -63,7 +63,7 @@ export function boardObjects(turns: readonly QTurn[]): BoardObject[] {
     );
     if (investors.length > 0) add("INVESTORS", "investors", investors);
     turn.blocks.forEach((block, index) => {
-      if (block.kind === "COMPARISON") {
+      if (block.kind === "COMPARISON" || block.kind === "COMPARISON_CARDS") {
         add("COMPARISON", `comparison-${String(index)}`, [block]);
       } else if (block.kind === "ARTIFACT_REFERENCE") {
         add("ARTIFACT", `artifact-${block.artifactId}`, [block]);

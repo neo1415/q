@@ -74,6 +74,14 @@ const BLOCK_FIXTURES: Readonly<Record<string, unknown>> = {
       { label: "Runway", values: ["14 months", ""] },
     ],
   },
+  COMPARISON_CARDS: {
+    kind: "COMPARISON_CARDS",
+    title: null,
+    items: [
+      { name: "Ledgerfold", subtitle: "Seed", points: ["USD 40k MRR"] },
+      { name: "Kivu Freight", subtitle: null, points: ["Not known"] },
+    ],
+  },
   EVIDENCE: { kind: "EVIDENCE", evidenceRefs: [evidenceRef] },
   FINDING: { kind: "FINDING", finding: publicFinding },
   PUBLIC_SOURCE: {
@@ -170,6 +178,24 @@ describe("QResultBlock", () => {
         kind: "COMPARISON",
         subjects: [{ kind: "COMPANY", companyId: UUID }],
         rows: [],
+      }).success,
+    ).toBe(false);
+  });
+
+  it("keeps comparison cards to two to four items with no score field", () => {
+    const card = { name: "A", subtitle: null, points: ["b"] };
+    expect(
+      QResultBlockSchema.safeParse({
+        kind: "COMPARISON_CARDS",
+        title: null,
+        items: [card],
+      }).success,
+    ).toBe(false);
+    expect(
+      QResultBlockSchema.safeParse({
+        kind: "COMPARISON_CARDS",
+        title: null,
+        items: [card, { ...card, score: 9 }],
       }).success,
     ).toBe(false);
   });

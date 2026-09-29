@@ -61,10 +61,10 @@ describe("COMPANY_ANALYST v10", () => {
  * claim.
  */
 describe("COMPANY_ANALYST v11", () => {
-  it("is the one active analyst version", () => {
+  it("was the active analyst version until v12 took over", () => {
     const registry = createPromptRegistry(PROMPT_DEFINITIONS);
-    expect(registry.getActive("COMPANY_ANALYST").definition.version).toBe(11);
-    expect(COMPANY_ANALYST_V11.status).toBe("ACTIVE");
+    expect(registry.getActive("COMPANY_ANALYST").definition.version).toBe(12);
+    expect(COMPANY_ANALYST_V11.status).toBe("DEPRECATED");
   });
 
   it("allows lists, tables and callouts for structure, keeps unknowns empty and forbids HTML", () => {
@@ -81,5 +81,41 @@ describe("COMPANY_ANALYST v11", () => {
     expect(template.replace(/ANSWER FORMAT[\s\S]*?\n\n/, "")).toBe(
       COMPANY_ANALYST_V10.template,
     );
+  });
+});
+
+describe("COMPANY_ANALYST v12 (founder design 2026-09-28)", () => {
+  it("keeps every v11 rule and adds comparison cards under the evidence rules", async () => {
+    const { COMPANY_ANALYST_V12, CompanyAnalystV12ResultSchema } =
+      await import("../src/index.js");
+    expect(COMPANY_ANALYST_V12.status).toBe("ACTIVE");
+    const template = COMPANY_ANALYST_V12.template;
+    expect(template).toContain("ANSWER FORMAT");
+    expect(template).toContain("also fill comparisonCards");
+    expect(template).toContain('unknown is "Not known"');
+    expect(template).toContain("no order or verdict");
+    const read = CompanyAnalystV12ResultSchema.safeParse({
+      answer: "Ledgerfold leads on traction.",
+      responseShape: "ANALYTICAL",
+      insufficientEvidence: false,
+      recommendation: null,
+      comparisonCards: {
+        items: [
+          { name: "Ledgerfold", points: ["USD 40k monthly revenue"] },
+          { name: "Kivu Freight", points: ["Not known"] },
+        ],
+      },
+    });
+    expect(read.success ? [] : read.error.issues).toEqual([]);
+    // One item is not a comparison.
+    expect(
+      CompanyAnalystV12ResultSchema.safeParse({
+        answer: "x",
+        responseShape: "CONCISE",
+        insufficientEvidence: false,
+        recommendation: null,
+        comparisonCards: { items: [{ name: "A", points: ["b"] }] },
+      }).success,
+    ).toBe(false);
   });
 });

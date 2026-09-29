@@ -38,6 +38,7 @@ export const Q_RESULT_BLOCK_KINDS = [
   "COMPANY_REFERENCE",
   "INVESTOR_REFERENCE",
   "COMPARISON",
+  "COMPARISON_CARDS",
   "EVIDENCE",
   "FINDING",
   "UNCERTAINTY",
@@ -109,6 +110,32 @@ export const QComparisonBlockSchema = z
       path: ["rows"],
     },
   );
+
+/**
+ * Named things side by side as cards (founder design 2026-09-28): a name,
+ * a line under it, and the few points that matter for what was asked. The
+ * names are the analyst's words, not resolved entities, so this is not a
+ * COMPARISON over subject references. Never ordered, scored or ranked: the
+ * cards are laid out in the order written and carry no verdict.
+ */
+export const QComparisonCardsBlockSchema = z
+  .object({
+    kind: z.literal("COMPARISON_CARDS"),
+    title: z.string().trim().max(120).nullable(),
+    items: z
+      .array(
+        z
+          .object({
+            name: z.string().trim().min(1).max(80),
+            subtitle: z.string().trim().max(120).nullable(),
+            points: z.array(z.string().trim().min(1).max(160)).min(1).max(4),
+          })
+          .strict(),
+      )
+      .min(2)
+      .max(4),
+  })
+  .strict();
 
 export const QEvidenceBlockSchema = z
   .object({
@@ -251,6 +278,7 @@ export const QResultBlockSchema = z.discriminatedUnion("kind", [
   QCompanyReferenceBlockSchema,
   QInvestorReferenceBlockSchema,
   QComparisonBlockSchema,
+  QComparisonCardsBlockSchema,
   QEvidenceBlockSchema,
   QFindingBlockSchema,
   QUncertaintyBlockSchema,

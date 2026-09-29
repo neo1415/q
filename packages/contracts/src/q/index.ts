@@ -308,6 +308,7 @@ export {
   QClarificationRequestBlockSchema,
   QCompanyReferenceBlockSchema,
   QComparisonBlockSchema,
+  QComparisonCardsBlockSchema,
   QEvidenceBlockSchema,
   QFindingBlockSchema,
   QInvestorReferenceBlockSchema,

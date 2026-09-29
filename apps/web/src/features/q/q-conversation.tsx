@@ -450,6 +450,15 @@ export function QConversationPanel({
   const bodyRef = useRef<HTMLDivElement>(null);
   const newest = `${String(lines.length)}:${live?.text ?? ""}:${String(lines.at(-1)?.text.length ?? 0)}`;
   const conversing = lines.length > 0 || liveIsPerson;
+  // The newest answer laid out as cards (founder design 2026-09-28): the
+  // thread widens so they sit side by side, and Q steps aside to make room.
+  const latestAnswer = turns.findLast((turn) => turn.kind === "Q");
+  const showingCards =
+    !voice.active &&
+    !q.working &&
+    latestAnswer?.kind === "Q" &&
+    !latestAnswer.streaming &&
+    latestAnswer.blocks.some((block) => block.kind === "COMPARISON_CARDS");
   useEffect(() => {
     const body = bodyRef.current;
     if (body === null) return;
@@ -658,7 +667,10 @@ export function QConversationPanel({
             data-q-voice-stage-body
           >
             {conversing ? (
-              <div className="mx-auto flex w-full max-w-2xl flex-col gap-5 py-6">
+              <div
+                className={`mx-auto flex w-full flex-col gap-5 py-6 transition-[max-width] duration-(--cq-motion-slow) ease-(--cq-ease) motion-reduce:transition-none ${showingCards ? "max-w-5xl" : "max-w-2xl"}`}
+                data-q-cards-layout={showingCards ? "aside" : undefined}
+              >
                 <ol
                   className="flex w-full flex-col gap-5"
                   aria-label="Conversation"
@@ -717,6 +729,23 @@ export function QConversationPanel({
                   ) : null}
                 </ol>
 
+                {showingCards ? (
+                  // Q, small and to the side while the cards have the
+                  // stage: the status line's aperture, settled aside.
+                  <div
+                    aria-hidden="true"
+                    className="flex justify-end"
+                    data-q-aside
+                  >
+                    <ViewTransition
+                      name="q-aperture"
+                      share="cq-q-morph"
+                      default="none"
+                    >
+                      <QAperture state={presence.state} size={32} />
+                    </ViewTransition>
+                  </div>
+                ) : null}
                 {/* What Q is doing, only while it is doing something. */}
                 {voice.active || q.working ? (
                   <div
