@@ -243,6 +243,12 @@ export default async function ProfilePage() {
             }
           />
 
+          {journey === null ? null : (
+            <Suspense fallback={<StatRowSkeleton />}>
+              <StatRow journey={journey} />
+            </Suspense>
+          )}
+
           {company !== null ? (
             <>
               <EditableSection
@@ -333,6 +339,7 @@ export default async function ProfilePage() {
               {/* The mandate, one card per part, each edited in place (ADR 0024). */}
               <AnswersSlot
                 journey="investor"
+                bare={false}
                 include={[
                   "mandate",
                   "cheque",
@@ -705,6 +712,81 @@ async function SignalsRead(props: SignalsProps) {
   );
 }
 
+/** The hero's key facts, in the person's own answers (founder design). */
+async function StatRow({ journey }: { readonly journey: ProfileJourney }) {
+  const state = await pageAnswers();
+  if (state.status !== "READ") return null;
+  const line = (stepKey: string) =>
+    state.groups
+      .flatMap((group) => group.lines)
+      .find((candidate) => candidate.stepKey === stepKey);
+  const listOf = (stepKey: string, max = 3) => {
+    const found = line(stepKey);
+    const items = found?.items ?? (found?.value == null ? [] : [found.value]);
+    return items.length === 0
+      ? null
+      : items.slice(0, max).join(", ") +
+          (items.length > max ? ` +${String(items.length - max)}` : "");
+  };
+  const stats: readonly { readonly label: string; readonly value: string | null }[] =
+    journey === "investor"
+      ? [
+          { label: "Typical cheque", value: line("I2.cheque_typical")?.value ?? null },
+          { label: "Stages", value: listOf("I2.stages") },
+          { label: "Key sectors", value: listOf("I3.sectors") },
+        ]
+      : [
+          { label: "Sector", value: listOf("F1.categories", 2) },
+          { label: "Team", value: line("F4.team_size")?.value ?? null },
+          {
+            label: "Raise",
+            value:
+              line("F6.target_amount")?.value ??
+              line("objective.stage")?.value ??
+              null,
+          },
+        ];
+  return (
+    <dl
+      className="grid grid-cols-1 gap-3 sm:grid-cols-3"
+      data-profile-stats
+    >
+      {stats.map((stat) => (
+        <div
+          key={stat.label}
+          className="flex flex-col gap-1 rounded-xl border border-(--cq-border-subtle) bg-(--cq-surface) px-4 py-3"
+        >
+          <dt className="cq-caption text-(--cq-text-secondary)">
+            {stat.label}
+          </dt>
+          <dd
+            className={
+              stat.value === null
+                ? "cq-body text-(--cq-text-tertiary)"
+                : "cq-title-sm cq-numeric text-(--cq-text-primary)"
+            }
+          >
+            {stat.value ?? "Not added"}
+          </dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
+function StatRowSkeleton() {
+  return (
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-3" aria-busy="true">
+      {[0, 1, 2].map((key) => (
+        <div
+          key={key}
+          className="h-16 animate-pulse rounded-xl border border-(--cq-border-subtle) bg-(--cq-surface-subtle) motion-reduce:animate-none"
+        />
+      ))}
+    </div>
+  );
+}
+
 /**
  * The onboarding answers (R25) a section shows, streamed: the declared
  * fields paint at once, and the answers arrive when the onboarding session
@@ -715,11 +797,14 @@ function AnswersSlot({
   include,
   emptyText,
   provenance,
+  bare = true,
 }: {
   readonly journey: ProfileJourney;
   readonly include: readonly string[];
   readonly emptyText?: string | undefined;
   readonly provenance?: boolean | undefined;
+  /** Inside a section card (the default); false for free-standing cards. */
+  readonly bare?: boolean | undefined;
 }) {
   return (
     <div className="pt-2">
@@ -738,6 +823,7 @@ function AnswersSlot({
           include={include}
           emptyText={emptyText}
           provenance={provenance}
+          bare={bare}
         />
       </Suspense>
     </div>
@@ -749,11 +835,13 @@ async function AnswersRead({
   include,
   emptyText,
   provenance,
+  bare,
 }: {
   readonly journey: ProfileJourney;
   readonly include: readonly string[];
   readonly emptyText?: string | undefined;
   readonly provenance?: boolean | undefined;
+  readonly bare: boolean;
 }) {
   const state = await pageAnswers();
   return (
@@ -763,6 +851,7 @@ async function AnswersRead({
       include={include}
       emptyText={emptyText}
       provenance={provenance}
+      bare={bare}
     />
   );
 }

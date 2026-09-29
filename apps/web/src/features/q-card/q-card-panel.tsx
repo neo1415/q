@@ -278,8 +278,8 @@ function ShareRow({
 }
 
 const AUDIENCE_WORDS: Readonly<Record<QCardScope, string>> = {
-  network_visible: "Capital Q members only",
-  public_external: "Anyone with the link",
+  network_visible: "Capital Q members",
+  public_external: "Everyone",
 };
 
 /**
@@ -358,15 +358,14 @@ function ScopeForm({
           What the card shows
         </h3>
         <p className="cq-caption text-(--cq-text-secondary)">
-          The name is always shown. Switch a field on to add it; it starts as
-          members only. Your raise, financials and setup answers stay private
-          and can&apos;t go on a card.
+          The name is always shown. Choose who sees each field: nobody, people
+          signed in to Capital Q, or everyone with the link. Your raise and
+          financials stay private and can&apos;t go on a card.
         </p>
       </div>
       <ul className="flex flex-col divide-y divide-(--cq-border-subtle) border-y border-(--cq-border-subtle)">
         {fields.map((field) => {
           const scope = scopes[field.key];
-          const on = scope !== undefined;
           const lower = field.label.toLowerCase();
           return (
             <li
@@ -375,7 +374,8 @@ function ScopeForm({
               data-card-choice={field.key}
               data-state={scope ?? "off"}
             >
-              <label className="flex min-h-11 cursor-pointer items-center justify-between gap-4">
+              {/* One dropdown per field (founder design 2026-09-28): who sees it. */}
+              <div className="flex min-h-11 items-center justify-between gap-4">
                 <span className="flex min-w-0 flex-col">
                   <span className="cq-body-sm text-(--cq-text-primary)">
                     {field.label}
@@ -386,45 +386,30 @@ function ScopeForm({
                     </span>
                   )}
                 </span>
-                <input
-                  type="checkbox"
-                  role="switch"
-                  aria-label={`Show ${lower} on the card`}
-                  checked={on}
-                  onChange={(event) =>
+                <select
+                  aria-label={`Who sees ${lower}`}
+                  value={scope ?? "hidden"}
+                  onChange={(event) => {
+                    const next = event.target.value;
                     set(
                       field.key,
-                      event.target.checked ? "network_visible" : null,
-                    )
-                  }
-                  className="size-5 shrink-0 accent-(--cq-accent)"
-                />
-              </label>
-              {scope === undefined ? null : (
-                <fieldset>
-                  <legend className="sr-only">Who sees {lower}</legend>
-                  <div className="flex flex-wrap gap-x-5">
-                    {(["network_visible", "public_external"] as const).map(
-                      (choice) => (
-                        <label
-                          key={choice}
-                          className="cq-body-sm flex min-h-11 cursor-pointer items-center gap-2 text-(--cq-text-secondary)"
-                        >
-                          <input
-                            type="radio"
-                            name={`${id}-${field.key}`}
-                            value={choice}
-                            checked={scope === choice}
-                            onChange={() => set(field.key, choice)}
-                            className="size-4 accent-(--cq-accent)"
-                          />
-                          {AUDIENCE_WORDS[choice]}
-                        </label>
-                      ),
-                    )}
-                  </div>
-                </fieldset>
-              )}
+                      next === "network_visible" || next === "public_external"
+                        ? next
+                        : null,
+                    );
+                  }}
+                  className="cq-body-sm min-h-11 shrink-0 rounded-md border border-(--cq-border-subtle) bg-(--cq-surface) px-3 text-(--cq-text-primary) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
+                  data-card-audience={field.key}
+                >
+                  <option value="hidden">Nobody</option>
+                  <option value="network_visible">
+                    {AUDIENCE_WORDS.network_visible}
+                  </option>
+                  <option value="public_external">
+                    {AUDIENCE_WORDS.public_external}
+                  </option>
+                </select>
+              </div>
             </li>
           );
         })}

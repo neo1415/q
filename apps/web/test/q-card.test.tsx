@@ -239,17 +239,12 @@ describe("the profile panel", () => {
     });
     renderPanel(CARD);
     expect(screen.getByText(/3 scans of your QR/)).toBeTruthy();
-    fireEvent.click(
-      screen.getByRole("switch", { name: "Show stage on the card" }),
-    );
-    fireEvent.click(
-      screen.getByRole("switch", { name: "Show website on the card" }),
-    );
-    fireEvent.click(
-      within(screen.getByRole("group", { name: "Who sees website" })).getByRole(
-        "radio",
-        { name: "Anyone with the link" },
-      ),
+    fireEvent.change(screen.getByRole("combobox", { name: "Who sees stage" }), {
+      target: { value: "hidden" },
+    });
+    fireEvent.change(
+      screen.getByRole("combobox", { name: "Who sees website" }),
+      { target: { value: "public_external" } },
     );
     // Making a field public says so before anything is saved.
     expect(
@@ -279,15 +274,14 @@ describe("the profile panel", () => {
     expect(refresh).toHaveBeenCalled();
   });
 
-  it("a switched-on field starts members only", () => {
+  it("one dropdown per field: off is Nobody, and members-only says nothing public", () => {
     renderPanel({ ...CARD, fieldScopes: { canonicalName: "public_external" } });
-    fireEvent.click(
-      screen.getByRole("switch", { name: "Show in one line on the card" }),
-    );
-    const members = within(
-      screen.getByRole("group", { name: "Who sees in one line" }),
-    ).getByRole("radio", { name: "Capital Q members only" });
-    expect((members as HTMLInputElement).checked).toBe(true);
+    const audience = screen.getByRole("combobox", {
+      name: "Who sees in one line",
+    }) as HTMLSelectElement;
+    expect(audience.value).toBe("hidden");
+    fireEvent.change(audience, { target: { value: "network_visible" } });
+    expect(audience.value).toBe("network_visible");
     expect(document.querySelector("[data-public-warning]")).toBeNull();
   });
 

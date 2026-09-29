@@ -84,6 +84,7 @@ export function ProfileAnswers({
   include,
   emptyText,
   provenance = true,
+  bare = false,
 }: {
   readonly journey: ProfileJourney;
   readonly state: AnswersState;
@@ -93,6 +94,8 @@ export function ProfileAnswers({
   readonly emptyText?: string | undefined;
   /** Whether to add the "How this is known" note (once per page). */
   readonly provenance?: boolean | undefined;
+  /** Inside a section card already: no card frame of their own. */
+  readonly bare?: boolean | undefined;
 }) {
   const state: AnswersState =
     include === undefined || fullState.status !== "READ"
@@ -139,13 +142,14 @@ export function ProfileAnswers({
 
   return (
     <div className="flex flex-col gap-4" data-answers="read">
-      {state.groups.map((group) => (
+      {state.groups.filter((group) => group.lines.length > 0).map((group) => (
         <AnswerGroupView
           key={group.id}
           journey={journey}
           group={group}
           href={editHref(journey, group)}
           editable={editableOf(journey, group, fullState)}
+          bare={bare}
         />
       ))}
       {provenance ? (
@@ -203,7 +207,9 @@ function AnswerGroupView({
   group,
   href,
   editable,
+  bare,
 }: {
+  readonly bare: boolean;
   readonly journey: ProfileJourney;
   readonly group: AnswerGroup;
   readonly href: string;
@@ -239,7 +245,11 @@ function AnswerGroupView({
     <section
       aria-labelledby={headingId}
       data-answer-group={group.id}
-      className="rounded-xl border border-(--cq-border-subtle) bg-(--cq-surface) p-4 sm:p-5"
+      className={
+        bare
+          ? "border-t border-(--cq-border-subtle) pt-3"
+          : "rounded-xl border border-(--cq-border-subtle) bg-(--cq-surface) p-4 sm:p-5"
+      }
     >
       <div className="flex items-center justify-between gap-3 pb-1">
         <h3
