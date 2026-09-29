@@ -101,7 +101,8 @@ export async function relationshipDigests(
   const session = await apiSession();
   if (session === null || items.length === 0) return {};
   const now = Date.now();
-  const reminders = await listReminders(session)
+  // Started now, awaited per card: it no longer holds up the other reads.
+  const remindersRead = listReminders(session)
     .then((list) => list.items)
     .catch(() => [] as const);
 
@@ -119,6 +120,7 @@ export async function relationshipDigests(
               .catch(() => [] as const)
           : Promise.resolve([] as const),
       ]);
+      const reminders = await remindersRead;
       const own = reminders.filter(
         (reminder) => reminder.relationshipId === item.relationshipId,
       );

@@ -13,8 +13,8 @@ import { classifyRoute } from "./route-policy";
  *
  * Two jobs, both required by the supported Supabase SSR pattern:
  *
- *   1. refresh -- `getUser()` verifies the session with the Auth server and,
- *      when the access token has expired, rotates it; the new cookies are
+ *   1. refresh -- `getClaims()` verifies the session against the signing
+ *      keys and, when the access token has expired, rotates it; the new cookies are
  *      written onto the outgoing response so Server Components (which cannot
  *      write cookies) always see a live session;
  *   2. protect -- a signed-out visitor to a protected route is sent to
@@ -54,8 +54,12 @@ export async function handleSessionProxy(
     },
   );
 
-  const { data } = await supabase.auth.getUser();
-  const user = data.user;
+  // Verified locally against the project's signing keys (and refreshed if
+  // expired), not a round trip to the Auth server on every navigation
+  // (founder live 2026-09-29: clicks waited seconds). getClaims falls back
+  // to the server itself where keys cannot be verified locally.
+  const { data } = await supabase.auth.getClaims();
+  const user = typeof data?.claims.sub === "string" ? data.claims.sub : null;
 
   const { pathname, search, searchParams } = request.nextUrl;
   const access = classifyRoute(pathname);

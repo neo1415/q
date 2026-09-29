@@ -9,9 +9,10 @@ import { createServerSupabaseClient } from "./supabase-server";
 /**
  * "Who is signed in?" for the web application. One answer, server-rendered.
  *
- * The identity comes from `auth.getUser()`, which sends the session to the
- * Auth server for verification; it is never read from a decoded cookie, a
- * client store or a request parameter. What comes back is authentication
+ * The identity comes from `auth.getClaims()`, which verifies the session's
+ * signature against the project's published signing keys (ES256) and falls
+ * back to the Auth server where it cannot; it is never read from an
+ * unverified cookie, a client store or a request parameter. What comes back is authentication
  * only: an auth subject and the provider's verified email. Organisation,
  * tenant and membership are the API's to resolve (`GET /v1/me`).
  */
@@ -23,13 +24,15 @@ export type SessionUser = {
 /** Memoised per request so a layout and its page share one verification. */
 export const getSessionUser = cache(async (): Promise<SessionUser | null> => {
   const supabase = await createServerSupabaseClient();
-  const { data, error } = await supabase.auth.getUser();
-
-  if (error !== null || data.user === null) {
+  // The token verified locally (getClaims), as in the proxy: the same
+  // identity without a second Auth-server round trip per page.
+  const { data, error } = await supabase.auth.getClaims();
+  const sub = data?.claims.sub;
+  if (error !== null || typeof sub !== "string") {
     return null;
   }
-
-  return { authUserId: data.user.id, email: data.user.email ?? null };
+  const email = data?.claims.email;
+  return { authUserId: sub, email: typeof email === "string" ? email : null };
 });
 
 /**

@@ -200,11 +200,15 @@ export async function resolveOwnContextWith(
   if (session === null) {
     return { kind: "NONE" };
   }
-  const founder = await lookups.founder(session);
+  // Both at once (founder live 2026-09-29: every click waited on these one
+  // after the other); founder still wins when both exist.
+  const [founder, investor] = await Promise.all([
+    lookups.founder(session),
+    lookups.investor(session),
+  ]);
   if (founder.status === "FOUND") {
     return founder.value;
   }
-  const investor = await lookups.investor(session);
   if (investor.status === "FOUND") {
     return investor.value;
   }
