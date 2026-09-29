@@ -607,6 +607,44 @@ describe("GET /v1/discovery/network-pitches (ADR 0021)", () => {
     await app.close();
   });
 
+  it("searches what the network shows, never what disclosure hid", async () => {
+    const { app } = buildApp({
+      principal: PRINCIPAL,
+      page: new Error("not used"),
+      network: {
+        networkPitches: {
+          findNetworkPitches: () =>
+            Promise.resolve([video(1, VISIBLE), video(2, HIDDEN)]),
+        },
+        networkCompany: (_actor, companyId) =>
+          Promise.resolve(
+            companyId === HIDDEN
+              ? null
+              : {
+                  canonicalName: "Open Co",
+                  shortDescription: "Freight booking in Lagos",
+                  headquartersCountry: "NG",
+                  currentStageCode: "seed",
+                  companyStatus: "active",
+                },
+          ),
+      },
+    });
+    const byDescription = await app.inject({
+      method: "GET",
+      url: "/v1/discovery/network-pitches?q=FREIGHT",
+    });
+    expect(
+      byDescription.json<{ items: { canonicalName: string }[] }>().items,
+    ).toHaveLength(1);
+    const none = await app.inject({
+      method: "GET",
+      url: "/v1/discovery/network-pitches?q=hidden",
+    });
+    expect(none.json()).toEqual({ items: [], nextCursor: null });
+    await app.close();
+  });
+
   it("is an empty page when the feed is not composed", async () => {
     const { app } = buildApp({ principal: PRINCIPAL, page: new Error("x") });
     const response = await app.inject({

@@ -31,7 +31,7 @@ export type NavigationItem = {
     | "/profile"
     | "/pitch"
     | "/investors"
-    | "/find"
+    | "/search"
     | "/settings";
   readonly label: string;
   readonly icon: ComponentType<{
@@ -98,10 +98,10 @@ export const FOUNDER_REQUESTS_NAVIGATION: NavigationItem = {
   icon: Handshake,
 };
 
-/** Open someone's Q Card by the @handle they gave you (founder design). */
+/** Search people by @handle and founders' videos (founder design 2026-09-29). */
 export const FIND_NAVIGATION: NavigationItem = {
-  href: "/find",
-  label: "Find by handle",
+  href: "/search",
+  label: "Search",
   icon: Search,
 };
 

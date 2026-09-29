@@ -13,6 +13,7 @@ import {
   DiscoveryCompanySlateDtoSchema,
   DiscoveryInvestorSlateDtoSchema,
   NetworkPitchPageDtoSchema,
+  type NetworkPitchItemDto,
   parseContract,
   NetworkPitchCursorSchema,
   type DiscoverFilters,
@@ -262,26 +263,51 @@ export function registerDiscoveryRoutes(
       ) {
         return NetworkPitchPageDtoSchema.parse({ items: [], nextCursor: null });
       }
-      const rows = await dependencies.networkPitches.findNetworkPitches({
-        excludeOwnerOrganisationId: actor.organisationId ?? null,
-        before: decodeNetworkCursor(page.cursor),
-        limit,
-      });
+      const networkPitches = dependencies.networkPitches;
+      const networkCompany = dependencies.networkCompany;
+      // Search (founder direction 2026-09-29): an optional text matched
+      // against what the network already shows of each company, after the
+      // disclosure read, so it can never match on anything hidden.
+      const rawText = (request.query as { readonly q?: string }).q;
+      const text =
+        typeof rawText === "string"
+          ? rawText.trim().toLowerCase().slice(0, 80)
+          : "";
       const companies = new Map<
         string,
-        Awaited<ReturnType<NonNullable<typeof dependencies.networkCompany>>>
+        Awaited<ReturnType<typeof networkCompany>>
       >();
-      for (const companyId of new Set(rows.map((row) => row.companyId))) {
-        companies.set(
-          companyId,
-          await dependencies.networkCompany(actor, companyId).catch(() => null),
-        );
-      }
-      const items = rows.flatMap((row) => {
-        const company = companies.get(row.companyId) ?? null;
-        if (company === null || company.companyStatus !== "active") return [];
-        return [
-          {
+      const items: NetworkPitchItemDto[] = [];
+      let before = decodeNetworkCursor(page.cursor);
+      let nextCursor: string | null = null;
+      // Without a search, one page as before; with one, a few pages are
+      // read until a page of matches is found.
+      for (let scanned = 0; scanned < (text.length === 0 ? 1 : 4); scanned++) {
+        const batch = text.length === 0 ? limit : NETWORK_PITCH_PAGE_MAX;
+        const rows = await networkPitches.findNetworkPitches({
+          excludeOwnerOrganisationId: actor.organisationId ?? null,
+          before,
+          limit: batch,
+        });
+        for (const companyId of new Set(rows.map((row) => row.companyId))) {
+          if (companies.has(companyId)) continue;
+          companies.set(
+            companyId,
+            await networkCompany(actor, companyId).catch(() => null),
+          );
+        }
+        for (const row of rows) {
+          const company = companies.get(row.companyId) ?? null;
+          if (company === null || company.companyStatus !== "active") continue;
+          if (
+            text.length > 0 &&
+            !`${company.canonicalName} ${company.shortDescription ?? ""}`
+              .toLowerCase()
+              .includes(text)
+          ) {
+            continue;
+          }
+          items.push({
             companyId: row.companyId,
             canonicalName: company.canonicalName,
             shortDescription: company.shortDescription,
@@ -289,17 +315,23 @@ export function registerDiscoveryRoutes(
             currentStageCode: company.currentStageCode,
             pitch: pitchSummary(row),
             postedAt: row.createdAt,
-          },
-        ];
-      });
-      const last = rows.at(-1);
-      return NetworkPitchPageDtoSchema.parse({
-        items,
-        nextCursor:
-          rows.length === limit && last !== undefined
+          });
+        }
+        const last = rows.at(-1);
+        nextCursor =
+          rows.length === batch && last !== undefined
             ? encodeNetworkCursor(last.createdAt, last.mediaAssetId)
-            : null,
-      });
+            : null;
+        if (
+          nextCursor === null ||
+          items.length >= limit ||
+          last === undefined
+        ) {
+          break;
+        }
+        before = decodeNetworkCursor(nextCursor);
+      }
+      return NetworkPitchPageDtoSchema.parse({ items, nextCursor });
     },
   );
 

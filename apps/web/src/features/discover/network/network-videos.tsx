@@ -68,7 +68,12 @@ function asCompany(item: NetworkPitchItemDto): DiscoveredCompanyDto {
   };
 }
 
-export function NetworkVideos() {
+export function NetworkVideos({
+  text = "",
+}: {
+  /** Search: only videos whose company name or line matches (Search page). */
+  readonly text?: string | undefined;
+} = {}) {
   const [items, setItems] = useState<readonly NetworkPitchItemDto[] | null>(
     null,
   );
@@ -85,7 +90,7 @@ export function NetworkVideos() {
 
   useEffect(() => {
     let cancelled = false;
-    void loadNetworkPitchesAction(null).then((result) => {
+    void loadNetworkPitchesAction(null, text).then((result) => {
       if (cancelled) return;
       if (!result.ok) {
         setError(result.message);
@@ -97,12 +102,12 @@ export function NetworkVideos() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [text]);
 
   const more = useCallback(async () => {
     if (cursor === null) return;
     setLoadingMore(true);
-    const result = await loadNetworkPitchesAction(cursor);
+    const result = await loadNetworkPitchesAction(cursor, text);
     setLoadingMore(false);
     if (!result.ok) {
       setError(result.message);
@@ -110,7 +115,7 @@ export function NetworkVideos() {
     }
     setItems((known) => [...(known ?? []), ...result.value.items]);
     setCursor(result.value.nextCursor);
-  }, [cursor]);
+  }, [cursor, text]);
 
   // Posters are minted grants: asked for once per video, a page at a time.
   const asked = useRef(new Set<string>());
@@ -144,6 +149,13 @@ export function NetworkVideos() {
     );
   }
   if (items === null) return <Skeleton lines={4} />;
+  if (items.length === 0 && text.trim().length > 0) {
+    return (
+      <p className="cq-body-sm text-(--cq-text-secondary)" role="status">
+        No founder videos match &ldquo;{text.trim()}&rdquo;.
+      </p>
+    );
+  }
   if (items.length === 0) {
     return (
       <EmptyState

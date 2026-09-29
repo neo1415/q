@@ -83,11 +83,18 @@ export function getDiscoveredInvestor(
 }
 
 /** `GET /v1/discovery/network-pitches` — videos opened to everyone (ADR 0021). */
-export function listNetworkPitches(session: ApiSession, page: Page = {}) {
+export function listNetworkPitches(
+  session: ApiSession,
+  page: Page & { readonly text?: string | undefined } = {},
+) {
+  const search =
+    page.text === undefined || page.text.trim().length === 0
+      ? ""
+      : `${query(page).length === 0 ? "?" : "&"}q=${encodeURIComponent(page.text.trim())}`;
   return call(
     session,
     "GET",
-    `${DISCOVERY_NETWORK_PITCHES_PATH}${query(page)}`,
+    `${DISCOVERY_NETWORK_PITCHES_PATH}${query(page)}${search}`,
     NetworkPitchPageDtoSchema,
   );
 }

@@ -195,8 +195,8 @@ export function PublicCardView({
             Investors
           </Link>
           <Link
-            href="/find"
-            aria-label="Find by handle"
+            href="/search"
+            aria-label="Search"
             className="inline-flex size-11 items-center justify-center rounded-md text-(--cq-text-secondary) hover:text-(--cq-text-primary)"
           >
             <Search aria-hidden="true" size={18} strokeWidth={ICON_STROKE} />

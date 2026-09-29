@@ -21,6 +21,7 @@ export const config = {
     "/pitch/:path*",
     "/investors/:path*",
     "/find/:path*",
+    "/search/:path*",
     "/verification/:path*",
     "/profile/:path*",
     "/onboarding/:path*",

@@ -155,7 +155,9 @@ export async function recordDecisionAction(input: {
  */
 export async function loadNetworkPitchesAction(
   rawCursor: string | null,
+  rawText = "",
 ): Promise<FeedActionResult<NetworkPitchPageDto>> {
+  const text = typeof rawText === "string" ? rawText.trim().slice(0, 80) : "";
   const cursor = rawCursor === null ? null : CursorInput.safeParse(rawCursor);
   if (cursor !== null && !cursor.success) {
     return { ok: false, message: "That page could not be loaded." };
@@ -165,10 +167,10 @@ export async function loadNetworkPitchesAction(
   try {
     return {
       ok: true,
-      value: await listNetworkPitches(
-        current,
-        cursor === null ? {} : { cursor: cursor.data },
-      ),
+      value: await listNetworkPitches(current, {
+        ...(cursor === null ? {} : { cursor: cursor.data }),
+        ...(text.length === 0 ? {} : { text }),
+      }),
     };
   } catch {
     return {
