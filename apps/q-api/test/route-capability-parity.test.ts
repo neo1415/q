@@ -425,6 +425,15 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   // ---- apps/q-api -------------------------------------------------------
   'q-api/app.ts GET "/health/live"': HEALTH,
   'q-api/app.ts GET "/health/ready"': HEALTH,
+  "q-api/http/meeting-assistant.ts GET Q_MEETING_ASSISTANT_PATH": exempt(
+    "the organiser reading whether Q is in their call and its notes; shown on the meeting itself",
+  ),
+  "q-api/http/meeting-assistant.ts POST Q_MEETING_ASSISTANT_PATH": exempt(
+    "the organiser's own click bringing Q to their call: a paid bot joins, so never a Q action without that click",
+  ),
+  "q-api/http/meeting-assistant.ts DELETE Q_MEETING_ASSISTANT_PATH": exempt(
+    "the organiser taking Q back out of their call",
+  ),
   "q-api/http/memory.ts GET Q_MEMORY_PATH": exempt(
     "the person's own view of what Q remembers; Q reads memory on every run, not as a tool",
   ),

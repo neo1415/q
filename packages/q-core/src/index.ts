@@ -240,6 +240,15 @@ export {
   type MemoryExtractorResult,
   type MemoryExtractorVariables,
 } from "./prompts/schemas/memory-extractor.js";
+export { MEETING_NOTES_V1 } from "./prompts/tasks/meeting-notes.v1.js";
+export {
+  MEETING_NOTES_SCHEMA_NAME,
+  MEETING_NOTES_SCHEMA_VERSION,
+  MeetingNotesResultSchema,
+  MeetingNotesVariablesSchema,
+  type MeetingNotesResult,
+  type MeetingNotesVariables,
+} from "./prompts/schemas/meeting-notes.js";
 export { WELCOME_CONDUCTOR_V1 } from "./prompts/tasks/welcome-conductor.v1.js";
 export { PRESENCE_READER_V1 } from "./prompts/tasks/presence-reader.v1.js";
 export {

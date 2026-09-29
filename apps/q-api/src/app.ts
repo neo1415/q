@@ -33,6 +33,10 @@ import {
   registerMemoryRoutes,
   type MemoryRoutesDependencies,
 } from "./http/memory.js";
+import {
+  registerMeetingAssistantRoutes,
+  type MeetingAssistantRoutesDependencies,
+} from "./http/meeting-assistant.js";
 import { registerQMcpRoute, type QMcpRouteDependencies } from "./http/q-mcp.js";
 import {
   registerQApprovalRoutes,
@@ -91,6 +95,9 @@ export type QApiModules = {
     RecommendationExplanationRoutesDependencies["explanations"] | undefined;
   /** What Q remembers about the person, for them to read and correct. */
   readonly memory?: MemoryRoutesDependencies["memory"] | undefined;
+  /** Q in a meeting: bring it to a call, read its notes. */
+  readonly meetingAssistant?:
+    MeetingAssistantRoutesDependencies["assistant"] | undefined;
   /** What Q found about the actor's own profile subject (BIZ-002). */
   readonly profileFindings?:
     ProfileFindingsRoutesDependencies["findings"] | undefined;
@@ -289,6 +296,19 @@ export function createApp(
       authenticator: security.authenticator,
       resolver: security.resolver,
       memory: modules.memory,
+    });
+  }
+
+  if (modules.meetingAssistant !== undefined) {
+    if (security.resolver === undefined) {
+      throw new Error(
+        "q-api: meeting assistant routes require an actor context resolver",
+      );
+    }
+    registerMeetingAssistantRoutes(app, {
+      authenticator: security.authenticator,
+      resolver: security.resolver,
+      assistant: modules.meetingAssistant,
     });
   }
 

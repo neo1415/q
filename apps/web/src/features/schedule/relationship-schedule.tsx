@@ -9,7 +9,8 @@ import { RelationshipScheduleControls } from "./relationship-schedule-controls";
 
 /** Calls that ended over an hour ago are history, not something to act on. */
 function notPast(meetings: readonly MeetingDto[]): readonly MeetingDto[] {
-  const cutoff = Date.now() - 3_600_000;
+  // A week back: Q's notes on a call arrive after it ends.
+  const cutoff = Date.now() - 7 * 24 * 3_600_000;
   return meetings.filter((meeting) => Date.parse(meeting.endsAt) > cutoff);
 }
 

@@ -261,3 +261,8 @@ export {
 } from "./schedule.js";
 
 export { forgetQMemory, listQMemory } from "./memory.js";
+export {
+  bringMeetingAssistant,
+  dismissMeetingAssistant,
+  getMeetingAssistant,
+} from "./meeting-assistant.js";

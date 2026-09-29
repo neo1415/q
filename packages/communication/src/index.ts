@@ -92,3 +92,15 @@ export {
   createPostgresMeetingDirectory,
   createPostgresScheduleStore,
 } from "./schedule/postgres.js";
+export {
+  createMeetingAssistantService,
+  Q_MEETING_BOT_NAME,
+  transcriptText,
+  type MeetingAssistantOutcome,
+  type MeetingAssistantService,
+  type MeetingBotProvider,
+  type MeetingBotState,
+  type MeetingNotes,
+  type MeetingNotesComposer,
+  type MeetingTranscriptLine,
+} from "./meeting-assistant/service.js";

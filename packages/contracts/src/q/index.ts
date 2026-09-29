@@ -642,3 +642,18 @@ export {
   type QMemoryItemDto,
   type QMemoryListDto,
 } from "./memory.js";
+
+export {
+  Q_MEETING_ASSISTANT_PATH,
+  Q_MEETING_ASSISTANT_STATUSES,
+  Q_MEETING_FLAG_KINDS,
+  QMeetingAssistantDtoSchema,
+  QMeetingAssistantStatusSchema,
+  QMeetingFlagSchema,
+  QMeetingFollowUpSchema,
+  qMeetingAssistantPath,
+  type QMeetingAssistantDto,
+  type QMeetingAssistantStatus,
+  type QMeetingFlag,
+  type QMeetingFollowUp,
+} from "./meeting-assistant.js";

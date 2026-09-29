@@ -99,6 +99,8 @@ describe("registry", () => {
         "DECISION_READER",
         // ADR 0012: what a conversation taught Q about the person.
         "MEMORY_EXTRACTOR",
+        // Founder direction 2026-09-29: Q's notes on a call it attended.
+        "MEETING_NOTES",
         // CQ-GATE-002: Q interviewing somebody applying to a gateway.
         "GATEQ_INTERVIEWER",
         // ADR 0013: rewriting the prose of a document Q already composed.

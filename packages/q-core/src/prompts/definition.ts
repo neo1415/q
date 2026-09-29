@@ -35,6 +35,8 @@ export const PROMPT_IDS = [
   "PRESENCE_READER",
   "DECISION_READER",
   "MEMORY_EXTRACTOR",
+  /** Founder direction 2026-09-29: Q's notes on a call it attended. */
+  "MEETING_NOTES",
   /** CQ-GATE-002: Q interviewing somebody applying to a gateway. */
   "GATEQ_INTERVIEWER",
   /** QX-003F: rewriting the prose of a document Q already composed. */
@@ -63,6 +65,7 @@ export const PROMPT_SLUGS: Readonly<Record<PromptId, string>> = {
   PRESENCE_READER: "presence-reader",
   DECISION_READER: "decision-reader",
   MEMORY_EXTRACTOR: "memory-extractor",
+  MEETING_NOTES: "meeting-notes",
   GATEQ_INTERVIEWER: "gateq-interviewer",
   ARTIFACT_REVISION: "artifact-revision",
   TURN_READER: "turn-reader",

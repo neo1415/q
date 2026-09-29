@@ -17,6 +17,7 @@ import {
   dismissReminderAction,
   findSlotsAction,
 } from "./schedule-actions";
+import { MeetingQ } from "./meeting-q";
 
 /**
  * The relationship page's calls and reminders (BIZ-008). The same things Q
@@ -74,6 +75,9 @@ export function RelationshipScheduleControls({
   const [reminderKey, setReminderKey] = useState(newKey);
   const [message, setMessage] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  // When the page was opened: whether a call is over is read once, not
+  // on every render.
+  const [openedAt] = useState(() => Date.now());
 
   const upcoming = meetings.filter((meeting) => meeting.status === "SCHEDULED");
 
@@ -208,7 +212,8 @@ export function RelationshipScheduleControls({
                     : `${meeting.organiserName} invited you`}
                 </span>
                 <div className="flex flex-wrap gap-2">
-                  {meeting.meetLink === null ? null : (
+                  {meeting.meetLink === null ||
+                  Date.parse(meeting.endsAt) < openedAt ? null : (
                     <a
                       href={meeting.meetLink}
                       target="_blank"
@@ -218,7 +223,8 @@ export function RelationshipScheduleControls({
                       Join Google Meet
                     </a>
                   )}
-                  {meeting.organisedByYou ? (
+                  {meeting.organisedByYou &&
+                  Date.parse(meeting.endsAt) >= openedAt ? (
                     <Button
                       variant="quiet"
                       size="compact"
@@ -229,6 +235,12 @@ export function RelationshipScheduleControls({
                     </Button>
                   ) : null}
                 </div>
+                {meeting.organisedByYou && meeting.meetLink !== null ? (
+                  <MeetingQ
+                    meetingId={meeting.id}
+                    ended={Date.parse(meeting.endsAt) < openedAt}
+                  />
+                ) : null}
               </li>
             ))}
           </ul>

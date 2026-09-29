@@ -58,6 +58,8 @@ import {
   INVESTOR_REVISABLE_STEPS,
 } from "@capital-q/investor-onboarding";
 import { createPexelsPhotos } from "./composition/stock-photos.js";
+import { createRecallBots } from "./composition/recall-bots.js";
+import { createMeetingNotesComposer } from "./composition/meeting-notes.js";
 import {
   createProfileAnswerAction,
   type ProfileAnswersPort,
@@ -77,7 +79,11 @@ import {
   OnboardingSessionIdSchema,
   createOwnOnboardingSummaryReader,
 } from "@capital-q/onboarding";
-import { composeChat, composeSchedule } from "@capital-q/communication";
+import {
+  composeChat,
+  composeSchedule,
+  createMeetingAssistantService,
+} from "@capital-q/communication";
 import {
   createPostgresDocumentQueryPort,
   DocumentIdSchema,
@@ -1729,6 +1735,38 @@ setInterval(
   5 * 60 * 1000,
 ).unref();
 
+// Q in a meeting (founder direction 2026-09-29): the organiser brings Q to
+// a booked call through a meeting bot; afterwards Q files notes. Composed
+// only where the bot provider's key is set. The collector reads a bot only
+// once its call has started, every two minutes, so a trial budget is spent
+// on calls, not on polling.
+const meetingAssistant = createMeetingAssistantService({
+  sql: database.sql,
+  bots: createRecallBots({
+    apiKey: process.env.RECALL_API_KEY ?? process.env.RECALL_API,
+    region: process.env.RECALL_REGION ?? "eu-central-1",
+  }),
+  composer: createMeetingNotesComposer({
+    gateway: modelGateway,
+    dataPosture: demoDataPosture,
+    logger,
+  }),
+  nameOf: (userId) =>
+    database.sql<{ display_name: string | null }[]>`
+      select display_name from identity.user_profiles where id = ${userId} limit 1`.then(
+      (rows) => rows[0]?.display_name ?? null,
+    ),
+  logger,
+});
+setInterval(
+  () => {
+    meetingAssistant.collect().catch((error: unknown) => {
+      logger.warn({ err: error }, "meeting assistant collection failed");
+    });
+  },
+  2 * 60 * 1000,
+).unref();
+
 // The realtime voice channel (CQ-Q-VOICE-001 C): ElevenLabs as the Speech
 // Engine, composed only when its key and a Speech Engine id are configured.
 // The key is revealed here, once, and handed to the adapter; the channel
@@ -2025,6 +2063,7 @@ const { app, logger: appLogger } = createApp(
     // the own-public-presence envelope, then the cited pages.
     profileFindings: profileFindingsReader,
     memory: memoryService,
+    meetingAssistant,
     orchestration: { orchestrator, autostart: Q_ORCHESTRATION_AUTOSTART },
     qActions,
     continueApproved,
