@@ -259,3 +259,5 @@ export {
   markNotificationsRead,
   scheduleMeeting,
 } from "./schedule.js";
+
+export { forgetQMemory, listQMemory } from "./memory.js";

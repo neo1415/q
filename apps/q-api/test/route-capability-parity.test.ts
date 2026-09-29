@@ -425,6 +425,12 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   // ---- apps/q-api -------------------------------------------------------
   'q-api/app.ts GET "/health/live"': HEALTH,
   'q-api/app.ts GET "/health/ready"': HEALTH,
+  "q-api/http/memory.ts GET Q_MEMORY_PATH": exempt(
+    "the person's own view of what Q remembers; Q reads memory on every run, not as a tool",
+  ),
+  "q-api/http/memory.ts POST Q_MEMORY_FORGET_PATH": exempt(
+    "the person correcting Q's memory of them; never a Q action",
+  ),
   "q-api/http/profile-findings.ts GET Q_PROFILE_FINDINGS_PATH": cap(
     "tool.read_my_record",
   ),
@@ -510,6 +516,9 @@ const PAGE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "/company/interest": cap("navigate.COMPANY_INTEREST"),
   "/relationships": cap("navigate.RELATIONSHIPS"),
   "/settings": cap("navigate.SETTINGS"),
+  "/settings/memory": exempt(
+    "the person reading and correcting what Q remembers; not a place Q sends anyone",
+  ),
   "/verification": cap("navigate.VERIFICATION"),
   "/pitch": cap("navigate.PITCH"),
   // One video's page and a new video's, both opened from Pitch & media (ADR 0022).

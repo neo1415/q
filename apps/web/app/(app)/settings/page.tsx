@@ -1,5 +1,8 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import type { ReactNode } from "react";
+
+import { buttonClassName } from "@capital-q/ui/button";
 
 import {
   PageContainer,
@@ -49,6 +52,21 @@ export default async function SettingsPage({
               <VoiceSetting />
             </SettingRow>
           </dl>
+        </PageSection>
+
+        <PageSection id="memory" title="Q's memory">
+          <div className="flex flex-col items-start gap-3">
+            <p className="cq-body-sm text-(--cq-text-secondary)">
+              What Q remembers about you and how you like to work, used in every
+              conversation. Read it, and forget anything that&apos;s wrong.
+            </p>
+            <Link
+              href="/settings/memory"
+              className={buttonClassName("secondary")}
+            >
+              See what Q remembers
+            </Link>
+          </div>
         </PageSection>
 
         <PageSection id="connected-accounts" title="Connected accounts">

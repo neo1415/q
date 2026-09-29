@@ -29,6 +29,10 @@ import {
   registerProfileFindingsRoutes,
   type ProfileFindingsRoutesDependencies,
 } from "./http/profile-findings.js";
+import {
+  registerMemoryRoutes,
+  type MemoryRoutesDependencies,
+} from "./http/memory.js";
 import { registerQMcpRoute, type QMcpRouteDependencies } from "./http/q-mcp.js";
 import {
   registerQApprovalRoutes,
@@ -85,6 +89,8 @@ export type QApiModules = {
    */
   readonly recommendationExplanations?:
     RecommendationExplanationRoutesDependencies["explanations"] | undefined;
+  /** What Q remembers about the person, for them to read and correct. */
+  readonly memory?: MemoryRoutesDependencies["memory"] | undefined;
   /** What Q found about the actor's own profile subject (BIZ-002). */
   readonly profileFindings?:
     ProfileFindingsRoutesDependencies["findings"] | undefined;
@@ -271,6 +277,18 @@ export function createApp(
       authenticator: security.authenticator,
       resolver: security.resolver,
       explanations: modules.recommendationExplanations,
+    });
+  }
+
+  // What Q remembers about the person (ADR 0012), theirs to correct.
+  if (modules.memory !== undefined) {
+    if (security.resolver === undefined) {
+      throw new Error("q-api: memory routes require an actor context resolver");
+    }
+    registerMemoryRoutes(app, {
+      authenticator: security.authenticator,
+      resolver: security.resolver,
+      memory: modules.memory,
     });
   }
 

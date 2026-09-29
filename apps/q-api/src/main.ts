@@ -2020,6 +2020,7 @@ const { app, logger: appLogger } = createApp(
     // The profile page's "Q found" column (BIZ-002): firewall first, then
     // the own-public-presence envelope, then the cited pages.
     profileFindings: profileFindingsReader,
+    memory: memoryService,
     orchestration: { orchestrator, autostart: Q_ORCHESTRATION_AUTOSTART },
     qActions,
     continueApproved,

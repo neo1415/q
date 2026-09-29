@@ -100,6 +100,11 @@ export type ForgetCommand = {
 
 export type MemoryService = {
   readonly recall: (query: RecallQuery) => Promise<MemoryBundle>;
+  /**
+   * What Q holds about the person, for them to read and correct. Not a
+   * recall: nothing is marked used, and it never reaches a prompt.
+   */
+  readonly list: (actor: ActorContext) => Promise<readonly MemoryItem[]>;
   readonly remember: (command: RememberCommand) => Promise<MemoryWriteResult>;
   readonly forget: (command: ForgetCommand) => Promise<MemoryItem | null>;
 };
@@ -144,6 +149,8 @@ export function createMemoryService(
   const { sql, transactions, repository, logger } = dependencies;
 
   return {
+    list: (actor) =>
+      repository.listLive(sql, actor.tenantId, personOwner(actor), 200),
     recall: async (query) => {
       const owner = personOwner(query.actor);
       const limit = Math.min(Math.max(query.limit ?? RECALL_DEFAULT, 1), 200);

@@ -94,6 +94,7 @@ function world(extractorOutput: unknown) {
   };
   const memory: MemoryService = {
     recall: () => Promise.resolve(empty),
+    list: () => Promise.resolve([]),
     remember: (command) => {
       remembered.push(command);
       return Promise.resolve({

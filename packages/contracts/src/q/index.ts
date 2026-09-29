@@ -625,3 +625,13 @@ export {
   type ProfileFindingsQuery,
   type ProfileFindingsResponse,
 } from "./profile-findings.js";
+
+export {
+  Q_MEMORY_FORGET_PATH,
+  Q_MEMORY_KINDS,
+  Q_MEMORY_PATH,
+  QMemoryItemDtoSchema,
+  QMemoryListDtoSchema,
+  type QMemoryItemDto,
+  type QMemoryListDto,
+} from "./memory.js";
