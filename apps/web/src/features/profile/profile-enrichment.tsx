@@ -11,6 +11,16 @@ import type {
 import Link from "next/link";
 
 import { buttonClassName } from "@capital-q/ui/button";
+import {
+  ChartColumn,
+  ICON_SIZE,
+  Lightbulb,
+  Search,
+  Shield,
+  ShieldCheck,
+  UserRound,
+} from "@capital-q/ui/icons";
+import { Skeleton } from "@capital-q/ui/states";
 
 import { useGlobalQ } from "@/components/app-shell/global-q";
 import { SourcesDisclosure } from "@/components/sources-disclosure";
@@ -99,6 +109,7 @@ export function ProfileFindings({
   subjectLabel,
   state,
   hasWebsite = false,
+  bare = false,
 }: {
   /** How the subject is named in a question to Q ("Kivu Freight", "me"). */
   readonly subjectLabel: string;
@@ -108,18 +119,28 @@ export function ProfileFindings({
    * what is already there (R30 #18).
    */
   readonly hasWebsite?: boolean | undefined;
+  /** Inside the Signals card, which already heads and explains it. */
+  readonly bare?: boolean | undefined;
 }) {
   const { askAbout } = useGlobalQ();
   const headingId = `found-${subjectLabel.replace(/\W+/g, "-").toLowerCase()}`;
   return (
-    <section aria-labelledby={headingId} data-profile-findings>
-      <h3 id={headingId} className="cq-label text-(--cq-text-primary)">
-        What Q found
-      </h3>
-      <p className="cq-caption pt-1 text-(--cq-text-secondary)">
-        Q&apos;s reading of public pages. Not on your profile until you confirm
-        it.
-      </p>
+    <section
+      aria-labelledby={bare ? undefined : headingId}
+      aria-label={bare ? `What Q found about ${subjectLabel}` : undefined}
+      data-profile-findings
+    >
+      {bare ? null : (
+        <>
+          <h3 id={headingId} className="cq-label text-(--cq-text-primary)">
+            What Q found
+          </h3>
+          <p className="cq-caption pt-1 text-(--cq-text-secondary)">
+            Q&apos;s reading of public pages. Not on your profile until you
+            confirm it.
+          </p>
+        </>
+      )}
       {state.status === "LOADING" ? (
         <p
           className="cq-body-sm pt-3 text-(--cq-text-secondary)"
@@ -218,92 +239,279 @@ export type VerificationState =
   | { readonly status: "UNAVAILABLE" }
   | { readonly status: "NONE" };
 
+/** One subject Q may have read about: the organisation, or the person. */
+export type SignalsSubject = {
+  readonly label: string;
+  /** How the group is headed when there are two ("Your company", "You"). */
+  readonly heading: string;
+  readonly hasWebsite: boolean;
+  readonly findings: FindingsState;
+};
+
 /**
- * What Capital Q has verified, claim by claim, in the Verification
- * context's own words. A separate workflow from the three axes (ADR-001),
- * so it is listed apart and never folded into a field's provenance.
+ * The profile's right rail (founder design 2026-09-28): one card, three
+ * parts. What Q found on public pages (never the profile's value until the
+ * person confirms it), what Capital Q verified claim by claim, and a way
+ * into Q for a review. Every button opens something real: Q with a draft
+ * the person edits or sends, or the verification page for a company.
  */
-export function ProfileVerification({
-  state,
+export function SignalsAndVerification({
+  subjects,
+  verification,
+  verificationHref,
+  reviewDraft,
+  improveDraft,
 }: {
-  readonly state: VerificationState;
+  readonly subjects: readonly SignalsSubject[];
+  /** A company's standings; null for an organisation without that workflow. */
+  readonly verification: VerificationState | null;
+  /** Where verification is asked for; null when this side has no page for it. */
+  readonly verificationHref: string | null;
+  readonly reviewDraft: string;
+  readonly improveDraft: string;
 }) {
+  const { askAbout } = useGlobalQ();
+  const primary = subjects[0];
+  const loading = subjects.some((s) => s.findings.status === "LOADING");
+  const read = subjects.flatMap((subject) =>
+    subject.findings.status === "READ" && subject.findings.findings.length > 0
+      ? [subject]
+      : [],
+  );
+  const unavailable =
+    !loading &&
+    read.length === 0 &&
+    subjects.some((s) => s.findings.status === "UNAVAILABLE");
+  const lookDraft =
+    primary === undefined
+      ? "Look for public information about me."
+      : `Look for public information about ${primary.label} and tell me what you find.`;
+
   return (
-    <section aria-labelledby="verified-heading" data-profile-verification>
-      <h3 id="verified-heading" className="cq-label text-(--cq-text-primary)">
-        What Capital Q verified
-      </h3>
-      {state.status === "READ" ? (
-        <dl className="flex flex-col divide-y divide-(--cq-border-subtle)">
-          {state.standings.map((standing) => (
-            <div
-              key={standing.claimType}
-              data-claim={standing.claimType}
-              data-status={standing.status}
-              className="flex flex-col gap-0.5 py-3"
-            >
-              <dt className="cq-caption text-(--cq-text-secondary)">
-                {CLAIM_WORDS[standing.claimType]}
-              </dt>
-              <dd className="cq-body-sm text-(--cq-text-primary)">
-                {standing.description}
-              </dd>
-            </div>
-          ))}
-        </dl>
-      ) : (
-        <p className="cq-body-sm pt-2 text-(--cq-text-secondary)">
-          {state.status === "UNAVAILABLE"
-            ? "Couldn't be read just now."
-            : "Nothing verified yet. Verification is claim by claim, and says exactly what was checked."}
-        </p>
-      )}
-      <Link
-        href="/verification"
-        className={buttonClassName("quiet", "regular", "-ml-4 mt-1")}
+    <section
+      aria-labelledby="signals-heading"
+      className="flex flex-col gap-4 rounded-xl border border-(--cq-border-subtle) bg-(--cq-surface) p-4"
+      data-profile-signals
+    >
+      <h2
+        id="signals-heading"
+        className="cq-title-sm flex items-center gap-2 text-(--cq-text-primary)"
       >
-        Verification
-      </Link>
+        <Shield size={ICON_SIZE.regular} aria-hidden="true" />
+        Signals &amp; verification
+      </h2>
+
+      <SignalsPart
+        icon={<Search size={ICON_SIZE.compact} aria-hidden="true" />}
+        title="What Q found"
+        description="Q's reading of public pages. Not on your profile until you confirm it."
+        data="findings"
+      >
+        {loading ? (
+          <div aria-busy="true" className="flex flex-col gap-2">
+            <Skeleton lines={2} />
+          </div>
+        ) : read.length > 0 ? (
+          <div className="flex flex-col gap-3">
+            {read.map((subject) => (
+              <div key={subject.heading} className="flex flex-col gap-1">
+                {subjects.length > 1 ? (
+                  <p className="cq-caption text-(--cq-text-tertiary)">
+                    {subject.heading}
+                  </p>
+                ) : null}
+                <ProfileFindings
+                  subjectLabel={subject.label}
+                  state={subject.findings}
+                  hasWebsite={subject.hasWebsite}
+                  bare
+                />
+              </div>
+            ))}
+          </div>
+        ) : (
+          <InnerEmpty
+            icon={<UserRound size={ICON_SIZE.regular} aria-hidden="true" />}
+            title={
+              unavailable ? "Couldn't be read just now" : "Nothing found yet"
+            }
+            hint={
+              unavailable
+                ? "Try again in a moment, or ask Q to look."
+                : primary?.hasWebsite === true
+                  ? "Your name and website are on record; ask Q to look for more."
+                  : "Q looks once it knows your name and website."
+            }
+          />
+        )}
+        <button
+          type="button"
+          className={buttonClassName("secondary", "regular", "w-full")}
+          onClick={() => askAbout(lookDraft)}
+          data-signals-look
+        >
+          Ask Q
+        </button>
+      </SignalsPart>
+
+      <SignalsPart
+        icon={
+          <ShieldCheck
+            size={ICON_SIZE.compact}
+            aria-hidden="true"
+            className="text-(--cq-positive)"
+          />
+        }
+        title="Verified by Capital Q"
+        description="Verification is claim by claim, and says exactly what was checked."
+        data="verified"
+      >
+        {verification !== null && verification.status === "READ" ? (
+          <dl className="flex flex-col divide-y divide-(--cq-border-subtle)">
+            {verification.standings.map((standing) => (
+              <div
+                key={standing.claimType}
+                data-claim={standing.claimType}
+                data-status={standing.status}
+                className="flex flex-col gap-0.5 py-2"
+              >
+                <dt className="cq-caption text-(--cq-text-secondary)">
+                  {CLAIM_WORDS[standing.claimType]}
+                </dt>
+                <dd className="cq-body-sm text-(--cq-text-primary)">
+                  {standing.description}
+                </dd>
+              </div>
+            ))}
+          </dl>
+        ) : (
+          <InnerEmpty
+            icon={<ShieldCheck size={ICON_SIZE.regular} aria-hidden="true" />}
+            title={
+              verification?.status === "UNAVAILABLE"
+                ? "Couldn't be read just now"
+                : "Nothing verified yet"
+            }
+            hint={
+              verificationHref === null ? (
+                "Capital Q verifies founders and their organisations; ask Q what applies to you."
+              ) : (
+                <>
+                  <Link
+                    href={verificationHref}
+                    className="text-(--cq-text-primary) underline underline-offset-4"
+                  >
+                    Add claims
+                  </Link>{" "}
+                  to get them verified by Capital Q.
+                </>
+              )
+            }
+          />
+        )}
+        {verificationHref === null ? (
+          <button
+            type="button"
+            className={buttonClassName("secondary", "regular", "w-full")}
+            onClick={() =>
+              askAbout(
+                "How does verification work on Capital Q, and what can be verified for my organisation?",
+              )
+            }
+          >
+            Learn about verification
+          </button>
+        ) : (
+          <Link
+            href={verificationHref}
+            className={buttonClassName("secondary", "regular", "w-full")}
+          >
+            Learn about verification
+          </Link>
+        )}
+      </SignalsPart>
+
+      <SignalsPart
+        icon={<Lightbulb size={ICON_SIZE.compact} aria-hidden="true" />}
+        title="Need help?"
+        description="Ask Q to review your profile or suggest improvements."
+        data="help"
+      >
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            className={buttonClassName("secondary")}
+            onClick={() => askAbout(reviewDraft)}
+            data-signals-review
+          >
+            Ask Q
+          </button>
+          <button
+            type="button"
+            className={buttonClassName("quiet")}
+            onClick={() => askAbout(improveDraft)}
+            data-signals-improve
+          >
+            <ChartColumn size={ICON_SIZE.compact} aria-hidden="true" />
+            Improve profile
+          </button>
+        </div>
+      </SignalsPart>
     </section>
   );
 }
 
-/**
- * The two ways into Q from a profile section (ADR 0017: Q is reachable
- * from everywhere). Both open the one Q beside the page with a draft the
- * person edits or sends -- never a message sent for them. "Edit with Q"
- * leads to a prepared change the person approves (propose_profile_change
- * → the same write path as Edit); "Ask Q" is a question.
- */
-export function ProfileQEntry({
-  editDraft,
-  askDraft,
-  subject,
+function SignalsPart({
+  icon,
+  title,
+  description,
+  data,
+  children,
 }: {
-  readonly editDraft: string;
-  readonly askDraft: string;
-  /** Names the section in the accessible labels ("your company"). */
-  readonly subject: string;
+  readonly icon: React.ReactNode;
+  readonly title: string;
+  readonly description: string;
+  readonly data: string;
+  readonly children: React.ReactNode;
 }) {
-  const { askAbout } = useGlobalQ();
+  const id = `signals-${data}`;
   return (
-    <div className="flex flex-wrap gap-2" data-profile-q-entry>
-      <button
-        type="button"
-        className={buttonClassName("secondary")}
-        onClick={() => askAbout(editDraft)}
-        aria-label={`Edit ${subject} with Q`}
-      >
-        Edit with Q
-      </button>
-      <button
-        type="button"
-        className={buttonClassName("quiet")}
-        onClick={() => askAbout(askDraft)}
-        aria-label={`Ask Q about ${subject}`}
-      >
-        Ask Q
-      </button>
+    <section
+      aria-labelledby={id}
+      className="flex flex-col gap-3 rounded-lg border border-(--cq-border-subtle) bg-(--cq-surface-subtle) p-3"
+      data-signals-part={data}
+    >
+      <div className="flex flex-col gap-1">
+        <h3
+          id={id}
+          className="cq-label flex items-center gap-2 text-(--cq-text-primary)"
+        >
+          {icon}
+          {title}
+        </h3>
+        <p className="cq-caption text-(--cq-text-secondary)">{description}</p>
+      </div>
+      {children}
+    </section>
+  );
+}
+
+function InnerEmpty({
+  icon,
+  title,
+  hint,
+}: {
+  readonly icon: React.ReactNode;
+  readonly title: string;
+  readonly hint: React.ReactNode;
+}) {
+  return (
+    <div className="flex items-start gap-3 rounded-md border border-(--cq-border-subtle) bg-(--cq-surface) p-3">
+      <span className="mt-0.5 text-(--cq-text-tertiary)">{icon}</span>
+      <div className="flex flex-col gap-0.5">
+        <p className="cq-body-sm text-(--cq-text-primary)">{title}</p>
+        <p className="cq-caption text-(--cq-text-secondary)">{hint}</p>
+      </div>
     </div>
   );
 }

@@ -51,7 +51,12 @@ export function inboundLabel(
 }
 
 export function initials(name: string): string {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
+  // Words that start with a letter or digit: "(fictional)" or "&" is not
+  // part of anyone's initials.
+  const parts = name
+    .trim()
+    .split(/\s+/)
+    .filter((word) => /^[\p{L}\p{N}]/u.test(word));
   const first = parts[0]?.[0] ?? "";
   const last = parts.length > 1 ? (parts[parts.length - 1]?.[0] ?? "") : "";
   return (first + last).toUpperCase() || "?";

@@ -24,9 +24,8 @@ import {
   loadProfilePage,
 } from "@/features/profile/profile-data";
 import {
-  ProfileFindings,
-  ProfileQEntry,
-  ProfileVerification,
+  SignalsAndVerification,
+  type VerificationState,
 } from "@/features/profile/profile-enrichment";
 import {
   COMPANY_FIELDS,
@@ -522,63 +521,58 @@ export default async function ProfilePage() {
           aria-label="What else is known"
           className="flex min-w-0 flex-col gap-6 lg:sticky lg:top-6 lg:self-start"
         >
-          {company !== null ? (
-            <>
-              <FindingsSlot
-                subjectType="COMPANY"
-                subjectId={company.id}
-                subjectLabel={company.canonicalName}
-                hasWebsite={Boolean(company.websiteUrl)}
-              />
-              <ProfileVerification state={data.verification} />
-              <ProfileQEntry
-                subject="your company"
-                editDraft={`Update ${company.canonicalName}'s profile: `}
-                askDraft={`What is missing or weak in ${company.canonicalName}'s profile, from an investor's point of view?`}
-              />
-            </>
-          ) : investor !== null ? (
-            <>
-              <FindingsSlot
-                subjectType="INVESTOR_ORGANISATION"
-                subjectId={investor.id}
-                subjectLabel={investor.displayName}
-                hasWebsite={Boolean(investor.websiteUrl)}
-              />
-              <section aria-labelledby="investor-verified">
-                <h3
-                  id="investor-verified"
-                  className="cq-label text-(--cq-text-primary)"
-                >
-                  What Capital Q verified
-                </h3>
-                <p className="cq-body-sm pt-2 text-(--cq-text-secondary)">
-                  {investor.verificationState === "unverified"
-                    ? "Nothing verified yet. Verification is claim by claim, and says exactly what was checked."
-                    : investor.verificationState.replace(/_/g, " ")}
-                </p>
-              </section>
-              <ProfileQEntry
-                subject="your investor organisation"
-                editDraft={`Update ${investor.displayName}'s profile: `}
-                askDraft={`What would founders want to know about ${investor.displayName} that our profile doesn't say yet?`}
-              />
-            </>
-          ) : null}
-          {person === null ? null : (
-            <>
-              <FindingsSlot
-                subjectType="PERSON"
-                subjectId={person.userId}
-                subjectLabel="me"
-              />
-              <ProfileQEntry
-                subject="your profile"
-                editDraft="Change my headline to "
-                askDraft="What does my profile say about me, and what would make it clearer?"
-              />
-            </>
-          )}
+          <SignalsSlot
+            subjects={[
+              ...(company !== null
+                ? [
+                    {
+                      subjectType: "COMPANY" as const,
+                      subjectId: company.id,
+                      label: company.canonicalName,
+                      heading: "Your company",
+                      hasWebsite: Boolean(company.websiteUrl),
+                    },
+                  ]
+                : investor !== null
+                  ? [
+                      {
+                        subjectType: "INVESTOR_ORGANISATION" as const,
+                        subjectId: investor.id,
+                        label: investor.displayName,
+                        heading: "Your organisation",
+                        hasWebsite: Boolean(investor.websiteUrl),
+                      },
+                    ]
+                  : []),
+              ...(person === null
+                ? []
+                : [
+                    {
+                      subjectType: "PERSON" as const,
+                      subjectId: person.userId,
+                      label: "me",
+                      heading: "You",
+                      hasWebsite: false,
+                    },
+                  ]),
+            ]}
+            verification={company !== null ? data.verification : null}
+            verificationHref={company !== null ? "/verification" : null}
+            reviewDraft={
+              company !== null
+                ? `What is missing or weak in ${company.canonicalName}'s profile, from an investor's point of view?`
+                : investor !== null
+                  ? `What would founders want to know about ${investor.displayName} that our profile doesn't say yet?`
+                  : "What does my profile say about me, and what would make it clearer?"
+            }
+            improveDraft={
+              company !== null
+                ? `Suggest specific improvements to ${company.canonicalName}'s profile that I can approve.`
+                : investor !== null
+                  ? `Suggest specific improvements to ${investor.displayName}'s profile that I can approve.`
+                  : "Suggest specific improvements to my profile that I can approve."
+            }
+          />
         </aside>
       </div>
     </PageContainer>
@@ -654,48 +648,58 @@ function OrganisationImages({
   );
 }
 
-/**
- * What Q found, streamed: the declared profile paints at once and the
- * findings arrive when the Q API has planned and read them.
- */
-function FindingsSlot(props: {
+type SignalsSubjectRef = {
   readonly subjectType: ProfileFindingSubjectType;
   readonly subjectId: string;
-  readonly subjectLabel: string;
-  readonly hasWebsite?: boolean | undefined;
-}) {
+  readonly label: string;
+  readonly heading: string;
+  readonly hasWebsite: boolean;
+};
+
+type SignalsProps = {
+  readonly subjects: readonly SignalsSubjectRef[];
+  readonly verification: VerificationState | null;
+  readonly verificationHref: string | null;
+  readonly reviewDraft: string;
+  readonly improveDraft: string;
+};
+
+/**
+ * Signals & verification, streamed: the declared profile paints at once
+ * and what Q found arrives when the Q API has read it, for every subject
+ * in one card (the organisation, then the person).
+ */
+function SignalsSlot(props: SignalsProps) {
   return (
     <Suspense
       fallback={
-        <ProfileFindings
-          subjectLabel={props.subjectLabel}
-          state={{ status: "LOADING" }}
-          hasWebsite={props.hasWebsite}
+        <SignalsAndVerification
+          {...props}
+          subjects={props.subjects.map((subject) => ({
+            ...subject,
+            findings: { status: "LOADING" },
+          }))}
         />
       }
     >
-      <FindingsRead {...props} />
+      <SignalsRead {...props} />
     </Suspense>
   );
 }
 
-async function FindingsRead({
-  subjectType,
-  subjectId,
-  subjectLabel,
-  hasWebsite,
-}: {
-  readonly subjectType: ProfileFindingSubjectType;
-  readonly subjectId: string;
-  readonly subjectLabel: string;
-  readonly hasWebsite?: boolean | undefined;
-}) {
-  const state = await loadProfileFindings(subjectType, subjectId);
+async function SignalsRead(props: SignalsProps) {
+  const findings = await Promise.all(
+    props.subjects.map((subject) =>
+      loadProfileFindings(subject.subjectType, subject.subjectId),
+    ),
+  );
   return (
-    <ProfileFindings
-      subjectLabel={subjectLabel}
-      state={state}
-      hasWebsite={hasWebsite}
+    <SignalsAndVerification
+      {...props}
+      subjects={props.subjects.map((subject, at) => ({
+        ...subject,
+        findings: findings[at] ?? { status: "UNAVAILABLE" },
+      }))}
     />
   );
 }

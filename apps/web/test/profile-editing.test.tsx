@@ -79,7 +79,7 @@ vi.mock("next/navigation", () => ({
 
 const { EditableProfile } =
   await import("../src/features/profile/editable-profile");
-const { ProfileFindings, ProfileQEntry } =
+const { ProfileFindings, SignalsAndVerification } =
   await import("../src/features/profile/profile-enrichment");
 const { COMPANY_FIELDS, PERSON_FIELDS, normaliseDraft } =
   await import("../src/features/profile/profile-fields");
@@ -394,24 +394,68 @@ describe("what Q found", () => {
   });
 });
 
-describe("Edit with Q and Ask Q", () => {
-  it("open the one Q with the section's drafts", () => {
+describe("Signals & verification", () => {
+  const subjects = [
+    {
+      label: "Kivu Freight",
+      heading: "Your company",
+      hasWebsite: true,
+      findings: { status: "READ" as const, findings: [] },
+    },
+    {
+      label: "me",
+      heading: "You",
+      hasWebsite: false,
+      findings: { status: "READ" as const, findings: [] },
+    },
+  ];
+
+  it("is one card: nothing found and nothing verified said once, every button wired", () => {
     render(
-      <ProfileQEntry
-        subject="your company"
-        editDraft="Update Kivu Freight's profile: "
-        askDraft="What is missing?"
+      <SignalsAndVerification
+        subjects={subjects}
+        verification={{ status: "NONE" }}
+        verificationHref="/verification"
+        reviewDraft="What is missing?"
+        improveDraft="Suggest improvements."
       />,
     );
-    fireEvent.click(
-      screen.getByRole("button", { name: "Edit your company with Q" }),
-    );
-    fireEvent.click(
-      screen.getByRole("button", { name: "Ask Q about your company" }),
-    );
+    expect(screen.getAllByText("What Q found")).toHaveLength(1);
+    expect(screen.getAllByText("Nothing found yet")).toHaveLength(1);
+    expect(screen.getByText("Nothing verified yet")).toBeTruthy();
+    expect(
+      screen.getByRole("link", { name: "Learn about verification" }),
+    ).toHaveProperty("pathname", "/verification");
+    const [look, review] = screen.getAllByRole("button", { name: "Ask Q" });
+    fireEvent.click(look as HTMLElement);
+    fireEvent.click(review as HTMLElement);
+    fireEvent.click(screen.getByRole("button", { name: "Improve profile" }));
     expect(askAbout.mock.calls).toEqual([
-      ["Update Kivu Freight's profile: "],
+      [
+        "Look for public information about Kivu Freight and tell me what you find.",
+      ],
       ["What is missing?"],
+      ["Suggest improvements."],
     ]);
+  });
+
+  it("while reading, shows a loading state and never 'nothing'", () => {
+    render(
+      <SignalsAndVerification
+        subjects={subjects.map((subject) => ({
+          ...subject,
+          findings: { status: "LOADING" as const },
+        }))}
+        verification={null}
+        verificationHref={null}
+        reviewDraft="r"
+        improveDraft="i"
+      />,
+    );
+    expect(screen.queryByText("Nothing found yet")).toBeNull();
+    // No verification page on this side: the button asks Q instead.
+    expect(
+      screen.getByRole("button", { name: "Learn about verification" }),
+    ).toBeTruthy();
   });
 });

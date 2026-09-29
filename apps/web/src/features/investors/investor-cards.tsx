@@ -54,7 +54,7 @@ function InvestorCard({ item }: { readonly item: DiscoveredInvestorDto }) {
         )}
       </div>
       <div className="flex flex-1 flex-col gap-2 px-4 pb-4">
-        <div className="-mt-7 size-14 overflow-hidden rounded-xl border-2 border-(--cq-surface) bg-(--cq-surface-subtle)">
+        <div className="relative -mt-7 size-14 overflow-hidden rounded-xl border-2 border-(--cq-surface) bg-(--cq-surface-subtle)">
           {photo === null ? (
             <span
               aria-hidden="true"

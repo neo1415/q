@@ -70,6 +70,8 @@ Google sign-in redirect_uri_mismatch (Cloud Console); malware scanner for chat f
 
 - 09db556: several live pitch videos per company (ADR 0022) + "Who can watch it" per video (ADR 0021: Investors only | Everyone on Capital Q) + Founders' videos tab on the founder's Discover. Hosted migration 20261022090000 applied (82/82) under the founder's explicit approval (it drops the single-current-pitch index; no data change). Remaining for this item: nothing functional; visual pass on the deployed grid/edit page.
 
+- 7914210 (2026-09-29): founder Investors page + Connection Requests (ADR 0023). Founders: /investors cards (photo, cover, type, country, public description, how they take requests), /investors/[id] visible profile + Request connection (server-confirmed, idempotent), Discover names link there. Investors: /investors = Founder requests inbox (Accept/Decline), linked from Relationships; "How founders can reach you" (Any founder | Only companies that fit my mandate | No requests) on Visibility; Q can set it with approval; onboarding confirm records I10. A request is a COMPANY-party interest on the one relationship; QUALIFIED = the investor's ACTIVE mandate hard rules (ELIGIBLE only). Hosted migration 20261023090000 applied (83/83; backfill: 9 QUALIFIED, 1 OPEN, 12 not stated). Follow-ups in ADR 0023: GateQ gateway inbound_mode precedence; Q NAVIGATE → INVESTORS needs TURN_READER v15.
+
 ## Founder backlog, 2026-09-28 night (second live review) — ALL MUST BE BUILT, none optional
 
 The founder attached design images in chat (not in the repo). Their content, precisely, so a later session can build them without the pictures:
