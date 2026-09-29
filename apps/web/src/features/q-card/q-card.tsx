@@ -69,7 +69,7 @@ export function QCard({
       aria-label={`Q Card for ${name}`}
       style={style}
       className={cx(
-        "relative m-0 flex aspect-[1.8/1] w-full max-w-[34rem] overflow-hidden rounded-[1.75rem] border border-(--cq-card-edge) bg-(--cq-qcard-surface) text-(--cq-qcard-text) shadow-[0_0_24px_var(--cq-qcard-glow)]",
+        "relative m-0 flex min-h-48 w-full sm:aspect-[1.8/1] max-w-[34rem] overflow-hidden rounded-[1.75rem] border border-(--cq-card-edge) bg-(--cq-qcard-surface) text-(--cq-qcard-text) shadow-[0_0_24px_var(--cq-qcard-glow)]",
         className,
       )}
     >

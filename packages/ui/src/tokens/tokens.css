@@ -152,7 +152,7 @@
    */
   --cq-q-light: oklch(0.5 0.2 258);
   --cq-q-core: oklch(0.99 0.012 85);
-  --cq-q-bloom: oklch(0.62 0.19 258 / 0.42);
+  --cq-q-bloom: oklch(0.62 0.19 258 / 0.34);
   --cq-q-ember: oklch(0.5 0.035 258);
   /* The focus sweep's highlight: the deeper stroke on paper, the core in light. */
   --cq-q-sweep: var(--cq-q-light);
@@ -160,7 +160,7 @@
   /* The same light on the stage, which is one night in either theme. */
   --cq-stage-q-light: oklch(0.8 0.13 258);
   --cq-stage-q-core: oklch(0.985 0.014 85);
-  --cq-stage-q-bloom: oklch(0.7 0.17 258 / 0.6);
+  --cq-stage-q-bloom: oklch(0.7 0.17 258 / 0.48);
   --cq-stage-q-ember: oklch(0.63 0.035 258);
 }
 
@@ -198,7 +198,7 @@
     --cq-qcard-text: oklch(0.97 0.01 262);
     --cq-qcard-muted: oklch(0.74 0.03 262);
     --cq-qcard-edge: oklch(0.68 0.16 255);
-    --cq-qcard-glow: oklch(0.68 0.16 255 / 0.28);
+    --cq-qcard-glow: oklch(0.68 0.16 255 / 0.22);
     --cq-qcard-arc: oklch(0.7 0.16 255 / 0.2);
     --cq-accent-hover: oklch(0.76 0.14 258);
     --cq-accent-soft: oklch(0.27 0.06 258);
@@ -216,7 +216,7 @@
     --cq-shadow-overlay: 0 12px 32px -8px oklch(0.05 0.01 258 / 0.7);
     --cq-q-light: oklch(0.8 0.13 258);
     --cq-q-core: oklch(0.985 0.014 85);
-    --cq-q-bloom: oklch(0.7 0.17 258 / 0.6);
+    --cq-q-bloom: oklch(0.7 0.17 258 / 0.48);
     --cq-q-ember: oklch(0.63 0.035 258);
     --cq-q-sweep: var(--cq-q-core);
     --cq-q-ink: 0;
@@ -243,7 +243,7 @@
   --cq-qcard-text: oklch(0.97 0.01 262);
   --cq-qcard-muted: oklch(0.74 0.03 262);
   --cq-qcard-edge: oklch(0.68 0.16 255);
-  --cq-qcard-glow: oklch(0.68 0.16 255 / 0.28);
+  --cq-qcard-glow: oklch(0.68 0.16 255 / 0.22);
   --cq-qcard-arc: oklch(0.7 0.16 255 / 0.2);
   --cq-accent-hover: oklch(0.76 0.14 258);
   --cq-accent-soft: oklch(0.27 0.06 258);
@@ -261,7 +261,7 @@
   --cq-shadow-overlay: 0 12px 32px -8px oklch(0.05 0.01 258 / 0.7);
   --cq-q-light: oklch(0.8 0.13 258);
   --cq-q-core: oklch(0.985 0.014 85);
-  --cq-q-bloom: oklch(0.7 0.17 258 / 0.6);
+  --cq-q-bloom: oklch(0.7 0.17 258 / 0.48);
   --cq-q-ember: oklch(0.63 0.035 258);
   --cq-q-sweep: var(--cq-q-core);
   --cq-q-ink: 0;

@@ -148,9 +148,13 @@ export function PublicCardView({
   const location = byKey(
     card.subjectType === "COMPANY" ? "headquartersCountry" : "hqCountry",
   );
-  const status = byKey(
-    card.subjectType === "COMPANY" ? "currentStageCode" : "deploymentState",
-  );
+  // Said once: an investor's status already leads the glance when shown.
+  const status =
+    card.subjectType === "COMPANY"
+      ? byKey("currentStageCode")
+      : glance.some((item) => item.key === "deploymentState")
+        ? undefined
+        : byKey("deploymentState");
   const more = facts.filter(
     (field) =>
       !GLANCE_KEYS.has(field.key) &&

@@ -38,7 +38,7 @@ export const QCARD_RASTER = {
   text: "#f4f6fb",
   muted: "#a3adc2",
   edge: "#4c8dff",
-  glow: "rgba(76, 141, 255, 0.28)",
+  glow: "rgba(76, 141, 255, 0.22)",
   arc: "rgba(90, 150, 255, 0.2)",
   qrPaper: "#ffffff",
   qrInk: "#0c1630",
