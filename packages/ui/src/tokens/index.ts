@@ -29,6 +29,22 @@ export const RASTER_COLORS = {
 } as const;
 
 /**
+ * The Q Card's dark rendering in sRGB, for the downloadable image and PDF
+ * (a raster cannot read custom properties). Mirrors the dark
+ * `--cq-qcard-*` tokens in tokens.css.
+ */
+export const QCARD_RASTER = {
+  surface: "#0c1630",
+  text: "#f4f6fb",
+  muted: "#a3adc2",
+  edge: "#4c8dff",
+  glow: "rgba(76, 141, 255, 0.28)",
+  arc: "rgba(90, 150, 255, 0.2)",
+  qrPaper: "#ffffff",
+  qrInk: "#0c1630",
+} as const;
+
+/**
  * Motion timing in seconds, for the rare script-driven animation (Web
  * Animations API, a future Motion for React) that cannot read a custom
  * property. Mirrors `--cq-motion-*` and `--cq-ease*` in tokens.css exactly;

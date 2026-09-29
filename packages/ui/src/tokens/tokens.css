@@ -127,6 +127,14 @@
    * state label and a waveform, and these tokens are all the stage reads.
    */
   --cq-stage-canvas: oklch(0.17 0.02 262);
+  /* The Q Card (founder design 2026-09-28): a card with a thin lit edge
+     and one soft arc of light. Light theme: paper card, blue edge. */
+  --cq-qcard-surface: oklch(0.985 0.006 258);
+  --cq-qcard-text: oklch(0.2 0.03 262);
+  --cq-qcard-muted: oklch(0.48 0.025 262);
+  --cq-qcard-edge: oklch(0.6 0.16 255);
+  --cq-qcard-glow: oklch(0.6 0.16 255 / 0.16);
+  --cq-qcard-arc: oklch(0.62 0.16 255 / 0.1);
   --cq-stage-surface: oklch(1 0 0 / 0.06);
   --cq-stage-surface-strong: oklch(1 0 0 / 0.12);
   --cq-stage-border: oklch(1 0 0 / 0.14);
@@ -186,6 +194,12 @@
     --cq-border: oklch(0.34 0.011 258);
     --cq-border-strong: oklch(0.47 0.012 258);
     --cq-accent: oklch(0.72 0.15 258);
+    --cq-qcard-surface: oklch(0.19 0.045 262);
+    --cq-qcard-text: oklch(0.97 0.01 262);
+    --cq-qcard-muted: oklch(0.74 0.03 262);
+    --cq-qcard-edge: oklch(0.68 0.16 255);
+    --cq-qcard-glow: oklch(0.68 0.16 255 / 0.28);
+    --cq-qcard-arc: oklch(0.7 0.16 255 / 0.2);
     --cq-accent-hover: oklch(0.76 0.14 258);
     --cq-accent-soft: oklch(0.27 0.06 258);
     --cq-positive: oklch(0.72 0.12 151);
@@ -225,6 +239,12 @@
   --cq-border: oklch(0.34 0.011 258);
   --cq-border-strong: oklch(0.47 0.012 258);
   --cq-accent: oklch(0.72 0.15 258);
+  --cq-qcard-surface: oklch(0.19 0.045 262);
+  --cq-qcard-text: oklch(0.97 0.01 262);
+  --cq-qcard-muted: oklch(0.74 0.03 262);
+  --cq-qcard-edge: oklch(0.68 0.16 255);
+  --cq-qcard-glow: oklch(0.68 0.16 255 / 0.28);
+  --cq-qcard-arc: oklch(0.7 0.16 255 / 0.2);
   --cq-accent-hover: oklch(0.76 0.14 258);
   --cq-accent-soft: oklch(0.27 0.06 258);
   --cq-positive: oklch(0.72 0.12 151);

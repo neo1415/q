@@ -145,7 +145,7 @@ describe("card content", () => {
 });
 
 describe("the card", () => {
-  it("shows the name, the chosen line, the handle and an accessible QR", () => {
+  it("shows the name, the company line, the handle as a link to the public page, and an accessible QR", () => {
     render(
       <QCard
         name="Kivu Freight"
@@ -159,11 +159,14 @@ describe("the card", () => {
     const card = screen.getByRole("figure", {
       name: "Q Card for Kivu Freight",
     });
-    expect(within(card).getByText("@kivu")).toBeTruthy();
-    expect(within(card).getByText("Seed · Nairobi, Kenya")).toBeTruthy();
     expect(
-      within(card).getByText("Cross-border freight booking."),
-    ).toBeTruthy();
+      within(card).getByRole("link", { name: /kivu/ }).getAttribute("href"),
+    ).toBe("https://capitalq.example/@kivu");
+    expect(within(card).getByText("Seed · Nairobi, Kenya")).toBeTruthy();
+    // The founder's card design carries no tagline line.
+    expect(
+      within(card).queryByText("Cross-border freight booking."),
+    ).toBeNull();
     expect(
       within(card).getByRole("img", {
         name: "QR code linking to capitalq.example/@kivu",
@@ -276,7 +279,7 @@ describe("the profile panel", () => {
 
   it("one dropdown per field: off is Nobody, and members-only says nothing public", () => {
     renderPanel({ ...CARD, fieldScopes: { canonicalName: "public_external" } });
-    const audience = screen.getByRole("combobox", {
+    const audience = screen.getByRole<HTMLSelectElement>("combobox", {
       name: "Who sees in one line",
     });
     expect(audience.value).toBe("hidden");

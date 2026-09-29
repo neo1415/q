@@ -133,6 +133,7 @@ export async function QCardSection({
             tagline={tagline}
             handle={handle}
             displayUrl={displayUrlFor(handle)}
+            href={`${origin}/@${handle}`}
             qrSvg={qrSvg(`${origin}/c/${card.publicCode}`)}
             brand={brand}
           />
