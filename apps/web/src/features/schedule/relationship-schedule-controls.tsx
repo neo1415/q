@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 
 import type {
   MeetingDto,
@@ -18,6 +18,7 @@ import {
   findSlotsAction,
 } from "./schedule-actions";
 import { MeetingQ } from "./meeting-q";
+import { QSwarm } from "@/features/q-swarm/q-swarm";
 
 /**
  * The relationship page's calls and reminders (BIZ-008). The same things Q
@@ -46,6 +47,30 @@ function when(iso: string): string {
   }).format(new Date(iso));
 }
 
+/** A local "YYYY-MM-DDTHH:mm" for the datetime input. */
+function localInput(date: Date): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${String(date.getFullYear())}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+function atNine(from: number, days: number): string {
+  const date = new Date(from);
+  date.setDate(date.getDate() + days);
+  date.setHours(9, 0, 0, 0);
+  return localInput(date);
+}
+
+/** One tap for the usual "when" (founder live 2026-09-29: flow, not forms). */
+const QUICK_WHEN: readonly {
+  readonly label: string;
+  readonly at: (from: number) => string;
+}[] = [
+  { label: "In an hour", at: (from) => localInput(new Date(from + 3_600_000)) },
+  { label: "Tomorrow 9:00", at: (from) => atNine(from, 1) },
+  { label: "In 3 days", at: (from) => atNine(from, 3) },
+  { label: "Next week", at: (from) => atNine(from, 7) },
+];
+
 function newKey(): string {
   return `web-${crypto.randomUUID()}`;
 }
@@ -56,7 +81,10 @@ export function RelationshipScheduleControls({
   connected,
   initialMeetings,
   initialReminders,
+  focus = "all",
 }: {
+  /** Which job the surface opened for (founder live 2026-09-29: one flow each). */
+  readonly focus?: "call" | "reminder" | "all" | undefined;
   readonly relationshipId: string;
   readonly counterpart: string;
   readonly connected: boolean;
@@ -94,6 +122,18 @@ export function RelationshipScheduleControls({
         setMessage("No free time in the next week. Try again later.");
       }
     });
+
+  // "Book a call" opens on your free times, not on a button to find them.
+  const autoFound = useRef(false);
+  const findTimesRef = useRef(findTimes);
+  useEffect(() => {
+    findTimesRef.current = findTimes;
+  });
+  useEffect(() => {
+    if (focus !== "call" || !connected || autoFound.current) return;
+    autoFound.current = true;
+    findTimesRef.current();
+  }, [focus, connected]);
 
   const book = () =>
     startTransition(async () => {
@@ -142,12 +182,15 @@ export function RelationshipScheduleControls({
   const remind = () =>
     startTransition(async () => {
       const due = new Date(reminderAt);
-      if (reminderTitle.trim() === "" || Number.isNaN(due.getTime())) {
-        setMessage("Say what to remind you of, and when.");
+      if (Number.isNaN(due.getTime())) {
+        setMessage("Pick when.");
         return;
       }
       const created = await createReminderAction({
-        title: reminderTitle,
+        title:
+          reminderTitle.trim() === ""
+            ? `Follow up with ${counterpart}`
+            : reminderTitle,
         dueAt: due.toISOString(),
         relationshipId,
         byEmail,
@@ -187,199 +230,222 @@ export function RelationshipScheduleControls({
         Calls and reminders
       </h2>
 
-      <div className="flex flex-col gap-3">
-        {upcoming.length === 0 ? (
-          <p className="cq-body text-(--cq-text-secondary)">
-            No calls booked with {counterpart}.
-          </p>
-        ) : (
-          <ul className="flex flex-col gap-3" data-meetings>
-            {upcoming.map((meeting) => (
-              <li key={meeting.id} className="flex flex-col gap-1">
-                <time
-                  dateTime={meeting.startsAt}
-                  className="cq-caption cq-numeric text-(--cq-text-tertiary)"
-                  suppressHydrationWarning
-                >
-                  {when(meeting.startsAt)}
-                </time>
-                <span className="cq-body text-(--cq-text-primary)">
-                  {meeting.purpose}
-                </span>
-                <span className="cq-caption text-(--cq-text-secondary)">
-                  {meeting.organisedByYou
-                    ? `You invited ${meeting.attendees.join(", ") || counterpart}`
-                    : `${meeting.organiserName} invited you`}
-                </span>
-                <div className="flex flex-wrap gap-2">
-                  {meeting.meetLink === null ||
-                  Date.parse(meeting.endsAt) < openedAt ? null : (
-                    <a
-                      href={meeting.meetLink}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className={buttonClassName("secondary", "compact")}
-                    >
-                      Join Google Meet
-                    </a>
-                  )}
-                  {meeting.organisedByYou &&
-                  Date.parse(meeting.endsAt) >= openedAt ? (
-                    <Button
-                      variant="quiet"
-                      size="compact"
-                      disabled={pending}
-                      onClick={() => cancel(meeting.id)}
-                    >
-                      Cancel call
-                    </Button>
+      {focus === "reminder" ? null : (
+        <div className="flex flex-col gap-3">
+          {upcoming.length === 0 ? null : (
+            <ul className="flex flex-col gap-3" data-meetings>
+              {upcoming.map((meeting) => (
+                <li key={meeting.id} className="flex flex-col gap-1">
+                  <time
+                    dateTime={meeting.startsAt}
+                    className="cq-caption cq-numeric text-(--cq-text-tertiary)"
+                    suppressHydrationWarning
+                  >
+                    {when(meeting.startsAt)}
+                  </time>
+                  <span className="cq-body text-(--cq-text-primary)">
+                    {meeting.purpose}
+                  </span>
+                  <span className="cq-caption text-(--cq-text-secondary)">
+                    {meeting.organisedByYou
+                      ? `You invited ${meeting.attendees.join(", ") || counterpart}`
+                      : `${meeting.organiserName} invited you`}
+                  </span>
+                  <div className="flex flex-wrap gap-2">
+                    {meeting.meetLink === null ||
+                    Date.parse(meeting.endsAt) < openedAt ? null : (
+                      <a
+                        href={meeting.meetLink}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className={buttonClassName("secondary", "compact")}
+                      >
+                        Join Google Meet
+                      </a>
+                    )}
+                    {meeting.organisedByYou &&
+                    Date.parse(meeting.endsAt) >= openedAt ? (
+                      <Button
+                        variant="quiet"
+                        size="compact"
+                        disabled={pending}
+                        onClick={() => cancel(meeting.id)}
+                      >
+                        Cancel call
+                      </Button>
+                    ) : null}
+                  </div>
+                  {meeting.organisedByYou && meeting.meetLink !== null ? (
+                    <MeetingQ
+                      meetingId={meeting.id}
+                      ended={Date.parse(meeting.endsAt) < openedAt}
+                    />
                   ) : null}
-                </div>
-                {meeting.organisedByYou && meeting.meetLink !== null ? (
-                  <MeetingQ
-                    meetingId={meeting.id}
-                    ended={Date.parse(meeting.endsAt) < openedAt}
-                  />
-                ) : null}
-              </li>
-            ))}
-          </ul>
-        )}
-
-        {!connected ? (
-          <p className="cq-caption text-(--cq-text-secondary)">
-            Calls open once you&apos;re connected with {counterpart}.
-          </p>
-        ) : slots === null ? (
-          <Button
-            variant="secondary"
-            disabled={pending}
-            onClick={findTimes}
-            className="self-start"
-          >
-            Find a time
-          </Button>
-        ) : (
-          <fieldset className="flex flex-col gap-3" data-slots>
-            <legend className="cq-label text-(--cq-text-secondary)">
-              Free in your calendar (30 minutes)
-            </legend>
-            <div className="flex flex-wrap gap-2">
-              {slots.map((slot) => (
-                <Button
-                  key={slot.startsAt}
-                  variant={
-                    chosen?.startsAt === slot.startsAt ? "primary" : "secondary"
-                  }
-                  size="compact"
-                  aria-pressed={chosen?.startsAt === slot.startsAt}
-                  onClick={() => setChosen(slot)}
-                >
-                  <span suppressHydrationWarning>{when(slot.startsAt)}</span>
-                </Button>
+                </li>
               ))}
-            </div>
-            {chosen === null ? null : (
-              <>
-                <Input
-                  id="meeting-purpose"
-                  label="What the call is for"
-                  value={purpose}
-                  maxLength={500}
-                  onChange={(event) => setPurpose(event.target.value)}
-                />
-                <div className="flex gap-2">
+            </ul>
+          )}
+
+          {!connected ? (
+            <p className="cq-caption text-(--cq-text-secondary)">
+              Calls open once you&apos;re connected with {counterpart}.
+            </p>
+          ) : slots === null ? (
+            pending ? (
+              <div className="flex items-center gap-3" role="status">
+                <QSwarm state="WORKING" pixels={40} />
+                <span className="cq-body-sm text-(--cq-text-secondary)">
+                  Looking at your calendar…
+                </span>
+              </div>
+            ) : (
+              <Button
+                variant="secondary"
+                disabled={pending}
+                onClick={findTimes}
+                className="self-start"
+              >
+                Find a time
+              </Button>
+            )
+          ) : (
+            <fieldset className="flex flex-col gap-3" data-slots>
+              <legend className="cq-label text-(--cq-text-secondary)">
+                Free in your calendar (30 minutes)
+              </legend>
+              <div className="flex flex-wrap gap-2">
+                {slots.map((slot) => (
+                  <Button
+                    key={slot.startsAt}
+                    variant={
+                      chosen?.startsAt === slot.startsAt
+                        ? "primary"
+                        : "secondary"
+                    }
+                    size="compact"
+                    aria-pressed={chosen?.startsAt === slot.startsAt}
+                    onClick={() => setChosen(slot)}
+                  >
+                    <span suppressHydrationWarning>{when(slot.startsAt)}</span>
+                  </Button>
+                ))}
+              </div>
+              {chosen === null ? null : (
+                <div className="flex flex-col items-start gap-2">
                   <Button
                     variant="primary"
                     disabled={pending || purpose.trim() === ""}
                     onClick={book}
                   >
-                    Send invite
+                    <span suppressHydrationWarning>
+                      Send invite · {when(chosen.startsAt)}
+                    </span>
                   </Button>
+                  <details className="cq-caption text-(--cq-text-secondary)">
+                    <summary className="cursor-pointer">
+                      Topic: {purpose}
+                    </summary>
+                    <div className="pt-2">
+                      <Input
+                        id="meeting-purpose"
+                        label="What the call is for"
+                        value={purpose}
+                        maxLength={500}
+                        onChange={(event) => setPurpose(event.target.value)}
+                      />
+                    </div>
+                  </details>
+                </div>
+              )}
+            </fieldset>
+          )}
+        </div>
+      )}
+
+      {focus === "call" ? null : (
+        <div className="flex flex-col gap-3">
+          {reminders.length === 0 ? null : (
+            <ul className="flex flex-col gap-2" data-reminders>
+              {reminders.map((reminder) => (
+                <li
+                  key={reminder.id}
+                  className="flex flex-wrap items-baseline justify-between gap-2"
+                >
+                  <span className="cq-body text-(--cq-text-primary)">
+                    {reminder.title}{" "}
+                    <time
+                      dateTime={reminder.dueAt}
+                      className="cq-caption cq-numeric text-(--cq-text-tertiary)"
+                      suppressHydrationWarning
+                    >
+                      {when(reminder.dueAt)}
+                    </time>
+                  </span>
                   <Button
                     variant="quiet"
-                    onClick={() => {
-                      setSlots(null);
-                      setChosen(null);
-                    }}
+                    size="compact"
+                    disabled={pending}
+                    onClick={() => dismiss(reminder.id)}
                   >
-                    Not now
+                    Done
                   </Button>
-                </div>
-                <p className="cq-caption text-(--cq-text-secondary)">
-                  A Google Calendar invite with a Meet link goes from your
-                  calendar to {counterpart}&apos;s people.
-                </p>
-              </>
-            )}
-          </fieldset>
-        )}
-      </div>
-
-      <div className="flex flex-col gap-3">
-        {reminders.length === 0 ? null : (
-          <ul className="flex flex-col gap-2" data-reminders>
-            {reminders.map((reminder) => (
-              <li
-                key={reminder.id}
-                className="flex flex-wrap items-baseline justify-between gap-2"
-              >
-                <span className="cq-body text-(--cq-text-primary)">
-                  {reminder.title}{" "}
-                  <time
-                    dateTime={reminder.dueAt}
-                    className="cq-caption cq-numeric text-(--cq-text-tertiary)"
-                    suppressHydrationWarning
-                  >
-                    {when(reminder.dueAt)}
-                  </time>
-                </span>
-                <Button
-                  variant="quiet"
-                  size="compact"
-                  disabled={pending}
-                  onClick={() => dismiss(reminder.id)}
-                >
-                  Done
-                </Button>
-              </li>
-            ))}
-          </ul>
-        )}
-        <div className="flex flex-col gap-2" data-remind-form>
-          <Input
-            id="reminder-title"
-            label="Remind me to"
-            placeholder="Follow up"
-            value={reminderTitle}
-            maxLength={200}
-            onChange={(event) => setReminderTitle(event.target.value)}
-          />
-          <Input
-            id="reminder-at"
-            label="When"
-            type="datetime-local"
-            value={reminderAt}
-            onChange={(event) => setReminderAt(event.target.value)}
-          />
-          <label className="cq-body flex min-h-11 items-center gap-2 text-(--cq-text-primary)">
-            <input
-              type="checkbox"
-              checked={byEmail}
-              onChange={(event) => setByEmail(event.target.checked)}
+                </li>
+              ))}
+            </ul>
+          )}
+          <div className="flex flex-col gap-2" data-remind-form>
+            <Input
+              id="reminder-title"
+              label="Remind me to"
+              placeholder={`Follow up with ${counterpart}`}
+              value={reminderTitle}
+              maxLength={200}
+              onChange={(event) => setReminderTitle(event.target.value)}
             />
-            Email me too
-          </label>
-          <Button
-            variant="secondary"
-            disabled={pending}
-            onClick={remind}
-            className="self-start"
-          >
-            Set reminder
-          </Button>
+            <div
+              className="flex flex-wrap gap-2"
+              role="group"
+              aria-label="When"
+            >
+              {QUICK_WHEN.map((quick) => (
+                <Button
+                  key={quick.label}
+                  variant={
+                    reminderAt === quick.at(openedAt) ? "primary" : "secondary"
+                  }
+                  size="compact"
+                  onClick={() => setReminderAt(quick.at(openedAt))}
+                >
+                  {quick.label}
+                </Button>
+              ))}
+            </div>
+            <Input
+              id="reminder-at"
+              label="Or pick a time"
+              type="datetime-local"
+              value={reminderAt}
+              onChange={(event) => setReminderAt(event.target.value)}
+            />
+            <label className="cq-body flex min-h-11 items-center gap-2 text-(--cq-text-primary)">
+              <input
+                type="checkbox"
+                checked={byEmail}
+                onChange={(event) => setByEmail(event.target.checked)}
+              />
+              Email me too
+            </label>
+            <Button
+              variant="secondary"
+              disabled={pending}
+              onClick={remind}
+              className="self-start"
+            >
+              Set reminder
+            </Button>
+          </div>
         </div>
-      </div>
+      )}
 
       {message === null ? null : (
         <p role="status" className="cq-caption text-(--cq-text-secondary)">

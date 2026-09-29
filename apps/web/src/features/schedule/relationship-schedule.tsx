@@ -24,10 +24,12 @@ export async function RelationshipSchedule({
   relationshipId,
   counterpart,
   connected,
+  focus = "all",
 }: {
   readonly relationshipId: string;
   readonly counterpart: string;
   readonly connected: boolean;
+  readonly focus?: "call" | "reminder" | "all" | undefined;
 }) {
   const session = await apiSession();
   if (session === null) return null;
@@ -54,6 +56,7 @@ export async function RelationshipSchedule({
       connected={connected}
       initialMeetings={meetings}
       initialReminders={reminders}
+      focus={focus}
     />
   );
 }

@@ -129,13 +129,26 @@ export function RelationshipDetail({
                 </Link>
               ) : null}
               {relationship === null ? null : (
-                <ScheduleDialog canCall={connected}>
-                  <RelationshipSchedule
-                    relationshipId={relationship.relationshipId}
-                    counterpart={counterpart}
-                    connected={connected}
-                  />
-                </ScheduleDialog>
+                <>
+                  {connected ? (
+                    <ScheduleDialog kind="call">
+                      <RelationshipSchedule
+                        relationshipId={relationship.relationshipId}
+                        counterpart={counterpart}
+                        connected={connected}
+                        focus="call"
+                      />
+                    </ScheduleDialog>
+                  ) : null}
+                  <ScheduleDialog kind="reminder">
+                    <RelationshipSchedule
+                      relationshipId={relationship.relationshipId}
+                      counterpart={counterpart}
+                      connected={connected}
+                      focus="reminder"
+                    />
+                  </ScheduleDialog>
+                </>
               )}
             </div>
           </Card>

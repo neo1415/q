@@ -6,37 +6,39 @@ import { buttonClassName } from "@capital-q/ui/button";
 import { DialogContent, DialogRoot, DialogTrigger } from "@capital-q/ui/dialog";
 import { Bell, CalendarDays, ICON_SIZE } from "@capital-q/ui/icons";
 
-const SCHEDULE_HASHES = new Set(["#calls", "#reminders"]);
-
 function subscribeHash(onChange: () => void): () => void {
   window.addEventListener("hashchange", onChange);
   return () => window.removeEventListener("hashchange", onChange);
 }
 
+const KINDS = {
+  call: { hash: "#calls", title: "Book a call", Icon: CalendarDays },
+  reminder: { hash: "#reminders", title: "Set a reminder", Icon: Bell },
+} as const;
+
 /**
- * Calls and reminders open over the page from the button that asks for
- * them (founder direction 2026-09-29: a modal, not a block always on the
- * page). The contents are the same server-rendered controls.
+ * One job per dialog (founder live 2026-09-29: "it should be obvious what
+ * you need to do"): Book a call opens on your free times, Set a reminder on
+ * when. Links elsewhere arrive as #calls or #reminders and open the one
+ * they name. The contents are the same server-rendered controls, focused.
  */
 export function ScheduleDialog({
-  canCall,
+  kind,
   children,
 }: {
-  /** Calls open once connected; reminders are always offered. */
-  readonly canCall: boolean;
+  readonly kind: keyof typeof KINDS;
   readonly children: ReactNode;
 }) {
-  // Links elsewhere ("Book a call" on a relationship card) arrive as
-  // #calls or #reminders and open the dialog straight away.
+  const { hash, title, Icon } = KINDS[kind];
   const asked = useSyncExternalStore(
     subscribeHash,
-    () => SCHEDULE_HASHES.has(window.location.hash),
+    () => window.location.hash === hash,
     () => false,
   );
   const [chosen, setChosen] = useState<boolean | null>(null);
   const open = chosen ?? asked;
   const onOpenChange = (next: boolean) => {
-    if (!next && SCHEDULE_HASHES.has(window.location.hash)) {
+    if (!next && window.location.hash === hash) {
       window.history.replaceState(
         null,
         "",
@@ -47,22 +49,14 @@ export function ScheduleDialog({
   };
   return (
     <DialogRoot open={open} onOpenChange={onOpenChange}>
-      {canCall ? (
-        <DialogTrigger>
-          <button type="button" className={buttonClassName("secondary")}>
-            <CalendarDays size={ICON_SIZE.regular} aria-hidden="true" />
-            Book a call
-          </button>
-        </DialogTrigger>
-      ) : null}
       <DialogTrigger>
         <button type="button" className={buttonClassName("secondary")}>
-          <Bell size={ICON_SIZE.regular} aria-hidden="true" />
-          Set a reminder
+          <Icon size={ICON_SIZE.regular} aria-hidden="true" />
+          {title}
         </button>
       </DialogTrigger>
       <DialogContent
-        title="Calls and reminders"
+        title={title}
         className="max-h-[85vh] max-w-lg overflow-y-auto"
       >
         {children}
