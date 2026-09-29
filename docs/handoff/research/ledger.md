@@ -177,3 +177,10 @@ P2
 14. Learning pipeline: consent flag, de-identified corpus (turns, corrections, outcomes), eval sets, export for future own-model training.
 WOW candidates: live shared meeting notes for both sides; IC rehearsal (Q plays a tough partner, scores the pitch); raise autopilot with approvals; warm-intro graph; weekly voice brief; term-sheet + e-signature with commitment ladder.
 Onboarding status: founder/investor interviews live; presence read (Q looks the company/person up during onboarding) exists and stays silent when nothing is found (turn.ts proactive → no line) — verify it only mentions finds tied to the next question.
+
+### 2026-09-29 late — progress on the priority list
+- DONE #2 meeting record (52bee2f, migration 20261027090000 applied): Q auto-enlists every booked call with a Meet link ≤30 min before start; consent line in invite; transcript + attendees + agreements + money-mentioned (firmness + quote, "not a commitment until confirmed") + flags + next steps, readable by BOTH sides; `meeting_held` relationship event (attribution trail). Speaking in calls: not built (ADR 0027 §3).
+- DONE #3 chat = WhatsApp, #5 swipe + plain search rows (earlier commits).
+- #4 nav speed re-measured on prod: loader ~80 ms, page 0.47–1.71 s (was 2–5 s). Relationships slowest.
+- DONE #7 "wow" errands (c8c788db, migration 20261028090000 applied, ADR 0028): "Let Q handle this" on a relationship, or ask Q; one approval of an exact plan (interest → opening message → answers from an approved brief → call booked at first free time → notices with Meet link); Stop any time. Needs one live run (small model spend) on seed accounts.
+- NEXT: #8 business layer (fundraising ledger from confirmed commitment signals + attribution export), #9 GateQ embed, then P0 live checks (Brevo reminder, Gmail, Recall call).
