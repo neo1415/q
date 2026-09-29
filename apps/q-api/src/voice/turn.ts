@@ -17,6 +17,7 @@ import {
   CorrelationIdSchema,
   QApprovalIdSchema,
   QConversationIdSchema,
+  Q_VOICE_QUESTION_BEAT,
   type CorrelationId,
   type OnboardingSessionView,
   type OnboardingUnderstanding,
@@ -353,6 +354,8 @@ const THINKING_HM_AFTER_MS = 2_600;
 const THINKING_HUM_AFTER_MS = 6_500;
 /** The share of slow turns that get a beat: sometimes, never every time. */
 const THINKING_BEAT_SHARE = 0.35;
+/** The share of questions back that open on a rising "Hm?". */
+const QUESTION_BEAT_SHARE = 0.5;
 /**
  * The utterance the turn in hand is about, until the one run that answers
  * the person's words takes it. A look-up Q starts on its own is not the
@@ -1033,6 +1036,12 @@ export function createVoiceTurnHandler(
             break;
           }
           case "q.input.required":
+            // A rising "Hm?" before a question back, as a person asks
+            // (founder live 2026-09-29: a flat hm thinks, a rising one
+            // asks, a low one acknowledges); on some turns, never all.
+            if (Math.random() < QUESTION_BEAT_SHARE) {
+              yield `${Q_VOICE_QUESTION_BEAT} `;
+            }
             yield event.data.clarification.options === undefined
               ? event.data.clarification.question
               : `${event.data.clarification.question} ${joinOptions(event.data.clarification.options)}?`;

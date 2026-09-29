@@ -1584,7 +1584,9 @@ const qArtifacts = createQArtifacts({
   transactions: database.transactions,
   gateway: modelGateway,
   logger,
-  photos: createPexelsPhotos(process.env.PEXELS_API_KEY),
+  photos: createPexelsPhotos(
+    process.env.PEXELS_API_KEY ?? process.env.PEXELS_API,
+  ),
 });
 const qIntelligence = composeQIntelligence({
   // The attestation is the claim about the data; where it holds, every

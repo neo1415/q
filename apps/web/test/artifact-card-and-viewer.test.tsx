@@ -167,16 +167,16 @@ describe("QX-003E · the card in an answer", () => {
         onOpenArtifact={vi.fn()}
       />,
     );
-    expect(screen.getByText(/still preparing/i)).toBeTruthy();
+    expect(screen.getByText(/Q is writing this. Please wait/i)).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Open" })).toBeNull();
     expect(screen.queryByText("Edit with Q")).toBeNull();
     // No bytes exist yet, so there is no download to offer.
     expect(screen.queryByText("PDF")).toBeNull();
-    // A skeleton holds the card's shape, hidden from assistive technology,
-    // so the actions arriving later do not move the answer.
+    // Q's swarm at work stands in for the actions (founder live
+    // 2026-09-29), hidden from assistive technology.
     const card = document.querySelector('[data-q-artifact-card="PREPARING"]');
     expect(
-      card?.querySelector('[aria-hidden="true"] .animate-pulse'),
+      card?.querySelector('canvas[aria-hidden="true"][data-q-swarm]'),
     ).toBeTruthy();
   });
 

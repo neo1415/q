@@ -233,6 +233,10 @@ export function describeQStage(stage: QVisibleStage | null): string | null {
       return "Reviewing the relationship";
     case "PREPARING_ANALYSIS":
       return "Preparing the analysis";
+    case "PREPARING_DOCUMENT":
+      return "Writing your document. This takes a moment.";
+    case "REVISING_DOCUMENT":
+      return "Making your changes to the document. One moment.";
     case "WAITING_FOR_REPLY":
       return "Q needs a little more information before continuing.";
     case "WAITING_FOR_APPROVAL":

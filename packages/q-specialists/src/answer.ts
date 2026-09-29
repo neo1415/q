@@ -645,6 +645,7 @@ export function createSpecialistQAnswer(
       company: subject,
       companyName: name,
       saidVerbatim: said,
+      showStage: (stage) => showStage(request, stage),
       // The reading decided this is a request to prepare; a model's own
       // field (which may be empty for an impatient "just do it") does not
       // get to overrule it. How it should look is still the model's read.
@@ -727,6 +728,7 @@ export function createSpecialistQAnswer(
           "There's no mandate on your record yet, so there's nothing to put in a document. Set it up with me and I'll make it.",
       };
     }
+    await showStage(request, "PREPARING_DOCUMENT");
     try {
       const summary = await preparation.port.prepare({
         actorContext: request.actor,
@@ -783,6 +785,7 @@ export function createSpecialistQAnswer(
           "There's no written answer here yet to put in a document. Ask me what you want it to say and I'll write it and make the PDF.",
       };
     }
+    await showStage(request, "PREPARING_DOCUMENT");
     try {
       const summary = await preparation.port.prepare({
         actorContext: request.actor,
@@ -1541,6 +1544,7 @@ export function createSpecialistQAnswer(
             saidVerbatim: latest.content,
             result,
             history,
+            showStage: (stage) => showStage(request, stage),
             ...(logger === undefined ? {} : { logger }),
           });
     const prepared =

@@ -1,6 +1,7 @@
 import type {
   QArtifactSummary,
   QResultBlock,
+  QVisibleStage,
   QSubjectRef,
 } from "@capital-q/contracts";
 import type { Logger } from "@capital-q/observability";
@@ -129,6 +130,8 @@ export async function prepareOrReviseArtifact(input: {
   readonly result: CompanyIntelligenceResult;
   readonly history: HistoryLike;
   readonly logger?: Logger | undefined;
+  /** Tells the person Q is writing or editing, while it does. */
+  readonly showStage?: ((stage: QVisibleStage) => Promise<void>) | undefined;
 }): Promise<ArtifactPreparationOutcome> {
   const { artifacts, request, company, result, history, logger } = input;
   const ask = result.artifactRequest;
@@ -160,6 +163,7 @@ export async function prepareOrReviseArtifact(input: {
           target,
         );
         if (current !== null) {
+          await input.showStage?.("REVISING_DOCUMENT");
           const revised = await artifacts.reviser.revise({
             base: {
               title: current.title,
@@ -246,6 +250,7 @@ export async function prepareOrReviseArtifact(input: {
     );
     return { kind: "THIN_RECORD", artifactType: ask.artifactType };
   }
+  await input.showStage?.("PREPARING_DOCUMENT");
   try {
     return {
       kind: "PREPARED",

@@ -33,14 +33,19 @@ export const Q_VOICE_WS_PATH = "/v1/q/voice/ws" as const;
 export const Q_VOICE_THINK_PATH = "/v1/q/voice/think" as const;
 
 /**
- * The sounds Q makes while it thinks ("hm", a hum): voiced, never part of
- * an answer. Named here so the transcript can leave them out too.
+ * The sounds Q makes, each with its own tune (founder live 2026-09-29):
+ * a flat "Hmm." while it thinks, a low "Mm..." as it considers, a rising
+ * "Hm?" before it asks something back. Voiced, never part of an answer,
+ * and named here so the transcript can leave them out too. The speech
+ * model reads the tune from the punctuation.
  */
-export const Q_VOICE_HM_BEATS = ["Hmm.", "Hm."] as const;
+export const Q_VOICE_HM_BEATS = ["Hmm.", "Hm.", "Mm..."] as const;
 export const Q_VOICE_HUM_BEATS = ["Mmm..."] as const;
+export const Q_VOICE_QUESTION_BEAT = "Hm?" as const;
 export const Q_VOICE_THINKING_BEATS: ReadonlySet<string> = new Set([
   ...Q_VOICE_HM_BEATS,
   ...Q_VOICE_HUM_BEATS,
+  Q_VOICE_QUESTION_BEAT,
 ]);
 export const Q_VOICE_PROVIDERS = ["elevenlabs", "deepgram"] as const;
 export const QVoiceProviderSchema = z.enum(Q_VOICE_PROVIDERS);

@@ -55,6 +55,8 @@ const envSchema = z.object({
    * over HTTPS instead and SMTP_HOST/PORT/USER/PASS are not needed.
    */
   BREVO_API_KEY: optionalValue,
+  /** The same Brevo key under the name the founder set it as on Railway. */
+  SMTP_API_KEY: optionalValue,
   // "Name <address>" or a bare address.
   SMTP_SENDER: optionalValue.pipe(
     z
@@ -89,11 +91,12 @@ export function loadAppEmailConfig(env: EnvironmentInput): AppEmailConfig {
   const missing = APP_EMAIL_ENV_NAMES.filter(
     (name) => parsed[name] === undefined,
   );
+  const brevoKey = parsed.BREVO_API_KEY ?? parsed.SMTP_API_KEY;
   return {
     brevoApi:
-      parsed.BREVO_API_KEY !== undefined && parsed.SMTP_SENDER !== undefined
+      brevoKey !== undefined && parsed.SMTP_SENDER !== undefined
         ? {
-            apiKey: new ProviderCredential(parsed.BREVO_API_KEY),
+            apiKey: new ProviderCredential(brevoKey),
             sender: parsed.SMTP_SENDER,
           }
         : undefined,

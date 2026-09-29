@@ -24,6 +24,8 @@ export const Q_VISIBLE_STAGES = [
   "COMPARING_OPPORTUNITIES",
   "REVIEWING_RELATIONSHIP",
   "PREPARING_ANALYSIS",
+  "PREPARING_DOCUMENT",
+  "REVISING_DOCUMENT",
   "WAITING_FOR_REPLY",
   "WAITING_FOR_APPROVAL",
   "COMPLETING_APPROVED_ACTION",
@@ -47,6 +49,9 @@ export const Q_VISIBLE_STAGE_LABELS: Readonly<Record<QVisibleStage, string>> = {
   COMPARING_OPPORTUNITIES: "Comparing opportunities",
   REVIEWING_RELATIONSHIP: "Reviewing relationship context",
   PREPARING_ANALYSIS: "Preparing your analysis",
+  // Founder live 2026-09-29: a document takes a while; say so and to wait.
+  PREPARING_DOCUMENT: "Writing your document. This takes a moment.",
+  REVISING_DOCUMENT: "Making your changes to the document. One moment.",
   WAITING_FOR_REPLY: "Waiting for your reply",
   WAITING_FOR_APPROVAL: "Waiting for your approval",
   COMPLETING_APPROVED_ACTION: "Completing the approved action",

@@ -49,6 +49,7 @@ import {
   type QTurn,
 } from "./conversation";
 import { announceQSaid } from "@/features/q-swarm/q-said";
+import { QSwarm } from "@/features/q-swarm/q-swarm";
 
 import { plainFromMarkdown, QMarkdown } from "./markdown";
 import { QAnswer } from "./q-answer";
@@ -494,6 +495,9 @@ export function QConversationPanel({
   const boardDocked = wide && boardOpen;
 
   const stage = workingLabel(q.state);
+  const documentStage =
+    q.state.stage === "PREPARING_DOCUMENT" ||
+    q.state.stage === "REVISING_DOCUMENT";
   const showWelcome = welcome !== undefined && lines.length === 0 && !q.loading;
   const showSuggestions =
     welcome === undefined &&
@@ -830,16 +834,21 @@ export function QConversationPanel({
                   ) : null}
                 </ol>
 
-                {/* What Q is doing, only while it is doing something. */}
+                {/* What Q is doing, only while it is doing something: the
+                    swarm at work beside it (founder live 2026-09-29), and
+                    a document's "one moment" even while talking. */}
                 {voice.active || q.working ? (
                   <div
                     className="flex items-center gap-3"
                     role="status"
                     data-q-thread-status
                   >
+                    {q.working ? <QSwarm state="WORKING" pixels={40} /> : null}
                     <span className="cq-caption text-(--cq-text-secondary)">
                       {stateLabel}
-                      {!voice.active && q.working && stage !== undefined
+                      {q.working &&
+                      stage !== undefined &&
+                      (!voice.active || documentStage)
                         ? ` · ${stage}`
                         : ""}
                     </span>

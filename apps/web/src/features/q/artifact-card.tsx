@@ -12,6 +12,8 @@ import {
   Presentation,
 } from "@capital-q/ui/icons";
 
+import { QSwarm } from "@/features/q-swarm/q-swarm";
+
 import { artifactTypeLabel } from "./artifact-type";
 import { ArtifactDownloads } from "./artifact-download";
 import type { QTurnObjectBlock } from "./conversation";
@@ -137,13 +139,10 @@ export function ArtifactCard({
           )}
         </div>
       ) : block.status === "PREPARING" ? (
-        <div className="flex flex-col gap-2" data-q-artifact-preparing>
-          <div aria-hidden="true" className="flex gap-2">
-            <span className="h-11 w-20 animate-pulse rounded-md bg-(--cq-surface-strong) lg:h-10" />
-            <span className="h-11 w-24 animate-pulse rounded-md bg-(--cq-surface-strong) lg:h-10" />
-          </div>
+        <div className="flex items-center gap-3" data-q-artifact-preparing>
+          <QSwarm state="WORKING" pixels={48} />
           <p className="cq-caption text-(--cq-text-secondary)">
-            Q is still preparing this. It opens here when it&apos;s ready.
+            Q is writing this. Please wait; it opens here when it&apos;s ready.
           </p>
         </div>
       ) : (
