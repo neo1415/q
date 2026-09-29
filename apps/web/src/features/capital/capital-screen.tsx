@@ -17,6 +17,8 @@ import { ownRelationships } from "@/features/relationships/relationship-data";
 import { RelationshipList } from "@/features/relationships/relationship-list";
 import { formatDay } from "@/components/date-format";
 
+import { AskQChips } from "./ask-q-chips";
+
 /**
  * Capital: the objective and the relationships behind it (doc 17 §§105-107;
  * design/visual-direction.md "No dashboards").
@@ -85,17 +87,49 @@ export async function CapitalScreen() {
     ownRelationships(context),
   ]);
 
+  const asks =
+    context.kind === "INVESTOR"
+      ? [
+          {
+            label: "Companies that fit my mandate",
+            prompt:
+              "Which companies on Capital Q fit my mandate best right now?",
+          },
+          {
+            label: "Where are my deals?",
+            prompt:
+              "Summarise where each of my company relationships stands and what I should do next.",
+          },
+          {
+            label: "Sharpen my mandate",
+            prompt:
+              "Review my mandate and tell me what would make it sharper for founders.",
+          },
+        ]
+      : [
+          {
+            label: "Plan this raise",
+            prompt:
+              "Plan my raise: who to approach, in what order, and what to prepare.",
+          },
+          {
+            label: "Investors who fit",
+            prompt: "Which investors on Capital Q fit my raise best, and why?",
+          },
+          {
+            label: "Make my pitch deck",
+            prompt: "Make me a pitch deck for this raise.",
+          },
+          {
+            label: "What's missing?",
+            prompt:
+              "What would an investor ask about my raise that I can't answer yet?",
+          },
+        ];
+
   return (
     <div className="flex flex-col gap-10">
-      <PageSection
-        id="objective"
-        title="Your objective"
-        description={
-          context.kind === "INVESTOR"
-            ? "What you are deploying is your mandate; Discover works from it."
-            : undefined
-        }
-      >
+      <PageSection id="objective" title="Your raise">
         {objective !== null && objective !== undefined ? (
           <ObjectivePanel objective={objective} />
         ) : (
@@ -131,17 +165,12 @@ export async function CapitalScreen() {
             }
           />
         )}
+        <div className="pt-4">
+          <AskQChips asks={asks} />
+        </div>
       </PageSection>
 
-      <PageSection
-        id="relationships"
-        title="Relationships"
-        description={
-          context.kind === "INVESTOR"
-            ? "Companies your organisation has discovered or approached, and where each stands."
-            : "Investor organisations that have approached your company, and where each stands."
-        }
-      >
+      <PageSection id="relationships" title="Relationships">
         {relationships === undefined ? (
           <QuietEmpty sentence="Your relationships couldn't load. Try again in a moment." />
         ) : (
@@ -194,47 +223,60 @@ function ObjectivePanel({
     { id: "use", term: "Use of funds", value: objective.useOfFundsSummary },
   ];
 
+  // The raise at a glance (founder direction 2026-09-29): the number large,
+  // the terms as quiet chips, the use of funds under it. What is not set
+  // is simply absent; editing is Q's (the asks below the card).
+  const terms = rows.filter(
+    (row) =>
+      row.id !== "target" &&
+      row.id !== "use" &&
+      row.value !== null &&
+      row.value.length > 0,
+  );
+  const use = rows.find((row) => row.id === "use")?.value ?? null;
   return (
-    <section className="cq-panel max-w-(--cq-layout-reading)" data-objective>
-      <header className="cq-panel-header">
-        <h3 className="cq-title-sm cq-numeric text-(--cq-text-primary)">
-          Raising {target}
-        </h3>
-        <span className="cq-status-line">
+    <section
+      className="cq-glow-card flex max-w-(--cq-layout-reading) flex-col gap-4 rounded-2xl p-5 sm:p-6"
+      data-objective
+    >
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="flex flex-col gap-1">
+          <span className="cq-caption text-(--cq-text-tertiary)">Raising</span>
+          <h3 className="cq-title-xl cq-numeric text-(--cq-text-primary)">
+            {target}
+          </h3>
+        </div>
+        <span className="flex items-center gap-2">
           <Badge tone={objective.status === "ACTIVE" ? "accent" : "neutral"}>
             {STATUS_LABELS[objective.status]}
           </Badge>
-          <span className="cq-numeric">
+          <span className="cq-caption cq-numeric text-(--cq-text-tertiary)">
             since {formatDate(objective.startedAt)}
           </span>
         </span>
-      </header>
-      <dl className="cq-panel-body cq-panel-rows py-1">
-        {rows.map((row) => (
-          <div
-            key={row.id}
-            className="flex flex-col gap-0.5 py-3 sm:flex-row sm:justify-between sm:gap-4"
-            data-objective-row={row.id}
-          >
-            <dt className="cq-label shrink-0 text-(--cq-text-secondary)">
-              {row.term}
-            </dt>
-            <dd
-              className={
-                row.numeric === true
-                  ? "cq-body cq-numeric text-(--cq-text-primary) sm:text-right"
-                  : "cq-body text-(--cq-text-primary) sm:text-right"
-              }
+      </div>
+      {terms.length === 0 ? null : (
+        <ul className="flex flex-wrap gap-2" aria-label="Terms">
+          {terms.map((row) => (
+            <li
+              key={row.id}
+              data-objective-row={row.id}
+              className="cq-body-sm rounded-full border border-(--cq-border-subtle) bg-(--cq-surface-subtle) px-3 py-1 text-(--cq-text-primary)"
             >
-              {row.value === null || row.value.length === 0 ? (
-                <span className="text-(--cq-text-tertiary)">Not set</span>
-              ) : (
-                row.value
-              )}
-            </dd>
-          </div>
-        ))}
-      </dl>
+              <span className="sr-only">{row.term}: </span>
+              {row.id === "close" ? `Close ${row.value ?? ""}` : row.value}
+            </li>
+          ))}
+        </ul>
+      )}
+      {use === null || use.length === 0 ? null : (
+        <p
+          className="cq-body text-(--cq-text-secondary)"
+          data-objective-row="use"
+        >
+          {use}
+        </p>
+      )}
     </section>
   );
 }
