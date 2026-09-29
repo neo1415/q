@@ -142,16 +142,18 @@ export function ProfileAnswers({
 
   return (
     <div className="flex flex-col gap-4" data-answers="read">
-      {state.groups.filter((group) => group.lines.length > 0).map((group) => (
-        <AnswerGroupView
-          key={group.id}
-          journey={journey}
-          group={group}
-          href={editHref(journey, group)}
-          editable={editableOf(journey, group, fullState)}
-          bare={bare}
-        />
-      ))}
+      {state.groups
+        .filter((group) => group.lines.length > 0)
+        .map((group) => (
+          <AnswerGroupView
+            key={group.id}
+            journey={journey}
+            group={group}
+            href={editHref(journey, group)}
+            editable={editableOf(journey, group, fullState)}
+            bare={bare}
+          />
+        ))}
       {provenance ? (
         <details className="max-w-(--cq-layout-reading)">
           <summary className="cq-caption inline-flex min-h-11 cursor-pointer items-center text-(--cq-text-tertiary) hover:text-(--cq-text-secondary) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)">

@@ -17,6 +17,7 @@ import {
 
 import {
   FOUNDER_MEDIA_NAVIGATION,
+  FIND_NAVIGATION,
   FOUNDER_REQUESTS_NAVIGATION,
   INVESTORS_NAVIGATION,
   PROFILE_NAVIGATION,
@@ -40,6 +41,7 @@ export function AccountMenu({
   const sideLinks = [
     ...(founder ? [INVESTORS_NAVIGATION, FOUNDER_MEDIA_NAVIGATION] : []),
     ...(investor ? [FOUNDER_REQUESTS_NAVIGATION] : []),
+    FIND_NAVIGATION,
   ];
   return (
     <PopoverRoot>

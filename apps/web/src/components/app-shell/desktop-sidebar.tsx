@@ -22,6 +22,7 @@ import { ChatsListForRoute } from "@/features/q/chats-list";
 import type { ShellContext } from "./app-shell";
 import {
   FOUNDER_MEDIA_NAVIGATION,
+  FIND_NAVIGATION,
   FOUNDER_REQUESTS_NAVIGATION,
   INVESTORS_NAVIGATION,
   isActiveRoute,
@@ -64,6 +65,7 @@ export function DesktopSidebar({
       : context.scope === "investor_private"
         ? [FOUNDER_REQUESTS_NAVIGATION]
         : []),
+    FIND_NAVIGATION,
   ];
 
   return (

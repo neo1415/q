@@ -516,6 +516,10 @@ const PAGE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "/pitch/new": cap("navigate.PITCH"),
   // ADR 0023: investors for a founder, founders' requests for an investor.
   "/investors": cap("offer.connection_request"),
+  // Founder design 2026-09-28: a Q Card by its whole @handle.
+  "/find": exempt(
+    "opening someone's public Q Card by the handle they gave you; the page is public and Q links it directly",
+  ),
   "/investors/[investorOrganisationId]": cap("offer.connection_request"),
   "/pitch/[mediaAssetId]": cap("navigate.PITCH"),
   "/company/[companyId]": cap("tool.open_page"),

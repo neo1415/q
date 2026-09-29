@@ -27,6 +27,15 @@ const nextConfig: NextConfig = {
   rewrites() {
     return Promise.resolve([
       { source: "/@:handle([a-z0-9-]+).vcf", destination: "/u/:handle/vcard" },
+      // The card to save or send (founder design 2026-09-28).
+      {
+        source: "/@:handle([a-z0-9-]+).png",
+        destination: "/u/:handle/card.png",
+      },
+      {
+        source: "/@:handle([a-z0-9-]+).pdf",
+        destination: "/u/:handle/card.pdf",
+      },
       { source: "/@:handle([A-Za-z0-9-]+)", destination: "/u/:handle" },
     ]);
   },

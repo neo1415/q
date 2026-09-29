@@ -728,10 +728,16 @@ async function StatRow({ journey }: { readonly journey: ProfileJourney }) {
       : items.slice(0, max).join(", ") +
           (items.length > max ? ` +${String(items.length - max)}` : "");
   };
-  const stats: readonly { readonly label: string; readonly value: string | null }[] =
+  const stats: readonly {
+    readonly label: string;
+    readonly value: string | null;
+  }[] =
     journey === "investor"
       ? [
-          { label: "Typical cheque", value: line("I2.cheque_typical")?.value ?? null },
+          {
+            label: "Typical cheque",
+            value: line("I2.cheque_typical")?.value ?? null,
+          },
           { label: "Stages", value: listOf("I2.stages") },
           { label: "Key sectors", value: listOf("I3.sectors") },
         ]
@@ -747,10 +753,7 @@ async function StatRow({ journey }: { readonly journey: ProfileJourney }) {
           },
         ];
   return (
-    <dl
-      className="grid grid-cols-1 gap-3 sm:grid-cols-3"
-      data-profile-stats
-    >
+    <dl className="grid grid-cols-1 gap-3 sm:grid-cols-3" data-profile-stats>
       {stats.map((stat) => (
         <div
           key={stat.label}

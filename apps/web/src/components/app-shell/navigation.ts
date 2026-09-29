@@ -4,6 +4,7 @@ import {
   CircleUser,
   Compass,
   Handshake,
+  Search,
   Landmark,
   Play,
   Settings,
@@ -30,6 +31,7 @@ export type NavigationItem = {
     | "/profile"
     | "/pitch"
     | "/investors"
+    | "/find"
     | "/settings";
   readonly label: string;
   readonly icon: ComponentType<{
@@ -94,6 +96,13 @@ export const FOUNDER_REQUESTS_NAVIGATION: NavigationItem = {
   href: "/investors",
   label: "Founder requests",
   icon: Handshake,
+};
+
+/** Open someone's Q Card by the @handle they gave you (founder design). */
+export const FIND_NAVIGATION: NavigationItem = {
+  href: "/find",
+  label: "Find by handle",
+  icon: Search,
 };
 
 /**

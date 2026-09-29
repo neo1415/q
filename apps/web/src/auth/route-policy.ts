@@ -25,6 +25,7 @@ export const PROTECTED_PATH_PREFIXES = [
   "/company",
   "/pitch",
   "/investors",
+  "/find",
   "/verification",
   "/profile",
   "/onboarding",

@@ -258,10 +258,27 @@ function ShareRow({
       >
         Copy link
       </Button>
+      {/* The card to save or send: an image or a one-page PDF. */}
+      <a
+        href={`/@${handle}.png`}
+        download
+        className={buttonClassName("secondary")}
+        data-card-download="png"
+      >
+        Download image
+      </a>
+      <a
+        href={`/@${handle}.pdf`}
+        download
+        className={buttonClassName("secondary")}
+        data-card-download="pdf"
+      >
+        Download PDF
+      </a>
       <a
         href={qrHref}
         download={`${handle}-qr.svg`}
-        className={buttonClassName("secondary")}
+        className={buttonClassName("quiet")}
       >
         Download QR
       </a>

@@ -20,6 +20,7 @@ export const config = {
     "/company/:path*",
     "/pitch/:path*",
     "/investors/:path*",
+    "/find/:path*",
     "/verification/:path*",
     "/profile/:path*",
     "/onboarding/:path*",
