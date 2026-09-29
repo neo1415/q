@@ -1,13 +1,12 @@
 "use client";
 
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { cx } from "@capital-q/ui";
 
-import { ApertureAnimator } from "./aperture-frame";
 import { Q_APERTURE_LABELS, type QApertureState } from "./aperture-state";
-import { ApertureSvg } from "./aperture-svg";
 import { useQMotion } from "./q-motion";
+import { QSwarm } from "../q-swarm/q-swarm";
 
 /**
  * The Q Aperture: Q's one presence (ADR 0017 F2; spec §5). Q's ring and
@@ -76,27 +75,13 @@ export function useStageApertureSize(): 160 | 224 {
   return size;
 }
 
-type Renderer = typeof import("./renderer");
-let rendererModule: Promise<Renderer> | null = null;
-
-/** The shader loads once, when the browser is idle after first paint. */
-function loadRenderer(): Promise<Renderer> {
-  rendererModule ??= new Promise<void>((resolve) => {
-    if ("requestIdleCallback" in window) {
-      window.requestIdleCallback(() => resolve(), { timeout: 2000 });
-    } else {
-      setTimeout(resolve, 200);
-    }
-  }).then(() => import("./renderer"));
-  return rendererModule;
-}
-
 export function QAperture({
   state,
   size = "panel",
   inputLevel,
   outputLevel,
-  progress = null,
+  // A durable task's progress is said by its own surface; the swarm runs its ring.
+  progress: _progress = null,
   label,
   detail,
   className,
@@ -109,126 +94,7 @@ export function QAperture({
         ? size
         : Q_APERTURE_SIZES[size];
   const environment = useQMotion();
-  const bloomId = useId().replace(/:/g, "");
   const hostRef = useRef<HTMLDivElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [gpu, setGpu] = useState(false);
-
-  // What the draw loop reads each frame. Kept in a ref so a new level
-  // function or state never restarts the renderer, only retargets it.
-  const live = useRef({
-    state,
-    progress,
-    inputLevel,
-    outputLevel,
-    motion: environment.motion,
-    bloom: environment.bloom,
-  });
-  const invalidateRef = useRef<(() => void) | null>(null);
-  useEffect(() => {
-    live.current = {
-      state,
-      progress,
-      inputLevel,
-      outputLevel,
-      motion: environment.motion,
-      bloom: environment.bloom,
-    };
-    invalidateRef.current?.();
-  }, [
-    state,
-    progress,
-    inputLevel,
-    outputLevel,
-    environment.motion,
-    environment.bloom,
-  ]);
-
-  const wantGpu = environment.gpu;
-  useEffect(() => {
-    const host = hostRef.current;
-    const canvas = canvasRef.current;
-    if (!wantGpu || host === null || canvas === null) return;
-    let cancelled = false;
-    let teardown: (() => void) | null = null;
-
-    void loadRenderer().then((renderer) => {
-      if (cancelled || !renderer.canRender()) return;
-      const target = canvas.getContext("2d");
-      if (target === null) return;
-      const dpr = Math.min(2, window.devicePixelRatio || 1);
-      const pixels = Math.round(px * dpr);
-      canvas.width = pixels;
-      canvas.height = pixels;
-      const animator = new ApertureAnimator(
-        live.current.state,
-        performance.now(),
-      );
-      let colours = renderer.readColours(host);
-      let onScreen = true;
-      let shown = false;
-      const slot = {
-        render: (now: number) => {
-          if (!onScreen) return false;
-          const current = live.current;
-          animator.setState(current.state, now);
-          const { params, live: moving } = animator.frame(now, {
-            input: current.inputLevel,
-            output: current.outputLevel,
-            progress: current.progress,
-            motion: current.motion,
-            bloom: current.bloom,
-          });
-          renderer.drawAperture(target, pixels, params, colours);
-          if (!shown) {
-            shown = true;
-            setGpu(true);
-          }
-          return moving;
-        },
-        onLost: () => {
-          setGpu(false);
-        },
-      };
-      const unregister = renderer.register(slot);
-      const invalidate = () => renderer.invalidate(slot);
-      invalidateRef.current = invalidate;
-
-      // The theme, the stage around it, or the device's scheme changing
-      // changes the light's colours; one redraw, no loop.
-      const recolour = () => {
-        colours = renderer.readColours(host);
-        invalidate();
-      };
-      const themeWatch = new MutationObserver(recolour);
-      themeWatch.observe(document.documentElement, {
-        attributes: true,
-        attributeFilter: ["data-theme"],
-      });
-      const scheme = window.matchMedia("(prefers-color-scheme: dark)");
-      scheme.addEventListener("change", recolour);
-      const visibility = new IntersectionObserver((entries) => {
-        onScreen = entries.some((entry) => entry.isIntersecting);
-        if (onScreen) invalidate();
-      });
-      visibility.observe(host);
-      invalidate();
-
-      teardown = () => {
-        unregister();
-        themeWatch.disconnect();
-        scheme.removeEventListener("change", recolour);
-        visibility.disconnect();
-        invalidateRef.current = null;
-      };
-    });
-
-    return () => {
-      cancelled = true;
-      teardown?.();
-      setGpu(false);
-    };
-  }, [wantGpu, px]);
 
   const text = label === true ? Q_APERTURE_LABELS[state] : label;
 
@@ -238,18 +104,18 @@ export function QAperture({
       className={cx("cq-aperture", className)}
       data-q-aperture={state}
       data-q-aperture-size={px}
-      data-renderer={gpu && wantGpu ? "webgl" : "svg"}
+      data-renderer="swarm"
       data-motion={environment.motion}
       data-bloom={environment.bloom ? undefined : "off"}
     >
       <div className="cq-aperture-mark" style={{ width: px, height: px }}>
-        <ApertureSvg
+        {/* Q as a particle swarm (founder direction 2026-09-29). */}
+        <QSwarm
           state={state}
           pixels={px}
-          progress={progress}
-          bloomId={bloomId}
+          inputLevel={inputLevel}
+          outputLevel={outputLevel}
         />
-        <canvas ref={canvasRef} aria-hidden="true" />
       </div>
       {text !== undefined || detail !== undefined ? (
         <div className="cq-aperture-label" role="status">
