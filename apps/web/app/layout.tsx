@@ -6,6 +6,8 @@ import { loadWebServerConfig } from "@capital-q/config/web";
 import { THEME_COLORS } from "@capital-q/ui/tokens";
 
 import { THEME_BOOT_SCRIPT } from "@/features/appearance/theme";
+import { SplashOverlay } from "@/features/splash/splash-overlay";
+import { SPLASH_BOOT_SCRIPT } from "@/features/splash/splash-policy";
 import { ServiceWorkerRegistration } from "@/pwa/service-worker-registration";
 
 import "./globals.css";
@@ -88,8 +90,11 @@ export default function RootLayout({
          * the rest, and no choice at all leaves the device deciding.
          */}
         <script dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} />
+        {/* Whether this load shows the splash, decided before any paint. */}
+        <script dangerouslySetInnerHTML={{ __html: SPLASH_BOOT_SCRIPT }} />
       </head>
       <body>
+        <SplashOverlay />
         <ServiceWorkerRegistration />
         {children}
       </body>

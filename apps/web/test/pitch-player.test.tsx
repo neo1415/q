@@ -243,7 +243,7 @@ describe("the frame a pitch is shown in (UX2 P1)", () => {
 });
 
 describe("the player element", () => {
-  it("is muted and inline, and carries the controller's preload", async () => {
+  it("plays with sound, inline, and carries the controller's preload (ADR 0026)", async () => {
     const authorize = vi.fn(() => Promise.resolve(authorization()));
     const { container } = render(
       <PitchPlayer
@@ -257,7 +257,7 @@ describe("the player element", () => {
     await waitFor(() => expect(videoIn(container).poster).not.toBe(""));
     const video = videoIn(container);
 
-    expect(video.muted).toBe(true);
+    expect(video.muted).toBe(false);
     expect(video.getAttribute("playsinline")).not.toBeNull();
     expect(video.getAttribute("preload")).toBe("auto");
     expect(video.poster).toBe("https://cdn.test/sample.jpg");
@@ -605,8 +605,8 @@ describe("R36 · poster first, on request", () => {
     await userEvent.click(screen.getByRole("button", { name: "Play" }));
     await waitFor(() => expect(play).toHaveBeenCalledTimes(1));
     expect(video.getAttribute("src")).toBe("https://cdn.test/sample.mp4");
-    // Still muted and inline: pressing Play is not turning the sound on.
-    expect(video.muted).toBe(true);
+    // Inline, with its sound (ADR 0026): pressing Play is asking to hear it.
+    expect(video.muted).toBe(false);
     expect(video.hasAttribute("playsinline")).toBe(true);
   });
 
@@ -786,7 +786,7 @@ describe("a pitch this browser cannot play (R30 #22, #23)", () => {
     );
   });
 
-  it("offers sound only on the card on screen, so there is one Unmute", async () => {
+  it("offers the sound control only on the card on screen, so there is one", async () => {
     const authorize = vi.fn(() => Promise.resolve(authorization()));
     render(
       <>
@@ -807,7 +807,7 @@ describe("a pitch this browser cannot play (R30 #22, #23)", () => {
       </>,
     );
     await waitFor(() =>
-      expect(screen.getAllByRole("button", { name: "Unmute" })).toHaveLength(1),
+      expect(screen.getAllByRole("button", { name: "Mute" })).toHaveLength(1),
     );
   });
 });

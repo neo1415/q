@@ -411,14 +411,14 @@ describe("swipe", () => {
 });
 
 describe("playback", () => {
-  it("plays only the card in view, muted and inline", async () => {
+  it("plays only the card in view, with sound and inline (ADR 0026)", async () => {
     const { container } = await renderFeed();
     await waitFor(() => expect(play).toHaveBeenCalled());
     const active = container.querySelector<HTMLVideoElement>(
       "[data-slot-active] video",
     );
     expect(active?.getAttribute("aria-label")).toBe("Pitch from Company 1");
-    expect(active?.muted).toBe(true);
+    expect(active?.muted).toBe(false);
     expect(active?.hasAttribute("playsinline")).toBe(true);
     for (const call of play.mock.contexts) {
       expect(call).toBe(active);

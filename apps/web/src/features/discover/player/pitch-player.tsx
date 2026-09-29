@@ -149,8 +149,30 @@ export function PitchPlayer({
   startOnRequest = false,
 }: PitchPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
-  const [ownMuted, setOwnMuted] = useState(true);
+  // Sound on (ADR 0026), except under reduced motion, where audio stays
+  // off until the person enables it (ADR-001 D5).
+  const [ownMuted, setOwnMuted] = useState(reducedMotion);
   const muted = controlledMuted ?? ownMuted;
+  const mutedRef = useRef(muted);
+  useEffect(() => {
+    mutedRef.current = muted;
+  }, [muted]);
+  // A muted fallback because the browser refused sound before any tap.
+  const [soundBlocked, setSoundBlocked] = useState(false);
+  // What the person hears, which the control shows: muted by them, or by
+  // the browser until their first tap.
+  const silent = muted || soundBlocked;
+  const toggleSound = () => {
+    if (soundBlocked) {
+      // Their tap on the control is the gesture the browser waited for.
+      const video = videoRef.current;
+      if (video !== null) video.muted = false;
+      setSoundBlocked(false);
+      if (muted) setMuted(false);
+      return;
+    }
+    setMuted(!muted);
+  };
   const setMuted = (next: boolean) => {
     if (onMutedChange !== undefined) onMutedChange(next);
     else setOwnMuted(next);
@@ -246,8 +268,48 @@ export function PitchPlayer({
     // events that say what is happening -- a promise that resolved is not
     // the same fact as a video that is running, and a browser may refuse
     // autoplay under its own policy without either of them being wrong.
-    void video.play().catch(() => undefined);
+    //
+    // With sound on and no tap yet, a browser refuses the play outright.
+    // Then it plays muted, and the first tap or key anywhere brings the
+    // sound back (founder direction 2026-09-29: sound on, like TikTok).
+    void video.play().catch((error: unknown) => {
+      if (
+        video.muted ||
+        !(error instanceof DOMException) ||
+        error.name !== "NotAllowedError"
+      ) {
+        return;
+      }
+      video.muted = true;
+      setSoundBlocked(true);
+      void video.play().catch(() => undefined);
+    });
   }, [intent.autoplay, playbackUrl, hold, startOnRequest]);
+
+  // The first gesture after a muted fallback restores the sound the person
+  // has on; one they turned off stays off.
+  useEffect(() => {
+    if (!soundBlocked) return;
+    const restore = (event: Event) => {
+      // The sound control handles its own tap.
+      if (
+        event.target instanceof Element &&
+        event.target.closest("[data-sound-toggle]") !== null
+      ) {
+        return;
+      }
+      const video = videoRef.current;
+      if (video !== null && !mutedRef.current) video.muted = false;
+      setSoundBlocked(false);
+    };
+    const options = { once: true, capture: true } as const;
+    window.addEventListener("pointerdown", restore, options);
+    window.addEventListener("keydown", restore, options);
+    return () => {
+      window.removeEventListener("pointerdown", restore, options);
+      window.removeEventListener("keydown", restore, options);
+    };
+  }, [soundBlocked]);
 
   // Leaving the page is leaving the claim.
   useEffect(() => {
@@ -343,11 +405,12 @@ export function PitchPlayer({
               <button
                 type="button"
                 className="cq-stage-control"
-                aria-pressed={!muted}
-                aria-label={muted ? "Unmute" : "Mute"}
-                onClick={() => setMuted(!muted)}
+                aria-pressed={!silent}
+                aria-label={silent ? "Unmute" : "Mute"}
+                onClick={toggleSound}
+                data-sound-toggle
               >
-                {muted ? (
+                {silent ? (
                   <VolumeX
                     aria-hidden="true"
                     size={ICON_SIZE.regular}
@@ -508,10 +571,11 @@ export function PitchPlayer({
         {intent.attach ? (
           <Button
             variant="quiet"
-            aria-pressed={!muted}
-            onClick={() => setMuted(!muted)}
+            aria-pressed={!silent}
+            onClick={toggleSound}
+            data-sound-toggle
           >
-            {muted ? (
+            {silent ? (
               <VolumeX
                 aria-hidden="true"
                 size={ICON_SIZE.regular}
@@ -524,7 +588,7 @@ export function PitchPlayer({
                 strokeWidth={ICON_STROKE}
               />
             )}
-            <span className="sr-only">{muted ? "Unmute" : "Mute"}</span>
+            <span className="sr-only">{silent ? "Unmute" : "Mute"}</span>
           </Button>
         ) : null}
 

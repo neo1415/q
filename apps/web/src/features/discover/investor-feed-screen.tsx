@@ -60,6 +60,15 @@ import type { PlaybackSource } from "./player/pitch-playback";
 import { attachHlsOrNativeSource } from "./player/hls-source";
 import { PitchPlayer } from "./player/pitch-player";
 import {
+  SPLASH_DONE_EVENT,
+  splashShowing,
+} from "@/features/splash/splash-policy";
+
+function subscribeSplash(onChange: () => void): () => void {
+  window.addEventListener(SPLASH_DONE_EVENT, onChange);
+  return () => window.removeEventListener(SPLASH_DONE_EVENT, onChange);
+}
+import {
   usePitchPlayback,
   useReducedMotionPreference,
 } from "./player/use-pitch-playback";
@@ -383,7 +392,13 @@ function InvestorFeed({
   });
   const { setOpen, open: qOpen } = useGlobalQ();
   const session = useQSessionOptional();
-  const [muted, setMuted] = useState(true);
+  // Sound on, like TikTok (founder direction 2026-09-29). Where the
+  // browser refuses sound before the first tap, the player starts muted
+  // and turns the sound on at that tap by itself.
+  // Under reduced motion nothing plays by itself and audio stays off until
+  // the person turns it on (ADR-001 D5); null is "not chosen yet".
+  const [chosenMuted, setMuted] = useState<boolean | null>(null);
+  const muted = chosenMuted ?? reducedMotion;
   // Which of a company's videos is showing (ADR 0022); the first (newest)
   // unless the person moved on. The item stays one company, ranked once.
   const [videoOf, setVideoOf] = useState<Readonly<Record<string, number>>>({});
@@ -496,7 +511,13 @@ function InvestorFeed({
    */
   const [pausedAt, setPausedAt] = useState<number | null>(null);
   const tapPaused = pausedAt === index;
-  const hold = settledAt !== index || tabHidden || tapPaused;
+  // The splash covers the first pitch; it starts the moment the splash goes.
+  const splashUp = useSyncExternalStore(
+    subscribeSplash,
+    splashShowing,
+    () => false,
+  );
+  const hold = settledAt !== index || tabHidden || tapPaused || splashUp;
   const effectiveMuted = muted || qOpen || qSpeaking;
 
   /** Space plays or pauses the pitch in view; the element is the truth. */
@@ -616,10 +637,10 @@ function InvestorFeed({
         togglePlay();
       } else if (event.key === "m") {
         event.preventDefault();
-        setMuted((current) => !current);
+        setMuted((current) => !(current ?? reducedMotion));
       }
     },
-    [next, previous, togglePlay],
+    [next, previous, togglePlay, reducedMotion],
   );
 
   const hasCard = feed.card !== null;

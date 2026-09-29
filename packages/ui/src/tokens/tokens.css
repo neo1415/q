@@ -88,6 +88,8 @@
      the body like every popover, so it must clear the modal it came from. */
   --cq-z-modal-popover: 55;
   --cq-z-toast: 60;
+  /* The cold-start splash covers everything while it plays, then is gone. */
+  --cq-z-splash: 70;
 
   /* Layout widths (doc 18 §22). */
   --cq-layout-full: 1440px;

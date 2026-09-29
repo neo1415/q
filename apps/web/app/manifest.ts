@@ -25,7 +25,9 @@ export default function manifest(): MetadataRoute.Manifest {
     scope: "/",
     display: "standalone",
     orientation: "portrait",
-    background_color: THEME_COLORS.light.canvas,
+    // The OS launch screen, in the splash's own navy, so an installed
+    // launch hands straight over to the particle splash (2026-09-29).
+    background_color: "#030916",
     theme_color: THEME_COLORS.light.canvas,
     categories: ["business", "finance", "productivity"],
     icons: [
