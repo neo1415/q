@@ -407,6 +407,16 @@ export function createScheduleService(
     return calendar;
   }
 
+  /** A calendar failure, logged with its cause: "didn't answer" alone hid a revoked scope. */
+  function failed(error: unknown) {
+    const outcome = providerFailure(error);
+    logger?.warn(
+      { err: error, code: outcome.code },
+      "google calendar call failed",
+    );
+    return outcome;
+  }
+
   async function organiserZone(
     calendar: OrganiserCalendar,
     requested: string | undefined,
@@ -471,7 +481,7 @@ export function createScheduleService(
           }),
         };
       } catch (error: unknown) {
-        return providerFailure(error);
+        return failed(error);
       }
     },
 
@@ -566,7 +576,7 @@ export function createScheduleService(
           { meetingId: record.id, err: error },
           "calendar insert failed for an approved meeting",
         );
-        return providerFailure(error);
+        return failed(error);
       }
       logger?.info(
         {
@@ -656,7 +666,7 @@ export function createScheduleService(
           timeZone: record.timeZone,
         });
       } catch (error: unknown) {
-        return providerFailure(error);
+        return failed(error);
       }
       await transactions.run(async (tx) => {
         if (
@@ -709,7 +719,7 @@ export function createScheduleService(
         try {
           await calendar.cancel(record.googleEventId);
         } catch (error: unknown) {
-          return providerFailure(error);
+          return failed(error);
         }
       }
       let changed = false;

@@ -179,10 +179,7 @@ export function RelationshipScheduleControls({
       className="flex max-w-(--cq-layout-reading) flex-col gap-6"
       data-relationship-schedule
     >
-      <h2
-        id="relationship-schedule"
-        className="cq-title-sm text-(--cq-text-primary)"
-      >
+      <h2 id="relationship-schedule" className="sr-only">
         Calls and reminders
       </h2>
 

@@ -118,6 +118,20 @@ function problemFor(
   request: FastifyRequest,
   outcome: Exclude<ScheduleOutcome<object>, { outcome: "OK" }>,
 ): ProblemDetails {
+  if (
+    outcome.outcome === "FAILED" &&
+    (outcome.code === "CALENDAR_UNAUTHORIZED" ||
+      outcome.code === "CALENDAR_REJECTED")
+  ) {
+    // Google refused this person's access (a revoked grant, or calendar
+    // not allowed when they connected): reconnecting is what fixes it.
+    return createProblemDetails({
+      code: "RESOURCE_CONFLICT",
+      requestId: request.id,
+      detail:
+        "Google Calendar refused access. Reconnect Google in Settings and allow calendar access.",
+    });
+  }
   if (outcome.outcome === "FAILED") {
     return createProblemDetails({
       code: "PROVIDER_UNAVAILABLE",

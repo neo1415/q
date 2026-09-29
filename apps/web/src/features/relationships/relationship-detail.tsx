@@ -9,8 +9,6 @@ import { buttonClassName } from "@capital-q/ui/button";
 import {
   ArrowLeft,
   ArrowUpRight,
-  Bell,
-  CalendarDays,
   Globe,
   ICON_SIZE,
   MapPin,
@@ -22,14 +20,14 @@ import { RelationshipMail } from "@/features/integrations/relationship-mail";
 import { initials } from "@/features/investors/investor-labels";
 import { RelationshipSchedule } from "@/features/schedule/relationship-schedule";
 
+import { ScheduleDialog } from "./schedule-dialog";
+
 import { AskQAboutRelationship } from "./relationship-actions";
 import type { CounterpartProfile } from "./relationship-page-data";
 import { StatusPill } from "./status-pill";
 import { RelationshipTimeline } from "./relationship-timeline";
 import {
-  formatRelationshipDate,
   NEXT_STEP_WORDS,
-  nextStepSentence,
   type RelationshipSide,
   STATE_WORDS,
 } from "./relationship-words";
@@ -78,19 +76,11 @@ export function RelationshipDetail({
   return (
     <PageContainer className="flex flex-col gap-6">
       <BackToRelationships />
-      <header className="flex flex-col gap-1">
-        <h1 className="cq-title-xl text-(--cq-text-primary)">{counterpart}</h1>
-        <p className="cq-body text-(--cq-text-secondary)">
-          {relationship === null
-            ? absentSentence
-            : nextStepSentence(relationship.nextStep, counterpart)}
-        </p>
-      </header>
-
       <RelationshipHero
         counterpart={counterpart}
         relationship={relationship}
         profile={profile}
+        note={relationship === null ? absentSentence : undefined}
       />
 
       <RelationshipTabs
@@ -101,38 +91,6 @@ export function RelationshipDetail({
 
       <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_20rem]">
         <div className="flex min-w-0 flex-col gap-8">
-          <Card title="Where things stand" id="where">
-            {relationship === null ? (
-              <p className="cq-body text-(--cq-text-secondary)">
-                {absentSentence}
-              </p>
-            ) : (
-              <dl
-                className="grid gap-4 sm:grid-cols-3"
-                data-relationship-state={relationship.state}
-              >
-                <Fact label="Status" value={STATE_WORDS[relationship.state]} />
-                <Fact
-                  label="Since"
-                  value={formatRelationshipDate(relationship.stateSince)}
-                  numeric
-                />
-                <Fact
-                  label="Next step"
-                  value={NEXT_STEP_WORDS[relationship.nextStep]}
-                />
-              </dl>
-            )}
-          </Card>
-
-          {profile.about === null ? null : (
-            <Card title={`About ${counterpart}`} id="about">
-              <p className="cq-body whitespace-pre-line text-(--cq-text-secondary)">
-                {profile.about}
-              </p>
-            </Card>
-          )}
-
           {relationship === null ||
           relationship.milestones.length === 0 ? null : (
             <Card title="What happened" id="history">
@@ -145,47 +103,6 @@ export function RelationshipDetail({
           )}
 
           {relationship === null ? null : (
-            <Card
-              title={
-                connected && messageCount > 0
-                  ? `Messages · ${String(messageCount)}${thread !== null && messageCount >= 100 ? "+" : ""}`
-                  : "Messages"
-              }
-              id="messages"
-              action={
-                connected ? (
-                  <Link
-                    href={`${basePath}/messages`}
-                    className={buttonClassName("quiet", "compact")}
-                  >
-                    {messageCount === 0 ? "Open conversation" : "View all"}
-                  </Link>
-                ) : null
-              }
-            >
-              <MessagesPreview
-                thread={thread}
-                connected={connected}
-                counterpart={counterpart}
-              />
-            </Card>
-          )}
-
-          {relationship === null ? null : (
-            <div
-              id="calls"
-              className="scroll-mt-24 rounded-xl border border-(--cq-border-subtle) bg-(--cq-surface-raised) p-4 sm:p-5"
-            >
-              <span id="reminders" className="block scroll-mt-24" />
-              <RelationshipSchedule
-                relationshipId={relationship.relationshipId}
-                counterpart={counterpart}
-                connected={connected}
-              />
-            </div>
-          )}
-
-          {relationship === null ? null : (
             <RelationshipMail
               relationshipId={relationship.relationshipId}
               counterpart={counterpart}
@@ -193,38 +110,32 @@ export function RelationshipDetail({
           )}
         </div>
 
-        <aside className="flex min-w-0 flex-col gap-6" aria-label="Next">
-          <Card title="Recommended next action" id="next">
+        <aside
+          className="flex min-w-0 flex-col gap-6 lg:sticky lg:top-6 lg:self-start"
+          aria-label="Next"
+        >
+          <Card title="Next" id="next">
             <div className="flex flex-col items-stretch gap-2">
               {actions}
               {connected ? (
-                <>
-                  <Link
-                    href={`${basePath}/messages`}
-                    className={buttonClassName(
-                      actions === null ? "primary" : "secondary",
-                    )}
-                  >
-                    <MessageSquare
-                      size={ICON_SIZE.regular}
-                      aria-hidden="true"
-                    />
-                    Send a message
-                  </Link>
-                  <Link href="#calls" className={buttonClassName("secondary")}>
-                    <CalendarDays size={ICON_SIZE.regular} aria-hidden="true" />
-                    Book a call
-                  </Link>
-                </>
+                <Link
+                  href={`${basePath}/messages`}
+                  className={buttonClassName(
+                    actions === null ? "primary" : "secondary",
+                  )}
+                >
+                  <MessageSquare size={ICON_SIZE.regular} aria-hidden="true" />
+                  Send a message
+                </Link>
               ) : null}
               {relationship === null ? null : (
-                <Link
-                  href="#reminders"
-                  className={buttonClassName("secondary")}
-                >
-                  <Bell size={ICON_SIZE.regular} aria-hidden="true" />
-                  Set a reminder
-                </Link>
+                <ScheduleDialog canCall={connected}>
+                  <RelationshipSchedule
+                    relationshipId={relationship.relationshipId}
+                    counterpart={counterpart}
+                    connected={connected}
+                  />
+                </ScheduleDialog>
               )}
             </div>
           </Card>
@@ -239,7 +150,7 @@ export function RelationshipDetail({
                   {counterpart} hasn&apos;t shared a description you can see.
                 </p>
               ) : (
-                <p className="cq-body-sm line-clamp-4 text-(--cq-text-secondary)">
+                <p className="cq-body-sm line-clamp-6 text-(--cq-text-secondary)">
                   {profile.about}
                 </p>
               )}
@@ -265,10 +176,6 @@ export function RelationshipDetail({
               aria-label="Ask Q"
               className="flex flex-col gap-3 rounded-xl border border-(--cq-border-subtle) bg-(--cq-surface-subtle) p-4"
             >
-              <p className="cq-body-sm text-(--cq-text-secondary)">
-                Need help? Q can summarise where this stands and suggest what to
-                do next.
-              </p>
               <AskQAboutRelationship counterpart={counterpart} />
             </section>
           ) : null}
@@ -283,10 +190,13 @@ export function RelationshipHero({
   counterpart,
   relationship,
   profile,
+  note,
 }: {
   readonly counterpart: string;
   readonly relationship: RelationshipStatusDto | null;
   readonly profile: CounterpartProfile;
+  /** Said under the name when nothing is on record. */
+  readonly note?: string | undefined;
 }) {
   return (
     <section
@@ -296,8 +206,11 @@ export function RelationshipHero({
     >
       <Avatar name={counterpart} photoUrl={profile.photoUrl} />
       <div className="flex min-w-0 flex-1 flex-col gap-2">
-        <p className="cq-title-sm text-(--cq-text-primary)">{counterpart}</p>
+        <h1 className="cq-title-lg text-(--cq-text-primary)">{counterpart}</h1>
         <ProfileChips profile={profile} />
+        {note === undefined ? null : (
+          <p className="cq-body-sm text-(--cq-text-secondary)">{note}</p>
+        )}
       </div>
       {relationship === null ? null : (
         <div className="flex flex-col items-start gap-1 sm:items-end">
@@ -364,70 +277,7 @@ export function RelationshipTabs({
           ) : null}
         </Link>
       )}
-      <Link href={`${basePath}#calls`} className={tab(false)}>
-        Calls
-      </Link>
-      <Link href={`${basePath}#reminders`} className={tab(false)}>
-        Reminders
-      </Link>
     </nav>
-  );
-}
-
-function MessagesPreview({
-  thread,
-  connected,
-  counterpart,
-}: {
-  readonly thread: ChatThreadDto | null;
-  readonly connected: boolean;
-  readonly counterpart: string;
-}) {
-  if (!connected) {
-    return (
-      <p className="cq-body-sm text-(--cq-text-secondary)">
-        Messages open once you&apos;re connected: when interest has been
-        expressed and accepted.
-      </p>
-    );
-  }
-  if (thread === null) {
-    return (
-      <p className="cq-body-sm text-(--cq-text-secondary)">
-        Messages couldn&apos;t load just now.
-      </p>
-    );
-  }
-  const latest = thread.messages.slice(-3);
-  if (latest.length === 0) {
-    return (
-      <p className="cq-body-sm text-(--cq-text-secondary)">
-        No messages yet. Say hello to {counterpart}.
-      </p>
-    );
-  }
-  return (
-    <ol className="flex flex-col gap-3" aria-label="Latest messages">
-      {latest.map((message) => (
-        <li key={message.messageId} className="flex flex-col gap-0.5">
-          <span className="cq-caption text-(--cq-text-tertiary)">
-            {message.mine ? "You" : message.senderName} ·{" "}
-            <time dateTime={message.sentAt} className="cq-numeric">
-              {formatRelationshipDate(message.sentAt)}
-            </time>
-          </span>
-          <span className="cq-body-sm line-clamp-2 text-(--cq-text-primary)">
-            {message.unsent
-              ? "Message unsent"
-              : message.kind === "VOICE_NOTE"
-                ? "Voice note"
-                : message.kind === "ATTACHMENT"
-                  ? `Shared ${message.attachment?.title ?? "a document"}`
-                  : message.body}
-          </span>
-        </li>
-      ))}
-    </ol>
   );
 }
 
@@ -524,27 +374,6 @@ function Card({
       </div>
       {children}
     </section>
-  );
-}
-
-function Fact({
-  label,
-  value,
-  numeric = false,
-}: {
-  readonly label: string;
-  readonly value: string;
-  readonly numeric?: boolean;
-}) {
-  return (
-    <div className="flex flex-col gap-1">
-      <dt className="cq-caption text-(--cq-text-tertiary)">{label}</dt>
-      <dd
-        className={`cq-body text-(--cq-text-primary) ${numeric ? "cq-numeric" : ""}`}
-      >
-        {value}
-      </dd>
-    </div>
   );
 }
 

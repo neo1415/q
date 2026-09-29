@@ -64,9 +64,13 @@ async function run<T>(
             : (error.problem?.detail ?? "That didn't work. Please try again."),
       };
     }
+    // A 503 still carries a sentence worth showing (Google didn't answer).
     return {
       ok: false,
-      message: "Couldn't reach Capital Q just now. Please try again.",
+      message:
+        error instanceof ApiProblemError && error.problem?.detail !== undefined
+          ? error.problem.detail
+          : "Couldn't reach Capital Q just now. Please try again.",
     };
   }
 }
