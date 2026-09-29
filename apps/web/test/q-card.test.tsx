@@ -278,7 +278,7 @@ describe("the profile panel", () => {
     renderPanel({ ...CARD, fieldScopes: { canonicalName: "public_external" } });
     const audience = screen.getByRole("combobox", {
       name: "Who sees in one line",
-    }) as HTMLSelectElement;
+    });
     expect(audience.value).toBe("hidden");
     fireEvent.change(audience, { target: { value: "network_visible" } });
     expect(audience.value).toBe("network_visible");
