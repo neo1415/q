@@ -71,6 +71,7 @@ import {
   anchorCues,
   type SpeechPerformanceBoard,
 } from "./speech-performance.js";
+import { withThinkingBeats } from "./thinking-beats.js";
 import type { WelcomeHost } from "./welcome.js";
 import { createLiveReply } from "./live-reply.js";
 import type { VoiceSpeaker, VoiceTranscriptTurn } from "./provider.js";
@@ -338,6 +339,10 @@ type LiveRun = {
   readonly utterance?: string | undefined;
 };
 const liveRuns = new WeakMap<VoiceSessionBinding, LiveRun>();
+
+/** About when a person thinking aloud says "hm", and when they hum. */
+const THINKING_HM_AFTER_MS = 1_100;
+const THINKING_HUM_AFTER_MS = 4_500;
 /**
  * The utterance the turn in hand is about, until the one run that answers
  * the person's words takes it. A look-up Q starts on its own is not the
@@ -1097,11 +1102,22 @@ export function createVoiceTurnHandler(
           await speaker.speak(line);
         }
       } else {
+        // A "hm" when the first sentence is slow, a hum when slower still;
+        // voiced, never part of what is remembered as the answer.
         await speaker.speak(
-          tap(bySentence(answer(), signal), (part) => {
-            spokenSoFar += `${part} `;
-            rememberSpoken(binding, part);
-          }),
+          withThinkingBeats(
+            tap(bySentence(answer(), signal), (part) => {
+              spokenSoFar += `${part} `;
+              rememberSpoken(binding, part);
+            }),
+            {
+              hmAfterMs: THINKING_HM_AFTER_MS,
+              humAfterMs: THINKING_HUM_AFTER_MS,
+              pick: (choices) =>
+                choices[Math.floor(Math.random() * choices.length)] ?? "",
+              signal,
+            },
+          ),
         );
       }
     } finally {
