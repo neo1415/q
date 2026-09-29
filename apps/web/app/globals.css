@@ -32,9 +32,34 @@
     );
   }
 
+  html {
+    scrollbar-color: var(--cq-qcard-edge) transparent;
+  }
+
   body {
     min-height: 100dvh;
     background-color: var(--cq-canvas);
+    /*
+     * Texture, not decoration (founder direction 2026-09-29): two faint
+     * blooms of the brand blue and a very low-contrast grain, fixed so
+     * content scrolls over them. Tokens only, so light mode gets its own
+     * quieter values.
+     */
+    background-image:
+      radial-gradient(
+        60rem 40rem at 100% -10%,
+        var(--cq-qcard-arc),
+        transparent 70%
+      ),
+      radial-gradient(
+        50rem 36rem at -10% 110%,
+        var(--cq-qcard-arc),
+        transparent 70%
+      ),
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .5 0 0 0 0 .55 0 0 0 0 .7 0 0 0 .045 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    background-attachment: fixed;
+    /* Brand-coloured scrollbars, thin, everywhere. */
+    scrollbar-color: var(--cq-qcard-edge) transparent;
     color: var(--cq-text-primary);
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
@@ -67,6 +92,50 @@
  * is the enhancement: a sidebar replaces both header and bottom navigation.
  */
 @layer components {
+  /*
+   * A card that matters on its page (the relationship hero, the list's
+   * cards, the Q Card's neighbours): a faint lit edge, a soft outer glow,
+   * a surface that deepens toward one corner, and one arc of light. Used
+   * sparingly: most surfaces stay flat (founder direction 2026-09-29:
+   * "some parts do need to glow, just not everything").
+   */
+  .cq-glow-card {
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+    border: 1px solid
+      color-mix(in oklch, var(--cq-qcard-edge) 55%, var(--cq-border-subtle));
+    background-image: linear-gradient(
+      135deg,
+      var(--cq-surface-raised) 0%,
+      color-mix(in oklch, var(--cq-qcard-surface) 70%, var(--cq-surface-raised))
+        100%
+    );
+    box-shadow: 0 0 28px var(--cq-qcard-glow);
+  }
+  .cq-glow-card::before {
+    content: "";
+    position: absolute;
+    z-index: -1;
+    top: -60%;
+    right: -30%;
+    width: 90%;
+    aspect-ratio: 1;
+    border-radius: 9999px;
+    border: 1.5px solid var(--cq-qcard-arc);
+    box-shadow: inset 0 0 48px var(--cq-qcard-arc);
+    pointer-events: none;
+  }
+  @media (prefers-contrast: more), (forced-colors: active) {
+    .cq-glow-card {
+      box-shadow: none;
+      background-image: none;
+    }
+    .cq-glow-card::before {
+      display: none;
+    }
+  }
+
   .cq-shell {
     display: flex;
     min-height: 100dvh;

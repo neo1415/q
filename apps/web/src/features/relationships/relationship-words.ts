@@ -71,11 +71,22 @@ export function nextStepSentence(
     case "ANSWER_INTEREST":
       return `${counterpart} is waiting for your answer: accept to connect, or decline.`;
     case "SCHEDULE_MEETING":
-      return `A first meeting is the natural next step. Scheduling inside Capital Q is not available yet, so arrange it with ${counterpart} directly.`;
+      return `A first call is the natural next step. Book one with ${counterpart} here, or send them a message.`;
     case "NONE":
       return "Nothing is pending.";
   }
 }
+
+/** The next step in a few words, for the "Where things stand" row. */
+export const NEXT_STEP_WORDS: Readonly<
+  Record<RelationshipSummaryDto["nextStep"], string>
+> = {
+  EXPRESS_INTEREST: "Express interest",
+  AWAIT_ANSWER: "Wait for their answer",
+  ANSWER_INTEREST: "Answer their interest",
+  SCHEDULE_MEETING: "Book a first call",
+  NONE: "Nothing pending",
+};
 
 /** A calendar date as people write it. */
 export function formatRelationshipDate(value: string): string {

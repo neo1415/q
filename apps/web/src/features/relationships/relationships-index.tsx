@@ -3,12 +3,13 @@ import Link from "next/link";
 import type { RelationshipSummaryDto } from "@capital-q/contracts";
 import { buttonClassName } from "@capital-q/ui/button";
 
-import { RelationshipList } from "./relationship-list";
+import type { RelationshipDigest } from "./relationship-data";
+import { RelationshipsBoard } from "./relationships-board";
 
 /**
- * The Relationships page body (R27). One hairline row per canonical
- * relationship -- counterpart, state in words, since when, what is next --
- * or one sentence and one way forward when there is nothing to list.
+ * The Relationships page body (R27). One card per canonical relationship
+ * (founder design 2026-09-28; see RelationshipsBoard), or one sentence and
+ * one way forward when there is nothing to list.
  * "Since" is the time of the relationship's latest event: in V1 every
  * relationship event moves its state, so it is also the last activity.
  */
@@ -16,8 +17,10 @@ export function RelationshipsIndex({
   side,
   items,
   unread,
+  digests = {},
 }: {
   readonly side: "INVESTOR" | "COMPANY" | "NONE";
+  readonly digests?: Readonly<Record<string, RelationshipDigest>> | undefined;
   readonly items: readonly RelationshipSummaryDto[] | undefined;
   /** R34: unread chat messages per relationship id. */
   readonly unread?: ReadonlyMap<string, number> | undefined;
@@ -56,7 +59,13 @@ export function RelationshipsIndex({
       />
     );
   }
-  return <RelationshipList items={items} emptySentence="" unread={unread} />;
+  return (
+    <RelationshipsBoard
+      items={items}
+      digests={digests}
+      unread={Object.fromEntries(unread ?? new Map<string, number>())}
+    />
+  );
 }
 
 function Empty({

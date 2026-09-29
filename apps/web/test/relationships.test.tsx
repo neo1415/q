@@ -105,9 +105,9 @@ describe("relationship words", () => {
     );
   });
 
-  it("does not claim scheduling exists", () => {
-    expect(words.nextStepSentence("SCHEDULE_MEETING", "Apex")).toMatch(
-      /not available yet/,
+  it("points a connected relationship at booking a call, which exists (BIZ-008)", () => {
+    expect(words.nextStepSentence("SCHEDULE_MEETING", "Apex")).toBe(
+      "A first call is the natural next step. Book one with Apex here, or send them a message.",
     );
   });
 

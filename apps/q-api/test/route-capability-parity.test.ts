@@ -525,6 +525,9 @@ const PAGE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "/company/[companyId]": cap("tool.open_page"),
   "/relationships/company/[companyId]": cap("tool.open_page"),
   "/relationships/investor/[investorOrganisationId]": cap("tool.open_page"),
+  "/relationships/company/[companyId]/messages": cap("tool.open_page"),
+  "/relationships/investor/[investorOrganisationId]/messages":
+    cap("tool.open_page"),
 };
 
 const APPS = join(dirname(fileURLToPath(import.meta.url)), "..", "..");

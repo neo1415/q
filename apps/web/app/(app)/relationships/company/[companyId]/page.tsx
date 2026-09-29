@@ -1,18 +1,12 @@
 import type { Metadata } from "next";
 
-import {
-  getCompanyNetworkPreview,
-  getOwnInterest,
-  getRelationshipWithCompany,
-} from "@capital-q/api-client";
-
 import { QPageSubject } from "@/features/q/q-subject";
-import { apiSession, resolveOwnContext } from "@/features/q/context";
 import { InvestorRelationshipActions } from "@/features/relationships/relationship-actions";
 import {
   RelationshipDetail,
   RelationshipUnavailable,
 } from "@/features/relationships/relationship-detail";
+import { loadInvestorSideRelationship } from "@/features/relationships/relationship-page-data";
 
 export const metadata: Metadata = { title: "Relationship" };
 export const dynamic = "force-dynamic";
@@ -21,10 +15,10 @@ export const dynamic = "force-dynamic";
  * An investor organisation's relationship with one company (CQ-WEB-030).
  *
  * Every read is the investor's own, under their session: the company's
- * network projection for its name, the relationship through the per-party
- * fold (CQ-NET-012), and the organisation's own interest for the one
- * action this side has. The API authorises each; this page only chooses
- * what to say when one of them answers nothing.
+ * network projection for its name and context, the relationship through
+ * the per-party fold (CQ-NET-012), and the organisation's own interest for
+ * the one action this side has. The API authorises each; this page only
+ * chooses what to say when one of them answers nothing.
  */
 export default async function InvestorRelationshipPage({
   params,
@@ -32,35 +26,15 @@ export default async function InvestorRelationshipPage({
   readonly params: Promise<{ readonly companyId: string }>;
 }) {
   const { companyId } = await params;
-  const [context, session] = await Promise.all([
-    resolveOwnContext(),
-    apiSession(),
-  ]);
-
-  if (context.kind !== "INVESTOR" || session === null) {
-    return (
-      <RelationshipUnavailable sentence="Relationships with companies belong to an investor organisation. This one is not yours to see." />
-    );
+  const loaded = await loadInvestorSideRelationship(companyId);
+  if (loaded.kind === "UNAVAILABLE") {
+    return <RelationshipUnavailable sentence={loaded.sentence} />;
   }
-
-  const company = await getCompanyNetworkPreview(session, companyId).catch(
-    () => null,
-  );
-  if (company === null) {
-    return (
-      <RelationshipUnavailable sentence="This company isn't available to you. It may not be discoverable, or it may no longer exist." />
-    );
-  }
-
-  const [status, own] = await Promise.all([
-    getRelationshipWithCompany(session, company.companyId).catch(() => null),
-    getOwnInterest(session, company.companyId).catch(() => null),
-  ]);
+  const { relationship, own, counterpart } = loaded;
 
   // The investor's one action is expressing interest. Once it is
   // expressed, the state line already says where things stand, so the
   // control would only repeat it.
-  const relationship = status?.relationship ?? null;
   const mayExpress =
     relationship === null || relationship.nextStep === "EXPRESS_INTEREST";
 
@@ -71,32 +45,31 @@ export default async function InvestorRelationshipPage({
           relationship === null
             ? {
                 kind: "COMPANY",
-                companyId: company.companyId,
-                label: company.canonicalName,
+                companyId: loaded.companyId,
+                label: counterpart,
                 scope: "network_visible",
               }
             : {
                 kind: "RELATIONSHIP",
                 relationshipId: relationship.relationshipId,
-                label: company.canonicalName,
+                label: counterpart,
                 scope: "relationship_shared",
               }
         }
       />
       <RelationshipDetail
         side="INVESTOR"
-        counterpart={company.canonicalName}
+        counterpart={counterpart}
         relationship={relationship}
-        absentSentence={
-          status === null
-            ? "Where you stand couldn't load just now. Nothing has changed; try again in a moment."
-            : `Nothing is on record yet between your organisation and ${company.canonicalName}.`
-        }
+        profile={loaded.profile}
+        thread={loaded.thread}
+        basePath={`/relationships/company/${loaded.companyId}`}
+        absentSentence={loaded.absentSentence}
         actions={
           own === null || !mayExpress ? null : (
             <InvestorRelationshipActions
-              companyId={company.companyId}
-              companyName={company.canonicalName}
+              companyId={loaded.companyId}
+              companyName={counterpart}
               interest={own.interest}
             />
           )
