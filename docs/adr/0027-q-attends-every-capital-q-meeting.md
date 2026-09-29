@@ -30,8 +30,11 @@ someone remembering to invite Q is not a record.
    captions) and writes a structured record: summary, attendees, agreements,
    money mentioned (as commitment signals with a firmness, never as
    committed capital: §6.6.14 still requires human confirmation), flags and
-   follow-ups. Both sides of the relationship may read the record of a call
-   they were party to. A `meeting_held` relationship event marks the call on
+   follow-ups. Every participant reads what was said (transcript, attendees,
+   agreements, money mentioned); Q's analysis (summary, flags, follow-ups)
+   is written for the person Q attended for and stays theirs, because one
+   side's private Q analysis never reaches the other (spec §6.9.6). A
+   separate debrief for the other side (PADL #64) is later work. A `meeting_held` relationship event marks the call on
    the relationship's history.
 3. **Speaking.** Q stays silent by default and speaks only when addressed,
    answering only from context every participant may see (relationship-shared

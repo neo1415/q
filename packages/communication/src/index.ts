@@ -94,6 +94,7 @@ export {
 } from "./schedule/postgres.js";
 export {
   createMeetingAssistantService,
+  meetingAssistantView,
   Q_MEETING_BOT_NAME,
   transcriptText,
   type MeetingAssistantOutcome,

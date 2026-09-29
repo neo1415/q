@@ -146,9 +146,17 @@ function asArray<T>(value: unknown): T[] {
   return Array.isArray(value) ? (value as T[]) : [];
 }
 
-function toDto(
+/**
+ * Both sides of the call read what was said -- transcript, attendees,
+ * agreements, money mentioned -- but Q's own analysis (summary, flags,
+ * follow-ups) was written for the person who owns the assistant row and
+ * stays theirs: one side's private Q analysis never reaches the other
+ * (spec 6.9.6).
+ */
+export function meetingAssistantView(
   row: AssistantRow | null,
   meetingId: string,
+  viewerUserId: string,
 ): QMeetingAssistantDto {
   if (row === null) {
     return {
@@ -165,12 +173,15 @@ function toDto(
       updatedAt: null,
     };
   }
+  const own = row.user_id === viewerUserId;
   return {
     meetingId: row.meeting_id,
     status: row.status,
-    summary: row.summary,
-    flags: asArray<QMeetingFlag>(row.flags).slice(0, 20),
-    followUps: asArray<QMeetingFollowUp>(row.follow_ups).slice(0, 20),
+    summary: own ? row.summary : null,
+    flags: own ? asArray<QMeetingFlag>(row.flags).slice(0, 20) : [],
+    followUps: own
+      ? asArray<QMeetingFollowUp>(row.follow_ups).slice(0, 20)
+      : [],
     attendees: asArray<QMeetingAssistantDto["attendees"][number]>(
       row.attendees,
     ).slice(0, 20),
@@ -365,7 +376,11 @@ export function createMeetingAssistantService(dependencies: {
     read: async (actor, meetingId) => {
       const meeting = await attended(actor, meetingId);
       if (meeting === null) return null;
-      return toDto(await assistantOf(meeting.id), meeting.id);
+      return meetingAssistantView(
+        await assistantOf(meeting.id),
+        meeting.id,
+        actor.userId,
+      );
     },
 
     bring: async (actor, meetingId, idempotencyKey) => {
@@ -385,7 +400,10 @@ export function createMeetingAssistantService(dependencies: {
         existing !== null &&
         (OPEN as readonly string[]).includes(existing.status)
       ) {
-        return { outcome: "OK", assistant: toDto(existing, meeting.id) };
+        return {
+          outcome: "OK",
+          assistant: meetingAssistantView(existing, meeting.id, actor.userId),
+        };
       }
       // One row per meeting: asking again after a failure or a cancel
       // reuses it rather than adding a second.
@@ -417,7 +435,11 @@ export function createMeetingAssistantService(dependencies: {
       }
       return {
         outcome: "OK",
-        assistant: toDto(await assistantOf(meeting.id), meeting.id),
+        assistant: meetingAssistantView(
+          await assistantOf(meeting.id),
+          meeting.id,
+          actor.userId,
+        ),
       };
     },
 
@@ -446,7 +468,11 @@ export function createMeetingAssistantService(dependencies: {
       }
       return {
         outcome: "OK",
-        assistant: toDto(await assistantOf(meeting.id), meeting.id),
+        assistant: meetingAssistantView(
+          await assistantOf(meeting.id),
+          meeting.id,
+          actor.userId,
+        ),
       };
     },
 
