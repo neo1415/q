@@ -31,6 +31,17 @@ export const Q_VOICE_SESSIONS_PATH = "/v1/q/voice/sessions" as const;
 export const Q_VOICE_WS_PATH = "/v1/q/voice/ws" as const;
 /** Where the Deepgram Voice Agent brings each turn (OpenAI chat-completions dialect). */
 export const Q_VOICE_THINK_PATH = "/v1/q/voice/think" as const;
+
+/**
+ * The sounds Q makes while it thinks ("hm", a hum): voiced, never part of
+ * an answer. Named here so the transcript can leave them out too.
+ */
+export const Q_VOICE_HM_BEATS = ["Hmm.", "Hm."] as const;
+export const Q_VOICE_HUM_BEATS = ["Mmm..."] as const;
+export const Q_VOICE_THINKING_BEATS: ReadonlySet<string> = new Set([
+  ...Q_VOICE_HM_BEATS,
+  ...Q_VOICE_HUM_BEATS,
+]);
 export const Q_VOICE_PROVIDERS = ["elevenlabs", "deepgram"] as const;
 export const QVoiceProviderSchema = z.enum(Q_VOICE_PROVIDERS);
 export type QVoiceProvider = z.infer<typeof QVoiceProviderSchema>;

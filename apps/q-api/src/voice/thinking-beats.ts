@@ -1,3 +1,5 @@
+import { Q_VOICE_HM_BEATS, Q_VOICE_HUM_BEATS } from "@capital-q/contracts";
+
 /**
  * The sounds a person makes while they think (founder direction
  * 2026-09-29: "sometimes it can start with 'hm?'... if it's taking a
@@ -11,6 +13,11 @@
  *
  * This supersedes the 2026-09-27 rule against spoken fillers for these
  * two sounds only; progress lines ("Checking the web...") stay silent.
+ *
+ * Founder live 2026-09-29: an "hm" before every answer is a tic, not a
+ * person. The beat now waits longer and is used on some turns only
+ * (`enabled`, decided once per turn by chance), and "Mm, okay." is gone:
+ * said before an answer that turned out to be silence it read as a reply.
  */
 
 export type ThinkingBeatsOptions = {
@@ -21,10 +28,12 @@ export type ThinkingBeatsOptions = {
   /** The beat's words; varied so it never sounds the same twice running. */
   readonly pick: (choices: readonly string[]) => string;
   readonly signal?: AbortSignal | undefined;
+  /** False: this turn gets no beats at all. */
+  readonly enabled?: boolean | undefined;
 };
 
-export const HM_CHOICES = ["Hmm.", "Hm.", "Mm, okay."] as const;
-export const HUM_CHOICES = ["Mmm...", "Hmm-mm..."] as const;
+export const HM_CHOICES = Q_VOICE_HM_BEATS;
+export const HUM_CHOICES = Q_VOICE_HUM_BEATS;
 
 const TIMEOUT = Symbol("timeout");
 
@@ -39,7 +48,11 @@ export async function* withThinkingBeats(
   let hummed = false;
   let pending = iterator.next();
   for (;;) {
-    if (!first || options.signal?.aborted === true) {
+    if (
+      !first ||
+      options.enabled === false ||
+      options.signal?.aborted === true
+    ) {
       const step = await pending;
       if (step.done === true) return;
       yield step.value;

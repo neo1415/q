@@ -32,6 +32,19 @@ describe("thinking beats", () => {
     ).toEqual(["Yes.", "It is."]);
   });
 
+  it("stays silent on a turn that was not chosen for a beat", async () => {
+    expect(
+      await collect(
+        withThinkingBeats(after(90, ["Here it is."]), {
+          hmAfterMs: 30,
+          humAfterMs: 60,
+          pick,
+          enabled: false,
+        }),
+      ),
+    ).toEqual(["Here it is."]);
+  });
+
   it("says hm when the answer is slow, and hums once when it is slower still", async () => {
     expect(
       await collect(

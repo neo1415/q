@@ -341,8 +341,18 @@ type LiveRun = {
 const liveRuns = new WeakMap<VoiceSessionBinding, LiveRun>();
 
 /** About when a person thinking aloud says "hm", and when they hum. */
-const THINKING_HM_AFTER_MS = 1_100;
-const THINKING_HUM_AFTER_MS = 4_500;
+/**
+ * A laughing face in Q's own written answer. Matched on Q's output, never
+ * on anything the person said (ADR 0011 governs their words).
+ */
+const LAUGHING_FACE = /[\u{1F600}-\u{1F606}\u{1F602}\u{1F923}\u{1F60A}]/u;
+/** What a laugh is voiced as; the reaction tag renders the laugh itself. */
+const LAUGH_LINE = "Ha!";
+
+const THINKING_HM_AFTER_MS = 2_600;
+const THINKING_HUM_AFTER_MS = 6_500;
+/** The share of slow turns that get a beat: sometimes, never every time. */
+const THINKING_BEAT_SHARE = 0.35;
 /**
  * The utterance the turn in hand is about, until the one run that answers
  * the person's words takes it. A look-up Q starts on its own is not the
@@ -948,6 +958,7 @@ export function createVoiceTurnHandler(
     /** The answer has been handed to the speaker, streamed or whole. */
     let answerGiven = false;
     let spokenCharacters = 0;
+    let laughed = false;
     let proposedSummary: string | null = null;
     const record = await qStream.authorize(actor, runId, correlationId);
     async function* answer(): AsyncGenerator<string> {
@@ -982,6 +993,22 @@ export function createVoiceTurnHandler(
             streamedDeltas = true;
             spokenCharacters += spoken.length + 1;
             yield `${spoken} `;
+            // Q's own sentence ended on a laugh (founder live 2026-09-29:
+            // "it didn't really laugh"): the emoji is silent in speech, so
+            // the laugh is voiced after it, where a person laughs.
+            if (LAUGHING_FACE.test(event.data.text) && !laughed) {
+              laughed = true;
+              dependencies.performance?.perform(binding.voiceSessionId, [
+                {
+                  sentence: LAUGH_LINE,
+                  reaction: "LAUGH",
+                  pauseAfter: false,
+                  pace: "NORMAL",
+                  emphasis: [],
+                },
+              ]);
+              yield `${LAUGH_LINE} `;
+            }
             break;
           }
           case "q.message.completed": {
@@ -1113,6 +1140,7 @@ export function createVoiceTurnHandler(
             {
               hmAfterMs: THINKING_HM_AFTER_MS,
               humAfterMs: THINKING_HUM_AFTER_MS,
+              enabled: Math.random() < THINKING_BEAT_SHARE,
               pick: (choices) =>
                 choices[Math.floor(Math.random() * choices.length)] ?? "",
               signal,

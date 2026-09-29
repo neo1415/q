@@ -594,7 +594,12 @@ export function registerQVoiceRoutes(
         firstMessage = spoken.length === 0 ? undefined : spoken;
       }
 
-      if (firstMessage === undefined && !resume) {
+      // Continuing a conversation already on screen is not an arrival:
+      // "Hi Zino. I'm listening" in the middle of one (founder live
+      // 2026-09-29) read as Q forgetting what was just said. Q greets
+      // only a new conversation.
+      const continuing = input.conversationId !== undefined;
+      if (firstMessage === undefined && !resume && !continuing) {
         // Q always speaks first. On the open thread there is no interview
         // state to open from, so the line is a plain greeting.
         const first = knownName?.trim().split(/\s+/)[0];
