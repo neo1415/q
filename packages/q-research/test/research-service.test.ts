@@ -133,6 +133,7 @@ describe("public web research service", () => {
       requestedQuery: `Kibo Health Systems ${PRIVATE_MARKER} Kenya operations`,
       userText: "Research my company and compare with our Kenya operations",
       subject: ownedCompany,
+      extractCount: 3,
     });
     expect(outcome.status).toBe("OK");
     if (outcome.status !== "OK") {
@@ -142,9 +143,14 @@ describe("public web research service", () => {
     expect(provider.egressed()).not.toContain(PRIVATE_MARKER);
     expect(outcome.query).not.toContain(PRIVATE_MARKER);
     expect(outcome.queryMinimised).toBe(true);
-    // Budget: one search, five considered, three extracted (default), at most two per domain.
+    // Budget: the search and its parallel past-month twin, five distinct
+    // results considered, three extracted (as asked), at most two per domain.
+    expect(provider.searches.map((s) => s.freshness)).toEqual([
+      "ANY",
+      "PAST_MONTH",
+    ]);
     expect(outcome.budget).toEqual({
-      searchCalls: 1,
+      searchCalls: 2,
       resultsConsidered: 5,
       extractCalls: 1,
       sourcesExtracted: 3,
@@ -202,6 +208,7 @@ describe("public web research service", () => {
       requestedQuery: "Kibo Health Systems Kenya",
       userText: "Research my company Kenya",
       subject: ownedCompany,
+      extractCount: 3,
     });
     expect(again.status).toBe("OK");
     expect(evidence.sources).toHaveLength(3);
@@ -284,8 +291,9 @@ describe("public web research service", () => {
       includeDomains: ["nowhere.example"],
     });
     expect(outcome.status).toBe("OK");
-    expect(provider.searches).toHaveLength(2);
-    expect(provider.searches[1]?.query).toBe(
+    // The general search and its past-month twin, then the refinement.
+    expect(provider.searches).toHaveLength(3);
+    expect(provider.searches[2]?.query).toBe(
       "Kibo Health Systems kibohealth.example",
     );
   });

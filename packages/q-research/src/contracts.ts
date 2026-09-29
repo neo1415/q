@@ -14,11 +14,13 @@ import { z } from "zod";
 /** Per Q research turn (§8, §36). */
 export const RESEARCH_BOUNDS = {
   /** Search calls a single research turn may make, including a refinement. */
-  maxSearchCalls: 2,
+  maxSearchCalls: 3,
   /** Search results considered per turn. */
-  maxSearchResults: 5,
+  maxSearchResults: 6,
+  /** Results from the parallel past-month search, merged after the main ones. */
+  maxRecentResults: 4,
   /** Sources extracted by default. */
-  defaultExtractCount: 3,
+  defaultExtractCount: 4,
   /** Hard upper bound on sources extracted per turn. */
   maxExtractCount: 5,
   /** Characters of extracted text kept per source (fits an evidence item summary). */

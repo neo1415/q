@@ -83,7 +83,8 @@ describe("research reuse within a run", () => {
     );
     expect(first.status).toBe("OK");
     expect(second).toBe(first);
-    expect(h.provider.searches).toHaveLength(1);
+    // One research: the search and its parallel past-month twin.
+    expect(h.provider.searches).toHaveLength(2);
     expect(h.provider.extracts).toHaveLength(1);
     expect(h.registered).toHaveLength(1);
   });
@@ -93,6 +94,6 @@ describe("research reuse within a run", () => {
     await h.research("90000000-0000-4000-8000-000000000001", "Kobo360 markets");
     await h.research("90000000-0000-4000-8000-000000000002", "Kobo360 markets");
     await h.research("90000000-0000-4000-8000-000000000002", "Kobo360 funding");
-    expect(h.provider.searches).toHaveLength(3);
+    expect(h.provider.searches).toHaveLength(6);
   });
 });

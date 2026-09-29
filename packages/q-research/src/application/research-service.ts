@@ -519,19 +519,44 @@ export function createPublicWebResearchService(
       let hits: readonly PublicWebSearchHit[];
       try {
         searchCalls += 1;
-        const first = await provider.search(
-          {
-            query: egress.query,
-            maxResults: RESEARCH_BOUNDS.maxSearchResults,
-            freshness: command.freshness ?? "ANY",
-            includeDomains,
-          },
-          context,
-        );
+        // The same query restricted to the past month, started alongside
+        // the main search (founder direction 2026-09-29: wider search, no
+        // added wait). Recent coverage is what a general ranking buries;
+        // its failure costs only its own hits, never the answer.
+        const wantsRecent = (command.freshness ?? "ANY") === "ANY";
+        if (wantsRecent) searchCalls += 1;
+        const [first, recent] = await Promise.all([
+          provider.search(
+            {
+              query: egress.query,
+              maxResults: RESEARCH_BOUNDS.maxSearchResults,
+              freshness: command.freshness ?? "ANY",
+              includeDomains,
+            },
+            context,
+          ),
+          wantsRecent
+            ? provider
+                .search(
+                  {
+                    query: egress.query,
+                    maxResults: RESEARCH_BOUNDS.maxRecentResults,
+                    freshness: "PAST_MONTH",
+                    includeDomains,
+                  },
+                  context,
+                )
+                .catch(() => null)
+            : Promise.resolve(null),
+        ]);
         metrics.searchLatency.record(first.latencyMs, {
           provider: provider.code,
         });
-        hits = first.hits;
+        const seen = new Set(first.hits.map((hit) => hit.url));
+        hits = [
+          ...first.hits,
+          ...(recent?.hits ?? []).filter((hit) => !seen.has(hit.url)),
+        ];
         // One refinement, only when the composed query found nothing and the
         // subject's public identity alone is a different, allowed query.
         const identityQuery = identity.join(" ").trim();

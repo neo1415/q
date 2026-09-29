@@ -58,7 +58,7 @@ runLive("tavily live smoke", () => {
     if (outcome.status !== "OK") {
       throw new Error("unreachable");
     }
-    expect(outcome.budget.searchCalls).toBeLessThanOrEqual(2);
+    expect(outcome.budget.searchCalls).toBeLessThanOrEqual(3);
     expect(outcome.budget.extractCalls).toBeLessThanOrEqual(1);
     expect(outcome.sources.length).toBeGreaterThan(0);
     expect(outcome.sources.length).toBeLessThanOrEqual(2);
