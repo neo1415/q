@@ -49,6 +49,12 @@ const envSchema = z.object({
   ),
   SMTP_USER: optionalValue,
   SMTP_PASS: optionalValue,
+  /**
+   * Brevo's transactional API key (founder live 2026-09-29): Railway
+   * blocks outbound SMTP on every port, so where this is set, email goes
+   * over HTTPS instead and SMTP_HOST/PORT/USER/PASS are not needed.
+   */
+  BREVO_API_KEY: optionalValue,
   // "Name <address>" or a bare address.
   SMTP_SENDER: optionalValue.pipe(
     z
@@ -62,6 +68,10 @@ const envSchema = z.object({
 });
 
 export type AppEmailConfig = {
+  /** Email over Brevo's HTTPS API; preferred over SMTP when present. */
+  readonly brevoApi:
+    | { readonly apiKey: ProviderCredential; readonly sender: string }
+    | undefined;
   readonly smtp:
     | {
         readonly host: string;
@@ -80,6 +90,13 @@ export function loadAppEmailConfig(env: EnvironmentInput): AppEmailConfig {
     (name) => parsed[name] === undefined,
   );
   return {
+    brevoApi:
+      parsed.BREVO_API_KEY !== undefined && parsed.SMTP_SENDER !== undefined
+        ? {
+            apiKey: new ProviderCredential(parsed.BREVO_API_KEY),
+            sender: parsed.SMTP_SENDER,
+          }
+        : undefined,
     smtp:
       parsed.SMTP_HOST !== undefined &&
       parsed.SMTP_PORT !== undefined &&

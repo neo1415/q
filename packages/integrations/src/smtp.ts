@@ -63,3 +63,57 @@ export function createSmtpAppEmailSender(config: {
     },
   };
 }
+
+/**
+ * The same email over Brevo's transactional HTTPS API (founder live
+ * 2026-09-29): the deployment's network blocks outbound SMTP, so a relay
+ * reached over 587 or 2525 only ever timed out. Same contract as the SMTP
+ * sender: plain text, one recipient, header injection refused, throws on
+ * failure so the caller retries.
+ */
+export function createBrevoApiEmailSender(config: {
+  readonly apiKey: { readonly reveal: () => string };
+  readonly sender: string;
+  readonly fetch?: typeof fetch | undefined;
+}): AppEmailSender {
+  const match = /^(?:(.*?)\s*<)?([^<>\s]+@[^<>\s]+)>?$/.exec(
+    config.sender.trim(),
+  );
+  const senderEmail = match?.[2] ?? config.sender.trim();
+  const senderName = match?.[1]?.trim();
+  const doFetch = config.fetch ?? fetch;
+  return {
+    available: true,
+    send: async (message) => {
+      if (LINE_BREAK.test(message.subject) || LINE_BREAK.test(message.to)) {
+        throw new Error("header injection refused");
+      }
+      const response = await doFetch("https://api.brevo.com/v3/smtp/email", {
+        method: "POST",
+        headers: {
+          "api-key": config.apiKey.reveal(),
+          "content-type": "application/json",
+          accept: "application/json",
+        },
+        body: JSON.stringify({
+          sender:
+            senderName === undefined || senderName.length === 0
+              ? { email: senderEmail }
+              : { email: senderEmail, name: senderName },
+          to: [{ email: message.to }],
+          subject: message.subject,
+          textContent: message.text,
+        }),
+        signal: AbortSignal.timeout(15_000),
+      });
+      if (!response.ok) {
+        const error = new Error("email API refused the message");
+        Object.assign(error, {
+          code: "EAPI",
+          responseCode: response.status,
+        });
+        throw error;
+      }
+    },
+  };
+}

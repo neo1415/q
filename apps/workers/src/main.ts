@@ -161,6 +161,7 @@ import { composeSchedule } from "@capital-q/communication";
 import { loadAppEmailConfig } from "@capital-q/config/app-email";
 import {
   composeGoogleIntegrations,
+  createBrevoApiEmailSender,
   createSmtpAppEmailSender,
   unavailableAppEmailSender,
 } from "@capital-q/integrations";
@@ -829,7 +830,9 @@ if (!gmailIntegrations.available) {
 // Reminders and prep briefs (BIZ-008): in-app always; email over the
 // SMTP relay in the setup contract when SMTP_* are set.
 const appEmail = loadAppEmailConfig(process.env);
-if (appEmail.smtp === undefined) {
+if (appEmail.brevoApi !== undefined) {
+  logger.info({}, "reminder email enabled: Brevo API configured");
+} else if (appEmail.smtp === undefined) {
   logger.error(
     { missing: appEmail.missing },
     "reminder email disabled: SMTP not configured (in-app delivery continues)",
@@ -844,10 +847,13 @@ const schedule = composeSchedule({
   // person's authorised request created. No party check can pass here.
   interests: { relationshipById: () => Promise.resolve(null) },
   calendars: (userId) => gmailIntegrations.calendarOf(userId),
+  // HTTPS first: the deployment's network blocks outbound SMTP.
   email:
-    appEmail.smtp === undefined
-      ? unavailableAppEmailSender
-      : createSmtpAppEmailSender(appEmail.smtp),
+    appEmail.brevoApi !== undefined
+      ? createBrevoApiEmailSender(appEmail.brevoApi)
+      : appEmail.smtp === undefined
+        ? unavailableAppEmailSender
+        : createSmtpAppEmailSender(appEmail.smtp),
   logger,
 });
 

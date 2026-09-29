@@ -64,6 +64,7 @@ export {
   type CalendarProvider,
 } from "./google/calendar.js";
 export {
+  createBrevoApiEmailSender,
   createSmtpAppEmailSender,
   unavailableAppEmailSender,
   type AppEmail,
