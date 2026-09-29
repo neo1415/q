@@ -16,6 +16,7 @@ export {
   wrap,
   type ChartBar,
   type ChartBox,
+  type CircleBox,
   type LaidOutBox,
   type LaidOutDeck,
   type LaidOutSlide,

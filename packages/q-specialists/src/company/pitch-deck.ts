@@ -86,6 +86,14 @@ const GAP_LABELS: Readonly<Record<CompanyIntelligenceDimension, string>> = {
   CAPITAL_OBJECTIVE: "What is being raised, and for what",
 };
 
+/** Dimensions whose points read as steps in order, drawn as a flow. */
+const FLOWING: ReadonlySet<CompanyIntelligenceDimension> = new Set([
+  "BUSINESS_MODEL",
+  "STRATEGY",
+]);
+/** A step's words must fit under its marker. */
+const FLOW_STEP_MAX = 110;
+
 /** Dimensions where a chart is worth drawing if the numbers are there. */
 const CHARTABLE: ReadonlySet<CompanyIntelligenceDimension> = new Set([
   "TRACTION",
@@ -239,6 +247,31 @@ function chartFor(
   };
 }
 
+/**
+ * Headline figures for a slide without a chart: each the figure exactly as
+ * the statement writes it, beside the words it counts. At most three, and
+ * only where a statement plainly carries one; otherwise nothing.
+ */
+function figuresFor(
+  findings: readonly CompanyFinding[],
+): { value: string; label: string }[] {
+  const figures: { value: string; label: string }[] = [];
+  for (const finding of findings) {
+    if (figureIn(finding.statement) === null) continue;
+    const written =
+      /(?:[$£€]\s?)?\d[\d,]*(?:\.\d+)?\s?(?:%|k\b|m\b|bn\b|b\b)?/i.exec(
+        finding.statement,
+      )?.[0];
+    const label = bullet(finding);
+    if (written === undefined || label === null) continue;
+    const value = written.trim();
+    if (value.length === 0 || value.length > 24) continue;
+    figures.push({ value, label: label.slice(0, 90) });
+    if (figures.length >= 3) break;
+  }
+  return figures;
+}
+
 export type ComposedPitchDeck = {
   readonly title: string;
   readonly summary: string;
@@ -347,11 +380,27 @@ export function composePitchDeck(input: {
       continue;
     }
     if (bullets.length === 0) continue;
+    const figures = CHARTABLE.has(dimension) ? figuresFor(findings) : [];
+    const flow =
+      FLOWING.has(dimension) &&
+      bullets.length >= 3 &&
+      bullets.length <= 5 &&
+      bullets.every((line) => line.length <= FLOW_STEP_MAX);
     slides.push({
-      layout: bullets.length === 1 ? "STATEMENT" : "BULLETS",
+      layout:
+        bullets.length === 1 && figures.length === 0 ? "STATEMENT" : "BULLETS",
       title: SLIDE_TITLES[dimension],
-      bullets,
+      // A figure shown large is not repeated as a bullet under it.
+      bullets:
+        figures.length === 0
+          ? bullets
+          : bullets.filter(
+              (line) =>
+                !figures.some((figure) => line.startsWith(figure.label)),
+            ),
       bulletsRight: [],
+      ...(figures.length === 0 ? {} : { figures }),
+      ...(flow ? { visual: "FLOW" as const } : {}),
       section: sectionIndex,
     });
   }

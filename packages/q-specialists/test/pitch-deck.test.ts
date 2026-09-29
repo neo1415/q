@@ -226,7 +226,24 @@ describe("QX-004 §4, §6 · a chart is grounded or it is absent", () => {
       (s) => s.title === "Traction",
     );
     expect(traction?.chart).toBeUndefined();
-    expect(traction?.bullets[0]).toContain("320 deliveries");
+    // The one figure is shown large, exactly as written, with its words.
+    expect(traction?.figures?.[0]?.value).toBe("320");
+    expect(traction?.figures?.[0]?.label).toContain("320 deliveries");
+  });
+
+  it("draws ordered strategy points as a flow, words unchanged", () => {
+    const deck = composePitchDeck({
+      companyName: "Northstar Logistics",
+      result: populated([
+        finding({ dimension: "STRATEGY", statement: "Win Lagos first." }),
+        finding({ dimension: "STRATEGY", statement: "Then open Abuja." }),
+        finding({ dimension: "STRATEGY", statement: "Then add cold chain." }),
+      ]),
+    });
+    const strategy = (deck?.content.deck?.slides ?? []).find(
+      (s) => s.visual === "FLOW",
+    );
+    expect(strategy?.bullets).toHaveLength(3);
   });
 
   it("does not mistake a year for a measurement", () => {

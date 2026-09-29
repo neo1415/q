@@ -109,6 +109,15 @@ export async function deckToPdf(
         });
         continue;
       }
+      if (box.kind === "CIRCLE") {
+        page.drawCircle({
+          x: box.x + box.width / 2,
+          y: deck.height - box.y - box.height / 2,
+          size: box.width / 2,
+          color: colour(box.colour),
+        });
+        continue;
+      }
       if (box.kind === "TEXT") {
         drawText(page, box, deck.height, fonts);
         continue;

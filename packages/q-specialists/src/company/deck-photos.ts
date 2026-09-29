@@ -55,6 +55,8 @@ export async function illustrateDeck(
     .filter(
       ({ slide, index }) =>
         slide.image === undefined &&
+        slide.visual === undefined &&
+        slide.figures === undefined &&
         (index === 0 ? slide.layout === "TITLE" : slide.layout === "BULLETS"),
     )
     .slice(0, CONTENT_PHOTOS + 1);

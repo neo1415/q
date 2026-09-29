@@ -247,6 +247,29 @@ export const QSlideSchema = z
       .max(Q_ARTIFACT_SECTIONS_MAX - 1),
     /** A photograph beside the words, when the deck has one for it. */
     image: QSlideImageSchema.optional(),
+    /**
+     * Drawn rather than listed (founder direction 2026-09-29): FLOW sets
+     * the bullets out as numbered steps joined in order. The words are the
+     * same bullets; only the drawing changes.
+     */
+    visual: z.enum(["FLOW"]).optional(),
+    /**
+     * Headline figures shown large, each read from a statement on record
+     * and carrying the same grounding as the section it rests on. Never a
+     * number the record does not hold.
+     */
+    figures: z
+      .array(
+        z
+          .object({
+            value: z.string().trim().min(1).max(24),
+            label: z.string().trim().min(1).max(90),
+          })
+          .strict(),
+      )
+      .min(1)
+      .max(4)
+      .optional(),
   })
   .strict();
 export type QSlide = z.infer<typeof QSlideSchema>;

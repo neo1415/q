@@ -153,6 +153,17 @@ export async function deckToPptx(
         });
         continue;
       }
+      if (box.kind === "CIRCLE") {
+        slide.addShape("ellipse", {
+          x: inches(box.x),
+          y: inches(box.y),
+          w: inches(box.width),
+          h: inches(box.height),
+          fill: { color: hex(box.colour) },
+          line: { color: hex(box.colour), width: 0 },
+        });
+        continue;
+      }
       if (box.kind === "TEXT") {
         addText(slide, box, deck.theme);
         continue;

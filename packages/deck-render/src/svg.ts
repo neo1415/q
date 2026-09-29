@@ -60,6 +60,12 @@ export function slideToSvg(slide: LaidOutSlide, deck: LaidOutDeck): string {
       );
       continue;
     }
+    if (box.kind === "CIRCLE") {
+      parts.push(
+        `<circle cx="${String(box.x + box.width / 2)}" cy="${String(box.y + box.height / 2)}" r="${String(box.width / 2)}" fill="${escape(box.colour)}"/>`,
+      );
+      continue;
+    }
     if (box.kind === "IMAGE") {
       // The browser fetches it from the stock library's CDN directly.
       parts.push(

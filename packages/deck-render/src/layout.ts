@@ -91,7 +91,17 @@ export type ImageBox = {
   readonly credit: string;
 };
 
-export type LaidOutBox = TextBox | ChartBox | RuleBox | ImageBox;
+/** A filled circle: a step marker in a drawn flow. Decoration, like a rule. */
+export type CircleBox = {
+  readonly kind: "CIRCLE";
+  readonly x: number;
+  readonly y: number;
+  readonly width: number;
+  readonly height: number;
+  readonly colour: string;
+};
+
+export type LaidOutBox = TextBox | ChartBox | RuleBox | ImageBox | CircleBox;
 
 export type LaidOutSlide = {
   readonly index: number;
@@ -431,6 +441,120 @@ function layOutSlide(
         }),
       );
     }
+    return {
+      index,
+      layout: slide.layout,
+      title: slide.title,
+      boxes,
+      note: slide.note,
+      dropped,
+    };
+  }
+
+  if (slide.figures !== undefined && slide.figures.length > 0) {
+    // Headline figures across the slide: an accent rule, the number large,
+    // what it counts underneath. The bullets follow only if room is left.
+    const count = slide.figures.length;
+    const gap = 32;
+    const tile = Math.floor((width - gap * (count - 1)) / count);
+    let tallest = 0;
+    slide.figures.forEach((figure, i) => {
+      const x = MARGIN + i * (tile + gap);
+      boxes.push({
+        kind: "RULE",
+        x,
+        y: cursor,
+        width: 40,
+        height: 3,
+        colour: theme.accent,
+      });
+      const value = text("HEADING", figure.value, {
+        x,
+        y: cursor + 18,
+        width: tile,
+        size: size(Math.min(theme.sizes.title, count > 2 ? 40 : 52)),
+        colour: theme.ink,
+        bold: true,
+      });
+      const label = text("LABEL", figure.label, {
+        x,
+        y: cursor + 18 + value.height + 8,
+        width: tile,
+        size: size(theme.sizes.label),
+        colour: theme.muted,
+      });
+      boxes.push(value, label);
+      tallest = Math.max(tallest, 18 + value.height + 8 + label.height);
+    });
+    cursor += tallest + 36;
+  }
+
+  if (
+    slide.visual === "FLOW" &&
+    slide.bullets.length >= 2 &&
+    slide.bullets.length <= 5
+  ) {
+    // Numbered steps joined left to right; each step's words under it.
+    const steps = slide.bullets;
+    const slot = width / steps.length;
+    const diameter = 44;
+    const labelSize = size(theme.sizes.label);
+    const numberSize = size(theme.sizes.label);
+    // Centred in the space left, allowing three lines of words per step.
+    const drawn = diameter + 18 + labelSize * LINE_SPACING * 3;
+    cursor += Math.max(0, Math.round((bottom - cursor - drawn) / 2));
+    const centreY = cursor + diameter / 2;
+    // The number in whichever of the deck's inks reads on the marker.
+    const numberInk =
+      (contrastRatio(theme.background, theme.accent) ?? 0) >=
+      (contrastRatio(theme.ink, theme.accent) ?? 0)
+        ? theme.background
+        : theme.ink;
+    for (let i = 0; i < steps.length - 1; i += 1) {
+      const from = MARGIN + slot * i + slot / 2 + diameter / 2 + 6;
+      const to = MARGIN + slot * (i + 1) + slot / 2 - diameter / 2 - 6;
+      if (to > from) {
+        boxes.push({
+          kind: "RULE",
+          x: Math.round(from),
+          y: Math.round(centreY - 1),
+          width: Math.round(to - from),
+          height: 2,
+          colour: theme.muted,
+        });
+      }
+    }
+    steps.forEach((step, i) => {
+      const centreX = MARGIN + slot * i + slot / 2;
+      boxes.push({
+        kind: "CIRCLE",
+        x: Math.round(centreX - diameter / 2),
+        y: Math.round(cursor),
+        width: diameter,
+        height: diameter,
+        colour: theme.accent,
+      });
+      const number = text("LABEL", String(i + 1), {
+        x: Math.round(centreX - diameter / 2),
+        y: Math.round(centreY - (numberSize * LINE_SPACING) / 2),
+        width: diameter,
+        size: numberSize,
+        colour: numberInk,
+        bold: true,
+        align: "centre",
+      });
+      const words = text("BULLET", step, {
+        x: Math.round(MARGIN + slot * i + 8),
+        y: Math.round(cursor + diameter + 18),
+        width: Math.round(slot - 16),
+        size: labelSize,
+        colour: theme.ink,
+        align: "centre",
+      });
+      boxes.push(number);
+      if (words.y + words.height > bottom) dropped.push(step);
+      else boxes.push(words);
+    });
     return {
       index,
       layout: slide.layout,

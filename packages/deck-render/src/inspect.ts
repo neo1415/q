@@ -6,6 +6,7 @@ import {
   measure,
   type LaidOutDeck,
   type LaidOutSlide,
+  type CircleBox,
   type TextBox,
 } from "./layout.js";
 
@@ -90,7 +91,10 @@ function inspectSlide(
     );
   }
 
-  const placed = slide.boxes.filter((box) => box.kind !== "RULE");
+  // Rules and step markers are decoration; a step's number sits on its marker.
+  const placed = slide.boxes.filter(
+    (box) => box.kind !== "RULE" && box.kind !== "CIRCLE",
+  );
   for (const box of slide.boxes) {
     if (
       box.x < MARGIN - 1 ||
@@ -152,9 +156,22 @@ function inspectSlide(
         `a word on "${slide.title}" is wider than the space it has`,
       );
     }
+    // A step number is read against its marker, not the page.
+    const centreX = box.x + box.width / 2;
+    const centreY = box.y + box.height / 2;
+    const marker = slide.boxes.find(
+      (other): other is CircleBox =>
+        other.kind === "CIRCLE" &&
+        centreX >= other.x &&
+        centreX <= other.x + other.width &&
+        centreY >= other.y &&
+        centreY <= other.y + other.height,
+    );
     const ratio = worstContrast(
       box.colour,
-      slide.background ?? [theme.background],
+      marker === undefined
+        ? (slide.background ?? [theme.background])
+        : [marker.colour],
     );
     if (ratio !== null && ratio < CONTRAST_MIN) {
       at(
