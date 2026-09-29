@@ -64,3 +64,28 @@ alter table network.interest_responses
 
 comment on column network.interest_responses.responded_by_party is
   'The party that answered: the one the interest was addressed to.';
+
+-- ---------------------------------------------------------------------------
+-- Reference data (production, idempotent; mirrored in the local seed)
+-- ---------------------------------------------------------------------------
+
+insert into permissions.capabilities (code, description) values
+  ('company.connection.request', 'Send an investor organisation a Connection Request on the company''s behalf, where the investor allows founders to reach them.'),
+  ('investor.connection.view',   'See the Connection Requests founders sent the investor organisation, and how it answered.'),
+  ('investor.connection.respond', 'Accept or decline a founder''s Connection Request on the investor organisation''s behalf.')
+on conflict (code) do update
+  set description = excluded.description;
+
+insert into permissions.role_capabilities (role_id, capability_id, effect)
+select r.id, c.id, 'ALLOW'
+  from permissions.roles r
+  join permissions.capabilities c
+    on (r.code, c.code) in (
+      ('organisation_admin',  'company.connection.request'),
+      ('organisation_member', 'company.connection.request'),
+      ('organisation_admin',  'investor.connection.view'),
+      ('organisation_member', 'investor.connection.view'),
+      ('organisation_admin',  'investor.connection.respond'),
+      ('organisation_member', 'investor.connection.respond')
+    )
+on conflict (role_id, capability_id) do nothing;

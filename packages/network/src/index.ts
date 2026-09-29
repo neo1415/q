@@ -25,6 +25,7 @@
  */
 
 export {
+  INTEREST_PARTIES,
   InterestIdSchema,
   InterestResponseIdSchema,
   MatchIdSchema,
@@ -37,6 +38,7 @@ export {
   type Interest,
   type InterestDecision,
   type InterestId,
+  type InterestParty,
   type InterestResponseId,
   type MatchId,
   type Relationship,
@@ -47,6 +49,8 @@ export {
   type RelationshipId,
 } from "./contracts/index.js";
 export {
+  ConnectionNotAcceptedError,
+  ConnectionNotPermittedError,
   InterestAlreadyAnsweredError,
   InterestCompanyNotFoundError,
   InterestIdempotencyConflictError,
@@ -151,6 +155,19 @@ export {
   type RespondToInterestResult,
 } from "./application/respond-to-interest.js";
 export {
+  COMPANY_CONNECTION_REQUEST,
+  createGetConnectionStatus,
+  createListConnectionRequests,
+  createRequestConnection,
+  createRespondToConnectionRequest,
+  hashConnectionRequestIdempotencyKey,
+  INVESTOR_CONNECTION_RESPOND,
+  INVESTOR_CONNECTION_VIEW,
+  type ConnectionRequestDependencies,
+  type ConnectionRequestResult,
+  type InboundPreference,
+} from "./application/connection-requests.js";
+export {
   createRelationshipStateProjector,
   readHistory,
   type RelationshipStateProjector,
@@ -179,7 +196,10 @@ export {
   type RelationshipProjection,
 } from "./domain/state-projector.js";
 export {
+  createConnectionService,
   createInterestService,
+  type ConnectionService,
+  type ConnectionServiceOptions,
   createNetworkService,
   type InterestService,
   type InterestServiceOptions,

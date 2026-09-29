@@ -137,6 +137,9 @@ export type InterestDecision = "ACCEPTED" | "DECLINED";
  * `response` and `connection` are the company's answer (CQ-NET-011), read
  * with it so neither side ever sees an interest without its answer.
  */
+export const INTEREST_PARTIES = ["INVESTOR", "COMPANY"] as const;
+export type InterestParty = (typeof INTEREST_PARTIES)[number];
+
 export type Interest = {
   readonly id: InterestId;
   /** The relationship's (company's) tenant anchor. */
@@ -144,13 +147,17 @@ export type Interest = {
   readonly relationshipId: RelationshipId;
   readonly companyId: CompanyId;
   readonly investorOrganisationId: InvestorOrganisationId;
-  readonly expressedByParty: "INVESTOR";
+  /**
+   * Who reached out: INVESTOR (Express Interest) or COMPANY (a founder's
+   * Connection Request, ADR 0023). The other party answers.
+   */
+  readonly expressedByParty: InterestParty;
   readonly status: "EXPRESSED" | "WITHDRAWN";
   readonly expressedByUserId: string;
   readonly expressedInOrganisationId: string;
   readonly relationshipEventId: RelationshipEventId;
   readonly createdAt: UtcTimestamp;
-  /** Null until the company answers. */
+  /** Null until the other party answers. */
   readonly response: {
     readonly id: InterestResponseId;
     readonly decision: InterestDecision;

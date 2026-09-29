@@ -78,6 +78,9 @@ export const DiscoveredRelationshipEvent = defineRelationshipEvent({
 export const InterestExpressedPayloadSchema = z
   .object({
     interestId: UuidSchema,
+    // Who reached out (ADR 0023). Absent on every event written before
+    // founders could send Connection Requests: those are all INVESTOR.
+    expressedByParty: z.enum(["INVESTOR", "COMPANY"]).optional(),
   })
   .strict();
 export type InterestExpressedPayload = z.infer<

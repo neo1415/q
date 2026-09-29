@@ -11,6 +11,7 @@ import {
   InterestResponseIdSchema,
   MatchIdSchema,
   RelationshipEventIdSchema,
+  INTEREST_PARTIES,
   RelationshipIdSchema,
   type Interest,
 } from "../contracts/index.js";
@@ -44,7 +45,7 @@ const InterestRow = z.object({
   relationship_id: RelationshipIdSchema,
   company_id: CompanyIdSchema,
   investor_organisation_id: InvestorOrganisationIdSchema,
-  expressed_by_party: z.literal("INVESTOR"),
+  expressed_by_party: z.enum(INTEREST_PARTIES),
   status: z.enum(["EXPRESSED", "WITHDRAWN"]),
   expressed_by_user_id: UuidSchema,
   expressed_in_organisation_id: UuidSchema,
@@ -110,11 +111,15 @@ export function createPostgresInterestRepository(): InterestRepository {
         ${interestSelect(executor)} where i.id = ${interestId}`;
       return rows.length === 0 ? null : toInterest(rows[0]);
     },
-    findOpenByRelationship: async (executor, relationshipId) => {
+    findOpenByRelationship: async (
+      executor,
+      relationshipId,
+      party = "INVESTOR",
+    ) => {
       const rows = await executor`
         ${interestSelect(executor)}
          where i.relationship_id = ${relationshipId}
-           and i.expressed_by_party = 'INVESTOR'
+           and i.expressed_by_party = ${party}
            and i.status = 'EXPRESSED'`;
       return rows.length === 0 ? null : toInterest(rows[0]);
     },
@@ -122,6 +127,17 @@ export function createPostgresInterestRepository(): InterestRepository {
       const rows = await executor`
         ${interestSelect(executor)}
          where r.company_id = ${companyId}
+           and i.expressed_by_party = 'INVESTOR'
+           and i.status = 'EXPRESSED'
+         order by i.created_at desc
+         limit ${limit}`;
+      return rows.map(toInterest);
+    },
+    listByInvestor: async (executor, investorOrganisationId, limit) => {
+      const rows = await executor`
+        ${interestSelect(executor)}
+         where r.investor_organisation_id = ${investorOrganisationId}
+           and i.expressed_by_party = 'COMPANY'
            and i.status = 'EXPRESSED'
          order by i.created_at desc
          limit ${limit}`;
@@ -133,7 +149,8 @@ export function createPostgresInterestRepository(): InterestRepository {
           (id, tenant_id, relationship_id, expressed_by_party, expressed_by_user_id,
            expressed_in_organisation_id, relationship_event_id)
         values
-          (${input.id}, ${input.tenantId}, ${input.relationshipId}, 'INVESTOR',
+          (${input.id}, ${input.tenantId}, ${input.relationshipId},
+           ${input.expressedByParty ?? "INVESTOR"},
            ${input.expressedByUserId}, ${input.expressedInOrganisationId},
            ${input.relationshipEventId})`;
       const rows = await tx.sql`
@@ -187,11 +204,12 @@ export function createPostgresInterestResponseRepository(): InterestResponseRepo
       await tx.sql`
         insert into network.interest_responses
           (id, tenant_id, relationship_id, interest_id, decision,
-           responded_by_user_id, responded_in_organisation_id, relationship_event_id)
+           responded_by_user_id, responded_in_organisation_id, relationship_event_id,
+           responded_by_party)
         values
           (${input.id}, ${input.tenantId}, ${input.relationshipId}, ${input.interestId},
            ${input.decision}, ${input.respondedByUserId}, ${input.respondedInOrganisationId},
-           ${input.relationshipEventId})`;
+           ${input.relationshipEventId}, ${input.respondedByParty ?? "COMPANY"})`;
     },
     insertMatch: async (tx, input) => {
       await tx.sql`

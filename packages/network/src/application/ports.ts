@@ -10,6 +10,7 @@ import type { ActorType, TenantId } from "@capital-q/security";
 
 import type {
   Interest,
+  InterestParty,
   InterestDecision,
   InterestId,
   InterestResponseId,
@@ -144,15 +145,22 @@ export type InterestRepository = {
     executor: DatabaseExecutor,
     interestId: InterestId,
   ) => Promise<Interest | null>;
-  /** The investor party's open interest on this relationship, if any. */
+  /** One party's open interest on this relationship, if any (default: the investor's). */
   readonly findOpenByRelationship: (
     executor: DatabaseExecutor,
     relationshipId: RelationshipId,
+    party?: InterestParty,
   ) => Promise<Interest | null>;
-  /** Open interests addressed to one company, newest first, with their answers. */
+  /** Open investor interests addressed to one company, newest first, with their answers. */
   readonly listByCompany: (
     executor: DatabaseExecutor,
     companyId: CompanyId,
+    limit: number,
+  ) => Promise<readonly Interest[]>;
+  /** Open Connection Requests addressed to one investor organisation, newest first (ADR 0023). */
+  readonly listByInvestor: (
+    executor: DatabaseExecutor,
+    investorOrganisationId: InvestorOrganisationId,
     limit: number,
   ) => Promise<readonly Interest[]>;
   readonly insert: (
@@ -161,6 +169,8 @@ export type InterestRepository = {
       readonly id: InterestId;
       readonly tenantId: TenantId;
       readonly relationshipId: RelationshipId;
+      /** Absent: the investor, as before ADR 0023. */
+      readonly expressedByParty?: InterestParty;
       readonly expressedByUserId: string;
       readonly expressedInOrganisationId: string;
       readonly relationshipEventId: RelationshipEventId;
@@ -213,6 +223,8 @@ export type InterestResponseRepository = {
       readonly decision: InterestDecision;
       readonly respondedByUserId: string;
       readonly respondedInOrganisationId: string;
+      /** Absent: the company, as before ADR 0023. */
+      readonly respondedByParty?: InterestParty;
       readonly relationshipEventId: RelationshipEventId;
     },
   ) => Promise<void>;

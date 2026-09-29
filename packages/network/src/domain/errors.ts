@@ -95,3 +95,33 @@ export class RelationshipEventVisibilityNotAllowedError extends Error {
     this.visibilityScope = visibilityScope;
   }
 }
+
+/**
+ * The investor does not take Connection Requests from this founder: they
+ * chose closed, have not said, or (qualified) this company does not meet
+ * the rules they declared (ADR 0023). Safe to say: it describes the
+ * investor's own public choice, never anything private.
+ */
+export class ConnectionNotAcceptedError extends Error {
+  readonly reason: "CLOSED" | "NOT_STATED" | "NOT_QUALIFIED";
+
+  constructor(reason: "CLOSED" | "NOT_STATED" | "NOT_QUALIFIED") {
+    super(
+      reason === "NOT_QUALIFIED"
+        ? "This investor only takes requests from companies that meet the criteria they set, and yours doesn't yet."
+        : "This investor isn't taking requests from founders right now.",
+    );
+    this.name = "ConnectionNotAcceptedError";
+    this.reason = reason;
+  }
+}
+
+/** The actor is not acting for a company, or their role cannot send requests. */
+export class ConnectionNotPermittedError extends Error {
+  constructor() {
+    super(
+      "Only a member of a company on Capital Q can send a Connection Request.",
+    );
+    this.name = "ConnectionNotPermittedError";
+  }
+}

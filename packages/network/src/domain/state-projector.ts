@@ -243,12 +243,14 @@ export type RelationshipNextStep =
 export function nextStepFor(
   state: RelationshipStateV1,
   party: RelationshipParty,
+  /** Who sent the open interest; a founder's Connection Request is COMPANY. */
+  expressedBy: RelationshipParty = "INVESTOR",
 ): RelationshipNextStep {
   switch (state) {
     case "DISCOVERED":
       return party === "INVESTOR" ? "EXPRESS_INTEREST" : "NONE";
     case "INTEREST_EXPRESSED":
-      return party === "INVESTOR" ? "AWAIT_ANSWER" : "ANSWER_INTEREST";
+      return party === expressedBy ? "AWAIT_ANSWER" : "ANSWER_INTEREST";
     case "CONNECTED":
       // Doc 17 §86: the post-match primary action.
       return "SCHEDULE_MEETING";

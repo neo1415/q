@@ -45,6 +45,13 @@ import {
   createRelationshipEventAppender,
   type RelationshipEventAppender,
 } from "./append-event.js";
+import {
+  createGetConnectionStatus,
+  createListConnectionRequests,
+  createRequestConnection,
+  createRespondToConnectionRequest,
+  type ConnectionRequestDependencies,
+} from "./connection-requests.js";
 import type { NetworkServiceDependencies } from "./dependencies.js";
 import {
   createEnsureRelationship,
@@ -184,10 +191,10 @@ export type InterestServiceOptions = NetworkServiceOptions &
       InterestResponseRequestStore | undefined;
   };
 
-export function createInterestService(
+function interestDependencies(
   options: InterestServiceOptions,
-): InterestService {
-  const dependencies: ExpressInterestDependencies = {
+): ExpressInterestDependencies {
+  return {
     ...options,
     registry:
       options.registry ??
@@ -205,6 +212,12 @@ export function createInterestService(
       options.interestResponseRequests ??
       createPostgresInterestResponseRequestStore(),
   };
+}
+
+export function createInterestService(
+  options: InterestServiceOptions,
+): InterestService {
+  const dependencies = interestDependencies(options);
   return {
     expressInterest: createExpressInterest(dependencies),
     getOwnInterest: createGetOwnInterest(dependencies),
@@ -219,5 +232,36 @@ export function createInterestService(
       createListRelationshipsForInvestor(dependencies),
     listRelationshipsForCompany:
       createListRelationshipsForCompany(dependencies),
+  };
+}
+
+/** A founder's Connection Requests and the investor's answers (ADR 0023). */
+export type ConnectionService = {
+  readonly requestConnection: ReturnType<typeof createRequestConnection>;
+  readonly connectionStatus: ReturnType<typeof createGetConnectionStatus>;
+  readonly listConnectionRequests: ReturnType<
+    typeof createListConnectionRequests
+  >;
+  readonly respondToConnectionRequest: ReturnType<
+    typeof createRespondToConnectionRequest
+  >;
+};
+
+export type ConnectionServiceOptions = InterestServiceOptions &
+  Pick<ConnectionRequestDependencies, "founderSubject" | "investorReach">;
+
+export function createConnectionService(
+  options: ConnectionServiceOptions,
+): ConnectionService {
+  const dependencies: ConnectionRequestDependencies = {
+    ...interestDependencies(options),
+    founderSubject: options.founderSubject,
+    investorReach: options.investorReach,
+  };
+  return {
+    requestConnection: createRequestConnection(dependencies),
+    connectionStatus: createGetConnectionStatus(dependencies),
+    listConnectionRequests: createListConnectionRequests(dependencies),
+    respondToConnectionRequest: createRespondToConnectionRequest(dependencies),
   };
 }

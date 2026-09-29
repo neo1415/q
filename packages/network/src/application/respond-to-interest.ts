@@ -29,6 +29,7 @@ import {
   MatchIdSchema,
   type Interest,
   type InterestDecision,
+  type InterestParty,
 } from "../contracts/index.js";
 import {
   InterestAlreadyAnsweredError,
@@ -157,7 +158,14 @@ async function authoriseForInterest(
     dependencies.sql,
     parsed.data,
   );
-  if (interest === null || interest.status !== "EXPRESSED") {
+  // Only an investor's interest is the company's to answer: a founder's
+  // own Connection Request is answered by the investor (ADR 0023), never
+  // accepted by the company that sent it.
+  if (
+    interest === null ||
+    interest.status !== "EXPRESSED" ||
+    interest.expressedByParty !== "INVESTOR"
+  ) {
     throw new InterestNotFoundError();
   }
   const company = await authoriseForCompany(
@@ -199,6 +207,54 @@ async function investorOf(
 export function createRespondToInterest(
   dependencies: ExpressInterestDependencies,
 ) {
+  return async (
+    command: RespondToInterestCommand,
+  ): Promise<RespondToInterestResult> => {
+    const { interest, company } = await authoriseForInterest(
+      dependencies,
+      command.actor,
+      command.interestId,
+    );
+    const investor = await investorOf(dependencies, interest);
+    const answered = await answerInterest(dependencies, {
+      actor: command.actor,
+      interest,
+      responderOrganisationId: company.organisationId,
+      respondedByParty: "COMPANY",
+      decision: command.decision,
+      surface: command.surface,
+      idempotencyKey: command.idempotencyKey,
+      correlationId: command.correlationId,
+    });
+    return { ...answered, investor };
+  };
+}
+
+/**
+ * One party's answer to an interest the other party expressed, already
+ * authorised by the caller (the company for an investor's interest, the
+ * investor organisation for a founder's Connection Request, ADR 0023).
+ *
+ *   idempotency lock/lookup -> pair lock -> re-read (still open, not
+ *   answered differently) -> accepted | declined event -> response row
+ *   (+ match on acceptance) -> audit -> outbox -> idempotency record
+ *
+ * The same one path for both directions, so a match means the same thing
+ * whichever side reached out.
+ */
+export async function answerInterest(
+  dependencies: ExpressInterestDependencies,
+  input: {
+    readonly actor: ActorContext;
+    readonly interest: Interest;
+    readonly responderOrganisationId: string;
+    readonly respondedByParty: InterestParty;
+    readonly decision: InterestDecision;
+    readonly surface: InterestResponseSurface;
+    readonly idempotencyKey: string;
+    readonly correlationId: CorrelationId;
+  },
+): Promise<{ readonly interest: Interest; readonly deduplicated: boolean }> {
   const {
     transactions,
     audit,
@@ -209,150 +265,139 @@ export function createRespondToInterest(
     repositories,
   } = dependencies;
   const appender = createRelationshipEventAppender(dependencies);
-
-  return async (
-    command: RespondToInterestCommand,
-  ): Promise<RespondToInterestResult> => {
-    const { actor, decision } = command;
-    const { interest, company } = await authoriseForInterest(
-      dependencies,
-      actor,
-      command.interestId,
+  const { actor, decision, interest } = input;
+  const organisationId = input.responderOrganisationId;
+  const keyHash = hashInterestResponseIdempotencyKey(input.idempotencyKey);
+  const requestHash = hashRespondToInterestRequest(interest.id, decision);
+  return transactions.run(async (tx) => {
+    await interestResponseRequests.lock(
+      tx,
+      actor.userId,
+      organisationId,
+      keyHash,
     );
-    const investor = await investorOf(dependencies, interest);
-    const organisationId = company.organisationId;
-    const keyHash = hashInterestResponseIdempotencyKey(command.idempotencyKey);
-    const requestHash = hashRespondToInterestRequest(interest.id, decision);
+    const previous = await interestResponseRequests.find(
+      tx,
+      actor.userId,
+      organisationId,
+      keyHash,
+    );
+    if (previous !== null) {
+      if (previous.requestHash !== requestHash) {
+        throw new InterestIdempotencyConflictError();
+      }
+      const replayed = await interests.findById(tx.sql, previous.interestId);
+      if (replayed === null) throw new InterestIdempotencyConflictError();
+      return { interest: replayed, deduplicated: true };
+    }
 
-    return transactions.run(async (tx) => {
-      await interestResponseRequests.lock(
-        tx,
-        actor.userId,
-        organisationId,
-        keyHash,
-      );
-      const previous = await interestResponseRequests.find(
-        tx,
-        actor.userId,
-        organisationId,
-        keyHash,
-      );
-      if (previous !== null) {
-        if (previous.requestHash !== requestHash) {
-          throw new InterestIdempotencyConflictError();
-        }
-        const replayed = await interests.findById(tx.sql, previous.interestId);
-        if (replayed === null) throw new InterestIdempotencyConflictError();
-        return { interest: replayed, investor, deduplicated: true };
+    // The pair lock serialises two members answering at once, and an
+    // answer racing a new expression on the same relationship.
+    await repositories.relationships.lockPair(
+      tx,
+      interest.companyId,
+      interest.investorOrganisationId,
+    );
+    const current = await interests.findById(tx.sql, interest.id);
+    if (current === null || current.status !== "EXPRESSED") {
+      throw new InterestNotFoundError();
+    }
+    if (current.response !== null) {
+      if (current.response.decision !== decision) {
+        throw new InterestAlreadyAnsweredError();
       }
-
-      // The pair lock serialises two members answering at once, and an
-      // answer racing a new expression on the same relationship.
-      await repositories.relationships.lockPair(
-        tx,
-        interest.companyId,
-        interest.investorOrganisationId,
-      );
-      const current = await interests.findById(tx.sql, interest.id);
-      if (current === null || current.status !== "EXPRESSED") {
-        throw new InterestNotFoundError();
-      }
-      if (current.response !== null) {
-        if (current.response.decision !== decision) {
-          throw new InterestAlreadyAnsweredError();
-        }
-        await interestResponseRequests.record(tx, {
-          userId: actor.userId,
-          organisationId,
-          tenantId: actor.tenantId,
-          idempotencyKeyHash: keyHash,
-          requestHash,
-          interestResponseId: current.response.id,
-        });
-        return { interest: current, investor, deduplicated: true };
-      }
-
-      const responseId = InterestResponseIdSchema.parse(randomUUID());
-      const matchId =
-        decision === "ACCEPTED" ? MatchIdSchema.parse(randomUUID()) : null;
-      const source = { type: SOURCE_BY_SURFACE[command.surface] };
-      const event = await appender.append(tx, {
-        relationshipId: current.relationshipId,
-        eventType:
-          decision === "ACCEPTED"
-            ? RELATIONSHIP_EVENT_CONNECTION_ACCEPTED
-            : RELATIONSHIP_EVENT_INTEREST_DECLINED,
-        actor: { type: actor.actorType, id: actor.userId },
-        source,
-        visibilityScope: "relationship_shared",
-        payload:
-          matchId === null
-            ? { interestId: current.id }
-            : { interestId: current.id, matchId },
-        correlationId: command.correlationId,
-      });
-      await interestResponses.insert(tx, {
-        id: responseId,
-        tenantId: current.tenantId,
-        relationshipId: current.relationshipId,
-        interestId: current.id,
-        decision,
-        respondedByUserId: actor.userId,
-        respondedInOrganisationId: organisationId,
-        relationshipEventId: event.id,
-      });
-      if (matchId !== null) {
-        await interestResponses.insertMatch(tx, {
-          id: matchId,
-          tenantId: current.tenantId,
-          relationshipId: current.relationshipId,
-          interestResponseId: responseId,
-        });
-      }
-      await audit.record(tx, {
-        ...auditActorFromContext(actor),
-        auditEventId: createAuditEventId(),
-        actionType: decision === "ACCEPTED" ? ACTION_ACCEPTED : ACTION_DECLINED,
-        resourceType: RESOURCE_INTEREST,
-        resourceId: current.id,
-        occurredAt: occurredNow(),
-        outcome: "SUCCEEDED",
-        metadata: {
-          relationshipId: current.relationshipId,
-          companyId: current.companyId,
-          investorOrganisationId: current.investorOrganisationId,
-          ...(matchId === null ? {} : { matchId }),
-        },
-        correlationId: command.correlationId,
-      });
-      await outbox.enqueue(
-        tx,
-        interestAnsweredEvent({
-          decision,
-          tenantId: current.tenantId,
-          organisationId,
-          actorUserId: actor.userId,
-          correlationId: command.correlationId,
-          relationshipId: current.relationshipId,
-          interestId: current.id,
-          matchId,
-          companyId: current.companyId,
-          investorOrganisationId: current.investorOrganisationId,
-        }),
-      );
       await interestResponseRequests.record(tx, {
         userId: actor.userId,
         organisationId,
         tenantId: actor.tenantId,
         idempotencyKeyHash: keyHash,
         requestHash,
+        interestResponseId: current.response.id,
+      });
+      return { interest: current, deduplicated: true };
+    }
+
+    const responseId = InterestResponseIdSchema.parse(randomUUID());
+    const matchId =
+      decision === "ACCEPTED" ? MatchIdSchema.parse(randomUUID()) : null;
+    const source = { type: SOURCE_BY_SURFACE[input.surface] };
+    const event = await appender.append(tx, {
+      relationshipId: current.relationshipId,
+      eventType:
+        decision === "ACCEPTED"
+          ? RELATIONSHIP_EVENT_CONNECTION_ACCEPTED
+          : RELATIONSHIP_EVENT_INTEREST_DECLINED,
+      actor: { type: actor.actorType, id: actor.userId },
+      source,
+      visibilityScope: "relationship_shared",
+      payload:
+        matchId === null
+          ? { interestId: current.id }
+          : { interestId: current.id, matchId },
+      correlationId: input.correlationId,
+    });
+    await interestResponses.insert(tx, {
+      id: responseId,
+      tenantId: current.tenantId,
+      relationshipId: current.relationshipId,
+      interestId: current.id,
+      decision,
+      respondedByUserId: actor.userId,
+      respondedInOrganisationId: organisationId,
+      respondedByParty: input.respondedByParty,
+      relationshipEventId: event.id,
+    });
+    if (matchId !== null) {
+      await interestResponses.insertMatch(tx, {
+        id: matchId,
+        tenantId: current.tenantId,
+        relationshipId: current.relationshipId,
         interestResponseId: responseId,
       });
-      const answered = await interests.findById(tx.sql, current.id);
-      if (answered === null) throw new InterestNotFoundError();
-      return { interest: answered, investor, deduplicated: false };
+    }
+    await audit.record(tx, {
+      ...auditActorFromContext(actor),
+      auditEventId: createAuditEventId(),
+      actionType: decision === "ACCEPTED" ? ACTION_ACCEPTED : ACTION_DECLINED,
+      resourceType: RESOURCE_INTEREST,
+      resourceId: current.id,
+      occurredAt: occurredNow(),
+      outcome: "SUCCEEDED",
+      metadata: {
+        relationshipId: current.relationshipId,
+        companyId: current.companyId,
+        investorOrganisationId: current.investorOrganisationId,
+        ...(matchId === null ? {} : { matchId }),
+      },
+      correlationId: input.correlationId,
     });
-  };
+    await outbox.enqueue(
+      tx,
+      interestAnsweredEvent({
+        decision,
+        tenantId: current.tenantId,
+        organisationId,
+        actorUserId: actor.userId,
+        correlationId: input.correlationId,
+        relationshipId: current.relationshipId,
+        interestId: current.id,
+        matchId,
+        companyId: current.companyId,
+        investorOrganisationId: current.investorOrganisationId,
+      }),
+    );
+    await interestResponseRequests.record(tx, {
+      userId: actor.userId,
+      organisationId,
+      tenantId: actor.tenantId,
+      idempotencyKeyHash: keyHash,
+      requestHash,
+      interestResponseId: responseId,
+    });
+    const answered = await interests.findById(tx.sql, current.id);
+    if (answered === null) throw new InterestNotFoundError();
+    return { interest: answered, deduplicated: false };
+  });
 }
 
 /**

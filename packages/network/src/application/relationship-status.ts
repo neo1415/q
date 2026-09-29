@@ -24,6 +24,10 @@ import {
   type RelationshipParty,
   type RelationshipProjection,
 } from "../domain/state-projector.js";
+import {
+  InterestExpressedPayloadSchema,
+  RELATIONSHIP_EVENT_INTEREST_EXPRESSED,
+} from "../domain/event-registry.js";
 import type { ExpressInterestDependencies } from "./express-interest.js";
 import { readHistory } from "./relationship-projection.js";
 import { COMPANY_INTEREST_VIEW } from "./respond-to-interest.js";
@@ -71,14 +75,33 @@ function viewOf(
   history: Parameters<typeof visibleToParty>[0],
   party: RelationshipParty,
 ): RelationshipStatus | null {
-  const projection = projectRelationshipState(visibleToParty(history, party));
+  const visible = visibleToParty(history, party);
+  const projection = projectRelationshipState(visible);
   return projection === null
     ? null
     : {
         relationship,
         projection,
-        nextStep: nextStepFor(projection.state, party),
+        nextStep: nextStepFor(projection.state, party, lastExpresser(visible)),
       };
+}
+
+/** Who sent the latest interest: an investor's interest or a founder's request. */
+function lastExpresser(
+  history: readonly {
+    readonly eventType: string;
+    readonly payload?: unknown;
+  }[],
+): RelationshipParty {
+  for (let at = history.length - 1; at >= 0; at -= 1) {
+    const event = history[at];
+    if (event?.eventType !== RELATIONSHIP_EVENT_INTEREST_EXPRESSED) continue;
+    const parsed = InterestExpressedPayloadSchema.safeParse(event.payload);
+    return parsed.success && parsed.data.expressedByParty === "COMPANY"
+      ? "COMPANY"
+      : "INVESTOR";
+  }
+  return "INVESTOR";
 }
 
 /** One row of a party's list: the fold, plus the counterpart's name. */
