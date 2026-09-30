@@ -354,7 +354,8 @@ export function optionsOf(
  * separate step, which is exactly why "50000" could be spoken as a bare
  * integer for as long as it was.
  */
-const MONEY_STEP = /cheque|target_amount|valuation|round_size|revenue|mrr|arr/i;
+export const MONEY_STEP =
+  /cheque|target_amount|valuation|round_size|revenue|mrr|arr/i;
 
 /** The symbol for each currency the journey offers. Domain reference data. */
 const CURRENCY_SYMBOLS: Readonly<Record<string, string>> = {

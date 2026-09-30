@@ -243,3 +243,118 @@ describe("the reading runs alongside the first round (live 2026-09-30)", () => {
     expect(prompts[1]).toContain("They want to pause");
   });
 });
+
+describe("what an earlier utterance stated stays theirs (live 2026-09-30)", () => {
+  it("an answer from their monologue is recorded on a later turn, quoting it", async () => {
+    const world = investorSession({ currentStepKey: "I0.investor_type" });
+    const monologue =
+      "We're a venture capital fund based in Lagos and we back pre-seed.";
+    let turnNo = 0;
+    const gateway = {
+      execute: () => {
+        turnNo += 1;
+        // Turn 1 writes nothing; turn 2 records from the turn-1 words.
+        if (turnNo === 2) {
+          return Promise.resolve({
+            output: {
+              kind: "TOOL_CALLS",
+              text: "",
+              calls: [
+                {
+                  callId: "c1",
+                  name: "record_answers",
+                  arguments: {
+                    answers: [
+                      {
+                        stepKey: "I0.investor_type",
+                        value: "vc",
+                        quote: "We're a venture capital fund",
+                      },
+                    ],
+                  },
+                },
+              ],
+            },
+          });
+        }
+        return Promise.resolve({
+          output: {
+            kind: "TEXT",
+            text: JSON.stringify({ reply: "Got it.", asking: null }),
+          },
+        });
+      },
+    } as unknown as ModelGateway;
+    let readings = 0;
+    const agent = createInterviewAgent({
+      gateway,
+      firewall: firewall(),
+      logger,
+      recommendations: world.recommendations,
+      delegation: readerOf(() => {
+        readings += 1;
+        return readings === 1
+          ? reading({ stated: ["I0.investor_type"] })
+          : reading({});
+      }),
+    });
+    await agent.turn({ ...turn(world, monologue), actor });
+    expect(world.recordedValue("I0.investor_type")).toBeUndefined();
+    await agent.turn({
+      ...turn(world, "sure"),
+      recentTurns: [
+        { role: "person", text: monologue },
+        { role: "q", text: "Got it." },
+      ],
+      actor,
+    });
+    expect(world.recordedValue("I0.investor_type")).toEqual({
+      type: "SINGLE_SELECT",
+      optionKey: "vc",
+    });
+  });
+
+  it("an answer no earlier reading stated stays refused", async () => {
+    const world = investorSession({ currentStepKey: "I0.investor_type" });
+    const { gateway } = {
+      gateway: {
+        execute: () =>
+          Promise.resolve({
+            output: {
+              kind: "TOOL_CALLS",
+              text: "",
+              calls: [
+                {
+                  callId: "c1",
+                  name: "record_answers",
+                  arguments: {
+                    answers: [
+                      {
+                        stepKey: "I0.investor_type",
+                        value: "vc",
+                        quote: "a venture capital fund",
+                      },
+                    ],
+                  },
+                },
+              ],
+            },
+          }),
+      } as unknown as ModelGateway,
+    };
+    await createInterviewAgent({
+      gateway,
+      firewall: firewall(),
+      logger,
+      recommendations: world.recommendations,
+      delegation: readerOf(reading({})),
+    }).turn({
+      ...turn(world, "what do people usually say?"),
+      recentTurns: [
+        { role: "person", text: "is a venture capital fund common here?" },
+      ],
+      actor,
+    });
+    expect(world.recordedValue("I0.investor_type")).toBeUndefined();
+  });
+});

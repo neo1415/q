@@ -1,0 +1,43 @@
+{
+  "email": "bench.chowdeck@fictional.capitalq.local",
+  "name": "Femi Aluko",
+  "org": "Chowdeck",
+  "journey": "founder",
+  "script": [
+    "We need money lol. Raising.",
+    "Chowdeck yeah. Food and grocery delivery in Nigeria, Lagos first, then Ibadan, Abuja, Port Harcourt. Three of us started it. I'm CEO. We raised a seed from Y Combinator and others a while back, I think we're seed or series A, depends who you ask.",
+    "Call it Series A.",
+    "No wait you said seed? No. Series A. Fix it.",
+    "Team is around two hundred, maybe more with riders but they're not staff.",
+    "We want like, 10 to 15 million naira. No sorry, dollars. Ten million dollars.",
+    "Why does it matter what instrument, just write equity."
+  ],
+  "byStep": {
+    "F0.intent": "raising",
+    "F1.company_name": "yes",
+    "F1.stage": "Series A",
+    "F1.description": "Food and grocery delivery app in Nigerian cities.",
+    "F1.website": "chowdeck dot com",
+    "F1.country": "Nigeria",
+    "F1.categories": "logistics, consumer, food delivery",
+    "F2.materials": "we have a deck",
+    "F4.founder_role": "CEO",
+    "F4.founder_count": "three",
+    "F4.full_time": "yes all three",
+    "F4.team_size": "around two hundred",
+    "F4.functions": "product, engineering, operations",
+    "F5.signal": "we have lots of paying users",
+    "F5.revenue_status": "recurring and growing",
+    "F6.raising": "yes actively",
+    "F6.currency": "US dollars",
+    "F6.target_amount": "ten million dollars",
+    "F6.instrument": "equity",
+    "F6.timeframe": "next three months",
+    "F6.use_of_funds": "expansion into new cities and key hires",
+    "F6.confirm": "yes",
+    "F7.follow_up": "no",
+    "F3.review": "yes correct",
+    "F8.snapshot": "yes"
+  },
+  "fallback": "yes"
+}

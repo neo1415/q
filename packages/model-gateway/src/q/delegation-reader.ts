@@ -6,7 +6,7 @@ import {
   DelegationReaderV3ResultSchema,
   renderPrompt,
   type DelegationReaderV3Result,
-  type DelegationReaderV2Variables,
+  type DelegationReaderV4Variables,
   type PromptRegistry,
 } from "@capital-q/q-core";
 
@@ -62,6 +62,8 @@ export type QDelegationReader = {
   readonly read: (input: {
     readonly utterance: string;
     readonly lastQ: string;
+    /** The step Q was asking when they spoke, from code's own record. */
+    readonly askedStep?: string | null | undefined;
     readonly steps: readonly {
       readonly stepKey: string;
       readonly question: string;
@@ -121,7 +123,7 @@ export function createQDelegationReader(dependencies: {
       );
       const recommended = new Set(pending.map((item) => item.stepKey));
       try {
-        const rendered = renderPrompt<DelegationReaderV2Variables>(registry, {
+        const rendered = renderPrompt<DelegationReaderV4Variables>(registry, {
           task: "DELEGATION_READER",
           charter: "Q_SYSTEM",
           operatingMode: "ASSESSMENT",
@@ -133,6 +135,10 @@ export function createQDelegationReader(dependencies: {
             pending,
             lastQ: input.lastQ.slice(0, 2_000),
             utterance,
+            askedStep:
+              input.askedStep === undefined || input.askedStep === null
+                ? null
+                : input.askedStep.slice(0, 80),
           },
         });
         const response = await gateway.execute<DelegationReaderV3Result>(

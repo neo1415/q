@@ -154,3 +154,17 @@ export const DelegationReaderV3ResultSchema =
 export type DelegationReaderV3Result = z.infer<
   typeof DelegationReaderV3ResultSchema
 >;
+
+/**
+ * v4 variables — the step Q was asking when they spoke (founder live test
+ * 2026-09-30: "yep" to "Nixo, right?" and "yes" to the review were read as
+ * stating nothing, because the reader was not told what the question was).
+ * Trusted: code's own record of the step Q asked. Null when Q asked none.
+ */
+export const DelegationReaderV4VariablesSchema =
+  DelegationReaderV2VariablesSchema.extend({
+    askedStep: z.string().max(80).nullable(),
+  }).strict();
+export type DelegationReaderV4Variables = z.infer<
+  typeof DelegationReaderV4VariablesSchema
+>;

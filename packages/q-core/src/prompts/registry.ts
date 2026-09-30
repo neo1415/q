@@ -81,6 +81,7 @@ import { INVESTOR_RESEARCH_READER_V1 } from "./tasks/investor-research-reader.v1
 import { DELEGATION_READER_V1 } from "./tasks/delegation-reader.v1.js";
 import { DELEGATION_READER_V2 } from "./tasks/delegation-reader.v2.js";
 import { DELEGATION_READER_V3 } from "./tasks/delegation-reader.v3.js";
+import { DELEGATION_READER_V4 } from "./tasks/delegation-reader.v4.js";
 import { INTERVIEW_CONDUCTOR_V11 } from "./tasks/interview-conductor.v11.js";
 import { PRESENCE_READER_V1 } from "./tasks/presence-reader.v1.js";
 import { WELCOME_CONDUCTOR_V1 } from "./tasks/welcome-conductor.v1.js";
@@ -230,6 +231,7 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition<unknown, unknown>[] =
     DELEGATION_READER_V1,
     DELEGATION_READER_V2,
     DELEGATION_READER_V3,
+    DELEGATION_READER_V4,
     WELCOME_CONDUCTOR_V1,
     CLAIM_EXTRACTION_V1,
     INVESTOR_MANDATE_SYNTHESIS_V1,

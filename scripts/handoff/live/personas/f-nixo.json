@@ -1,0 +1,43 @@
+{
+  "email": "bench.nixo@fictional.capitalq.local",
+  "name": "Priya Khandelwal",
+  "org": "Nixo",
+  "journey": "founder",
+  "script": [
+    "um so, I'm... I think raising? yeah raising.",
+    "yep",
+    "So basically it's hard to explain. Forward deployed engineering teams at AI companies spend ages on custom deployments and it's all services work, we make that repeatable, kind of SaaS-like margins out of bespoke work. We did YC summer twenty five. it's just me founding it, well, my CTO is basically a founder but not on paper. There's like, uh, twelve of us? And we're looking at five mil on a post money safe maybe.",
+    "Hmm no actually make that four and a half million, not five.",
+    "Honestly I'm based in San Francisco but we're registering a subsidiary in Tashkent, Uzbekistan. The company itself is Delaware.",
+    "lol are you going to ask me my star sign next",
+    "I'd rather not share revenue numbers yet."
+  ],
+  "byStep": {
+    "F0.intent": "raising",
+    "F1.company_name": "yes Nixo",
+    "F1.stage": "seed",
+    "F1.description": "We make forward-deployed engineering work at AI companies repeatable, with SaaS-like margins.",
+    "F1.website": "I don't remember the exact url, you find it",
+    "F1.country": "United States",
+    "F1.categories": "AI infrastructure, developer tools",
+    "F2.materials": "no deck yet, can you help me make one at the end?",
+    "F4.founder_role": "I'm the founder, CEO basically",
+    "F4.founder_count": "one",
+    "F4.full_time": "yes full time",
+    "F4.team_size": "twelve",
+    "F4.functions": "engineering and product",
+    "F5.signal": "a few paying customers on annual contracts",
+    "F5.revenue_status": "I'd rather not say yet",
+    "F6.raising": "actively",
+    "F6.currency": "dollars",
+    "F6.target_amount": "four and a half million",
+    "F6.instrument": "post money safe",
+    "F6.timeframe": "about five months",
+    "F6.use_of_funds": "engineering and go to market, plus SOC two",
+    "F6.confirm": "yes go ahead",
+    "F7.follow_up": "nope",
+    "F3.review": "yes",
+    "F8.snapshot": "yes"
+  },
+  "fallback": "yes go ahead"
+}

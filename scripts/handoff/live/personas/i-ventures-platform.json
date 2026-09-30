@@ -1,0 +1,34 @@
+{
+  "email": "bench.venturesplatform@fictional.capitalq.local",
+  "name": "Kola Aina",
+  "org": "Ventures Platform",
+  "journey": "investor",
+  "script": [
+    "I invest. I'm here to find companies.",
+    "We're a venture capital fund, pan-African, based in Abuja and Lagos. I'm the founding partner. We back pre-seed and seed mostly, sometimes Series A follow-ons. Cheques usually between two hundred and fifty thousand and a million dollars, typical maybe five hundred k. Fintech, health, education, climate, B2B software. We're actively deploying from our current fund.",
+    "Actually strike education, we've done less of that lately.",
+    "Never gambling or anything like betting, that's a hard no.",
+    "You probably already found our portfolio, Paystack, PiggyVest, that lot."
+  ],
+  "byStep": {
+    "I0.investor_type": "venture capital fund",
+    "I0.organisation_name": "Ventures Platform",
+    "I0.business_title": "Founding partner",
+    "I1.deployment_status": "actively investing",
+    "I1.mandate_context": "our main fund",
+    "I2.stages": "pre-seed and seed, sometimes Series A",
+    "I2.currency": "US dollars",
+    "I2.cheque_min": "two hundred and fifty thousand",
+    "I2.cheque_typical": "five hundred thousand",
+    "I2.cheque_max": "one million",
+    "I2.investment_role": "we lead or co-lead",
+    "I3.geography": "Africa, mainly Nigeria, Kenya, Egypt",
+    "I3.sectors": "fintech, health, climate, B2B software",
+    "I7.hard_exclusions": "gambling and betting",
+    "I9.discovery_mode": "show me a curated set",
+    "I10.inbound_preference": "open to inbound from founders that fit",
+    "I11.review": "yes that's right",
+    "I12.handoff": "yes"
+  },
+  "fallback": "yes that's right"
+}

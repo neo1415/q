@@ -41,6 +41,7 @@ import {
   compactThread,
   createLoopMemoryReader,
   createPreferenceNotebook,
+  quoteOccursIn,
   type MemoryService,
 } from "@capital-q/q-knowledge";
 import type { ContextFirewallPort } from "@capital-q/q-runtime";
@@ -413,7 +414,7 @@ export function turnNotesFor(input: {
   if (open !== undefined) {
     if (open.signupName !== null) {
       notes.push(
-        `They typed "${open.signupName.slice(0, 80)}" as their ${open.signupNameIs} at sign-up: never ask it cold; put it to them ("${open.signupName.slice(0, 80)}, right?") and on their yes record ${open.signupStepKey}, quoting their yes.`,
+        `Their ${open.signupNameIs}, "${open.signupName.slice(0, 80)}", is on their record from sign-up (${open.signupStepKey}): say it back once in passing so they can correct it; never ask for it. If they correct it, record their correction.`,
       );
     }
     if (open.unsaidFindings.length > 0) {
@@ -499,6 +500,32 @@ export function createInterviewAgent(
   // Optional questions already put to each person: asked once, never
   // pressed again (live 2026-09-30: the website was asked every turn).
   const askedOptional = createInMemoryRaisedChecks();
+  // The step each session's last reply asked, for the independent reading
+  // of the answer to it (DELEGATION_READER v4).
+  const lastAsked = new Map<string, string>();
+  // What each earlier utterance stated, as the independent reading found
+  // it when it was said: a monologue's answers stay theirs on later turns
+  // (live 2026-09-30). Bounded per session and across sessions.
+  const statedBySession = new Map<
+    string,
+    { readonly text: string; readonly stated: readonly string[] }[]
+  >();
+  const rememberStated = (
+    sessionId: string,
+    text: string,
+    stated: ReadonlySet<string>,
+  ) => {
+    if (text.length === 0 || stated.size === 0) return;
+    const list = statedBySession.get(sessionId) ?? [];
+    list.push({ text: text.slice(0, 4_000), stated: [...stated] });
+    statedBySession.delete(sessionId);
+    statedBySession.set(sessionId, list.slice(-30));
+    while (statedBySession.size > 2_000) {
+      const oldest = statedBySession.keys().next().value;
+      if (oldest === undefined) break;
+      statedBySession.delete(oldest);
+    }
+  };
   const researchAvailable = dependencies.researchAvailable ?? true;
   /** The conversation core's state per session: the research ledger. */
   const conversations = new Map<string, ConversationState>();
@@ -586,6 +613,12 @@ export function createInterviewAgent(
     let delegationRead: Promise<QTurnAuthority | null> =
       Promise.resolve(NO_TURN_AUTHORITY);
     const port = createOnboardingPort({
+      statedEarlier: (stepKey, quote) =>
+        (statedBySession.get(input.onboardingSessionId) ?? []).some(
+          (earlier) =>
+            earlier.stated.includes(stepKey) &&
+            quoteOccursIn(quote, earlier.text),
+        ),
       session: input.session,
       onboardingSessionId: input.onboardingSessionId,
       journeyType: input.journeyType,
@@ -638,6 +671,7 @@ export function createInterviewAgent(
       delegationRead = reader.read({
         utterance,
         lastQ: lastQTurn ?? "",
+        askedStep: lastAsked.get(input.onboardingSessionId) ?? null,
         steps: journeySteps.map((step) => ({
           stepKey: step.stepKey,
           question: SPOKEN_QUESTIONS[step.stepKey] ?? step.configuration.prompt,
@@ -750,6 +784,21 @@ export function createInterviewAgent(
       conversation: { latestUserText: utterance },
     };
     const offered = await tools.offer(context);
+    // What they typed at sign-up is their own answer (founder direction
+    // 2026-09-30: prefill, then confirm): the company or firm name goes on
+    // the record at once, so nothing that depends on it waits, and Q says
+    // it back for them to correct rather than asking it.
+    const signupOrganisation = input.signup?.organisationName?.trim() ?? "";
+    if (signupOrganisation.length > 0) {
+      await port
+        .recordFromSignup(
+          input.journeyType === "investor"
+            ? INVESTOR_STEPS.organisationName
+            : FOUNDER_STEPS.companyName,
+          signupOrganisation.slice(0, 160),
+        )
+        .catch(() => false);
+    }
     let state = await port.state();
     if (research !== undefined) {
       considerResearch(port.view());
@@ -798,10 +847,9 @@ export function createInterviewAgent(
           : FOUNDER_STEPS.companyName;
       const signupName = input.signup?.organisationName?.trim() ?? "";
       return {
+        // On the record from sign-up and not yet said back to them.
         signupName:
-          signupName.length > 0 &&
-          !answered.has(signupStepKey) &&
-          !pendingSteps.has(signupStepKey)
+          signupName.length > 0 && !textStatedIn(signupName, qSaid)
             ? signupName
             : null,
         signupNameIs:
@@ -921,6 +969,11 @@ export function createInterviewAgent(
     let reading: ReturnType<typeof readingOf> | null = null;
     const readingDone = delegationRead.then((authority) => {
       reading = readingOf(authority ?? NO_TURN_AUTHORITY);
+      rememberStated(
+        input.onboardingSessionId,
+        utterance,
+        reading.authority.stated,
+      );
       return reading;
     });
     const NOT_READ_YET =
@@ -1131,7 +1184,18 @@ export function createInterviewAgent(
         );
       }
     }
+    // A reply that asks nothing leaves no step for the next answer.
+    if (result !== undefined && result.asking === null) {
+      lastAsked.delete(input.onboardingSessionId);
+    }
     if (result?.asking !== undefined && result.asking !== null) {
+      lastAsked.delete(input.onboardingSessionId);
+      lastAsked.set(input.onboardingSessionId, result.asking);
+      while (lastAsked.size > 2_000) {
+        const oldest = lastAsked.keys().next().value;
+        if (oldest === undefined) break;
+        lastAsked.delete(oldest);
+      }
       // The second time it is asked is marked too: a third is pressing.
       askedOptional.add(
         input.onboardingSessionId,

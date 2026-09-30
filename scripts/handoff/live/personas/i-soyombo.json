@@ -1,0 +1,32 @@
+{
+  "email": "bench.soyombo@fictional.capitalq.local",
+  "name": "Olumide Soyombo",
+  "org": "Voltron Capital",
+  "journey": "investor",
+  "script": [
+    "invest",
+    "Mostly angel, I write my own cheques, but I also co-founded Voltron Capital. So both? Put me down as an angel.",
+    "Fifty to a hundred k usually. Sometimes twenty five. Pre-seed, very early. Nigeria mostly but I'll look at anywhere in Africa if the founder is sharp.",
+    "hah no I'm not telling you my net worth",
+    "I like technical founders who ship fast. Sectors, whatever's interesting, fintech a lot, but I'm not into crypto tokens."
+  ],
+  "byStep": {
+    "I0.investor_type": "angel",
+    "I0.organisation_name": "Voltron Capital",
+    "I1.deployment_status": "actively investing",
+    "I1.mandate_context": "my personal angel investing",
+    "I2.stages": "pre-seed",
+    "I2.currency": "dollars",
+    "I2.cheque_min": "twenty five thousand",
+    "I2.cheque_typical": "fifty thousand",
+    "I2.cheque_max": "one hundred thousand",
+    "I3.geography": "Nigeria mostly, Africa broadly",
+    "I3.sectors": "fintech, software",
+    "I7.hard_exclusions": "crypto tokens",
+    "I9.discovery_mode": "curated",
+    "I10.inbound_preference": "yes open to inbound",
+    "I11.review": "yes",
+    "I12.handoff": "yes"
+  },
+  "fallback": "yes"
+}

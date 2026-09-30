@@ -52,6 +52,7 @@ import {
   recordedCurrency,
   toOpenStep,
   toResponseValue,
+  MONEY_STEP,
 } from "./interview-steps.js";
 import { SPOKEN_QUESTIONS } from "./step-copy.js";
 
@@ -156,6 +157,15 @@ export type BoundOnboardingPort = OnboardingToolPort &
     readonly view: () => OnboardingSessionView | null;
     /** Steps this port wrote, in order. */
     readonly recorded: () => readonly string[];
+    /**
+     * What the person typed at sign-up, recorded as their answer (the
+     * company or firm name): their own words, from their own form.
+     * Nothing when that step already has an answer.
+     */
+    readonly recordFromSignup: (
+      stepKey: string,
+      text: string,
+    ) => Promise<boolean>;
     /** Q's recommendations still waiting on the person, as Q would say them. */
     readonly pendingRecommendations: () => Promise<
       readonly {
@@ -247,6 +257,15 @@ export function createOnboardingPort(input: {
    * found it) and has not been said yet: not heard, so not approvable.
    */
   readonly unheardSteps?: ReadonlySet<string> | undefined;
+  /**
+   * Whether an earlier utterance of theirs in this conversation, read
+   * independently when it was said, stated this step, and the quote is
+   * from it (live 2026-09-30: a founder's opening monologue stated six
+   * answers that could not be saved yet, and later turns refused them
+   * because only the latest words counted).
+   */
+  readonly statedEarlier?:
+    ((stepKey: string, quote: string) => boolean) | undefined;
 }): BoundOnboardingPort {
   const steps = new Map(
     definitionFor(input.journeyType).steps.map(
@@ -567,6 +586,13 @@ export function createOnboardingPort(input: {
           continue;
         }
         if (found.resolution !== "EXACT" && found.candidates.length > 1) {
+          // Their own words, kept beside the categories that did match,
+          // when Q marks them so (live 2026-09-30: "AI infrastructure"
+          // came back as ambiguous three times running).
+          if (answer.ownWords === true) {
+            unmatched.push(phrase);
+            continue;
+          }
           return refuse({
             stepKey: step.stepKey,
             outcome: "AMBIGUOUS",
@@ -578,7 +604,9 @@ export function createOnboardingPort(input: {
         }
         if (!ids.includes(best.nodeId)) ids.push(best.nodeId);
       }
-      if (unmatched.length > 0) {
+      if (unmatched.length > 0 && answer.ownWords === true && ids.length > 0) {
+        otherWords = unmatched.join(", ").slice(0, 200);
+      } else if (unmatched.length > 0) {
         // Their words name no category: the categories Capital Q records
         // go back to the model, which reads which one means what they
         // said (ADR 0011). Nothing is recorded until it chooses one.
@@ -859,6 +887,7 @@ export function createOnboardingPort(input: {
     step: OnboardingStepManifest,
     value: OnboardingResponseValue,
     answer: { readonly quote: string; readonly basis?: string | undefined },
+    readerStated = false,
   ): OnboardingRecordResult | null => {
     if (answer.basis === "DELEGATED") return null;
     const refuse = (reason: string): OnboardingRecordResult => ({
@@ -888,6 +917,19 @@ export function createOnboardingPort(input: {
         }
         return null;
       }
+      // No figure in their words at all ("it's just me" for the number
+      // of founders): the independent reading found these words give
+      // this answer, so the count is theirs. A figure their words do
+      // contradict (stated === false) is still refused.
+      // Only for a small count (founders, team size), never an amount of
+      // money: an invented cheque size stays refused whatever the reading.
+      const config = step.configuration;
+      const smallCount =
+        config.stepType === "range" &&
+        Number.parseFloat(config.max) <= 100_000 &&
+        !MONEY_STEP.test(step.stepKey) &&
+        Number.isInteger(Number(value.value));
+      if (stated === null && readerStated && smallCount) return null;
       if (
         stated === null &&
         input.lastQTurn !== undefined &&
@@ -934,10 +976,14 @@ export function createOnboardingPort(input: {
    */
   const notStated = async (
     stepKey: string,
+    quote?: string,
   ): Promise<OnboardingRecordResult | null> => {
     if (input.authority === undefined) return null;
     const authority = await input.authority();
     if (authority?.stated.has(stepKey) === true) return null;
+    if (quote !== undefined && input.statedEarlier?.(stepKey, quote) === true) {
+      return null;
+    }
     return {
       stepKey: stepKey.slice(0, 80),
       outcome: "REJECTED",
@@ -1075,7 +1121,7 @@ export function createOnboardingPort(input: {
       };
     }
     if (answer.basis !== "DELEGATED") {
-      const refused = await notStated(answer.stepKey);
+      const refused = await notStated(answer.stepKey, answer.quote);
       if (refused !== null) return refused;
     }
     if (answer.basis === "DELEGATED") {
@@ -1099,7 +1145,16 @@ export function createOnboardingPort(input: {
     }
     const resolved = await resolve(answer);
     if (!resolved.ok) return resolved.result;
-    const refused = unsupported(resolved.step, resolved.value, answer);
+    const reading = (await input.authority?.()) ?? null;
+    const readerStated =
+      reading?.stated.has(resolved.step.stepKey) === true ||
+      input.statedEarlier?.(resolved.step.stepKey, answer.quote) === true;
+    const refused = unsupported(
+      resolved.step,
+      resolved.value,
+      answer,
+      readerStated,
+    );
     if (refused !== null) return refused;
     if (
       resolved.note !== undefined &&
@@ -1650,6 +1705,23 @@ export function createOnboardingPort(input: {
     },
     view: () => latest,
     recorded: () => [...written],
+    recordFromSignup: async (stepKey, text) => {
+      const step = steps.get(stepKey);
+      const words = text.trim();
+      if (step === undefined || words.length === 0) return false;
+      const view = await current();
+      if (view.responses.some((r) => r.stepKey === stepKey)) return false;
+      const value = toResponseValue(step, words);
+      if (value === null) return false;
+      try {
+        await submit(stepKey, value);
+        written.push(stepKey);
+        return true;
+      } catch {
+        // Not recordable yet (another step first): Q asks as before.
+        return false;
+      }
+    },
     pendingRecommendations: async () => {
       const view = await current();
       const list = await pendingNow().catch(() => []);

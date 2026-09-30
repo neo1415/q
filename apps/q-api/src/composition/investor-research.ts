@@ -1,3 +1,5 @@
+import { z } from "zod";
+
 import type { ModelDataPosture } from "@capital-q/contracts";
 import type { ModelGateway } from "@capital-q/model-gateway";
 import type { Logger } from "@capital-q/observability";
@@ -329,6 +331,29 @@ export function founderResearchReadFrom(
   };
 }
 
+/**
+ * One unusable field is unknown, not a reason to lose the rest (live
+ * 2026-09-30: an empty team size refused the whole reading, and Nixo's
+ * description and country with it). Only a field's own value is ever
+ * dropped to null; nothing is repaired or rewritten.
+ */
+const LENIENT_FOUNDER_READING = z.preprocess((raw) => {
+  const checked = FounderResearchReaderResultSchema.safeParse(raw);
+  if (checked.success || typeof raw !== "object" || raw === null) return raw;
+  const kept: Record<string, unknown> = { ...(raw as Record<string, unknown>) };
+  for (const issue of checked.error.issues) {
+    const field = issue.path[0];
+    if (
+      typeof field === "string" &&
+      field !== "wrongSubject" &&
+      field in kept
+    ) {
+      kept[field] = null;
+    }
+  }
+  return kept;
+}, FounderResearchReaderResultSchema);
+
 /** The founder reader model, then code's checks: findings or nothing. */
 export function createFounderResearchReader(dependencies: {
   readonly gateway: ModelGateway;
@@ -374,7 +399,7 @@ export function createFounderResearchReader(dependencies: {
             correlationId: request.correlationId,
           },
         },
-        { schema: FounderResearchReaderResultSchema },
+        { schema: LENIENT_FOUNDER_READING },
       );
       return result.output.kind === "STRUCTURED"
         ? validateFounderReading(

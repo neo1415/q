@@ -37,7 +37,7 @@ export const DELEGATION_READER_V3: PromptDefinition<
 > = {
   ...DELEGATION_READER_V2,
   version: 3,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   changeDescription:
     "P0-1: the reading also covers a question that needs a look-up beyond their own setup, a wish to pause, and a pronunciation correction, as concepts; the legacy conductor's reading and word list are retired.",
   effectiveFrom: "2026-09-26",
