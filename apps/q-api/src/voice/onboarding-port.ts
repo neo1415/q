@@ -942,7 +942,7 @@ export function createOnboardingPort(input: {
       return refuse(
         stated === false
           ? "That figure is not one they stated, so nothing was recorded. Record only a figure they gave; a range they gave is its two ends, never a point you work out inside it."
-          : "They gave no figure in digits here, so nothing was recorded. Say the number back to them and record it when they confirm it.",
+          : 'No figure could be read from their words here, so nothing was recorded. Say back the number you understood, in words ("four and a half million, right?"), and record it when they agree. Never ask them to repeat it in digits or in another form.',
       );
     }
     // An address said aloud is rewritten into its written form by the
@@ -1089,7 +1089,7 @@ export function createOnboardingPort(input: {
         question,
         recorded:
           view.session.status === "COMPLETED"
-            ? "Confirmed, and their setup is complete."
+            ? "Confirmed, and their setup is complete. Close warmly in a sentence or two and ask nothing more."
             : "Confirmed.",
       };
     } catch (error: unknown) {

@@ -106,3 +106,22 @@ describe("a figure said in words is a figure stated (live 2026-09-30)", () => {
     expect(figureStatedIn("1", "we are backed by Y Combinator")).toBe(null);
   });
 });
+
+describe("a half said in words (live 2026-09-30)", () => {
+  it("reads 'four and a half million' as 4,500,000", () => {
+    expect(
+      figureStatedIn("4500000", "make that four and a half million, not five"),
+    ).toBe(true);
+    expect(
+      figureStatedIn("4000000", "make that four and a half million, not five"),
+    ).toBe(false);
+  });
+});
+
+describe("a scale with an article (live 2026-09-30)", () => {
+  it("reads 'north of a thousand people' as 1,000", () => {
+    expect(figureStatedIn("1000", "Team is north of a thousand people.")).toBe(
+      true,
+    );
+  });
+});

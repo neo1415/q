@@ -349,6 +349,14 @@ export type JourneyOpenings = {
   }[];
   /** Optional steps asked twice and still unanswered: not asked again. */
   readonly passedOver?: readonly string[] | undefined;
+  /**
+   * Answers their earlier words gave (as read when said) that are not on
+   * the record yet, with those words: recorded from them, never asked
+   * again (live 2026-09-30: "$5 million on a post-money SAFE" from an
+   * opening monologue was asked for again as "How much are you raising?").
+   */
+  readonly givenEarlier?:
+    readonly { readonly stepKey: string; readonly words: string }[] | undefined;
 };
 
 export function turnNotesFor(input: {
@@ -415,6 +423,13 @@ export function turnNotesFor(input: {
     if (open.signupName !== null) {
       notes.push(
         `Their ${open.signupNameIs}, "${open.signupName.slice(0, 80)}", is on their record from sign-up (${open.signupStepKey}): say it back once in passing so they can correct it; never ask for it. If they correct it, record their correction.`,
+      );
+    }
+    if (open.givenEarlier !== undefined && open.givenEarlier.length > 0) {
+      notes.push(
+        `They already answered these earlier in this conversation and they are not on the record yet: record each now from those words (quote them); never ask them again: ${open.givenEarlier
+          .map((g) => `${g.stepKey} ("${g.words.slice(0, 120)}")`)
+          .join("; ")}`,
       );
     }
     if (open.unsaidFindings.length > 0) {
@@ -863,6 +878,27 @@ export function createInterviewAgent(
             value: p.value.slice(0, 200),
             because: p.rationale === null ? null : p.rationale.slice(0, 120),
           })),
+        givenEarlier: (() => {
+          const seen = new Set<string>();
+          const given: { stepKey: string; words: string }[] = [];
+          for (const earlier of statedBySession.get(
+            input.onboardingSessionId,
+          ) ?? []) {
+            if (earlier.text === utterance) continue;
+            for (const stepKey of earlier.stated) {
+              if (
+                seen.has(stepKey) ||
+                answered.has(stepKey) ||
+                setAside.has(stepKey)
+              ) {
+                continue;
+              }
+              seen.add(stepKey);
+              given.push({ stepKey, words: earlier.text.slice(0, 160) });
+            }
+          }
+          return given.slice(0, 6);
+        })(),
         passedOver: journeySteps
           .filter(
             (step) =>

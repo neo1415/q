@@ -617,7 +617,10 @@ function spokenNumber(text: string): number | null {
   let total = 0;
   let current = 0;
   let sawNumber = false;
+  let previous = "";
   for (const token of tokens) {
+    const before = previous;
+    previous = token;
     if (/^\d+(?:\.\d+)?$/.test(token)) {
       current += Number.parseFloat(token);
       sawNumber = true;
@@ -638,7 +641,18 @@ function spokenNumber(text: string): number | null {
       sawNumber = true;
       continue;
     }
+    // "four and a half million" (live 2026-09-30): a half of the unit
+    // being counted, before its scale.
+    if (token === "half" && sawNumber) {
+      current += 0.5;
+      continue;
+    }
     const scale = SCALE_WORDS[token];
+    // "a thousand", "north of a million": the article counts one.
+    if (scale !== undefined && !sawNumber && before === "a") {
+      current = 1;
+      sawNumber = true;
+    }
     if (scale !== undefined && sawNumber) {
       if (scale === 100) {
         current = (current === 0 ? 1 : current) * 100;
@@ -683,7 +697,9 @@ export function spokenFiguresIn(text: string): readonly number[] {
   const figures: number[] = [];
   for (let start = 0; start < tokens.length; start += 1) {
     const first = tokens[start] ?? "";
-    const opens = NUMBER_WORDS[first.replace(/-.*/, "")] !== undefined;
+    const opens =
+      NUMBER_WORDS[first.replace(/-.*/, "")] !== undefined ||
+      (first === "a" && SCALE_WORDS[tokens[start + 1] ?? ""] !== undefined);
     // Only where a figure begins: "five million" is 5,000,000, not also
     // the "million" read from its second word.
     if (!opens) continue;
