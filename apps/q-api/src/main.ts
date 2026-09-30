@@ -1681,6 +1681,35 @@ const qIntelligence = composeQIntelligence({
        limit 1`;
     const row = rows[0];
     if (row === undefined) return null;
+    // What research found for their setup and they never confirmed (live
+    // 2026-09-30: Nixo's description and country sat pending after
+    // onboarding finished). Their own session's suggestions only.
+    const found = await database.sql<
+      { step_key: string; value: unknown; rationale: string | null }[]
+    >`
+      select g.step_key, g.suggested_value as value, g.rationale
+        from onboarding.suggestions g
+        join onboarding.sessions s on s.id = g.session_id
+       where s.user_id = ${userId}
+         and s.tenant_id = ${tenantId}
+         and s.status = 'COMPLETED'
+         and g.status = 'PENDING'
+       order by g.created_at desc
+       limit 4`.catch(() => []);
+    const findings = found
+      .map((f) => {
+        const v = f.value as { text?: unknown; optionKey?: unknown } | null;
+        const said =
+          typeof v?.text === "string"
+            ? v.text
+            : typeof v?.optionKey === "string"
+              ? v.optionKey
+              : null;
+        return said === null
+          ? null
+          : `${f.step_key}: "${said.slice(0, 160)}"${f.rationale === null ? "" : ` (${f.rationale.slice(0, 80)})`}`;
+      })
+      .filter((f): f is string => f !== null);
     const name = row.display_name?.trim().slice(0, 80) ?? "";
     const company = row.company?.trim().slice(0, 120) ?? "";
     if (name.length === 0 && company.length === 0) return null;
@@ -1695,6 +1724,9 @@ const qIntelligence = composeQIntelligence({
       row.no_deck === true
         ? " They have no pitch deck yet: when their question is answered, offer once, in one short sentence, to make one with them now."
         : "",
+      findings.length === 0
+        ? ""
+        : ` Research found these for their profile and they have not confirmed them: ${findings.join("; ")}. Offer them once, in one line; if they agree, propose the profile change for their approval.`,
     ].join("");
   },
   // The attestation is the claim about the data; where it holds, every
