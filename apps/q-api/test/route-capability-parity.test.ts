@@ -213,6 +213,12 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "api/http/commitments.ts POST NETWORK_COMMITMENT_CONFIRM_PATH": exempt(
     "consequential financial facts need human confirmation by the other side (spec 6.6.14); never a Q action",
   ),
+  "api/http/commitments.ts POST NETWORK_COMMITMENT_ADOPT_PATH": exempt(
+    "a party adopting money Q heard in a call as their own statement (spec 6.6.14); never a Q action",
+  ),
+  "api/http/commitments.ts POST NETWORK_COMMITMENT_DISPUTE_PATH": exempt(
+    "a party disputing money Q heard in a call; their own judgement, never a Q action",
+  ),
   "api/http/commitments.ts POST NETWORK_COMMITMENT_WITHDRAW_PATH": exempt(
     "a party withdrawing its relationship's commitment is their own decision; never a Q action",
   ),

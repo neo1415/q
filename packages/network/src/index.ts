@@ -222,6 +222,12 @@ export {
   createPostgresInterestResponseRequestStore,
 } from "./infrastructure/postgres-interest-repositories.js";
 
+// Founder direction 2026-09-30: money Q heard in a call.
+export {
+  parseSpokenAmount,
+  sideOfParty,
+  type SpokenAmount,
+} from "./domain/commitment-signals.js";
 // Spec 6.6.14-6.6.15: commitments and the fundraising view.
 export {
   commitmentBucket,
@@ -232,6 +238,12 @@ export {
 export {
   CommitmentActivityPayloadSchema,
   CommitmentConfirmedRelationshipEvent,
+  CommitmentDetectedRelationshipEvent,
+  CommitmentDisputedRelationshipEvent,
+  MeetingRecordingDeclinedRelationshipEvent,
+  RELATIONSHIP_EVENT_COMMITMENT_DETECTED,
+  RELATIONSHIP_EVENT_COMMITMENT_DISPUTED,
+  RELATIONSHIP_EVENT_MEETING_RECORDING_DECLINED,
   CommitmentStatedRelationshipEvent,
   CommitmentWithdrawnRelationshipEvent,
   RELATIONSHIP_EVENT_COMMITMENT_CONFIRMED,

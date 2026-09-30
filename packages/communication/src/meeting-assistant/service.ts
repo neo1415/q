@@ -86,6 +86,9 @@ type AssistantRow = {
   attendees: unknown;
   agreements: unknown;
   commitments: unknown;
+  declined_by_user_id: string | null;
+  declined_by_name: string | null;
+  declined_at: Date | null;
   updated_at: Date;
 };
 
@@ -170,6 +173,7 @@ export function meetingAssistantView(
       commitments: [],
       transcript: [],
       failure: null,
+      declined: null,
       updatedAt: null,
     };
   }
@@ -194,6 +198,14 @@ export function meetingAssistantView(
       row.transcript,
     ).slice(0, TRANSCRIPT_MAX_LINES),
     failure: row.failure,
+    declined:
+      row.status === "DECLINED" && row.declined_at !== null
+        ? {
+            byYou: row.declined_by_user_id === viewerUserId,
+            byName: row.declined_by_name,
+            at: new Date(row.declined_at).toISOString(),
+          }
+        : null,
     updatedAt: new Date(row.updated_at).toISOString(),
   };
 }
@@ -224,6 +236,17 @@ export function createMeetingAssistantService(dependencies: {
         readonly relationshipId: string;
         readonly meetingId: string;
         readonly organiserUserId: string;
+        /** Who was there and the money said, from Q's record. */
+        readonly attendees: MeetingNotes["attendees"];
+        readonly commitments: MeetingNotes["commitments"];
+      }) => Promise<void>)
+    | undefined;
+  /** A participant declined recording: marked on the relationship's history. */
+  readonly onDeclined?:
+    | ((meeting: {
+        readonly relationshipId: string;
+        readonly meetingId: string;
+        readonly declinedByUserId: string;
       }) => Promise<void>)
     | undefined;
   readonly now?: (() => Date) | undefined;
@@ -231,20 +254,6 @@ export function createMeetingAssistantService(dependencies: {
 }): MeetingAssistantService {
   const { sql, bots, composer, logger } = dependencies;
   const now = dependencies.now ?? (() => new Date());
-
-  /** The meeting, only when this person organised it. */
-  async function organised(
-    actor: ActorContext,
-    meetingId: string,
-  ): Promise<MeetingRow | null> {
-    if (!UUID.test(meetingId)) return null;
-    const rows = await sql<MeetingRow[]>`
-      select id, relationship_id, organiser_user_id, organiser_tenant_id, purpose,
-             starts_at, ends_at, status, meet_link
-        from communication.meetings
-       where id = ${meetingId} and organiser_user_id = ${actor.userId}`;
-    return rows[0] ?? null;
-  }
 
   /** The meeting, when this person is a participant (either side). */
   async function attended(
@@ -266,11 +275,13 @@ export function createMeetingAssistantService(dependencies: {
   /** The meeting's one record (a row per meeting, whoever brought Q). */
   async function assistantOf(meetingId: string): Promise<AssistantRow | null> {
     const rows = await sql<AssistantRow[]>`
-      select id, meeting_id, tenant_id, user_id, provider_bot_id, status, failure,
-             summary, flags, follow_ups, transcript, attendees, agreements,
-             commitments, updated_at
-        from communication.meeting_assistants
-       where meeting_id = ${meetingId}`;
+      select a.id, a.meeting_id, a.tenant_id, a.user_id, a.provider_bot_id,
+             a.status, a.failure, a.summary, a.flags, a.follow_ups, a.transcript,
+             a.attendees, a.agreements, a.commitments, a.declined_by_user_id,
+             p.display_name as declined_by_name, a.declined_at, a.updated_at
+        from communication.meeting_assistants a
+        left join identity.user_profiles p on p.id = a.declined_by_user_id
+       where a.meeting_id = ${meetingId}`;
     return rows[0] ?? null;
   }
 
@@ -356,6 +367,8 @@ export function createMeetingAssistantService(dependencies: {
         relationshipId: row.relationship_id,
         meetingId: row.meeting_id,
         organiserUserId: row.organiser_user_id,
+        attendees: notes.attendees,
+        commitments: notes.commitments,
       })
       .catch((error: unknown) => {
         logger?.warn(
@@ -384,7 +397,9 @@ export function createMeetingAssistantService(dependencies: {
     },
 
     bring: async (actor, meetingId, idempotencyKey) => {
-      const meeting = await organised(actor, meetingId);
+      // Any participant may bring Q; only the person who declined
+      // recording can take the decline back.
+      const meeting = await attended(actor, meetingId);
       if (meeting === null) return { outcome: "REFUSED", code: "NOT_FOUND" };
       if (meeting.status !== "SCHEDULED" || meeting.meet_link === null) {
         return { outcome: "REFUSED", code: "NO_LINK" };
@@ -398,7 +413,9 @@ export function createMeetingAssistantService(dependencies: {
       const existing = await assistantOf(meeting.id);
       if (
         existing !== null &&
-        (OPEN as readonly string[]).includes(existing.status)
+        ((OPEN as readonly string[]).includes(existing.status) ||
+          (existing.status === "DECLINED" &&
+            existing.declined_by_user_id !== actor.userId))
       ) {
         return {
           outcome: "OK",
@@ -410,10 +427,11 @@ export function createMeetingAssistantService(dependencies: {
       const rows = await sql<{ id: string }[]>`
         insert into communication.meeting_assistants
           (meeting_id, tenant_id, user_id, provider, status, idempotency_key)
-        values (${meeting.id}, ${meeting.organiser_tenant_id}, ${actor.userId}, 'recall',
+        values (${meeting.id}, ${meeting.organiser_tenant_id}, ${meeting.organiser_user_id}, 'recall',
                 'REQUESTED', ${idempotencyKey})
         on conflict (meeting_id) do update
           set status = 'REQUESTED', failure = null, provider_bot_id = null,
+              declined_by_user_id = null, declined_at = null,
               idempotency_key = excluded.idempotency_key, updated_at = clock_timestamp()
         returning id`;
       const id = rows[0]?.id;
@@ -443,18 +461,25 @@ export function createMeetingAssistantService(dependencies: {
       };
     },
 
-    // Any participant may remove Q (ADR 0027: consent stays theirs).
+    // Any participant may decline recording -- their legal right -- but
+    // the decline is itself recorded (founder direction 2026-09-30): who,
+    // when, told to everyone on the call, and kept on the relationship's
+    // history. The meeting still counts as held through Capital Q.
     dismiss: async (actor, meetingId) => {
       const meeting = await attended(actor, meetingId);
       if (meeting === null) return { outcome: "REFUSED", code: "NOT_FOUND" };
       const existing = await assistantOf(meeting.id);
-      if (
+      const settled =
         existing !== null &&
-        (existing.status === "REQUESTED" ||
-          existing.status === "SCHEDULED" ||
-          existing.status === "IN_CALL")
-      ) {
-        if (bots !== undefined && existing.provider_bot_id !== null) {
+        (existing.status === "COMPOSING" ||
+          existing.status === "DONE" ||
+          existing.status === "DECLINED");
+      if (!settled) {
+        if (
+          bots !== undefined &&
+          existing !== null &&
+          existing.provider_bot_id !== null
+        ) {
           await bots
             .cancel(existing.provider_bot_id)
             .catch((error: unknown) => {
@@ -464,7 +489,46 @@ export function createMeetingAssistantService(dependencies: {
               );
             });
         }
-        await update(existing.id, { status: "CANCELLED" });
+        await sql`
+          insert into communication.meeting_assistants
+            (meeting_id, tenant_id, user_id, provider, status, idempotency_key,
+             declined_by_user_id, declined_at)
+          values (${meeting.id}, ${meeting.organiser_tenant_id}, ${meeting.organiser_user_id},
+                  'recall', 'DECLINED', ${`declined:${meeting.id}`},
+                  ${actor.userId}, clock_timestamp())
+          on conflict (meeting_id) do update
+            set status = 'DECLINED', declined_by_user_id = ${actor.userId},
+                declined_at = clock_timestamp(), updated_at = clock_timestamp()`;
+        const others = await sql<{ user_id: string; tenant_id: string }[]>`
+          select p.user_id, p.participant_tenant_id as tenant_id
+            from communication.meeting_participants p
+           where p.meeting_id = ${meeting.id} and p.user_id <> ${actor.userId}
+          union
+          select ${meeting.organiser_user_id}::uuid, ${meeting.organiser_tenant_id}::uuid
+           where ${meeting.organiser_user_id}::uuid <> ${actor.userId}::uuid`;
+        const who = (await dependencies.nameOf(actor.userId)) ?? "Someone";
+        for (const other of others) {
+          await sql`
+            insert into communication.notifications
+              (tenant_id, user_id, kind, title, body, link_path, reminder_id, meeting_id, dedupe_key)
+            values (${other.tenant_id}, ${other.user_id}, 'MEETING_RECORDING_DECLINED',
+                    ${`${who} declined recording: ${meeting.purpose}`.slice(0, 200)},
+                    'Q will not keep a record of this call.', null, null, ${meeting.id},
+                    ${`declined:${meeting.id}`})
+            on conflict (user_id, dedupe_key) do nothing`;
+        }
+        await dependencies
+          .onDeclined?.({
+            relationshipId: meeting.relationship_id,
+            meetingId: meeting.id,
+            declinedByUserId: actor.userId,
+          })
+          .catch((error: unknown) => {
+            logger?.warn(
+              { err: error, meetingId },
+              "declined recording not recorded on the relationship",
+            );
+          });
       }
       return {
         outcome: "OK",
@@ -483,7 +547,8 @@ export function createMeetingAssistantService(dependencies: {
       const rows = await sql<(AssistantRow & MeetingRow)[]>`
         select a.id, a.meeting_id, a.tenant_id, a.user_id, a.provider_bot_id, a.status,
                a.failure, a.summary, a.flags, a.follow_ups, a.transcript, a.attendees,
-               a.agreements, a.commitments, a.updated_at,
+               a.agreements, a.commitments, a.declined_by_user_id,
+               null::text as declined_by_name, a.declined_at, a.updated_at,
                m.relationship_id, m.organiser_user_id,
                m.organiser_tenant_id, m.purpose, m.starts_at, m.ends_at,
                m.status as meeting_status, m.meet_link

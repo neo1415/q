@@ -296,6 +296,38 @@ export const CommitmentWithdrawnRelationshipEvent = defineRelationshipEvent({
   description: "A party withdrew the relationship's current commitment.",
 });
 
+/** A participant declined recording of a Capital Q call (founder direction 2026-09-30). */
+export const RELATIONSHIP_EVENT_MEETING_RECORDING_DECLINED =
+  "meeting_recording_declined" as const;
+export const MeetingRecordingDeclinedRelationshipEvent =
+  defineRelationshipEvent({
+    type: RELATIONSHIP_EVENT_MEETING_RECORDING_DECLINED,
+    payloadSchema: MeetingActivityPayloadSchema,
+    allowedVisibilityScopes: ["relationship_shared"],
+    description:
+      "A participant declined Q's recording of a call booked on Capital Q; the call still counts as held through Capital Q.",
+  });
+
+/** Q heard money in a call and filed it for both sides to adopt or dispute. */
+export const RELATIONSHIP_EVENT_COMMITMENT_DETECTED =
+  "commitment_detected" as const;
+export const CommitmentDetectedRelationshipEvent = defineRelationshipEvent({
+  type: RELATIONSHIP_EVENT_COMMITMENT_DETECTED,
+  payloadSchema: CommitmentActivityPayloadSchema,
+  allowedVisibilityScopes: ["relationship_shared"],
+  description:
+    "Q heard money in a call it recorded and filed it as a detected commitment; it counts only once adopted and confirmed.",
+});
+
+export const RELATIONSHIP_EVENT_COMMITMENT_DISPUTED =
+  "commitment_disputed" as const;
+export const CommitmentDisputedRelationshipEvent = defineRelationshipEvent({
+  type: RELATIONSHIP_EVENT_COMMITMENT_DISPUTED,
+  payloadSchema: CommitmentActivityPayloadSchema,
+  allowedVisibilityScopes: ["relationship_shared"],
+  description: "A party disputed money Q detected in a call.",
+});
+
 export type RelationshipEventRegistry = {
   readonly get: (eventType: string) => RelationshipEventDefinition | undefined;
   readonly types: () => readonly string[];
@@ -379,4 +411,7 @@ export const RELATIONSHIP_EVENT_DEFINITIONS: readonly RelationshipEventDefinitio
     CommitmentStatedRelationshipEvent,
     CommitmentConfirmedRelationshipEvent,
     CommitmentWithdrawnRelationshipEvent,
+    MeetingRecordingDeclinedRelationshipEvent,
+    CommitmentDetectedRelationshipEvent,
+    CommitmentDisputedRelationshipEvent,
   ];

@@ -14,9 +14,10 @@ import {
 } from "./meeting-q-actions";
 
 /**
- * Q in a meeting, on the meeting itself (ADR 0027): Q joins every call
- * booked here under its own name, any participant may remove it, and
- * afterwards both sides read the same record -- who was there, what was
+ * Q in a meeting, on the meeting itself (ADR 0027; founder direction
+ * 2026-09-30): Q joins every call booked here under its own name; a
+ * participant may decline recording, and that decline is itself on record.
+ * Afterwards both sides read the same record -- who was there, what was
  * agreed, money mentioned, what to know, what to do next, and the full
  * transcript. One state at a time, never a paragraph of help.
  */
@@ -47,15 +48,13 @@ function newKey(): string {
 export function MeetingQ({
   meetingId,
   ended,
-  organiser,
 }: {
   readonly meetingId: string;
-  /** The call is over: Q can no longer be brought, only read. */
+  /** The call is over: its record can only be read. */
   readonly ended: boolean;
-  /** Only the organiser books Q back after it was removed (ADR 0027). */
-  readonly organiser: boolean;
 }) {
   const [state, setState] = useState<QMeetingAssistantDto | null>(null);
+  const [confirming, setConfirming] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -98,53 +97,88 @@ export function MeetingQ({
     );
   }
 
-  if (status === "REQUESTED" || status === "SCHEDULED") {
+  if (status === "DECLINED" && state.declined !== null) {
     return (
       <div
         className="flex flex-wrap items-center gap-2"
-        data-meeting-q={status}
+        data-meeting-q="DECLINED"
       >
         <span className="cq-caption text-(--cq-text-secondary)">
-          Q will join and take notes.
+          {state.declined.byYou
+            ? "You declined recording. Both sides and Capital Q can see that."
+            : `${state.declined.byName ?? "A participant"} declined recording.`}
         </span>
-        {ended ? null : (
+        {state.declined.byYou && !ended ? (
           <Button
             variant="quiet"
             size="compact"
             disabled={pending}
-            onClick={() => act(() => dismissMeetingQAction(meetingId))}
+            onClick={() => act(() => bringMeetingQAction(meetingId, newKey()))}
           >
-            Remove Q
+            Let Q record
           </Button>
-        )}
+        ) : null}
       </div>
     );
   }
 
-  // NONE, CANCELLED or FAILED.
-  if (ended || !organiser) {
-    return status === "FAILED" && state.failure !== null ? (
+  if (status === "FAILED" && state.failure !== null) {
+    return (
       <p
         className="cq-caption text-(--cq-text-secondary)"
         data-meeting-q="FAILED"
       >
         {state.failure}
       </p>
-    ) : null;
+    );
   }
+
+  if (ended) return null;
+
+  // Q joins every call booked here (founder direction 2026-09-30).
+  // Declining is each person's right, and it is recorded, never silent.
   return (
     <div className="flex flex-col items-start gap-1" data-meeting-q={status}>
-      <Button
-        variant="secondary"
-        size="compact"
-        disabled={pending}
-        onClick={() => act(() => bringMeetingQAction(meetingId, newKey()))}
-      >
-        {pending ? "Booking Q…" : "Bring Q to take notes"}
-      </Button>
-      {status === "FAILED" && state.failure !== null ? (
+      <div className="flex flex-wrap items-center gap-2">
         <span className="cq-caption text-(--cq-text-secondary)">
-          {state.failure}
+          Q joins and keeps the record for both sides.
+        </span>
+        {confirming ? (
+          <>
+            <Button
+              variant="quiet"
+              size="compact"
+              disabled={pending}
+              onClick={() => {
+                setConfirming(false);
+                act(() => dismissMeetingQAction(meetingId));
+              }}
+            >
+              Yes, decline
+            </Button>
+            <Button
+              variant="quiet"
+              size="compact"
+              onClick={() => setConfirming(false)}
+            >
+              Keep Q
+            </Button>
+          </>
+        ) : (
+          <Button
+            variant="quiet"
+            size="compact"
+            disabled={pending}
+            onClick={() => setConfirming(true)}
+          >
+            Decline recording
+          </Button>
+        )}
+      </div>
+      {confirming ? (
+        <span className="cq-caption text-(--cq-text-tertiary)">
+          Q won&apos;t record this call. Everyone on it, and Capital Q, will see
+          that you declined.
         </span>
       ) : null}
       {message === null ? null : (

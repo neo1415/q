@@ -17,6 +17,20 @@ export const NETWORK_RELATIONSHIP_COMMITMENTS_PATH =
   "/v1/network/relationships/:relationshipId/commitments" as const;
 export const NETWORK_COMMITMENT_CONFIRM_PATH =
   "/v1/network/commitments/:commitmentId/confirm" as const;
+export const NETWORK_COMMITMENT_ADOPT_PATH =
+  "/v1/network/commitments/:commitmentId/adopt" as const;
+export const NETWORK_COMMITMENT_DISPUTE_PATH =
+  "/v1/network/commitments/:commitmentId/dispute" as const;
+export const networkCommitmentAdoptPath = (commitmentId: string) =>
+  NETWORK_COMMITMENT_ADOPT_PATH.replace(
+    ":commitmentId",
+    encodeURIComponent(commitmentId),
+  );
+export const networkCommitmentDisputePath = (commitmentId: string) =>
+  NETWORK_COMMITMENT_DISPUTE_PATH.replace(
+    ":commitmentId",
+    encodeURIComponent(commitmentId),
+  );
 export const NETWORK_COMMITMENT_WITHDRAW_PATH =
   "/v1/network/commitments/:commitmentId/withdraw" as const;
 export const NETWORK_COMPANY_FUNDRAISING_PATH =
@@ -76,7 +90,19 @@ export const CommitmentDtoSchema = z
     amount: z.string(),
     currencyCode: CurrencyCodeSchema,
     level: CommitmentLevelSchema,
-    status: z.enum(["STATED", "CONFIRMED", "SUPERSEDED", "WITHDRAWN"]),
+    status: z.enum([
+      "STATED",
+      "CONFIRMED",
+      "SUPERSEDED",
+      "WITHDRAWN",
+      "DETECTED",
+      "ADOPTED",
+      "DISPUTED",
+    ]),
+    /** PERSON: a party stated it. Q_MEETING: Q heard it in a recorded call. */
+    source: z.enum(["PERSON", "Q_MEETING"]),
+    /** The words Q heard, for a detected commitment. */
+    quote: z.string().nullable(),
     /** Whether the caller's own side stated it. */
     statedByYourSide: z.boolean(),
     statedAt: UtcTimestampSchema,
@@ -86,6 +112,9 @@ export const CommitmentDtoSchema = z
     /** Only the other side confirms; a current, stated commitment. */
     canConfirm: z.boolean(),
     canWithdraw: z.boolean(),
+    /** Detected money either side may adopt (then the other confirms) or dispute. */
+    canAdopt: z.boolean(),
+    canDispute: z.boolean(),
   })
   .strict();
 export type CommitmentDto = z.infer<typeof CommitmentDtoSchema>;
@@ -95,6 +124,8 @@ export const RelationshipCommitmentsDtoSchema = z
     /** The one that counts; null when none. */
     current: CommitmentDtoSchema.nullable(),
     history: z.array(CommitmentDtoSchema).max(20),
+    /** Money Q heard in calls, waiting for a party to adopt or dispute it. */
+    detected: z.array(CommitmentDtoSchema).max(10),
     /** Commitments open once both sides are connected. */
     connected: z.boolean(),
   })

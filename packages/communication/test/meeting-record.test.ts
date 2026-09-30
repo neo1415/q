@@ -32,6 +32,9 @@ const row = {
       quote: "We could do 500k.",
     },
   ],
+  declined_by_user_id: null,
+  declined_by_name: null,
+  declined_at: null,
   updated_at: new Date("2026-09-30T10:00:00Z"),
 };
 
@@ -53,5 +56,24 @@ describe("the meeting record", () => {
     expect(view.attendees).toEqual(row.attendees);
     expect(view.agreements).toEqual(row.agreements);
     expect(view.commitments).toEqual(row.commitments);
+  });
+
+  it("says who declined recording, to everyone on the call", () => {
+    const declined = {
+      ...row,
+      status: "DECLINED" as const,
+      declined_by_user_id: OTHER,
+      declined_by_name: "Kemi",
+      declined_at: new Date("2026-09-30T09:00:00Z"),
+    };
+    expect(meetingAssistantView(declined, MEETING, OWNER).declined).toEqual({
+      byYou: false,
+      byName: "Kemi",
+      at: "2026-09-30T09:00:00.000Z",
+    });
+    expect(meetingAssistantView(declined, MEETING, OTHER).declined?.byYou).toBe(
+      true,
+    );
+    expect(meetingAssistantView(row, MEETING, OWNER).declined).toBeNull();
   });
 });

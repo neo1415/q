@@ -1,7 +1,9 @@
 import {
   FundraisingDtoSchema,
   IDEMPOTENCY_KEY_HEADER,
+  networkCommitmentAdoptPath,
   networkCommitmentConfirmPath,
+  networkCommitmentDisputePath,
   networkCommitmentWithdrawPath,
   networkCompanyFundraisingPath,
   networkRelationshipCommitmentsPath,
@@ -45,6 +47,30 @@ export function confirmCommitment(session: ApiSession, commitmentId: string) {
     session,
     "POST",
     networkCommitmentConfirmPath(commitmentId),
+    RelationshipCommitmentsDtoSchema,
+  );
+}
+
+/** A party adopts money Q heard in a call; one key per press. */
+export function adoptCommitment(
+  session: ApiSession,
+  commitmentId: string,
+  idempotencyKey: string,
+) {
+  return call(
+    session,
+    "POST",
+    networkCommitmentAdoptPath(commitmentId),
+    RelationshipCommitmentsDtoSchema,
+    { headers: { [IDEMPOTENCY_KEY_HEADER]: idempotencyKey } },
+  );
+}
+
+export function disputeCommitment(session: ApiSession, commitmentId: string) {
+  return call(
+    session,
+    "POST",
+    networkCommitmentDisputePath(commitmentId),
     RelationshipCommitmentsDtoSchema,
   );
 }

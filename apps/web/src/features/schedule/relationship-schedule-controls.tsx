@@ -279,7 +279,6 @@ export function RelationshipScheduleControls({
                     <MeetingQ
                       meetingId={meeting.id}
                       ended={Date.parse(meeting.endsAt) < openedAt}
-                      organiser={meeting.organisedByYou}
                     />
                   ) : null}
                 </li>

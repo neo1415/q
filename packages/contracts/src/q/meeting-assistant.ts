@@ -26,6 +26,8 @@ export const Q_MEETING_ASSISTANT_STATUSES = [
   "DONE",
   "FAILED",
   "CANCELLED",
+  /** A participant declined recording; recorded, never hidden. */
+  "DECLINED",
 ] as const;
 export const QMeetingAssistantStatusSchema = z.enum(
   Q_MEETING_ASSISTANT_STATUSES,
@@ -108,6 +110,15 @@ export const QMeetingAssistantDtoSchema = z
     followUps: z.array(QMeetingFollowUpSchema).max(20),
     /** Why it did not work, in words for the organiser. */
     failure: z.string().max(200).nullable(),
+    /** Who declined recording and when; null unless DECLINED. */
+    declined: z
+      .object({
+        byYou: z.boolean(),
+        byName: z.string().max(120).nullable(),
+        at: UtcTimestampSchema,
+      })
+      .strict()
+      .nullable(),
     updatedAt: UtcTimestampSchema.nullable(),
   })
   .strict();

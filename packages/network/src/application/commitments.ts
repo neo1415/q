@@ -10,6 +10,8 @@ import type { ActorContext } from "@capital-q/security";
 import { RelationshipIdSchema } from "../contracts/index.js";
 import {
   RELATIONSHIP_EVENT_COMMITMENT_CONFIRMED,
+  RELATIONSHIP_EVENT_COMMITMENT_DETECTED,
+  RELATIONSHIP_EVENT_COMMITMENT_DISPUTED,
   RELATIONSHIP_EVENT_COMMITMENT_STATED,
   RELATIONSHIP_EVENT_COMMITMENT_WITHDRAWN,
 } from "../domain/event-registry.js";
@@ -47,8 +49,17 @@ type Row = {
   amount: string;
   currency_code: string;
   level: "SOFT" | "FIRM" | "INVESTED";
-  status: "STATED" | "CONFIRMED" | "SUPERSEDED" | "WITHDRAWN";
-  stated_by_side: "COMPANY" | "INVESTOR";
+  status:
+    | "STATED"
+    | "CONFIRMED"
+    | "SUPERSEDED"
+    | "WITHDRAWN"
+    | "DETECTED"
+    | "ADOPTED"
+    | "DISPUTED";
+  stated_by_side: "COMPANY" | "INVESTOR" | null;
+  source: "PERSON" | "Q_MEETING";
+  quote: string | null;
   note: string | null;
   meeting_id: string | null;
   created_at: Date;
@@ -81,8 +92,12 @@ function toDto(row: Row, side: "COMPANY" | "INVESTOR"): CommitmentDto {
         : new Date(row.confirmed_at).toISOString(),
     note: row.note,
     meetingId: row.meeting_id,
+    source: row.source,
+    quote: row.quote,
     canConfirm: row.status === "STATED" && row.stated_by_side !== side,
     canWithdraw: current,
+    canAdopt: row.status === "DETECTED",
+    canDispute: row.status === "DETECTED",
   };
 }
 
@@ -113,7 +128,8 @@ export function createCommitmentService(dependencies: {
   async function rowsOf(relationshipId: string): Promise<readonly Row[]> {
     return sql<Row[]>`
       select id, relationship_id, amount::text as amount, currency_code, level,
-             status, stated_by_side, note, meeting_id, created_at, confirmed_at
+             status, stated_by_side, source, quote, note, meeting_id, created_at,
+             confirmed_at
         from network.commitments
        where relationship_id = ${relationshipId}
        order by created_at desc
@@ -123,7 +139,8 @@ export function createCommitmentService(dependencies: {
   async function commitmentRow(commitmentId: string): Promise<Row | null> {
     const rows = await sql<Row[]>`
       select id, relationship_id, amount::text as amount, currency_code, level,
-             status, stated_by_side, note, meeting_id, created_at, confirmed_at
+             status, stated_by_side, source, quote, note, meeting_id, created_at,
+             confirmed_at
         from network.commitments
        where id = ${commitmentId}`;
     return rows[0] ?? null;
@@ -159,12 +176,160 @@ export function createCommitmentService(dependencies: {
     return {
       current: current === null ? null : toDto(current, party.side),
       history: rows.map((row) => toDto(row, party.side)),
+      detected: rows
+        .filter((row) => row.status === "DETECTED")
+        .slice(0, 10)
+        .map((row) => toDto(row, party.side)),
       connected: party.connected,
     };
   }
 
+  /** A commitment a party acts on, with that party's side. */
+  async function detectedFor(actor: ActorContext, commitmentId: string) {
+    const row = await commitmentRow(commitmentId);
+    if (row === null) return null;
+    const party = await partyOf(actor, row.relationship_id);
+    if (party === null) return null;
+    return { row, party };
+  }
+
   return {
     view,
+
+    /**
+     * Money Q heard in a call it recorded (founder direction 2026-09-30).
+     * Filed once per signal; it never counts until a party adopts it and
+     * the other side confirms. No actor: Q's record is the source, and the
+     * relationship's history names Q (for this call) as the actor.
+     */
+    detect: async (input: {
+      readonly relationshipId: string;
+      readonly meetingId: string;
+      readonly amount: string;
+      readonly currencyCode: string;
+      readonly level: "SOFT" | "FIRM";
+      readonly statedBySide: "COMPANY" | "INVESTOR" | null;
+      readonly quote: string;
+      readonly key: string;
+    }): Promise<boolean> =>
+      transactions.run(async (tx) => {
+        const inserted = await tx.sql<{ id: string }[]>`
+          insert into network.commitments
+            (tenant_id, relationship_id, amount, currency_code, level, status,
+             stated_by_side, source, quote, meeting_id, idempotency_key)
+          select r.tenant_id, r.id, ${input.amount}::numeric, ${input.currencyCode},
+                 ${input.level}, 'DETECTED', ${input.statedBySide}, 'Q_MEETING',
+                 ${input.quote.slice(0, 300)}, ${input.meetingId}, ${input.key}
+            from network.relationships r
+           where r.id = ${input.relationshipId}
+          on conflict (relationship_id, idempotency_key) where source <> 'PERSON'
+          do nothing
+          returning id`;
+        const id = inserted[0]?.id;
+        if (id === undefined) return false;
+        await appender.append(tx, {
+          relationshipId: RelationshipIdSchema.parse(input.relationshipId),
+          eventType: RELATIONSHIP_EVENT_COMMITMENT_DETECTED,
+          actor: { type: "Q", id: input.meetingId },
+          source: { type: "Q", id },
+          visibilityScope: "relationship_shared",
+          payload: { commitmentId: id },
+          correlationId: dependencies.newCorrelationId(),
+        });
+        return true;
+      }),
+
+    /** A party adopts detected money as their side's statement. */
+    adopt: async (
+      actor: ActorContext,
+      commitmentId: string,
+      idempotencyKey: string,
+    ): Promise<
+      CommitmentOutcome<NonNullable<Awaited<ReturnType<typeof view>>>>
+    > => {
+      const found = await detectedFor(actor, commitmentId);
+      if (found === null) return { outcome: "REFUSED", code: "NOT_FOUND" };
+      const { row, party } = found;
+      if (row.status !== "DETECTED") {
+        return { outcome: "REFUSED", code: "NOT_ALLOWED" };
+      }
+      if (!party.connected) {
+        return { outcome: "REFUSED", code: "NOT_CONNECTED" };
+      }
+      await transactions.run(async (tx) => {
+        const marked = await tx.sql<{ id: string }[]>`
+          update network.commitments
+             set status = 'ADOPTED', updated_at = clock_timestamp()
+           where id = ${commitmentId} and status = 'DETECTED'
+          returning id`;
+        if (marked.length === 0) return;
+        // The adopted statement replaces whatever counted before it.
+        await tx.sql`
+          update network.commitments
+             set status = 'SUPERSEDED', updated_at = clock_timestamp()
+           where relationship_id = ${row.relationship_id}
+             and status in ('STATED', 'CONFIRMED')`;
+        const inserted = await tx.sql<{ id: string }[]>`
+          insert into network.commitments
+            (tenant_id, relationship_id, amount, currency_code, level,
+             stated_by_side, stated_by_user_id, note, meeting_id, idempotency_key)
+          values (${party.tenantId}, ${row.relationship_id}, ${row.amount}::numeric,
+                  ${row.currency_code}, ${row.level}, ${party.side}, ${actor.userId},
+                  'Adopted from what Q heard in a call.', ${row.meeting_id},
+                  ${idempotencyKey})
+          returning id`;
+        const id = inserted[0]?.id;
+        if (id !== undefined) {
+          await record(
+            tx,
+            actor,
+            row.relationship_id,
+            RELATIONSHIP_EVENT_COMMITMENT_STATED,
+            id,
+          );
+        }
+      });
+      const after = await view(actor, row.relationship_id);
+      return after === null
+        ? { outcome: "REFUSED", code: "NOT_FOUND" }
+        : { outcome: "OK", value: after };
+    },
+
+    /** A party disputes detected money; it stays on record, disputed. */
+    dispute: async (
+      actor: ActorContext,
+      commitmentId: string,
+    ): Promise<
+      CommitmentOutcome<NonNullable<Awaited<ReturnType<typeof view>>>>
+    > => {
+      const found = await detectedFor(actor, commitmentId);
+      if (found === null) return { outcome: "REFUSED", code: "NOT_FOUND" };
+      const { row } = found;
+      if (row.status !== "DETECTED") {
+        return { outcome: "REFUSED", code: "NOT_ALLOWED" };
+      }
+      await transactions.run(async (tx) => {
+        const updated = await tx.sql<{ id: string }[]>`
+          update network.commitments
+             set status = 'DISPUTED', disputed_by_user_id = ${actor.userId},
+                 disputed_at = clock_timestamp(), updated_at = clock_timestamp()
+           where id = ${commitmentId} and status = 'DETECTED'
+          returning id`;
+        if (updated.length > 0) {
+          await record(
+            tx,
+            actor,
+            row.relationship_id,
+            RELATIONSHIP_EVENT_COMMITMENT_DISPUTED,
+            commitmentId,
+          );
+        }
+      });
+      const after = await view(actor, row.relationship_id);
+      return after === null
+        ? { outcome: "REFUSED", code: "NOT_FOUND" }
+        : { outcome: "OK", value: after };
+    },
 
     state: async (input: {
       readonly actor: ActorContext;

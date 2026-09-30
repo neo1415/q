@@ -3,8 +3,10 @@
 import { z } from "zod";
 
 import {
+  adoptCommitment,
   ApiProblemError,
   confirmCommitment,
+  disputeCommitment,
   getCompanyFundraising,
   getRelationshipCommitments,
   stateCommitment,
@@ -90,6 +92,24 @@ export async function confirmCommitmentAction(
   const id = Id.safeParse(commitmentId);
   if (!id.success) return { ok: false, message: "Not found." };
   return run((session) => confirmCommitment(session, id.data));
+}
+
+export async function adoptCommitmentAction(
+  commitmentId: string,
+  idempotencyKey: string,
+): Promise<CommitmentResult<RelationshipCommitmentsDto>> {
+  const id = Id.safeParse(commitmentId);
+  const key = Key.safeParse(idempotencyKey);
+  if (!id.success || !key.success) return { ok: false, message: "Not found." };
+  return run((session) => adoptCommitment(session, id.data, key.data));
+}
+
+export async function disputeCommitmentAction(
+  commitmentId: string,
+): Promise<CommitmentResult<RelationshipCommitmentsDto>> {
+  const id = Id.safeParse(commitmentId);
+  if (!id.success) return { ok: false, message: "Not found." };
+  return run((session) => disputeCommitment(session, id.data));
 }
 
 export async function withdrawCommitmentAction(

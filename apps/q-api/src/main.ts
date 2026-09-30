@@ -108,9 +108,15 @@ import {
 } from "@capital-q/investors";
 import { INVESTOR_EVENTS } from "@capital-q/investors/events";
 import {
+  createCommitmentService,
   createInterestService,
   createPostgresRelationshipEventRepository,
   createPostgresRelationshipRepository,
+  createRelationshipEventAppender,
+  createRelationshipEventRegistry,
+  parseSpokenAmount,
+  RELATIONSHIP_EVENT_DEFINITIONS,
+  sideOfParty,
   type RelationshipQueryPort,
 } from "@capital-q/network";
 import { NETWORK_EVENTS } from "@capital-q/network/events";
@@ -1768,6 +1774,19 @@ setInterval(
 // only where the bot provider's key is set. The collector reads a bot only
 // once its call has started, every two minutes, so a trial budget is spent
 // on calls, not on polling.
+const meetingCommitments = createCommitmentService({
+  sql: database.sql,
+  transactions: database.transactions,
+  interests: interestService,
+  appender: createRelationshipEventAppender({
+    registry: createRelationshipEventRegistry(RELATIONSHIP_EVENT_DEFINITIONS),
+    repositories: {
+      relationships: createPostgresRelationshipRepository(),
+      events: createPostgresRelationshipEventRepository(),
+    },
+  }),
+  newCorrelationId: () => CorrelationIdSchema.parse(`cor_${randomUUID()}`),
+});
 const meetingAssistant = createMeetingAssistantService({
   sql: database.sql,
   bots: createRecallBots({
@@ -1789,6 +1808,42 @@ const meetingAssistant = createMeetingAssistantService({
         eventType: "meeting_held",
         meetingId: held.meetingId,
         actorUserId: held.organiserUserId,
+        correlationId: `cor_${randomUUID()}`,
+      }),
+    );
+    // Founder direction 2026-09-30: money said in the call is filed by Q
+    // for both sides to adopt or dispute; it never counts until confirmed.
+    for (const [index, signal] of held.commitments.entries()) {
+      const money = parseSpokenAmount(signal.amount);
+      if (money === null) continue;
+      await meetingCommitments
+        .detect({
+          relationshipId: held.relationshipId,
+          meetingId: held.meetingId,
+          amount: money.amount,
+          currencyCode: money.currencyCode,
+          level: signal.firmness === "FIRM" ? "FIRM" : "SOFT",
+          statedBySide: sideOfParty(signal.party, held.attendees),
+          quote: signal.quote,
+          key: `meeting:${held.meetingId}:${String(index)}`,
+        })
+        .catch((error: unknown) => {
+          logger.warn(
+            { err: error, meetingId: held.meetingId },
+            "detected commitment not filed",
+          );
+        });
+    }
+  },
+  // A declined recording stays on the relationship's history.
+  onDeclined: async (declined) => {
+    const writer = createNetworkMeetingActivityWriter();
+    await database.transactions.run((tx) =>
+      writer.record(tx, {
+        relationshipId: declined.relationshipId,
+        eventType: "meeting_recording_declined",
+        meetingId: declined.meetingId,
+        actorUserId: declined.declinedByUserId,
         correlationId: `cor_${randomUUID()}`,
       }),
     );

@@ -9,7 +9,9 @@ import {
   FundraisingDtoSchema,
   IDEMPOTENCY_KEY_HEADER,
   IdempotencyKeyHeaderSchema,
+  NETWORK_COMMITMENT_ADOPT_PATH,
   NETWORK_COMMITMENT_CONFIRM_PATH,
+  NETWORK_COMMITMENT_DISPUTE_PATH,
   NETWORK_COMMITMENT_WITHDRAW_PATH,
   NETWORK_COMPANY_FUNDRAISING_PATH,
   NETWORK_RELATIONSHIP_COMMITMENTS_PATH,
@@ -166,6 +168,46 @@ export function registerCommitmentRoutes(
         request,
         reply,
         await commitments.withdraw(getActorContext(request), commitmentId),
+      );
+    },
+  );
+
+  // Money Q heard in a call: a party adopts it as their side's statement
+  // (the other side then confirms) or disputes it. Never deleted.
+  app.post(
+    NETWORK_COMMITMENT_ADOPT_PATH,
+    { onRequest: withContext },
+    async (request, reply) => {
+      const commitmentId = paramOf(request, "commitmentId");
+      if (commitmentId === null) return reply.callNotFound();
+      const rawKey = request.headers[IDEMPOTENCY_KEY_HEADER];
+      const idempotencyKey = parseContract(
+        IdempotencyKeyHeaderSchema,
+        typeof rawKey === "string" ? rawKey : undefined,
+        "An Idempotency-Key header is required to adopt a commitment.",
+      );
+      return answer(
+        request,
+        reply,
+        await commitments.adopt(
+          getActorContext(request),
+          commitmentId,
+          idempotencyKey,
+        ),
+      );
+    },
+  );
+
+  app.post(
+    NETWORK_COMMITMENT_DISPUTE_PATH,
+    { onRequest: withContext },
+    async (request, reply) => {
+      const commitmentId = paramOf(request, "commitmentId");
+      if (commitmentId === null) return reply.callNotFound();
+      return answer(
+        request,
+        reply,
+        await commitments.dispute(getActorContext(request), commitmentId),
       );
     },
   );

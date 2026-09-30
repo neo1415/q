@@ -239,7 +239,8 @@ export type MeetingActivityWriter = {
         | "meeting_scheduled"
         | "meeting_rescheduled"
         | "meeting_cancelled"
-        | "meeting_held";
+        | "meeting_held"
+        | "meeting_recording_declined";
       readonly meetingId: string;
       readonly actorUserId: string;
       readonly correlationId: string;

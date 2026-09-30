@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useState, useTransition, type ReactNode } from "react";
 
 import type {
   CommitmentLevel,
@@ -14,7 +14,9 @@ import {
 } from "@capital-q/ui/money-input";
 
 import {
+  adoptCommitmentAction,
   confirmCommitmentAction,
+  disputeCommitmentAction,
   readCommitmentsAction,
   stateCommitmentAction,
   withdrawCommitmentAction,
@@ -93,15 +95,65 @@ export function RelationshipCommitment({
       after?.();
     });
 
+  // Money Q heard in a call: either side adopts it (the other confirms) or
+  // disputes it. It is never removed and never counts on its own.
+  const detectedBlock =
+    state.detected.length === 0 ? null : (
+      <ul className="flex flex-col gap-3" aria-label="Q heard in a call">
+        {state.detected.map((item) => (
+          <li key={item.id} className="flex flex-col gap-1" data-detected>
+            <span className="cq-body-sm text-(--cq-text-primary)">
+              Q heard {item.currencyCode} {formatAmountForDisplay(item.amount)}{" "}
+              in your call
+            </span>
+            {item.quote === null ? null : (
+              <span className="cq-caption text-(--cq-text-secondary)">
+                &ldquo;{item.quote}&rdquo;
+              </span>
+            )}
+            <div className="flex flex-wrap gap-2">
+              {item.canAdopt ? (
+                <Button
+                  size="compact"
+                  disabled={pending}
+                  onClick={() =>
+                    act(() => adoptCommitmentAction(item.id, newKey()))
+                  }
+                >
+                  That&apos;s right
+                </Button>
+              ) : null}
+              {item.canDispute ? (
+                <Button
+                  variant="quiet"
+                  size="compact"
+                  disabled={pending}
+                  onClick={() => act(() => disputeCommitmentAction(item.id))}
+                >
+                  Not right
+                </Button>
+              ) : null}
+            </div>
+          </li>
+        ))}
+      </ul>
+    );
+  const withDetected = (main: ReactNode) => (
+    <div className="flex flex-col gap-4">
+      {detectedBlock}
+      {main}
+    </div>
+  );
+
   if (editing || current === null) {
     if (!editing) {
-      return (
+      return withDetected(
         <Button variant="secondary" onClick={() => setEditing(true)}>
           Record a commitment
-        </Button>
+        </Button>,
       );
     }
-    return (
+    return withDetected(
       <form
         className="flex flex-col gap-3"
         onSubmit={(event) => {
@@ -161,14 +213,14 @@ export function RelationshipCommitment({
             {message}
           </span>
         )}
-      </form>
+      </form>,
     );
   }
 
   const levelLabel =
     LEVELS.find((option) => option.level === current.level)?.label ??
     current.level;
-  return (
+  return withDetected(
     <div className="flex flex-col gap-2" data-commitment={current.status}>
       <p className="cq-title-sm text-(--cq-text-primary)">
         {current.currencyCode} {formatAmountForDisplay(current.amount)}
@@ -225,6 +277,6 @@ export function RelationshipCommitment({
           {message}
         </span>
       )}
-    </div>
+    </div>,
   );
 }
